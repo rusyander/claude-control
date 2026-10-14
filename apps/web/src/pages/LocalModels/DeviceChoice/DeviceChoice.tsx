@@ -39,11 +39,13 @@ export function DeviceChoice({ info }: DeviceChoiceProps) {
             onClick={() => {
               if (device === info.device) return;
               setDevice.mutate(device, {
-                onSuccess: () =>
+                onSuccess: (next) =>
                   toast.success(
-                    t('localModels.device.switched', {
-                      device: t(`localModels.device.${device}`),
-                    }),
+                    next.restartPending
+                      ? t('localModels.pending.saved')
+                      : t('localModels.device.switched', {
+                          device: t(`localModels.device.${device}`),
+                        }),
                   ),
               });
             }}

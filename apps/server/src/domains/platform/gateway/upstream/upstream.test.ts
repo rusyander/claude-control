@@ -243,3 +243,39 @@ describe('транспорт контура (DRV-04/05)', () => {
     expect(headers['content-type']).toBe('application/json');
   });
 });
+
+describe('обрыв по сроку первого байта', () => {
+  /** Сервер, который молчит, пока его не оборвут: так выглядит обработка длинного промпта. */
+  const silent = (_url: string, init?: RequestInit): Promise<Response> =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+    });
+
+  it('облачный контур — прежние слова про контур', async () => {
+    const run = callUpstream({
+      platform: PLATFORM,
+      token: 'k',
+      path: 'chat/completions',
+      body: '{}',
+      headersTimeoutMs: 20,
+      retry: false,
+      fetchImpl: silent as never,
+    });
+    await expect(run).rejects.toThrow('Контур не начал отвечать за 0.02 с');
+  });
+
+  it('локальная модель — слова про обработку длинного запроса, а не про мёртвый контур', async () => {
+    const run = callUpstream({
+      platform: PLATFORM,
+      token: 'k',
+      path: 'chat/completions',
+      body: '{}',
+      headersTimeoutMs: 20,
+      retry: false,
+      local: true,
+      fetchImpl: silent as never,
+    });
+    await expect(run).rejects.toThrow(/Локальная модель не начала отвечать/);
+    await expect(run).rejects.toThrow(/\/compact/);
+  });
+});

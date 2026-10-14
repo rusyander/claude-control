@@ -1,0 +1,76 @@
+{
+  "title": {
+    "ru": "Копии ставят зависимости на нужной версии Node, Python и Go; группа ревью закрывается с отчётом по копии",
+    "en": "Copies install on the right Node, Python and Go version; a review group closes with a report on its copy"
+  },
+  "summary": {
+    "ru": "Подготовка копии читает версию рантайма из файлов проекта и не строит окружение на чужой версии, а ошибка установки показывается первой строкой, а не хвостом лога. Группа ревью по ссылке получает одноразовую базу для проверки миграций и после закрытия показывает, что осталось в копии.",
+    "en": "Copy preparation reads the runtime version from the project files and never builds an environment on the wrong one, and an install error is shown as the first line instead of the log tail. A link-review group gets a throwaway database for migration checks and, once closed, shows what is left in its copy."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Версия Node берётся из .nvmrc, .node-version, .tool-versions, volta или engines, и зависимости ставятся на ней, если такая стоит на машине. Не нашлась — установка идёт на имеющейся версии, и карточка копии это называет.",
+        "en": "The Node version is read from .nvmrc, .node-version, .tool-versions, volta or engines and dependencies are installed on it when the machine has it. When none is found the install runs on the available one and the copy card says so."
+      },
+      "area": { "ru": "Копии", "en": "Copies" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сервис на Python получает .venv и pip install из requirements*.txt (uv sync при uv.lock) только на подходящей версии; у модуля Go прогревается кэш. Эти шаги подготовку не проваливают. Своя команда в настройке копий отключает автоопределение.",
+        "en": "A Python service gets a .venv and pip install from requirements*.txt (uv sync with uv.lock) only on a matching version; a Go module gets its cache warmed. These steps never fail the preparation. A command set in the copy settings turns auto-detection off."
+      },
+      "area": { "ru": "Копии", "en": "Copies" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "При сбое установки на карточке копии и в задании агента первой стоит первая настоящая ошибка, а полный лог лежит в файле. Раньше два экрана предупреждений прятали причину.",
+        "en": "When an install fails, the copy card and the agent task lead with the first real error and the full log is kept in a file. Before, two screens of warnings hid the cause."
+      },
+      "area": { "ru": "Копии", "en": "Copies" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Группа ревью по ссылке получает одноразовую базу PostgreSQL в своём контейнере из образа compose, только на 127.0.0.1; чужая база и адрес из .env не передаются. Нет Docker или образа — пункт уходит в «не охвачено» с причиной. Контейнер снимается при закрытии группы и при старте панели, если остался.",
+        "en": "A link-review group gets a throwaway PostgreSQL in its own container from the compose image, on 127.0.0.1 only; someone's database and the address from .env are never passed. Without Docker or the image the item goes to “uncovered” with the reason. The container is removed when the group closes and at panel start if it was left."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка закрытой группы ревью называет правки в копии (имена файлов), временные копии, которые группа завела, и снятую базу. Безопасные временные копии убираются, остальные остаются с причиной.",
+        "en": "The card of a closed review group names edits in the copy (file names), scratch copies the group made and the removed database. Safe scratch copies are removed, the rest stay with the reason."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ревью по словам владельца, чей блок следа требований не написан или не разобрался ни в одной строке, больше не засчитывается как полное: агента просят повторить один раз, потом карточка помечает «не разобрано».",
+        "en": "A review of an owner request whose requirement-trace block is missing or parsed to no row is no longer counted as complete: the agent is asked once more, then the card marks it as not parsed."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Задание группы ревью без человека в разговоре стало жёстче: формат карточки замечания, перечитывание файла перед первой правкой, схема записей и запрет подбирать пределы вместо расширения числа агентов.",
+        "en": "The task of an unattended review group is stricter: the finding card format, re-reading a file before the first edit, the sieves schema and a ban on tuning limits instead of adding agents."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка чата описывает выбор версии рантайма, первую ошибку и итог закрытия группы ревью.",
+        "en": "Chat help covers runtime version selection, the first error and the closing report of a review group."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

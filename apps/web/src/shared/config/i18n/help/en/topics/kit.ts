@@ -76,7 +76,10 @@ export const kitEn: typeof kitRu = {
     cliClaude: 'Claude Code',
     cliClaudeText:
       'All three modes. On a local model tool calls run one at a time, and the kit refuses ' +
-      'background commands and background subagents: the GPU answers one request at a time.',
+      'background commands and background subagents: the GPU answers one request at a time. The ' +
+      'local-model rule (including the .agent/PROGRESS.md part) travels in every mode; the kit ' +
+      'hooks — the compaction reminder, thresholds scaled to the local window, the checkpoint ' +
+      'before compaction — only in “Yours and the panel kit” and “Panel kit only”.',
     cliQwen: 'Qwen Code',
     cliQwenText:
       '«Panel kit only» while Qwen Code runs on a local model. Qwen Code has no per-launch layer, ' +
@@ -84,7 +87,9 @@ export const kitEn: typeof kitRu = {
       'subagents and hooks as a kit extension. «Both» cannot be assembled without touching ' +
       '`~/.qwen`. The kit hooks know the run is local: the guard lets a single subagent through ' +
       'without asking, since on your own card it spends no subscription limit; a fan-out of many ' +
-      'agents still asks. Kit rules and skills name Claude tools, so QWEN.md also carries a map ' +
+      'agents still asks. The local-model rule tells the agent to keep .agent/PROGRESS.md: create it, update it step by step and read it after compaction. ' +
+      'It arrives only in this mode: with “Yours only” Qwen Code does not get it — there is nothing to deliver for a single launch ' +
+      'and the panel will not touch `~/.qwen`, so on an overnight Qwen Code run task memory rests on this mode. Kit rules and skills name Claude tools, so QWEN.md also carries a map ' +
       'of Qwen Code tool names; background work is refused here too.',
     cliCodex: 'Codex',
     cliCodexText:
@@ -92,7 +97,7 @@ export const kitEn: typeof kitRu = {
       'the `developer_instructions` key for that launch, after your own from `config.toml`; the ' +
       'skills as the kit folder: in the chat (codex app-server) Codex sees them as its own ' +
       'skills, and in a one-off launch (codex exec) it gets them as a «name — description — ' +
-      'path to SKILL.md» list in the same instructions. Pipelines and subagents do ' +
+      'path to SKILL.md» list in the same instructions; on a local model the description is cut to 240 characters so that the kit stays within the limit. Pipelines and subagents do ' +
       'not: Codex cannot take them for one launch. Hooks neither: Codex runs a hook only after ' +
       'it is approved in Codex itself. The panel does not touch `~/.codex`.',
     cliOther: 'The rest',

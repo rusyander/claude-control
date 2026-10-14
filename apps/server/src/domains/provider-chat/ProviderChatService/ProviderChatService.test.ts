@@ -326,6 +326,82 @@ describe('ProviderChatService', () => {
   });
 
   /**
+   * L4b: окно локальной модели чужому CLI — слоем настроек ДО строки о каталоге; строка
+   * читает файл, выбранный окном, и дописывает свой слой поверх (иначе окно потерялось бы).
+   */
+  it('окно локальной модели: слой окна — основа для слоя строки, оба в окружении прогона', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    const limits = { contextWindow: 65_536, timeoutMs: 600_000, idleMs: 300_000 };
+    const seen: string[] = [];
+    service.setPlatformRouting(() => ({
+      env: { OPENAI_BASE_URL: 'http://127.0.0.1:1/x' },
+      localLimits: limits,
+    }));
+    service.setWorkspaceNote(() => 'QA workspace: e2e');
+    service.setLocalLimits((providerId, got, env) => {
+      seen.push(`${providerId}:${got.contextWindow}:${env.OPENAI_BASE_URL ?? ''}`);
+      return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/window.json' };
+    });
+    let noteBase: string | undefined;
+    service.setSystemNote((_providerId, _note, env) => {
+      noteBase = env.QWEN_CODE_SYSTEM_SETTINGS_PATH;
+      return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/note.json' };
+    });
+    service.send(dir, 'codex', 'wd', { text: 'напиши тест' }, { provider: PROVIDER });
+    expect(seen).toEqual(['codex:65536:http://127.0.0.1:1/x']);
+    expect(noteBase).toBe('/window.json');
+    const options = run.options as { platformEnv: Record<string, string> };
+    expect(options.platformEnv.QWEN_CODE_SYSTEM_SETTINGS_PATH).toBe('/note.json');
+    expect(options.platformEnv.OPENAI_BASE_URL).toBe('http://127.0.0.1:1/x');
+  });
+
+  /** L4b: запрет сна и отложенный перезапуск сервера спрашивают, идёт ли ход чужого CLI на локальной модели. */
+  it('localRunning: ход через контур локальной модели — да, обычный — нет', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    expect(service.localRunning()).toBe(false);
+    service.setPlatformRouting(() => ({ env: {} }));
+    service.send(dir, 'codex', 'wd', { text: 'облако' }, { provider: PROVIDER });
+    expect(service.localRunning()).toBe(false);
+  });
+
+  it('localRunning: у маршрута есть окно сервера — ход локальный, пока идёт', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setPlatformRouting(() => ({
+      env: { OPENAI_BASE_URL: 'http://127.0.0.1:1/x' },
+      localLimits: { contextWindow: 65_536, timeoutMs: 600_000, idleMs: 300_000 },
+    }));
+    service.send(dir, 'codex', 'wd', { text: 'локально' }, { provider: PROVIDER });
+    expect(service.localRunning()).toBe(true);
+  });
+
+  it('окно локальной модели: у маршрута нет пределов — слой не пишется', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    let calls = 0;
+    service.setLocalLimits(() => {
+      calls += 1;
+      return undefined;
+    });
+    service.send(dir, 'codex', 'wd', { text: 'раз' }, { provider: PROVIDER });
+    expect(calls).toBe(0);
+  });
+
+  it('окно локальной модели: осечка записи слоя отправку не срывает', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    let calls = 0;
+    service.setPlatformRouting(() => ({
+      env: {},
+      localLimits: { contextWindow: 1, timeoutMs: 1, idleMs: 1 },
+    }));
+    service.setLocalLimits(() => {
+      calls += 1;
+      throw new Error('disk full');
+    });
+    const outcome = service.send(dir, 'codex', 'wd', { text: 'два' }, { provider: PROVIDER });
+    expect(calls).toBe(1);
+    expect(outcome.ok).toBe(true);
+  });
+
+  /**
    * E6. Системная строка — одна на разговор, как у Claude: строка, пересчитанная
    * на каждом ходе, меняла системный промпт посреди разговора и сбивала кэш.
    * Перемена уходит блоком в реплике — один раз.

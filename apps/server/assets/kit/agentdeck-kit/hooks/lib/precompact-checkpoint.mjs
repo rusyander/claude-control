@@ -9,7 +9,7 @@
 //    sections properly before the summary is cut.
 // (Clearing this session's rule stamps is the dispatcher's job: it must happen even when this item
 // is switched off, or the situational rules lapse for the rest of a long session.)
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const MARKER = /^<!-- precompact:.*-->\r?\n?/;
@@ -28,11 +28,28 @@ export const INSTRUCTION =
   'current task, the immediate next step, and decisions that would be re-litigated without it. ' +
   'Do not restate file contents, command output or anything already written to disk.';
 
+// Local model: nothing is billed, so "re-billed on every request" would be noise; what is true there
+// is that the window is small and the summary is what the next turns start from — and that an
+// unattended run has nobody to re-explain the task, so PROGRESS.md must hold it.
+export const LOCAL_INSTRUCTION =
+  'Before compaction: write .agent/PROGRESS.md (create it if missing) so the run can continue ' +
+  'without the transcript and without a human: done+verified / in progress (the exact next ' +
+  'step) / left+blockers / key decisions / important paths. Files by path, no pasted content, ' +
+  'no secrets.\n' +
+  'Keep the SUMMARY SHORT: the window is small and the summary takes room from the work. State ' +
+  'the task, the immediate next step and that the state is in .agent/PROGRESS.md; anything ' +
+  'already on disk stays out of it. After compaction read that file first and continue.';
+
+const isLocal = () => String(process.env.AGENTDECK_KIT_VARIANT ?? '').trim() === 'local';
+
 /** @returns {string} the instruction for the model (the stamp is a side effect). */
 export default function precompactCheckpoint(input) {
   const cwd = String(input?.cwd || process.cwd());
+  const local = isLocal();
   try {
     const agentDir = join(cwd, '.agent');
+    // An unattended local run has no other chance to create the folder: the restore side must find a file.
+    if (local && !existsSync(agentDir)) mkdirSync(agentDir, { recursive: true });
     if (existsSync(agentDir)) {
       const file = join(agentDir, 'PROGRESS.md');
       const stamp = `<!-- precompact: compaction at ${new Date().toISOString()} — sections below may predate it; reconcile with the summary -->\n`;
@@ -42,5 +59,5 @@ export default function precompactCheckpoint(input) {
   } catch {
     /* a checkpoint stamp must never block compaction */
   }
-  return INSTRUCTION;
+  return local ? LOCAL_INSTRUCTION : INSTRUCTION;
 }

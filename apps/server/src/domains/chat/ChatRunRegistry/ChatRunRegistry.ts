@@ -113,6 +113,10 @@ export interface RunFinished {
    * маршрут как «чат» — то есть меняла бы провайдера посреди цепочки.
    */
   origin?: PlatformRunConsumer;
+  /** Прогон шёл на локальной модели (`RunMeta.local`). */
+  local?: true;
+  /** Сколько инструментов отработало за ход: у продолжения — «успело поработать». */
+  toolResults?: number;
   /** Последняя ошибка хода — по ней надзор решает, временный ли сбой (Д10). */
   error?: string;
   /** Последнее событие лимита: `rejected` с `resetsAt` — повтор в момент сброса (Д10). */
@@ -246,6 +250,10 @@ interface RegisteredRun {
   /** Хвост ответа агента: в нём ищется блок предложения продолжить. */
   text: string;
   events: BufferedEvent[];
+  /** Размер буфера в байтах (JSON кадров) — для предела `MAX_BUFFERED_BYTES`. */
+  eventBytes: number;
+  /** Номер последнего сброшенного кадра; 0 — ничего не сбрасывалось. */
+  trimmedSeq: number;
   seq: number;
   status: RunStatus;
   errored: boolean;
@@ -302,6 +310,8 @@ interface RegisteredRun {
    * минуту и уходит, а журналу нужен итог.
    */
   checks: string[];
+  /** Сколько инструментов отработало за прогон — мера «продолжение сделало работу» (L4c, F5). */
+  toolResults?: number;
   /**
    * Усыновлён после перезапуска панели (см. `adopt`): процесс жив, но stdout
    * умер вместе с прежним сервером. Текст ответа у такого прогона копится не в
@@ -363,6 +373,16 @@ const GRACE_MS = 60_000;
 const TEXT_TAIL = 32_768;
 
 /**
+ * Буфер кадров прогона нужен одному: переподключившийся клиент догоняет по нему хвост.
+ * Ночной прогон на локальной модели льёт кадры часами (каждый вывод инструмента, каждый
+ * кусок ответа), а буфер жил до конца прогона плюс минуту — память панели росла без предела.
+ * Держим последние кадры в пределах числа и объёма; старше — только в транскрипте сессии,
+ * который клиент перечитывает по окончании хода. Последний кадр остаётся всегда.
+ */
+export const MAX_BUFFERED_EVENTS = 4_000;
+export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
+
+/**
  * Сколько выбывших прогонов помним по их второму написанию ключа. Строка на
  * прогон, за сеанс сервера их сотни — предел нужен от бесконечного роста.
  */
@@ -400,6 +420,21 @@ export class ChatRunRegistry {
     string,
     { chatId: string; options: RunOptions; meta: RunMeta }
   >();
+
+  private localOf?: (options: RunOptions, meta: RunMeta) => boolean;
+
+  /** Как узнать прогон на локальной модели по его опциям: ответ уходит в метку `RunMeta.local` и в журнал. */
+  setLocalClassifier(classify: (options: RunOptions, meta: RunMeta) => boolean): void {
+    this.localOf = classify;
+  }
+
+  /** Идёт ли хоть один прогон, подходящий под условие (по опциям и метке запуска). */
+  anyRunning(match: (run: { options: RunOptions; meta: RunMeta }) => boolean): boolean {
+    for (const run of this.runs.values()) {
+      if (run.status === 'running' && match({ options: run.options, meta: run.meta })) return true;
+    }
+    return false;
+  }
 
   /** Накопленный за сеанс сервера расход — переживает перезагрузку вкладки. */
   private totalCostUsd = 0;
@@ -793,6 +828,7 @@ export class ChatRunRegistry {
       ...(autoApprove ? { autoApprove } : {}),
       ...(run.options.permissionMode ? { permissionMode: run.options.permissionMode } : {}),
       ...(run.meta.origin ? { origin: run.meta.origin } : {}),
+      ...(run.meta.local ? { local: true as const } : {}),
       ...(live ? { relay: live } : {}),
       ...(run.pids ? { pids: run.pids } : {}),
       ...(idle ? { idle: true as const } : {}),
@@ -832,6 +868,8 @@ export class ChatRunRegistry {
       startedAt: entry.startedAt,
       text: '',
       events: [],
+      eventBytes: 0,
+      trimmedSeq: 0,
       seq: ADOPTED_SEQ_BASE,
       status: 'running',
       errored: false,
@@ -1104,6 +1142,7 @@ export class ChatRunRegistry {
     // пережил бы снятую галочку. Пустой объект — законный ответ «не через
     // контур», и он затирает прежний.
     const route = this.platformRouting?.(meta.origin ?? 'chat', options.model ?? '') ?? { env: {} };
+    const mcp = route.localMcp?.(options.cwd);
     const routed: RunOptions = {
       ...options,
       // Модель и усилие принадлежат КОНТУРУ, пока прогон идёт через него (Т6):
@@ -1133,6 +1172,11 @@ export class ChatRunRegistry {
       // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
       platformArgs: [...(route.layers?.args ?? []), ...(route.kit?.args ?? [])],
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
+      // Блок набора к системному промпту (дисциплина локальной модели при режиме «глобальные»): решается на каждом старте, как и остальной маршрут.
+      platformAppend: route.kit?.append ?? '',
+      // MCP-серверы, взятые человеком в локальный прогон этого проекта: выбор меняется
+      // между ходами, поэтому читается на каждом старте и кладётся безусловно.
+      ...(mcp ? { platformMcp: mcp } : {}),
       // Одна на сессию (E6): перемена между ходами уезжает в сообщении ниже.
       workspaceNote: workspace.system,
       child: this.childOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
@@ -1148,20 +1192,27 @@ export class ChatRunRegistry {
         this.briefOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]),
       ),
     };
+    // Выбор, снятый между ходами, не переживает продолжение: прежние параметры несли поле.
+    if (!mcp) delete routed.platformMcp;
     // Журнал понижений отвечает на «окупается ли понижение», и отвечать он обязан
     // моделью, которой прогон ШЁЛ. Через контур это модель маршрута, а не имя из
     // шапки: иначе расход считался бы по модели, которой прогона не было (ревью
     // Т6, m8). Глубина, которую контур не принимает, в журнал тоже не пишется.
-    const routedMeta: RunMeta = meta.lowered
+    const { local: _stale, ...freshMeta } = meta;
+    const withLowered: RunMeta = freshMeta.lowered
       ? {
-          ...meta,
+          ...freshMeta,
           lowered: {
-            ...meta.lowered,
+            ...freshMeta.lowered,
             ...(route.model?.model ? { model: route.model.model } : {}),
             ...(route.effort === false ? { effort: '' } : {}),
           },
         }
-      : meta;
+      : freshMeta;
+    // Отметка решается на каждом старте, как и маршрут: продолжение приходит со старой.
+    const routedMeta: RunMeta = this.localOf?.(routed, freshMeta)
+      ? { ...withLowered, local: true }
+      : withLowered;
     const registered: RegisteredRun = {
       chatId,
       run,
@@ -1170,6 +1221,8 @@ export class ChatRunRegistry {
       startedAt: Date.now(),
       text: '',
       events: [],
+      eventBytes: 0,
+      trimmedSeq: 0,
       seq: 0,
       status: 'running',
       errored: false,
@@ -1296,6 +1349,7 @@ export class ChatRunRegistry {
   private emit(run: RegisteredRun, event: ChatEvent): void {
     // Внутреннее событие: вкладкам и буферу его знать незачем.
     if (event.kind === 'toolResult') {
+      run.toolResults = (run.toolResults ?? 0) + 1;
       const deferred = run.expectedPicks?.get(event.toolUseId);
       if (deferred) {
         run.expectedPicks?.delete(event.toolUseId);
@@ -1480,7 +1534,37 @@ export class ChatRunRegistry {
 
     const buffered: BufferedEvent = { seq: ++run.seq, event: outgoing };
     run.events.push(buffered);
+    this.trimBuffer(run, buffered);
     for (const subscriber of run.subscribers) subscriber.send(buffered);
+  }
+
+  /** Держит буфер в пределах: старые кадры уходят, последний остаётся. */
+  private trimBuffer(run: RegisteredRun, latest: BufferedEvent): void {
+    try {
+      run.eventBytes += JSON.stringify(latest.event).length;
+    } catch {
+      // Кадр без JSON-вида в поток всё равно ушёл; считаем его пустым.
+    }
+    if (run.events.length <= MAX_BUFFERED_EVENTS && run.eventBytes <= MAX_BUFFERED_BYTES) return;
+    // Режем пачкой (десятая часть предела), а не по кадру: сдвиг массива не на каждый кадр.
+    let drop = Math.max(0, run.events.length - MAX_BUFFERED_EVENTS) + MAX_BUFFERED_EVENTS / 10;
+    let bytes = run.eventBytes;
+    let count = 0;
+    const last = run.events.length - 1;
+    while (count < last && (count < drop || bytes > MAX_BUFFERED_BYTES * 0.9)) {
+      const gone = run.events[count];
+      if (!gone) break;
+      try {
+        bytes -= JSON.stringify(gone.event).length;
+      } catch {
+        // см. выше
+      }
+      run.trimmedSeq = gone.seq;
+      count += 1;
+    }
+    drop = count;
+    run.events.splice(0, drop);
+    run.eventBytes = Math.max(0, bytes);
   }
 
   /**
@@ -1582,6 +1666,8 @@ export class ChatRunRegistry {
           ...(asked ? { asked: true } : {}),
           ...(interrupted ? { interrupted: true as const } : {}),
           ...(run.meta.origin ? { origin: run.meta.origin } : {}),
+          ...(run.meta.local ? { local: true as const } : {}),
+          ...(run.toolResults ? { toolResults: run.toolResults } : {}),
           ...(run.lastError ? { error: run.lastError } : {}),
           ...(run.limit ? { limit: run.limit } : {}),
         });
@@ -1642,6 +1728,22 @@ export class ChatRunRegistry {
     const run = this.runs.get(this.resolveKey(chatId));
     if (!run) return undefined;
 
+    // Клиент ждёт кадры, которых уже нет: говорим об этом, а не молчим о дыре в ленте.
+    // Номер сообщения — последний сброшенный: он больше `fromSeq` и меньше любого оставшегося.
+    if (run.trimmedSeq > fromSeq) {
+      const first = run.seq >= ADOPTED_SEQ_BASE ? ADOPTED_SEQ_BASE : 0;
+      const params = { count: String(run.trimmedSeq - Math.max(fromSeq, first)) };
+      subscriber.send({
+        seq: run.trimmedSeq,
+        event: {
+          kind: 'notice',
+          code: 'eventsTrimmed',
+          text: serverText('chat-events-trimmed-notice', params),
+          textCode: 'chat-events-trimmed-notice',
+          textParams: params,
+        },
+      });
+    }
     for (const buffered of run.events) {
       if (buffered.seq > fromSeq) subscriber.send(buffered);
     }

@@ -121,8 +121,14 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/global-layer/:id/apply': 'human:code-write',
   // local-models-routes.ts: загрузки, нагрузка на видеокарту, удаление и подключение — человек.
   'GET /api/local-models': 'action:local_models_status',
+  'GET /api/local-models/quants': 'gap:P3',
   'POST /api/local-models/hardware/refresh': 'gap:P3',
   'PUT /api/local-models/kit': 'gap:P3',
+  'PUT /api/local-models/keep-loaded': 'gap:P3',
+  'PUT /api/local-models/keep-awake': 'gap:P3',
+  'GET /api/local-models/mcp': 'gap:P3',
+  'PUT /api/local-models/mcp': 'gap:P3',
+  'POST /api/local-models/mcp/measure': 'gap:P3',
   'POST /api/local-models/jobs/:id/cancel': 'gap:P3',
   'POST /api/local-models/runtime/install': 'human:download',
   'POST /api/local-models/pull': 'human:download',
@@ -136,6 +142,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/local-models/disconnect': 'human:consent',
   'PUT /api/local-models/device': 'human:consent',
   'PUT /api/local-models/claude': 'human:consent',
+  'PUT /api/local-models/choice': 'human:consent',
+  'POST /api/local-models/custom': 'human:download',
   // kit-routes.ts (В2): набор панели живёт в сторе панели, не в ~/.claude — чтение и правка копии «моё» пока пробел агента.
   'GET /api/kit': 'action:kit_status',
   'GET /api/kit/item': 'gap:P3',

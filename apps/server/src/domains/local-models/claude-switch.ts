@@ -1,6 +1,7 @@
 import type { LocalClaudeInfo } from '@agentdeck/contracts/local-models';
 import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { localError } from './errors.ts';
+import { LOCAL_RUN_ENV_VARS, localRunEnv } from './run-env.ts';
 import type { ClaudeModelPicker, ClaudeSwitchRecord } from './paths.ts';
 
 /**
@@ -13,13 +14,13 @@ import type { ClaudeModelPicker, ClaudeSwitchRecord } from './paths.ts';
  * Поэтому новый сеанс — новое окно терминала, новый чат в редакторе — подхватывает
  * включение сразу, без правки руками и без перезапуска панели.
  *
- * Ollama говорит на Anthropic Messages сам, поэтому адрес — сервер моделей без
+ * llama-server говорит на Anthropic Messages сам, поэтому адрес — сервер моделей без
  * пути: `/v1/messages` Claude Code допишет. Алиасы моделей (`opus`, `sonnet`,
  * `haiku`, `fable`) и модель подагентов уводятся на ту же модель: в settings.json
  * у человека обычно стоит алиас, и без них он ушёл бы на имя, которого у
- * Ollama нет. Окно контекста — настоящее окно сервера: без него Claude Code
+ * сервера нет. Окно контекста — настоящее окно сервера: без него Claude Code
  * считает незнакомой модели 200k (так и пишет), сжатие истории не наступает
- * вовремя, и Ollama молча обрезает начало запроса — вместе с системным промптом.
+ * вовремя, и сервер молча обрезает начало запроса — вместе с системным промптом.
  *
  * Выбор модели (`/model` в терминале, список моделей в расширении редактора)
  * перестраивается ключом `modelPicker`: одна строка с именем локальной модели
@@ -30,7 +31,7 @@ import type { ClaudeModelPicker, ClaudeSwitchRecord } from './paths.ts';
  * которую человек сменил руками после включения, оно не трогает.
  */
 
-/** Ключ-заглушка: Ollama ключ не проверяет, а Claude Code без ключа не стартует. */
+/** Ключ-заглушка: сервер моделей ключ не проверяет, а Claude Code без ключа не стартует. */
 export const CLAUDE_SWITCH_TOKEN = 'ollama';
 
 /** Имя настройки в отказе контура: им человек находит, что увело прогон. */
@@ -66,7 +67,7 @@ export const CLAUDE_SWITCH_VARS = [
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   // Пусто — чтобы настоящий ключ из окружения человека не ушёл заголовком на
-  // локальный сервер (так советует и документация Ollama для Claude Code).
+  // локальный сервер (так советуют и документации локальных серверов для Claude Code).
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_MODEL',
   'ANTHROPIC_DEFAULT_OPUS_MODEL',
@@ -74,7 +75,8 @@ export const CLAUDE_SWITCH_VARS = [
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
   'ANTHROPIC_DEFAULT_FABLE_MODEL',
   'CLAUDE_CODE_SUBAGENT_MODEL',
-  'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
+  // Окно и ограничения прогона (`run-env.ts`): и терминалу, и расширению редактора.
+  ...LOCAL_RUN_ENV_VARS,
 ] as const;
 
 export function claudeSwitchEnv(input: {
@@ -93,7 +95,7 @@ export function claudeSwitchEnv(input: {
     ANTHROPIC_DEFAULT_HAIKU_MODEL: model,
     ANTHROPIC_DEFAULT_FABLE_MODEL: model,
     CLAUDE_CODE_SUBAGENT_MODEL: model,
-    CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(input.context),
+    ...localRunEnv(input.context),
   };
 }
 

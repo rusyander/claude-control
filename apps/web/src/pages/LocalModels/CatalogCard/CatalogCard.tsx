@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { InstalledModel, ModelBench } from '@agentdeck/contracts/local-models';
+import type { TFunction } from 'i18next';
+import { deviceGpu, usableVramGb } from '@agentdeck/contracts/local-models';
+import type { ModelBench } from '@agentdeck/contracts/local-models';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { TextField } from '@shared/ui/text-field';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { toast } from '@shared/lib/toast';
 import {
@@ -13,17 +16,37 @@ import {
   catalogRows,
   foreignInstalled,
   toGb,
+  useAddCustomModel,
   useBenchModel,
   useCancelLocalJob,
   useConnectLocal,
   useImportModel,
   usePullModel,
   useRemoveModel,
+  useSetModelChoice,
 } from '@entities/LocalModels';
 import { ModelRow } from '../ModelRow/ModelRow';
+import { formatGb } from '../ModelSelects/optionText';
 import styles from './CatalogCard.module.scss';
-import type { CatalogCardProps } from './CatalogCard.types';
+import type { CatalogCardProps, RemoveTarget } from './CatalogCard.types';
 import { formatDate } from '../../../shared/lib/formatDate';
+
+/** Строка «по чему считается, что влезает»: свободная видеопамять сейчас, процессорная — оперативная. */
+function basisOf(
+  info: CatalogCardProps['info'],
+  availableGb: number,
+  t: TFunction,
+  locale: string,
+): string {
+  const gpu = deviceGpu(info.hardware, info.device);
+  if (!gpu) return t('localModels.catalog.basisCpu', { available: formatGb(availableGb, locale) });
+  const sizes = {
+    available: formatGb(usableVramGb(gpu), locale),
+    total: formatGb(gpu.vramGb, locale),
+  };
+  if (gpu.freeGb === undefined) return t('localModels.catalog.basisNoFree', sizes);
+  return t('localModels.catalog.basis', { ...sizes, free: formatGb(gpu.freeGb, locale) });
+}
 
 /** Каталог моделей для кода под эту машину плюс установленное помимо каталога. */
 export function CatalogCard({ info }: CatalogCardProps) {
@@ -34,7 +57,10 @@ export function CatalogCard({ info }: CatalogCardProps) {
   const bench = useBenchModel();
   const remove = useRemoveModel();
   const cancel = useCancelLocalJob();
-  const [toRemove, setToRemove] = useState<InstalledModel | undefined>(undefined);
+  const choose = useSetModelChoice();
+  const addCustom = useAddCustomModel();
+  const [toRemove, setToRemove] = useState<RemoveTarget | undefined>(undefined);
+  const [repo, setRepo] = useState('');
   const rows = catalogRows(info);
   const measuredText = (bench: ModelBench): string => {
     const where = benchElsewhere(bench, info.device);
@@ -49,6 +75,8 @@ export function CatalogCard({ info }: CatalogCardProps) {
   const canRun = info.runtime.source !== 'none';
   const inUse = (tag: string): boolean => info.connect.active && info.connect.model === tag;
 
+  const basisText = basisOf(info, rows[0]?.choiceFit.availableGb ?? 0, t, i18n.language);
+
   const runBench = (tag: string): void =>
     bench.mutate(tag, {
       onSuccess: (result) =>
@@ -58,6 +86,16 @@ export function CatalogCard({ info }: CatalogCardProps) {
     connect.mutate(tag, {
       onSuccess: () => toast.success(t('localModels.connect.connected', { model: tag })),
     });
+  const submitCustom = (): void => {
+    const input = repo.trim();
+    if (input.length < 3) return;
+    addCustom.mutate(input, {
+      onSuccess: (model) => {
+        toast.success(t('localModels.catalog.custom.added', { title: model.title }));
+        setRepo('');
+      },
+    });
+  };
 
   return (
     <Card padding="md" role="region" aria-label={t('localModels.catalog.title')}>
@@ -67,6 +105,9 @@ export function CatalogCard({ info }: CatalogCardProps) {
         </Typography>
         <Typography variant="body-sm" color="muted">
           {t('localModels.catalog.hint')}
+        </Typography>
+        <Typography variant="body-sm" color="muted">
+          {basisText}
         </Typography>
         <div className={styles.modelList}>
           {rows.map((row) => (
@@ -80,12 +121,25 @@ export function CatalogCard({ info }: CatalogCardProps) {
                 bench: bench.isPending && bench.variables === row.model.tag,
                 connect: connect.isPending && connect.variables === row.model.tag,
               }}
-              onPull={() => pull.mutate({ tag: row.model.tag })}
+              onPull={() =>
+                pull.mutate({
+                  tag: row.model.tag,
+                  quant: row.choice.quant,
+                  context: row.choice.context,
+                })
+              }
               onImport={() => importModel.mutate(row.model.tag)}
               onConnect={() => runConnect(row.model.tag)}
               onBench={() => runBench(row.model.tag)}
-              onRemove={() => row.installed && setToRemove(row.installed)}
+              onRemove={() =>
+                setToRemove({
+                  tag: row.model.tag,
+                  sizeBytes: row.installed?.sizeBytes ?? 0,
+                  custom: row.model.custom,
+                })
+              }
               onCancel={(id) => cancel.mutate(id)}
+              onChoose={(body) => choose.mutate({ tag: row.model.tag, ...body })}
             />
           ))}
         </div>
@@ -94,6 +148,44 @@ export function CatalogCard({ info }: CatalogCardProps) {
             date: formatDate(info.catalog.checkedAt, i18n.language),
           })}
         </Typography>
+
+        <form
+          className={styles.customForm}
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitCustom();
+          }}
+          aria-label={t('localModels.catalog.custom.title')}
+        >
+          <Typography variant="heading-sm" as="h3">
+            {t('localModels.catalog.custom.title')}
+          </Typography>
+          <Typography variant="caption" color="muted">
+            {t('localModels.catalog.custom.hint')}
+          </Typography>
+          <div className={styles.customRow}>
+            <div className={styles.customField}>
+              <TextField
+                label={t('localModels.catalog.custom.label')}
+                value={repo}
+                onChange={setRepo}
+                placeholder={t('localModels.catalog.custom.placeholder')}
+                isMono
+                disabled={addCustom.isPending}
+              />
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              variant="secondary"
+              leftIcon={<Icon name="plus" />}
+              isLoading={addCustom.isPending}
+              disabled={repo.trim().length < 3}
+            >
+              {t('localModels.catalog.custom.add')}
+            </Button>
+          </div>
+        </form>
 
         {foreign.length > 0 ? (
           <Stack gap="var(--spacing-xs)">
@@ -109,7 +201,9 @@ export function CatalogCard({ info }: CatalogCardProps) {
                   <Typography variant="mono">{model.tag}</Typography>
                   <Typography variant="caption" color="muted">
                     {[
-                      t('localModels.catalog.size', { size: toGb(model.sizeBytes) }),
+                      t('localModels.catalog.size', {
+                        size: formatGb(toGb(model.sizeBytes), i18n.language),
+                      }),
                       model.bench ? measuredText(model.bench) : '',
                     ]
                       .filter(Boolean)
@@ -132,7 +226,9 @@ export function CatalogCard({ info }: CatalogCardProps) {
                     iconOnly
                     icon={<Icon name="trash" />}
                     aria-label={t('localModels.catalog.remove')}
-                    onClick={() => setToRemove(model)}
+                    onClick={() =>
+                      setToRemove({ tag: model.tag, sizeBytes: model.sizeBytes, custom: false })
+                    }
                   />
                 </Stack>
               </div>
@@ -145,11 +241,24 @@ export function CatalogCard({ info }: CatalogCardProps) {
         onOpenChange={(open) => {
           if (!open) setToRemove(undefined);
         }}
-        title={t('localModels.catalog.removeTitle')}
-        description={t('localModels.catalog.removeText', {
-          tag: toRemove?.tag ?? '',
-          size: toRemove ? toGb(toRemove.sizeBytes) : 0,
-        })}
+        title={
+          toRemove?.custom
+            ? t('localModels.catalog.custom.removeCustomTitle')
+            : t('localModels.catalog.removeTitle')
+        }
+        description={
+          toRemove?.custom
+            ? t(
+                toRemove.sizeBytes > 0
+                  ? 'localModels.catalog.custom.removeCustomText'
+                  : 'localModels.catalog.custom.removeCustomEmpty',
+                { tag: toRemove.tag, size: toGb(toRemove.sizeBytes) },
+              )
+            : t('localModels.catalog.removeText', {
+                tag: toRemove?.tag ?? '',
+                size: toRemove ? toGb(toRemove.sizeBytes) : 0,
+              })
+        }
         confirmLabel={t('localModels.catalog.remove')}
         isPending={remove.isPending}
         onConfirm={() => {

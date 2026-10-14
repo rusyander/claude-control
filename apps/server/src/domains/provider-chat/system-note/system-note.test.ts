@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { qwenNoteLayersRoot, writeQwenSystemNote } from './system-note.ts';
+import {
+  qwenLimitLayersRoot,
+  qwenNoteLayersRoot,
+  writeQwenLimits,
+  writeQwenSystemNote,
+} from './system-note.ts';
 
 /**
  * Слой строки о каталоге для Qwen: `QWEN.md` со строкой и файл системных
@@ -89,5 +94,88 @@ describe('writeQwenSystemNote', () => {
   it('пустая строка — слоя нет', () => {
     expect(writeQwenSystemNote({ appData, note: '  ', env: {} })).toBeUndefined();
     expect(existsSync(qwenNoteLayersRoot(appData))).toBe(false);
+  });
+});
+
+/**
+ * Окно и сроки локальной модели для Qwen Code (L4b). Имена полей `model.generationConfig`
+ * (`contextWindowSize`, `timeout`, `streamIdleTimeoutMs`) — из схемы настроек бандла 0.25.0;
+ * живым прогоном с моделью не проверено (Qwen Code не установлен на этой машине).
+ */
+describe('writeQwenLimits', () => {
+  let appData: string;
+  const limits = { contextWindow: 65_536, timeoutMs: 600_000, idleMs: 300_000 };
+
+  beforeEach(() => {
+    appData = mkdtempSync(join(tmpdir(), 'cc-qwen-limits-'));
+  });
+
+  afterEach(() => {
+    rmSync(appData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  const read = (env: Record<string, string>): Record<string, unknown> =>
+    JSON.parse(readFileSync(env.QWEN_CODE_SYSTEM_SETTINGS_PATH ?? '', 'utf8')) as Record<
+      string,
+      unknown
+    >;
+
+  it('окно и сроки — в model.generationConfig слоя, а не в окружении', () => {
+    const env = writeQwenLimits({ appData, limits, env: {} });
+    expect(dirname(dirname(env.QWEN_CODE_SYSTEM_SETTINGS_PATH ?? ''))).toBe(
+      qwenLimitLayersRoot(appData),
+    );
+    expect(read(env).model).toEqual({
+      generationConfig: {
+        contextWindowSize: 65_536,
+        timeout: 600_000,
+        streamIdleTimeoutMs: 300_000,
+      },
+    });
+  });
+
+  it('основа не теряется: группы, MCP и чужие поля generationConfig остаются', () => {
+    const group = join(appData, 'group.json');
+    writeFileSync(
+      group,
+      JSON.stringify({
+        mcpServers: { a: { command: 'a' } },
+        model: { name: 'x', generationConfig: { maxRetries: 7, contextWindowSize: 1 } },
+      }),
+    );
+    const env = writeQwenLimits({
+      appData,
+      limits,
+      env: { QWEN_CODE_SYSTEM_SETTINGS_PATH: group },
+    });
+    const merged = read(env);
+    expect(merged.mcpServers).toEqual({ a: { command: 'a' } });
+    expect(merged.model).toEqual({
+      name: 'x',
+      generationConfig: {
+        maxRetries: 7,
+        contextWindowSize: 65_536,
+        timeout: 600_000,
+        streamIdleTimeoutMs: 300_000,
+      },
+    });
+  });
+
+  it('слой строки о каталоге ложится ПОВЕРХ слоя окна и не теряет его', () => {
+    const window = writeQwenLimits({ appData, limits, env: {} });
+    const note = writeQwenSystemNote({ appData, note: 'QA', env: window });
+    expect(read(note ?? {}).model).toEqual(read(window).model);
+  });
+
+  it('те же числа — тот же каталог: два разговора не переписывают файл друг друга', () => {
+    const first = writeQwenLimits({ appData, limits, env: {} });
+    const second = writeQwenLimits({ appData, limits, env: {} });
+    expect(second).toEqual(first);
+    const other = writeQwenLimits({
+      appData,
+      limits: { ...limits, contextWindow: 131_072 },
+      env: {},
+    });
+    expect(other).not.toEqual(first);
   });
 });

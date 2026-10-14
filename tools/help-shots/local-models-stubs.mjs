@@ -8,21 +8,34 @@
  * карта, сервер, загрузка, замер.
  *
  * Карта — RTX 4090 на 24 ГБ; рекомендуемая модель на ней — Qwen3.6 27B Coding с
- * контекстом 131072 (так её и считает `recommendModel`; запись сервера несёт тот же
- * контекст, иначе кадр показал бы сервер, который пришлось бы перезапускать).
+ * контекстом 65536 (меньшее из `defaultContext` каталога и того, что влезло; запись
+ * сервера несёт тот же контекст, иначе кадр показал бы сервер, который пришлось бы
+ * перезапускать).
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './kit.mjs';
 
-const CATALOG = JSON.parse(
+const RAW_CATALOG = JSON.parse(
   readFileSync(join(REPO_ROOT, 'apps/server/src/domains/local-models/data/catalog.json'), 'utf8'),
 );
+// Сервер отдаёт каталог после разбора схемы контрактов: к модели добавлены размер
+// выбранного по умолчанию квантования и байт кеша на токен. Заглушка повторяет
+// эти два поля, иначе страница считала бы подбор из `undefined`.
+const CATALOG = {
+  ...RAW_CATALOG,
+  models: RAW_CATALOG.models.map((model) => ({
+    ...model,
+    sizeBytes: (model.quants.find((quant) => quant.id === model.defaultQuant) ?? model.quants[0])
+      .sizeBytes,
+    kvBytesPerToken: model.arch.kvLayers * 2 * model.arch.kvHeads * model.arch.headDim * 2,
+  })),
+};
 
 export const TAG = 'qwen3.6:27b-coding';
 const MODEL = CATALOG.models.find((model) => model.tag === TAG);
 const ROOT = 'D:\\agentdeck\\.local-models';
-const RUNTIME = `${ROOT}\\runtime\\ollama-0.35.1\\ollama.exe`;
+const RUNTIME = `${ROOT}\\runtime\\llama-b11583\\llama-server.exe`;
 const NOW = '2026-10-05T16:20:00.000Z';
 /** «Claude Code на этой модели» — выключено, как по умолчанию. */
 const CLAUDE_OFF = {
@@ -58,7 +71,7 @@ const base = () => ({
     version: '',
     outdated: false,
     systemBinary: '',
-    latest: { version: '0.35.1', sizeBytes: 1_870_000_000 },
+    latest: { version: 'b11583', sizeBytes: 640_000_000 },
   },
   server: {
     running: false,
@@ -71,30 +84,34 @@ const base = () => ({
   catalog: CATALOG,
   installed: [],
   importable: [],
+  importFailed: [],
   jobs: [],
   connect: { configured: false, active: false, model: '' },
   qwenCode: { binary: '', version: '', source: 'none' },
   kit: { claude: 'global', qwen: 'global', variant: 'local' },
   device: 'gpu',
+  choices: {},
   claude: CLAUDE_OFF,
   diskUsedBytes: 0,
 });
 
-const runningServer = (loaded = []) => ({
+const runningServer = (loaded = [], context = 65536) => ({
   running: true,
   port: 11435,
   baseUrl: 'http://127.0.0.1:11435',
   pid: 18244,
+  model: TAG,
+  quant: 'Q4_K_M',
+  mtp: true,
   loaded,
-  context: 131072,
+  context,
   device: 'gpu',
-  // 27B на 4090: 128K влезают в карту только со сжатым кешем.
-  kvCache: 'q4_0',
+  kvCache: 'q8_0',
 });
 const panelRuntime = {
   source: 'panel',
   binary: RUNTIME,
-  version: '0.35.1',
+  version: 'b11583',
   outdated: false,
   systemBinary: '',
 };
@@ -140,6 +157,8 @@ export const STATES = {
     installed: [
       {
         tag: TAG,
+        quant: 'Q4_K_M',
+        source: 'hf',
         sizeBytes: MODEL.sizeBytes,
         modifiedAt: NOW,
         known: true,
@@ -148,7 +167,13 @@ export const STATES = {
           promptTokensPerSec: 2210,
           measuredAt: NOW,
           gpu: 'NVIDIA GeForce RTX 4090',
+          // С чем снят замер: окно по умолчанию (65536) и скачанное квантование.
+          context: 65536,
+          quant: 'Q4_K_M',
+          kvCache: 'q8_0',
+          offload: 'all',
         },
+        quants: ['Q4_K_M'],
       },
     ],
     connect: { configured: true, active: true, model: TAG },
@@ -162,14 +187,86 @@ export const STATES = {
   }),
 };
 
+/** Выбрано другое окно у загруженной модели: сервер перезапускается с новым `-c`. */
+STATES.restarting = () => {
+  const ready = STATES.ready();
+  return {
+    ...ready,
+    choices: { [TAG]: { quant: 'Q4_K_M', context: 98304 } },
+    jobs: [
+      {
+        id: 'job-restart',
+        kind: 'server',
+        target: TAG,
+        state: 'running',
+        phase: 'restart',
+        doneBytes: 0,
+        totalBytes: 0,
+        speed: 0,
+        startedAt: NOW,
+      },
+    ],
+  };
+};
+
+/** Модель из «Любая модель»: репозиторий прочитан, агентность ещё не проверена. */
+const CUSTOM = {
+  ...MODEL,
+  tag: 'hf:unsloth/Qwen3-14B-GGUF',
+  title: 'Qwen3-14B',
+  repo: 'unsloth/Qwen3-14B-GGUF',
+  coding: 'general',
+  quants: [
+    { id: 'Q3_K_M', file: 'Qwen3-14B-Q3_K_M.gguf', sizeBytes: 7_320_000_000 },
+    { id: 'Q4_K_M', file: 'Qwen3-14B-Q4_K_M.gguf', sizeBytes: 9_000_000_000 },
+    { id: 'Q5_K_M', file: 'Qwen3-14B-Q5_K_M.gguf', sizeBytes: 10_500_000_000 },
+    { id: 'Q6_K', file: 'Qwen3-14B-Q6_K.gguf', sizeBytes: 12_100_000_000 },
+    { id: 'Q8_0', file: 'Qwen3-14B-Q8_0.gguf', sizeBytes: 15_700_000_000 },
+  ],
+  defaultQuant: 'Q4_K_M',
+  sizeBytes: 9_000_000_000,
+  paramsB: 14.8,
+  activeParamsB: 14.8,
+  mtp: false,
+  contextMax: 40960,
+  defaultContext: undefined,
+  arch: { layers: 40, kvLayers: 40, kvHeads: 8, headDim: 128 },
+  kvBytesPerToken: 40 * 2 * 8 * 128 * 2,
+  custom: true,
+  toolsProbe: 'unknown',
+};
+
 /**
- * Подменить `/api/local-models` текущим состоянием. Действия страницы отвечают
- * успехом и ничего не меняют — кадры переключает сценарий, а не клик.
+ * Подменить `/api/local-models` текущим состоянием. Выбор квантования и окна и
+ * «Любая модель» держат состояние внутри `holder`: списки в кадре пересчитываются
+ * настоящей страницей от того, что выбрано, — так кадр показывает ответ на клик,
+ * а не вымысел. Остальные действия отвечают успехом и ничего не меняют.
  */
 export async function localModelsRoutes(page, holder) {
+  holder.choices ??= {};
+  holder.custom ??= [];
   await page.route('**/api/local-models**', async (route) => {
     const request = route.request();
-    if (request.method() === 'GET') return route.fulfill({ json: holder.state() });
+    const url = new URL(request.url());
+    if (request.method() === 'PUT' && url.pathname.endsWith('/choice')) {
+      const { tag, ...body } = request.postDataJSON();
+      holder.choices[tag] = { ...holder.choices[tag], ...body };
+      return route.fulfill({ json: { choice: holder.choices[tag] } });
+    }
+    if (request.method() === 'POST' && url.pathname.endsWith('/custom')) {
+      holder.custom = [CUSTOM];
+      return route.fulfill({ json: CUSTOM });
+    }
+    if (request.method() === 'GET') {
+      const state = holder.state();
+      return route.fulfill({
+        json: {
+          ...state,
+          catalog: { ...state.catalog, models: [...state.catalog.models, ...holder.custom] },
+          choices: { ...state.choices, ...holder.choices },
+        },
+      });
+    }
     return route.fulfill({ json: { ok: true } });
   });
 }

@@ -211,15 +211,32 @@ describe('подпись о наших слоях', () => {
         systemPrompt: true,
         dropped: ['skills'],
       }),
-    ).toEqual({ key: 'chat.platformLayers', dropped: ['skills'] });
+    ).toEqual({ key: 'chat.platformLayers', dropped: ['skills'], picked: [] });
   });
 
-  it('снято всё — своя строка, а не перечисление из четырёх', () => {
+  // L4: MCP, взятые человеком в локальный прогон, называются только когда слой «MCP» снят —
+  // иначе серверы и так едут все, и подпись говорила бы о выборе, которого нет.
+  it('взятые MCP-серверы называются, пока слой «MCP» снят', () => {
+    const layers = { args: ['--strict-mcp-config'], systemPrompt: true, dropped: ['mcp' as const] };
+    expect(platformLayersCaption(layers, { picked: ['gitlab'] })).toMatchObject({
+      dropped: ['mcp'],
+      picked: ['gitlab'],
+    });
+    expect(platformLayersCaption(layers, undefined)).toMatchObject({ picked: [] });
+    const skills = {
+      args: ['--disable-slash-commands'],
+      systemPrompt: true,
+      dropped: ['skills' as const],
+    };
+    expect(platformLayersCaption(skills, { picked: ['gitlab'] })).toMatchObject({ picked: [] });
+  });
+
+  it('снято всё — своя строка, а не перечисление из пяти', () => {
     expect(
       platformLayersCaption({
         args: ['--setting-sources', 'project,local'],
         systemPrompt: false,
-        dropped: ['settings', 'skills', 'mcp', 'systemPrompt'],
+        dropped: ['settings', 'skills', 'mcp', 'tools', 'systemPrompt'],
       }),
     ).toMatchObject({ key: 'chat.platformLayersAll' });
   });

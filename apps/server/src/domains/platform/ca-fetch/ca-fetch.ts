@@ -142,18 +142,33 @@ export function createCaStreamFetch(
   return createFetch(caCertPath, true, 0, env);
 }
 
+/**
+ * Поток для локального сервера моделей (L4b): без прокси и без собственных потолков.
+ *
+ * Встроенный `fetch` (undici) держит пять минут на заголовки и пять на паузу в теле, и
+ * ни тот ни другой нельзя поднять без пакета `undici`: разбор 130 тысяч токенов при
+ * 360 ток/с занимает шесть минут, и сервер, живой и работающий, получал обрыв
+ * «headers timeout» раньше расчётного срока шлюза. `node:http` собственных потолков не
+ * имеет — срок первого байта ставит сам шлюз (`callUpstream`). Прокси из окружения
+ * здесь не читается: адрес сервера — петля этой машины.
+ */
+export function createLoopbackStreamFetch(): PlatformFetch {
+  return createFetch('', true, 0, {}, true);
+}
+
 function createFetch(
   caCertPath: string,
   stream: boolean,
   redirects: number,
   env: ProxyEnv,
+  ownTransport = false,
 ): PlatformFetch {
   const path = caCertPath.trim();
   // Своя реализация нужна ровно там, где без неё не обойтись: свой корень
   // доверия ИЛИ прокси в окружении. Ни того, ни другого — общий путь остаётся
   // встроенным `fetch`, и нашего кода на нём нет. Единственное, что ему
   // приходится сказать явно, — не ходить по перенаправлениям самому.
-  if (!path && !hasProxyEnv(env)) {
+  if (!ownTransport && !path && !hasProxyEnv(env)) {
     return redirects > 0
       ? globalThis.fetch
       : (url, init) => globalThis.fetch(url, { ...init, redirect: 'manual' });

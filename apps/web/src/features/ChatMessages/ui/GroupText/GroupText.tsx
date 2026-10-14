@@ -9,6 +9,7 @@ import { GroupMeta } from '../GroupMeta/GroupMeta';
 import type { ChildStageGroup } from '../ChildStages.types';
 import styles from './GroupText.module.scss';
 import { pendingText } from '../../lib/pendingText';
+import { reviewCloseText } from '../../lib/reviewCloseText';
 import { tokenLedgerText } from '../../lib/tokenLedgerText';
 
 /** Название группы и строка её состояния — одна и та же у строки с чатом и без. */
@@ -64,6 +65,7 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
     }
   }
   const tokens = group.tokens ? tokenLedgerText(group.tokens, t, i18n.language) : undefined;
+  const close = group.reviewClose ? reviewCloseText(group.reviewClose, t) : undefined;
   const branch = [
     group.branch,
     group.base ? t('chat.cascade.hub.base', { branch: group.base }) : undefined,
@@ -147,6 +149,30 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
           data-hub-delivery-missing
         >
           {t('chat.cascade.hub.deliveryMissing', { list: missing.join('; ') })}
+        </Typography>
+      )}
+      {/* Итог закрытия группы ревью (T13, T6/T11): правки в копии, временные копии
+          и база — факты по git и docker, а не слова агента. */}
+      {close?.dirt && (
+        <Typography
+          variant="caption"
+          as="span"
+          className={cn(styles.wrap, styles.chipAsk)}
+          title={close.dirtList}
+          data-hub-review-dirt
+        >
+          {close.dirt}
+        </Typography>
+      )}
+      {close && (close.scratch.length > 0 || close.stand) && (
+        <Typography
+          variant="caption"
+          color="subtle"
+          as="span"
+          className={styles.wrap}
+          data-hub-review-close
+        >
+          {[...close.scratch, close.stand].filter(Boolean).join(' · ')}
         </Typography>
       )}
       {/* Счёт токенов закрытой группы (E4): утечка инструкций или тяжёлый старт

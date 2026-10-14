@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, join, resolve, sep } from 'node:path';
-import type { WorktreeBootstrapState } from '@agentdeck/contracts';
+import type { WorktreeBootstrapState, WorktreeRuntimeNote } from '@agentdeck/contracts';
 import {
   isHeavyShape,
   SPLIT_HEAVY_RULE_DEFAULT,
@@ -17,6 +17,15 @@ import {
 } from '@agentdeck/contracts/split-groups';
 import { killChildTree } from '../../lib/process-tree/process-tree.ts';
 import { gitSync } from './exec/exec.ts';
+import type { BootstrapChain, BootstrapPlan, BootstrapStep } from './bootstrap.types.ts';
+import { firstErrorLine, quietLog } from './bootstrap-log.ts';
+import {
+  SOFT_CHAIN_TIMEOUT_MS,
+  detectLanguageChains,
+  resolveLanguageStep,
+  type LanguageStepResult,
+} from './language-chains.ts';
+import { prepareNode, realRuntimeDeps, type RuntimeDeps } from './runtimes.ts';
 import {
   LOCKFILES,
   NPM_SEEDED_INSTALL,
@@ -49,34 +58,11 @@ import {
  * вопросов и не рисуют прогресс, а вопрос без ответа висел бы до таймаута.
  */
 
+export type { BootstrapChain, BootstrapPlan, BootstrapStep } from './bootstrap.types.ts';
+
 export const BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
 /** Хвост лога, который уезжает в карточку и в задание агента. */
 export const LOG_TAIL_CHARS = 2000;
-
-/** Одна команда подготовки; `cwd` — каталог относительно корня копии, `''` — сам корень. */
-export interface BootstrapStep {
-  cwd: string;
-  command: string;
-}
-
-/**
- * Цепочка — шаги ОДНОГО каталога по порядку (установка, затем сборка);
- * `after` — каталоги, чьи цепочки должны кончиться раньше.
- */
-export interface BootstrapChain {
-  cwd: string;
-  steps: BootstrapStep[];
-  after: string[];
-}
-
-/**
- * План подготовки копии: цепочки идут ПАРАЛЛЕЛЬНО, шаги в цепочке — по
- * порядку. `summary` — то, что человек видит в карточке копии и в состоянии.
- */
-export interface BootstrapPlan {
-  summary: string;
-  chains: BootstrapChain[];
-}
 
 /** Сколько цепочек одного плана идёт разом: шесть `npm ci` сразу забивают диск. */
 export const BOOTSTRAP_CHAIN_LIMIT = 4;
@@ -288,7 +274,13 @@ function planOfCommand(command: string): BootstrapPlan {
 /** Настроенная человеком команда сильнее автоопределения; пустая строка — «определи сама». */
 export function bootstrapPlanFor(dir: string, configured?: string): BootstrapPlan | undefined {
   const own = configured?.trim();
-  return own ? planOfCommand(own) : detectBootstrapPlan(dir);
+  if (own) return planOfCommand(own);
+  const base = detectBootstrapPlan(dir);
+  // Среда Python и Go — мягкие цепочки рядом с установкой зависимостей (T15).
+  const language = detectLanguageChains(dir);
+  if (language.length === 0) return base;
+  const chains = [...(base?.chains ?? []), ...language];
+  return { summary: summarize(chains), chains };
 }
 
 /**
@@ -301,8 +293,10 @@ export function isHeavyPlan(
   rule: SplitHeavyRule = SPLIT_HEAVY_RULE_DEFAULT,
 ): boolean {
   if (!plan) return false;
+  // Среда языков (Python, Go) идёт мягко и не делает подготовку «тяжёлой»: правило
+  // про число установок зависимостей, от него зависит, сколько групп стартует разом.
   return isHeavyShape(
-    plan.chains.map((chain) => chain.steps.length),
+    plan.chains.filter((chain) => !chain.soft).map((chain) => chain.steps.length),
     rule,
   );
 }
@@ -325,8 +319,12 @@ function normalizeDir(dir: string): string {
  * pnpm build`), с `CI=1`: установщики в этом режиме не задают вопросов и не
  * рисуют прогресс.
  */
-function spawnShell(command: string, cwd: string): ChildProcess {
-  const env = { ...process.env, CI: '1', FORCE_COLOR: '0' };
+function spawnShell(
+  command: string,
+  cwd: string,
+  base: NodeJS.ProcessEnv = process.env,
+): ChildProcess {
+  const env = { ...base, CI: '1', FORCE_COLOR: '0' };
   return process.platform === 'win32'
     ? spawn('cmd.exe', ['/d', '/s', '/c', `"${command}"`], {
         cwd,
@@ -401,6 +399,10 @@ export interface BootstrapOptions {
    * состояние. Не задано — ничего.
    */
   afterRun?: (dir: string) => Promise<string[]>;
+  /** Рантаймы машины (версии, менеджеры версий) — в тесте подменяются. */
+  runtimes?: RuntimeDeps;
+  /** Потолок мягкой цепочки (Python, Go); по умолчанию `SOFT_CHAIN_TIMEOUT_MS`. */
+  softTimeoutMs?: number;
 }
 
 export class WorktreeBootstraps {
@@ -410,12 +412,16 @@ export class WorktreeBootstraps {
   private readonly now: () => Date;
   private readonly logDir: string;
   private readonly afterRun?: (dir: string) => Promise<string[]>;
+  private readonly runtimes: RuntimeDeps;
+  private readonly softTimeoutMs: number;
 
   constructor(logDir: string, options: BootstrapOptions = {}) {
     this.logDir = logDir;
     this.timeoutMs = options.timeoutMs ?? BOOTSTRAP_TIMEOUT_MS;
     this.now = options.now ?? (() => new Date());
     this.afterRun = options.afterRun;
+    this.runtimes = options.runtimes ?? realRuntimeDeps();
+    this.softTimeoutMs = options.softTimeoutMs ?? SOFT_CHAIN_TIMEOUT_MS;
   }
 
   /** Имя файлов лога: имя каталога плюс хвост хеша пути — две копии `feature-x` разных проектов не сойдутся. */
@@ -527,18 +533,6 @@ export class WorktreeBootstraps {
       file?.write(text);
     };
 
-    const finish = (patch: Partial<WorktreeBootstrapState>): WorktreeBootstrapState => {
-      const done: WorktreeBootstrapState = {
-        ...state,
-        ...patch,
-        finishedAt: this.now().toISOString(),
-        logTail: logTail(chunks.join('')),
-      };
-      this.states.set(normalizeDir(dir), done);
-      this.writeRecord(dir, done);
-      return done;
-    };
-
     try {
       file = createWriteStream(this.logPath(dir), { flags: 'w' });
     } catch (error) {
@@ -557,17 +551,90 @@ export class WorktreeBootstraps {
       for (const child of children) killChildTree(child, { group: process.platform !== 'win32' });
     }, this.timeoutMs);
 
-    const runStep = async (step: BootstrapStep): Promise<number | undefined> => {
+    // Версии рантайма и среда языков: что просит проект и что нашлось на машине.
+    // Строка на (инструмент, каталог); позднейшая заменяет раннюю.
+    const notes = new Map<string, WorktreeRuntimeNote>();
+    const noteOf = (note: WorktreeRuntimeNote | undefined): void => {
+      if (note) notes.set(`${note.tool}|${note.where}`, note);
+    };
+    // Node выбирается по каталогу шага: у каждого приложения монорепозитория
+    // может быть свой `.nvmrc`. Одно определение на каталог за запуск.
+    const nodeEnvs = new Map<string, Promise<NodeJS.ProcessEnv>>();
+    const envFor = (cwd: string): Promise<NodeJS.ProcessEnv> => {
+      let found = nodeEnvs.get(cwd);
+      if (!found) {
+        found = prepareNode(dir, cwd, this.runtimes)
+          .then((prepared) => {
+            if (!prepared) return this.runtimes.env;
+            noteOf(prepared.note);
+            const { note } = prepared;
+            const where = cwd ? `[${cwd}] ` : '';
+            if (note.status === 'switched') {
+              write(
+                `${where}Node ${note.used}: проект просит ${note.wanted} (${note.source}), по умолчанию ${note.found ?? 'не найден'} — ${note.detail}\n`,
+              );
+            } else if (note.status === 'missing') {
+              write(
+                `${where}⚠ Node ${note.wanted} (${note.source}) на машине не найден; подготовка идёт на ${note.found ?? 'неизвестной версии'}\n`,
+              );
+            }
+            return prepared.env;
+          })
+          .catch(() => this.runtimes.env);
+        nodeEnvs.set(cwd, found);
+      }
+      return found;
+    };
+
+    // Мягкая цепочка итог не решает: её провал — строка о среде языка.
+    const softStopped = new Set<BootstrapChain>();
+    const softMinutes = Math.round(this.softTimeoutMs / 60_000);
+    const softFailed = (step: BootstrapStep, why: string): void => {
+      // Шаг без языка (своя мягкая цепочка) в карточку языка не попадает — только в лог.
+      if (!step.lang) return;
+      const tool = step.lang === 'go-download' ? 'go' : 'python';
+      const prior = notes.get(`${tool}|${step.cwd}`);
+      noteOf({
+        tool,
+        where: step.cwd,
+        wanted: prior?.wanted ?? '',
+        source: prior?.source ?? '',
+        ...(prior?.used ? { used: prior.used } : {}),
+        status: 'failed',
+        detail: why,
+      });
+    };
+
+    const runStep = async (
+      step: BootstrapStep,
+      chain: BootstrapChain,
+      own: Set<ChildProcess>,
+    ): Promise<number | undefined> => {
       const tag = tagged ? `[${step.cwd || '.'}] ` : '';
-      const manager = MANAGER_OF_INSTALL.get(step.command);
-      const command = manager
-        ? await preparedInstall(dir, step.cwd, manager, tag, write)
-        : step.command;
+      let command: string | undefined;
+      if (step.lang) {
+        const resolved = await resolveLanguageStep(dir, step, this.runtimes).catch(
+          (error: unknown): LanguageStepResult => ({
+            log: `не удалось подготовить шаг: ${error instanceof Error ? error.message : String(error)}`,
+          }),
+        );
+        if (resolved.log) write(`${tag}${resolved.log}\n`);
+        noteOf(resolved.note);
+        command = resolved.command;
+      } else {
+        const manager = MANAGER_OF_INSTALL.get(step.command);
+        command = manager
+          ? await preparedInstall(dir, step.cwd, manager, tag, write)
+          : step.command;
+      }
       if (command === undefined) return 0;
       if (tagged || command !== step.command) write(`${tag}$ ${command}\n`);
+      const env = step.lang ? this.runtimes.env : await envFor(step.cwd);
+      const run = command;
       return new Promise((resolveStep) => {
-        const child = spawnShell(command, step.cwd ? join(dir, step.cwd) : dir);
+        const child = spawnShell(run, step.cwd ? join(dir, step.cwd) : dir, env);
         children.add(child);
+        own.add(child);
         let pending = '';
         const onData = (chunk: Buffer): void => {
           const text = chunk.toString('utf8');
@@ -586,6 +653,7 @@ export class WorktreeBootstraps {
           if (settled) return;
           settled = true;
           children.delete(child);
+          own.delete(child);
           if (pending) write(`${tag}${pending}\n`);
           write(note);
           resolveStep(code);
@@ -597,7 +665,7 @@ export class WorktreeBootstraps {
           settle(
             typeof code === 'number' ? code : undefined,
             `\n${tag}[${this.now().toISOString()}] ${
-              timedOut ? 'таймаут' : `код ${code ?? signal ?? '?'}`
+              timedOut || softStopped.has(chain) ? 'таймаут' : `код ${code ?? signal ?? '?'}`
             }\n`,
           ),
         );
@@ -607,13 +675,39 @@ export class WorktreeBootstraps {
     // Первый провал решает итог: его код — в состоянии, как у одиночной команды.
     let failure: { code?: number } | undefined;
     const runChain = async (chain: BootstrapChain): Promise<void> => {
-      for (const step of chain.steps) {
-        if (timedOut) return;
-        const code = await runStep(step);
-        if (code !== 0) {
+      const own = new Set<ChildProcess>();
+      // Потолок мягкой цепочки свой и снимает только её процессы.
+      const softTimer = chain.soft
+        ? setTimeout(() => {
+            softStopped.add(chain);
+            write(
+              `\n[${chain.cwd || '.'}] [потолок ${softMinutes} мин для среды языка — процесс остановлен]\n`,
+            );
+            for (const child of own) killChildTree(child, { group: process.platform !== 'win32' });
+          }, this.softTimeoutMs)
+        : undefined;
+      try {
+        for (const step of chain.steps) {
+          if (timedOut || softStopped.has(chain)) {
+            if (chain.soft) softFailed(step, `остановлено на потолке ${softMinutes} мин`);
+            return;
+          }
+          const code = await runStep(step, chain, own);
+          if (code === 0) continue;
+          if (chain.soft) {
+            softFailed(
+              step,
+              softStopped.has(chain)
+                ? `остановлено на потолке ${softMinutes} мин`
+                : `«${step.command}» завершилась с кодом ${code ?? '?'}`,
+            );
+            return;
+          }
           failure ??= typeof code === 'number' ? { code } : {};
           return;
         }
+      } finally {
+        if (softTimer) clearTimeout(softTimer);
       }
     };
 
@@ -633,7 +727,9 @@ export class WorktreeBootstraps {
           const chain = waiting[index] as BootstrapChain;
           const ready =
             timedOut ||
-            chain.after.every((dep) => done.has(dep) || !plan.chains.some((c) => c.cwd === dep));
+            chain.after.every(
+              (dep) => done.has(dep) || !plan.chains.some((c) => !c.soft && c.cwd === dep),
+            );
           if (!ready) {
             index++;
             continue;
@@ -642,7 +738,8 @@ export class WorktreeBootstraps {
           active++;
           void runChain(chain).finally(() => {
             active--;
-            done.add(chain.cwd);
+            // Мягкая цепочка того же каталога не делает «готовой» сборку соседа.
+            if (!chain.soft) done.add(chain.cwd);
             pump();
           });
         }
@@ -655,8 +752,15 @@ export class WorktreeBootstraps {
     // переписать lock-файл. Отказ отката не портит итог установки.
     const reverted = this.afterRun ? await this.afterRun(dir).catch(() => []) : [];
     if (reverted.length > 0) write(`[lock-файлы откачены: ${reverted.join(', ')}]\n`);
-    const result = finish({
-      status: !timedOut && !failure ? 'ok' : 'failed',
+    const failed = timedOut || Boolean(failure);
+    // Файл дописывается до чтения: первая ошибка ищется во ВСЁМ логе, а не в
+    // хвосте памяти, куда за долгую установку первая строка уже не дошла.
+    await new Promise<void>((finished) => (file ? file.end(() => finished()) : finished()));
+    const firstError = failed ? firstErrorLine(this.readLogForError(dir, chunks)) : undefined;
+    const runtimes = [...notes.values()];
+    const result: WorktreeBootstrapState = {
+      ...state,
+      status: failed ? 'failed' : 'ok',
       ...(failure?.code !== undefined
         ? { exitCode: failure.code }
         : !failure && !timedOut
@@ -664,9 +768,21 @@ export class WorktreeBootstraps {
           : {}),
       ...(timedOut ? { timedOut: true } : {}),
       ...(reverted.length > 0 ? { reverted } : {}),
-    });
-    file?.end();
+      ...(firstError ? { firstError } : {}),
+      ...(runtimes.length > 0 ? { runtimes } : {}),
+      logFile: this.logPath(dir),
+      finishedAt: this.now().toISOString(),
+      logTail: logTail(quietLog(chunks.join(''))),
+    };
+    this.states.set(normalizeDir(dir), result);
+    this.writeRecord(dir, result);
     return result;
+  }
+
+  /** Полный лог запуска для поиска первой ошибки; нет файла — то, что держит память. */
+  private readLogForError(dir: string, chunks: readonly string[]): string {
+    const full = this.log(dir);
+    return full ? full.slice(-1_000_000) : chunks.join('');
   }
 
   private readRecord(dir: string): WorktreeBootstrapState | undefined {
@@ -685,6 +801,15 @@ export class WorktreeBootstraps {
         ...(record.finishedAt ? { finishedAt: record.finishedAt } : {}),
         ...(typeof record.exitCode === 'number' ? { exitCode: record.exitCode } : {}),
         ...(record.timedOut ? { timedOut: true } : {}),
+        ...(typeof record.firstError === 'string' && record.firstError
+          ? { firstError: record.firstError }
+          : {}),
+        ...(typeof record.logFile === 'string' && record.logFile
+          ? { logFile: record.logFile }
+          : {}),
+        ...(Array.isArray(record.runtimes) && record.runtimes.length > 0
+          ? { runtimes: record.runtimes }
+          : {}),
         // Откат lock-файлов — единственное, что панель СДЕЛАЛА с рабочим
         // деревом копии; потерять его при перезапуске значит промолчать о
         // своей же правке.

@@ -7,3 +7,6 @@
  * отдельным запросом и только когда его попросили.
  */
 export const TONE = { running: 'info', ok: 'success', failed: 'danger' } as const;
+
+/** Как называть рантайм в строке версии (имена собственные — не переводятся). */
+export const RUNTIME_NAME = { node: 'Node', python: 'Python', go: 'Go' } as const;

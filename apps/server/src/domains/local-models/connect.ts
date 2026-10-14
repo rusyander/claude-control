@@ -1,5 +1,10 @@
 import type { LocalConnectInfo } from '@agentdeck/contracts/local-models';
-import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
+import type { OurRules } from '@agentdeck/contracts/platform';
+import {
+  PLATFORM_ASSISTANT_TARGET,
+  defaultOurRules,
+  defaultPlatformRules,
+} from '@agentdeck/contracts/platform';
 import {
   PLATFORM_ASSISTANT_CONSUMER,
   foreignConsumerId,
@@ -13,16 +18,22 @@ import { localError } from './errors.ts';
  * Контур уже умеет ровно то, что тут нужно: отдать адрес модели окружению
  * одного прогона (чат, группы, тесты, ассистент), не записав ни строки в
  * `~/.claude`; проверить связь и вызов инструментов пробным запросом; показать в
- * шапке чата, куда идёт работа; вернуть всё одной кнопкой. Ollama говорит на
- * Anthropic Messages сам, и пресет `ollama` шлёт запросы Claude Code к нему без
+ * шапке чата, куда идёт работа; вернуть всё одной кнопкой. llama-server говорит на
+ * Anthropic Messages сам, и пресет `llama-cpp` шлёт запросы Claude Code к нему без
  * перевода. Своя вторая обвязка разошлась бы с этой на первой же правке.
  *
  * Контур заводится и включается через ТЕ ЖЕ маршруты, что и мастер контура:
  * проверки тела, транзакция активации и проба проходят и здесь.
  */
 
+/**
+ * Идентификатор контура остался прежним при смене движка с Ollama на llama.cpp:
+ * по нему живёт всё, что человек уже настроил (разделы маршрута, бюджет, журнал).
+ */
 export const LOCAL_PLATFORM_ID = 'local-ollama';
-/** Ключ-заглушка: Ollama ключ не проверяет, а контур без ключа прогон не поведёт. */
+/** Пресет контура: `llama-server` говорит на Anthropic Messages сам. */
+export const LOCAL_DRIVER = 'llama-cpp';
+/** Ключ-заглушка: сервер моделей ключ не проверяет, а контур без ключа прогон не поведёт. */
 export const LOCAL_PLATFORM_TOKEN = 'ollama-local-key';
 
 export interface InjectAnswer {
@@ -37,7 +48,15 @@ export type Inject = (request: {
 
 interface PlatformsInfoLite {
   activePlatformId: string;
-  platforms: { platform: { id: string; title: string; defaultModel: string } }[];
+  platforms: {
+    platform: {
+      id: string;
+      title: string;
+      defaultModel: string;
+      driver?: string;
+      rules?: { platform?: unknown; ours?: unknown };
+    };
+  }[];
 }
 
 function reasonOf(answer: InjectAnswer): string {
@@ -51,18 +70,30 @@ function fail(code: LocalMessageCode, step: string, answer: InjectAnswer): Error
   return localError(code, `${step}: ${reason}`, { reason });
 }
 
+/**
+ * Наши слои локального контура по умолчанию (L1b, замер 13.10.2026): базовый
+ * промпт Claude Code на этой машине — около 46 тыс. токенов при окне 65536, и
+ * сжатие срабатывает на каждом ходу. Без MCP-серверов (около 19 тыс.) и с рабочим
+ * набором инструментов (минус около 11 тыс.) он укладывается в 16 тыс.; правила,
+ * хуки и скиллы человека остаются — их можно вернуть на карточке контура.
+ */
+export function localLeanRules(): OurRules {
+  return { ...defaultOurRules(), mcp: false, tools: false };
+}
+
 export function localPlatformSettings(input: {
   baseUrl: string;
   model: string;
   title: string;
   consumers: string[];
+  /** Правила действующего контура этого же вида — переживают повторное «Подключить». */
+  rules?: Record<string, unknown>;
 }): Record<string, unknown> {
   return {
     id: LOCAL_PLATFORM_ID,
     title: input.title,
-    driver: 'ollama',
-    // Адрес с версией: так его ждёт пресет `ollama` (`/v1`), а путь Anthropic
-    // шлюз строит сам.
+    driver: LOCAL_DRIVER,
+    // Адрес с версией: так его ждёт пресет (`/v1`), а путь Anthropic шлюз строит сам.
     baseUrl: `${input.baseUrl.replace(/\/$/, '')}/v1`,
     enabled: true,
     mode: 'required',
@@ -75,6 +106,7 @@ export function localPlatformSettings(input: {
     capabilities: ['models', 'chat', 'client-tools'],
     consumers: input.consumers,
     defaultModel: input.model,
+    rules: input.rules ?? { platform: defaultPlatformRules(), ours: localLeanRules() },
   };
 }
 
@@ -107,12 +139,26 @@ export async function connectLocal(
   inject: Inject,
   input: { baseUrl: string; model: string; title: string },
 ): Promise<unknown> {
+  // Контур этого же вида уже есть — его слои человек мог править на карточке, и
+  // повторное «Подключить» их не сбрасывает. Контур старого вида (Ollama) или
+  // новый получает облегчённый набор.
+  const known = await inject({ method: 'GET', url: '/api/platforms' });
+  const own =
+    known.status < 400
+      ? (known.body as Partial<PlatformsInfoLite>).platforms?.find(
+          (item) => item.platform.id === LOCAL_PLATFORM_ID,
+        )
+      : undefined;
+  const rules =
+    own?.platform.driver === LOCAL_DRIVER && own.platform.rules
+      ? (own.platform.rules as Record<string, unknown>)
+      : undefined;
   const put = async (consumers: string[]): Promise<void> => {
     const answer = await inject({
       method: 'PUT',
       url: `/api/platforms/${LOCAL_PLATFORM_ID}`,
       payload: {
-        settings: localPlatformSettings({ ...input, consumers }),
+        settings: localPlatformSettings({ ...input, consumers, ...(rules ? { rules } : {}) }),
         token: LOCAL_PLATFORM_TOKEN,
       },
     });

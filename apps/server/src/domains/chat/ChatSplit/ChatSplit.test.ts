@@ -981,6 +981,64 @@ describe('группа ревью по ссылке', () => {
     expect(started[0]?.prompt).toContain('it is branched from the base');
   });
 
+  describe('стенд и база ревью (T5, T7)', () => {
+    const CONTAINER = {
+      name: 'agentdeck-review-abc123',
+      image: 'postgres:16.4',
+      startedAt: '2026-10-13T12:00:00.000Z',
+    };
+    const standGit = (released: string[] = []) =>
+      fakeGit({
+        reviewEnvironment: async () => ({
+          text: 'Database: a throwaway PostgreSQL 16.4 runs for THIS review.',
+          container: CONTAINER,
+        }),
+        releaseReviewStand: async (container) => void released.push(container.name),
+      });
+
+    it('абзац про стенд — в задании ревью, контейнер — в ответе разделения', async () => {
+      const released: string[] = [];
+      const { started, result } = await split({ git: standGit(released) });
+      expect(started[0]?.prompt).toContain('a throwaway PostgreSQL 16.4 runs for THIS review');
+      expect(result.chats[0]?.reviewStand).toEqual(CONTAINER);
+      expect(released).toEqual([]);
+    });
+
+    it('обычной группе (не ревью) стенд не заводится вовсе', async () => {
+      const calls: string[] = [];
+      const git = fakeGit({
+        reviewEnvironment: async () => {
+          calls.push('called');
+          return undefined;
+        },
+      });
+      await split(
+        { git },
+        { groups: [{ title: 'Форма', branch: 'fix/form', tasks: ['поправь форму'] }] },
+      );
+      expect(calls).toEqual([]);
+    });
+
+    it('группа не стартовала — база снимается, а не остаётся висеть', async () => {
+      const released: string[] = [];
+      const { result } = await split({ git: standGit(released), start: () => false });
+      expect(result.chats[0]?.started).toBe(false);
+      expect(result.chats[0]?.reviewStand).toBeUndefined();
+      expect(released).toEqual(['agentdeck-review-abc123']);
+    });
+
+    it('сбой самого стенда группу не держит: задание уходит без абзаца', async () => {
+      const git = fakeGit({
+        reviewEnvironment: async () => {
+          throw new Error('docker exploded');
+        },
+      });
+      const { started, result } = await split({ git });
+      expect(result.failures).toEqual([]);
+      expect(started[0]?.prompt).not.toContain('Database:');
+    });
+  });
+
   it('задание — ревью MR, а не задание группы: править и писать в MR запрещено прямо', async () => {
     const { started } = await split({ resolveReview: async () => ({ branch: 'feature/login' }) });
 

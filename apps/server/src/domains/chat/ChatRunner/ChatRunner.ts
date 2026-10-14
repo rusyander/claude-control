@@ -28,6 +28,9 @@ import { isRelayLost } from '../live-transport/live-transport.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { watchCliChild } from '../../../lib/cli-spawn/cli-spawn.ts';
 import type { LedgerRelay } from '../run-ledger/run-ledger.ts';
+
+/** Сколько последних знаков stderr разового прогона хранится до выхода процесса. */
+export const RUN_STDERR_MAX = 16_384;
 import { CHILD_DENIED_TOOLS, childAppend } from '../initiative/initiative.ts';
 import { SyntheticGate } from '../synthetic-gate.ts';
 import { autoPickResults, picksFor } from '../auto-pick/auto-pick.ts';
@@ -57,14 +60,21 @@ const isWindows = process.platform === 'win32';
  * берёт подпись живой сессии — иначе процесс из пула держал бы старый промпт.
  */
 function appendedOf(options: RunOptions): string {
-  if (options.platformDropAppend) return '';
-  return [
-    options.child ? childAppend(options.appendSystemPrompt) : (options.appendSystemPrompt ?? ''),
-    options.workspaceNote ?? '',
-  ]
-    .filter((part) => part.trim())
-    .join('\n\n')
-    .trim();
+  // Блок набора (`platformAppend`) — не наша дописка и слоем «системный промпт»
+  // не снимается: он выбран на странице набора, а не расчётом контура.
+  const kit = options.platformAppend?.trim() ?? '';
+  const ours = options.platformDropAppend
+    ? ''
+    : [
+        options.child
+          ? childAppend(options.appendSystemPrompt)
+          : (options.appendSystemPrompt ?? ''),
+        options.workspaceNote ?? '',
+      ]
+        .filter((part) => part.trim())
+        .join('\n\n')
+        .trim();
+  return [ours, kit].filter(Boolean).join('\n\n');
 }
 
 /**
@@ -205,6 +215,20 @@ export interface RunOptions {
    * ставит на КАЖДОМ старте, поэтому прошлая жизнь прогона его не переживает.
    */
   platformDropAppend?: boolean;
+  /**
+   * Блок набора панели к системному промпту, когда флага плагина нет: сейчас —
+   * дисциплина локальной модели при режиме «глобальные». Реестр ставит его на
+   * КАЖДОМ старте, по той же причине, что и остальные `platform*`: прошлая жизнь
+   * прогона его не переживает.
+   */
+  platformAppend?: string;
+  /**
+   * MCP-серверы, взятые человеком в локальный прогон (L4): записи из его файлов
+   * настроек. Прогон идёт с `--strict-mcp-config`, который унёс бы все серверы, и
+   * эти приезжают своим `--mcp-config` — так же, как брокер прав. Реестр ставит поле на
+   * КАЖДОМ старте: выбор человека меняется между ходами.
+   */
+  platformMcp?: { ids: string[]; config: unknown };
   /**
    * Права на действия с файлами. В песочнице — acceptEdits: там файлы Claude
    * и есть результат. В настоящем проекте по умолчанию `default`: чтение
@@ -500,6 +524,14 @@ export class ChatRun {
       args.push('--settings', file);
     }
 
+    // Взятые в локальный прогон MCP-серверы: свой файл и свой флаг, отдельно от брокера
+    // прав — тот пишется только при подтверждениях, а эти нужны и при полном доступе.
+    if (options.platformMcp?.ids.length) {
+      const file = join(this.ensureTempDir(), 'local-mcp.json');
+      writeFileSync(file, JSON.stringify(options.platformMcp.config), 'utf8');
+      args.push('--mcp-config', file);
+    }
+
     // Интерактивные права: добавляем свой MCP-сервер и указываем его инструмент
     // как обработчик запросов на разрешение. Конфиг сливается с настоящим (без
     // --strict-mcp-config), поэтому пользовательские MCP-серверы остаются. При
@@ -710,6 +742,7 @@ export class ChatRun {
       platformEnv: options.platformEnv ?? {},
       platformSystemPrompt: options.platformSystemPrompt?.trim() ?? '',
       platformArgs: options.platformArgs ?? [],
+      platformMcp: options.platformMcp ?? null,
       // Та же дописка, что уходит процессу, — со строкой о тестах проекта и
       // переводами строки: папка e2e, появившаяся между ходами, меняет промпт, и
       // живой процесс со старым промптом отдавать ходу нельзя.
@@ -761,8 +794,12 @@ export class ChatRun {
     child.stdin.write(options.prompt);
     child.stdin.end();
 
-    const stderr: string[] = [];
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk.toString()));
+    // Хвост, а не всё: CLI, который ночью сыплет предупреждениями, копил бы их до выхода, а
+    // читается из них одно — последние строки, что он сказал перед смертью.
+    let stderr = '';
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-RUN_STDERR_MAX);
+    });
 
     // Расход хода и границы блоков — у трекера: по одной строке их не разобрать,
     // правда размазана по нескольким (см. stream-usage.ts). С потоковыми
@@ -797,11 +834,7 @@ export class ChatRun {
     const code = await closed;
 
     if (this.isStopped) return;
-    const failure = exitFailure(
-      command,
-      { spawnError, code, stderr: stderr.join('').trim() },
-      streamError,
-    );
+    const failure = exitFailure(command, { spawnError, code, stderr: stderr.trim() }, streamError);
     if (failure) onEvent(failure);
   }
 

@@ -740,6 +740,23 @@ export interface SplitOverlapView {
   unread: { index: number; reason: string }[];
 }
 
+/**
+ * Итог закрытия группы ревью по её рабочей копии (T13, T6/T11): ревью «ничего не
+ * правит», и всё, что осталось в копии и рядом, — факт, а не слова агента. Форма
+ * записи сервера, `SplitReviewClose`.
+ */
+export interface SplitGroupReviewClose {
+  at: string;
+  /** `git status` копии: правки и неотслеженные файлы (до 20 имён), без `node_modules` и `.venv` панели. */
+  dirt?: { total: number; files: string[] };
+  /** Временные копии, заведённые группой и убранные при закрытии (пути). */
+  scratchRemoved?: string[];
+  /** Временные копии, которые остались, и почему — человеку на карточку. */
+  scratchKept?: { path: string; why: string }[];
+  /** Одноразовая база ревью снята. */
+  standRemoved?: boolean;
+}
+
 /** Счёт токенов группы (E4) — форма записи сервера, `SplitTokenLedger`. */
 export interface SplitGroupTokenLedger {
   at: string;
@@ -865,6 +882,8 @@ export interface SplitPlanView {
        * содержимым под разными путями.
        */
       tokenLedger?: SplitGroupTokenLedger;
+      /** Итог закрытия группы ревью: что осталось в копии и что убрано рядом (T13, T6/T11). */
+      reviewClose?: SplitGroupReviewClose;
       /** Что в счёте похоже на утечку — подсветка карточки. */
       tokenFlags?: SplitGroupTokenFlag[];
       /** Медиана холодного старта по группам проекта; мало групп — нет. */

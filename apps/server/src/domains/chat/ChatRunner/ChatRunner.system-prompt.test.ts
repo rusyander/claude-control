@@ -59,7 +59,13 @@ interface SpawnCall {
  */
 async function runOn(
   platform: string,
-  extra: { appendSystemPrompt?: string; platformSystemPrompt?: string; workspaceNote?: string } = {
+  extra: {
+    appendSystemPrompt?: string;
+    platformSystemPrompt?: string;
+    platformAppend?: string;
+    platformDropAppend?: boolean;
+    workspaceNote?: string;
+  } = {
     appendSystemPrompt: APPENDED,
   },
 ): Promise<SpawnCall> {
@@ -168,6 +174,34 @@ describe('ChatRun: строка о тестах проекта', () => {
   it('без текста панели строка уходит одна', async () => {
     const call = await runOn('linux', { workspaceNote: 'QA workspace' });
     expect(call.args[call.args.indexOf('--append-system-prompt') + 1]).toBe('QA workspace');
+  });
+});
+
+describe('ChatRun: блок набора к системному промпту (L1)', () => {
+  const DISCIPLINE = '# Local model discipline\n\n- One tool call per step.';
+
+  it('на Windows уходит файлом вместе с допиской панели, строки целы', async () => {
+    const call = await runOn('win32', {
+      appendSystemPrompt: 'инициатива',
+      platformAppend: DISCIPLINE,
+    });
+    const flag = call.args.indexOf('--append-system-prompt-file');
+    expect(flag).toBeGreaterThanOrEqual(0);
+    expect(call.fileContents[call.args[flag + 1] ?? '']).toBe(`инициатива\n\n${DISCIPLINE}`);
+  });
+
+  it('слой «системный промпт» снимает нашу дописку, но не блок набора', async () => {
+    const call = await runOn('linux', {
+      appendSystemPrompt: 'инициатива',
+      platformDropAppend: true,
+      platformAppend: DISCIPLINE,
+    });
+    expect(call.args[call.args.indexOf('--append-system-prompt') + 1]).toBe(DISCIPLINE);
+  });
+
+  it('пустой блок не добавляет ничего', async () => {
+    const call = await runOn('linux', { appendSystemPrompt: 'инициатива', platformAppend: '  ' });
+    expect(call.args[call.args.indexOf('--append-system-prompt') + 1]).toBe('инициатива');
   });
 });
 

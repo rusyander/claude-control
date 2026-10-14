@@ -7,7 +7,7 @@ import { Badge } from '@shared/ui/badge';
 import { useWorktreeBootstrapLog } from '@entities/ProjectGit';
 import type { WorktreeBootstrapCardProps } from './WorktreeBootstrapCard.types';
 import styles from './WorktreeBootstrapCard.module.scss';
-import { TONE } from './WorktreeBootstrapCard.constants';
+import { RUNTIME_NAME, TONE } from './WorktreeBootstrapCard.constants';
 
 export function WorktreeBootstrapCard({
   path,
@@ -49,6 +49,33 @@ export function WorktreeBootstrapCard({
           </Button>
         )}
       </Stack>
+
+      {/* Первая настоящая ошибка — на виду: хвост лога в два экрана предупреждений её прятал. */}
+      {state.status === 'failed' && state.firstError && (
+        <Typography variant="caption" color="subtle" as="div" data-bootstrap-first-error>
+          {t('git.worktrees.bootstrapFirstError', { line: state.firstError })}
+        </Typography>
+      )}
+      {/* Версии рантайма, которые просит проект, и на чём шла подготовка. */}
+      {state.runtimes?.map((note) => (
+        <Typography
+          key={`${note.tool}:${note.where}`}
+          variant="caption"
+          color="subtle"
+          as="div"
+          title={note.detail}
+          data-bootstrap-runtime={note.status}
+        >
+          {t(`git.worktrees.bootstrapRuntime.${note.status}`, {
+            tool: RUNTIME_NAME[note.tool],
+            where: note.where ? ` (${note.where})` : '',
+            wanted: note.wanted,
+            source: note.source,
+            used: note.used ?? '?',
+            found: note.found ?? '?',
+          })}
+        </Typography>
+      ))}
 
       {open && (
         <div className={styles.log}>

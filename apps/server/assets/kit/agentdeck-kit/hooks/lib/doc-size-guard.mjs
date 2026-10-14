@@ -6,7 +6,7 @@
 // Runs as the FIRST context-group module of pre-tool-dispatch: it decides from one statSync, while every
 // other module in that dispatcher parses the transcript first. Denying here skips that work.
 // Kill-switch: AGENTDECK_KIT_DOC_SIZE=0 (CLAUDE_DOC_SIZE=0 honoured).
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 
 // Not text — size says nothing (screenshots/PDF are read differently).
 const EXEMPT =
@@ -41,6 +41,35 @@ export default function docSizeGuard(input) {
     reason:
       `[doc-size-guard] ${kb} KB file — reading it whole is denied (it would sit in context until the ` +
       `end of the session and be re-sent on every turn). Grep for the anchor you need, then Read with ` +
-      `offset/limit around the hit. Splitting/compression rules: skill doc-hygiene.`,
+      `offset/limit around the hit. Splitting/compression rules: skill doc-hygiene.` +
+      windows(filePath, size),
   };
+}
+
+const WINDOW = 400;
+const SHOWN = 8;
+const COUNT_CAP = 64 * 1024 * 1024;
+
+/**
+ * Ready Read windows for the refusal. A persisted tool result (`tool-results/*.txt`, a whole MR diff)
+ * is the file a reader most often gives up on: the refusal named no window, so the diff was
+ * skimmed instead of read (MR !988). Line count = one pass over the file, skipped above 64 MB.
+ */
+function windows(filePath, size) {
+  if (size > COUNT_CAP) return '';
+  let lines;
+  try {
+    lines = readFileSync(filePath, 'utf8').split('\n').length;
+  } catch {
+    return '';
+  }
+  const total = Math.ceil(lines / WINDOW);
+  const shown = [];
+  for (let k = 0; k < Math.min(total, SHOWN); k++)
+    shown.push(`offset=${k * WINDOW + 1} limit=${WINDOW}`);
+  const more = total > SHOWN ? `, … ${total - SHOWN} more (${total} windows)` : '';
+  const persisted = /[\\/]tool-results[\\/]/.test(filePath)
+    ? ' A persisted tool result is read to the end in these windows — a diff skimmed by grep alone is not read.'
+    : '';
+  return ` ${lines} lines; ${WINDOW}-line windows: ${shown.join('; ')}${more}.${persisted}`;
 }

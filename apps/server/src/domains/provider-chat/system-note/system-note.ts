@@ -96,3 +96,65 @@ export function writeQwenSystemNote(options: {
   pruneStaleLayers(root, digest, now);
   return { [QWEN_SYSTEM_SETTINGS_ENV]: join(dir, SETTINGS_FILE) };
 }
+
+/**
+ * Окно и сроки локальной модели для Qwen Code (L4b, бандл 0.25.0).
+ *
+ * Qwen Code не знает окна незнакомой модели и берёт по имени; на локальной оно другое, и
+ * автосжатие истории считалось бы от чужого числа. Читает он `model.generationConfig` из
+ * настроек: `contextWindowSize` (окно для сжатия и шапки), `timeout` (весь запрос) и
+ * `streamIdleTimeoutMs` (пауза в потоке; умолчание 240 с короче законного разбора
+ * промпта). Слой кладётся ПОВЕРХ уже выбранного файла системных настроек — группы и
+ * настройки администратора остаются, как у строки о каталоге.
+ */
+export interface QwenLocalLimits {
+  contextWindow: number;
+  timeoutMs: number;
+  idleMs: number;
+}
+
+export function qwenLimitLayersRoot(appData: string): string {
+  return join(appData, 'qwen-limit-layers');
+}
+
+export function writeQwenLimits(options: {
+  appData: string;
+  limits: QwenLocalLimits;
+  env: NodeJS.ProcessEnv;
+  now?: number;
+}): Record<string, string> {
+  const base = baseSystemSettings(options.env);
+  const model = objectAt(base.model);
+  const merged = {
+    ...base,
+    model: {
+      ...model,
+      generationConfig: {
+        ...objectAt(model.generationConfig),
+        contextWindowSize: options.limits.contextWindow,
+        timeout: options.limits.timeoutMs,
+        streamIdleTimeoutMs: options.limits.idleMs,
+      },
+    },
+  };
+  const digest = layerDigest({ kind: 'qwen-local-limits', merged });
+  const root = qwenLimitLayersRoot(options.appData);
+  const dir = join(root, digest);
+  const now = options.now ?? Date.now();
+  if (!existsSync(join(dir, SETTINGS_FILE))) {
+    const staging = join(root, `.${digest}-${randomUUID().slice(0, 8)}`);
+    mkdirSync(staging, { recursive: true });
+    writeJsonFile(join(staging, SETTINGS_FILE), merged);
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    try {
+      renameWithRetry(staging, dir);
+    } catch {
+      rmSync(staging, { recursive: true, force: true });
+    }
+  } else {
+    const stamp = new Date(now);
+    utimesSync(dir, stamp, stamp);
+  }
+  pruneStaleLayers(root, digest, now);
+  return { [QWEN_SYSTEM_SETTINGS_ENV]: join(dir, SETTINGS_FILE) };
+}

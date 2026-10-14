@@ -1,0 +1,56 @@
+{
+  "title": {
+    "ru": "Локальные модели работают на llama.cpp вместо Ollama: генерация быстрее, модели из Ollama забираются без повторной загрузки",
+    "en": "Local models run on llama.cpp instead of Ollama: faster generation, Ollama models are taken over without downloading again"
+  },
+  "items": [
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Сервер локальных моделей — llama.cpp (llama-server) закреплённой сборки. Панель скачивает его сама: архив выбирается по видеокарте и версии драйвера, контрольная сумма сверяется с той, что посчитал GitHub. Ollama не запускается и не нужна; установленная у человека Ollama не меняется.",
+        "en": "The local model server is llama.cpp (llama-server) in a pinned build. The panel downloads it itself: the archive is picked by the graphics card and driver version, and the checksum is compared with the one GitHub computed. Ollama is not started and not needed; an Ollama installed by the user is left as it is."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Qwen3.6 27B с предсказанием нескольких токенов (слой MTP): 82 токена в секунду вместо 47 на той же видеокарте при окне 65 536; ускорение включается само, если слой есть в файле. Подсчёт токенов запроса идёт через сервер модели и отвечает за десятки миллисекунд.",
+        "en": "Qwen3.6 27B with multi-token prediction (the MTP layer): 82 tokens a second instead of 47 on the same card with a 65,536 window; the speed-up turns on by itself when the layer is in the file. Request token counting goes through the model server and answers in tens of milliseconds."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Модели скачиваются из репозиториев Hugging Face файлом GGUF нужного квантования с докачкой и проверкой суммы; файл без суммы в репозитории не принимается.",
+        "en": "Models are downloaded from Hugging Face repositories as a GGUF file of the chosen quantization, with resume and a checksum check; a file without a checksum in the repository is refused."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Модели, уже скачанные в Ollama, забираются жёсткой ссылкой на слой с весами — вторая копия на диске не появляется. Перед записью в установленные модель открывается в llama.cpp на процессоре; если не открылась, ссылка убирается, причина показывается в разделе, а модель предлагается скачать заново.",
+        "en": "Models already downloaded in Ollama are taken over by a hard link to the weights layer, so no second copy appears on disk. Before being listed as installed the model is opened in llama.cpp on the processor; if it does not open, the link is removed, the reason is shown in the section and the model is offered for a fresh download."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Модель остаётся в видеопамяти, пока работает сервер; «Остановить и освободить память» останавливает сервер, и память возвращается сразу. Сервер перезапускается, когда меняются модель, файл, окно, кеш, устройство или MTP.",
+        "en": "The model stays in video memory while the server runs; “Stop and free memory” stops the server and the memory comes back at once. The server restarts when the model, file, window, cache, device or MTP changes."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели»: откуда берётся сервер, как забираются модели из Ollama, что происходит с видеопамятью.",
+        "en": "The “Local models” help: where the server comes from, how Ollama models are taken over, what happens to video memory."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

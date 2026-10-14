@@ -123,7 +123,14 @@ describe('settings-validation: контуры', () => {
         generationPreset: 'creative',
         enableThinking: 'off',
       },
-      ours: { enabled: true, settings: false, skills: true, mcp: false, systemPrompt: true },
+      ours: {
+        enabled: true,
+        settings: false,
+        skills: true,
+        mcp: false,
+        systemPrompt: true,
+        tools: false,
+      },
     },
     caCertPath: 'c:/certs/corp-root.pem',
     // Транспорт (DRV-04/05): вырезанный молча заголовок ключа означал бы, что
@@ -235,7 +242,14 @@ describe('settings-validation: контуры', () => {
         // Умолчание слоёв — «всё наше едет»: контур, настроенный до Т8, обязан
         // вести себя ровно как до неё. Умолчание `false` тихо сняло бы человеку
         // правила, хуки и права на каждом прогоне.
-        ours: { enabled: true, settings: true, skills: true, mcp: true, systemPrompt: true },
+        ours: {
+          enabled: true,
+          settings: true,
+          skills: true,
+          mcp: true,
+          systemPrompt: true,
+          tools: true,
+        },
       });
     }
   });

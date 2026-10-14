@@ -451,6 +451,36 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     expect(prompt).toContain('QA workspace: two</agentdeck-workspace>\n\nещё');
   });
 
+  /**
+   * L4: выбор MCP локального прогона читается на КАЖДОМ старте и по каталогу этого
+   * прогона. Снятый выбор не переживает продолжение остановленного прогона: в его
+   * сохранённых параметрах поле старое, и без перезаписи сервер ехал бы дальше.
+   */
+  it('MCP локального прогона спрашивается по каталогу прогона и снимается, когда выбора нет', () => {
+    const asked: string[] = [];
+    let picked: string[] = ['gitlab'];
+    registry.setPlatformRouting(() => ({
+      env: {},
+      localMcp: (cwd) => {
+        asked.push(cwd);
+        return picked.length
+          ? {
+              ids: picked,
+              config: { mcpServers: Object.fromEntries(picked.map((id) => [id, {}])) },
+            }
+          : undefined;
+      },
+    }));
+
+    registry.start('m1', OPTIONS, {});
+    expect(asked).toEqual([OPTIONS.cwd]);
+    expect(registry.describe('m1')?.options.platformMcp?.ids).toEqual(['gitlab']);
+
+    picked = [];
+    registry.start('m2', registry.describe('m1')?.options ?? OPTIONS, {});
+    expect(registry.describe('m2')?.options.platformMcp).toBeUndefined();
+  });
+
   it('маршрута нет — флагов нет, и дописка панели остаётся как была', () => {
     registry.start('c5', { ...OPTIONS, appendSystemPrompt: 'инициатива панели' }, {});
     const options = registry.describe('c5')?.options;

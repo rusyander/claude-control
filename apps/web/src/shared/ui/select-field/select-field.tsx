@@ -27,7 +27,7 @@ export function SelectField({ label, value, onChange, options, hint }: SelectFie
         aria-describedby={hint ? hintId : undefined}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </option>
         ))}

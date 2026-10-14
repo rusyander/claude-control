@@ -25,16 +25,16 @@ export const localModelsEn: typeof localModelsRu = {
   },
   runtime: {
     title: 'Model server',
-    what: 'Ollama is the program that keeps a model in video memory and answers the agents. The panel starts it itself, on its own port, with its own model folder.',
+    what: 'llama.cpp is the program that keeps a model in video memory and answers the agents. The panel downloads it itself, starts it on its own port and stops it with a button.',
     none: 'Not installed.',
     download: 'Download',
     downloadSize: 'Download (~{{size}} GB)',
-    system: 'Found on this system and used as is, nothing else to download:',
+    system: 'Set by the LLAMA_SERVER_BINARY variable and used as is, nothing else to download:',
     panel: 'The panel’s own copy:',
-    version: 'Version {{version}}',
+    version: 'Build {{version}}',
     versionUnknown: 'The version is known after the first start',
     outdated:
-      'Version {{version}} is older than required ({{min}}); it does not know some catalog models. Download the panel’s own copy.',
+      'Build {{version}} is older than required ({{min}}); it does not know some catalog models. Download the panel’s own copy.',
     ownCopy: 'Download own copy',
     running: 'Running on port {{port}}',
     stopped: 'Stopped',
@@ -73,17 +73,15 @@ export const localModelsEn: typeof localModelsRu = {
       'cpu-slow': 'Too slow for an agent on the processor — fine for questions',
     },
     size: 'Size {{size}} GB',
-    contextLine: 'Context {{value}}K',
-    need: 'Needs {{need}} GB',
     speed: '≈{{low}}\u2060–\u2060{{high}}\u00a0tok/\u2060s',
     speedEstimate: 'estimate',
     measured: 'Measured: {{value}}\u00a0tok/\u2060s',
     measuredOn: 'Measured on the {{where}}: {{value}}\u00a0tok/\u2060s',
     measuredWhere: { gpu: 'video card', cpu: 'processor' },
     download: 'Download',
-    import: 'Take from system Ollama',
+    import: 'Take from Ollama',
     importHint:
-      'Already downloaded in your Ollama: moved over without downloading and without a second copy on disk',
+      'Already downloaded in your Ollama: llama.cpp opens its file without downloading again and without a second copy on disk; Ollama itself is not started',
     use: 'Hand to agents',
     inUse: 'Used by agents',
     bench: 'Measure',
@@ -95,6 +93,77 @@ export const localModelsEn: typeof localModelsRu = {
     removed: 'Model deleted',
     foreignTitle: 'Other installed',
     foreignHint: 'In the panel folder but not in the catalog: installed separately.',
+    measuredWith: '{{context}}, {{quant}}',
+    benchStale: {
+      other: 'measured at another choice',
+      unknown: 'measured at unknown settings',
+    },
+    downloadQuant: 'Download {{quant}} · {{size}} GB',
+    quantMissing: 'No {{quant}} file on disk: download it (on disk: {{quants}})',
+    facts: {
+      group: 'Estimate for the selected values: {{title}}',
+      title: 'On this machine',
+      speed: 'Speed',
+      memory: 'Memory',
+      file: 'File',
+      bench: 'Measured',
+      benchOn: 'Measured on {{where}}',
+      need: '{{need}} of {{available}}\u00a0GB',
+      gb: '{{value}}\u00a0GB',
+      tps: '{{value}}\u00a0tok/\u2060s',
+      contextOf: 'at context {{value}}',
+    },
+    selects: {
+      title: 'Launch settings',
+      group: 'Quantization and context of {{title}}',
+      quant: 'Quantization',
+      context: 'Context',
+      quantOption: '{{id}} · {{size}} GB',
+      installedMark: 'downloaded',
+      fromOllama: 'imported from Ollama',
+      noFit: 'does not fit: needs {{need}} GB of {{available}}',
+      partial: 'partly in system memory, slow',
+      agentMin: 'too small for an agent: under {{min}}K',
+      allowPartial: 'Partly in system memory',
+      needOf: 'needs {{need}} GB of {{available}}',
+      kvQ4: 'cache q4_0',
+      recommended: 'recommended',
+      lowQuality: 'low quality',
+      unknownQuant: 'unknown quantization',
+      apply: 'Apply',
+      lowNote: 'noticeably lower quality',
+      hintGpu: 'For your graphics card ({{gb}} GB): {{quant}} · {{context}}',
+      hintCpu: 'For your system memory ({{gb}} GB for the model): {{quant}} · {{context}}',
+      hintOnGpu:
+        'The recommended pick for your graphics card ({{gb}} GB) is selected: {{quant}} · {{context}}',
+      hintOnCpu:
+        'The recommended pick for your system memory ({{gb}} GB for the model) is selected: {{quant}} · {{context}}',
+      hintNoneGpu: 'Nothing fits entirely on your graphics card ({{gb}} GB) even at {{min}}K',
+      hintNoneCpu: 'Nothing fits in your system memory ({{gb}} GB for the model) even at {{min}}K',
+    },
+    basis:
+      'What fits is computed from the video memory available to the model now: {{available}} GB of {{total}} (free {{free}} GB). Change one list and the other is recomputed.',
+    basisNoFree:
+      'What fits is computed from the card’s video memory minus the desktop: {{available}} GB of {{total}}. Change one list and the other is recomputed.',
+    basisCpu:
+      'The model runs on the processor: what fits is computed from system memory, {{available}} GB. Change one list and the other is recomputed.',
+    custom: {
+      badge: 'Custom',
+      unchecked: 'Tool calling not verified',
+      uncheckedHint:
+        'Whether the model calls tools is learned at “Hand to agents”: the panel checks it with one request.',
+      failed: 'Does not call tools',
+      title: 'Any model',
+      hint: 'Any Hugging Face repository with GGUF files: give owner and repository or paste a link. The panel reads the quantization list and the model layout without downloading anything.',
+      label: 'Repository or link',
+      placeholder: 'unsloth/Qwen3.6-27B-GGUF',
+      add: 'Add',
+      added: 'Added: {{title}}',
+      removeCustomTitle: 'Remove the model from the list?',
+      removeCustomText:
+        'The entry {{tag}} disappears from the list and the downloaded files ({{size}} GB) are deleted.',
+      removeCustomEmpty: 'The entry {{tag}} disappears from the list. No files are downloaded.',
+    },
   },
   job: {
     phase: {
@@ -110,6 +179,7 @@ export const localModelsEn: typeof localModelsRu = {
       connect: 'Handing to agents…',
       import: 'Moving',
       install: 'Installing',
+      restart: 'Restarting with the new settings…',
     },
     bytes: '{{done}} of {{total}} GB',
     packages: 'Packages fetched: {{count}}',
@@ -149,6 +219,35 @@ export const localModelsEn: typeof localModelsRu = {
       'The processor is selected, but the server put {{size}} GB into video memory: the choice has no effect on this system (this happens with Metal on a Mac).',
     spilled:
       'The model did not fit into video memory entirely — part of it runs on the processor, which is slow. Free the card or take a smaller model.',
+  },
+  keepLoaded: {
+    toggle: 'Keep the model loaded',
+    off: 'The model is unloaded from memory after {{minutes}} min without requests — video and system memory are freed. The first request after idle loads it again: a few seconds on a 7B, longer on bigger ones.',
+    on: 'The model stays in memory while the server runs: the first request after idle answers at once, but video memory stays taken.',
+    sleeping:
+      'The model is unloaded by idle right now: memory is free, the next request loads it again.',
+    saved: 'Setting saved, the model server restarted',
+    savedIdle: 'Setting saved, it applies the next time the model server starts',
+  },
+  pending: {
+    saved: 'Setting saved, it applies after the current run',
+    note: 'Setting saved: the model server restarts after the current run — a restart in the middle of a task would break it.',
+    failed:
+      'Setting saved, but the model server did not restart after the run (two attempts): {{reason}}. Start the server yourself — it comes up with the saved choice.',
+  },
+  keepAwake: {
+    toggle: 'Keep the system awake during a run',
+    on: 'While a run on the local model is going, the computer does not go to sleep: an overnight task does not freeze halfway. The screen may still turn off. With no runs the block is released.',
+    off: 'The sleep block is off: if the computer sleeps in the middle of a run, the run breaks off.',
+    holding: 'A run is going now — the sleep block is on.',
+  },
+  serverNotice: {
+    restarted:
+      'The model server went down and was brought back at {{time}}. Restarts in the last 10 minutes: {{count}}.',
+    failed:
+      'The model server went down and the restart at {{time}} failed{{reason}}. Restarts in the last 10 minutes: {{count}}.',
+    gaveUp:
+      'The model server will not come up: {{count}} attempts so far{{reason}}. The panel tries again every 10 minutes, next at {{next}}; you can also start the server yourself.',
   },
   claude: {
     toggle: 'Claude Code on this model',

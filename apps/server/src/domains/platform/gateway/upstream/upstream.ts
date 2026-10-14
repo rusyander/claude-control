@@ -1,5 +1,9 @@
 import type { Platform } from '@agentdeck/contracts';
-import { createCaStreamFetch, type PlatformFetch } from '../../ca-fetch/ca-fetch.ts';
+import {
+  createCaStreamFetch,
+  createLoopbackStreamFetch,
+  type PlatformFetch,
+} from '../../ca-fetch/ca-fetch.ts';
 import { headerUnsafeKeyReason } from '../../errors.ts';
 import { contourHeaders, contourUrl } from '../../transport/transport.ts';
 import { serverText } from '../../../../lib/server-texts/server-texts.ts';
@@ -101,6 +105,12 @@ export interface UpstreamCall {
    */
   headersTimeoutMs?: number;
   /**
+   * Собеседник — локальная модель: до первого байта она обрабатывает весь
+   * промпт, и обрыв по потолку значит «запрос слишком длинный для отведённого
+   * времени», а не «контур умер». Меняет только слова отказа.
+   */
+  local?: boolean;
+  /**
    * Заголовки протокола (`anthropic-version`). Лежат ПОД заголовками контура:
    * ни ключ, ни настроенные человеком заголовки ими не перебиваются.
    */
@@ -110,7 +120,18 @@ export interface UpstreamCall {
 }
 
 /** Не дошли до контура. Причина уже пригодна для показа человеку. */
-export class UpstreamError extends Error {}
+export class UpstreamError extends Error {
+  /**
+   * Почему не дошли. `connection` — соединение не открылось или оборвалось (сервер не
+   * слушает порт, сброс): для локального сервера это повод поднять его заново, а не
+   * показывать отказ. Прочее (потолок ожидания, сертификат, заголовок) — `other`.
+   */
+  readonly kind: 'connection' | 'other';
+  constructor(message: string, kind: 'connection' | 'other' = 'other') {
+    super(message);
+    this.kind = kind;
+  }
+}
 
 /** Адрес запроса к контуру. Ключа в нём нет никогда — он в заголовке. */
 export function upstreamUrl(platform: Platform, path: string): string {
@@ -193,6 +214,8 @@ export function retryAfterSeconds(response: Response, now = Date.now()): number 
   return Math.ceil(waitMs / 1_000);
 }
 
+const loopbackFetch = createLoopbackStreamFetch();
+
 /**
  * Отправить запрос в контур. Бросает `UpstreamError` с русской причиной — и
  * никогда не пробует другой адрес.
@@ -203,7 +226,9 @@ export function retryAfterSeconds(response: Response, now = Date.now()): number 
  */
 export async function callUpstream(call: UpstreamCall): Promise<Response> {
   const url = upstreamUrl(call.platform, call.path);
-  const fetchImpl = call.fetchImpl ?? createCaStreamFetch(call.platform.caCertPath);
+  // Локальный сервер — по `node:http`: потолки встроенного `fetch` короче законного разбора промпта.
+  const fetchImpl =
+    call.fetchImpl ?? (call.local ? loopbackFetch : createCaStreamFetch(call.platform.caCertPath));
 
   const attempt = async (): Promise<Response> => {
     // Свой потолок стоит на ЗАГОЛОВКАХ, а не на всём запросе: таймер, доживший до
@@ -238,7 +263,10 @@ export async function callUpstream(call: UpstreamCall): Promise<Response> {
       // Потолок называется тот, что действительно стоял: у не-потоковой ручки
       // он свой, и «не ответил за 60 с» про вызов с бюджетом в две минуты —
       // это неверная причина, по которой чинят не то.
-      throw new UpstreamError(describeFailure(error, headersTimeout));
+      throw new UpstreamError(
+        describeFailure(error, headersTimeout, call.local === true),
+        failureKind(error),
+      );
     } finally {
       // Снимается ТОЛЬКО таймер заголовков. Мост отмены остаётся жить: ответ
       // отдан потоком, и уход клиента через минуту после заголовков обязан
@@ -306,16 +334,37 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+/** Соединение не открылось или оборвалось: код сокета в причине (undici прячет его в `cause`). */
+export function failureKind(error: unknown): 'connection' | 'other' {
+  const chain: string[] = [];
+  for (let item: unknown = error, depth = 0; item && depth < 4; depth += 1) {
+    if (item instanceof Error) {
+      chain.push(item.message, (item as { code?: string }).code ?? '');
+      item = (item as { cause?: unknown }).cause;
+    } else {
+      chain.push(String(item));
+      break;
+    }
+  }
+  return /ECONNREFUSED|ECONNRESET|EPIPE|ECONNABORTED|socket hang up|other side closed|UND_ERR_SOCKET/i.test(
+    chain.join(' '),
+  )
+    ? 'connection'
+    : 'other';
+}
+
 /**
  * Почему не дошли — словами и БЕЗ чужого текста заголовков: прокси и шлюзы
  * кладут в сообщение об ошибке весь запрос вместе с `Authorization`.
  */
-function describeFailure(error: unknown, headersTimeoutMs: number): string {
+function describeFailure(error: unknown, headersTimeoutMs: number, local = false): string {
   const name = error instanceof Error ? error.name : '';
   if (name === 'TimeoutError' || name === 'AbortError' || name === 'Error') {
     const message = error instanceof Error ? error.message : '';
     if (message === 'timeout' || name === 'TimeoutError') {
-      return serverText('gateway-headers-timeout', { seconds: headersTimeoutMs / 1_000 });
+      return serverText(local ? 'gateway-headers-timeout-local' : 'gateway-headers-timeout', {
+        seconds: headersTimeoutMs / 1_000,
+      });
     }
   }
   const reason = error instanceof Error ? error.message : String(error);

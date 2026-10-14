@@ -7,8 +7,11 @@ import {
   reviewDepthGaps,
   reviewDepthPrompt,
   reviewRetryPrompt,
+  ownerTraceRetryPrompt,
   scanReviewBlocks,
+  type ReviewDepthGap,
 } from '@agentdeck/contracts/model-cascade';
+import { OWNER_REQUEST_OPENER } from '@agentdeck/contracts/quality-floor';
 import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { SplitReviewOutcome, SplitReviewView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink, ChatReviewState } from '../../../lib/app-store/app-store.types.ts';
@@ -18,6 +21,7 @@ import {
   linkIdentity,
 } from '../../../lib/app-store/chat-links.ts';
 import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
+import { ownerTraceUnparsed } from '../owner-coverage/owner-coverage.ts';
 
 /**
  * Ревью запроса на слияние по ссылке (Т7): замечания в связь, решение — человеку.
@@ -337,13 +341,25 @@ export class SplitReview {
     }
     // Отчёт о глубине судит панель (U4): неполное ревью один раз уходит той же
     // сессии дочитать; что осталось и после этого — на карточку, а не «чисто».
-    const gaps = reviewDepthGaps(scan.depth);
+    const gaps: ReviewDepthGap[] = reviewDepthGaps(scan.depth);
     if (
       gaps.length > 0 &&
       !review.depthAsked &&
       this.followUp(input.aliases, link, rest, reviewDepthPrompt(gaps), { depthAsked: at })
     ) {
       return undefined;
+    }
+    // След требований чужой схемы (T21): блок есть, а панель его не разобрала —
+    // пункты владельца «не разобраны», не «выполнены». Одна просьба переписать в
+    // той же сессии; не вышло — «trace» на карточку рядом с неполной глубиной.
+    if (ownerTraceUnparsed(text, Boolean(link.task?.includes(OWNER_REQUEST_OPENER)))) {
+      if (
+        !review.traceAsked &&
+        this.followUp(input.aliases, link, rest, ownerTraceRetryPrompt(), { traceAsked: at })
+      ) {
+        return undefined;
+      }
+      gaps.push('trace');
     }
     const findings = scan.findings;
     const tier = scan.depth?.tier;
@@ -401,7 +417,7 @@ export class SplitReview {
     link: ChatLink,
     review: ChatReviewState,
     prompt: string,
-    mark: Pick<ChatReviewState, 'missingAsked' | 'depthAsked'>,
+    mark: Pick<ChatReviewState, 'missingAsked' | 'depthAsked' | 'traceAsked'>,
   ): boolean {
     const session = sessionKeyOf(aliases);
     if (!session) return false;
@@ -441,6 +457,7 @@ export class SplitReview {
       decidedAt: _a,
       missingAsked: _m,
       depthAsked: _p,
+      traceAsked: _t,
       ...base
     } = review;
     const { conversation: _c, sieveRows: _s, reviewedAt: _r, ...carried } = link;

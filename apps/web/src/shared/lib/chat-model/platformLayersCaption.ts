@@ -10,6 +10,8 @@ export interface PlatformLayersCaption {
    * карточкой контура, и вторая их копия здесь разошлась бы с первой.
    */
   dropped: OurLayerId[];
+  /** MCP-серверы, взятые человеком в локальный прогон (L4): они едут, хотя слой снят. */
+  picked: string[];
 }
 
 /**
@@ -22,8 +24,13 @@ export interface PlatformLayersCaption {
  */
 export function platformLayersCaption(
   layers: PlatformRunLayers | undefined,
+  localMcp?: { picked: string[] },
 ): PlatformLayersCaption | undefined {
   if (!layers || layers.dropped.length === 0) return undefined;
   const all = layers.dropped.length === ourLayerIds.length;
-  return { key: all ? 'chat.platformLayersAll' : 'chat.platformLayers', dropped: layers.dropped };
+  return {
+    key: all ? 'chat.platformLayersAll' : 'chat.platformLayers',
+    dropped: layers.dropped,
+    picked: layers.dropped.includes('mcp') ? (localMcp?.picked ?? []) : [],
+  };
 }

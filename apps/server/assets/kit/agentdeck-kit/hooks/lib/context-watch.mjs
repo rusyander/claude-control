@@ -19,6 +19,28 @@ const FLOOR = 150_000; // below this the session is cheap; saying anything is pu
 const BUCKET = 25_000; // one message per this much growth
 const URGENT = 260_000; // auto-compact is close — stop deferring the write
 
+/**
+ * Thresholds for the run. The numbers above are the cloud window's (300k auto-compact): half,
+ * a twelfth, 87%. A local model runs a 16-128k window, so 150k never arrives and the file
+ * would stay unwritten until compaction wiped the context. On a local run the panel exports the
+ * window it compacts at (CLAUDE_CODE_AUTO_COMPACT_WINDOW); the same proportions apply to it.
+ * No readable window → the cloud numbers.
+ * @returns {{floor:number, bucket:number, urgent:number, window:number|null}}
+ */
+export function limitsFor(env = process.env) {
+  const local = String(env.AGENTDECK_KIT_VARIANT ?? '').trim() === 'local';
+  const window = Number(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW);
+  if (!local || !Number.isFinite(window) || window < 8_000) {
+    return { floor: FLOOR, bucket: BUCKET, urgent: URGENT, window: null };
+  }
+  return {
+    floor: Math.round(window * 0.5),
+    bucket: Math.max(2_000, Math.round(window / 12)),
+    urgent: Math.round(window * 0.85),
+    window,
+  };
+}
+
 /** @returns {string|null} one short instruction, or null. */
 export default function contextWatch(input) {
   if (process.env.AGENTDECK_KIT_CONTEXT_WATCH === '0' || process.env.CLAUDE_CONTEXT_WATCH === '0')
@@ -26,15 +48,26 @@ export default function contextWatch(input) {
   const path = String(input?.transcript_path ?? '');
   if (!path || !existsSync(path)) return null;
 
+  const limits = limitsFor();
   const ctx = lastContextTokens(path);
-  if (!ctx || ctx < FLOOR) return null;
+  if (!ctx || ctx < limits.floor) return null;
 
-  const bucket = Math.floor(ctx / BUCKET);
+  const bucket = Math.floor(ctx / limits.bucket);
   const session = String(input?.session_id ?? 'x').slice(0, 12);
   if (alreadySent(session, bucket)) return null;
 
   const k = Math.round(ctx / 1000);
-  if (ctx >= URGENT) {
+  if (limits.window !== null) {
+    // Local model: nothing is billed, the window is small and compaction takes everything not on disk.
+    const of = `${k}k of ${Math.round(limits.window / 1000)}k`;
+    return ctx >= limits.urgent
+      ? `[context-watch] ctx ${of}, compaction near. NOW, before the next step, update ` +
+          `.agent/PROGRESS.md (create it if missing): done / in progress / left / decisions / paths. ` +
+          `After compaction only that file survives. Files by path, not content. Then continue the task.`
+      : `[context-watch] ctx ${of}. Update .agent/PROGRESS.md (create it if missing): done / in ` +
+          `progress / left / decisions / paths, briefly, then carry on — this counter is not a deadline.`;
+  }
+  if (ctx >= limits.urgent) {
     return (
       `[context-watch] ctx ${k}k, auto-compact near. NOW, before the next step, update ` +
       `.agent/PROGRESS.md: done+verified / in progress / left+blockers / decisions / key paths / ` +

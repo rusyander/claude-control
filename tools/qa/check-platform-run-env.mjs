@@ -89,6 +89,8 @@ function removeDir(dir) {
 }
 /** Копия системного промпта, снятая фальшивым CLI, пока файл панели ещё жив. */
 const SYSTEM_PROMPT_COPY = 'cc-system-prompt.txt';
+/** Копия дописки `--append-system-prompt-file`: на Windows дописка панели едет только файлом. */
+const APPEND_PROMPT_COPY = 'cc-append-prompt.txt';
 /** Чужой CLI для проверки: у него задокументирован и неинтерактивный флаг, и раздел переменных. */
 const FOREIGN = 'qwen';
 
@@ -216,6 +218,7 @@ function fakeCli(bin, name) {
     const scan =
       `:scan\r\nif "%~1"=="" goto dump\r\n` +
       `if "%~1"=="--system-prompt-file" copy /y "%~2" "%CD%\\${SYSTEM_PROMPT_COPY}" >nul\r\n` +
+      `if "%~1"=="--append-system-prompt-file" copy /y "%~2" "%CD%\\${APPEND_PROMPT_COPY}" >nul\r\n` +
       `shift\r\ngoto scan\r\n:dump\r\n`;
     writeFileSync(
       join(bin, `${name}.cmd`),
@@ -226,6 +229,7 @@ function fakeCli(bin, name) {
   const scan =
     `prev=""\nfor a in "$@"; do\n` +
     `  [ "$prev" = "--system-prompt-file" ] && cp "$a" "$PWD/${SYSTEM_PROMPT_COPY}"\n` +
+    `  [ "$prev" = "--append-system-prompt-file" ] && cp "$a" "$PWD/${APPEND_PROMPT_COPY}"\n` +
     `  prev="$a"\ndone\n`;
   writeFileSync(
     join(bin, name),
@@ -332,6 +336,7 @@ async function main() {
   const helperBin = mkdtempSync(join(tmpdir(), 'cc-t3-helper-bin-'));
   const watchDir = mkdtempSync(join(tmpdir(), 'cc-t3-watch-'));
   const watchOffDir = mkdtempSync(join(tmpdir(), 'cc-t3-watch-off-'));
+  const localDir = mkdtempSync(join(tmpdir(), 'cc-t3-local-'));
   // Конфиги Kimi и Goose — временные: проверка читает их (настройка мимо контура)
   // и не должна зависеть от конфигов человека на этой машине.
   const cliHomes = mkdtempSync(join(tmpdir(), 'cc-t3-cli-homes-'));
@@ -947,6 +952,140 @@ async function main() {
       check(!codexWatch.dump.raw.includes(SECRET), 'codex: наблюдатель — ключа контура нет');
     }
 
+    // ── 6б. Локальная модель (L1): окно сервера доходит до процесса Claude ────
+    // Без этих переменных Claude Code считает окно незнакомой модели 200 тысяч,
+    // не сжимает историю вовремя, а сервер молча обрезает начало запроса (разбор
+    // 13.10: входы 134–173 тысячи токенов при окне 131072). Окно здесь — то, что
+    // отдаёт сервис моделей, а не константа в коде; сжатие по окну бьёт и
+    // `autoCompactWindow` из настроек человека. Дисциплина локальной модели едет
+    // допиской даже при режиме набора «глобальные», когда плагин не подключён.
+    {
+      const { localRunEnv } = await import('../../apps/server/src/domains/local-models/run-env.ts');
+      const { localLeanRules, LOCAL_DRIVER } =
+        await import('../../apps/server/src/domains/local-models/connect.ts');
+      const { KitService } = await import('../../apps/server/src/domains/kit/service.ts');
+      const LOCAL_ID = 'local-ollama';
+      const LOCAL_MODEL = 'qwen3.6:27b-coding';
+      const LOCAL_CTX = 65_536;
+      const localPlatform = {
+        ...platform,
+        id: LOCAL_ID,
+        driver: LOCAL_DRIVER,
+        // Слои, с которыми панель заводит контур локальной модели (L1b).
+        rules: { platform: defaultPlatformRules(), ours: localLeanRules() },
+        baseUrl: 'http://127.0.0.1:11435/v1',
+        consumers: ['chat'],
+        toolShim: false,
+        contourPrompt: false,
+        defaultModel: LOCAL_MODEL,
+      };
+      const settingsBefore6b = store.getSettings();
+      writePlatform(store, localPlatform);
+      writeToken(appData, LOCAL_ID, SECRET);
+      store.updateSettings({
+        activePlatformId: LOCAL_ID,
+        endpointProfiles: [
+          buildManagedProfile(
+            localPlatform,
+            { enabled: true, port, forceStream: true },
+            LOCAL_MODEL,
+          ),
+        ],
+      });
+      const localDeps = {
+        ...deps,
+        localRunEnv: (id) => (id === LOCAL_ID ? localRunEnv(LOCAL_CTX) : undefined),
+      };
+      const localKit = new KitService({
+        appDataDir: appData,
+        claudeDir: () => configDir,
+        providers: () => [],
+        legacyModes: () => ({ claude: 'global' }),
+      });
+      localKit.setMode('claude', 'global');
+      // Те же строки, что стоят в `runRoute` сборки сервера (bootstrap/runtime/runtime.ts).
+      const localRoute = (origin) => {
+        const decision = resolveRunRoute(localDeps, origin);
+        const route = runRouteOf(decision);
+        if (!decision.routed) return route;
+        const extras = localKit.runExtras({
+          provider: 'claude',
+          local: decision.platformId === LOCAL_ID,
+          hasSources: false,
+        });
+        return extras.args.length || Object.keys(extras.env).length || extras.append
+          ? { ...route, kit: extras }
+          : route;
+      };
+      const localRuns = new ChatRunRegistry();
+      localRuns.setPlatformRouting(localRoute);
+      localRuns.start(
+        'local-chat',
+        { prompt: 'привет', cwd: localDir, configDir },
+        { origin: 'chat' },
+      );
+      const local = await waitForDump(localDir);
+      check(Boolean(local), 'локальная модель: фальшивый claude запустился');
+      if (local) {
+        for (const [key, value] of Object.entries(localRunEnv(LOCAL_CTX))) {
+          check(
+            local.env.get(key) === value,
+            `локальная модель: ${key}=${local.env.get(key) ?? '—'} (ждали ${value})`,
+          );
+        }
+        const base = local.env.get('ANTHROPIC_BASE_URL') ?? '';
+        check(
+          base === `http://127.0.0.1:${port}/${LOCAL_ID}/_s/chat`,
+          `локальная модель: адрес шлюза рядом с окном: ${base || '—'}`,
+        );
+        check(!local.raw.includes(SECRET), 'локальная модель: ключа контура в окружении нет');
+        // Дисциплина — допиской: на Windows файлом, на остальных — аргументом.
+        const copy = join(localDir, APPEND_PROMPT_COPY);
+        const appended = existsSync(copy)
+          ? readFileSync(copy, 'utf8')
+          : (local.env.get(ARGV_KEY) ?? '');
+        check(
+          appended.includes('Local model discipline'),
+          `локальная модель, режим «глобальные»: дисциплина доехала допиской (${appended.length} знаков)`,
+        );
+        check(
+          !(local.env.get(ARGV_KEY) ?? '').includes('--plugin-dir'),
+          'локальная модель, режим «глобальные»: плагин набора не подключён',
+        );
+        // Облегчённый набор (L1b): MCP снят, инструменты — белым списком, а правила
+        // и скиллы человека остаются (флагов `--setting-sources` и
+        // `--disable-slash-commands` нет).
+        const localArgv = local.env.get(ARGV_KEY) ?? '';
+        check(
+          localArgv.includes('--strict-mcp-config'),
+          'локальная модель: MCP-серверы сняты (облегчённый набор)',
+        );
+        check(
+          /--tools "?Bash,Read,Edit,Write,Glob,Grep,WebFetch,Skill,Agent,TodoWrite/.test(localArgv),
+          `локальная модель: инструменты белым списком (--tools)${localArgv.includes('--tools') ? '' : `: ${localArgv}`}`,
+        );
+        check(
+          !localArgv.includes('--setting-sources') &&
+            !localArgv.includes('--disable-slash-commands'),
+          'локальная модель: правила и скиллы человека не сняты',
+        );
+      }
+      localRuns.stopAll?.();
+      // Чужой контур (первый чат этого прогона) окна локальной модели не получал.
+      if (chat) {
+        check(
+          !chat.env.has('CLAUDE_CODE_AUTO_COMPACT_WINDOW') &&
+            !chat.env.has('CLAUDE_CODE_MAX_CONTEXT_TOKENS'),
+          'облачный контур: окна локальной модели в окружении нет',
+        );
+      }
+      // Состояние для следующих разделов — как до этого.
+      store.updateSettings({
+        activePlatformId: settingsBefore6b.activePlatformId,
+        endpointProfiles: settingsBefore6b.endpointProfiles,
+      });
+    }
+
     // ── 7. Контур окружением прогона: Kimi Code, Goose, OpenCode (X7) ────────
     const savedEnv = { KIMI_CODE_HOME: process.env.KIMI_CODE_HOME, APPDATA: process.env.APPDATA };
     process.env.KIMI_CODE_HOME = join(cliHomes, 'kimi-home');
@@ -1062,6 +1201,7 @@ async function main() {
       helperBin,
       watchDir,
       watchOffDir,
+      localDir,
       cliHomes,
       ...Object.values(endpointDirs),
       ...Object.values(codexDirs),

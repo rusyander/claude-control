@@ -17,7 +17,7 @@ export function LayerRow({ id, platform, ours, update }: LayerRowProps) {
         checked={layerOn(ours, id)}
         onCheckedChange={(checked) => update(withOurRule(platform, id, checked))}
         aria-label={t(`platform.layerTitle.${id}`)}
-        disabled={!ours.enabled}
+        disabled={id !== 'tools' && !ours.enabled}
       />
       <Stack gap="var(--spacing-3xs)">
         <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>

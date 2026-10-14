@@ -87,6 +87,8 @@ interface LiveRun {
   steerable?: boolean;
   subscribers: Set<ProviderChatSubscriber>;
   isRunning: boolean;
+  /** Прогон идёт через контур локальной модели (есть окно сервера в маршруте). */
+  local?: boolean;
   /** Когда прогон начался: по нему считается время ответа (Т1 партии чужих CLI). */
   startedAt: number;
   /**
@@ -445,6 +447,39 @@ export class ProviderChatService {
   ) => Record<string, string> | undefined;
 
   /**
+   * Окно и сроки локальной модели чужому CLI (L4b): у Qwen Code — слой настроек поверх
+   * выбранного файла. `undefined` — у этого CLI такого канала нет, прогон идёт как шёл.
+   */
+  setLocalLimits(
+    resolve: (
+      providerId: string,
+      limits: { contextWindow: number; timeoutMs: number; idleMs: number },
+      env: NodeJS.ProcessEnv,
+    ) => Record<string, string> | undefined,
+  ): void {
+    this.localLimitsOf = resolve;
+  }
+
+  private localLimitsOf?: (
+    providerId: string,
+    limits: { contextWindow: number; timeoutMs: number; idleMs: number },
+    env: NodeJS.ProcessEnv,
+  ) => Record<string, string> | undefined;
+
+  private localLimitsEnv(
+    providerId: string,
+    limits: { contextWindow: number; timeoutMs: number; idleMs: number },
+    env: Record<string, string>,
+  ): Record<string, string> | undefined {
+    try {
+      return this.localLimitsOf?.(providerId, limits, { ...process.env, ...env });
+    } catch {
+      // Окно не главнее разговора: осечка записи слоя отправку не срывает.
+      return undefined;
+    }
+  }
+
+  /**
    * «Что получил агент» (U8): реплика, уехавшая CLI (со сводкой детей и
    * строкой о каталоге, если та поехала в реплику), и системная строка, если
    * она ушла своим каналом. Ключ — как у связи конвейера: `<провайдер>:<id>`.
@@ -579,6 +614,12 @@ export class ProviderChatService {
 
     // Слой группы — последним: его файл настроек решён для ЭТОГО разговора.
     const runEnv: Record<string, string> = { ...route.env, ...route.kit?.env, ...groupEnv };
+    // Окно локальной модели ложится слоем настроек ДО строки о каталоге: та читает файл,
+    // выбранный здесь, и дописывает свой слой поверх.
+    if (route.localLimits) live.local = true;
+    if (route.localLimits) {
+      Object.assign(runEnv, this.localLimitsEnv(providerId, route.localLimits, runEnv));
+    }
     const current = this.workspaceNote(chat.workdir);
     // Системная строка — одна на разговор, как у Claude (E6): перемена между
     // ходами едет в реплике, а не в системном промпте.
@@ -1045,6 +1086,12 @@ export class ProviderChatService {
 
   private broadcast(live: LiveRun, event: ProviderChatEvent): void {
     for (const subscriber of live.subscribers) subscriber.send(event);
+  }
+
+  /** Идёт ли сейчас ход чужого CLI на локальной модели: ему нужен живой сервер и непрерывная работа ОС. */
+  localRunning(): boolean {
+    for (const live of this.runs.values()) if (live.isRunning && live.local) return true;
+    return false;
   }
 
   private finish(chatId: string, live: LiveRun, event: ProviderChatEvent): void {

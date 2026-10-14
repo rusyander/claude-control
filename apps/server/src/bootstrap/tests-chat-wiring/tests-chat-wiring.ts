@@ -9,7 +9,10 @@ import { e2eChatLine } from '../../domains/project-tests/e2e-chat.ts';
 import { syncE2eIfChanged } from '../../domains/project-tests/e2e-sync/e2e-sync.ts';
 import { readEnvironments } from '../../domains/project-tests/library/library.ts';
 import { readAutomation } from '../../domains/project-tests/automation/automation.ts';
-import { writeQwenSystemNote } from '../../domains/provider-chat/system-note/system-note.ts';
+import {
+  writeQwenLimits,
+  writeQwenSystemNote,
+} from '../../domains/provider-chat/system-note/system-note.ts';
 import { panelHomeDir } from '../../lib/brand.mjs';
 import { getProvider } from '../../providers/registry.ts';
 
@@ -32,7 +35,10 @@ import { getProvider } from '../../providers/registry.ts';
 export interface TestsChatWiringDeps {
   appData: string;
   chatRuns: Pick<ChatRunRegistry, 'setWorkspaceNote'>;
-  providerChats?: Pick<ProviderChatService, 'setWorkspaceNote' | 'setSystemNote'>;
+  providerChats?: Pick<
+    ProviderChatService,
+    'setWorkspaceNote' | 'setSystemNote' | 'setLocalLimits'
+  >;
   /** Прогон раздела «Тесты» пишет в файлы групп — сверка поверх него потеряла бы правку. */
   isBusy?: (path: string) => boolean;
   now?: () => string;
@@ -130,6 +136,13 @@ export function wireTestsChatNote(deps: TestsChatWiringDeps): {
   deps.providerChats?.setSystemNote((providerId, note, env) =>
     getProvider(providerId).groupLayer === 'qwen-system-settings'
       ? writeQwenSystemNote({ appData: deps.appData, note, env })
+      : undefined,
+  );
+  // Окно и сроки локальной модели — тем же файлом настроек Qwen (L4b): иначе он считает окно
+  // по имени модели и сжимает историю от чужого числа.
+  deps.providerChats?.setLocalLimits((providerId, limits, env) =>
+    getProvider(providerId).groupLayer === 'qwen-system-settings'
+      ? writeQwenLimits({ appData: deps.appData, limits, env })
       : undefined,
   );
   return { finished: (cwd, startedAt) => testsChatFinished(deps, cwd, startedAt) };

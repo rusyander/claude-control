@@ -1,5 +1,6 @@
-/** Коды текстов сервера, раздел «local»: локальные модели (сервер Ollama, модели, Qwen Code). Сборка всех — `../server-messages.ts`. */
+/** Коды текстов сервера, раздел «local»: локальные модели (сервер llama.cpp, модели, Qwen Code). Сборка всех — `../server-messages.ts`. */
 export const localMessageParams = {
+  'local-supervisor-gave-up': ['restarts'],
   'local-port-busy': ['port'],
   'local-start-failed': ['binary'],
   'local-exited': ['code', 'log'],
@@ -24,7 +25,15 @@ export const localMessageParams = {
   'local-npm-failed': ['reason'],
   'local-kit-provider': ['provider'],
   'local-import-failed': ['tag', 'reason'],
+  'local-load-failed': ['tag', 'reason'],
+  'local-quant-unknown': ['tag', 'quant'],
+  'local-context-range': ['min', 'max'],
+  'local-choice-no-fit': ['tag', 'need', 'available'],
+  'local-custom-input': [],
+  'local-custom-no-gguf': ['repo'],
+  'local-custom-no-arch': ['repo'],
   'local-job-unknown': [],
+  'local-mcp-project': [],
   'local-claude-settings-broken': ['path'],
   'kit-item-unknown': [],
   'kit-mode-unsupported': [],

@@ -475,6 +475,8 @@ describe('чем пойдёт прогон, если запустить сейч
 
     expect(plan).toEqual({
       routed: true,
+      // Контур, который ведёт прогон: по нему чат понимает, что прогон локальный (L4).
+      platformId: 'company-dev',
       title: 'Company · dev',
       rules: {
         model: 'company-mid',
@@ -492,6 +494,33 @@ describe('чем пойдёт прогон, если запустить сейч
     // Правила отдаются целиком именно для этого: клиент пересчитывает выбор на
     // каждое переключение модели сам, той же функцией контрактов.
     expect(plan.routed && chooseRunModel(plan.rules, 'sonnet').model).toBe('company-small');
+  });
+
+  /**
+   * L4: шапка называет MCP-серверы, выбранные для локального прогона проекта, — но
+   * только когда выбор действует: облегчённый набор (`--strict-mcp-config`) и проект
+   * назван. Иначе подпись говорила бы о выборе, который прогону ничего не даёт.
+   */
+  it('выбор MCP локального прогона называется, только когда он действует', () => {
+    const lean = {
+      ...PLATFORM,
+      rules: { platform: defaultPlatformRules(), ours: { ...defaultOurRules(), mcp: false } },
+    };
+    const picks: PlatformRoutingDeps['localMcpPicks'] = (platformId, project) =>
+      platformId === 'company-dev' && project === '/work/app' ? ['gitlab'] : undefined;
+    connect(lean);
+    const withPicks = { ...deps, localMcpPicks: picks };
+
+    expect(describeRunPlan(withPicks, 'chat', '/work/app').localMcp).toEqual({
+      picked: ['gitlab'],
+    });
+    // Проект не назван — выбирать не из чего.
+    expect(describeRunPlan(withPicks, 'chat').localMcp).toBeUndefined();
+    // Контур не локальный (источник ответил «нет») — поля нет.
+    expect(describeRunPlan(withPicks, 'chat', '/elsewhere').localMcp).toBeUndefined();
+    // Набор не облегчён: MCP-серверы едут все, и выбирать нечего.
+    connect({ ...PLATFORM });
+    expect(describeRunPlan(withPicks, 'chat', '/work/app').localMcp).toBeUndefined();
   });
 
   it('маршрута нет — причина названа, а усилие остаётся выбором человека', () => {

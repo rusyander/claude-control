@@ -4,6 +4,7 @@ import { Typography } from '@shared/ui/typography';
 import { usePlatformRunPlan } from '@entities/Platform';
 import { MODEL_OPTIONS, EFFORT_LEVELS, modelLabel } from '@shared/lib/chat-model';
 import type { ChatModelPickerProps } from './ChatModelPicker.types';
+import { LocalMcpPicker } from './LocalMcpPicker/LocalMcpPicker';
 import styles from './ChatModelPicker.module.scss';
 import {
   modelSelectOptions,
@@ -32,6 +33,7 @@ export function ChatModelPicker({
   defaultEffort,
   models,
   consumer = 'chat',
+  projectPath,
   onModelChange,
   onEffortChange,
 }: ChatModelPickerProps) {
@@ -42,7 +44,7 @@ export function ChatModelPicker({
   // выбранное как действующее значило бы соврать ровно в том месте, куда человек
   // смотрит перед отправкой сообщения. Считается ТОЙ ЖЕ функцией, что на
   // сервере, — второй расчёт разошёлся бы с первым молча.
-  const plan = usePlatformRunPlan(consumer);
+  const plan = usePlatformRunPlan(consumer, projectPath ?? '');
   const routed = plan.data?.routed === true ? plan.data : undefined;
   // Спрашиваем тем же, с чем уйдёт запрос: пустой выбор чата — это модель из
   // настроек, а не пустота (ревью Т13).
@@ -52,7 +54,7 @@ export function ChatModelPicker({
   // правила» выглядит поломкой агента, пока человек не увидит, что это его
   // собственная галочка на карточке контура. Сказать надо ДО отправки
   // сообщения, а не объяснять постфактум.
-  const layers = platformLayersCaption(routed?.layers);
+  const layers = platformLayersCaption(routed?.layers, routed?.localMcp);
   const refusal = platformRefusalCaption(plan.data);
   // «По возможности» без шлюза или ключа: уход мимо контура назван до отправки
   // (решение по контуру №4) — молча данные в облако вендора не уезжают.
@@ -217,7 +219,14 @@ export function ChatModelPicker({
             // запятую читалось бы как шесть слоёв вместо трёх.
             list: layers.dropped.map((id) => t(`platform.layerTitle.${id}`)).join(' · '),
           })}
+          {layers.picked.length > 0 &&
+            ` ${t('chat.localMcp.pickedCaption', { list: layers.picked.join(', ') })}`}
         </Typography>
+      )}
+
+      {/* Локальный прогон с облегчённым набором: MCP-серверы берутся по выбору человека (L4). */}
+      {routed?.localMcp && projectPath && (
+        <LocalMcpPicker project={projectPath} picked={routed.localMcp.picked} />
       )}
 
       {routed && !routed.effort && (

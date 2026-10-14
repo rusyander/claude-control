@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { MIN_OLLAMA_VERSION } from '@agentdeck/contracts/local-models';
+import { MIN_LLAMA_BUILD } from '@agentdeck/contracts/local-models';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -17,14 +17,17 @@ import {
   useStartLocalServer,
   useStopLocalServer,
 } from '@entities/LocalModels';
+import { KeepLoaded } from '../KeepLoaded/KeepLoaded';
+import { KeepAwake } from '../KeepAwake/KeepAwake';
+import { ServerNotes } from '../ServerNotes/ServerNotes';
 import { DeviceChoice } from '../DeviceChoice/DeviceChoice';
 import type { RuntimeCardProps } from './RuntimeCard.types';
 
 /**
  * Сервер моделей: чей он (системный или своя копия), где лежит, какой версии,
  * работает ли и что держит в памяти. Кнопка «Скачать» — только когда своего
- * сервера нет вовсе или системный устарел: найденный в системе Ollama
- * используется как есть, и второй гигабайт ради него не качается.
+ * сервера нет вовсе или сборка устарела: заданный переменной `LLAMA_SERVER_BINARY`
+ * сервер используется как есть, и лишний гигабайт ради него не качается.
  */
 export function RuntimeCard({ info }: RuntimeCardProps) {
   const { t } = useTranslation();
@@ -33,8 +36,8 @@ export function RuntimeCard({ info }: RuntimeCardProps) {
   const stop = useStopLocalServer();
   const cancel = useCancelLocalJob();
   const { runtime, server } = info;
-  const job = jobFor(info, 'runtime', 'ollama');
-  const busy = Boolean(runningJob(info, 'runtime', 'ollama'));
+  const job = jobFor(info, 'runtime', 'llama.cpp');
+  const busy = Boolean(runningJob(info, 'runtime', 'llama.cpp'));
   const canDownload = runtime.source === 'none' || runtime.outdated;
   const sizeGb = runtime.latest ? toGb(runtime.latest.sizeBytes) : 0;
 
@@ -111,7 +114,7 @@ export function RuntimeCard({ info }: RuntimeCardProps) {
           <Typography variant="body-sm" color="warning">
             {t('localModels.runtime.outdated', {
               version: runtime.version,
-              min: MIN_OLLAMA_VERSION,
+              min: `b${MIN_LLAMA_BUILD}`,
             })}
           </Typography>
         ) : null}
@@ -160,6 +163,9 @@ export function RuntimeCard({ info }: RuntimeCardProps) {
           </Stack>
         ) : null}
         <DeviceChoice info={info} />
+        <KeepLoaded info={info} />
+        <KeepAwake info={info} />
+        <ServerNotes server={server} />
         <Typography variant="caption" color="muted">
           {[
             t('localModels.runtime.folder', { path: info.root }),

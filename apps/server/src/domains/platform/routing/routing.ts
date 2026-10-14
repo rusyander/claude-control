@@ -78,6 +78,19 @@ export interface PlatformRoutingDeps {
         title?: string;
       }
     | undefined;
+  /**
+   * Окружение Claude Code для прогона на локальной модели (окно сервера, резерв
+   * под ответ, один вызов за раз) — по контуру: у чужих контуров пусто. Без него
+   * Claude Code не знает окна локальной модели, не сжимает историю вовремя, и
+   * сервер молча обрезает начало запроса. Ответ — на каждый запуск: окно меняется
+   * вместе с перезапуском сервера моделей.
+   */
+  localRunEnv?: (platformId: string) => Record<string, string> | undefined;
+  /**
+   * MCP-серверы, взятые в локальный прогон проекта (L4): имена; контур не локальный — `undefined`.
+   * Шапка чата по ним называет, что поедет вместе с облегчённым набором.
+   */
+  localMcpPicks?: (platformId: string, project: string) => string[] | undefined;
 }
 
 /**
@@ -90,12 +103,19 @@ export function localClaudeRun(
   deps: PlatformRoutingDeps,
   consumer: string,
   decision: PlatformRouteDecision,
-): { model: string; title: string } | undefined {
+): { model: string; title: string; env: Record<string, string> } | undefined {
   if (decision.routed || decision.refusal) return undefined;
   if (providerOf(consumer)?.id !== 'claude') return undefined;
   const redirect = deps.claudeSettingsRoute?.();
   if (!redirect?.model) return undefined;
-  return { model: redirect.model, title: redirect.title || redirect.model };
+  return {
+    model: redirect.model,
+    title: redirect.title || redirect.model,
+    // settings.json переключателя несёт то же окно, но лёгкое окно его не читает, а
+    // дрейф (человек правил файл руками) процесс не заметит — окружение прогона
+    // повторяет его на каждом старте.
+    env: deps.localRunEnv?.(redirect.platformId) ?? {},
+  };
 }
 
 /** Почему прогон пошёл провайдером по умолчанию. */
@@ -191,7 +211,28 @@ export interface PlatformRunRoute {
    * не в `env`: набор едет и МИМО контура (облачный Claude), а непустое `env`
    * у чужого чата значит «прогон через контур».
    */
-  kit?: { args: string[]; env: Record<string, string> };
+  kit?: { args: string[]; env: Record<string, string>; append?: string };
+  /**
+   * MCP-серверы, взятые человеком в локальный прогон (L4): по каталогу проекта — что
+   * ехать `--mcp-config`. Есть только у прогона на локальной модели с облегчённым
+   * набором, где `--strict-mcp-config` иначе унёс бы все серверы; нет выбора — `undefined`.
+   */
+  localMcp?: (cwd: string) => { ids: string[]; config: unknown } | undefined;
+  /**
+   * Пределы локальной модели для ЧУЖОГО CLI (L4b): окно сервера и сроки, которые он обязан
+   * знать, чтобы не считать окно облачным и не рвать законный разбор промпта. Только прогон
+   * на локальном контуре; Qwen Code получает их файлом настроек (`model.generationConfig`).
+   */
+  localLimits?: LocalRunLimits;
+}
+
+/** Окно и сроки локальной модели в числах: из них выходной слой собирает настройки чужого CLI. */
+export interface LocalRunLimits {
+  contextWindow: number;
+  /** Сколько ждать ответ целиком, мс. */
+  timeoutMs: number;
+  /** Сколько ждать паузу в потоке, мс. */
+  idleMs: number;
 }
 
 /** Активный контур либо undefined. Читается на каждый запуск: он же и меняется. */
@@ -414,6 +455,10 @@ export function resolveRunRoute(
   // можно было править, а не читал её никто.
   const systemPrompt = contourRunPrompt(deps.appDataDir, platform, model.model);
   const layers = provider.id === 'claude' ? runLayers(platform) : undefined;
+  // Окно локальной модели — только Claude Code: переменные его, а чужому CLI они
+  // ничего не значат. Поверх адреса контура: по ключам они не пересекаются.
+  if (provider.id === 'claude') Object.assign(env, deps.localRunEnv?.(platform.id));
+  const limits = provider.id === 'claude' ? undefined : limitsOf(deps.localRunEnv?.(platform.id));
   return {
     routed: true,
     platformId: platform.id,
@@ -428,7 +473,19 @@ export function resolveRunRoute(
     // должна действовать со следующего прогона, а не с перезапуска панели.
     // compromise: rules-partial — личные правила, хуки и права снимаются одним флагом, порознь CLI их не различает
     ...(layers ? { layers } : {}),
+    ...(limits ? { localLimits: limits } : {}),
   };
+}
+
+/** Пределы из окружения локальной модели; нет окружения (контур не локальный) — нет пределов. */
+function limitsOf(env: Record<string, string> | undefined): LocalRunLimits | undefined {
+  if (!env) return undefined;
+  const contextWindow = Number(env.CLAUDE_CODE_MAX_CONTEXT_TOKENS);
+  const timeoutMs = Number(env.API_TIMEOUT_MS);
+  const idleMs = Number(env.CLAUDE_STREAM_IDLE_TIMEOUT_MS);
+  return contextWindow > 0 && timeoutMs > 0 && idleMs > 0
+    ? { contextWindow, timeoutMs, idleMs }
+    : undefined;
 }
 
 /**
@@ -456,6 +513,7 @@ export function runRouteOf(decision: PlatformRouteDecision): PlatformRunRoute {
     effort: decision.effort,
     ...(decision.systemPrompt ? { systemPrompt: decision.systemPrompt } : {}),
     ...(decision.layers ? { layers: decision.layers } : {}),
+    ...(decision.localLimits ? { localLimits: decision.localLimits } : {}),
   };
 }
 
@@ -468,13 +526,17 @@ export function runRouteOf(decision: PlatformRouteDecision): PlatformRunRoute {
  * там, где он смотрит перед отправкой сообщения. Правила отдаются целиком —
  * клиент пересчитывает выбор на каждое переключение модели сам.
  */
-export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): PlatformRunPlan {
+export function describeRunPlan(
+  deps: PlatformRoutingDeps,
+  consumer: string,
+  project = '',
+): PlatformRunPlan {
   const decision = resolveRunRoute(deps, consumer);
   const platform = activePlatform(deps.store);
   if (!decision.routed || !platform) {
     const local = localClaudeRun(deps, consumer, decision);
     return {
-      ...(local ? { local } : {}),
+      ...(local ? { local: { model: local.model, title: local.title } } : {}),
       routed: false,
       title: platform?.title ?? '',
       ...(decision.routed ? {} : { reason: decision.reason }),
@@ -485,8 +547,14 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
       effort: true,
     };
   }
+  // Выбор MCP называется, только когда он действует: прогон локальный и идёт с облегчённым набором.
+  const picked =
+    project && decision.layers?.args.includes('--strict-mcp-config')
+      ? deps.localMcpPicks?.(platform.id, project)
+      : undefined;
   return {
     routed: true,
+    platformId: platform.id,
     title: platform.title,
     rules: modelRulesFor(deps.store, platform, consumer),
     effort: effortAccepted(platform),
@@ -497,6 +565,7 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
     // отправки, а не объясняет их постфактум. У чужого CLI поля нет вовсе, и
     // шапка про наши слои молчит — их там и не снимают.
     ...(decision.layers ? { layers: decision.layers } : {}),
+    ...(picked ? { localMcp: { picked } } : {}),
   };
 }
 

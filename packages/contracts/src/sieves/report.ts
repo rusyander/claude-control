@@ -119,6 +119,11 @@ export function parseSieveBody(
     });
     if (lessons.length >= LEARNED_MAX) break;
   }
+  // Блок со строками, из которых не разобрана ни одна (числовой `id`, статус `done`),
+  // — не отчёт, а блок чужой схемы: он остаётся текстом и считается отклонённым (T21).
+  const offered =
+    (Array.isArray(sieves) ? sieves.length : 0) + (Array.isArray(learned) ? learned.length : 0);
+  if (offered > 0 && rows.length === 0 && lessons.length === 0) return undefined;
   return { rows, learned: lessons };
 }
 

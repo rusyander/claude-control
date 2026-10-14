@@ -318,6 +318,55 @@ describe('runExtras: что получает прогон', () => {
     expect(existsSync(join(appData, 'kit', 'effective'))).toBe(false);
   });
 
+  it('Claude «глобальные» на локальной модели — набор не подключается, но блок дисциплины едет дописью', () => {
+    const result = extras('claude', true);
+    expect(result.args).toEqual([]);
+    expect(result.env).toEqual({});
+    expect(result.append).toContain('Local model discipline');
+    expect(result.append).toContain('One tool call per step');
+    // Облачный прогон и чужой CLI при «глобальных» — по-прежнему ничего.
+    expect(extras('claude', false)).toEqual({ args: [], env: {} });
+    expect(extras('qwen', true)).toEqual({ args: [], env: {} });
+  });
+
+  /**
+   * L4, п.4: контрольная точка перед сжатием (`precompact-checkpoint`) на локальном
+   * прогоне. На «глобальных» набор не подключается и хук PreCompact не стоит —
+   * поэтому блок дисциплины сам просит вести PROGRESS.md; в режимах с набором хук
+   * приезжает в плагине и в локальном варианте тоже.
+   */
+  it('контрольная точка сжатия доезжает до локального прогона в обоих путях', () => {
+    expect(extras('claude', true).append).toContain('.agent/PROGRESS.md');
+    for (const mode of ['hybrid', 'ours'] as const) {
+      service().setMode('claude', mode);
+      const [flag, dir] = extras('claude', true).args;
+      expect(flag).toBe('--plugin-dir');
+      const hooks = readFileSync(join(dir ?? '', 'hooks', 'hooks.json'), 'utf8');
+      expect(hooks).toContain('"PreCompact"');
+      expect(existsSync(join(dir ?? '', 'hooks', 'lib', 'precompact-checkpoint.mjs'))).toBe(true);
+    }
+  });
+
+  it('блок дисциплины едет ОДИН раз: при режимах с набором его даёт хук плагина, а не допись', () => {
+    service().setMode('claude', 'hybrid');
+    expect(extras('claude', true)).not.toHaveProperty('append');
+  });
+
+  it('человек выключил элемент «local.md» — на «глобальных» дописи нет; своя копия читается первой', () => {
+    const kit = service();
+    kit.setEnabled('rules/local.md', false);
+    expect(kit.runExtras({ provider: 'claude', local: true, hasSources: false })).toEqual({
+      args: [],
+      env: {},
+    });
+    kit.setEnabled('rules/local.md', true);
+    mkdirSync(join(appData, 'kit', 'mine', 'rules'), { recursive: true });
+    writeFileSync(join(appData, 'kit', 'mine', 'rules', 'local.md'), 'моя дисциплина');
+    expect(kit.runExtras({ provider: 'claude', local: true, hasSources: false }).append).toBe(
+      'моя дисциплина',
+    );
+  });
+
   it('Claude «оба» — плагин собранного набора и стандартный вариант правил', () => {
     service().setMode('claude', 'hybrid');
     const result = extras('claude');

@@ -97,6 +97,8 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/local-models/disconnect': 'human:consent',
   'PUT /api/local-models/device': 'human:consent',
   'PUT /api/local-models/claude': 'human:consent',
+  'PUT /api/local-models/choice': 'human:consent',
+  'POST /api/local-models/custom': 'human:download',
   'POST /api/credentials': 'human:secret',
   'POST /api/integrations/discover': 'human:secret',
   'POST /api/env-transfer/import/apply': 'human:upload',

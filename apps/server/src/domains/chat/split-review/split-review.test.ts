@@ -5,6 +5,7 @@ import {
   reviewSummaryComment,
   type SplitReviewDeps,
 } from './split-review.ts';
+import { OWNER_REQUEST_OPENER } from '@agentdeck/contracts/quality-floor';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 
 /**
@@ -977,6 +978,98 @@ describe('глубина ревью судится панелью (U4)', () => {
     expect(event).toMatchObject({ findings: ['src/a.ts:1 — ошибка'] });
     expect(links.c1?.review?.tier).toBe('T2');
     expect(links.c1?.review?.incomplete).toBeUndefined();
+  });
+});
+
+describe('след требований чужой схемы в ревью по ссылке (T21)', () => {
+  /** Задание с блоком слов владельца — как собирает его панель: после преамбулы копии. */
+  const OWNER_TASK = `The panel prepared this copy.
+
+${OWNER_REQUEST_OPENER}
+
+[owner message 1 of 1]
+
+проверь все MR, глубоко
+
+${TASK}`;
+  const FULL_T1 = { tier: 'T1', entries: ['diff-first'], coverage: 'full', uncovered: [] };
+  const sieves = (body: object): string =>
+    ['```agentdeck:sieves', JSON.stringify(body), '```'].join('\n');
+  const withTrace = (findings: string[], body: object): string =>
+    [answer(findings, FULL_T1), sieves(body)].join('\n');
+  const WRONG = { points: [{ id: 1, status: 'done', note: 'ok' }] };
+  const RIGHT = {
+    sieves: [{ id: 'owner-1', status: 'pass', evidence: 'src/a.ts:10 — проверено дифф-first' }],
+  };
+
+  it('блок не той схемы — одна просьба переписать в той же сессии, замечания пока не пишутся', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: OWNER_TASK });
+
+    const event = finishReview(review, links, 'c1', withTrace(['a.ts:1 — x'], WRONG));
+
+    expect(event).toBeUndefined();
+    expect(started).toHaveLength(1);
+    expect(started[0]?.resume).toBe('c1');
+    expect(started[0]?.prompt).toContain('owner-N');
+    expect(started[0]?.prompt).toContain('never "points"');
+    expect(links.c1?.review?.traceAsked).toBeDefined();
+    expect(links.c1?.review?.findings).toBeUndefined();
+  });
+
+  it('строки есть, но ни одна не разобрана (числовой id, статус done) — тоже чужая схема', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: OWNER_TASK });
+    finishReview(
+      review,
+      links,
+      'c1',
+      withTrace([], { sieves: [{ id: 1, status: 'done', evidence: 'a long enough evidence' }] }),
+    );
+    expect(started).toHaveLength(1);
+  });
+
+  it('после просьбы схема всё ещё чужая — «trace» на карточке, группа не «чистая»', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({
+      task: OWNER_TASK,
+      review: { url: URL, path: '/copy', traceAsked: '2026-09-09T11:00:00.000Z', followUp: true },
+    });
+
+    const event = finishReview(review, links, 'c1', withTrace([], WRONG));
+
+    expect(started).toEqual([]);
+    expect(event).toMatchObject({ kind: 'review', findings: [], incomplete: ['trace'] });
+    expect(links.c1?.review?.incomplete).toEqual(['trace']);
+  });
+
+  it('блока следа нет вовсе — та же одна просьба, потом «trace» на карточке', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: OWNER_TASK });
+    const asked = finishReview(review, links, 'c1', answer(['a.ts:1 — x'], FULL_T1));
+    expect(asked).toBeUndefined();
+    expect(started).toHaveLength(1);
+    expect(started[0]?.prompt).toContain('missing');
+    expect(links.c1?.review?.traceAsked).toBeDefined();
+
+    const again = finishReview(review, links, 'c1', answer(['a.ts:1 — x'], FULL_T1));
+    expect(started).toHaveLength(1);
+    expect(again).toMatchObject({ kind: 'review', incomplete: ['trace'] });
+  });
+
+  it('читаемый блок owner-N — никаких просьб, итог принят', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: OWNER_TASK });
+    const event = finishReview(review, links, 'c1', withTrace(['a.ts:1 — x'], RIGHT));
+    expect(started).toEqual([]);
+    expect(event).toMatchObject({ findings: ['a.ts:1 — x'] });
+  });
+
+  it('слов владельца в задании нет — чужая схема сит ничего не требует', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: TASK });
+    finishReview(review, links, 'c1', withTrace(['a.ts:1 — x'], WRONG));
+    expect(started).toEqual([]);
   });
 });
 

@@ -4,7 +4,13 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AddressInfo } from 'node:net';
-import { createCaFetch, createCaStreamFetch, readCaCert } from './ca-fetch.ts';
+import {
+  createCaFetch,
+  createCaStreamFetch,
+  createLoopbackStreamFetch,
+  readCaCert,
+} from './ca-fetch.ts';
+import { failureKind } from '../gateway/upstream/upstream.ts';
 
 /**
  * Транспорт с корневым сертификатом компании — против НАСТОЯЩЕГО сервера.
@@ -147,6 +153,10 @@ describe('createCaFetch: своя реализация нужна только �
     // проверял бы уже не «без сертификата», а чужую сеть.
     expect(createCaFetch('', {})).toBe(globalThis.fetch);
     expect(createCaFetch('   ', {})).toBe(globalThis.fetch);
+  });
+
+  it('прокси в окружении — свой транспорт, даже без сертификата', () => {
+    expect(createCaFetch('', { HTTPS_PROXY: 'http://127.0.0.1:3128' })).not.toBe(globalThis.fetch);
   });
 
   it('нечитаемый сертификат ломается СРАЗУ при создании, до первого запроса', () => {
@@ -365,5 +375,48 @@ describe('инвариант: ключ контура не подписывае�
     walk(resolve(import.meta.dirname, '../../../'));
 
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('поток для локального сервера моделей', () => {
+  it('идёт по node:http, а не по встроенному fetch: у того свои пятиминутные потолки на заголовки и тело', async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (() => {
+      throw new Error('встроенный fetch не должен вызываться');
+    }) as typeof fetch;
+    try {
+      const answer = await createLoopbackStreamFetch()(`${base}/v1/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{"ok":true}',
+      });
+      expect(answer.status).toBe(200);
+      expect(seen.body).toBe('{"ok":true}');
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it('прокси из окружения не читается: адрес сервера — петля этой машины', async () => {
+    const before = process.env.HTTP_PROXY;
+    process.env.HTTP_PROXY = 'http://127.0.0.1:9';
+    try {
+      const answer = await createLoopbackStreamFetch()(`${base}/health`);
+      expect(answer.status).toBe(200);
+    } finally {
+      if (before === undefined) delete process.env.HTTP_PROXY;
+      else process.env.HTTP_PROXY = before;
+    }
+  });
+
+  it('закрытый порт — ошибка с кодом ECONNREFUSED: по нему шлюз узнаёт «сервер умер»', async () => {
+    const closed = createServer();
+    await new Promise<void>((done) => closed.listen(0, '127.0.0.1', done));
+    const port = (closed.address() as AddressInfo).port;
+    await new Promise<void>((done) => closed.close(() => done()));
+    const failure = await createLoopbackStreamFetch()(`http://127.0.0.1:${port}/x`).catch(
+      (error: unknown) => error,
+    );
+    expect(failureKind(failure)).toBe('connection');
   });
 });

@@ -1,6 +1,116 @@
 {
   "topic": "localModels",
   "frames": {
+    "choice/01-selects": {
+      "light-ru": {
+        "file": "01-selects.png",
+        "width": 1106,
+        "height": 345
+      },
+      "light-en": {
+        "file": "01-selects.en.png",
+        "width": 1106,
+        "height": 345
+      },
+      "dark-ru": {
+        "file": "01-selects.dark.png",
+        "width": 1106,
+        "height": 345
+      },
+      "dark-en": {
+        "file": "01-selects.dark.en.png",
+        "width": 1106,
+        "height": 345
+      }
+    },
+    "choice/02-other-quant": {
+      "light-ru": {
+        "file": "02-other-quant.png",
+        "width": 1106,
+        "height": 370
+      },
+      "light-en": {
+        "file": "02-other-quant.en.png",
+        "width": 1106,
+        "height": 370
+      },
+      "dark-ru": {
+        "file": "02-other-quant.dark.png",
+        "width": 1106,
+        "height": 370
+      },
+      "dark-en": {
+        "file": "02-other-quant.dark.en.png",
+        "width": 1106,
+        "height": 370
+      }
+    },
+    "choice/03-restart": {
+      "light-ru": {
+        "file": "03-restart.png",
+        "width": 1106,
+        "height": 392
+      },
+      "light-en": {
+        "file": "03-restart.en.png",
+        "width": 1106,
+        "height": 392
+      },
+      "dark-ru": {
+        "file": "03-restart.dark.png",
+        "width": 1106,
+        "height": 392
+      },
+      "dark-en": {
+        "file": "03-restart.dark.en.png",
+        "width": 1106,
+        "height": 392
+      }
+    },
+    "choice/04-custom-form": {
+      "light-ru": {
+        "file": "04-custom-form.png",
+        "width": 1106,
+        "height": 173
+      },
+      "light-en": {
+        "file": "04-custom-form.en.png",
+        "width": 1106,
+        "height": 173
+      },
+      "dark-ru": {
+        "file": "04-custom-form.dark.png",
+        "width": 1106,
+        "height": 173
+      },
+      "dark-en": {
+        "file": "04-custom-form.dark.en.png",
+        "width": 1106,
+        "height": 173
+      }
+    },
+    "choice/05-custom-row": {
+      "light-ru": {
+        "file": "05-custom-row.png",
+        "width": 1106,
+        "height": 345
+      },
+      "light-en": {
+        "file": "05-custom-row.en.png",
+        "width": 1106,
+        "height": 345
+      },
+      "dark-ru": {
+        "file": "05-custom-row.dark.png",
+        "width": 1106,
+        "height": 345
+      },
+      "dark-en": {
+        "file": "05-custom-row.dark.en.png",
+        "width": 1106,
+        "height": 345
+      }
+    },
     "first/01-machine": {
       "light-ru": {
         "file": "01-machine.png",
@@ -27,44 +137,44 @@
       "light-ru": {
         "file": "02-catalog.png",
         "width": 1140,
-        "height": 1126
+        "height": 1500
       },
       "light-en": {
         "file": "02-catalog.en.png",
         "width": 1140,
-        "height": 1126
+        "height": 1500
       },
       "dark-ru": {
         "file": "02-catalog.dark.png",
         "width": 1140,
-        "height": 1126
+        "height": 1500
       },
       "dark-en": {
         "file": "02-catalog.dark.en.png",
         "width": 1140,
-        "height": 1126
+        "height": 1500
       }
     },
     "first/03-pulling": {
       "light-ru": {
         "file": "03-pulling.png",
         "width": 1140,
-        "height": 1176
+        "height": 1500
       },
       "light-en": {
         "file": "03-pulling.en.png",
         "width": 1140,
-        "height": 1176
+        "height": 1500
       },
       "dark-ru": {
         "file": "03-pulling.dark.png",
         "width": 1140,
-        "height": 1176
+        "height": 1500
       },
       "dark-en": {
         "file": "03-pulling.dark.en.png",
         "width": 1140,
-        "height": 1176
+        "height": 1500
       }
     },
     "first/04-ready": {

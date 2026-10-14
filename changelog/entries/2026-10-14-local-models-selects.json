@@ -1,0 +1,115 @@
+{
+  "title": {
+    "ru": "У каждой локальной модели — выбор квантования и контекста, любая модель Hugging Face по имени репозитория",
+    "en": "Every local model has a quantization and a context choice; any Hugging Face model by repository name"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "У каждой строки каталога — установленной, скачиваемой и своей — в блоке «Запуск» справа от расчёта два списка: «Квантование» (файлы репозитория с размером, скачанные отмечены) и «Контекст» (от 8K до предела модели; по умолчанию — окно, которое каталог считает разумным для модели, у Qwen3.6 27B Coding — 64K). Выбор запоминается для модели и действует на каждый запуск, замер и подключение агентам.",
+        "en": "Every catalog row, installed, downloadable or custom, has two lists in the “Launch settings” block next to the estimate: “Quantization” (the repository files with their sizes, downloaded ones marked) and “Context” (from 8K up to the model’s limit; by default the window the catalog considers sensible for the model, 64K for Qwen3.6 27B Coding). The choice is remembered per model and applies to every launch, measurement and hand-over to agents."
+      },
+      "how": {
+        "ru": "Списки пересчитывают друг друга по видеопамяти, свободной сейчас: вариант, который вместе с выбором в соседнем списке не влезает, закрыт, а причина написана в самом варианте — «не влезет: нужно 26,1 ГБ из 24». Контекст меньше 32K закрыт для агентов. Тип кеша (q8_0, при нехватке q4_0) подбирается под выбранную пару.",
+        "en": "The lists recompute each other from the video memory free right now: an option that does not fit together with the choice in the other list is closed, and the reason is written in the option itself, “does not fit: needs 26.1 GB of 24”. A context under 32K is closed for agents. The cache type (q8_0, q4_0 when short of memory) is picked for the selected pair."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Строка пересказывает выбранную пару: размер файла, нужная память из доступной, скорость, кеш. Нескачанное квантование предлагается кнопкой «Скачать» с названием и размером, пока файла нет, «Отдать агентам» и «Замерить» скрыты. Выбор на загруженной модели перезапускает сервер: строка показывает «Перезапуск с новыми настройками…».",
+        "en": "The row restates the selected pair: file size, memory needed out of what is available, speed, cache. A quantization that is not downloaded is offered by a “Download” button with its name and size; until the file exists, “Hand to agents” and “Measure” are hidden. Changing the choice on a loaded model restarts the server: the row shows “Restarting with the new settings…”."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Частичная выгрузка в оперативную память включается переключателем у модели: без него вариант, который не влезает в видеопамять целиком, закрыт, а сервер не принимает выбор, который не влезает вовсе, и называет, сколько нужно и сколько есть.",
+        "en": "Offloading part of the model to system memory is enabled by a switch on the model: without it an option that does not fit the video memory entirely stays closed, and the server refuses a choice that does not fit at all, saying how much is needed and how much there is."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "«Любая модель»: поле «Репозиторий или ссылка» принимает владелец/репозиторий или адрес Hugging Face. Панель читает список квантований и устройство модели из заголовка GGUF (скачивается только его начало), добавляет строку с теми же двумя списками и скачиванием; запись убирается корзиной. Пока проба инструментов не пройдена, у строки пометка «Агентность не проверена».",
+        "en": "“Any model”: the “Repository or link” field accepts owner/repository or a Hugging Face address. The panel reads the quantization list and the model layout from the GGUF header (only its start is fetched) and adds a row with the same two lists and a download; the entry is removed with the trash button. Until the tool probe passes, the row carries the “Tool calling not verified” mark."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Замер подписан окном и квантованием, при которых снят, и помечается устаревшим, когда выбор другой; замер, снятый до этой правки, помечен как снятый неизвестно при чём. «Замерить» теперь всегда идёт на выбранных квантовании и окне.",
+        "en": "A measurement is labelled with the context and quantization it was taken at and is marked stale when the choice differs; a measurement taken before this change is marked as taken at unknown settings. “Measure” now always runs on the selected quantization and context."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Карточка модели разобрана на блоки одной раскладки для всего списка: название, метки и кнопки вверху; под ними «На этой машине» (скорость, память, файл, замер) и «Запуск» (списки и переключатель частичной выгрузки в одну строку). Выбранное в списке показывается коротко, а причина, по которой пара не влезает, — отдельной строкой под списками; ни один выбранный вариант не обрезается ни на широком экране, ни при 400 пикселях.",
+        "en": "The model card is split into blocks laid out the same across the whole list: name, marks and buttons on top; below them “On this machine” (speed, memory, file, measurement) and “Launch settings” (the lists and the partial-offload switch on one line). The selected value shows short, and the reason a pair does not fit is a separate line under the lists; no selected option is clipped on a wide screen or at 400 pixels."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Под списками — рекомендация для этой машины: окно по умолчанию и лучшее квантование (не выше Q6_K), которое с ним целиком помещается в доступную память; не помещается — окно уменьшается шагом, но не ниже 32K. Кнопка «Применить» ставит рекомендованную пару, у рекомендованных вариантов в списках пометка «рекомендуется», у квантований ниже Q4 — «низкое качество». Если на 32K не влезает ни один файл, строка говорит об этом прямо.",
+        "en": "Under the lists sits a recommendation for this machine: the default window and the best quantization (up to Q6_K) that fits it entirely in the available memory; if nothing fits, the window steps down, never under 32K. “Apply” sets the recommended pair, recommended options carry a “recommended” mark in the lists and quantizations below Q4 a “low quality” mark. When no file fits even at 32K the line says so plainly."
+      },
+      "how": {
+        "ru": "Считается только по объёму памяти, доступной модели на этой машине (видеопамять карты или, без карты, оперативная память), — без оглядки на производителя и название карты.",
+        "en": "Computed from the amount of memory available to the model on this machine alone (the card’s video memory or, without a card, system memory), never from the vendor or the card name."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Модель, забранная из Ollama, показывается с настоящим квантованием, прочитанным из файла (из заголовка GGUF, а если там не записано — по типам весов; например, Q4_K_M), и пометкой «перенесён из Ollama», а не словом «Ollama» вместо квантования. Не определилось — «неизвестное квантование · перенесён из Ollama».",
+        "en": "A model taken over from Ollama is shown with the real quantization read from the file (the GGUF header, or the weight types when the header does not record it; for example Q4_K_M) and the mark “imported from Ollama” instead of the bare word “Ollama”. When it cannot be determined: “unknown quantization · imported from Ollama”."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели»: раздел «По кадрам: квантование и контекст» с пятью кадрами — списки, квантование без файла, перезапуск, поле «Любая модель», добавленная модель.",
+        "en": "The “Local models” help: a “Frame by frame: quantization and context” section with five frames covering the lists, a quantization without a file, the restart, the “Any model” field and an added model."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    }
+  ]
+}

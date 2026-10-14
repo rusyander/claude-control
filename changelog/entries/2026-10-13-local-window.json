@@ -1,0 +1,56 @@
+{
+  "title": {
+    "ru": "Локальная модель не переполняет контекст: сжатие наступает вовремя, лишнее не обрезается молча",
+    "en": "A local model no longer overflows its context: compaction happens in time and nothing is cut silently"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Claude Code на локальной модели получает настоящее окно сервера, предел ответа и один вызов инструмента за раз — и через контур, и при включённой галочке «Claude Code на этой модели». Раньше он считал окно незнакомой модели равным 200 тысячам токенов, не сжимал историю, а сервер молча обрезал начало запроса вместе с системным промптом.",
+        "en": "Claude Code on a local model gets the server’s real window, a reply limit and one tool call at a time — through the contour and with the «Claude Code on this model» switch on. Before, it assumed the window of an unknown model was 200 thousand tokens, never compacted, and the server silently cut the start of the request together with the system prompt."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Запрос, который не помещается в окно, шлюз отклоняет отказом «prompt is too long», по которому Claude Code сжимает историю и продолжает; ответ, оборванный на границе окна, больше не выглядит как «превышен предел вывода». Двадцать четыре файла подряд на модели с окном 65 536 прочитаны с тремя сжатиями, без обрезки запроса.",
+        "en": "A request that does not fit the window is refused by the gateway with «prompt is too long», which Claude Code answers by compacting the history and carrying on; a reply cut at the window edge no longer looks like «output limit exceeded». Twenty-four files in a row on a model with a 65,536 window were read with three compactions and no truncated request."
+      },
+      "area": { "ru": "Шлюз", "en": "Gateway" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Первый байт ответа локальной модели ждётся не минуту, а не меньше пяти: срок считается от размера запроса и замеренной скорости обработки. Сообщение о тайм-ауте называет обработку запроса, а не недоступность контура.",
+        "en": "The first byte of a local model’s reply is awaited for at least five minutes instead of one: the wait is computed from the request size and the measured prompt speed. The timeout message names request processing, not an unreachable contour."
+      },
+      "area": { "ru": "Шлюз", "en": "Gateway" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Для qwen3.6:27b-coding подбор останавливается на контексте 65 536: на видеокарте остаётся запас под кеш и систему.",
+        "en": "For qwen3.6:27b-coding the fit stops at a 65,536 context, leaving headroom on the card for the cache and the system."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Блок дисциплины для локальной модели (один субагент за раз, без веера ревьюеров, проверка запуском) доходит до агента при любом режиме набора, в том числе «Ваш».",
+        "en": "The local-model discipline block (one subagent at a time, no reviewer fan-out, verify by running) reaches the agent in every kit mode, including «Yours»."
+      },
+      "area": { "ru": "Набор панели", "en": "Panel kit" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели»: контекст 65 536, сжатие по окну сервера, отказ «prompt is too long», срок ожидания первого ответа, блок дисциплины в режиме «Ваш».",
+        "en": "Local models help: the 65,536 context, compaction by the server window, the «prompt is too long» refusal, the first-reply wait, the discipline block in «Yours» mode."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

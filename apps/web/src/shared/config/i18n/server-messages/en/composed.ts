@@ -148,6 +148,12 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
   'chat-autonomy-deferred-notice':
     "The agent's background commands are still running ({{count}}): the chat process restarts with the new autonomy setting once they finish — restarting now would kill them. Until then the process itself keeps its previous autonomy marker.",
+  'chat-auto-continue-notice':
+    'The turn broke off: {{reason}}. The chat will continue on its own in {{seconds}} s (attempt {{attempt}} of {{max}}).',
+  'chat-auto-continue-spent-notice':
+    'The turn broke off: {{reason}}. Automatic continuations are used up ({{max}} of {{max}}) — a human is needed.',
+  'chat-events-trimmed-notice':
+    "Long run: {{count}} old stream frames were dropped from the panel's memory. The full conversation is in the chat history once the turn ends.",
   'chat-stop-unconfirmed-notice':
     "The agent process ({{pid}}) could not be stopped: without a process snapshot the panel cannot verify that this number is still the agent's, and it never touches a foreign process. The run stays running — press Stop again; after a panel restart it is picked up again.",
   'split-group-run-not-started': 'the run did not start',

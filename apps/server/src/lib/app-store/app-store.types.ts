@@ -26,6 +26,7 @@ import type {
 import type {
   SplitGroupCleaned,
   SplitGroupTokenFlag,
+  SplitGroupReviewClose,
   SplitGroupTokenLedger,
   SplitGroupWait,
   SplitOverlapView,
@@ -294,6 +295,8 @@ export interface ChatReviewState {
   missingAsked?: string;
   /** Когда панель попросила дочитать по отчёту о глубине (U4): один раз. */
   depthAsked?: string;
+  /** Когда панель попросила переписать нечитаемый блок следа требований (T21): один раз. */
+  traceAsked?: string;
   /** Тир из отчёта ревьюера о глубине. */
   tier?: ReviewTier;
   /** Что осталось неполным после просьбы дочитать — на карточку. */
@@ -462,7 +465,13 @@ export interface SplitPlanGroupRecord {
   testsVerdict?: { cases: number; passed: number; runId?: string; runAt?: string };
   /** Счёт токенов группы на её закрытии (E4, `token-ledger.ts`). */
   tokenLedger?: SplitTokenLedger;
+  /** Одноразовая база, поднятая группе ревью (T7): снимается, когда группа закрыта. */
+  stand?: { name: string; image: string; startedAt: string };
+  /** Итог закрытия группы ревью по её копии (T13, T6/T11). */
+  reviewClose?: SplitGroupReviewClose;
 }
+
+export type SplitReviewClose = SplitGroupReviewClose;
 
 /** Счёт токенов группы (E4) — форма записи та же, что у хаба. */
 export type SplitTokenLedger = SplitGroupTokenLedger;

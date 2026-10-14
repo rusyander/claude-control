@@ -7,5 +7,7 @@ import type { OurRules, OurLayerId } from '@agentdeck/contracts';
  * СЛОЖНЕЕ этого (флаги запуска), карточка берёт готовым с сервера.
  */
 export function layerOn(rules: OurRules, layer: OurLayerId): boolean {
+  // `tools` не из `~/.claude`: общий выключатель его не трогает (см. контракт).
+  if (layer === 'tools') return rules.tools !== false;
   return rules.enabled && rules[layer];
 }

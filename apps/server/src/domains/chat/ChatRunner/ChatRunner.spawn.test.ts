@@ -60,7 +60,7 @@ vi.mock('node:child_process', () => ({
   spawnSync: () => ({ status: 0 }),
 }));
 
-const { ChatRun } = await import('./ChatRunner.ts');
+const { ChatRun, RUN_STDERR_MAX } = await import('./ChatRunner.ts');
 
 beforeEach(() => {
   child = new FakeChild();
@@ -118,6 +118,25 @@ describe('ChatRun.start: сбой запуска CLI', () => {
     expect(await finished).toBe(true);
     expect(child.stdin.unhandled).toEqual([]);
     expect(events.find((event) => event.kind === 'error')?.message).toContain('Invalid API key');
+  });
+
+  it('stderr разового прогона ограничен хвостом: мегабайты предупреждений не копятся', async () => {
+    const events: { kind: string; message?: string }[] = [];
+    const finished = runWithDeadline(events, process.cwd());
+    process.nextTick(() => {
+      for (let i = 0; i < 400; i += 1)
+        child.stderr.write(`предупреждение ${i} ${'я'.repeat(2_000)}
+`);
+      child.stderr.write('последнее слово CLI');
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 1);
+    });
+    expect(await finished).toBe(true);
+    const message = events.find((event) => event.kind === 'error')?.message ?? '';
+    expect(message.length).toBeLessThanOrEqual(RUN_STDERR_MAX);
+    expect(message.endsWith('последнее слово CLI')).toBe(true);
+    expect(message).not.toContain('предупреждение 0 ');
   });
 
   /**

@@ -411,6 +411,10 @@ export type ChatEvent =
        * 'stopUnconfirmed' — «Остановить» не сняло процесс: номер не проверить без
        *   снимка процессов, а чужое панель не трогает; прогон остаётся идущим (F-145).
        * 'conversationLost' — файла сессии группы нет на диске, ход пошёл новым разговором (Q2).
+       * 'autoContinue' / 'autoContinueSpent' — чат на локальной модели оборвался и продолжит сам /
+       *   автоматические продолжения исчерпаны, нужен человек (L4b).
+       * 'eventsTrimmed' — долгий прогон: старые кадры потока сброшены из буфера, переподключение
+       *   начинается не с начала (L4b).
        */
       code:
         | 'adopted'
@@ -433,7 +437,10 @@ export type ChatEvent =
         | 'pathGateFailed'
         | 'autonomyDeferred'
         | 'stopUnconfirmed'
-        | 'conversationLost';
+        | 'conversationLost'
+        | 'autoContinue'
+        | 'autoContinueSpent'
+        | 'eventsTrimmed';
       text: string;
       /**
        * Код самой строки — отдельно от `code`, который называет повод. Есть не

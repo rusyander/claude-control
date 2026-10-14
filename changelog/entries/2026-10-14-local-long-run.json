@@ -1,0 +1,118 @@
+{
+  "title": {
+    "ru": "Локальная модель на ночных задачах: присмотр за сервером, запрет сна, продолжение после сбоя",
+    "en": "Local model on overnight tasks: server supervision, sleep block, continuing after a failure"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Присмотр за сервером моделей: раз в 15 секунд проверяется, что сервер отвечает. Упавший или молчащий восемь проверок подряд сервер поднимается заново с теми же настройками, а запрос, которому он не ответил, уходит второй раз. Не больше трёх подъёмов за десять минут; если сервер так и не встаёт, панель пробует реже — раз в десять минут, — а карточка сервера держит сообщение с числом попыток, причиной и временем следующей. Сервер, остановленный человеком, не поднимается ни по таймеру, ни по запросу прогона. Пока сервер лежит, а прогон идёт, клиент ждёт без предела — человек видит это на карточке и прерывает ожидание остановкой в чате.",
+        "en": "The model server is supervised: every 15 seconds the panel checks that it answers. A server that died or stayed silent for eight checks in a row is started again with the same settings, and the request it failed to answer is sent a second time. At most three restarts in ten minutes; if the server still will not come up, the panel tries less often — once every ten minutes — and the server card keeps a message with the attempt count, the reason and the time of the next try. A server stopped by a human is restarted neither by the timer nor by a run request. While the server is down and a run is going, the client waits without limit — it is visible on the card and the wait is ended by stopping in the chat."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Пока идёт прогон на локальной модели, компьютер не уходит в сон (Windows, macOS, Linux с systemd), в том числе прогон, подхваченный после перезапуска панели. Запрет включён по умолчанию, снимается, когда прогонов нет; переключатель стоит в карточке сервера. Закрытую крышку ноутбука и «современный режим ожидания» запрет не держит. Три быстрых выхода помощника подряд отключают запрет, но выход после долгой работы счёт обнуляет.",
+        "en": "While a run on a local model is going the computer does not fall asleep (Windows, macOS, Linux with systemd), including a run picked up after a panel restart. The block is on by default, released when there are no runs; the switch is in the server card. It does not hold a closed laptop lid or “modern standby”. Three quick helper exits in a row turn the block off, but an exit after a long stretch resets the count."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Чат на локальной модели сам продолжает сессию после сбоя сервера, сети или таймаута: через 20, 60 и 180 секунд, не больше трёх попыток подряд, каждая отмечена в ленте. Продолжение, успевшее выполнить несколько инструментов, начинает счёт заново, так что ночь с редкими сбоями предел не исчерпает; продолжается и прогон, подхваченный после перезапуска панели. Сообщение человека отменяет ожидание; остановка кнопкой и ошибки, которые повтор не лечит, не продолжаются.",
+        "en": "A chat on a local model continues its session itself after a server failure, a network error or a timeout: after 20, 60 and 180 seconds, at most three attempts in a row, each marked in the feed. A continuation that ran several tools starts the count over, so a night with rare failures does not exhaust the limit; a run picked up after a panel restart is continued too. A human message cancels the wait; a stop by the button and errors a repeat does not cure are not continued."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Настройка, которой нужен перезапуск сервера моделей (выгрузка по простою, где считать), во время прогона откладывается: перезапуск оборвал бы задачу. Карточка пишет «применится после текущего прогона», перезапуск идёт, когда прогонов нет; ожидание хранится в файле и переживает перезапуск панели. Если перезапуск не удался, делается ещё одна попытка, после неё карточка называет причину, а настройка применяется при ближайшем запуске сервера.",
+        "en": "A setting that needs a model server restart (unloading on idle, where to compute) is deferred during a run: the restart would cut the task. The card says “will apply after the current run” and the restart happens when there are no runs; the wait is kept in a file and survives a panel restart. If the restart fails there is one more attempt, then the card names the reason and the setting applies at the next server start."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Запрос, не влезающий в окно локальной модели, больше не ломает прогон: слишком длинный вход получает отказ «prompt is too long» с числами, по которым Claude Code сам сжимает историю, а у Qwen Code слишком большой max_tokens урезается под остаток окна (Claude Code снижает его сам по отказу). Для Qwen Code окно и сроки записываются в настройки, а недоступный сервер моделей отвечает 503, который он повторяет, а не 502, после которого сдаётся.",
+        "en": "A request that does not fit the local model window no longer breaks the run: an input that is too long gets a “prompt is too long” refusal with the numbers Claude Code compacts its history by, and for Qwen Code an oversized max_tokens is clamped to the rest of the window (Claude Code lowers it itself after the refusal). For Qwen Code the window and deadlines are written into its settings, and an unreachable model server answers 503, which it retries, instead of 502, after which it gives up."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Сроки ответа локальной модели считаются от длины контекста и замеренной скорости разбора (от 5 до 30 минут), а не берутся облачными: полный промпт разбирается дольше минуты. Чтение файла и ответ MCP-сервера ограничены восьмой частью окна, чтобы один ответ не заполнял его.",
+        "en": "Local model reply deadlines are computed from the context length and the measured prompt speed (5 to 30 minutes) instead of the cloud ones: a full prompt takes longer than a minute. A file read and an MCP server answer are capped at an eighth of the window so that one answer does not fill it."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Правило локальной модели велит заводить файл .agent/PROGRESS.md в проекте, обновлять его по шагам и читать после сжатия контекста; оно едет в любом режиме набора для Claude Code, а напоминания о сжатии с порогами от окна локальной модели и контрольная точка перед сжатием — в режимах с набором. Для Qwen Code правило доставляется только режимом «Только набор панели». Описание навыков в наборе для Codex обрезается до 240 знаков только на локальном прогоне, чтобы наложение укладывалось в предел.",
+        "en": "The local-model rule tells the agent to create .agent/PROGRESS.md in the project, update it step by step and read it after the context is compacted; it travels in every kit mode for Claude Code, while the compaction reminders with thresholds scaled to the local window and the checkpoint before compaction work in the modes that carry the kit. For Qwen Code the rule is delivered only by “Panel kit only”. Skill descriptions in the Codex kit are cut to 240 characters only on a local run, so that the overlay stays within its limit."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Буфер событий идущего прогона ограничен (4000 событий, 4 МБ), как и хвост stderr процесса: долгий прогон больше не растёт в памяти панели без предела. Экран, отставший дальше буфера, видит пометку о пропущенных событиях.",
+        "en": "The event buffer of a running chat is bounded (4000 events, 4 MB), as is the stderr tail of the process: a long run no longer grows without limit in the panel memory. A screen that fell further behind than the buffer sees a note about the skipped events."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Прогон на локальной модели, подхваченный после перезапуска панели, остаётся локальным: запрет сна держится, ожидающая настройка не применяется посреди задачи, обрыв продолжается автоматически.",
+        "en": "A run on a local model picked up after a panel restart stays local: the sleep block holds, a pending setting is not applied in the middle of the task, a break-off is continued automatically."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели»: раздел «Ночной прогон: что держит задачу живой» (присмотр, ожидание при недоступном сервере, запрет сна и его пределы, продолжение, память задачи); справка «Набор»: где правило памяти задачи доезжает, а где нет; выгрузка модели по простою в описании ограничений.",
+        "en": "The “Local models” help: section “Overnight run: what keeps the task alive” (supervision, waiting while the server is down, the sleep block and its limits, continuing, task memory); the “Kit” help: where the task-memory rule arrives and where it does not; unloading on idle in the limits description."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    }
+  ]
+}

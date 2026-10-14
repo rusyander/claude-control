@@ -8,7 +8,7 @@ description: "Use when reviewing code — an MR/PR, own branch, working tree, a 
 **Evidence, not impressions — strict by default.** A finding is _proved_ (§4) or it is a ❓; a zone is
 _read_ or it is named unread (§1). The bar is the team's best human reviewers on the same change.
 Calibration on a real ~460-file MR: a solo pass raised 9 of ≈110 findings and declared "no blocking"
-over zones it never read; the misses were systematic, and §2 is their catalogue.
+over unread zones; §2 lists the misses.
 
 **Hunt wide, triage once.** The hunt (§2) is for coverage: every candidate is written down as it
 appears — uncertain and minor ones included — with a first guess at severity and what would prove it.
@@ -23,12 +23,12 @@ every probe, harness and stand runs from a scratch clone (§4).
 
 **Scope** — read it off the prompt; ask only when it names none:
 
-| form                 | how to take it                                                                               |
-| -------------------- | -------------------------------------------------------------------------------------------- |
-| MR / PR              | diff + shas via GitLab MCP; description as frame, threads and pipeline read first            |
-| branch               | `git diff <base>...HEAD`; `git fetch`, then read from `origin/<branch>` — the checkout stays |
-| working tree         | `git diff` plus `git status` — uncommitted work counts                                       |
-| feature / dir / repo | file list first; no diff, so the baseline is the project's idiom                             |
+| form                 | how to take it                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| MR / PR              | diff via forge MCP; description = frame; versions NOW; threads + pipeline first ([§1](references/gitlab-publish.md)) |
+| branch               | `git diff <base>...HEAD`; `git fetch`, then read from `origin/<branch>` — the checkout stays                         |
+| working tree         | `git diff` plus `git status` — uncommitted work counts                                                               |
+| feature / dir / repo | file list first; no diff, so the baseline is the project's idiom                                                     |
 
 The diff is the **starting point, not the boundary**: every touched symbol is followed to its other
 call sites; findings outside the changed lines go to their own section, labelled pre-existing. A
@@ -60,16 +60,13 @@ that covered it; with lanes, `review-plan check` computes it and prints the `**L
 "No blocking" and "clean" are earned only by a ledger with no unread zone and a
 radius that was not truncated; short of that, the verdict names what stayed uncovered.
 
-**Quick request** ("quick", "just glance", «быстро», «глянь») sets the depth, never whether the review
+**Quick request** ("quick", "just glance", "run through it") sets the depth, never whether the review
 runs: no lanes and no stand, but every changed file is read or named unread in the ledger, and docs,
 i18n and help are never cut to save time. T2, a single pass, a partial zone or a truncated radius → the
-verdict is "not fully checked" naming what stayed uncovered, never "no findings". Why: a quick pass
-that skipped the docs once reported clean over two docs blockers.
+verdict is "not fully checked", naming what stayed uncovered.
 
-**Lanes** — `node <kit>/tools/review-plan.mjs plan --base <sha> --out <dir>` cuts the zones into
-chunks and sizes the fleet: T0 none; ≤100 files → 2 lane agents, over 100 → 4. No question before the
-spawn (review agents run unasked, per the kit delegation rule) — one line names the plan's `grant:` numbers and
-`lane-high`, then the rounds start. Protocol, prompt, stop: [references/lanes.md](references/lanes.md).
+**Lanes** — `review-plan.mjs plan` sizes the fleet; review agents run unasked.
+Command, sizing, protocol: [references/lanes.md](references/lanes.md).
 
 Criterion: one line before the first finding — scope, files, the three shas, frame sources (tickets,
 spec, criteria counted), tier, zones, radius totals, lanes.
@@ -170,11 +167,10 @@ line with its reason. Everything started is stopped in the same turn.
 
 **A kill is a claim too.** A candidate dies only when its defence is shown at `file:line` on every
 path its thesis spans — write and read, each consumer, each exit of pass 1. A one-sided check, an
-empty grep, a defence inferred from a name: the candidate stays, as ❓. One real pass wrote "RBAC — checked" having
-checked enabling storage, never reading it; the leak was 🔴.
+empty grep, a defence inferred from a name: the candidate stays, as ❓. A real pass wrote "RBAC — checked" after
+checking enabling storage, never reading it; the leak was 🔴.
 
-**Cold verifier** (when lanes run) — a 🔴/🟡 whose proof stops at L0 goes to a verifier holding only
-the thesis and the evidence: [references/lanes.md](references/lanes.md) §Merge.
+**Cold verifier** (lanes) — a 🔴/🟡 proved only at L0: [references/lanes.md](references/lanes.md) §Merge.
 
 Criterion: every 🔴 and 🟡 shows run output, `file:line` or a search result; a clean spec verdict shows
 both directions; each `✗` names the paths it covered.
@@ -192,9 +188,8 @@ rating: a narrow trigger, the author's rationale and «nothing calls it yet» le
 «nothing calls it» is its own finding against the frame. Rank within each axis and name the blocking
 ones: a review where everything blocks is applied nowhere.
 
-**Nits keep their own shelf.** 🟢 go to the report's last section, "Nits", in compact form; the chat
-digest carries their count, the forge the folded list of gitlab-publish.md §4 — every 🟢 is recorded,
-and none stands between the reader and a 🔴.
+**Nits keep their own shelf** — every 🟢 recorded, none between the reader and a 🔴 (report-shape.md
+"Nits", gitlab-publish.md §4).
 
 ## 6. Report — a work list, not prose
 
@@ -203,10 +198,9 @@ finding stands alone under a stable id (`F-01`) with a `Status` line and carries
 — thesis, evidence, fix direction — and the report ends where the findings do. A second review of the
 scope opens with `review-sync --write` and updates the same file in place. Header lines, section order,
 fields, `Coverage` / `Passes` / `Acceptance` / `Classes` / `Live`, computed counts:
-[references/report-shape.md](references/report-shape.md). Chat gets the digest — scope, **raised ·
-published · confirmed**, every 🔴/🟡/❓ as a references/finding-card.md card, never a list item; 🟢 as a
-count; candidates killed under proof are a result. The
-finished review then runs against [references/red-flags.md](references/red-flags.md).
+[references/report-shape.md](references/report-shape.md). Chat digest: scope, **raised · published ·
+confirmed**, every 🔴/🟡/❓ as a references/finding-card.md card, never a list item; 🟢 as a
+count, kills as a result. Then check it against [references/red-flags.md](references/red-flags.md).
 
 ## 7. Own code — the fix loop
 

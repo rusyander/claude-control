@@ -1,0 +1,48 @@
+/* Два списка в своём острове: квантование на всю ширину (в нём самый длинный текст —
+   размер, «скачано», причина закрытого варианта), под ним контекст и переключатель.
+   Поле шире любого значения, поэтому выбранный вариант виден целиком. */
+.island {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-xs) var(--spacing-md);
+}
+
+.context {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+/* Рекомендация под списками: подпись и «Применить» в строку, на узком экране — подпись над кнопкой. */
+.hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+}
+
+/* Переключатель и подпись — одной строкой, по центру друг друга и вровень с полем списка. */
+.partial {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+  height: 36px;
+  white-space: nowrap;
+}
+
+/* Узкий экран: подпись переключателя может занять две строки, сам переключатель — по центру блока. */
+@media (max-width: 640px) {
+  .partial {
+    height: auto;
+    min-height: 36px;
+    white-space: normal;
+  }
+}

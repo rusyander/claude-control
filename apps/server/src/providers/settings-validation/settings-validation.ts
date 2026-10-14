@@ -195,6 +195,7 @@ export const platformObjectSchema = object({
       skills: boolean().default(true),
       mcp: boolean().default(true),
       systemPrompt: boolean().default(true),
+      tools: boolean().default(true),
     }).default(defaultOurRules),
     // Чьи правила действуют (баг 11б). Без default: нет поля — «оба набора»,
     // как до выбора; умолчание здесь записало бы выбор, которого человек не делал.

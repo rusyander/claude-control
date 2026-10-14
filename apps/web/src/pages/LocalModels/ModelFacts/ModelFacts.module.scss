@@ -1,0 +1,53 @@
+/* Расчёт на выбранные значения: четыре ячейки одного порядка в каждой карточке,
+   чтобы скорость, память, файл и замер стояли друг под другом по всему списку. */
+.island {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: var(--spacing-xs) var(--spacing-sm);
+  margin: 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+
+  dt,
+  dd {
+    margin: 0;
+  }
+}
+
+.value {
+  font-size: var(--font-size-body-lg);
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Скорость — главное число карточки после «влезает ли». */
+.speed {
+  color: var(--color-accent);
+}
+
+.dim {
+  color: var(--color-fg-muted);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}

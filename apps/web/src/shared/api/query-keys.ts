@@ -83,6 +83,8 @@ export const queryKeys = {
   /** Защита данных: настройки, правила и состояние локального прокси. */
   dlp: ['dlp'] as const,
   localModels: ['local-models'] as const,
+  /** MCP-серверы локального прогона проекта (L4): цена, выбор, запас окна. Под корнем `localModels` — его сброс перечитывает и их. */
+  localMcp: (project: string) => ['local-models', 'mcp', project] as const,
   /** Сверка панели с глобальным слоем (В5); дифф предложения — под ним же. */
   globalLayer: ['global-layer'] as const,
   /** Встроенный набор панели (В2); текст элемента — под ним же. */
@@ -121,7 +123,8 @@ export const queryKeys = {
    * принимает ли контур усилие (Т6). Ветка `platforms` намеренно — ответ меняют
    * и правка контура, и его включение, и оба сбрасывают этот корень целиком.
    */
-  platformRunPlan: (consumer: string) => ['platforms', 'run-plan', consumer] as const,
+  platformRunPlan: (consumer: string, project = '') =>
+    ['platforms', 'run-plan', consumer, project] as const,
   /** Зарегистрирован ли переходник контура в конфигурации активного CLI. */
   platformMcp: ['platforms', 'mcp'] as const,
   /**

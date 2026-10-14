@@ -32,6 +32,7 @@ import type {
   SplitPlanGroupRecord,
   SplitPlanRecord,
   SplitTokenFlag,
+  SplitReviewClose,
   SplitTokenLedger,
 } from '../../../lib/app-store/app-store.types.ts';
 import { coldStartMedian, tokenFlags } from '../token-ledger/token-ledger.ts';
@@ -144,6 +145,16 @@ export interface SplitConveyorDeps {
     group: SplitPlanGroupRecord,
     provider: string,
   ) => Promise<SplitTokenLedger | undefined>;
+  /**
+   * Закрытие группы ревью по её копии (T13, T6/T11): что осталось в копии, какие
+   * временные копии убраны, снята ли одноразовая база. Не задан — группа
+   * закрывается как раньше, без итога.
+   */
+  closeReview?: (
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    options: { dirt: boolean },
+  ) => Promise<SplitReviewClose | undefined>;
   /**
    * Сколько групп разделения работает одновременно (настройка проекта). Не
    * задан — без ограничения. Сверх него готовые группы ждут в очереди
@@ -459,6 +470,7 @@ function absorb(record: SplitPlanRecord, result: TaskSplitResult, at: string): v
     // Решение «До MR» пишется и «нет»: без него шапка чата группы брала бы
     // настройку проекта, а та с планом расходится (живой прогон 25.09, O2).
     group.deliver = chat.deliver === true;
+    if (chat.reviewStand) group.stand = chat.reviewStand;
     if (group.status === 'done' || group.status === 'failed') continue;
     group.status = chat.started ? 'started' : 'failed';
     if (!chat.started) group.error = serverText('split-group-run-not-started');
@@ -938,10 +950,39 @@ export class SplitConveyor {
     // ни один отказ git не должен помешать соседям стартовать.
     this.deps.watchOverlap?.(record.parentChatId);
     this.measureTokens(record, group);
+    this.closeReviewGroup(record, group);
 
     void this.launchNext(record).catch((error) => {
       this.deps.log('split conveyor: launch after chain end failed', error);
     });
+  }
+
+  /**
+   * Закрытие группы ревью по ссылке: итог по её копии пишется в запись и на
+   * карточку. Асинхронное и отдельное, как счёт токенов: сбой уборки группу не
+   * держит, а ждавшие её стартуют сразу.
+   */
+  private closeReviewGroup(record: SplitPlanRecord, group: SplitPlanGroupRecord): void {
+    const close = this.deps.closeReview;
+    if (!close || !record.proposal.groups[group.index]?.review) return;
+    // Правки группы ревью, которая чинила по решению человека, — не «грязь»: `git status` копии
+    // нужен только ревью без правок, а база и временные копии убираются в любом случае.
+    const readOnly = !group.result || group.result.kind === 'reviewed';
+    const { parentChatId } = record;
+    const { index } = group;
+    void close(record, group, { dirt: readOnly })
+      .then((closed) => {
+        if (!closed) return;
+        const fresh = this.deps.store.get(parentChatId);
+        const same = fresh?.groups[index];
+        if (!fresh || !same) return;
+        same.reviewClose = closed;
+        if (closed.standRemoved) delete same.stand;
+        this.deps.store.set(fresh);
+      })
+      .catch((error: unknown) => {
+        this.deps.log('split conveyor: review close failed', error);
+      });
   }
 
   /**
@@ -1800,6 +1841,7 @@ export class SplitConveyor {
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
         ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
         ...(group.tokenLedger ? this.tokenView(record, group.tokenLedger) : {}),
+        ...(group.reviewClose ? { reviewClose: group.reviewClose } : {}),
         ...(group.deliver !== undefined ? { deliver: group.deliver } : {}),
         ...(group.interruptedAt ? { interruptedAt: group.interruptedAt } : {}),
         ...(group.interruptResumes ? { interruptResumes: group.interruptResumes } : {}),

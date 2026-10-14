@@ -30,6 +30,7 @@ import type { TreeStartGate } from '../../domains/chat/tree-pause/tree-pause.ts'
 import {
   makeSplitGit,
   splitTasks,
+  type SplitGit,
   type SplitGroupContext,
   type SplitLink,
   type SplitStart,
@@ -85,6 +86,11 @@ export interface SplitLaunchDeps {
   providerChats: ProviderChatService;
   session: ChatSession;
   gate?: TreeStartGate;
+  /**
+   * Стенд и база для групп ревью (T5, T7): подставляет запуск панели, у которого есть docker
+   * и реестр запущенных целей. Нет — задание ревью обходится без абзаца про стенд.
+   */
+  stands?: Pick<SplitGit, 'reviewEnvironment' | 'releaseReviewStand'>;
   /** Куда писать сбой включения набора — форма и у fastify, и у консоли одна. */
   log: { warn: (detail: { err: unknown }, message: string) => void };
 }
@@ -270,6 +276,7 @@ export function createSplitLauncher(
       return plan ? ctx.worktreeBootstraps.run(copy, plan) : undefined;
     },
     ctx.location.paths.mcpConfig,
+    deps.stands,
   );
 
   /**

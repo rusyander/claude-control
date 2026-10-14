@@ -187,6 +187,7 @@ function ourRulesOf(platform: Platform): OurRules {
     skills: flag(stored.skills, fallback.skills),
     mcp: flag(stored.mcp, fallback.mcp),
     systemPrompt: flag(stored.systemPrompt, fallback.systemPrompt),
+    tools: flag(stored.tools, fallback.tools),
   };
 }
 

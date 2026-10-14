@@ -134,15 +134,35 @@ export function codexSkillLines(skillsDir: string): CodexSkillLine[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * Предел описания в списке навыков. Список едет в той же командной строке, что и правила,
+ * а предел у неё общий: ночной прогон локальной модели добавил правило памяти задачи, и
+ * без обрезки самых длинных описаний набор переставал помещаться. Полное описание лежит в
+ * самом SKILL.md, который модель обязана прочесть, когда задача подходит.
+ */
+export const CODEX_SKILL_DESCRIPTION_MAX = 240;
+
+function clipDescription(text: string): string {
+  if (text.length <= CODEX_SKILL_DESCRIPTION_MAX) return text;
+  const cut = text.slice(0, CODEX_SKILL_DESCRIPTION_MAX - 1);
+  const word = cut.lastIndexOf(' ');
+  return `${(word > CODEX_SKILL_DESCRIPTION_MAX / 2 ? cut.slice(0, word) : cut).trimEnd()}…`;
+}
+
 export function codexSkillIndex(
   skills: readonly CodexSkillLine[],
   heading = 'agentdeck kit skills',
+  /** Резать длинные описания: только локальному прогону, где место в строке на счету; обычный набор и слои групп — как были. */
+  clip = false,
 ): string {
   if (skills.length === 0) return '';
   return [
     `## ${heading}`,
     'When a task matches one of these, read that SKILL.md first and follow it.',
-    ...skills.map((skill) => `- ${skill.name} — ${skill.description} (${skill.path})`),
+    ...skills.map(
+      (skill) =>
+        `- ${skill.name} — ${clip ? clipDescription(skill.description) : skill.description} (${skill.path})`,
+    ),
   ].join('\n');
 }
 
@@ -183,7 +203,7 @@ export function buildCodexOverlay(input: {
     ? `# agentdeck kit rules\n\n${rules.replace(/^# agentdeck kit rules\s*/, '')}`
     : '';
   const appServer = join2(own, kitRules);
-  const exec = join2(own, kitRules, codexSkillIndex(skills));
+  const exec = join2(own, kitRules, codexSkillIndex(skills, undefined, input.local));
   const longest = Math.max(argLength(appServer), argLength(exec));
   if (longest > CODEX_KIT_ARG_LIMIT) throw new CodexKitTooLarge(longest);
   return { appServer, exec, ...(skills.length > 0 ? { skillsDir } : {}) };

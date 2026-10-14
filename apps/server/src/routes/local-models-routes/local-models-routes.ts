@@ -1,15 +1,25 @@
+import { existsSync, statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
+  localChoiceBodySchema,
   localClaudeBodySchema,
   localConnectBodySchema,
+  localCustomBodySchema,
   localDeviceBodySchema,
+  localKeepLoadedBodySchema,
+  localKeepAwakeBodySchema,
   localKitBodySchema,
+  localMcpMeasureBodySchema,
+  localMcpPickBodySchema,
+  localModelBodySchema,
   localPullBodySchema,
 } from '@agentdeck/contracts/local-models';
 import type { ServerContext } from '../../context.ts';
 import { readApiToken } from '../../lib/api-token/api-token.ts';
 import { parseBody } from '../../lib/request-body.ts';
 import { errorBody } from '../../lib/server-text/server-text.ts';
+import { localError } from '../../domains/local-models/errors.ts';
 import type { Inject } from '../../domains/local-models/connect.ts';
 import type { LocalModels } from '../../domains/local-models/service.ts';
 import type { KitService } from '../../domains/kit/service.ts';
@@ -74,10 +84,52 @@ export function registerLocalModelsRoutes(
 
   app.post('/api/local-models/runtime/install', () => local.installRuntime());
 
+  /**
+   * Поднять сервер. Тело необязательно: пусто — модель, что уже стоит или лучшая из
+   * скачанных; `quant`, `context`, `kvCache` называют запуск явно и запоминаются.
+   */
   app.post<{ Body: unknown }>('/api/local-models/server/start', async (request, reply) => {
-    const tag = (request.body as { tag?: unknown } | undefined)?.tag;
+    const raw = request.body ?? {};
+    const body = parseBody(localModelBodySchema.partial(), raw, reply);
+    if (!body) return reply;
     try {
-      return await local.startServer(typeof tag === 'string' && tag ? tag : undefined);
+      return await local.startServer(body);
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
+  /** Квантования модели: живой список из репозитория, что скачано и как ляжет на карту. */
+  app.get<{ Querystring: { tag?: string } }>('/api/local-models/quants', async (request, reply) => {
+    const tag = request.query.tag ?? '';
+    try {
+      return await local.quants(tag);
+    } catch (error) {
+      return refuse(reply, error, 404);
+    }
+  });
+
+  /**
+   * Выбор квантования и окна для модели: запоминается, им же поднимется каждый
+   * следующий запуск. Идущий сервер перезапускается работой «restart»; выбор, который
+   * не влезает на карту сейчас, отклоняется с цифрами.
+   */
+  app.put<{ Body: unknown }>('/api/local-models/choice', async (request, reply) => {
+    const body = parseBody(localChoiceBodySchema, request.body, reply);
+    if (!body) return reply;
+    try {
+      return await local.setChoice(body);
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
+  /** «Любая модель»: репозиторий Hugging Face → запись с квантованиями и устройством, без скачивания. */
+  app.post<{ Body: unknown }>('/api/local-models/custom', async (request, reply) => {
+    const body = parseBody(localCustomBodySchema, request.body, reply);
+    if (!body) return reply;
+    try {
+      return await local.addCustom(body.input);
     } catch (error) {
       return refuse(reply, error);
     }
@@ -96,7 +148,7 @@ export function registerLocalModelsRoutes(
     if (!body) return reply;
     const connect = (request.body as { connect?: unknown }).connect === true;
     try {
-      return local.pull(body.tag, connect ? injectFor(request) : undefined);
+      return local.pull(body, connect ? injectFor(request) : undefined);
     } catch (error) {
       return refuse(reply, error, 404);
     }
@@ -108,11 +160,11 @@ export function registerLocalModelsRoutes(
     return local.importFromSystem(body.tag);
   });
 
-  app.delete<{ Params: { tag: string } }>(
+  app.delete<{ Params: { tag: string }; Querystring: { quant?: string } }>(
     '/api/local-models/models/:tag',
     async (request, reply) => {
       try {
-        await local.remove(decodeURIComponent(request.params.tag));
+        await local.remove(decodeURIComponent(request.params.tag), request.query.quant);
         return { ok: true };
       } catch (error) {
         return refuse(reply, error);
@@ -134,7 +186,7 @@ export function registerLocalModelsRoutes(
     const body = parseBody(localConnectBodySchema, request.body, reply);
     if (!body) return reply;
     try {
-      await local.connect(injectFor(request), body.tag);
+      await local.connect(injectFor(request), body);
       return await local.describeConnect(injectFor(request));
     } catch (error) {
       return refuse(reply, error);
@@ -158,6 +210,63 @@ export function registerLocalModelsRoutes(
     } catch (error) {
       return refuse(reply, error);
     }
+  });
+
+  app.put<{ Body: unknown }>('/api/local-models/keep-loaded', async (request, reply) => {
+    const body = parseBody(localKeepLoadedBodySchema, request.body, reply);
+    if (!body) return reply;
+    try {
+      return await local.setKeepLoaded(body.keepLoaded);
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
+  app.put<{ Body: unknown }>('/api/local-models/keep-awake', async (request, reply) => {
+    const body = parseBody(localKeepAwakeBodySchema, request.body, reply);
+    if (!body) return reply;
+    try {
+      return await local.setKeepAwake(body.keepAwake);
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
+  /**
+   * MCP-серверы локального прогона проекта. Путь — каталог проекта (рабочий каталог
+   * чата): из него читается .mcp.json. Не абсолютный или не каталог — 400, а не
+   * чтение чего придётся.
+   */
+  const projectDir = (project: string | undefined, reply: FastifyReply): string | undefined => {
+    if (project && isAbsolute(project) && existsSync(project) && statSync(project).isDirectory())
+      return project;
+    refuse(reply, localError('local-mcp-project', 'нужен абсолютный путь к каталогу проекта'), 400);
+    return undefined;
+  };
+
+  app.get<{ Querystring: { project?: string } }>(
+    '/api/local-models/mcp',
+    async (request, reply) => {
+      const project = projectDir(request.query.project, reply);
+      if (!project) return reply;
+      return local.mcpInfo(project);
+    },
+  );
+
+  app.put<{ Body: unknown }>('/api/local-models/mcp', async (request, reply) => {
+    const body = parseBody(localMcpPickBodySchema, request.body, reply);
+    if (!body) return reply;
+    const project = projectDir(body.project, reply);
+    if (!project) return reply;
+    return local.mcpPick(project, body.servers);
+  });
+
+  app.post<{ Body: unknown }>('/api/local-models/mcp/measure', async (request, reply) => {
+    const body = parseBody(localMcpMeasureBodySchema, request.body, reply);
+    if (!body) return reply;
+    const project = projectDir(body.project, reply);
+    if (!project) return reply;
+    return await local.mcpMeasure(project, body.ids);
   });
 
   app.put<{ Body: unknown }>('/api/local-models/claude', async (request, reply) => {

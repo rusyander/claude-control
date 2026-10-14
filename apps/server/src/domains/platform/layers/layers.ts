@@ -52,8 +52,34 @@ export type RunLayers = PlatformRunLayers;
  * «ни одного нашего слоя», и частная галочка его не переспорит.
  */
 export function layerOn(rules: OurRules, layer: OurLayerId): boolean {
+  // `tools` — не из `~/.claude`, и общий выключатель его не трогает (см. контракт).
+  // Запись, сохранённая до появления слоя, поля не имеет — и это «полный набор».
+  if (layer === 'tools') return rules.tools !== false;
   return rules.enabled && rules[layer];
 }
+
+/**
+ * Рабочие встроенные инструменты облегчённого набора (слой `tools` снят).
+ * Замерено 13.10.2026 настоящим `claude` 2.1.286: полный набор — 27 схем, около
+ * 16 тыс. токенов на каждый запрос; эти десять — около 5 тыс. Уходят расписания
+ * (Cron*, ScheduleWakeup), рабочие деревья, SendMessage/ListAgents/TaskStop,
+ * Workflow, DesignSync, LSP, NotebookEdit, WebSearch (серверный поиск Anthropic
+ * на чужом эндпоинте не работает), ресурсы MCP. `Agent` остаётся: на локальной
+ * модели один подагент за раз решает правило набора, а не отсутствие инструмента.
+ * Имя, которого нет в этой версии CLI, он просто не учитывает (замерено).
+ */
+export const LEAN_TOOLS = [
+  'Bash',
+  'Read',
+  'Edit',
+  'Write',
+  'Glob',
+  'Grep',
+  'WebFetch',
+  'Skill',
+  'Agent',
+  'TodoWrite',
+] as const;
 
 /**
  * Слои этого контура для прогона Claude. Выбор «только правила контура» снимает
@@ -229,6 +255,12 @@ function layersOf(rules: OurRules, keepProject: boolean): RunLayers {
   }
   const systemPrompt = layerOn(rules, 'systemPrompt');
   if (!systemPrompt) dropped.push('systemPrompt');
+  if (!layerOn(rules, 'tools')) {
+    // Белый список, а не `--disallowedTools`: новый инструмент следующей версии
+    // CLI не должен молча вернуть в запрос тысячи токенов.
+    args.push('--tools', LEAN_TOOLS.join(','));
+    dropped.push('tools');
+  }
 
   return { args, systemPrompt, dropped };
 }

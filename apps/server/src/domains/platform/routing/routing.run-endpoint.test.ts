@@ -13,6 +13,7 @@ import {
   localClaudeRun,
   listConsumerOptions,
   resolveRunRoute,
+  runRouteOf,
   type PlatformRoutingDeps,
 } from './routing.ts';
 
@@ -351,5 +352,93 @@ describe('шапка чата при Claude, уведённом на локал�
     const decision = resolveRunRoute(withLocal(PLATFORM.id), 'chat');
     expect(decision.routed).toBe(true);
     expect(localClaudeRun(withLocal(PLATFORM.id), 'chat', decision)).toBeUndefined();
+  });
+});
+
+describe('окно локальной модели в окружении прогона Claude (L1)', () => {
+  const WINDOW = {
+    CLAUDE_CODE_MAX_CONTEXT_TOKENS: '65536',
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: '65536',
+    CLAUDE_CODE_MAX_OUTPUT_TOKENS: '8192',
+    CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1',
+  };
+  const LOCAL_PLATFORM: Platform = {
+    ...PLATFORM,
+    id: 'local-ollama',
+    driver: 'ollama',
+    consumers: ['chat', 'foreign:qwen'],
+    toolShim: false,
+    contourPrompt: false,
+  };
+  const withWindow = (): PlatformRoutingDeps => ({
+    ...deps,
+    // Как в сборке сервера: окно знает только контур локальной модели.
+    localRunEnv: (platformId) => (platformId === 'local-ollama' ? WINDOW : undefined),
+  });
+
+  it('контур локальной модели: прогон Claude получает окно сервера, сжатие и один вызов за раз', () => {
+    connect(LOCAL_PLATFORM);
+    const decision = resolveRunRoute(withWindow(), 'chat');
+    expect(decision.routed).toBe(true);
+    if (!decision.routed) return;
+    expect(decision.env).toMatchObject(WINDOW);
+    // Адрес контура на месте рядом с окном.
+    expect(decision.env.ANTHROPIC_BASE_URL).toContain('127.0.0.1:5179');
+  });
+
+  it('окно не едет чужому CLI и чужому контуру', () => {
+    connect(LOCAL_PLATFORM);
+    const foreign = resolveRunRoute(withWindow(), 'foreign:qwen');
+    expect(foreign.routed ? Object.keys(foreign.env) : []).not.toContain(
+      'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
+    );
+    connect({ ...PLATFORM, consumers: ['chat'] });
+    const company = resolveRunRoute(withWindow(), 'chat');
+    expect(company.routed ? Object.keys(company.env) : []).not.toContain(
+      'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+    );
+  });
+
+  it('чужой CLI на локальном контуре получает окно и сроки числами (L4b), Claude и чужой контур — нет', () => {
+    const limited: PlatformRoutingDeps = {
+      ...deps,
+      localRunEnv: (platformId) =>
+        platformId === 'local-ollama'
+          ? { ...WINDOW, API_TIMEOUT_MS: '600000', CLAUDE_STREAM_IDLE_TIMEOUT_MS: '300000' }
+          : undefined,
+    };
+    connect(LOCAL_PLATFORM);
+    const foreign = resolveRunRoute(limited, 'foreign:qwen');
+    expect(foreign.routed && foreign.localLimits).toEqual({
+      contextWindow: 65_536,
+      timeoutMs: 600_000,
+      idleMs: 300_000,
+    });
+    // Доезжает до места спавна тем же проектором, что и остальное.
+    expect(runRouteOf(foreign).localLimits?.contextWindow).toBe(65_536);
+    const claude = resolveRunRoute(limited, 'chat');
+    expect(claude.routed && claude.localLimits).toBeFalsy();
+    connect({ ...PLATFORM, consumers: ['foreign:qwen'] });
+    const company = resolveRunRoute(limited, 'foreign:qwen');
+    expect(company.routed && company.localLimits).toBeFalsy();
+  });
+
+  it('переключатель: прогон мимо контура несёт то же окно в результате localClaudeRun', () => {
+    const redirected: PlatformRoutingDeps = {
+      ...withWindow(),
+      claudeSettingsRoute: () => ({
+        setting: 'settings.json → env.ANTHROPIC_BASE_URL',
+        platformId: 'local-ollama',
+        model: 'qwen3.6:27b-coding',
+        title: 'Qwen3.6 27B Coding',
+      }),
+    };
+    const decision = resolveRunRoute(redirected, 'chat');
+    expect(localClaudeRun(redirected, 'chat', decision)?.env).toEqual(WINDOW);
+    // Шапке чата окружение не отдаётся: у плана только имя и подпись.
+    expect(describeRunPlan(redirected, 'chat').local).toEqual({
+      model: 'qwen3.6:27b-coding',
+      title: 'Qwen3.6 27B Coding',
+    });
   });
 });

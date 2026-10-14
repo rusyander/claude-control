@@ -176,12 +176,13 @@ export const en: Dictionary = {
     platformLayers: (title: string, list: string) =>
       `Through the contour “${title}” the run goes without our: ${list}.`,
     platformLayersAll: (title: string) =>
-      `Through the contour “${title}” the run goes without any of our layers: no rules, hooks, permissions, skills, MCP servers or panel prompt addition.`,
+      `Through the contour “${title}” the run goes without any of our layers: no rules, hooks, permissions, skills, MCP servers or panel prompt addition, and with a trimmed tool set.`,
     layerTitle: {
       settings: 'Personal rules, hooks and permissions',
       skills: 'Skills',
       mcp: 'MCP servers',
       systemPrompt: 'Panel addition to the system prompt',
+      tools: 'Full Claude Code tool set',
     },
     mode: {
       text: 'Message',

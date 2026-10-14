@@ -1,12 +1,11 @@
-import { copyFile, link, mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { localError } from './errors.ts';
-import type { JobHandle } from './jobs.ts';
+import { join } from 'node:path';
 
 /**
- * Хранилище моделей Ollama — прямо по файлам, без сервера.
+ * Хранилище моделей Ollama — прямо по файлам, без сервера. Панель его только ЧИТАЕТ
+ * (чтобы забрать скачанное жёсткой ссылкой): Ollama человека она не запускает.
  *
  * Хранилище простое и стабильное с первых версий: `manifests/<хост>/<пространство>/<модель>/<тег>`
  * — JSON со списком слоёв, `blobs/sha256-<хеш>` — сами слои. Чтение файлов, а не
@@ -122,8 +121,12 @@ export async function listStoredModels(modelsDir: string): Promise<StoredModel[]
   return found.sort((a, b) => a.tag.localeCompare(b.tag));
 }
 
-/** Сколько места занимает каталог целиком, байт. */
-export async function dirSize(dir: string): Promise<number> {
+/**
+ * Сколько места занимает каталог целиком, байт. Файл с несколькими жёсткими
+ * ссылками (импорт из Ollama: слой и `.gguf` — одни и те же байты) считается один
+ * раз: иначе импортированная 17-гигабайтная модель «занимала» бы 34 ГБ.
+ */
+export async function dirSize(dir: string, seen = new Set<string>()): Promise<number> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -133,10 +136,16 @@ export async function dirSize(dir: string): Promise<number> {
   let total = 0;
   for (const entry of entries) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) total += await dirSize(path);
+    if (entry.isDirectory()) total += await dirSize(path, seen);
     else if (entry.isFile()) {
       try {
-        total += (await stat(path)).size;
+        const info = await stat(path, { bigint: true });
+        if (info.nlink > 1n) {
+          const id = `${info.dev}:${info.ino}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+        }
+        total += Number(info.size);
       } catch {
         // Файл исчез между чтением каталога и замером — его и не считаем.
       }
@@ -145,71 +154,43 @@ export async function dirSize(dir: string): Promise<number> {
   return total;
 }
 
-/**
- * Забрать модель системного Ollama в хранилище панели без скачивания.
- *
- * Слой — жёсткой ссылкой: те же байты на диске, без второй копии на 20 ГБ, и
- * удаление в любом из двух хранилищ другое не задевает. На другом томе ссылка
- * невозможна — тогда копия, через временный файл: оборванная копия не должна
- * выглядеть готовым слоем. Манифест пишется последним: пока его нет, модели
- * для сервера нет, и наполовину перенесённая не всплывёт в списке.
- */
-export async function importStoredModel(input: {
-  fromDir: string;
-  toDir: string;
-  tag: string;
-  handle: JobHandle;
-}): Promise<void> {
-  const source = manifestPathOf(input.fromDir, input.tag);
-  const manifest = await readManifest(source);
-  if (!manifest?.layers?.length) {
-    throw localError('local-import-failed', `модель ${input.tag} не найдена в системном Ollama`, {
-      tag: input.tag,
-      reason: 'manifest',
-    });
-  }
-  const layers = layersOf(manifest);
-  const total = layers.reduce((sum, layer) => sum + layer.size, 0);
-  input.handle.progress({ phase: 'import', totalBytes: total, doneBytes: 0 });
-  let done = 0;
-  await mkdir(join(input.toDir, 'blobs'), { recursive: true });
-  for (const layer of layers) {
-    if (input.handle.signal.aborted)
-      throw localError('local-download-cancelled', 'загрузка отменена');
-    const from = blobPathOf(input.fromDir, layer.digest);
-    const to = blobPathOf(input.toDir, layer.digest);
-    if (!existsSync(to)) {
-      if (!existsSync(from)) {
-        throw localError('local-import-failed', `у модели ${input.tag} нет слоя ${layer.digest}`, {
-          tag: input.tag,
-          reason: layer.digest,
-        });
-      }
-      try {
-        await link(from, to);
-      } catch {
-        const temp = `${to}.part`;
-        await copyFile(from, temp);
-        await rename(temp, to);
-      }
-    }
-    done += layer.size;
-    input.handle.progress({ doneBytes: done });
-  }
-  const target = manifestPathOf(input.toDir, input.tag);
-  await mkdir(dirname(target), { recursive: true });
-  await copyFile(source, target);
+/** Слой с весами модели (GGUF) в манифесте Ollama: путь файла и размер. */
+export async function modelLayerOf(
+  modelsDir: string,
+  tag: string,
+): Promise<{ blob: string; sizeBytes: number } | undefined> {
+  const manifest = (await readManifest(manifestPathOf(modelsDir, tag))) as
+    { layers?: (ManifestLayer & { mediaType?: string })[] } | undefined;
+  const layer = manifest?.layers?.find(
+    (item) => item.mediaType === 'application/vnd.ollama.image.model',
+  );
+  return layer ? { blob: blobPathOf(modelsDir, layer.digest), sizeBytes: layer.size } : undefined;
 }
 
-/** Удалить частичную копию слоя, оставшуюся от оборванного переноса. */
-export async function dropPartials(modelsDir: string): Promise<void> {
+/**
+ * Убрать слои, на которые не ссылается ни один манифест СОБСТВЕННОГО хранилища
+ * панели (прежние загрузки Ollama в `.local-models/models`). Системное хранилище
+ * человека сюда не передаётся никогда.
+ */
+export async function dropUnreferencedBlobs(modelsDir: string): Promise<number> {
+  const used = new Set<string>();
+  for (const model of await listStoredModels(modelsDir)) {
+    const manifest = await readManifest(model.manifest);
+    for (const layer of manifest ? layersOf(manifest) : [])
+      used.add(blobPathOf(modelsDir, layer.digest));
+  }
   let entries: string[];
   try {
     entries = await readdir(join(modelsDir, 'blobs'));
   } catch {
-    return;
+    return 0;
   }
-  for (const name of entries.filter((entry) => entry.endsWith('.part'))) {
-    await rm(join(modelsDir, 'blobs', name), { force: true });
+  let removed = 0;
+  for (const name of entries) {
+    const path = join(modelsDir, 'blobs', name);
+    if (used.has(path)) continue;
+    await rm(path, { force: true });
+    removed += 1;
   }
+  return removed;
 }

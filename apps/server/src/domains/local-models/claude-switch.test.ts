@@ -51,6 +51,19 @@ describe('Claude Code на локальной модели', () => {
       ANTHROPIC_DEFAULT_FABLE_MODEL: 'qwen3.6:27b-coding',
       CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3.6:27b-coding',
       CLAUDE_CODE_MAX_CONTEXT_TOKENS: '131072',
+      // Окно сжатия бьёт autoCompactWindow из settings.json человека (300000 под облако);
+      // резерв под ответ меньше облачного, вызовы — по одному.
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '131072',
+      CLAUDE_CODE_MAX_OUTPUT_TOKENS: '8192',
+      CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1',
+      // Сроки и пределы вывода (L4b): локальный разбор промпта длиннее облачных умолчаний.
+      CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS: '1310720',
+      CLAUDE_STREAM_IDLE_TIMEOUT_MS: '1310720',
+      CLAUDE_BYTE_STREAM_IDLE_TIMEOUT_MS: '1310720',
+      API_TIMEOUT_MS: '1430720',
+      CLAUDE_CODE_RETRY_WATCHDOG: '1',
+      CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS: '16384',
+      MAX_MCP_OUTPUT_TOKENS: '16384',
     });
     expect(Object.keys(VARS)).toEqual([...CLAUDE_SWITCH_VARS]);
   });

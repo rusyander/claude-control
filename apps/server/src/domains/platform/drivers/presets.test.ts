@@ -109,7 +109,7 @@ describe('пресеты: объявленное доезжает до пров�
   });
 
   it('vLLM, LiteLLM, Ollama, OpenRouter — клиент Anthropic идёт к родной ручке', () => {
-    for (const driver of ['vllm', 'litellm', 'ollama', 'openrouter'] as const) {
+    for (const driver of ['vllm', 'litellm', 'ollama', 'llama-cpp', 'openrouter'] as const) {
       const platform = contour({ driver });
       expect(nativeMessagesPath(platform, driverOf(platform)), driver).toBe('messages');
     }

@@ -29,6 +29,10 @@ import { createRuntime, type Runtime } from './runtime.ts';
 interface Started {
   args: string[];
   env: Record<string, string>;
+  /** Блок набора к системному промпту (`platformAppend`). */
+  append: string;
+  /** MCP-серверы, взятые человеком для локального прогона (L4). */
+  mcp: { ids: string[]; config: unknown } | undefined;
 }
 
 describe('набор панели доезжает до прогона облачного Claude (runtime runRoute)', () => {
@@ -71,7 +75,12 @@ describe('набор панели доезжает до прогона обла�
     started = [];
     const fake = (): RunLike => ({
       start: async (options, onEvent) => {
-        started.push({ args: options.platformArgs ?? [], env: options.platformEnv ?? {} });
+        started.push({
+          args: options.platformArgs ?? [],
+          env: options.platformEnv ?? {},
+          append: options.platformAppend ?? '',
+          mcp: options.platformMcp,
+        });
         onEvent({ kind: 'text', text: 'ок' });
         onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: `s-${started.length}` });
       },
@@ -134,9 +143,8 @@ describe('набор панели доезжает до прогона обла�
     expect((await send('наш-2'))?.args).toEqual([]);
   });
 
-  it('контур локальной модели — локальный вариант правил и вызовы инструментов по одному', async () => {
-    // Контур заведён так же, как его заводит «Скачать и подключить» (`connect.ts`):
-    // та же форма настроек через схему, ключ-заглушка, активен; шлюз — живой.
+  /** Контур заведён так же, как его заводит «Скачать и подключить» (`connect.ts`); шлюз — живой. */
+  async function connectLocal(): Promise<void> {
     const appData = join(root, 'agentdeck');
     const settings = platformSchema.parse(
       localPlatformSettings({
@@ -150,6 +158,10 @@ describe('набор панели доезжает до прогона обла�
     writeToken(appData, LOCAL_PLATFORM_ID, LOCAL_PLATFORM_TOKEN);
     store.updateSettings({ activePlatformId: LOCAL_PLATFORM_ID });
     await runtime.platformGateway.start({ store, appDataDir: appData, port: 0 });
+  }
+
+  it('контур локальной модели — локальный вариант правил и вызовы инструментов по одному', async () => {
+    await connectLocal();
     try {
       runtime.kit.setMode('claude', 'hybrid');
       const run = await send('локальный');
@@ -157,6 +169,71 @@ describe('набор панели доезжает до прогона обла�
       expect(run?.env.ANTHROPIC_BASE_URL).toContain(`/${LOCAL_PLATFORM_ID}/`);
       expect(run?.env.AGENTDECK_KIT_VARIANT).toBe('local');
       expect(run?.env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY).toBe('1');
+    } finally {
+      await runtime.platformGateway.stop();
+    }
+  });
+
+  it('локальный контур при «глобальных»: окно и ограничения в окружении, дисциплина — допиской, набор не подключён', async () => {
+    await connectLocal();
+    try {
+      runtime.kit.setMode('claude', 'global');
+      const run = await send('локальный-глобальный');
+      expect(run?.args).not.toContain('--plugin-dir');
+      // Окно — то, что отдаёт сервис моделей (запись о запущенном сервере либо наименьшее
+      // окно агента); сам выбор окна проверяет `local-models.run-env.test.ts`.
+      const window = runtime.localModels.runEnv();
+      expect(Number(window.CLAUDE_CODE_MAX_CONTEXT_TOKENS)).toBeGreaterThanOrEqual(32_768);
+      expect(run?.env).toMatchObject(window);
+      expect(run?.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe(
+        run?.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,
+      );
+      expect(run?.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBe('8192');
+      expect(run?.env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY).toBe('1');
+      expect(run?.append).toContain('Local model discipline');
+    } finally {
+      await runtime.platformGateway.stop();
+    }
+  });
+
+  it('MCP-сервер, взятый в проекте, едет локальному прогону и только ему', async () => {
+    writeFileSync(
+      join(root, '.claude.json'),
+      JSON.stringify({ mcpServers: { gitlab: { command: 'gitlab-mcp' } } }),
+      'utf8',
+    );
+    runtime.localModels.mcpPick(project, ['gitlab']);
+    runtime.kit.setMode('claude', 'global');
+    // Облачный прогон того же проекта MCP получает обычным путём — своего файла нет.
+    expect((await send('облачный-mcp'))?.mcp).toBeUndefined();
+    await connectLocal();
+    try {
+      const run = await send('локальный-mcp');
+      expect(run?.args).toContain('--strict-mcp-config');
+      expect(run?.mcp).toEqual({
+        ids: ['gitlab'],
+        config: { mcpServers: { gitlab: { command: 'gitlab-mcp' } } },
+      });
+    } finally {
+      await runtime.platformGateway.stop();
+    }
+  });
+
+  it('облачный Claude: ни окна локальной модели, ни дисциплины', async () => {
+    runtime.kit.setMode('claude', 'global');
+    const run = await send('облачный');
+    expect(run?.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
+    expect(run?.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined();
+    expect(run?.append).toBe('');
+  });
+
+  it('режим с набором: дисциплину несёт хук плагина, допиской она не дублируется', async () => {
+    await connectLocal();
+    try {
+      runtime.kit.setMode('claude', 'hybrid');
+      const run = await send('локальный-гибрид');
+      expect(run?.append).toBe('');
+      expect(run?.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeDefined();
     } finally {
       await runtime.platformGateway.stop();
     }

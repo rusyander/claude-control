@@ -79,6 +79,7 @@ export function mergeSplitGroups(
         ...deliveryMissingOf(group),
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
         ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
+        ...(group.reviewClose ? { reviewClose: group.reviewClose } : {}),
         ...(group.tokenLedger
           ? {
               tokens: {

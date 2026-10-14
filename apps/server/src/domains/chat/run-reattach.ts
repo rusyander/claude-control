@@ -34,6 +34,7 @@ export function ledgerRunMeta(entry: RunLedgerEntry): RunMeta {
     ...(entry.origin ? { origin: entry.origin } : {}),
     ...(entry.projectPath ? { projectPath: entry.projectPath } : {}),
     ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
+    ...(entry.local ? { local: true as const } : {}),
     ...(entry.lowered ? { lowered: entry.lowered } : {}),
   };
 }

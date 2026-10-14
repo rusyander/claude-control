@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 import { statfs } from 'node:fs/promises';
 import { arch, platform, totalmem } from 'node:os';
 import type {
@@ -37,6 +38,16 @@ export interface HardwareDeps {
   /** Каталог, под которым меряется свободное место. */
   root?: string;
   table: GpuSpec[];
+  /**
+   * Путь к своему `llama-server`. Есть — устройства спрашиваем у него первым: он
+   * видит ровно то, на чём потом запустит модель (CUDA, ROCm, Vulkan, Metal, SYCL),
+   * у любого производителя, без утилит драйвера.
+   */
+  llamaServer?: string;
+  /** Чтение файла sysfs (Linux); пусто — файла нет. Подменяется в тестах. */
+  readSysfs?: (path: string) => string | undefined;
+  /** Каталоги `/sys/class/drm/card*`; подменяется в тестах. */
+  listDrmCards?: () => string[];
 }
 
 /** «NVIDIA GeForce RTX 4070 Ti SUPER» → «rtx 4070 ti super»: без производителя и марки. */
@@ -133,23 +144,143 @@ function withBandwidth(
   };
 }
 
+/**
+ * Чипы с общей с процессором памятью: Apple, NVIDIA GB10 (DGX Spark) и Jetson,
+ * AMD Strix Halo / Strix Point (Ryzen AI Max+ 395, Radeon 8060S/890M). Своей
+ * видеопамяти у них нет — модели доступна часть ОЗУ, и считать надо от неё.
+ */
+const UNIFIED_NAME = /\b(gb10|gb200|jetson|orin|thor|8060s|8050s|890m|880m|ryzen ai|strix)\b/i;
+
 /** Вывод `nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader,nounits`. */
-export function parseNvidiaSmi(text: string, table: GpuSpec[]): HardwareGpu[] {
+export function parseNvidiaSmi(
+  text: string,
+  table: GpuSpec[],
+  totalMemBytes = totalmem(),
+): HardwareGpu[] {
   return text
     .split(/\r?\n/)
     .map((line) => line.split(',').map((part) => part.trim()))
-    .filter((parts) => parts.length >= 3 && parts[0] && Number(parts[1]) > 0)
-    .map(([name = '', total = '0', free = '0']) =>
+    .filter((parts) => parts.length >= 3 && parts[0])
+    .flatMap(([name = '', total = '0', free = '0']) => {
+      // GB10 и Jetson отдают память как «[N/A]»: она общая, и объём — это ОЗУ.
+      // Раньше такая строка отбрасывалась, и DGX Spark выглядел машиной без карты.
+      if (!(Number(total) > 0)) {
+        if (!UNIFIED_NAME.test(name)) return [];
+        return [
+          withBandwidth(
+            { vendor: 'nvidia', name, vramGb: round1(totalMemBytes / 1024 ** 3), unified: true },
+            table,
+          ),
+        ];
+      }
+      return [
+        withBandwidth(
+          {
+            vendor: 'nvidia',
+            name,
+            vramGb: round1(Number(total) / 1024),
+            freeGb: round1(Number(free) / 1024),
+          },
+          table,
+        ),
+      ];
+    });
+}
+
+/**
+ * Вывод `llama-server --list-devices`:
+ * `  CUDA0: NVIDIA GeForce RTX 4090 (24563 MiB, 23036 MiB free)`,
+ * `  Vulkan0: AMD Radeon RX 7900 XTX (…)`, `  MTL0: Apple M3 Max (…)`, `  SYCL0: Intel Arc …`.
+ * Производитель — по движку, а у Vulkan (он у всех) — по названию.
+ */
+export function parseLlamaDevices(text: string, table: GpuSpec[]): HardwareGpu[] {
+  const gpus: HardwareGpu[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*([A-Za-z]+)\d+:\s*(.+?)\s*\((\d+)\s*MiB,\s*(\d+)\s*MiB free\)/.exec(line);
+    if (!match) continue;
+    const [, backend = '', name = '', total = '0', free = '0'] = match;
+    const kind = backend.toUpperCase();
+    // Удалённые узлы (RPC) и процессор картой не считаются.
+    if (kind === 'RPC' || kind === 'CPU' || !(Number(total) > 0)) continue;
+    const vendor: GpuVendor =
+      kind === 'MTL' || kind === 'METAL'
+        ? 'apple'
+        : kind === 'CUDA'
+          ? 'nvidia'
+          : kind === 'ROCM' || kind === 'HIP'
+            ? 'amd'
+            : kind === 'SYCL'
+              ? 'intel'
+              : vendorOf(name);
+    const unified = vendor === 'apple' || UNIFIED_NAME.test(name);
+    gpus.push(
       withBandwidth(
         {
-          vendor: 'nvidia',
+          vendor,
           name,
           vramGb: round1(Number(total) / 1024),
           freeGb: round1(Number(free) / 1024),
+          ...(unified ? { unified: true } : {}),
         },
         table,
       ),
     );
+  }
+  return gpus;
+}
+
+/**
+ * Карты amdgpu на Linux через sysfs — без ROCm (у многих стоит только Mesa).
+ * Встроенный чип с крошечной выделенной памятью, но большой GTT (Strix Halo) —
+ * общая память: модели доступна GTT.
+ */
+export function readAmdSysfs(
+  cards: string[],
+  read: (path: string) => string | undefined,
+  table: GpuSpec[],
+): HardwareGpu[] {
+  const gpus: HardwareGpu[] = [];
+  for (const card of cards) {
+    const dev = `${card}/device`;
+    if (read(`${dev}/vendor`)?.trim() !== '0x1002') continue;
+    const vram = Number(read(`${dev}/mem_info_vram_total`) ?? 0);
+    const used = Number(read(`${dev}/mem_info_vram_used`) ?? 0);
+    const gtt = Number(read(`${dev}/mem_info_gtt_total`) ?? 0);
+    const name = read(`${dev}/product_name`)?.trim() || 'AMD GPU';
+    const apu = vram < 4 * 1024 ** 3 && gtt > vram;
+    const total = apu ? gtt : vram;
+    if (total < 2 * 1024 ** 3) continue;
+    gpus.push(
+      withBandwidth(
+        {
+          vendor: 'amd',
+          name,
+          vramGb: round1(total / 1024 ** 3),
+          ...(apu ? { unified: true } : { freeGb: round1((vram - used) / 1024 ** 3) }),
+        },
+        table,
+      ),
+    );
+  }
+  return gpus;
+}
+
+function readSysfsFile(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+function listDrmCards(): string[] {
+  try {
+    return readdirSync('/sys/class/drm')
+      .filter((name) => /^card\d+$/.test(name))
+      .map((name) => `/sys/class/drm/${name}`);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -230,19 +361,32 @@ async function tryRun(run: RunCommand, cmd: string, args: string[]): Promise<str
   }
 }
 
-/** Видеокарты по очереди способов: NVIDIA → платформенный → пусто (ручной выбор). */
+/**
+ * Видеокарты по очереди способов: своя llama.cpp (любой производитель) → NVIDIA →
+ * платформенный → sysfs amdgpu → пусто (ручной выбор). Утилиты драйвера нужны,
+ * пока сборка не скачана: подбор модели идёт до первой загрузки.
+ */
 export async function detectGpus(
   deps: HardwareDeps,
 ): Promise<{ gpus: HardwareGpu[]; detectedBy: string }> {
   const run = deps.run ?? runCommand;
   const os = deps.platform ?? platform();
+  // Windows (WDDM) вытесняет чужую видеопамять, когда модели она нужна.
+  const pageable = os === 'win32' ? { pageable: true } : {};
+  if (deps.llamaServer) {
+    const out = await tryRun(run, deps.llamaServer, ['--list-devices']);
+    const gpus = out ? parseLlamaDevices(out, deps.table) : [];
+    if (gpus.length)
+      return {
+        gpus: gpus.map((gpu) => (gpu.unified ? gpu : { ...gpu, ...pageable })),
+        detectedBy: 'llama.cpp',
+      };
+  }
   const nvidia = await tryRun(run, 'nvidia-smi', [
     '--query-gpu=name,memory.total,memory.free',
     '--format=csv,noheader,nounits',
   ]);
-  const fromNvidia = nvidia ? parseNvidiaSmi(nvidia, deps.table) : [];
-  // Windows (WDDM) вытесняет чужую видеопамять, когда модели она нужна.
-  const pageable = os === 'win32' ? { pageable: true } : {};
+  const fromNvidia = nvidia ? parseNvidiaSmi(nvidia, deps.table, deps.totalMemBytes) : [];
   if (fromNvidia.length)
     return { gpus: fromNvidia.map((gpu) => ({ ...gpu, ...pageable })), detectedBy: 'nvidia-smi' };
 
@@ -273,6 +417,9 @@ export async function detectGpus(
     } catch {
       // То же.
     }
+    const cards = (deps.listDrmCards ?? listDrmCards)();
+    const gpus = readAmdSysfs(cards, deps.readSysfs ?? readSysfsFile, deps.table);
+    if (gpus.length) return { gpus, detectedBy: 'sysfs' };
   }
   return { gpus: [], detectedBy: 'none' };
 }

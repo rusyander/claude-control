@@ -74,6 +74,29 @@ export function LocalModelsTopic() {
         </GuideSteps>
       </HelpSection>
 
+      <HelpSection title={g('choiceTitle')} caption={g('choiceCaption')}>
+        <GuideSteps>
+          <GuideStep title={g('choiceSelects')} text={g('choiceSelectsText')}>
+            <HelpShot topic="localModels" scenario="choice" frame="01-selects" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('choiceOther')} text={g('choiceOtherText')}>
+            <HelpShot topic="localModels" scenario="choice" frame="02-other-quant" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('choiceRestart')} text={g('choiceRestartText')}>
+            <HelpShot topic="localModels" scenario="choice" frame="03-restart" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('customForm')} text={g('customFormText')}>
+            <HelpShot topic="localModels" scenario="choice" frame="04-custom-form" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('customRow')} text={g('customRowText')}>
+            <HelpShot topic="localModels" scenario="choice" frame="05-custom-row" side="panel" />
+          </GuideStep>
+        </GuideSteps>
+        <Callout tone="warning" title={g('choicePartialTitle')}>
+          {g('choicePartialText')}
+        </Callout>
+      </HelpSection>
+
       <HelpSection title={tr('fitTitle')} caption={tr('fitCaption')}>
         <FieldTable
           nameHeader={tr('fitHeader')}
@@ -118,6 +141,46 @@ export function LocalModelsTopic() {
         </Stack>
       </HelpSection>
 
+      <HelpSection title={tr('memoryTitle')} caption={tr('memoryCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <OptionCards
+            items={[
+              { title: tr('memoryIdle'), text: tr('memoryIdleText') },
+              { title: tr('memoryCache'), text: tr('memoryCacheText') },
+            ]}
+          />
+          <Callout tone="info" title={tr('memoryChats')}>
+            {tr('memoryChatsText')}
+          </Callout>
+        </Stack>
+      </HelpSection>
+
+      <HelpSection title={tr('longTitle')} caption={tr('longCaption')}>
+        <OptionCards
+          items={[
+            { title: tr('longSupervisor'), text: tr('longSupervisorText') },
+            { title: tr('longAwake'), text: tr('longAwakeText') },
+            { title: tr('longDefer'), text: tr('longDeferText') },
+            { title: tr('longContinue'), text: tr('longContinueText') },
+            { title: tr('longMemory'), text: tr('longMemoryText') },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('mcpTitle')} caption={tr('mcpCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <OptionCards
+            items={[
+              { title: tr('mcpWhy'), text: tr('mcpWhyText') },
+              { title: tr('mcpHow'), text: tr('mcpHowText') },
+            ]}
+          />
+          <Callout tone="info" title={tr('mcpHonest')}>
+            {tr('mcpHonestText')}
+          </Callout>
+        </Stack>
+      </HelpSection>
+
       <HelpSection title={tr('claudeTitle')} caption={tr('claudeCaption')}>
         <Stack gap="var(--spacing-xs)">
           <OptionCards
@@ -150,6 +213,22 @@ export function LocalModelsTopic() {
         />
       </HelpSection>
 
+      <HelpSection title={tr('runtimeTitle')}>
+        <Callout tone="info" title={tr('runtimeTitle')}>
+          {tr('runtimeText')}
+        </Callout>
+      </HelpSection>
+
+      <HelpSection title={tr('importTitle')} caption={tr('importLead')}>
+        <OptionCards
+          items={[
+            { title: tr('importOk'), text: tr('importOkText') },
+            { title: tr('importFail'), text: tr('importFailText') },
+            { title: tr('importOwn'), text: tr('importOwnText') },
+          ]}
+        />
+      </HelpSection>
+
       <HelpSection title={tr('filesTitle')} caption={tr('filesCaption')}>
         <Stack gap="var(--spacing-xs)">
           <StorageCard
@@ -159,8 +238,8 @@ export function LocalModelsTopic() {
               { label: tr('fileModels'), value: '.local-models/models/', isMono: true },
               { label: tr('fileDownloads'), value: '.local-models/downloads/', isMono: true },
               { label: tr('fileTools'), value: '.local-models/tools/', isMono: true },
-              { label: tr('fileLogs'), value: '.local-models/logs/ollama.log', isMono: true },
-              { label: tr('fileRecord'), value: '.local-models/run/ollama.json', isMono: true },
+              { label: tr('fileLogs'), value: '.local-models/logs/llama.log', isMono: true },
+              { label: tr('fileRecord'), value: '.local-models/run/llama.json', isMono: true },
               { label: tr('fileState'), value: '.local-models/state.json', isMono: true },
             ]}
           />

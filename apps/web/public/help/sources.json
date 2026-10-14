@@ -485,7 +485,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "751a3d9e8172492b"
+          "sha": "4d2525ac5033c240"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions/ChatPermissions.ts",
@@ -505,12 +505,12 @@
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "55e720161f033540"
+          "sha": "933c2ac733deaf22"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "e89af64b9b9353f0"
+          "sha": "8769d0ef730d430b"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -525,7 +525,7 @@
         {
           "path": "apps/server/src/domains/chat/tree-pause/tree-pause.ts",
           "why": "«Пауза дерева»: ответ всегда от корня, продолжение всего дерева",
-          "sha": "7211e8a3c97c4612"
+          "sha": "8ba5da00cf13be61"
         },
         {
           "path": "apps/server/src/domains/media/images.ts",
@@ -658,7 +658,7 @@
           "sha": "bb23d4b9ff80b8e5"
         }
       ],
-      "confirmedAt": "2026-10-13T08:33:44.177Z"
+      "confirmedAt": "2026-10-13T17:15:10.725Z"
     },
     {
       "topic": "tests",
@@ -2839,59 +2839,89 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-12T18:01:56.900Z",
+      "confirmedAt": "2026-10-14T11:23:55.285Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
           "why": "«Пометки каталога»: уровни «влезает / частично / не влезет», причины «не агент» и «короткий контекст», подбор «Рекомендуем»",
-          "sha": "7fb6fb5e5add3598"
+          "sha": "9a6653bb1f1a7817"
         },
         {
           "path": "apps/server/src/domains/local-models/server.ts",
-          "why": "«Контекст — на весь сервер», «Видеопамять возвращается сама»: окружение сервера (контекст, простой 10 минут, порт); «Где считать»: процессор — скрытые видеокарты в окружении сервера",
-          "sha": "9128188963f1e21b"
+          "why": "«Контекст — на весь сервер», «Видеопамять занята, пока работает сервер»: аргументы запуска llama-server (контекст, кеш, слои на карте, MTP, порт); «Где считать»: процессор — скрытые видеокарты в окружении сервера",
+          "sha": "e838336cb9866a0a"
         },
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Чей набор у агента»: что каждый режим добавляет или снимает у Claude Code и Qwen Code (runExtras)",
-          "sha": "36f2f6204b1cf036"
+          "sha": "58231c792c3eb35c"
         },
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
           "why": "«Куда идёт запрос»: контур локальной модели, режим «обязательно», кому отдаётся маршрут",
-          "sha": "367b0d33591c463f"
+          "sha": "b0dc9714b98d251a"
         },
         {
           "path": "apps/server/src/domains/local-models/paths.ts",
           "why": "«Где что лежит»: раскладка папки .local-models",
-          "sha": "7549396991ffafa1"
+          "sha": "b30ac8d903328236"
         },
         {
           "path": "apps/server/src/domains/local-models/store.ts",
-          "why": "«Где что лежит»: перенос из системного Ollama жёсткой ссылкой, копия на другом диске",
-          "sha": "78bc61e5e6e7977e"
+          "why": "«Где что лежит»: модели по репозиториям, перенос из хранилища Ollama жёсткой ссылкой, копия на другом диске",
+          "sha": "b547fb999e447719"
         },
         {
           "path": "apps/server/src/domains/local-models/claude-switch.ts",
           "why": "«Claude Code на этой модели»: какие переменные пишутся в settings.json, что возвращает выключение, правка руками",
-          "sha": "185e16d7a5925f34"
+          "sha": "b634a42973fae6c3"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/ollama-import.ts",
+          "why": "«Модели, уже скачанные в Ollama»: слой GGUF, жёсткая ссылка, пробная загрузка, отказ с причиной",
+          "sha": "f60abebaf94f0e17"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/runtime.ts",
+          "why": "«Откуда берётся сервер моделей»: закреплённая сборка llama.cpp, выбор архива по карте, проверка суммы",
+          "sha": "2c9b4c5e2956034a"
         },
         {
           "path": "apps/server/src/domains/local-models/hardware.ts",
           "why": "«Mac с чипом M»: скорость памяти чипа из справочника и прикидка для чипа, которого там нет",
-          "sha": "9db7f04ef49d9acf"
+          "sha": "a9445ae3874eb24d"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/local-mcp.ts",
+          "why": "«MCP-серверы локального прогона»: окно, цена каждого сервера в токенах, остаток до сжатия, порог закрытия сервера",
+          "sha": "99781a5fce2d2e2c"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/supervisor.ts",
+          "why": "«Ночной прогон»: присмотр за сервером — период проверки, число подъёмов за окно, зависание",
+          "sha": "bb74b62ecedc8bc1"
+        },
+        {
+          "path": "apps/server/src/lib/keep-awake/keep-awake.ts",
+          "why": "«Ночной прогон»: запрет сна на время прогона по системам",
+          "sha": "373c738defe0392b"
+        },
+        {
+          "path": "apps/server/src/domains/chat/auto-continue/auto-continue.ts",
+          "why": "«Ночной прогон»: продолжение после сбоя — паузы и число попыток",
+          "sha": "cbb0a66588597fa0"
         }
       ]
     },
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-12T18:01:56.788Z",
+      "confirmedAt": "2026-10-14T11:23:55.389Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Как набор доезжает до прогона», «Режимы», «Какой CLI что умеет»: runExtras, отказы, сброс в архив",
-          "sha": "36f2f6204b1cf036"
+          "sha": "58231c792c3eb35c"
         },
         {
           "path": "apps/server/src/domains/kit/compose.ts",
@@ -2906,7 +2936,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "8b70fe1fbdaa9048"
+          "sha": "807531511b3b61ed"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",
@@ -2931,7 +2961,7 @@
         {
           "path": "apps/server/src/domains/kit/codex.ts",
           "why": "«Какой CLI что умеет», строка Codex: что доезжает (правила ключом после собственных инструкций, навыки каталогом), что нет",
-          "sha": "fd384b6599113e3e"
+          "sha": "3fdad9472eb4d581"
         }
       ]
     }

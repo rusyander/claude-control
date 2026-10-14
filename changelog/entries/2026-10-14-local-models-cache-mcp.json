@@ -1,0 +1,74 @@
+{
+  "title": {
+    "ru": "Локальная модель: кеш промпта, выгрузка по простою и MCP-серверы по выбору для каждого проекта",
+    "en": "Local model: prompt cache, unloading on idle and per-project MCP servers by choice"
+  },
+  "items": [
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Сервер моделей запускается с кешем промпта в оперативной памяти (четверть свободной, от 1 до 8 ГиБ), контрольными точками и сдвигом кеша там, где модель его умеет: у гибридных моделей с рекуррентным состоянием, например Qwen3.5/3.6, сдвиг не ставится, потому что сервер всё равно отключил бы его сам. На плотной модели 7B промпт со срезанным после сжатия началом пересчитывается за 70 мс вместо 603.",
+        "en": "The model server starts with a prompt cache in RAM (a quarter of the free memory, 1 to 8 GiB), state checkpoints and cache shifting where the model supports it: hybrid models with a recurrent state, such as Qwen3.5/3.6, get no shifting because the server would turn it off itself. On a dense 7B model a prompt whose head was cut by compaction is recomputed in 70 ms instead of 603."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Модель выгружается из памяти после десяти минут без запросов: видеопамять на замере упала с 7090 до 1842 МиБ, оперативная — с 4662 до 392 МиБ; первый запрос после простоя загружает её заново за четыре секунды на модели 7B. В карточке сервера появился переключатель «Держать модель загруженной», он отключает выгрузку и перезапускает сервер, а спящий сервер показывается как выгруженный по простою.",
+        "en": "The model is unloaded from memory after ten minutes without requests: measured video memory fell from 7090 to 1842 MiB and RAM from 4662 to 392 MiB; the first request after idle loads it again in four seconds on a 7B model. The server card gained a “Keep the model loaded” switch that turns unloading off and restarts the server, and a sleeping server is shown as unloaded by idle."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Когда запрос приходит из другого разговора, кеш слота сервера стирается, и новый чат не наследует чужой префикс. Возврат в прежний разговор пересчитывает его промпт заново. Спящий сервер не будится ради стирания.",
+        "en": "When a request comes from a different conversation the server slot cache is erased, so a new chat does not inherit another chat’s prefix. Going back to the previous conversation recomputes its prompt. A sleeping server is not woken for the erase."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В шапке чата на локальной модели появилась кнопка «MCP: N». По умолчанию облегчённый набор не берёт ни одного MCP-сервера, потому что описания инструментов занимают окно модели: на замере один сервер GitLab с 39 инструментами стоит около 15 тысяч токенов. В списке у каждого сервера из настроек и из .mcp.json проекта показана цена в токенах (с «~», если она прикинута по длине схем), внизу — остаток окна на разговор до сжатия; сервер, после которого остаётся меньше четырёх тысяч токенов, закрыт, как и сервер без замеренной цены. Серверы из .mcp.json проекта сами не запускаются — только по кнопке «Замерить заново». Выбор запоминается для проекта, действует со следующего сообщения и назван в подписи слоёв.",
+        "en": "A chat on a local model has an “MCP: N” button in its header. The lean set takes no MCP servers by default because tool descriptions occupy the model window: measured, one GitLab server with 39 tools costs about 15 thousand tokens. The list shows, for every server from the settings and from the project .mcp.json, its cost in tokens (with “~” when estimated from schema length) and, below, the window left for the conversation before compaction; a server that would leave under four thousand tokens is locked, as is a server with no measured cost. Servers from the project .mcp.json are never started on their own, only by “Measure again”. The choice is remembered per project, applies from the next message and is named in the layers caption."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Прогон на локальной модели без плагина панели не получал контрольной точки перед сжатием истории; правило набора теперь велит вести файл PROGRESS.md, если он есть в проекте, чтобы после сжатия задача не терялась.",
+        "en": "A run on a local model without the panel plugin got no checkpoint before history compaction; the kit rule now asks to keep a PROGRESS.md file, when the project has one, so that a task is not lost after compaction."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели»: разделы «Память, простой и кеш промпта» и «MCP-серверы локального прогона».",
+        "en": "The “Local models” help: sections “Memory, idle and the prompt cache” and “MCP servers of the local run”."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    }
+  ]
+}

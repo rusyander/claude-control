@@ -47,6 +47,7 @@ const VERSIONS_READ = new RegExp(
   `^${GITLAB}(list_merge_request_versions|get_merge_request_version)$`,
   'i',
 );
+const GITLAB_TOOL = new RegExp(`^${GITLAB}`, 'i');
 
 // Forge CLIs. The number is the first bare integer after the subcommand, or the one in a pasted URL.
 const NUM = String.raw`(?:[^\n;&|]*?(?:\/(?:pull|merge_requests)\/|\s!?#?)(\d+)\b)`;
@@ -167,11 +168,115 @@ function deepReviewLoaded(input) {
   );
 }
 
+// --- People named in published text -------------------------------------------------------------------
+// An index note once said «треды Андрея» (Andrew's threads) — the data held one username, the first name
+// was invented. A published note speaks to a live team: a name comes from the MR/PR data
+// (`author.name` / `username`, harvested from this session's reads), else the username, else the
+// sentence goes impersonal. Judged only when the session has read some names; code spans are text, not
+// mentions. `@x` pings a real person — an unknown handle pings a stranger. The Russian pattern is the
+// shape the original incident had; English: "<Name>'s threads", "thanks <Name>".
+const PERSON_REF =
+  /(?<![а-яёА-ЯЁ])(?:[Тт]ред[а-яё]*|[Зз]амечани[а-яё]*|[Кк]омментари[а-яё]*|[Рр]евью|[Вв]опрос[а-яё]*|[Нн]аходк[а-яё]*|[Рр]евьюер[а-яё]*|[Рр]ецензент[а-яё]*|[Аа]втор[а-яё]*|[Кк]оллег[а-яё]*|[Сс]пасибо)[ \t]+([А-ЯЁ][а-яё]{2,})(?![а-яё])/gu;
+const PERSON_REF_EN =
+  /(?:\b[Tt]hanks(?: to)?|\b[Tt]hank you|\b[Rr]eviewer|\b[Aa]uthor)[ \t]+([A-Z][a-z]{2,})\b|\b([A-Z][a-z]{2,})['’]s[ \t]+(?:threads?|comments?|review|findings?|remarks?)\b/g;
+const MENTION = /(?<![\w@./-])@([A-Za-z0-9][\w.-]*[A-Za-z0-9])/g;
+
+function strayNames(body, namesList) {
+  if (!namesList?.length) return [];
+  const known = new Set(namesList);
+  const text = body.replace(/```[\s\S]*?```/g, ' ').replace(/`[^`\n]*`/g, ' ');
+  const out = [];
+  for (const m of text.matchAll(MENTION)) {
+    if (!known.has(m[1].toLowerCase())) out.push(`@${m[1]}`);
+  }
+  const cut = (s) => s.slice(0, Math.max(3, s.length - 2));
+  const unknown = (word) => {
+    const w = word.toLowerCase();
+    return ![...known].some((k) => k.startsWith(cut(w)) || w.startsWith(cut(k)));
+  };
+  for (const m of text.matchAll(PERSON_REF)) if (unknown(m[1])) out.push(m[1]);
+  for (const m of text.matchAll(PERSON_REF_EN)) {
+    const word = m[1] ?? m[2];
+    if (unknown(word)) out.push(word);
+  }
+  return [...new Set(out)];
+}
+
+// --- Inline anchor = the card's location line --------------------------------------------------------
+// Threads were once pinned to ONE line with the range only named in the text. A finding on lines 10-14 is
+// an inline thread on 10-14: GitLab `position.line_range {start,end}` (end = the position's own
+// new_line), GitHub `start_line` + `line`. The guard compares what the card says with what the call
+// anchors.
+const LOCATION =
+  /\*\*(?:Где|Where|Location):\*\*\s*`?([^\s`]+?):(\d+)(?:[-–](\d+))?|([^\s`(]+\.\w+):(\d+)(?:[-–](\d+))?/;
+
+function anchorOf(i) {
+  let pos = i.position;
+  if (typeof pos === 'string') {
+    try {
+      pos = JSON.parse(pos);
+    } catch {
+      pos = null;
+    }
+  }
+  const src = pos && typeof pos === 'object' ? pos : i;
+  const nums = (x) => [x?.new_line, x?.old_line, x?.line].map(asNumber).filter((n) => n !== null);
+  let end = nums(src);
+  let start = end;
+  if (src.line_range && typeof src.line_range === 'object') {
+    start = nums(src.line_range.start);
+    end = nums(src.line_range.end);
+  } else if (asNumber(src.start_line) !== null) start = [asNumber(src.start_line)];
+  if (!end.length) return null;
+  return { path: src.new_path ?? src.old_path ?? src.path ?? null, start, end };
+}
+
+function anchorRefusal(i, body) {
+  const loc = LOCATION.exec(body);
+  const anchor = loc && anchorOf(i);
+  if (!anchor) return null;
+  const file = loc[1] ?? loc[4];
+  const start = Number(loc[2] ?? loc[5]);
+  const end = (loc[3] ?? loc[6]) ? Number(loc[3] ?? loc[6]) : start;
+  const norm = (p) => String(p).replace(/\\/g, '/').replace(/^\.\//, '');
+  const a = anchor.path ? norm(anchor.path) : null;
+  const f = norm(file);
+  if (a && a !== f && !a.endsWith(`/${f}`) && !f.endsWith(`/${a}`)) {
+    return `the card says ${file} but the position anchors ${anchor.path}. The thread must sit on the file the finding names.`;
+  }
+  const fits =
+    start === end
+      ? anchor.end.includes(end)
+      : anchor.start.includes(start) && anchor.end.includes(end);
+  if (fits) return null;
+  const anchored = anchor.start.join('/');
+  const anchoredEnd = anchor.end.join('/');
+  return (
+    `the card says ${file}:${start}${end > start ? `-${end}` : ''} but the position anchors ` +
+    `${anchored}${anchoredEnd === anchored ? '' : `..${anchoredEnd}`}. ` +
+    (end > start
+      ? 'A multi-line finding is an inline thread on the RANGE, not on one line with the range in the text: GitLab position.line_range ' +
+        `{start:{line_code,type,new_line:${start}}, end:{line_code,type,new_line:${end}}} with position.new_line = ${end}; GitHub start_line ${start} + line ${end}. ` +
+        `Build it: node <kit>/tools/review-position.mjs --base <sha> --start <sha> --head <sha> --file <path> --lines ${start}-${end} (references/gitlab-publish.md §3).`
+      : `A single-line finding anchors exactly line ${end}.`)
+  );
+}
+
 /** Shape gates; a deny object or null. */
 function shapeRefusal(tool, input, cli) {
   const i = input?.tool_input ?? {};
-  if (!cli && isReply(tool, i)) return null;
   const body = String(i.body ?? i.note ?? '');
+  const stray = cli ? [] : strayNames(body, load(sessionPath(input?.session_id)).names);
+  if (stray.length) {
+    return {
+      decision: 'deny',
+      reason:
+        `Published text names ${stray.map((s) => `«${s}»`).join(', ')}, which no MR/PR data read in this session contains. ` +
+        'A person is named only as the API gives it (author.name / username from the reads), else by username, else the sentence goes ' +
+        'impersonal. Never infer a first name, never @-mention a handle that was not read. Rule: skill agentdeck-kit:situational-rules → published-text.',
+    };
+  }
+  if (!cli && isReply(tool, i)) return null;
   const thread = !cli && POSITIONAL.test(tool);
   const bulk = /bulk_publish_draft_notes$/i.test(tool);
   if (!cli && !thread && !bulk && !REVIEW_TEXT.test(body)) return null;
@@ -195,6 +300,8 @@ function shapeRefusal(tool, input, cli) {
           'Template: <kit>/skills/deep-review/references/finding-card.md.',
       };
     }
+    const off = anchorRefusal(i, body);
+    if (off) return { decision: 'deny', reason: `Review thread blocked: ${off}` };
   } else if (!cli && !bulk && CLEAN_CLAIM.test(body) && !COVERAGE.test(body)) {
     return {
       decision: 'deny',
@@ -207,6 +314,136 @@ function shapeRefusal(tool, input, cli) {
   return null;
 }
 
+// --- Was the thread list actually READ? ---------------------------------------------------------------
+// The GitLab MCP discussions response is `{items:[…], pagination:{x_total,…}}`. A jmespath that started
+// one level too low (`[].notes[]`) answered `null` and was taken for «no discussions» on an MR that had 27
+// — the review would have re-posted every human finding. A call that merely HAPPENED is no evidence:
+// null, an empty projection result, an error, `items: []` while `x_total` says otherwise, or the first
+// page of several are failed reads. Only a read that returned the list (or proved it empty with
+// `x_total: 0`) stamps `discussions`. The same verdict judges a forge-CLI read (`glab api`, `gh api`).
+const PROJECTION = /^(?:jmespath|jq|projection|select|fields)$/i;
+const CLI_PROJECTION = /\s(?:--jq|--template)\b|\sapi\b[^\n;&|]*\s-q\b/;
+
+/** Every text piece of a tool result: plain strings, `{type:'text',text}` blocks, nested content. */
+function responseTexts(response, out = []) {
+  if (typeof response === 'string') out.push(response);
+  else if (Array.isArray(response)) response.forEach((v) => responseTexts(v, out));
+  else if (response && typeof response === 'object') {
+    if (typeof response.text === 'string') out.push(response.text);
+    else Object.values(response).forEach((v) => responseTexts(v, out));
+  }
+  return out;
+}
+
+const asNumber = (v) =>
+  v === undefined || v === null || v === '' || Number.isNaN(Number(v)) ? null : Number(v);
+
+/** One parsed payload → `{ok, why?, total?, pages?, page?}`. */
+function judgePayload(p, projected) {
+  const hint =
+    ' — a jmespath/jq that returns nothing on a non-empty answer is a wrong projection (the shape is {items:[…], pagination}: start at items[])';
+  if (p === null || p === undefined) return { ok: false, why: `returned null${hint}` };
+  if (Array.isArray(p)) {
+    return p.length || !projected
+      ? { ok: true }
+      : { ok: false, why: `returned an empty list from a projection${hint}` };
+  }
+  if (typeof p === 'object') {
+    const pg = p.pagination ?? p.meta ?? {};
+    const total = asNumber(pg.x_total ?? pg.total);
+    if (Array.isArray(p.items)) {
+      if (p.items.length) {
+        return {
+          ok: true,
+          total,
+          pages: asNumber(pg.x_total_pages ?? pg.total_pages ?? pg.pages),
+          page: asNumber(pg.x_page ?? pg.page),
+        };
+      }
+      return total === 0
+        ? { ok: true, total }
+        : {
+            ok: false,
+            why: `returned items: [] with ${total === null ? 'no pagination.x_total' : `x_total ${total}`} — empty is proved only by x_total: 0`,
+          };
+    }
+    if ('pagination' in p || 'meta' in p)
+      return { ok: false, why: 'returned pagination without items' };
+    if (!Object.keys(p).length) return { ok: false, why: 'returned an empty object' };
+    return { ok: true }; // a single discussion or a shape we do not know: not ours to judge
+  }
+  return projected
+    ? { ok: false, why: `returned a bare ${typeof p} from a projection${hint}` }
+    : { ok: true };
+}
+
+/**
+ * Did this discussions call return the thread list? `{ok:true,…}` or `{ok:false, why}`. No
+ * `tool_response` at all (a CLI whose hook does not send one) is unjudgeable and passes — the guard must
+ * not block on evidence it never gets.
+ */
+export function discussionsVerdict(input) {
+  const resp = input?.tool_response;
+  if (resp === undefined) return { ok: true };
+  if (resp === null) return { ok: false, why: 'returned nothing (null)' };
+  if (resp?.isError === true || resp?.is_error === true)
+    return { ok: false, why: 'returned an error' };
+  const projected =
+    Object.keys(input?.tool_input ?? {}).some((k) => PROJECTION.test(k)) ||
+    CLI_PROJECTION.test(String(input?.tool_input?.command ?? ''));
+  const texts = responseTexts(resp).filter((t) => t.trim() !== '');
+  if (!texts.length) return { ok: false, why: 'returned an empty result' };
+  let first = null;
+  for (const raw of texts) {
+    const s = raw.trim();
+    let v;
+    try {
+      v = JSON.parse(s);
+    } catch {
+      if (/^(?:error|failed|unauthori[sz]ed|forbidden|not found|\d{3}\b)/i.test(s)) {
+        first ??= { ok: false, why: `returned an error text («${s.slice(0, 60)}»)` };
+        continue;
+      }
+      return { ok: true }; // prose or markdown: not ours to parse
+    }
+    const r = judgePayload(v, projected);
+    if (r.ok) return r;
+    first ??= r;
+  }
+  return first ?? { ok: false, why: 'returned nothing usable' };
+}
+
+/** Names a person goes by in MR/PR data: every `{username|login, name}` object. Lower-case tokens. */
+function harvestNames(response) {
+  const out = new Set();
+  const add = (s) => {
+    for (const t of String(s ?? '')
+      .toLowerCase()
+      .split(/[\s,]+/)) {
+      if (t.length >= 3) out.add(t);
+    }
+  };
+  const walk = (v) => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') {
+      const handle = typeof v.username === 'string' ? v.username : v.login;
+      if (typeof handle === 'string') {
+        add(handle);
+        add(v.name);
+      }
+      Object.values(v).forEach(walk);
+    }
+  };
+  for (const raw of responseTexts(response)) {
+    try {
+      walk(JSON.parse(raw));
+    } catch {
+      /* prose — no names to take */
+    }
+  }
+  return out;
+}
+
 /**
  * PostToolUse module: remember that this MR's thread list (or its shas) was actually read.
  * Always silent — it records, it never speaks.
@@ -217,16 +454,56 @@ export function recordReviewRead(input) {
     save(sessionPath(input?.session_id), { skill: Date.now() });
     return null;
   }
+  const original = input;
   const cli = cliMatch(input, CLI_READ);
   if (cli) input = asCli(input, cli.iid);
   const tool = String(input?.tool_name ?? '');
+  const now = Date.now();
+  const sess = sessionPath(input?.session_id);
+
+  // People named in MR data — the only names a published note may carry (see `strayNames`).
+  if (GITLAB_TOOL.test(tool) && original?.tool_response !== undefined) {
+    const found = harvestNames(original.tool_response);
+    if (found.size) {
+      save(sess, { names: [...new Set([...(load(sess).names ?? []), ...found])].slice(-600) });
+    }
+  }
   const discussions = Boolean(cli) || DISCUSSIONS_READ.test(tool);
   if (!discussions && !VERSIONS_READ.test(tool)) return null;
-  const now = Date.now();
-  const path = mrKey(input, input?.session_id);
-  if (path) save(path, discussions ? { discussions: now } : { versions: now });
 
-  const sess = sessionPath(input?.session_id);
+  const path = mrKey(input, input?.session_id);
+  let complete = true;
+  if (discussions) {
+    const v = discussionsVerdict(original);
+    if (!v.ok) {
+      if (path) save(path, { bad: { at: now, why: v.why } });
+      return null;
+    }
+    // Several pages: the dedup needs ALL of them — the first twenty of 27 miss the rest.
+    const total = v.pages ?? 1;
+    if (path && total > 1) {
+      const state = load(path);
+      const seen = state.pagesTotal === total ? (state.pages ?? {}) : {};
+      seen[v.page ?? asNumber(original?.tool_input?.page) ?? 1] = now;
+      const fresh = (n) => Number(seen[n] ?? 0) > now - FRESH_MS;
+      complete = Array.from({ length: total }, (_, k) => k + 1).every(fresh);
+      save(path, {
+        pages: seen,
+        pagesTotal: total,
+        partial: complete
+          ? null
+          : {
+              total,
+              have: Object.keys(seen)
+                .map(Number)
+                .sort((a, b) => a - b),
+            },
+      });
+    } else if (path) save(path, { pages: null, pagesTotal: null, partial: null });
+  }
+  if (!complete) return null; // some pages still unread: neither the key nor the session record opens the gate
+  if (path) save(path, discussions ? { discussions: now, bad: null } : { versions: now });
+
   const iid = iidOf(input);
   if (iid === null) save(sess, discussions ? { dAny: now } : { vAny: now });
   else {
@@ -278,11 +555,31 @@ export default function reviewPublishGuard(input) {
   if (discussionsOk && versionsOk) return null;
 
   const missing = [];
-  if (!discussionsOk)
-    missing.push(
-      `${cli ? 'the thread list (glab mr view -c / gh pr view --comments)' : 'mr_discussions'}${exactD ? ' (read is older than 15 min)' : ''}`,
-    );
-  if (!versionsOk) missing.push('list_merge_request_versions');
+  let why = '';
+  if (!discussionsOk) {
+    const failed = state.bad && Number(state.bad.at) > exactD ? state.bad : null;
+    const partial = state.partial?.total ? state.partial : null;
+    if (failed) {
+      missing.push(`a successful thread-list read (the last one ${failed.why})`);
+      why =
+        ' A read that returned null/empty/an error is a FAILED read, never "no discussions": re-read without the projection (or start it at items[]) and check pagination.x_total.';
+    } else if (partial) {
+      const left = Array.from({ length: partial.total }, (_, k) => k + 1).filter(
+        (n) => !partial.have.includes(n),
+      );
+      missing.push(`mr_discussions page(s) ${left.join(', ')} of ${partial.total}`);
+      why = ' The list has several pages — the dedup needs all of them.';
+    } else {
+      missing.push(
+        `${cli ? 'the thread list (glab mr view -c / gh pr view --comments)' : 'mr_discussions'}${exactD ? ' (read is older than 15 min)' : ''}`,
+      );
+    }
+  }
+  if (!versionsOk) {
+    missing.push('list_merge_request_versions');
+    why +=
+      ' Versions belong to the START of a review (right after the MR is read); a tool category that is opt-in (merge_requests) must be activated first — run discover_tools if the tool is absent.';
+  }
 
   const fingerprint = createHash('sha1')
     .update(tool)
@@ -301,6 +598,6 @@ export default function reviewPublishGuard(input) {
       `Review write blocked: ${missing.join(' + ')} not read for this MR in this session. ` +
       'Threads arrive while a review is being written — re-read the list, drop anything a human already ' +
       'raised, check the head sha has not moved, then send the write. A list that cannot be read at all → ' +
-      'stop and tell the user, never publish blind. Rule: skill agentdeck-kit:situational-rules → review-depth.',
+      `stop and tell the user, never publish blind.${why} Rule: skill agentdeck-kit:situational-rules → review-depth.`,
   };
 }

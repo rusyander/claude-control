@@ -1,19 +1,21 @@
-import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { JobProgress, toGb } from '@entities/LocalModels';
+import { ModelFacts } from '../ModelFacts/ModelFacts';
+import { ModelSelects } from '../ModelSelects/ModelSelects';
+import { formatGb, quantTitle } from '../ModelSelects/optionText';
 import styles from './ModelRow.module.scss';
 import type { ModelRowProps } from './ModelRow.types';
 import { FIT_TONE } from './ModelRow.constants';
 
 /**
- * Строка каталога. Скорость — всегда диапазоном и словом «оценка»: число из
- * формулы, поданное как замер, человек принял бы за обещание. Замер на этой
- * машине показывается рядом, когда он есть.
+ * Карточка модели из четырёх частей, одинаково разложенных во всём списке:
+ * кто это (название, метки, влезает ли) · кнопки · расчёт на этой машине ·
+ * настройки запуска. Всё, что сказано про память и скорость, — про ВЫБРАННЫЕ
+ * квантование и окно, а не про умолчание каталога.
  */
 export function ModelRow({
   row,
@@ -26,127 +28,125 @@ export function ModelRow({
   onBench,
   onRemove,
   onCancel,
+  onChoose,
 }: ModelRowProps) {
-  const { t } = useTranslation();
-  const { model, fit, installed, job, benchOn } = row;
+  const { t, i18n } = useTranslation();
+  const { model, choiceFit: fit, installed, job, serverJob } = row;
   const running = job?.state === 'running';
-  const usable = fit.level !== 'none';
-  const [low, high] = fit.tokensPerSec;
-  const tokensPerSec = installed?.bench?.tokensPerSec;
-  let measured = '';
-  if (tokensPerSec !== undefined)
-    measured = benchOn
-      ? t('localModels.catalog.measuredOn', {
-          value: tokensPerSec,
-          where: t(`localModels.catalog.measuredWhere.${benchOn}`),
-        })
-      : t('localModels.catalog.measured', { value: tokensPerSec });
+  const importOnly = !installed && row.importable;
+  const canDownload = !row.quantInstalled && !running && !importOnly && fit.allowed;
+  const toolsFailed = model.toolsProbe === 'failed';
 
   return (
-    <div className={styles.modelRow}>
-      <Stack gap="var(--spacing-2xs)" flex={1} minWidth={0}>
-        <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-          <Typography weight="semibold">{model.title}</Typography>
-          {row.recommended ? (
-            <Badge tone="accent">{t('localModels.catalog.recommended')}</Badge>
-          ) : null}
-          <Badge tone="info">{t(`localModels.catalog.kind.${model.coding}`)}</Badge>
-          <Badge tone={FIT_TONE[fit.level]} withDot>
-            {t(`localModels.catalog.fit.${fit.level}`)}
-          </Badge>
-          {inUse ? <Badge tone="success">{t('localModels.catalog.inUse')}</Badge> : null}
-        </Stack>
-        <Typography variant="mono" color="muted">
-          {model.tag}
-        </Typography>
-        <Typography variant="body-sm" color="muted">
-          {[
-            t('localModels.catalog.size', { size: toGb(model.sizeBytes) }),
-            usable
-              ? t('localModels.catalog.contextLine', { value: Math.round(fit.context / 1024) })
-              : '',
-            t('localModels.catalog.need', { need: Math.round(fit.needGb * 10) / 10 }),
-            usable && high > 0
-              ? `${t('localModels.catalog.speed', { low, high })} (${t('localModels.catalog.speedEstimate')})`
-              : '',
-            measured,
-          ]
-            .filter(Boolean)
-            // Перенос — только между частями: внутри «61.4 ток/с» косая черта
-            // иначе разрывала бы единицу измерения.
-            .map((part, index) => (
-              <Fragment key={part}>
-                {index > 0 ? ' · ' : ''}
-                <span className={styles.metaPart}>{part}</span>
-              </Fragment>
-            ))}
-        </Typography>
-        {fit.reason ? (
-          <Typography variant="caption" color={fit.reason === 'too-big' ? 'muted' : 'warning'}>
-            {t(`localModels.catalog.reason.${fit.reason}`)}
-          </Typography>
-        ) : null}
-        {job && (running || job.state === 'failed' || job.state === 'cancelled') ? (
-          <JobProgress job={job} {...(running ? { onCancel: () => onCancel(job.id) } : {})} />
-        ) : null}
-      </Stack>
+    <article
+      className={`${styles.card} ${row.recommended ? styles.recommended : ''}`}
+      aria-label={model.title}
+    >
+      <div className={styles.head}>
+        <div className={styles.identity}>
+          <div className={styles.titleLine}>
+            <Typography variant="body-lg" weight="semibold">
+              {model.title}
+            </Typography>
+            <Typography variant="mono" color="muted">
+              {model.tag}
+            </Typography>
+          </div>
+          <div className={styles.badges}>
+            <Badge tone={FIT_TONE[fit.level]} withDot>
+              {t(`localModels.catalog.fit.${fit.level}`)}
+            </Badge>
+            {row.recommended ? (
+              <Badge tone="accent">{t('localModels.catalog.recommended')}</Badge>
+            ) : null}
+            <Badge tone="info">{t(`localModels.catalog.kind.${model.coding}`)}</Badge>
+            {model.custom ? (
+              <Badge tone="neutral">{t('localModels.catalog.custom.badge')}</Badge>
+            ) : null}
+            {model.custom && model.toolsProbe !== 'ok' ? (
+              <Badge tone={toolsFailed ? 'danger' : 'warning'}>
+                {toolsFailed
+                  ? t('localModels.catalog.custom.failed')
+                  : t('localModels.catalog.custom.unchecked')}
+              </Badge>
+            ) : null}
+            {inUse ? <Badge tone="success">{t('localModels.catalog.inUse')}</Badge> : null}
+          </div>
+        </div>
 
-      <Stack
-        direction="row"
-        gap="var(--spacing-xs)"
-        wrap
-        justify="end"
-        className={styles.rowActions}
-      >
-        {!installed && !running && row.importable ? (
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={onImport}
-            title={t('localModels.catalog.importHint')}
-          >
-            {t('localModels.catalog.import')}
-          </Button>
-        ) : null}
-        {!installed && !running && !row.importable && usable ? (
-          <Button
-            size="sm"
-            variant={row.recommended ? 'primary' : 'secondary'}
-            leftIcon={<Icon name="plus" />}
-            isLoading={busy.pull}
-            onClick={onPull}
-          >
-            {t('localModels.catalog.download')}
-          </Button>
-        ) : null}
-        {installed && fit.agentReady && !inUse ? (
-          <Button size="sm" variant="primary" isLoading={busy.connect} onClick={onConnect}>
-            {t('localModels.catalog.use')}
-          </Button>
-        ) : null}
-        {installed ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            leftIcon={<Icon name="analytics" />}
-            isLoading={busy.bench}
-            disabled={!serverReady}
-            onClick={onBench}
-          >
-            {t('localModels.catalog.bench')}
-          </Button>
-        ) : null}
-        {installed ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            iconOnly
-            icon={<Icon name="trash" />}
-            aria-label={t('localModels.catalog.remove')}
-            onClick={onRemove}
-          />
-        ) : null}
-      </Stack>
-    </div>
+        <div className={styles.actions}>
+          {importOnly && !running ? (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={onImport}
+              title={t('localModels.catalog.importHint')}
+            >
+              {t('localModels.catalog.import')}
+            </Button>
+          ) : null}
+          {canDownload ? (
+            <Button
+              size="sm"
+              variant={row.recommended ? 'primary' : 'secondary'}
+              leftIcon={<Icon name="plus" />}
+              isLoading={busy.pull}
+              onClick={onPull}
+            >
+              {row.quant
+                ? t('localModels.catalog.downloadQuant', {
+                    quant: quantTitle(model, row.quant.id, t),
+                    size: formatGb(toGb(row.quant.sizeBytes), i18n.language),
+                  })
+                : t('localModels.catalog.download')}
+            </Button>
+          ) : null}
+          {installed && row.quantInstalled && fit.agentReady && !inUse ? (
+            <Button size="sm" variant="primary" isLoading={busy.connect} onClick={onConnect}>
+              {t('localModels.catalog.use')}
+            </Button>
+          ) : null}
+          {installed && row.quantInstalled ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              leftIcon={<Icon name="analytics" />}
+              isLoading={busy.bench}
+              disabled={!serverReady}
+              onClick={onBench}
+            >
+              {t('localModels.catalog.bench')}
+            </Button>
+          ) : null}
+          {installed || model.custom ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon={<Icon name="trash" />}
+              aria-label={t('localModels.catalog.remove')}
+              onClick={onRemove}
+            />
+          ) : null}
+        </div>
+      </div>
+
+      {job && (running || job.state === 'failed' || job.state === 'cancelled') ? (
+        <JobProgress job={job} {...(running ? { onCancel: () => onCancel(job.id) } : {})} />
+      ) : null}
+      {serverJob && (serverJob.state === 'running' || serverJob.state === 'failed') ? (
+        // Без «Отменить»: перезапуск сервера на полпути не прервать — модель осталась бы ни на старых, ни на новых настройках.
+        <JobProgress job={serverJob} />
+      ) : null}
+
+      <div className={styles.islands}>
+        <div className={`${styles.island} ${styles.factsIsland}`}>
+          <ModelFacts row={row} />
+        </div>
+        <div className={`${styles.island} ${styles.settingsIsland}`}>
+          <ModelSelects row={row} onChoose={onChoose} />
+        </div>
+      </div>
+    </article>
   );
 }

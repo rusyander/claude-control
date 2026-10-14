@@ -533,7 +533,7 @@ export function parseReviewDepth(raw: unknown): ReviewDepth | undefined {
 }
 
 /** Чем отчёт о глубине не дотягивает до того, что ревью закрывается как полное. */
-export type ReviewDepthGap = 'unreported' | 'partial' | 'entries';
+export type ReviewDepthGap = 'unreported' | 'partial' | 'entries' | 'trace';
 
 /**
  * Судит отчёт панель, а не ревьюер (U4): отчёта нет; покрытие не полное или
@@ -1179,8 +1179,23 @@ export function reviewLinkPrompt(input: {
    * карточке, и по клику публикует та же сессия (`reviewPublishPrompt`).
    */
   publish?: boolean;
+  /**
+   * Что панель знает про стенд и базу (T5, T7): одним абзацем, из `prepareReviewStand`.
+   * Нет — абзаца в задании нет.
+   */
+  environment?: string;
 }): string {
-  const { url, branch, onMrBranch = true, tasks = [], shared, detached, remote, publish } = input;
+  const {
+    url,
+    branch,
+    onMrBranch = true,
+    tasks = [],
+    shared,
+    detached,
+    remote,
+    publish,
+    environment,
+  } = input;
 
   return [
     // Пустые строки здесь не разделители, а мусор: `filter(Boolean)` их
@@ -1219,10 +1234,12 @@ export function reviewLinkPrompt(input: {
         'because this group edits nothing.'
       : '',
     ...tasks.map((task, index) => `${index + 1}. ${task}`),
+    environment ?? '',
     FINDING_CARD_LINE,
     REVIEW_BLOCK_LINE,
     REVIEW_DEPTH_LINE,
     EMPTY_REVIEW_LINE,
+    REVIEW_UNATTENDED_LINE,
     ANSWER_LANGUAGE_LINE,
     OWNER_PRECEDENCE_LINE,
   ]
@@ -1347,7 +1364,66 @@ const DEPTH_GAP_TEXT: Record<ReviewDepthGap, string> = {
   unreported: 'the outcome block carries no "depth" report with a tier and a coverage',
   partial: 'the coverage is partial — the "uncovered" part was left unread',
   entries: 'a T2 review was taken from fewer than two independent entry points',
+  trace: 'the requirement-trace block could not be read',
 };
+
+/**
+ * Вопрос планировщика ревью в группе, где спросить некого (T4). Живая группа
+ * на MR 988 получила «ASK: N rounds > 6» и ушла от вопроса подгонкой
+ * `--chunk 500 --per-round 8` — тонкий срез диффа на агента вместо вопроса,
+ * который некому задать. Решение принято заранее: больше агентов в пределах
+ * бюджета, глубина не режется, а упёршийся лимит называется вслух.
+ */
+export const REVIEW_UNATTENDED_LINE =
+  'Nobody answers questions in this group. When the review planner prints "ASK: N rounds > 6" ' +
+  '(or any other question meant for a human), take the option with MORE agents per round — never ' +
+  'fewer diff lines per agent: do not tune --chunk or --per-round to dodge the question and do not ' +
+  'merge tail rounds by hand, the depth the risk tier demands stays whole. The spawn budget of ' +
+  'this review is what its plan needs (the agents of every round plus the verifiers); if the ' +
+  'session cap on spawns is below that, name in "uncovered" what stays unread because of it, ' +
+  'never trim the review silently.';
+
+/**
+ * Что ревью обязано помнить после сжатия контекста (T17). Первое сообщение
+ * группы после сжатия уходит в пересказ, и вместе с ним — формат карточки
+ * замечания (10 тредов подряд в чужом стиле отклонил `review-publish-guard`) и
+ * схема отчёта по словам владельца (блок не той схемы не прочитался). Системная
+ * дописка в пересказ не уходит; она одна на все ходы звена и не зависит от
+ * задания, поэтому совпадает байт в байт у каждого, кто её строит.
+ */
+export const REVIEW_DURABLE_LINE =
+  'Review rules that outlive context compaction (the first message may be summarised away). ' +
+  `${FINDING_CARD_LINE} ` +
+  'Before the FIRST write of a finding into an MR, re-read the finding-card format of the ' +
+  "deep-review skill — never copy the style of other people's threads in that MR. " +
+  `${REVIEW_BLOCK_LINE} ` +
+  "If the first message carried the owner's request, the answer ALSO ends with a requirement-trace " +
+  `block in the language ${blockLang('sieves')}: ` +
+  '{"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"<file:line, the command and a line of its output, or why it does not apply>"}]} ' +
+  '— the key is "sieves", every id is the string owner-N, the status is exactly pass, fail or n/a, ' +
+  "the evidence at least 12 characters; any other shape is not parsed and the owner's points count as " +
+  `not checked. ${REVIEW_UNATTENDED_LINE}`;
+
+/**
+ * Сообщение в ТУ ЖЕ сессию ревью, чей блок следа требований панель не смогла
+ * прочесть (T21): другая схема (`points` вместо `sieves`, числовые `id`, статус
+ * `done`). Блок такой схемы не разбирается — пункт слов владельца остаётся «не
+ * разобран», а не «выполнен». Один раз и без человека.
+ */
+export function ownerTraceRetryPrompt(): string {
+  return [
+    `The panel found no readable requirement-trace block (${'```'}${blockLang('sieves')}) in your answer: it is missing or its schema is not the one the panel parses, so the owner's points count as NOT PARSED, not as done.`,
+    'Rewrite it exactly as {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"<the point in a few words — file:line, the command and a line of its output, or why it does not apply>"}]}: ' +
+      'the key is "sieves" (never "points" or "items"), every "id" is the string owner-N where N is the number of the point, "status" is exactly one of pass, fail, n/a (never "done" or "ok"), "evidence" is a sentence of at least 12 characters.',
+    'Do not redo the review: report the points from what you have already read. Keep the FULL findings list and the "depth" report in the outcome block.',
+    REVIEW_BLOCK_LINE,
+    REVIEW_DEPTH_LINE,
+    FINDING_CARD_LINE,
+    EMPTY_REVIEW_LINE,
+    'EDIT NOTHING. Write into the MR only what the first message of this session allowed.',
+    ANSWER_LANGUAGE_LINE,
+  ].join('\n');
+}
 
 /**
  * Сообщение в ТУ ЖЕ сессию ревью, чей отчёт о глубине панель сочла неполным

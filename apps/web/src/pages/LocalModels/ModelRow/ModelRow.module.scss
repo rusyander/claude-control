@@ -1,22 +1,96 @@
-.modelRow {
+/* Карточка модели. Раскладка одна на весь список: шапка (кто это + кнопки), под ней
+   два острова — расчёт и настройки — с одинаковыми шириной и высотой строки во всех
+   карточках, поэтому одно и то же стоит друг под другом, как столбцы таблицы. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background-color: var(--color-surface);
+}
+
+.recommended {
+  border-color: var(--color-accent);
+}
+
+.head {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--spacing-sm);
-  padding-block: var(--spacing-sm);
-  border-top: 1px solid var(--color-border);
-
-  &:first-child {
-    border-top: 0;
-  }
+  gap: var(--spacing-xs) var(--spacing-md);
 }
 
-.metaPart {
-  white-space: nowrap;
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1 1 320px;
+  min-width: 0;
 }
 
-.rowActions {
-  flex-shrink: 0;
+.titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-3xs) var(--spacing-sm);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Кнопки — у правого края шапки; на узком экране уходят под название, но остаются справа. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+  margin-left: auto;
   max-width: 100%;
+}
+
+.islands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.island {
+  padding: var(--spacing-sm);
+  border-radius: 8px;
+  background-color: var(--color-surface-sunken);
+  min-width: 0;
+}
+
+.factsIsland {
+  flex: 1 1 340px;
+}
+
+/* Настройки — фиксированной ширины: поле квантования вмещает самый длинный вариант
+   вместе с причиной («не влезет: нужно 26,1 ГБ из 24»), не обрезая его. */
+.settingsIsland {
+  flex: 0 1 600px;
+}
+
+/* Узкий экран: поля внутри карточки уже, каждый пиксель ширины нужен спискам. */
+@media (max-width: 640px) {
+  .card {
+    padding: var(--spacing-sm);
+  }
+
+  .island {
+    padding: var(--spacing-xs);
+  }
+
+  .card .badges > * {
+    max-width: 100%;
+    white-space: normal;
+  }
 }

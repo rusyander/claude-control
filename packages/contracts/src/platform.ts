@@ -487,6 +487,15 @@ export const ourRulesSchema = object({
   mcp: boolean().default(true),
   /** Дописка панели к системному промпту: инициативы, разделение, продолжение. */
   systemPrompt: boolean().default(true),
+  /**
+   * Полный набор встроенных инструментов Claude Code. Снят — в запросе остаются
+   * рабочие (Bash, Read, Edit, Write, Glob, Grep, WebFetch, Skill, Agent,
+   * TodoWrite); расписания, рабочие деревья, рассылки, воркфлоу и прочее уходят.
+   * Общему выключателю НЕ подчиняется: он говорит про то, что едет из `~/.claude`,
+   * а это не оттуда, и «только правила контура» не должно молча урезать
+   * инструменты облачного контура. Локальный контур заводится со снятым.
+   */
+  tools: boolean().default(true),
 });
 
 export type OurRules = Infer<typeof ourRulesSchema>;
@@ -519,7 +528,14 @@ export interface PlatformRunLayers {
  * и по той же причине — общий объект zod разъехался бы между контурами.
  */
 export function defaultOurRules(): OurRules {
-  return { enabled: true, settings: true, skills: true, mcp: true, systemPrompt: true };
+  return {
+    enabled: true,
+    settings: true,
+    skills: true,
+    mcp: true,
+    systemPrompt: true,
+    tools: true,
+  };
 }
 
 /**
@@ -1660,6 +1676,14 @@ export interface PlatformRunPlan {
    * прогон мимо контура.
    */
   toolRoute?: PlatformToolRoute;
+  /** Контур, который ведёт прогон (идентификатор); нет — прогон идёт мимо контура. */
+  platformId?: string;
+  /**
+   * Прогон локальный и берёт MCP-серверы по выбору человека: список выбранных для
+   * проекта из запроса плана (пусто — ни одного). Нет поля — это не локальный прогон
+   * или проект плану не назван.
+   */
+  localMcp?: { picked: string[] };
 }
 
 /**

@@ -63,6 +63,7 @@ const DECLARED: Record<string, { vendorFields: number; statusRows: number; viola
   litellm: { vendorFields: 0, statusRows: 0, violations: 0 },
   vllm: { vendorFields: 0, statusRows: 0, violations: 0 },
   ollama: { vendorFields: 0, statusRows: 0, violations: 0 },
+  'llama-cpp': { vendorFields: 0, statusRows: 0, violations: 0 },
   openrouter: { vendorFields: 0, statusRows: 0, violations: 0 },
   'azure-openai': { vendorFields: 0, statusRows: 0, violations: 0 },
   dashscope: { vendorFields: 0, statusRows: 0, violations: 0 },

@@ -52,6 +52,19 @@ import {
   nativeRequestBody,
   type NativeFacts,
 } from '../anthropic-native.ts';
+import {
+  ContextCutFilter,
+  PromptCounter,
+  firstTokenTimeoutMs,
+  promptLimitOf,
+  promptTooLongMessage,
+  maxTokensOverflowMessage,
+  needsPrecount,
+  overflowOfUpstream,
+  sessionOf,
+  LOCAL_REPLY_RESERVE_TOKENS,
+  type LocalUpstreamInfo,
+} from '../local-window/local-window.ts';
 import { NativeThinkFilter, withoutThinkMessage } from '../native-think/native-think.ts';
 import { historyHasToolUse } from '../tool-shim/encode.ts';
 import type { ShimCall } from '../tool-shim/parse.ts';
@@ -115,6 +128,7 @@ const MAX_ANSWER_BYTES = 8 * 1024 * 1024;
 export const GATEWAY_ROUTES = [
   '/v1/chat/completions',
   '/v1/messages',
+  '/v1/messages/count_tokens',
   '/v1/models',
   '/v1/images/generations',
   '/v1/responses',
@@ -123,7 +137,8 @@ export const GATEWAY_ROUTES = [
   '/v1beta/models/{model}:countTokens',
 ] as const;
 
-export type GatewayRoute = 'chat' | 'messages' | 'models' | 'images' | 'responses' | 'google';
+export type GatewayRoute =
+  'chat' | 'messages' | 'count' | 'models' | 'images' | 'responses' | 'google';
 
 export interface PipelineDeps {
   store: AppStore;
@@ -156,6 +171,19 @@ export interface PipelineDeps {
    * `portability/wire`.
    */
   toolGate?: (runTag: string) => ToolCallGate | undefined;
+  /**
+   * Окно и скорость, если собеседник — локальная модель панели; иначе пусто.
+   * Шлюз про локальные модели не знает ничего, кроме этого вопроса: по ответу он
+   * отказывает запросу, не влезающему в окно (`prompt is too long`), и даёт
+   * серверу время обработать длинный промпт.
+   */
+  localUpstream?: (platformId: string, model: string) => LocalUpstreamInfo | undefined;
+  /**
+   * Счётчик токенов запроса к локальной модели: выучивает соотношение символов и
+   * токенов по настоящим ответам. Свой на слушатель — так выученное одним
+   * сервером не достаётся другому; нет — общий на процесс.
+   */
+  promptCounter?: PromptCounter;
   /** Подстановка транспорта для тестов. */
   fetchImpl?: PlatformFetch;
   now?: () => Date;
@@ -176,6 +204,9 @@ export function resolveRoute(path: string): GatewayRoute | undefined {
   // Первым: имя модели в пути Gemini произвольно и могло бы кончаться чем угодно.
   if (parseGooglePath(clean)) return 'google';
   if (clean.endsWith('/chat/completions')) return 'chat';
+  // Первым: путь счёта токенов кончается на `/messages/count_tokens`, и общее
+  // окончание `/messages` ниже его не должно перехватить.
+  if (clean.endsWith('/messages/count_tokens')) return 'count';
   if (clean.endsWith('/messages')) return 'messages';
   if (clean.endsWith('/models')) return 'models';
   if (clean.endsWith('/images/generations')) return 'images';
@@ -185,7 +216,7 @@ export function resolveRoute(path: string): GatewayRoute | undefined {
 
 /** Диалект клиента однозначно задан маршрутом, а не заголовком. */
 function dialectOf(route: GatewayRoute): Dialect {
-  return route === 'messages' ? 'anthropic' : 'openai-compat';
+  return route === 'messages' || route === 'count' ? 'anthropic' : 'openai-compat';
 }
 
 /**
@@ -367,6 +398,9 @@ export async function handleGatewayRequest(
 
   if (route === 'models') {
     return models(response, deps, platform, token, path, dialect, { runTag, section });
+  }
+  if (route === 'count') {
+    return countTokens(request, response, deps, platform, token, path);
   }
   if (route === 'images') {
     return imagesRequest(
@@ -817,30 +851,91 @@ async function chat(
     return ceilingCut;
   };
 
-  let upstream: Response;
-  try {
-    upstream = await callUpstream({
+  // Локальная модель: тот же слой окна, что и на родной ручке (L4b). Qwen Code, Codex и
+  // Gemini идут сюда, а не в `nativeChat`: без слоя запрос, не влезающий в окно, доходил бы до
+  // сервера и кончался его 400, который они не узнают.
+  const local = deps.localUpstream?.(platform.id, model);
+  const promptCounter = deps.promptCounter ?? fallbackPromptCounter;
+  const promptTokens = local ? promptCounter.estimate(platform.id, model, bodyText.length) : 0;
+  if (local && promptTokens + LOCAL_REPLY_RESERVE_TOKENS > local.context) {
+    return refuse(response, deps, {
+      platformId: platform.id,
+      path,
+      dialect,
+      status: 400,
+      code: 'invalid_request_error',
+      message: promptTooLongMessage(promptTokens, promptLimitOf(local.context)),
+      lost,
+    });
+  }
+  // Вход влезает, а вход плюс `max_tokens` — нет: ответ, который Qwen Code не умеет
+  // урезать сам, урезается здесь, а не отказом (в отличие от Claude Code).
+  if (local) bodyText = clampReplyTokens(bodyText, promptTokens, local.context);
+  if (local?.prepare) await local.prepare(sessionOf(clientBody));
+  const wholeTimeout = upstreamStreams ? 0 : wholeBodyTimeoutMs(driver);
+  const headersTimeoutMs = local
+    ? Math.max(wholeTimeout, firstTokenTimeoutMs(promptTokens, local))
+    : wholeTimeout;
+  const sendChat = (): Promise<Response> =>
+    callUpstream({
       platform,
       token,
       path: 'chat/completions',
       body: bodyText,
       signal: abortSignalOf(response),
       fetchImpl: deps.fetchImpl,
-      ...(upstreamStreams
-        ? {}
-        : { accept: 'application/json', headersTimeoutMs: wholeBodyTimeoutMs(driver) }),
+      ...(upstreamStreams ? {} : { accept: 'application/json' }),
+      ...(headersTimeoutMs > 0 ? { headersTimeoutMs } : {}),
+      ...(local ? { local: true } : {}),
     });
+
+  let upstream: Response;
+  try {
+    upstream = await sendChat();
   } catch (error) {
-    const message = error instanceof UpstreamError ? error.message : String(error);
-    return refuse(response, deps, {
-      platformId: platform.id,
-      path,
-      dialect,
-      status: 502,
-      code: 'api_error',
-      message,
-      lost,
-    });
+    // Сервер моделей не принял соединение — присмотр поднимает его, запрос идёт второй раз.
+    // Нет — «подождите» (503: Qwen Code повторяет такой ответ до десяти раз с нарастающей
+    // паузой, 529 он не знает), а не 502, после которого он сдаётся.
+    if (local && error instanceof UpstreamError && error.kind === 'connection') {
+      const revived = await reviveLocal(local);
+      if (revived.ready) {
+        try {
+          upstream = await sendChat();
+        } catch (again) {
+          const message = again instanceof UpstreamError ? again.message : String(again);
+          return refuse(response, deps, {
+            platformId: platform.id,
+            path,
+            dialect,
+            status: localBusyStatus(dialect),
+            code: 'overloaded_error',
+            message,
+            lost,
+          });
+        }
+      } else {
+        return refuse(response, deps, {
+          platformId: platform.id,
+          path,
+          dialect,
+          status: localBusyStatus(dialect),
+          code: 'overloaded_error',
+          message: revived.message,
+          lost,
+        });
+      }
+    } else {
+      const message = error instanceof UpstreamError ? error.message : String(error);
+      return refuse(response, deps, {
+        platformId: platform.id,
+        path,
+        dialect,
+        status: 502,
+        code: 'api_error',
+        message,
+        lost,
+      });
+    }
   }
 
   if (upstream.status >= 400) {
@@ -851,6 +946,7 @@ async function chat(
       dialect,
       model,
       lost,
+      ...(local ? { local } : {}),
     });
   }
 
@@ -939,10 +1035,22 @@ async function chat(
         serverText('gateway-answer-broken', {
           reason: error instanceof Error ? error.message : String(error),
         }));
-    finishBroken(response, translator, restore, dialect, failure);
+    finishBroken(
+      response,
+      translator,
+      restore,
+      dialect,
+      failure,
+      local ? localBusyStatus(dialect) : 502,
+    );
+    // Локальный сервер оборвал ответ — он, скорее всего, умер: присмотр поднимает его, пока клиент повторяет.
+    if (local && !response.destroyed) void local.revive?.().catch(() => undefined);
   }
 
   const facts = translator.facts;
+  if (local) promptCounter.learn(platform.id, model, bodyText.length, facts.promptTokens);
+  // Поток кончился, не досказав (сервер убит посреди ответа): поднять его, пока клиент повторяет.
+  if (local && !failure && facts.truncated) void local.revive?.().catch(() => undefined);
   // Сжатие истории — в журнал сжатий: по нему лента подписывает ТОТ ответ (`context-managed`).
   if (facts.summarized) {
     noteSummarized(deps.appDataDir, {
@@ -1050,12 +1158,28 @@ async function refuseUpstreamStatus(
     dialect: Dialect;
     model: string;
     lost: string[];
+    /** Локальный сервер: его отказ «не влезает в окно» переводится в то, что Claude Code узнаёт. */
+    local?: LocalUpstreamInfo;
   },
 ): Promise<void> {
   const { platform, driver } = context;
   // Тело контура наружу НЕ идёт: в перечне нарушений 451 вполне может лежать
   // кусок самого запроса. Клиент получает свою форму и русскую причину.
   const body = safeJson(await upstream.text());
+  const overflow = context.local ? overflowOfUpstream(upstream.status, body) : undefined;
+  if (overflow) {
+    // Оценка шлюза промахнулась, сервер отказал сам: тем же текстом, что и наш отказ, —
+    // Claude Code по нему сжимает историю и повторяет, а не кончает ход.
+    return refuse(response, deps, {
+      platformId: platform.id,
+      path: context.path,
+      dialect: context.dialect,
+      status: 400,
+      code: 'invalid_request_error',
+      message: promptTooLongMessage(overflow.tokens, promptLimitOf(overflow.context)),
+      lost: context.lost,
+    });
+  }
   noteExhausted(deps, platform, upstream.status, body);
   // Модель уточняет 403 и 404: без её имени первый непонятно про что, а
   // второй читается как «нет такого маршрута». `Retry-After` — вторая
@@ -1071,7 +1195,12 @@ async function refuseUpstreamStatus(
     platformId: platform.id,
     path: context.path,
     dialect: context.dialect,
-    status: bridged.status,
+    // Загружающийся сервер отвечает 503: у локального это «подождите», а не отказ, —
+    // 529 Claude Code ждёт бесконечно (`CLAUDE_CODE_RETRY_WATCHDOG`), 503 — десять раз.
+    status:
+      context.local && bridged.status === 503 && context.dialect === 'anthropic'
+        ? 529
+        : bridged.status,
     code: bridged.code,
     message: bridged.message,
     violations: bridged.violations,
@@ -1115,6 +1244,194 @@ function countUsage(
   // ответ модели не имеет права ждать нашу бухгалтерию. Модель называем ту, что
   // ушла наверх: по ней ищется цена, и без неё расход виден только в токенах.
   deps.spend?.add(platformId, { model, ...tokens, ...(unreported ? { unreported } : {}) }, at);
+}
+
+/** Запасной счётчик на процесс, когда слушатель своего не передал. */
+const fallbackPromptCounter = new PromptCounter();
+
+/** Точный счёт токенов у сервера моделей (`count_tokens`); нет ответа — `undefined`. */
+async function exactPromptTokens(input: {
+  deps: PipelineDeps;
+  platform: Platform;
+  token: string;
+  messages: string;
+  bodyText: string;
+  headers: Readonly<Record<string, string>>;
+  signal: AbortSignal;
+}): Promise<number | undefined> {
+  try {
+    const upstream = await callUpstream({
+      platform: input.platform,
+      token: input.token,
+      path: `${input.messages}/count_tokens`,
+      body: input.bodyText,
+      headers: input.headers,
+      signal: input.signal,
+      fetchImpl: input.deps.fetchImpl,
+      accept: 'application/json',
+      headersTimeoutMs: COUNT_TOKENS_TIMEOUT_MS,
+      retry: false,
+      local: true,
+    });
+    if (upstream.status >= 400) {
+      await upstream.body?.cancel().catch(() => undefined);
+      return undefined;
+    }
+    const answer = safeJson(await upstream.text());
+    const counted = isRecord(answer) ? Number(answer.input_tokens) : Number.NaN;
+    return Number.isFinite(counted) && counted > 0 ? Math.round(counted) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Сервер моделей не принял соединение: просим присмотр поднять его. Готов — запрос можно
+ * повторить; нет — текст, который клиент покажет, пока ждёт (529: он повторяет сам).
+ */
+async function reviveLocal(local: LocalUpstreamInfo): Promise<{ ready: boolean; message: string }> {
+  const outcome = await local.revive?.().catch(() => 'failed' as const);
+  if (outcome === 'restarted' || outcome === 'alive') return { ready: true, message: '' };
+  if (outcome === 'busy') return { ready: false, message: serverText('gateway-local-restarting') };
+  if (outcome === 'none' || outcome === undefined)
+    return { ready: false, message: serverText('gateway-local-stopped') };
+  return {
+    ready: false,
+    message: serverText('gateway-local-down', {
+      reason: local.notice?.() ?? serverText('gateway-local-down-unknown'),
+    }),
+  };
+}
+
+/**
+ * Код «сервер занят, подождите» для локальной модели. Claude Code ждёт 529 бесконечно
+ * (`CLAUDE_CODE_RETRY_WATCHDOG`); Qwen Code 529 не знает, а 503 повторяет до десяти раз с
+ * паузой от минуты до пяти (его `RATE_LIMIT_ERROR_CODES` = 429/503, бандл 0.25.0).
+ */
+function localBusyStatus(dialect: Dialect): number {
+  return dialect === 'anthropic' ? 529 : 503;
+}
+
+/** Запас под расхождение оценки и счёта сервера и под служебные токены шаблона. */
+const LOCAL_CLAMP_MARGIN_TOKENS = 512;
+/** Меньше этого ответу не оставляем: вход плюс резерв уже проверены. */
+const LOCAL_MIN_REPLY_TOKENS = 1_024;
+
+/**
+ * Вход влезает в окно, а вход плюс `max_tokens` — нет: ответ урезается до остатка окна
+ * (с запасом на счёт), чтобы сервер не вёл генерацию до предела и не обрывал её как «длину».
+ * Нет поля или остаток шире запроса — тело как есть.
+ */
+function clampReplyTokens(bodyText: string, promptTokens: number, context: number): string {
+  const body = safeJson(bodyText);
+  if (!isRecord(body)) return bodyText;
+  const room = Math.max(
+    LOCAL_MIN_REPLY_TOKENS,
+    context - Math.ceil(promptTokens) - LOCAL_CLAMP_MARGIN_TOKENS,
+  );
+  let changed = false;
+  for (const field of ['max_tokens', 'max_completion_tokens']) {
+    const asked = body[field];
+    if (typeof asked === 'number' && Number.isFinite(asked) && asked > room) {
+      body[field] = room;
+      changed = true;
+    }
+  }
+  return changed ? JSON.stringify(body) : bodyText;
+}
+
+/** Сколько секунд сервер моделей отвечает на счёт токенов, прежде чем шлюз посчитает сам. */
+const COUNT_TOKENS_TIMEOUT_MS = 20_000;
+
+/**
+ * Счёт токенов запроса (`POST /v1/messages/count_tokens`): Claude Code зовёт его
+ * перед сжатием истории и для шапки, и без ответа считает сам по длине.
+ *
+ * Только для локальной модели: там сервер (`llama-server`) считает настоящим
+ * токенайзером, и шлюз отдаёт его число — это точнее прикидки по символам, а от
+ * точности зависит, сожмётся ли история до переполнения окна. Не отвечает (старый
+ * сервер, 404, обрыв) — прикидка шлюза по символам, с выученным по настоящим
+ * ответам коэффициентом: число всегда есть, клиент не гадает. Облачный контур
+ * этой ручки по-прежнему не получает: чужому шлюзу счёт навязывать нечем, а
+ * прикидка вместо его отказа была бы хуже собственного счёта клиента.
+ */
+async function countTokens(
+  request: IncomingMessage,
+  response: ServerResponse,
+  deps: PipelineDeps,
+  platform: Platform,
+  token: string,
+  path: string,
+): Promise<void> {
+  const dialect: Dialect = 'anthropic';
+  const declared = Number(request.headers['content-length'] ?? 0);
+  const raw = declared > MAX_BODY_BYTES ? undefined : await readBody(request);
+  if (raw === undefined) {
+    refuse(response, deps, {
+      platformId: platform.id,
+      path,
+      dialect,
+      status: 413,
+      code: 'request_too_large',
+      message: serverText('gateway-body-too-large'),
+    });
+    request.destroy();
+    return;
+  }
+  const clientBody = safeJson(raw.toString('utf8'));
+  const model =
+    isRecord(clientBody) && typeof clientBody.model === 'string' ? clientBody.model : '';
+  const local = deps.localUpstream?.(platform.id, model);
+  if (!isRecord(clientBody) || !local) {
+    return refuse(response, deps, {
+      platformId: platform.id,
+      path,
+      dialect: 'openai-compat',
+      status: 404,
+      code: 'not_found_error',
+      message: serverText('gateway-route-unknown', { routes: GATEWAY_ROUTES.join(', ') }),
+    });
+  }
+  const driver = driverOf(platform);
+  const messages = nativeMessagesPath(platform, driver);
+  // Тело то же, что ушло бы в чат: счёт по другому телу сказал бы про другой запрос.
+  const { body: stripped } = nativeRequestBody(
+    clientBody,
+    platform.rules.platform.platformTools.length > 0,
+  );
+  const bodyText = JSON.stringify(applyManagedRules(stripped, platform, driver));
+  const promptCounter = deps.promptCounter ?? fallbackPromptCounter;
+  if (messages) {
+    try {
+      const upstream = await callUpstream({
+        platform,
+        token,
+        path: `${messages}/count_tokens`,
+        body: bodyText,
+        headers: nativeHeaders(request),
+        signal: abortSignalOf(response),
+        fetchImpl: deps.fetchImpl,
+        accept: 'application/json',
+        headersTimeoutMs: COUNT_TOKENS_TIMEOUT_MS,
+        retry: false,
+        local: true,
+      });
+      if (upstream.status < 400) {
+        const answer = safeJson(await upstream.text());
+        const counted = isRecord(answer) ? Number(answer.input_tokens) : Number.NaN;
+        if (Number.isFinite(counted) && counted >= 0) {
+          return respond(response, 200, { input_tokens: Math.round(counted) });
+        }
+      } else {
+        await upstream.body?.cancel().catch(() => undefined);
+      }
+    } catch {
+      // Сервер молчит или не знает ручки — ниже прикидка.
+    }
+  }
+  respond(response, 200, {
+    input_tokens: promptCounter.estimate(platform.id, model, bodyText.length),
+  });
 }
 
 interface NativeRequest {
@@ -1165,9 +1482,51 @@ async function nativeChat(
     bodyText = guarded.body;
   }
 
-  let upstream: Response;
-  try {
-    upstream = await callUpstream({
+  // Локальная модель: запрос, не влезающий в окно сервера, Ollama молча обрезает
+  // с головы (вместе с системным промптом) или обрывает ответ как «длину», а
+  // Claude Code читает это как перебор выходных токенов и не сжимает историю.
+  // Отказ текстом, который он узнаёт, — и он сжимает сам и повторяет.
+  const local = deps.localUpstream?.(platform.id, model);
+  const promptCounter = deps.promptCounter ?? fallbackPromptCounter;
+  let promptTokens = local ? promptCounter.estimate(platform.id, model, bodyText.length) : 0;
+  // Оценка по символам промахивается на плотном выводе (код, JSON): выше 75% окна
+  // спрашиваем у сервера точный счёт — промах здесь стоил бы хода, а не токенов.
+  if (local && needsPrecount(promptTokens, local.context)) {
+    const exact = await exactPromptTokens({
+      deps,
+      platform,
+      token: native.token,
+      messages: native.messages,
+      bodyText,
+      headers: nativeHeaders(request),
+      signal: abortSignalOf(response),
+    });
+    if (exact !== undefined) {
+      promptCounter.learn(platform.id, model, bodyText.length, exact);
+      promptTokens = exact;
+    }
+  }
+  if (local && promptTokens + LOCAL_REPLY_RESERVE_TOKENS > local.context) {
+    return refusal(
+      400,
+      'invalid_request_error',
+      promptTooLongMessage(promptTokens, promptLimitOf(local.context)),
+    );
+  }
+  // Вход влезает, а вход плюс `max_tokens` — нет: Claude Code сам уменьшит `max_tokens`.
+  const reduceReply = local
+    ? maxTokensOverflowMessage(promptTokens, ruledBody.max_tokens, local.context)
+    : undefined;
+  if (reduceReply) return refusal(400, 'invalid_request_error', reduceReply);
+  // Разговор сменился — серверу моделей пора сбросить кеш слота (до запроса, не после).
+  if (local?.prepare) await local.prepare(sessionOf(native.clientBody));
+  const wholeTimeout = ruledBody.stream === true ? 0 : wholeBodyTimeoutMs(driver);
+  const headersTimeoutMs = local
+    ? Math.max(wholeTimeout, firstTokenTimeoutMs(promptTokens, local))
+    : wholeTimeout;
+
+  const send = (): Promise<Response> =>
+    callUpstream({
       platform,
       token: native.token,
       path: native.messages,
@@ -1175,13 +1534,32 @@ async function nativeChat(
       headers: nativeHeaders(request),
       signal: abortSignalOf(response),
       fetchImpl: deps.fetchImpl,
-      ...(ruledBody.stream === true
-        ? {}
-        : { accept: 'application/json', headersTimeoutMs: wholeBodyTimeoutMs(driver) }),
+      ...(ruledBody.stream === true ? {} : { accept: 'application/json' }),
+      ...(headersTimeoutMs > 0 ? { headersTimeoutMs } : {}),
+      ...(local ? { local: true } : {}),
     });
+  let upstream: Response;
+  try {
+    upstream = await send();
   } catch (error) {
-    const message = error instanceof UpstreamError ? error.message : String(error);
-    return refusal(502, 'api_error', message);
+    // Локальный сервер не принял соединение — он умер. Присмотр поднимает его заново;
+    // поднялся — запрос идёт второй раз, нет — 529: клиент ждёт и повторяет, а не сдаётся.
+    if (local && error instanceof UpstreamError && error.kind === 'connection') {
+      const revived = await reviveLocal(local);
+      if (revived.ready) {
+        try {
+          upstream = await send();
+        } catch (again) {
+          const message = again instanceof UpstreamError ? again.message : String(again);
+          return refusal(529, 'overloaded_error', message);
+        }
+      } else {
+        return refusal(529, 'overloaded_error', revived.message);
+      }
+    } else {
+      const message = error instanceof UpstreamError ? error.message : String(error);
+      return refusal(502, 'api_error', message);
+    }
   }
   if (upstream.status >= 400) {
     return refuseUpstreamStatus(response, deps, upstream, {
@@ -1191,6 +1569,7 @@ async function nativeChat(
       dialect,
       model,
       lost,
+      ...(local ? { local } : {}),
     });
   }
 
@@ -1206,7 +1585,17 @@ async function nativeChat(
   try {
     if ((upstream.headers.get('content-type') ?? '').includes('event-stream')) {
       thought = think;
-      await streamNative(response, upstream, meter, restore, think, language);
+      const cut = await streamNative(
+        response,
+        upstream,
+        meter,
+        restore,
+        think,
+        language,
+        local?.context,
+        local !== undefined,
+      );
+      if (cut) failure = promptTooLongMessage(cut, promptLimitOf(local?.context ?? 0));
     } else {
       const text = await readCappedAnswer(upstream, () => response.destroyed);
       if (text === undefined) {
@@ -1227,20 +1616,34 @@ async function nativeChat(
       : serverText('gateway-answer-broken', {
           reason: error instanceof Error ? error.message : String(error),
         });
+    // Локальный сервер оборвал ответ — он, скорее всего, умер: присмотр поднимает его, а
+    // клиенту уходит «перегрузка» (529), которую Claude Code повторяет, а не считает концом хода.
+    const deadCode = local ? 'overloaded_error' : 'api_error';
+    if (local && !response.destroyed) void local.revive?.().catch(() => undefined);
     if (!response.destroyed && !response.writableEnded) {
       if (response.headersSent) {
         response.end(
           restore.push(think.end()) +
             restore.end() +
-            nativeErrorFrame(`AgentDeck: ${failure}`, 'api_error', language),
+            nativeErrorFrame(`AgentDeck: ${failure}`, deadCode, language),
         );
       } else {
-        respond(response, 502, errorBody(dialect, `AgentDeck: ${failure}`, 'api_error', language));
+        respond(
+          response,
+          local ? 529 : 502,
+          errorBody(dialect, `AgentDeck: ${failure}`, deadCode, language),
+        );
       }
     }
   }
+  // Поток кончился, не досказав (сервер убит посреди ответа): поднять сервер, пока клиент повторяет.
+  if (local && !failure && !whole && !meter.facts.complete && !meter.facts.upstreamError) {
+    void local.revive?.().catch(() => undefined);
+  }
 
   const facts = whole ?? meter.facts;
+  // Настоящий счёт сервера уточняет прикидку: следующий запрос считается по нему.
+  if (local) promptCounter.learn(platform.id, model, bodyText.length, facts.promptTokens);
   if (thought.sawBareClose) deps.store.markThinkTail(platform.id, model);
   const status = failure
     ? response.destroyed
@@ -1287,7 +1690,12 @@ async function streamNative(
   restore: ResponseStreamFilter,
   think: NativeThinkFilter,
   language: TextLanguage,
-): Promise<void> {
+  /** Окно локального сервера: ответ, оборванный на его пределе, заменяется отказом переполнения. */
+  localContext?: number,
+  /** Локальный сервер: обрыв без конца ответа — «перегрузка» (клиент повторит), а не «ошибка сервера». */
+  retryableTail = false,
+): Promise<number> {
+  const cutFilter = localContext ? new ContextCutFilter(localContext, language) : undefined;
   response.writeHead(200, {
     'content-type': 'text/event-stream',
     'cache-control': 'no-cache',
@@ -1299,7 +1707,7 @@ async function streamNative(
     { stream: upstream },
     async (text) => {
       meter.push(text);
-      await write(response, restore.push(think.push(text)));
+      await write(response, restore.push(think.push(cutFilter ? cutFilter.push(text) : text)));
     },
     () => response.destroyed,
   );
@@ -1309,8 +1717,15 @@ async function streamNative(
   const tail =
     complete || upstreamError || response.destroyed
       ? ''
-      : nativeErrorFrame(`AgentDeck: ${TRUNCATED_MESSAGE}`, 'api_error', language);
-  response.end(restore.push(think.end()) + restore.end() + tail);
+      : nativeErrorFrame(
+          `AgentDeck: ${TRUNCATED_MESSAGE}`,
+          retryableTail ? 'overloaded_error' : 'api_error',
+          language,
+        );
+  response.end(
+    restore.push(think.push(cutFilter ? cutFilter.end() : '') + think.end()) + restore.end() + tail,
+  );
+  return cutFilter?.cutAt ?? 0;
 }
 
 /** Цельное тело с потолком собранного ответа; `undefined` — потолок превышен. */
@@ -1437,13 +1852,20 @@ function finishBroken(
   restore: ResponseStreamFilter,
   dialect: Dialect,
   message: string,
+  /** Не 502 — у локальной модели: «подождите», а не «сломалось». */
+  status = 502,
 ): void {
   if (response.destroyed || response.writableEnded) return;
   if (!response.headersSent) {
     respond(
       response,
-      502,
-      errorBody(dialect, `AgentDeck: ${message}`, 'api_error', translator.language),
+      status,
+      errorBody(
+        dialect,
+        `AgentDeck: ${message}`,
+        status === 502 ? 'api_error' : 'overloaded_error',
+        translator.language,
+      ),
     );
     return;
   }

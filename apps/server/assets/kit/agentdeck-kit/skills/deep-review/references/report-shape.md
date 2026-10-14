@@ -86,6 +86,11 @@ showing no trigger>". `Classes` answers axis-1 §Six miss classes the same way.
 ```
 </example>
 
+Every 🔴/🟡/❓ also carries **Code** (lines quoted from head), **How it was found** (numbered steps) and
+**How to reproduce** (command + expected vs actual) — the fields the forge card of
+[gitlab-publish.md](gitlab-publish.md) §5 is assembled from; a thread is built from the file, never
+rewritten.
+
 The thesis is a claim, not a topic; the evidence is pasted output; the fix is code. A security finding
 carries both marks and sits in the security block. A ❓ keeps the shape — the question in place of
 **Why it matters**, the settling investigation in place of the fix.

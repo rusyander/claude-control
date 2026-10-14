@@ -148,12 +148,14 @@ describe('bootstrap/tests-chat-wiring', () => {
     let claude: ((cwd: string) => string | undefined) | undefined;
     let foreign: ((cwd: string) => string | undefined) | undefined;
     let system: Parameters<ProviderChatService['setSystemNote']>[0] | undefined;
+    let limits: Parameters<ProviderChatService['setLocalLimits']>[0] | undefined;
     const wired = wireTestsChatNote({
       appData,
       chatRuns: { setWorkspaceNote: (fn) => (claude = fn) },
       providerChats: {
         setWorkspaceNote: (fn) => (foreign = fn),
         setSystemNote: (fn) => (system = fn),
+        setLocalLimits: (fn) => (limits = fn),
       },
     });
     expect(foreign?.(root)).toBe(claude?.(root));
@@ -165,6 +167,13 @@ describe('bootstrap/tests-chat-wiring', () => {
     expect(qwen?.QWEN_CODE_SYSTEM_SETTINGS_PATH).toContain(join(appData, 'qwen-note-layers'));
     expect(system?.('codex', 'QA note', {})).toBeUndefined();
     expect(system?.('claude', 'QA note', {})).toBeUndefined();
+    // Окно локальной модели — тоже только у Qwen и тем же файлом настроек.
+    const window = { contextWindow: 65_536, timeoutMs: 600_000, idleMs: 300_000 };
+    expect(limits?.('qwen', window, {})?.QWEN_CODE_SYSTEM_SETTINGS_PATH).toContain(
+      join(appData, 'qwen-limit-layers'),
+    );
+    expect(limits?.('codex', window, {})).toBeUndefined();
+    expect(limits?.('claude', window, {})).toBeUndefined();
   });
 
   it('конец хода: агент написал тест — кейс заведён; идёт прогон — сверка ждёт', () => {

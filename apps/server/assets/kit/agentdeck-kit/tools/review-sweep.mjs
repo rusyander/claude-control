@@ -4,6 +4,8 @@
 // skipped on !778 (lanes stopped at ~100 tool calls); a command's output cannot be skipped silently.
 //
 //   node review-sweep.mjs <cmd> --base <sha> [--head <sha>] [--repo <dir>] [--paths a,b] [--out <file>]
+//     --paths  comma/newline list; a path that matches no changed file = exit 2 (an unmatched scope sweeps 0 rows,
+//              which «zero rows is a result» would record as checked); the header prints «paths: N of M given matched»
 //     sweep    added lines × the regex tables of deep-review/references/{backend,data-deploy,frontend}.md;
 //              removed lines × what stopped happening (Close, Rollback, rows.Err, ctx, validation, LIMIT…)
 //     guards   guard census per function, base vs head: a count that dropped, a new handler with none
@@ -393,6 +395,55 @@ export function mutants(repo, head, d, test, max = 40) {
   return plan;
 }
 
+const GLOB = /[*?[]/;
+
+/**
+ * `--paths` against the files the diff really touches. Separators: comma or newline; whitespace inside an
+ * item is part of a path (`my docs/a.md`) unless the item matches nothing whole — then it is read as a
+ * space-separated list, longest-first so a directory with a space survives. A path that names no changed
+ * file is `unmatched`: a sweep over it prints 0 rows, and «zero rows is a result» would count an empty
+ * scan as a checked one (`--paths "a b c"` swept nothing, silently).
+ * `files` = the diff's file names; `viaGit(item)` answers a glob item (git owns pathspec magic).
+ */
+export function resolvePaths(raw, files, viaGit = () => 0) {
+  const clean = (s) =>
+    s
+      .trim()
+      .replace(/^(["'])(.*)\1$/, '$2')
+      .replace(/\\/g, '/')
+      .replace(/^\.\//, '');
+  const count = (p) =>
+    GLOB.test(p)
+      ? viaGit(p)
+      : files.filter((f) => f === p || f.startsWith(`${p.replace(/\/+$/, '')}/`)).length;
+  const paths = [];
+  const unmatched = [];
+  for (const item of String(raw).split(/[,\n]/).map(clean).filter(Boolean)) {
+    if (count(item)) {
+      paths.push(item);
+      continue;
+    }
+    const words = item.split(/\s+/);
+    if (words.length < 2) {
+      unmatched.push(item);
+      continue;
+    }
+    for (let i = 0; i < words.length;) {
+      let took = 0;
+      for (let j = words.length; j > i && !took; j--) {
+        const cand = words.slice(i, j).join(' ');
+        if (count(cand)) {
+          paths.push(cand);
+          took = j - i;
+        }
+      }
+      if (!took) unmatched.push(words[i]);
+      i += took || 1;
+    }
+  }
+  return { paths, unmatched };
+}
+
 function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const o = args(rest);
@@ -404,8 +455,49 @@ function main() {
   }
   const repo = path.resolve(o.repo ?? '.');
   const head = o.head ?? 'HEAD';
-  const paths = o.paths ? String(o.paths).split(',').filter(Boolean) : [];
+  // An unknown revision makes `git diff` print nothing: the sweep would report a clean diff of an empty one.
+  for (const rev of [o.base, head]) {
+    const ok = spawnSync(
+      'git',
+      ['-C', repo, 'rev-parse', '--verify', '--quiet', `${rev}^{commit}`],
+      {
+        encoding: 'utf8',
+      },
+    );
+    if (ok.status !== 0) {
+      console.error(
+        `review-sweep: ${rev} is not a commit in ${repo} — a sweep over an unreadable diff is not a clean one`,
+      );
+      return 2;
+    }
+  }
+  let paths = [];
+  let given = 0;
+  if (o.paths && o.paths !== true) {
+    const changed = git(repo, 'diff', '--name-only', '-z', '-M', o.base, head)
+      .split('\0')
+      .filter(Boolean);
+    const r = resolvePaths(
+      o.paths,
+      changed,
+      (p) =>
+        git(repo, 'diff', '--name-only', '-M', o.base, head, '--', p).split('\n').filter(Boolean)
+          .length,
+    );
+    given = r.paths.length + r.unmatched.length;
+    if (r.unmatched.length) {
+      console.error(
+        `review-sweep: --paths names no changed file in ${o.base}..${head}: ${r.unmatched.map((p) => JSON.stringify(p)).join(', ')} — swept 0 of ${given} given. ` +
+          'Separate paths with a comma or a newline; a path with spaces needs no quoting. Zero rows over an unmatched path is NOT a clean result.',
+      );
+      return 2;
+    }
+    paths = r.paths;
+  }
   const d = diffLines(repo, o.base, head, paths);
+  const scope = given
+    ? ` · paths: ${paths.length} of ${given} given matched, ${d.files.size} files swept`
+    : ` · ${d.files.size} files swept`;
   if (cmd === 'mutants') {
     const plan = mutants(repo, head, d, o.test, +(o.max ?? 40));
     const text = JSON.stringify(plan, null, 1);
@@ -442,7 +534,7 @@ function main() {
     return 2;
   }
   const text = [
-    `# review-sweep ${cmd} — ${o.base}..${head} · +${d.added.length} −${d.removed.length} lines · candidates, not findings`,
+    `# review-sweep ${cmd} — ${o.base}..${head} · +${d.added.length} −${d.removed.length} lines${scope} · candidates, not findings`,
     '',
     ...sections,
   ].join('\n');

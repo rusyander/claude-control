@@ -10,18 +10,21 @@
  * 4. Чат панели (`/chat/send`) отвечает тем же путём.
  * 5. Щелчок обратно: `settings.json` ровно тот, что был до включения.
  *
- * Модели — настоящая папка панели (`.local-models/models`, junction), а
- * состояние раздела — временное: отметка «Claude уведён» не попадает в
- * `state.json` стенда человека. `~/.claude` человека не трогается.
+ * Модели и сборка llama.cpp — настоящие папки панели (`.local-models/models`
+ * и `runtime`, junction), а состояние раздела — временная копия настоящего:
+ * отметка «Claude уведён» не попадает в `state.json` стенда человека, а
+ * перенесённые из Ollama модели в копии уже значатся. Нужна модель
+ * `LOCAL_SWITCH_TAG` (по умолчанию qwen3.6:27b-coding) среди скачанных или
+ * перенесённых. `~/.claude` человека не трогается.
  *
- * ЗАМОК: грузит модель ~17 ГБ в видеопамять. Без `ALLOW_OLLAMA=1` — «не
- * проверено», код 2. После прогона модель выгружается, сервер снимается,
- * видеопамять печатается (протокол владельца).
+ * ЗАМОК: грузит модель ~17 ГБ в видеопамять. Без `ALLOW_LOCAL_MODEL=1` (или
+ * прежнего `ALLOW_OLLAMA=1`) — «не проверено», код 2. После прогона сервер
+ * снимается, видеопамять печатается (протокол владельца).
  *
- * Запуск: ALLOW_OLLAMA=1 node tools/qa/check-claude-local-switch.mjs
+ * Запуск: ALLOW_LOCAL_MODEL=1 node tools/qa/check-claude-local-switch.mjs
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,16 +32,22 @@ import { chromium } from 'playwright';
 import { NotChecked, reporter, startStand, wait } from './throwaway-stand.mjs';
 
 const REPO = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const REAL_MODELS = join(REPO, '.local-models', 'models');
 const PORT = 11435;
 const IS_WIN = process.platform === 'win32';
 
-if (process.env.ALLOW_OLLAMA !== '1') {
-  console.log('Не проверено: нужен ALLOW_OLLAMA=1 (грузит локальную модель в видеопамять).');
+if (process.env.ALLOW_LOCAL_MODEL !== '1' && process.env.ALLOW_OLLAMA !== '1') {
+  console.log('Не проверено: нужен ALLOW_LOCAL_MODEL=1 (грузит локальную модель в видеопамять).');
   process.exit(2);
 }
-if (!existsSync(join(REAL_MODELS, 'manifests'))) {
-  console.log(`Не проверено: моделей панели нет (${REAL_MODELS}).`);
+const REAL_ROOT = join(REPO, '.local-models');
+const REAL_RUNTIME = join(REAL_ROOT, 'runtime');
+const REAL_STATE = join(REAL_ROOT, 'state.json');
+const model = process.env.LOCAL_SWITCH_TAG || 'qwen3.6:27b-coding';
+const realState = existsSync(REAL_STATE) ? JSON.parse(readFileSync(REAL_STATE, 'utf8')) : {};
+if (!existsSync(REAL_RUNTIME) || !realState.imported?.[model]) {
+  console.log(
+    `Не проверено: нет собранного llama.cpp (${REAL_RUNTIME}) или модели ${model} среди перенесённых (${REAL_STATE}).`,
+  );
   process.exit(2);
 }
 
@@ -65,59 +74,45 @@ const vram = () => {
     return 'nvidia-smi недоступен';
   }
 };
-const ps = async () => {
+const props = async () => {
   try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/api/ps`);
-    return res.ok ? ((await res.json()).models ?? []) : [];
+    const res = await fetch(`http://127.0.0.1:${PORT}/props`);
+    return res.ok ? await res.json() : undefined;
   } catch {
     return undefined;
   }
 };
 
-/** Протокол владельца: выгрузить модель, снять сервер, показать видеопамять. */
+/** Протокол владельца: снять сервер (память возвращается с процессом), показать видеопамять. */
 async function releaseGpu() {
-  for (const model of (await ps()) ?? []) {
-    await fetch(`http://127.0.0.1:${PORT}/api/generate`, {
-      method: 'POST',
-      body: JSON.stringify({ model: model.name, keep_alive: 0 }),
-    }).catch(() => undefined);
-  }
-  await wait(1500);
+  if (stand)
+    await stand.api('/local-models/server/stop', { method: 'POST' }).catch(() => undefined);
+  await wait(2500);
   console.log(
-    `  модели после выгрузки: ${JSON.stringify(((await ps()) ?? []).map((m) => m.name))}`,
+    `  сервер моделей после остановки: ${(await props()) ? 'ЕЩЁ ОТВЕЧАЕТ' : 'не отвечает'}`,
   );
-  if (IS_WIN) {
-    for (const image of ['ollama.exe', 'ollama app.exe']) {
-      spawnSync('taskkill', ['/IM', image, '/T', '/F'], { stdio: 'ignore' });
-    }
-    const left = spawnSync('tasklist', [], { encoding: 'utf8' }).stdout ?? '';
-    console.log(
-      `  процессов ollama осталось: ${left.split(/\r?\n/).filter((l) => /ollama/i.test(l)).length}`,
-    );
-  }
-  await wait(1500);
   console.log(`  видеопамять после: ${vram()}`);
 }
 
 const localRoot = mkdtempSync(join(tmpdir(), 'cc-local-switch-'));
-// Junction на настоящую папку моделей: 17 ГБ не копируются, а состояние раздела своё.
-if (IS_WIN) {
-  execFileSync('cmd', ['/c', 'mklink', '/J', join(localRoot, 'models'), REAL_MODELS], {
-    stdio: 'ignore',
-  });
-} else {
-  execFileSync('ln', ['-s', REAL_MODELS, join(localRoot, 'models')]);
+// Junction на настоящие модели и сборку: гигабайты не копируются, а состояние раздела своё.
+const LINKS = ['models', 'runtime'];
+for (const name of LINKS) {
+  if (IS_WIN) {
+    execFileSync('cmd', ['/c', 'mklink', '/J', join(localRoot, name), join(REAL_ROOT, name)], {
+      stdio: 'ignore',
+    });
+  } else {
+    execFileSync('ln', ['-s', join(REAL_ROOT, name), join(localRoot, name)]);
+  }
 }
+// В копии — только проверяемая модель: переключатель берёт первую из установленных.
+writeFileSync(
+  join(localRoot, 'state.json'),
+  JSON.stringify({ ...realState, imported: { [model]: realState.imported[model] } }),
+);
 // Стенд не наследует AGENTDECK_* (увели бы его в каталоги человека) — только явным env.
-const REAL_STATE = join(REPO, '.local-models', 'state.json');
 const realStateBefore = existsSync(REAL_STATE) ? readFileSync(REAL_STATE, 'utf8') : null;
-const model = readdirSync(join(REAL_MODELS, 'manifests', 'registry.ollama.ai', 'library'))
-  .flatMap((name) =>
-    readdirSync(join(REAL_MODELS, 'manifests', 'registry.ollama.ai', 'library', name)).map(
-      (tag) => `${name}:${tag}`,
-    ),
-  )
-  .at(0);
 console.log(`Модель: ${model}; видеопамять до: ${vram()}`);
 
 const { check, failed } = reporter();
@@ -183,11 +178,11 @@ try {
       cli.stdout?.includes(word),
       `${cli.status} ${cli.stdout?.slice(0, 300)} ${cli.stderr?.slice(0, 300)}`,
     );
-    const loaded = (await ps()) ?? [];
+    const served = await props();
     check(
       'ответ дал локальный сервер: модель загружена в нём',
-      loaded.some((item) => item.name === model),
-      JSON.stringify(loaded.map((item) => item.name)),
+      served?.model_alias === model,
+      JSON.stringify(served?.model_alias ?? null),
     );
 
     // Чат панели: ответ на отправку — поток прогона до конца.
@@ -258,14 +253,16 @@ ${stand.log().slice(-3000)}`);
   }
 } finally {
   if (browser) await browser.close();
-  // Сервер моделей, поднятый панелью стенда, держит его каталог: сперва он.
+  // Сервер моделей, поднятый панелью стенда, держит каталог стенда: сперва он.
   await releaseGpu();
   if (stand) await stand.stop().catch((error) => console.log(`  ! стенд: ${error.code ?? error}`));
   // Сначала junction (rmdir не идёт внутрь), потом остальное.
-  if (IS_WIN) spawnSync('cmd', ['/c', 'rmdir', join(localRoot, 'models')], { stdio: 'ignore' });
-  else rmSync(join(localRoot, 'models'), { force: true });
-  // Рекурсивное удаление — только когда junction уже снят: иначе ушли бы модели.
-  if (!existsSync(join(localRoot, 'models'))) {
+  for (const name of LINKS) {
+    if (IS_WIN) spawnSync('cmd', ['/c', 'rmdir', join(localRoot, name)], { stdio: 'ignore' });
+    else rmSync(join(localRoot, name), { force: true });
+  }
+  // Рекурсивное удаление — только когда junction'ы сняты: иначе ушли бы модели.
+  if (!LINKS.some((name) => existsSync(join(localRoot, name)))) {
     rmSync(localRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   } else console.log(`  ! junction не снят, каталог оставлен: ${localRoot}`);
   if (project) {

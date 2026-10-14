@@ -3,11 +3,17 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Group } from '@agentdeck/contracts';
+import { reviewLinkPrompt } from '@agentdeck/contracts/model-cascade';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { projectKey, updateGroupSources } from '../../../lib/app-store/group-sources.ts';
 import { createChat } from '../../provider-chat/store/store.ts';
-import { chatKnobsLine, foreignChildExtra, runPathSteps } from './group-run-lines.ts';
+import {
+  chatKnobsLine,
+  childStageExtra,
+  foreignChildExtra,
+  runPathSteps,
+} from './group-run-lines.ts';
 
 /**
  * F-107, соседи остатка (V-fix-D): закрепление, сделанное, пока его сторона
@@ -128,5 +134,36 @@ describe('строки группы прогона сверяют закрепл
     expect(
       runPathSteps(store, appData, ['pinned'], 'review', undefined).map((one) => one.id),
     ).toEqual(['global-side']);
+  });
+});
+
+describe('правила ревью, переживающие сжатие контекста (T17, T4)', () => {
+  it('ревью несёт формат карточки, схему следа требований и правило про ASK; работа — нет', () => {
+    const review = childStageExtra('review', undefined);
+    expect(review).toContain('finding-card format');
+    expect(review).toContain('re-read the finding-card format');
+    expect(review).toContain('"id":"owner-1"');
+    expect(review).toContain('"ASK: N rounds > 6"');
+    expect(review).toContain('never fewer diff lines per agent');
+    expect(childStageExtra('work', undefined)).not.toContain('finding-card');
+    expect(childStageExtra('fix', undefined)).toBe('');
+  });
+
+  it('дописка не зависит от задания: одна и та же строка у каждого, кто её строит', () => {
+    expect(childStageExtra('review', 'числа группы')).toBe(
+      `${childStageExtra('review', undefined)} числа группы`,
+    );
+    expect(childStageExtra('review', undefined)).toBe(childStageExtra('review', undefined));
+  });
+});
+
+describe('ASK планировщика ревью в группе без человека (T4)', () => {
+  it('задание ревью по ссылке называет решение заранее и бюджет спавнов от плана', () => {
+    const prompt = reviewLinkPrompt({ url: 'https://tracker.example.com/x/-/merge_requests/1' });
+    expect(prompt).toContain('Nobody answers questions in this group');
+    expect(prompt).toContain('MORE agents per round');
+    expect(prompt).toContain('do not tune --chunk or --per-round');
+    expect(prompt).toContain('the agents of every round plus the verifiers');
+    expect(prompt).toContain('name in "uncovered"');
   });
 });

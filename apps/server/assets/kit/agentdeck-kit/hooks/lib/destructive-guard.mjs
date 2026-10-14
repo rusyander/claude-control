@@ -22,10 +22,15 @@
 // directory, no glob, no `-f`, no switch), and a delete of files THIS session created (Write tool or a
 // shell redirect in the transcript) that git does not track. A tracked file, a directory, a file the
 // session never wrote, the main clone, a branch with no tracker key — the ordinary doors.
+//
+// A scratch clone or worktree the session made itself (`git worktree add`, `git clone` in the
+// transcript, `scratch-zone.mjs`) is an agent zone like a temp dir: deletes, `git clean` and discards
+// inside it need no yes. Never the cwd, its ancestors, the main repo, home or a drive root.
 import { consentGate, ASK_THE_USER } from './consent.mjs';
 import { commandText, executedText } from './shell-text.mjs';
 import { readTail, sinceLastCompact } from './transcript.mjs';
 import { shellWords, gitCall, ownSplitAt, slash } from './split-worktree.mjs';
+import { inScratchZone } from './scratch-zone.mjs';
 import path from 'node:path';
 import { readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -196,7 +201,7 @@ export default function destructiveGuard(input) {
         const rest = simpleCommand(command, m.index);
         if (unless?.test(original.slice(m.index, m.index + rest.length))) return false;
         return !targets(original, m, rest.length, input).every(
-          (t) => inAgentZone(t) || ownScratch(t, input),
+          (t) => inAgentZone(t) || ownScratch(t, input) || inScratchZone(t, input),
         );
       });
       if (!hit) continue;
@@ -204,6 +209,11 @@ export default function destructiveGuard(input) {
       if (!re.test(command)) continue;
       if (tempText && TEMP_TEXT.test(original)) continue;
       if (id === 'git-discard' && ownWorktreeDiscard(command, original, re, input)) continue;
+      if (
+        (id === 'git-discard' || id === 'git-clean') &&
+        inScratchClone(command, original, re, input)
+      )
+        continue;
     }
     return consentGate(input, {
       marker: `destructive-guard(${id})`,
@@ -407,6 +417,21 @@ function ownWorktreeDiscard(command, original, re, input) {
       calls.every(({ m }) =>
         fileDiscardInOwnWorktree(gitCall(original, m.index, input?.cwd), input),
       )
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Every matching git call runs inside a clone or worktree this session made — nothing there is the user's. */
+function inScratchClone(command, original, re, input) {
+  try {
+    const calls = [...command.matchAll(/\bgit\s/g)]
+      .map((m) => ({ m, simple: command.slice(m.index).match(/^[^\n|;&)]*/)[0] }))
+      .filter(({ simple }) => new RegExp(re.source, re.flags.replace('g', '')).test(simple));
+    return (
+      calls.length > 0 &&
+      calls.every(({ m }) => inScratchZone(gitCall(original, m.index, input?.cwd)?.dir, input))
     );
   } catch {
     return false;

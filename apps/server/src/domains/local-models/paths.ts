@@ -1,24 +1,33 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { KitMode, LocalDevice, ModelBench } from '@agentdeck/contracts/local-models';
+import type {
+  KitMode,
+  LocalDevice,
+  ModelBench,
+  ModelChoiceInfo,
+} from '@agentdeck/contracts/local-models';
 import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import type { McpCostRecord } from './local-mcp.ts';
 
 /**
  * Всё локальное — в ОДНОМ каталоге внутри панели: `<корень приложения>/.local-models`.
  *
- * Внутри панели, а не в `~/.ollama` и не в профиле пользователя, по слову
+ * Внутри панели, а не в `~/.cache` и не в профиле пользователя, по слову
  * владельца: человек должен видеть, где лежат гигабайты, и убирать их одной
  * кнопкой (или удалением папки), не вспоминая, какая программа куда что
  * положила. Каталог в `.gitignore`.
  */
 export const LOCAL_MODELS_DIR = '.local-models';
-/** Порт нашего сервера моделей. Не 11434: тот принадлежит Ollama пользователя, если он стоит. */
+/** Порт нашего сервера моделей. Не 11434: тот принадлежит Ollama пользователя, если он стоит; панель её не трогает. */
 export const LOCAL_SERVER_PORT = 11435;
 
 export interface LocalPaths {
   root: string;
   runtime: string;
+  /** GGUF-файлы: `<репозиторий>/<файл>.gguf`; рядом `ollama-import/` и прежнее хранилище Ollama (`blobs/`, `manifests/`). */
   models: string;
+  /** Жёсткие ссылки на слои моделей Ollama, которые открыл llama.cpp. */
+  ollamaImport: string;
   downloads: string;
   tools: string;
   logs: string;
@@ -26,6 +35,8 @@ export interface LocalPaths {
   state: string;
   pidFile: string;
   serverLog: string;
+  /** Каталог слотов сервера (`--slot-save-path`): без него `POST /slots/0?action=erase` отвечает 501. */
+  slotsDir: string;
 }
 
 export function localPaths(appRoot: string, env: NodeJS.ProcessEnv = process.env): LocalPaths {
@@ -36,13 +47,15 @@ export function localPaths(appRoot: string, env: NodeJS.ProcessEnv = process.env
     root,
     runtime: join(root, 'runtime'),
     models: join(root, 'models'),
+    ollamaImport: join(root, 'models', 'ollama-import'),
     downloads: join(root, 'downloads'),
     tools: join(root, 'tools'),
     logs: join(root, 'logs'),
     run: join(root, 'run'),
     state: join(root, 'state.json'),
-    pidFile: join(root, 'run', 'ollama.json'),
-    serverLog: join(root, 'logs', 'ollama.log'),
+    pidFile: join(root, 'run', 'llama.json'),
+    serverLog: join(root, 'logs', 'llama.log'),
+    slotsDir: join(root, 'run', 'slots'),
   };
 }
 
@@ -51,27 +64,63 @@ export function ensureDirs(paths: LocalPaths): void {
     paths.root,
     paths.runtime,
     paths.models,
+    paths.ollamaImport,
     paths.downloads,
     paths.tools,
     paths.logs,
     paths.run,
+    paths.slotsDir,
   ]) {
     mkdirSync(dir, { recursive: true });
   }
 }
 
+/** Что человек выбрал для модели; не названное подбирается под карту. */
+export type ModelChoice = ModelChoiceInfo;
+
+/** Модель из хранилища Ollama, которую открыл llama.cpp: файл — жёсткая ссылка на слой. */
+export interface ImportedModel {
+  /** Путь файла относительно `models/`. */
+  file: string;
+  sizeBytes: number;
+  /** В файле есть слой предсказания нескольких токенов (`nextn_predict_layers` > 0). */
+  mtp: boolean;
+  importedAt: string;
+}
+
 /** Что раздел помнит между запусками панели. */
 export interface LocalState {
-  /** Версия сервера, как ответил `/api/version`, по пути исполняемого файла. */
-  versions: Record<string, string>;
-  /** Взять свою копию сервера, даже если в системе стоит своя. */
-  preferPanelRuntime: boolean;
   bench: Record<string, ModelBench>;
+  /** Выбор квантования, контекста и кеша по моделям. */
+  choices: Record<string, ModelChoice>;
+  imported: Record<string, ImportedModel>;
+  /**
+   * Модели, добавленные по имени репозитория («Любая модель»): запись в форме
+   * каталога (её разбирает схема каталога при каждом чтении), ключ — тег.
+   */
+  custom: Record<string, Record<string, unknown>>;
+  /** Итог пробы инструментов при подключении модели агентам: `ok` или `failed`. */
+  tools: Record<string, 'ok' | 'failed'>;
+  /** Модели Ollama, которых llama.cpp не открыл, и почему: их предлагается скачать заново. */
+  importFailed: Record<string, string>;
   kit: { claude: KitMode; qwen: KitMode; variant: 'standard' | 'local' };
   /** Где считать: видеокарта (умолчание) или процессор. */
   device: LocalDevice;
   /** Claude Code уведён на локальную модель; нет записи — выключено. */
   claude?: ClaudeSwitchRecord;
+  /** «Держать загруженной»: простой не выгружает модель из памяти (умолчание — выгружать). */
+  keepLoaded: boolean;
+  /** Не давать ОС уснуть, пока идёт локальный прогон (умолчание — да). */
+  keepAwake: boolean;
+  /**
+   * Настройка сохранена, а перезапуск сервера ждёт конца прогона. В файле, а не в памяти: после
+   * перезапуска панели среди ночи идущий сервер иначе остался бы на старой настройке.
+   */
+  pendingRestart?: true;
+  /** MCP-серверы, взятые в локальный прогон, по проектам (ключ — `projectKeyOf`); нет записи — ни одного. */
+  mcpPicks: Record<string, string[]>;
+  /** Замеренная цена инструментов сервера в токенах, по `scope:id`. */
+  mcpCosts: Record<string, McpCostRecord>;
 }
 
 /**
@@ -99,11 +148,18 @@ export interface ClaudeModelPicker {
 
 export function defaultState(): LocalState {
   return {
-    versions: {},
-    preferPanelRuntime: false,
     bench: {},
+    choices: {},
+    imported: {},
+    custom: {},
+    tools: {},
+    importFailed: {},
     kit: { claude: 'global', qwen: 'global', variant: 'local' },
     device: 'gpu',
+    keepLoaded: false,
+    keepAwake: true,
+    mcpPicks: {},
+    mcpCosts: {},
   };
 }
 
@@ -113,17 +169,43 @@ export function readState(paths: LocalPaths): LocalState {
     const raw = JSON.parse(readFileSync(paths.state, 'utf8')) as Partial<LocalState>;
     const base = defaultState();
     return {
-      versions: raw.versions ?? base.versions,
-      preferPanelRuntime: raw.preferPanelRuntime ?? base.preferPanelRuntime,
       bench: raw.bench ?? base.bench,
+      choices: raw.choices ?? base.choices,
+      imported: raw.imported ?? base.imported,
+      custom: raw.custom ?? base.custom,
+      tools: raw.tools ?? base.tools,
+      importFailed: raw.importFailed ?? base.importFailed,
       kit: { ...base.kit, ...(raw.kit ?? {}) },
       device: raw.device === 'cpu' ? 'cpu' : 'gpu',
+      keepLoaded: raw.keepLoaded === true,
+      keepAwake: raw.keepAwake !== false,
+      ...(raw.pendingRestart === true ? { pendingRestart: true as const } : {}),
+      mcpPicks: picksOf(raw.mcpPicks),
+      mcpCosts: isRecord(raw.mcpCosts) ? raw.mcpCosts : base.mcpCosts,
       ...(raw.claude ? { claude: raw.claude } : {}),
     };
   } catch {
     // Испорченный файл состояния не должен запирать раздел: начинаем с умолчаний.
     return defaultState();
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Выбор MCP читается на старте каждого локального прогона: запись не той формы
+ * (правка руками, прежний формат) уронила бы сам прогон. Берутся только списки строк.
+ */
+function picksOf(value: unknown): LocalState['mcpPicks'] {
+  if (!isRecord(value)) return {};
+  const picks: LocalState['mcpPicks'] = {};
+  for (const [project, ids] of Object.entries(value)) {
+    if (Array.isArray(ids))
+      picks[project] = ids.filter((id): id is string => typeof id === 'string');
+  }
+  return picks;
 }
 
 export function writeState(paths: LocalPaths, state: LocalState): void {

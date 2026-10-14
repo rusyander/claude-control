@@ -32,6 +32,7 @@ export const platformDrivers = [
   'litellm',
   'vllm',
   'ollama',
+  'llama-cpp',
   'openrouter',
   'azure-openai',
   'dashscope',
@@ -248,6 +249,16 @@ export const PLATFORM_PRESETS: Record<PlatformDriverId, PlatformDriverPreset> = 
     defaults: { toolShim: false, contourPrompt: false },
     manifest: { anthropicMessages: 'messages' },
     source: 'https://docs.ollama.com/api/anthropic-compatibility',
+  },
+  'llama-cpp': {
+    base: 'openai-compat',
+    title: 'llama.cpp',
+    sampleUrl: 'http://127.0.0.1:8080/v1',
+    defaults: { toolShim: false, contourPrompt: false },
+    // `llama-server` отвечает на Anthropic Messages сам (`/v1/messages`, инструменты
+    // — при `--jinja`), поэтому клиенту Claude Code перевод не нужен.
+    manifest: { anthropicMessages: 'messages' },
+    source: 'https://github.com/ggml-org/llama.cpp/tree/master/tools/server',
   },
   openrouter: {
     base: 'openai-compat',

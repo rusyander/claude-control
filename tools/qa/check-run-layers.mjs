@@ -359,6 +359,9 @@ function factsOf(body) {
     kitSkill: text.includes(MARK.kitSkill),
     text,
     tools,
+    // Размер запроса по слоям — для облегчённого набора локальной модели (L1b).
+    chars: JSON.stringify(body).length,
+    toolChars: JSON.stringify(body.tools ?? []).length,
   };
 }
 
@@ -931,6 +934,43 @@ ${MARK.ancestor}
         'набор «только наш»: ни личного навыка, ни личного хука',
       );
       check(kitOurs.facts.project, 'набор «только наш»: проектный CLAUDE.md остаётся');
+    }
+    // ── 11. Облегчённый набор локальной модели (L1b) ──────────────────────────
+    // Слои берутся у ТОГО ЖЕ `localLeanRules`, которым панель заводит контур
+    // локальной модели: копия списка здесь проверяла бы сама себя. Полный набор —
+    // контроль: без него «Cron* нет в запросе» могло бы значить, что этой версии
+    // CLI их не было вовсе. Мера — тело запроса: правила и скиллы человека обязаны
+    // остаться (они «достижимы»), а запрос — стать заметно короче.
+    const { localLeanRules } =
+      await import('../../apps/server/src/domains/local-models/connect.ts');
+    const lean = await runCase('lean', localLeanRules());
+    check(Boolean(lean.facts), 'облегчённый набор: запрос записан');
+    if (lean.facts && full.facts) {
+      const has = (facts, name) => facts.tools.includes(name);
+      for (const name of ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep']) {
+        check(has(lean.facts, name), `облегчённый набор: рабочий инструмент ${name} на месте`);
+      }
+      const extras = ['CronCreate', 'ScheduleWakeup', 'Workflow', 'SendMessage', 'EnterWorktree'];
+      check(
+        extras.some((name) => has(full.facts, name)),
+        'контроль: в полном наборе расширенные инструменты (Cron*, Workflow…) есть',
+      );
+      check(
+        extras.every((name) => !has(lean.facts, name)),
+        'облегчённый набор: расширенных инструментов нет',
+      );
+      check(!lean.facts.mcp && !lean.facts.projectMcp, 'облегчённый набор: MCP-серверов нет');
+      check(lean.facts.rules, 'облегчённый набор: личные правила на месте');
+      check(lean.facts.hook, 'облегчённый набор: хук личных настроек на месте');
+      check(lean.facts.skill, 'облегчённый набор: личные скиллы на месте (достижимы)');
+      check(lean.facts.project, 'облегчённый набор: проектный CLAUDE.md на месте');
+      check(
+        lean.facts.toolChars < full.facts.toolChars / 2,
+        `облегчённый набор: схемы инструментов ${lean.facts.toolChars} знаков вместо ${full.facts.toolChars}`,
+      );
+      console.log(
+        `     тело запроса: полный набор ${full.facts.chars} знаков, облегчённый ${lean.facts.chars}`,
+      );
     }
   } finally {
     stub.close();

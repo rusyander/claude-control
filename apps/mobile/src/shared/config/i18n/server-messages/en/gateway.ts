@@ -100,6 +100,15 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
   'gateway-redirect-to':
     'The contour answered with a redirect to {{where}} ({{status}}) — the panel did not follow it: the request would have gone to another address. Put the address it redirects to into the contour settings',
   'gateway-headers-timeout': 'The contour did not start answering within {{seconds}} s',
+  'gateway-headers-timeout-local':
+    'The local model did not start answering within {{seconds}} s: a long prompt takes longer to process than allowed. Compact the history (/compact) or start a new chat',
+  'gateway-local-restarting':
+    'The model server is restarting after a failure — the request will be retried automatically',
+  'gateway-local-stopped':
+    'The model server is stopped — start it in the “Local models” section and the run will continue on its own',
+  'gateway-local-down':
+    'The model server is not answering: {{reason}}. Start it in the “Local models” section — the run will continue on its own',
+  'gateway-local-down-unknown': 'no reason given',
   'gateway-cert-failed':
     'The contour certificate did not verify: {{reason}}. Set the company root certificate in the contour settings',
   'gateway-no-connection': 'No connection to the contour: {{reason}}',

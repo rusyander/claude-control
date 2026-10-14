@@ -104,6 +104,7 @@ describe('новый контур', () => {
           skills: true,
           mcp: true,
           systemPrompt: true,
+          tools: true,
         },
       },
       caCertPath: '',

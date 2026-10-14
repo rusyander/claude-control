@@ -413,6 +413,8 @@ function withoutRoute(options: RunOptions): RunOptions {
     platformSystemPrompt: _prompt,
     platformArgs: _args,
     platformDropAppend: _drop,
+    platformAppend: _append,
+    platformMcp: _mcp,
     ...rest
   } = options;
   return rest;

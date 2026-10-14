@@ -31,6 +31,7 @@ import {
 } from '../../project-git/project-git.ts';
 import { describeGaps, readinessForCwd, repairCopy } from '../../project-git/copy-readiness.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import type { ReviewStand, ReviewStandContainer } from '../review-stand/review-stand.ts';
 
 /**
  * Разделение списка задач по нескольким чатам: под каждую группу — своя ветка,
@@ -101,6 +102,13 @@ export interface SplitGit {
     dir: string,
     target: MergeRequestBranch,
   ): Promise<SplitCopy & { detached: boolean }>;
+  /**
+   * Стенд и база для ревью MR (T5, T7): абзац для задания и, если панель подняла
+   * одноразовую базу, её контейнер. Не бросает; нет метода — абзаца нет.
+   */
+  reviewEnvironment?(dir: string, copy: string, groupKey: string): Promise<ReviewStand | undefined>;
+  /** Убрать контейнер, поднятый `reviewEnvironment`, когда группа не стартовала. */
+  releaseReviewStand?(container: ReviewStandContainer, copy: string): Promise<void>;
 }
 
 /**
@@ -113,8 +121,11 @@ export function makeSplitGit(
   bootstrapFor?: (dir: string, copy: string) => Promise<WorktreeBootstrapState | undefined>,
   /** Путь к `.claude.json`: копия разделения получает запись доступа оригинала. */
   claudeJsonPath?: string,
+  /** Стенд и база для ревью: подставляет маршрут, у которого есть docker и реестр запусков. */
+  stands?: Pick<SplitGit, 'reviewEnvironment' | 'releaseReviewStand'>,
 ): SplitGit {
   return {
+    ...(stands ?? {}),
     ...(bootstrapFor ? { bootstrap: bootstrapFor } : {}),
     isRepo: isGitRepo,
     async takenBranches(dir) {
@@ -530,6 +541,25 @@ export async function splitTasks({
     claimBranch?.(index, branch, isWorktree ? cwd : undefined);
   }
 
+  // Стенд и база ревью (T5, T7) поднимаются рядом с подготовкой копии: обе ждут
+  // долго, и друг от друга не зависят.
+  const stands = await Promise.all(
+    prepared.map(async (item) => {
+      if (!item.review || !item.isWorktree || !git.reviewEnvironment) return undefined;
+      try {
+        return await git.reviewEnvironment(projectPath, item.cwd, `${stamp}-${item.index}`);
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+  const dropStand = (position: number): void => {
+    const stand = stands[position];
+    const item = prepared[position];
+    if (stand?.container && item)
+      void git.releaseReviewStand?.(stand.container, item.cwd).catch(() => undefined);
+  };
+
   const bootstraps = await Promise.all(
     prepared.map(async (item) => {
       if (!item.isWorktree || !git.bootstrap) return undefined;
@@ -559,7 +589,9 @@ export async function splitTasks({
     const { index, group, branch, cwd, isWorktree, mirror, review: target } = item;
     const bootstrap = bootstraps[position];
     const gaps = unready[position];
+    const stand = stands[position];
     if (gaps) {
+      dropStand(position);
       failures.push({
         index,
         title: group.title,
@@ -590,6 +622,7 @@ export async function splitTasks({
           tasks: group.tasks,
           ...(proposal.shared ? { shared: proposal.shared } : {}),
           ...(review.publish ? { publish: true } : {}),
+          ...(stand?.text ? { environment: stand.text } : {}),
         })
       : target
         ? `${mergeRequestWorkPreamble({
@@ -637,6 +670,7 @@ export async function splitTasks({
     // помнила бы ключ, которого в истории никогда не появится.
     const chatId = `new-${stamp}-${index}`;
     if (startRuns && startable && !startable(index)) {
+      dropStand(position);
       // Ни связи, ни чата: разговора не было, и в дереве ему взяться неоткуда.
       chats.push({
         index,
@@ -691,6 +725,7 @@ export async function splitTasks({
         })
       : false;
 
+    if (!started) dropStand(position);
     chats.push({
       index,
       title: group.title,
@@ -701,6 +736,7 @@ export async function splitTasks({
       started,
       prompt,
       stage: groupStage,
+      ...(stand?.container && started ? { reviewStand: stand.container } : {}),
       ...(assignment
         ? {
             model: assignment.model,

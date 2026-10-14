@@ -1193,6 +1193,13 @@ export const en: TranslationSchema = {
             duplicate: 'instructions loaded twice',
           },
         },
+        reviewClose: {
+          dirt: 'a review must not edit, yet files changed in the copy: {{count}} — {{list}}',
+          more: ' and {{count}} more',
+          scratchRemoved: 'the group scratch copy was removed: {{path}}',
+          scratchKept: 'a scratch copy was left: {{path}} ({{why}})',
+          standRemoved: 'the throwaway review database was removed',
+        },
         interruptedAt: 'process cut short at {{time}}',
         interruptResumes: 'resumed by the panel: {{count}}',
         autoNotices: 'Allowed automatically: {{list}}',
@@ -1527,6 +1534,8 @@ export const en: TranslationSchema = {
         unreported: 'the reviewer did not report what it read and how much',
         partial: 'only part of the diff was read',
         entries: 'high risk, yet the review had one entry point — two are needed (diff and frame)',
+        trace:
+          "the requirement-trace block is missing or could not be parsed — the owner's points were not checked",
       },
       witness: 'Second independent pass over an empty review',
       pushBlocked: 'The fixes cannot be pushed to the MR: the MR branch is unknown',
@@ -1699,6 +1708,28 @@ export const en: TranslationSchema = {
     localLocked:
       'Claude Code is switched to the local model "{{title}}": it answers whatever model you pick. Turn it off in the Local models section.',
     localCaption: 'The local model {{title}} answers — Claude Code is switched to it',
+    localMcp: {
+      button: 'MCP: {{count}}',
+      hint: 'MCP servers that go to the local model in this project. None by default: each takes room in its small window.',
+      title: 'MCP servers of the local run',
+      what: 'The local model runs without MCP servers: their descriptions take window space (one GitLab server is about 15k tokens). Tick only what you need; the choice is remembered for the project and applies from the next message.',
+      empty: 'No enabled MCP servers in the settings or in the project .mcp.json.',
+      loadError: 'Could not read the project MCP servers',
+      noRoom: 'Does not fit: too little window would be left for the conversation',
+      noCost:
+        'No cost yet: measure the server first, otherwise there is no telling whether it fits',
+      cost: '{{tokens}} · {{tools}} tools',
+      costEstimate: '~{{tokens}} · {{tools}} tools',
+      unmeasured: 'not measured',
+      measuring: 'counting…',
+      failed: 'not responding',
+      headroom:
+        'Window {{context}}: {{headroom}} tokens left for the conversation before history is compacted',
+      overflow:
+        'Window {{context}}: {{headroom}} tokens short — history will be compacted on every turn',
+      remeasure: 'Measure again',
+      pickedCaption: 'MCP by choice: {{list}}.',
+    },
     platformEffortOff: 'not sent',
     platformRefused:
       'The "{{title}}" contour is required, but {{reason}}: the message will be refused — it goes neither to the contour nor to the vendor cloud. {{fix}}',
@@ -1718,7 +1749,8 @@ export const en: TranslationSchema = {
     platformLayers: 'Through the "{{title}}" contour the run goes without ours: {{list}}.',
     platformLayersAll:
       'Through the "{{title}}" contour the run goes without a single layer of ours: no rules, no ' +
-      'hooks, no permissions, no skills, no MCP servers, no addition from the panel.',
+      'hooks, no permissions, no skills, no MCP servers, no addition from the panel, and with a ' +
+      'trimmed tool set.',
     taskNotice: {
       completed: 'Background command finished',
       failed: 'Background command failed',
@@ -3067,6 +3099,7 @@ export const en: TranslationSchema = {
       litellm: 'LiteLLM',
       vllm: 'vLLM',
       ollama: 'Ollama',
+      'llama-cpp': 'llama.cpp',
       openrouter: 'OpenRouter',
       'azure-openai': 'Azure OpenAI',
       dashscope: 'DashScope (Qwen)',
@@ -3082,6 +3115,8 @@ export const en: TranslationSchema = {
       vllm: 'vLLM server. The Anthropic client goes to the native /v1/messages; thinking is switched with the chat_template_kwargs.enable_thinking field. vLLM accepts tools as a request field only when started with --enable-auto-tool-choice and --tool-call-parser — otherwise turn the tool shim on.',
       ollama:
         'Ollama. The Anthropic client goes to its native /v1/messages, the OpenAI client to /v1/chat/completions. Only models trained for tool calls accept tools as a field; turn the shim on for the rest.',
+      'llama-cpp':
+        'llama.cpp (llama-server). The Anthropic client goes to its native /v1/messages, the OpenAI client to /v1/chat/completions. llama-server accepts tools as a field when started with --jinja (the way the panel starts it).',
       openrouter:
         'OpenRouter. The Anthropic client goes to the native /v1/messages, the OpenAI client to /chat/completions. The key comes from your OpenRouter account.',
       'azure-openai':
@@ -3619,6 +3654,7 @@ export const en: TranslationSchema = {
       skills: 'Skills',
       mcp: 'MCP servers',
       systemPrompt: "The panel's addition to the system prompt",
+      tools: 'Full Claude Code tool set',
     },
     layerText: {
       settings:
@@ -3641,6 +3677,12 @@ export const en: TranslationSchema = {
         'What the panel adds of its own: initiatives, task splitting, session continuation. The ' +
         'panel drops it itself — the CLI has no flag for that, which is why it is absent from the ' +
         'flag list.',
+      tools:
+        'The CLI’s built-in tools. Unticked, the request keeps the working ones: Bash, Read, Edit, ' +
+        'Write, Glob, Grep, WebFetch, Skill, Agent, TodoWrite (the `--tools` flag); schedules, ' +
+        'worktrees, broadcasts, workflows and the rest go, about 11k tokens on every request. ' +
+        'For small-window models; the local contour is created with it unticked. The master ' +
+        'switch does not govern it: it is not from `~/.claude`.',
     },
     layersFlags: 'The run will carry the flags: {{args}}',
     layersFlagsNone: 'No flags — everything of ours travels into the run.',
@@ -6774,7 +6816,7 @@ export const en: TranslationSchema = {
       bootstrapCommand: 'Command after creating a copy',
       bootstrapCommandPlaceholder: 'pnpm install --frozen-lockfile --prefer-offline',
       bootstrapCommandHint:
-        'Runs in the copy before the agent starts, 10-minute ceiling, through the system shell with CI=1. Empty — the panel decides by lockfiles: in the root pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci --prefer-offline --no-audit --no-fund, yarn.lock → yarn install --immutable; none in the root — the same in each first-level folder (frontend/, web/…), up to four at once; a local library (file:) whose entry is not built in the copy is built with its build script. No lockfile — nothing',
+        'Runs in the copy before the agent starts, 10-minute ceiling, through the system shell with CI=1. Empty — the panel decides by lockfiles: in the root pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci --prefer-offline --no-audit --no-fund, yarn.lock → yarn install --immutable; none in the root — the same in each first-level folder (frontend/, web/…), up to four at once; a local library (file:) whose entry is not built in the copy is built with its build script. No lockfile — nothing. The Node version comes from .nvmrc, .node-version, .tool-versions, volta or engines and the install runs on it when the machine has it; a Python service gets a .venv on the right version and pip install from requirements*.txt (or uv sync with uv.lock), a Go module gets its cache warmed (go mod download) — these two steps never fail the preparation. A command set above turns all auto-detection off',
       bootstrapTitle: 'Copy preparation',
       bootstrap: {
         running: 'installing',
@@ -6789,6 +6831,16 @@ export const en: TranslationSchema = {
       bootstrapEmptyLog: 'Nothing yet',
       bootstrapRerun: 'Retry install',
       bootstrapReverted: 'Lockfiles rewritten by the install were reverted: {{files}}',
+      bootstrapFirstError: 'First error: {{line}}',
+      bootstrapRuntime: {
+        ok: '{{tool}}{{where}}: the project asks for {{wanted}} ({{source}}) — {{used}} fits',
+        switched:
+          '{{tool}}{{where}}: the project asks for {{wanted}} ({{source}}) — prepared on {{used}}, not on {{found}}',
+        missing:
+          '⚠ {{tool}}{{where}}: the project asks for {{wanted}} ({{source}}), no matching version is installed',
+        failed:
+          '⚠ {{tool}}{{where}}: the project asks for {{wanted}} ({{source}}), preparing it failed',
+      },
     },
   },
   remote: {

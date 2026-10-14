@@ -7,9 +7,10 @@ import { queryKeys } from '@shared/api/query-keys';
  * Чем пойдёт прогон этого потребителя. Короткий ответ вместо карточек: шапке
  * чата нужна одна строка, а карточка везёт каталог, пробу и учёт расхода.
  */
-export async function getRunPlan(consumer: string): Promise<PlatformRunPlan> {
+export async function getRunPlan(consumer: string, project = ''): Promise<PlatformRunPlan> {
   const { data } = await apiClient.get<PlatformRunPlan>(
     `/platform-run-plan/${encodeURIComponent(consumer)}`,
+    project ? { params: { project } } : undefined,
   );
   return data;
 }
@@ -19,12 +20,13 @@ export async function getRunPlan(consumer: string): Promise<PlatformRunPlan> {
  *
  * Спрашивает шапка чата — там человек выбирает модель, и показать ему выбор,
  * который по дороге будет заменён, значит соврать. Запрос дешёвый и без сети:
- * решение принимается по состоянию панели.
+ * решение принимается по состоянию панели. `project` — каталог проекта: по нему
+ * ответ называет MCP-серверы, взятые в локальный прогон этого проекта.
  */
-export function usePlatformRunPlan(consumer: string) {
+export function usePlatformRunPlan(consumer: string, project = '') {
   return useQuery({
-    queryKey: queryKeys.platformRunPlan(consumer),
-    queryFn: () => getRunPlan(consumer),
+    queryKey: queryKeys.platformRunPlan(consumer, project),
+    queryFn: () => getRunPlan(consumer, project),
     // Пустой потребитель — это «страница ещё не знает, чей это чат» (провайдер
     // разговора приезжает своим запросом), а не потребитель с пустым именем:
     // такой адрес сервер не знает вовсе.

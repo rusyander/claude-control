@@ -12,6 +12,6 @@
  * Поэтому здесь НЕ ДОЛЖНО появиться ни одного импорта. Нужна связь с другим
  * модулем контрактов — она живёт на стороне того модуля, не здесь.
  */
-export const ourLayerIds = ['settings', 'skills', 'mcp', 'systemPrompt'] as const;
+export const ourLayerIds = ['settings', 'skills', 'mcp', 'systemPrompt', 'tools'] as const;
 
 export type OurLayerId = (typeof ourLayerIds)[number];

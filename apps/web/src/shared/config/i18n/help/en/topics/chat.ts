@@ -1011,7 +1011,15 @@ export const chatEn: typeof chatRu = {
       'all of them. After the command the panel checks the lockfiles (package-lock.json, ' +
       'pnpm-lock.yaml, yarn.lock, bun.lock): ones rewritten by the install are reverted to ' +
       'the index version, newly created ones are removed, and the list shows on the card ' +
-      'and in the log.',
+      'and in the log. ' +
+      'The Node version comes from .nvmrc, .node-version, .tool-versions, volta or engines and ' +
+      'the install runs on it when the machine has one (nvm, fnm, volta); when none is found the ' +
+      'install runs on what exists and a line under the card says so. A Python service gets a ' +
+      '.venv and pip install from requirements*.txt (uv sync with uv.lock), but only on a ' +
+      'matching version; Go gets its module cache warmed; these steps never fail the ' +
+      'preparation. A command set under “Copy settings” turns auto-detection off. The full ' +
+      'log is kept in a file, and the card and the agent’s task lead with the first real ' +
+      'error, not the log tail.',
     parallelPreamble: 'The agent’s first move in a copy is the task',
     parallelPreambleText:
       'The task of every split group running in a copy opens with a panel preamble: what ' +
@@ -1442,7 +1450,14 @@ export const chatEn: typeof chatRu = {
       'dependency between MRs, access, someone else’s service) collect in “For you to ' +
       'do: N” — the panel does not carry them out. A review-by-link group delivers ' +
       'nothing: it collects no steps for you, and a defect of the MR it reviews is a ' +
-      'review finding, not a ticket. A delivered group has “Recheck ' +
+      'review finding, not a ticket. When a review group closes, its card states facts about the ' +
+      'copy: edits in a tree the review must not touch (file names), scratch copies the group ' +
+      'made (safe ones are removed, the rest are named with the reason) and the throwaway database ' +
+      'taken down. The database for migration checks is started by the panel itself, only in its own ' +
+      'container from the compose image on 127.0.0.1; the agent never gets someone’s database or a DSN ' +
+      'from .env, and without Docker or the image the item goes to “uncovered” with the reason. A ' +
+      'review of an owner request whose requirement-trace block is missing or could not be parsed is asked once more, then the report is marked ' +
+      'incomplete. A delivered group has “Recheck ' +
       'MR”: the panel reads the MR — conflicts with the target branch, every pending ' +
       'reviewer comment, a red pipeline — and hands that to the group’s own ' +
       'conversation together with a request to check every task is done; what is ' +

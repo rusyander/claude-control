@@ -137,6 +137,7 @@ export function ChatHeader({
               defaultEffort={defaultEffort}
               models={models}
               consumer={consumer}
+              {...(projectPath ? { projectPath } : {})}
               onModelChange={onModelChange}
               onEffortChange={onEffortChange}
             />

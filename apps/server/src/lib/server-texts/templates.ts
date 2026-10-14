@@ -281,6 +281,30 @@ export const serverTextTemplates = {
     ru: 'Контур не начал отвечать за {{seconds}} с',
     en: 'The contour did not start answering within {{seconds}} s',
   },
+  'gateway-headers-timeout-local': {
+    ru: 'Локальная модель не начала отвечать за {{seconds}} с: длинный запрос обрабатывается дольше, чем отведено. Сожмите историю (/compact) или начните новый чат',
+    en: 'The local model did not start answering within {{seconds}} s: a long prompt takes longer to process than allowed. Compact the history (/compact) or start a new chat',
+  },
+  'gateway-local-restarting': {
+    ru: 'Сервер моделей перезапускается после сбоя — запрос повторится сам',
+    en: 'The model server is restarting after a failure — the request will be retried automatically',
+  },
+  'gateway-local-stopped': {
+    ru: 'Сервер моделей остановлен — запустите его в разделе «Локальные модели», прогон продолжится сам',
+    en: 'The model server is stopped — start it in the “Local models” section and the run will continue on its own',
+  },
+  'gateway-local-down': {
+    ru: 'Сервер моделей не отвечает: {{reason}}. Запустите его в разделе «Локальные модели» — прогон продолжится сам',
+    en: 'The model server is not answering: {{reason}}. Start it in the “Local models” section — the run will continue on its own',
+  },
+  'gateway-local-down-unknown': {
+    ru: 'причина не названа',
+    en: 'no reason given',
+  },
+  'local-supervisor-gave-up': {
+    ru: 'сервер упал и не поднялся после {{restarts}} попыток подряд; панель пробует снова раз в 10 минут',
+    en: 'the server crashed and did not come back after {{restarts}} attempts in a row; the panel tries again every 10 minutes',
+  },
   'gateway-cert-failed': {
     ru: 'Сертификат контура не проверился: {{reason}}. Укажите корневой сертификат компании в настройках контура',
     en: 'The contour certificate did not verify: {{reason}}. Set the company root certificate in the contour settings',
@@ -1253,6 +1277,18 @@ export const serverTextTemplates = {
   'chat-autonomy-deferred-notice': {
     ru: 'Фоновые команды агента ещё идут ({{count}}): процесс чата перезапустится с новой настройкой автономии, когда они кончатся, — перезапуск сейчас оборвал бы их. До тех пор у самого процесса прежняя метка автономии.',
     en: "The agent's background commands are still running ({{count}}): the chat process restarts with the new autonomy setting once they finish — restarting now would kill them. Until then the process itself keeps its previous autonomy marker.",
+  },
+  'chat-auto-continue-notice': {
+    ru: 'Ход оборвался: {{reason}}. Чат продолжит сам через {{seconds}} с (попытка {{attempt}} из {{max}}).',
+    en: 'The turn broke off: {{reason}}. The chat will continue on its own in {{seconds}} s (attempt {{attempt}} of {{max}}).',
+  },
+  'chat-auto-continue-spent-notice': {
+    ru: 'Ход оборвался: {{reason}}. Автоматические продолжения исчерпаны ({{max}} из {{max}}) — нужен человек.',
+    en: 'The turn broke off: {{reason}}. Automatic continuations are used up ({{max}} of {{max}}) — a human is needed.',
+  },
+  'chat-events-trimmed-notice': {
+    ru: 'Долгий прогон: {{count}} старых кадров потока сброшено из памяти панели. Полная переписка — в истории разговора после завершения хода.',
+    en: "Long run: {{count}} old stream frames were dropped from the panel's memory. The full conversation is in the chat history once the turn ends.",
   },
   'chat-stop-unconfirmed-notice': {
     ru: 'Остановить процесс агента ({{pid}}) не удалось: без снимка процессов панель не может проверить, что этот номер всё ещё его, а чужой процесс не трогает. Прогон остаётся идущим — нажмите «Остановить» ещё раз; после перезапуска панели он будет подхвачен снова.',

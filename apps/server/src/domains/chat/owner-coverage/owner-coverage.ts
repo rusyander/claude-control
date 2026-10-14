@@ -1,6 +1,6 @@
 import { blockLang } from '@agentdeck/contracts/brand';
 import { OWNER_POINT_ID } from '@agentdeck/contracts/quality-floor';
-import { EVIDENCE_MIN, type SieveReportRow } from '@agentdeck/contracts/sieves';
+import { EVIDENCE_MIN, scanSieveBlocks, type SieveReportRow } from '@agentdeck/contracts/sieves';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
@@ -30,4 +30,19 @@ export function ownerCoverageGaps(
     }
   }
   return gaps;
+}
+
+/**
+ * Блок следа требований написан, но панель его не разобрала (T21): схема чужая —
+ * `{"points":[…]}`, числовые `id`, статус `done`. Пункты владельца остаются «не
+ * разобраны», а не «выполнены»: ревью по ссылке просит ту же сессию переписать
+ * блок один раз. Блока нет вовсе — то же самое: слова владельца заданы, а след не
+ * написан. Читаемый блок сит без строк `owner-N` здесь не судится — это пробел
+ * доставки «не отчитано».
+ */
+export function ownerTraceUnparsed(text: string, required: boolean): boolean {
+  if (!required) return false;
+  const scan = scanSieveBlocks(text);
+  if (scan.rows.some((row) => OWNER_POINT_ID.test(row.id))) return false;
+  return scan.rejected > 0 || scan.rows.length === 0;
 }

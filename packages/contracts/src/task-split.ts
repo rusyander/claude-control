@@ -21,7 +21,7 @@
  * пониманиям формата негде.
  */
 
-import type { WorktreeBootstrapState } from './project-git';
+import type { WorktreeBootstrapState, WorktreeRuntimeNote } from './project-git';
 import type { GroupPermissionLevel, GroupRequestId } from './split-groups.ts';
 import { blockLang, blockLangPattern } from './brand.ts';
 import { SPLIT_HUMAN_TAG, SPLIT_TICKET_TAG } from './split-tickets.ts';
@@ -268,6 +268,11 @@ export interface TaskSplitStarted {
    * конвейер закрывает группу только по фактам git, а не по словам агента.
    */
   deliver?: boolean;
+  /**
+   * Одноразовая база, которую панель подняла группе ревью (T7). Нужна конвейеру,
+   * чтобы убрать её, когда группа закрыта; человеку не показывается.
+   */
+  reviewStand?: { name: string; image: string; startedAt: string };
 }
 
 /** Группа, которую завести не удалось: остальные при этом не откатываются. */
@@ -773,6 +778,38 @@ export interface EnvironmentPreambleInput {
 }
 
 /**
+ * Что панель сделала с версиями рантайма проекта — строки для задания (T1/T8,
+ * T15). Молчаливый запуск на чужой версии стоил группе ревью `npm ci` с кодом
+ * 2: агент должен знать, на чём собрана копия и как в ней запускать тесты.
+ */
+function runtimeLines(notes: WorktreeRuntimeNote[] | undefined): string[] {
+  const names = { node: 'Node', python: 'Python', go: 'Go' } as const;
+  const lines: string[] = [];
+  for (const note of notes ?? []) {
+    const where = note.where ? ` in ${note.where}/` : '';
+    const head = `${names[note.tool]}${where}: the project asks for ${note.wanted} (${note.source})`;
+    const run = note.run ? ` Run it with: ${note.run}.` : '';
+    const detail = note.detail ? ` ${note.detail}` : '';
+    if (note.status === 'switched') {
+      lines.push(
+        `${head}; the panel prepared the copy on ${note.used}, the machine default is ${note.found ?? 'other'}. Use ${note.used} for installs and runs (put it first in PATH).${run}${detail}`,
+      );
+    } else if (note.status === 'missing') {
+      lines.push(
+        `⚠ ${head}, but no matching version is installed${note.found ? ` (default ${note.found})` : ''}. The copy was NOT prepared on a wrong version${note.tool === 'python' ? ' (no venv was built)' : ''} — say so in the first lines of your answer if the task needs it, and never work around it silently.${detail}`,
+      );
+    } else if (note.status === 'failed') {
+      lines.push(
+        `⚠ ${head}: preparing it failed.${detail} Decide yourself: retry or do without it.`,
+      );
+    } else {
+      lines.push(`${head}: ready on ${note.used ?? 'the default'}.${run}${detail}`);
+    }
+  }
+  return lines;
+}
+
+/**
  * Преамбула задания для агента в копии: что панель уже сделала, чтобы первый
  * ход был по задаче, а не по «обживанию» копии.
  *
@@ -783,7 +820,7 @@ export interface EnvironmentPreambleInput {
  * «окружение готово» при ненастроенной подготовке отправило детей живого проекта на
  * пустые `node_modules` — 5–10 минут установки, поднятые установщиком
  * дев-серверы и четыре переписанных lock-файла. Провал подготовки не
- * скрывается — хвост лога здесь же, и агент решает сам, повторять установку
+ * скрывается — первая строка ошибки и путь к полному логу здесь же, и агент решает сам, повторять установку
  * или обойтись.
  */
 export function environmentPreamble(input: EnvironmentPreambleInput): string {
@@ -806,13 +843,27 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
     const why = boot.timedOut
       ? 'was stopped at the 10-minute ceiling'
       : `exited with code ${boot.exitCode ?? '?'}`;
+    const first = boot.firstError?.trim();
     const tail = boot.logTail.trim();
+    // Первая строка настоящей ошибки вместо хвоста: хвост из двух килобайт
+    // предупреждений установщика (EBADENGINE) прятал причину (13.10.2026).
+    const logLine = boot.logFile
+      ? `
+Full log: ${boot.logFile}`
+      : '';
+    const evidence = first
+      ? `
+First error: ${first}${logLine}`
+      : tail
+        ? `
+Log tail:
+${tail}${logLine}`
+        : '';
     lines.push(
-      `⚠ Copy preparation: the command "${boot.command}" ${why}. Dependencies may not be installed — decide yourself: repeat the install or do without it.${
-        tail ? `\nLog tail:\n${tail}` : ''
-      }`,
+      `⚠ Copy preparation: the command "${boot.command}" ${why}. Dependencies may not be installed — decide yourself: repeat the install or do without it.${evidence}`,
     );
   }
+  lines.push(...runtimeLines(boot?.runtimes));
   // «Не проверяй MCP» стоило ревью MR без форджа: сервер не поднялся, а агент,
   // которому сказали «всё готово», молча обходил его (12.10.2026). Готовое не
   // настраивают заново, но отсутствующий инструмент называют, а не обходят.

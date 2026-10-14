@@ -1,6 +1,8 @@
 export interface SelectOption {
   value: string;
   label: string;
+  /** Вариант виден, но выбрать его нельзя; причину пишут в подписи. */
+  disabled?: boolean;
 }
 
 export interface SelectFieldProps {

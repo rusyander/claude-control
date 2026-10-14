@@ -43,16 +43,18 @@ Run on the final code: the evidence belongs to the HEAD that goes up.
 **High risk** = a data path, or a path segment like auth/login/oauth/sso/password/credential/secret/
 crypt/permission/rbac/acl/policy/payment/billing/invoice/checkout/wallet/security, or ≥40 code files.
 
-Test paths (`tests/ e2e/ qa/ spec/ cypress/ playwright/ __tests__/`, `*.test.* *.spec.* *.stories.*`)
-trigger only as an OpenAPI/Swagger/`.proto`/GraphQL file (contract).
+Test paths — by name (`*.test.* *.spec.* *.stories.* *.cy.*`, `*_test.go`, `test_*.py`, `*_spec.rb`,
+`FooTest.java`, `__tests__/`), or a test root with no `src/` above it (`test/ tests/ spec/ e2e/ cypress/
+playwright/` dirs, a `test.*` file); `tests/` inside `src/` and `qa/` are code — trigger only as an
+OpenAPI/Swagger/`.proto`/GraphQL file (contract).
 
 | Sieve                | When              | Check → evidence                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | consumers-repo-wide  | code              | `node <kit>/tools/risk-tier.mjs --base origin/<target>`: the radius follows importers of what the files offer now; its block "CONSUMERS OF CHANGED STRINGS" is the repo-wide grep (e2e/QA included) for removed exports, test ids, routes and i18n keys. By hand, `git grep -nwF` over the WHOLE repo: every token in its «NOT SEARCHED» tail, plus the `-` side names it does not read — roles, UI strings. → commands + hits, each hit fixed or named |
 | contract-by-request  | contract, backend | Second entry, from the contract: list every claim docs/OpenAPI/proto/README/help make about the changed behaviour (status, field names, error shape, limits, defaults); check EACH by a real request to a stand running THIS branch, or the route test through the real route. A claim checked by reading the diff counts as unchecked. → request + observed status/body line                                                                           |
 | merge-tree           | always            | `git fetch`, then `git merge-tree --write-tree origin/<target> HEAD` → no conflicts; files the target changed since the merge-base that this branch also touches re-read (a clean merge can still be a semantic conflict). → command + result, re-read files named                                                                                                                                                                                      |
-| foreign-removals     | always            | Every `-` hunk of `git diff origin/<target>...HEAD` is a removal this task meant; unsure → `git blame -L <start>,+<n> $(git merge-base origin/<target> HEAD) -- <file>` (the diff's old-side line numbers belong to the merge-base, not the target tip). Someone else's line lost in a rebase or an overwritten file → restored, or the file named with why. → files with removals, each marked intended/restored                                       |
-| browser-focus        | ui                | Browser test (Playwright or the project e2e) over the changed screens: Tab order, visible focus, Escape/Enter, a narrow and a wide width. A component unit test is a different check. → command + pass line                                                                                                                                                                                                                                             |
+| foreign-removals     | always            | Every `-` hunk of `git diff origin/<target>...HEAD` is a removal this task meant; unsure → `git blame -L <start>,+<n> $(git merge-base origin/<target> HEAD) -- <file>` (old-side line numbers are the merge-base's). Someone else's line lost in a rebase or an overwritten file → restored, or the file named with why. → files with removals, each marked intended/restored                                                                          |
+| browser-focus        | ui                | Browser test (Playwright or the project e2e) over the changed screens: Tab order, visible focus, Escape/Enter, a narrow and a wide width. A component unit test does not count. → command + pass line                                                                                                                                                                                                                                                   |
 | branch-backend-stand | backend           | Every live check ran against a stand whose backend is built from THIS branch — main or a shared dev stand proves another commit. → process/port + the commit it runs = `git rev-parse HEAD`                                                                                                                                                                                                                                                             |
 | boundary-negative    | code              | One negative in the live run at a type or limit boundary of the changed input (empty, max+1, wrong type, missing field); the refusal is the documented one. → input + observed response                                                                                                                                                                                                                                                                 |
 | tests-alongside      | code              | A behaviour change ships with a test that fails without it (red-before shown, skill `agentdeck-kit:bug-regression-test` for a fix), or the MR says why none is needed. → test file + the red run                                                                                                                                                                                                                                                        |
@@ -73,12 +75,13 @@ migration-safety and rollback-plan. It is the backstop, cited as evidence only f
 on; the rows above stay yours.
 
 **Learned sieves.** A project may keep `.claude/sieves.md`: rows in the same shape, each born from a
-reviewer blocker of a class the table above lacks (MR link + the blocker in one line). A reviewer
-blocker of a new class → add its row there in the same pass as the fix, so the next MR runs it
-unprompted. Those rows run beside the table, with the same gate.
+reviewer blocker of a class the table above lacks (MR link + the blocker in one line). A new-class
+blocker → its row lands there with the fix; those rows run beside the table, same gate.
 
 Gate: a row per sieve, `pass` / `fail` / `n-a`, each with evidence — `n-a` names the absent kind or
-the reason. Evidence from an older HEAD than the last edit → re-run that sieve. `fail` → fix, re-run
+the reason. Live checks (contract-by-request, browser-focus, branch-backend-stand, boundary-negative)
+take `n-a` only on a diff with no behaviour file (product code, UI or backend), and that row's id and
+reason go into the MR description. Evidence from an older HEAD than the last edit → re-run that sieve. `fail` → fix, re-run
 step 1 for the touched subproject, then every sieve whose evidence predates the fix. A sieve left
 unchecked (no stand, no browser, no network) → **the MR is not ready**: name the sieve and why.
 

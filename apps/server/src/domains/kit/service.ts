@@ -417,6 +417,18 @@ export class KitService {
   }
 
   /**
+   * Блок дисциплины локальной модели (`rules/local.md`) — тот же текст, что в
+   * режимах с набором получает сессия хуком. Копия «моё» читается первой; элемент,
+   * выключенный человеком, не едет и здесь. Нет файла — пусто, а не сбой прогона.
+   */
+  private localDiscipline(): string {
+    const id = 'rules/local.md';
+    if (this.readState().disabled.includes(id)) return '';
+    const file = this.files().find((item) => item.id === id);
+    return file ? this.ownText(file).trim() : '';
+  }
+
+  /**
    * Что добавить к прогону. Вызывается на КАЖДЫЙ старт: режим, сменённый на
    * странице, действует со следующего сообщения, без перезапуска панели.
    *
@@ -427,9 +439,18 @@ export class KitService {
   runExtras(input: { provider: string; local: boolean; hasSources: boolean }): {
     args: string[];
     env: Record<string, string>;
+    /** Дописка к системному промпту: только блок дисциплины локальной модели при режиме «глобальные». */
+    append?: string;
   } {
     const mode = this.modeOf(input.provider);
-    if (mode === 'global') return { args: [], env: {} };
+    if (mode === 'global') {
+      // Режим «глобальные» набор не подключает, но локальная модель без дисциплины
+      // ведёт себя хуже всего: на живом разборе 13.10 Qwen спланировал 24 параллельных
+      // ревьюера на видеокарте, обслуживающей один запрос. Поэтому на локальном
+      // прогоне Claude блок едет и здесь — единственное, что набор даёт при «глобальных».
+      const append = input.provider === 'claude' && input.local ? this.localDiscipline() : '';
+      return append ? { args: [], env: {}, append } : { args: [], env: {} };
+    }
     if (input.provider === 'claude') {
       const args = ['--plugin-dir', this.composed(mode)];
       // «Только набор панели»: личный источник `user` снимается тем же флагом,

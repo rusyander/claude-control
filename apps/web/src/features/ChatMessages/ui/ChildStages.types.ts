@@ -2,6 +2,7 @@ import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type {
   ChatTreeView,
   SplitGroupCleaned,
+  SplitGroupReviewClose,
   SplitGroupStatusView,
   SplitGroupTokenFlag,
   SplitGroupTokenLedger,
@@ -130,6 +131,8 @@ export interface ChildStageGroup {
   deliveryNudges?: number;
   /** Чем проверена работа: блок «Тесты» копии группы (решение владельца 29.09). */
   testsVerdict?: { cases: number; passed: number; runId?: string; runAt?: string };
+  /** Итог закрытия группы ревью по её копии (T13, T6/T11). */
+  reviewClose?: SplitGroupReviewClose;
   /** Счёт токенов закрытой группы (E4) — флаги против медианы проекта. */
   tokens?: {
     ledger: SplitGroupTokenLedger;

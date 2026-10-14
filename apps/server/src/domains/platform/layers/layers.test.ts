@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { OurRules, Platform } from '@agentdeck/contracts';
-import { layerOn, lightWindowLayers, runLayers, userMemoryExcludes } from './layers.ts';
+import { LEAN_TOOLS, layerOn, lightWindowLayers, runLayers, userMemoryExcludes } from './layers.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
@@ -95,6 +95,28 @@ describe('наши слои в прогоне через контур', () => {
       '--strict-mcp-config',
     ]);
     expect(layers.dropped).toEqual(runLayers(withOurs({ enabled: false })).dropped);
+  });
+
+  it('облегчённый набор инструментов: белый список рабочих, не зависит от общего выключателя', () => {
+    const lean = runLayers(withOurs({ tools: false }));
+    expect(lean.args).toEqual(['--tools', LEAN_TOOLS.join(',')]);
+    expect(lean.dropped).toEqual(['tools']);
+    // Рабочие руки на месте; расписания, воркфлоу и рассылки в список не входят.
+    for (const name of ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep']) {
+      expect(LEAN_TOOLS).toContain(name);
+    }
+    for (const name of ['CronCreate', 'Workflow', 'SendMessage', 'ScheduleWakeup']) {
+      expect(LEAN_TOOLS).not.toContain(name);
+    }
+    // Общий выключатель слой инструментов не трогает: он не из `~/.claude`.
+    expect(runLayers(withOurs({ enabled: false })).args).not.toContain('--tools');
+    expect(layerOn({ ...defaultOurRules(), enabled: false }, 'tools')).toBe(true);
+    // Лёгкое окно агента панели задаёт свои инструменты (`--tools ''`) само.
+    expect(lightWindowLayers().args).not.toContain('--tools');
+    // Запись, сохранённая до появления слоя, — полный набор.
+    const older = { ...defaultOurRules() } as Partial<OurRules>;
+    delete older.tools;
+    expect(layerOn(older as OurRules, 'tools')).toBe(true);
   });
 
   it('частная галочка не переспоривает общий выключатель', () => {

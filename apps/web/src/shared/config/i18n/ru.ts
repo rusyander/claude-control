@@ -1305,6 +1305,13 @@ export const ru = {
             duplicate: 'инструкции загружены дважды',
           },
         },
+        reviewClose: {
+          dirt: 'ревью не должно править, а в копии изменено файлов: {{count}} — {{list}}',
+          more: ' и ещё {{count}}',
+          scratchRemoved: 'временная копия группы убрана: {{path}}',
+          scratchKept: 'временная копия осталась: {{path}} ({{why}})',
+          standRemoved: 'одноразовая база ревью снята',
+        },
         interruptedAt: 'процесс оборвался в {{time}}',
         interruptResumes: 'панель продолжала сама: {{count}}',
         autoNotices: 'Разрешено автоматически: {{list}}',
@@ -1668,6 +1675,8 @@ export const ru = {
         unreported: 'ревьюер не отчитался, что и насколько прочитал',
         partial: 'прочитана только часть диффа',
         entries: 'риск высокий, а вход в ревью один — нужны два (дифф и рамка)',
+        trace:
+          'блок следа требований не разобран или не написан — пункты слов владельца не сверены',
       },
       witness: 'Второй независимый проход по пустому ревью',
       pushBlocked: 'Отправить правки в MR нельзя: ветка MR неизвестна',
@@ -1861,6 +1870,30 @@ export const ru = {
     localLocked:
       'Claude Code переключён на локальную модель «{{title}}»: отвечает она, какую модель ни выбери. Выключается в разделе «Локальные модели».',
     localCaption: 'Отвечает локальная модель {{title}} — Claude Code переключён на неё',
+    /**
+     * MCP-серверы локального прогона (L4). Облегчённый набор снимает их все; человек берёт нужные
+     * по проекту, видя цену каждого в окне модели.
+     */
+    localMcp: {
+      button: 'MCP: {{count}}',
+      hint: 'MCP-серверы, которые поедут локальной модели в этом проекте. По умолчанию ни один: каждый занимает место в её небольшом окне.',
+      title: 'MCP-серверы локального прогона',
+      what: 'Локальная модель идёт без MCP-серверов: их описания занимают окно (один сервер GitLab — около 15 тыс. токенов). Отметьте только нужные; выбор запоминается для проекта и действует со следующего сообщения.',
+      empty: 'В настройках и в .mcp.json проекта нет включённых MCP-серверов.',
+      loadError: 'Не удалось прочитать MCP-серверы проекта',
+      noRoom: 'Не влезает: после него на разговор останется слишком мало окна',
+      noCost: 'Цены ещё нет: замерьте сервер, иначе не проверить, влезет ли он',
+      cost: '{{tokens}} · {{tools}} инстр.',
+      costEstimate: '~{{tokens}} · {{tools}} инстр.',
+      unmeasured: 'не замерен',
+      measuring: 'считаем…',
+      failed: 'не отвечает',
+      headroom: 'Окно {{context}}: на разговор остаётся {{headroom}} токенов до сжатия истории',
+      overflow:
+        'Окно {{context}}: не хватает {{headroom}} токенов — история будет сжиматься на каждом ходу',
+      remeasure: 'Замерить заново',
+      pickedCaption: 'MCP по выбору: {{list}}.',
+    },
     platformEffortOff: 'не отправляется',
     platformRefused:
       'Контур «{{title}}» обязателен, а {{reason}}: сообщение будет отклонено — ни в контур, ни в облако вендора оно не уйдёт. {{fix}}',
@@ -1887,7 +1920,7 @@ export const ru = {
     platformLayers: 'Через контур «{{title}}» прогон пойдёт без нашего: {{list}}.',
     platformLayersAll:
       'Через контур «{{title}}» прогон пойдёт без единого нашего слоя: ни правил, ни хуков, ни ' +
-      'прав, ни скиллов, ни MCP-серверов, ни дописки панели.',
+      'прав, ни скиллов, ни MCP-серверов, ни дописки панели, и с урезанным набором инструментов.',
     /** Уведомление CLI о фоновой команде, пришедшее между ходами. */
     taskNotice: {
       completed: 'Фоновая команда закончилась',
@@ -3282,6 +3315,7 @@ export const ru = {
       litellm: 'LiteLLM',
       vllm: 'vLLM',
       ollama: 'Ollama',
+      'llama-cpp': 'llama.cpp',
       openrouter: 'OpenRouter',
       'azure-openai': 'Azure OpenAI',
       dashscope: 'DashScope (Qwen)',
@@ -3297,6 +3331,8 @@ export const ru = {
       vllm: 'Сервер vLLM. Клиент Anthropic идёт к родной ручке /v1/messages, размышления включаются полем chat_template_kwargs.enable_thinking. Инструменты полем запроса vLLM понимает, только если запущен с --enable-auto-tool-choice и --tool-call-parser, — иначе включите прослойку инструментов.',
       ollama:
         'Ollama. Клиент Anthropic идёт к её родной ручке /v1/messages, клиент OpenAI — к /v1/chat/completions. Инструменты полем принимают только модели, обученные вызовам; для остальных включите прослойку.',
+      'llama-cpp':
+        'llama.cpp (llama-server). Клиент Anthropic идёт к его родной ручке /v1/messages, клиент OpenAI — к /v1/chat/completions. Инструменты полем llama-server принимает при запуске с --jinja (так панель его и запускает).',
       openrouter:
         'OpenRouter. Клиент Anthropic идёт к родной ручке /v1/messages, клиент OpenAI — к /chat/completions. Ключ — из кабинета OpenRouter.',
       'azure-openai':
@@ -3863,6 +3899,7 @@ export const ru = {
       skills: 'Скиллы',
       mcp: 'MCP-серверы',
       systemPrompt: 'Дописка панели к системному промпту',
+      tools: 'Полный набор инструментов Claude Code',
     },
     layerText: {
       settings:
@@ -3884,6 +3921,12 @@ export const ru = {
       systemPrompt:
         'То, что панель добавляет от себя: инициативы, разделение задачи, продолжение сессии. ' +
         'Снимает её сама панель — флага у CLI для этого нет, поэтому в списке флагов её не видно.',
+      tools:
+        'Встроенные инструменты CLI. Снята галочка — в запросе остаются рабочие: Bash, Read, Edit, ' +
+        'Write, Glob, Grep, WebFetch, Skill, Agent, TodoWrite (флаг `--tools`); расписания, ' +
+        'рабочие деревья, рассылки, воркфлоу и прочее уходят, это около 11 тыс. токенов на каждый ' +
+        'запрос. Нужна для моделей с небольшим окном, локальный контур заводится с ней снятой. ' +
+        'Общему выключателю не подчиняется: это не из `~/.claude`.',
     },
     layersFlags: 'Прогон уйдёт с флагами: {{args}}',
     layersFlagsNone: 'Флагов нет — в прогон едет всё наше.',
@@ -7038,7 +7081,7 @@ export const ru = {
       bootstrapCommand: 'Команда после создания копии',
       bootstrapCommandPlaceholder: 'pnpm install --frozen-lockfile --prefer-offline',
       bootstrapCommandHint:
-        'Идёт в копии до старта агента, потолок 10 минут, через оболочку системы с CI=1. Пусто — панель решает сама по lock-файлам: в корне pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci --prefer-offline --no-audit --no-fund, yarn.lock → yarn install --immutable; в корне нет — то же в каждом каталоге первого уровня (frontend/, web/…), до четырёх разом; локальная библиотека (file:), чей вход в копии не собран, собирается своей командой build. Без lock-файла ничего',
+        'Идёт в копии до старта агента, потолок 10 минут, через оболочку системы с CI=1. Пусто — панель решает сама по lock-файлам: в корне pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci --prefer-offline --no-audit --no-fund, yarn.lock → yarn install --immutable; в корне нет — то же в каждом каталоге первого уровня (frontend/, web/…), до четырёх разом; локальная библиотека (file:), чей вход в копии не собран, собирается своей командой build. Без lock-файла ничего. Версию Node панель берёт из .nvmrc, .node-version, .tool-versions, volta или engines и ставит зависимости на ней, если на машине стоит такая версия; Python-сервис получает .venv на нужной версии и pip install из requirements*.txt (или uv sync при uv.lock), у Go-модуля прогревается кэш (go mod download) — эти два шага не проваливают подготовку. Своя команда выше отключает всё автоопределение',
       bootstrapTitle: 'Подготовка копии',
       bootstrap: {
         running: 'ставится',
@@ -7053,6 +7096,15 @@ export const ru = {
       bootstrapEmptyLog: 'Пока пусто',
       bootstrapRerun: 'Повторить установку',
       bootstrapReverted: 'Lock-файлы, переписанные установкой, откачены: {{files}}',
+      bootstrapFirstError: 'Первая ошибка: {{line}}',
+      bootstrapRuntime: {
+        ok: '{{tool}}{{where}}: проект просит {{wanted}} ({{source}}) — подходит {{used}}',
+        switched:
+          '{{tool}}{{where}}: проект просит {{wanted}} ({{source}}) — подготовка шла на {{used}}, а не на {{found}}',
+        missing:
+          '⚠ {{tool}}{{where}}: проект просит {{wanted}} ({{source}}), подходящей версии на машине нет',
+        failed: '⚠ {{tool}}{{where}}: проект просит {{wanted}} ({{source}}), подготовка не удалась',
+      },
     },
   },
   remote: {

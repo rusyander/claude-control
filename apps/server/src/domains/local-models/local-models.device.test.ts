@@ -4,7 +4,7 @@ import {
   fitModel,
   heldVramBytes,
   modelNeedGb,
-  OLLAMA_GPU_RESERVE_GB,
+  GPU_RESERVE_GB,
   recommendModel,
   TARGET_CONTEXT,
   usableVramGb,
@@ -13,8 +13,7 @@ import {
 } from '@agentdeck/contracts/local-models';
 import { loadCatalog, loadGpuTable } from './service.ts';
 import { appleBandwidth, detectGpus, parseAppleSysctl } from './hardware.ts';
-import { localPaths } from './paths.ts';
-import { CPU_ONLY_ENV, serverEnv } from './server.ts';
+import { CPU_ONLY_ENV, serverArgs, serverEnv, type ServerShape } from './server.ts';
 
 /**
  * Где считает модель: видеокарта по умолчанию, процессор по выбору — и учёт
@@ -22,8 +21,12 @@ import { CPU_ONLY_ENV, serverEnv } from './server.ts';
  */
 
 const catalog = loadCatalog().models;
-const qwen27 = catalog.find((model) => model.tag === 'qwen3.6:27b-coding');
-if (!qwen27) throw new Error('qwen3.6:27b-coding нет в каталоге');
+const qwen27Catalog = catalog.find((model) => model.tag === 'qwen3.6:27b-coding');
+if (!qwen27Catalog) throw new Error('qwen3.6:27b-coding нет в каталоге');
+// Учёт видеопамяти и кеша проверяется на полном окне модели: умолчание каталога
+// (65536) срезало бы подбор раньше, чем до этого учёта дошла бы очередь. Само
+// умолчание — отдельный блок ниже, на записи каталога как есть.
+const qwen27 = { ...qwen27Catalog, defaultContext: undefined };
 
 const RTX_4090: HardwareGpu = {
   vendor: 'nvidia',
@@ -72,15 +75,17 @@ describe('видеопамять нашего же сервера', () => {
 });
 
 describe('запас видеопамяти — по живому замеру, а не впритык', () => {
-  it('27B на 4090 при 22,3 ГБ свободных: q8_0 не дотягивает 131072, который сползал на процессор', () => {
+  it('27B на 4090 при 22,3 ГБ свободных: q8_0 не дотягивает 98304 и 131072, которые сползали на процессор', () => {
     // Замер 07.10: фон 1696 из 24564 МиБ. Оценка «впритык» дала 131072 на q8_0, сервер
     // поднялся с ним, и Ollama положил на карту 15,1 из 17,6 ГиБ — 4,4 ток/с вместо 107.
-    expect(modelNeedGb(qwen27, 131_072) + OLLAMA_GPU_RESERVE_GB).toBeGreaterThan(IDLE_FREE_GB);
-    expect(modelNeedGb(qwen27, 98_304) + OLLAMA_GPU_RESERVE_GB).toBeLessThanOrEqual(IDLE_FREE_GB);
+    expect(modelNeedGb(qwen27, 131_072) + GPU_RESERVE_GB).toBeGreaterThan(IDLE_FREE_GB);
+    // С llama.cpp слой MTP добавляет к оценке 1,2 ГиБ, и 98304 на q8_0 впритык не влезает; 65536 — влезает.
+    expect(modelNeedGb(qwen27, 98_304) + GPU_RESERVE_GB).toBeGreaterThan(IDLE_FREE_GB);
+    expect(modelNeedGb(qwen27, 65_536) + GPU_RESERVE_GB).toBeLessThanOrEqual(IDLE_FREE_GB);
   });
 
-  it('при 98304 оценка не меньше занятого на деле: 21,1 ГиБ сверх фона', () => {
-    expect(modelNeedGb(qwen27, 98_304)).toBeGreaterThanOrEqual(21.1);
+  it('при 65536 на q8_0 оценка не меньше занятого на деле: ≈19,4 ГБ сверх фона (llama.cpp, MTP, замер 13.10)', () => {
+    expect(modelNeedGb(qwen27, 65_536, 'q8_0')).toBeGreaterThanOrEqual(19.4);
   });
 
   it('загруженная модель засчитывается тем, что держит, без запаса Ollama — каталог не обещает 128K', () => {
@@ -99,10 +104,10 @@ describe('рабочий стол Windows уступает видеопамят�
   // давал 27B 16K, а сервер на 131072 с q4_0 встал на карту целиком, 120 ток/с.
   const desktop = { ...RTX_4090, freeGb: Math.round(((24_564 - 4_172) / 1024) * 10) / 10 };
 
-  it('на Windows занятое рабочим столом не режет контекст: 27B получает 128K', () => {
+  it('на Windows занятое рабочим столом не режет контекст до 16K: 27B получает 96K на q4_0', () => {
     expect(fitModel(qwen27, { ...desktop, pageable: true }, 95)).toMatchObject({
       level: 'gpu',
-      context: TARGET_CONTEXT,
+      context: 98_304,
       kvCache: 'q4_0',
     });
   });
@@ -147,15 +152,15 @@ describe('кеш контекста: q8_0 по умолчанию, q4_0 — ра
   });
 
   it('q4_0 не дотягивает до 128K — всё равно берётся, если даёт контекст длиннее q8_0', () => {
-    // Владелец 08.10: 16K агенту мало. При 20 ГБ свободных q8_0 дал бы 27B лишь 32K.
-    const big = fitModel(qwen27, { ...RTX_4090, freeGb: 20 }, 95);
-    expect(fitModel(qwen27, { ...RTX_4090, freeGb: 20, pageable: false }, 95).context).toBe(
+    // Владелец 08.10: 16K агенту мало. При 21,5 ГБ свободных q8_0 дал бы 27B лишь 64K.
+    const big = fitModel(qwen27, { ...RTX_4090, freeGb: 21.5 }, 95);
+    expect(fitModel(qwen27, { ...RTX_4090, freeGb: 21.5, pageable: false }, 95).context).toBe(
       big.context,
     );
     expect(big.kvCache).toBe('q4_0');
-    expect(big.context).toBeGreaterThan(32_768);
+    expect(big.context).toBeGreaterThan(65_536);
     expect(big.context).toBeLessThan(TARGET_CONTEXT);
-    expect(modelNeedGb(qwen27, big.context, 'q8_0') + OLLAMA_GPU_RESERVE_GB).toBeGreaterThan(20);
+    expect(modelNeedGb(qwen27, big.context, 'q8_0') + GPU_RESERVE_GB).toBeGreaterThan(21.5);
   });
 
   it('q8_0 даёт тот же контекст, что q4_0, — кеш не сжимается', () => {
@@ -179,19 +184,24 @@ describe('кеш контекста: q8_0 по умолчанию, q4_0 — ра
     });
   });
 
-  it('сервер получает выбранный кеш; без выбора — q8_0', () => {
-    const paths = localPaths('C:/app', {});
-    const q4 = serverEnv({
-      paths,
-      port: 11435,
+  it('сервер получает выбранный кеш и окно аргументами запуска', () => {
+    const shape: ServerShape = {
+      tag: 'qwen3.6:27b-coding',
+      file: '/m/x.gguf',
+      quant: 'Q4_K_M',
       context: TARGET_CONTEXT,
       kvCache: 'q4_0',
-      base: {},
-    });
-    expect(q4.OLLAMA_KV_CACHE_TYPE).toBe('q4_0');
-    expect(q4.OLLAMA_CONTEXT_LENGTH).toBe(String(TARGET_CONTEXT));
-    const plain = serverEnv({ paths, port: 11435, context: 32_768, base: {} });
-    expect(plain.OLLAMA_KV_CACHE_TYPE).toBe('q8_0');
+      device: 'gpu',
+      mtp: false,
+      offload: 'all',
+    };
+    const args = serverArgs(shape, 11435);
+    expect(args[args.indexOf('-ctk') + 1]).toBe('q4_0');
+    expect(args[args.indexOf('-ctv') + 1]).toBe('q4_0');
+    expect(args[args.indexOf('-c') + 1]).toBe(String(TARGET_CONTEXT));
+    const plain = serverArgs({ ...shape, kvCache: 'q8_0', context: 32_768 }, 11435);
+    expect(plain[plain.indexOf('-ctk') + 1]).toBe('q8_0');
+    expect(plain[plain.indexOf('-c') + 1]).toBe('32768');
   });
 });
 
@@ -225,11 +235,10 @@ describe('счёт на процессоре', () => {
   });
 
   it('сервер на процессоре прячет карты всех движков; на видеокарте — не прячет', () => {
-    const paths = localPaths('C:/app', {});
-    const cpu = serverEnv({ paths, port: 11435, context: 32_768, device: 'cpu', base: {} });
+    const cpu = serverEnv('cpu', {});
     for (const [key, value] of Object.entries(CPU_ONLY_ENV)) expect(cpu[key]).toBe(value);
     expect(CPU_ONLY_ENV.CUDA_VISIBLE_DEVICES).toBe('-1');
-    const gpu = serverEnv({ paths, port: 11435, context: 32_768, device: 'gpu', base: {} });
+    const gpu = serverEnv('gpu', {});
     for (const key of Object.keys(CPU_ONLY_ENV)) expect(gpu[key]).toBeUndefined();
   });
 });
@@ -269,5 +278,26 @@ describe('чипы Apple M — по поколению и уровню', () => {
     const fit = fitModel(qwen27, m4max, 64);
     expect(fit.level).toBe('gpu');
     expect(fit.agentReady).toBe(true);
+  });
+});
+
+describe('контекст по умолчанию — меньшее из «умолчание модели» и «влезло»', () => {
+  const idle = { ...RTX_4090, freeGb: IDLE_FREE_GB };
+
+  it('27B Coding из каталога на простой 4090 встаёт на 65536 с q8_0, хотя карта вытянула бы 131072', () => {
+    expect(qwen27Catalog.defaultContext).toBe(65_536);
+    expect(fitModel(qwen27Catalog, idle, 95)).toMatchObject({
+      level: 'gpu',
+      context: 65_536,
+      kvCache: 'q8_0',
+    });
+    // Без умолчания та же карта дала бы 131072 на q4_0 — отличие и есть срез.
+    expect(fitModel(qwen27, idle, 95).context).toBe(TARGET_CONTEXT);
+  });
+
+  it('карта поменьше: умолчание не поднимает контекст выше того, что влезло', () => {
+    const tight = { ...RTX_4090, vramGb: 16, freeGb: 15 };
+    const fit = fitModel(qwen27Catalog, tight, 95);
+    expect(fit.context).toBeLessThanOrEqual(65_536);
   });
 });

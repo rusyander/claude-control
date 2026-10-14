@@ -1,3 +1,4 @@
+import type { LocalChoiceBody } from '@agentdeck/contracts/local-models';
 import type { CatalogRow } from '@entities/LocalModels';
 
 export interface ModelRowProps {
@@ -12,4 +13,5 @@ export interface ModelRowProps {
   onBench: () => void;
   onRemove: () => void;
   onCancel: (id: string) => void;
+  onChoose: (body: Omit<LocalChoiceBody, 'tag'>) => void;
 }

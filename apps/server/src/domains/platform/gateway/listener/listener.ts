@@ -15,6 +15,7 @@ import { GATEWAY_ROUTES, handleGatewayRequest, type ToolCallGate } from '../pipe
 import { SpendFlusher, type BudgetCrossingNotice } from '../spend-flush/spend-flush.ts';
 import { summarizedReport } from '../summarized-ledger/summarized-ledger.ts';
 import { GatewayJournal } from '../usage/usage.ts';
+import { PromptCounter, type LocalUpstreamInfo } from '../local-window/local-window.ts';
 import { localizeText, serverText } from '../../../../lib/server-texts/server-texts.ts';
 
 /**
@@ -132,6 +133,21 @@ export class PlatformGateway {
     this.#toolGate = resolve;
   }
 
+  /**
+   * Окно локальной модели по контуру и имени модели (L1). Ставится снаружи и той
+   * же расстановкой: сервер моделей — свойство панели, а слушатель пересоздаётся
+   * на каждой смене порта.
+   */
+  #localUpstream?: (platformId: string, model: string) => LocalUpstreamInfo | undefined;
+  /** Выученное по ответам соотношение символов и токенов — одно на слушатель. */
+  readonly #promptCounter = new PromptCounter();
+
+  setLocalUpstream(
+    resolve: (platformId: string, model: string) => LocalUpstreamInfo | undefined,
+  ): void {
+    this.#localUpstream = resolve;
+  }
+
   #enqueue(task: () => Promise<void>): Promise<void> {
     const next = this.#queue.then(task, task);
     this.#queue = next.catch(() => undefined);
@@ -224,6 +240,8 @@ export class PlatformGateway {
         spend: this.#spend,
         onRightsRefusal: (platformId) => this.#onRightsRefusal?.(platformId),
         toolGate: (runTag) => this.#toolGate?.(runTag),
+        localUpstream: (platformId, model) => this.#localUpstream?.(platformId, model),
+        promptCounter: this.#promptCounter,
         fetchImpl: runtime.fetchImpl,
         ...(runtime.now ? { now: runtime.now } : {}),
       }).catch(() => {

@@ -3,12 +3,12 @@
  *
  * ПАНЕЛЬ ОДНОРАЗОВАЯ: каталог конфигурации во временной папке, свои порты, свой
  * фронт. Подменяются только ответы `/api/local-models` (`page.route`): настоящий
- * раздел нашёл бы системный Ollama и при несовпадении контекста поднял бы его на
+ * раздел при несовпадении контекста перезапустил бы сервер моделей на
  * видеокарте владельца — съёмке это не нужно и недопустимо. Экран — настоящий,
  * подбор под карту и оценки страница считает сама.
  *
  * Запуск: node tools/help-shots/local-models-panel.mjs
- * Переменные: GUIDE_PANEL_PORT (5227), GUIDE_WEB_PORT (8937), GUIDE_ONLY (first).
+ * Переменные: GUIDE_PANEL_PORT (5227), GUIDE_WEB_PORT (8937), GUIDE_ONLY (first|choice).
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { openScenario, applyShotLanguage } from './kit.mjs';
-import { shootFirst } from './local-models-scenes.mjs';
+import { shootFirst, shootChoice } from './local-models-scenes.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5227);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8937);
@@ -36,7 +36,10 @@ async function waitFor(url, seconds) {
   return false;
 }
 
-const SCENARIOS = [{ only: 'first', topic: 'localModels', name: 'first', shoot: shootFirst }];
+const SCENARIOS = [
+  { only: 'first', topic: 'localModels', name: 'first', shoot: shootFirst },
+  { only: 'choice', topic: 'localModels', name: 'choice', shoot: shootChoice },
+];
 
 const started = [];
 const home = mkdtempSync(join(tmpdir(), 'cc-local-models-guide-'));

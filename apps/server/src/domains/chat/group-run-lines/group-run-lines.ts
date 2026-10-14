@@ -1,5 +1,9 @@
 import type { Group } from '@agentdeck/contracts';
-import { ESCALATE_LINE, type CascadeStage } from '@agentdeck/contracts/model-cascade';
+import {
+  ESCALATE_LINE,
+  REVIEW_DURABLE_LINE,
+  type CascadeStage,
+} from '@agentdeck/contracts/model-cascade';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import { groupKeyOf } from '@agentdeck/contracts/group-sources';
@@ -110,10 +114,15 @@ export function chatKnobsLine(
 /**
  * Дополнение дописки звена по стадии. Ревью, правки и доставка получают
  * строку эскалации в самом задании (`model-cascade.ts`), а работа — только
- * здесь: у неё задание — слова человека, и дописать туда нечего.
+ * здесь: у неё задание — слова человека, и дописать туда нечего. Ревью, кроме
+ * того, несёт здесь правила, что переживают сжатие контекста.
  */
 export function childStageExtra(stage: CascadeStage, knobs: string | undefined): string {
-  return [stage === 'work' ? ESCALATE_LINE : '', knobs ?? ''].filter(Boolean).join(' ');
+  // Ревью несёт то, что обязано пережить сжатие контекста (T17, T4): системная
+  // дописка в пересказ не уходит, а первое сообщение уходит.
+  const stageLine =
+    stage === 'work' ? ESCALATE_LINE : stage === 'review' ? REVIEW_DURABLE_LINE : '';
+  return [stageLine, knobs ?? ''].filter(Boolean).join(' ');
 }
 
 /**

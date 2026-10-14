@@ -4,16 +4,16 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
-import { createLocalModels } from '../../../domains/local-models/service.ts';
+import { createLocalModels, loadCatalog } from '../../../domains/local-models/service.ts';
 import { localPaths } from '../../../domains/local-models/paths.ts';
-import { blobPathOf, manifestPathOf } from '../../../domains/local-models/store.ts';
+import { modelFilePath } from '../../../domains/local-models/hf.ts';
 import { KitService } from '../../../domains/kit/service.ts';
 import { registerLocalModelsRoutes } from '../../local-models-routes/local-models-routes.ts';
 import { manageHarness, type ManageHarness } from '../manage-test-harness.ts';
 
 /**
  * «Локальные модели» через агента панели — настоящий маршрут и сервис над
- * временным каталогом: модель лежит на диске манифестом и слоями, железо —
+ * временным каталогом: модель лежит на диске файлом GGUF, железо —
  * строкой nvidia-smi, сервера моделей нет (порт, где никто не слушает).
  */
 
@@ -27,18 +27,13 @@ describe('panel-agent actions: local models', () => {
     root = mkdtempSync(join(tmpdir(), 'cc-agent-local-'));
     const lm = join(root, 'lm');
     const paths = localPaths(root, { AGENTDECK_LOCAL_MODELS_DIR: lm });
-    const manifest = manifestPathOf(paths.models, TAG);
-    mkdirSync(join(manifest, '..'), { recursive: true });
-    mkdirSync(join(paths.models, 'blobs'), { recursive: true });
-    writeFileSync(blobPathOf(paths.models, 'sha256:c4'), 'cfg');
-    writeFileSync(blobPathOf(paths.models, 'sha256:w4'), 'weights');
-    writeFileSync(
-      manifest,
-      JSON.stringify({
-        config: { digest: 'sha256:c4', size: 3 },
-        layers: [{ digest: 'sha256:w4', size: 7 }],
-      }),
-    );
+    // Модель скачана: файл лежит там, где его оставляет загрузка из репозитория.
+    const model = loadCatalog().models.find((item) => item.tag === TAG);
+    const quant = model?.quants.find((item) => item.id === model.defaultQuant);
+    if (!model || !quant) throw new Error(`${TAG} not in catalog`);
+    const file = modelFilePath(paths, model.repo, quant.file);
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, 'weights');
     const local = createLocalModels({
       appRoot: root,
       env: {

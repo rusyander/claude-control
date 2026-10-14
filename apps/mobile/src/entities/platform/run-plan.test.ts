@@ -115,7 +115,7 @@ describe('runPlanView', () => {
         layers: {
           args: [],
           systemPrompt: false,
-          dropped: ['settings', 'skills', 'mcp', 'systemPrompt'],
+          dropped: ['settings', 'skills', 'mcp', 'tools', 'systemPrompt'],
         },
       }),
       { model: '', effort: '' },

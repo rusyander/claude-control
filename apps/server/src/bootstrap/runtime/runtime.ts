@@ -2,6 +2,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appRootDir } from '../../domains/watcher/report.ts';
 import { createLocalModels, type LocalModels } from '../../domains/local-models/service.ts';
+import { createLocalMcpSource } from '../../domains/local-models/mcp-source.ts';
+import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
+import { createRunSync } from '../../domains/local-models/run-sync.ts';
+import { createKeepAwake } from '../../lib/keep-awake/keep-awake.ts';
+import { readEnvLookup } from '../../domains/env/env.ts';
 import { createGlobalLayer, type GlobalLayer } from '../../domains/global-layer/service.ts';
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import { liveNaIds, type SieveReportRow, type SieveStage } from '@agentdeck/contracts/sieves';
@@ -58,9 +63,14 @@ import { KitService } from '../../domains/kit/service.ts';
 import { kitComposeRefusal } from '../../domains/kit/codex.ts';
 import { codexHome } from '../../providers/catalog/config-dirs.ts';
 import { LOCAL_PLATFORM_ID } from '../../domains/local-models/connect.ts';
+import { AutoContinue, continueNotice } from '../../domains/chat/auto-continue/auto-continue.ts';
 import { CLAUDE_SWITCH_SETTING } from '../../domains/local-models/claude-switch.ts';
 import { localPaths, readState as readLocalState } from '../../domains/local-models/paths.ts';
-import { ProjectRunnerRegistry } from '../../domains/project-runner/project-runner.ts';
+import {
+  listRunnerTargets,
+  ProjectRunnerRegistry,
+} from '../../domains/project-runner/project-runner.ts';
+import { normalizePath } from '../../domains/project-runner/targets.ts';
 import {
   E2eRunRegistry,
   MutationChecks,
@@ -109,6 +119,13 @@ import {
   atlassianTaskTracker,
   atlassianTicketTracker,
 } from '../../domains/chat/split-ticket-tracker.ts';
+import { closeReviewGroup } from '../../domains/chat/review-close/review-close.ts';
+import {
+  prepareReviewStand,
+  removeReviewStand,
+  sweepStaleReviewStands,
+} from '../../domains/chat/review-stand/review-stand.ts';
+import { execDocker } from '../../domains/compose/docker.ts';
 import { copyRootOf, SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import { MrWatch } from '../../domains/chat/mr-watch/mr-watch.ts';
 import { MrStateRefresh } from '../../domains/chat/mr-state-refresh/mr-state-refresh.ts';
@@ -251,11 +268,16 @@ export interface Runtime {
   gatewayPort: () => number;
   /** Куда уведён сам Claude настройкой settings.json — для шапки чата. */
   claudeSettingsRoute: PlatformRoutingDeps['claudeSettingsRoute'];
+  /** Выбор MCP локального прогона проекта — для подписи шапки чата. */
+  localMcpPicks: PlatformRoutingDeps['localMcpPicks'];
   /** Окружение этого переключателя — лёгкому окну, которое settings.json не читает. */
   claudeSwitchEnv: () => Record<string, string>;
   /** Погасить всё, что спавнит процессы. Идемпотентно. */
   shutdown: () => void;
 }
+
+/** Как часто смотрим, идёт ли локальный прогон: запрет сна и отложенный перезапуск. */
+const LOCAL_RUN_POLL_MS = 5_000;
 
 export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime {
   // Реестр dev-серверов проектов — иначе спавненные процессы осиротеют; порт
@@ -484,6 +506,30 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     providerChats,
     session: chatSession,
     gate: treePause,
+    // Стенд и одноразовая база группам ревью (T5, T7): docker и реестр запущенных целей здесь.
+    stands: {
+      reviewEnvironment: (projectDir: string, copy: string, groupKey: string) =>
+        prepareReviewStand(
+          { originDir: projectDir, copyDir: copy, groupKey },
+          {
+            docker: execDocker,
+            runner: (dir: string) => ({
+              running: projectRunner
+                .list()
+                .filter(
+                  (view) =>
+                    view.status === 'running' &&
+                    normalizePath(view.projectPath) === normalizePath(dir),
+                )
+                .map((view) => ({ name: view.name, ...(view.url ? { url: view.url } : {}) })),
+              startable: listRunnerTargets(dir).targets.map((target) => target.name),
+            }),
+          },
+        ),
+      releaseReviewStand: async (container: { name: string }, copy: string) => {
+        await removeReviewStand(execDocker, container.name, copy);
+      },
+    },
     log: {
       warn: (detail: { err: unknown }, message: string) => console.warn(message, detail.err),
     },
@@ -684,6 +730,26 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       links: () => ctx.store.getChatLinks(),
       projectsDir: () => projectsDir(ctx),
     }),
+    // Закрытие группы ревью (T13, T6/T11): `git status` копии, временные копии и
+    // одноразовая база. Копии групп всех разделений — не временные.
+    closeReview: (record, group, options) =>
+      closeReviewGroup(
+        {
+          mainDir: copyRootOf(record),
+          ...(group.path && !group.cleaned ? { copy: group.path } : {}),
+          ...(group.startedAt ? { startedAt: group.startedAt } : {}),
+          knownCopies: Object.values(ctx.store.getSplitPlans())
+            .flatMap((plan) => plan.groups.map((item) => item.path ?? ''))
+            .filter(Boolean),
+          mirror: ctx.store.getWorktreeMirror(record.projectPath),
+          dirt: options.dirt,
+          ...(group.stand ? { stand: group.stand } : {}),
+        },
+        {
+          docker: execDocker,
+          log: (message, error) => console.warn(`[review-close] ${message}`, error),
+        },
+      ),
     launch: (record, groups, context, claimBranch, startable) =>
       launchFromRecord(ctx, launchDeps, record, groups, context, claimBranch, startable),
     startTriage: (record, prompt, claim) =>
@@ -858,6 +924,28 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       }),
     log: (message, error) => console.warn(message, error),
   });
+  // Обычный чат на локальной модели после обрыва продолжает сам (L4b): сервер поднимает
+  // присмотр, а ход, который CLI закончил ошибкой, — это.
+  /** Прогон Claude идёт на локальной модели: маршрутом контура или переключателем «Claude Code на локальной модели». */
+  const isLocalClaudeRun = (options: RunOptions, origin: string | undefined): boolean => {
+    const url = options.platformEnv?.ANTHROPIC_BASE_URL ?? '';
+    if (url) return url.includes(`/${LOCAL_PLATFORM_ID}`);
+    // Claude, уведённый на локальную модель переключателем: адрес лежит в settings.json.
+    return (origin ?? 'chat') === 'chat' && localModels.claudeRedirected();
+  };
+  /** Идёт ли хоть один прогон на локальной модели — Claude или чужой CLI. */
+  const localRunActive = (): boolean =>
+    chatRuns.anyRunning(
+      (run) => run.meta.local === true || isLocalClaudeRun(run.options, run.meta.origin),
+    ) || providerChats.localRunning();
+  // Метка «локальный» ложится в журнал: усыновлённый после перезапуска прогон опций с адресом не несёт.
+  chatRuns.setLocalClassifier((options, meta) => isLocalClaudeRun(options, meta.origin));
+  const autoContinue = new AutoContinue({
+    start: (chatId, options, meta) => chatRuns.start(chatId, options, meta),
+    isLocal: (finished) =>
+      finished.local === true || isLocalClaudeRun(finished.options, finished.origin),
+    log: (message, error) => console.warn(message, error),
+  });
   // «Стоп» человека в чате группы — пауза группы (журнал 89c).
   chatRuns.setHumanStopListener(pauseOnHumanStop(ctx.store, splitConveyor));
   // Процесс группы умер, держа фон, — обрыв с продолжением, а не провал (W3-4c).
@@ -868,6 +956,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     keys.some((key) => retriesLink(ctx.store.getChatLink(key)));
   chatRuns.setStartListener((keys) => {
     runRetry.started(keys);
+    autoContinue.started(keys);
     pendingAsks.started(keys);
     for (const key of keys) {
       const link = ctx.store.getChatLink(key);
@@ -1000,7 +1089,20 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     const decision =
       !finished.interrupted && isRetriedChild(keys) ? runRetry.finished(finished) : undefined;
     const retry = retryOutcome(decision);
-    return handoffPlanner(retry ? { ...finished, retry } : finished);
+    const planned = handoffPlanner(retry ? { ...finished, retry } : finished);
+    // Дети разделения идут своим надзором; обычному чату на локальной модели — продолжение.
+    const continued = isRetriedChild(keys)
+      ? undefined
+      : autoContinue.finished(finished, Boolean(planned));
+    if (planned || !continued) return planned;
+    const notice = continueNotice(continued);
+    return {
+      kind: 'notice',
+      code: notice.code,
+      text: serverText(notice.textCode, notice.params),
+      textCode: notice.textCode,
+      textParams: notice.params,
+    };
   });
   /**
    * Тот же конвейер «работа → ревью → правки», но у чужих CLI. Живёт не на
@@ -1146,13 +1248,47 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    */
   // Корень приложения, а не каталог настроек: гигабайты моделей человек видит
   // рядом с панелью и удаляет вместе с ней (решение владельца 05.10).
+  // Пока идёт локальный прогон, система не засыпает (L4b); выключатель — в настройках раздела.
+  const keepAwake = createKeepAwake({ log: (message, error) => console.warn(message, error) });
   const localModels = createLocalModels({
     appRoot: appRootDir(),
+    runActive: localRunActive,
+    awakeHeld: () => keepAwake.status().held,
     claude: { settingsPath: () => ctx.location.paths.settings, backupDir: () => ctx.backupDir },
+    // MCP-серверы локального прогона читаются теми же файлами и тем же клиентом, что раздел «MCP».
+    mcp: createLocalMcpSource({
+      userConfig: () => ctx.location.paths.mcpConfig,
+      store: ctx.store,
+      appData: () => ctx.location.paths.appData,
+      envLookup: () => ({
+        ...process.env,
+        ...readEnvLookup(
+          ctx.location.paths.settings,
+          ctx.location.paths.secretsEnv,
+          ctx.location.paths.settingsLocal,
+        ),
+      }),
+      networkTimeoutMs: () => ctx.store.getSettings().mcpNetworkTimeoutMs,
+    }),
   });
   // Сессии из терминала и VS Code видны телефону только через хуки панели:
   // включённой пересылке они нужны с первого сеанса, без ручной установки.
   syncRelayHooks(ctx);
+  // Раз в несколько секунд: запрет сна держится, пока идёт локальный прогон, а ждавший
+  // перезапуск сервера выполняется, когда прогонов не осталось. Опрос, а не слушатели на
+  // каждый путь завершения (конец, стоп, обрыв, усыновление): пути разные, итог один.
+  const syncLocalRun = createRunSync({
+    active: localRunActive,
+    keepAwakeOn: () => localModels.keepAwakeOn(),
+    awake: keepAwake,
+    restart: {
+      pending: () => localModels.restartPending(),
+      apply: () => localModels.applyPending(),
+    },
+    log: (message, error) => console.warn(message, error),
+  });
+  const localRunTimer = setInterval(syncLocalRun, LOCAL_RUN_POLL_MS);
+  localRunTimer.unref();
   // Включённому «Claude на локальной модели» нужен живой сервер с первого сеанса.
   void localModels.resume().catch((error: unknown) => {
     console.warn('local models: server for the Claude switch did not start', error);
@@ -1167,7 +1303,16 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         ? { setting: CLAUDE_SWITCH_SETTING, platformId: LOCAL_PLATFORM_ID, ...model }
         : undefined;
     },
+    localRunEnv: (platformId) =>
+      platformId === LOCAL_PLATFORM_ID ? localModels.runEnv() : undefined,
+    localMcpPicks: (platformId, project) =>
+      platformId === LOCAL_PLATFORM_ID ? localModels.mcpInfo(project).picked : undefined,
   };
+  // Шлюз спрашивает окно локальной модели на каждый запрос: отказ «prompt is too
+  // long» и срок первого байта считаются от настоящего окна сервера, а не от константы.
+  platformGateway.setLocalUpstream((platformId, model) =>
+    platformId === LOCAL_PLATFORM_ID ? localModels.upstream(model) : undefined,
+  );
   // Набор панели (В2) решается на КАЖДОМ старте, как и маршрут: режим, сменённый
   // на странице, действует со следующего сообщения. Едет и мимо контура —
   // облачный Claude получает его тем же флагом плагина.
@@ -1192,6 +1337,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     const route: PlatformRunRoute = local
       ? {
           ...routeOf,
+          // Окно сервера и ограничения — и прогону, уведённому переключателем:
+          // у него адреса контура нет, а окружение прогона всё равно доходит.
+          env: { ...routeOf.env, ...local.env },
           model: {
             model: local.model,
             asked,
@@ -1214,7 +1362,18 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       const language = ctx.store.getSettings().language === 'en' ? 'en' : 'ru';
       return { ...route, refusal: localizeText(kitComposeRefusal(error), language) };
     }
-    return extras.args.length || Object.keys(extras.env).length ? { ...route, kit: extras } : route;
+    // Облегчённый набор локального прогона унёс все MCP-серверы (`--strict-mcp-config`):
+    // взятые человеком в этом проекте едут своим `--mcp-config` (L4).
+    const leanLocal =
+      decision.routed &&
+      decision.platformId === LOCAL_PLATFORM_ID &&
+      route.layers?.args.includes('--strict-mcp-config') === true;
+    const withMcp: PlatformRunRoute = leanLocal
+      ? { ...route, localMcp: (cwd) => localModels.mcpRun(cwd) }
+      : route;
+    return extras.args.length || Object.keys(extras.env).length || extras.append
+      ? { ...withMcp, kit: extras }
+      : withMcp;
   };
   chatRuns.setPlatformRouting(runRoute);
   projectTestRuns.setPlatformRouting(() => runRoute('tests'));
@@ -1368,6 +1527,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   }
   // Проверки доставки, оборванные прежним процессом, — заново (WP1b).
   splitConveyor.recoverDeliveryChecks();
+  // Одноразовые базы ревью, забытые упавшей панелью: только свои, по метке, старше 12 часов.
+  void sweepStaleReviewStands(execDocker, process.cwd()).catch((error: unknown) => {
+    console.warn('[review-stand] stale sweep failed', error);
+  });
   // Наблюдение за MR доставленных групп (WP1j): таймеры жили в прежнем процессе.
   mrWatch.recover();
   // Группы, чей прогон не пережил перезапуск, — прерваны и продолжаются (WP1c).
@@ -1433,6 +1596,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // Загрузки обрываются (докачаются с места), сервер моделей живёт дальше —
     // новый процесс панели подхватит его по записи.
     localModels.shutdown();
+    clearInterval(localRunTimer);
+    keepAwake.stop();
   };
 
   return {
@@ -1485,6 +1650,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     runRoute: (origin) => runRoute(origin),
     gatewayPort: platformRouting.gatewayPort,
     claudeSettingsRoute: platformRouting.claudeSettingsRoute,
+    localMcpPicks: platformRouting.localMcpPicks,
     claudeSwitchEnv: () => localModels.claudeEnv(),
     shutdown,
   };

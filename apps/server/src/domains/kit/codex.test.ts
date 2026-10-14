@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CODEX_KIT_ARG_LIMIT,
   CODEX_KIT_ENV,
+  CODEX_SKILL_DESCRIPTION_MAX,
   CodexKitTooLarge,
   buildCodexOverlay,
+  codexSkillIndex,
   withCodexKit,
   writeCodexOverlay,
 } from './codex.ts';
@@ -67,6 +69,24 @@ describe('buildCodexOverlay', () => {
     );
     expect(overlay.appServer).not.toContain('verify-by-running');
     expect(overlay.skillsDir).toBe(join(kitDir, 'skills'));
+  });
+
+  it('длинные описания навыков режутся только в локальном наложении (L4c, F3)', () => {
+    const long = 'слово '.repeat(200).trim();
+    mkdirSync(join(kitDir, 'skills', 'wordy'), { recursive: true });
+    writeFileSync(
+      join(kitDir, 'skills', 'wordy', 'SKILL.md'),
+      `---
+name: wordy
+description: ${long}
+---
+body
+`,
+    );
+    expect(buildCodexOverlay({ kitDir, local: false, codexHome }).exec).toContain(long);
+    const local = buildCodexOverlay({ kitDir, local: true, codexHome }).exec;
+    expect(local).not.toContain(long);
+    expect(local).toContain('wordy — ');
   });
 
   it('нечитаемый config.toml человека не роняет сборку: дописывать не к чему', () => {
@@ -130,5 +150,33 @@ describe('withCodexKit', () => {
       'exec',
     );
     expect(result.missing).toBe(true);
+  });
+});
+
+describe('список навыков в наложении: длинное описание обрезается', () => {
+  const line = (description: string, clip = true) =>
+    codexSkillIndex([{ name: 'big', description, path: '/k/big/SKILL.md' }], undefined, clip);
+
+  it('описание длиннее предела режется по слову и кончается «…»; путь к SKILL.md остаётся', () => {
+    const text = line('слово '.repeat(200));
+    const shown = text.split('\n').at(-1) ?? '';
+    expect(shown).toMatch(/^- big — .+… \(\/k\/big\/SKILL\.md\)$/);
+    const description = shown.slice('- big — '.length, shown.indexOf(' (/k/'));
+    expect(description.length).toBeLessThanOrEqual(CODEX_SKILL_DESCRIPTION_MAX);
+    expect(description.endsWith('слово…')).toBe(true);
+  });
+
+  it('короткое описание — как есть, ровно по пределу — тоже', () => {
+    expect(line('Use when X')).toContain('- big — Use when X (/k/big/SKILL.md)');
+    const exact = 'я'.repeat(CODEX_SKILL_DESCRIPTION_MAX);
+    expect(line(exact)).toContain(`- big — ${exact} (`);
+  });
+
+  it('обычный (не локальный) набор и слои групп описаний не режут — как до L4b (L4c, F3)', () => {
+    const long = 'слово '.repeat(200).trim();
+    expect(line(long, false)).toContain(`- big — ${long} (`);
+    expect(
+      codexSkillIndex([{ name: 'big', description: long, path: '/k/big/SKILL.md' }]),
+    ).toContain(long);
   });
 });

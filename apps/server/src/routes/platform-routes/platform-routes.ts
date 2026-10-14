@@ -107,6 +107,8 @@ export function registerPlatformRoutes(
   selfBaseUrl = 'http://127.0.0.1:5178',
   /** Куда уведён сам Claude настройкой settings.json — шапка чата говорит это. */
   claudeSettingsRoute?: PlatformRoutingDeps['claudeSettingsRoute'],
+  /** Выбор MCP локального прогона проекта — шапка чата называет его (L4). */
+  localMcpPicks?: PlatformRoutingDeps['localMcpPicks'],
 ): void {
   const appData = (): string => ctx.location.paths.appData;
 
@@ -216,16 +218,20 @@ export function registerPlatformRoutes(
    * статический сегмент сильнее параметра, и контур с идентификатором
    * `run-plan` перекрыл бы собственные маршруты.
    */
-  app.get<{ Params: { consumer: string } }>('/api/platform-run-plan/:consumer', (request) =>
-    describeRunPlan(
-      {
-        store: ctx.store,
-        appDataDir: appData(),
-        gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
-        ...(claudeSettingsRoute ? { claudeSettingsRoute } : {}),
-      },
-      request.params.consumer,
-    ),
+  app.get<{ Params: { consumer: string }; Querystring: { project?: string } }>(
+    '/api/platform-run-plan/:consumer',
+    (request) =>
+      describeRunPlan(
+        {
+          store: ctx.store,
+          appDataDir: appData(),
+          gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
+          ...(claudeSettingsRoute ? { claudeSettingsRoute } : {}),
+          ...(localMcpPicks ? { localMcpPicks } : {}),
+        },
+        request.params.consumer,
+        request.query.project,
+      ),
   );
 
   app.get('/api/platforms', () => {

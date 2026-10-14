@@ -26,3 +26,5 @@ Per point, in the reply itself:
   A reader who never opens the diff must be able to judge the decision from the reply alone. Length
   is fine here; the six forbidden families above still apply, so it stays impersonal and free of
   process narration.
+
+NAMES — only from data. A person addressed or mentioned in a published text (a reply, a handle, a name after "thanks to" / "as @x said") is copied from what this session read — the thread's `author`/`username`, a participant, the MR author — never recalled, inferred from a display name or declined by guess. No name in the read data → no name in the text. `review-publish-guard` refuses a handle or a name after a person-reference word that was never read.

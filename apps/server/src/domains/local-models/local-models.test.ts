@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { existsSync, mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -10,10 +10,10 @@ import {
 } from '@agentdeck/contracts/local-models';
 import { LocalJobs } from './jobs.ts';
 import { localError } from './errors.ts';
-import { blobPathOf, importStoredModel, listStoredModels, manifestPathOf, tagOf } from './store.ts';
-import { benchOf, loadCatalog, pullPhase, pullProgress } from './service.ts';
+import { listStoredModels, manifestPathOf, tagOf } from './store.ts';
+import { benchOf, loadCatalog } from './service.ts';
 import { countFetches, npmCliPath } from './qwen-code.ts';
-import { assetsFor, compareVersions, parseSha256Sums, pickRuntime } from './runtime.ts';
+import { pickRuntime } from './runtime.ts';
 import { parseNvidiaSmi } from './hardware.ts';
 import { connectLocal, localPlatformSettings, LOCAL_PLATFORM_ID } from './connect.ts';
 import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
@@ -105,49 +105,6 @@ describe('хранилище моделей по файлам', () => {
     const models = await listStoredModels(dir);
     expect(models.map((model) => [model.tag, model.sizeBytes])).toEqual([['qwen3.5:9b', 100]]);
   });
-
-  it('перенос из системного Ollama — жёсткой ссылкой, без второй копии, манифест последним', async () => {
-    const from = temp();
-    const to = temp();
-    const manifest = manifestPathOf(from, 'qwen3.5:4b');
-    mkdirSync(join(manifest, '..'), { recursive: true });
-    mkdirSync(join(from, 'blobs'), { recursive: true });
-    writeFileSync(blobPathOf(from, 'sha256:c1'), 'config');
-    writeFileSync(blobPathOf(from, 'sha256:w1'), 'weights!');
-    writeFileSync(
-      manifest,
-      JSON.stringify({
-        config: { digest: 'sha256:c1', size: 6 },
-        layers: [{ digest: 'sha256:w1', size: 8 }],
-      }),
-    );
-    const jobs = new LocalJobs();
-    const job = jobs.start('model', 'qwen3.5:4b', (handle) =>
-      importStoredModel({ fromDir: from, toDir: to, tag: 'qwen3.5:4b', handle }),
-    );
-    await waitFor(() => job.state !== 'running');
-    expect(job.state).toBe('done');
-    expect(job.doneBytes).toBe(14);
-    expect((await listStoredModels(to)).map((model) => model.tag)).toEqual(['qwen3.5:4b']);
-    // Та же запись на диске: у файла две ссылки, а не два файла.
-    expect(statSync(blobPathOf(to, 'sha256:w1')).nlink).toBeGreaterThanOrEqual(2);
-  });
-
-  it('перенос модели без слоя падает с кодом и манифеста не оставляет', async () => {
-    const from = temp();
-    const to = temp();
-    const manifest = manifestPathOf(from, 'qwen3.5:4b');
-    mkdirSync(join(manifest, '..'), { recursive: true });
-    writeFileSync(manifest, JSON.stringify({ layers: [{ digest: 'sha256:gone', size: 8 }] }));
-    const jobs = new LocalJobs();
-    const job = jobs.start('model', 'qwen3.5:4b', (handle) =>
-      importStoredModel({ fromDir: from, toDir: to, tag: 'qwen3.5:4b', handle }),
-    );
-    await waitFor(() => job.state !== 'running');
-    expect(job.state).toBe('failed');
-    expect(job.errorCode).toBe('local-import-failed');
-    expect(existsSync(manifestPathOf(to, 'qwen3.5:4b'))).toBe(false);
-  });
 });
 
 describe('работы с прогрессом', () => {
@@ -177,7 +134,7 @@ describe('работы с прогрессом', () => {
 
   it('ошибка с кодом доезжает до работы кодом и параметрами', async () => {
     const jobs = new LocalJobs();
-    const job = jobs.start('runtime', 'ollama', () =>
+    const job = jobs.start('runtime', 'llama.cpp', () =>
       Promise.reject(localError('local-checksum-mismatch', 'не сошлась', { name: 'x.zip' })),
     );
     await waitFor(() => job.state !== 'running');
@@ -206,19 +163,7 @@ describe('работы с прогрессом', () => {
   });
 });
 
-describe('поток загрузки и замер', () => {
-  it('прогресс — сумма слоёв, этап — по строке Ollama', () => {
-    const layers = new Map([
-      ['a', { total: 100, completed: 50 }],
-      ['b', { total: 300, completed: 0 }],
-    ]);
-    expect(pullProgress(layers)).toEqual({ doneBytes: 50, totalBytes: 400 });
-    expect(pullPhase('pulling manifest')).toBe('manifest');
-    expect(pullPhase('pulling 3ea3f9c1a1b2')).toBe('pull');
-    expect(pullPhase('verifying sha256 digest')).toBe('verify');
-    expect(pullPhase('success')).toBe('finish');
-  });
-
+describe('замер скорости', () => {
   it('замер — токены, делённые на время генерации', () => {
     const bench = benchOf(
       { evalCount: 256, evalDurationNs: 4e9, promptCount: 100, promptDurationNs: 1e8 },
@@ -248,24 +193,13 @@ describe('мелочи разбора', () => {
     });
   });
 
-  it('версии, архивы выпуска и контрольные суммы', () => {
-    expect(compareVersions('0.35.1', '0.32.12')).toBeGreaterThan(0);
-    expect(compareVersions('v0.9.0', '0.10.0')).toBeLessThan(0);
-    expect(assetsFor('win32', 'x64', [])).toEqual(['ollama-windows-amd64.zip']);
-    expect(assetsFor('win32', 'x64', [{ ...RTX_4090, vendor: 'amd' }])).toContain(
-      'ollama-windows-amd64-rocm.zip',
-    );
-    const sums = parseSha256Sums(`${'a'.repeat(64)}  ./ollama-windows-amd64.zip\n`);
-    expect(sums.get('ollama-windows-amd64.zip')).toBe('a'.repeat(64));
-  });
-
-  it('системный Ollama берётся, пока человек не выбрал свою копию', () => {
-    expect(pickRuntime('/sys/ollama', '/panel/ollama', false)).toEqual({
+  it('свой llama-server из переменной берётся раньше собственной сборки панели', () => {
+    expect(pickRuntime('/sys/llama-server', '/panel/llama-server')).toEqual({
       source: 'system',
-      binary: '/sys/ollama',
+      binary: '/sys/llama-server',
     });
-    expect(pickRuntime('/sys/ollama', '/panel/ollama', true).source).toBe('panel');
-    expect(pickRuntime('', '', false).source).toBe('none');
+    expect(pickRuntime('', '/panel/llama-server').source).toBe('panel');
+    expect(pickRuntime('', '').source).toBe('none');
   });
 
   it('npm: путь к самому npm рядом с node; счёт пакетов по строкам журнала', () => {
@@ -336,7 +270,7 @@ describe('мелочи разбора', () => {
     ).rejects.toThrow('no_token');
   });
 
-  it('контур локальной модели — драйвер ollama, адрес с /v1, обязательный режим', () => {
+  it('контур локальной модели — драйвер llama-cpp, адрес с /v1, обязательный режим', () => {
     expect(
       localPlatformSettings({
         baseUrl: 'http://127.0.0.1:11435/',
@@ -346,7 +280,7 @@ describe('мелочи разбора', () => {
       }),
     ).toMatchObject({
       id: LOCAL_PLATFORM_ID,
-      driver: 'ollama',
+      driver: 'llama-cpp',
       baseUrl: 'http://127.0.0.1:11435/v1',
       mode: 'required',
       defaultModel: 'qwen3.5:9b',

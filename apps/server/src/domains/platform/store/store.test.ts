@@ -178,9 +178,27 @@ describe('domains/platform/store: контуры и ключи', () => {
       skills: true,
       mcp: true,
       systemPrompt: true,
+      tools: true,
     });
     expect(card.layers.args).toEqual([]);
     expect(card.layers.dropped).toEqual([]);
+  });
+
+  it('снятый слой инструментов переживает запись и чтение настроек и виден карточке флагом', () => {
+    // Обе схемы настроек (контракт и проверка записи) и разбор слоёв из записи
+    // обязаны знать слой: потеряй любая — контур молча вернётся к полному набору.
+    store.updateSettings({
+      platforms: [
+        {
+          ...PLATFORM,
+          rules: { platform: defaultPlatformRules(), ours: { ...defaultOurRules(), tools: false } },
+        },
+      ],
+    });
+    const card = describePlatforms(store, dir)[0]!;
+    expect(card.platform.rules.ours.tools).toBe(false);
+    expect(card.layers.dropped).toEqual(['tools']);
+    expect(card.layers.args[0]).toBe('--tools');
   });
 
   it('снятый слой личных настроек виден карточке флагом запуска и гасит гейт в матрице', () => {

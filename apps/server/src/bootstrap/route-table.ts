@@ -287,6 +287,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         platformGateway,
         selfBaseUrl,
         runtime.claudeSettingsRoute,
+        runtime.localMcpPicks,
       ),
     // Локальные модели: работы с прогрессом переживают запрос, объект — из runtime.
     (instance, context) => registerLocalModelsRoutes(instance, context, localModels, kit),

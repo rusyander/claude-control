@@ -9,8 +9,9 @@ export const localModelsEn: typeof localModelsRu = {
     lead:
       'This section puts a coding model on your machine and hands it to the panel’s agents. It ' +
       'reads the graphics card itself, shows which models will run on it and how fast, downloads ' +
-      'the model server and the model, starts the server with the right context and sets up the ' +
-      'local-model contour — everything that used to be installed and configured by hand. The ' +
+      'the model server (llama.cpp) and the model, starts the server with the right context and sets up the ' +
+      'local-model contour — everything that used to be installed and configured by hand. Models ' +
+      'already downloaded in Ollama are taken over without downloading again. The ' +
       'cloud comes back in one click.',
 
     guideTitle: 'What this document covers',
@@ -27,7 +28,7 @@ export const localModelsEn: typeof localModelsRu = {
       'bandwidth; “Measure” measures the real speed.',
     whyOne: 'One button instead of a manual',
     whyOneText:
-      'Model server, environment variables, context, the address for Claude Code — the panel does ' +
+      'Model server, its launch arguments, context, the address for Claude Code — the panel does ' +
       'it all. The work runs on the panel’s server: closing the tab does not stop a download, and ' +
       'an interrupted download resumes where it stopped.',
     whyBack: 'The cloud is one click away',
@@ -43,7 +44,7 @@ export const localModelsEn: typeof localModelsRu = {
     pathTextText:
       'A chat, group or test starts Claude Code as usual. The panel gives it the address of its ' +
       'gateway; through the local-model contour the gateway passes the request to the model ' +
-      'server on 127.0.0.1:11435, which holds the model in video memory. The contour’s mode is ' +
+      'server (llama-server) on 127.0.0.1:11435, which holds the model in video memory. The contour’s mode is ' +
       '“required”: if the server does not answer, the request does not silently go to the cloud — ' +
       'it fails with a clear error. The panel’s own helpers — the panel agent, the form helper, ' +
       'the assistant window, the watcher and group service calls — take the same contour: ' +
@@ -59,8 +60,8 @@ export const localModelsEn: typeof localModelsRu = {
       firstMachine: 'First visit: card detected, no server yet',
       firstMachineText:
         'The “Hardware & server” tab. On the left is your machine: the card, its video memory and how much is free, bandwidth, ' +
-        'RAM and disk space. On the right is the model server: if Ollama is already installed, ' +
-        'the section uses it; if not, “Download” puts its own copy into the panel folder.',
+        'RAM and disk space. On the right is the model server: “Download” puts llama.cpp into the panel folder — ' +
+        'the build is pinned in the panel and the panel checks its checksum itself. Ollama is not started and not needed.',
       firstCatalog: 'The catalog for this card',
       firstCatalogText:
         'The “Models” tab. Each model shows how it was trained (for code, tuned for code or general), whether it ' +
@@ -84,6 +85,52 @@ export const localModelsEn: typeof localModelsRu = {
         'this model” checkbox (off) sends Claude Code itself there too. Below are Qwen Code ' +
         'and the kit choice: whose skills, hooks and rules the agent gets while it runs on the ' +
         'local model.',
+      choiceTitle: 'Frame by frame: quantization and context',
+      choiceCaption:
+        'The card of every model, catalog, downloaded or your own, has two blocks: “On this machine” on the left (speed, memory, file, measurement) and “Launch settings” with the two lists on the right. The choice is remembered for ' +
+        'that model and applies to every launch: “Hand to agents”, “Measure”, a server restart. Nothing chosen means the card-based pick.',
+      choiceSelects: 'Two lists on every model',
+      choiceSelectsText:
+        'Quantization is the repository’s files with their sizes; “downloaded” marks a file already on disk. Context ' +
+        'runs from 8K up to the model’s limit; by default it is what the catalog considers sensible for the model ' +
+        '(64K for Qwen3.6 27B Coding) if it fits. Each list closes the options that would not fit together with the ' +
+        'choice in the other one and says why in numbers: “does not fit: needs 26.1\u00a0GB of 24”. A context under 32K is ' +
+        'closed for agents: Claude Code’s system prompt alone takes about 20 thousand tokens. The fit is computed from ' +
+        'the video memory available to the model right now, and the line above the list says which figure; the row ' +
+        'restates the same for the selected pair: what it needs, the speed, the cache. Under the lists sits the ' +
+        'recommendation for this machine: the default window and the best quantization (up to Q6_K) that fits ' +
+        'it entirely in the available memory; if nothing fits, the window steps down, never under 32K. It is ' +
+        'computed from the memory size alone, never from the vendor. When another pair is selected, “Apply” sets the recommended one. A quantization below Q4 is ' +
+        'marked “low quality”. A file imported from Ollama shows the real quantization read from the GGUF header ' +
+        'and the note “imported from Ollama”; when it cannot be read, “unknown quantization”.',
+      choiceOther: 'A quantization that is not on disk',
+      choiceOtherText:
+        'The row is recomputed for the choice: size, memory needed, speed. The “Download” button carries the file name ' +
+        'and size. While the file is missing, “Hand to agents” and “Measure” are hidden: a launch would go to a file ' +
+        'that is not there. A measurement taken at another context or quantization is marked stale, since the speed differs.',
+      choiceRestart: 'Changing it on a loaded model',
+      choiceRestartText:
+        'If the server holds this model, the choice differs from what it runs and the file is already on disk, the ' +
+        'server restarts with the new settings; the row shows “Restarting with the new settings…”. A quantization ' +
+        'that is not downloaded leaves the server alone: the choice is remembered and the button offers the download.',
+      choicePartialTitle: 'Partly in system memory, only by permission',
+      choicePartialText:
+        'An option that does not fit the video memory entirely but fits with some layers offloaded to system memory ' +
+        'stays closed until the model’s “Partly in system memory” switch is on. The speed drops several ' +
+        'times — fine for questions, not for an agent. A choice that does not fit at all is refused by the server, ' +
+        'and the answer says how much is needed and how much there is.',
+      customForm: 'Any model: a repository or a link',
+      customFormText:
+        'Below the catalog sits the “Repository or link” field: owner/repository or a Hugging Face address. The panel ' +
+        'reads the repository’s quantization list and the model layout from the GGUF header (only the start of the ' +
+        'file is fetched), downloading nothing whole. No GGUF, or an architecture the server does not know, is refused ' +
+        'with the repository name.',
+      customRow: 'Your own model in the list',
+      customRowText:
+        'The row carries a “Custom” mark and the same two lists. “Tool calling not verified” stays until the panel ' +
+        'checks with one request whether the model calls tools, which happens at “Hand to agents”; until then the model ' +
+        'counts as an agent “with a caveat”. Passed: the mark goes away. Failed: “Does not call tools”, and the model ' +
+        'no longer counts as an agent. The trash button removes the entry and deletes the model files.',
     },
 
     fitTitle: 'Catalog marks',
@@ -133,6 +180,102 @@ export const localModelsEn: typeof localModelsRu = {
       'The device is set when the server starts: switching restarts it and unloads the model. ' +
       'The “In memory” line shows where the model actually went — from the server answer, not ' +
       'from the choice: fully on the card, on the processor, or a share on the card.',
+    memoryTitle: 'Memory, idle and the prompt cache',
+    memoryCaption:
+      'What the server does while you are not typing, and how it avoids recomputing the same prompt. The “Keep the model loaded” switch is in the server card, “Hardware & server” tab.',
+    memoryIdle: 'Unloading on idle',
+    memoryIdleText:
+      'After ten minutes without requests the server unloads the model from memory: measured on ' +
+      '14 Oct, video memory fell from 7090 to 1842 MiB and RAM from 4662 to 392 MiB. The first ' +
+      'request after idle loads the model again — about four seconds on a 7B, longer on bigger ' +
+      'ones. The “In memory” line is empty meanwhile and the card says the model is unloaded by ' +
+      'idle. “Keep the model loaded” turns unloading off; the server restarts at once, or after the run if one is going.',
+    memoryCache: 'Prompt cache',
+    memoryCacheText:
+      'The agent system prompt and history are not recomputed every turn: the server keeps a ' +
+      'prompt cache in RAM — a quarter of the free memory, 1 to 8 GiB — and state checkpoints. ' +
+      'Cache shifting (`--cache-reuse`) is enabled only where the server supports it: hybrid ' +
+      'models with a recurrent state, such as Qwen3.5/3.6, do not support it, so it is not set — ' +
+      'the server would silently turn it off anyway.',
+    memoryChats: 'Switching the conversation erases the slot cache',
+    memoryChatsText:
+      'When a request comes from a different conversation, the server slot cache is erased: a ' +
+      'new chat does not inherit someone else’s prefix. The price — going back to the previous ' +
+      'conversation recomputes its prompt from scratch. A sleeping server is left alone: its ' +
+      'cache is empty already and there is no point waking it for the erase.',
+    longTitle: 'Overnight run: what keeps the task alive',
+    longCaption:
+      'A local model is left alone overnight: what the panel relies on so that the run either finishes or stops only where a human is needed.',
+    longSupervisor: 'The model server is supervised',
+    longSupervisorText:
+      'Every fifteen seconds the panel checks the model server. If it died or hung (eight ' +
+      'checks in a row without an answer) it is started again with the same settings; the ' +
+      'request that found it unreachable is sent a second time after the restart. At most ' +
+      'three restarts in ten minutes; if the server still will not come up the panel does not ' +
+      'give up but tries less often — once every ten minutes — and the server card keeps a ' +
+      'message with the attempt count, the last reason and the time of the next try; a ' +
+      'successful start resets the count. You can start the server by hand at any moment. A ' +
+      'server stopped with the button is not restarted, neither by the timer nor by a run’s ' +
+      'request. The timer only restarts a server that already answered in this panel run; a ' +
+      'run’s request that finds the server down starts it even after a computer reboot, from ' +
+      'the remembered launch. While the server is down and a run is going, the model gets ' +
+      '“server unavailable” and the client waits without limit (by design: a night must not ' +
+      'cut the task): you see it on the server card, and the wait is ended with the stop ' +
+      'button in the chat.',
+    longAwake: 'The computer does not fall asleep',
+    longAwakeText:
+      'While a run on a local model is going, the panel asks the system not to sleep (Windows, ' +
+      'macOS and Linux with systemd). The switch is in the server card, “Hardware & server” ' +
+      'tab, on by default. The screen may turn off; with no runs the block is released by ' +
+      'itself. With the switch off, sleep in the middle of a run ends it. The block does not ' +
+      'hold a closed laptop lid or “modern standby”: for an overnight run keep the laptop ' +
+      'open and plugged in. A run picked up after a panel restart holds the block too.',
+    longDefer: 'A restart waits for the end of the run',
+    longDeferText:
+      'Settings that need a server restart (unloading on idle, where to compute) are not ' +
+      'applied at once during a run: a restart would cut the task. The server card says “will ' +
+      'apply after the current run”, and the restart happens when there are no runs; the wait ' +
+      'is kept in a file and survives a panel restart. If it fails there is one more attempt, ' +
+      'then the card names the reason and the setting applies at the next server start.',
+    longContinue: 'The run continues after a failure',
+    longContinueText:
+      'If a turn ends because of a server failure, the network or a timeout, the chat continues ' +
+      'the same session itself: after 20, 60 and 180 seconds, at most three attempts in a ' +
+      'row; the feed keeps a note for each. Any message from a human cancels the wait and ' +
+      'resets the count. If a continuation did work (it ran several tools), the count ' +
+      'starts over: a night with rare failures amid hours of work does not exhaust the limit. ' +
+      'A run picked up after a panel restart is continued too, if it broke off. A stop by the ' +
+      'button and errors a repeat does not cure are not continued. A pending attempt does not ' +
+      'survive a panel restart.',
+    longMemory: 'Task memory and deadlines',
+    longMemoryText:
+      'The local-model kit tells the agent to create `.agent/PROGRESS.md` in the project, ' +
+      'update it step by step and read it after the context is compacted; the compaction hints ' +
+      'are scaled to the local model window, not the cloud one. Model reply deadlines start at ' +
+      'five minutes and grow with the context: a full prompt at the measured speed takes longer ' +
+      'than a minute. The run event buffer kept for reconnecting a screen is bounded (4000 ' +
+      'events, 4 MB): the oldest go, and a screen that fell further behind sees a note about it.',
+    mcpTitle: 'MCP servers of the local run',
+    mcpCaption:
+      'The “MCP: N” button in the chat header when the chat runs on a local model in a project. No servers by default.',
+    mcpWhy: 'Why none by default',
+    mcpWhyText:
+      'Tool descriptions ride in every request and take model window. Measured on 14 Oct: one ' +
+      'GitLab server with 39 tools is about 15 thousand tokens, while the request base without ' +
+      'MCP is about 12.6 thousand. In a 64K window history compaction starts near 44 thousand.',
+    mcpHow: 'How to choose',
+    mcpHowText:
+      'Open “MCP: N”: every server from the settings and from the project .mcp.json shows its ' +
+      'cost in tokens (with “~” when the model server is not running and the cost is estimated ' +
+      'from schema length) and the window left for the conversation. Tick what you need — the ' +
+      'choice is remembered for the project and applies from the next message; the layers ' +
+      'caption in the header names the chosen ones. A server that would leave under four ' +
+      'thousand tokens for the conversation is locked. Servers from the project .mcp.json are ' +
+      'never started on their own: their cost appears after “Measure again”.',
+    mcpHonest: 'What this does not change',
+    mcpHonestText:
+      'The choice applies only to a local run with the lean set. A project copy (a branch in a ' +
+      'separate folder) is a different directory, and its choice is made separately.',
     deviceMac: 'Mac with an M chip',
     deviceMacText:
       'On a Mac (M1 and newer) the “video card” is the chip GPU on unified memory. There is no ' +
@@ -175,7 +318,8 @@ export const localModelsEn: typeof localModelsRu = {
     kitWhat: 'What the agent gets',
     kitGlobal: 'Yours',
     kitGlobalText:
-      'Your skills, hooks and rules — exactly as in normal work. The default when you have a layer of your own.',
+      'Your skills, hooks and rules — exactly as in normal work. The default when you have a layer of your own. ' +
+      'The local-model discipline block (one subagent at a time, no reviewer fan-out) reaches the agent in this mode too.',
     kitOurs: 'Panel kit only',
     kitOursText:
       'The panel’s rules and skills; your personal settings are not loaded. Project files (.claude ' +
@@ -186,20 +330,45 @@ export const localModelsEn: typeof localModelsRu = {
       'skills only); Qwen Code has no way to add a kit for a single run. The default for Claude Code and ' +
       'Codex while you have no layer of your own: no skills, commands, subagents, CLAUDE.md or AGENTS.md.',
 
+    runtimeTitle: 'Where the model server comes from',
+    runtimeText:
+      'The panel downloads its own llama.cpp build from a GitHub release: the build number is pinned in the ' +
+      'panel, and an update is a deliberate edit together with a check of the launch flags. For an NVIDIA card ' +
+      'it takes the CUDA build matching the driver and a separate archive with the CUDA libraries; for other cards Vulkan, on a Mac Metal, ' +
+      'without a card the CPU build. The checksum is compared with the one GitHub computed when the file was uploaded; ' +
+      'a mismatch deletes the file and it is downloaded again. Your own llama-server can be set with the LLAMA_SERVER_BINARY variable.',
+    importTitle: 'Models already downloaded in Ollama',
+    importLead:
+      'The weights layer in the Ollama store is a plain GGUF. The panel attaches it with a hard link and tries to open ' +
+      'it in llama.cpp without the graphics card; Ollama is neither started nor changed.',
+    importOk: 'It opened: the model is installed',
+    importOkText:
+      'The model appears in the installed list with the real quantization read from the file (for example Q4_K_M) and the mark “imported from Ollama”. The MTP layer (if the file has one) is found by the panel ' +
+      'itself and generation speeds up — on Qwen3.6 27B that is 82 tokens a second instead of 47.',
+    importFail: 'It did not open: download again',
+    importFailText:
+      'A format or architecture this build lacks cannot be opened by llama.cpp. The link is removed, the reason ' +
+      'is shown in the section and the model is offered for a fresh download from Hugging Face.',
+    importOwn: 'The panel’s own previous store',
+    importOwnText:
+      'Models the panel downloaded while Ollama was the server (the .local-models/models folder) are taken over ' +
+      'on the first start by themselves. The system Ollama store is not touched like that: its models are taken over with a button.',
+
     filesTitle: 'Where things live',
     filesCaption:
       'Everything is in one panel folder, .local-models. Deleting it deletes both the server and the models.',
     filesPanelTitle: 'The .local-models folder',
     fileRuntime: 'Model server (own copy)',
-    fileModels: 'Models',
+    fileModels:
+      'Models: GGUF files by repository; ollama-import/ holds the ones taken over from Ollama',
     fileDownloads: 'Partial downloads',
     fileTools: 'Qwen Code and its kit',
     fileLogs: 'Server log',
-    fileRecord: 'Running server: port, context, device and context cache',
-    fileState: 'Measurements and kit choice',
+    fileRecord: 'Running server: port, model file, quantization, context, device and context cache',
+    fileState: 'Measurements, kit choice, quantization and context choice, added custom models',
     fileImport:
-      'A model from the system Ollama is moved by a hard link — no second copy on disk. If the ' +
-      'folders are on different drives a link is impossible, and the model is copied.',
+      'A model file from Ollama (a store layer) is attached by a hard link — no second copy on disk. If the ' +
+      'folders are on different drives a link is impossible, and the file is copied.',
 
     limitsTitle: 'What a local model cannot do',
     limitWeakerTitle: 'It is weaker than the cloud',
@@ -210,17 +379,24 @@ export const localModelsEn: typeof localModelsRu = {
     limitContextText:
       'The context is set when the server starts. Another model with another context means a ' +
       'server restart, and the previously loaded model is unloaded. The context cache is normally ' +
-      'q8_0; it is compressed to q4_0 when that fits a longer context entirely on the GPU, and a ' +
-      'note under the «Context» line says so. On Windows the memory held by the browser and other ' +
-      'programs is handed to the model on demand, so the fit does not cut the context because of it.',
+      'q8_0; it is compressed to q4_0 when that fits a longer context entirely on the GPU, and the ' +
+      'model row says “cache q4_0”. On Windows the memory held by the browser and other ' +
+      'programs is handed to the model on demand, so the fit does not cut the context because of it. ' +
+      'For qwen3.6:27b-coding the default is 65,536; going higher is only by picking it in the “Context” list. ' +
+      'Claude Code in such a run gets the server’s real window and compacts the history early; a ' +
+      'request that no longer fits the window is refused by the gateway with «prompt is too long», ' +
+      'which Claude Code answers by compacting — the start of a request is never cut silently. The ' +
+      'first reply after a long request waits at least five minutes, not one: the server processes a ' +
+      'large request for minutes.',
     limitEstimateTitle: 'An estimate is not a measurement',
     limitEstimateText:
       'The catalog speed is computed from the card’s bandwidth. The real number depends on the ' +
       'driver and the load on the card — “Measure” gives it.',
-    limitMemoryTitle: 'Video memory comes back on its own',
+    limitMemoryTitle: 'Video memory stays taken while the server runs',
     limitMemoryText:
-      'A model nobody used for 10 minutes is unloaded. “Stop and free memory” unloads it at once ' +
-      'and stops the server.',
+      'While the model is in use it holds video memory; after ten minutes without requests the ' +
+      'server unloads it itself (unless “Keep loaded” is on) and the memory is freed. ' +
+      '“Stop and free memory” stops the server at once; the next request starts it again.',
     limitLocalTitle: 'This machine only',
     limitLocalText:
       'The server listens on 127.0.0.1. You cannot share the model with colleagues from here — ' +
@@ -246,6 +422,18 @@ export const localModelsEn: typeof localModelsRu = {
         'Ready: the server on port 11435, “Where to compute” set to the video card, the model fully on it',
       '05-agents':
         'Agents on the local model, “Back to the cloud”, the “Claude Code on this model” checkbox off, Qwen Code and the kit',
+    },
+    choice: {
+      '01-selects':
+        'The Qwen3.6 27B Coding card: the “Launch settings” block next to the estimate, “Quantization” Q4_K_M downloaded, “Context” 64K, the measurement labelled with its context and quantization',
+      '02-other-quant':
+        'UD-Q4_K_XL selected, not on disk: a “Download” button with its size, “Hand to agents” and “Measure” hidden, the measurement marked stale',
+      '03-restart':
+        'A 96K context chosen on a loaded model: “Restarting with the new settings…”, the row recomputed for 96K',
+      '04-custom-form':
+        'The “Repository or link” field with unsloth/Qwen3-14B-GGUF typed in and the “Add” button',
+      '05-custom-row':
+        'The added model: “Custom” and “Tool calling not verified” marks, quantization sizes from the repository, the same two lists',
     },
   },
 

@@ -57,6 +57,8 @@ export interface RunLedgerEntry {
    * правки групп пошли не в авторежиме и встали на карточке прав.
    */
   permissionMode?: string;
+  /** Прогон шёл на локальной модели (`RunMeta.local`): без записи усыновлённый прогон терял это знание. */
+  local?: true;
   /** Чем прогон был для контура (`RunMeta.origin`): ход, начатый CLI после подхвата, — тот же. */
   origin?: PlatformRunConsumer;
   /**

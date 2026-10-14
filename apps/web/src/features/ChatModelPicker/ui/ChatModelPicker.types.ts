@@ -24,6 +24,11 @@ export interface ChatModelPickerProps {
    * шапка обещала слои чужого маршрута, поэтому потребителя передаёт страница.
    */
   consumer?: string;
+  /**
+   * Каталог проекта разговора. Нужен локальному прогону: по нему выбираются MCP-серверы
+   * (L4) и называются в подписи слоёв. Песочница и черновик без проекта его не дают.
+   */
+  projectPath?: string;
   onModelChange: (value: string) => void;
   onEffortChange: (value: string) => void;
 }

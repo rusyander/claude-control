@@ -390,6 +390,16 @@ export const progressAgentSchema = object({
   status: union([literal('running'), literal('done'), literal('failed')]),
   /** Первые строки того, что субагент вернул, — для read-only заглядывания. */
   result: string().optional(),
+  /**
+   * Запущен в фоне: вызов ответил распиской, итог придёт уведомлением. Такой
+   * субагент переживает конец хода — и умирает вместе с процессом разговора.
+   */
+  background: boolean().optional(),
+  /**
+   * Последняя запись субагента в его транскрипт (ISO, время правки файла
+   * `subagents/agent-*.jsonl`): «жив ли он ещё» видно без живого потока.
+   */
+  lastActivityAt: string().optional(),
 });
 
 export type ProgressAgent = Infer<typeof progressAgentSchema>;

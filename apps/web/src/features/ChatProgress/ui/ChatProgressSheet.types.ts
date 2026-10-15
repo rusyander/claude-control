@@ -19,6 +19,12 @@ export interface TaskRowProps {
 
 export interface AgentRowProps {
   agent: ProgressAgent;
+  /** Ход ещё идёт. */
+  isRunning: boolean;
+  /** Жив ли процесс CLI разговора: нет — «работающий» субагент умер вместе с ним. */
+  processAlive?: boolean;
+  /** Текущее время — для «писал N назад». */
+  now: number;
 }
 
 export interface ShellRowProps {

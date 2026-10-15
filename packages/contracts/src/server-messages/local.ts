@@ -1,6 +1,9 @@
 /** Коды текстов сервера, раздел «local»: локальные модели (сервер llama.cpp, модели, Qwen Code). Сборка всех — `../server-messages.ts`. */
 export const localMessageParams = {
+  'local-stalled': ['seconds'],
   'local-supervisor-gave-up': ['restarts'],
+  'local-on-demand-backoff': ['attempts', 'max', 'cause', 'seconds'],
+  'local-on-demand-failed': ['attempts', 'cause'],
   'local-port-busy': ['port'],
   'local-start-failed': ['binary'],
   'local-exited': ['code', 'log'],
@@ -19,6 +22,10 @@ export const localMessageParams = {
   'local-server-down': [],
   'local-model-unknown': ['tag'],
   'local-model-missing': ['tag'],
+  'local-model-loaded': ['tag', 'quant'],
+  'local-model-run-active': ['tag', 'quant'],
+  'local-model-downloading': ['tag'],
+  'local-model-path': ['tag'],
   'local-contour-save': ['reason'],
   'local-contour-activate': ['reason'],
   'local-contour-deactivate': ['reason'],

@@ -48,6 +48,29 @@ describe('runPlanView', () => {
     expect(texts(view)).toEqual([words.localCaption('Qwen3.6 27B Coding')]);
   });
 
+  it('контур локальной модели — «Локальная модель · llama.cpp», без слова «контур» (L6)', () => {
+    const view = runPlanView(
+      plan({
+        platformId: 'local-ollama',
+        title: 'Qwen3.6 27B Coding',
+        effort: false,
+        rules: {
+          model: 'qwen3.6:27b-coding',
+          source: 'default',
+          map: {},
+          catalog: ['qwen3.6:27b-coding'],
+        },
+        layers: { args: [], systemPrompt: true, dropped: ['mcp'] },
+      }),
+      { model: 'qwen3.6:27b-coding', effort: '' },
+      words,
+    );
+    const all = [...texts(view), view.locked?.hint ?? ''];
+    expect(all[0]).toBe('Локальная модель · llama.cpp: qwen3.6:27b-coding.');
+    expect(view.locked?.hint).toContain('на локальной модели (llama.cpp)');
+    for (const text of all) expect(text).not.toMatch(/контур/i);
+  });
+
   it('молчит и не запирает выбор, когда контур прогон не ведёт', () => {
     const view = runPlanView(
       plan({ routed: false, title: '' }),

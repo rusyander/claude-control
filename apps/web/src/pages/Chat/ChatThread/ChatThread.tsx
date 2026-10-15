@@ -25,6 +25,7 @@ export function ChatThread({
   onPickOption,
   isRunning,
   runStartedAt,
+  localRun,
   chatId,
   permissions,
   branchGates,
@@ -85,6 +86,7 @@ export function ChatThread({
       onPickOption={onPickOption}
       isRunning={isRunning}
       runStartedAt={runStartedAt}
+      localRun={localRun}
       permissions={permissions}
       branchGates={branchGates}
       queued={queued}

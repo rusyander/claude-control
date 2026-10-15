@@ -9,6 +9,7 @@ import {
   TARGET_CONTEXT,
   usableVramGb,
   withOwnHeldVram,
+  withQuant,
   type HardwareGpu,
 } from '@agentdeck/contracts/local-models';
 import { loadCatalog, loadGpuTable } from './service.ts';
@@ -25,8 +26,16 @@ const qwen27Catalog = catalog.find((model) => model.tag === 'qwen3.6:27b-coding'
 if (!qwen27Catalog) throw new Error('qwen3.6:27b-coding нет в каталоге');
 // Учёт видеопамяти и кеша проверяется на полном окне модели: умолчание каталога
 // (65536) срезало бы подбор раньше, чем до этого учёта дошла бы очередь. Само
-// умолчание — отдельный блок ниже, на записи каталога как есть.
-const qwen27 = { ...qwen27Catalog, defaultContext: undefined };
+// умолчание — отдельный блок ниже, на записи каталога как есть. Замеры 07.10–13.10, на
+// которые опираются числа ниже, сняты на Q4_K_M: квантование закреплено им, а умолчание
+// каталога (IQ4_XS с ревью L6) проверяется там же, в блоке умолчаний.
+const qwen27 = {
+  ...withQuant(qwen27Catalog, 'Q4_K_M'),
+  defaultContext: undefined,
+  defaultQuant: 'Q4_K_M',
+};
+/** Каталог, где 27B — та же запись на Q4_K_M: замеры загруженной модели сняты на нём. */
+const pinnedCatalog = catalog.map((model) => (model.tag === qwen27.tag ? qwen27 : model));
 
 const RTX_4090: HardwareGpu = {
   vendor: 'nvidia',
@@ -48,7 +57,7 @@ describe('видеопамять нашего же сервера', () => {
     const loaded = [
       { tag: 'qwen3.6:27b-coding', vramBytes: 17_573_148_097, sizeBytes: 17_573_148_097 },
     ];
-    const held = heldVramBytes(loaded, catalog, 98_304);
+    const held = heldVramBytes(loaded, pinnedCatalog, 98_304);
     // `size_vram` занижает: берётся наша оценка при контексте сервера.
     expect(held).toBeGreaterThan(17_573_148_097);
     const credited = withOwnHeldVram(busy, held);
@@ -94,7 +103,7 @@ describe('запас видеопамяти — по живому замеру, 
     const loaded = [
       { tag: 'qwen3.6:27b-coding', vramBytes: 17_573_148_097, sizeBytes: 17_573_148_097 },
     ];
-    const credited = withOwnHeldVram(busy, heldVramBytes(loaded, catalog, 98_304));
+    const credited = withOwnHeldVram(busy, heldVramBytes(loaded, pinnedCatalog, 98_304));
     expect(fitModel(qwen27, credited, 95).context).toBe(131_072);
   });
 });
@@ -176,8 +185,8 @@ describe('кеш контекста: q8_0 по умолчанию, q4_0 — ра
     const loaded = [
       { tag: 'qwen3.6:27b-coding', vramBytes: 17_573_148_097, sizeBytes: 17_573_148_097 },
     ];
-    const held = heldVramBytes(loaded, catalog, TARGET_CONTEXT, 'q4_0');
-    expect(held).toBeLessThan(heldVramBytes(loaded, catalog, TARGET_CONTEXT));
+    const held = heldVramBytes(loaded, pinnedCatalog, TARGET_CONTEXT, 'q4_0');
+    expect(held).toBeLessThan(heldVramBytes(loaded, pinnedCatalog, TARGET_CONTEXT));
     expect(fitModel(qwen27, withOwnHeldVram(busy, held), 95)).toMatchObject({
       context: TARGET_CONTEXT,
       kvCache: 'q4_0',
@@ -284,15 +293,27 @@ describe('чипы Apple M — по поколению и уровню', () => {
 describe('контекст по умолчанию — меньшее из «умолчание модели» и «влезло»', () => {
   const idle = { ...RTX_4090, freeGb: IDLE_FREE_GB };
 
-  it('27B Coding из каталога на простой 4090 встаёт на 65536 с q8_0, хотя карта вытянула бы 131072', () => {
-    expect(qwen27Catalog.defaultContext).toBe(65_536);
-    expect(fitModel(qwen27Catalog, idle, 95)).toMatchObject({
-      level: 'gpu',
-      context: 65_536,
-      kvCache: 'q8_0',
-    });
-    // Без умолчания та же карта дала бы 131072 на q4_0 — отличие и есть срез.
+  it('27B Coding из каталога на простой 4090 встаёт на 131072 — умолчание L6 не режет окно', () => {
+    // Владелец 15.10: агенту 64K мало — умолчание поднято до 131072.
+    expect(qwen27Catalog.defaultContext).toBe(131_072);
+    expect(fitModel(qwen27Catalog, idle, 95)).toMatchObject({ level: 'gpu', context: 131_072 });
     expect(fitModel(qwen27, idle, 95).context).toBe(TARGET_CONTEXT);
+  });
+
+  it('умолчание на рабочем столе владельца (стол держит 3,28 ГБ, замер L6) — 131072 целиком на карте (ревью B1)', () => {
+    const card = 24_564 / 1024;
+    const held = 3_280 / 1024;
+    const desktop = { ...RTX_4090, freeGb: Math.round((card - held) * 10) / 10, pageable: true };
+    for (const tag of ['qwen3.6:27b-coding', 'qwen3.8:27b']) {
+      const model = catalog.find((item) => item.tag === tag);
+      if (!model) throw new Error(`${tag} нет в каталоге`);
+      const fit = fitModel(model, desktop, 95);
+      expect(fit, tag).toMatchObject({ level: 'gpu', context: 131_072 });
+      // Вес, кеш и служебное плюс то, что стол не отдал, — меньше карты: модель не сползает.
+      expect(fit.needGb + held, tag).toBeLessThan(card);
+    }
+    // Прежнее умолчание с этим окном сползало (замер L6 15.10: 21,5 ГиБ, разбор 1900 → 90 ток/с).
+    expect(modelNeedGb(qwen27Catalog, 131_072, 'q4_0', 'Q4_K_M') + held).toBeGreaterThan(card);
   });
 
   it('карта поменьше: умолчание не поднимает контекст выше того, что влезло', () => {

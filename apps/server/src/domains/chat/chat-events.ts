@@ -160,6 +160,8 @@ export type ChatEvent =
        *   автоматические продолжения исчерпаны, нужен человек (L4b).
        * 'eventsTrimmed' — долгий прогон: старые кадры потока сброшены из буфера, переподключение
        *   начинается не с начала (L4b).
+       * 'backgroundAsk' — фоновому субагенту после конца хода нужно решение человека: панель
+       *   завела под ждущую сессию видимый прогон с карточкой (L6, живой прогон 14.10).
        */
       code:
         | 'adopted'
@@ -185,7 +187,8 @@ export type ChatEvent =
         | 'conversationLost'
         | 'autoContinue'
         | 'autoContinueSpent'
-        | 'eventsTrimmed';
+        | 'eventsTrimmed'
+        | 'backgroundAsk';
       text: string;
       /**
        * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод

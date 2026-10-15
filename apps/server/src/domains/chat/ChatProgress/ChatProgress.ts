@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   ChatProgress,
   ProgressTask,
@@ -34,7 +36,45 @@ export function readChatProgress(projectsDir: string, chatId: string): ChatProgr
   const path = findTranscript(projectsDir, chatId);
   if (!path) return { tasks: [], agents: [] };
 
-  return buildProgress(readTranscriptRecords(path));
+  const progress = buildProgress(readTranscriptRecords(path));
+  return { ...progress, agents: withAgentActivity(progress.agents, path) };
+}
+
+/**
+ * Когда субагент писал в последний раз. CLI кладёт его транскрипт рядом с
+ * главным — `<сессия>/subagents/agent-<id>.jsonl`, а `agent-<id>.meta.json`
+ * называет вызов, которым он запущен (`toolUseId`, claude 2.1.286). Время правки
+ * файла — единственная правда о живости фонового агента между ходами: живого
+ * потока у панели тогда нет (живой прогон 14.10 — агент стоял часами, а полоса
+ * молча звала его «работает»).
+ */
+export function withAgentActivity(
+  agents: ProgressAgent[],
+  transcriptPath: string,
+): ProgressAgent[] {
+  if (agents.length === 0) return agents;
+  const dir = join(transcriptPath.replace(/\.jsonl$/i, ''), 'subagents');
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((name) => name.endsWith('.meta.json'));
+  } catch {
+    return agents;
+  }
+  const activity = new Map<string, string>();
+  for (const name of files) {
+    try {
+      const meta = JSON.parse(readFileSync(join(dir, name), 'utf8')) as { toolUseId?: unknown };
+      if (typeof meta.toolUseId !== 'string') continue;
+      const log = join(dir, name.replace(/\.meta\.json$/, '.jsonl'));
+      activity.set(meta.toolUseId, statSync(log).mtime.toISOString());
+    } catch {
+      // Файл пишется прямо сейчас или его ещё нет — без времени, не без агента.
+    }
+  }
+  return agents.map((agent) => {
+    const at = activity.get(agent.id);
+    return at ? { ...agent, lastActivityAt: at } : agent;
+  });
 }
 
 export function buildProgress(records: TranscriptRecord[]): ChatProgress {
@@ -531,7 +571,10 @@ function applyToolResult(block: TranscriptBlock, agents: Map<string, ProgressAge
   if (!agent) return;
 
   const text = resultText(block);
-  if (isLaunchAcknowledgement(text)) return;
+  if (isLaunchAcknowledgement(text)) {
+    agents.set(id, { ...agent, background: true });
+    return;
+  }
 
   agents.set(id, {
     ...agent,

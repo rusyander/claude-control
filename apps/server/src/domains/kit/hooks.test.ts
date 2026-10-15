@@ -228,7 +228,7 @@ describe('local-discipline: на локальной модели без фоно
           .hookSpecificOutput?.permissionDecision
       : undefined;
 
-  it('фоновая команда и фоновый субагент — отказ с причиной', () => {
+  it('фоновая команда — отказ с причиной; фоновый субагент разрешён (L6)', () => {
     const shell = runNode(
       ITEM,
       call('Bash', { command: 'npm test', run_in_background: true }),
@@ -237,7 +237,9 @@ describe('local-discipline: на локальной модели без фоно
     expect(decision(shell.stdout)).toBe('deny');
     expect(shell.stdout).toContain('without run_in_background');
     const agent = call('Agent', { prompt: 'x', description: 'y', run_in_background: true });
-    expect(decision(runNode(ITEM, agent, LOCAL).stdout)).toBe('deny');
+    expect(runNode(ITEM, agent, LOCAL).stdout.trim()).toBe('');
+    const task = call('Task', { prompt: 'x', description: 'y', run_in_background: true });
+    expect(runNode(ITEM, task, LOCAL).stdout.trim()).toBe('');
   });
 
   it('форма Qwen Code (`run_shell_command`) — тот же отказ', () => {

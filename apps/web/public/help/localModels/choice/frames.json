@@ -9,31 +9,31 @@
       "masked": 0,
       "width": 1106,
       "height": 345,
-      "shotAt": "2026-10-13T21:23:30.899Z",
-      "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Рекомендуем Настроена на код Работает у агентов Замерить На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ при контексте 64K Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · рекомендуется Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): UD-Q4_K_XL · 64K Применить",
+      "shotAt": "2026-10-14T20:34:23.585Z",
+      "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Замерить На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ при контексте 64K Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · рекомендуется · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить",
       "dark": {
         "file": "01-selects.dark.png",
         "masked": 0,
         "width": 1106,
         "height": 345,
-        "shotAt": "2026-10-13T21:24:11.631Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Рекомендуем Настроена на код Работает у агентов Замерить На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ при контексте 64K Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · рекомендуется Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): UD-Q4_K_XL · 64K Применить"
+        "shotAt": "2026-10-14T20:35:07.216Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Замерить На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ при контексте 64K Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · рекомендуется · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить"
       },
       "en": {
         "file": "01-selects.en.png",
         "masked": 0,
         "width": 1106,
         "height": 345,
-        "shotAt": "2026-10-13T21:24:52.826Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Recommended Tuned for code Used by agents Measure On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB at context 64K File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · recommended Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): UD-Q4_K_XL · 64K Apply"
+        "shotAt": "2026-10-14T20:35:51.418Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Measure On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB at context 64K File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · recommended · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply"
       },
       "darkEn": {
         "file": "01-selects.dark.en.png",
         "masked": 0,
         "width": 1106,
         "height": 345,
-        "shotAt": "2026-10-13T21:25:34.059Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Recommended Tuned for code Used by agents Measure On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB at context 64K File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · recommended Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): UD-Q4_K_XL · 64K Apply"
+        "shotAt": "2026-10-14T20:36:35.148Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Measure On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB at context 64K File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · recommended · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply"
       }
     },
     {
@@ -43,31 +43,31 @@
       "masked": 0,
       "width": 1106,
       "height": 370,
-      "shotAt": "2026-10-13T21:23:31.882Z",
-      "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Рекомендуем Настроена на код Работает у агентов Скачать UD-Q4_K_XL · 16,7 ГБ На этой машине Скорость ≈50⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 16,7 ГБ UD-Q4_K_XL Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Файла UD-Q4_K_XL нет на диске — скачайте (на диске: Q4_K_M) Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K · не влезет: нужно 22,5 ГБ из 21,8 128K · не влезет: нужно 23,5 ГБ из 21,8 192K · не влезет: нужно 25,6 ГБ из 21,8 256K · не влезет: нужно 27,8 ГБ из 21,8 Частично в оперативной памяти Выбрано рекомендуемое для вашей видеокарты (21,8 ГБ): UD-Q4_K_XL · 64K",
+      "shotAt": "2026-10-14T20:34:24.569Z",
+      "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Скачать UD-Q4_K_XL · 16,7 ГБ На этой машине Скорость ≈50⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 16,7 ГБ UD-Q4_K_XL Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Файла UD-Q4_K_XL нет на диске — скачайте (на диске: Q4_K_M) Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K · не влезет: нужно 22,5 ГБ из 21,8 128K · рекомендуется · не влезет: нужно 23,5 ГБ из 21,8 192K · не влезет: нужно 25,6 ГБ из 21,8 256K · не влезет: нужно 27,8 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить",
       "dark": {
         "file": "02-other-quant.dark.png",
         "masked": 0,
         "width": 1106,
         "height": 370,
-        "shotAt": "2026-10-13T21:24:12.614Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Рекомендуем Настроена на код Работает у агентов Скачать UD-Q4_K_XL · 16,7 ГБ На этой машине Скорость ≈50⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 16,7 ГБ UD-Q4_K_XL Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Файла UD-Q4_K_XL нет на диске — скачайте (на диске: Q4_K_M) Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K · не влезет: нужно 22,5 ГБ из 21,8 128K · не влезет: нужно 23,5 ГБ из 21,8 192K · не влезет: нужно 25,6 ГБ из 21,8 256K · не влезет: нужно 27,8 ГБ из 21,8 Частично в оперативной памяти Выбрано рекомендуемое для вашей видеокарты (21,8 ГБ): UD-Q4_K_XL · 64K"
+        "shotAt": "2026-10-14T20:35:08.201Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Скачать UD-Q4_K_XL · 16,7 ГБ На этой машине Скорость ≈50⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 16,7 ГБ UD-Q4_K_XL Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Файла UD-Q4_K_XL нет на диске — скачайте (на диске: Q4_K_M) Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ Q5_K_S · 17,9 ГБ · не влезет: нужно 22,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 23,2 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 26 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 28,9 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 31,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 38 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K · не влезет: нужно 22,5 ГБ из 21,8 128K · рекомендуется · не влезет: нужно 23,5 ГБ из 21,8 192K · не влезет: нужно 25,6 ГБ из 21,8 256K · не влезет: нужно 27,8 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить"
       },
       "en": {
         "file": "02-other-quant.en.png",
         "masked": 0,
         "width": 1106,
         "height": 370,
-        "shotAt": "2026-10-13T21:24:53.816Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Recommended Tuned for code Used by agents Download UD-Q4_K_XL · 16.7 GB On this machine Speed ≈50⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 16.7 GB UD-Q4_K_XL Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice No UD-Q4_K_XL file on disk: download it (on disk: Q4_K_M) Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K · does not fit: needs 22.5 GB of 21.8 128K · does not fit: needs 23.5 GB of 21.8 192K · does not fit: needs 25.6 GB of 21.8 256K · does not fit: needs 27.8 GB of 21.8 Partly in system memory The recommended pick for your graphics card (21.8 GB) is selected: UD-Q4_K_XL · 64K"
+        "shotAt": "2026-10-14T20:35:52.402Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Download UD-Q4_K_XL · 16.7 GB On this machine Speed ≈50⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 16.7 GB UD-Q4_K_XL Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice No UD-Q4_K_XL file on disk: download it (on disk: Q4_K_M) Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K · does not fit: needs 22.5 GB of 21.8 128K · recommended · does not fit: needs 23.5 GB of 21.8 192K · does not fit: needs 25.6 GB of 21.8 256K · does not fit: needs 27.8 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply"
       },
       "darkEn": {
         "file": "02-other-quant.dark.en.png",
         "masked": 0,
         "width": 1106,
         "height": 370,
-        "shotAt": "2026-10-13T21:25:35.047Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Recommended Tuned for code Used by agents Download UD-Q4_K_XL · 16.7 GB On this machine Speed ≈50⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 16.7 GB UD-Q4_K_XL Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice No UD-Q4_K_XL file on disk: download it (on disk: Q4_K_M) Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K · does not fit: needs 22.5 GB of 21.8 128K · does not fit: needs 23.5 GB of 21.8 192K · does not fit: needs 25.6 GB of 21.8 256K · does not fit: needs 27.8 GB of 21.8 Partly in system memory The recommended pick for your graphics card (21.8 GB) is selected: UD-Q4_K_XL · 64K"
+        "shotAt": "2026-10-14T20:36:36.128Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Download UD-Q4_K_XL · 16.7 GB On this machine Speed ≈50⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 16.7 GB UD-Q4_K_XL Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice No UD-Q4_K_XL file on disk: download it (on disk: Q4_K_M) Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB Q5_K_S · 17.9 GB · does not fit: needs 22.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 23.2 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 23.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 26 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 28.9 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 31.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 38 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K · does not fit: needs 22.5 GB of 21.8 128K · recommended · does not fit: needs 23.5 GB of 21.8 192K · does not fit: needs 25.6 GB of 21.8 256K · does not fit: needs 27.8 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply"
       }
     },
     {
@@ -77,31 +77,31 @@
       "masked": 0,
       "width": 1106,
       "height": 392,
-      "shotAt": "2026-10-13T21:23:35.037Z",
-      "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Рекомендуем Настроена на код Работает у агентов Замерить Перезапуск с новыми настройками… На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · рекомендуется · не влезет: нужно 22,5 ГБ из 21,8 Q5_K_S · 17,9 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 24,3 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 24,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 27,1 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 30 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 32,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 39,1 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K · рекомендуется 96K 128K · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): UD-Q4_K_XL · 64K Применить",
+      "shotAt": "2026-10-14T20:34:27.691Z",
+      "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Замерить Перезапуск с новыми настройками… На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · не влезет: нужно 22,5 ГБ из 21,8 Q5_K_S · 17,9 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 24,3 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 24,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 27,1 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 30 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 32,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 39,1 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · рекомендуется · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить",
       "dark": {
         "file": "03-restart.dark.png",
         "masked": 0,
         "width": 1106,
         "height": 392,
-        "shotAt": "2026-10-13T21:24:15.834Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Рекомендуем Настроена на код Работает у агентов Замерить Перезапуск с новыми настройками… На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · рекомендуется · не влезет: нужно 22,5 ГБ из 21,8 Q5_K_S · 17,9 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 24,3 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 24,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 27,1 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 30 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 32,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 39,1 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K · рекомендуется 96K 128K · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): UD-Q4_K_XL · 64K Применить"
+        "shotAt": "2026-10-14T20:35:11.235Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Замерить Перезапуск с новыми настройками… На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · не влезет: нужно 22,5 ГБ из 21,8 Q5_K_S · 17,9 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 24,3 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 24,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 27,1 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 30 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 32,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 39,1 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · рекомендуется · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить"
       },
       "en": {
         "file": "03-restart.en.png",
         "masked": 0,
         "width": 1106,
         "height": 392,
-        "shotAt": "2026-10-13T21:24:57.147Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Recommended Tuned for code Used by agents Measure Restarting with the new settings… On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · recommended · does not fit: needs 22.5 GB of 21.8 Q5_K_S · 17.9 GB · does not fit: needs 23.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 24.3 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 24.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 27.1 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 30 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 32.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 39.1 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K · recommended 96K 128K · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): UD-Q4_K_XL · 64K Apply"
+        "shotAt": "2026-10-14T20:35:55.701Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Measure Restarting with the new settings… On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · does not fit: needs 22.5 GB of 21.8 Q5_K_S · 17.9 GB · does not fit: needs 23.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 24.3 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 24.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 27.1 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 30 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 32.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 39.1 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · recommended · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply"
       },
       "darkEn": {
         "file": "03-restart.dark.en.png",
         "masked": 0,
         "width": 1106,
         "height": 392,
-        "shotAt": "2026-10-13T21:25:38.309Z",
-        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Recommended Tuned for code Used by agents Measure Restarting with the new settings… On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · recommended · does not fit: needs 22.5 GB of 21.8 Q5_K_S · 17.9 GB · does not fit: needs 23.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 24.3 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 24.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 27.1 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 30 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 32.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 39.1 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K · recommended 96K 128K · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): UD-Q4_K_XL · 64K Apply"
+        "shotAt": "2026-10-14T20:36:39.071Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Measure Restarting with the new settings… On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · does not fit: needs 22.5 GB of 21.8 Q5_K_S · 17.9 GB · does not fit: needs 23.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 24.3 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 24.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 27.1 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 30 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 32.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 39.1 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · recommended · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply"
       }
     },
     {
@@ -111,14 +111,14 @@
       "masked": 0,
       "width": 1106,
       "height": 173,
-      "shotAt": "2026-10-13T21:23:38.241Z",
+      "shotAt": "2026-10-14T20:34:30.864Z",
       "text": "Любая модель Любой репозиторий Hugging Face с GGUF: укажите владельца и репозиторий или вставьте ссылку. Панель прочитает список квантований и устройство модели, ничего не скачивая. Репозиторий или ссылка Добавить",
       "dark": {
         "file": "04-custom-form.dark.png",
         "masked": 0,
         "width": 1106,
         "height": 173,
-        "shotAt": "2026-10-13T21:24:19.057Z",
+        "shotAt": "2026-10-14T20:35:14.327Z",
         "text": "Любая модель Любой репозиторий Hugging Face с GGUF: укажите владельца и репозиторий или вставьте ссылку. Панель прочитает список квантований и устройство модели, ничего не скачивая. Репозиторий или ссылка Добавить"
       },
       "en": {
@@ -126,7 +126,7 @@
         "masked": 0,
         "width": 1106,
         "height": 173,
-        "shotAt": "2026-10-13T21:25:00.504Z",
+        "shotAt": "2026-10-14T20:35:59.027Z",
         "text": "Any model Any Hugging Face repository with GGUF files: give owner and repository or paste a link. The panel reads the quantization list and the model layout without downloading anything. Repository or link Add"
       },
       "darkEn": {
@@ -134,7 +134,7 @@
         "masked": 0,
         "width": 1106,
         "height": 173,
-        "shotAt": "2026-10-13T21:25:41.654Z",
+        "shotAt": "2026-10-14T20:36:42.124Z",
         "text": "Any model Any Hugging Face repository with GGUF files: give owner and repository or paste a link. The panel reads the quantization list and the model layout without downloading anything. Repository or link Add"
       }
     },
@@ -145,14 +145,14 @@
       "masked": 0,
       "width": 1106,
       "height": 345,
-      "shotAt": "2026-10-13T21:23:42.080Z",
+      "shotAt": "2026-10-14T20:34:34.685Z",
       "text": "Qwen3-14B hf:unsloth/Qwen3-14B-GGUF Влезает в видеокарту Общая Своя Агентность не проверена Скачать Q4_K_M · 8,4 ГБ На этой машине Скорость ≈65⁠–⁠95 ток/⁠с оценка Память 12,4 из 21,8 ГБ при контексте 32K Файл 8,4 ГБ Q4_K_M Зовёт ли модель инструменты, станет известно при «Отдать агентам»: панель проверит это один запросом. Запуск Квантование Q3_K_M · 6,8 ГБ · низкое качество Q4_K_M · 8,4 ГБ Q5_K_M · 9,8 ГБ Q6_K · 11,3 ГБ · рекомендуется Q8_0 · 14,6 ГБ Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 40K · рекомендуется Для вашей видеокарты (21,8 ГБ): Q6_K · 40K Применить",
       "dark": {
         "file": "05-custom-row.dark.png",
         "masked": 0,
         "width": 1106,
         "height": 345,
-        "shotAt": "2026-10-13T21:24:22.848Z",
+        "shotAt": "2026-10-14T20:35:18.152Z",
         "text": "Qwen3-14B hf:unsloth/Qwen3-14B-GGUF Влезает в видеокарту Общая Своя Агентность не проверена Скачать Q4_K_M · 8,4 ГБ На этой машине Скорость ≈65⁠–⁠95 ток/⁠с оценка Память 12,4 из 21,8 ГБ при контексте 32K Файл 8,4 ГБ Q4_K_M Зовёт ли модель инструменты, станет известно при «Отдать агентам»: панель проверит это один запросом. Запуск Квантование Q3_K_M · 6,8 ГБ · низкое качество Q4_K_M · 8,4 ГБ Q5_K_M · 9,8 ГБ Q6_K · 11,3 ГБ · рекомендуется Q8_0 · 14,6 ГБ Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 40K · рекомендуется Для вашей видеокарты (21,8 ГБ): Q6_K · 40K Применить"
       },
       "en": {
@@ -160,7 +160,7 @@
         "masked": 0,
         "width": 1106,
         "height": 345,
-        "shotAt": "2026-10-13T21:25:04.245Z",
+        "shotAt": "2026-10-14T20:36:02.784Z",
         "text": "Qwen3-14B hf:unsloth/Qwen3-14B-GGUF Fits the GPU General Custom Tool calling not verified Download Q4_K_M · 8.4 GB On this machine Speed ≈65⁠–⁠95 tok/⁠s estimate Memory 12.4 of 21.8 GB at context 32K File 8.4 GB Q4_K_M Whether the model calls tools is learned at “Hand to agents”: the panel checks it with one request. Launch settings Quantization Q3_K_M · 6.8 GB · low quality Q4_K_M · 8.4 GB Q5_K_M · 9.8 GB Q6_K · 11.3 GB · recommended Q8_0 · 14.6 GB Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 40K · recommended For your graphics card (21.8 GB): Q6_K · 40K Apply"
       },
       "darkEn": {
@@ -168,8 +168,76 @@
         "masked": 0,
         "width": 1106,
         "height": 345,
-        "shotAt": "2026-10-13T21:25:45.427Z",
+        "shotAt": "2026-10-14T20:36:45.811Z",
         "text": "Qwen3-14B hf:unsloth/Qwen3-14B-GGUF Fits the GPU General Custom Tool calling not verified Download Q4_K_M · 8.4 GB On this machine Speed ≈65⁠–⁠95 tok/⁠s estimate Memory 12.4 of 21.8 GB at context 32K File 8.4 GB Q4_K_M Whether the model calls tools is learned at “Hand to agents”: the panel checks it with one request. Launch settings Quantization Q3_K_M · 6.8 GB · low quality Q4_K_M · 8.4 GB Q5_K_M · 9.8 GB Q6_K · 11.3 GB · recommended Q8_0 · 14.6 GB Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 40K · recommended For your graphics card (21.8 GB): Q6_K · 40K Apply"
+      }
+    },
+    {
+      "id": "06-files",
+      "side": "panel",
+      "file": "06-files.png",
+      "masked": 0,
+      "width": 1106,
+      "height": 454,
+      "shotAt": "2026-10-14T20:34:37.841Z",
+      "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Замерить На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · скачано · не влезет: нужно 22,5 ГБ из 21,8 Q5_K_S · 17,9 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 24,3 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 24,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 27,1 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 30 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 32,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 39,1 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · рекомендуется · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить На диске Q4_K_M · 15,9 ГБ загружено в сервер — остановите сервер, чтобы удалить UD-Q4_K_XL · 16,7 ГБ",
+      "dark": {
+        "file": "06-files.dark.png",
+        "masked": 0,
+        "width": 1106,
+        "height": 454,
+        "shotAt": "2026-10-14T20:35:21.255Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Влезает в видеокарту Настроена на код Работает у агентов Замерить На этой машине Скорость ≈55⁠–⁠80 ток/⁠с оценка Память 20,7 из 21,8 ГБ кеш q4_0 Файл 15,9 ГБ Q4_K_M Замер 61.4 ток/⁠с 64K, Q4_K_M замер снят при другом выборе Запуск Квантование UD-IQ2_XXS · 8,9 ГБ · низкое качество UD-IQ2_M · 10,3 ГБ · низкое качество UD-Q2_K_XL · 11,2 ГБ · низкое качество UD-IQ3_XXS · 11,4 ГБ · низкое качество Q3_K_S · 11,7 ГБ · низкое качество Q3_K_M · 12,9 ГБ · низкое качество UD-Q3_K_XL · 13,8 ГБ · низкое качество IQ4_XS · 14,6 ГБ Q4_0 · 15 ГБ Q4_K_S · 15 ГБ · рекомендуется IQ4_NL · 15,2 ГБ Q4_K_M · 15,9 ГБ · скачано Q4_1 · 16,3 ГБ UD-Q4_K_XL · 16,7 ГБ · скачано · не влезет: нужно 22,5 ГБ из 21,8 Q5_K_S · 17,9 ГБ · не влезет: нужно 23,7 ГБ из 21,8 Q5_K_M · 18,5 ГБ · не влезет: нужно 24,3 ГБ из 21,8 UD-Q5_K_XL · 19 ГБ · не влезет: нужно 24,7 ГБ из 21,8 Q6_K · 21,3 ГБ · не влезет: нужно 27,1 ГБ из 21,8 UD-Q6_K_XL · 24,2 ГБ · не влезет: нужно 30 ГБ из 21,8 Q8_0 · 27,1 ГБ · не влезет: нужно 32,8 ГБ из 21,8 UD-Q8_K_XL · 33,3 ГБ · не влезет: нужно 39,1 ГБ из 21,8 Контекст 8K · агенту мало: меньше 32K 16K · агенту мало: меньше 32K 32K 48K 64K 96K 128K · рекомендуется · не влезет: нужно 22,8 ГБ из 21,8 192K · не влезет: нужно 24,9 ГБ из 21,8 256K · не влезет: нужно 27 ГБ из 21,8 Частично в оперативной памяти Для вашей видеокарты (21,8 ГБ): Q4_K_S · 128K Применить На диске Q4_K_M · 15,9 ГБ загружено в сервер — остановите сервер, чтобы удалить UD-Q4_K_XL · 16,7 ГБ"
+      },
+      "en": {
+        "file": "06-files.en.png",
+        "masked": 0,
+        "width": 1106,
+        "height": 454,
+        "shotAt": "2026-10-14T20:36:05.983Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Measure On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · downloaded · does not fit: needs 22.5 GB of 21.8 Q5_K_S · 17.9 GB · does not fit: needs 23.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 24.3 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 24.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 27.1 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 30 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 32.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 39.1 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · recommended · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply On disk Q4_K_M · 15.9 GB loaded in the server: stop the server to delete UD-Q4_K_XL · 16.7 GB"
+      },
+      "darkEn": {
+        "file": "06-files.dark.en.png",
+        "masked": 0,
+        "width": 1106,
+        "height": 454,
+        "shotAt": "2026-10-14T20:36:48.685Z",
+        "text": "Qwen3.6 27B Coding qwen3.6:27b-coding Fits the GPU Tuned for code Used by agents Measure On this machine Speed ≈55⁠–⁠80 tok/⁠s estimate Memory 20.7 of 21.8 GB cache q4_0 File 15.9 GB Q4_K_M Measured 61.4 tok/⁠s 64K, Q4_K_M measured at another choice Launch settings Quantization UD-IQ2_XXS · 8.9 GB · low quality UD-IQ2_M · 10.3 GB · low quality UD-Q2_K_XL · 11.2 GB · low quality UD-IQ3_XXS · 11.4 GB · low quality Q3_K_S · 11.7 GB · low quality Q3_K_M · 12.9 GB · low quality UD-Q3_K_XL · 13.8 GB · low quality IQ4_XS · 14.6 GB Q4_0 · 15 GB Q4_K_S · 15 GB · recommended IQ4_NL · 15.2 GB Q4_K_M · 15.9 GB · downloaded Q4_1 · 16.3 GB UD-Q4_K_XL · 16.7 GB · downloaded · does not fit: needs 22.5 GB of 21.8 Q5_K_S · 17.9 GB · does not fit: needs 23.7 GB of 21.8 Q5_K_M · 18.5 GB · does not fit: needs 24.3 GB of 21.8 UD-Q5_K_XL · 19 GB · does not fit: needs 24.7 GB of 21.8 Q6_K · 21.3 GB · does not fit: needs 27.1 GB of 21.8 UD-Q6_K_XL · 24.2 GB · does not fit: needs 30 GB of 21.8 Q8_0 · 27.1 GB · does not fit: needs 32.8 GB of 21.8 UD-Q8_K_XL · 33.3 GB · does not fit: needs 39.1 GB of 21.8 Context 8K · too small for an agent: under 32K 16K · too small for an agent: under 32K 32K 48K 64K 96K 128K · recommended · does not fit: needs 22.8 GB of 21.8 192K · does not fit: needs 24.9 GB of 21.8 256K · does not fit: needs 27 GB of 21.8 Partly in system memory For your graphics card (21.8 GB): Q4_K_S · 128K Apply On disk Q4_K_M · 15.9 GB loaded in the server: stop the server to delete UD-Q4_K_XL · 16.7 GB"
+      }
+    },
+    {
+      "id": "07-confirm",
+      "side": "panel",
+      "file": "07-confirm.png",
+      "masked": 0,
+      "width": 444,
+      "height": 344,
+      "shotAt": "2026-10-14T20:34:38.528Z",
+      "text": "Удалить UD-Q4_K_XL? Файл UD-Q4_K_XL модели qwen3.6:27b-coding будет удалён из папки панели, освободится 16,7 ГБ. Остальные квантования останутся; скачать это заново можно в этой же карточке. Отмена Удалить",
+      "dark": {
+        "file": "07-confirm.dark.png",
+        "masked": 0,
+        "width": 444,
+        "height": 344,
+        "shotAt": "2026-10-14T20:35:21.960Z",
+        "text": "Удалить UD-Q4_K_XL? Файл UD-Q4_K_XL модели qwen3.6:27b-coding будет удалён из папки панели, освободится 16,7 ГБ. Остальные квантования останутся; скачать это заново можно в этой же карточке. Отмена Удалить"
+      },
+      "en": {
+        "file": "07-confirm.en.png",
+        "masked": 0,
+        "width": 444,
+        "height": 344,
+        "shotAt": "2026-10-14T20:36:06.658Z",
+        "text": "Delete UD-Q4_K_XL? The UD-Q4_K_XL file of qwen3.6:27b-coding will be deleted from the panel folder, freeing 16.7 GB. Other quantizations stay; you can download this one again in the same card. Cancel Delete"
+      },
+      "darkEn": {
+        "file": "07-confirm.dark.en.png",
+        "masked": 0,
+        "width": 444,
+        "height": 344,
+        "shotAt": "2026-10-14T20:36:49.357Z",
+        "text": "Delete UD-Q4_K_XL? The UD-Q4_K_XL file of qwen3.6:27b-coding will be deleted from the panel folder, freeing 16.7 GB. Other quantizations stay; you can download this one again in the same card. Cancel Delete"
       }
     }
   ]

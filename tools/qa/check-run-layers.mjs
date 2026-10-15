@@ -935,8 +935,8 @@ ${MARK.ancestor}
       );
       check(kitOurs.facts.project, 'набор «только наш»: проектный CLAUDE.md остаётся');
     }
-    // ── 11. Облегчённый набор локальной модели (L1b) ──────────────────────────
-    // Слои берутся у ТОГО ЖЕ `localLeanRules`, которым панель заводит контур
+    // ── 11. Облегчённый набор локальной модели (L1b, только по выбору) ────────
+    // Слои берутся у ТОГО ЖЕ `localLeanRules`, которым облегчается контур
     // локальной модели: копия списка здесь проверяла бы сама себя. Полный набор —
     // контроль: без него «Cron* нет в запросе» могло бы значить, что этой версии
     // CLI их не было вовсе. Мера — тело запроса: правила и скиллы человека обязаны
@@ -970,6 +970,34 @@ ${MARK.ancestor}
       );
       console.log(
         `     тело запроса: полный набор ${full.facts.chars} знаков, облегчённый ${lean.facts.chars}`,
+      );
+    }
+    // ── 12. Локальная модель ПО УМОЛЧАНИЮ — полный набор (L6, 15.10) ──────────
+    // Слои — те, с которыми `localPlatformSettings` заводит контур, а не литерал:
+    // вернись умолчание к облегчённому набору — MCP и расширенные инструменты
+    // пропадут из запроса, и это увидит именно эта проверка.
+    const { localPlatformSettings } =
+      await import('../../apps/server/src/domains/local-models/connect.ts');
+    const born = localPlatformSettings({
+      baseUrl: 'http://127.0.0.1:1',
+      model: 'm',
+      title: 't',
+      consumers: ['chat'],
+    });
+    const localDefault = await runCase('local-default', born.rules.ours);
+    check(Boolean(localDefault.facts), 'локальная модель по умолчанию: запрос записан');
+    if (localDefault.facts) {
+      check(
+        localDefault.args.length === 0,
+        `локальная модель по умолчанию: флагов снятия нет: ${JSON.stringify(localDefault.args)}`,
+      );
+      check(localDefault.facts.mcp, 'локальная модель по умолчанию: личный MCP-сервер в запросе');
+      check(localDefault.facts.skill, 'локальная модель по умолчанию: личный скилл в запросе');
+      check(
+        ['CronCreate', 'ScheduleWakeup', 'Workflow', 'SendMessage', 'EnterWorktree'].some((name) =>
+          localDefault.facts.tools.includes(name),
+        ),
+        'локальная модель по умолчанию: расширенные инструменты на месте',
       );
     }
   } finally {

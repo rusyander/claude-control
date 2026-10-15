@@ -10,6 +10,7 @@ import { TruncatedText } from '@shared/ui/truncated-text';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
 import { toast } from '@shared/lib/toast';
+import { platformTitleOf } from '@shared/lib/chat-model';
 import {
   CapabilityMatrix,
   platformBudgetOf,
@@ -103,7 +104,8 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
           <Stack gap="var(--spacing-3xs)" minWidth="14rem" flex={1}>
             <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
               <Typography variant="heading-sm" as="h2">
-                {platform.title}
+                {/* Контур локальной модели — «Локальная модель · llama.cpp» (L6). */}
+                {platformTitleOf(platform, t)}
               </Typography>
               <StatusDot tone={TONE[state]} />
               <Typography variant="body-sm" color="muted" as="span">

@@ -36,6 +36,7 @@ import { basename } from 'node:path';
 import { issuesOf } from '../../lib/request-body.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
 import { runLegacyGroupMigrations } from '../../domains/groups/legacy-migrations.ts';
+import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { migrateLegacyIntegrations } from '@agentdeck/contracts/integrations-legacy';
 import type { CredentialsLookup } from '../../lib/credentials/credentials.ts';
 
@@ -56,6 +57,14 @@ function credentialsReply(found: CredentialsLookup) {
 function afterRelocate(app: FastifyInstance, ctx: ServerContext): void {
   const deps = { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir };
   runLegacyGroupMigrations(deps, app.log);
+  // И перевод локального контура на полный набор (L6): отметка у каждого каталога своя.
+  try {
+    runLocalFullLayer(ctx.store, ctx.location.paths.appData, (outcome) =>
+      app.log.info({ outcome }, 'local full-layer migration'),
+    );
+  } catch (error) {
+    app.log.warn({ err: error }, 'local full-layer migration failed');
+  }
 }
 
 /** Маршруты про само приложение: расположение конфигов, настройки, сводка. */

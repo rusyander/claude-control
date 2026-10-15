@@ -5,6 +5,7 @@ import { SkeletonList, SkeletonText } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { LocalLayerWarning, LocalRunStatus } from '@entities/LocalModels';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { CrashCard, ErrorBoundary } from '@shared/ui/error-boundary';
 import { isOpenAsk } from '@shared/lib/chat-stream';
@@ -97,6 +98,7 @@ export function ChatMessages({
   mediaTopic,
   mediaRevision,
   runStartedAt,
+  localRun,
 }: ChatMessagesProps) {
   const { t } = useTranslation();
   const timings = useMessageTimings(messages, isRunning);
@@ -344,6 +346,15 @@ export function ChatMessages({
 
             {stream.isRunning && stream.text && <span className={styles.caret} />}
 
+            {/* Локальная модель: что сервер делает с ходом прямо сейчас (L6). */}
+            {stream.isRunning && localRun && (
+              <LocalRunStatus
+                waitingPermission={(permissions?.length ?? 0) > 0}
+                {...(runStartedAt !== undefined ? { since: runStartedAt } : {})}
+                className={styles.liveTimer}
+              />
+            )}
+
             {/* Живой таймер под ответом; шагам стрима время не ставится — при
                 восстановлении события приходят пачкой и дали бы нули. */}
             {stream.isRunning && runStartedAt !== undefined && (
@@ -354,6 +365,9 @@ export function ChatMessages({
       )}
 
       <FeedNotices stream={stream} onRefresh={onRefresh} />
+
+      {/* Слой прогона не влезает в окно локальной модели — видно и между ходами (L6). */}
+      {localRun && !stream.isRunning && <LocalLayerWarning className={styles.liveTimer} />}
 
       {/*
         Дописанное, ждущее конца хода, — в ленте, а не только полоской над

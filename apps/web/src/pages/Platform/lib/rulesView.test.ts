@@ -157,6 +157,7 @@ describe('наши слои', () => {
           skills: true,
           mcp: true,
           systemPrompt: true,
+          tools: true,
           ...patch,
         },
       },
@@ -169,6 +170,7 @@ describe('наши слои', () => {
       skills: true,
       mcp: true,
       systemPrompt: true,
+      tools: true,
     });
   });
 
@@ -189,6 +191,7 @@ describe('наши слои', () => {
       skills: true,
       mcp: false,
       systemPrompt: true,
+      tools: true,
     });
     expect(next.rules.platform.platformTools).toEqual(['web_search']);
   });
@@ -203,6 +206,7 @@ describe('наши слои', () => {
       skills: true,
       mcp: true,
       systemPrompt: true,
+      tools: true,
     });
   });
 });

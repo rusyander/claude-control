@@ -26,3 +26,41 @@ describe('hiddenLaunchScript', () => {
     expect(script).toMatch(/\[Console\]::Out\.Write\(\$p\.Id\)$/);
   });
 });
+
+/**
+ * Настоящий путь Windows: PowerShell `Start-Process -ArgumentList` склеивает элементы
+ * пробелом КАК ЕСТЬ, а процесс разбирает строку по правилам CommandLineToArgvW. Без
+ * своих кавычек JSON `--chat-template-kwargs` теряет `"` и сервер не стартует, путь с
+ * пробелом рвётся на два аргумента. Запускается node, который пишет свой argv в файл.
+ */
+describe.runIf(process.platform === 'win32')('launchHidden: аргументы доходят как есть', () => {
+  it('JSON с кавычками, путь с пробелом, обратные косые перед кавычкой и в конце', async () => {
+    const { mkdtempSync, readFileSync, writeFileSync, existsSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { launchHidden } = await import('./hidden-launch.ts');
+    const dir = mkdtempSync(join(tmpdir(), 'hidden launch '));
+    const out = join(dir, 'argv.json');
+    const script = join(dir, 'dump.cjs');
+    writeFileSync(
+      script,
+      `require('fs').writeFileSync(${JSON.stringify(out)}, JSON.stringify(process.argv.slice(2)));`,
+    );
+    const args = [
+      '--chat-template-kwargs',
+      '{"reasoning_effort":"medium"}',
+      '-m',
+      'C:\\Models dir\\Qwen 3.8\\model.gguf',
+      'trailing dir\\',
+      'quote\\"inside',
+      'plain',
+    ];
+    await launchHidden(process.execPath, [script, ...args], process.env, {
+      out: join(dir, 'out.log'),
+      err: join(dir, 'err.log'),
+    });
+    for (let waited = 0; waited < 15_000 && !existsSync(out); waited += 100)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(JSON.parse(readFileSync(out, 'utf8'))).toEqual(args);
+  }, 30_000);
+});

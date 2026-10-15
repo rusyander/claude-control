@@ -12,6 +12,7 @@ import {
 import { chatPathHint } from '../../../domains/chat/path-steps/path-steps.ts';
 import { genTimeSink } from '../../../domains/chat/gen-time-ledger/gen-time-ledger.ts';
 import type { ChatRunRegistry } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
 import { RUN_UNKNOWN_DENIED } from '../../../domains/chat/run-ledger/run-ledger.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { apiTokenPath, readApiToken } from '../../../lib/api-token/api-token.ts';
@@ -847,7 +848,15 @@ export function registerChatRunRoutes(
     // вызова, а про место: каталог у git один на всех, и первая правка делает
     // чаты проекта зависимыми друг от друга (`ChatBranchGate.ts`).
     const rules = allowedPermissionRules(ctx.store.getSettings().autoApproveRules);
-    const held = registry.describe(runId);
+    // Хода нет, а процесс разговора жив — спросил фоновый субагент, переживший
+    // конец хода (живой прогон 14.10). Решается по параметрам разговора; карточка,
+    // если она нужна, заводит видимый прогон (`showCard` ниже).
+    const held = registry.describe(runId) ?? registry.describeIdle(runId);
+    // Карточке нужен ИДУЩИЙ прогон: буфер закончившегося не видит ни одна
+    // вкладка, и брокер держал бы вызов сутки при молчащем чате.
+    const showCard = (event: ChatEvent): boolean =>
+      (registry.isRunning(runId) || registry.hostBackgroundAsk(runId)) &&
+      registry.emitExternal(runId, event);
     // Прогона нет в реестре — ни живого, ни усыновлённого из журнала: ни обходом
     // при старте (`bootstrap/runtime/runtime.ts`), ни поздним подхватом выше. Значит его
     // процесс мёртв или записи о нём нет вовсе. Отказ — раньше любого
@@ -870,7 +879,7 @@ export function registerChatRunRoutes(
       // Работа разговора отдана группам (Д15): карточка говорит кому, а копия,
       // если её всё же заведут, встанет на ветку MR детей, а не на HEAD.
       const handed = registry.branchGateContext(runId);
-      const shown = registry.emitExternal(runId, {
+      const shown = showCard({
         kind: 'branchGate',
         toolName,
         input,
@@ -959,7 +968,7 @@ export function registerChatRunRoutes(
     }
 
     // Прогон мог уйти из реестра, пока шли проверки выше, — тот же отказ.
-    const shown = registry.emitExternal(runId, {
+    const shown = showCard({
       kind: 'permission',
       toolName,
       input,

@@ -121,6 +121,8 @@ export interface LocalState {
   mcpPicks: Record<string, string[]>;
   /** Замеренная цена инструментов сервера в токенах, по `scope:id`. */
   mcpCosts: Record<string, McpCostRecord>;
+  /** Слой прогона (системный промпт и инструменты), замеренный шлюзом, по моделям: токены и когда. */
+  layers: Record<string, { tokens: number; at: number }>;
 }
 
 /**
@@ -160,6 +162,7 @@ export function defaultState(): LocalState {
     keepAwake: true,
     mcpPicks: {},
     mcpCosts: {},
+    layers: {},
   };
 }
 
@@ -182,12 +185,26 @@ export function readState(paths: LocalPaths): LocalState {
       ...(raw.pendingRestart === true ? { pendingRestart: true as const } : {}),
       mcpPicks: picksOf(raw.mcpPicks),
       mcpCosts: isRecord(raw.mcpCosts) ? raw.mcpCosts : base.mcpCosts,
+      layers: layersOf(raw.layers),
       ...(raw.claude ? { claude: raw.claude } : {}),
     };
   } catch {
     // Испорченный файл состояния не должен запирать раздел: начинаем с умолчаний.
     return defaultState();
   }
+}
+
+/** Замер слоя читается на каждом опросе чата: запись не той формы пропускается, а не роняет раздел. */
+function layersOf(value: unknown): LocalState['layers'] {
+  if (!isRecord(value)) return {};
+  const layers: LocalState['layers'] = {};
+  for (const [tag, entry] of Object.entries(value)) {
+    if (!isRecord(entry)) continue;
+    const { tokens, at } = entry;
+    if (typeof tokens === 'number' && tokens > 0 && typeof at === 'number')
+      layers[tag] = { tokens, at };
+  }
+  return layers;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

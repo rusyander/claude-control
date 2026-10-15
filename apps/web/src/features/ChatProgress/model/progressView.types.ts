@@ -1,4 +1,4 @@
-import type { ProgressShell, ProgressActiveTool } from '@agentdeck/contracts';
+import type { ProgressAgent, ProgressShell, ProgressActiveTool } from '@agentdeck/contracts';
 
 /**
  * Что стало с фоновой командой — с поправкой на процесс. Фон живёт, пока жив
@@ -7,6 +7,9 @@ import type { ProgressShell, ProgressActiveTool } from '@agentdeck/contracts';
  * процессе значит «оборвана». Сервер без признака (старый) — судим по прогону.
  */
 export type ShellView = ProgressShell['status'] | 'lost';
+
+/** То же для субагента: `lost` — процесс разговора умер, пока он «работал». */
+export type AgentView = ProgressAgent['status'] | 'lost';
 
 /**
  * Чистая выжимка для шапки панели прогресса. Вынесена из компонента, чтобы
@@ -21,6 +24,8 @@ export interface ProgressSummary {
   /** Сколько субагентов ещё работает — по ним видно, что дерево живое. */
   agentsRunning: number;
   agentsTotal: number;
+  /** Субагенты, умершие вместе с процессом разговора, — их итога не будет. */
+  agentsLost: number;
   /** Вызов, который идёт прямо сейчас. Только у живого прогона. */
   activeTool?: ProgressActiveTool;
   /** Фоновые команды, которые идут прямо сейчас. */

@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createLocalModels, loadCatalog } from './service.ts';
-import { localPaths } from './paths.ts';
+import { localPaths, updateState } from './paths.ts';
 import { readRecord, type ServerShape } from './server.ts';
 import { modelFilePath } from './hf.ts';
 import type { FetchLike } from './download.ts';
@@ -111,6 +111,11 @@ beforeEach(() => {
   awake = false;
   spawnFails = false;
   const paths = localPaths(root, ENV());
+  // Окно 65536 — выбор человека (как у владельца): умолчание каталога выросло до 131072 (L6),
+  // а эти проверки — о перезапуске и присмотре, не о подборе окна.
+  updateState(paths, (state) => {
+    state.choices[TAG] = { context: 65_536 };
+  });
   const runtimeDir = join(paths.runtime, 'llama-b11583');
   mkdirSync(runtimeDir, { recursive: true });
   writeFileSync(join(runtimeDir, BINARY), '');

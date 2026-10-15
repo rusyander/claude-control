@@ -88,9 +88,23 @@ export const localModelsEn: typeof localModelsRu = {
     remove: 'Delete',
     removeTitle: 'Delete the model?',
     removeText:
-      'The files of {{tag}} ({{size}} GB) will be deleted from the panel folder. You can download it again at any time.',
+      'All downloaded quantizations of {{tag}} ({{count}}) and unfinished downloads will be deleted from the panel folder, freeing {{size}}\u00a0GB. You can download it again at any time.',
+    removeLoaded: 'The model is loaded in the server: stop the server to delete it entirely',
     benched: '{{tag}} speed: {{value}}\u00a0tok/\u2060s',
-    removed: 'Model deleted',
+    removed: 'Model deleted, {{size}}\u00a0GB freed',
+    files: {
+      title: 'On disk',
+      group: 'Downloaded quantizations of {{title}}',
+      ollama: 'link to the Ollama file',
+      loaded: 'loaded in the server: stop the server to delete',
+      remove: 'Delete {{quant}}, frees {{size}}\u00a0GB',
+      removeTitle: 'Delete {{quant}}?',
+      removeText:
+        'The {{quant}} file of {{tag}} will be deleted from the panel folder, freeing {{size}}\u00a0GB. Other quantizations stay; you can download this one again in the same card.',
+      removeOllamaText:
+        'Only the panel link to the Ollama file is deleted: the model stays in Ollama and no disk space is freed. Take it again with "Take from Ollama".',
+      removed: '{{quant}} deleted, {{size}}\u00a0GB freed',
+    },
     foreignTitle: 'Other installed',
     foreignHint: 'In the panel folder but not in the catalog: installed separately.',
     measuredWith: '{{context}}, {{quant}}',
@@ -98,7 +112,7 @@ export const localModelsEn: typeof localModelsRu = {
       other: 'measured at another choice',
       unknown: 'measured at unknown settings',
     },
-    downloadQuant: 'Download {{quant}} · {{size}} GB',
+    downloadQuant: 'Download {{quant}} · {{size}}\u00a0GB',
     quantMissing: 'No {{quant}} file on disk: download it (on disk: {{quants}})',
     facts: {
       group: 'Estimate for the selected values: {{title}}',
@@ -118,7 +132,7 @@ export const localModelsEn: typeof localModelsRu = {
       group: 'Quantization and context of {{title}}',
       quant: 'Quantization',
       context: 'Context',
-      quantOption: '{{id}} · {{size}} GB',
+      quantOption: '{{id}} · {{size}}\u00a0GB',
       installedMark: 'downloaded',
       fromOllama: 'imported from Ollama',
       noFit: 'does not fit: needs {{need}} GB of {{available}}',
@@ -161,7 +175,7 @@ export const localModelsEn: typeof localModelsRu = {
       added: 'Added: {{title}}',
       removeCustomTitle: 'Remove the model from the list?',
       removeCustomText:
-        'The entry {{tag}} disappears from the list and the downloaded files ({{size}} GB) are deleted.',
+        'The entry {{tag}} disappears from the list and the files the panel downloaded into its folder are deleted ({{size}}\u00a0GB). Files outside the panel folder are never touched.',
       removeCustomEmpty: 'The entry {{tag}} disappears from the list. No files are downloaded.',
     },
   },
@@ -240,6 +254,15 @@ export const localModelsEn: typeof localModelsRu = {
     on: 'While a run on the local model is going, the computer does not go to sleep: an overnight task does not freeze halfway. The screen may still turn off. With no runs the block is released.',
     off: 'The sleep block is off: if the computer sleeps in the middle of a run, the run breaks off.',
     holding: 'A run is going now — the sleep block is on.',
+  },
+  layer: {
+    tooBig:
+      'The run layer — system prompt and tools — is ≈ {{tokens}} tokens, and the server window is {{context}} ({{limit}} for the prompt): no room is left for the conversation, and every turn will be refused with “Prompt is too long”.',
+    fixContext: 'Raise the window to {{context}} in the “Local models” section.',
+    fixQuant:
+      'In the “Local models” section pick quantization {{quant}} and window {{context}}: with the current quantization that window does not fit on the card whole.',
+    fixNone:
+      'This model has no window that holds the layer: pick another model or the lean layer on the contour card.',
   },
   serverNotice: {
     restarted:

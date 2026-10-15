@@ -67,7 +67,8 @@ export const localModelsEn: typeof localModelsRu = {
         'The “Models” tab. Each model shows how it was trained (for code, tuned for code or general), whether it ' +
         'fits, its context, how much memory it needs and the speed estimate. “Recommended” is the ' +
         'best one for an agent on this machine. A red line under a model says why it will not do ' +
-        'for an agent.',
+        'for an agent. The order runs from the best choice: “Recommended” on top, then the models that fit ' +
+        'entirely, then “partly in system memory”, and the ones that do not fit at the bottom.',
       firstPulling: 'Downloading',
       firstPullingText:
         'A bar, the speed and the time left. “Cancel” stops the download but keeps what was ' +
@@ -93,7 +94,7 @@ export const localModelsEn: typeof localModelsRu = {
       choiceSelectsText:
         'Quantization is the repository’s files with their sizes; “downloaded” marks a file already on disk. Context ' +
         'runs from 8K up to the model’s limit; by default it is what the catalog considers sensible for the model ' +
-        '(64K for Qwen3.6 27B Coding) if it fits. Each list closes the options that would not fit together with the ' +
+        '(128K for Qwen3.6 27B Coding and Qwen3.8 27B) if it fits. Each list closes the options that would not fit together with the ' +
         'choice in the other one and says why in numbers: “does not fit: needs 26.1\u00a0GB of 24”. A context under 32K is ' +
         'closed for agents: Claude Code’s system prompt alone takes about 20 thousand tokens. The fit is computed from ' +
         'the video memory available to the model right now, and the line above the list says which figure; the row ' +
@@ -131,6 +132,20 @@ export const localModelsEn: typeof localModelsRu = {
         'checks with one request whether the model calls tools, which happens at “Hand to agents”; until then the model ' +
         'counts as an agent “with a caveat”. Passed: the mark goes away. Failed: “Does not call tools”, and the model ' +
         'no longer counts as an agent. The trash button removes the entry and deletes the model files.',
+      filesRow: 'On disk: downloaded quantizations one by one',
+      filesRowText:
+        'Under the model row sits “On disk”: every downloaded quantization with its size and its own trash button; the ' +
+        'button label says how much space comes back. The quantization currently loaded into the model server has no ' +
+        'trash button — instead it reads “loaded into the server — stop the server to delete it”, and the whole-model ' +
+        'trash button in the row header is closed too. A file brought over from Ollama is marked “link to the Ollama ' +
+        'file”: it is the same entry on disk as Ollama’s, so deleting it frees 0 GB and the model in Ollama stays whole.',
+      filesConfirm: 'Deletion — after confirmation',
+      filesConfirmText:
+        'The trash button opens a dialog naming the quantization and the space that will be freed; nothing is deleted ' +
+        'until “Delete”. The unfinished download next to the file goes with it. If the chosen quantization was deleted, ' +
+        'the choice moves to another one still on disk. The panel refuses rather than stopping the server itself when ' +
+        'the server holds the file, a download into it is running, or a running local run would restart the server on ' +
+        'exactly that file: the answer says what to do first.',
     },
 
     fitTitle: 'Catalog marks',
@@ -218,7 +233,8 @@ export const localModelsEn: typeof localModelsRu = {
       'server stopped with the button is not restarted, neither by the timer nor by a run’s ' +
       'request. The timer only restarts a server that already answered in this panel run; a ' +
       'run’s request that finds the server down starts it even after a computer reboot, from ' +
-      'the remembered launch. While the server is down and a run is going, the model gets ' +
+      'the remembered launch, but no more than three failed starts in a row (see «Context is ' +
+      'server-wide»). While the server is down and a run is going, the model gets ' +
       '“server unavailable” and the client waits without limit (by design: a night must not ' +
       'cut the task): you see it on the server card, and the wait is ended with the stop ' +
       'button in the chat.',
@@ -251,14 +267,18 @@ export const localModelsEn: typeof localModelsRu = {
     longMemoryText:
       'The local-model kit tells the agent to create `.agent/PROGRESS.md` in the project, ' +
       'update it step by step and read it after the context is compacted; the compaction hints ' +
-      'are scaled to the local model window, not the cloud one. Model reply deadlines start at ' +
-      'five minutes and grow with the context: a full prompt at the measured speed takes longer ' +
+      'are scaled to the local model window, not the cloud one. While the server watch follows a ' +
+      'request, the first-byte deadline is only a six-hour safety net: silence without progress ' +
+      'decides a cut, not a calculation from the measured speed. Without the watch, model reply ' +
+      'deadlines start at five minutes and grow with the context: a full prompt takes longer ' +
       'than a minute. The run event buffer kept for reconnecting a screen is bounded (4000 ' +
       'events, 4 MB): the oldest go, and a screen that fell further behind sees a note about it.',
     mcpTitle: 'MCP servers of the local run',
     mcpCaption:
-      'The “MCP: N” button in the chat header when the chat runs on a local model in a project. No servers by default.',
-    mcpWhy: 'Why none by default',
+      'By default a local run gets the full set, like cloud Claude: every MCP server, skill and hook. ' +
+      'The lean set is switched on in the contour card; then the chat header in a project shows the “MCP: N” button, ' +
+      'and the lean set has no servers by default.',
+    mcpWhy: 'Why the lean set has none by default',
     mcpWhyText:
       'Tool descriptions ride in every request and take model window. Measured on 14 Oct: one ' +
       'GitLab server with 39 tools is about 15 thousand tokens, while the request base without ' +
@@ -312,7 +332,7 @@ export const localModelsEn: typeof localModelsRu = {
     kitCaption:
       'The kit mode is chosen separately for Claude Code, Qwen Code and Codex. On a local model the kit ' +
       'gets its own variant: a short discipline block for a small model, tool calls one at a time, ' +
-      'background commands and subagents refused, and for Qwen Code a map of its own tool names. The kit itself, ' +
+      'background commands refused (a background subagent is allowed), and for Qwen Code a map of its own tool names. The kit itself, ' +
       'editing and the check against the global layer live in the «Panel kit» section.',
     kitHeader: 'Mode',
     kitWhat: 'What the agent gets',
@@ -365,7 +385,9 @@ export const localModelsEn: typeof localModelsRu = {
     fileTools: 'Qwen Code and its kit',
     fileLogs: 'Server log',
     fileRecord: 'Running server: port, model file, quantization, context, device and context cache',
-    fileState: 'Measurements, kit choice, quantization and context choice, added custom models',
+    fileState:
+      'Measurements, kit choice, quantization and context choice, run-layer measurements, added ' +
+      'custom models',
     fileImport:
       'A model file from Ollama (a store layer) is attached by a hard link — no second copy on disk. If the ' +
       'folders are on different drives a link is impossible, and the file is copied.',
@@ -382,12 +404,36 @@ export const localModelsEn: typeof localModelsRu = {
       'q8_0; it is compressed to q4_0 when that fits a longer context entirely on the GPU, and the ' +
       'model row says “cache q4_0”. On Windows the memory held by the browser and other ' +
       'programs is handed to the model on demand, so the fit does not cut the context because of it. ' +
-      'For qwen3.6:27b-coding the default is 65,536; going higher is only by picking it in the “Context” list. ' +
+      'For qwen3.6:27b-coding and qwen3.8:27b the default is the IQ4_XS quantization (UD-IQ4_XS for ' +
+      '3.8) and a 131,072 window: that way the model with the full Claude Code set fits entirely on a ' +
+      '24 GB card, and the cache is fitted to free memory; with Q4_K_M that window fits only with a q4_0 cache. ' +
+      'A pick in the “Context” list beats the default and is remembered, ' +
+      'and while the same server runs, a repeated start keeps the cache and offload it already fitted. ' +
+      'Left alone, Qwen3.8 27B reasons at the “extra high” level, tens of thousands of tokens per turn, so the ' +
+      'server starts with reasoning effort medium (--chat-template-kwargs); a request carrying its own effort overrides it. ' +
+      'Qwen3.8 27B also runs with its own chat template (--chat-template-file): the one inside the model file rejected a ' +
+      'system message anywhere but first, Claude Code sends one in every request, and the server refused them all. ' +
       'Claude Code in such a run gets the server’s real window and compacts the history early; a ' +
       'request that no longer fits the window is refused by the gateway with «prompt is too long», ' +
-      'which Claude Code answers by compacting — the start of a request is never cut silently. The ' +
-      'first reply after a long request waits at least five minutes, not one: the server processes a ' +
-      'large request for minutes.',
+      'which Claude Code answers by compacting — the start of a request is never cut silently. The run ' +
+      'layer — system prompt and tool schemas — is measured by the gateway on every request with tools. ' +
+      'If, together with the reply reserve, it leaves no room for the conversation, every turn would get ' +
+      'that refusal: then the server line in the chat, the chat itself between turns and the server card ' +
+      'show the layer, window and limit and one action — raise the window to the nearest sufficient one, ' +
+      'and if the current quantization cannot carry that window on the card, pick one that can. The panel ' +
+      'never trims the set itself: that is the human’s decision on the contour card. The server ' +
+      'takes minutes over a long request, and that is not a hang: while a turn runs, a server line under ' +
+      'the chat messages shows the model, quantization, window and stage — loading, reading the prompt (how ' +
+      'many tokens of how many), answering, waiting for permission. Only silence without progress counts as a ' +
+      'stall: two minutes on the GPU, ten on the CPU; a server that answers the health check but stays silent ' +
+      'about its slot shows no progress. Then the request is cut with the reason and sent again, ' +
+      'and a server stuck mid-prompt is restarted; after 20 seconds of silence the line offers a restart ' +
+      'button. A refusal from the server itself (a 4xx/5xx code other than 503 “loading model”) shows on the line in red with its code and ' +
+      'text until the next request goes through. If the server is not running and the chat goes to the local model, the first request starts ' +
+      'it and waits for the load. If it does not come up, the next try comes no sooner than 30, then 60 ' +
+      'seconds later; after the third failure requests get a refusal with the cause from the server log ' +
+      'until the server is started or restarted by hand or the model choice changes. The previous server ' +
+      'run keeps its log next to it, in llama.prev.log.',
     limitEstimateTitle: 'An estimate is not a measurement',
     limitEstimateText:
       'The catalog speed is computed from the card’s bandwidth. The real number depends on the ' +
@@ -416,7 +462,7 @@ export const localModelsEn: typeof localModelsRu = {
       '01-machine':
         'First visit: a 24 GB RTX 4090 detected, no model server installed, the catalog marked for the card',
       '02-catalog':
-        'The catalog: “Recommended” on Qwen3.6 27B Coding, “partly in system memory” on the big ones, “not an agent” on models without tools',
+        'The catalog: “Recommended” on Qwen3.8 27B, Qwen3.6 27B Coding next; “partly in system memory” on the big ones, “not an agent” on models without tools',
       '03-pulling': 'Downloading a model: the bar, 7.1 of 16.5 GB, speed and time left',
       '04-ready':
         'Ready: the server on port 11435, “Where to compute” set to the video card, the model fully on it',
@@ -434,6 +480,10 @@ export const localModelsEn: typeof localModelsRu = {
         'The “Repository or link” field with unsloth/Qwen3-14B-GGUF typed in and the “Add” button',
       '05-custom-row':
         'The added model: “Custom” and “Tool calling not verified” marks, quantization sizes from the repository, the same two lists',
+      '06-files':
+        '“On disk”: Q4_K_M is loaded into the server and has no trash button, UD-Q4_K_XL has one; the whole-model trash button in the header is closed',
+      '07-confirm':
+        'The quantization delete dialog: what goes away, how much space is freed, and that the other quantizations stay',
     },
   },
 

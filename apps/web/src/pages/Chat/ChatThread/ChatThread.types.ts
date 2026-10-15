@@ -43,6 +43,8 @@ export interface ChatThreadProps {
   isRunning: boolean;
   /** Старт живого прогона (мс эпохи) — таймер под ответом, пока тот пишется. */
   runStartedAt?: number;
+  /** Ход идёт на локальной модели — под ответом строка её состояния (L6). */
+  localRun?: boolean;
   /** Ключ прогона этого разговора: по нему уходят права и повтор. */
   chatId?: string;
   permissions: PendingPermission[];

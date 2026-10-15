@@ -1,4 +1,3 @@
-import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelQuant } from '@agentdeck/contracts/local-models';
 import { downloadResumable, verifySha256, type FetchLike } from './download.ts';
@@ -129,10 +128,4 @@ export async function downloadModelFile(input: {
   handle.progress({ phase: 'verify', doneBytes: listed.size });
   await verifySha256(dest, listed.sha256, file);
   return dest;
-}
-
-/** Удалить файл модели (и недокачанный хвост). */
-export function removeModelFile(path: string): void {
-  rmSync(path, { force: true });
-  rmSync(`${path}.part`, { force: true });
 }

@@ -484,11 +484,21 @@ describe('раздел «Локальные модели» по настояще
     expect(body.device).toBe('gpu');
   });
 
-  it('удаление модели, которую держит сервер, снимает сервер и убирает файл; чужие модели целы', async () => {
+  it('модель, которую держит сервер, не удаляется (409), пока сервер не остановлен; после — файл убран, чужие модели целы', async () => {
     const model = loadCatalog().models.find((item) => item.tag === TAG);
     const file = modelFilePath(paths(), model?.repo ?? '', 'Qwen3.5-9B-Q4_K_M.gguf');
     expect(existsSync(file)).toBe(true);
     const before = killed.length;
+    // Удаление сервер не останавливает (L5): отказ с причиной, файл и сервер на месте.
+    const refused = await api<{ messageCode?: string }>(
+      'DELETE',
+      `/api/local-models/models/${encodeURIComponent(TAG)}`,
+    );
+    expect(refused.status).toBe(409);
+    expect(refused.body.messageCode).toBe('local-model-loaded');
+    expect(killed.length).toBe(before);
+    expect(existsSync(file)).toBe(true);
+    await api('POST', '/api/local-models/server/stop');
     const { status } = await api('DELETE', `/api/local-models/models/${encodeURIComponent(TAG)}`);
     expect(status).toBe(200);
     expect(killed.length).toBe(before + 1);

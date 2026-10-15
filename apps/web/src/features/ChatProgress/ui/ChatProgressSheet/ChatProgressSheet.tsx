@@ -52,6 +52,13 @@ export function ChatProgressSheet({
         .join(' · ')
     : undefined;
   const shells = progress?.shells ?? [];
+  /** Ни шага, ни вызова: ход идёт сам по себе или работают только фоновые агенты. */
+  const quietLine = (): string => {
+    if (isRunning) return t('chat.progress.working');
+    if (summary.agentsRunning > 0)
+      return t('chat.progress.backgroundAgents', { count: summary.agentsRunning });
+    return '';
+  };
 
   return (
     <div className={styles.sheet} data-chat-progress>
@@ -87,6 +94,12 @@ export function ChatProgressSheet({
           </Badge>
         )}
 
+        {summary.agentsLost > 0 && (
+          <Badge tone="danger" data-progress-agents-lost>
+            {t('chat.progress.agentsLost', { count: summary.agentsLost })}
+          </Badge>
+        )}
+
         {summary.shellsRunning > 0 && (
           <Badge tone="warning">
             {t('chat.progress.shellsRunning', { count: summary.shellsRunning })}
@@ -103,7 +116,7 @@ export function ChatProgressSheet({
             и ради одной строки открывать панель незачем. Нет шага в плане —
             показываем вызов, который идёт, с таймером. */}
         <Typography variant="caption" color="subtle" as="span" className={styles.current}>
-          {summary.current ?? activeLine ?? (isRunning ? t('chat.progress.working') : '')}
+          {summary.current ?? activeLine ?? quietLine()}
         </Typography>
       </button>
 
@@ -134,9 +147,22 @@ export function ChatProgressSheet({
               </Typography>
               <ul className={styles.tree}>
                 {progress.agents.map((agent) => (
-                  <AgentRow key={agent.id} agent={agent} />
+                  <AgentRow
+                    key={agent.id}
+                    agent={agent}
+                    isRunning={isRunning}
+                    {...(progress.processAlive !== undefined
+                      ? { processAlive: progress.processAlive }
+                      : {})}
+                    now={now}
+                  />
                 ))}
               </ul>
+              {summary.agentsLost > 0 && (
+                <Typography variant="caption" color="subtle" as="p" data-agents-lost-hint>
+                  {t('chat.progress.agentsLostHint')}
+                </Typography>
+              )}
             </Stack>
           )}
 

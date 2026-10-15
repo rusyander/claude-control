@@ -1,3 +1,4 @@
+import { LOCAL_REPLY_RESERVE_TOKENS } from '@agentdeck/contracts/local-models';
 import { nativeErrorFrame } from '../anthropic-native.ts';
 import type { TextLanguage } from '../../../../lib/server-texts/server-texts.ts';
 
@@ -40,6 +41,60 @@ export interface LocalUpstreamInfo {
   revive?: () => Promise<'restarted' | 'failed' | 'capped' | 'busy' | 'none' | 'alive'>;
   /** Сообщение присмотра, когда сервер не поднялся: уходит текстом ошибки. */
   notice?: () => string | undefined;
+  /**
+   * Присмотр за запросом в пути (L6): панель опрашивает сервер и, если ничего не
+   * двигается, обрывает запрос сигналом — причина в `signal.reason`. `done` — запрос
+   * кончился любым путём; `failed` / `succeeded` — чем ответил сервер (чат показывает отказ).
+   */
+  watch?: (promptTokens: number) => {
+    signal: AbortSignal;
+    failed?(status: number, message: string): void;
+    succeeded?(): void;
+    done(): void;
+  };
+  /**
+   * Сколько токенов запроса — слой (системный промпт и описания инструментов): панель
+   * сравнивает его с окном сервера и показывает человеку, когда он не влезает (L6). Зовётся
+   * только для запросов с инструментами — служебные (заголовок чата) слоя не несут.
+   */
+  layer?: (tokens: number) => void;
+}
+
+/**
+ * Доля слоя в запросе, переведённая в токены: символы системного промпта и описаний
+ * инструментов против символов всего тела, умноженные на счёт токенов запроса. Слой у
+ * Anthropic — `system` и `tools`, у OpenAI-совместимых — сообщения `system` и `tools`. Без
+ * инструментов — `undefined`: такой запрос (заголовок чата, сжатие) слоя прогона не несёт.
+ */
+export function layerTokensOf(
+  body: unknown,
+  bodyChars: number,
+  promptTokens: number,
+): number | undefined {
+  if (typeof body !== 'object' || body === null || bodyChars <= 0 || promptTokens <= 0)
+    return undefined;
+  const record = body as { system?: unknown; tools?: unknown; messages?: unknown };
+  if (!Array.isArray(record.tools) || record.tools.length === 0) return undefined;
+  const systemMessages = Array.isArray(record.messages)
+    ? record.messages.filter(
+        (message) =>
+          typeof message === 'object' &&
+          message !== null &&
+          (message as { role?: unknown }).role === 'system',
+      )
+    : [];
+  const chars =
+    JSON.stringify(record.tools).length +
+    (record.system === undefined ? 0 : JSON.stringify(record.system).length) +
+    (systemMessages.length > 0 ? JSON.stringify(systemMessages).length : 0);
+  return Math.round((promptTokens * Math.min(chars, bodyChars)) / bodyChars);
+}
+
+/** Текст обрыва по тишине: причина сигнала присмотра или пусто, если сигнал не сработал. */
+export function stallReasonOf(signal: AbortSignal | undefined): string | undefined {
+  if (!signal?.aborted) return undefined;
+  const reason: unknown = signal.reason;
+  return reason instanceof Error ? reason.message : String(reason);
 }
 
 /**
@@ -62,11 +117,8 @@ export function sessionOf(body: unknown): string | undefined {
   return legacy?.[1];
 }
 
-/**
- * Запас под ответ: промпт, подошедший к окну вплотную, оставил бы модели место
- * на пару слов, и ответ упёрся бы в «length». С ним сжатие уходит раньше.
- */
-export const LOCAL_REPLY_RESERVE_TOKENS = 4_096;
+// Запас под ответ — общий со страницей локальных моделей: она по нему считает, влезает ли слой.
+export { LOCAL_REPLY_RESERVE_TOKENS };
 
 /** Меньше этого ждать первый байт у локальной модели нельзя: холодная загрузка и полный промпт. */
 export const LOCAL_FIRST_TOKEN_FLOOR_MS = 300_000;

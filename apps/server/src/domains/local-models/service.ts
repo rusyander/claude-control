@@ -1,17 +1,21 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { arch, platform } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   AGENT_MIN_CONTEXT,
   GPU_RESERVE_GB,
   catalogModelSchema,
+  contextStepsFor,
   deviceGpu,
   fitChoice,
   fitModel,
   gpuTableSchema,
   heldVramBytes,
+  layerNeedContext,
   modelCatalogSchema,
+  LOCAL_REPLY_RESERVE_TOKENS,
   modelNeedGb,
   resolveChoice,
   usableVramGb,
@@ -22,15 +26,18 @@ import {
   type InstalledModel,
   type KitMode,
   type KvCacheType,
+  type LocalActivity,
   type LocalChoiceBody,
   type LocalChoiceResult,
   type LocalClaudeInfo,
   type LocalDevice,
   type LocalJob,
+  type LocalLayerFit,
   type LocalModelBody,
   type LocalModelsInfo,
   type LocalQuantRow,
   type LocalQuantsInfo,
+  type LocalRemoveResult,
   type LocalRuntimeInfo,
   type LocalServerInfo,
   type ModelBench,
@@ -52,23 +59,18 @@ import { codeOf } from '../../lib/server-text/server-text.ts';
 import { localError } from './errors.ts';
 import { quantNameOf, readGgufFacts, readGgufWeightType } from './gguf.ts';
 import { detectHardware, runCommand, type RunCommand } from './hardware.ts';
-import {
-  downloadModelFile,
-  listRepoFiles,
-  modelFilePath,
-  quantsOf,
-  removeModelFile,
-  type RepoQuant,
-} from './hf.ts';
+import { downloadModelFile, listRepoFiles, modelFilePath, quantsOf, type RepoQuant } from './hf.ts';
 import { type JobHandle, LocalJobs } from './jobs.ts';
 import { killProcessTree } from '../../lib/kill-tree.mjs';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { pidAlive } from './hidden-launch.ts';
 import { llamaClient } from './llama-client.ts';
-import { createServerSupervisor, type ReviveResult } from './supervisor.ts';
+import { MAX_RESTARTS, createServerSupervisor, type ReviveResult } from './supervisor.ts';
+import { createActivityWatch, type ActivityTrack } from './activity.ts';
 import { importOllamaModel } from './ollama-import.ts';
 import { localRunEnv } from './run-env.ts';
 import { createLocalMcp } from './mcp-service.ts';
+import { freesBytes, insideDir, pruneEmptyDirs, removeCounted, samePath } from './remove.ts';
 import type { LocalMcpSource } from './local-mcp.ts';
 import {
   LOCAL_SERVER_PORT,
@@ -94,6 +96,7 @@ import {
 import {
   IDLE_SLEEP_SECONDS,
   baseUrlOf,
+  lastErrorLine,
   probe,
   readRecord,
   sameShape,
@@ -151,6 +154,11 @@ export function loadCatalog(): ModelCatalog {
   );
 }
 
+/** Путь к своему шаблону чата из каталога: имя проверено схемой, выйти из папки оно не может. */
+export function templatePath(name: string): string {
+  return fileURLToPath(new URL(`templates/${name}`, DATA));
+}
+
 export function loadGpuTable(): ReturnType<typeof gpuTableSchema.parse> {
   return gpuTableSchema.parse(
     JSON.parse(readFileSync(new URL('gpus.json', DATA), 'utf8')) as unknown,
@@ -193,6 +201,8 @@ export interface LocalModelsDeps {
   kill?: (pid: number, startedAt: number) => void;
   /** Присмотр за сервером: проверки задают срок тика и подменяют «жив ли процесс». */
   supervise?: { intervalMs?: number; pidAlive?: (pid: number) => boolean };
+  /** Опрос сервера, пока запрос чата в пути (`activity.ts`); проверки подставляют свои сроки. */
+  activity?: { intervalMs?: number; stallMs?: (device: string) => number; now?: () => number };
   /** Свободная оперативная память, байт, — под неё считается `--cache-ram`; проверки подставляют своё. */
   freeBytes?: () => number;
   /** Откуда MCP-серверы проекта и как их опросить; нет — раздел MCP локального прогона пуст. */
@@ -213,6 +223,8 @@ export interface LocalModelsDeps {
   runActive?: () => boolean;
   /** Держит ли панель сейчас запрет на сон ОС — для карточки сервера. */
   awakeHeld?: () => boolean;
+  /** Часы подъёма по запросу (пауза между неудачами); проверки подставляют свои. */
+  now?: () => number;
 }
 
 export type LocalModels = ReturnType<typeof createLocalModels>;
@@ -231,6 +243,12 @@ interface ModelFile {
 
 /** Окно по умолчанию для модели вне каталога: меньшего агенту не хватит. */
 const UNKNOWN_CONTEXT = AGENT_MIN_CONTEXT;
+/** Неудачных подъёмов по запросу чата подряд, после которых панель сама больше не поднимает сервер. */
+export const ON_DEMAND_MAX = MAX_RESTARTS;
+/** Пауза после первой неудачи подъёма по запросу; каждая следующая — вдвое длиннее. */
+export const ON_DEMAND_BACKOFF_MS = 30_000;
+/** Наибольший слой за это время держится: служебные запросы прогона несут слой меньше основного. */
+const LAYER_HOLD_MS = 10 * 60_000;
 
 export function createLocalModels(deps: LocalModelsDeps) {
   const env = deps.env ?? process.env;
@@ -457,6 +475,13 @@ export function createLocalModels(deps: LocalModelsDeps) {
           ...(active.quantLabel ? { quantLabel: active.quantLabel } : {}),
           source: active.source,
           quants: filesOf(tag).map((file) => file.quant),
+          files: filesOf(tag).map((file) => ({
+            quant: file.quant,
+            ...(file.quantLabel ? { quantLabel: file.quantLabel } : {}),
+            source: file.source,
+            sizeBytes: file.sizeBytes,
+            freesBytes: freesBytes(file.path),
+          })),
           ...(bench ? { bench } : {}),
         };
       })
@@ -541,21 +566,36 @@ export function createLocalModels(deps: LocalModelsDeps) {
         `окно ${context} больше предела модели ${model.contextMax}`,
         { min: 2048, max: model.contextMax },
       );
+    // Идущий сервер этой же модели с тем же окном, чей кеш выбрал подбор, — его выбор
+    // остаётся (`ServerShape.fitted`): подбор при живом сервере видит память иначе.
+    const named = body.kvCache ?? choice.kvCache;
+    const running = readRecord(paths);
+    const sticky =
+      !named &&
+      running?.fitted === true &&
+      running.tag === tag &&
+      running.file === file.path &&
+      running.context === context &&
+      running.device === device()
+        ? running
+        : undefined;
     // Тип кеша — под ВЫБРАННОЕ окно, а не под подобранное: человек мог взять окно
     // больше того, что лёг бы без выбора, и q8_0 тогда не влезет, а q4_0 — да.
     const kvCache: KvCacheType =
-      body.kvCache ??
-      choice.kvCache ??
+      named ??
+      sticky?.kvCache ??
       (model ? fitChoice(model, gpu, hw.ramGb, { quant: file.quant, context }).kvCache : 'q8_0');
     const facts = readGgufFacts(file.path);
     let offload: Offload = 'fit';
     if (device() === 'cpu' || !gpu) offload = 'none';
+    else if (sticky) offload = sticky.offload;
     else if (
       model &&
       modelNeedGb(model, context, kvCache, file.quant) + GPU_RESERVE_GB <= usableVramGb(gpu)
     )
       offload = 'all';
     return {
+      ...(named ? {} : { fitted: true }),
       tag,
       file: file.path,
       quant: file.quant,
@@ -566,6 +606,10 @@ export function createLocalModels(deps: LocalModelsDeps) {
       offload,
       idleSeconds: readState(paths).keepLoaded ? 0 : IDLE_SLEEP_SECONDS,
       recurrent: facts?.recurrent ?? false,
+      ...(model?.chatTemplateKwargs
+        ? { templateKwargs: JSON.stringify(model.chatTemplateKwargs) }
+        : {}),
+      ...(model?.chatTemplate ? { templateFile: templatePath(model.chatTemplate) } : {}),
     };
   }
 
@@ -603,14 +647,22 @@ export function createLocalModels(deps: LocalModelsDeps) {
       else delete state.pendingRestart;
     });
   }
+  /**
+   * Запуски и остановки сервера идут по одному — очередью, а не счётчиком. Счётчик лишь
+   * глушил присмотр, а «Перезапустить» в чате, подъём по запросу чата, «Запустить» и смена
+   * выбора на странице шли одновременно: два `startServer` на один порт, и проигравший стирал
+   * запись живого сервера — сирота держала порт и видеопамять, а удаление файла модели
+   * считало его свободным. Работа под очередью саму очередь не зовёт (`ensureServerNow`).
+   */
   let managed = 0;
-  async function managedBy<T>(work: () => Promise<T>): Promise<T> {
+  let queue: Promise<unknown> = Promise.resolve();
+  function managedBy<T>(work: () => Promise<T>): Promise<T> {
     managed += 1;
-    try {
-      return await work();
-    } finally {
+    const run = queue.then(work, work);
+    queue = run.catch(() => undefined);
+    return run.finally(() => {
       managed -= 1;
-    }
+    });
   }
 
   function ensureServer(shape: ServerShape): Promise<void> {
@@ -679,8 +731,102 @@ export function createLocalModels(deps: LocalModelsDeps) {
     if (claude) writeClaude(claude.model, shape.context);
   }
 
+  /**
+   * Сервер не запущен и не помнится, а запрос чата на скачанную модель уже пришёл: панель
+   * поднимает его сама и держит запрос до готовности (L6, «с первого клика»). Раньше такой
+   * запрос получал «Нет связи с контуром», и человек включал и выключал модель, пока сервер
+   * не поднимался другим путём. Одновременные запросы ждут один и тот же подъём.
+   */
+  let onDemand: Promise<ReviveResult> | undefined;
+  /**
+   * Подъём по запросу ограничен (L6, ревью M1): модель, падающая при загрузке (нехватка
+   * видеопамяти на большом окне), не оставляет ни записи, ни цели присмотра, и каждый повтор
+   * 529 у Claude Code (а он повторяет бесконечно) грузил 17 ГБ заново — всю ночь. Теперь
+   * `MAX_RESTARTS` неудач подряд с паузой 30 с, 60 с между ними, дальше отказ с причиной из
+   * журнала, пока человек сам не запустит сервер. Удачный подъём снимает счёт.
+   */
+  let onDemandFailures = 0;
+  let onDemandNextAt = 0;
+  let onDemandCause: string | undefined;
+  const clock = deps.now ?? Date.now;
+  function resetOnDemand(): void {
+    onDemandFailures = 0;
+    onDemandNextAt = 0;
+    onDemandCause = undefined;
+  }
+  /** Причина неудачи: последняя строка-ошибка журнала этого запуска, иначе прошлого, иначе текст отказа. */
+  function crashCause(error: unknown): string {
+    const log = paths.serverLog;
+    return (
+      lastErrorLine([log, log.replace(/\.log$/, '.out.log'), log.replace(/\.log$/, '.prev.log')]) ??
+      (error instanceof Error ? error.message : String(error))
+    );
+  }
+  function startOnDemand(tag: string): Promise<ReviveResult> {
+    if (readRecord(paths) || supervisor.target()) return supervisor.revive();
+    if (onDemandFailures >= ON_DEMAND_MAX || clock() < onDemandNextAt)
+      return Promise.resolve('capped');
+    onDemand ??= (async (): Promise<ReviveResult> => {
+      try {
+        await ensureServer(await shapeFor({ tag }));
+        // Поднят заново — у присмотра новая эпоха: прежние неудачи ему не в счёт.
+        supervisor.reset();
+        resetOnDemand();
+        return 'restarted';
+      } catch (error) {
+        onDemandFailures += 1;
+        onDemandCause = crashCause(error);
+        onDemandNextAt =
+          onDemandFailures >= ON_DEMAND_MAX
+            ? Number.POSITIVE_INFINITY
+            : clock() + ON_DEMAND_BACKOFF_MS * 2 ** (onDemandFailures - 1);
+        return 'failed';
+      } finally {
+        onDemand = undefined;
+      }
+    })();
+    return onDemand;
+  }
+
+  /**
+   * Окно, с которым поднимется сервер этой модели, — до того, как он поднят. То же правило,
+   * что у `shapeFor`: выбор, иначе подбор под эту карту (на 16 ГБ — меньше умолчания каталога).
+   * Шлюз по нему считает предел промпта и урезает ответ: окно умолчания вместо подобранного
+   * пропускало запрос, который сервер потом отвергал переполнением. Железо — последний замер;
+   * его ещё не было — умолчание каталога, и замер заводится на следующий раз.
+   */
+  function plannedContext(tag: string): number {
+    const chosen = readState(paths).choices[tag]?.context;
+    if (chosen) return chosen;
+    const known = catalogModel(tag);
+    const file = activeFile(tag);
+    const hw = hardware?.value;
+    if (!hw) void readHardware().catch(() => undefined);
+    if (known && file && hw)
+      return fitModel(
+        withInstalledQuant(known, file),
+        deviceGpu(hw, device()),
+        hw.ramGb,
+        file.quant,
+      ).context;
+    return known?.defaultContext ?? UNKNOWN_CONTEXT;
+  }
+
   /** Что сказать прогону, когда сервер не поднялся: текст ошибки шлюза. */
   function noticeText(): string | undefined {
+    if (onDemandFailures > 0 && onDemandCause && !readRecord(paths)) {
+      if (onDemandFailures >= ON_DEMAND_MAX)
+        return serverText('local-on-demand-failed', {
+          attempts: onDemandFailures,
+          cause: onDemandCause,
+        });
+      return serverText('local-on-demand-backoff', {
+        attempts: onDemandFailures,
+        max: ON_DEMAND_MAX,
+        cause: onDemandCause,
+        seconds: Math.max(0, Math.ceil((onDemandNextAt - clock()) / 1_000)),
+      });
+    }
     const notice = supervisor.notice();
     if (!notice || notice.kind === 'restarted') return undefined;
     const said = serverText('local-supervisor-gave-up', { restarts: notice.restarts });
@@ -714,6 +860,89 @@ export function createLocalModels(deps: LocalModelsDeps) {
     busy: () => managed > 0,
     ...(deps.supervise?.intervalMs ? { intervalMs: deps.supervise.intervalMs } : {}),
   });
+
+  /**
+   * Перезапуск сервера теми же параметрами: слот застыл посреди разбора при живом
+   * `/health` (L6) или человек нажал «Перезапустить» в чате. Присмотр молчит, пока идёт.
+   */
+  async function restartServerNow(): Promise<void> {
+    await managedBy(async () => {
+      // Запись читается в очереди: пока ждали, сервер могли остановить или поднять иначе.
+      const record = readRecord(paths) ?? supervisor.target();
+      if (!record) return;
+      await stopServer(paths, port, fetchImpl, deps.kill);
+      await ensureServerNow(record);
+    });
+  }
+
+  // Что сервер делает с запросом чата: живость вместо срока ожидания (L6, `activity.ts`).
+  const activity = createActivityWatch({
+    health: () => probe(port, fetchImpl),
+    slot: () => client.slot(0),
+    server: () => {
+      const record = readRecord(paths) ?? supervisor.target();
+      return record
+        ? { model: record.tag, quant: record.quant, context: record.context, device: record.device }
+        : undefined;
+    },
+    onWedged: () => void restartServerNow().catch(() => undefined),
+    stallText: (seconds) => serverText('local-stalled', { seconds }),
+    ...deps.activity,
+  });
+
+  // ── Слой прогона против окна (L6, ревью B1) ────────────────────────────
+
+  /**
+   * Шлюз меряет слой (системный промпт и инструменты) на каждом запросе с инструментами.
+   * Держится наибольший за `LAYER_HOLD_MS`: подагенты и служебные запросы несут слой меньше
+   * основного и иначе прятали бы его. В файл состояния — только когда изменился заметно:
+   * страница показывает его и до первого хода после перезапуска панели.
+   */
+  function noteLayer(tag: string, tokens: number): void {
+    const at = clock();
+    const stored = readState(paths).layers[tag];
+    if (stored && tokens < stored.tokens && at - stored.at < LAYER_HOLD_MS) return;
+    if (stored && Math.abs(stored.tokens - tokens) < 512 && at - stored.at < LAYER_HOLD_MS) return;
+    updateState(paths, (state) => {
+      state.layers[tag] = { tokens, at };
+    });
+  }
+
+  /** Чем починить слой, который не влезает: окно, а если нынешнее квантование его не вынесет — и квантование. */
+  async function layerFix(tag: string, tokens: number): Promise<LocalLayerFit['fix']> {
+    const need = layerNeedContext(tokens);
+    const known = catalogModel(tag);
+    if (!known) return undefined;
+    const file = activeFile(tag);
+    const model = withInstalledQuant(known, file);
+    const context = contextStepsFor(model).find((step) => step >= need);
+    if (context === undefined) return undefined;
+    const hw = await readHardware();
+    const gpu = deviceGpu(hw, device());
+    const current = file?.quant ?? model.defaultQuant;
+    const fitsWith = (quant: string): boolean =>
+      fitChoice(model, gpu, hw.ramGb, { quant, context }).fits;
+    if (fitsWith(current)) return { context };
+    const other = [...model.quants]
+      .sort((a, b) => b.sizeBytes - a.sizeBytes)
+      .find((quant) => quant.id !== current && fitsWith(quant.id));
+    return other ? { context, quant: other.id } : { context };
+  }
+
+  /** Слой последней модели против окна её сервера (идущего, иначе того, с которым поднимется). */
+  async function layerFit(): Promise<LocalLayerFit | undefined> {
+    const record = readRecord(paths) ?? supervisor.target();
+    const { layers } = readState(paths);
+    // Сервера нет — модель последнего замера: её поднимет первый же запрос чата.
+    const tag = record?.tag ?? Object.entries(layers).sort(([, a], [, b]) => b.at - a.at)[0]?.[0];
+    const stored = tag ? layers[tag] : undefined;
+    if (!tag || !stored || !activeFile(tag)) return undefined;
+    const context = record?.context ?? plannedContext(tag);
+    const limit = Math.max(0, context - LOCAL_REPLY_RESERVE_TOKENS);
+    const fits = layerNeedContext(stored.tokens) <= context;
+    const fix = fits ? undefined : await layerFix(tag, stored.tokens).catch(() => undefined);
+    return { tokens: stored.tokens, context, limit, fits, at: stored.at, ...(fix ? { fix } : {}) };
+  }
 
   /** Спит ли сервер по простою: `/props` его не будит (замер 14.10); не отвечает — не спит. */
   async function isSleeping(): Promise<boolean> {
@@ -773,10 +1002,12 @@ export function createLocalModels(deps: LocalModelsDeps) {
     const keepLoaded = readState(paths).keepLoaded;
     const sleeping = running && record ? await isSleeping() : false;
     const notice = supervisor.notice();
+    const layer = await layerFit();
     const base: LocalServerInfo = {
       ...(notice ? { notice } : {}),
       ...(pendingRestart ? { restartPending: true } : {}),
       ...(restartError ? { restartError } : {}),
+      ...(layer ? { layer } : {}),
       keepLoaded,
       keepAwake: readState(paths).keepAwake,
       ...(deps.awakeHeld?.() ? { awake: true } : {}),
@@ -984,6 +1215,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
     updateState(paths, (state) => {
       state.choices[body.tag] = next;
     });
+    // Новый выбор — новая попытка: отказ подъёма по запросу касался прежнего окна или файла.
+    resetOnDemand();
     // Идёт именно эта модель, выбрано скачанное квантование и запуск изменился —
     // перезапуск виден работой с этапом «restart». Не скачанное квантование сервер
     // не трогает: страница предлагает его скачать.
@@ -1135,13 +1368,19 @@ export function createLocalModels(deps: LocalModelsDeps) {
       const shape = await shapeFor(request);
       rememberChoice(request);
       supervisor.reset();
+      // Человек запустил сам — отказ подъёма по запросу снят: следующий сбой снова получит попытки.
+      resetOnDemand();
       await ensureServer(shape);
       return describeServer();
     },
 
     async stopServer(): Promise<{ unloaded: string[] }> {
       supervisor.forget();
-      return managedBy(() => stopServer(paths, port, fetchImpl, deps.kill));
+      return managedBy(() => {
+        // И в очереди тоже: подъём, шедший перед «Стопом», успел взять сервер под присмотр.
+        supervisor.forget();
+        return stopServer(paths, port, fetchImpl, deps.kill);
+      });
     },
 
     /**
@@ -1180,28 +1419,90 @@ export function createLocalModels(deps: LocalModelsDeps) {
       return jobs.start('model', tag, (handle) => importOne(tag, handle));
     },
 
-    /** Удалить модель: все её файлы (или один квантованием), сервер — если держит именно её. */
-    async remove(tag: string, quant?: string): Promise<void> {
-      const record = readRecord(paths);
+    /**
+     * Удалить скачанное: одно квантование или всю модель (все квантования, недокачанные
+     * хвосты, своя запись «Любой модели»). Сервер моделей НЕ останавливается никогда:
+     * файл, который он держит или поднимет после идущего прогона, — отказ 409 с причиной,
+     * остальные файлы удаляются при работающем сервере. Ничего за каталогом моделей.
+     */
+    async remove(tag: string, quant?: string): Promise<LocalRemoveResult> {
+      if (jobs.find('model', tag))
+        throw localError(
+          'local-model-downloading',
+          `модель ${tag} сейчас скачивается — дождитесь конца или отмените загрузку`,
+          { tag },
+        );
       const files = filesOf(tag).filter((file) => !quant || file.quant === quant);
-      if (record?.tag === tag && files.some((file) => file.path === record.file))
-        supervisor.forget();
-      await managedBy(() => stopServer(paths, port, fetchImpl, deps.kill));
-      for (const file of files) removeModelFile(file.path);
+      const model = catalogModel(tag);
+      // Недокачанное лежит рядом с файлом (`.part`) и у квантований, которых в скачанном нет.
+      const parts = (model?.quants ?? [])
+        .filter((item) => !quant || item.id === quant)
+        .map((item) => `${modelFilePath(paths, model?.repo ?? '', item.file)}.part`)
+        .filter((path) => existsSync(path));
+      const ownStore = !quant || quant === OLLAMA_QUANT;
+      const manifest = ownStore ? manifestPathOf(paths.models, tag) : undefined;
+      const targets = [
+        ...files.map((file) => file.path),
+        ...parts,
+        ...(manifest ? [manifest] : []),
+      ];
+      if (targets.some((path) => !insideDir(paths.models, path)))
+        throw localError(
+          'local-model-path',
+          `файл модели ${tag} лежит вне каталога моделей панели — удаление отклонено`,
+          { tag },
+        );
+      // Запись стёрта неудачным подъёмом, а присмотр помнит сервер и поднимет его с этим файлом.
+      const held = readRecord(paths) ?? supervisor.target();
+      const loaded = files.find((file) => samePath(file.path, held?.file));
+      if (loaded)
+        throw localError(
+          'local-model-loaded',
+          `квантование ${loaded.quantLabel ?? loaded.quant} модели ${tag} загружено в сервер моделей — сначала остановите сервер`,
+          { tag, quant: loaded.quantLabel ?? loaded.quant },
+        );
+      // Прогон идёт, а сервер после него перейдёт на выбранное (отложенный перезапуск, присмотр).
+      const next = deps.runActive?.() && held?.tag === tag ? activeFile(tag) : undefined;
+      const pending = files.find((file) => samePath(file.path, next?.path));
+      if (pending)
+        throw localError(
+          'local-model-run-active',
+          `идёт локальный прогон, после него сервер перейдёт на ${pending.quantLabel ?? pending.quant} модели ${tag} — удалите после прогона`,
+          { tag, quant: pending.quantLabel ?? pending.quant },
+        );
+
+      let freedBytes = 0;
+      for (const part of parts) freedBytes += removeCounted(part);
+      for (const file of files) {
+        freedBytes += removeCounted(file.path);
+        pruneEmptyDirs(dirname(file.path), paths.models);
+      }
+      for (const part of parts) pruneEmptyDirs(dirname(part), paths.models);
       updateState(paths, (state) => {
-        if (!quant || quant === OLLAMA_QUANT) delete state.imported[tag];
+        if (ownStore) delete state.imported[tag];
         if (!quant) {
           delete state.choices[tag];
           delete state.custom[tag];
           delete state.tools[tag];
-        } else if (state.choices[tag]?.quant === quant) delete state.choices[tag]?.quant;
+        }
       });
+      // Выбранное квантование удалено: выбор переходит на оставшееся на диске, нет таких — снимается.
+      if (quant && readState(paths).choices[tag]?.quant === quant) {
+        const fallback = activeFile(tag)?.quant;
+        updateState(paths, (state) => {
+          const choice = state.choices[tag];
+          if (!choice) return;
+          if (fallback) choice.quant = fallback;
+          else delete choice.quant;
+        });
+      }
       // Прежняя загрузка Ollama в каталоге панели: без манифеста её не станут предлагать
       // снова, а слой, на который больше никто не ссылается, освобождает место.
-      if (!quant || quant === OLLAMA_QUANT) {
-        await rm(manifestPathOf(paths.models, tag), { force: true });
+      if (manifest) {
+        await rm(manifest, { force: true });
         await dropUnreferencedBlobs(paths.models);
       }
+      return { tag, removed: files.map((file) => file.quant), freedBytes };
     },
 
     async bench(tag: string): Promise<ModelBench> {
@@ -1384,17 +1685,28 @@ export function createLocalModels(deps: LocalModelsDeps) {
           prepare: (session: string | undefined) => Promise<void>;
           revive: () => Promise<ReviveResult>;
           notice: () => string | undefined;
+          watch: (promptTokens: number) => ActivityTrack;
+          layer: (tokens: number) => void;
         }
       | undefined => {
-      const context = (readRecord(paths) ?? supervisor.target())?.context;
-      if (!context) return undefined;
+      const serverContext = (): number | undefined =>
+        (readRecord(paths) ?? supervisor.target())?.context;
+      const known = serverContext();
+      // Сервера нет, а модель скачана — его поднимет первый же запрос (`startOnDemand`).
+      const planned = known ?? (activeFile(model) ? plannedContext(model) : undefined);
+      if (!planned) return undefined;
       const speed = readState(paths).bench[model]?.promptTokensPerSec;
       return {
-        context,
+        // Читается заново: после подъёма по запросу окно — настоящее окно поднятого сервера.
+        get context(): number {
+          return serverContext() ?? planned;
+        },
         ...(speed ? { promptTokensPerSecond: speed } : {}),
         prepare: noteSession,
-        revive: () => supervisor.revive(),
+        revive: () => (known ? supervisor.revive() : startOnDemand(model)),
         notice: noticeText,
+        watch: (promptTokens: number) => activity.track(promptTokens),
+        layer: (tokens: number) => noteLayer(model, tokens),
       };
     },
 
@@ -1436,7 +1748,24 @@ export function createLocalModels(deps: LocalModelsDeps) {
       if (!jobs.cancel(id)) throw localError('local-job-unknown', 'такой загрузки нет');
     },
 
+    /** Что сервер делает с запросом чата прямо сейчас (L6). */
+    async activity(): Promise<LocalActivity> {
+      const layer = await layerFit();
+      return { ...activity.snapshot(), ...(layer ? { layer } : {}) };
+    },
+
+    /** «Перезапустить» из чата: тот же сервер заново, теми же параметрами. */
+    async restartServer(): Promise<LocalServerInfo> {
+      if (!readRecord(paths) && !supervisor.target())
+        throw localError('local-model-missing', 'нет скачанной модели', { tag: '—' });
+      supervisor.reset();
+      resetOnDemand();
+      await restartServerNow();
+      return describeServer();
+    },
+
     shutdown(): void {
+      activity.stop();
       supervisor.stop();
       jobs.cancelAll();
     },

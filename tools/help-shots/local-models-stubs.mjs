@@ -209,6 +209,27 @@ STATES.restarting = () => {
   };
 };
 
+/**
+ * Скачаны два квантования: Q4_K_M держит сервер (корзины нет), UD-Q4_K_XL лежит без дела
+ * (корзина с объёмом) — остров «На диске» и окно удаления.
+ */
+STATES.files = () => {
+  const ready = STATES.ready();
+  const own = ready.installed[0];
+  const xl = MODEL.quants.find((quant) => quant.id === 'UD-Q4_K_XL').sizeBytes;
+  const file = (quant, sizeBytes) => ({ quant, source: 'hf', sizeBytes, freesBytes: sizeBytes });
+  return {
+    ...ready,
+    installed: [
+      {
+        ...own,
+        quants: ['Q4_K_M', 'UD-Q4_K_XL'],
+        files: [file('Q4_K_M', MODEL.sizeBytes), file('UD-Q4_K_XL', xl)],
+      },
+    ],
+  };
+};
+
 /** Модель из «Любая модель»: репозиторий прочитан, агентность ещё не проверена. */
 const CUSTOM = {
   ...MODEL,

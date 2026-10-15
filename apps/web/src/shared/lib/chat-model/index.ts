@@ -33,3 +33,4 @@ export { platformRefusalCaption } from './platformRefusalCaption';
 export { platformBypassCaption } from './platformBypassCaption';
 export { platformLayersCaption, type PlatformLayersCaption } from './platformLayersCaption';
 export { withCurrentValue } from './withCurrentValue';
+export { isLocalRoute, routeKey, platformTitleOf } from './localRoute';

@@ -155,6 +155,21 @@ export const en: Dictionary = {
       `The contour “${title}” does not accept thinking depth — it is not sent.`,
     platformLocked: (title: string) =>
       `This chat goes through the contour “${title}”: it sets the model and depth. Change it in the panel's “Contour” section or return to the default provider.`,
+    localRoute: {
+      platformModel: (_title: string, model: string) => `Local model · llama.cpp: ${model}.`,
+      platformModelReplaced: (_title: string, asked: string, model: string) =>
+        `Local model · llama.cpp: no "${asked}" there, the request goes with ${model}.`,
+      platformModelUnset: (_title: string) =>
+        'Local model · llama.cpp: no model assigned — the request goes as it is.',
+      platformNoEffort: (_title: string) =>
+        'Local model · llama.cpp takes no reasoning effort — it is not sent.',
+      platformLocked: (_title: string) =>
+        'This chat runs on the local model (llama.cpp): it sets the model and effort. Change them in the Local models section of the panel or return to the default provider.',
+      platformLayers: (_title: string, list: string) =>
+        `Local model · llama.cpp: the run goes without ours: ${list}.`,
+      platformLayersAll: (_title: string) =>
+        'Local model · llama.cpp: the run goes without a single layer of ours: no rules, no hooks, no permissions, no skills, no MCP servers, no addition from the panel, and with a trimmed tool set.',
+    },
     platformModelNone: 'contour model',
     localLocked: (title: string) =>
       `Claude Code is switched to the local model "${title}": it answers whatever model you pick. Turn it off in the panel's Local models section.`,

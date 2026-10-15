@@ -75,6 +75,8 @@ describe('окно для шлюза', () => {
       prepare: expect.any(Function),
       revive: expect.any(Function),
       notice: expect.any(Function),
+      watch: expect.any(Function),
+      layer: expect.any(Function),
     });
   });
 
@@ -100,6 +102,8 @@ describe('окно для шлюза', () => {
       prepare: expect.any(Function),
       revive: expect.any(Function),
       notice: expect.any(Function),
+      watch: expect.any(Function),
+      layer: expect.any(Function),
     });
     // Замер другой модели этой не принадлежит.
     expect(service().upstream('other:1b')).toEqual({
@@ -107,6 +111,8 @@ describe('окно для шлюза', () => {
       prepare: expect.any(Function),
       revive: expect.any(Function),
       notice: expect.any(Function),
+      watch: expect.any(Function),
+      layer: expect.any(Function),
     });
   });
 

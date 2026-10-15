@@ -148,6 +148,8 @@ export const composedRu: Record<ComposedMessageCode, string> = {
     'Ход оборвался: {{reason}}. Чат продолжит сам через {{seconds}} с (попытка {{attempt}} из {{max}}).',
   'chat-auto-continue-spent-notice':
     'Ход оборвался: {{reason}}. Автоматические продолжения исчерпаны ({{max}} из {{max}}) — нужен человек.',
+  'chat-background-ask-notice':
+    'Главный ход уже закончился, а фоновая работа агента ({{count}}: {{tasks}}) просит решения. Карточка ниже; когда фон закончится, агент продолжит здесь же сам.',
   'chat-events-trimmed-notice':
     'Долгий прогон: {{count}} старых кадров потока сброшено из памяти панели. Полная переписка — в истории разговора после завершения хода.',
   'chat-stop-unconfirmed-notice':

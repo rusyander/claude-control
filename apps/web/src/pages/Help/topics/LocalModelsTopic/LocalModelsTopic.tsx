@@ -91,6 +91,12 @@ export function LocalModelsTopic() {
           <GuideStep title={g('customRow')} text={g('customRowText')}>
             <HelpShot topic="localModels" scenario="choice" frame="05-custom-row" side="panel" />
           </GuideStep>
+          <GuideStep title={g('filesRow')} text={g('filesRowText')}>
+            <HelpShot topic="localModels" scenario="choice" frame="06-files" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('filesConfirm')} text={g('filesConfirmText')}>
+            <HelpShot topic="localModels" scenario="choice" frame="07-confirm" side="panel" />
+          </GuideStep>
         </GuideSteps>
         <Callout tone="warning" title={g('choicePartialTitle')}>
           {g('choicePartialText')}

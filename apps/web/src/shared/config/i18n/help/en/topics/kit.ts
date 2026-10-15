@@ -76,7 +76,8 @@ export const kitEn: typeof kitRu = {
     cliClaude: 'Claude Code',
     cliClaudeText:
       'All three modes. On a local model tool calls run one at a time, and the kit refuses ' +
-      'background commands and background subagents: the GPU answers one request at a time. The ' +
+      'background commands: the model would poll them and spend its window. A background subagent ' +
+      'is allowed: the turn ends, the subagent works, and its result wakes the turn again. The ' +
       'local-model rule (including the .agent/PROGRESS.md part) travels in every mode; the kit ' +
       'hooks — the compaction reminder, thresholds scaled to the local window, the checkpoint ' +
       'before compaction — only in “Yours and the panel kit” and “Panel kit only”.',

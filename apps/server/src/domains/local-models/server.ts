@@ -6,7 +6,10 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readSync,
+  renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
@@ -65,6 +68,18 @@ export interface ServerShape {
    * `--cache-reuse` не передаётся. Следствие файла, а не выбора — в сравнении запусков не участвует.
    */
   recurrent?: boolean;
+  /** JSON для `--chat-template-kwargs` из каталога (усилие рассуждения); нет — флага нет. */
+  templateKwargs?: string;
+  /** Полный путь к своему шаблону чата из каталога (`--chat-template-file`); нет — шаблон из GGUF. */
+  templateFile?: string;
+  /**
+   * Тип кеша и раскладку выбрал подбор, а не человек. Пока такой сервер идёт, следующий
+   * запуск берёт их из записи, а не подбирает заново: подбор при живом сервере засчитывает
+   * его память по оценке, а она с запасом больше настоящей, и второй запуск выбирал q8_0
+   * вместо q4_0 — лишний перезапуск на 131072 (L6, «не с первого раза»). В сравнении
+   * запусков не участвует.
+   */
+  fitted?: boolean;
 }
 
 export interface ServerRecord extends ServerShape {
@@ -84,7 +99,9 @@ export function sameShape(record: ServerShape, shape: ServerShape): boolean {
     record.device === shape.device &&
     record.mtp === shape.mtp &&
     record.offload === shape.offload &&
-    (record.idleSeconds ?? 0) === (shape.idleSeconds ?? 0)
+    (record.idleSeconds ?? 0) === (shape.idleSeconds ?? 0) &&
+    (record.templateKwargs ?? '') === (shape.templateKwargs ?? '') &&
+    (record.templateFile ?? '') === (shape.templateFile ?? '')
   );
 }
 
@@ -166,6 +183,8 @@ export function serverArgs(
   if (!shape.recurrent) args.push('--cache-reuse', String(CACHE_REUSE_MIN_CHUNK));
   if (tuning.slotSavePath) args.push('--slot-save-path', tuning.slotSavePath);
   if (shape.idleSeconds) args.push('--sleep-idle-seconds', String(shape.idleSeconds));
+  if (shape.templateKwargs) args.push('--chat-template-kwargs', shape.templateKwargs);
+  if (shape.templateFile) args.push('--chat-template-file', shape.templateFile);
   if (shape.mtp)
     args.push('--spec-type', 'draft-mtp', '--spec-draft-n-max', String(MTP_DRAFT_TOKENS));
   return args;
@@ -247,6 +266,59 @@ export interface StartInput {
   freeBytes?: () => number;
 }
 
+/**
+ * Журнал прошлого запуска переезжает в `<имя>.prev.log` до нового запуска. Скрытый
+ * запуск на Windows пишет журнал заново, и подъём после зависания стирал ровно то,
+ * что объясняло зависание (L6, 14.10: 20 минут тишины чата, журнал того часа
+ * перезаписан следующим запуском). Хранится один прошлый — не архив, а улика.
+ * Не вышло (файл держит чужой процесс) — запуск идёт как раньше.
+ */
+export function keepPreviousLog(path: string): void {
+  try {
+    if (!existsSync(path) || statSync(path).size === 0) return;
+    renameSync(path, path.replace(/\.log$/, '.prev.log'));
+  } catch {
+    // Журнал занят живым процессом — новый запуск допишет в него же.
+  }
+}
+
+/** Строка журнала, похожая на причину падения: ошибка CUDA, нехватка памяти, отказ открыть файл. */
+const ERROR_LINE = /error|fail|out of memory|abort|exception|cannot|unable|exceeds/i;
+/** Сколько с конца журнала читать: причина — в последних строках, журнал бывает в десятки мегабайт. */
+const LOG_TAIL_BYTES = 64 * 1024;
+
+/**
+ * Последняя строка, похожая на ошибку, из первого журнала, где она есть: её называет отказ,
+ * когда сервер не поднимается раз за разом (L6), вместо «код 1» и пути к журналу. Нет такой
+ * строки или журнала — `undefined`.
+ */
+export function lastErrorLine(logPaths: string[]): string | undefined {
+  for (const path of logPaths) {
+    let text: string;
+    try {
+      const size = statSync(path).size;
+      const length = Math.min(size, LOG_TAIL_BYTES);
+      const buffer = Buffer.alloc(length);
+      const fd = openSync(path, 'r');
+      try {
+        readSync(fd, buffer, 0, length, size - length);
+      } finally {
+        closeSync(fd);
+      }
+      text = buffer.toString('utf8');
+    } catch {
+      continue;
+    }
+    const hit = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .reverse()
+      .find((line) => line.length > 0 && ERROR_LINE.test(line));
+    if (hit) return hit.length > 300 ? `${hit.slice(0, 300)}…` : hit;
+  }
+  return undefined;
+}
+
 interface Launched {
   pid: number;
   /** Код выхода, если процесс уже завершился; жив — null. */
@@ -309,6 +381,8 @@ export async function startServer(input: StartInput): Promise<{ record: ServerRe
   }
   mkdirSync(dirname(input.paths.serverLog), { recursive: true });
   mkdirSync(input.paths.slotsDir, { recursive: true });
+  keepPreviousLog(input.paths.serverLog);
+  keepPreviousLog(input.paths.serverLog.replace(/\.log$/, '.out.log'));
   const launched = await launch(
     input,
     serverArgs(input.shape, input.port, {

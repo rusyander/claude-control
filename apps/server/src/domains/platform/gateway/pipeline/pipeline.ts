@@ -56,6 +56,8 @@ import {
   ContextCutFilter,
   PromptCounter,
   firstTokenTimeoutMs,
+  stallReasonOf,
+  layerTokensOf,
   promptLimitOf,
   promptTooLongMessage,
   maxTokensOverflowMessage,
@@ -857,6 +859,7 @@ async function chat(
   const local = deps.localUpstream?.(platform.id, model);
   const promptCounter = deps.promptCounter ?? fallbackPromptCounter;
   const promptTokens = local ? promptCounter.estimate(platform.id, model, bodyText.length) : 0;
+  if (local?.layer) reportLayer(local, safeJson(bodyText), bodyText.length, promptTokens);
   if (local && promptTokens + LOCAL_REPLY_RESERVE_TOKENS > local.context) {
     return refuse(response, deps, {
       platformId: platform.id,
@@ -872,9 +875,10 @@ async function chat(
   // урезать сам, урезается здесь, а не отказом (в отличие от Claude Code).
   if (local) bodyText = clampReplyTokens(bodyText, promptTokens, local.context);
   if (local?.prepare) await local.prepare(sessionOf(clientBody));
+  const watched = watchedSignal(response, local, promptTokens);
   const wholeTimeout = upstreamStreams ? 0 : wholeBodyTimeoutMs(driver);
   const headersTimeoutMs = local
-    ? Math.max(wholeTimeout, firstTokenTimeoutMs(promptTokens, local))
+    ? Math.max(wholeTimeout, localFirstByteMs(watched.watching, promptTokens, local))
     : wholeTimeout;
   const sendChat = (): Promise<Response> =>
     callUpstream({
@@ -882,7 +886,7 @@ async function chat(
       token,
       path: 'chat/completions',
       body: bodyText,
-      signal: abortSignalOf(response),
+      signal: watched.signal,
       fetchImpl: deps.fetchImpl,
       ...(upstreamStreams ? {} : { accept: 'application/json' }),
       ...(headersTimeoutMs > 0 ? { headersTimeoutMs } : {}),
@@ -896,6 +900,18 @@ async function chat(
     // Сервер моделей не принял соединение — присмотр поднимает его, запрос идёт второй раз.
     // Нет — «подождите» (503: Qwen Code повторяет такой ответ до десяти раз с нарастающей
     // паузой, 529 он не знает), а не 502, после которого он сдаётся.
+    const stalled = watched.stalled();
+    if (stalled) {
+      return refuse(response, deps, {
+        platformId: platform.id,
+        path,
+        dialect,
+        status: localBusyStatus(dialect),
+        code: 'overloaded_error',
+        message: stalled,
+        lost,
+      });
+    }
     if (local && error instanceof UpstreamError && error.kind === 'connection') {
       const revived = await reviveLocal(local);
       if (revived.ready) {
@@ -926,6 +942,7 @@ async function chat(
       }
     } else {
       const message = error instanceof UpstreamError ? error.message : String(error);
+      watched.failed(502, message);
       return refuse(response, deps, {
         platformId: platform.id,
         path,
@@ -947,8 +964,10 @@ async function chat(
       model,
       lost,
       ...(local ? { local } : {}),
+      onFailure: watched.failed,
     });
   }
+  watched.succeeded();
 
   // Суффикс id сообщения ЭТОГО запроса: id контура у разных ответов бывает
   // одинаковым, а лента Claude находит ответ со сжатием истории именно по id.
@@ -1160,12 +1179,15 @@ async function refuseUpstreamStatus(
     lost: string[];
     /** Локальный сервер: его отказ «не влезает в окно» переводится в то, что Claude Code узнаёт. */
     local?: LocalUpstreamInfo;
+    /** Присмотр локального запроса: отказ сервера моделей виден чату. */
+    onFailure?: (status: number, message: string) => void;
   },
 ): Promise<void> {
   const { platform, driver } = context;
   // Тело контура наружу НЕ идёт: в перечне нарушений 451 вполне может лежать
   // кусок самого запроса. Клиент получает свою форму и русскую причину.
   const body = safeJson(await upstream.text());
+  context.onFailure?.(upstream.status, localFailureText(upstream.status, body));
   const overflow = context.local ? overflowOfUpstream(upstream.status, body) : undefined;
   if (overflow) {
     // Оценка шлюза промахнулась, сервер отказал сам: тем же текстом, что и наш отказ, —
@@ -1258,7 +1280,7 @@ async function exactPromptTokens(input: {
   bodyText: string;
   headers: Readonly<Record<string, string>>;
   signal: AbortSignal;
-}): Promise<number | undefined> {
+}): Promise<number | 'down' | undefined> {
   try {
     const upstream = await callUpstream({
       platform: input.platform,
@@ -1280,8 +1302,9 @@ async function exactPromptTokens(input: {
     const answer = safeJson(await upstream.text());
     const counted = isRecord(answer) ? Number(answer.input_tokens) : Number.NaN;
     return Number.isFinite(counted) && counted > 0 ? Math.round(counted) : undefined;
-  } catch {
-    return undefined;
+  } catch (error) {
+    // Порт не слушает никто — сервера нет; прочие сбои счёта оставляют оценку.
+    return error instanceof UpstreamError && error.kind === 'connection' ? 'down' : undefined;
   }
 }
 
@@ -1492,20 +1515,32 @@ async function nativeChat(
   // Оценка по символам промахивается на плотном выводе (код, JSON): выше 75% окна
   // спрашиваем у сервера точный счёт — промах здесь стоил бы хода, а не токенов.
   if (local && needsPrecount(promptTokens, local.context)) {
-    const exact = await exactPromptTokens({
-      deps,
-      platform,
-      token: native.token,
-      messages: native.messages,
-      bodyText,
-      headers: nativeHeaders(request),
-      signal: abortSignalOf(response),
-    });
-    if (exact !== undefined) {
+    const count = (): Promise<number | 'down' | undefined> =>
+      exactPromptTokens({
+        deps,
+        platform,
+        token: native.token,
+        messages: native.messages,
+        bodyText,
+        headers: nativeHeaders(request),
+        signal: abortSignalOf(response),
+      });
+    let exact = await count();
+    // Сервер не запущен: точного счёта нет, а оценка без выученного соотношения (3 символа
+    // на токен) завышает. Отказ «prompt is too long» по ней не давал серверу даже подняться —
+    // первый ход с полным набором умирал за секунду (L6, 15.10: ~96 тыс. по оценке). Сначала
+    // подъём, потом счёт; не поднялся — 529 с причиной, как у отказа соединения.
+    if (exact === 'down') {
+      const revived = await reviveLocal(local);
+      if (!revived.ready) return refusal(529, 'overloaded_error', revived.message);
+      exact = await count();
+    }
+    if (typeof exact === 'number') {
       promptCounter.learn(platform.id, model, bodyText.length, exact);
       promptTokens = exact;
     }
   }
+  if (local?.layer) reportLayer(local, ruledBody, bodyText.length, promptTokens);
   if (local && promptTokens + LOCAL_REPLY_RESERVE_TOKENS > local.context) {
     return refusal(
       400,
@@ -1520,9 +1555,11 @@ async function nativeChat(
   if (reduceReply) return refusal(400, 'invalid_request_error', reduceReply);
   // Разговор сменился — серверу моделей пора сбросить кеш слота (до запроса, не после).
   if (local?.prepare) await local.prepare(sessionOf(native.clientBody));
+  // Присмотр за запросом (L6): ничего не движется на сервере — обрыв и 529, клиент повторяет.
+  const watched = watchedSignal(response, local, promptTokens);
   const wholeTimeout = ruledBody.stream === true ? 0 : wholeBodyTimeoutMs(driver);
   const headersTimeoutMs = local
-    ? Math.max(wholeTimeout, firstTokenTimeoutMs(promptTokens, local))
+    ? Math.max(wholeTimeout, localFirstByteMs(watched.watching, promptTokens, local))
     : wholeTimeout;
 
   const send = (): Promise<Response> =>
@@ -1532,7 +1569,7 @@ async function nativeChat(
       path: native.messages,
       body: bodyText,
       headers: nativeHeaders(request),
-      signal: abortSignalOf(response),
+      signal: watched.signal,
       fetchImpl: deps.fetchImpl,
       ...(ruledBody.stream === true ? {} : { accept: 'application/json' }),
       ...(headersTimeoutMs > 0 ? { headersTimeoutMs } : {}),
@@ -1542,6 +1579,9 @@ async function nativeChat(
   try {
     upstream = await send();
   } catch (error) {
+    // Сервер ничего не делал с запросом `stallMs` подряд — 529: Claude Code повторяет.
+    const stalled = watched.stalled();
+    if (stalled) return refusal(529, 'overloaded_error', stalled);
     // Локальный сервер не принял соединение — он умер. Присмотр поднимает его заново;
     // поднялся — запрос идёт второй раз, нет — 529: клиент ждёт и повторяет, а не сдаётся.
     if (local && error instanceof UpstreamError && error.kind === 'connection') {
@@ -1558,6 +1598,7 @@ async function nativeChat(
       }
     } else {
       const message = error instanceof UpstreamError ? error.message : String(error);
+      watched.failed(502, message);
       return refusal(502, 'api_error', message);
     }
   }
@@ -1570,8 +1611,10 @@ async function nativeChat(
       model,
       lost,
       ...(local ? { local } : {}),
+      onFailure: watched.failed,
     });
   }
+  watched.succeeded();
 
   const restore = new ResponseStreamFilter(dialect, vault.reverse());
   const meter = new AnthropicStreamMeter();
@@ -1613,9 +1656,10 @@ async function nativeChat(
   } catch (error) {
     failure = response.destroyed
       ? serverText('gateway-client-gone')
-      : serverText('gateway-answer-broken', {
+      : (watched.stalled() ??
+        serverText('gateway-answer-broken', {
           reason: error instanceof Error ? error.message : String(error),
-        });
+        }));
     // Локальный сервер оборвал ответ — он, скорее всего, умер: присмотр поднимает его, а
     // клиенту уходит «перегрузка» (529), которую Claude Code повторяет, а не считает концом хода.
     const deadCode = local ? 'overloaded_error' : 'api_error';
@@ -2302,8 +2346,99 @@ function safeJson(text: string): unknown {
  * а контур продолжал отвечать в закрытое соединение (аудит GW-06). Закрытие
  * ответа, не дописанного до конца, — это и есть уход клиента.
  */
+/**
+ * Сигнал запроса к локальной модели: уход клиента ИЛИ тишина сервера (присмотр, L6).
+ * `stalled` — текст обрыва по тишине, если оборвал присмотр. Присмотр снимается с
+ * закрытием ответа — любым путём, без `finally` на каждом выходе.
+ */
+function watchedSignal(
+  response: ServerResponse,
+  local: LocalUpstreamInfo | undefined,
+  promptTokens: number,
+): WatchedSignal {
+  const client = abortSignalOf(response);
+  const watch = local?.watch?.(promptTokens);
+  if (!watch)
+    return {
+      signal: client,
+      stalled: () => undefined,
+      watching: false,
+      failed: () => undefined,
+      succeeded: () => undefined,
+    };
+  // Клиент мог уйти раньше — пока шли подготовка, точный счёт и подъём сервера (Esc в
+  // Claude Code на «запуске»). Закрытый ответ `close` второй раз не шлёт, и запрос висел бы
+  // в присмотре до обрыва по тишине, который чат показал бы как «обрыв».
+  if (response.destroyed) watch.done();
+  else response.once('close', () => watch.done());
+  return {
+    signal: AbortSignal.any([client, watch.signal]),
+    stalled: () => stallReasonOf(watch.signal),
+    watching: true,
+    failed: (status, message) => watch.failed?.(status, message),
+    succeeded: () => watch.succeeded?.(),
+  };
+}
+
+interface WatchedSignal {
+  signal: AbortSignal;
+  stalled: () => string | undefined;
+  watching: boolean;
+  /** Сервер моделей ответил отказом — чат покажет код и текст (L6). */
+  failed: (status: number, message: string) => void;
+  succeeded: () => void;
+}
+
+/**
+ * Текст отказа сервера моделей для чата: `error.message` его тела, последней непустой
+ * строкой — ошибка шаблона llama.cpp идёт экраном выдержки из исходника, а суть в конце.
+ */
+export function localFailureText(status: number, body: unknown): string {
+  const error = isRecord(body) && isRecord(body.error) ? body.error.message : undefined;
+  const lines = typeof error === 'string' ? error.split('\n').map((line) => line.trim()) : [];
+  return lines.filter(Boolean).at(-1) ?? `HTTP ${status}`;
+}
+
+/**
+ * Срок первого байта локальной модели. Под присмотром (L6) — только страховка в часы:
+ * присмотр видит разбор промпта по слоту и обрывает запрос, когда ничего не движется, а
+ * срок по скорости замера обрывал здоровый разбор (модель, частично ушедшая с карты,
+ * разбирает в двадцать раз медленнее замера). Без присмотра — расчёт по скорости, как был.
+ */
+function localFirstByteMs(
+  watching: boolean,
+  promptTokens: number,
+  local: LocalUpstreamInfo,
+): number {
+  return watching ? LOCAL_WATCHED_FIRST_BYTE_MS : firstTokenTimeoutMs(promptTokens, local);
+}
+
+/** Страховочный срок первого байта под присмотром: дольше любого законного разбора на процессоре. */
+export const LOCAL_WATCHED_FIRST_BYTE_MS = 6 * 60 * 60_000;
+
+/** Слой прогона — панели (L6): она сравнивает его с окном сервера и показывает человеку. */
+function reportLayer(
+  local: LocalUpstreamInfo,
+  body: unknown,
+  bodyChars: number,
+  promptTokens: number,
+): void {
+  const tokens = layerTokensOf(body, bodyChars, promptTokens);
+  if (tokens === undefined) return;
+  try {
+    local.layer?.(tokens);
+  } catch {
+    // Замер слоя — подсказка человеку, не повод ронять запрос.
+  }
+}
+
 function abortSignalOf(response: ServerResponse): AbortSignal {
   const controller = new AbortController();
+  // Уже закрытый ответ `close` не пришлёт: отмена — сразу.
+  if (response.destroyed && !response.writableFinished) {
+    controller.abort();
+    return controller.signal;
+  }
   response.on('close', () => {
     if (!response.writableFinished) controller.abort();
   });

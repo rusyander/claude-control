@@ -112,6 +112,7 @@ export const composedMessageParams = {
   'chat-autonomy-deferred-notice': ['count'],
   'chat-auto-continue-notice': ['attempt', 'max', 'seconds', 'reason'],
   'chat-auto-continue-spent-notice': ['max', 'reason'],
+  'chat-background-ask-notice': ['count', 'tasks'],
   'chat-events-trimmed-notice': ['count'],
   'chat-stop-unconfirmed-notice': ['pid'],
   'split-group-run-not-started': [],

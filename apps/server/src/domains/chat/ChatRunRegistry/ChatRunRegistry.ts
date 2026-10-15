@@ -929,6 +929,10 @@ export class ChatRunRegistry {
     // `sessionId`. Брокер прав знает то написание, с которым прогон стартовал.
     const entry = this.ledger.read().find((item) => item.key === runId || item.sessionId === runId);
     if (!entry) return undefined;
+    // Процесс этой сессии уже в пуле ЭТОГО сервера: подхватывать нечего. Второе
+    // подключение к посреднику вытеснило бы живое, а `pool.keep` закрыл бы ему
+    // ввод — CLI ушёл бы вместе с фоновым агентом, который и спрашивал (14.10).
+    if (entry.sessionId && this.livePool.has(entry.sessionId)) return undefined;
     const [adoptable] = adoptableEntries([entry], probe).adopt;
     if (!adoptable || !this.adopt(adoptable, deps)) return undefined;
     return adoptable;
@@ -965,14 +969,95 @@ export class ChatRunRegistry {
    * прогон того же разговора — вкладка узнает о нём опросом `/chat/active`.
    * false — разговор неизвестен или занят: ход всё равно ляжет в транскрипт.
    */
-  wake(sessionId: string): boolean {
+  wake(sessionId: string, hold = false): boolean {
     const last = this.wakeable.get(sessionId);
     if (!last) return false;
     return this.start(
       last.chatId,
-      { ...last.options, sessionId, prompt: '', wake: true },
+      { ...last.options, sessionId, prompt: '', wake: true, ...(hold ? { hold: true } : {}) },
       { ...last.meta, sessionId },
     );
+  }
+
+  /**
+   * Запрос прав пришёл, когда хода у разговора нет, а его процесс жив: спросил
+   * фоновый субагент, переживший конец хода (живой прогон 14.10 — ревью MR
+   * локальной моделью). Прежде карточка уходила в буфер закончившегося прогона,
+   * которого не видит ни одна вкладка, брокер держал вызов сутки, агент стоял, а
+   * человек видел тишину. Здесь под сессию заводится видимый прогон, который
+   * держит её до следующего хода CLI (`RunOptions.hold`): карточка показывается в
+   * нём, а пробуждение по концу фона приходит в тот же прогон. `true` — у
+   * разговора теперь идёт прогон. Процесса нет или он занят — `false`.
+   */
+  hostBackgroundAsk(runId: string): boolean {
+    if (this.isRunning(runId)) return true;
+    const sessionId = this.idleSessionOf(runId);
+    if (!sessionId) return false;
+    const session = this.livePool.waking(sessionId);
+    if (!session || (session.busy && !session.pendingWake)) return false;
+    const tasks = session.backgroundList;
+    if (!this.wake(sessionId, true)) return false;
+    const params = {
+      count: String(Math.max(tasks.length, session.backgroundCount)),
+      tasks: tasks
+        .map((task) => task.description || task.id)
+        .filter(Boolean)
+        .join('; '),
+    };
+    this.emitExternal(runId, {
+      kind: 'notice',
+      code: 'backgroundAsk',
+      text: serverText('chat-background-ask-notice', params),
+      textCode: 'chat-background-ask-notice',
+      textParams: params,
+    });
+    return true;
+  }
+
+  /**
+   * Параметры разговора, у которого хода нет, а процесс жив (ждущая сессия):
+   * по ним брокер прав решает запрос фонового субагента так же, как решил бы
+   * его в ходе, — не заводя прогона, если карточка не нужна.
+   */
+  describeIdle(runId: string): RunSnapshot | undefined {
+    const sessionId = this.idleSessionOf(runId);
+    const last = sessionId ? this.wakeable.get(sessionId) : undefined;
+    if (!sessionId || !last) return undefined;
+    return {
+      key: last.chatId,
+      status: 'done',
+      options: { ...last.options },
+      meta: { ...last.meta },
+      sessionId,
+    };
+  }
+
+  /**
+   * Последний прогон разговора, чей процесс ждал следующего хода, — по любому из
+   * ключей. Нужен слушателю обрыва фона: продолжить локальный чат после смерти
+   * процесса можно только с его параметрами, а прогона в реестре уже нет.
+   */
+  lastRunOf(
+    keys: readonly string[],
+  ): { chatId: string; sessionId: string; options: RunOptions; meta: RunMeta } | undefined {
+    for (const [sessionId, last] of this.wakeable) {
+      if (keys.includes(sessionId) || keys.includes(last.chatId)) {
+        return { chatId: last.chatId, sessionId, options: last.options, meta: last.meta };
+      }
+    }
+    return undefined;
+  }
+
+  /** sessionId ждущей живой сессии разговора под этим ключом прогона. */
+  private idleSessionOf(runId: string): string | undefined {
+    const key = this.resolveKey(runId);
+    let sessionId = this.runs.get(key)?.sessionId;
+    if (!sessionId) {
+      for (const [id, last] of this.wakeable) {
+        if (id === runId || last.chatId === key || last.chatId === runId) sessionId = id;
+      }
+    }
+    return sessionId && this.livePool.has(sessionId) ? sessionId : undefined;
   }
 
   /**

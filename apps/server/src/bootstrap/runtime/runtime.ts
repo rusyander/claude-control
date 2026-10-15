@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appRootDir } from '../../domains/watcher/report.ts';
 import { createLocalModels, type LocalModels } from '../../domains/local-models/service.ts';
+import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { createLocalMcpSource } from '../../domains/local-models/mcp-source.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import { createRunSync } from '../../domains/local-models/run-sync.ts';
@@ -145,7 +146,10 @@ import {
   retryOutcome,
 } from '../../domains/chat/run-retry/run-retry.ts';
 import { pauseOnForeignStop, pauseOnHumanStop } from '../../routes/chat/split-control-routes.ts';
-import { interruptOnBackgroundLost } from '../../domains/chat/background-lost.ts';
+import {
+  continueOnBackgroundLost,
+  interruptOnBackgroundLost,
+} from '../../domains/chat/background-lost.ts';
 import { SplitOverlap } from '../../domains/chat/split-overlap/split-overlap.ts';
 import { SplitReview } from '../../domains/chat/split-review/split-review.ts';
 import { createSplitLauncher, launchFromRecord } from '../../routes/chat/split-launch.ts';
@@ -949,7 +953,12 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // «Стоп» человека в чате группы — пауза группы (журнал 89c).
   chatRuns.setHumanStopListener(pauseOnHumanStop(ctx.store, splitConveyor));
   // Процесс группы умер, держа фон, — обрыв с продолжением, а не провал (W3-4c).
-  chatRuns.setBackgroundLostListener(interruptOnBackgroundLost(ctx.store, splitConveyor));
+  const interruptGroup = interruptOnBackgroundLost(ctx.store, splitConveyor);
+  const continueLocal = continueOnBackgroundLost(ctx.store, chatRuns, autoContinue);
+  chatRuns.setBackgroundLostListener((keys) => {
+    interruptGroup(keys);
+    continueLocal(keys);
+  });
   // И у чужого CLI: его «Стоп» — та же пауза группы (открытый вопрос WP9e).
   providerChats.setHumanStopListener(pauseOnForeignStop(ctx.store, splitConveyor));
   const isRetriedChild = (keys: readonly string[]): boolean =>
@@ -1250,6 +1259,16 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // рядом с панелью и удаляет вместе с ней (решение владельца 05.10).
   // Пока идёт локальный прогон, система не засыпает (L4b); выключатель — в настройках раздела.
   const keepAwake = createKeepAwake({ log: (message, error) => console.warn(message, error) });
+  // Локальный контур, заведённый до 15.10 с облегчённым набором, которого человек не
+  // выбирал, — на полный набор, один раз (L6). Сбой переноса старт не роняет.
+  try {
+    runLocalFullLayer(ctx.store, ctx.location.paths.appData, (outcome) => {
+      if (outcome === 'migrated')
+        console.log('[local-models] local contour moved to the full layer');
+    });
+  } catch (error) {
+    console.warn('[local-models] full-layer migration failed:', error);
+  }
   const localModels = createLocalModels({
     appRoot: appRootDir(),
     runActive: localRunActive,

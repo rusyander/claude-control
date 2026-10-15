@@ -1,0 +1,82 @@
+{
+  "title": {
+    "ru": "Qwen3.8 27B рекомендуется для кода, каталог локальных моделей идёт от лучшего выбора",
+    "en": "Qwen3.8 27B is recommended for code, and the local model catalog runs from the best choice"
+  },
+  "items": [
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Рекомендуемая модель для кода — Qwen3.8 27B; Qwen3.6 27B Coding остаётся в каталоге запасным выбором. Сервер запускает Qwen3.8 с умеренной глубиной рассуждений: на коде она даёт результат без многоминутных размышлений над каждым шагом.",
+        "en": "The recommended model for code is Qwen3.8 27B; Qwen3.6 27B Coding stays in the catalog as the fallback. The server starts Qwen3.8 with medium reasoning effort: on code it delivers without minutes of thinking over every step."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Qwen3.8 27B в каталоге помечена «Настроена на код», а не «Общая»: отдельной кодовой версии у неё нет, но на задачах агента в среде Claude Code она сильнее Qwen3.6 (SWE-bench Pro 61,7 против 53,5 по карточке модели).",
+        "en": "Qwen3.8 27B is marked “Tuned for code” in the catalog rather than “General”: it has no separate coder build, but on agent tasks in the Claude Code harness it beats Qwen3.6 (SWE-bench Pro 61.7 vs 53.5 per the model card)."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Порядок каталога — от лучшего выбора: сверху «Рекомендуем», за ней модели, что влезают целиком, потом «частично в оперативной памяти», внизу не влезающие. Внутри группы порядок прежний, и строки не прыгают, пока меняются квантование и контекст.",
+        "en": "The catalog runs from the best choice: “Recommended” on top, then the models that fit entirely, then “partly in system memory”, and the ones that do not fit at the bottom. Inside a group the order is unchanged, and rows do not jump while the quantization and context change."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      },
+      "images": ["before.png", "after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "На Windows аргументы запуска сервера моделей с пробелами и кавычками доходят до сервера целыми: раньше значение вроде настроек шаблона чата рассыпалось на части и сервер не стартовал.",
+        "en": "On Windows, model server launch arguments with spaces and quotes reach the server intact: a value such as chat template settings used to fall apart and the server did not start."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели»: порядок каталога и глубина рассуждений Qwen3.8, кадры каталога пересняты в обеих темах и на обоих языках.",
+        "en": "“Local models” help: the catalog order and Qwen3.8’s reasoning effort, with catalog frames re-shot in both themes and both languages."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: первой шла не влезающая Qwen3-Coder-Next, рекомендуемая — второй",
+        "en": "Before: Qwen3-Coder-Next, which does not fit, came first and the recommended model second"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: сверху рекомендуемая Qwen3.8 27B, следом влезающие целиком",
+        "en": "After: the recommended Qwen3.8 27B on top, followed by the models that fit entirely"
+      }
+    }
+  ]
+}

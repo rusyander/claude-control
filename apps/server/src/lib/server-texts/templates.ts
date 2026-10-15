@@ -301,9 +301,21 @@ export const serverTextTemplates = {
     ru: 'причина не названа',
     en: 'no reason given',
   },
+  'local-stalled': {
+    ru: 'сервер моделей {{seconds}} с не двигался с запросом — запрос оборван и уйдёт заново',
+    en: 'the model server made no progress on the request for {{seconds}} s — the request was dropped and goes again',
+  },
   'local-supervisor-gave-up': {
     ru: 'сервер упал и не поднялся после {{restarts}} попыток подряд; панель пробует снова раз в 10 минут',
     en: 'the server crashed and did not come back after {{restarts}} attempts in a row; the panel tries again every 10 minutes',
+  },
+  'local-on-demand-backoff': {
+    ru: 'сервер моделей не поднялся ({{attempts}} из {{max}} попыток): {{cause}}; следующая попытка через {{seconds}} с',
+    en: 'the model server did not come up ({{attempts}} of {{max}} attempts): {{cause}}; next attempt in {{seconds}} s',
+  },
+  'local-on-demand-failed': {
+    ru: 'сервер моделей не поднялся {{attempts}} раза подряд, и панель больше не запускает его по запросу чата: {{cause}}',
+    en: 'the model server did not come up {{attempts}} times in a row, and the panel no longer starts it on a chat request: {{cause}}',
   },
   'gateway-cert-failed': {
     ru: 'Сертификат контура не проверился: {{reason}}. Укажите корневой сертификат компании в настройках контура',
@@ -1285,6 +1297,10 @@ export const serverTextTemplates = {
   'chat-auto-continue-spent-notice': {
     ru: 'Ход оборвался: {{reason}}. Автоматические продолжения исчерпаны ({{max}} из {{max}}) — нужен человек.',
     en: 'The turn broke off: {{reason}}. Automatic continuations are used up ({{max}} of {{max}}) — a human is needed.',
+  },
+  'chat-background-ask-notice': {
+    ru: 'Главный ход уже закончился, а фоновая работа агента ({{count}}: {{tasks}}) просит решения. Карточка ниже; когда фон закончится, агент продолжит здесь же сам.',
+    en: "The main turn has already ended, but the agent's background work ({{count}}: {{tasks}}) needs a decision. The card is below; once the background work finishes, the agent continues here on its own.",
   },
   'chat-events-trimmed-notice': {
     ru: 'Долгий прогон: {{count}} старых кадров потока сброшено из памяти панели. Полная переписка — в истории разговора после завершения хода.',

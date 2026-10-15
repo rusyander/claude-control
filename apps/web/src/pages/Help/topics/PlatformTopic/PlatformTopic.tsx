@@ -220,6 +220,7 @@ export function PlatformTopic() {
             { name: tr('layerSkills'), description: tr('layerSkillsText'), isMono: false },
             { name: tr('layerMcp'), description: tr('layerMcpText'), isMono: false },
             { name: tr('layerPrompt'), description: tr('layerPromptText'), isMono: false },
+            { name: tr('layerTools'), description: tr('layerToolsText'), isMono: false },
           ]}
         />
         <Callout tone="info" title={tr('layersFlagsTitle')}>

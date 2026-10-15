@@ -111,6 +111,50 @@
         "height": 345
       }
     },
+    "choice/06-files": {
+      "light-ru": {
+        "file": "06-files.png",
+        "width": 1106,
+        "height": 454
+      },
+      "light-en": {
+        "file": "06-files.en.png",
+        "width": 1106,
+        "height": 454
+      },
+      "dark-ru": {
+        "file": "06-files.dark.png",
+        "width": 1106,
+        "height": 454
+      },
+      "dark-en": {
+        "file": "06-files.dark.en.png",
+        "width": 1106,
+        "height": 454
+      }
+    },
+    "choice/07-confirm": {
+      "light-ru": {
+        "file": "07-confirm.png",
+        "width": 444,
+        "height": 344
+      },
+      "light-en": {
+        "file": "07-confirm.en.png",
+        "width": 444,
+        "height": 344
+      },
+      "dark-ru": {
+        "file": "07-confirm.dark.png",
+        "width": 444,
+        "height": 344
+      },
+      "dark-en": {
+        "file": "07-confirm.dark.en.png",
+        "width": 444,
+        "height": 344
+      }
+    },
     "first/01-machine": {
       "light-ru": {
         "file": "01-machine.png",

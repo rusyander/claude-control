@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createLocalModels, loadCatalog } from './service.ts';
-import { localPaths, readState, type LocalPaths } from './paths.ts';
+import { localPaths, readState, updateState, type LocalPaths } from './paths.ts';
 import {
   IDLE_SLEEP_SECONDS,
   readRecord,
@@ -115,6 +115,11 @@ beforeEach(() => {
   killed = [];
   const paths = localPaths(root, ENV());
   const runtimeDir = join(paths.runtime, 'llama-b11583');
+  // Окно 65536 — выбор человека (как у владельца): умолчание каталога выросло до 131072 (L6),
+  // а эти проверки — о перезапуске и присмотре, не о подборе окна.
+  updateState(paths, (state) => {
+    state.choices[TAG] = { context: 65_536 };
+  });
   mkdirSync(runtimeDir, { recursive: true });
   writeFileSync(join(runtimeDir, BINARY), '');
   // Модель «скачана»: настоящий заголовок GGUF со слоем MTP.
@@ -151,6 +156,32 @@ describe('перезапуск сервера при смене кеша кон�
     await local.startServer({ tag: TAG });
     expect(spawned).toHaveLength(1);
     expect(killed).toHaveLength(1);
+  });
+
+  it('первый запуск на окне по умолчанию (131072) выбирает кеш раз и навсегда: второй запуск сервер не трогает', async () => {
+    // Чистая машина: сервера нет, окно не выбиралось — подбор решает всё сам (L6).
+    const paths = localPaths(root, ENV());
+    rmSync(paths.pidFile, { force: true });
+    up = false;
+    // Квантование — Q4_K_M, на котором сняты замеры 07.10: с умолчанием каталога (IQ4_XS, ревью
+    // L6) окну 131072 хватает и q8_0, и подбор кеш не выбирал бы — проверять было бы нечего.
+    const model = loadCatalog().models.find((item) => item.tag === TAG);
+    const q4km = model?.quants.find((item) => item.id === 'Q4_K_M');
+    if (!model || !q4km) throw new Error('Q4_K_M not in catalog');
+    stubs.writeGguf(modelFilePath(paths, model.repo, q4km.file), { nextn: 1 });
+    updateState(paths, (state) => {
+      state.choices = { [TAG]: { quant: 'Q4_K_M' } };
+    });
+    const local = service();
+    const first = await local.startServer({ tag: TAG });
+    expect(first).toMatchObject({ running: true, context: 131_072, kvCache: 'q4_0' });
+    expect(spawned).toHaveLength(1);
+    // Живой сервер подбор засчитывает по оценке поверх замера, сделанного ДО запуска:
+    // без записи «кеш выбрал подбор» второй запуск видел q8_0 и перезапускал сервер.
+    const again = await local.startServer({ tag: TAG });
+    expect(spawned).toHaveLength(1);
+    expect(killed).toHaveLength(0);
+    expect(again).toMatchObject({ context: 131_072, kvCache: 'q4_0' });
   });
 
   it('кеш, названный человеком, бьёт подбор и запоминается для следующего запуска', async () => {

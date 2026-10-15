@@ -93,6 +93,7 @@ function html(over: Partial<LocalModelsInfo> & Record<string, unknown> = {}): st
       onConnect={() => undefined}
       onBench={() => undefined}
       onRemove={() => undefined}
+      onRemoveFile={() => undefined}
       onCancel={() => undefined}
       onChoose={() => undefined}
     />,
@@ -199,5 +200,56 @@ describe('ModelRow: выбор квантования и окна', () => {
     expect(ok).not.toContain('Агентность не проверена');
     // Корзина у своей записи есть и без скачанных файлов: запись убирается из списка.
     expect(unknown).toContain('aria-label="Удалить"');
+  });
+});
+
+describe('ModelRow: скачанные квантования и их удаление', () => {
+  const Q4 = 17_106_773_120;
+  const XL = 17_900_000_000;
+  const two = {
+    ...INSTALLED,
+    quants: ['Q4_K_M', 'UD-Q4_K_XL'],
+    files: [
+      { quant: 'Q4_K_M', source: 'hf', sizeBytes: Q4, freesBytes: Q4 },
+      { quant: 'UD-Q4_K_XL', source: 'hf', sizeBytes: XL, freesBytes: XL },
+    ],
+  };
+  const server = (quant: string) => ({ running: true, model: MODEL.tag, quant });
+
+  it('«На диске»: каждое квантование с размером и корзиной, подпись корзины называет освобождаемое', () => {
+    const out = html({ installed: [two] as never, server: { running: false } as never });
+    expect(out).toContain('На диске');
+    expect(out).toContain('aria-label="Скачанные квантования Qwen3.6 27B Coding"');
+    expect(out).toMatch(/aria-label="Удалить Q4_K_M — освободится 15,9.ГБ"/);
+    expect(out).toMatch(/aria-label="Удалить UD-Q4_K_XL — освободится 16,7.ГБ"/);
+    expect(out).not.toContain('загружено в сервер');
+  });
+
+  it('квантование, которое держит сервер: вместо корзины «остановите сервер», корзина модели закрыта', () => {
+    const out = html({ installed: [two] as never, server: server('Q4_K_M') as never });
+    expect(out).toContain('загружено в сервер — остановите сервер, чтобы удалить');
+    expect(out).not.toMatch(/aria-label="Удалить Q4_K_M/);
+    expect(out).toMatch(/aria-label="Удалить UD-Q4_K_XL/);
+    expect(out).toMatch(/disabled="" title="Модель загружена в сервер/);
+  });
+
+  it('ссылка на файл Ollama: подпись и «освободится 0 ГБ» — байты остаются у Ollama', () => {
+    const imported = {
+      ...INSTALLED,
+      quant: 'Ollama',
+      quants: ['Ollama'],
+      quantLabel: 'Q4_K_M',
+      source: 'ollama',
+      files: [
+        { quant: 'Ollama', quantLabel: 'Q4_K_M', source: 'ollama', sizeBytes: Q4, freesBytes: 0 },
+      ],
+    };
+    const out = html({ installed: [imported] as never, choices: {} });
+    expect(out).toContain('ссылка на файл Ollama');
+    expect(out).toMatch(/aria-label="Удалить Q4_K_M — освободится 0.ГБ"/);
+  });
+
+  it('ничего не скачано — острова «На диске» нет', () => {
+    expect(html({ installed: [] })).not.toContain('На диске');
   });
 });

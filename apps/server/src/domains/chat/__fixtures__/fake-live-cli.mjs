@@ -7,7 +7,8 @@
 // STEER / STEERLATE model a message written to stdin mid-turn (claude 2.1.285, measured
 // 30.09): STEER absorbs it into the open turn (one result, the text names it); STEERLATE
 // has no step left — the turn ends and the CLI starts the next turn with it by itself.
-/* global process, setTimeout, clearTimeout */
+/* global process, setTimeout, clearTimeout, setInterval, clearInterval */
+import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 const SESSION = 'live-session-0001';
@@ -158,6 +159,27 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     // Background task that never finishes: the process holds it until it dies.
     out({ type: 'system', subtype: 'background_tasks_changed', tasks: [{ id: 'bg-hold' }] });
     runTurn(`turn ${turn + 1} pid ${process.pid}`);
+    return;
+  }
+  if (content.includes('BGASK')) {
+    // Background SUBAGENT that outlives the turn (claude 2.1.286 task shape, live run
+    // 14.10): it finishes only when the file named after BGASK appears, then the CLI
+    // wakes itself. End of input while it runs = the CLI leaves without it (exit 3).
+    const release = content.slice(content.indexOf('BGASK') + 'BGASK'.length).trim();
+    const task = { task_id: 'a53c', task_type: 'local_agent', description: 'Fetch MR' };
+    out({ type: 'system', subtype: 'background_tasks_changed', tasks: [task] });
+    runTurn(`turn ${turn + 1} pid ${process.pid}`);
+    const poll = setInterval(() => {
+      if (!existsSync(release)) return;
+      clearInterval(poll);
+      out({ type: 'system', subtype: 'background_tasks_changed', tasks: [] });
+      out({ type: 'system', subtype: 'task_notification', status: 'completed' });
+      runTurn(`woke pid ${process.pid}`, NOTIFIED);
+    }, 50);
+    process.stdin.once('end', () => {
+      clearInterval(poll);
+      process.exit(3);
+    });
     return;
   }
   if (content.includes('LATEWAKE')) {

@@ -1,10 +1,14 @@
 import type { PlatformModelChoice } from '@agentdeck/contracts/platform-models';
 import { modelCaptionState } from '@agentdeck/contracts/platform-models';
+import { routeKey } from './localRoute';
 
 /** Что сказать о модели прогона, идущего через контур (Т6). */
 export interface PlatformModelCaption {
   /** Ключ словаря: подпись выбирается здесь, а не в двух шапках порознь. */
-  key: 'chat.platformModel' | 'chat.platformModelReplaced' | 'chat.platformModelUnset';
+  key:
+    | ReturnType<typeof routeKey<'chat.platformModel'>>
+    | ReturnType<typeof routeKey<'chat.platformModelReplaced'>>
+    | ReturnType<typeof routeKey<'chat.platformModelUnset'>>;
   params: { title: string; asked: string; model: string };
   /** Человеку стоит присмотреться: уедет не то, что он выбрал. */
   warn: boolean;
@@ -23,6 +27,8 @@ export interface PlatformModelCaption {
 export function platformModelCaption(
   title: string,
   choice: PlatformModelChoice,
+  /** Прогон ведёт контур локальной модели: слова «Локальная модель · llama.cpp» (L6). */
+  local = false,
 ): PlatformModelCaption {
   const params = { title, asked: choice.asked, model: choice.model };
   // Состояние выбирают КОНТРАКТЫ (`modelCaptionState`), а здесь — только слова:
@@ -33,10 +39,10 @@ export function platformModelCaption(
   // увидеть её надо до отправки сообщения.
   switch (modelCaptionState(choice)) {
     case 'unset':
-      return { key: 'chat.platformModelUnset', params, warn: true };
+      return { key: routeKey('chat.platformModelUnset', local), params, warn: true };
     case 'replaced':
-      return { key: 'chat.platformModelReplaced', params, warn: true };
+      return { key: routeKey('chat.platformModelReplaced', local), params, warn: true };
     default:
-      return { key: 'chat.platformModel', params, warn: false };
+      return { key: routeKey('chat.platformModel', local), params, warn: false };
   }
 }

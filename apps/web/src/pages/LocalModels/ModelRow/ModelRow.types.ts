@@ -1,5 +1,5 @@
 import type { LocalChoiceBody } from '@agentdeck/contracts/local-models';
-import type { CatalogRow } from '@entities/LocalModels';
+import type { CatalogRow, DownloadedFile } from '@entities/LocalModels';
 
 export interface ModelRowProps {
   row: CatalogRow;
@@ -12,6 +12,8 @@ export interface ModelRowProps {
   onConnect: () => void;
   onBench: () => void;
   onRemove: () => void;
+  /** Удалить одно скачанное квантование (подтверждение — на странице). */
+  onRemoveFile: (file: DownloadedFile) => void;
   onCancel: (id: string) => void;
   onChoose: (body: Omit<LocalChoiceBody, 'tag'>) => void;
 }

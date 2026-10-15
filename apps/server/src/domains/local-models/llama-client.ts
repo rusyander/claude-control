@@ -25,6 +25,23 @@ export interface ServerProps {
   sleeping: boolean;
 }
 
+/**
+ * Слот за работой (`GET /slots`, сборка b11583): `filled` — сколько токенов промпта уже в кеше
+ * слота (растёт на каждом пакете разбора), `decoded` — сколько токенов ответа выдано.
+ */
+export interface SlotState {
+  processing: boolean;
+  filled: number;
+  decoded: number;
+}
+
+/**
+ * Сколько ждать ответа на опрос слота. `/slots` проходит через очередь задач сервера и отвечается
+ * между пакетами разбора: на видеокарте — сразу, на процессоре пакет идёт минуту. Не ответил —
+ * присмотр считает это тишиной (`activity.ts`), а не пропускает шаг.
+ */
+export const SLOT_TIMEOUT_MS = 1_500;
+
 export interface BenchResult {
   evalCount: number;
   evalDurationNs: number;
@@ -69,6 +86,8 @@ export interface LlamaClient {
   countTokens(body: unknown): Promise<number>;
   /** Сбросить кеш слота (`POST /slots/N?action=erase`); сколько токенов стёрто. Спящий сервер этим будят — звать только бодрствующий. */
   eraseSlot(slot?: number): Promise<number>;
+  /** Что делает слот. Спящий сервер этим будят — звать, только пока запрос в пути. */
+  slot(id?: number): Promise<SlotState | undefined>;
   bench(model: string, signal?: AbortSignal): Promise<BenchResult>;
 }
 
@@ -117,6 +136,26 @@ export function llamaClient(baseUrl: string, fetchImpl: FetchLike = fetch): Llam
         signal: AbortSignal.timeout(ERASE_TIMEOUT_MS),
       });
       return ((await response.json()) as { n_erased?: number }).n_erased ?? 0;
+    },
+
+    async slot(id = 0) {
+      const response = await fetchImpl(`${baseUrl}/slots`, {
+        signal: AbortSignal.timeout(SLOT_TIMEOUT_MS),
+      });
+      if (!response.ok) return undefined;
+      const slots = (await response.json()) as {
+        id?: number;
+        is_processing?: boolean;
+        n_prompt_tokens?: number;
+        next_token?: { n_decoded?: number }[];
+      }[];
+      const slot = Array.isArray(slots) ? slots.find((item) => item.id === id) : undefined;
+      if (!slot) return undefined;
+      return {
+        processing: slot.is_processing === true,
+        filled: slot.n_prompt_tokens ?? 0,
+        decoded: slot.next_token?.[0]?.n_decoded ?? 0,
+      };
     },
 
     async countTokens(body) {

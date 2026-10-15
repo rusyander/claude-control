@@ -54,6 +54,7 @@ import { useChildHub } from '../model/useChildHub';
 import { useChatDots } from '../model/useChatDots';
 import { useProjectShelf } from '../model/useProjectShelf';
 import { useChatModelPrefs } from '../model/useChatModelPrefs';
+import { useLocalRun } from '../model/useLocalRun';
 import { useStreamState } from '../model/useStreamState';
 import { downloadChatExport } from '../lib/downloadChatExport';
 import { keepPending } from '../lib/pending';
@@ -98,6 +99,7 @@ export function ChatPage() {
   // ходят: всё это живёт в одном месте — здесь только читаем.
   const session = useChatSession({ chats: chats.data });
   const { activeChat, chatId, projectPath, isProjectContext, draftKey, preview, pending } = session;
+  const localRun = useLocalRun(activeChat?.parentId ? 'groups' : 'chat', projectPath);
 
   const run = useAgentRun(chatId);
   // Авторежим прав этого чата — с сервера: выбор человека в чате сильнее
@@ -420,6 +422,7 @@ export function ChatPage() {
             onPickOption={answerQuestion}
             isRunning={isRunning}
             runStartedAt={run.startedAt}
+            localRun={localRun}
             chatId={chatId}
             permissions={run.permissions}
             branchGates={run.branchGates}

@@ -14,6 +14,8 @@ import {
   platformRefusalCaption,
   platformBypassCaption,
   platformLayersCaption,
+  isLocalRoute,
+  routeKey,
 } from '../../../shared/lib/chat-model';
 
 /**
@@ -49,12 +51,15 @@ export function ChatModelPicker({
   // Спрашиваем тем же, с чем уйдёт запрос: пустой выбор чата — это модель из
   // настроек, а не пустота (ревью Т13).
   const choice = routed ? platformRunChoice(routed.rules, model, defaultModel) : undefined;
-  const caption = routed && choice ? platformModelCaption(routed.title, choice) : undefined;
+  // Контур локальной модели называется своими словами, не «контуром» (L6).
+  const localRoute = isLocalRoute(routed);
+  const caption =
+    routed && choice ? platformModelCaption(routed.title, choice, localRoute) : undefined;
   // Снятые нами слои (Т8) — здесь же и по той же причине: «агент не читает мои
   // правила» выглядит поломкой агента, пока человек не увидит, что это его
   // собственная галочка на карточке контура. Сказать надо ДО отправки
   // сообщения, а не объяснять постфактум.
-  const layers = platformLayersCaption(routed?.layers, routed?.localMcp);
+  const layers = platformLayersCaption(routed?.layers, routed?.localMcp, localRoute);
   const refusal = platformRefusalCaption(plan.data);
   // «По возможности» без шлюза или ключа: уход мимо контура назван до отправки
   // (решение по контуру №4) — молча данные в облако вендора не уезжают.
@@ -86,7 +91,9 @@ export function ChatModelPicker({
   // Claude уведён на локальную модель: ответит она, и шапка говорит это, а не «Opus».
   const local = routed ? undefined : plan.data?.local;
   const locked = routed && choice;
-  const lockedTitle = routed ? t('chat.platformLocked', { title: routed.title }) : undefined;
+  const lockedTitle = routed
+    ? t(routeKey('chat.platformLocked', localRoute), { title: routed.title })
+    : undefined;
   const lockedModel = choice?.model || t('chat.platformModelNone');
   const lockedEffort = routed?.effort ? effortName(effort) : t('chat.platformEffortOff');
 
@@ -231,7 +238,7 @@ export function ChatModelPicker({
 
       {routed && !routed.effort && (
         <Typography variant="caption" color="muted" as="span">
-          {t('chat.platformNoEffort', { title: routed.title })}
+          {t(routeKey('chat.platformNoEffort', localRoute), { title: routed.title })}
         </Typography>
       )}
     </Stack>

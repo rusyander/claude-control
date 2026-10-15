@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { LocalLayerNotice } from '@entities/LocalModels';
 import { Typography } from '@shared/ui/typography';
 import type { ServerNotesProps } from './ServerNotes.types';
 
@@ -44,6 +45,7 @@ export function ServerNotes({ server }: ServerNotesProps) {
           {t('localModels.pending.note')}
         </Typography>
       ) : null}
+      <LocalLayerNotice layer={server.layer} />
       {server.restartError ? (
         <Typography variant="caption" color="warning" role="status" aria-live="polite">
           {t('localModels.pending.failed', { reason: server.restartError })}

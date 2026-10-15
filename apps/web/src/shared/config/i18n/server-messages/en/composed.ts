@@ -152,6 +152,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'The turn broke off: {{reason}}. The chat will continue on its own in {{seconds}} s (attempt {{attempt}} of {{max}}).',
   'chat-auto-continue-spent-notice':
     'The turn broke off: {{reason}}. Automatic continuations are used up ({{max}} of {{max}}) — a human is needed.',
+  'chat-background-ask-notice':
+    "The main turn has already ended, but the agent's background work ({{count}}: {{tasks}}) needs a decision. The card is below; once the background work finishes, the agent continues here on its own.",
   'chat-events-trimmed-notice':
     "Long run: {{count}} old stream frames were dropped from the panel's memory. The full conversation is in the chat history once the turn ends.",
   'chat-stop-unconfirmed-notice':

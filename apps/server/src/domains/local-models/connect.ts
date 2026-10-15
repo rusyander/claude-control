@@ -1,4 +1,4 @@
-import type { LocalConnectInfo } from '@agentdeck/contracts/local-models';
+import { LOCAL_PLATFORM_ID, type LocalConnectInfo } from '@agentdeck/contracts/local-models';
 import type { OurRules } from '@agentdeck/contracts/platform';
 import {
   PLATFORM_ASSISTANT_TARGET,
@@ -29,8 +29,9 @@ import { localError } from './errors.ts';
 /**
  * Идентификатор контура остался прежним при смене движка с Ollama на llama.cpp:
  * по нему живёт всё, что человек уже настроил (разделы маршрута, бюджет, журнал).
+ * Значение — в контрактах: по нему же экран называет контур «Локальная модель».
  */
-export const LOCAL_PLATFORM_ID = 'local-ollama';
+export { LOCAL_PLATFORM_ID };
 /** Пресет контура: `llama-server` говорит на Anthropic Messages сам. */
 export const LOCAL_DRIVER = 'llama-cpp';
 /** Ключ-заглушка: сервер моделей ключ не проверяет, а контур без ключа прогон не поведёт. */
@@ -71,11 +72,15 @@ function fail(code: LocalMessageCode, step: string, answer: InjectAnswer): Error
 }
 
 /**
- * Наши слои локального контура по умолчанию (L1b, замер 13.10.2026): базовый
- * промпт Claude Code на этой машине — около 46 тыс. токенов при окне 65536, и
- * сжатие срабатывает на каждом ходу. Без MCP-серверов (около 19 тыс.) и с рабочим
- * набором инструментов (минус около 11 тыс.) он укладывается в 16 тыс.; правила,
- * хуки и скиллы человека остаются — их можно вернуть на карточке контура.
+ * Облегчённый набор локального контура (L1b, замер 13.10.2026) — ТОЛЬКО по выбору
+ * человека на карточке контура: без MCP-серверов (около 19 тыс. токенов) и с рабочим
+ * набором инструментов (минус около 11 тыс.). Правила, хуки и скиллы остаются.
+ *
+ * По умолчанию локальный контур идёт с ПОЛНЫМ набором, как облачный Claude (слово
+ * владельца 15.10: десять часов без присмотра на локальной модели со всем, что есть
+ * у облака). Облегчённый набор без MCP толкал модель в обход — субагент ревью ходил
+ * в GitLab curl'ом с ключом из файла секретов, потому что MCP-сервера у него не было.
+ * Под полный набор поднято окно в каталоге (`defaultContext`), а не урезан набор.
  */
 export function localLeanRules(): OurRules {
   return { ...defaultOurRules(), mcp: false, tools: false };
@@ -106,7 +111,7 @@ export function localPlatformSettings(input: {
     capabilities: ['models', 'chat', 'client-tools'],
     consumers: input.consumers,
     defaultModel: input.model,
-    rules: input.rules ?? { platform: defaultPlatformRules(), ours: localLeanRules() },
+    rules: input.rules ?? { platform: defaultPlatformRules(), ours: defaultOurRules() },
   };
 }
 
@@ -141,7 +146,7 @@ export async function connectLocal(
 ): Promise<unknown> {
   // Контур этого же вида уже есть — его слои человек мог править на карточке, и
   // повторное «Подключить» их не сбрасывает. Контур старого вида (Ollama) или
-  // новый получает облегчённый набор.
+  // новый получает полный набор.
   const known = await inject({ method: 'GET', url: '/api/platforms' });
   const own =
     known.status < 400

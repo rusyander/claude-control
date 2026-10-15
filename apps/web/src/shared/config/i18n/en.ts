@@ -1593,7 +1593,14 @@ export const en: TranslationSchema = {
         running: 'working',
         done: 'done',
         failed: 'failed',
+        lost: 'lost: the conversation process closed',
       },
+      agentBackground: 'in background',
+      agentQuiet: 'last wrote {{ago}} ago',
+      agentsLost: 'Subagent lost: {{count}}',
+      agentsLostHint:
+        'A background subagent lives as long as the CLI process of the conversation. The process closed before the subagent finished: its result will not come. Send a message — the agent continues and sees that the subagent was cut off.',
+      backgroundAgents: 'Turn finished, subagents working in background: {{count}}',
       now: 'Now: {{what}}',
       shells: 'Background commands',
       shellsRunning: 'In background: {{count}}',
@@ -1704,6 +1711,42 @@ export const en: TranslationSchema = {
     platformNoEffort: 'The "{{title}}" contour takes no reasoning effort — it is not sent.',
     platformLocked:
       'This chat runs through the "{{title}}" contour: it sets the model and effort. Change them in the Contour section or return to the default provider.',
+    localRun: {
+      aria: 'Local model status',
+      server: '{{model}} · {{quant}} · context {{context}}',
+      serverUnknown: 'Local model',
+      permission: 'waiting for your permission',
+      idle: 'no request to the model — the agent is running tools',
+      preparing: 'the agent is preparing a request to the model',
+      failed: 'no request to the model: the model server refused the last one',
+      failure: 'The model server answered {{status}}: {{message}}',
+      starting: 'the model server is starting',
+      loading: 'the model is loading into memory',
+      queued: 'the request waits for the server to take it',
+      prompt: 'reading the prompt: {{filled}} of {{total}} tokens',
+      promptNoTotal: 'reading the prompt: {{filled}} tokens',
+      generating: 'writing the answer: {{decoded}} tokens',
+      silent: 'the server has been silent for {{seconds}} s — in {{left}} s the request goes again',
+      stalled: 'the request was cut after {{seconds}} s of silence and went again',
+      restart: 'Restart the server',
+      restarting: 'Restarting…',
+      restartFailed: 'The server did not restart: {{message}}',
+    },
+    localRoute: {
+      label: 'Local model · llama.cpp',
+      model: 'Local model · llama.cpp: {{model}}.',
+      modelReplaced:
+        'Local model · llama.cpp: no "{{asked}}" there, the request goes with {{model}}.',
+      modelUnset: 'Local model · llama.cpp: no model assigned — the request goes as it is.',
+      noEffort: 'Local model · llama.cpp takes no reasoning effort — it is not sent.',
+      locked:
+        'This chat runs on the local model (llama.cpp): it sets the model and effort. Change them in the Local models section or return to the default provider.',
+      layers: 'Local model · llama.cpp: the run goes without ours: {{list}}.',
+      layersAll:
+        'Local model · llama.cpp: the run goes without a single layer of ours: no rules, no ' +
+        'hooks, no permissions, no skills, no MCP servers, no addition from the panel, and with a ' +
+        'trimmed tool set.',
+    },
     platformModelNone: 'contour model',
     localLocked:
       'Claude Code is switched to the local model "{{title}}": it answers whatever model you pick. Turn it off in the Local models section.',
@@ -3681,7 +3724,8 @@ export const en: TranslationSchema = {
         'The CLI’s built-in tools. Unticked, the request keeps the working ones: Bash, Read, Edit, ' +
         'Write, Glob, Grep, WebFetch, Skill, Agent, TodoWrite (the `--tools` flag); schedules, ' +
         'worktrees, broadcasts, workflows and the rest go, about 11k tokens on every request. ' +
-        'For small-window models; the local contour is created with it unticked. The master ' +
+        'For small-window models; the local contour runs with the full set, dropping it is ' +
+        'your choice. The master ' +
         'switch does not govern it: it is not from `~/.claude`.',
     },
     layersFlags: 'The run will carry the flags: {{args}}',

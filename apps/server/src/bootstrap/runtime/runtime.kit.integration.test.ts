@@ -11,8 +11,10 @@ import {
   LOCAL_CONSUMERS,
   LOCAL_PLATFORM_ID,
   LOCAL_PLATFORM_TOKEN,
+  localLeanRules,
   localPlatformSettings,
 } from '../../domains/local-models/connect.ts';
+import { defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { writePlatform, writeToken } from '../../domains/platform/store/store.ts';
 import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
 import { createRuntime, type Runtime } from './runtime.ts';
@@ -70,6 +72,9 @@ describe('набор панели доезжает до прогона обла�
       pricing: { current: () => ({ entries: [] }) },
       models: { current: () => ({ models: [] }) },
     } as unknown as ServerContext;
+    // Каталог локальных моделей — свой: выбор MCP и состояние сервиса пишутся в
+    // state.json, и без этого тест писал бы в настоящий каталог панели.
+    process.env.AGENTDECK_LOCAL_MODELS_DIR = join(root, 'local-models');
     runtime = createRuntime(ctx, 'http://127.0.0.1:1');
 
     started = [];
@@ -96,6 +101,7 @@ describe('набор панели доезжает до прогона обла�
   afterEach(async () => {
     runtime.chatRuns.stopAll();
     runtime.shutdown();
+    delete process.env.AGENTDECK_LOCAL_MODELS_DIR;
     await app.close();
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
@@ -144,7 +150,8 @@ describe('набор панели доезжает до прогона обла�
   });
 
   /** Контур заведён так же, как его заводит «Скачать и подключить» (`connect.ts`); шлюз — живой. */
-  async function connectLocal(): Promise<void> {
+  /** `lean` — облегчённый набор, который человек включает на карточке контура (по умолчанию полный, L6). */
+  async function connectLocal(lean = false): Promise<void> {
     const appData = join(root, 'agentdeck');
     const settings = platformSchema.parse(
       localPlatformSettings({
@@ -152,6 +159,7 @@ describe('набор панели доезжает до прогона обла�
         model: 'qwen3-coder:30b',
         title: 'Локальная модель',
         consumers: LOCAL_CONSUMERS,
+        ...(lean ? { rules: { platform: defaultPlatformRules(), ours: localLeanRules() } } : {}),
       }),
     );
     writePlatform(store, settings);
@@ -196,7 +204,25 @@ describe('набор панели доезжает до прогона обла�
     }
   });
 
-  it('MCP-сервер, взятый в проекте, едет локальному прогону и только ему', async () => {
+  it('полный набор по умолчанию (L6): локальный прогон берёт MCP обычным путём, без своего файла', async () => {
+    writeFileSync(
+      join(root, '.claude.json'),
+      JSON.stringify({ mcpServers: { gitlab: { command: 'gitlab-mcp' } } }),
+      'utf8',
+    );
+    runtime.localModels.mcpPick(project, ['gitlab']);
+    runtime.kit.setMode('claude', 'global');
+    await connectLocal();
+    try {
+      const run = await send('локальный-полный');
+      expect(run?.args).not.toContain('--strict-mcp-config');
+      expect(run?.mcp).toBeUndefined();
+    } finally {
+      await runtime.platformGateway.stop();
+    }
+  });
+
+  it('облегчённый набор: MCP-сервер, взятый в проекте, едет локальному прогону и только ему', async () => {
     writeFileSync(
       join(root, '.claude.json'),
       JSON.stringify({ mcpServers: { gitlab: { command: 'gitlab-mcp' } } }),
@@ -206,7 +232,7 @@ describe('набор панели доезжает до прогона обла�
     runtime.kit.setMode('claude', 'global');
     // Облачный прогон того же проекта MCP получает обычным путём — своего файла нет.
     expect((await send('облачный-mcp'))?.mcp).toBeUndefined();
-    await connectLocal();
+    await connectLocal(true);
     try {
       const run = await send('локальный-mcp');
       expect(run?.args).toContain('--strict-mcp-config');

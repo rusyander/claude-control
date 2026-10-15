@@ -360,7 +360,18 @@ async function main() {
     fakeCli(bin, FOREIGN);
     for (const id of ['kimi', 'goose', 'opencode']) fakeCli(bin, id);
     fakeHelperCli(helperBin, FOREIGN);
-    process.env.PATH = `${bin}${isWindows ? ';' : ':'}${process.env.PATH ?? ''}`;
+    // На Windows панель берёт нативный `<имя>.exe` из ЛЮБОЙ папки PATH раньше
+    // `.cmd`-обёртки (resolveWindowsExecutable), и установленный у человека goose
+    // перебивал бы фальшивый. Папки с настоящими копиями фальшивых CLI убираем.
+    const realCopy = (dir) =>
+      isWindows &&
+      ['kimi', 'goose', 'opencode'].some((id) =>
+        ['.exe', '.com'].some((ext) => existsSync(join(dir, `${id}${ext}`))),
+      );
+    const rest = (process.env.PATH ?? '')
+      .split(isWindows ? ';' : ':')
+      .filter((dir) => dir && !realCopy(dir));
+    process.env.PATH = [bin, ...rest].join(isWindows ? ';' : ':');
 
     // ── Состояние панели: контур сохранён, активен, ключ на месте ────────────
     const store = new AppStore(appData);
@@ -961,7 +972,7 @@ async function main() {
     // допиской даже при режиме набора «глобальные», когда плагин не подключён.
     {
       const { localRunEnv } = await import('../../apps/server/src/domains/local-models/run-env.ts');
-      const { localLeanRules, LOCAL_DRIVER } =
+      const { localPlatformSettings, LOCAL_DRIVER } =
         await import('../../apps/server/src/domains/local-models/connect.ts');
       const { KitService } = await import('../../apps/server/src/domains/kit/service.ts');
       const LOCAL_ID = 'local-ollama';
@@ -971,8 +982,14 @@ async function main() {
         ...platform,
         id: LOCAL_ID,
         driver: LOCAL_DRIVER,
-        // Слои, с которыми панель заводит контур локальной модели (L1b).
-        rules: { platform: defaultPlatformRules(), ours: localLeanRules() },
+        // Слои — те, с которыми панель заводит контур локальной модели: полный
+        // набор по умолчанию (L6, 15.10), облегчённый только по выбору человека.
+        rules: localPlatformSettings({
+          baseUrl: 'http://127.0.0.1:11435',
+          model: LOCAL_MODEL,
+          title: 't',
+          consumers: ['chat'],
+        }).rules,
         baseUrl: 'http://127.0.0.1:11435/v1',
         consumers: ['chat'],
         toolShim: false,
@@ -1052,17 +1069,16 @@ async function main() {
           !(local.env.get(ARGV_KEY) ?? '').includes('--plugin-dir'),
           'локальная модель, режим «глобальные»: плагин набора не подключён',
         );
-        // Облегчённый набор (L1b): MCP снят, инструменты — белым списком, а правила
-        // и скиллы человека остаются (флагов `--setting-sources` и
-        // `--disable-slash-commands` нет).
+        // Полный набор по умолчанию (L6, 15.10): MCP-серверы и все инструменты едут,
+        // как у облачного Claude; правила и скиллы человека тоже.
         const localArgv = local.env.get(ARGV_KEY) ?? '';
         check(
-          localArgv.includes('--strict-mcp-config'),
-          'локальная модель: MCP-серверы сняты (облегчённый набор)',
+          !localArgv.includes('--strict-mcp-config'),
+          'локальная модель: MCP-серверы не сняты (полный набор по умолчанию)',
         );
         check(
-          /--tools "?Bash,Read,Edit,Write,Glob,Grep,WebFetch,Skill,Agent,TodoWrite/.test(localArgv),
-          `локальная модель: инструменты белым списком (--tools)${localArgv.includes('--tools') ? '' : `: ${localArgv}`}`,
+          !localArgv.includes('--tools'),
+          `локальная модель: инструменты без белого списка${localArgv.includes('--tools') ? `: ${localArgv}` : ''}`,
         );
         check(
           !localArgv.includes('--setting-sources') &&
@@ -1128,8 +1144,12 @@ async function main() {
       check(!kimi.raw.includes(SECRET), 'kimi: ключа контура в окружении нет');
     }
 
-    const goose = (await sendTo('goose', endpointDirs.goose)).dump;
-    check(Boolean(goose), 'goose: фальшивый CLI запустился и выгрузил окружение');
+    const gooseChat = await sendTo('goose', endpointDirs.goose);
+    const goose = gooseChat.dump;
+    check(
+      Boolean(goose),
+      `goose: фальшивый CLI запустился и выгрузил окружение${goose ? '' : ': ' + JSON.stringify(readChat(appData, 'goose', gooseChat.chat.id)?.messages ?? []).slice(0, 400)}`,
+    );
     if (goose) {
       const host = goose.env.get('OPENAI_HOST');
       const path = goose.env.get('OPENAI_BASE_PATH') ?? '';

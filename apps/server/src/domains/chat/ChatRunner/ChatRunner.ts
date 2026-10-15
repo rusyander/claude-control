@@ -281,6 +281,12 @@ export interface RunOptions {
    */
   wake?: boolean;
   /**
+   * С `wake`: хода CLI ещё нет — прогон держит сессию и ждёт его
+   * (`LiveSession.awaitTurn`). Заводит реестр, когда фоновому субагенту между
+   * ходами нужно решение человека (`ChatRunRegistry.hostBackgroundAsk`).
+   */
+  hold?: boolean;
+  /**
    * Прогон ребёнка разделения: закрыты инструменты обмена с другими сессиями и
    * дописаны правила ребёнка (`CHILD_PROMPT`). Решает реестр на КАЖДОМ старте
    * по связи разговора — продолжение после паузы дерева несёт прежние
@@ -617,7 +623,9 @@ export class ChatRun {
 
     if (options.wake) {
       const session = pool.waking(sessionId);
-      const claimed = session?.claimWake(runId, onRaw);
+      const claimed = options.hold
+        ? session?.awaitTurn(runId, onRaw)
+        : session?.claimWake(runId, onRaw);
       if (!session || !claimed) return;
       this.session = session;
       const outcome = await claimed;

@@ -151,6 +151,154 @@
       "source": "huggingface.co/unsloth/Qwen3-Coder-Next-GGUF tree 2026-10-13; GGUF header: 48 layers, 12 with KV, 2 KV heads x 256"
     },
     {
+      "tag": "qwen3.8:27b",
+      "title": "Qwen3.8 27B",
+      "family": "qwen3.8",
+      "coding": "tuned",
+      "repo": "unsloth/Qwen3.8-27B-GGUF",
+      "quants": [
+        {
+          "id": "UD-IQ1_S",
+          "file": "Qwen3.8-27B-UD-IQ1_S.gguf",
+          "sizeBytes": 6192222208
+        },
+        {
+          "id": "UD-IQ1_M",
+          "file": "Qwen3.8-27B-UD-IQ1_M.gguf",
+          "sizeBytes": 6729166848
+        },
+        {
+          "id": "UD-IQ2_XXS",
+          "file": "Qwen3.8-27B-UD-IQ2_XXS.gguf",
+          "sizeBytes": 7266070528
+        },
+        {
+          "id": "UD-IQ2_S",
+          "file": "Qwen3.8-27B-UD-IQ2_S.gguf",
+          "sizeBytes": 8371970048
+        },
+        {
+          "id": "UD-Q2_K_XL",
+          "file": "Qwen3.8-27B-UD-Q2_K_XL.gguf",
+          "sizeBytes": 9828981664
+        },
+        {
+          "id": "UD-IQ3_XXS",
+          "file": "Qwen3.8-27B-UD-IQ3_XXS.gguf",
+          "sizeBytes": 10934860704
+        },
+        {
+          "id": "UD-IQ3_S",
+          "file": "Qwen3.8-27B-UD-IQ3_S.gguf",
+          "sizeBytes": 12040883104
+        },
+        {
+          "id": "UD-Q3_K_XL",
+          "file": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "sizeBytes": 13146393504
+        },
+        {
+          "id": "UD-IQ4_XS",
+          "file": "Qwen3.8-27B-UD-IQ4_XS.gguf",
+          "sizeBytes": 14252845984
+        },
+        {
+          "id": "UD-Q4_K_S",
+          "file": "Qwen3.8-27B-UD-Q4_K_S.gguf",
+          "sizeBytes": 15358213024
+        },
+        {
+          "id": "Q4_0",
+          "file": "Qwen3.8-27B-Q4_0.gguf",
+          "sizeBytes": 16056478688
+        },
+        {
+          "id": "UD-Q4_K_M",
+          "file": "Qwen3.8-27B-UD-Q4_K_M.gguf",
+          "sizeBytes": 16464440224
+        },
+        {
+          "id": "Q4_1",
+          "file": "Qwen3.8-27B-Q4_1.gguf",
+          "sizeBytes": 17540705248
+        },
+        {
+          "id": "UD-Q4_K_XL",
+          "file": "Qwen3.8-27B-UD-Q4_K_XL.gguf",
+          "sizeBytes": 17559178144
+        },
+        {
+          "id": "UD-Q5_K_S",
+          "file": "Qwen3.8-27B-UD-Q5_K_S.gguf",
+          "sizeBytes": 18665753504
+        },
+        {
+          "id": "UD-Q5_K_M",
+          "file": "Qwen3.8-27B-UD-Q5_K_M.gguf",
+          "sizeBytes": 19771509664
+        },
+        {
+          "id": "UD-Q5_K_XL",
+          "file": "Qwen3.8-27B-UD-Q5_K_XL.gguf",
+          "sizeBytes": 20876938144
+        },
+        {
+          "id": "UD-Q6_K",
+          "file": "Qwen3.8-27B-UD-Q6_K.gguf",
+          "sizeBytes": 21983677344
+        },
+        {
+          "id": "UD-Q6_K_M",
+          "file": "Qwen3.8-27B-UD-Q6_K_M.gguf",
+          "sizeBytes": 23088409504
+        },
+        {
+          "id": "UD-Q6_K_L",
+          "file": "Qwen3.8-27B-UD-Q6_K_L.gguf",
+          "sizeBytes": 24193919904
+        },
+        {
+          "id": "UD-Q6_K_XL",
+          "file": "Qwen3.8-27B-UD-Q6_K_XL.gguf",
+          "sizeBytes": 25299061664
+        },
+        {
+          "id": "UD-Q8_K_L",
+          "file": "Qwen3.8-27B-UD-Q8_K_L.gguf",
+          "sizeBytes": 28045695904
+        },
+        {
+          "id": "Q8_0",
+          "file": "Qwen3.8-27B-Q8_0.gguf",
+          "sizeBytes": 29047086048
+        },
+        {
+          "id": "UD-Q8_K_XL",
+          "file": "Qwen3.8-27B-UD-Q8_K_XL.gguf",
+          "sizeBytes": 31457991680
+        }
+      ],
+      "defaultQuant": "UD-IQ4_XS",
+      "paramsB": 27,
+      "activeParamsB": 27,
+      "arch": {
+        "layers": 65,
+        "kvLayers": 16,
+        "kvHeads": 4,
+        "headDim": 256
+      },
+      "contextMax": 262144,
+      "defaultContext": 131072,
+      "mtp": true,
+      "agentic": true,
+      "chatTemplateKwargs": {
+        "reasoning_effort": "medium"
+      },
+      "chatTemplate": "qwen3.8.jinja",
+      "released": "2026-08",
+      "source": "huggingface.co/unsloth/Qwen3.8-27B-GGUF tree re-checked 2026-10-15 (24 quants, sizes equal); GGUF header: 65 layers (64 + MTP head blk.64 inside every quant file, nextn=1), 16 with KV, 4 KV heads x 256. Separate MTP/mtp-Qwen3.8-27B-Q4_0.gguf not needed. reasoning_effort default is xhigh upstream; medium per unsloth docs"
+    },
+    {
       "tag": "qwen3.6:27b-coding",
       "title": "Qwen3.6 27B Coding",
       "family": "qwen3.6",
@@ -263,7 +411,7 @@
           "sizeBytes": 35776484480
         }
       ],
-      "defaultQuant": "Q4_K_M",
+      "defaultQuant": "IQ4_XS",
       "paramsB": 27,
       "activeParamsB": 27,
       "arch": {
@@ -273,7 +421,7 @@
         "headDim": 256
       },
       "contextMax": 262144,
-      "defaultContext": 65536,
+      "defaultContext": 131072,
       "mtp": true,
       "agentic": true,
       "released": "2026-04",
@@ -554,149 +702,6 @@
       "agentic": true,
       "released": "2026-04",
       "source": "huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF tree 2026-10-13; GGUF header: 41 layers, 10 with KV, 2 KV heads x 256"
-    },
-    {
-      "tag": "qwen3.8:27b",
-      "title": "Qwen3.8 27B",
-      "family": "qwen3.8",
-      "coding": "general",
-      "repo": "unsloth/Qwen3.8-27B-GGUF",
-      "quants": [
-        {
-          "id": "UD-IQ1_S",
-          "file": "Qwen3.8-27B-UD-IQ1_S.gguf",
-          "sizeBytes": 6192222208
-        },
-        {
-          "id": "UD-IQ1_M",
-          "file": "Qwen3.8-27B-UD-IQ1_M.gguf",
-          "sizeBytes": 6729166848
-        },
-        {
-          "id": "UD-IQ2_XXS",
-          "file": "Qwen3.8-27B-UD-IQ2_XXS.gguf",
-          "sizeBytes": 7266070528
-        },
-        {
-          "id": "UD-IQ2_S",
-          "file": "Qwen3.8-27B-UD-IQ2_S.gguf",
-          "sizeBytes": 8371970048
-        },
-        {
-          "id": "UD-Q2_K_XL",
-          "file": "Qwen3.8-27B-UD-Q2_K_XL.gguf",
-          "sizeBytes": 9828981664
-        },
-        {
-          "id": "UD-IQ3_XXS",
-          "file": "Qwen3.8-27B-UD-IQ3_XXS.gguf",
-          "sizeBytes": 10934860704
-        },
-        {
-          "id": "UD-IQ3_S",
-          "file": "Qwen3.8-27B-UD-IQ3_S.gguf",
-          "sizeBytes": 12040883104
-        },
-        {
-          "id": "UD-Q3_K_XL",
-          "file": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
-          "sizeBytes": 13146393504
-        },
-        {
-          "id": "UD-IQ4_XS",
-          "file": "Qwen3.8-27B-UD-IQ4_XS.gguf",
-          "sizeBytes": 14252845984
-        },
-        {
-          "id": "UD-Q4_K_S",
-          "file": "Qwen3.8-27B-UD-Q4_K_S.gguf",
-          "sizeBytes": 15358213024
-        },
-        {
-          "id": "Q4_0",
-          "file": "Qwen3.8-27B-Q4_0.gguf",
-          "sizeBytes": 16056478688
-        },
-        {
-          "id": "UD-Q4_K_M",
-          "file": "Qwen3.8-27B-UD-Q4_K_M.gguf",
-          "sizeBytes": 16464440224
-        },
-        {
-          "id": "Q4_1",
-          "file": "Qwen3.8-27B-Q4_1.gguf",
-          "sizeBytes": 17540705248
-        },
-        {
-          "id": "UD-Q4_K_XL",
-          "file": "Qwen3.8-27B-UD-Q4_K_XL.gguf",
-          "sizeBytes": 17559178144
-        },
-        {
-          "id": "UD-Q5_K_S",
-          "file": "Qwen3.8-27B-UD-Q5_K_S.gguf",
-          "sizeBytes": 18665753504
-        },
-        {
-          "id": "UD-Q5_K_M",
-          "file": "Qwen3.8-27B-UD-Q5_K_M.gguf",
-          "sizeBytes": 19771509664
-        },
-        {
-          "id": "UD-Q5_K_XL",
-          "file": "Qwen3.8-27B-UD-Q5_K_XL.gguf",
-          "sizeBytes": 20876938144
-        },
-        {
-          "id": "UD-Q6_K",
-          "file": "Qwen3.8-27B-UD-Q6_K.gguf",
-          "sizeBytes": 21983677344
-        },
-        {
-          "id": "UD-Q6_K_M",
-          "file": "Qwen3.8-27B-UD-Q6_K_M.gguf",
-          "sizeBytes": 23088409504
-        },
-        {
-          "id": "UD-Q6_K_L",
-          "file": "Qwen3.8-27B-UD-Q6_K_L.gguf",
-          "sizeBytes": 24193919904
-        },
-        {
-          "id": "UD-Q6_K_XL",
-          "file": "Qwen3.8-27B-UD-Q6_K_XL.gguf",
-          "sizeBytes": 25299061664
-        },
-        {
-          "id": "UD-Q8_K_L",
-          "file": "Qwen3.8-27B-UD-Q8_K_L.gguf",
-          "sizeBytes": 28045695904
-        },
-        {
-          "id": "Q8_0",
-          "file": "Qwen3.8-27B-Q8_0.gguf",
-          "sizeBytes": 29047086048
-        },
-        {
-          "id": "UD-Q8_K_XL",
-          "file": "Qwen3.8-27B-UD-Q8_K_XL.gguf",
-          "sizeBytes": 31457991680
-        }
-      ],
-      "defaultQuant": "UD-Q4_K_M",
-      "paramsB": 27,
-      "activeParamsB": 27,
-      "arch": {
-        "layers": 65,
-        "kvLayers": 16,
-        "kvHeads": 4,
-        "headDim": 256
-      },
-      "contextMax": 262144,
-      "mtp": true,
-      "agentic": true,
-      "released": "2026-08",
-      "source": "huggingface.co/unsloth/Qwen3.8-27B-GGUF tree 2026-10-13; GGUF header: 65 layers, 16 with KV, 4 KV heads x 256"
     },
     {
       "tag": "qwen3.5:9b",

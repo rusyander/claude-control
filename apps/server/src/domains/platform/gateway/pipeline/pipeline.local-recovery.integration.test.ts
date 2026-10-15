@@ -277,6 +277,43 @@ describe('точный счёт у порога окна', () => {
     expect(chatCalls).toBe(1);
   });
 
+  it('сервер не запущен: сначала подъём, потом точный счёт — а не отказ по завышенной оценке (L6)', async () => {
+    let up = false;
+    let revived = 0;
+    await start(
+      (url) => {
+        if (!up) return Promise.reject(refused());
+        if (String(url).endsWith('/count_tokens'))
+          return Promise.resolve(json(200, { input_tokens: 1_000 }));
+        chatCalls += 1;
+        return Promise.resolve(eventStream(stream()));
+      },
+      {
+        revive: () => {
+          revived += 1;
+          up = true;
+          return Promise.resolve('restarted');
+        },
+      },
+      true,
+    );
+    // Оценка (5000) выше предела окна: без подъёма до счёта это был бы отказ по оценке.
+    const answer = await ask('x'.repeat(15_000));
+    expect(answer.status).toBe(200);
+    expect(revived).toBe(1);
+    expect(chatCalls).toBe(1);
+  });
+
+  it('сервер не запущен и не поднялся — 529 с причиной присмотра, а не «prompt is too long»', async () => {
+    await start(() => Promise.reject(refused()), { revive: () => Promise.resolve('capped') }, true);
+    const answer = await ask('x'.repeat(15_000));
+    expect(answer.status).toBe(529);
+    const body = (await answer.json()) as ErrorBody;
+    expect(body.error.type).toBe('overloaded_error');
+    expect(body.error.message).not.toMatch(/prompt is too long/);
+    expect(chatCalls).toBe(0);
+  });
+
   it('малый запрос счёта не просит: ниже 75% окна верим оценке', async () => {
     const urls: string[] = [];
     await start(

@@ -2,6 +2,7 @@ import type { ChatProgress } from '@agentdeck/contracts';
 import type { ProgressSummary } from './progressView.types';
 import { shellView } from './shellView';
 import { isLostShell } from './progressView';
+import { agentView } from './agentView';
 
 export function summarizeProgress(
   progress: ChatProgress | undefined,
@@ -12,13 +13,15 @@ export function summarizeProgress(
   const shells = (progress?.shells ?? []).map((shell) =>
     shellView(shell, isRunning, progress?.processAlive),
   );
+  const agentViews = agents.map((agent) => agentView(agent, isRunning, progress?.processAlive));
   const activeTool = isRunning ? progress?.activeTool : undefined;
 
   return {
     total: tasks.length,
     done: tasks.filter((task) => task.status === 'completed').length,
     current: tasks.find((task) => task.status === 'in_progress')?.text,
-    agentsRunning: agents.filter((agent) => agent.status === 'running').length,
+    agentsRunning: agentViews.filter((view) => view === 'running').length,
+    agentsLost: agentViews.filter((view) => view === 'lost').length,
     agentsTotal: agents.length,
     ...(activeTool ? { activeTool } : {}),
     shellsRunning: shells.filter((status) => status === 'running').length,

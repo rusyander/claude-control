@@ -68,4 +68,29 @@ describe('сообщения о сервере моделей', () => {
     expect(html).toContain('не хватило видеопамяти');
     expect(html).not.toContain(i18n.t('localModels.pending.note').slice(0, 30));
   });
+
+  it('слой не влезает в окно: числа замера и одно действие — квантование и окно (L6, B1)', () => {
+    const html = render({
+      layer: {
+        tokens: 73_254,
+        context: 65_536,
+        limit: 61_440,
+        fits: false,
+        at: AT,
+        fix: { context: 98_304, quant: 'IQ4_XS' },
+      },
+    });
+    expect(html).toContain('local-layer-notice');
+    expect(html).toContain('73');
+    expect(html).toContain('254');
+    expect(html).toContain('61');
+    expect(html).toContain('квантование IQ4_XS и окно 98');
+  });
+
+  it('слой влезает — строки о нём нет', () => {
+    const html = render({
+      layer: { tokens: 20_000, context: 131_072, limit: 126_976, fits: true, at: AT },
+    });
+    expect(html).not.toContain('local-layer-notice');
+  });
 });

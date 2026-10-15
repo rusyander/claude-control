@@ -4,6 +4,7 @@ import type {
   ChoiceRecommendation,
   ChoiceOption,
   ModelFit,
+  InstalledFile,
   InstalledModel,
   LocalJob,
   LocalDevice,
@@ -24,6 +25,7 @@ import {
 } from '@agentdeck/contracts/local-models';
 import { jobFor } from './jobFor';
 import { benchElsewhere } from './benchElsewhere';
+import { orderCatalogRows } from './catalogOrder';
 
 export interface CatalogRow {
   /** Модель каталога; у модели с файлом из Ollama в списке квантований есть и он. */
@@ -50,6 +52,8 @@ export interface CatalogRow {
   quantInstalled: boolean;
   /** Квантования, которые на диске. */
   installedQuants: string[];
+  /** Скачанные файлы с размером и тем, что вернёт удаление; `loaded` — его держит сервер моделей. */
+  downloaded: DownloadedFile[];
   /**
    * Что рекомендуется на этой машине (по доступной сейчас памяти): квантование и окно, либо «ничего не лезет».
    * Пересчитывается с каждым опросом — свободная память меняется.
@@ -63,13 +67,19 @@ export interface CatalogRow {
   benchStale?: 'other' | 'unknown';
 }
 
+/** Скачанный файл строки: держит ли его сервер моделей прямо сейчас (такой удалить нельзя). */
+export interface DownloadedFile extends InstalledFile {
+  loaded: boolean;
+}
+
 export function catalogRows(info: LocalModelsInfo): CatalogRow[] {
   // При счёте на процессоре подбор — по оперативной памяти: карта не участвует.
   const gpu = deviceGpu(info.hardware, info.device);
   const ram = info.hardware.ramGb;
   const best = recommendModel(info.catalog.models, gpu, ram);
   const importable = new Set(info.importable.map((item) => item.tag));
-  return info.catalog.models.map((source) => {
+  const server = info.server?.running ? info.server : undefined;
+  const rows = info.catalog.models.map((source): CatalogRow => {
     const installed = info.installed.find((item) => item.tag === source.tag);
     const model = withInstalledQuant(source, installed);
     const job = jobFor(info, 'model', model.tag);
@@ -95,10 +105,15 @@ export function catalogRows(info: LocalModelsInfo): CatalogRow[] {
       ...(quant ? { quant } : {}),
       quantInstalled: installedQuants.includes(choice.quant),
       installedQuants,
+      downloaded: (installed?.files ?? []).map((file) => ({
+        ...file,
+        loaded: server?.model === model.tag && server.quant === file.quant,
+      })),
       recommendation: recommendChoice(model, gpu, ram),
       onGpu: gpu !== undefined,
       ...(serverJob ? { serverJob } : {}),
       ...(stale ? { benchStale: stale } : {}),
     };
   });
+  return orderCatalogRows(rows);
 }

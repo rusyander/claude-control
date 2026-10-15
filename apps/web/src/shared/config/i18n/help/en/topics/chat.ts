@@ -332,7 +332,12 @@ export const chatEn: typeof chatRu = {
         'permissions, group, autonomy). That is why an agent’s background ' +
         'command survives the end of a ' +
         'turn: when it finishes, the CLI starts a turn with its result on its own, ' +
-        'and that turn lands in this same conversation. On every start the agent ' +
+        'and that turn lands in this same conversation. A background subagent lives the ' +
+        'same way: the turn progress marks it “in background” with the time of its ' +
+        'last record. If it asks for permission after the main turn has ended, the chat ' +
+        'shows the card with a note on whose work it is; if the process closed before ' +
+        'the subagent finished, it is marked “lost” instead of an endless “thinking”. ' +
+        'On every start the agent ' +
         'also gets a short note about its folder — where the project’s autotests ' +
         'live and how a test becomes a case (the “Tests” section). A sandbox with ' +
         'its own config directory takes settings from that directory only: the ' +
@@ -1171,7 +1176,15 @@ export const chatEn: typeof chatRu = {
       'without a branch of its own (detached HEAD) rather than a “branch-2” cut from ' +
       'main. If the branch cannot be found, the copy is cut from the base branch and ' +
       'the card says so outright: the findings may have been read from the wrong ' +
-      'diff. The review runs on the ceiling model, with no plan and no fixes, through ' +
+      'diff. Before it starts, the group gets a paragraph about the stand in its task: ' +
+      'which panel targets are already running (that is the original’s tree, not the ' +
+      'MR head), whether Docker is there and which database the project’s compose ' +
+      'describes. If a database of this version is needed, the panel raises a ' +
+      'throwaway container on 127.0.0.1 with its own password and removes it once the ' +
+      'group closes or never starts; it never touches other databases or the ' +
+      'project’s containers. If that fails, the paragraph says so, and the live-stand ' +
+      'check goes to uncovered with the reason. ' +
+      'The review runs on the ceiling model, with no plan and no fixes, through ' +
       'the deep review skill at the full depth of its risk tier: the whole diff, docs, ' +
       'locales and tests included. Every finding comes back at its honest severity ' +
       '(blocker, should fix, question, optional), each as a full card: where, the ' +
@@ -2241,7 +2254,16 @@ export const chatEn: typeof chatRu = {
       'generation time, prompt reading excluded. It stays after the turn ends and ' +
       'after a reload; an answer written outside the panel (in a terminal) has none — ' +
       'only the panel’s live stream knows the generation time. Such a model has no ' +
-      'price until you set one yourself in the pricing settings.',
+      'price until you set one yourself in the pricing settings. While a turn on a ' +
+      'local model runs, a server line sits under the messages: model, quantization, ' +
+      'window and stage — loading, reading the prompt (how many tokens of how many, ' +
+      'with a bar), answering, waiting for your permission, “the agent is preparing a ' +
+      'request to the model” (the turn has begun, no request yet), or “the agent is ' +
+      'running tools”. If the server stays silent for over 20 seconds, the line says how ' +
+      'long until the request is retried and offers a “Restart the server” button. If ' +
+      'the model server refuses a request, the line turns red and quotes its code and ' +
+      'text: the turn is stuck not on tools but on a server that will not take the ' +
+      'request; a successful answer clears that line.',
 
     recipesTitle: 'How to start working with a project',
     recipe1: 'Open the project',

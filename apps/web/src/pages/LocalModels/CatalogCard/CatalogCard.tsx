@@ -26,7 +26,7 @@ import {
   useSetModelChoice,
 } from '@entities/LocalModels';
 import { ModelRow } from '../ModelRow/ModelRow';
-import { formatGb } from '../ModelSelects/optionText';
+import { formatGb, quantTitle } from '../ModelSelects/optionText';
 import styles from './CatalogCard.module.scss';
 import type { CatalogCardProps, RemoveTarget } from './CatalogCard.types';
 import { formatDate } from '../../../shared/lib/formatDate';
@@ -46,6 +46,34 @@ function basisOf(
   };
   if (gpu.freeGb === undefined) return t('localModels.catalog.basisNoFree', sizes);
   return t('localModels.catalog.basis', { ...sizes, free: formatGb(gpu.freeGb, locale) });
+}
+
+function removeTitle(target: RemoveTarget, t: TFunction): string {
+  if (target.quant) return t('localModels.catalog.files.removeTitle', { quant: target.quantTitle });
+  return target.custom
+    ? t('localModels.catalog.custom.removeCustomTitle')
+    : t('localModels.catalog.removeTitle');
+}
+
+/** Что именно исчезнет и сколько места вернётся: у ссылки на файл Ollama — ничего, байты у Ollama. */
+function removeText(target: RemoveTarget, t: TFunction, locale: string): string {
+  const size = formatGb(toGb(target.freesBytes), locale);
+  if (target.quant)
+    return target.ollama
+      ? t('localModels.catalog.files.removeOllamaText')
+      : t('localModels.catalog.files.removeText', {
+          quant: target.quantTitle,
+          tag: target.tag,
+          size,
+        });
+  if (target.custom)
+    return t(
+      target.count > 0
+        ? 'localModels.catalog.custom.removeCustomText'
+        : 'localModels.catalog.custom.removeCustomEmpty',
+      { tag: target.tag, size },
+    );
+  return t('localModels.catalog.removeText', { tag: target.tag, count: target.count, size });
 }
 
 /** Каталог моделей для кода под эту машину плюс установленное помимо каталога. */
@@ -134,8 +162,21 @@ export function CatalogCard({ info }: CatalogCardProps) {
               onRemove={() =>
                 setToRemove({
                   tag: row.model.tag,
-                  sizeBytes: row.installed?.sizeBytes ?? 0,
+                  freesBytes: row.downloaded.reduce((sum, file) => sum + file.freesBytes, 0),
+                  count: row.downloaded.length,
                   custom: row.model.custom,
+                  ollama: false,
+                })
+              }
+              onRemoveFile={(file) =>
+                setToRemove({
+                  tag: row.model.tag,
+                  quant: file.quant,
+                  quantTitle: quantTitle(row.model, file.quant, t),
+                  freesBytes: file.freesBytes,
+                  count: 1,
+                  custom: row.model.custom,
+                  ollama: file.source === 'ollama',
                 })
               }
               onCancel={(id) => cancel.mutate(id)}
@@ -227,7 +268,15 @@ export function CatalogCard({ info }: CatalogCardProps) {
                     icon={<Icon name="trash" />}
                     aria-label={t('localModels.catalog.remove')}
                     onClick={() =>
-                      setToRemove({ tag: model.tag, sizeBytes: model.sizeBytes, custom: false })
+                      setToRemove({
+                        tag: model.tag,
+                        freesBytes:
+                          model.files?.reduce((sum, file) => sum + file.freesBytes, 0) ??
+                          model.sizeBytes,
+                        count: model.files?.length ?? 1,
+                        custom: false,
+                        ollama: false,
+                      })
                     }
                   />
                 </Stack>
@@ -241,33 +290,24 @@ export function CatalogCard({ info }: CatalogCardProps) {
         onOpenChange={(open) => {
           if (!open) setToRemove(undefined);
         }}
-        title={
-          toRemove?.custom
-            ? t('localModels.catalog.custom.removeCustomTitle')
-            : t('localModels.catalog.removeTitle')
-        }
-        description={
-          toRemove?.custom
-            ? t(
-                toRemove.sizeBytes > 0
-                  ? 'localModels.catalog.custom.removeCustomText'
-                  : 'localModels.catalog.custom.removeCustomEmpty',
-                { tag: toRemove.tag, size: toGb(toRemove.sizeBytes) },
-              )
-            : t('localModels.catalog.removeText', {
-                tag: toRemove?.tag ?? '',
-                size: toRemove ? toGb(toRemove.sizeBytes) : 0,
-              })
-        }
+        title={toRemove ? removeTitle(toRemove, t) : ''}
+        description={toRemove ? removeText(toRemove, t, i18n.language) : ''}
         confirmLabel={t('localModels.catalog.remove')}
         isPending={remove.isPending}
         onConfirm={() => {
           if (!toRemove) return;
-          remove.mutate(toRemove.tag, {
-            onSuccess: () => {
-              toast.success(t('localModels.catalog.removed'));
-              setToRemove(undefined);
+          const { tag, quant } = toRemove;
+          remove.mutate(quant ? { tag, quant } : { tag }, {
+            onSuccess: (result) => {
+              const size = formatGb(toGb(result.freedBytes), i18n.language);
+              toast.success(
+                quant
+                  ? t('localModels.catalog.files.removed', { quant: toRemove.quantTitle, size })
+                  : t('localModels.catalog.removed', { size }),
+              );
             },
+            // Отказ (сервер держит файл, идёт загрузка) показывает общий тост ошибки; окно закрывается в обоих случаях.
+            onSettled: () => setToRemove(undefined),
           });
         }}
       />

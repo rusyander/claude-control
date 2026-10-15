@@ -1,0 +1,155 @@
+{
+  "title": {
+    "ru": "Локальная модель отвечает с первого сообщения и показывает, что делает с ходом",
+    "en": "The local model answers from the first message and shows what it is doing with the turn"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Пока ход на локальной модели идёт, под сообщениями чата стоит строка сервера: модель, квантование, окно и этап — загрузка модели, разбор промпта (сколько токенов из скольких, с полосой), ответ, ожидание разрешения или «агент выполняет инструменты». Сервер молчит дольше 20 секунд — строка говорит, сколько осталось до повтора, и даёт кнопку «Перезапустить сервер».",
+        "en": "While a turn on a local model runs, a server line sits under the chat messages: model, quantization, window and stage — loading the model, reading the prompt (how many tokens of how many, with a bar), answering, waiting for permission, or “the agent is running tools”. If the server stays silent for over 20 seconds, the line says how long until the retry and offers a “Restart the server” button."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Claude Code на Qwen3.8 27B больше не получает отказ сервера на каждый запрос. Шаблон чата, зашитый в файл модели, принимал системное сообщение только в начале, а Claude Code шлёт ещё одно — блок окружения — после первого сообщения человека; сервер отвечал 500 «System message must be at the beginning», и ход стоял. Теперь сервер 3.8 поднимается со своим шаблоном, где такое сообщение идёт своим системным ходом на своём месте; это касается и чата панели, и Claude Code в терминале, переведённого на локальную модель.",
+        "en": "Claude Code on Qwen3.8 27B no longer gets a server refusal on every request. The chat template inside the model file accepted a system message only at the start, while Claude Code sends another one — the environment block — after the first human message; the server answered 500 “System message must be at the beginning” and the turn stalled. A 3.8 server now starts with its own template, where such a message becomes a system turn in its own place; this covers both the panel chat and Claude Code in a terminal switched to the local model."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Строка сервера под ходом показывает отказ сервера моделей красным — с кодом и последней строкой его текста — вместо «агент выполняет инструменты», пока Claude Code молча повторяет запрос; удачный ответ строку убирает. В начале хода, пока запроса к модели ещё не было, строка пишет «агент готовит запрос к модели».",
+        "en": "The server line under a turn shows a model-server refusal in red — its code and the last line of its text — instead of “the agent is running tools” while Claude Code silently retries; a successful answer clears it. At the start of a turn, before any request to the model, the line reads “the agent is preparing a request to the model”."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["before.png", "after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Длинное название кейса в библиотеке тестов на широком экране больше не растягивает колонку в одну строку: оно переносится абзацем читаемой ширины.",
+        "en": "A long case title in the test library no longer stretches its column into one line on a wide screen: it wraps as a paragraph of readable width."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ход на локальной модели больше не висит молча по двадцать минут. Обрывом считается только тишина сервера без продвижения — две минуты на видеокарте, десять на процессоре; тогда запрос прерывается с причиной и уходит заново, а сервер, застрявший посреди разбора промпта, перезапускается. Раньше срок считался от замера скорости коротких запросов и на длинном разговоре доходил до 12–24 минут.",
+        "en": "A turn on a local model no longer hangs silently for twenty minutes. Only server silence without progress counts as a stall — two minutes on the GPU, ten on the CPU; then the request is cut with the reason and sent again, and a server stuck mid-prompt is restarted. The limit used to come from the speed measured on short requests and reached 12–24 minutes on a long conversation."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чат на локальной модели при остановленном сервере больше не отвечает «Нет связи с контуром»: первый же запрос поднимает сервер сам и ждёт загрузки модели, а длину запроса проверяет точным счётом сервера, а не завышенной оценкой по символам, которая отказывала ещё до подъёма. Одновременные запросы ждут один и тот же подъём.",
+        "en": "A chat on a local model with the server stopped no longer answers “no connection to the contour”: the first request starts the server itself and waits for the model to load, and checks the request length with the server’s exact count rather than the inflated character-based estimate that used to refuse before the start. Concurrent requests wait for the same start."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Повторный запуск того же сервера больше не меняет кеш контекста: первый запуск подбирал q4_0, второй — q8_0 и перезапускал сервер. Подобранные кеш и выгрузка держатся, пока работает сервер той же модели, файла, окна и устройства.",
+        "en": "Starting the same server again no longer changes the context cache: the first start picked q4_0, the second q8_0 and restarted the server. The fitted cache and offload hold while a server of the same model, file, window and device runs."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Окно по умолчанию у Qwen3.6 27B Coding и Qwen3.8 27B — 131 072 токена (на 24 ГБ — с кешем q4_0). Выбор в списке «Контекст» по-прежнему сильнее умолчания.",
+        "en": "The default window of Qwen3.6 27B Coding and Qwen3.8 27B is 131,072 tokens (with a q4_0 cache on 24 GB). A pick in the “Context” list still beats the default."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Локальный контур по умолчанию получает полный набор, как облачный Claude: все MCP-серверы, навыки и хуки. Контур, заведённый раньше с облегчённым набором, который человек не выбирал, один раз переводится на полный; облегчённый можно включить на карточке контура. Подпись маршрута — «Локальная модель · llama.cpp».",
+        "en": "The local contour now gets the full set by default, like cloud Claude: every MCP server, skill and hook. A contour set up earlier with a lean set nobody chose is moved to the full set once; the lean set can be switched on in the contour card. The route label reads “Local model · llama.cpp”."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Фоновый субагент на локальной модели разрешён и доживает до конца: его запрос разрешения после конца главного хода показывается карточкой с пояснением, а не теряется, а субагент, оборванный закрытием процесса, помечается «оборван» вместо вечного «думает». Фоновые команды на локальной модели по-прежнему отклоняются.",
+        "en": "A background subagent on a local model is allowed and lives to the end: its permission request after the main turn has ended shows as a card with a note instead of getting lost, and a subagent cut off by the process closing is marked “lost” instead of an endless “thinking”. Background commands on a local model are still refused."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Журнал прошлого запуска сервера моделей сохраняется в llama.prev.log: причину сбоя видно и после перезапуска.",
+        "en": "The model server’s previous run log is kept in llama.prev.log, so the cause of a failure survives a restart."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели», «Набор панели» и «Чат»: строка сервера, порог тишины, подъём по первому запросу, полный набор по умолчанию, фоновый субагент, отказ сервера в строке хода, свой шаблон чата Qwen3.8.",
+        "en": "“Local models”, “Panel kit” and “Chat” help: the server line, the silence threshold, start on the first request, the full set by default, the background subagent, a server refusal on the turn line, the Qwen3.8 chat template."
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: каждый запрос к серверу падал с 500, а строка хода писала «агент выполняет инструменты»",
+        "en": "Before: every request to the server failed with a 500 while the turn line read “the agent is running tools”"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: строка хода красным называет код и текст отказа сервера",
+        "en": "After: the turn line names the server refusal’s code and text in red"
+      }
+    }
+  ]
+}

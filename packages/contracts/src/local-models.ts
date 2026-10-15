@@ -1,4 +1,14 @@
-import { array, boolean, enum as zodEnum, number, object, string, type infer as Infer } from 'zod';
+import {
+  array,
+  boolean,
+  enum as zodEnum,
+  number,
+  object,
+  record,
+  string,
+  union,
+  type infer as Infer,
+} from 'zod';
 
 /**
  * Локальные модели: сервер моделей (llama.cpp), каталог моделей под код и подбор
@@ -107,10 +117,16 @@ export const catalogModelSchema = object({
   contextMax: number().int().positive(),
   /**
    * Контекст, с которым панель поднимает модель, пока человек не выбрал свой.
-   * Выше него подбор не идёт, даже если карта вытянула бы больше: окно в 128K у
-   * плотной 27B означает обработку 130-тысячного промпта заново после каждого
-   * сжатия (минуты) и скорость, упавшую втрое. Нет поля — берётся наибольший шаг,
-   * который лёг на карту. Итог — меньшее из «по умолчанию» и «влезло».
+   * Выше него подбор не идёт, даже если карта вытянула бы больше. Нет поля —
+   * берётся наибольший шаг, который лёг на карту. Итог — меньшее из «по умолчанию»
+   * и «влезло» (влезло — целиком на карту: замер 15.10, 4090, 27B UD-Q4_K_XL, 128K
+   * с кешем q4_0 вылез на 1,1 ГБ в общую память, и разбор промпта упал с 1900 до
+   * 90 ток/с).
+   *
+   * У плотных 27B — 128K (L6, 15.10): полный набор Claude Code (MCP, все
+   * инструменты, скиллы) — около 43 тыс. токенов основы, и в 64K сжатие шло на
+   * каждом ходу. Карта, где 128K не лезет, получает наибольший влезающий шаг, а
+   * рекомендация — квантование помельче на 128K.
    */
   defaultContext: number().int().positive().optional(),
   /**
@@ -137,6 +153,20 @@ export const catalogModelSchema = object({
    * агентом «с оговоркой»; у моделей каталога поля нет — они сверены.
    */
   toolsProbe: zodEnum(['ok', 'failed', 'unknown']).optional(),
+  /**
+   * Параметры шаблона чата по умолчанию для всего сервера (`--chat-template-kwargs`):
+   * у Qwen3.8 рассуждение по умолчанию `xhigh` — десятки тысяч токенов на ход, поэтому
+   * каталог ставит `reasoning_effort: medium`. Запрос со своими параметрами их перекрывает.
+   */
+  chatTemplateKwargs: record(string(), union([string(), number(), boolean()])).optional(),
+  /**
+   * Свой шаблон чата вместо зашитого в GGUF (`--chat-template-file`), имя файла в
+   * `data/templates/` сервера. У Qwen3.8 зашитый падает на системном сообщении не в
+   * начале, а Claude Code такое шлёт в каждом запросе — без замены сервер отвечает 500.
+   */
+  chatTemplate: string()
+    .regex(/^[\w.-]+\.jinja$/)
+    .optional(),
   /** Дата выпуска модели, ГГГГ-ММ. */
   released: string().default(''),
   /** Где сверены репозиторий, файлы и устройство — для того, кто будет обновлять каталог. */
@@ -893,6 +923,9 @@ export function deviceGpu(
  */
 export const MIN_LLAMA_BUILD = 11583;
 
+/** Идентификатор контура локальной модели — в модуле без zod: его берёт и телефон. */
+export { LOCAL_PLATFORM_ID } from './platform-layers.ts';
+
 export const runtimeSources = ['system', 'panel', 'none'] as const;
 export type RuntimeSource = (typeof runtimeSources)[number];
 
@@ -909,6 +942,91 @@ export interface LocalRuntimeInfo {
   systemBinary: string;
   /** Последняя версия для скачивания (если известна) и её размер. */
   latest?: { version: string; sizeBytes: number };
+}
+
+/**
+ * Что сервер моделей делает с запросом чата (`GET /api/local-models/activity`, L6).
+ * `idle` — запроса в пути нет; `starting` — сервер не отвечает (присмотр поднимает);
+ * `loading` — модель грузится в память; `queued` — запрос ушёл, слот его ещё не взял;
+ * `prompt` — разбор промпта (`filled` из `promptTokens`); `generating` — пишет ответ
+ * (`decoded` токенов).
+ */
+export type LocalActivityPhase =
+  'idle' | 'starting' | 'loading' | 'queued' | 'prompt' | 'generating';
+
+/**
+ * Запас под ответ модели у локального окна: промпт, подошедший к окну вплотную, оставил бы
+ * модели место на пару слов. Шлюз отказывает «prompt is too long» по окну за его вычетом.
+ */
+export const LOCAL_REPLY_RESERVE_TOKENS = 4_096;
+/**
+ * Сколько окна сверх слоя и запаса под ответ нужно самому разговору: меньше — и Claude Code
+ * сжимает историю на каждом ходу, а сжатие, не влезающее в окно вместе со слоем, не удаётся.
+ */
+export const LOCAL_LAYER_ROOM_TOKENS = 16_384;
+
+/** Окно, в котором слой (системный промпт и инструменты) оставляет место разговору. */
+export function layerNeedContext(layerTokens: number): number {
+  return Math.ceil(layerTokens) + LOCAL_REPLY_RESERVE_TOKENS + LOCAL_LAYER_ROOM_TOKENS;
+}
+
+/**
+ * Слой локального прогона против окна сервера (L6, 15.10). Полный набор панели — ~66 тыс.
+ * токенов системного промпта и описаний инструментов; при окне 65 536 каждый ход отказывался
+ * «Prompt is too long» ещё до работы, и человек не видел ни чисел, ни выхода. Слой меряет
+ * шлюз по настоящему запросу (доля системного промпта и инструментов в счёте токенов).
+ */
+export interface LocalLayerFit {
+  /** Токенов в слое: системный промпт и описания инструментов. */
+  tokens: number;
+  /** Окно сервера, с которым сравнивали (идущего, иначе того, с которым он поднимется). */
+  context: number;
+  /** Сколько токенов отведено промпту при этом окне: окно за вычетом запаса под ответ. */
+  limit: number;
+  /** Слой оставляет разговору хотя бы `LOCAL_LAYER_ROOM_TOKENS`. */
+  fits: boolean;
+  /** Когда замерено, мс с начала эпохи. */
+  at: number;
+  /**
+   * Чем починить, когда не влезает: наименьшее окно, вмещающее слой и разговор; `quant` —
+   * когда нынешнее квантование с таким окном целиком на карту не ляжет, а это ляжет. Нет поля —
+   * окна с местом под слой у модели нет.
+   */
+  fix?: { context: number; quant?: string };
+}
+
+export interface LocalActivity {
+  phase: LocalActivityPhase;
+  /** Слой прогона против окна сервера: последний замер шлюза. */
+  layer?: LocalLayerFit;
+  model?: string;
+  quant?: string;
+  /** Окно сервера, токенов. */
+  context?: number;
+  /** Запросов в пути. */
+  inFlight: number;
+  startedAt?: number;
+  /** Сколько токенов в запросе — счёт шлюза (оценка или точный счёт сервера). */
+  promptTokens?: number;
+  /** Токенов промпта уже в кеше слота. */
+  filled?: number;
+  /** Токенов ответа выдано. */
+  decoded?: number;
+  phaseSince?: number;
+  /** Сколько ничего не двигалось, мс. */
+  silentMs?: number;
+  /** Через сколько тишины запрос обрывается и повторяется, мс. */
+  stallMs?: number;
+  /** Последний обрыв по тишине: когда и после скольких секунд. */
+  lastStall?: { at: number; seconds: number };
+  /** Когда ушёл последний запрос к серверу: ход, не сделавший ни одного, ещё готовит первый. */
+  lastRequestAt?: number;
+  /**
+   * Последний запрос, на который сервер ответил отказом (`status` — его код, `message` — его
+   * текст). Удачный ответ стирает. Без этого чат на шаблоне, падавшем на каждом запросе,
+   * показывал «агент выполняет инструменты», пока Claude Code молча повторял 500.
+   */
+  lastError?: { at: number; status: number; message: string };
 }
 
 export interface LocalServerInfo {
@@ -954,6 +1072,8 @@ export interface LocalServerInfo {
   restartPending?: boolean;
   /** Отложенный перезапуск не удался и после повтора: причина; настройка сохранена, применится при следующем запуске сервера. */
   restartError?: string;
+  /** Слой прогона против окна этого сервера (или того, с которым он поднимется): последний замер шлюза. */
+  layer?: LocalLayerFit;
   error?: string;
 }
 
@@ -978,6 +1098,8 @@ export interface InstalledModel {
   source?: 'hf' | 'ollama';
   /** Все скачанные квантования этой модели; `quant` — то, с которым модель поднимается. */
   quants?: string[];
+  /** Файлы скачанных квантований: размер и сколько места вернёт удаление (кнопка у каждого). */
+  files?: InstalledFile[];
   sizeBytes: number;
   modifiedAt: string;
   /** Есть ли модель в каталоге панели. */
@@ -985,6 +1107,33 @@ export interface InstalledModel {
   /** Последний замер на этой машине. */
   bench?: ModelBench;
 }
+
+/** Скачанный файл одного квантования модели. */
+export interface InstalledFile {
+  /** Квантование; у забранного из Ollama — служебная метка `Ollama`. */
+  quant: string;
+  /** Настоящее квантование из заголовка GGUF, когда `quant` служебный. */
+  quantLabel?: string;
+  source: 'hf' | 'ollama';
+  sizeBytes: number;
+  /**
+   * Сколько места вернёт удаление. У жёсткой ссылки на файл Ollama — 0: удаляется
+   * только ссылка панели, сами байты остаются у Ollama.
+   */
+  freesBytes: number;
+}
+
+/** Ответ на удаление: какие квантования убраны и сколько места вернулось (с недокачанными хвостами). */
+export interface LocalRemoveResult {
+  tag: string;
+  removed: string[];
+  freedBytes: number;
+}
+
+/** `DELETE /api/local-models/models/:tag?quant=` — без `quant` удаляется вся модель. */
+export const localRemoveQuerySchema = object({
+  quant: string().min(1).max(80).optional(),
+});
 
 /** Строка выбора квантования: что за файл, скачан ли и как ляжет на эту карту. */
 export interface LocalQuantRow extends ModelQuant {

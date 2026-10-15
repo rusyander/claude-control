@@ -12,6 +12,8 @@ import styles from './ProviderChatHeader.module.scss';
 import {
   platformRunChoice,
   platformModelCaption,
+  isLocalRoute,
+  routeKey,
   platformRefusalCaption,
   platformBypassCaption,
 } from '../../../shared/lib/chat-model';
@@ -53,7 +55,11 @@ export function ProviderChatHeader({
   const plan = usePlatformRunPlan(providerId ? foreignConsumerId(providerId) : '');
   const routed = plan.data?.routed === true ? plan.data : undefined;
   const caption = routed
-    ? platformModelCaption(routed.title, platformRunChoice(routed.rules, chat?.model ?? ''))
+    ? platformModelCaption(
+        routed.title,
+        platformRunChoice(routed.rules, chat?.model ?? ''),
+        isLocalRoute(routed),
+      )
     : undefined;
   const refusal = platformRefusalCaption(plan.data);
   // Уход мимо контура — той же меткой, что и в шапке своего чата (решение №4).
@@ -120,7 +126,9 @@ export function ProviderChatHeader({
           </Badge>
         )}
         {routed && !routed.effort && (
-          <Badge tone="neutral">{t('chat.platformNoEffort', { title: routed.title })}</Badge>
+          <Badge tone="neutral">
+            {t(routeKey('chat.platformNoEffort', isLocalRoute(routed)), { title: routed.title })}
+          </Badge>
         )}
         {chat?.workdir && (
           <Badge tone="neutral">{t('providerChat.workdirBadge', { path: chat.workdir })}</Badge>

@@ -14,6 +14,7 @@ import {
   localMcpPickBodySchema,
   localModelBodySchema,
   localPullBodySchema,
+  localRemoveQuerySchema,
 } from '@agentdeck/contracts/local-models';
 import type { ServerContext } from '../../context.ts';
 import { readApiToken } from '../../lib/api-token/api-token.ts';
@@ -135,6 +136,24 @@ export function registerLocalModelsRoutes(
     }
   });
 
+  /**
+   * Что сервер моделей делает с запросом чата: этап, разбор промпта, токены ответа, тишина
+   * (L6). Дёшево: без `/props` и без опроса слотов — их держит присмотр за запросом, а
+   * спящий сервер опрос слотов разбудил бы. Плюс замер слоя против окна (ревью B1): действие
+   * подбирается, только когда слой не влезает, и по железу из кеша — карта опрашивается заново
+   * лишь по истечении его срока.
+   */
+  app.get('/api/local-models/activity', () => local.activity());
+
+  /** «Перезапустить» из чата: тот же сервер заново, теми же параметрами. */
+  app.post('/api/local-models/server/restart', async (_request, reply) => {
+    try {
+      return await local.restartServer();
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
   app.post('/api/local-models/server/stop', async (_request, reply) => {
     try {
       return await local.stopServer();
@@ -160,12 +179,18 @@ export function registerLocalModelsRoutes(
     return local.importFromSystem(body.tag);
   });
 
-  app.delete<{ Params: { tag: string }; Querystring: { quant?: string } }>(
+  /**
+   * Удалить скачанное: `?quant=` — одно квантование, без него — модель целиком. Файл, который
+   * держит сервер моделей или поднимет после идущего прогона, — 409 с причиной: сервер
+   * останавливает человек, а не удаление.
+   */
+  app.delete<{ Params: { tag: string }; Querystring: unknown }>(
     '/api/local-models/models/:tag',
     async (request, reply) => {
+      const query = parseBody(localRemoveQuerySchema, request.query, reply);
+      if (!query) return reply;
       try {
-        await local.remove(decodeURIComponent(request.params.tag), request.query.quant);
-        return { ok: true };
+        return await local.remove(decodeURIComponent(request.params.tag), query.quant);
       } catch (error) {
         return refuse(reply, error);
       }

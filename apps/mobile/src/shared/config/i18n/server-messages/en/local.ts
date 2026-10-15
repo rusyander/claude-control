@@ -1,8 +1,14 @@
 import type { LocalMessageCode } from '@agentdeck/contracts/server-messages';
 
 export const localEn: Record<LocalMessageCode, string> = {
+  'local-stalled':
+    'the model server made no progress on the request for {{seconds}} s — the request was dropped and goes again',
   'local-supervisor-gave-up':
     'the server crashed and did not come back after {{restarts}} attempts in a row; the panel tries again every 10 minutes',
+  'local-on-demand-backoff':
+    'the model server did not come up ({{attempts}} of {{max}} attempts): {{cause}}; next attempt in {{seconds}} s',
+  'local-on-demand-failed':
+    'the model server did not come up {{attempts}} times in a row, and the panel no longer starts it on a chat request: {{cause}}',
   'local-port-busy': 'port {{port}} is taken by another server — stop it or free the port',
   'local-start-failed': 'could not start {{binary}}',
   'local-exited': 'the model server exited right after start (code {{code}}) — log: {{log}}',
@@ -16,6 +22,14 @@ export const localEn: Record<LocalMessageCode, string> = {
   'local-server-down': 'the model server is not running',
   'local-model-unknown': 'model {{tag}} is not in the panel catalog',
   'local-model-missing': 'model {{tag}} is not downloaded',
+  'local-model-loaded':
+    'quantization {{quant}} of {{tag}} is loaded in the model server — stop the server first ("Stop and free memory" on the "Hardware & server" tab), then delete',
+  'local-model-run-active':
+    'a local run is in progress and afterwards the server switches to quantization {{quant}} of {{tag}} — delete once the run ends',
+  'local-model-downloading':
+    'model {{tag}} is downloading — wait for it to finish or cancel the download, then delete',
+  'local-model-path':
+    'the file of model {{tag}} lies outside the panel models folder — the panel deletes only its own files, deletion refused',
   'local-contour-save': 'saving the contour: {{reason}}',
   'local-contour-activate': 'activating the contour: {{reason}}',
   'local-contour-deactivate': 'deactivating the contour: {{reason}}',

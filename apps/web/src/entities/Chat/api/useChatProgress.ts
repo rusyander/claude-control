@@ -32,9 +32,12 @@ export function useChatProgress(
     refetchInterval: (query) => {
       if (isRunning) return runningPollMs;
       const data = query.state.data;
+      // Фоновый субагент между ходами — тоже фон: «писал N назад» и его конец
+      // видны только опросом (живой прогон 14.10).
       const backgroundAlive =
         data?.processAlive === true &&
-        (data.shells ?? []).some((shell) => shell.status === 'running');
+        ((data.shells ?? []).some((shell) => shell.status === 'running') ||
+          data.agents.some((agent) => agent.status === 'running'));
       return backgroundAlive ? 15_000 : false;
     },
   });

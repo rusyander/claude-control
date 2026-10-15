@@ -1,8 +1,14 @@
 import type { LocalMessageCode } from '@agentdeck/contracts/server-messages';
 
 export const localRu: Record<LocalMessageCode, string> = {
+  'local-stalled':
+    'сервер моделей {{seconds}} с не двигался с запросом — запрос оборван и уйдёт заново',
   'local-supervisor-gave-up':
     'сервер упал и не поднялся после {{restarts}} попыток подряд; панель пробует снова раз в 10 минут',
+  'local-on-demand-backoff':
+    'сервер моделей не поднялся ({{attempts}} из {{max}} попыток): {{cause}}; следующая попытка через {{seconds}} с',
+  'local-on-demand-failed':
+    'сервер моделей не поднялся {{attempts}} раза подряд, и панель больше не запускает его по запросу чата: {{cause}}',
   'local-port-busy': 'порт {{port}} занят другим сервером — остановите его или освободите порт',
   'local-start-failed': 'не удалось запустить {{binary}}',
   'local-exited': 'сервер моделей завершился сразу после запуска (код {{code}}) — журнал: {{log}}',
@@ -17,6 +23,14 @@ export const localRu: Record<LocalMessageCode, string> = {
   'local-server-down': 'сервер моделей не запущен',
   'local-model-unknown': 'модели {{tag}} нет в каталоге панели',
   'local-model-missing': 'модель {{tag}} не скачана',
+  'local-model-loaded':
+    'квантование {{quant}} модели {{tag}} загружено в сервер моделей — сначала остановите сервер («Остановить и освободить память» на вкладке «Железо и сервер»), потом удаляйте',
+  'local-model-run-active':
+    'идёт локальный прогон, и после него сервер перейдёт на квантование {{quant}} модели {{tag}} — удалите, когда прогон кончится',
+  'local-model-downloading':
+    'модель {{tag}} сейчас скачивается — дождитесь конца или отмените загрузку, потом удаляйте',
+  'local-model-path':
+    'файл модели {{tag}} лежит вне каталога моделей панели — панель удаляет только своё, удаление отклонено',
   'local-contour-save': 'сохранение контура: {{reason}}',
   'local-contour-activate': 'включение контура: {{reason}}',
   'local-contour-deactivate': 'выключение контура: {{reason}}',

@@ -85,6 +85,8 @@ export const queryKeys = {
   localModels: ['local-models'] as const,
   /** MCP-серверы локального прогона проекта (L4): цена, выбор, запас окна. Под корнем `localModels` — его сброс перечитывает и их. */
   localMcp: (project: string) => ['local-models', 'mcp', project] as const,
+  /** Что сервер моделей делает с запросом чата (L6): этап, разбор промпта, тишина. */
+  localActivity: ['local-models', 'activity'] as const,
   /** Сверка панели с глобальным слоем (В5); дифф предложения — под ним же. */
   globalLayer: ['global-layer'] as const,
   /** Встроенный набор панели (В2); текст элемента — под ним же. */

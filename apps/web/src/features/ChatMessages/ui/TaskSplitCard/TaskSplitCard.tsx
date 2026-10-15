@@ -21,7 +21,12 @@ import { Toggle } from '@shared/ui/toggle';
 import { Badge } from '@shared/ui/badge';
 import type { TaskSplitCardProps } from '../TaskSplitCard.types';
 import styles from './TaskSplitCard.module.scss';
-import { platformRunChoice, platformModelCaption } from '../../../../shared/lib/chat-model';
+import {
+  platformRunChoice,
+  platformModelCaption,
+  isLocalRoute,
+  routeKey,
+} from '../../../../shared/lib/chat-model';
 
 /**
  * Предложение разделить задачи по нескольким чатам.
@@ -167,7 +172,11 @@ export function TaskSplitCard({
           const plan = plans[index];
           const contourCaption =
             routed && plan
-              ? platformModelCaption(routed.title, platformRunChoice(routed.rules, plan.model))
+              ? platformModelCaption(
+                  routed.title,
+                  platformRunChoice(routed.rules, plan.model),
+                  isLocalRoute(routed),
+                )
               : undefined;
           return (
             <div key={index} className={styles.group}>
@@ -294,7 +303,7 @@ export function TaskSplitCard({
           каждой группы: выбор глубины у групп остаётся, но наверх не уедет. */}
       {hasCascade && routed && !routed.effort && (
         <Typography variant="caption" color="muted" as="p">
-          {t('chat.platformNoEffort', { title: routed.title })}
+          {t(routeKey('chat.platformNoEffort', isLocalRoute(routed)), { title: routed.title })}
         </Typography>
       )}
 

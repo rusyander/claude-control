@@ -5,6 +5,7 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { JobProgress, toGb } from '@entities/LocalModels';
 import { ModelFacts } from '../ModelFacts/ModelFacts';
+import { ModelFiles } from '../ModelFiles/ModelFiles';
 import { ModelSelects } from '../ModelSelects/ModelSelects';
 import { formatGb, quantTitle } from '../ModelSelects/optionText';
 import styles from './ModelRow.module.scss';
@@ -27,6 +28,7 @@ export function ModelRow({
   onConnect,
   onBench,
   onRemove,
+  onRemoveFile,
   onCancel,
   onChoose,
 }: ModelRowProps) {
@@ -36,6 +38,8 @@ export function ModelRow({
   const importOnly = !installed && row.importable;
   const canDownload = !row.quantInstalled && !running && !importOnly && fit.allowed;
   const toolsFailed = model.toolsProbe === 'failed';
+  // Файл, который держит сервер, не удаляется — и модель целиком тоже: корзина закрыта, причина — в «На диске».
+  const loaded = row.downloaded.some((file) => file.loaded);
 
   return (
     <article
@@ -125,6 +129,10 @@ export function ModelRow({
               iconOnly
               icon={<Icon name="trash" />}
               aria-label={t('localModels.catalog.remove')}
+              title={
+                loaded ? t('localModels.catalog.removeLoaded') : t('localModels.catalog.remove')
+              }
+              disabled={loaded}
               onClick={onRemove}
             />
           ) : null}
@@ -145,6 +153,7 @@ export function ModelRow({
         </div>
         <div className={`${styles.island} ${styles.settingsIsland}`}>
           <ModelSelects row={row} onChoose={onChoose} />
+          <ModelFiles row={row} onRemove={onRemoveFile} />
         </div>
       </div>
     </article>

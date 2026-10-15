@@ -2,7 +2,7 @@ import type { Dictionary } from '../../shared/config/i18n/ru';
 import type { RunPlanLine } from './run-plan.types';
 import type { PlatformRunPlan } from '@agentdeck/contracts';
 import { chooseRunModel, modelCaptionState } from '@agentdeck/contracts/platform-models';
-import { ourLayerIds } from '@agentdeck/contracts/platform-layers';
+import { LOCAL_PLATFORM_ID, ourLayerIds } from '@agentdeck/contracts/platform-layers';
 
 /**
  * Что сказать под полем ввода о прогоне через контур (Т6/Т8) — те же подписи,
@@ -29,8 +29,14 @@ export interface RunPlanView {
 export function runPlanView(
   plan: PlatformRunPlan | undefined,
   chosen: { model: string; effort: string },
-  words: Words,
+  dictionary: Words,
 ): RunPlanView {
+  // Контур локальной модели называется «Локальная модель · llama.cpp», а не контуром
+  // (L6): те же подписи, другие слова — подмена словаря, а не вторая ветка логики.
+  const words: Words =
+    plan?.platformId === LOCAL_PLATFORM_ID
+      ? { ...dictionary, ...dictionary.localRoute }
+      : dictionary;
   const lines: RunPlanLine[] = [];
   const routed = plan?.routed === true ? plan : undefined;
   const choice = routed ? chooseRunModel(routed.rules, chosen.model) : undefined;

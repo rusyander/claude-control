@@ -40,9 +40,9 @@ const RTX_4090: HardwareGpu = {
 describe('подбор модели под карту', () => {
   const catalog = loadCatalog().models;
 
-  it('на 4090 агенту рекомендуется Qwen3.6 27B Coding целиком в видеопамяти', () => {
+  it('на 4090 агенту рекомендуется Qwen3.8 27B целиком в видеопамяти', () => {
     const best = recommendModel(catalog, RTX_4090, 95);
-    expect(best?.model.tag).toBe('qwen3.6:27b-coding');
+    expect(best?.model.tag).toBe('qwen3.8:27b');
     expect(best?.fit.level).toBe('gpu');
     expect(best?.fit.context).toBeGreaterThanOrEqual(AGENT_MIN_CONTEXT);
     // Оценка — диапазон, нижняя граница меньше верхней и обе разумны для 27B.

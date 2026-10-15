@@ -1,0 +1,82 @@
+{
+  "title": {
+    "ru": "Скачанные локальные модели удаляются по одному квантованию, с размером освобождаемого места",
+    "en": "Downloaded local models are deleted one quantization at a time, with the space to be freed shown"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Под строкой модели — блок «На диске»: каждое скачанное квантование с размером и своей корзиной, подпись корзины называет, сколько места вернётся. Удаление идёт после окна подтверждения с названием квантования и объёмом; остальные квантования модели остаются. Корзина в шапке строки по-прежнему удаляет модель целиком, окно называет число файлов и общий объём.",
+        "en": "Under the model row sits an “On disk” block: every downloaded quantization with its size and its own trash button, whose label says how much space comes back. Deletion follows a confirmation dialog naming the quantization and the size; the model’s other quantizations stay. The trash button in the row header still deletes the whole model, and its dialog names the file count and the total size."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      },
+      "images": ["before.png", "after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Удаление любой модели больше не останавливает сервер моделей. Файл, который сервер держит, к которому идёт загрузка или на который идущий локальный прогон перезапустит сервер, удалить нельзя: ответ называет причину и что сделать сначала, а у загруженного квантования вместо корзины написано «загружено в сервер — остановите сервер, чтобы удалить».",
+        "en": "Deleting any model no longer stops the model server. A file the server holds, one being downloaded, or one a running local run would restart the server on cannot be deleted: the answer names the reason and what to do first, and a loaded quantization shows “loaded into the server — stop the server to delete it” instead of a trash button."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Удалённое выбранное квантование больше не сбрасывает выбор: он переходит на квантование, ещё лежащее на диске. Вместе с файлом уходит и недокачанный остаток рядом с ним, у квантований, которые так и не докачались, тоже.",
+        "en": "Deleting the chosen quantization no longer clears the choice: it moves to a quantization still on disk. The unfinished download next to the file goes with it, including for quantizations that never finished downloading."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Файл, перенесённый из Ollama, — та же запись на диске, что у Ollama: удаляется только ссылка панели, модель в Ollama остаётся целой, а окно и подпись корзины честно говорят, что место не освободится. Удаление не выходит за папку моделей панели, какое бы имя ни пришло в запросе.",
+        "en": "A file brought over from Ollama is the same entry on disk as Ollama’s: only the panel’s link is deleted, the model in Ollama stays whole, and the dialog and the trash label say plainly that no space is freed. Deletion never leaves the panel’s models folder, whatever name arrives in the request."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели»: два шага о блоке «На диске» и окне удаления, с кадрами в обеих темах и на обоих языках.",
+        "en": "“Local models” help: two steps about the “On disk” block and the delete dialog, with frames in both themes and both languages."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: одна корзина на всю модель, без размера",
+        "en": "Before: one trash button for the whole model, no size"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: «На диске» — квантования с размером и своей корзиной, загруженное в сервер без корзины",
+        "en": "After: “On disk” lists quantizations with sizes and their own trash buttons; the loaded one has none"
+      }
+    }
+  ]
+}

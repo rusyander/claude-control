@@ -62,8 +62,11 @@ $library-floor: 320px;
   width: 28px;
 }
 
+// Длинное название кейса на широком экране тянуло колонку в одну строку под 900px:
+// мера строки держит его читаемым абзацем.
 .caseLink {
   display: block;
+  max-width: 72ch;
   padding: 0;
   border: 0;
   background: none;

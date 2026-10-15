@@ -543,7 +543,15 @@ describe('«Любая модель»: репозиторий → квантов
     toolsAnswer = undefined;
   });
 
-  it('убрать: файлы, запись и выбор исчезают, сервер, державший её, снят', async () => {
+  it('убрать: пока сервер держит её — 409; после остановки файлы, запись и выбор исчезают', async () => {
+    const refused = await api<{ messageCode?: string }>(
+      'DELETE',
+      `/api/local-models/models/${encodeURIComponent(CUSTOM_TAG)}`,
+    );
+    expect(refused.status).toBe(409);
+    expect(refused.body.messageCode).toBe('local-model-loaded');
+    expect(readState(paths()).custom[CUSTOM_TAG]).toBeDefined();
+    await api('POST', '/api/local-models/server/stop');
     const removed = await api(
       'DELETE',
       `/api/local-models/models/${encodeURIComponent(CUSTOM_TAG)}`,

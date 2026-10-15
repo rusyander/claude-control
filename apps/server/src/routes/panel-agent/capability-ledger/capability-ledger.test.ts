@@ -91,6 +91,7 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/local-models/import': 'human:upload',
   'POST /api/local-models/server/start': 'human:consent',
   'POST /api/local-models/server/stop': 'human:consent',
+  'POST /api/local-models/server/restart': 'human:consent',
   'DELETE /api/local-models/models/:tag': 'human:consent',
   'POST /api/local-models/bench': 'human:consent',
   'POST /api/local-models/connect': 'human:consent',

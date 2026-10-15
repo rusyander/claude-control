@@ -122,6 +122,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   // local-models-routes.ts: загрузки, нагрузка на видеокарту, удаление и подключение — человек.
   'GET /api/local-models': 'action:local_models_status',
   'GET /api/local-models/quants': 'gap:P3',
+  'GET /api/local-models/activity': 'gap:P3',
   'POST /api/local-models/hardware/refresh': 'gap:P3',
   'PUT /api/local-models/kit': 'gap:P3',
   'PUT /api/local-models/keep-loaded': 'gap:P3',
@@ -136,6 +137,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/local-models/import': 'human:upload',
   'POST /api/local-models/server/start': 'human:consent',
   'POST /api/local-models/server/stop': 'human:consent',
+  'POST /api/local-models/server/restart': 'human:consent',
   'DELETE /api/local-models/models/:tag': 'human:consent',
   'POST /api/local-models/bench': 'human:consent',
   'POST /api/local-models/connect': 'human:consent',

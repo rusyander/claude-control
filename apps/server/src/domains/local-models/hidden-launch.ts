@@ -22,13 +22,28 @@ export function psQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+/**
+ * Аргумент командной строки Windows по правилам CommandLineToArgvW: `Start-Process
+ * -ArgumentList` склеивает элементы пробелом как есть, без кавычек. Пробел или `"` —
+ * в кавычки; `"` внутри — `\"`; обратные косые перед кавычкой и в конце удваиваются.
+ */
+export function winArg(value: string): string {
+  if (value !== '' && !/[\s"]/.test(value)) return value;
+  const escaped = value
+    .replace(/(\\*)"/g, (_match, slashes: string) => `${slashes}${slashes}\\"`)
+    .replace(/(\\+)$/, '$1$1');
+  return `"${escaped}"`;
+}
+
 /** Скрипт PowerShell: запустить, перенаправить вывод, напечатать номер процесса. */
 export function hiddenLaunchScript(
   binary: string,
   args: string[],
   log: { out: string; err: string },
 ): string {
-  const list = args.length ? ` -ArgumentList ${args.map(psQuote).join(',')}` : '';
+  const list = args.length
+    ? ` -ArgumentList ${args.map((arg) => psQuote(winArg(arg))).join(',')}`
+    : '';
   return (
     `$p = Start-Process -FilePath ${psQuote(binary)}${list} -WindowStyle Hidden -PassThru ` +
     `-RedirectStandardOutput ${psQuote(log.out)} -RedirectStandardError ${psQuote(log.err)}; ` +

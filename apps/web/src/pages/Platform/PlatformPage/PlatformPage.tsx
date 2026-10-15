@@ -10,6 +10,7 @@ import { EmptyState } from '@shared/ui/empty-state';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { SelectField } from '@shared/ui/select-field';
+import { platformTitleOf } from '@shared/lib/chat-model';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { LoadErrorCard } from '@shared/ui/load-error';
 import { PlatformWizard } from '@features/PlatformEditor';
@@ -189,8 +190,10 @@ export function PlatformPage() {
                   options={platforms.map((status) => ({
                     value: status.platform.id,
                     label: status.active
-                      ? t('platform.contourPickerActive', { title: status.platform.title })
-                      : status.platform.title,
+                      ? t('platform.contourPickerActive', {
+                          title: platformTitleOf(status.platform, t),
+                        })
+                      : platformTitleOf(status.platform, t),
                   }))}
                 />
               </div>

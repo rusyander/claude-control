@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,13 +24,41 @@ import type { LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
 const fixture = (name: string): string =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
+/** Живые подделки: каталог теста удаляем только после их выхода (см. `afterEach`). */
+const children = new Set<ChildProcess>();
+
 function spawnInto(file: string): LiveTurnOptions['spawnImpl'] {
-  return ((_command: string, args: string[], options: object) =>
-    spawn(
-      process.execPath,
-      [fixture(file), ...args],
-      options,
-    )) as unknown as LiveTurnOptions['spawnImpl'];
+  return ((_command: string, args: string[], options: object) => {
+    const child = spawn(process.execPath, [fixture(file), ...args], options);
+    children.add(child);
+    child.once('exit', () => children.delete(child));
+    return child;
+  }) as unknown as LiveTurnOptions['spawnImpl'];
+}
+
+/** Ждёт выхода всех подделок; задержавшуюся гасит сам, но выхода ждёт всё равно. */
+async function childrenGone(): Promise<void> {
+  await Promise.all(
+    [...children].map(
+      (child) =>
+        new Promise<void>((resolve) => {
+          if (child.exitCode !== null || child.signalCode !== null) return resolve();
+          child.once('exit', () => resolve());
+          setTimeout(() => child.kill(), 2_000).unref();
+        }),
+    ),
+  );
+  children.clear();
+}
+
+/**
+ * Каталог теста — cwd подделки, а Windows не даёт удалить cwd живого процесса.
+ * Под нагрузкой полного прогона подделка гаснет дольше любых повторов удаления
+ * (EPERM ловили и после 4 с), поэтому сначала ждём её выхода, потом удаляем.
+ */
+async function removeDir(dir: string): Promise<void> {
+  await childrenGone();
+  rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 
 interface Cli {
@@ -100,11 +128,7 @@ describe.each(CLIS)('$name: сессия между ходами разгово�
     dir = mkdtempSync(join(tmpdir(), `cc-live-session-${cli.name}-`));
     store = join(dir, 'store.json');
   });
-  // Сервер-заглушка стоит в каталоге и под нагрузкой полного прогона гаснет дольше
-  // секунды после конца хода (Windows держит cwd живого процесса) — ждём до 4 с.
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 40, retryDelay: 100 });
-  });
+  afterEach(() => removeDir(dir));
 
   const disk = (): Disk =>
     existsSync(store)
@@ -197,9 +221,7 @@ describe('codex: параметры потока под сессию', () => {
     dir = mkdtempSync(join(tmpdir(), 'cc-live-session-codex-'));
     store = join(dir, 'store.json');
   });
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-  });
+  afterEach(() => removeDir(dir));
   const log = (): string[] => (JSON.parse(readFileSync(store, 'utf8')) as Disk).log;
   const run = (session?: LiveTurnOptions['session']) =>
     new CodexAppServerTurn().run(
@@ -261,7 +283,7 @@ describe('goose: агент без loadSession', () => {
       expect(state.deleted).toEqual(['ses-1']);
       expect(state.log.some((line) => line.startsWith('load'))).toBe(false);
     } finally {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+      await removeDir(dir);
     }
   });
 });

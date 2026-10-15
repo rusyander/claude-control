@@ -51,6 +51,8 @@ export default defineConfig({
         'src/**/*.d.mts',
         'src/**/__fixtures__/**',
         'src/domains/prompts/catalog/**',
+        // Шаблоны чата llama-server — Jinja, уезжают серверу моделей файлом.
+        'src/domains/local-models/data/templates/**',
       ],
       // Считается в каждом прогоне всего набора: порог — часть гейта, а не
       // отдельный режим. Уровень зафиксирован по замеру 06.09.2026 (86,3 / 78,1 /

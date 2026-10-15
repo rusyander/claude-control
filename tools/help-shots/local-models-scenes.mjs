@@ -91,7 +91,9 @@ async function pick(page, row, index, value) {
 export async function shootChoice(browser, web, scenario) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1500 } });
   page.on('pageerror', (error) => console.log(`  ошибка страницы: ${error.message}`));
-  const holder = { state: STATES.ready };
+  // Окно 64K выбрано явно: подписи кадров рассказывают историю при 64K, а окно по
+  // умолчанию у модели задаёт каталог и может меняться — кадр от него не зависит.
+  const holder = { state: STATES.ready, choices: { [TAG]: { context: 65536 } } };
   try {
     await settings(page);
     await localModelsRoutes(page, holder);
@@ -136,6 +138,25 @@ export async function shootChoice(browser, web, scenario) {
       .waitFor({ state: 'hidden', timeout: 20000 });
     await page.locator(custom).first().scrollIntoViewIfNeeded();
     await scenario.shot(page, '05-custom-row', { clip: custom, padding: 12 });
+
+    // ── 06. «На диске»: два квантования, загруженное в сервер — без корзины ──
+    holder.custom = [];
+    holder.choices = {};
+    holder.state = STATES.files;
+    await openTab(page, web, 'models', CATALOG);
+    await page.locator(row).first().scrollIntoViewIfNeeded();
+    await scenario.shot(page, '06-files', { clip: row, padding: 12 });
+
+    // ── 07. Корзина у незагруженного: окно называет квантование и освобождаемое место ──
+    await page
+      .locator(row)
+      .first()
+      .locator('button[aria-label^="Удалить UD-Q4_K_XL"], button[aria-label^="Delete UD-Q4_K_XL"]')
+      .click();
+    const dialog = '[role="alertdialog"], [role="dialog"]';
+    await page.waitForSelector(dialog);
+    await page.waitForTimeout(500);
+    await scenario.shot(page, '07-confirm', { clip: dialog, padding: 12 });
   } finally {
     await page.close();
   }

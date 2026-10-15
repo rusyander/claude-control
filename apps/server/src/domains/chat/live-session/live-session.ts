@@ -65,6 +65,21 @@ export interface TurnOutcome {
 /** Сколько хвоста stderr держим: процесс живёт часами, а нужна причина падения. */
 const STDERR_TAIL = 8_192;
 
+/**
+ * Сколько ждать хода CLI после того, как фон опустел, пока прогон держит сессию
+ * (`awaitTurn`). CLI начинает ход уведомления сразу за концом фоновой задачи
+ * (замер 23.09, 2.1.280); пустой фон без хода — ждать больше нечего.
+ */
+export const HOLD_DRAIN_MS = 30_000;
+
+/** Фоновая задача CLI, как её называет `background_tasks_changed` (2.1.286). */
+export interface BackgroundTask {
+  id: string;
+  /** `local_agent` — субагент, `local_bash` — команда; иное — как прислал CLI. */
+  type: string;
+  description: string;
+}
+
 type RawSink = (raw: RawEvent) => void;
 
 export class LiveSession {
@@ -83,7 +98,16 @@ export class LiveSession {
   private readonly launch: LiveLaunch;
   /** `prompt` — ход по сообщению панели (`turn`), а не забранный ход самого CLI (`claimWake`). */
   private sink:
-    { onRaw: RawSink; resolve: (outcome: TurnOutcome) => void; prompt: boolean } | undefined;
+    | {
+        onRaw: RawSink;
+        resolve: (outcome: TurnOutcome) => void;
+        prompt: boolean;
+        /** Прогон держит сессию между ходами (`awaitTurn`): ход ещё не начался. */
+        hold?: boolean;
+      }
+    | undefined;
+  private holdTimer: ReturnType<typeof setTimeout> | undefined;
+  private tasks: BackgroundTask[] = [];
   private waking: RawEvent[] | undefined;
   private closed = false;
   private exitCode: number | undefined;
@@ -192,6 +216,11 @@ export class LiveSession {
     return this.backgroundTasks;
   }
 
+  /** Что именно идёт в фоне — для человека: какой агент, с каким заданием. */
+  get backgroundList(): readonly BackgroundTask[] {
+    return this.tasks;
+  }
+
   /**
    * Процесс ушёл сам (упал, снят снаружи, посредник закрыл простой), держа
    * фоновые задачи: их итогов не будет, и пробуждения тоже. Это обрыв работы, а
@@ -259,6 +288,27 @@ export class LiveSession {
     this.waking = undefined;
     const done = this.expect(onRaw, false);
     for (const raw of buffered) this.deliver(raw);
+    return done;
+  }
+
+  /**
+   * Держать сессию между ходами: прогон ничего не пишет в stdin, а забирает
+   * следующий ход CLI — пробуждение по концу фоновой задачи или сообщение
+   * человека, отданное `inject`. Нужен, когда фоновому субагенту понадобилось
+   * решение человека после конца хода (живой прогон 14.10): карточке прав нужен
+   * идущий прогон, иначе её не видит ни одна вкладка. Ход, уже начатый CLI, —
+   * обычный `claimWake`. `undefined` — сессия занята ходом. Фон опустел, а хода
+   * нет (`HOLD_DRAIN_MS`) — прогон закрывается пустым: ждать нечего.
+   */
+  awaitTurn(runId: string | undefined, onRaw: RawSink): Promise<TurnOutcome> | undefined {
+    if (this.waking) return this.claimWake(runId, onRaw);
+    if (this.closed) return Promise.resolve(this.outcome());
+    if (this.sink) return undefined;
+    this.writeRunId(runId);
+    const done = new Promise<TurnOutcome>((resolve) => {
+      this.sink = { onRaw, resolve, prompt: false, hold: true };
+    });
+    this.armHoldDrain();
     return done;
   }
 
@@ -349,6 +399,13 @@ export class LiveSession {
     if (raw.type === 'system' && raw.subtype === 'background_tasks_changed') {
       const tasks = (raw as { tasks?: unknown }).tasks;
       this.backgroundTasks = Array.isArray(tasks) ? tasks.length : 0;
+      this.tasks = Array.isArray(tasks) ? tasks.map(backgroundTaskOf) : [];
+      if (this.sink?.hold) this.armHoldDrain();
+    }
+    // Ход начался — держащий прогон его получил, срок «пустого фона» снят.
+    if (raw.type === 'system' && raw.subtype === 'init' && this.sink?.hold) {
+      this.sink.hold = false;
+      this.clearHoldDrain();
     }
     if (raw.type === 'result') {
       const total = raw.total_cost_usd ?? 0;
@@ -396,6 +453,26 @@ export class LiveSession {
     sink.resolve({ closed: false, stderr: '' });
   }
 
+  /** Держащий прогон при пустом фоне ждёт хода не дольше `HOLD_DRAIN_MS`. */
+  private armHoldDrain(): void {
+    this.clearHoldDrain();
+    if (!this.sink?.hold || this.backgroundTasks > 0) return;
+    this.holdTimer = setTimeout(() => {
+      this.holdTimer = undefined;
+      const sink = this.sink;
+      if (!sink?.hold) return;
+      this.sink = undefined;
+      this.lastUsedAt = this.now();
+      sink.resolve({ closed: false, stderr: '' });
+    }, HOLD_DRAIN_MS);
+    this.holdTimer.unref?.();
+  }
+
+  private clearHoldDrain(): void {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = undefined;
+  }
+
   private outcome(): TurnOutcome {
     return {
       closed: true,
@@ -410,6 +487,7 @@ export class LiveSession {
     this.closed = true;
     this.exitCode = code;
     this.waking = undefined;
+    this.clearHoldDrain();
     for (const waiter of this.syncedWaiters.splice(0)) waiter();
     for (const waiter of this.closedWaiters.splice(0)) waiter();
     const sink = this.sink;
@@ -424,6 +502,22 @@ export class LiveSession {
     }
     this.onClose?.(this);
   }
+}
+
+function backgroundTaskOf(raw: unknown): BackgroundTask {
+  const task = (raw ?? {}) as {
+    task_id?: unknown;
+    id?: unknown;
+    task_type?: unknown;
+    description?: unknown;
+  };
+  const id =
+    typeof task.task_id === 'string' ? task.task_id : typeof task.id === 'string' ? task.id : '';
+  return {
+    id,
+    type: typeof task.task_type === 'string' ? task.task_type : '',
+    description: typeof task.description === 'string' ? task.description.slice(0, 200) : '',
+  };
 }
 
 export interface LivePoolLimits {

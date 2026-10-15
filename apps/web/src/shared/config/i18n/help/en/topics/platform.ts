@@ -475,7 +475,9 @@ export const platformEn: typeof platformRu = {
       'and which contour the request goes through: without that line the model assembles ' +
       'itself from the Claude Code environment and calls itself Claude. The model pick is ' +
       'locked the same way when Claude Code itself is switched to a local model («Local ' +
-      'models»): that model answers, and the header names it.',
+      'models»): that model answers, and the header names it. Claude Code receives that ' +
+      'model’s window in an environment variable on every launch: without it the CLI would ' +
+      'take the window for a cloud one and compact its history too late.',
     modelsColumn: 'On the card',
     modelsMeaningColumn: 'What it means',
     modelsDefault: 'The contour’s model',
@@ -612,7 +614,8 @@ export const platformEn: typeof platformRu = {
     layersAllText:
       'The master switch. Off — not one of our layers travels through this contour, whatever the ' +
       'switches below say: they turn grey rather than argue with it. This is the case where you ' +
-      'need not think about four settings at all.',
+      'need not think about four settings at all. The fifth switch — the full tool set — it ' +
+      'does not touch: that one is not from «~/.claude».',
     layerSettings: 'Personal rules, hooks and permissions',
     layerSettingsText:
       'Everything from `~/.claude` at once: the rules (CLAUDE.md or AGENTS.md), hooks, permissions, personal skills ' +
@@ -646,6 +649,15 @@ export const platformEn: typeof platformRu = {
       'What the panel adds of its own: initiatives, task splitting, session continuation. The CLI ' +
       'has no flag for it — the panel drops it itself, which is why it is absent from the flag ' +
       'list.',
+    layerTools: 'Full Claude Code tool set',
+    layerToolsText:
+      'The CLI’s built-in tools. Off — ten working ones stay in the request: Bash, Read, Edit, ' +
+      'Write, Glob, Grep, WebFetch, Skill, Agent, TodoWrite, via «--tools». An allow-list, not a ' +
+      'deny-list: a new tool in the next CLI version does not silently bring thousands of ' +
+      'tokens back. Schedules, worktrees, messaging, workflows and the rest go — about 11k ' +
+      'tokens on every request. The master switch does not govern it: it is not from ' +
+      '«~/.claude». The local contour runs with the full set, like cloud Claude; dropping it is ' +
+      'your choice on the card, the panel never drops it by itself.',
     layersFlagsTitle: 'The flags shown are the real ones',
     layersFlagsText:
       'Under the switches stands the line of flags the run will carry — exactly the ones that ' +
@@ -854,7 +866,11 @@ export const platformEn: typeof platformRu = {
       'traffic goes through the gateway, and only on calls marked up by the protocol: a quoted ' +
       'call inside a code block is neither executed nor refused. A refusal can ' +
       'arrive at any of three ' +
-      'places: content checks — 451, the key budget — 402, request frequency — 429.',
+      'places: content checks — 451, the key budget — 402, request frequency — 429. For the ' +
+      'local contour (a model server on this machine) the gateway also checks the request ' +
+      'against the server’s window: one that does not fit gets a «Prompt is too long» refusal, ' +
+      'on which the CLI compacts its history, and the gateway reports the share of the system ' +
+      'prompt and tools to the panel — details in «Local models».',
 
     d2Title: 'The path of one request: six steps and three places it can end in a refusal',
     d2Dialect: 'Translation into the contour dialect',

@@ -89,6 +89,7 @@ import {
   localPaths,
   readState,
   updateState,
+  type LayerDetail,
   type LocalPaths,
 } from './paths.ts';
 import { addQwenToPath, describeQwenCode, installQwenCode } from './qwen-code.ts';
@@ -999,13 +1000,22 @@ export function createLocalModels(deps: LocalModelsDeps) {
    * основного и иначе прятали бы его. В файл состояния — только когда изменился заметно:
    * страница показывает его и до первого хода после перезапуска панели.
    */
-  function noteLayer(tag: string, tokens: number): void {
+  function noteLayer(tag: string, tokens: number, detail: LayerDetail = {}): void {
     const at = clock();
     const stored = readState(paths).layers[tag];
-    if (stored && tokens < stored.tokens && at - stored.at < LAYER_HOLD_MS) return;
-    if (stored && Math.abs(stored.tokens - tokens) < 512 && at - stored.at < LAYER_HOLD_MS) return;
+    const held = stored !== undefined && at - stored.at < LAYER_HOLD_MS;
+    // Тот же разговор с другим ответом о замороженных описаниях — запись, даже при том же слое.
+    const sameFrozen =
+      stored?.session === detail.session && stored?.frozenTools === detail.frozenTools;
+    if (held && tokens < stored.tokens && sameFrozen) return;
+    if (held && Math.abs(stored.tokens - tokens) < 512 && sameFrozen) return;
     updateState(paths, (state) => {
-      state.layers[tag] = { tokens, at };
+      state.layers[tag] = {
+        tokens,
+        at,
+        ...(detail.session ? { session: detail.session } : {}),
+        ...(detail.frozenTools ? { frozenTools: detail.frozenTools } : {}),
+      };
     });
   }
 
@@ -1042,7 +1052,16 @@ export function createLocalModels(deps: LocalModelsDeps) {
     const limit = Math.max(0, context - LOCAL_REPLY_RESERVE_TOKENS);
     const fits = layerNeedContext(stored.tokens) <= context;
     const fix = fits ? undefined : await layerFix(tag, stored.tokens).catch(() => undefined);
-    return { tokens: stored.tokens, context, limit, fits, at: stored.at, ...(fix ? { fix } : {}) };
+    return {
+      tokens: stored.tokens,
+      context,
+      limit,
+      fits,
+      at: stored.at,
+      ...(fix ? { fix } : {}),
+      ...(stored.session ? { session: stored.session } : {}),
+      ...(stored.frozenTools ? { frozenTools: stored.frozenTools } : {}),
+    };
   }
 
   /** Спит ли сервер по простою: `/props` его не будит (замер 14.10); не отвечает — не спит. */
@@ -1878,7 +1897,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
           revive: () => Promise<ReviveResult>;
           notice: () => string | undefined;
           watch: (promptTokens: number) => ActivityTrack;
-          layer: (tokens: number) => void;
+          layer: (tokens: number, detail?: LayerDetail) => void;
           readonly deferredInline: boolean;
         }
       | undefined => {
@@ -1909,7 +1928,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
             },
           };
         },
-        layer: (tokens: number) => noteLayer(model, tokens),
+        layer: (tokens: number, detail?: LayerDetail) => noteLayer(model, tokens, detail),
         // Пометку знает только наш шаблон, и только тот, что сейчас лежит в данных: сервер,
         // поднятый с прежним (ждёт перезапуска), показал бы пометку модели вместо описания.
         get deferredInline(): boolean {

@@ -17,7 +17,12 @@ import styles from './LocalRunStatus.module.scss';
  * сервера с кнопкой перезапуска. Без этой строки 20 минут разбора длинного промпта
  * неотличимы от зависания, и человек слал сообщение заново, обрывая начатое.
  */
-export function LocalRunStatus({ waitingPermission, since, className }: LocalRunStatusProps) {
+export function LocalRunStatus({
+  waitingPermission,
+  since,
+  session,
+  className,
+}: LocalRunStatusProps) {
   const { t, i18n } = useTranslation();
   const activity = useLocalActivity(true);
   const restart = useRestartLocalServer();
@@ -87,7 +92,7 @@ export function LocalRunStatus({ waitingPermission, since, className }: LocalRun
           {t('chat.localRun.failure', view.failed)}
         </Typography>
       )}
-      <LocalLayerNotice layer={activity.data?.layer} />
+      <LocalLayerNotice layer={activity.data?.layer} {...(session ? { session } : {})} />
       {view.stalled && !view.silent && (
         <Typography as="span" variant="body-sm" color="muted">
           {t('chat.localRun.stalled', view.stalled)}

@@ -134,7 +134,16 @@ export function goTestJsonToJUnit(content: string): string {
   }
   for (const [pkg, build] of failedPackages) {
     if (packagesWithFailures.has(pkg)) continue;
-    const text = [build ? (packageOutput.get(build) ?? '') : '', packageOutput.get(pkg) ?? ''];
+    // Причины сборки пакета разложены по `ImportPath` зависимостей — собираются
+    // все его секции `# <пакет>`; не подписан ни одной — весь вывод `FailedBuild`.
+    const own = build
+      ? [...packageOutput]
+          .filter(([key]) => key !== pkg)
+          .map(([, out]) => ownBuildSections(out, pkg))
+          .filter(Boolean)
+      : [];
+    const shared = build ? (packageOutput.get(build) ?? '') : '';
+    const text = [own.join('\n') || shared, packageOutput.get(pkg) ?? ''];
     cases.set(`${pkg}\u0000${BUILD_FAILURE}`, {
       owner: pkg,
       name: BUILD_FAILURE,
@@ -143,6 +152,23 @@ export function goTestJsonToJUnit(content: string): string {
     });
   }
   return toJUnit([...cases.values()]);
+}
+
+/**
+ * Вывод сборки бывает общим на несколько пакетов: при недостающей записи
+ * `go.sum` Go отдаёт его по `ImportPath` модуля зависимости, а `FailedBuild`
+ * пакета ссылается на один из них. Секции там подписаны `# <пакет>` — пакету
+ * достаются только свои, иначе каталог показывал бы ошибку соседа.
+ */
+function ownBuildSections(text: string, pkg: string): string {
+  const own: string[] = [];
+  let mine = false;
+  for (const line of text.split('\n')) {
+    const header = /^# (\S+)/.exec(line);
+    if (header) mine = header[1] === pkg;
+    if (mine) own.push(line);
+  }
+  return own.join('\n').trim();
 }
 
 const CARGO_RUNNING = /^\s*Running (?:unittests )?(\S+)/;

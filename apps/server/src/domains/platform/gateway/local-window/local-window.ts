@@ -21,6 +21,14 @@ import type { TextLanguage } from '../../../../lib/server-texts/server-texts.ts'
  */
 
 /** Окно и скорость обработки промпта у локального собеседника шлюза. */
+/** Подробности замера слоя: чей он и сколько в нём описаний MCP, замороженных разговором. */
+export interface LayerDetail {
+  /** Разговор Claude Code (`sessionOf`). */
+  session?: string;
+  /** Токенов описаний MCP, идущих целиком при включённом поиске (`frozenToolChars`). */
+  frozenTools?: number;
+}
+
 export interface LocalUpstreamInfo {
   /** Окно сервера моделей, токенов: настоящее, из записи о запущенном сервере. */
   context: number;
@@ -57,7 +65,7 @@ export interface LocalUpstreamInfo {
    * сравнивает его с окном сервера и показывает человеку, когда он не влезает (L6). Зовётся
    * только для запросов с инструментами — служебные (заголовок чата) слоя не несут.
    */
-  layer?: (tokens: number) => void;
+  layer?: (tokens: number, detail?: LayerDetail) => void;
   /**
    * Шаблон чата идущего сервера знает пометку отложенного инструмента (`DEFERRED_TOOL_MARK`):
    * подгруженный через `ToolSearch` инструмент не печатается в шапке, и начало промпта не

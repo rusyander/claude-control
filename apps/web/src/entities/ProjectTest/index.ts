@@ -83,6 +83,8 @@ export {
   useTestAutomation,
 } from './api/ProjectTestAutomationApi';
 
+export { useSetTestTurnHooks, useTestTurnHooks } from './api/ProjectTestTurnHooksApi';
+
 export { useTestRelease } from './api/ProjectTestReleaseApi';
 export { releaseExportUrl } from './lib/releaseExportUrl';
 export type { ReleaseExportFormat } from './lib/releaseExportUrl';

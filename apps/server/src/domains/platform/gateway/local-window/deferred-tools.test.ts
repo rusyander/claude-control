@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DEFERRED_TOOL_MARK, expandDeferredTools } from './deferred-tools.ts';
+import { DEFERRED_TOOL_MARK, expandDeferredTools, frozenToolChars } from './deferred-tools.ts';
 
 /**
  * @covers gateway/local-window/deferred-tools.ts — отложенные инструменты на пути к llama-server (L7)
@@ -104,5 +104,29 @@ describe('expandDeferredTools', () => {
     expect(templates.length).toBeGreaterThan(0);
     for (const name of templates)
       expect(readFileSync(new URL(name, dir), 'utf8'), name).toContain(DEFERRED_TOOL_MARK);
+  });
+});
+
+const resumed = JSON.parse(
+  readFileSync(new URL('./__fixtures__/tool-search-resumed-2.1.286.json', import.meta.url), 'utf8'),
+) as { frozen: Record<string, unknown> };
+
+describe('frozenToolChars', () => {
+  it('продолженный разговор: MCP целиком при ToolSearch в списке — их символы', () => {
+    const mcp = toolsOf(resumed.frozen).filter((tool) => tool.name.startsWith('mcp__'));
+    expect(mcp.length).toBe(2);
+    expect(frozenToolChars(resumed.frozen)).toBe(
+      mcp.reduce((sum, tool) => sum + JSON.stringify(tool).length, 0),
+    );
+  });
+
+  it('новый разговор с поиском: MCP отложены — ничего не заморожено', () => {
+    expect(frozenToolChars(wire.before)).toBe(0);
+    expect(frozenToolChars(wire.after)).toBe(0);
+  });
+
+  it('поиск выключен (нет ToolSearch): MCP целиком — это выбор, не заморозка', () => {
+    const tools = toolsOf(resumed.frozen).filter((tool) => tool.name !== 'ToolSearch');
+    expect(frozenToolChars({ ...resumed.frozen, tools })).toBe(0);
   });
 });

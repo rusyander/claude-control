@@ -77,7 +77,15 @@ const HELP = `Тест-кейсы проекта без панели.
   diff      что изменилось между прогонами: diff <база> <новый>
   plan      собрать план правилом: plan smoke | diff | release | flaky
   case      завести или обновить кейс (агент чата): --group <g> --json '<кейс>' | --file <f.json>
-            кейс человека не переписывается — правка уходит черновиком на приёмку
+            кейс человека не переписывается — правка уходит черновиком на приёмку;
+            правка по "id" — кейс целиком: поля, которых нет в JSON, не берутся из прежнего
+            Кейс пишется для человека: заголовок — проверяемое поведение, шаг на поведение,
+            ожидание шага — что видно (текст на экране, статус или поле ответа, содержимое
+            файла, строка отчёта), а не «все проходят» / «работает» (это ловит lint, правило
+            vague-case, и проверка конца хода); кейс на тест называет тест в ожидании (файл › тест)
+  suites    каталоги с тестами — в кейсы-наборы (кейс на каталог, итог — худший тест); --dry — только счёт
+  gate      пробелы хода агента: gate --since <ISO> [--changed-at <ISO>] <файл…>; код 1 — есть пробелы
+            (его зовёт хук конца хода: правил код — кейс, прогон, запись)
   record    записать проверенное вручную (только ручные кейсы, в разделе — «вручную»):
             record <группа>:<кейс>=passed|failed|blocked|skipped …; автокейс — только run
 
@@ -132,6 +140,8 @@ async function main() {
   if (command === 'plan') return await plan(project, options, positional);
   if (command === 'case') return await saveCase(project, options);
   if (command === 'record') return await recordResults(project, options, positional);
+  if (command === 'gate') return await turnGate(project, options, positional);
+  if (command === 'suites') return await syncSuiteCases(project, options);
   throw new Error(`Неизвестная команда «${command}». Список — node tools/tests-cli.mjs help`);
 }
 
@@ -298,6 +308,60 @@ async function saveCase(project, options) {
 }
 
 /**
+ * Пробелы хода агента (хук Stop, `tools/tests-hook.mjs`): правил код — кейс на
+ * изменённое, прогон после правки, запись ручного. Пусто — молчит и выходит с 0.
+ */
+async function turnGate(project, options, positional) {
+  const since = typeof options.since === 'string' ? options.since : '';
+  if (!Number.isFinite(Date.parse(since)))
+    throw new Error('Нужно начало хода: gate --since <ISO> <файл…>');
+  const { judgeTurn } = await domain('turn-gate');
+  const { readGroups } = await domain('store');
+  const { readRuns } = await domain('runs-store');
+  const gaps = judgeTurn({
+    groups: readGroups(project),
+    runs: readRuns(project),
+    paths: positional.map((file) => toProjectRelative(project, file)),
+    since,
+    ...(typeof options['changed-at'] === 'string' ? { changedAt: options['changed-at'] } : {}),
+    cli: `node "${fileURLToPath(import.meta.url)}"`,
+    root: project,
+  });
+  for (const gap of gaps) console.log(gap);
+  if (gaps.length > 0) process.exitCode = 1;
+}
+
+/**
+ * Каталоги с тестами — в кейсы-наборы: кейс на каталог, результат — худший из
+ * его тестов. Повтор заводит только новые каталоги.
+ */
+async function syncSuiteCases(project, options) {
+  const { adoptRunCommand, syncSuites } = await domain('suites');
+  const dry = Boolean(options.dry);
+  const sync = syncSuites(project, new Date().toISOString(), dry);
+  const adopted = adoptRunCommand(project, dry);
+  console.log(`Каталогов с тестами: ${sync.suites}`);
+  console.log(
+    `${dry ? 'Будет заведено' : 'Заведено'} кейсов-наборов: ${sync.added}` +
+      (sync.groups.length > 0 ? ` (группы: ${sync.groups.join(', ')})` : ''),
+  );
+  if (sync.refreshed > 0) {
+    console.log(
+      `${dry ? 'Будет переписано' : 'Переписано'} по нынешним тестам каталога: ${sync.refreshed}`,
+    );
+  }
+  for (const item of sync.missing) {
+    console.log(
+      `  ~ ${item.groupId}/${item.caseId} — каталога ${item.dir} больше нет, кейс оставлен`,
+    );
+  }
+  if (sync.truncated)
+    console.log('Обход упёрся в потолок каталогов: часть проекта не просмотрена.');
+  if (adopted)
+    console.log(`${dry ? 'Командой прогона станет' : 'Команда прогона'} — рецепт ${adopted}`);
+}
+
+/**
  * Записать проверенное агентом чата прогоном в историю блока: «проверил» —
  * запись, которую видит раздел и проверка доставки группы, а не слова в ответе.
  */
@@ -434,6 +498,8 @@ async function runTests(project, options) {
 
   console.log(`Кейсов с автотестом: ${automated.length}, файлов: ${files.length}`);
   console.log(`Команда: ${plan.line}`);
+  // Список длиннее строки cmd.exe ушёл файлом — иначе по строке выглядит, будто гонится всё.
+  if (plan.listed) console.log(`Файлов прогона: ${plan.listed} — списком в AGENTDECK_TEST_FILES`);
   if (options.dry) {
     dropTemp(plan.temp);
     printSkipped(skipped);
@@ -577,6 +643,7 @@ async function automationPlan(project, files, whole) {
   clearReport(own.report);
   return {
     line: own.line,
+    listed: own.listed,
     cwd: own.cwd,
     env: own.env,
     collect: (started) => collectReport(own.report, own.format, started),

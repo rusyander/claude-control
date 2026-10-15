@@ -68,6 +68,7 @@ export const composedMessageParams = {
   'tests-lint-no-code-paths': [],
   'tests-lint-no-priority': [],
   'tests-lint-too-many-steps': [],
+  'tests-lint-vague-case': [],
   'tests-lint-undeclared-parameter': [],
   'tests-lint-unused-parameter': [],
   'tests-lint-duplicate-title': [],

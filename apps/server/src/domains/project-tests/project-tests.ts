@@ -156,3 +156,12 @@ export {
   sweepMutationCopies,
 } from './mutation/mutation.ts';
 export { agentUpsertCase, recordAgentResults } from './agent-write/agent-write.ts';
+export { judgeTurn } from './turn-gate/turn-gate.ts';
+export {
+  installTurnHooks,
+  readTurnHooks,
+  reconcileTurnHooks,
+  removeTurnHooks,
+  testsHookScript,
+} from './turn-hooks/turn-hooks.ts';
+export { syncSuites, syncSuitesOnce } from './suites/suites.ts';

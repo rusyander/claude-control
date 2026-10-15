@@ -304,7 +304,10 @@ export const localModelsEn: typeof localModelsRu = {
       'the model does not get MCP tool descriptions up front: a request carries only their names, ' +
       'and a tool gets its description on first use through tool search (ToolSearch). Measured ' +
       '15.10 on Qwen3.8 27B: the first request is 23 thousand tokens instead of 71 thousand; once ' +
-      'the tool is loaded, later requests recompute 59–166 tokens out of 22 thousand.',
+      'the tool is loaded, later requests recompute 59–166 tokens out of 22 thousand. This holds for ' +
+      'conversations started with tool search: resuming an older conversation, Claude Code repeats ' +
+      'its earlier tool set whole so the cache stays intact. The chat marks such a conversation with a ' +
+      'line naming the tokens of those descriptions — a new chat gets rid of them.',
     mcpWhy: 'Why the lean set has none by default',
     mcpWhyText:
       'Tool descriptions ride in every request and take model window. Measured on 14 Oct: one ' +

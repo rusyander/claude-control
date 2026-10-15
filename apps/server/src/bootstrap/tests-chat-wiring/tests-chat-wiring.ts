@@ -10,6 +10,11 @@ import { syncE2eIfChanged } from '../../domains/project-tests/e2e-sync/e2e-sync.
 import { readEnvironments } from '../../domains/project-tests/library/library.ts';
 import { readAutomation } from '../../domains/project-tests/automation/automation.ts';
 import {
+  reconcileTurnHooks,
+  syncSuitesOnce,
+  testsHookScript,
+} from '../../domains/project-tests/project-tests.ts';
+import {
   writeQwenLimits,
   writeQwenSystemNote,
 } from '../../domains/provider-chat/system-note/system-note.ts';
@@ -57,6 +62,48 @@ export function projectTestsBusy(
   e2eRuns: { isRunning: (path: string) => boolean },
 ): (path: string) => boolean {
   return (path) => runs.holds(path) !== undefined || e2eRuns.isRunning(path);
+}
+
+/**
+ * Хуки блока во всех проектах реестра (решение владельца 15.10): проверка конца
+ * хода работает в любом Claude Code над проектом, а не только в чате панели.
+ * Выключенный человеком проект не трогается. Свои каталоги панели — не проекты.
+ */
+export function reconcileProjectTurnHooks(
+  appData: string,
+  roots: readonly string[],
+  log?: (message: string, error: unknown) => void,
+): void {
+  reconcileTurnHooks(
+    appData,
+    roots.filter((root) => !isInside(panelHomeDir(), root)),
+    testsHookScript(),
+    log,
+  );
+}
+
+/**
+ * Каталоги с тестами зарегистрированных проектов — в кейсы-наборы, по проекту за
+ * шаг цикла событий: обход большого репозитория идёт синхронно, и разом по всем
+ * проектам он держал бы запросы. Каждый проект — один раз (`syncSuitesOnce`).
+ */
+export function reconcileProjectSuites(
+  appData: string,
+  roots: readonly string[],
+  log?: (message: string, error: unknown) => void,
+): void {
+  const queue = roots.filter((root) => existsSync(root) && !isInside(panelHomeDir(), root));
+  const step = (): void => {
+    const root = queue.shift();
+    if (!root) return;
+    try {
+      syncSuitesOnce(appData, root, new Date().toISOString());
+    } catch (error) {
+      log?.('test suites sync failed', error);
+    }
+    setImmediate(step);
+  };
+  setImmediate(step);
 }
 
 /** CLI раздела тестов — абсолютным путём: агент вызывает его из каталога проекта. */

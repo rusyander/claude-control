@@ -30,3 +30,16 @@ function fixOf(layer: LocalLayerFit): LayerFixView {
     return { key: 'fixQuant', context: layer.fix.context, quant: layer.fix.quant };
   return { key: 'fixContext', context: layer.fix.context };
 }
+
+/**
+ * Описания MCP, замороженные разговором: начат до подгрузки по требованию, и Claude Code держит
+ * его набор инструментов неизменным. Строка — только в том разговоре, чей запрос замерен:
+ * замер один на модель, и в другом чате эта строка была бы неправдой.
+ */
+export function frozenToolsNotice(
+  layer: LocalLayerFit | undefined,
+  session: string | undefined,
+): { tokens: number } | undefined {
+  if (!layer?.frozenTools || !session || layer.session !== session) return undefined;
+  return { tokens: layer.frozenTools };
+}

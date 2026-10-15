@@ -1,0 +1,26 @@
+{
+  "title": {
+    "ru": "Чат на локальной модели называет разговор, который шлёт описания MCP целиком",
+    "en": "A chat on the local model names a conversation that sends MCP descriptions whole"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Разговор, начатый до подгрузки инструментов по требованию и продолженный на локальной модели, получает в чате строку с числом токенов описаний MCP-серверов, которые уходят в каждом запросе, и выход — новый чат. Claude Code при продолжении разговора повторяет его прежний набор инструментов целиком, чтобы не сбить кеш, поэтому такой разговор читал около 76 тысяч токенов на первом ходе вместо 23 тысяч у нового.",
+        "en": "A conversation started before tools were loaded on demand and continued on the local model gets a chat line naming the tokens of MCP server descriptions sent with every request, and the way out — a new chat. When a conversation is resumed, Claude Code repeats its earlier tool set whole so the cache stays intact, so such a conversation read about 76 thousand tokens on the first turn instead of 23 thousand for a new one."
+      },
+      "how": {
+        "ru": "Шлюз узнаёт такой запрос по поиску инструментов в списке рядом с описаниями MCP без пометки отложенных и сообщает панели размер этих описаний вместе с разговором; строка показывается только в нём.",
+        "en": "The gateway recognises such a request by tool search in the list next to MCP descriptions without the deferred mark and reports their size to the panel together with the conversation; the line shows only there."
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели» объясняет, почему продолженный старый разговор не получает подгрузку по требованию.",
+        "en": "The “Local models” help explains why a resumed older conversation does not get on-demand loading."
+      }
+    }
+  ]
+}

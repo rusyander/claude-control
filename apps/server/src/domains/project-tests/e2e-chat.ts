@@ -1,5 +1,6 @@
 import type { ProjectTestAutomationCommand, ProjectTestE2eFolder } from '@agentdeck/contracts';
 import { AUTOMATION_FILE } from './automation/automation.ts';
+import { CASE_STANDARD } from './case-standard.ts';
 import { TESTS_DIR } from './files.ts';
 
 /**
@@ -103,7 +104,9 @@ function ownWorkLine(root: string, cli: string): string {
     'step on your own — add or update the case that covers the change',
     `(${cli} case --project "${root}" --group <group> --json`,
     '\'{"title":"…","steps":["…"],"expected":"…","codePaths":["<changed path>"]}\';',
-    'pass "id" to update; a case a human wrote becomes a draft they accept). A manual case: record',
+    'pass "id" to update; a case a human wrote becomes a draft they accept).',
+    CASE_STANDARD,
+    'A manual case: record',
     `what you actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
     '--note "<how you checked>"; it shows as checked by hand). An automated case is never recorded —',
     'record refuses it — run it as above. Never call the work tested',

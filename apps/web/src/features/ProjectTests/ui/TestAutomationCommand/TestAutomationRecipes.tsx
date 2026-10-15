@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import type { ProjectTestAutomationRecipe } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
@@ -12,6 +13,14 @@ import styles from './TestAutomationCommand.module.scss';
  */
 export function TestAutomationRecipes({ recipes, disabled, onTake }: TestAutomationRecipesProps) {
   const { t } = useTranslation();
+  /** Где гонит рецепт: все модули, каталог модуля или корень. */
+  const recipeDir = (recipe: ProjectTestAutomationRecipe): string => {
+    if (recipe.id.endsWith(':*')) {
+      return t('testsE2e.automation.allModules', { count: recipe.evidence.length });
+    }
+    return recipe.dir ? `${recipe.dir}/` : t('testsE2e.automation.root');
+  };
+
   return (
     <ul className={styles.recipes} data-testid="tests-automation-recipes">
       {recipes.map((recipe) => (
@@ -20,7 +29,7 @@ export function TestAutomationRecipes({ recipes, disabled, onTake }: TestAutomat
             <Typography variant="caption" weight="medium" as="span">
               {t('testsE2e.automation.recipe', {
                 stack: t(`testsE2e.automation.stack.${recipe.stack}`),
-                dir: recipe.dir ? `${recipe.dir}/` : t('testsE2e.automation.root'),
+                dir: recipeDir(recipe),
               })}
             </Typography>
             <code className={styles.command}>{recipe.automation.command}</code>

@@ -172,6 +172,7 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/api-explorer/history/clear': 'human:rights',
   'PUT /api/project-tests/automation': 'human:code-write',
   'DELETE /api/project-tests/automation': 'human:code-write',
+  'PUT /api/project-tests/turn-hooks': 'human:code-write',
 };
 
 /**

@@ -3,8 +3,8 @@ import { HelpSection, Callout, GuideSteps, GuideStep, HelpShot } from '../../ui'
 
 /**
  * Тесты бэкенда в документе «Тесты»: рецепт команды по файлам проекта, запись,
- * прогон и «Завести кейсы». Отдельным файлом — документ упирается в предел
- * длины. Кадры — настоящая съёмка `tools/help-shots/tests-panel.mjs`
+ * прогон, «Завести кейсы» и кейсы-наборы каталогов. Отдельным файлом — документ
+ * упирается в предел длины. Кадры — настоящая съёмка `tools/help-shots/tests-panel.mjs`
  * (сценарий `backend`); за поведением следит `apps/web/public/help/sources.json`
  * (раздел `tests`).
  */
@@ -28,6 +28,9 @@ export function TestsBackendSection() {
           <HelpShot topic="tests" scenario="backend" frame="04-library" side="panel" />
         </GuideStep>
       </GuideSteps>
+      <Callout tone="info" title={b('suitesTitle')}>
+        {b('suitesText')}
+      </Callout>
       <Callout tone="warning" title={b('limitsTitle')}>
         {b('limitsText')}
       </Callout>

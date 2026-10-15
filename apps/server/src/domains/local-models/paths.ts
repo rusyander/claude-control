@@ -92,6 +92,17 @@ export interface ImportedModel {
 }
 
 /** Что раздел помнит между запусками панели. */
+/** Замер слоя шлюзом (`LayerDetail` в `local-window.ts`). */
+export interface LayerRecord {
+  tokens: number;
+  at: number;
+  session?: string;
+  frozenTools?: number;
+}
+
+/** Что шлюз сообщает о слое сверх токенов. */
+export type LayerDetail = Pick<LayerRecord, 'session' | 'frozenTools'>;
+
 export interface LocalState {
   bench: Record<string, ModelBench>;
   /** Выбор квантования, контекста и кеша по моделям. */
@@ -126,8 +137,11 @@ export interface LocalState {
   mcpPicks: Record<string, string[]>;
   /** Замеренная цена инструментов сервера в токенах, по `scope:id`. */
   mcpCosts: Record<string, McpCostRecord>;
-  /** Слой прогона (системный промпт и инструменты), замеренный шлюзом, по моделям: токены и когда. */
-  layers: Record<string, { tokens: number; at: number }>;
+  /**
+   * Слой прогона (системный промпт и инструменты), замеренный шлюзом, по моделям: токены и когда;
+   * чей разговор и сколько в слое описаний MCP, замороженных этим разговором.
+   */
+  layers: Record<string, LayerRecord>;
 }
 
 /**
@@ -207,9 +221,15 @@ function layersOf(value: unknown): LocalState['layers'] {
   const layers: LocalState['layers'] = {};
   for (const [tag, entry] of Object.entries(value)) {
     if (!isRecord(entry)) continue;
-    const { tokens, at } = entry;
-    if (typeof tokens === 'number' && tokens > 0 && typeof at === 'number')
-      layers[tag] = { tokens, at };
+    const { tokens, at, session, frozenTools } = entry;
+    if (typeof tokens === 'number' && tokens > 0 && typeof at === 'number') {
+      layers[tag] = {
+        tokens,
+        at,
+        ...(typeof session === 'string' ? { session } : {}),
+        ...(typeof frozenTools === 'number' && frozenTools > 0 ? { frozenTools } : {}),
+      };
+    }
   }
   return layers;
 }

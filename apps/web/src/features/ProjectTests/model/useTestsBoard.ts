@@ -41,6 +41,7 @@ import {
 } from '@entities/ProjectTest';
 import { useTestFilters, type TestFilters } from './useTestFilters';
 import { pickActive } from '../lib/pickActive';
+import { ALL_GROUPS } from '../lib/allGroups';
 import { pendingDraftItems } from '../lib/pendingDraftItems';
 import { toggleChecked } from '../lib/toggleChecked';
 import { messageOf } from '../lib/messageOf';
@@ -61,6 +62,8 @@ export interface TestsBoard {
   groups: ProjectTestGroup[];
   active?: ProjectTestGroup;
   activeId: string;
+  /** Открыт сквозной список «Все группы» (`select(ALL_GROUPS)`): `active` пуст. */
+  allGroups: boolean;
   select: (id: string) => void;
   /** Отмеченные кейсы. */
   checked: string[];
@@ -145,7 +148,9 @@ export function useTestsBoard(projectPath: string | undefined, isOpen: boolean):
   const [activeId, setActiveId] = useState('');
   const [checked, setChecked] = useState<string[]>([]);
 
-  const active = pickActive(groups, activeId);
+  // «Все группы»: открытой группы нет, отбор идёт по кейсам всех файлов.
+  const allGroups = activeId === ALL_GROUPS && groups.length > 0;
+  const active = allGroups ? undefined : pickActive(groups, activeId);
   useEffect(() => {
     if (active && active.id !== activeId) setActiveId(active.id);
   }, [active, activeId]);
@@ -240,6 +245,7 @@ export function useTestsBoard(projectPath: string | undefined, isOpen: boolean):
     groups,
     active,
     activeId: active?.id ?? '',
+    allGroups,
     select,
     checked,
     toggleCase: (id) => setChecked((current) => toggleChecked(current, id)),

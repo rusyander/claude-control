@@ -16,6 +16,7 @@ import { findElements, textContent } from '../import-xml/import-xml.ts';
 import { writeRun } from '../runs-store/runs-store.ts';
 import { applyResults, readGroups, type CaseResultPatch } from '../store/store.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
+import { suiteKeysOf } from '../suites/suites.ts';
 
 /**
  * Результаты автотестов из CI — в статусы кейсов.
@@ -100,6 +101,13 @@ const SEVERITY: Record<string, number> = {
   failed: 5,
 };
 
+/**
+ * Кейс-набор каталога: пропуск теста (`it.skip`, `t.Skip`) — решение автора, а
+ * не итог каталога. Прошёл хоть один — набор прошёл; «пропущен» — только когда
+ * пропущено всё (16.10: 8 зелёных наборов agentdeck стояли «пропущенными»).
+ */
+const SUITE_SEVERITY: Record<string, number> = { ...SEVERITY, skipped: 2, passed: 3 };
+
 /** Хвост чужого текста падения: полный стек в заметке кейса не нужен. */
 const MAX_MESSAGE = 400;
 /** Провал — длиннее: в нём ожидание, полученное и место в коде. */
@@ -125,6 +133,8 @@ const RED_ATTEMPTS = new Set(['failed', 'timedout', 'interrupted']);
 interface CaseRef {
   groupId: string;
   caseId: string;
+  /** Кейс-набор каталога: на него ложатся все тесты каталога. */
+  suite?: boolean;
 }
 
 export function parseJUnit(xml: string): ImportedTestResult[] {
@@ -495,6 +505,8 @@ export function prepareResultsForRun(
   const groups = readGroups(root);
   const index = buildIndex(groups);
   const matched = new Map<string, { ref: CaseRef; result: ImportedTestResult }>();
+  // Счёт тестов кейса-набора: «упало 3 из 40» — первое, что спрашивают о каталоге.
+  const tally = new Map<string, SuiteTally>();
   const unmatched: string[] = [];
   const unmatchedResults: ImportedTestResult[] = [];
 
@@ -508,27 +520,35 @@ export function prepareResultsForRun(
       continue;
     }
     const key = `${ref.groupId}/${ref.caseId}`;
+    if (ref.suite) {
+      const count = tally.get(key) ?? { total: 0, failed: 0, skipped: 0 };
+      count.total += 1;
+      if (result.status === 'failed') count.failed += 1;
+      if (result.status === 'skipped') count.skipped += 1;
+      tally.set(key, count);
+    }
     const previous = matched.get(key);
     // Один кейс мог получить несколько результатов (параметризованный тест,
     // прогон на нескольких браузерах). Побеждает худший: «где-то упало» — это
     // падение, а не «в одном месте прошло».
     // При равной тяжести сохраняется тот, что прошёл на повторе: «где-то
     // спасал только повтор» — сведение о нестабильности, терять его нельзя.
-    const heavier = !previous || severity(result.status) > severity(previous.result.status);
+    const rank = ref.suite ? suiteSeverity : severity;
+    const heavier = !previous || rank(result.status) > rank(previous.result.status);
     const sameButFlakier =
       previous &&
-      severity(result.status) === severity(previous.result.status) &&
+      rank(result.status) === rank(previous.result.status) &&
       (result.flakyAttempts ?? 0) > (previous.result.flakyAttempts ?? 0);
     if (heavier || sameButFlakier) matched.set(key, { ref, result });
   }
 
-  const points: ProjectTestPointResult[] = [...matched.values()].map(({ ref, result }) => ({
+  const points: ProjectTestPointResult[] = [...matched].map(([key, { ref, result }]) => ({
     pointId: pointId(ref.groupId, ref.caseId, input.environmentId),
     groupId: ref.groupId,
     caseId: ref.caseId,
     environmentId: input.environmentId,
     status: result.status,
-    note: result.message,
+    note: ref.suite ? suiteNote(tally.get(key), result) : result.message,
     startedAt: now,
     finishedAt: now,
     durationMs: result.durationMs,
@@ -559,6 +579,19 @@ export function prepareResultsForRun(
     apply: () => applyResults(root, patches, now),
     unmatchedResults,
   };
+}
+
+/**
+ * Заметка кейса-набора: счёт и худший тест. Знаки, а не слова: заметка уходит
+ * в файл кейса как есть, а словарь у каждой стороны свой.
+ */
+function suiteNote(count: SuiteTally | undefined, worst: ImportedTestResult): string {
+  const total = count?.total ?? 1;
+  // «✓ N» — сколько прошло на деле: пропущенный автором тест не засчитан.
+  if (worst.status === 'passed') return `✓ ${total - (count?.skipped ?? 0)}`;
+  if (worst.status !== 'failed') return worst.message ?? '';
+  const head = `✗ ${count?.failed ?? 1}/${total} · ${worst.name}`;
+  return worst.message ? `${head}: ${worst.message}` : head;
 }
 
 function parseByFormat(
@@ -620,6 +653,8 @@ interface CaseIndex {
   byTestName: Map<string, CaseRef>;
   byId: Map<string, CaseRef>;
   byTitle: Map<string, CaseRef>;
+  /** Ключ набора → кейс; `null` — ключ у двух кейсов, и гадать между ними нельзя. */
+  bySuite: Map<string, CaseRef | null>;
 }
 
 function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
@@ -628,6 +663,7 @@ function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
     byTestName: new Map(),
     byId: new Map(),
     byTitle: new Map(),
+    bySuite: new Map(),
   };
   for (const group of groups) {
     if (group.error) continue;
@@ -641,6 +677,19 @@ function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
         remember(index.byExternalId, item.automation.externalId, ref);
       }
       if (item.automation?.testName) remember(index.byTestName, item.automation.testName, ref);
+      const suite = item.automation?.suite?.trim();
+      if (suite) {
+        // Набор JS (ключ — путь от корня пакета, без точек) узнаётся и по каталогу
+        // от корня проекта: прогон из корня (workspace vitest) пишет classname так,
+        // и одинаковые `src/app` пяти пакетов там уже не двусмысленны.
+        const dir = item.automation?.file?.replace(/\/$/, '');
+        const keys = new Set([suite]);
+        if (dir && dir !== '.' && (suite === '.' || !suite.includes('.'))) keys.add(dir);
+        for (const key of keys) {
+          const known = index.bySuite.get(key);
+          index.bySuite.set(key, known === undefined ? { ...ref, suite: true } : null);
+        }
+      }
     }
   }
   return index;
@@ -680,6 +729,14 @@ function matchCase(result: ImportedTestResult, index: CaseIndex): CaseRef | unde
   const loose = result.owner ? [...names, result.owner] : names;
   if (result.owner) {
     const hit = index.byTestName.get(normalize(result.owner));
+    if (hit) return hit;
+  }
+  // Набор каталога — после всех точных правил: кейс на сам тест сильнее
+  // кейса на каталог. От точного ключа к общему; двусмысленный ключ обрывает
+  // поиск — уйти к предку значило бы отдать результат чужому набору.
+  for (const key of suiteKeysOf(result.owner ?? '')) {
+    const hit = index.bySuite.get(key);
+    if (hit === null) break;
     if (hit) return hit;
   }
   for (const name of loose) {
@@ -730,6 +787,16 @@ function normalize(value: string): string {
 
 function severity(status: string): number {
   return SEVERITY[status] ?? 0;
+}
+
+function suiteSeverity(status: string): number {
+  return SUITE_SEVERITY[status] ?? 0;
+}
+
+interface SuiteTally {
+  total: number;
+  failed: number;
+  skipped: number;
 }
 
 function safeJson(content: string): unknown {

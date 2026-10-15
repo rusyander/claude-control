@@ -126,6 +126,7 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'lint-rule-no-code-paths': 'Not linked to code',
   'lint-rule-no-priority': 'No priority',
   'lint-rule-too-many-steps': 'Scenario too long',
+  'lint-rule-vague-case': 'Expectation names nothing',
   'lint-rule-undeclared-parameter': 'Parameter not declared',
   'lint-rule-unused-parameter': 'Parameter declared but unused',
   'lint-rule-duplicate-title': 'Duplicate title in the group',
@@ -143,6 +144,8 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'lint-no-priority': 'No priority: selection by importance will not see the case.',
   'lint-too-many-steps':
     '{{steps}} steps with a limit of {{limit}}: such a scenario is worth splitting into several.',
+  'lint-vague-case':
+    'The expectation names nothing observable: "all pass" or "works" cannot be refuted. Write the observable result — what is on screen, in the response, in the file, in the report.',
   'lint-undeclared-parameter':
     'The text has {{names}}, but the case parameters do not — there is nothing to substitute.',
   'lint-unused-parameter':

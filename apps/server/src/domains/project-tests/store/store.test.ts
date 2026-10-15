@@ -496,6 +496,18 @@ describe('project-tests store: строгость на входе', () => {
 
     expect(only(root).cases[0]?.attachments).toEqual(['a.png', 'b.png']);
   });
+
+  it('зелёный результат без своей заметки снимает заметку прошлого провала; провал без новой — держит', () => {
+    const note = 'Тест «frozenToolChars» не найден в отчёте vitest';
+    applyResults(root, [{ groupId: 'gui', caseId: 'gui-001', status: 'failed', note }], NOW);
+    applyResults(root, [{ groupId: 'gui', caseId: 'gui-001', status: 'failed' }], NOW);
+    expect(only(root).cases[0]?.note).toBe(note);
+
+    applyResults(root, [{ groupId: 'gui', caseId: 'gui-001', status: 'passed' }], NOW);
+    expect(only(root).cases[0]?.note).toBeUndefined();
+    applyResults(root, [{ groupId: 'gui', caseId: 'gui-001', status: 'passed', note: '✓ 3' }], NOW);
+    expect(only(root).cases[0]?.note).toBe('✓ 3');
+  });
 });
 
 // Окно правки подставляет описание и зовёт стереть его, а сервер подменял пустое

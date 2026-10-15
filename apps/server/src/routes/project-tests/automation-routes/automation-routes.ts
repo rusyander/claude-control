@@ -1,11 +1,19 @@
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { ProjectTestAutomationCommand, ProjectTestAutomationInfo } from '@agentdeck/contracts';
+import type {
+  ProjectTestAutomationCommand,
+  ProjectTestAutomationInfo,
+  ProjectTestTurnHooks,
+} from '@agentdeck/contracts';
 import {
   adoptUnmatched,
   automationRecipes,
+  installTurnHooks,
   readAutomation,
+  readTurnHooks,
   removeAutomation,
+  removeTurnHooks,
+  testsHookScript,
   writeAutomation,
 } from '../../../domains/project-tests/project-tests.ts';
 import {
@@ -83,6 +91,33 @@ export function registerTestAutomationRoutes(app: FastifyInstance, deps: TestsDe
    * до следующего прогона; нечего заводить — пустой итог, а не ошибка: кнопку
    * мог нажать второй открытый экран.
    */
+  // Проверка конца хода агента — хуки проекта (`turn-hooks`): видна и переключается здесь.
+  app.get<{ Querystring: { path?: string } }>('/api/project-tests/turn-hooks', (request, reply) => {
+    const root = requireRoot(request.query.path, reply);
+    if (!root) return reply;
+    return guard(reply, (): ProjectTestTurnHooks => ({
+      state: readTurnHooks(deps.ctx.location.paths.appData, root),
+    }));
+  });
+
+  app.put<{ Body: { path?: string; enabled?: boolean } }>(
+    '/api/project-tests/turn-hooks',
+    (request, reply) => {
+      const root = requireRoot(request.body?.path, reply);
+      if (!root) return reply;
+      return guard(reply, (): ProjectTestTurnHooks => {
+        assertOwnProject(deps, root);
+        const appData = deps.ctx.location.paths.appData;
+        return {
+          state:
+            request.body?.enabled === false
+              ? removeTurnHooks(appData, root)
+              : installTurnHooks(appData, root, testsHookScript(), true),
+        };
+      });
+    },
+  );
+
   app.post<{ Body: { path?: string } }>('/api/project-tests/e2e/adopt', (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;

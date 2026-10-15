@@ -167,8 +167,17 @@ function parseAutomation(raw: unknown): ProjectTestAutomation | undefined {
   const file = optional(record.file);
   const testName = optional(record.testName);
   const externalId = optional(record.externalId);
-  if (!status && !file && !testName && !externalId) return undefined;
-  return { status: status ?? (file ? 'automated' : 'manual'), file, testName, externalId };
+  const suite = optional(record.suite);
+  const suiteDigest = suite ? optional(record.suiteDigest) : undefined;
+  if (!status && !file && !testName && !externalId && !suite) return undefined;
+  return {
+    status: status ?? (file ? 'automated' : 'manual'),
+    file,
+    testName,
+    externalId,
+    ...(suite ? { suite } : {}),
+    ...(suiteDigest ? { suiteDigest } : {}),
+  };
 }
 
 /**
@@ -786,7 +795,12 @@ export function applyResults(root: string, patches: CaseResultPatch[], now: stri
         ...item,
         status: patch.status,
         statusId: patch.statusId ?? item.statusId,
-        note: patch.note ?? item.note,
+        // Заметка — о последнем результате, как и разбор ниже: зелёный без своей
+        // заметки снимает причину прошлого провала («тест не найден» на
+        // пройденном кейсе читается как неправда). Провал без новой — держит.
+        note:
+          patch.note ??
+          (patch.status === 'failed' || patch.status === 'blocked' ? item.note : undefined),
         // Разбор описывает ПОСЛЕДНИЙ провал. Кейс, ставший зелёным, с прошлым
         // разбором на борту выглядел бы доказанным провалом, которого больше нет.
         failure:

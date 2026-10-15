@@ -143,6 +143,29 @@ describe('project-tests/automation/recipes: готовые команды бэк
     );
   });
 
+  it('много go.mod: один рецепт на все модули; с выбором — только модули и пакеты выбранного', () => {
+    put('api/go.mod', 'module example.com/api\n');
+    put('api/auth/auth_test.go', 'package auth\n');
+    put('svc/go.mod', 'module example.com/svc\n');
+    put('svc/orders/orders_test.go', 'package orders\n');
+    put('svc/store/store_test.go', 'package store\n');
+    const recipes = automationRecipes(root, all);
+    expect(recipes.map((recipe) => recipe.id)).toEqual(['go:*', 'go:api', 'go:svc']);
+    const own = recipes[0]?.automation ?? { command: '' };
+    expect(own).toMatchObject({ command: '{go-modules}', format: 'go-test-json' });
+    expect(automationCommand(root, own, [], 'r.json', true).line).toBe(
+      'go test -C api -json ./... > r.json || echo - && go test -C svc -json ./... >> r.json || echo -',
+    );
+    // Кейс-набор каталога (`file` кончается `/`) и обычный файл теста — оба к пакету.
+    const narrowed = automationCommand(
+      root,
+      own,
+      ['svc/orders/', 'svc/store/store_test.go'],
+      'r.json',
+    );
+    expect(narrowed.line).toBe('go test -C svc -json ./orders ./store > r.json || echo -');
+  });
+
   it('каталоги сборки и зависимостей не обходятся', () => {
     put('node_modules/pkg/go.mod', 'module x\n');
     put('node_modules/pkg/a_test.go', '');

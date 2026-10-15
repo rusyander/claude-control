@@ -67,7 +67,7 @@ import {
   LOCAL_REPLY_RESERVE_TOKENS,
   type LocalUpstreamInfo,
 } from '../local-window/local-window.ts';
-import { expandDeferredTools } from '../local-window/deferred-tools.ts';
+import { expandDeferredTools, frozenToolChars } from '../local-window/deferred-tools.ts';
 import { NativeThinkFilter, withoutThinkMessage } from '../native-think/native-think.ts';
 import { historyHasToolUse } from '../tool-shim/encode.ts';
 import type { ShimCall } from '../tool-shim/parse.ts';
@@ -1549,7 +1549,12 @@ async function nativeChat(
       promptTokens = exact;
     }
   }
-  if (local?.layer) reportLayer(local, ruledBody, bodyText.length, promptTokens);
+  if (local?.layer) {
+    reportLayer(local, ruledBody, bodyText.length, promptTokens, {
+      body: managed,
+      session: sessionOf(native.clientBody),
+    });
+  }
   if (local && promptTokens + LOCAL_REPLY_RESERVE_TOKENS > local.context) {
     return refusal(
       400,
@@ -2431,11 +2436,20 @@ function reportLayer(
   body: unknown,
   bodyChars: number,
   promptTokens: number,
+  sent?: { body: Record<string, unknown>; session: string | undefined },
 ): void {
   const tokens = layerTokensOf(body, bodyChars, promptTokens);
   if (tokens === undefined) return;
+  // Замороженные описания ищутся в теле ДО разворота: разворот снимает с подгруженных
+  // `defer_loading`, и их было бы не отличить от замороженных.
+  const frozen = sent ? frozenToolChars(sent.body) : 0;
+  const frozenTools =
+    frozen > 0 ? Math.round((promptTokens * Math.min(frozen, bodyChars)) / bodyChars) : 0;
   try {
-    local.layer?.(tokens);
+    local.layer?.(tokens, {
+      ...(sent?.session ? { session: sent.session } : {}),
+      ...(frozenTools > 0 ? { frozenTools } : {}),
+    });
   } catch {
     // Замер слоя — подсказка человеку, не повод ронять запрос.
   }

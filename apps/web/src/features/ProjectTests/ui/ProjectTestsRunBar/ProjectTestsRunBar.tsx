@@ -36,7 +36,9 @@ export function ProjectTestsRunBar({
   const scope = useDraftValue(scopeBox);
   const run = board.run;
   const isRunning = run?.status === 'running';
-  const cases = board.active?.cases ?? [];
+  const cases = board.allGroups
+    ? board.groups.flatMap((group) => group.cases)
+    : (board.active?.cases ?? []);
   // Веха живёт здесь, а не в состоянии страницы: её читает только запуск, и
   // пустая она означает не «без вехи», а «возьми тег git» — это решает сервер.
   const [release, setRelease] = useState('');

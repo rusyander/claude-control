@@ -348,6 +348,30 @@ describe('ревью L6: окно до подъёма, слой прогона, 
     });
   });
 
+  it('разговор с замороженными описаниями MCP: замер называет разговор, новый разговор поменьше его не прячет', async () => {
+    const local = service();
+    await local.startServer({ tag: TAG });
+    const info = local.upstream(TAG);
+    info?.layer(30_000, { session: 'old', frozenTools: 25_000 });
+    expect((await local.activity()).layer).toMatchObject({
+      tokens: 30_000,
+      session: 'old',
+      frozenTools: 25_000,
+      fits: true,
+    });
+    // Новый разговор с поиском: слой меньше, заморозки нет — запись его, а не старого.
+    info?.layer(9_000, { session: 'new' });
+    const layer = (await local.activity()).layer;
+    expect(layer).toMatchObject({ tokens: 9_000, session: 'new' });
+    expect(layer?.frozenTools).toBeUndefined();
+    // Перезапуск панели: подробности читаются из файла состояния.
+    info?.layer(30_000, { session: 'old', frozenTools: 25_000 });
+    expect((await service().activity()).layer).toMatchObject({
+      session: 'old',
+      frozenTools: 25_000,
+    });
+  });
+
   it('окно подняли до предложенного — предупреждения нет (B1)', async () => {
     const local = service();
     local.upstream(TAG)?.layer(73_254);

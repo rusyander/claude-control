@@ -33,6 +33,7 @@ export function TestCaseTable({
   onEdit,
   onRemove,
   withGroup,
+  selectable = true,
   risk,
   flaky,
 }: TestCaseTableProps) {
@@ -58,14 +59,16 @@ export function TestCaseTable({
         </caption>
         <thead>
           <tr>
-            <th scope="col" className={styles.cellCheck}>
-              <input
-                type="checkbox"
-                checked={isAllChecked}
-                onChange={() => (isAllChecked ? onClearChecked() : onCheckAll())}
-                aria-label={t('tests.library.checkAll')}
-              />
-            </th>
+            {selectable && (
+              <th scope="col" className={styles.cellCheck}>
+                <input
+                  type="checkbox"
+                  checked={isAllChecked}
+                  onChange={() => (isAllChecked ? onClearChecked() : onCheckAll())}
+                  aria-label={t('tests.library.checkAll')}
+                />
+              </th>
+            )}
             <th scope="col" className={styles.cellTitle}>
               {t('tests.library.columnTitle')}
             </th>
@@ -106,14 +109,16 @@ export function TestCaseTable({
                   .filter(Boolean)
                   .join(' ')}
               >
-                <td className={styles.cellCheck}>
-                  <input
-                    type="checkbox"
-                    checked={checked.includes(item.id)}
-                    onChange={() => onToggle(item.id)}
-                    aria-label={item.title}
-                  />
-                </td>
+                {selectable && (
+                  <td className={styles.cellCheck}>
+                    <input
+                      type="checkbox"
+                      checked={checked.includes(item.id)}
+                      onChange={() => onToggle(item.id)}
+                      aria-label={item.title}
+                    />
+                  </td>
+                )}
                 <td>
                   <button
                     type="button"

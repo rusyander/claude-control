@@ -90,6 +90,7 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'tests-lint-no-code-paths': 'No link to the code',
   'tests-lint-no-priority': 'No priority',
   'tests-lint-too-many-steps': 'The scenario is too long',
+  'tests-lint-vague-case': 'The expectation names nothing',
   'tests-lint-undeclared-parameter': 'The parameter is not declared',
   'tests-lint-unused-parameter': 'The parameter is declared for nothing',
   'tests-lint-duplicate-title': 'A repeated title inside the group',

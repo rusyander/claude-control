@@ -38,7 +38,12 @@ import {
   resolveProjectPaths,
   type ProjectPaths,
 } from '../../domains/projects/projects.ts';
-import { onboardE2e } from '../../domains/project-tests/project-tests.ts';
+import {
+  installTurnHooks,
+  onboardE2e,
+  syncSuitesOnce,
+  testsHookScript,
+} from '../../domains/project-tests/project-tests.ts';
 import { requireProject as requireProjectAccess, type ErrorReply } from '../project-access.ts';
 import { done } from '../write-result.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
@@ -136,6 +141,23 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     } catch (error) {
       console.warn('e2e folder onboarding failed', error);
       e2e = { state: 'failed' };
+    }
+    // Проверка конца хода агента (хуки в `.claude/settings.local.json` проекта) —
+    // тем же шагом: чат в VS Code и в терминале видит пробел в кейсах так же, как
+    // чат панели. Выключенное человеком раньше не включается; сбой проект не отменяет.
+    // Без каталога данных панели (сборка без него) помнить выключение негде — не ставим.
+    const appData = ctx.location.paths.appData;
+    try {
+      if (appData) installTurnHooks(appData, project.path, testsHookScript());
+    } catch (error) {
+      console.warn('tests turn hooks install failed', error);
+    }
+    // Каталоги с тестами — в кейсы-наборы: тысячи тестов проекта видны в разделе
+    // сразу, по кейсу на каталог, а не после первого хода агента.
+    try {
+      if (appData) syncSuitesOnce(appData, project.path, new Date().toISOString());
+    } catch (error) {
+      console.warn('test suites sync failed', error);
     }
     const added: ProjectAdded = { ...project, ...(e2e ? { e2e } : {}) };
     return added;

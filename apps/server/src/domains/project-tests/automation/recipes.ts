@@ -51,9 +51,16 @@ const SKIP = new Set([
   'site-packages',
 ]);
 
-type ToolCheck = (tool: string) => boolean;
+export type ToolCheck = (tool: string) => boolean;
 
 const skipped = (name: string): boolean => name.startsWith('.') || SKIP.has(name);
+
+/** Каталоги модулей Go проекта от корня (`''` — корень): для `{go-modules}`. */
+export function goModuleDirs(root: string): string[] {
+  return moduleDirs(root)
+    .filter((dir) => isFile(join(dir, 'go.mod')))
+    .map((dir) => (dir === root ? '' : relPath(root, dir)));
+}
 
 /** Каталоги-кандидаты в модули: корень и подкаталоги до `MODULE_DEPTH`. */
 function moduleDirs(root: string): string[] {
@@ -338,5 +345,38 @@ export function automationRecipes(
       recipes.push(recipe);
     }
   }
-  return recipes;
+  const allGo = allGoModules(recipes);
+  return allGo ? [allGo, ...recipes] : recipes;
+}
+
+/**
+ * Все модули Go одной командой — для репозитория из многих `go.mod` без
+ * `go.work`: команда у проекта одна, а рецепт на модуль прогнал бы один из них.
+ * Команда — подстановка `{go-modules}`: цепочку `go test -C <модуль>` по
+ * модулям собирает `automationCommand`.
+ */
+function allGoModules(
+  recipes: ProjectTestAutomationRecipe[],
+): ProjectTestAutomationRecipe | undefined {
+  const modules = recipes.filter((recipe) => recipe.stack === 'go');
+  if (modules.length < 2) return undefined;
+  const first = modules[0] as ProjectTestAutomationRecipe;
+  return {
+    id: 'go:*',
+    stack: 'go',
+    dir: '',
+    evidence: modules.flatMap((recipe) => recipe.evidence),
+    tests: modules.reduce((sum, recipe) => sum + recipe.tests, 0),
+    automation: {
+      // Цепочку собирает подстановка: без выбора — все модули целиком, с выбором —
+      // только модули и пакеты выбранных кейсов (`automationCommand`).
+      command: '{go-modules}',
+      timeoutMinutes: Math.min(240, 30 * modules.length),
+      format: 'go-test-json',
+    },
+    tool: 'go',
+    ...(first.missing ? { missing: true } : {}),
+    install: first.install,
+    wholeSuite: false,
+  };
 }

@@ -103,6 +103,17 @@ export interface ProjectTestAutomationInfo {
   recipes: ProjectTestAutomationRecipe[];
 }
 
+/**
+ * Проверка конца хода агента в проекте: хуки в `.claude/settings.local.json`
+ * (строка о блоке в начале сессии, пропуск, если код правлен без кейса и прогона).
+ * `broken` — личный файл проекта не JSON, панель его не трогает.
+ */
+export type ProjectTestTurnHooksState = 'on' | 'off' | 'broken';
+
+export interface ProjectTestTurnHooks {
+  state: ProjectTestTurnHooksState;
+}
+
 /** Тело записи своей команды. */
 export interface ProjectTestAutomationSave extends ProjectTestAutomationCommand {
   path: string;

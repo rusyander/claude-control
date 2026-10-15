@@ -3,5 +3,7 @@ export interface LocalRunStatusProps {
   waitingPermission: boolean;
   /** Начало хода, мс: отказ и запросы раньше него — прошлого хода. */
   since?: number;
+  /** Разговор хода: строка о замороженных описаниях MCP — только про него. */
+  session?: string;
   className?: string;
 }

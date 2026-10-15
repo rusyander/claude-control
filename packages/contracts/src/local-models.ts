@@ -1010,6 +1010,14 @@ export interface LocalLayerFit {
    * окна с местом под слой у модели нет.
    */
   fix?: { context: number; quant?: string };
+  /** Разговор Claude Code, чей запрос замерен. */
+  session?: string;
+  /**
+   * Токенов описаний MCP, которые этот разговор шлёт целиком при включённом поиске
+   * инструментов: начат без поиска, и CLI держит его набор инструментов неизменным.
+   * В новом разговоре они подгружаются по требованию.
+   */
+  frozenTools?: number;
 }
 
 export interface LocalActivity {

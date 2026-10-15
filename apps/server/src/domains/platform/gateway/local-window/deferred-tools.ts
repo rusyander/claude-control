@@ -37,6 +37,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Символы описаний MCP, которые Claude Code шлёт целиком, хотя поиск инструментов включён
+ * (`ToolSearch` в списке): разговор начат без поиска, а CLI при продолжении повторяет снимок
+ * промпта (`prompt_snapshot` в журнале) вместе с набором инструментов, чтобы не сбить кеш.
+ * Замер 15.10, 2.1.286: новый сеанс с поиском — 17 инструментов, тот же сеанс, начатый без
+ * поиска и продолженный с ним, — 140, описания MCP целиком. Шлюз их не снимает: CLI считает
+ * их объявленными, и `ToolSearch` их не найдёт. Сказать человеку — дело панели. Нет таких — 0.
+ */
+export function frozenToolChars(body: Record<string, unknown>): number {
+  const tools = Array.isArray(body.tools) ? body.tools.filter(isRecord) : [];
+  if (!tools.some((tool) => tool.name === 'ToolSearch')) return 0;
+  return tools
+    .filter(
+      (tool) =>
+        typeof tool.name === 'string' &&
+        tool.name.startsWith('mcp__') &&
+        tool.defer_loading !== true,
+    )
+    .reduce((sum, tool) => sum + JSON.stringify(tool).length, 0);
+}
+
 /** Имена инструментов, на которые сослался `ToolSearch` где-либо в разговоре. */
 function referencedNames(messages: unknown): Set<string> {
   const names = new Set<string>();

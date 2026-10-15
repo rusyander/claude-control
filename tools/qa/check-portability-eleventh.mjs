@@ -19,7 +19,7 @@
  *      матрица, которая начала лгать (§5 плана);
  *   4. роспись живой приёмки: у каждого CLI каталога есть открытый пункт в
  *      `TASKS.md` со всеми шестью пробами ЛИБО строка в разделе «Живая
- *      приёмка: закрыто» плана, и список проб взят из самого плана, а не
+ *      приёмка: где пройдена» плана, и список проб взят из самого плана, а не
  *      переписан рядом.
  *
  * Запуск: `node tools/qa/check-portability-eleventh.mjs`
@@ -255,14 +255,12 @@ function checkRoster(ctx, damage) {
   const failures = [];
   const plan = readFileSync(new URL('docs/PORTABILITY-DESIGN.ru.md', root), 'utf8');
 
-  // Шесть проб берутся ИЗ ПЛАНА: список назван в §9 (доктрина) и в разделе
-  // закрытой приёмки, и обе копии обязаны совпасть — иначе приёмка закрывается
-  // не тем, о чём договаривались.
+  // Шесть проб берутся ИЗ ПЛАНА: список назван в доктрине (§8), и пройденная
+  // приёмка ссылается на него, а не на свою копию. Копий больше одной — обязаны
+  // совпасть, иначе приёмка проходит не то, о чём договаривались.
   const spelled = [...plan.matchAll(/\(хук блокирует[^)]*\)/g)].map((match) => match[0]);
-  if (spelled.length < 2) {
-    failures.push(
-      `список проб назван в плане ${spelled.length} раз(а), ожидались §9 и «Живая приёмка: закрыто»`,
-    );
+  if (spelled.length < 1) {
+    failures.push('список проб в плане не назван: ожидался в доктрине проверок (§8)');
     return failures;
   }
   if (new Set(spelled).size !== 1) {
@@ -297,13 +295,17 @@ function checkRoster(ctx, damage) {
     }
     if (current && line.trim().length > 0) items.set(current, `${items.get(current)}\n${line}`);
   }
-  // Закрытый пункт уходит из `TASKS.md` (там только открытое) и остаётся
-  // строкой таблицы в плане: «| `codex` | 22.09.2026 | …».
+  // Пройденный пункт уходит из `TASKS.md` (там только открытое) и остаётся
+  // строкой таблицы в плане: «| `codex` | `codex-cli` 0.160.0 | …».
   const closed = new Set();
   const planLines = plan.split('\n');
   const closedAt = planLines.findIndex(
-    (line) => line.startsWith('#') && line.includes('Живая приёмка: закрыто'),
+    (line) => line.startsWith('#') && line.includes('Живая приёмка: где пройдена'),
   );
+  if (closedAt < 0) {
+    failures.push('в плане нет раздела «Живая приёмка: где пройдена»');
+    return failures;
+  }
   for (let index = closedAt + 1; closedAt >= 0 && index < planLines.length; index += 1) {
     const line = planLines[index];
     if (line.startsWith('#')) break;

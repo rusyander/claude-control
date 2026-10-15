@@ -8,9 +8,9 @@ answers to the user stay Russian.
 [.agent/code-map.agent.md](.agent/code-map.agent.md) — which module owns what, per app; read it
 before touching code you have not touched this session; chat at a foreign CLI has its own map,
 [.agent/code-map-foreign-chat.agent.md](.agent/code-map-foreign-chat.agent.md) ·
-[.claude/gotchas.md](.claude/gotchas.md) — traps already paid for; read the
-entry BEFORE touching pricing/analytics, enable-disable of hooks/rules/groups, sessions & chat
-resume, MCP OAuth, secrets, help texts, Windows file ops ·
+[.claude/gotchas.md](.claude/gotchas.md) — traps already paid for (sessions & chat resume →
+[gotchas-sessions.md](.claude/gotchas-sessions.md), enable-disable of hooks/rules/groups →
+[gotchas-enable-disable.md](.claude/gotchas-enable-disable.md)); read the entry BEFORE touching pricing/analytics, MCP OAuth, secrets, help texts, Windows file ops ·
 [.agent/universal-providers.agent.md](.agent/universal-providers.agent.md) — capability map +
 IMMUTABLE RULES, before any provider-layer edit ·
 [.agent/provider-formats.agent.md](.agent/provider-formats.agent.md) — per-CLI facts, the ONE entry

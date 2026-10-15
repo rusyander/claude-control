@@ -1,0 +1,137 @@
+{
+  "title": {
+    "ru": "Агент сам доводит кейсы до правки, а тесты большого репозитория становятся кейсами по каталогам",
+    "en": "The agent brings cases up to date with its change, and a large repository’s tests become cases per folder"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Проверка в конце хода: если агент правил код, а у изменённого файла нет кейса или кейс не прогнан после правки, агент получает короткий список пробелов с готовыми командами и закрывает их в том же ходе; пробелов нет — проверка молчит. Работает для любого Claude Code над проектом — в чате панели, в VS Code и в терминале: хук лежит в личном .claude/settings.local.json проекта, который не уходит в git. Панель ставит его всем проектам реестра и новому при добавлении; вкладка «Агенты» в настройках набора его выключает и возвращает файл как был. Без панели та же сверка — pnpm tests gate.",
+        "en": "An end-of-turn check: if the agent changed code and a changed file has no case, or its case was not run after the change, the agent gets a short list of gaps with ready commands and closes them in the same turn; no gaps — the check stays silent. It works for any Claude Code over the project — the panel chat, VS Code and a terminal: the hook lives in the project’s personal .claude/settings.local.json, which stays out of git. The panel installs it into every registry project and into a new one when it is added; the “Agents” tab in Library settings turns it off and restores the file as it was. Without the panel the same check is pnpm tests gate."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Кейс на каталог с тестами: пакет Go, срез JS/TS или модуль pytest — один кейс-набор, итог — худший из его тестов (тест, пропущенный автором, итог не портит), в заметке — счёт и первая причина падения; несобравшийся пакет показывает только свои строки ошибки сборки. Проект без кейсов получает наборы сам, один раз, и команду прогона из готового рецепта, если своей нет. Новые каталоги потом заводит pnpm tests suites. Кейс на отдельный тест по-прежнему сильнее набора.",
+        "en": "A case per folder with tests: a Go package, a JS/TS slice or a pytest module is one suite case, its result is the worst of its tests (a test skipped by its author does not spoil it), and the note carries the count and the first failure reason; a package that failed to build shows only its own build error lines. A project with no cases gets the suites by itself, once, along with a run command from a ready recipe when it has none. New folders are added later by pnpm tests suites. A case for a single test still beats the suite."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Рецепт «все модули» для репозитория из многих go.mod без go.work: go test по каждому модулю в один отчёт, а прогон выбранных кейсов гонит только их модули и пакеты.",
+        "en": "An “all modules” recipe for a repository of many go.mod files without go.work: go test per module into one report, while a run of selected cases runs only their modules and packages."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "«Все группы» в библиотеке: кейсы всех групп одной таблицей с колонкой группы; правка и удаление ложатся в группу строки.",
+        "en": "“All groups” in the library: the cases of every group in one table with a group column; edits and removals land in the row’s group."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Кейс-набор читается как сценарий: текст пишется из самих тестов каталога, без модели — шаг на проверяемое поведение (название теста, строки табличного теста Go, первая фраза docstring pytest), в ожидании шага — тест, который его доказывает. Тесты каталога изменились — нетронутый кейс переписывается сам; правленый руками панель не трогает. Кейсы первой версии с одним шагом «прогнать тесты каталога» переписываются при следующем pnpm tests suites.",
+        "en": "A suite case reads as a scenario: its text is written from the folder’s own tests, with no model — a step per behaviour checked (the test name, the rows of a Go table test, the first sentence of a pytest docstring), and the step’s expected names the test that proves it. When the folder’s tests change, an untouched case is rewritten by itself; one edited by hand the panel leaves alone. First-version cases with a single “run the folder’s tests” step are rewritten on the next pnpm tests suites."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Правило линтера «Ожидание ничего не называет»: кейс, где ни общее ожидание, ни ожидание шага не говорит, что видно («все проходят», «работает», «без ошибок»), зелёный при любом поведении — линтер его называет, а проверка конца хода возвращает агенту кейсы такого вида, написанные за ход, со стандартом кейса.",
+        "en": "A lint rule “The expectation names nothing”: a case where neither the overall nor any step’s expected says what is seen (“all pass”, “works”, “no errors”) is green whatever the product does — the linter names it, and the end-of-turn check hands such cases written this turn back to the agent with the case standard."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Библиотека тестов больше не упирается последней строкой в нижний край окна: под списком остаётся отступ.",
+        "en": "The test library no longer runs its last row into the bottom edge of the window: a gap stays under the list."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      },
+      "images": ["before.png", "after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Кейс, ставший зелёным, больше не показывает заметку прошлого провала вроде «тест не найден в отчёте»: заметка всегда о последнем результате.",
+        "en": "A case that turned green no longer shows the previous failure’s note such as “test not found in the report”: the note is always about the latest result."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Прогон группы из сотен кейсов-наборов на Windows больше не обрывается за 0 секунд с «Слишком длинная командная строка»: список, не влезший в строку команды, передаётся файлом, а каталоги одного пакета прогоняются одним запуском vitest.",
+        "en": "Running a group of hundreds of suite cases on Windows no longer aborts in 0 seconds with “The command line is too long”: a list that does not fit the command line is passed as a file, and the directories of one package run in a single vitest launch."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка раздела «Тесты» описывает проверку конца хода, кейсы-наборы и их текст из тестов, правило «Ожидание ничего не называет», рецепт «все модули» и «Все группы».",
+        "en": "The Tests help covers the end-of-turn check, suite cases and their text from the tests, the “expectation names nothing” rule, the “all modules” recipe and “All groups”."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: последняя строка библиотеки стоит вплотную к нижнему краю окна",
+        "en": "Before: the library’s last row sits flush against the bottom edge of the window"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: под списком остаётся отступ, видно, что список кончился",
+        "en": "After: a gap stays under the list, so its end is visible"
+      }
+    }
+  ]
+}

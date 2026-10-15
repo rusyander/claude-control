@@ -20,6 +20,7 @@ import {
   collectReport,
   readAutomation,
   reportTail,
+  RUN_FILES_ENV,
 } from '../automation/automation.ts';
 import { BUILD_FAILURE } from '../automation/native-reports.ts';
 import type { ImportedTestResult } from '../import-results/import-results.ts';
@@ -338,7 +339,8 @@ export class E2eRunRegistry {
       );
       return {
         ...own,
-        scope: `Автотесты проекта: ${own.line}`,
+        // Список, не влезший в строку, назван знаками: число путей и переменная.
+        scope: `Автотесты проекта: ${own.line}${own.listed ? ` [${own.listed} → ${RUN_FILES_ENV}]` : ''}`,
         ...(automation.timeoutMinutes ? { timeoutMinutes: automation.timeoutMinutes } : {}),
       };
     }

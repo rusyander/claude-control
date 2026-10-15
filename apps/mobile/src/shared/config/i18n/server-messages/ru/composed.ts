@@ -86,6 +86,7 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'tests-lint-no-code-paths': 'Нет привязки к коду',
   'tests-lint-no-priority': 'Нет приоритета',
   'tests-lint-too-many-steps': 'Слишком длинный сценарий',
+  'tests-lint-vague-case': 'Ожидание ничего не называет',
   'tests-lint-undeclared-parameter': 'Параметр не объявлен',
   'tests-lint-unused-parameter': 'Параметр объявлен впустую',
   'tests-lint-duplicate-title': 'Повтор заголовка в группе',

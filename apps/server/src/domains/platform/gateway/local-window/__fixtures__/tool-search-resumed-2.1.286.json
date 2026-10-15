@@ -1,0 +1,121 @@
+{
+  "note": "Shape of a request from claude 2.1.286 in a session STARTED without ENABLE_TOOL_SEARCH and resumed with it (--resume): ToolSearch present, yet MCP tools go inline without defer_loading — the CLI replays the session prompt snapshot. Tools trimmed to five, texts to the first line; order as on the wire.",
+  "frozen": {
+    "model": "qwen3.8:27b",
+    "max_tokens": 32000,
+    "metadata": {
+      "user_id": "{\"device_id\":\"device\",\"account_uuid\":\"account\",\"session_id\":\"11111111-2222-4333-8444-555555555555\"}"
+    },
+    "system": [
+      {
+        "type": "text",
+        "text": "You are Claude Code."
+      }
+    ],
+    "tools": [
+      {
+        "name": "Read",
+        "description": "Reads a file from the local filesystem.",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "description": "The absolute path to the file to read",
+              "type": "string"
+            },
+            "offset": {
+              "description": "The line number to start reading from. Only provide if the file is too large to read at once",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "limit": {
+              "description": "The number of lines to read. Only provide if the file is too large to read at once.",
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pages": {
+              "description": "Page range for PDF files (e.g., \"1-5\", \"3\", \"10-20\"). Only applicable to PDF files. Maximum 20 pages per request.",
+              "type": "string"
+            }
+          },
+          "required": ["file_path"],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "ToolSearch",
+        "description": "Fetches full schema definitions for deferred tools so they can be called.",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "description": "Query to find deferred tools. Use \"select:<tool_name>\" for direct selection, or keywords to search.",
+              "type": "string"
+            },
+            "max_results": {
+              "description": "Maximum number of results to return (default: 5)",
+              "default": 5,
+              "type": "number"
+            }
+          },
+          "required": ["query", "max_results"],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "mcp__agentdeck-atlassian__jira_issue",
+        "description": "Прочитать задачу целиком по ключу (например ABC-123): описание, статус, тип.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Ключ задачи, например ABC-123."
+            }
+          },
+          "required": ["key"],
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        }
+      },
+      {
+        "name": "mcp__agentdeck-atlassian__qa_links",
+        "description": "Задача Jira, проект для дефектов и страница требований, привязанные человеком к этому каталогу. Начинай с этого инструмента: сам ты этих связей знать не можешь.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Абсолютный путь к каталогу проекта."
+            }
+          },
+          "required": ["path"],
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        }
+      },
+      {
+        "name": "DeferredToolPlaceholder",
+        "description": "Reserved placeholder that keeps deferred tool loading active; never call this tool.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "defer_loading": true
+      }
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "hi"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -22,6 +22,7 @@ import type { TestLibraryProps } from './TestLibrary.types';
 import styles from './TestLibrary.module.scss';
 import { serverFieldText } from '@shared/config/i18n';
 import { flakyIndex } from '../../model/flakyIndex';
+import { ALL_GROUPS } from '../../lib/allGroups';
 
 /**
  * Библиотека кейсов целиком: вкладки-группы, дерево секций, отбор, таблица.
@@ -45,7 +46,9 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
   // сквозном списке она не обязана совпадать с выбранной.
   const [editingGroupId, setEditingGroupId] = useState('');
   const [isCaseOpen, setCaseOpen] = useState(false);
-  const [removing, setRemoving] = useState<ProjectTestCase | undefined>();
+  const [removing, setRemoving] = useState<
+    { testCase: ProjectTestCase; groupId: string } | undefined
+  >();
   const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [isExchangeOpen, setExchangeOpen] = useState(false);
   // Отметки «нестабилен» и история кейса перечитываются, когда меняется
@@ -96,6 +99,19 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
         wrap
         className={`${styles.tabs} ${styles.narrowable}`}
       >
+        {board.allGroups && (
+          <Stack gap="0" className={styles.groupHead}>
+            <Typography variant="body" weight="medium" as="span" truncate>
+              {t('tests.library.allGroups')}
+            </Typography>
+            <Typography variant="caption" color="subtle" as="span" truncate>
+              {t('tests.library.allGroupsHint', {
+                cases: board.filters.total,
+                groups: board.groups.length,
+              })}
+            </Typography>
+          </Stack>
+        )}
         {board.active && (
           <Stack gap="0" className={styles.groupHead}>
             <Typography
@@ -186,7 +202,7 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
           />
         ))}
 
-      {board.active && !board.active.error && (
+      {(board.allGroups || (board.active && !board.active.error)) && (
         <>
           <TestFilterBar
             filters={board.filters}
@@ -197,14 +213,16 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
             budget={board.budget}
           />
 
-          <TestBulkToolbar
-            checked={board.checked}
-            groupId={board.activeId}
-            groups={board.groups}
-            sections={board.filters.facets.sections}
-            onApply={board.bulk}
-            onClear={board.clearChecked}
-          />
+          {!board.allGroups && (
+            <TestBulkToolbar
+              checked={board.checked}
+              groupId={board.activeId}
+              groups={board.groups}
+              sections={board.filters.facets.sections}
+              onApply={board.bulk}
+              onClear={board.clearChecked}
+            />
+          )}
         </>
       )}
 
@@ -215,11 +233,11 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
           <aside className={styles.tree}>
             <TestGroupList
               groups={board.groups}
-              activeId={board.activeId}
+              activeId={board.allGroups ? ALL_GROUPS : board.activeId}
               onSelect={board.select}
               onAdd={() => setGroupOpen(true)}
             />
-            {board.active && !board.active.error && (
+            {(board.allGroups || (board.active && !board.active.error)) && (
               <TestSectionTree
                 sections={board.filters.sections}
                 total={board.filters.total}
@@ -252,8 +270,10 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
                 // порядком: в обычном списке это лишняя колонка цифр.
                 risk={board.filters.sort === 'risk' ? board.filters.risk : undefined}
                 flaky={flaky}
+                selectable={!board.allGroups}
+                withGroup={board.allGroups}
                 onEdit={(testCase, groupId) => openCase(testCase, groupId)}
-                onRemove={(testCase) => setRemoving(testCase)}
+                onRemove={(testCase, groupId) => setRemoving({ testCase, groupId })}
               />
             )}
           </div>
@@ -270,7 +290,7 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
         sharedSteps={board.sharedSteps}
         schema={board.schema}
         sections={board.filters.facets.sections}
-        onSave={(input) => board.saveCase(board.activeId, input)}
+        onSave={(input) => board.saveCase(editingGroupId, input)}
       />
 
       <TestExchangeModal
@@ -304,11 +324,11 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
       <ConfirmDialog
         isOpen={removing !== undefined}
         onOpenChange={(open) => !open && setRemoving(undefined)}
-        title={t('projectTests.removeCaseConfirm', { title: removing?.title ?? '' })}
+        title={t('projectTests.removeCaseConfirm', { title: removing?.testCase.title ?? '' })}
         description={t('projectTests.removeCaseText')}
         confirmLabel={t('common.delete')}
         onConfirm={() => {
-          if (removing) board.removeCase(board.activeId, removing.id);
+          if (removing) board.removeCase(removing.groupId, removing.testCase.id);
           setRemoving(undefined);
         }}
       />

@@ -20,9 +20,17 @@
  *   порогов покрытия ронял бы весь набор. У кейса с `automation.testName`
  *   берётся ровно этот тест («описание > тест», как его зовёт vitest), без
  *   имени — худший итог по файлу.
+ * - `<каталог>/` — кейс-набор каталога (`tests-cli suites`): vitest пакета ОДИН
+ *   раз на все такие каталоги пакета, каждый тест — своим `<testcase>` с путём
+ *   файла в classname, без `[caseId]`: импорт сам кладёт тест в ближайший набор
+ *   (`suiteKeysOf`) и считает «✗ 3/40». Тесты чужих наборов из того же вызова
+ *   vitest отбрасываются — прогон каталога не трогает кейсы, которых не просили.
  *
  *   node tools/qa/junit-run.mjs [--project .] [--out <junit.xml>] [--timeout-min 10]
- *     [--health <url>] <файл>...
+ *     [--health <url>] <файл или каталог/>...
+ *
+ * Список длиннее строки команды (cmd.exe режет её на 8191 знаке) панель кладёт
+ * в файл и называет его в `AGENTDECK_TEST_FILES` — по строке на путь.
  *
  * `--health` (или `JUNIT_RUN_HEALTH`) — адрес стенда: живая проверка ждёт его до
  * 90 с перед стартом, а красный итог, пока стенд пропадал, повторяется один раз;
@@ -34,7 +42,15 @@
  * один провал.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -55,9 +71,13 @@ const timeoutMs = Number(option('--timeout-min') ?? 10) * 60_000;
 // Адрес стенда, без которого живые проверки не имеют смысла. Без флага
 // запускатель стенда не знает и судит только по коду выхода.
 const health = option('--health') ?? process.env.JUNIT_RUN_HEALTH;
-const files = [...new Set(args.filter((arg) => !arg.startsWith('--')).map(toRelative))];
+const entries = [
+  ...new Set([...args.filter((arg) => !arg.startsWith('--')), ...listedFiles()].map(toEntry)),
+];
+const files = entries.filter((entry) => !entry.endsWith('/'));
+const dirs = entries.filter((entry) => entry.endsWith('/'));
 
-if (files.length === 0) {
+if (entries.length === 0) {
   console.error('Нечего запускать: передайте файлы проверок.');
   process.exit(2);
 }
@@ -68,11 +88,16 @@ mkdirSync(dirname(out), { recursive: true });
 const linked = casesByFile(project);
 const suites = [];
 for (const file of files) suites.push(await runFile(file, linked.get(file) ?? []));
+suites.push(...runSuiteDirs(dirs, linked));
 
 writeFileSync(out, toJUnit(suites), 'utf8');
 const all = suites.flatMap((suite) => suite.cases);
 const failed = all.filter((item) => item.status === 'failed');
-const skipped = all.filter((item) => item.status === 'skipped');
+// `it.skip` в самом тесте — решение автора теста, а не сбой прогона: в отчёте он
+// пропущен, но ни счётчик «из-за стенда», ни код выхода его не видят (16.10:
+// 17 таких тестов наборов красили зелёный прогон).
+const authored = all.filter((item) => item.authoredSkip).length;
+const skipped = all.filter((item) => item.status === 'skipped' && !item.authoredSkip);
 const notRun = skipped.length;
 // Пропуск бывает двух родов: проверка сказала «не проверено» сама (кодом 2 —
 // нет CLI) или стенд лежал. Один счётчик «из-за стенда» на оба посылал
@@ -80,7 +105,8 @@ const notRun = skipped.length;
 const notChecked = skipped.filter((item) => item.message?.startsWith('Не проверено.')).length;
 console.log(
   `\njunit-run: файлов ${suites.length}, тестов ${all.length}, провалов ${failed.length}, ` +
-    `не проверено ${notChecked}, не засчитано из-за стенда ${notRun - notChecked} → ${relative(project, out)}`,
+    `не проверено ${notChecked}, не засчитано из-за стенда ${notRun - notChecked}` +
+    `${authored > 0 ? `, пропущено самими тестами ${authored}` : ''} → ${relative(project, out)}`,
 );
 // exitCode, а не exit(): выход посреди закрытия сокетов fetch роняет Node на
 // Windows (libuv `UV_HANDLE_CLOSING`, код 127).
@@ -110,6 +136,31 @@ function toRelative(file) {
   return relative(project, resolve(project, file)).split('\\').join('/');
 }
 
+/** Путь от корня; каталог — с `/` на конце (корень — `./`): так его зовёт кейс-набор. */
+function toEntry(file) {
+  const rel = toRelative(file);
+  const dir = /[\\/]$/.test(file) || isDir(join(project, rel));
+  return dir ? `${rel || '.'}/` : rel;
+}
+
+function isDir(path) {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Пути из файла `AGENTDECK_TEST_FILES`: панель кладёт туда список, не влезший в строку. */
+function listedFiles() {
+  const list = process.env.AGENTDECK_TEST_FILES;
+  if (!list) return [];
+  return readFileSync(list, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 /** Кейсы библиотеки по файлу автотеста: `automation.file` → [{caseId, testName}]. */
 function casesByFile(root) {
   const dir = join(root, '.agent', 'tests');
@@ -126,7 +177,7 @@ function casesByFile(root) {
     for (const item of Array.isArray(data?.cases) ? data.cases : []) {
       const file = item?.automation?.file;
       if (!file || item.archived) continue;
-      const key = toRelative(file);
+      const key = /[\\/]$/.test(file) ? `${toRelative(file) || '.'}/` : toRelative(file);
       const list = map.get(key) ?? [];
       list.push({ caseId: item.id, testName: item.automation.testName });
       map.set(key, list);
@@ -244,18 +295,7 @@ function runVitest(file, cases) {
   const target = relative(root, join(project, file)).split('\\').join('/');
   console.log(`\n▶ vitest ${target} (в ${relative(project, root) || '.'})`);
   const started = Date.now();
-  const result = spawnSync(
-    'npx',
-    [
-      'vitest',
-      'run',
-      target,
-      '--coverage.enabled=false',
-      '--reporter=junit',
-      `--outputFile=${report}`,
-    ],
-    { cwd: root, encoding: 'utf8', timeout: timeoutMs, shell: true, windowsHide: true },
-  );
+  const result = spawnVitest(root, [target], report);
   const seconds = (Date.now() - started) / 1000;
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   if (!existsSync(report)) {
@@ -294,6 +334,128 @@ function runVitest(file, cases) {
     );
   }
   return suite;
+}
+
+/** Наборы-каталоги: по вызову vitest на пакет, а не на каталог — 300 наборов не 300 запусков. */
+function runSuiteDirs(list, cases) {
+  const known = new Set([...cases.keys()].filter((key) => key.endsWith('/')));
+  const byRoot = new Map();
+  const ran = [];
+  for (const dir of list) {
+    const root = vitestRoot(join(project, dir));
+    if (!root) {
+      ran.push(
+        suiteOf(dir, cases.get(dir) ?? [], {
+          status: 'failed',
+          message: `Нет vitest.config.* над ${dir}`,
+        }),
+      );
+      continue;
+    }
+    byRoot.set(root, [...(byRoot.get(root) ?? []), dir]);
+  }
+  for (const [root, group] of byRoot) ran.push(runVitestDirs(root, group, cases, known));
+  return ran;
+}
+
+/**
+ * Каталоги одного пакета одним vitest. Фильтр vitest — подстрока пути, он
+ * захватывает и вложенные наборы; лишнее отсекается здесь: тест остаётся, только
+ * если ближайший к нему набор библиотеки — из запрошенных. Длинный список
+ * фильтров — весь пакет: строка `npx` тоже идёт через cmd.exe.
+ */
+function runVitestDirs(root, group, cases, known) {
+  const base = relative(project, root).split('\\').join('/');
+  const filters = group.map((dir) => {
+    const rel = relative(root, join(project, dir)).split('\\').join('/');
+    return rel ? `${rel}/` : '';
+  });
+  const whole = filters.includes('') || filters.join(' ').length > 6000;
+  const report = join(dirname(out), `vitest-dirs-${Date.now()}.xml`);
+  console.log(
+    `\n▶ vitest ${whole ? 'весь пакет' : `каталогов: ${group.length}`} (в ${base || '.'})`,
+  );
+  const started = Date.now();
+  const result = spawnVitest(root, whole ? [] : filters, report);
+  const seconds = (Date.now() - started) / 1000;
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  const name = `${base || '.'} (наборы)`;
+  if (!existsSync(report)) {
+    const failure = {
+      status: 'failed',
+      seconds,
+      message: `vitest не оставил отчёта (код ${result.status ?? 'нет'}). ${verdictLines(output)}`,
+      output: tail(output, 80),
+    };
+    return {
+      name,
+      cases: group.flatMap((dir) => suiteOf(dir, cases.get(dir) ?? [], failure).cases),
+    };
+  }
+  const tests = parseJUnitCases(readFileSync(report, 'utf8'));
+  rmSync(report, { force: true });
+  const wanted = new Set(group);
+  const seen = new Set();
+  const suite = { name, cases: [] };
+  for (const test of tests) {
+    const file = base ? `${base}/${test.owner}` : test.owner;
+    const owner = ownerSuite(file, known);
+    if (!owner || !wanted.has(owner)) continue;
+    seen.add(owner);
+    suite.cases.push({ ...test, file, authoredSkip: test.status === 'skipped' });
+  }
+  // Набор без единого теста в отчёте — не «зелёный молча»: тесты каталога
+  // переехали или не собрались, и человеку это надо увидеть.
+  for (const dir of group.filter((item) => !seen.has(item))) {
+    suite.cases.push(
+      ...suiteOf(dir, cases.get(dir) ?? [], {
+        status: 'failed',
+        message: `В отчёте vitest нет ни одного теста каталога ${dir}.`,
+      }).cases,
+    );
+  }
+  console.log(
+    `  тестов ${suite.cases.length}, наборов с тестами ${seen.size} из ${group.length}, ` +
+      `код ${result.status ?? 'нет'} за ${Math.round(seconds)} с`,
+  );
+  return suite;
+}
+
+/** Ближайший к файлу набор-каталог библиотеки: `a/b/c.test.ts` → `a/b/`, потом `a/`, `./`. */
+function ownerSuite(file, known) {
+  let at = file;
+  while (at) {
+    const cut = at.lastIndexOf('/');
+    at = cut < 0 ? '' : at.slice(0, cut);
+    const key = at ? `${at}/` : './';
+    if (known.has(key)) return key;
+  }
+  return undefined;
+}
+
+/**
+ * vitest одной строкой: аргументы рядом с `shell: true` Node 24 помечает DEP0190 на
+ * каждом вызове, а оболочка нужна ради npx.cmd на Windows.
+ */
+function spawnVitest(root, targets, report) {
+  const line = [
+    'npx vitest run',
+    ...targets.map(quoteArg),
+    '--coverage.enabled=false',
+    '--reporter=junit',
+    `--outputFile=${quoteArg(report)}`,
+  ].join(' ');
+  return spawnSync(line, {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: timeoutMs,
+    shell: true,
+    windowsHide: true,
+  });
+}
+
+function quoteArg(value) {
+  return /[\s"&|<>^]/.test(value) ? `"${value}"` : value;
 }
 
 function vitestRoot(start) {
@@ -343,6 +505,8 @@ function parseJUnitCases(xml) {
     const skipped = /<skipped\b/.test(body);
     list.push({
       name,
+      // classname vitest — путь файла теста от корня пакета.
+      owner: decode(attributes.match(/\bclassname="([^"]*)"/)?.[1] ?? ''),
       seconds: Number.isFinite(time) ? time : undefined,
       status: failure ? 'failed' : skipped ? 'skipped' : 'passed',
       message: failure

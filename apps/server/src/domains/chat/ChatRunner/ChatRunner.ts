@@ -505,6 +505,10 @@ export class ChatRun {
       ...parentEnv,
       ...(options.child ? childTestWorkers(process.env) : {}),
       ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
+      // Строку о блоке «Тесты» чату панели даёт дописка к промпту (`workspaceNote`);
+      // хук начала сессии проекта (`tools/tests-hook.mjs`) по этой метке молчит,
+      // чтобы агент не читал её дважды. Проверку конца хода метка не трогает.
+      AGENTDECK_TESTS_NOTE: '1',
       ...options.env,
       // Маршрут контура — ПОСЛЕДНИМ и отдельно от `env`: он пересобирается на
       // каждом старте (реестр прогонов), и значение прошлой жизни разговора не

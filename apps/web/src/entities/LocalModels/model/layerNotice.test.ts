@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalLayerFit } from '@agentdeck/contracts/local-models';
-import { layerNotice } from './layerNotice';
+import { frozenToolsNotice, layerNotice } from './layerNotice';
 
 const tooBig: LocalLayerFit = {
   tokens: 73_254,
@@ -35,5 +35,20 @@ describe('предупреждение о слое прогона (L6, ревь�
 
   it('окна под слой у модели нет — так и сказано', () => {
     expect(layerNotice(tooBig)?.fix).toEqual({ key: 'fixNone' });
+  });
+});
+
+describe('описания MCP, замороженные разговором', () => {
+  const frozen: LocalLayerFit = { ...tooBig, fits: true, session: 'old', frozenTools: 41_000 };
+
+  it('в том разговоре, чей запрос замерен, — строка с числом', () => {
+    expect(frozenToolsNotice(frozen, 'old')).toEqual({ tokens: 41_000 });
+  });
+
+  it('в другом разговоре, без разговора или без заморозки — молчит', () => {
+    expect(frozenToolsNotice(frozen, 'new')).toBeUndefined();
+    expect(frozenToolsNotice(frozen, undefined)).toBeUndefined();
+    expect(frozenToolsNotice({ ...frozen, frozenTools: undefined }, 'old')).toBeUndefined();
+    expect(frozenToolsNotice(undefined, 'old')).toBeUndefined();
   });
 });

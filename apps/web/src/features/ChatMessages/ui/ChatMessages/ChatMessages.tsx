@@ -351,6 +351,7 @@ export function ChatMessages({
               <LocalRunStatus
                 waitingPermission={(permissions?.length ?? 0) > 0}
                 {...(runStartedAt !== undefined ? { since: runStartedAt } : {})}
+                {...(conversationId ? { session: conversationId } : {})}
                 className={styles.liveTimer}
               />
             )}
@@ -367,7 +368,12 @@ export function ChatMessages({
       <FeedNotices stream={stream} onRefresh={onRefresh} />
 
       {/* Слой прогона не влезает в окно локальной модели — видно и между ходами (L6). */}
-      {localRun && !stream.isRunning && <LocalLayerWarning className={styles.liveTimer} />}
+      {localRun && !stream.isRunning && (
+        <LocalLayerWarning
+          {...(conversationId ? { session: conversationId } : {})}
+          className={styles.liveTimer}
+        />
+      )}
 
       {/*
         Дописанное, ждущее конца хода, — в ленте, а не только полоской над

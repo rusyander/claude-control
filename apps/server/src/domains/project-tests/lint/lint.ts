@@ -35,6 +35,7 @@ const RULES = {
   'no-code-paths': { severity: 'info', title: serverText('tests-lint-no-code-paths') },
   'no-priority': { severity: 'warning', title: serverText('tests-lint-no-priority') },
   'too-many-steps': { severity: 'warning', title: serverText('tests-lint-too-many-steps') },
+  'vague-case': { severity: 'warning', title: serverText('tests-lint-vague-case') },
   'undeclared-parameter': {
     severity: 'error',
     title: serverText('tests-lint-undeclared-parameter'),
@@ -132,6 +133,39 @@ function usedParameters(testCase: ProjectTestCase): Set<string> {
   return new Set(parametersInSteps([...(testCase.steps ?? []), { action: own }]));
 }
 
+/**
+ * Ожидание, которое ничего не называет: «все проходят», «работает», «без
+ * ошибок». Его нечем опровергнуть — кейс с таким текстом проходит при любом
+ * поведении, и читать его незачем. Сравнивается ВЕСЬ текст: «работает поиск
+ * по фамилии» уже называет, что видно, и замечания не стоит.
+ */
+const VAGUE_EXPECTED =
+  /^(?:(?:все|всё)\s+)?(?:(?:тесты|проверки)\s+(?:\S+\s+)?)?(?:проходят|проходит|прошли|пройдены|зел[её]н[а-яё]*|работает|работают|ок|ok|успешно|без ошибок|ошибок нет|нет ошибок|корректно|как ожидается|как ожидалось|всё хорошо|все хорошо|ни одного провала)$|^(?:all\s+)?(?:tests\s+)?(?:pass|passes|passed|green|works|ok|success|succeeds|no errors|as expected)$/;
+
+/** Текст ожидания без регистра, кавычек и точки в конце — для сравнения целиком. */
+function vague(text: string | undefined): boolean {
+  const flat = (text ?? '')
+    .toLowerCase()
+    .replace(/[«»"'`]/g, '')
+    .replace(/[.!;,\s]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return VAGUE_EXPECTED.test(flat);
+}
+
+/**
+ * Кейс, где ни общее ожидание, ни одно ожидание шага не называет наблюдаемого.
+ * Совсем пустые ожидания — забота `step-without-expected`: два замечания на
+ * одну дыру читаются как шум.
+ */
+export function isVagueCase(testCase: ProjectTestCase): boolean {
+  if (testCase.type !== 'case') return false;
+  const said = [testCase.expected, ...(testCase.steps ?? []).map((step) => step.expected)]
+    .map((text) => text?.trim() ?? '')
+    .filter(Boolean);
+  return said.length > 0 && said.every(vague);
+}
+
 /** Замечания по описанию кейса: чем доказывается, что и куда привязано. */
 function checkShape(
   groupId: string,
@@ -170,6 +204,19 @@ function checkShape(
         ),
       );
     }
+  }
+
+  if (isVagueCase(testCase)) {
+    found.push(
+      finding(
+        'vague-case',
+        groupId,
+        testCase,
+        'Ожидание не называет, что видно: «все проходят» или «работает» нечем опровергнуть. ' +
+          'Напишите наблюдаемый результат — что на экране, в ответе, в файле, в отчёте.',
+        { messageCode: 'lint-vague-case' },
+      ),
+    );
   }
 
   if (!isCase && (testCase.expected?.trim() || steps.some((step) => step.expected?.trim()))) {

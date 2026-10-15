@@ -18,6 +18,11 @@ export interface TestCaseTableProps {
   attributes: ProjectTestAttributeDef[];
   onEdit: (testCase: ProjectTestCase, groupId: string) => void;
   onRemove: (testCase: ProjectTestCase, groupId: string) => void;
+  /**
+   * Колонка отметок. Нет — в сквозном списке всех групп: отметки идут id кейса,
+   * а одинаковый id в двух файлах отметил бы оба.
+   */
+  selectable?: boolean;
   /** Показывать колонку группы — когда список собран из нескольких файлов. */
   withGroup?: boolean;
   /**

@@ -1152,6 +1152,10 @@ export const serverTextTemplates = {
   'tests-lint-no-code-paths': { ru: 'Нет привязки к коду', en: 'No link to the code' },
   'tests-lint-no-priority': { ru: 'Нет приоритета', en: 'No priority' },
   'tests-lint-too-many-steps': { ru: 'Слишком длинный сценарий', en: 'The scenario is too long' },
+  'tests-lint-vague-case': {
+    ru: 'Ожидание ничего не называет',
+    en: 'The expectation names nothing',
+  },
   'tests-lint-undeclared-parameter': {
     ru: 'Параметр не объявлен',
     en: 'The parameter is not declared',

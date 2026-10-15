@@ -87,7 +87,7 @@ import {
  *
  * Системный промпт уходит ФАЙЛОМ (`--append-system-prompt-file`), разговор — в
  * stdin: на Windows текст с кавычками и переводами строк в argv разваливается
- * (`.claude/gotchas.md` §Sessions).
+ * (`.claude/gotchas-sessions.md`).
  */
 
 export { PANEL_AGENT_TOOL_PREFIX };

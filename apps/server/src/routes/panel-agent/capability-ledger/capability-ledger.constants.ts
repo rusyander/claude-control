@@ -547,6 +547,10 @@ export const ROUTE_LEDGER: RouteLedger = {
   'PUT /api/project-tests/automation': 'human:code-write',
   'DELETE /api/project-tests/automation': 'human:code-write',
   'POST /api/project-tests/e2e/adopt': 'gap:P3',
+  // Хук конца хода пишет в настройки CLI проекта команду, которую CLI потом
+  // исполняет сам: включать и выключать его может только человек.
+  'GET /api/project-tests/turn-hooks': 'internal:preview',
+  'PUT /api/project-tests/turn-hooks': 'human:code-write',
   // project-tests/health-routes.ts
   'GET /api/project-tests/lint': 'action:lint_tests',
   'GET /api/project-tests/quarantine': 'action:read_tests_report',

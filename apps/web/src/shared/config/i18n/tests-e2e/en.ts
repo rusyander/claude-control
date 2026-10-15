@@ -137,6 +137,7 @@ export const testsE2eEn: typeof testsE2eRu = {
     custom: 'Set your own command',
     recipe: '{{stack}} · {{dir}}',
     root: 'project root',
+    allModules: 'every module of the project ({{count}})',
     stack: {
       go: 'Go',
       pytest: 'pytest',

@@ -1,2 +1,2 @@
 /** Разделы окна в порядке, в котором набор и заводят. */
-export const SECTIONS = ['environments', 'steps', 'fields'] as const;
+export const SECTIONS = ['environments', 'steps', 'fields', 'agents'] as const;

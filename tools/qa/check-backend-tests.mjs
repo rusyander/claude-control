@@ -199,6 +199,11 @@ await runOnStand(
         [MAVEN_FILES, dirs.mvn],
       ]) {
         for (const [path, body] of Object.entries(files)) put(dir, path, body);
+        // Сценарий — о проекте БЕЗ своей команды: рецепты, «Завести кейсы». Не
+        // репозиторий панель при добавлении сама снабжает кейсами-наборами и
+        // командой из рецепта (`syncSuitesOnce`); в репозитории, где .agent не
+        // спрятан от git, — нет. Так проект остаётся «свежим».
+        spawnSync('git', ['init', '-q'], { cwd: dir, windowsHide: true });
       }
       mkdirSync(dirs.stranger, { recursive: true });
       if (tools.uv) {

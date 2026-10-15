@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { agentUpsertCase, recordAgentResults } from './agent-write.ts';
 import { readDraft } from '../drafts/drafts.ts';
+import { CASE_STANDARD } from '../case-standard.ts';
 import { e2eChatLine } from '../e2e-chat.ts';
 import { readRuns } from '../runs-store/runs-store.ts';
 import { applyResults, readGroup, upsertCase } from '../store/store.ts';
@@ -189,6 +190,8 @@ describe('запись в блок «Тесты» от агента чата', (
     expect(line).toContain('whenever you change how the product behaves');
     expect(line).toContain('case --project "/repo" --group <group>');
     expect(line).toContain('record --project "/repo" <group>:<case>=passed|failed|blocked');
+    // Стандарт кейса — тот же, что спрашивают линтер и конец хода.
+    expect(line).toContain(CASE_STANDARD);
     expect(line).not.toContain('\n');
   });
 });

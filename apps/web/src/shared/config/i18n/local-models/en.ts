@@ -267,6 +267,8 @@ export const localModelsEn: typeof localModelsRu = {
       'In the “Local models” section pick quantization {{quant}} and window {{context}}: with the current quantization that window does not fit on the card whole.',
     fixNone:
       'This model has no window that holds the layer: pick another model or the lean layer on the contour card.',
+    frozen:
+      'This conversation started before tools were loaded on demand: MCP server descriptions (≈ {{tokens}} tokens) go out with every request, and Claude Code does not change the tool set of a conversation already under way. In a new chat they load only when needed — the first request is much shorter and faster.',
   },
   serverNotice: {
     restarted:

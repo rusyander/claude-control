@@ -93,7 +93,11 @@ const recordingServer: PlatformFetch = (url, init) => {
   );
 };
 
-async function start(local: { deferredInline: boolean } | undefined): Promise<void> {
+type LayerSpy = (tokens: number, detail?: { session?: string; frozenTools?: number }) => void;
+
+async function start(
+  local: { deferredInline: boolean; layer?: LayerSpy } | undefined,
+): Promise<void> {
   await gateway.start({
     store,
     appDataDir: appData,
@@ -108,12 +112,19 @@ async function start(local: { deferredInline: boolean } | undefined): Promise<vo
   port = gateway.status().port;
 }
 
-const post = (path: string): Promise<Response> =>
+const post = (path: string, body: Record<string, unknown> = wire.after): Promise<Response> =>
   fetch(`http://127.0.0.1:${port}/${PLATFORM.id}/v1/${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ ...wire.after, stream: path === 'messages' }),
+    body: JSON.stringify({ ...body, stream: path === 'messages' }),
   });
+
+const resumed = JSON.parse(
+  readFileSync(
+    new URL('../local-window/__fixtures__/tool-search-resumed-2.1.286.json', import.meta.url),
+    'utf8',
+  ),
+) as { frozen: Record<string, unknown> };
 
 type Tool = { name: string; description?: string; defer_loading?: boolean };
 const toolsOf = (body: Record<string, unknown> | undefined): Tool[] =>
@@ -172,6 +183,24 @@ describe('отложенные инструменты на пути к лока�
     const counted = seen.find((item) => item.path.endsWith('/count_tokens'))?.body;
     expect(JSON.stringify(counted)).not.toContain('tool_reference');
     expect(toolsOf(counted).map((tool) => tool.name)).not.toContain('DeferredToolPlaceholder');
+  });
+
+  it('продолженный разговор с MCP целиком: замер слоя называет разговор и замороженные описания', async () => {
+    const reports: { tokens: number; detail?: { session?: string; frozenTools?: number } }[] = [];
+    await start({
+      deferredInline: true,
+      layer: (tokens, detail) => reports.push({ tokens, ...(detail ? { detail } : {}) }),
+    });
+    await (await post('messages', resumed.frozen)).text();
+    await (await post('messages')).text();
+
+    expect(reports).toHaveLength(2);
+    const [frozen, fresh] = reports;
+    expect(frozen?.detail?.session).toBe('11111111-2222-4333-8444-555555555555');
+    expect(frozen?.detail?.frozenTools).toBeGreaterThan(0);
+    expect(frozen?.detail?.frozenTools).toBeLessThan(frozen?.tokens ?? 0);
+    // Тот же путь, новый разговор с поиском: подгруженный инструмент — не заморозка.
+    expect(fresh?.detail?.frozenTools).toBeUndefined();
   });
 
   it('не локальный контур: тело уходит как пришло — облако разворачивает само', async () => {

@@ -220,6 +220,9 @@ export function TestsTopic() {
           <Callout tone="info" title={tr('agentConventionTitle')}>
             {tr('agentConventionText')}
           </Callout>
+          <Callout tone="info" title={tr('agentGateTitle')}>
+            {tr('agentGateText')}
+          </Callout>
         </Stack>
       </HelpSection>
 

@@ -120,6 +120,7 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'lint-rule-no-code-paths': 'Нет привязки к коду',
   'lint-rule-no-priority': 'Нет приоритета',
   'lint-rule-too-many-steps': 'Слишком длинный сценарий',
+  'lint-rule-vague-case': 'Ожидание ничего не называет',
   'lint-rule-undeclared-parameter': 'Параметр не объявлен',
   'lint-rule-unused-parameter': 'Параметр объявлен впустую',
   'lint-rule-duplicate-title': 'Повтор заголовка в группе',
@@ -137,6 +138,8 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'lint-no-priority': 'Нет приоритета: отбор по важности кейс не увидит.',
   'lint-too-many-steps':
     'Шагов {{steps}} при пороге {{limit}}: такой сценарий стоит разбить на несколько.',
+  'lint-vague-case':
+    'Ожидание не называет, что видно: «все проходят» или «работает» нечем опровергнуть. Напишите наблюдаемый результат — что на экране, в ответе, в файле, в отчёте.',
   'lint-undeclared-parameter':
     'В тексте есть {{names}}, но в параметрах кейса такого нет — подставлять нечего.',
   'lint-unused-parameter':

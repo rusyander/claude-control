@@ -5,6 +5,7 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import type { TestGroupListProps } from './TestGroupList.types';
 import styles from './TestGroupList.module.scss';
+import { ALL_GROUPS } from '../../lib/allGroups';
 
 /**
  * Группы кейсов — списком в левой колонке, над деревом секций.
@@ -25,6 +26,24 @@ export function TestGroupList({ groups, activeId, onSelect, onAdd }: TestGroupLi
       <Typography variant="caption" color="subtle">
         {t('tests.library.groups')}
       </Typography>
+
+      {/* Сквозной список — первой строкой: на полусотне групп искать кейс по
+          одной группе за раз значило не видеть набор целиком. */}
+      {groups.length > 1 && (
+        <button
+          type="button"
+          className={[styles.section, activeId === ALL_GROUPS && styles.sectionActive]
+            .filter(Boolean)
+            .join(' ')}
+          aria-current={activeId === ALL_GROUPS ? 'true' : undefined}
+          onClick={() => onSelect(ALL_GROUPS)}
+        >
+          <span className={styles.sectionTitle}>{t('tests.library.allGroups')}</span>
+          <span className={styles.sectionCount}>
+            {groups.reduce((sum, group) => sum + group.cases.length, 0)}
+          </span>
+        </button>
+      )}
 
       {groups.map((group) => {
         const isActive = group.id === activeId;

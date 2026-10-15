@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestE2eFolder } from '@agentdeck/contracts';
 import {
   automationCommand,
+  COMMAND_LINE_LIMIT,
+  RUN_FILES_ENV,
   readAutomation,
   removeAutomation,
   writeAutomation,
@@ -141,6 +143,30 @@ describe('project-tests/automation: своя команда прогона пр�
     expect(automationCommand(root, command, files, 'x').line).toBe(
       'run orders/a_test.go tests/test_b.py | pytest orders/a_test.go tests/test_b.py | go test ./orders ./tests',
     );
+  });
+
+  /**
+   * 16.10: группа из 300 наборов собирала строку в 11 тыс. знаков, cmd.exe
+   * отвечал «Слишком длинная командная строка», и прогон падал за 0 с без отчёта.
+   */
+  it('список длиннее строки cmd.exe — файлом в AGENTDECK_TEST_FILES, строка — как весь набор', () => {
+    const command = { command: 'node junit-run.mjs {files} | pytest {paths} | go test {packages}' };
+    const files = Array.from({ length: 300 }, (_, index) => `apps/web/src/features/F${index}/`);
+    const report = join(root, 'run', 'junit.xml');
+    const own = automationCommand(root, command, files, report);
+    expect(own.line).toBe('node junit-run.mjs  | pytest  | go test ./...');
+    expect(own.line.length).toBeLessThan(COMMAND_LINE_LIMIT);
+    expect(own.listed).toBe(300);
+    const list = own.env[RUN_FILES_ENV]!;
+    expect(list).toBe(`${report}.files.txt`);
+    expect(readFileSync(list, 'utf8').trim().split('\n')).toEqual(files);
+    expect(own.env.AGENTDECK_JUNIT_REPORT).toBe(report);
+
+    const short = automationCommand(root, command, files.slice(0, 2), join(root, 'short.xml'));
+    expect(short.line).toContain('apps/web/src/features/F1/');
+    expect(short.env[RUN_FILES_ENV]).toBeUndefined();
+    expect(short.listed).toBeUndefined();
+    expect(existsSync(join(root, 'short.xml.files.txt'))).toBe(false);
   });
 
   it('запись — те же правила, что чтение; снятие откладывает файл, а не стирает', () => {

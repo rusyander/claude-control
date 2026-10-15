@@ -1,5 +1,5 @@
-import { existsSync, renameSync } from 'node:fs';
-import { isAbsolute, join, posix } from 'node:path';
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, posix } from 'node:path';
 import type {
   CodedMessage,
   ProjectTestAutomationCommand,
@@ -9,6 +9,7 @@ import { codedIf } from '../../../lib/server-text/server-text.ts';
 import { ProjectTestsError, readJson, testsPath, writeJson } from '../files.ts';
 import { shellArg } from '../e2e-command/e2e-command.ts';
 import { isReportDir } from './report.ts';
+import { goModuleDirs } from './recipes.ts';
 
 export { clearReport, collectReport, isReportDir, reportTail } from './report.ts';
 export type { CollectedReport } from './report.ts';
@@ -147,7 +148,19 @@ export interface AutomationCommand {
   /** Где искать отчёт этого прогона; кончается разделителем — каталог. */
   report: string;
   format: ProjectTestAutomationFormat;
+  /** Столько путей ушло файлом `RUN_FILES_ENV`, а не строкой: она бы не запустилась. */
+  listed?: number;
 }
+
+/**
+ * Длиннее строку не запустить: `shell: true` на Windows идёт через cmd.exe, а он
+ * режет команду на 8191 знаке («Слишком длинная командная строка») — прогон 300
+ * наборов падал за 0 с без отчёта, и ни один кейс не получал итога.
+ */
+export const COMMAND_LINE_LIMIT = 8000;
+
+/** Путь к файлу со списком прогона (по строке на путь), когда он не влез в строку. */
+export const RUN_FILES_ENV = 'AGENTDECK_TEST_FILES';
 
 const quote = (value: string): string => (/[\s"'&|<>^]/.test(value) ? `"${value}"` : value);
 
@@ -158,10 +171,51 @@ const quote = (value: string): string => (/[\s"'&|<>^]/.test(value) ? `"${value}
  */
 function goPackages(files: string[]): string {
   if (files.length === 0) return './...';
-  const dirs = [...new Set(files.map((file) => posix.dirname(file.split(/[\\/]/).join('/'))))];
+  const dirs = [...new Set(files.map(packageDir))];
   // Каталог — из `automation.file`, а его пишет и агент: та же защита от
   // подстановок оболочки, что у `{files}` (F-14).
   return dirs.map((dir) => (dir === '.' ? '.' : shellArg(`./${dir}`))).join(' ');
+}
+
+/** Каталог пакета файла кейса; у кейса-набора `file` — сам каталог (`dir/`). */
+function packageDir(file: string): string {
+  const path = file.split(/[\\/]/).join('/');
+  return path.endsWith('/') ? path.slice(0, -1) || '.' : posix.dirname(path);
+}
+
+/**
+ * `{go-modules}` — все модули Go проекта одной цепочкой, для репозитория из
+ * многих `go.mod` без `go.work`. `go test -C <модуль>` дописывает отчёт по
+ * очереди; `|| echo -` не даёт провалу модуля оборвать цепочку — так читают и
+ * cmd, и sh (`&&`/`||` слева направо), красное видно по отчёту. С выбором —
+ * только модули выбранных кейсов и только их пакеты: агенту после правки одного
+ * пакета не нужен прогон всего репозитория.
+ */
+function goModulesChain(root: string, files: string[], report: string): string {
+  const modules = goModuleDirs(root).sort((a, b) => b.length - a.length);
+  const picked = new Map<string, Set<string>>();
+  if (files.length === 0) {
+    for (const dir of modules) picked.set(dir, new Set(['./...']));
+  } else {
+    for (const file of files) {
+      const dir = packageDir(file);
+      const module = modules.find((item) => !item || dir === item || dir.startsWith(`${item}/`));
+      if (module === undefined) continue;
+      const inside = module ? dir.slice(module.length).replace(/^\//, '') : dir;
+      const rel = inside === '.' ? '' : inside;
+      const packages = picked.get(module) ?? new Set<string>();
+      packages.add(rel ? shellArg(`./${rel}`) : '.');
+      picked.set(module, packages);
+    }
+  }
+  return [...picked]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([module, packages], index) => {
+      const at = module ? shellArg(module) : '.';
+      const into = index === 0 ? '>' : '>>';
+      return `go test -C ${at} -json ${[...packages].join(' ')} ${into} ${quote(report)} || echo -`;
+    })
+    .join(' && ');
 }
 
 /**
@@ -174,6 +228,11 @@ function goPackages(files: string[]): string {
  * раза не видело бы новых тестов, а несобирающийся пакет без кейсов выпадал
  * из прогона молча. С выбором `{paths}` — те же файлы, `{packages}` — их
  * каталоги.
+ *
+ * Строка длиннее `COMMAND_LINE_LIMIT` собирается как прогон без выбора (весь
+ * набор раннера), а точный список ложится файлом рядом с отчётом панели и
+ * называется в `RUN_FILES_ENV`: junit-run берёт его оттуда, прочий раннер гонит
+ * всё — лишние итоги лучше прогона, который не стартует вовсе.
  */
 export function automationCommand(
   root: string,
@@ -185,17 +244,29 @@ export function automationCommand(
   // `join` хранит хвостовой разделитель — по нему отчёт и узнаётся каталогом.
   const report = automation.report ? join(root, automation.report) : panelReport;
   const shown = isReportDir(report) ? report.slice(0, -1) : report;
-  const line = automation.command
-    .replaceAll('{files}', files.map(shellArg).join(' '))
-    .replaceAll('{paths}', whole ? '' : files.map(shellArg).join(' '))
-    .replaceAll('{packages}', goPackages(whole ? [] : files))
-    .replaceAll('{report}', quote(shown))
-    .trim();
-  return {
-    line,
+  const build = (picked: string[], all: boolean): string =>
+    automation.command
+      .replaceAll('{files}', picked.map(shellArg).join(' '))
+      .replaceAll('{paths}', all ? '' : picked.map(shellArg).join(' '))
+      .replaceAll('{packages}', goPackages(all ? [] : picked))
+      .replaceAll('{go-modules}', () => goModulesChain(root, all ? [] : picked, shown))
+      .replaceAll('{report}', quote(shown))
+      .trim();
+  const own: AutomationCommand = {
+    line: build(files, whole),
     cwd: root,
     env: { AGENTDECK_JUNIT_REPORT: shown },
     report,
     format: automation.format ?? 'junit',
+  };
+  if (own.line.length <= COMMAND_LINE_LIMIT || files.length === 0) return own;
+  const list = `${panelReport.replace(/[\\/]+$/, '')}.files.txt`;
+  mkdirSync(dirname(list), { recursive: true });
+  writeFileSync(list, `${files.join('\n')}\n`, 'utf8');
+  return {
+    ...own,
+    line: build([], true),
+    env: { ...own.env, [RUN_FILES_ENV]: list },
+    listed: files.length,
   };
 }

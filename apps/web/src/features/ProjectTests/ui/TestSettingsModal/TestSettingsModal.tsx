@@ -8,6 +8,7 @@ import { serverFieldText } from '@shared/config/i18n';
 import { TestSettingsEnvironments } from '../TestSettingsEnvironments/TestSettingsEnvironments';
 import { TestSettingsSteps } from '../TestSettingsSteps/TestSettingsSteps';
 import { TestSettingsFields } from '../TestSettingsFields/TestSettingsFields';
+import { TestSettingsAgents } from '../TestSettingsAgents/TestSettingsAgents';
 import type { TestSettingsModalProps } from '../TestSettingsModal.types';
 import styles from './TestSettingsModal.module.scss';
 import { SECTIONS } from './TestSettingsModal.constants';
@@ -81,6 +82,7 @@ export function TestSettingsModal({ isOpen, onOpenChange, board }: TestSettingsM
         )}
         {section === 'steps' && <TestSettingsSteps board={board} onError={setError} />}
         {section === 'fields' && <TestSettingsFields board={board} onError={setError} />}
+        {section === 'agents' && <TestSettingsAgents board={board} onError={setError} />}
 
         {error && (
           <Typography variant="caption" color="danger">

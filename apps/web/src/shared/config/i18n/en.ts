@@ -5763,6 +5763,8 @@ export const en: TranslationSchema = {
       filtersActive: 'Filters · {{count}}',
       chipRemove: 'Remove the “{{label}}” condition',
       groupFile: 'File: {{file}}',
+      allGroups: 'All groups',
+      allGroupsHint: 'Cases: {{cases}} · groups: {{groups}} — one list',
     },
     bulk: {
       selected: 'Selected: {{count}}',
@@ -6265,6 +6267,15 @@ export const en: TranslationSchema = {
         environments: 'Environments',
         steps: 'Shared steps',
         fields: 'Custom fields',
+        agents: 'Agents',
+      },
+      agents: {
+        toggle: 'Check the end of an agent turn',
+        hint: 'At the end of every agent turn in this project — in the panel chat, in VS Code and in the terminal — the panel looks at which code it changed. No case for a changed file or no recorded run — the agent gets the list of gaps with ready commands and closes them in the same turn. The check lives in the project .claude/settings.local.json: a personal file that stays out of git.',
+        on: 'On',
+        off: 'Off: agents finish their turn unchecked. The project file is restored as it was.',
+        broken:
+          'The project .claude/settings.local.json does not parse as JSON — the panel leaves it alone. Fix the file and the check will be installed.',
       },
       brokenTitle: 'A file did not parse',
       brokenHint:

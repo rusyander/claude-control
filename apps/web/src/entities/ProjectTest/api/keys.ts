@@ -61,6 +61,8 @@ export const testKeys = {
   pyramid: (path: string | undefined) => [ROOT, 'pyramid', path ?? ''],
   /** Своя команда прогона и рецепты бэкенда — обход проекта, не опрашивается. */
   automation: (path: string | undefined) => [ROOT, 'automation', path ?? ''],
+  /** Хуки проверки конца хода агента в проекте. */
+  turnHooks: (path: string | undefined) => [ROOT, 'turn-hooks', path ?? ''],
   /** Риск кейсов: считается по всей библиотеке разом, бюджет применяется на экране. */
   risk: (path: string | undefined) => [ROOT, 'risk', path ?? ''],
   /**

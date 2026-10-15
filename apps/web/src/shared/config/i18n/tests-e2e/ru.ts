@@ -134,6 +134,7 @@ export const testsE2eRu = {
     custom: 'Задать свою команду',
     recipe: '{{stack}} · {{dir}}',
     root: 'корень проекта',
+    allModules: 'все модули проекта ({{count}})',
     stack: {
       go: 'Go',
       pytest: 'pytest',

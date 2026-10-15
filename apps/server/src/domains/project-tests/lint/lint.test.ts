@@ -150,6 +150,42 @@ describe('project-tests/lint: правила описания', () => {
     expect(rulesFor([group([long])], 'gui-001')).toEqual(['too-many-steps']);
     expect(lintLibrary([group([long])], { now: NOW, maxSteps: 20 }).findings).toEqual([]);
   });
+
+  it('ожидание, которое ничего не называет: «все проходят» опровергнуть нечем', () => {
+    const junk = healthy({
+      title: 'Тесты каталога web/src/app',
+      steps: [{ action: 'Прогнать тесты каталога web/src/app', expected: 'Все тесты проходят.' }],
+      expected: '«Работает»',
+    });
+    const report = lintLibrary([group([junk])], { now: NOW });
+
+    expect(report.findings.map((item) => item.rule)).toEqual(['vague-case']);
+    expect(report.findings[0]).toMatchObject({ messageCode: 'lint-vague-case' });
+    expect(report.byRule).toMatchObject([
+      { rule: 'vague-case', titleCode: 'lint-rule-vague-case' },
+    ]);
+    expect(rulesFor([group([healthy({ expected: 'all tests pass' })])], 'gui-001')).toEqual([]);
+  });
+
+  it('хотя бы одно ожидание называет видимое — кейс не пустой; пустые ожидания — другое правило', () => {
+    const named = healthy({
+      steps: [
+        { action: 'Прогнать тесты', expected: 'Все проходят' },
+        { action: 'Открыть отчёт', expected: 'Работает поиск по фамилии: найдено 3 записи' },
+      ],
+      expected: 'Без ошибок',
+    });
+    expect(rulesFor([group([named])], 'gui-001')).toEqual([]);
+
+    const empty = healthy({ steps: [{ action: 'Прогнать тесты' }], expected: undefined });
+    expect(rulesFor([group([empty])], 'gui-001')).toEqual(['step-without-expected']);
+    const checklist = healthy({
+      type: 'checklist',
+      oracle: undefined,
+      steps: [{ action: 'Прогнать тесты' }],
+    });
+    expect(rulesFor([group([checklist])], 'gui-001')).toEqual([]);
+  });
 });
 
 describe('project-tests/lint: правила параметров', () => {

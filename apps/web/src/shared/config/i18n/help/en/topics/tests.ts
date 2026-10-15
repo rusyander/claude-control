@@ -272,7 +272,10 @@ export const testsEn: typeof testsRu = {
       'to the right of its title. Groups split the set coarsely: interface, end-to-end ' +
       'scenarios, smoke. “New group” asks for the id (also the file name, fixed for good), a ' +
       'title and a description; an id already taken is refused, naming that group. Title ' +
-      'and description are changed later with “Edit group”.',
+      'and description are changed later with “Edit group”. The “All groups” row above the ' +
+      'list shows the cases of every group in one table, with a group column: you can find ' +
+      'and edit a case without knowing its file — the edit lands in the row’s group. There ' +
+      'are no checkboxes or bulk actions there: those work inside one group.',
     librarySections: 'Sections — a tree inside a group',
     librarySectionsText:
       'The section field holds a path like "Chat/Attachments", and the panel draws a tree ' +
@@ -616,6 +619,19 @@ export const testsEn: typeof testsRu = {
       'into the project’s CLAUDE.md” button appends a ' +
       'block with the format and the rules to the end of the file; it is read in EVERY ' +
       'conversation. Your text is left alone, and pressing again adds nothing.',
+    agentGateTitle: 'The end-of-turn check',
+    agentGateText:
+      'A line is not enough: the agent can forget it. So at the end of every turn the panel ' +
+      'checks it against the set — code changed but a changed file has no case or its case ' +
+      'was not run after the change; a case written whose expected names nothing — and hands ' +
+      'the agent a short list of gaps ' +
+      'with exact commands; no gaps — not a word and not a single extra token. It works for ' +
+      'any Claude Code over the project — the panel chat, VS Code, a terminal: the check is ' +
+      'carried by a hook in the project’s .claude/settings.local.json (the file stays out of ' +
+      'git). The panel installs it into every registry project itself, and into a new one ' +
+      'when it is added; the “Agents” tab in Library settings turns it off, and the file ' +
+      'is restored byte for byte if nobody edited it after the panel. Without the panel the ' +
+      'same check is pnpm tests gate.',
 
     sourceTitle: 'Where generation takes its material from',
     sourceCaption:
@@ -1093,7 +1109,9 @@ export const testsEn: typeof testsRu = {
     cliLint: 'pnpm tests lint',
     cliLintText:
       'The same findings as the library health card: cases with nothing to prove them, stale ' +
-      'drafts, repeats. It fixes nothing — it names the case and the button. The build turns ' +
+      'drafts, repeats, cases whose expected names nothing (“all pass”, “works” — such a case ' +
+      'is green whatever the product does). It fixes nothing — it names the case and the ' +
+      'button. The build turns ' +
       'red only with «--fail-on error | warning | info»: «worth a look» and «must not ship» ' +
       'are different claims, and the second one is yours to make.',
     cliDiff: 'pnpm tests diff <base> <new>',
@@ -1318,7 +1336,9 @@ export const testsEn: typeof testsRu = {
         'names the command itself in .agent/tests/automation.json ({"version":1,"command":"…"}) — ' +
         'by hand or with the “Run command” block (see “Backend tests” below): ' +
         '{files} becomes the files of the selected cases (of every automated case when none is selected), {paths} the same files but empty when none is selected (the runner collects the suite itself), {report} and the AGENTDECK_JUNIT_REPORT ' +
-        'variable become the junit report path. The command is named under the button and ' +
+        'variable become the junit report path. A list longer than the command line (cmd.exe ' +
+        'cuts it at 8191 characters) goes as a file: its path is in AGENTDECK_TEST_FILES, and ' +
+        'the line is built as a run without a selection. The command is named under the button and ' +
         'pnpm tests run without --cmd takes it too; a folder with tests wins over it. “Only ' +
         '“group”” runs just the files of the open group. Cases selected but none has an ' +
         'automated test — the panel refuses before starting: there is nothing to run.',
@@ -1393,7 +1413,8 @@ export const testsEn: typeof testsRu = {
         'conversation never creates the folder itself, and the agent will not create it ' +
         'silently either: with none and a task that needs tests, it asks in that same single ' +
         'question whether to keep them in the Tests section. Changing how the product behaves, ' +
-        'it adds or updates the case for the change on its own (tests-cli case) and records ' +
+        'it adds or updates the case for the change on its own (tests-cli case) — a step per ' +
+        'behaviour, each expected naming what is seen, never “all pass” — and records ' +
         'what it verified: a manual case with tests-cli record (marked “by hand”), an ' +
         'automated one only with a run; a case you wrote arrives as a draft edit to ' +
         'accept. When it cannot run commands or write files (for another CLI that is decided by ' +
@@ -1435,7 +1456,9 @@ export const testsEn: typeof testsRu = {
         'Gradle and Maven use the project’s wrapper (gradlew, mvnw), pytest uses uv, poetry or the ' +
         'project’s .venv. When the program is not on the machine, the recipe says so before the ' +
         'run and names how to install it. A module in a subfolder runs via “cd folder && …” and ' +
-        'always as a whole.',
+        'always as a whole. Several Go modules and no go.work — the “all modules” recipe comes ' +
+        'first: go test -C per module, appending to one report; with a selection only the ' +
+        'modules and packages of the selected cases run.',
       run: 'Command saved, run done',
       runText:
         '“Take” puts the recipe into the fields, “Save” writes .agent/tests/automation.json — the ' +
@@ -1471,7 +1494,28 @@ export const testsEn: typeof testsRu = {
         'The panel installs nothing — not go, a JDK, cargo or pytest; it only names them. Modules ' +
         'deeper than two folders get no recipe. .NET, PHPUnit, RSpec and the rest have no recipe: ' +
         'a command that writes JUnit is set with “Set your own command”. Several modules give ' +
-        'several recipes while a project has one command: you decide which one runs.',
+        'several recipes while a project has one command: you decide which one runs (Go has ' +
+        '“all modules” for that).',
+      suitesTitle: 'A case per folder, not per test',
+      suitesText:
+        'In a large repository a case per test function means thousands of rows nobody reads. ' +
+        'So a folder with tests (a Go package, a JS/TS slice, a pytest module) is one suite ' +
+        'case in the group suites-<top folder>; the case result is the worst of its tests, but ' +
+        'a test skipped by its author (it.skip, t.Skip) does not spoil it: a suite is “skipped” ' +
+        'only as a whole. The note carries the count of passed tests (“✓ 12” or “✗ 2/12 · name: reason”), and a package that failed ' +
+        'to build gets only its own build error lines. The case text is written from the tests ' +
+        'themselves, with no model: the title is the describe or the module docstring, a step is ' +
+        'a behaviour checked (the test name, the rows of a Go table test, the first sentence of a ' +
+        'pytest docstring), and its expected names the test that proves it; past fourteen ' +
+        'behaviours it is a step per file listing its checks. When the folder’s tests change, ' +
+        'the case is rewritten by itself as long as nobody has edited it; an edited one the ' +
+        'panel no longer touches. A project with no cases yet and .agent ' +
+        'hidden from git gets the suites by itself, once, when it is added or on the panel’s ' +
+        'first start; with no run command of its own, the recipe with the most tests is taken. ' +
+        'After that, new folders are added by pnpm tests suites (--dry only counts). A case for ' +
+        'a single test beats the suite: its result lands on it, not on the folder. The same ' +
+        'path in two packages is not guessed — such a run is recognised when started from the ' +
+        'project root.',
     },
   },
   shots: {

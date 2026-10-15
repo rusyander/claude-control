@@ -182,7 +182,12 @@ import {
 import { storeTreeReader } from '../../domains/chat/chat-autonomy/chat-autonomy.ts';
 import { triageGroupCatalog } from '../../domains/chat/group-auto-pick/group-auto-pick.ts';
 import { readChoice } from '../../domains/groups/choice/choice.ts';
-import { projectTestsBusy, wireTestsChatNote } from '../tests-chat-wiring/tests-chat-wiring.ts';
+import {
+  projectTestsBusy,
+  reconcileProjectSuites,
+  reconcileProjectTurnHooks,
+  wireTestsChatNote,
+} from '../tests-chat-wiring/tests-chat-wiring.ts';
 import { ActivatingTestRunRegistry } from '../activating-test-runs/activating-test-runs.ts';
 import { createReviewStarter } from '../../routes/chat/review-starter.ts';
 import { lostConversationBrief } from '../../domains/chat/split-continue.ts';
@@ -581,6 +586,20 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     isBusy: projectTestsBusy(projectTestRuns, e2eRuns),
     log: (message, error) => console.warn(message, error),
   });
+  // Проверка конца хода блока «Тесты» — хуком в каждом проекте реестра: так её видит
+  // и VS Code, и терминал, а не только чат панели. После старта, чтобы не держать его.
+  setImmediate(() =>
+    reconcileProjectTurnHooks(
+      ctx.location.paths.appData,
+      ctx.store.getProjects().map((project) => project.path),
+      (message, error) => console.warn(message, error),
+    ),
+  );
+  reconcileProjectSuites(
+    ctx.location.paths.appData,
+    ctx.store.getProjects().map((project) => project.path),
+    (message, error) => console.warn(message, error),
+  );
 
   const splitOverlap = new SplitOverlap({
     git: {

@@ -16,8 +16,8 @@
  */
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 
 const T_U32 = 4;
@@ -184,7 +184,8 @@ async function readBody(req) {
 
 /**
  * @param {{ port?: number, alias?: string, nCtx?: number, tokensPerSec?: number, loadingMs?: number,
- *           inputTokens?: number, sleeping?: boolean, countTools?: boolean }} [options]
+ *           inputTokens?: number, sleeping?: boolean, countTools?: boolean, slotTokens?: number,
+ *           slotDir?: string }} [options]
  */
 export async function startStubLlama(options = {}) {
   const calls = [];
@@ -215,6 +216,35 @@ export async function startStubLlama(options = {}) {
       });
     if (url.pathname === '/slots/0' && url.searchParams.get('action') === 'erase')
       return json(200, { id_slot: 0, n_erased: 2038 });
+    // Сохранение и восстановление кеша слота — ответы сборки b11583 (замер 15.10). Файлы
+    // «пишутся» в память заглушки: восстановить можно только сохранённое ею же. С `slotDir`
+    // (`--slot-save-path`) файл ложится и на диск, как у настоящего, — его видит панель.
+    if (url.pathname === '/slots/0' && url.searchParams.get('action') === 'save') {
+      state.savedSlots ??= new Set();
+      state.savedSlots.add(payload.filename);
+      if (options.slotDir) writeFileSync(join(options.slotDir, payload.filename), 'slot');
+      return json(200, {
+        id_slot: 0,
+        filename: payload.filename,
+        n_saved: options.slotTokens ?? 22358,
+        n_written: 2262668504,
+        timings: { save_ms: 1830 },
+      });
+    }
+    if (url.pathname === '/slots/0' && url.searchParams.get('action') === 'restore') {
+      const onDisk = options.slotDir && existsSync(join(options.slotDir, payload.filename));
+      if (!state.savedSlots?.has(payload.filename) && !onDisk)
+        return json(400, {
+          error: { code: 400, message: 'failed to restore slot', type: 'invalid_request_error' },
+        });
+      return json(200, {
+        id_slot: 0,
+        filename: payload.filename,
+        n_restored: options.slotTokens ?? 22358,
+        n_read: 2262668504,
+        timings: { restore_ms: 2224 },
+      });
+    }
     if (url.pathname === '/v1/messages/count_tokens')
       return json(200, {
         // `countTools`: инструменты запроса прибавляют токены (четверть длины JSON) — так видна цена набора.

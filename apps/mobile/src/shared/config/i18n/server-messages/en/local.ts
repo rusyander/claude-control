@@ -21,6 +21,8 @@ export const localEn: Record<LocalMessageCode, string> = {
   'local-runtime-missing': 'the model server is not installed — press «Install» first',
   'local-server-down': 'the model server is not running',
   'local-model-unknown': 'model {{tag}} is not in the panel catalog',
+  'local-toggle-no-model':
+    'no model is chosen for agents — turn one on in the «Agents» tab of «Local models»',
   'local-model-missing': 'model {{tag}} is not downloaded',
   'local-model-loaded':
     'quantization {{quant}} of {{tag}} is loaded in the model server — stop the server first ("Stop and free memory" on the "Hardware & server" tab), then delete',

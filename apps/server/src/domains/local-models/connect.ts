@@ -144,6 +144,20 @@ export async function connectLocal(
   inject: Inject,
   input: { baseUrl: string; model: string; title: string },
 ): Promise<unknown> {
+  await saveLocalContour(inject, input);
+  const activated = await inject({
+    method: 'POST',
+    url: `/api/platforms/${LOCAL_PLATFORM_ID}/activate`,
+  });
+  if (activated.status >= 400) throw fail('local-contour-activate', 'включение контура', activated);
+  return applyAssistant(inject, activated.body);
+}
+
+/** Записать контур локальной модели (без включения): адрес, модель, кому он отдан. */
+export async function saveLocalContour(
+  inject: Inject,
+  input: { baseUrl: string; model: string; title: string },
+): Promise<void> {
   // Контур этого же вида уже есть — его слои человек мог править на карточке, и
   // повторное «Подключить» их не сбрасывает. Контур старого вида (Ollama) или
   // новый получает полный набор.
@@ -177,11 +191,23 @@ export async function connectLocal(
     const qwen = options.find((option) => option.id === foreignConsumerId('qwen'));
     if (qwen && !qwen.reason) await put([...LOCAL_CONSUMERS, qwen.id]);
   }
+}
+
+/**
+ * Включить уже заведённый контур одним нажатием (кнопка в шапке чата): без пробы — она
+ * ждала бы ответа модели, которая в этот момент только грузится. Профиль ассистента
+ * назначается тем же шагом, что и при «Подключить»: выключение возвращает его откатом.
+ */
+export async function switchLocalOn(inject: Inject): Promise<unknown> {
   const activated = await inject({
     method: 'POST',
-    url: `/api/platforms/${LOCAL_PLATFORM_ID}/activate`,
+    url: `/api/platforms/${LOCAL_PLATFORM_ID}/activate?probe=skip`,
   });
   if (activated.status >= 400) throw fail('local-contour-activate', 'включение контура', activated);
+  return applyAssistant(inject, activated.body);
+}
+
+async function applyAssistant(inject: Inject, activated: unknown): Promise<unknown> {
   // Агент панели, помощники и наблюдатель ходят профилем «Ассистента панели», а не
   // окружением прогона: его назначает применение цели `assistant`, как в мастере
   // контура. Без этого шага при недоступном Claude они уходили в облако и падали
@@ -196,14 +222,14 @@ export async function connectLocal(
   const skipped = (applied.body as { skipped?: { reason?: string }[] } | undefined)?.skipped ?? [];
   // Шлюз не поднялся (порт занят): включение уже отдало красную проверку с
   // причиной — она человеку и нужна, а не 409 с кодом цели поверх неё.
-  if (skipped.every((item) => item.reason === 'gateway_down')) return activated.body;
+  if (skipped.every((item) => item.reason === 'gateway_down')) return activated;
   if (skipped.length > 0) {
     throw fail('local-contour-activate', 'ассистент панели', {
       status: 409,
       body: { message: `цель пропущена: ${skipped[0]?.reason ?? 'причина не названа'}` },
     });
   }
-  return activated.body;
+  return activated;
 }
 
 export async function disconnectLocal(inject: Inject): Promise<void> {

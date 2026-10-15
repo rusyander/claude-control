@@ -67,6 +67,7 @@ import {
   LOCAL_REPLY_RESERVE_TOKENS,
   type LocalUpstreamInfo,
 } from '../local-window/local-window.ts';
+import { expandDeferredTools } from '../local-window/deferred-tools.ts';
 import { NativeThinkFilter, withoutThinkMessage } from '../native-think/native-think.ts';
 import { historyHasToolUse } from '../tool-shim/encode.ts';
 import type { ShimCall } from '../tool-shim/parse.ts';
@@ -1422,7 +1423,12 @@ async function countTokens(
     clientBody,
     platform.rules.platform.platformTools.length > 0,
   );
-  const bodyText = JSON.stringify(applyManagedRules(stripped, platform, driver));
+  const bodyText = JSON.stringify(
+    expandDeferredTools(
+      applyManagedRules(stripped, platform, driver),
+      local.deferredInline === true,
+    ),
+  );
   const promptCounter = deps.promptCounter ?? fallbackPromptCounter;
   if (messages) {
     try {
@@ -1491,8 +1497,12 @@ async function nativeChat(
     native.clientBody,
     platform.rules.platform.platformTools.length > 0,
   );
-  const ruledBody = applyManagedRules(stripped, platform, driver);
-  const model = typeof ruledBody.model === 'string' ? ruledBody.model : '';
+  const managed = applyManagedRules(stripped, platform, driver);
+  const model = typeof managed.model === 'string' ? managed.model : '';
+  const local = deps.localUpstream?.(platform.id, model);
+  // Отложенные инструменты Claude Code (`ToolSearch`) разворачиваются здесь, а не
+  // сервером моделей: llama-server их не знает (L7, `deferred-tools.ts`).
+  const ruledBody = local ? expandDeferredTools(managed, local.deferredInline === true) : managed;
   const vault = new AliasVault({ avoid: driver.placeholderPattern });
   const refusal = (status: number, code: string, message: string): void =>
     refuse(response, deps, { platformId: platform.id, path, dialect, status, code, message, lost });
@@ -1509,7 +1519,6 @@ async function nativeChat(
   // с головы (вместе с системным промптом) или обрывает ответ как «длину», а
   // Claude Code читает это как перебор выходных токенов и не сжимает историю.
   // Отказ текстом, который он узнаёт, — и он сжимает сам и повторяет.
-  const local = deps.localUpstream?.(platform.id, model);
   const promptCounter = deps.promptCounter ?? fallbackPromptCounter;
   let promptTokens = local ? promptCounter.estimate(platform.id, model, bodyText.length) : 0;
   // Оценка по символам промахивается на плотном выводе (код, JSON): выше 75% окна

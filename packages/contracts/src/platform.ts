@@ -1756,6 +1756,17 @@ export interface PlatformActivationResult {
 }
 
 /**
+ * Включение уже проверенного контура без пробы (`?probe=skip`): итог пробы остаётся
+ * прежним, а шлюз поднят. `gatewayError` — почему не поднялся.
+ */
+export interface PlatformQuickActivationResult {
+  activePlatformId: string;
+  previousPlatformId: string;
+  rollback?: PlatformRollbackResult;
+  gatewayError?: string;
+}
+
+/**
  * Применение контура (Т3): куда панель направляет работу через шлюз.
  *
  * Второго механизма записи здесь не заводится. Контур ПОРОЖДАЕТ управляемый

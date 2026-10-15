@@ -1322,8 +1322,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         ? { setting: CLAUDE_SWITCH_SETTING, platformId: LOCAL_PLATFORM_ID, ...model }
         : undefined;
     },
-    localRunEnv: (platformId) =>
-      platformId === LOCAL_PLATFORM_ID ? localModels.runEnv() : undefined,
+    localRunEnv: (platformId, route) =>
+      platformId === LOCAL_PLATFORM_ID ? localModels.runEnv(route) : undefined,
     localMcpPicks: (platformId, project) =>
       platformId === LOCAL_PLATFORM_ID ? localModels.mcpInfo(project).picked : undefined,
   };

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -35,7 +35,7 @@ interface StubServer {
 interface Stubs {
   writeGguf: (path: string, options?: Record<string, unknown>) => Buffer;
   ggufBuffer: (options?: Record<string, unknown>) => Buffer;
-  startStubLlama: (options?: { port?: number }) => Promise<StubServer>;
+  startStubLlama: (options?: { port?: number; slotDir?: string }) => Promise<StubServer>;
 }
 const REPO = resolve(import.meta.dirname, '..', '..', '..', '..', '..');
 const stubs = (await import(
@@ -62,12 +62,13 @@ const ENV = (): NodeJS.ProcessEnv => ({
   USERPROFILE: root,
 });
 
-function service(freeGiB = 40) {
+function service(freeGiB = 40, now?: () => number) {
   return createLocalModels({
     appRoot: root,
     env: ENV(),
     port: PORT,
     freeBytes: () => freeGiB * GIB,
+    ...(now ? { now } : {}),
     run: async (cmd) => {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
@@ -75,9 +76,11 @@ function service(freeGiB = 40) {
     spawnServer: ((_binary: string, args: string[]) => {
       spawned.push({ args });
       starting.push(
-        stubs.startStubLlama({ port: PORT }).then((started) => {
-          stub = started;
-        }),
+        stubs
+          .startStubLlama({ port: PORT, slotDir: flag(args, '--slot-save-path') })
+          .then((started) => {
+            stub = started;
+          }),
       );
       return { pid: 4242, once: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
@@ -262,9 +265,9 @@ describe('сброс кеша слота при смене разговора', 
         call.method === 'POST' && call.path === '/slots/0' && call.query === '?action=erase',
     ).length;
 
-  async function ready() {
+  async function ready(now?: () => number) {
     seedModel({ nextn: 1 });
-    const local = service();
+    const local = service(40, now);
     await local.startServer({ tag: TAG });
     const upstream = local.upstream(TAG);
     if (!upstream?.prepare) throw new Error('no prepare');
@@ -285,10 +288,71 @@ describe('сброс кеша слота при смене разговора', 
     expect(erases()).toBe(3);
   });
 
+  it('длинный кеш уходящего чата ложится на диск, возврат к нему — из файла, без сброса', async () => {
+    const { local, prepare } = await ready();
+    const upstream = local.upstream(TAG);
+    const action = (name: string): number =>
+      (stub?.calls ?? []).filter((call) => call.query === `?action=${name}`).length;
+    await prepare('chat-A');
+    // Ход чата A: запрос в 30 тыс. токенов — столько окажется в кеше слота.
+    upstream?.watch(30_000).done();
+    await prepare('chat-B');
+    expect(action('save')).toBe(1);
+    expect(erases()).toBe(2);
+    const slotsDir = localPaths(root, ENV()).slotsDir;
+    expect(existsSync(join(slotsDir, 'chat-A.bin'))).toBe(true);
+    expect(existsSync(join(slotsDir, 'chat-A.json'))).toBe(true);
+    // Чат B короткий — не пишется; A поднимается из файла, слот не стирается.
+    await prepare('chat-A');
+    expect(action('save')).toBe(1);
+    expect(action('restore')).toBe(1);
+    expect(erases()).toBe(2);
+  });
+
+  it('перед сном по простою кеш пишется на диск — один раз и не раньше срока', async () => {
+    let now = 1_000_000;
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const { local, prepare } = await ready(() => now);
+      const saves = (): number =>
+        (stub?.calls ?? []).filter((call) => call.query === '?action=save').length;
+      await prepare('chat-A');
+      local.upstream(TAG)?.watch(30_000).done();
+      // Простой короче срока (сон через IDLE_SLEEP_SECONDS, запись — за 45 с до него): не пишем.
+      now += (IDLE_SLEEP_SECONDS - 60) * 1000;
+      await vi.advanceTimersByTimeAsync(15_000);
+      await new Promise((done) => setTimeout(done, 100));
+      expect(saves()).toBe(0);
+      now += 30_000;
+      await vi.advanceTimersByTimeAsync(15_000);
+      await vi.waitFor(() => expect(saves()).toBe(1));
+      await vi.advanceTimersByTimeAsync(30_000);
+      await new Promise((done) => setTimeout(done, 100));
+      expect(saves()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('запрос без метки разговора кеша не трогает', async () => {
     const { prepare } = await ready();
     await prepare(undefined);
     expect(erases()).toBe(0);
+  });
+
+  it('запрос без метки после хода чата: кеш чата — на диск, следующий ход чата поднимает его, а не считает слот своим', async () => {
+    const { local, prepare } = await ready();
+    const action = (name: string): number =>
+      (stub?.calls ?? []).filter((call) => call.query === `?action=${name}`).length;
+    await prepare('chat-A');
+    local.upstream(TAG)?.watch(30_000).done();
+    // Проба контура (без метки) перепишет слот своим промптом.
+    await prepare(undefined);
+    expect(action('save')).toBe(1);
+    expect(erases()).toBe(1);
+    await prepare('chat-A');
+    expect(action('restore')).toBe(1);
+    expect(erases()).toBe(1);
   });
 
   it('спящий сервер не будится сбросом: кеш у него и так пуст', async () => {

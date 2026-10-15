@@ -14,6 +14,7 @@ import {
   localMcpPickBodySchema,
   localModelBodySchema,
   localPullBodySchema,
+  localToggleBodySchema,
   localRemoveQuerySchema,
 } from '@agentdeck/contracts/local-models';
 import type { ServerContext } from '../../context.ts';
@@ -221,6 +222,21 @@ export function registerLocalModelsRoutes(
   app.post('/api/local-models/disconnect', async (request, reply) => {
     try {
       await local.disconnect(injectFor(request));
+      return await local.describeConnect(injectFor(request));
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
+  /**
+   * Одна кнопка в шапке чата: включить локальную модель, выбранную агентам (сервер
+   * поднимается в фоне, контур включается сразу), или выключить её вместе с сервером.
+   */
+  app.post<{ Body: unknown }>('/api/local-models/toggle', async (request, reply) => {
+    const body = parseBody(localToggleBodySchema, request.body, reply);
+    if (!body) return reply;
+    try {
+      await local.toggle(injectFor(request), body.on, body.tag);
       return await local.describeConnect(injectFor(request));
     } catch (error) {
       return refuse(reply, error);

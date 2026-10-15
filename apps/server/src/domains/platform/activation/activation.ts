@@ -1,6 +1,7 @@
 import type {
   Platform,
   PlatformActivationResult,
+  PlatformQuickActivationResult,
   PlatformProbeResult,
   PlatformRollbackResult,
   PlatformSmokeResult,
@@ -121,6 +122,29 @@ export async function activatePlatform(
     ...(rollback ? { rollback } : {}),
     probe,
     smoke,
+  };
+}
+
+/**
+ * Сделать контур активным без пробы и пробного запроса — для переключателя, который
+ * включает уже проверенный контур одним нажатием (кнопка локальной модели в шапке чата).
+ * Проба держала бы нажатие до ответа модели, а модель в этот момент только грузится:
+ * пробный запрос ждал бы загрузки, а то и записал бы красный итог про контур, который
+ * исправен. Шлюз поднимается здесь же — без него маршрут не пройдёт ни один прогон.
+ */
+export async function switchPlatformOn(
+  deps: ContourActivationDeps,
+  id: string,
+): Promise<PlatformQuickActivationResult> {
+  const platform = requirePlatform(deps.store, id);
+  const previousId = deps.store.getSettings().activePlatformId;
+  const rollback = runActivationTransaction(deps, platform, previousId);
+  const gatewayError = await raiseGateway(deps);
+  return {
+    activePlatformId: id,
+    previousPlatformId: previousId === id ? '' : previousId,
+    ...(rollback ? { rollback } : {}),
+    ...(gatewayError ? { gatewayError } : {}),
   };
 }
 

@@ -386,6 +386,26 @@ describe('окно локальной модели в окружении про�
     expect(decision.env.ANTHROPIC_BASE_URL).toContain('127.0.0.1:5179');
   });
 
+  it('маршрут прогона назван сервису: контур — через шлюз, переключатель — мимо (L7)', () => {
+    const routes: PlatformRoutingDeps = {
+      ...deps,
+      localRunEnv: (platformId, route) =>
+        platformId === 'local-ollama'
+          ? { ...WINDOW, ...(route === 'gateway' ? { ENABLE_TOOL_SEARCH: 'true' } : {}) }
+          : undefined,
+      claudeSettingsRoute: () => ({
+        setting: 'settings.json → env.ANTHROPIC_BASE_URL',
+        platformId: 'local-ollama',
+        model: 'qwen3.6:27b-coding',
+        title: 'Qwen3.6 27B Coding',
+      }),
+    };
+    expect(localClaudeRun(routes, 'chat', resolveRunRoute(routes, 'chat'))?.env).toEqual(WINDOW);
+    connect(LOCAL_PLATFORM);
+    const contour = resolveRunRoute({ ...routes, claudeSettingsRoute: undefined }, 'chat');
+    expect(contour.routed && contour.env.ENABLE_TOOL_SEARCH).toBe('true');
+  });
+
   it('окно не едет чужому CLI и чужому контуру', () => {
     connect(LOCAL_PLATFORM);
     const foreign = resolveRunRoute(withWindow(), 'foreign:qwen');

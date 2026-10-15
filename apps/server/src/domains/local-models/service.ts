@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { arch, platform } from 'node:os';
@@ -52,13 +53,22 @@ import {
   switchClaudeOff,
   switchClaudeOn,
 } from './claude-switch.ts';
-import { connectLocal, describeConnect, disconnectLocal, type Inject } from './connect.ts';
+import {
+  connectLocal,
+  describeConnect,
+  disconnectLocal,
+  saveLocalContour,
+  switchLocalOn,
+  type Inject,
+} from './connect.ts';
 import { buildCustomModel, parseRepoInput } from './custom.ts';
 import type { FetchLike } from './download.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
 import { localError } from './errors.ts';
 import { quantNameOf, readGgufFacts, readGgufWeightType } from './gguf.ts';
 import { detectHardware, runCommand, type RunCommand } from './hardware.ts';
+import { SPILL_BYTES, processVram, type ProcessVram } from './process-vram.ts';
+import { createSlotStore } from './slot-store.ts';
 import { downloadModelFile, listRepoFiles, modelFilePath, quantsOf, type RepoQuant } from './hf.ts';
 import { type JobHandle, LocalJobs } from './jobs.ts';
 import { killProcessTree } from '../../lib/kill-tree.mjs';
@@ -68,7 +78,7 @@ import { llamaClient } from './llama-client.ts';
 import { MAX_RESTARTS, createServerSupervisor, type ReviveResult } from './supervisor.ts';
 import { createActivityWatch, type ActivityTrack } from './activity.ts';
 import { importOllamaModel } from './ollama-import.ts';
-import { localRunEnv } from './run-env.ts';
+import { LOCAL_GATEWAY_RUN_ENV, localRunEnv } from './run-env.ts';
 import { createLocalMcp } from './mcp-service.ts';
 import { freesBytes, insideDir, pruneEmptyDirs, removeCounted, samePath } from './remove.ts';
 import type { LocalMcpSource } from './local-mcp.ts';
@@ -104,6 +114,7 @@ import {
   stopServer,
   testLoadModel,
   type Offload,
+  type ServerRecord,
   type ServerShape,
 } from './server.ts';
 import {
@@ -129,6 +140,11 @@ import {
 const DATA = new URL('./data/', import.meta.url);
 /** Железо меряется не на каждый опрос страницы: `nvidia-smi` и PowerShell — сотни миллисекунд. */
 const HARDWARE_TTL_MS = 15_000;
+const BYTES_PER_GB = 1024 ** 3;
+/** Как часто проверять, не пора ли сохранить кеш слота перед сном (L8). */
+const IDLE_SAVE_CHECK_MS = 15_000;
+/** За сколько до сна по простою сохранять: запись 2–13 ГБ идёт секунды, сон их не ждёт. */
+const IDLE_SAVE_LEAD_MS = 45_000;
 const RELEASE_TTL_MS = 60 * 60_000;
 const QUANTS_TTL_MS = 10 * 60_000;
 /** Метка квантования у модели, пришедшей из хранилища Ollama: какое оно, там не записано. */
@@ -157,6 +173,26 @@ export function loadCatalog(): ModelCatalog {
 /** Путь к своему шаблону чата из каталога: имя проверено схемой, выйти из папки оно не может. */
 export function templatePath(name: string): string {
   return fileURLToPath(new URL(`templates/${name}`, DATA));
+}
+
+/** С какого запуска снят кеш слота: файл модели, окно, тип кеша, шаблон — иное не прочтётся. */
+export function slotShapeOf(record: ServerShape): string {
+  return [record.file, record.context, record.kvCache, record.templateHash ?? ''].join('|');
+}
+
+/** Отпечаток содержимого шаблона: сменился файл — другой запуск (`sameShape`), а не тот же путь. */
+export function templateHashOf(file: string): string | undefined {
+  try {
+    return createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 16);
+  } catch {
+    return undefined;
+  }
+}
+
+function templateOf(name: string): { templateFile: string; templateHash?: string } {
+  const templateFile = templatePath(name);
+  const templateHash = templateHashOf(templateFile);
+  return { templateFile, ...(templateHash ? { templateHash } : {}) };
 }
 
 export function loadGpuTable(): ReturnType<typeof gpuTableSchema.parse> {
@@ -270,7 +306,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
 
   async function readHardware(force = false): Promise<HardwareInfo> {
     if (!force && hardware && Date.now() - hardware.at < HARDWARE_TTL_MS)
-      return creditOwnModels(hardware.value);
+      return creditOwnModels(hardware.value, false);
     const llamaServer = envBinary(env) || findPanelBinary(paths, os);
     const value = await detectHardware({
       table,
@@ -280,20 +316,52 @@ export function createLocalModels(deps: LocalModelsDeps) {
       ...(deps.run ? { run: deps.run } : {}),
     });
     hardware = { at: Date.now(), value };
-    return creditOwnModels(value);
+    return creditOwnModels(value, true);
+  }
+
+  /** Замер памяти процесса сервера (`process-vram.ts`): с тем же сроком, что и сведения о карте. */
+  let ownVram: { at: number; pid: number; value?: ProcessVram } | undefined;
+  /**
+   * Сервер, замеченный с вытеснением в общую память: его выбор кеша не закрепляется
+   * (`shapeFor`), и перезапуск ждёт конца прогонов — подбор по замеру положит меньше.
+   */
+  let spilledPid: number | undefined;
+
+  async function measureOwn(pid: number, fresh: boolean): Promise<ProcessVram | undefined> {
+    if (!fresh && ownVram?.pid === pid && Date.now() - ownVram.at < HARDWARE_TTL_MS)
+      return ownVram.value;
+    const value = await processVram(run, os, pid);
+    ownVram = { at: Date.now(), pid, value };
+    return value;
   }
 
   /**
    * Свободная память карты плюс то, что держит наш же сервер: модель, загруженная
-   * им, при перезапуске сервера освободится, значит, подбору она не помеха.
+   * им, при перезапуске сервера освободится, значит, подбору она не помеха. Засчитывается
+   * замер процесса, а оценка — только когда замера нет: вытесненное в общую память на
+   * карте не лежит и при перезапуске её не освободит (L9).
    */
-  async function creditOwnModels(value: HardwareInfo): Promise<HardwareInfo> {
+  async function creditOwnModels(value: HardwareInfo, fresh: boolean): Promise<HardwareInfo> {
     const [gpu, ...rest] = value.gpus;
     const record = readRecord(paths);
     if (!gpu || !record || record.device === 'cpu' || (await probe(port, fetchImpl)) !== 'ok')
       return value;
     // Выгруженная по простою модель память не держит — засчитывать нечего.
     if (await isSleeping()) return value;
+    const measured = record.pid ? await measureOwn(record.pid, fresh) : undefined;
+    if (measured && measured.sharedBytes > SPILL_BYTES) noteSpill(record);
+    if (measured) {
+      // Свободное — по драйверу, а не по CUDA: под WDDM она считает наш сервер свободным,
+      // и зачёт сверху удваивал бы его (`process-vram.ts`).
+      const freeGb =
+        measured.freeBytes !== undefined
+          ? measured.freeBytes / BYTES_PER_GB
+          : measured.adapterUsedBytes !== undefined
+            ? Math.max(0, gpu.vramGb - measured.adapterUsedBytes / BYTES_PER_GB)
+            : gpu.freeGb;
+      const base = freeGb === undefined ? gpu : { ...gpu, freeGb };
+      return { ...value, gpus: [withOwnHeldVram(base, measured.dedicatedBytes), ...rest] };
+    }
     const file = statOf(record.file);
     const held = heldVramBytes(
       [
@@ -573,6 +641,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
     const sticky =
       !named &&
       running?.fitted === true &&
+      running.pid !== spilledPid &&
       running.tag === tag &&
       running.file === file.path &&
       running.context === context &&
@@ -609,7 +678,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
       ...(model?.chatTemplateKwargs
         ? { templateKwargs: JSON.stringify(model.chatTemplateKwargs) }
         : {}),
-      ...(model?.chatTemplate ? { templateFile: templatePath(model.chatTemplate) } : {}),
+      ...(model?.chatTemplate ? templateOf(model.chatTemplate) : {}),
     };
   }
 
@@ -632,12 +701,34 @@ export function createLocalModels(deps: LocalModelsDeps) {
   /** Сколько запусков и остановок сервера панель ведёт сейчас: присмотр в это время молчит. */
   /** Настройка сохранена, а перезапуск сервера ждёт конца прогона. Хранится в файле состояния: переживает перезапуск панели. */
   let pendingRestart = readState(paths).pendingRestart === true;
+  // Шаблон чата идущего сервера сменился с обновлением панели (L7: пометка отложенных
+  // инструментов): сервер держит прежний, пока его не перезапустят, а шлюз уже шлёт
+  // тела под новый. Перезапуск — как у отложенной настройки, когда прогонов нет.
+  {
+    const record = readRecord(paths);
+    if (record?.templateFile && record.templateHash !== templateHashOf(record.templateFile))
+      pendingRestart = true;
+    // Так же со сроком простоя (L8: 600 → 300 с): сервер со старым сроком после записи кеша
+    // перед сном держал бы модель в видеопамяти вдвое дольше обещанного.
+    const idleSeconds = readState(paths).keepLoaded ? 0 : IDLE_SLEEP_SECONDS;
+    if (record && (record.idleSeconds ?? 0) !== idleSeconds) pendingRestart = true;
+  }
   /** Подряд не удавшихся применений отложенной настройки: вторая неудача снимает ожидание. */
   let applyFailures = 0;
   /** Модель, которую не удалось поднять с новой настройкой: после сбоя записи сервера уже нет. */
   let failedTag: string | undefined;
   /** Почему отложенная настройка так и не применилась (после двух попыток); видна на карточке сервера. */
   let restartError: string | undefined;
+  /**
+   * Сервер не влез в карту (L9): подобранный кеш больше не закрепляется, перезапуск —
+   * когда прогонов нет. Названный человеком кеш подбор не меняет, а перезапуск с тем же
+   * запуском ничего бы не дал — тогда только снимается закрепление.
+   */
+  function noteSpill(record: ServerRecord): void {
+    if (spilledPid === record.pid) return;
+    spilledPid = record.pid;
+    if (record.fitted) setPending(true);
+  }
   function setPending(value: boolean): void {
     pendingRestart = value;
     if (!value) applyFailures = 0;
@@ -762,6 +853,14 @@ export function createLocalModels(deps: LocalModelsDeps) {
       (error instanceof Error ? error.message : String(error))
     );
   }
+  function noteStartFailure(error: unknown): void {
+    onDemandFailures += 1;
+    onDemandCause = crashCause(error);
+    onDemandNextAt =
+      onDemandFailures >= ON_DEMAND_MAX
+        ? Number.POSITIVE_INFINITY
+        : clock() + ON_DEMAND_BACKOFF_MS * 2 ** (onDemandFailures - 1);
+  }
   function startOnDemand(tag: string): Promise<ReviveResult> {
     if (readRecord(paths) || supervisor.target()) return supervisor.revive();
     if (onDemandFailures >= ON_DEMAND_MAX || clock() < onDemandNextAt)
@@ -774,12 +873,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
         resetOnDemand();
         return 'restarted';
       } catch (error) {
-        onDemandFailures += 1;
-        onDemandCause = crashCause(error);
-        onDemandNextAt =
-          onDemandFailures >= ON_DEMAND_MAX
-            ? Number.POSITIVE_INFINITY
-            : clock() + ON_DEMAND_BACKOFF_MS * 2 ** (onDemandFailures - 1);
+        noteStartFailure(error);
         return 'failed';
       } finally {
         onDemand = undefined;
@@ -953,22 +1047,54 @@ export function createLocalModels(deps: LocalModelsDeps) {
     }
   }
 
+  // Кеш прочитанного промпта на диске (L8, `slot-store.ts`).
+  const slots = createSlotStore({
+    dir: paths.slotsDir,
+    client,
+    shape: () => {
+      const record = readRecord(paths);
+      return record ? slotShapeOf(record) : undefined;
+    },
+    pid: () => readRecord(paths)?.pid,
+    sleeping: isSleeping,
+    now: clock,
+  });
+
   /**
-   * Разговор, чей запрос сервер получил последним. Сменился — кеш слота сбрасывается
-   * (`POST /slots/0?action=erase`): новый чат не наследует чужой префикс. Спящий
-   * сервер не трогается — запрос к слотам будит его загрузкой модели, а кеш у него и
-   * так пуст. Сбой сброса запрос не срывает.
+   * Разговор, чей запрос сервер получит сейчас. Сменился — кеш прежнего уходит на диск, а
+   * кеш этого поднимается из файла; файла нет — слот стирается: новый чат не наследует чужой
+   * префикс. Спящий сервер без файла не будится. Сбой запрос не срывает (`slot-store.ts`).
    */
-  let lastSession: string | undefined;
   async function noteSession(session: string | undefined): Promise<void> {
-    if (!session || session === lastSession) return;
-    lastSession = session;
+    ensureIdleSaver();
     try {
-      if (await isSleeping()) return;
-      await client.eraseSlot(0);
+      await (session ? slots.switchTo(session) : slots.release());
     } catch {
       // Сервер без каталога слотов (запущен прежней панелью) или занят: запрос идёт как есть.
     }
+  }
+
+  /**
+   * Перед сном по простою кеш слота — на диск: спящий сервер выгружает модель вместе с
+   * кешем, и первый ход после сна читал бы весь промпт заново. Проверка раз в
+   * `IDLE_SAVE_CHECK_MS`; запись — за `IDLE_SAVE_LEAD_MS` до сна, один раз до следующего запроса.
+   */
+  let idleSaver: ReturnType<typeof setInterval> | undefined;
+  function ensureIdleSaver(): void {
+    if (idleSaver) return;
+    idleSaver = setInterval(
+      () => void saveBeforeSleep().catch(() => undefined),
+      IDLE_SAVE_CHECK_MS,
+    );
+    idleSaver.unref?.();
+  }
+  async function saveBeforeSleep(): Promise<void> {
+    const record = readRecord(paths);
+    const idle = slots.idleMs();
+    if (!record?.idleSeconds || idle === undefined || activity.snapshot().inFlight > 0) return;
+    const minIdleMs = record.idleSeconds * 1000 - IDLE_SAVE_LEAD_MS;
+    if (idle < minIdleMs) return;
+    await slots.saveIdle(minIdleMs);
   }
 
   // MCP-серверы локального прогона. Источника нет (проверки без панели) — раздел пуст.
@@ -1011,7 +1137,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
       keepLoaded,
       keepAwake: readState(paths).keepAwake,
       ...(deps.awakeHeld?.() ? { awake: true } : {}),
-      idleSeconds: IDLE_SLEEP_SECONDS,
+      // Срок идущего сервера, а не нынешний по умолчанию: до перезапуска действует прежний.
+      idleSeconds: (running && record?.idleSeconds) || IDLE_SLEEP_SECONDS,
       ...(sleeping ? { sleeping } : {}),
       running,
       port,
@@ -1533,6 +1660,45 @@ export function createLocalModels(deps: LocalModelsDeps) {
     disconnect: (inject: Inject) => disconnectLocal(inject),
 
     /**
+     * Кнопка в шапке чата. Включение не ждёт загрузки модели: контур включается сразу,
+     * сервер поднимается в фоне с настройками, выбранными модели (квантование, окно, кеш),
+     * а запрос чата, пришедший раньше, ждёт того же подъёма (присмотр отвечает «занят»,
+     * Claude Code повторяет). Неудача подъёма — причиной в подсказке, как у подъёма по запросу.
+     * Выключение возвращает облако и освобождает видеопамять.
+     */
+    async toggle(inject: Inject, on: boolean, tag?: string): Promise<void> {
+      if (!on) {
+        await disconnectLocal(inject);
+        supervisor.forget();
+        await managedBy(() => {
+          supervisor.forget();
+          return stopServer(paths, port, fetchImpl, deps.kill);
+        });
+        return;
+      }
+      if (!runtimeBinary().binary)
+        throw localError('local-runtime-missing', 'сервер моделей не установлен');
+      // `tag` — человек выбрал модель прямо в окне кнопки: она становится моделью агентов.
+      const known = await describeConnect(inject);
+      const model = tag ?? (known.configured ? known.model : '');
+      if (!model) throw localError('local-toggle-no-model', 'модель для агентов не выбрана');
+      if (!activeFile(model))
+        throw localError('local-model-missing', `модель ${model} не скачана`, { tag: model });
+      const shape = await shapeFor({ tag: model });
+      if (tag && (!known.configured || known.model !== tag)) {
+        await saveLocalContour(inject, {
+          baseUrl: baseUrlOf(port),
+          model: tag,
+          title: catalogModel(tag)?.title ?? tag,
+        });
+      }
+      supervisor.reset();
+      resetOnDemand();
+      void ensureServer(shape).catch(noteStartFailure);
+      await switchLocalOn(inject);
+    },
+
+    /**
      * Где считать. Идущий сервер перезапускается сразу: устройство задаётся
      * всему серверу, и выбор, вступающий в силу «когда-нибудь», человек не
      * отличит от несработавшего.
@@ -1664,12 +1830,17 @@ export function createLocalModels(deps: LocalModelsDeps) {
      * Окружение прогона Claude на локальной модели: окно — настоящее окно
      * запущенного сервера. Сервера нет (ещё не поднят, остановлен) — наименьшее
      * окно агента: сжатие по меньшему окну наступит раньше, а не позже
-     * переполнения.
+     * переполнения. `route` — как запрос дойдёт до сервера: через шлюз панели или прямо
+     * (переключатель Claude пишет адрес llama-server в settings.json).
      */
-    runEnv: (): Record<string, string> => {
+    runEnv: (route: 'gateway' | 'direct' = 'direct'): Record<string, string> => {
       const record = readRecord(paths);
       const speed = record ? readState(paths).bench[record.tag]?.promptTokensPerSec : undefined;
-      return localRunEnv(record?.context || AGENT_MIN_CONTEXT, speed);
+      return {
+        ...localRunEnv(record?.context || AGENT_MIN_CONTEXT, speed),
+        // Через шлюз — поиск инструментов (L7); переключатель Claude ведёт прямо на сервер.
+        ...(route === 'gateway' ? LOCAL_GATEWAY_RUN_ENV : {}),
+      };
     },
 
     /**
@@ -1687,6 +1858,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
           notice: () => string | undefined;
           watch: (promptTokens: number) => ActivityTrack;
           layer: (tokens: number) => void;
+          readonly deferredInline: boolean;
         }
       | undefined => {
       const serverContext = (): number | undefined =>
@@ -1705,8 +1877,28 @@ export function createLocalModels(deps: LocalModelsDeps) {
         prepare: noteSession,
         revive: () => (known ? supervisor.revive() : startOnDemand(model)),
         notice: noticeText,
-        watch: (promptTokens: number) => activity.track(promptTokens),
+        watch: (promptTokens: number) => {
+          slots.noteTokens(promptTokens);
+          const track = activity.track(promptTokens);
+          return {
+            ...track,
+            done: () => {
+              track.done();
+              slots.done();
+            },
+          };
+        },
         layer: (tokens: number) => noteLayer(model, tokens),
+        // Пометку знает только наш шаблон, и только тот, что сейчас лежит в данных: сервер,
+        // поднятый с прежним (ждёт перезапуска), показал бы пометку модели вместо описания.
+        get deferredInline(): boolean {
+          const record = readRecord(paths);
+          return Boolean(
+            record?.templateFile &&
+            record.templateHash !== undefined &&
+            record.templateHash === templateHashOf(record.templateFile),
+          );
+        },
       };
     },
 

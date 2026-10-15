@@ -83,9 +83,14 @@ export interface PlatformRoutingDeps {
    * под ответ, один вызов за раз) — по контуру: у чужих контуров пусто. Без него
    * Claude Code не знает окна локальной модели, не сжимает историю вовремя, и
    * сервер молча обрезает начало запроса. Ответ — на каждый запуск: окно меняется
-   * вместе с перезапуском сервера моделей.
+   * вместе с перезапуском сервера моделей. `route` — идёт ли прогон через шлюз панели
+   * (контур) или прямо на сервер моделей (переключатель Claude): от этого зависит,
+   * можно ли включать поиск инструментов (L7).
    */
-  localRunEnv?: (platformId: string) => Record<string, string> | undefined;
+  localRunEnv?: (
+    platformId: string,
+    route?: 'gateway' | 'direct',
+  ) => Record<string, string> | undefined;
   /**
    * MCP-серверы, взятые в локальный прогон проекта (L4): имена; контур не локальный — `undefined`.
    * Шапка чата по ним называет, что поедет вместе с облегчённым набором.
@@ -114,7 +119,7 @@ export function localClaudeRun(
     // settings.json переключателя несёт то же окно, но лёгкое окно его не читает, а
     // дрейф (человек правил файл руками) процесс не заметит — окружение прогона
     // повторяет его на каждом старте.
-    env: deps.localRunEnv?.(redirect.platformId) ?? {},
+    env: deps.localRunEnv?.(redirect.platformId, 'direct') ?? {},
   };
 }
 
@@ -457,7 +462,7 @@ export function resolveRunRoute(
   const layers = provider.id === 'claude' ? runLayers(platform) : undefined;
   // Окно локальной модели — только Claude Code: переменные его, а чужому CLI они
   // ничего не значат. Поверх адреса контура: по ключам они не пересекаются.
-  if (provider.id === 'claude') Object.assign(env, deps.localRunEnv?.(platform.id));
+  if (provider.id === 'claude') Object.assign(env, deps.localRunEnv?.(platform.id, 'gateway'));
   const limits = provider.id === 'claude' ? undefined : limitsOf(deps.localRunEnv?.(platform.id));
   return {
     routed: true,

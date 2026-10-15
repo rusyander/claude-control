@@ -31,8 +31,16 @@ export const localModelsEn: typeof localModelsRu = {
       'Model server, its launch arguments, context, the address for Claude Code — the panel does ' +
       'it all. The work runs on the panel’s server: closing the tab does not stop a download, and ' +
       'an interrupted download resumes where it stopped.',
-    whyBack: 'The cloud is one click away',
+    whyBack: 'There and back in one click',
     whyBackText:
+      'The chat header has a “Local” button next to the model choice. A click turns on the ' +
+      'model chosen for agents with its settings (quantization, window, cache): chats move to ' +
+      'it at once while the model loads into video memory in the background — the button says ' +
+      '“loading” and the first message waits for it. Turned on, the button is highlighted and ' +
+      'names the model; a second click returns the cloud and frees the video memory. When there ' +
+      'is nothing to turn on (no model server, no model, or no model chosen for agents), every ' +
+      'click explains what is missing and leads to the right tab; a downloaded model can be ' +
+      'turned on right there. ' +
       'Agents are switched through the contour, per run: the contour writes nothing to ' +
       '~/.claude, and “Back to the cloud” restores everything as it was. Only the “Claude Code ' +
       'on this model” checkbox writes there, and only if you turn it on.',
@@ -200,7 +208,10 @@ export const localModelsEn: typeof localModelsRu = {
       'What the server does while you are not typing, and how it avoids recomputing the same prompt. The “Keep the model loaded” switch is in the server card, “Hardware & server” tab.',
     memoryIdle: 'Unloading on idle',
     memoryIdleText:
-      'After ten minutes without requests the server unloads the model from memory: measured on ' +
+      'After five minutes without requests the server unloads the model from memory. If the ' +
+      'conversation cache is written to disk before that (with Claude Code it is almost always over ' +
+      'the threshold), the server counts the write as work and restarts the idle count — then the ' +
+      'model leaves around the ninth minute. Measured on ' +
       '14 Oct, video memory fell from 7090 to 1842 MiB and RAM from 4662 to 392 MiB. The first ' +
       'request after idle loads the model again — about four seconds on a 7B, longer on bigger ' +
       'ones. The “In memory” line is empty meanwhile and the card says the model is unloaded by ' +
@@ -212,12 +223,18 @@ export const localModelsEn: typeof localModelsRu = {
       'Cache shifting (`--cache-reuse`) is enabled only where the server supports it: hybrid ' +
       'models with a recurrent state, such as Qwen3.5/3.6, do not support it, so it is not set — ' +
       'the server would silently turn it off anyway.',
-    memoryChats: 'Switching the conversation erases the slot cache',
+    memoryChats: 'Switching the conversation: the cache goes to disk',
     memoryChatsText:
-      'When a request comes from a different conversation, the server slot cache is erased: a ' +
-      'new chat does not inherit someone else’s prefix. The price — going back to the previous ' +
-      'conversation recomputes its prompt from scratch. A sleeping server is left alone: its ' +
-      'cache is empty already and there is no point waking it for the erase.',
+      'When a request comes from a different conversation, the previous one’s cache is written to ' +
+      'disk (the run/slots folder) and the new one’s cache is loaded from its file. No file — the ' +
+      'slot is erased: a new chat does not inherit someone else’s prefix. Measured 15.10 on Qwen3.8 ' +
+      '27B: going back to a 22-thousand-token conversation recomputed 41 tokens instead of 22 ' +
+      'thousand, and the turn took 8 seconds instead of 20. A cache shorter than 8192 tokens is not ' +
+      'written: such a prompt is faster to read again. 45 seconds before the idle unload the cache ' +
+      'also goes to disk, so the first turn after sleep does not read the prompt from scratch. A ' +
+      'file weighs about 100 KB per token. At most six files and 32 GB are kept, the oldest go ' +
+      'first; files taken from another model, window, cache or template are deleted. A sleeping ' +
+      'server is not woken for the erase.',
     longTitle: 'Overnight run: what keeps the task alive',
     longCaption:
       'A local model is left alone overnight: what the panel relies on so that the run either finishes or stops only where a human is needed.',
@@ -277,7 +294,11 @@ export const localModelsEn: typeof localModelsRu = {
     mcpCaption:
       'By default a local run gets the full set, like cloud Claude: every MCP server, skill and hook. ' +
       'The lean set is switched on in the contour card; then the chat header in a project shows the “MCP: N” button, ' +
-      'and the lean set has no servers by default.',
+      'and the lean set has no servers by default. In the full set through the panel’s gateway ' +
+      'the model does not get MCP tool descriptions up front: a request carries only their names, ' +
+      'and a tool gets its description on first use through tool search (ToolSearch). Measured ' +
+      '15.10 on Qwen3.8 27B: the first request is 23 thousand tokens instead of 71 thousand; once ' +
+      'the tool is loaded, later requests recompute 59–166 tokens out of 22 thousand.',
     mcpWhy: 'Why the lean set has none by default',
     mcpWhyText:
       'Tool descriptions ride in every request and take model window. Measured on 14 Oct: one ' +
@@ -385,6 +406,7 @@ export const localModelsEn: typeof localModelsRu = {
     fileTools: 'Qwen Code and its kit',
     fileLogs: 'Server log',
     fileRecord: 'Running server: port, model file, quantization, context, device and context cache',
+    fileSlots: 'Read-prompt cache per conversation: a .bin file and its .json description',
     fileState:
       'Measurements, kit choice, quantization and context choice, run-layer measurements, added ' +
       'custom models',
@@ -401,8 +423,13 @@ export const localModelsEn: typeof localModelsRu = {
     limitContextText:
       'The context is set when the server starts. Another model with another context means a ' +
       'server restart, and the previously loaded model is unloaded. The context cache is normally ' +
-      'q8_0; it is compressed to q4_0 when that fits a longer context entirely on the GPU, and the ' +
-      'model row says “cache q4_0”. On Windows the memory held by the browser and other ' +
+      'q8_0; it is compressed to q4_0 when that fits a longer context entirely on the GPU, and when ' +
+      'the model fits on the card only partly — the model row says “cache q4_0”. The fit takes free ' +
+      'video memory from the driver and adds what our own server holds, measured for its process: ' +
+      'llama-server itself on Windows counts the memory it already holds as free. If after loading ' +
+      'the server still spilled into shared memory by more than 768 MiB (on Windows that is not an ' +
+      'error but a slowdown of tens of times: measured 15.10 — 0.6 tokens per second instead of ' +
+      '81.7), the panel restarts it and fits again by itself. On Windows the memory held by the browser and other ' +
       'programs is handed to the model on demand, so the fit does not cut the context because of it. ' +
       'For qwen3.6:27b-coding and qwen3.8:27b the default is the IQ4_XS quantization (UD-IQ4_XS for ' +
       '3.8) and a 131,072 window: that way the model with the full Claude Code set fits entirely on a ' +
@@ -413,6 +440,7 @@ export const localModelsEn: typeof localModelsRu = {
       'server starts with reasoning effort medium (--chat-template-kwargs); a request carrying its own effort overrides it. ' +
       'Qwen3.8 27B also runs with its own chat template (--chat-template-file): the one inside the model file rejected a ' +
       'system message anywhere but first, Claude Code sends one in every request, and the server refused them all. ' +
+      'When a new panel version changes that template, a server started with the old one restarts by itself. ' +
       'Claude Code in such a run gets the server’s real window and compacts the history early; a ' +
       'request that no longer fits the window is refused by the gateway with «prompt is too long», ' +
       'which Claude Code answers by compacting — the start of a request is never cut silently. The run ' +

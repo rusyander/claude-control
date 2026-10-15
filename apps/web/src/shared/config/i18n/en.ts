@@ -1732,11 +1732,34 @@ export const en: TranslationSchema = {
       restarting: 'Restarting…',
       restartFailed: 'The server did not restart: {{message}}',
     },
+    /** Local model button in the chat header: one click there and back. */
+    localToggle: {
+      off: 'Local',
+      offHint:
+        'Turn on the local model {{title}}: chats go to your GPU with the settings from «Local models». Press again to return to the cloud.',
+      offHintBlocked: 'The local model is not ready yet — press to see what is missing.',
+      onHint:
+        'Chats go to the local model {{title}}. Press to return to the cloud and free the video memory.',
+      starting: 'loading',
+      startingHint:
+        'Model {{title}} is loading into video memory — the first message will wait for it. Press to cancel.',
+      failed: 'Could not switch: {{reason}}',
+      blockedTitle: 'The local model is not ready yet',
+      blocked: {
+        runtime:
+          'The llama.cpp model server is not installed. Install it in the «Models» tab of «Local models» — it is one button.',
+        models:
+          'No model is downloaded. Pick one that fits your GPU in the «Models» tab of «Local models».',
+        agents:
+          'A model is downloaded but not chosen for agents. Turn it on here — or choose it in the «Agents» tab together with its window and quantization.',
+      },
+      enable: 'Turn on {{title}}',
+      goModels: 'Open «Models»',
+      goAgents: 'Open «Agents»',
+    },
     localRoute: {
       label: 'Local model · llama.cpp',
       model: 'Local model · llama.cpp: {{model}}.',
-      modelReplaced:
-        'Local model · llama.cpp: no "{{asked}}" there, the request goes with {{model}}.',
       modelUnset: 'Local model · llama.cpp: no model assigned — the request goes as it is.',
       noEffort: 'Local model · llama.cpp takes no reasoning effort — it is not sent.',
       locked:

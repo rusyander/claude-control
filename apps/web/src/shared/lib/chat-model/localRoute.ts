@@ -12,7 +12,6 @@ export function isLocalRoute(plan: { platformId?: string } | undefined): boolean
 
 const LOCAL_KEYS = {
   'chat.platformModel': 'chat.localRoute.model',
-  'chat.platformModelReplaced': 'chat.localRoute.modelReplaced',
   'chat.platformModelUnset': 'chat.localRoute.modelUnset',
   'chat.platformNoEffort': 'chat.localRoute.noEffort',
   'chat.platformLocked': 'chat.localRoute.locked',

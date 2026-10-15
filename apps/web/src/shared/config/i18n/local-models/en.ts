@@ -236,7 +236,7 @@ export const localModelsEn: typeof localModelsRu = {
   },
   keepLoaded: {
     toggle: 'Keep the model loaded',
-    off: 'The model is unloaded from memory after {{minutes}} min without requests — video and system memory are freed. The first request after idle loads it again: a few seconds on a 7B, longer on bigger ones.',
+    off: 'The model is unloaded from memory after {{minutes}} min without requests — video and system memory are freed. If the conversation cache is written to disk before that, the server counts the write as work, and the model leaves after about {{withSave}} min. The first request after idle loads it again: a few seconds on a 7B, longer on bigger ones.',
     on: 'The model stays in memory while the server runs: the first request after idle answers at once, but video memory stays taken.',
     sleeping:
       'The model is unloaded by idle right now: memory is free, the next request loads it again.',

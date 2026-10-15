@@ -18,6 +18,16 @@ function savedKey(next: { restartPending?: boolean; running: boolean }): string 
   return next.running ? 'localModels.keepLoaded.saved' : 'localModels.keepLoaded.savedIdle';
 }
 
+/**
+ * Срок выгрузки в минутах: свой у сервера и с записью кеша на диск. Панель пишет кеш перед
+ * самым сном (за 45 с), а сервер считает запись работой и отсчитывает простой заново —
+ * выходит почти вдвое дольше (замер 15.10).
+ */
+function idleMinutes(idleSeconds: number): { minutes: number; withSave: number } {
+  const minutes = Math.round(idleSeconds / 60);
+  return { minutes, withSave: Math.max(minutes, Math.floor((2 * idleSeconds) / 60) - 1) };
+}
+
 export function KeepLoaded({ info }: KeepLoadedProps) {
   const { t } = useTranslation();
   const set = useSetKeepLoaded();
@@ -42,7 +52,7 @@ export function KeepLoaded({ info }: KeepLoadedProps) {
       <Typography variant="caption" color="muted">
         {server.keepLoaded
           ? t('localModels.keepLoaded.on')
-          : t('localModels.keepLoaded.off', { minutes: Math.round(server.idleSeconds / 60) })}
+          : t('localModels.keepLoaded.off', idleMinutes(server.idleSeconds))}
       </Typography>
       {server.sleeping ? (
         <Typography variant="caption" color="muted" role="status" aria-live="polite">

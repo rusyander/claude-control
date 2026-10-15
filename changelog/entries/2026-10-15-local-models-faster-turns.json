@@ -1,0 +1,136 @@
+{
+  "title": {
+    "ru": "Локальная модель включается кнопкой в шапке чата, читает втрое меньше на первом ходу и не пересчитывает разговор при возврате к нему",
+    "en": "The local model turns on from a button in the chat header, reads a third as much on the first turn and does not recompute a conversation when you return to it"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В шапке чата рядом с выбором модели появилась кнопка «Локальная». Нажатие включает модель, выбранную агентам, с её квантованием, окном и кешем: чаты переходят на неё сразу, без пробного запроса, а сервер грузит модель в фоне — на кнопке «загружается», первое сообщение ждёт загрузки. Включённая кнопка подсвечена и называет модель; второе нажатие возвращает облако и останавливает сервер, освобождая видеопамять. Замер на Qwen3.8 27B: выключение 1,9 с, включение 2,4 с до нажатой кнопки и 11,5 с до загруженной модели. Если включать нечего — нет сервера моделей, ни одной модели или модель не выбрана агентам, — каждое нажатие открывает окно с причиной и ссылкой на нужную вкладку раздела «Локальные модели», а скачанную модель можно включить прямо в нём.",
+        "en": "The chat header has a “Local” button next to the model choice. A click turns on the model chosen for agents with its quantization, window and cache: chats move to it at once, without a test request, while the server loads the model in the background — the button says “loading” and the first message waits for the load. Turned on, the button is highlighted and names the model; a second click returns the cloud and stops the server, freeing the video memory. Measured on Qwen3.8 27B: off in 1.9 s, on in 2.4 s to the pressed button and 11.5 s to the loaded model. When there is nothing to turn on — no model server, no model, or no model chosen for agents — every click opens a window with the reason and a link to the right tab of “Local models”, and a downloaded model can be turned on right there."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Описания MCP-инструментов в полном наборе через шлюз панели приходят модели по первому обращению через поиск инструментов (ToolSearch), а не в каждом запросе. На Qwen3.8 27B первый запрос сократился с 71 до 23 тысяч токенов; после загрузки инструмента следующие запросы пересчитывают 59–166 токенов из 22 тысяч.",
+        "en": "In the full set through the panel’s gateway, MCP tool descriptions reach the model on first use through tool search (ToolSearch) instead of riding in every request. On Qwen3.8 27B the first request shrank from 71 to 23 thousand tokens; once a tool is loaded, later requests recompute 59–166 tokens out of 22 thousand."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Кеш прочитанного промпта переживает смену разговора и выгрузку по простою: при переходе в другой чат кеш прежнего записывается на диск, при возврате поднимается из файла, и за 45 секунд до сна — тоже. Возврат в разговор на 22 тысячи токенов пересчитал 41 токен вместо 22 тысяч, ход занял 8 секунд вместо 20. Короткий кеш (меньше 8192 токенов) не пишется; хранится не больше шести файлов и 32 ГБ, файлы другой модели, окна, кеша или шаблона удаляются.",
+        "en": "The read-prompt cache survives a conversation switch and the idle unload: moving to another chat writes the previous one’s cache to disk, returning loads it back from the file, and the same happens 45 seconds before sleep. Returning to a 22-thousand-token conversation recomputed 41 tokens instead of 22 thousand, and the turn took 8 seconds instead of 20. A short cache (under 8192 tokens) is not written; at most six files and 32 GB are kept, and files of another model, window, cache or template are deleted."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Модель выгружается по простою через пять минут вместо десяти. Запись кеша на диск перед сном сервер считает работой и отсчитывает простой заново, поэтому с записью модель уходит примерно на девятой минуте. Карточка «Держать модель загруженной» называет оба срока.",
+        "en": "The model is unloaded after five idle minutes instead of ten. The server counts the cache write before sleep as work and restarts the idle count, so with a write the model leaves around the ninth minute. The “Keep the model loaded” card names both periods."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сервер модели на Windows больше не вылезает в общую память и не замедляется до долей токена в секунду. Подбор брал свободную видеопамять у самого llama-server, который считает свободной и занятую им же память, и сверху прибавлял свою прикидку — кеш выходил в q8_0 там, где места хватало только на q4_0. Теперь свободная память берётся у драйвера, к ней прибавляется замер памяти нашего процесса, частичная выгрузка на карту идёт с кешем q4_0, а сервер, вылезший в общую память больше чем на 768 МиБ, панель сама перезапускает с подбором заново. Замер: 0,6 токена в секунду до, 81,7 после.",
+        "en": "A model server on Windows no longer spills into shared memory and slows down to a fraction of a token per second. The fit took free video memory from llama-server itself, which counts the memory it already holds as free, and added its own estimate on top — the cache came out q8_0 where only q4_0 fit. Free memory now comes from the driver plus a measurement of our own process, a partial offload to the card uses a q4_0 cache, and a server that spilled into shared memory by more than 768 MiB is restarted and fitted again by the panel itself. Measured: 0.6 tokens per second before, 81.7 after."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Когда новая версия панели меняет шаблон чата модели, сервер, поднятый со старым шаблоном, перезапускается сам.",
+        "en": "When a new panel version changes a model’s chat template, a server started with the old template restarts by itself."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Панель больше не падает целиком, когда процесс чата закрывает канал, пока панель ещё пишет в него: ошибка записи на этом канале теперь разбирается как обрыв связи с процессом.",
+        "en": "The panel no longer goes down entirely when a chat process closes its channel while the panel is still writing to it: a write error on that channel is now handled as a lost connection to the process."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Под выбором модели на локальной модели больше нет жёлтого «имени claude-opus-5-5 там нет, запрос уйдёт с qwen3.8:27b»: имя модели Claude заменяется там всегда, и подпись просто называет модель, которая ответит.",
+        "en": "Under the model choice on a local model there is no longer a yellow “there is no claude-opus-5-5 there, the request goes with qwen3.8:27b”: a Claude model name is always replaced there, and the caption simply names the model that will answer."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Запрос к локальной модели без метки разговора (проба контура, замер скорости) больше не оставляет слот за прежним чатом: кеш чата перед ним уходит на диск, и следующий ход этого чата поднимает его из файла, а не принимает чужой промпт за свой.",
+        "en": "A request to the local model without a conversation label (a contour probe, a speed test) no longer leaves the slot with the previous chat: that chat’s cache goes to disk before it, and the chat’s next turn loads it back from the file instead of taking someone else’s prompt for its own."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели» описывает отложенные описания MCP, кеш разговоров на диске, подбор видеопамяти перезапуск при вылете в общую память и кнопку «Локальная» в шапке чата; справка «Чат» называет эту кнопку в ряду шапки.",
+        "en": "The “Local models” help covers deferred MCP descriptions, the conversation cache on disk, the video memory fit the restart on a shared-memory spill and the “Local” button in the chat header; the “Chat” help names this button in the header row."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: на локальной модели под выбором жёлтое «имени claude-opus-5-5 там нет», кнопки переключения нет",
+        "en": "Before: on a local model a yellow “there is no claude-opus-5-5 there” under the choice, and no switch button"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: кнопка «Qwen3.8 27B» включена, подпись называет модель",
+        "en": "After: the “Qwen3.8 27B” button is on, and the caption names the model"
+      }
+    }
+  ]
+}

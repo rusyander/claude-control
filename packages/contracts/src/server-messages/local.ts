@@ -20,6 +20,7 @@ export const localMessageParams = {
   'local-binary-missing': [],
   'local-runtime-missing': [],
   'local-server-down': [],
+  'local-toggle-no-model': [],
   'local-model-unknown': ['tag'],
   'local-model-missing': ['tag'],
   'local-model-loaded': ['tag', 'quant'],

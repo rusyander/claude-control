@@ -679,6 +679,23 @@ describe('platform routes: активность контура (Т2)', () => {
     expect(calls[0]).toBe('https://api.dev.example.ru/v1/models');
   });
 
+  it('`?probe=skip`: контур активен и шлюз поднят без единого запроса в сеть', async () => {
+    // Кнопка локальной модели в шапке чата включает уже проверенный контур: проба ждала бы
+    // модели, которая в этот момент только грузится.
+    writePlatform(store, PLATFORM);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/platforms/company-dev/activate?probe=skip',
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ activePlatformId: 'company-dev', previousPlatformId: '' });
+    expect(store.getSettings().activePlatformId).toBe('company-dev');
+    expect(gateway.status().running).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
   it('«Поднять шлюз» с карточки: выключенная настройка включается, слушатель жив, в сеть ни шагу', async () => {
     // Живое подключение 14.09.2026: на карточке висело «Шлюз не поднят», а
     // кнопка жила только в мастере на последнем шаге. Маршрут делает то же, что

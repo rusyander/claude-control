@@ -1,0 +1,345 @@
+{
+  "note": "Shape of two consecutive requests from claude 2.1.286 with ENABLE_TOOL_SEARCH=true and one MCP server (t8marker): before and after ToolSearch. Texts trimmed; order, defer_loading and tool_reference as on the wire.",
+  "before": {
+    "model": "qwen3.8:27b",
+    "max_tokens": 32000,
+    "stream": true,
+    "system": [
+      {
+        "type": "text",
+        "text": "You are a Claude agent."
+      }
+    ],
+    "tools": [
+      {
+        "name": "Agent",
+        "description": "Launch a new agent to handle complex, multi-step tasks. Each agent type has spec",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Bash",
+        "description": "Executes a bash command and returns its output.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Edit",
+        "description": "Performs exact string replacement in a file.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Glob",
+        "description": "Fast file pattern matching. Supports glob patterns like \"**/*.js\" or \"src/**/*.t",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Grep",
+        "description": "Content search built on ripgrep. Prefer this over `grep`/`rg` via Bash — results",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ListAgents",
+        "description": "Lists agents you can SendMessage to — in-process subagents you spawned, the team",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Read",
+        "description": "Reads a file from the local filesystem.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ReportFindings",
+        "description": "Report code-review findings as a typed list so the host UI can render them. Use ",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ScheduleWakeup",
+        "description": "Schedule when to resume work in /loop dynamic mode — the user invoked /loop with",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Skill",
+        "description": "Invoke a skill.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ToolSearch",
+        "description": "Fetches full schema definitions for deferred tools so they can be called.",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "description": "Query to find deferred tools. Use \"select:<tool_name>\" for direct selection, or keywords to search.",
+              "type": "string"
+            },
+            "max_results": {
+              "description": "Maximum number of results to return (default: 5)",
+              "default": 5,
+              "type": "number"
+            }
+          },
+          "required": ["query", "max_results"],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "Workflow",
+        "description": "Execute a workflow script that orchestrates multiple subagents deterministically",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "DeferredToolPlaceholder",
+        "description": "Reserved placeholder that keeps deferred tool loading active; never call this to",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "defer_loading": true
+      },
+      {
+        "name": "Write",
+        "description": "Writes a file to the local filesystem, overwriting if one exists.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "вызови marker"
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "model": "qwen3.8:27b",
+    "max_tokens": 32000,
+    "stream": true,
+    "system": [
+      {
+        "type": "text",
+        "text": "You are a Claude agent."
+      }
+    ],
+    "tools": [
+      {
+        "name": "Agent",
+        "description": "Launch a new agent to handle complex, multi-step tasks. Each agent type has spec",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Bash",
+        "description": "Executes a bash command and returns its output.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Edit",
+        "description": "Performs exact string replacement in a file.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Glob",
+        "description": "Fast file pattern matching. Supports glob patterns like \"**/*.js\" or \"src/**/*.t",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Grep",
+        "description": "Content search built on ripgrep. Prefer this over `grep`/`rg` via Bash — results",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ListAgents",
+        "description": "Lists agents you can SendMessage to — in-process subagents you spawned, the team",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Read",
+        "description": "Reads a file from the local filesystem.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ReportFindings",
+        "description": "Report code-review findings as a typed list so the host UI can render them. Use ",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ScheduleWakeup",
+        "description": "Schedule when to resume work in /loop dynamic mode — the user invoked /loop with",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Skill",
+        "description": "Invoke a skill.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "ToolSearch",
+        "description": "Fetches full schema definitions for deferred tools so they can be called.",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "description": "Query to find deferred tools. Use \"select:<tool_name>\" for direct selection, or keywords to search.",
+              "type": "string"
+            },
+            "max_results": {
+              "description": "Maximum number of results to return (default: 5)",
+              "default": 5,
+              "type": "number"
+            }
+          },
+          "required": ["query", "max_results"],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "Workflow",
+        "description": "Execute a workflow script that orchestrates multiple subagents deterministically",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "Write",
+        "description": "Writes a file to the local filesystem, overwriting if one exists.",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "DeferredToolPlaceholder",
+        "description": "Reserved placeholder that keeps deferred tool loading active; never call this to",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "defer_loading": true
+      },
+      {
+        "name": "mcp__t8marker__marker",
+        "description": "метка для проверки слоёв прогона",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "defer_loading": true
+      }
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "вызови marker"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_1",
+            "name": "ToolSearch",
+            "input": {
+              "query": "select:mcp__t8marker__marker",
+              "max_results": 5
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_1",
+            "content": [
+              {
+                "type": "tool_reference",
+                "tool_name": "mcp__t8marker__marker"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "Tool loaded."
+          }
+        ]
+      }
+    ]
+  }
+}

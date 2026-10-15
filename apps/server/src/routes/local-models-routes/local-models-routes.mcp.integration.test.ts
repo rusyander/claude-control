@@ -8,6 +8,7 @@ import type { ServerContext } from '../../context.ts';
 import type { KitService } from '../../domains/kit/service.ts';
 import { createLocalModels } from '../../domains/local-models/service.ts';
 import { localPaths, readState } from '../../domains/local-models/paths.ts';
+import { IDLE_SLEEP_SECONDS } from '../../domains/local-models/server.ts';
 import type { LocalMcpSource, McpSourceEntry } from '../../domains/local-models/local-mcp.ts';
 import { registerLocalModelsRoutes } from './local-models-routes.ts';
 
@@ -136,12 +137,12 @@ describe('PUT /api/local-models/keep-loaded', () => {
       keepLoaded: true,
     });
     expect(on.status).toBe(200);
-    expect(on.body).toMatchObject({ keepLoaded: true, idleSeconds: 600 });
+    expect(on.body).toMatchObject({ keepLoaded: true, idleSeconds: IDLE_SLEEP_SECONDS });
     expect(readState(localPaths(root, env)).keepLoaded).toBe(true);
     const off = await call<LocalServerInfo>('PUT', '/api/local-models/keep-loaded', {
       keepLoaded: false,
     });
-    expect(off.body).toMatchObject({ keepLoaded: false, idleSeconds: 600 });
+    expect(off.body).toMatchObject({ keepLoaded: false, idleSeconds: IDLE_SLEEP_SECONDS });
   });
 
   it('тело не того вида — 400', async () => {

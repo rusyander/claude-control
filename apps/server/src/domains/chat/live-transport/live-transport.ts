@@ -266,7 +266,12 @@ export function connectRelay(
       aliveAt = Date.now();
       if (address.token) next.write(relayHello(address.token));
       for (const line of queue.splice(0)) next.write(line);
-      createInterface({ input: next }).on('line', (line) => {
+      const lines = createInterface({ input: next });
+      // `readline` пересылает ошибку сокета (EPIPE, когда посредник закрыл канал, а мы ещё
+      // пишем) своему Interface; без обработчика она роняла весь процесс панели. Конец
+      // канала разбирают `error` и `close` самого сокета ниже.
+      lines.on('error', () => undefined);
+      lines.on('line', (line) => {
         if (line.startsWith('{"type":"relay_')) {
           const control = JSON.parse(line) as Record<string, unknown>;
           if (control.type === 'relay_synced') {

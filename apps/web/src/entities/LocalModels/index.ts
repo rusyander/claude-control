@@ -4,6 +4,7 @@ export { useSetLocalDevice } from './api/useSetLocalDevice';
 export { useInstallQwenCode } from './api/useInstallQwenCode';
 export { useDisconnectLocal } from './api/useDisconnectLocal';
 export { useConnectLocal } from './api/useConnectLocal';
+export { useToggleLocal } from './api/useToggleLocal';
 export { useBenchModel } from './api/useBenchModel';
 export { useImportModel } from './api/useImportModel';
 export { usePullModel } from './api/usePullModel';

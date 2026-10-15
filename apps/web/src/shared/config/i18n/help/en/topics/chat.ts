@@ -521,7 +521,8 @@ export const chatEn: typeof chatRu = {
     toolsTitle: 'The project row: dev server and git',
     toolsCaption:
       'The project tab header has two rows. The top one is the conversation: model and ' +
-      'effort, “Agents”, “Chat settings”. The bottom one is the project: “To MR”, ' +
+      'effort, the “Local” button (your own GPU instead of the cloud in one click, see the ' +
+      '“Local models” help), “Agents”, “Chat settings”. The bottom one is the project: “To MR”, ' +
       '“Project code”, “Tests”, “Environment”, “Editor”, “Dev server” and, last, whether the ' +
       'project is on the “Projects” page: “In Projects” leads to its settings, “To Projects” ' +
       'adds it there in one click. All of it works against the ' +

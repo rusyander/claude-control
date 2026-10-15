@@ -181,6 +181,15 @@ describe('подпись модели через контур', () => {
     expect(caption).toMatchObject({ key: 'chat.platformModelReplaced', warn: true });
   });
 
+  it('на локальной модели замена имени Claude — не предупреждение: подпись называет модель', () => {
+    const caption = platformModelCaption(
+      'Локальная модель',
+      choice({ asked: 'claude-opus-5-5', replaced: true }),
+      true,
+    );
+    expect(caption).toMatchObject({ key: 'chat.localRoute.model', warn: false });
+  });
+
   it('у контура нет модели — своя строка, а не подмена с прочерком', () => {
     const caption = platformModelCaption(
       'Company · dev',

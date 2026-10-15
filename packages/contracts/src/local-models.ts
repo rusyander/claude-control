@@ -673,13 +673,16 @@ export function fitChoice(
       ...(agentReady ? {} : { reason: model.agentic ? 'small-context' : 'no-tools' }),
     };
   }
-  // Не влезла в карту: часть слоёв уйдёт в оперативную память (кеш — q8_0, как у `fitModel`).
-  const offload = Math.max(0, need8 + GPU_RESERVE_GB - vram);
-  const partial = offload <= ramForModelGb(ramGb) && offload < need8;
+  // Не влезла в карту: часть слоёв уйдёт в оперативную память. Кеш — q4_0: q8_0 тем более
+  // не влез, а каждый гигабайт кеша на карте выталкивает слой на процессор (L9, 15.10: с
+  // q8_0 такой запуск уходил в общую память Windows — 0,6 ток/с). Окно здесь названо
+  // человеком, поэтому, в отличие от `fitModel`, оно не урезается до агентского минимума.
+  const offload = Math.max(0, need4 + GPU_RESERVE_GB - vram);
+  const partial = offload <= ramForModelGb(ramGb) && offload < need4;
   return {
     level: partial ? 'partial' : 'none',
-    kvCache: 'q8_0',
-    needGb: need8,
+    kvCache: 'q4_0',
+    needGb: need4,
     availableGb: vram,
     offloadGb: offload,
     tokensPerSec: partial ? estimateTokensPerSec(model, gpu, offload) : [0, 0],
@@ -1311,6 +1314,17 @@ export const localKitBodySchema = object({
   mode: kitModeSchema,
 });
 export const localConnectBodySchema = localModelBodySchema;
+
+/**
+ * Кнопка локальной модели в шапке чата: `on` — поднять модель, выбранную агентам, с её
+ * настройками и пустить чаты в неё; `off` — вернуть облако и остановить сервер. Ответ —
+ * `LocalConnectInfo`.
+ */
+export const localToggleBodySchema = object({
+  on: boolean(),
+  /** Включить ЭТУ скачанную модель и сделать её моделью агентов (окно кнопки, когда выбора нет). */
+  tag: string().min(1).max(200).optional(),
+});
 
 // ── MCP-серверы в локальном прогоне (L4) ─────────────────────────────────────
 

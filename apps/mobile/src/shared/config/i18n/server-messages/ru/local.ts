@@ -21,6 +21,8 @@ export const localRu: Record<LocalMessageCode, string> = {
   'local-checksum-mismatch': 'контрольная сумма {{name}} не сошлась — файл удалён, нажмите ещё раз',
   'local-runtime-missing': 'сервер моделей не установлен — сначала «Установить»',
   'local-server-down': 'сервер моделей не запущен',
+  'local-toggle-no-model':
+    'модель для агентов не выбрана — включите её на вкладке «Агенты» раздела «Локальные модели»',
   'local-model-unknown': 'модели {{tag}} нет в каталоге панели',
   'local-model-missing': 'модель {{tag}} не скачана',
   'local-model-loaded':

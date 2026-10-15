@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic/PlatformTopic.tsx",
-      "confirmedAt": "2026-10-15T08:04:05.834Z",
+      "confirmedAt": "2026-10-15T12:15:03.110Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -19,7 +19,7 @@
         {
           "path": "apps/server/src/domains/platform/activation/activation.ts",
           "why": "«Активный контур: ровно один»: что снимается при переключении, пробный запрос через свой шлюз, возврат к провайдеру по умолчанию",
-          "sha": "f24149e59ce23ce9"
+          "sha": "2aa53d1dd20093cc"
         },
         {
           "path": "apps/server/src/domains/platform/store/store.ts",
@@ -34,7 +34,7 @@
         {
           "path": "apps/server/src/domains/platform/gateway/pipeline/pipeline.ts",
           "why": "«Путь одного запроса»: что панель делает с запросом между CLI и контуром",
-          "sha": "0923f12f0a5f6f11"
+          "sha": "33c78b633b2d5831"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/status/status.ts",
@@ -114,7 +114,7 @@
         {
           "path": "apps/server/src/domains/platform/routing/routing.ts",
           "why": "«Модель и глубина продумывания»: чем пойдёт прогон и что отвечает шапке чата",
-          "sha": "e7c4b0601879e8be"
+          "sha": "5ae934814aa0ab75"
         },
         {
           "path": "packages/contracts/src/platform-consumers.ts",
@@ -2839,17 +2839,17 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-15T08:36:18.179Z",
+      "confirmedAt": "2026-10-15T12:15:02.998Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
           "why": "«Пометки каталога»: уровни «влезает / частично / не влезет», причины «не агент» и «короткий контекст», подбор «Рекомендуем»",
-          "sha": "73754890f53ebc68"
+          "sha": "97f2c1d025d17fe0"
         },
         {
           "path": "apps/server/src/domains/local-models/server.ts",
           "why": "«Контекст — на весь сервер», «Видеопамять занята, пока работает сервер»: аргументы запуска llama-server (контекст, кеш, слои на карте, MTP, порт); «Где считать»: процессор — скрытые видеокарты в окружении сервера",
-          "sha": "99c5e3d9d278eb13"
+          "sha": "1d286e06ff6f6bdc"
         },
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -2859,7 +2859,7 @@
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
           "why": "«Куда идёт запрос»: контур локальной модели, режим «обязательно», кому отдаётся маршрут",
-          "sha": "e60f16efc912c5fc"
+          "sha": "f04491ec72c123b0"
         },
         {
           "path": "apps/server/src/domains/local-models/paths.ts",
@@ -2920,13 +2920,38 @@
           "path": "apps/server/src/domains/local-models/activity.ts",
           "why": "«Контекст — на весь сервер»: этапы хода, порог тишины 2/10 мин, обрыв и перезапуск застрявшего сервера",
           "sha": "0b800e5c032442e7"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/slot-store.ts",
+          "why": "«Смена разговора: кеш уходит на диск»: запись и подъём кеша слота, порог 8192 токена, запись перед сном, предел файлов и места, уборка чужих запусков",
+          "sha": "72bbda4dd24857ad"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/process-vram.ts",
+          "why": "«Контекст — на весь сервер»: свободная видеопамять у драйвера, замер памяти нашего процесса, вылет в общую память",
+          "sha": "494f25e2af56d57b"
+        },
+        {
+          "path": "apps/server/src/domains/platform/gateway/local-window/deferred-tools.ts",
+          "why": "«MCP-серверы локального прогона»: описания MCP-инструментов по первому обращению через ToolSearch",
+          "sha": "4a53b1ba591585c5"
+        },
+        {
+          "path": "apps/web/src/features/LocalModelToggle/model/toggleState.ts",
+          "why": "«Туда и обратно — одной кнопкой»: когда кнопка «Локальная» в шапке чата готова, почему нет (сервер, модель, выбор агентам), «загружается»",
+          "sha": "de51f7c6e195c301"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/service.ts",
+          "why": "«Туда и обратно — одной кнопкой»: включение без ожидания загрузки, выключение с остановкой сервера (toggle)",
+          "sha": "90e359ec02a81e97"
         }
       ]
     },
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-15T07:07:26.158Z",
+      "confirmedAt": "2026-10-15T11:12:13.051Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -2946,7 +2971,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "ca3915995decf35a"
+          "sha": "9a7c4adb10c63f30"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

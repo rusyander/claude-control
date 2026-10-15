@@ -1,4 +1,4 @@
-{#- AgentDeck: шаблон Unsloth из GGUF Qwen3.8 27B с одной правкой. Claude Code шлёт системное сообщение и после первого пользовательского (блок окружения); исходник на нём падал «System message must be at the beginning», и сервер отвечал 500 на каждый запрос. Здесь такое сообщение идёт своим системным ходом на своём месте — начало запроса не меняется, кеш префикса цел. #}
+{#- AgentDeck: шаблон Unsloth из GGUF Qwen3.8 27B с двумя правками. (1) Claude Code шлёт системное сообщение и после первого пользовательского (блок окружения); исходник на нём падал «System message must be at the beginning», и сервер отвечал 500 на каждый запрос. Здесь такое сообщение идёт своим системным ходом на своём месте — начало запроса не меняется, кеш префикса цел. (2) Инструмент с описанием «[[deferred]]» в шапке не печатается: это отложенный инструмент, подгруженный через ToolSearch, его описание модель читает в ответе ToolSearch, а в списке он нужен только грамматике вызова. Так подгрузка посреди разговора не сдвигает начало промпта (шлюз, local-window/deferred-tools.ts). #}
 {%- set image_count = namespace(value=0) %}
 {%- set video_count = namespace(value=0) %}
 {%- macro render_content(content, do_vision_count, is_system_content=false) %}
@@ -77,8 +77,10 @@
     {%- endif %}
     {{- "# Tools\n\nYou have access to the following functions:\n\n<tools>" }}
     {%- for tool in tools %}
+        {%- if not (tool.function is defined and tool.function.description is string and tool.function.description.startswith("[[deferred]]")) %}
         {{- "\n" }}
         {{- tool | tojson }}
+        {%- endif %}
     {%- endfor %}
     {{- "\n</tools>" }}
     {{- '\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>' }}

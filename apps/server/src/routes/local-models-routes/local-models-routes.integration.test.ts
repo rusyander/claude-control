@@ -240,6 +240,11 @@ beforeAll(async () => {
     platforms.activePlatformId = LOCAL_PLATFORM_ID;
     return { ok: true };
   });
+  app.post('/api/platforms/:id/deactivate', (request) => {
+    platformCalls.push({ method: 'POST', url: request.url, body: undefined });
+    platforms.activePlatformId = '';
+    return { ok: true };
+  });
   const ctx = { store: { getSettings: () => ({ remoteAccess: { enabled: false } }) } };
   kit = new KitService({
     appDataDir: join(root, 'app-data'),
@@ -482,6 +487,70 @@ describe('раздел «Локальные модели» по настояще
     expect((await api('PUT', '/api/local-models/device', { device: 'tpu' })).status).toBe(400);
     const { body } = await api<LocalModelsInfo>('GET', '/api/local-models');
     expect(body.device).toBe('gpu');
+  });
+
+  it('кнопка в шапке чата: выкл — облако и сервер остановлен; вкл — контур без пробы, сервер той же модели', async () => {
+    const off = await api<LocalModelsInfo['connect']>('POST', '/api/local-models/toggle', {
+      on: false,
+    });
+    expect(off.status).toBe(200);
+    expect(off.body).toEqual({ configured: true, active: false, model: TAG });
+    expect(platformCalls.at(-1)).toMatchObject({
+      url: `/api/platforms/${LOCAL_PLATFORM_ID}/deactivate`,
+    });
+    const stopped = await api<LocalModelsInfo>('GET', '/api/local-models');
+    expect(stopped.body.server.running).toBe(false);
+
+    const before = spawned.length;
+    const on = await api<LocalModelsInfo['connect']>('POST', '/api/local-models/toggle', {
+      on: true,
+    });
+    expect(on.status).toBe(200);
+    expect(on.body).toEqual({ configured: true, active: true, model: TAG });
+    // Включение без пробы — проба ждала бы модели, которая только грузится; ассистент — тем же шагом.
+    expect(platformCalls.slice(-2)).toMatchObject([
+      { method: 'POST', url: `/api/platforms/${LOCAL_PLATFORM_ID}/activate?probe=skip` },
+      { method: 'POST', url: `/api/platforms/${LOCAL_PLATFORM_ID}/apply` },
+    ]);
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const { body } = await api<LocalModelsInfo>('GET', '/api/local-models');
+      if (body.server.running) {
+        expect(body.server).toMatchObject({ model: TAG, quant: 'Q4_K_M' });
+        break;
+      }
+      if (Date.now() > deadline) throw new Error('server did not start after toggle');
+      await new Promise((done) => setTimeout(done, 25));
+    }
+    expect(spawned.length).toBe(before + 1);
+    const args = spawned.at(-1)?.args ?? [];
+    expect(args[args.indexOf('--alias') + 1]).toBe(TAG);
+  });
+
+  it('кнопка в шапке чата: модель агентам не выбрана или не скачана — отказ с кодом, контур не тронут', async () => {
+    const saved = platforms.saved;
+    const calls = platformCalls.length;
+    try {
+      platforms.saved = undefined;
+      const none = await api<{ messageCode: string }>('POST', '/api/local-models/toggle', {
+        on: true,
+      });
+      expect(none.status).toBe(409);
+      expect(none.body.messageCode).toBe('local-toggle-no-model');
+      platforms.saved = { ...saved, defaultModel: 'qwen3.6:27b' };
+      const missing = await api<{ messageCode: string }>('POST', '/api/local-models/toggle', {
+        on: true,
+      });
+      expect(missing.status).toBe(409);
+      expect(missing.body.messageCode).toBe('local-model-missing');
+      expect(platformCalls.length).toBe(calls);
+      const bad = await api<{ messageCode: string }>('POST', '/api/local-models/toggle', {
+        on: 'yes',
+      });
+      expect(bad.status).toBe(400);
+    } finally {
+      platforms.saved = saved;
+    }
   });
 
   it('модель, которую держит сервер, не удаляется (409), пока сервер не остановлен; после — файл убран, чужие модели целы', async () => {

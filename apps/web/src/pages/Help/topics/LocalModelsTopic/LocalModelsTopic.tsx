@@ -246,6 +246,7 @@ export function LocalModelsTopic() {
               { label: tr('fileTools'), value: '.local-models/tools/', isMono: true },
               { label: tr('fileLogs'), value: '.local-models/logs/llama.log', isMono: true },
               { label: tr('fileRecord'), value: '.local-models/run/llama.json', isMono: true },
+              { label: tr('fileSlots'), value: '.local-models/run/slots/', isMono: true },
               { label: tr('fileState'), value: '.local-models/state.json', isMono: true },
             ]}
           />

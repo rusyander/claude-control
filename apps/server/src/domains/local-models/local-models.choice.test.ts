@@ -116,8 +116,17 @@ describe('fitChoice: влезают ли ЭТО квантование и ЭТО
     const need = modelNeedGb(model, pick.context, 'q8_0', pick.quant);
     const free = need - 4;
     const refused = fitChoice(model, gpuWith(free), RAM, pick, false);
-    expect(refused).toMatchObject({ level: 'partial', fits: false, allowed: false });
-    expect(refused.offloadGb).toBeCloseTo(4 + GPU_RESERVE_GB, 6);
+    // Частично — с кешем q4_0 (L9): q8_0 тем более не влез, и меньший кеш оставляет на карте слои.
+    expect(refused).toMatchObject({
+      level: 'partial',
+      fits: false,
+      allowed: false,
+      kvCache: 'q4_0',
+    });
+    const need4 = modelNeedGb(model, pick.context, 'q4_0', pick.quant);
+    expect(refused.needGb).toBeCloseTo(need4, 6);
+    expect(refused.offloadGb).toBeCloseTo(need4 - free + GPU_RESERVE_GB, 6);
+    expect(refused.offloadGb).toBeLessThan(4 + GPU_RESERVE_GB);
     const allowed = fitChoice(model, gpuWith(free), RAM, pick, true);
     expect(allowed).toMatchObject({ level: 'partial', allowed: true, agentReady: false });
     expect(allowed.tokensPerSec[1]).toBeLessThan(whole.tokensPerSec[1]);

@@ -73,6 +73,11 @@ export interface ServerShape {
   /** Полный путь к своему шаблону чата из каталога (`--chat-template-file`); нет — шаблон из GGUF. */
   templateFile?: string;
   /**
+   * Отпечаток содержимого шаблона (`templateHashOf`): путь тот же, а шаблон обновился с
+   * панелью — сервер держит прежний, пока его не перезапустят. Нет — запуск без отпечатка.
+   */
+  templateHash?: string;
+  /**
    * Тип кеша и раскладку выбрал подбор, а не человек. Пока такой сервер идёт, следующий
    * запуск берёт их из записи, а не подбирает заново: подбор при живом сервере засчитывает
    * его память по оценке, а она с запасом больше настоящей, и второй запуск выбирал q8_0
@@ -101,7 +106,8 @@ export function sameShape(record: ServerShape, shape: ServerShape): boolean {
     record.offload === shape.offload &&
     (record.idleSeconds ?? 0) === (shape.idleSeconds ?? 0) &&
     (record.templateKwargs ?? '') === (shape.templateKwargs ?? '') &&
-    (record.templateFile ?? '') === (shape.templateFile ?? '')
+    (record.templateFile ?? '') === (shape.templateFile ?? '') &&
+    (record.templateHash ?? '') === (shape.templateHash ?? '')
   );
 }
 
@@ -129,8 +135,13 @@ export const CONTEXT_CHECKPOINTS = 8;
  * вместо 6364. Модели с рекуррентным состоянием сдвиг недоступен.
  */
 export const CACHE_REUSE_MIN_CHUNK = 256;
-/** Простой, после которого модель выгружается из видеопамяти и оперативной (`--sleep-idle-seconds`). */
-export const IDLE_SLEEP_SECONDS = 600;
+/**
+ * Простой, после которого модель выгружается из видеопамяти и оперативной (`--sleep-idle-seconds`).
+ * Пять минут, а не десять: запись кеша слота на диск перед сном (L8, `slot-store.ts`) сервер
+ * считает работой и отсчитывает простой заново (замер 15.10: сон через 10 мин после записи), так
+ * что с записью модель уходит примерно на девятой минуте, без неё — на пятой.
+ */
+export const IDLE_SLEEP_SECONDS = 300;
 /** Сколько токенов предсказывает слой MTP за шаг; по умолчанию сервера 3, замер 13.10 — 162 предсказано, 87 принято. */
 export const MTP_DRAFT_TOKENS = 3;
 

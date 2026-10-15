@@ -290,12 +290,12 @@ describe('выбор квантования и окна: сохраняется 
 
   it('выбор, который не влезает, — отказ с цифрами «нужно из доступно»; в файл ничего не попало', async () => {
     const before = readFileSync(paths().state, 'utf8');
-    // BF16 при 256K: 22,3 ГБ нужно, 19,5 ГБ свободно.
+    // BF16 при 256K: даже с кешем q4_0 нужно 21 ГБ (с q8_0 — 22,3), 19,5 ГБ свободно.
     const { status, body } = await put({ quant: 'BF16', context: 262_144 });
     expect(status).toBe(409);
     expect(body.messageCode).toBe('local-choice-no-fit');
     const params = body.params ?? {};
-    expect(params.need).toBeCloseTo(22.3, 1);
+    expect(params.need).toBeCloseTo(21, 1);
     // Доступно — свободная сейчас видеопамять (20000 МиБ), а не вся карта.
     expect(params.available).toBeCloseTo(19.5, 1);
     expect(readFileSync(paths().state, 'utf8')).toBe(before);

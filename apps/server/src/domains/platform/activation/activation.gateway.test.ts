@@ -7,7 +7,12 @@ import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { PlatformFetch } from '../ca-fetch/ca-fetch.ts';
 import { PlatformGateway } from '../gateway/listener/listener.ts';
-import { activatePlatform, SMOKE_MAX_TOKENS, type ContourActivationDeps } from './activation.ts';
+import {
+  activatePlatform,
+  switchPlatformOn,
+  SMOKE_MAX_TOKENS,
+  type ContourActivationDeps,
+} from './activation.ts';
 import { writePlatform, writeToken } from '../store/store.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
@@ -321,5 +326,49 @@ describe('пробный запрос спрашивает ту модель, к
     expect(result.smoke.ok).toBe(false);
     expect(result.smoke.detail).toContain(`${SMOKE_MAX_TOKENS}`);
     expect(result.smoke.detail).toContain('размышлен');
+  });
+});
+
+describe('включение без пробы (кнопка локальной модели в шапке чата)', () => {
+  it('контур активен, шлюз поднят, а наверх не ушло ни одного запроса и итог пробы не тронут', async () => {
+    let probed = 0;
+    const result = await switchPlatformOn(
+      {
+        ...deps(),
+        probeFetch: (...args) => {
+          probed += 1;
+          return modelsOk(...args);
+        },
+        ensureGateway: async () => {
+          await gateway.start({
+            store,
+            appDataDir: appData,
+            port: 0,
+            fetchImpl: upstream([DELTA, DONE]),
+            spendFlushMs: 0,
+          });
+        },
+      },
+      PLATFORM.id,
+    );
+
+    expect(result).toEqual({ activePlatformId: PLATFORM.id, previousPlatformId: '' });
+    expect(store.getSettings().activePlatformId).toBe(PLATFORM.id);
+    expect(gateway.status().running).toBe(true);
+    expect(probed).toBe(0);
+    expect(calls).toHaveLength(0);
+    expect(store.getPlatformSmoke()[PLATFORM.id]).toBeUndefined();
+  });
+
+  it('шлюз не поднялся — контур всё равно активен, причина в ответе', async () => {
+    const result = await switchPlatformOn(
+      {
+        ...deps(),
+        ensureGateway: () => Promise.reject(new Error('порт 5179 занят')),
+      },
+      PLATFORM.id,
+    );
+    expect(result.gatewayError).toBe('порт 5179 занят');
+    expect(store.getSettings().activePlatformId).toBe(PLATFORM.id);
   });
 });

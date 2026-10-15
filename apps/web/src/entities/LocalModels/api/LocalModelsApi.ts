@@ -19,12 +19,21 @@ async function getLocalModels(): Promise<LocalModelsInfo> {
 const BUSY_INTERVAL_MS = 1000;
 const IDLE_INTERVAL_MS = 10_000;
 
-export function useLocalModels(options: { enabled?: boolean } = {}) {
+/**
+ * `fastWhen` — опрос раз в секунду и без загрузок, пока снимок отвечает «да»: кнопка в
+ * шапке чата ждёт, пока сервер поднимет модель, и «загружается» не должно висеть лишние
+ * десять секунд.
+ */
+export function useLocalModels(
+  options: { enabled?: boolean; fastWhen?: (data: LocalModelsInfo | undefined) => boolean } = {},
+) {
   return useQuery({
     queryKey: queryKeys.localModels,
     queryFn: getLocalModels,
     enabled: options.enabled ?? true,
     refetchInterval: (query) =>
-      hasRunningJob(query.state.data) ? BUSY_INTERVAL_MS : IDLE_INTERVAL_MS,
+      options.fastWhen?.(query.state.data) || hasRunningJob(query.state.data)
+        ? BUSY_INTERVAL_MS
+        : IDLE_INTERVAL_MS,
   });
 }

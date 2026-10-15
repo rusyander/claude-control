@@ -26,6 +26,7 @@ import { checkPlatform } from '../../domains/platform/check.ts';
 import {
   activatePlatform,
   deactivatePlatform,
+  switchPlatformOn,
   type ContourActivationDeps,
 } from '../../domains/platform/activation/activation.ts';
 import { PlatformError, invalidField } from '../../domains/platform/errors.ts';
@@ -448,13 +449,19 @@ export function registerPlatformRoutes(
    * молчащая модель приезжают ВНУТРИ ответа, потому что активация к этому
    * моменту уже случилась (Р3) и человеку нужно видеть, что именно не так.
    */
-  app.post<{ Params: { id: string } }>('/api/platforms/:id/activate', async (request, reply) => {
-    try {
-      return await activatePlatform(activationDeps(), request.params.id);
-    } catch (error) {
-      return failWrite(reply, error);
-    }
-  });
+  app.post<{ Params: { id: string }; Querystring: { probe?: string } }>(
+    '/api/platforms/:id/activate',
+    async (request, reply) => {
+      try {
+        // `?probe=skip` — переключатель уже проверенного контура: без пробы и пробного запроса.
+        if (request.query.probe === 'skip')
+          return await switchPlatformOn(activationDeps(), request.params.id);
+        return await activatePlatform(activationDeps(), request.params.id);
+      } catch (error) {
+        return failWrite(reply, error);
+      }
+    },
+  );
 
   /**
    * Вернуть провайдер по умолчанию. Один маршрут на две кнопки — на карточке

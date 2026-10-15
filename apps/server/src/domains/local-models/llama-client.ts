@@ -88,6 +88,13 @@ export interface LlamaClient {
   eraseSlot(slot?: number): Promise<number>;
   /** Что делает слот. Спящий сервер этим будят — звать, только пока запрос в пути. */
   slot(id?: number): Promise<SlotState | undefined>;
+  /**
+   * Кеш слота — в файл каталога `--slot-save-path` (`POST /slots/0?action=save`); сколько
+   * токенов записано. Спящий сервер этим будят.
+   */
+  saveSlot(filename: string, timeoutMs: number): Promise<number>;
+  /** Кеш слота — из файла (`action=restore`); сколько токенов восстановлено. Будит спящий. */
+  restoreSlot(filename: string, timeoutMs: number): Promise<number>;
   bench(model: string, signal?: AbortSignal): Promise<BenchResult>;
 }
 
@@ -136,6 +143,26 @@ export function llamaClient(baseUrl: string, fetchImpl: FetchLike = fetch): Llam
         signal: AbortSignal.timeout(ERASE_TIMEOUT_MS),
       });
       return ((await response.json()) as { n_erased?: number }).n_erased ?? 0;
+    },
+
+    async saveSlot(filename, timeoutMs) {
+      const response = await get('/slots/0?action=save', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ filename }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      return ((await response.json()) as { n_saved?: number }).n_saved ?? 0;
+    },
+
+    async restoreSlot(filename, timeoutMs) {
+      const response = await get('/slots/0?action=restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ filename }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      return ((await response.json()) as { n_restored?: number }).n_restored ?? 0;
     },
 
     async slot(id = 0) {

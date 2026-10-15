@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { recommendModel, type HardwareGpu } from '@agentdeck/contracts/local-models';
 import { createLocalModels, loadCatalog, templatePath } from './service.ts';
 import { localPaths } from './paths.ts';
-import { readRecord, sameShape, serverArgs } from './server.ts';
+import { IDLE_SLEEP_SECONDS, readRecord, sameShape, serverArgs } from './server.ts';
 import { modelFilePath } from './hf.ts';
 import type { FetchLike } from './download.ts';
 
@@ -209,6 +209,49 @@ describe('Qwen3.8 27B в каталоге', () => {
     expect(spawned).toHaveLength(1);
     await local.startServer({ tag: Q38 });
     expect(spawned).toHaveLength(1);
+  });
+
+  it('шаблон в данных обновился, пока сервер шёл: панель после запуска перезапустит его, когда прогонов нет', async () => {
+    seed(Q38);
+    const paths = localPaths(root, ENV());
+    const warm = service();
+    await warm.startServer({ tag: Q38 });
+    await warm.startServer({ tag: Q38 });
+    const fresh = readRecord(paths);
+    if (!fresh?.templateHash) throw new Error('no template hash in record');
+    // Тот же сервер, но поднятый с прежним содержимым шаблона.
+    writeFileSync(paths.pidFile, JSON.stringify({ ...fresh, templateHash: 'before-update' }));
+    spawned = [];
+    up = true;
+    const local = service();
+    expect(local.restartPending()).toBe(true);
+    expect(local.upstream(Q38)?.deferredInline).toBe(false);
+    expect(await local.applyPending()).toBe(true);
+    expect(spawned).toHaveLength(1);
+    expect(readRecord(paths)?.templateHash).toBe(fresh.templateHash);
+    expect(local.upstream(Q38)?.deferredInline).toBe(true);
+    // Шаблон тот же — после следующего запуска панели ждать нечего.
+    expect(service().restartPending()).toBe(false);
+  });
+
+  it('сервер шёл с прежним сроком простоя: панель после запуска перезапустит его, карточка до того показывает прежний', async () => {
+    seed(Q38);
+    const paths = localPaths(root, ENV());
+    const warm = service();
+    await warm.startServer({ tag: Q38 });
+    await warm.startServer({ tag: Q38 });
+    const fresh = readRecord(paths);
+    if (!fresh) throw new Error('no record');
+    writeFileSync(paths.pidFile, JSON.stringify({ ...fresh, idleSeconds: 600 }));
+    spawned = [];
+    up = true;
+    const local = service();
+    expect(local.restartPending()).toBe(true);
+    expect((await local.describe()).server.idleSeconds).toBe(600);
+    expect(await local.applyPending()).toBe(true);
+    expect(spawned).toHaveLength(1);
+    expect(readRecord(paths)?.idleSeconds).toBe(IDLE_SLEEP_SECONDS);
+    expect(service().restartPending()).toBe(false);
   });
 
   it('serverArgs: JSON отдельным аргументом, без него флага нет', () => {

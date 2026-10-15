@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createLocalModels, loadCatalog } from './service.ts';
 import { localPaths, updateState } from './paths.ts';
-import { readRecord, type ServerShape } from './server.ts';
+import { IDLE_SLEEP_SECONDS, readRecord, type ServerShape } from './server.ts';
 import { modelFilePath } from './hf.ts';
 import type { FetchLike } from './download.ts';
 
@@ -163,7 +163,7 @@ describe('«держать загруженной» и устройство во
     expect(await local.applyPending()).toBe(true);
     expect(spawned).toBe(2);
     expect(record()?.idleSeconds).toBe(0);
-    expect(before).toBe(600);
+    expect(before).toBe(IDLE_SLEEP_SECONDS);
     expect((await local.describe()).server.restartPending).toBeUndefined();
     // Повторно ждать нечего.
     expect(await local.applyPending()).toBe(false);

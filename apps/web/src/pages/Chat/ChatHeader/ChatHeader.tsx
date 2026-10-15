@@ -6,6 +6,7 @@ import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { AgentsPanel } from '@features/AgentsPanel';
 import { ChatModelPicker } from '@features/ChatModelPicker';
+import { LocalModelToggle } from '@features/LocalModelToggle';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
 import { DeliveryControl } from '@features/ProjectGit';
 import { ChatHeaderMenu } from '../ChatHeaderMenu/ChatHeaderMenu';
@@ -141,6 +142,8 @@ export function ChatHeader({
               onModelChange={onModelChange}
               onEffortChange={onEffortChange}
             />
+            {/* Своя видеокарта или облако — одним нажатием рядом с выбором модели (15.10). */}
+            <LocalModelToggle />
           </div>
 
           <div className={styles.group}>

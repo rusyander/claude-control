@@ -1,0 +1,20 @@
+// Имя модели длиннее «Локальная» — кнопка не растягивает ряд шапки.
+.label {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.state {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}

@@ -28,9 +28,9 @@ describe('держать модель загруженной', () => {
   it('по умолчанию выключено: срок простоя берётся из ответа сервера, в минутах', () => {
     const html = render({});
     expect(html).toContain('aria-checked="false"');
-    expect(html).toContain(i18n.t('localModels.keepLoaded.off', { minutes: 10 }));
-    expect(render({ idleSeconds: 1800 })).toContain(
-      i18n.t('localModels.keepLoaded.off', { minutes: 30 }),
+    expect(html).toContain(i18n.t('localModels.keepLoaded.off', { minutes: 10, withSave: 19 }));
+    expect(render({ idleSeconds: 300 })).toContain(
+      i18n.t('localModels.keepLoaded.off', { minutes: 5, withSave: 9 }),
     );
   });
 
@@ -38,7 +38,7 @@ describe('держать модель загруженной', () => {
     const html = render({ keepLoaded: true });
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain(i18n.t('localModels.keepLoaded.on'));
-    expect(html).not.toContain(i18n.t('localModels.keepLoaded.off', { minutes: 10 }));
+    expect(html).not.toContain(i18n.t('localModels.keepLoaded.off', { minutes: 10, withSave: 19 }));
   });
 
   it('сервер спит по простою — об этом сказано, у бодрствующего строки нет', () => {

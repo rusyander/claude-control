@@ -32,6 +32,7 @@ import {
   type LocalChoiceResult,
   type LocalClaudeInfo,
   type LocalDevice,
+  type LocalIdleMinutes,
   type LocalJob,
   type LocalLayerFit,
   type LocalModelBody,
@@ -104,7 +105,6 @@ import {
   pickRuntime,
 } from './runtime.ts';
 import {
-  IDLE_SLEEP_SECONDS,
   baseUrlOf,
   lastErrorLine,
   probe,
@@ -145,6 +145,13 @@ const BYTES_PER_GB = 1024 ** 3;
 const IDLE_SAVE_CHECK_MS = 15_000;
 /** За сколько до сна по простою сохранять: запись 2–13 ГБ идёт секунды, сон их не ждёт. */
 const IDLE_SAVE_LEAD_MS = 45_000;
+/** Как часто убирать устаревшие файлы кеша слота, пока панель работает (L8). */
+const SLOT_SWEEP_EVERY_MS = 60 * 60_000;
+
+/** Аргумент `--sleep-idle-seconds`: 0 — модель держится загруженной. */
+function idleSecondsOf(state: { keepLoaded: boolean; idleMinutes: LocalIdleMinutes }): number {
+  return state.keepLoaded ? 0 : state.idleMinutes * 60;
+}
 const RELEASE_TTL_MS = 60 * 60_000;
 const QUANTS_TTL_MS = 10 * 60_000;
 /** Метка квантования у модели, пришедшей из хранилища Ollama: какое оно, там не записано. */
@@ -673,7 +680,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
       device: device(),
       mtp: (facts?.nextn ?? 0) > 0,
       offload,
-      idleSeconds: readState(paths).keepLoaded ? 0 : IDLE_SLEEP_SECONDS,
+      idleSeconds: idleSecondsOf(readState(paths)),
       recurrent: facts?.recurrent ?? false,
       ...(model?.chatTemplateKwargs
         ? { templateKwargs: JSON.stringify(model.chatTemplateKwargs) }
@@ -710,7 +717,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
       pendingRestart = true;
     // Так же со сроком простоя (L8: 600 → 300 с): сервер со старым сроком после записи кеша
     // перед сном держал бы модель в видеопамяти вдвое дольше обещанного.
-    const idleSeconds = readState(paths).keepLoaded ? 0 : IDLE_SLEEP_SECONDS;
+    const idleSeconds = idleSecondsOf(readState(paths));
     if (record && (record.idleSeconds ?? 0) !== idleSeconds) pendingRestart = true;
   }
   /** Подряд не удавшихся применений отложенной настройки: вторая неудача снимает ожидание. */
@@ -1059,6 +1066,14 @@ export function createLocalModels(deps: LocalModelsDeps) {
     sleeping: isSleeping,
     now: clock,
   });
+  // Уборка кеша слота при старте панели и раз в час: файл, оставшийся от прошлого запуска или
+  // брошенного чата, иначе лежал бы до следующей записи (её может не быть неделями).
+  void slots.sweep().catch(() => undefined);
+  const slotSweeper = setInterval(
+    () => void slots.sweep().catch(() => undefined),
+    SLOT_SWEEP_EVERY_MS,
+  );
+  slotSweeper.unref?.();
 
   /**
    * Разговор, чей запрос сервер получит сейчас. Сменился — кеш прежнего уходит на диск, а
@@ -1125,7 +1140,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
     const health = await probe(port, fetchImpl);
     const record = readRecord(paths);
     const running = health === 'ok';
-    const keepLoaded = readState(paths).keepLoaded;
+    const state = readState(paths);
+    const keepLoaded = state.keepLoaded;
     const sleeping = running && record ? await isSleeping() : false;
     const notice = supervisor.notice();
     const layer = await layerFit();
@@ -1138,7 +1154,9 @@ export function createLocalModels(deps: LocalModelsDeps) {
       keepAwake: readState(paths).keepAwake,
       ...(deps.awakeHeld?.() ? { awake: true } : {}),
       // Срок идущего сервера, а не нынешний по умолчанию: до перезапуска действует прежний.
-      idleSeconds: (running && record?.idleSeconds) || IDLE_SLEEP_SECONDS,
+      idleSeconds:
+        (running && record?.idleSeconds) || idleSecondsOf({ ...state, keepLoaded: false }),
+      idleMinutes: state.idleMinutes,
       ...(sleeping ? { sleeping } : {}),
       running,
       port,
@@ -1745,14 +1763,17 @@ export function createLocalModels(deps: LocalModelsDeps) {
     /**
      * «Держать загруженной». Флаг простоя — аргумент запуска, поэтому идущий
      * сервер перезапускается сразу, как и при смене устройства: настройка, которая
-     * вступит в силу «когда-нибудь», неотличима от несработавшей.
+     * вступит в силу «когда-нибудь», неотличима от несработавшей. Срок выгрузки — тот же
+     * аргумент: сервер перезапускается, только если срок у него действительно другой.
      */
-    async setKeepLoaded(keep: boolean): Promise<LocalServerInfo> {
+    async setKeepLoaded(keep: boolean, idleMinutes?: LocalIdleMinutes): Promise<LocalServerInfo> {
       updateState(paths, (state) => {
         state.keepLoaded = keep;
+        if (idleMinutes) state.idleMinutes = idleMinutes;
       });
       const record = readRecord(paths);
-      if (record && (await probe(port, fetchImpl)) !== undefined) {
+      const changed = (record?.idleSeconds ?? 0) !== idleSecondsOf(readState(paths));
+      if (record && changed && (await probe(port, fetchImpl)) !== undefined) {
         if (!deferRestart()) {
           await ensureServer(await shapeFor({ tag: record.tag, quant: record.quant }));
         }
@@ -1957,6 +1978,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
     },
 
     shutdown(): void {
+      clearInterval(slotSweeper);
+      if (idleSaver) clearInterval(idleSaver);
       activity.stop();
       supervisor.stop();
       jobs.cancelAll();

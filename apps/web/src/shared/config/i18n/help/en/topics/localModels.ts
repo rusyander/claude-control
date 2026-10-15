@@ -208,10 +208,13 @@ export const localModelsEn: typeof localModelsRu = {
       'What the server does while you are not typing, and how it avoids recomputing the same prompt. The “Keep the model loaded” switch is in the server card, “Hardware & server” tab.',
     memoryIdle: 'Unloading on idle',
     memoryIdleText:
-      'After five minutes without requests the server unloads the model from memory. If the ' +
+      'After five minutes without requests the server unloads the model from memory; the period is ' +
+      'chosen in the server card — “Unload after idle”: 5 minutes, 15 minutes or 1 hour. If the ' +
       'conversation cache is written to disk before that (with Claude Code it is almost always over ' +
       'the threshold), the server counts the write as work and restarts the idle count — then the ' +
-      'model leaves around the ninth minute. Measured on ' +
+      'model leaves almost twice as late: around the ninth minute at five minutes, about two hours at ' +
+      'one hour. A long period keeps video memory taken, while coming back after an unload costs ' +
+      'seconds: the model loads and the conversation cache is read back from disk. Measured on ' +
       '14 Oct, video memory fell from 7090 to 1842 MiB and RAM from 4662 to 392 MiB. The first ' +
       'request after idle loads the model again — about four seconds on a 7B, longer on bigger ' +
       'ones. The “In memory” line is empty meanwhile and the card says the model is unloaded by ' +
@@ -234,7 +237,10 @@ export const localModelsEn: typeof localModelsRu = {
       'also goes to disk, so the first turn after sleep does not read the prompt from scratch. A ' +
       'file weighs about 100 KB per token. At most six files and 32 GB are kept, the oldest go ' +
       'first; files taken from another model, window, cache or template are deleted. A sleeping ' +
-      'server is not woken for the erase.',
+      'server is not woken for the erase. Cleanup runs after every write, at panel start and once an ' +
+      'hour: files older than three days and files without a description (a write cut off midway) ' +
+      'go. The cache of a chat that ended with an error stays until then — coming back to that chat, ' +
+      'you do not wait for a re-read.',
     longTitle: 'Overnight run: what keeps the task alive',
     longCaption:
       'A local model is left alone overnight: what the panel relies on so that the run either finishes or stops only where a human is needed.',
@@ -468,7 +474,7 @@ export const localModelsEn: typeof localModelsRu = {
       'driver and the load on the card — “Measure” gives it.',
     limitMemoryTitle: 'Video memory stays taken while the server runs',
     limitMemoryText:
-      'While the model is in use it holds video memory; after ten minutes without requests the ' +
+      'While the model is in use it holds video memory; after an idle period (5 minutes, adjustable) the ' +
       'server unloads it itself (unless “Keep loaded” is on) and the memory is freed. ' +
       '“Stop and free memory” stops the server at once; the next request starts it again.',
     limitLocalTitle: 'This machine only',

@@ -2839,17 +2839,17 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-15T12:15:02.998Z",
+      "confirmedAt": "2026-10-15T13:56:20.845Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
           "why": "«Пометки каталога»: уровни «влезает / частично / не влезет», причины «не агент» и «короткий контекст», подбор «Рекомендуем»",
-          "sha": "97f2c1d025d17fe0"
+          "sha": "5ff6ffccc9deb235"
         },
         {
           "path": "apps/server/src/domains/local-models/server.ts",
           "why": "«Контекст — на весь сервер», «Видеопамять занята, пока работает сервер»: аргументы запуска llama-server (контекст, кеш, слои на карте, MTP, порт); «Где считать»: процессор — скрытые видеокарты в окружении сервера",
-          "sha": "1d286e06ff6f6bdc"
+          "sha": "e0d74425c385fb25"
         },
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -2864,7 +2864,7 @@
         {
           "path": "apps/server/src/domains/local-models/paths.ts",
           "why": "«Где что лежит»: раскладка папки .local-models",
-          "sha": "28134e5021928830"
+          "sha": "dc963a8512741942"
         },
         {
           "path": "apps/server/src/domains/local-models/store.ts",
@@ -2924,7 +2924,7 @@
         {
           "path": "apps/server/src/domains/local-models/slot-store.ts",
           "why": "«Смена разговора: кеш уходит на диск»: запись и подъём кеша слота, порог 8192 токена, запись перед сном, предел файлов и места, уборка чужих запусков",
-          "sha": "72bbda4dd24857ad"
+          "sha": "d60a0e4d087a0005"
         },
         {
           "path": "apps/server/src/domains/local-models/process-vram.ts",
@@ -2944,7 +2944,7 @@
         {
           "path": "apps/server/src/domains/local-models/service.ts",
           "why": "«Туда и обратно — одной кнопкой»: включение без ожидания загрузки, выключение с остановкой сервера (toggle)",
-          "sha": "90e359ec02a81e97"
+          "sha": "9893d56043741806"
         }
       ]
     },

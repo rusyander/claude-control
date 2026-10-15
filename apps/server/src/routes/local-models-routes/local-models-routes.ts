@@ -7,6 +7,7 @@ import {
   localConnectBodySchema,
   localCustomBodySchema,
   localDeviceBodySchema,
+  isLocalIdleMinutes,
   localKeepLoadedBodySchema,
   localKeepAwakeBodySchema,
   localKitBodySchema,
@@ -257,7 +258,10 @@ export function registerLocalModelsRoutes(
     const body = parseBody(localKeepLoadedBodySchema, request.body, reply);
     if (!body) return reply;
     try {
-      return await local.setKeepLoaded(body.keepLoaded);
+      return await local.setKeepLoaded(
+        body.keepLoaded,
+        isLocalIdleMinutes(body.idleMinutes) ? body.idleMinutes : undefined,
+      );
     } catch (error) {
       return refuse(reply, error);
     }

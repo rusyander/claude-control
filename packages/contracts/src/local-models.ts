@@ -906,7 +906,21 @@ export function recommendModel(
 export const localDevices = ['gpu', 'cpu'] as const;
 export type LocalDevice = (typeof localDevices)[number];
 export const localDeviceBodySchema = object({ device: zodEnum(localDevices) });
-export const localKeepLoadedBodySchema = object({ keepLoaded: boolean() });
+/**
+ * Через сколько минут простоя модель выгружается, когда её не держат. Короткий срок —
+ * умолчание: кеш разговора перед сном уходит на диск, и возврат стоит загрузки модели и
+ * подъёма кеша (секунды), а занятая видеопамять мешает всему остальному на карте.
+ */
+export const localIdleMinutes = [5, 15, 60] as const;
+export type LocalIdleMinutes = (typeof localIdleMinutes)[number];
+export const LOCAL_IDLE_MINUTES_DEFAULT: LocalIdleMinutes = 5;
+export function isLocalIdleMinutes(value: unknown): value is LocalIdleMinutes {
+  return (localIdleMinutes as readonly unknown[]).includes(value);
+}
+export const localKeepLoadedBodySchema = object({
+  keepLoaded: boolean(),
+  idleMinutes: number().refine(isLocalIdleMinutes).optional(),
+});
 export const localKeepAwakeBodySchema = object({ keepAwake: boolean() });
 
 /** Карта, на которую считать подбор: при счёте на процессоре — никакая. */
@@ -1062,6 +1076,8 @@ export interface LocalServerInfo {
   keepLoaded: boolean;
   /** Через сколько секунд простоя модель выгружается, когда её не держат. */
   idleSeconds: number;
+  /** Выбранный срок выгрузки, мин: применяется при следующем запуске, если сервер идёт со старым. */
+  idleMinutes: LocalIdleMinutes;
   /** «Не давать системе уснуть, пока идёт локальный прогон» (умолчание — включено). */
   keepAwake: boolean;
   /** Запрет сна системе стоит прямо сейчас: идёт локальный прогон и выключатель включён. */

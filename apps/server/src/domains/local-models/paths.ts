@@ -1,10 +1,13 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type {
-  KitMode,
-  LocalDevice,
-  ModelBench,
-  ModelChoiceInfo,
+import {
+  LOCAL_IDLE_MINUTES_DEFAULT,
+  isLocalIdleMinutes,
+  type KitMode,
+  type LocalDevice,
+  type LocalIdleMinutes,
+  type ModelBench,
+  type ModelChoiceInfo,
 } from '@agentdeck/contracts/local-models';
 import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import type { McpCostRecord } from './local-mcp.ts';
@@ -110,6 +113,8 @@ export interface LocalState {
   claude?: ClaudeSwitchRecord;
   /** «Держать загруженной»: простой не выгружает модель из памяти (умолчание — выгружать). */
   keepLoaded: boolean;
+  /** Через сколько минут простоя выгружать модель, когда её не держат. */
+  idleMinutes: LocalIdleMinutes;
   /** Не давать ОС уснуть, пока идёт локальный прогон (умолчание — да). */
   keepAwake: boolean;
   /**
@@ -159,6 +164,7 @@ export function defaultState(): LocalState {
     kit: { claude: 'global', qwen: 'global', variant: 'local' },
     device: 'gpu',
     keepLoaded: false,
+    idleMinutes: LOCAL_IDLE_MINUTES_DEFAULT,
     keepAwake: true,
     mcpPicks: {},
     mcpCosts: {},
@@ -181,6 +187,7 @@ export function readState(paths: LocalPaths): LocalState {
       kit: { ...base.kit, ...(raw.kit ?? {}) },
       device: raw.device === 'cpu' ? 'cpu' : 'gpu',
       keepLoaded: raw.keepLoaded === true,
+      idleMinutes: isLocalIdleMinutes(raw.idleMinutes) ? raw.idleMinutes : base.idleMinutes,
       keepAwake: raw.keepAwake !== false,
       ...(raw.pendingRestart === true ? { pendingRestart: true as const } : {}),
       mcpPicks: picksOf(raw.mcpPicks),

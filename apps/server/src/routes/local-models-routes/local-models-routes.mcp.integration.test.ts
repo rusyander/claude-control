@@ -150,4 +150,21 @@ describe('PUT /api/local-models/keep-loaded', () => {
       400,
     );
   });
+
+  it('срок выгрузки: выбранный запоминается, срок вне выбора — 400 и прежний на месте', async () => {
+    const ok = await call<LocalServerInfo>('PUT', '/api/local-models/keep-loaded', {
+      keepLoaded: false,
+      idleMinutes: 60,
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ idleMinutes: 60, idleSeconds: 3600 });
+    for (const idleMinutes of [7, 0, '60']) {
+      const bad = await call('PUT', '/api/local-models/keep-loaded', {
+        keepLoaded: false,
+        idleMinutes,
+      });
+      expect(bad.status).toBe(400);
+    }
+    expect(readState(localPaths(root, env)).idleMinutes).toBe(60);
+  });
 });

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  MAX_SLOT_AGE_MS,
   MAX_SLOT_FILES,
   SAVE_MIN_TOKENS,
   createSlotStore,
@@ -316,5 +317,60 @@ describe('slot-store: запись перед сном', () => {
     await turn('A', 10);
     world.clock += 30_000;
     expect(store.idleMs()).toBe(31_000);
+  });
+});
+
+describe('slot-store: уборка', () => {
+  it('файл старше срока уходит, свежий остаётся', async () => {
+    const { world, store, turn } = setup();
+    await turn('old', BIG);
+    await turn('fresh', BIG);
+    await turn('x', 10); // fresh — на диск
+    world.clock += MAX_SLOT_AGE_MS - 1_500; // old записан на 2 с раньше fresh
+    await store.sweep();
+    expect(existsSync(join(dir, 'old.bin'))).toBe(false);
+    expect(existsSync(join(dir, 'old.json'))).toBe(false);
+    expect(existsSync(join(dir, 'fresh.bin'))).toBe(true);
+  });
+
+  it('.bin без описания (запись оборвалась, файл замера) уходит, описанный остаётся', async () => {
+    const { store, turn } = setup();
+    await turn('A', BIG);
+    await turn('B', 10);
+    writeFileSync(join(dir, 'l8-probe.bin'), Buffer.alloc(8));
+    await store.sweep();
+    expect(existsSync(join(dir, 'l8-probe.bin'))).toBe(false);
+    expect(existsSync(join(dir, 'A.bin'))).toBe(true);
+  });
+
+  it('сервер не поднят — файл другого запуска не судится по запуску и остаётся', async () => {
+    const { world, store, turn } = setup();
+    await turn('A', BIG);
+    await turn('B', 10);
+    world.shape = undefined;
+    await store.sweep();
+    expect(existsSync(join(dir, 'A.bin'))).toBe(true);
+    world.shape = 'model-b|131072|q4_0|tpl1';
+    await store.sweep();
+    expect(existsSync(join(dir, 'A.bin'))).toBe(false);
+  });
+
+  it('кеш в слоте, записанный перед сном и убранный по сроку, при смене пишется заново', async () => {
+    const { world, store, turn } = setup();
+    await turn('A', BIG);
+    world.clock += 10 * 60_000;
+    expect(await store.saveIdle(60_000)).toBe(true);
+    world.clock += MAX_SLOT_AGE_MS + 1;
+    await store.sweep();
+    expect(existsSync(join(dir, 'A.bin'))).toBe(false);
+    world.calls = [];
+    await turn('B', 10);
+    expect(world.calls[0]).toBe(`save ${slotFileOf('A')}`);
+  });
+
+  it('каталога нет — уборка молчит', async () => {
+    const { store } = setup();
+    rmSync(dir, { recursive: true, force: true });
+    await expect(store.sweep()).resolves.toBeUndefined();
   });
 });

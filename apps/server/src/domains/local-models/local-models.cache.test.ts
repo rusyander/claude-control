@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createLocalModels, loadCatalog } from './service.ts';
@@ -224,6 +224,30 @@ describe('выгрузка по простою', () => {
     // Выключили — снова с флагом.
     await local.setKeepLoaded(false);
     expect(flag(spawned[2]?.args ?? [], '--sleep-idle-seconds')).toBe(String(IDLE_SLEEP_SECONDS));
+  });
+
+  it('срок выгрузки на выбор: 15 мин — перезапуск с 900 с, тот же срок — сервер не трогается', async () => {
+    seedModel({ nextn: 1 });
+    const local = service();
+    await local.startServer({ tag: TAG });
+    const info = await local.setKeepLoaded(false, 15);
+    expect(spawned).toHaveLength(2);
+    expect(flag(spawned[1]?.args ?? [], '--sleep-idle-seconds')).toBe('900');
+    expect(info).toMatchObject({ idleSeconds: 900, idleMinutes: 15, keepLoaded: false });
+    expect(readState(localPaths(root, ENV())).idleMinutes).toBe(15);
+    await local.setKeepLoaded(false, 15);
+    expect(spawned).toHaveLength(2);
+    // «Держать» поверх выбранного срока, затем снова выгрузка — срок не забыт.
+    await local.setKeepLoaded(true);
+    await local.setKeepLoaded(false);
+    expect(flag(spawned[3]?.args ?? [], '--sleep-idle-seconds')).toBe('900');
+  });
+
+  it('срок из файла состояния вне выбора — умолчание', () => {
+    const paths = localPaths(root, ENV());
+    mkdirSync(dirname(paths.state), { recursive: true });
+    writeFileSync(paths.state, JSON.stringify({ idleMinutes: 7 }));
+    expect(readState(paths).idleMinutes).toBe(IDLE_SLEEP_SECONDS / 60);
   });
 
   it('сервер не запущен: настройка запоминается, ничего не стартует', async () => {

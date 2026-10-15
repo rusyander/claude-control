@@ -12,7 +12,9 @@ import { KeepLoaded } from './KeepLoaded';
  */
 
 function render(server: Partial<LocalServerInfo>): string {
-  const info = { server: { keepLoaded: false, idleSeconds: 600, ...server } } as LocalModelsInfo;
+  const info = {
+    server: { keepLoaded: false, idleSeconds: 600, idleMinutes: 5, ...server },
+  } as LocalModelsInfo;
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
       <KeepLoaded info={info} />
@@ -39,6 +41,16 @@ describe('держать модель загруженной', () => {
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain(i18n.t('localModels.keepLoaded.on'));
     expect(html).not.toContain(i18n.t('localModels.keepLoaded.off', { minutes: 10, withSave: 19 }));
+  });
+
+  it('срок выгрузки на выбор — только когда модель не держат; выбран срок из ответа сервера', () => {
+    const html = render({ idleMinutes: 15 });
+    expect(html).toContain(i18n.t('localModels.keepLoaded.idleLabel'));
+    for (const minutes of [5, 15, 60]) {
+      expect(html).toContain(i18n.t(`localModels.keepLoaded.idle${minutes}`));
+    }
+    expect(html).toMatch(/<option value="15" selected="">/);
+    expect(render({ keepLoaded: true })).not.toContain(i18n.t('localModels.keepLoaded.idleLabel'));
   });
 
   it('сервер спит по простою — об этом сказано, у бодрствующего строки нет', () => {

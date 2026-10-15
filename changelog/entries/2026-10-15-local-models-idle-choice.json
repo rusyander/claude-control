@@ -1,0 +1,29 @@
+{
+  "title": {
+    "ru": "Срок выгрузки локальной модели выбирается, кеш разговоров на диске убирается сам",
+    "en": "The local model's unload period is adjustable, and the conversation cache on disk cleans itself up"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В карточке сервера моделей появился выбор «Выгружать после простоя»: 5 минут (умолчание), 15 минут или 1 час. Срок — аргумент запуска сервера, поэтому идущий сервер перезапускается сразу, и только если срок у него действительно другой. Короткий срок оставлен умолчанием: кеш разговора перед выгрузкой уходит на диск, и возврат стоит секунд на загрузку модели, а занятая видеопамять мешает всему остальному на карте.",
+        "en": "The model server card has an “Unload after idle” choice: 5 minutes (default), 15 minutes or 1 hour. The period is a server launch argument, so a running server restarts at once, and only when its period actually differs. The short period stays the default: the conversation cache goes to disk before an unload, so coming back costs seconds of model loading, while taken video memory gets in the way of everything else on the card."
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Файлы кеша разговоров убираются не только после записи нового, но и при запуске панели и раз в час: уходят файлы старше трёх суток и файлы без описания — запись, оборвавшаяся на середине. Раньше кеш брошенного чата лежал на диске (по 2–3 ГБ на файл), пока его не вытеснят шесть более новых. Кеш чата, оборвавшегося с ошибкой, по-прежнему лежит до срока: при возврате в этот чат промпт не перечитывается.",
+        "en": "Conversation cache files are cleaned up not only after a new one is written but also at panel start and once an hour: files older than three days and files without a description — a write cut off midway — go. Previously an abandoned chat's cache (2–3 GB per file) stayed on disk until six newer ones pushed it out. The cache of a chat that ended with an error still stays until then: returning to that chat does not re-read the prompt."
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Локальные модели» описывает выбор срока выгрузки и уборку кеша; в разделе ограничений исправлен устаревший срок «десять минут».",
+        "en": "The “Local models” help covers the unload period choice and the cache cleanup; the outdated “ten minutes” in the limits section is corrected."
+      }
+    }
+  ]
+}

@@ -16,6 +16,13 @@ import type { LlamaClient } from './llama-client.ts';
  * а файл есть и снят с этого же запуска (`shape`: файл модели, окно, тип кеша, шаблон).
  * Файл чужого запуска не читается и удаляется при уборке.
  *
+ * Уборка (`sweep`): после каждой записи, при старте панели и раз в час, пока она работает.
+ * Уходят файлы чужого запуска, старше `MAX_SLOT_AGE_MS`, сверх предела числа и места, и
+ * `.bin` без описания (запись оборвалась на середине или файл оставлен замером). Кеш чата,
+ * оборвавшегося с ошибкой, остаётся до срока: вернувшись в этот чат, человек не ждёт перечитки.
+ * Удаления чатов у панели нет (разговоры — файлы самого CLI), поэтому кеш брошенного чата
+ * уходит по сроку.
+ *
  * Сбой записи или чтения запрос не срывает: тогда слот просто стирается, как раньше.
  */
 
@@ -25,6 +32,8 @@ export const SAVE_MIN_TOKENS = 8_192;
 export const MAX_SLOT_FILES = 6;
 /** Сколько места занимать: файл — ~100 КБ на токен (замер 15.10), 131072 токена — ~13 ГБ. */
 export const MAX_SLOT_BYTES = 32 * 1024 ** 3;
+/** Старше этого кеш не держится: к чату, брошенному на трое суток, проще прочитать промпт заново. */
+export const MAX_SLOT_AGE_MS = 3 * 24 * 60 * 60_000;
 /** Запись и чтение идут очередью сервера — за чужим ходом; дольше этого не ждём. */
 export const SLOT_IO_TIMEOUT_MS = 120_000;
 
@@ -103,21 +112,36 @@ export function createSlotStore(deps: SlotStoreDeps) {
     }
   }
 
-  /** Файлы чужого запуска и сверх предела — прочь, начиная с самых давних. */
-  function prune(shape: string): void {
+  /**
+   * Файлы чужого запуска, устаревшие, без описания и сверх предела — прочь, начиная с самых
+   * давних. Запуск неизвестен (сервер не поднят) — по запуску не судим: файл ещё пригодится.
+   */
+  function prune(shape: string | undefined): void {
     let entries: { session: string; bytes: number; savedAt: number; stale: boolean }[] = [];
+    const described = new Set<string>();
+    let names: string[];
     try {
-      for (const name of readdirSync(deps.dir)) {
+      names = readdirSync(deps.dir);
+    } catch {
+      return;
+    }
+    const oldest = now() - MAX_SLOT_AGE_MS;
+    try {
+      for (const name of names) {
         if (!name.endsWith('.json')) continue;
         try {
           const meta = JSON.parse(readFileSync(join(deps.dir, name), 'utf8')) as Meta;
           const bin = join(deps.dir, slotFileOf(meta.session));
           const bytes = existsSync(bin) ? statSync(bin).size : 0;
+          described.add(slotFileOf(meta.session));
           entries.push({
             session: meta.session,
             bytes,
             savedAt: meta.savedAt,
-            stale: meta.shape !== shape || bytes === 0,
+            stale:
+              (shape !== undefined && meta.shape !== shape) ||
+              bytes === 0 ||
+              !(meta.savedAt >= oldest),
           });
         } catch {
           rmSync(join(deps.dir, name), { force: true });
@@ -129,7 +153,13 @@ export function createSlotStore(deps: SlotStoreDeps) {
     const drop = (session: string): void => {
       rmSync(join(deps.dir, slotFileOf(session)), { force: true });
       rmSync(metaPath(session), { force: true });
+      log(`slot dropped: ${session}`);
     };
+    for (const name of names) {
+      if (!name.endsWith('.bin') || described.has(name)) continue;
+      rmSync(join(deps.dir, name), { force: true });
+      log(`slot dropped: ${name} (no meta)`);
+    }
     for (const entry of entries.filter((item) => item.stale)) drop(entry.session);
     entries = entries.filter((item) => !item.stale).sort((a, b) => b.savedAt - a.savedAt);
     let total = 0;
@@ -198,6 +228,18 @@ export function createSlotStore(deps: SlotStoreDeps) {
         if (shape && owner && !onDisk && owner.tokens >= SAVE_MIN_TOKENS) await save(owner, shape);
         holder = undefined;
         onDisk = false;
+      });
+    },
+
+    /**
+     * Убрать устаревшее (см. шапку): в очереди слота, чтобы не встать посреди записи — та
+     * пишет `.bin` раньше описания. Кеш в слоте, уже лежащий на диске, файла не лишается
+     * молча: держатель после уборки сверяется с диском.
+     */
+    sweep(): Promise<void> {
+      return serial(async () => {
+        prune(deps.shape());
+        if (onDisk && holder && !readMeta(holder.session)) onDisk = false;
       });
     },
 

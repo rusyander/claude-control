@@ -132,7 +132,11 @@ export function judgeTurn(input: TurnGateInput): string[] {
   const covered = new Set<string>();
   for (const item of touched) {
     const testCase = byKey.get(`${item.groupId}:${item.caseId}`);
-    for (const path of testCase?.codePaths ?? []) covered.add(path.replace(/^\.\//, ''));
+    // Папку пишут и как `src/help/` — без среза черты `startsWith('src/help//')` не
+    // совпадал ни с одним файлом, и покрытый файл звался непокрытым.
+    for (const path of testCase?.codePaths ?? []) {
+      covered.add(path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, ''));
+    }
   }
   const uncovered = code.filter(
     (file) => ![...covered].some((path) => file === path || file.startsWith(`${path}/`)),

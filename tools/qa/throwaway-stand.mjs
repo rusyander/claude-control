@@ -240,13 +240,17 @@ async function waitFor(url, seconds, gone = () => false) {
  * самой проверкой (`checkAddedPathDirs`); если в таком лежит `claude`,
  * `keptClaude` велит стенду заслонить его заглушкой (`BLOCKED_CLAUDE`).
  */
-function pathWithoutClaude() {
+function pathWithoutClaude(hideCli = []) {
   const raw = process.env.PATH ?? process.env.Path ?? '';
-  const names = IS_WIN ? ['claude.cmd', 'claude.exe', 'claude.ps1', 'claude'] : ['claude'];
+  const filesOf = (cli) =>
+    IS_WIN ? ['cmd', 'exe', 'ps1', ''].map((ext) => (ext ? `${cli}.${ext}` : cli)) : [cli];
+  const names = filesOf('claude');
+  const hidden = hideCli.flatMap(filesOf);
   const added = new Set(checkAddedPathDirs(raw));
   let keptClaude = false;
   const dirs = raw.split(delimiter).filter((dir) => {
     if (!dir) return false;
+    if (hidden.some((name) => existsSync(join(dir, name)))) return false;
     const hasClaude = names.some((name) => existsSync(join(dir, name)));
     if (hasClaude && added.has(dir)) keptClaude = true;
     return !hasClaude || added.has(dir);
@@ -381,6 +385,13 @@ export async function startStand({
   noClaude = false,
   // Каталоги в КОНЕЦ PATH панели (настоящий CLI другого провайдера).
   extraPath = [],
+  // CLI, которых в PATH оболочки для стенда быть не должно (`['goose']`): каталоги
+  // с ними вырезаются целиком, как каталоги `claude`. Сценарий «CLI нет» иначе
+  // зависит от того, что человек поставил себе: `~/.local/bin` с goose.exe и
+  // aider.exe (09.10) превратил «нет aider» в «aider найден», а обёртку-без-acp
+  // перекрыл настоящий goose.exe — панель ищет .exe по всему PATH раньше .cmd.
+  // `extraPath` не трогается: его кладёт сама проверка.
+  hideCli = [],
   // Окружение панели сверх унаследованного (дом и конфиг чужого CLI, ключ
   // заглушки). Явное — поэтому чистка `shellLeak` его не трогает; дом и PATH
   // стенда всё равно главнее.
@@ -421,7 +432,7 @@ export async function startStand({
   // панели: скрипт запускается этим же node через обёртку под именем CLI. Так
   // проверка видит, что ДОШЛО до процесса (argv, stdin), не трогая настоящий.
   const bin = join(root, 'bin');
-  const shellPath = pathWithoutClaude();
+  const shellPath = pathWithoutClaude(hideCli);
   const fakes =
     shellPath.keptClaude && !fakeCli.claude ? { ...fakeCli, claude: BLOCKED_CLAUDE } : fakeCli;
   const fakeNames = Object.keys(fakes);

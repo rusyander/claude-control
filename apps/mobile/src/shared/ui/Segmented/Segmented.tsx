@@ -15,6 +15,9 @@ export function Segmented<T extends string>({
   value: T;
   onChange: (value: T) => void;
 }) {
+  // Четыре вкладки и больше: шрифт поменьше, ширина по длине подписи — иначе
+  // «Уведомления» обрезается до «Уведомле…».
+  const dense = options.length >= 4;
   return (
     <View style={styles.track} accessibilityRole="tablist">
       {options.map((option) => {
@@ -27,9 +30,12 @@ export function Segmented<T extends string>({
             accessibilityLabel={option.a11y ?? option.label}
             accessibilityState={{ selected }}
             onPress={() => onChange(option.value)}
-            style={[styles.segment, selected && styles.segmentOn]}
+            style={[styles.segment, dense && styles.segmentDense, selected && styles.segmentOn]}
           >
-            <Text style={[styles.text, selected && styles.textOn]} numberOfLines={1}>
+            <Text
+              style={[styles.text, dense && styles.textDense, selected && styles.textOn]}
+              numberOfLines={1}
+            >
               {option.label}
             </Text>
             {badge > 0 ? (

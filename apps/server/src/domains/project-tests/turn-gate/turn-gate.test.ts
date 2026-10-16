@@ -106,6 +106,12 @@ describe('пробелы хода агента', () => {
     expect(gaps.join('\n')).toContain('no case covers src/billing/pay.ts');
   });
 
+  it('папка в codePaths с косой чертой на конце покрывает свои файлы', () => {
+    const after = run('2026-10-15T10:06:00.000Z', [['help-001', 'passed']]);
+    const cases = [auto('help-001', ['public/help/', '.\\src\\help\\'])];
+    expect(judge(cases, [after], ['public/help/phone/01.png', 'src/help/a.ts'])).toEqual([]);
+  });
+
   it('автокейс прогнан до правки — пробел; после правки зелёным — чисто', () => {
     const cases = [auto('auth-001', ['src/auth'])];
     const before = run('2026-10-15T10:01:00.000Z', [['auth-001', 'passed']]);

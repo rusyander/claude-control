@@ -59,6 +59,34 @@ export function PhoneTopic() {
         />
       </HelpSection>
 
+      <HelpSection title={tr('computersTitle')} caption={tr('computersCaption')}>
+        <FieldTable
+          nameHeader={tr('computersColumn')}
+          descriptionHeader={tr('computersMeaningColumn')}
+          rows={[
+            row('computersPair'),
+            row('computersSwitch'),
+            row('computersRunning'),
+            row('computersSame'),
+            row('computersForget'),
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('powerTitle')} caption={tr('powerCaption')}>
+        <FieldTable
+          nameHeader={tr('powerColumn')}
+          descriptionHeader={tr('powerMeaningColumn')}
+          rows={[
+            row('powerWindows'),
+            row('powerMac'),
+            row('powerLinux'),
+            row('powerOff'),
+            row('powerConfirm'),
+          ]}
+        />
+      </HelpSection>
+
       <HelpSection title={tr('offlineTitle')} caption={tr('offlineCaption')}>
         <FieldTable
           nameHeader={tr('offlineColumn')}

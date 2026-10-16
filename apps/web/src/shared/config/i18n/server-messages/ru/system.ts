@@ -8,6 +8,8 @@ export const systemRu: Record<SystemMessageCode, string> = {
   'value-too-long': 'Значение превышает допустимую длину.',
   'remote-settings-invalid': 'Настройки заданы неверно',
   'remote-device-invalid': 'Устройство описано неверно',
+  'power-request-invalid': 'Запрос на сон или гибернацию составлен неверно',
+  'power-unavailable': 'Этого режима на компьютере нет — проверьте, что он включён в системе',
   'remote-device-token-unspecified': 'Не указан токен устройства',
   'location-not-found':
     'Каталог .claude не найден автоматически. Укажите путь к нему вручную в настройках приложения.',

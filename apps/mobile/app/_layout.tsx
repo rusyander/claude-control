@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 import { AppSplash } from '../src/features/splash/AppSplash';
-import { useConnection, loadConnection } from '../src/shared/api/connection';
+import { currentConnection, useConnection, loadConnection } from '../src/shared/api/connection';
 import { forgetPanelData } from '../src/shared/api/panel-cache';
 import { resumeActive } from '../src/shared/lib/runs';
 import { useNotificationOpen } from '../src/shared/lib/notifications';
@@ -17,6 +17,7 @@ import { colors } from '../src/shared/config/theme';
 import { useT, loadLanguage } from '../src/shared/config/i18n';
 import { ensureChannel } from '../src/shared/lib/ensureChannel';
 import { loadWorkspace, openChat } from '../src/shared/lib/workspace';
+import { activatePanel, panelForMachine, refreshIdentity } from '../src/shared/lib/panel-switch';
 
 export {
   // Ошибку в дереве навигации должен показывать экран, а не белый лист.
@@ -55,13 +56,16 @@ export default function RootLayout() {
   // оживляет и уходит. Приложение под ней уже смонтировано и готово.
   const [greeted, setGreeted] = useState(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
-  const connectionUrl = useConnection().url;
+  const connection = useConnection();
 
   // Нажатие на уведомление — в его разговор: чужой CLI открывается своим экраном,
-  // разговор Claude — обычным чатом своего проекта.
-  const openFromNotification = useCallback((data: unknown) => {
+  // разговор Claude — обычным чатом своего проекта. Уведомление с другого
+  // компьютера сначала выбирает его: разговор живёт на той машине.
+  const openFromNotification = useCallback(async (data: unknown) => {
     const target = notificationTarget(data);
     if (!target) return;
+    const panel = panelForMachine((data as { machineId?: unknown } | null)?.machineId);
+    if (panel) await activatePanel(panel);
     if (target.kind === 'foreign') {
       router.push({
         pathname: '/foreign-chat',
@@ -73,24 +77,32 @@ export default function RootLayout() {
     router.push('/chat');
   }, []);
   // Ждёт, пока смонтирован стек и показана заставка: раньше переходить некуда.
-  useNotificationOpen(openFromNotification, ready && greeted);
+  const onNotification = useCallback(
+    (data: unknown) => void openFromNotification(data),
+    [openFromNotification],
+  );
+  useNotificationOpen(onNotification, ready && greeted);
 
   useEffect(() => {
     void (async () => {
-      await Promise.all([loadConnection(), loadWorkspace(), loadLanguage(), ensureChannel()]);
+      await Promise.all([loadConnection(), loadLanguage(), ensureChannel()]);
+      await loadWorkspace(currentConnection().activeId);
       setReady(true);
       // Системная заставка гаснет растворением — стык с нашей не виден.
       SplashScreen.setOptions({ fade: true, duration: 220 });
       void SplashScreen.hideAsync();
-      void resumeActive();
+      // Имя машины могли сменить, а старая пара его не знала вовсе.
+      void refreshIdentity();
     })();
   }, []);
 
-  // Кэш запросов принадлежит одной панели: после «Отключить» или спаривания с другой
-  // экраны иначе показывают данные прежней, пока каждый не перезапросится сам.
+  // Кэш запросов принадлежит одной панели: после смены компьютера, «Забыть» или
+  // спаривания экраны иначе показывают данные прежней, пока каждый не перезапросится
+  // сам. Идущие на выбранной машине прогоны подхватываются тут же, без ожидания опроса.
   useEffect(() => {
-    forgetPanelData(queryClient);
-  }, [connectionUrl]);
+    void forgetPanelData(queryClient);
+    void resumeActive();
+  }, [connection.activeId, connection.url]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
@@ -135,6 +147,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="chat" options={{ headerShown: false }} />
             <Stack.Screen name="chats" options={{ title: t.chats.title }} />
+            <Stack.Screen name="project" options={{ title: '' }} />
             <Stack.Screen name="foreign-chat" options={{ title: '' }} />
             <Stack.Screen name="code" options={{ title: t.code.projectTitle }} />
             <Stack.Screen name="tests" options={{ title: t.tests.screenTitle }} />

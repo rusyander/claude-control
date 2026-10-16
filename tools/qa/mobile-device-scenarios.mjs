@@ -40,7 +40,7 @@ export function textColour(file, { x1, y1, x2, y2 }) {
 }
 export const isRed = (c) => c.r > c.g + 60 && c.r > c.b + 60;
 
-/** Экран «Тесты» проекта: Проекты → недавний проект → чат → «Tests». */
+/** Экран «Тесты» проекта: Проекты → карточка проекта → «Tests» на странице проекта. */
 async function openTests({ phone }) {
   phone.stopApp();
   phone.launch();
@@ -58,8 +58,12 @@ async function appAlive(phone, pid) {
 /** Язык приложения — переключателем в «Настройках», как человек. */
 async function setLanguage(phone, language) {
   await phone.tap(language === 'ru' ? /^(Settings|Настройки)$/ : /^(Настройки|Settings)$/);
+  // Язык — на вкладке настроек «Общее»; вкладка переживает уход с экрана,
+  // поэтому после выбора возвращаем «Связь», как после запуска.
+  await phone.tap(/^(Общее|General)$/);
   await phone.tap(language === 'ru' ? 'Русский' : 'English');
   await wait(800);
+  await phone.tap(/^(Связь|Link)$/);
 }
 
 /** Кейсы проекта: общий шаг из двух и кейс, который на него ссылается. */

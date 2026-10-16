@@ -672,7 +672,7 @@
         {
           "path": "apps/server/src/domains/project-tests/impact/impact.ts",
           "why": "«Только изменённое»: git status → codePaths → area, пусто ≠ всё",
-          "sha": "a3f118a146df40e2"
+          "sha": "9c70892d1c7d0b58"
         },
         {
           "path": "apps/server/src/domains/project-tests/manual/manual.ts",
@@ -847,7 +847,7 @@
         {
           "path": "apps/server/src/domains/project-tests/suites/suites.ts",
           "why": "кейс на каталог, итог — худший тест, сам один раз, рецепт без своей команды",
-          "sha": "d85b2df641eac75a"
+          "sha": "7216870bfc08cf79"
         },
         {
           "path": "apps/server/src/domains/project-tests/turn-hooks/turn-hooks.ts",
@@ -857,7 +857,7 @@
         {
           "path": "apps/server/src/domains/project-tests/turn-gate/turn-gate.ts",
           "why": "какие пробелы проверка конца хода называет агенту",
-          "sha": "641312a9bbad03a7"
+          "sha": "4d6682fab95d0878"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/native-reports.ts",
@@ -865,7 +865,7 @@
           "sha": "b87cc7baba498557"
         }
       ],
-      "confirmedAt": "2026-10-15T20:33:26.702Z"
+      "confirmedAt": "2026-10-16T08:33:41.620Z"
     },
     {
       "topic": "rules",
@@ -2762,7 +2762,7 @@
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic/PhoneTopic.tsx",
-      "confirmedAt": "2026-10-11T16:35:43.335Z",
+      "confirmedAt": "2026-10-16T09:17:11.281Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate/access-gate.ts",
@@ -2786,8 +2786,8 @@
         },
         {
           "path": "apps/server/src/domains/remote-notify.ts",
-          "why": "«Уведомления»: что уходит в Expo — вид события и имя папки, ничего больше",
-          "sha": "53e3a29e252ef735"
+          "why": "«Уведомления»: что уходит в Expo — вид события, имя папки и номер машины, ничего больше",
+          "sha": "d84b744fb34158a8"
         },
         {
           "path": "apps/server/src/domains/chat/chat-inbox/chat-inbox.ts",
@@ -2807,12 +2807,12 @@
         {
           "path": "apps/mobile/app/pair.tsx",
           "why": "Путь 1, шаг 5: камера, поля «Или руками», где лежат адрес и токен",
-          "sha": "4fa6511da1083d12"
+          "sha": "5e4eefff32e6dd2d"
         },
         {
           "path": "apps/mobile/app/(tabs)/_layout.tsx",
           "why": "Путь 2: какие вкладки есть у приложения и что за число на «Главной»",
-          "sha": "a58de755e3a1cce9"
+          "sha": "3b8301d5da4c2350"
         },
         {
           "path": "apps/server/src/routes/panel-agent/run-routes/run-routes.ts",
@@ -2842,17 +2842,47 @@
         {
           "path": "apps/mobile/app/_layout.tsx",
           "why": "«Отключить» и новое спаривание: данные прежней панели уходят со всех экранов сразу",
-          "sha": "ef31fed843f3d110"
+          "sha": "da36a56ce19d8170"
         },
         {
           "path": "apps/mobile/app/(tabs)/index.tsx",
           "why": "Кадр «Главная, панель молчит»: крутилка только от жеста, не от фонового опроса",
-          "sha": "16ea6cde192c7770"
+          "sha": "c7fd144d04e9eb9a"
         },
         {
           "path": "apps/mobile/app/(tabs)/settings.tsx",
           "why": "«Настройки: не отвечает»: откуда берётся статус связи и что делает жест вниз",
-          "sha": "e1bd51f4065db688"
+          "sha": "09193765710aaf78"
+        },
+        {
+          "path": "apps/mobile/app/(tabs)/projects.tsx",
+          "why": "«Проекты»: карточки проектов, «+» и «Продолжить», «Из истории чатов», «Папки»",
+          "sha": "672d6a82cb229e51"
+        },
+        {
+          "path": "apps/mobile/app/(tabs)/analytics.tsx",
+          "why": "«Аналитика»: вкладки «Обзор», «Расход», «Инструменты», «Сессии» и что на каждой",
+          "sha": "1f605884c0a15da1"
+        },
+        {
+          "path": "apps/server/src/lib/power/power.ts",
+          "why": "«Питание»: какие режимы у Windows / macOS / Linux, откуда это известно, какая команда",
+          "sha": "1bb6216053094a00"
+        },
+        {
+          "path": "apps/server/src/routes/power-routes.ts",
+          "why": "«Питание»: подтверждение, пауза 2 с, снятие запрета на сон, отказ системы в карточке",
+          "sha": "34b415260d4c5041"
+        },
+        {
+          "path": "apps/mobile/src/shared/api/connection.ts",
+          "why": "«Несколько компьютеров»: список, выбор, переименование, «Забыть», склейка по номеру машины",
+          "sha": "9bacf2c08d71ce39"
+        },
+        {
+          "path": "apps/mobile/src/shared/lib/panel-switch.ts",
+          "why": "«Несколько компьютеров»: смена не останавливает работу, своё место у каждого, уведомление выбирает компьютер",
+          "sha": "8dbb1594636e478f"
         }
       ]
     },
@@ -2971,7 +3001,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-15T16:41:26.912Z",
+      "confirmedAt": "2026-10-16T08:33:41.793Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -2991,7 +3021,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "0d6d43396cf12f8e"
+          "sha": "cf419b33bc6b8d7a"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

@@ -210,6 +210,18 @@
         "width": 540,
         "height": 1200
       }
+    },
+    "pair/07-phone-power-confirm": {
+      "light-ru": {
+        "file": "07-phone-power-confirm.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "07-phone-power-confirm.en.png",
+        "width": 540,
+        "height": 1200
+      }
     }
   }
 }

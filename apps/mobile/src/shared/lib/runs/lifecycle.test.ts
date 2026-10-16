@@ -60,7 +60,7 @@ vi.mock('../../config/i18n', () => ({
   }),
 }));
 
-import { restoreQueue, resumeActive, send, stop } from './lifecycle';
+import { resetRuns, restoreQueue, resumeActive, send, stop } from './lifecycle';
 import type { ActiveRunInfo } from './types';
 import { subscribe, runs, getRun, setRun, lastSeqs, controllers } from './store';
 
@@ -189,6 +189,29 @@ describe('подхват из /chat/active', () => {
     expect(runs.size).toBe(1);
     expect(getRun('new-1').status).toBe('running');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/chat/s3/stream');
+  });
+});
+
+describe('смена компьютера', () => {
+  it('поток прежней панели оборван и ничего не дописывает в стор новой', async () => {
+    const stream = sseStream();
+    fetchMock.mockResolvedValueOnce(stream.response);
+    apiGet.mockResolvedValueOnce([active({ chatId: 's9', sessionId: 's9', status: 'running' })]);
+    await resumeActive();
+    expect(getRun('s9').status).toBe('running');
+    const [controller] = [...controllers.values()];
+
+    resetRuns();
+    expect(runs.size).toBe(0);
+    expect(controller?.signal.aborted).toBe(true);
+
+    // Прежняя панель успела дослать кадры и конец хода — их никто не должен увидеть.
+    stream.push({ kind: 'text', text: 'чужой ответ', seq: 1 });
+    stream.push({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: 's9', seq: 2 });
+    stream.close();
+    await flush();
+    expect(runs.size).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

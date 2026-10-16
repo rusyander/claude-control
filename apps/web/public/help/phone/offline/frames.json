@@ -10,33 +10,33 @@
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-11T13:47:19.233Z",
-        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 The panel did not answer — showing the last data received New chat New chat All conversations All conversations shop-app waiting: 1 · working: 1 Add sign-in by QR code to the mobile layout, needs you Add sign-in by QR code to the mobile layout 13 min needs you 1 question Waiting for your answer. Run the checkout e2e tests, working Run the checkout e2e tests 5 min working Fix the failing cart total test, quiet Fix the failing cart total test 3 h Fixed: the total now rounds after the discount. All 42 tests pass. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings"
+        "shotAt": "2026-10-16T08:17:20.685Z",
+        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 The panel did not answer — showing the last data received 1 running Questions: 1 waiting for an answer 1 needs you 1 project New chat New chat All conversations All conversations , New chat — no project, change  New chat — no project change shop-app waiting: 1 · working: 1 Add sign-in by QR code to the mobile layout, needs you Add sign-in by QR code to the mobile layout 10 min needs you 1 question Waiting for your answer. Run the checkout e2e tests, working Run the checkout e2e tests 2 min working Fix the failing cart total test, quiet Fix the failing cart total test 3 h Fixed: the total now rounds after the discount. All 42 tests pass. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings"
       },
       "file": "01-home-silent.png",
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-11T13:47:51.453Z",
-      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 Панель не ответила — показано последнее, что пришло Новый чат Новый чат Все разговоры Все разговоры shop-app ждут: 1 · работают: 1 Add sign-in by QR code to the mobile layout, ждёт вас Add sign-in by QR code to the mobile layout 13 мин ждёт вас 1 вопрос Waiting for your answer. Run the checkout e2e tests, работает Run the checkout e2e tests 5 мин работает Fix the failing cart total test, молчит Fix the failing cart total test 3 ч Fixed: the total now rounds after the discount. All 42 tests pass. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки"
+      "shotAt": "2026-10-16T08:18:04.869Z",
+      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 Панель не ответила — показано последнее, что пришло 1 работает Вопросы: ждут ответа 1 1 ждёт вас 1 проект Новый чат Новый чат Все разговоры Все разговоры , Новый чат — без проекта, сменить  Новый чат — без проекта сменить shop-app ждут: 1 · работают: 1 Add sign-in by QR code to the mobile layout, ждёт вас Add sign-in by QR code to the mobile layout 11 мин ждёт вас 1 вопрос Waiting for your answer. Run the checkout e2e tests, работает Run the checkout e2e tests 3 мин работает Fix the failing cart total test, молчит Fix the failing cart total test 3 ч Fixed: the total now rounds after the discount. All 42 tests pass. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки"
     },
     {
       "id": "02-settings-silent",
       "side": "phone",
       "en": {
         "file": "02-settings-silent.en.png",
-        "masked": 0,
+        "masked": 1,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-11T13:47:32.923Z",
-        "text": "Settings Panel http://10.0.2.2:59550 not answering Pair again Pair again Disconnect Disconnect Language Русский Русский English English Notifications They arrive when work is finished, has failed, waits for a permission or the agent asks a question. Only the kind of event and the project folder name leave the machine — no text, no code. Enable on this phone Enable on this phone The panel sends notifications The panel sends notifications Test notification Test notification Questions from the computer When the agent in a terminal or VS Code asks a question, you can answer it here — the answer reaches the agent just like a choice made in the window on the computer. While on, the question waits here, not in the window; «I will answer on the computer» hands it back. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-10-16T08:17:37.440Z",
+        "text": "Link Link Alerts Alerts General General  desk not answering http://10.0.2.2:55898 Rename Rename Pair again Pair again Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:55898, selected  desk Windows · 10.0.2.2:55898 selected Add a computer Add a computer Access from outside On: the panel requires a token on every request. Tailscale: https://•••••••••••• (serve is running) Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
       },
       "file": "02-settings-silent.png",
-      "masked": 0,
+      "masked": 1,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-11T13:48:04.481Z",
-      "text": "Настройки Панель http://10.0.2.2:59550 не отвечает Спарить заново Спарить заново Отключить Отключить Язык Русский Русский English English Уведомления Приходят, когда работа закончена, упала, ждёт разрешения или агент задал вопрос. Уходит только вид события и имя папки проекта — ни текста, ни кода. Включить на этом телефоне Включить на этом телефоне Панель шлёт уведомления Панель шлёт уведомления Проверочное уведомление Проверочное уведомление Вопросы с компьютера Когда агент в терминале или VS Code задаёт вопрос, ответить можно отсюда — ответ уйдёт агенту так же, как выбор в окне на компьютере. Пока включено, вопрос ждёт здесь, а не в окне; вернуть его окну — «Отвечу на компьютере». Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки "
+      "shotAt": "2026-10-16T08:18:21.521Z",
+      "text": "Связь Связь Уведомления Уведомления Общее Общее  desk не отвечает http://10.0.2.2:55898 Переименовать Переименовать Спарить заново Спарить заново Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:55898, выбран  desk Windows · 10.0.2.2:55898 выбран Добавить компьютер Добавить компьютер Доступ снаружи Включён: панель требует токен на каждом запросе. Tailscale: https://•••••••••••• (serve работает) Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки "
     }
   ]
 }

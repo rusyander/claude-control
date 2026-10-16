@@ -242,7 +242,8 @@ async function openTab(name, expect, ms = 20_000) {
 async function setLanguage(lang) {
   // Сразу после запуска (и после смены ночного режима) экран ещё пересобирается:
   // ждём сам заголовок «Язык», а не первый попавшийся кадр.
-  await openTab('settings', /^(Язык|Language)$/);
+  await openTab('settings', SETTINGS_TABS);
+  await settingsTab(/^(Общее|General)$/, /^(Язык|Language)$/);
   const button = await phone.scrollTo(lang === 'ru' ? /^Русский$/ : /^English$/);
   if (!button) {
     throw new Error(
@@ -251,6 +252,20 @@ async function setLanguage(lang) {
   }
   phone.tapAt(button.x, button.y);
   await wait(800);
+  // Вкладка настроек переживает уход с экрана: дальше кадрам нужна «Связь».
+  await settingsTab(/^(Связь|Link)$/);
+}
+
+/** Подписи вкладок настроек — по ним видно, что экран настроек поднялся. */
+const SETTINGS_TABS = /^(Связь|Link)$/;
+
+/** Вкладка внутри настроек: «Связь», «Уведомления», «Контур», «Общее». */
+async function settingsTab(label, expect) {
+  await phone.tap(label);
+  if (expect && !(await phone.waitFor(expect, 15_000))) {
+    throw new Error(`вкладка настроек ${label}: не дождались ${expect}`);
+  }
+  await wait(400);
 }
 
 /** Поле ввода: очистить и набрать. */
@@ -282,6 +297,40 @@ async function pairFrames(lang, url, token, scenario) {
     throw new Error(`не подключился: ${(await phone.texts()).slice(0, 30).join(' ¦ ')}`);
   }
   await shoot(scenario, '06-phone-online', lang);
+  await powerFrame(scenario, lang);
+}
+
+/**
+ * «Питание»: вопрос перед гибернацией. Нажимаются только сама кнопка и «Отмена»;
+ * даже нажатое «Да» машину съёмки не усыпит — панель в холостом режиме питания.
+ */
+async function powerFrame(scenario, lang) {
+  // «Гибернация» на экране дважды — заголовок варианта и кнопка под ним; нужна кнопка.
+  const label = /^(Гибернация|Hibernate)$/;
+  let button;
+  for (let attempt = 0; attempt <= 8 && !button; attempt += 1) {
+    const found = await phone.find(label);
+    const last = found.at(-1);
+    if (found.length >= 2 && last.y < 2000) button = last;
+    else {
+      phone.shell('input swipe 540 1700 540 1100 400');
+      await wait(700);
+    }
+  }
+  if (!button) {
+    throw new Error(`нет кнопки гибернации: ${(await phone.texts()).slice(0, 40).join(' ¦ ')}`);
+  }
+  phone.tapAt(button.x, button.y);
+  const question = /^(Отправить «desk» в гибернацию\?|Put “desk” to hibernate\?)$/;
+  if (!(await phone.waitFor(question, 10_000))) {
+    throw new Error(
+      `нет вопроса перед гибернацией: ${(await phone.texts()).slice(0, 40).join(' ¦ ')}`,
+    );
+  }
+  phone.shell('input swipe 540 1600 540 1150 400');
+  await wait(900);
+  await shoot(scenario, '07-phone-power-confirm', lang);
+  await phone.tap(/^(Отмена|Cancel)$/);
 }
 
 /**
@@ -356,7 +405,8 @@ async function offlineFrames(lang, scenario) {
   await shoot(scenario, '01-home-silent', lang);
   // Настройки держат последний ответ панели, пока их не обновить: человек тянет
   // экран вниз — и только тогда видит «не отвечает».
-  await openTab('settings', /^(Язык|Language)$/);
+  await openTab('settings', SETTINGS_TABS);
+  await settingsTab(SETTINGS_TABS);
   phone.shell('input swipe 540 700 540 1900 250');
   if (!(await phone.waitFor(/^(не отвечает|not answering)$/i, 30_000))) {
     throw new Error(
@@ -390,6 +440,11 @@ try {
     web: false,
     label: 'phone-shots',
     fakeCli: { claude: PHONE_FAKE_CLI },
+    // Телефон подписывает компьютер именем, которое машина называет сама (`/api/system`);
+    // настоящее имя машины съёмки в кадр попадать не должно — сверка кадров его ищет.
+    // Холостой режим питания: кадр «Питание» нажимает кнопку гибернации, а панель съёмки
+    // крутится на настоящей машине — команда только пишется в журнал.
+    env: { AGENTDECK_MACHINE_NAME: 'desk', AGENTDECK_POWER_DRY_RUN: '1' },
     seed: ({ cfg }) => {
       mkdirSync(DEMO_ROOT, { recursive: true });
       writeFileSync(DEMO_MARK, 'phone-device.mjs\n', 'utf8');

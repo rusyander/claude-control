@@ -189,8 +189,12 @@ async function startThrowawayDatabase(
   let ready = false;
   const tries = deps.readyTries ?? 40;
   for (let attempt = 0; attempt < tries && !ready; attempt += 1) {
+    // Через TCP, а не сокет: образ postgres на первом старте поднимает временный
+    // сервер только на сокете (initdb, POSTGRES_DB), гасит его и стартует настоящий.
+    // Проба по сокету говорила «готово» за ~0,5 с до настоящего старта, и первый
+    // запрос по выданному DSN падал (`the database system is shutting down`).
     const check = await deps.docker(
-      ['exec', name, 'pg_isready', '-U', 'postgres', '-d', 'review'],
+      ['exec', name, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'review'],
       cwd,
       10_000,
     );

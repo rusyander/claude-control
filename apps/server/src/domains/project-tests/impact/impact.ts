@@ -134,7 +134,8 @@ export function casesTouching(
       if (testCase.archived) continue;
 
       const byPath = (testCase.codePaths ?? []).find((path) => {
-        const needle = path.replace(/\\/g, '/').replace(/^\.\//, '');
+        // `src/help/` — та же папка, что `src/help`: без среза черты кейс не задевался
+        const needle = path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
         return files.some((file) => file === needle || file.startsWith(`${needle}/`));
       });
       if (byPath) {

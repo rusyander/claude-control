@@ -6,6 +6,8 @@ export const systemMessageParams = {
   'value-too-long': [],
   'remote-settings-invalid': [],
   'remote-device-invalid': [],
+  'power-request-invalid': [],
+  'power-unavailable': [],
   'remote-device-token-unspecified': [],
   'location-not-found': [],
   'location-dir-missing': ['dir'],

@@ -95,16 +95,46 @@ function allTargets() {
 
 /**
  * Убрать (или, при `dry`, только посчитать) промежуточные файлы.
- * Возвращает, сколько каталогов и байтов это было.
+ * Возвращает, сколько каталогов и байтов убрано и какие каталоги не дались.
+ *
+ * Каталог может держать открытым процесс, переживший сборку: `gradle --stop`
+ * гасит демон Gradle, но не демон компилятора Kotlin. Windows тогда отказывает
+ * в удалении (EPERM/EBUSY). Такой каталог пропускаем и называем, остальные
+ * убираем — раньше первый же занятый файл обрывал уборку целиком.
  */
 export function sweepMobileBuild({ dry = false } = {}) {
   const targets = allTargets();
   let bytes = 0;
+  let count = 0;
+  const locked = [];
   for (const target of targets) {
-    bytes += size(target);
-    if (!dry) rmSync(target, { recursive: true, force: true });
+    const before = size(target);
+    if (dry) {
+      bytes += before;
+      count += 1;
+      continue;
+    }
+    try {
+      rmSync(target, { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
+      bytes += before;
+      count += 1;
+    } catch {
+      // Часть файлов уже могла уйти — считаем то, что действительно освободилось.
+      bytes += before - size(target);
+      locked.push(target);
+    }
   }
-  return { count: targets.length, bytes };
+  return { count, bytes, locked };
+}
+
+/** Строка о каталогах, которые не дались, — или пусто, если таких нет. */
+export function lockedNote(locked) {
+  if (locked.length === 0) return '';
+  const names = locked.map((path) => path.slice(mobile.length + 1)).join(', ');
+  return (
+    `Не удалось убрать каталогов: ${locked.length} (${names}) — их держит открытым другой ` +
+    'процесс, обычно демон Kotlin после сборки; он гаснет сам. Повторите pnpm mobile:clean позже.'
+  );
 }
 
 /** Сколько сейчас занимают промежуточные файлы — для доктора и отчётов. */
@@ -117,8 +147,8 @@ export const formatGb = (bytes) => `${(bytes / 1024 ** 3).toFixed(1)} ГБ`;
 // Запуск командой, а не импортом.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const dry = process.argv.includes('--dry');
-  const { count, bytes } = sweepMobileBuild({ dry });
-  if (count === 0) {
+  const { count, bytes, locked } = sweepMobileBuild({ dry });
+  if (count === 0 && locked.length === 0) {
     console.log('Чистить нечего: промежуточных файлов сборки нет.');
   } else {
     console.log(
@@ -127,5 +157,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         : `Убрано ${count} каталогов, освобождено ${formatGb(bytes)}.`,
     );
     if (!dry) console.log('Следующая сборка APK будет полной — это нормально.');
+  }
+  const note = lockedNote(locked);
+  if (note) {
+    console.log(note);
+    process.exitCode = 1;
   }
 }

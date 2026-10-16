@@ -4,6 +4,8 @@ import type { DiscoveredMemberKind } from '@agentdeck/contracts/group-sources';
 import { readJsonFile, readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
 import { readHooksFromFiles } from '../hooks/hooks.ts';
+import { RELAY_HOOK_FILE } from '../chat/outside-relay/outside-relay-install.ts';
+import { TURN_HOOK_SCRIPT } from '../project-tests/turn-hooks/turn-hooks.ts';
 import { hashDir, hashText, projectClaudeDir } from '../groups/members/members.ts';
 import { skillSteps } from '../groups/path/path.ts';
 import { splitFrontmatter } from '../skills/frontmatter.ts';
@@ -102,19 +104,31 @@ function mdFiles(kind: DiscoveredMemberKind, dir: string | undefined): Inventory
   });
 }
 
+/**
+ * Хуки, которые пишет сама панель: проверка блока «Тесты» и мост окон вне панели.
+ * В набор их брать нельзя — выключенная группа сняла бы их вместе со своими, и
+ * панель потеряла бы проверку конца хода или запросы прав на телефон.
+ */
+const PANEL_HOOK_SCRIPTS = [TURN_HOOK_SCRIPT, RELAY_HOOK_FILE];
+const isPanelHook = (command: string): boolean =>
+  PANEL_HOOK_SCRIPTS.some((script) => command.includes(script));
+
 function hooks(files: InventoryLayout['hookFiles']): InventoryItem[] {
   if (!files) return [];
-  return readHooksFromFiles(files.settings, files.local, files.projectRoot).map((hook) => ({
-    kind: 'hook' as const,
-    id: hook.id,
-    path: hook.source === 'settings-local' && files.local ? files.local : files.settings,
-    // Команда уходит модели и в кэш поиска: токен из аргументов — маской, до обрезки.
-    summary: maskSecretsInText(
-      `${hook.event}${hook.matcher ? ` [${hook.matcher}]` : ''}: ${hook.command}`,
-    ).slice(0, MAX_SUMMARY),
-    steps: [],
-    hash: hashText(`${hook.event}\0${hook.matcher ?? ''}\0${hook.command}`),
-  }));
+  const found = readHooksFromFiles(files.settings, files.local, files.projectRoot);
+  return found
+    .filter((hook) => !isPanelHook(hook.command))
+    .map((hook) => ({
+      kind: 'hook' as const,
+      id: hook.id,
+      path: hook.source === 'settings-local' && files.local ? files.local : files.settings,
+      // Команда уходит модели и в кэш поиска: токен из аргументов — маской, до обрезки.
+      summary: maskSecretsInText(
+        `${hook.event}${hook.matcher ? ` [${hook.matcher}]` : ''}: ${hook.command}`,
+      ).slice(0, MAX_SUMMARY),
+      steps: [],
+      hash: hashText(`${hook.event}\0${hook.matcher ?? ''}\0${hook.command}`),
+    }));
 }
 
 function mcp(file: string | undefined): InventoryItem[] {

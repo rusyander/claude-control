@@ -13,6 +13,10 @@ import { pendingCount } from '../../src/entities/inbox/pendingCount';
  * переключение проекта, аналитика, агент панели (А8) и своя настройка. Остальные три десятка
  * разделов панели на телефон не переносятся: они настраивают конфигурацию, а
  * это работа за столом.
+ *
+ * Шапки навигатора нет ни у одной вкладки: у каждой наверху свой переключатель
+ * видов, а имя раздела и так подсвечено внизу — строка заголовка над
+ * переключателем «Проекты | Папки» только повторяла его и съедала место.
  */
 export default function TabLayout() {
   const t = useT();
@@ -58,6 +62,7 @@ export default function TabLayout() {
         name="projects"
         options={{
           title: t.tabs.projects,
+          headerShown: false,
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{ ios: 'folder', android: 'folder', web: 'folder' }}
@@ -71,6 +76,7 @@ export default function TabLayout() {
         name="analytics"
         options={{
           title: t.tabs.analytics,
+          headerShown: false,
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{ ios: 'chart.bar', android: 'bar_chart', web: 'bar_chart' }}
@@ -100,6 +106,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: t.tabs.settings,
+          headerShown: false,
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{ ios: 'gearshape', android: 'settings', web: 'settings' }}

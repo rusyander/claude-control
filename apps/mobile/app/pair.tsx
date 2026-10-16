@@ -6,7 +6,8 @@ import type { RemotePairing } from '@agentdeck/contracts';
 import { Button, Card, Field, Mono, Muted, Screen, Title } from '../src/shared/ui';
 import { colors, radius, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
-import { bundledUrl, normalizeUrl, saveConnection } from '../src/shared/api/connection';
+import { bundledUrl, normalizeUrl } from '../src/shared/api/connection';
+import { pairPanel } from '../src/shared/lib/panel-switch';
 import { registerForPush } from '../src/shared/lib/registerForPush';
 
 /**
@@ -37,7 +38,9 @@ export default function PairScreen() {
     setSaving(true);
     setFailed('');
     try {
-      await saveConnection(address, nextToken);
+      // Новый компьютер встаёт в список, знакомый (тот же адрес или номер машины)
+      // обновляет токен; в обоих случаях он становится выбранным.
+      await pairPanel(address, nextToken);
       // Push-токен отдаём сразу: пара «адрес + токен» уже есть, а второй заход в
       // настройки ради разрешения человек делать не станет.
       await registerForPush(t.settings.thisPhone);

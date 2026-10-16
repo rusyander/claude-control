@@ -123,6 +123,14 @@ describe('prepareReviewStand', () => {
     expect(calls.find((args) => args[0] === 'pull')).toBeUndefined();
   });
 
+  it('готовность базы спрашивается по TCP — временный сервер initdb слушает только сокет', async () => {
+    withDb();
+    const { exec, calls } = fakeDocker({ info: ok('29'), port: ok('127.0.0.1:49153\n') });
+    await run(exec);
+    const probe = calls.find((args) => args[0] === 'exec' && args.includes('pg_isready'));
+    expect(probe?.[probe.indexOf('-h') + 1]).toBe('127.0.0.1');
+  });
+
   it('образа на машине нет — тянется только образ без чужого реестра', async () => {
     withDb();
     const hub = fakeDocker({

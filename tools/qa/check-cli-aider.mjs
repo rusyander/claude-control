@@ -362,6 +362,7 @@ try {
     label: 'cli-aider-key',
     web: false,
     noClaude: true,
+    hideCli: ['aider'],
     settings: { provider: 'aider' },
     env: {
       OPENAI_API_KEY: SENT_OPENAI,

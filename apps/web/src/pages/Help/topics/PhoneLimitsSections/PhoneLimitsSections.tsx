@@ -30,6 +30,7 @@ export function PhoneLimitsSections({ tr }: SectionProps) {
             { label: tr('storagePanelToken'), value: tr('storagePanelTokenValue'), isMono: true },
             { label: tr('storageSettings'), value: tr('storageSettingsValue'), isMono: true },
             { label: tr('storageDevices'), value: tr('storageDevicesValue'), isMono: true },
+            { label: tr('storageMachine'), value: tr('storageMachineValue'), isMono: true },
             { label: tr('storagePhone'), value: tr('storagePhoneValue') },
             { label: tr('storageNever'), value: tr('storageNeverValue') },
           ]}

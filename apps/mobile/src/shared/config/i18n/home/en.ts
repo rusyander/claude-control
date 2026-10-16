@@ -7,6 +7,12 @@ export const homeEn: HomeTexts = {
   tabQuestionsA11y: (count: number) =>
     count > 0 ? `Questions: ${count} waiting for an answer` : 'Questions: nothing waiting',
   newChat: 'New chat',
+  newChatWhere: (project: string) => `New chat — in ${project}`,
+  newChatNoProject: 'New chat — no project',
+  changeProject: 'change',
+  pulseRunning: () => 'running',
+  pulseWaiting: (count: number) => (count === 1 ? 'needs you' : 'need you'),
+  pulseProjects: (count: number) => (count === 1 ? 'project' : 'projects'),
   allChats: 'All conversations',
   failed: 'The panel did not answer — showing the last data received',
   failedEmpty: 'The panel did not answer. Pull down to ask again.',

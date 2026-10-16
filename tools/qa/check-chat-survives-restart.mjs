@@ -363,6 +363,9 @@ function buildStand(stand) {
       !/\.(test|spec)\.[cm]?[jt]s$/.test(source) && !/[\\/]__fixtures__([\\/]|$)/.test(source),
   });
   copyFileSync(join(serverFrom, 'package.json'), join(serverTo, 'package.json'));
+  // Встроенный набор панели: без него сборка набора падает, а прогон при сбое
+  // сборки не запускается вовсе — сценарий обрывался «фальшивый CLI не поднялся».
+  cpSync(join(serverFrom, 'assets'), join(serverTo, 'assets'), { recursive: true });
   // Зависимости — ссылкой: копировать их незачем, а менять их проверка не
   // будет. Ссылка снимается первой при уборке (`unlinkStand`). Контракты сервер
   // берёт через неё же (`@agentdeck/contracts`), а сторожу нужен лишь каталог:

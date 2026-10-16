@@ -141,6 +141,9 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/mobile/apk/build': 'human:remote',
   'POST /api/mobile/apk/install': 'human:remote',
   'POST /api/remote/token': 'human:remote',
+  // 16.10: гибернация и сон компьютера с телефона.
+  'GET /api/power': 'human:remote',
+  'POST /api/power': 'human:remote',
   'POST /api/sandbox/mcp-call': 'human:outward',
   'POST /api/sandbox/mcp-tools': 'human:outward',
   'POST /api/settings/import': 'human:settings-import',

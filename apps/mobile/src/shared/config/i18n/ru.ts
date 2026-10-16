@@ -4,6 +4,8 @@ import { panelTextsRu } from './panel-texts/texts.ru.ts';
 import { homeRu } from './home/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
 import { foreignChatRu } from './foreign-chat/ru.ts';
+import { projectsRu } from './projects/ru.ts';
+import { computersRu } from './computers/ru.ts';
 
 /**
  * Русский словарь — источник истины. Английский типизирован по нему, поэтому
@@ -296,16 +298,9 @@ export const ru = {
     messages: (count: number) => `${count} сообщ.`,
   },
 
-  projects: {
-    toChat: 'В разговор',
-    code: 'Код',
-    recent: 'Недавние',
-    browse: 'Обзор',
-    toDisks: 'к дискам',
-    openFolder: 'Открыть эту папку',
-    chats: (count: number) => `${count} разгов.`,
-    gone: 'папки больше нет',
-  },
+  // Вкладка «Проекты» и экран проекта — отдельным модулем (`projects/`).
+  projects: projectsRu,
+  computers: computersRu,
 
   git: {
     title: 'Git',
@@ -606,6 +601,16 @@ export const ru = {
     allModels: 'Все модели',
     filters: 'Фильтры',
     nothingForFilter: 'За этот период с такими фильтрами ничего не нашлось.',
+    tabOverview: 'Обзор',
+    tabSpend: 'Расход',
+    tabTools: 'Инструменты',
+    tabSessions: 'Сессии',
+    byHour: 'По часам',
+    byHourHint: 'Запросы к модели за период — в какие часы суток идёт работа.',
+    tapDay: 'Нажмите на столбик, чтобы увидеть день.',
+    noSessions: 'За этот период сессий нет.',
+    noTools: 'За этот период инструменты не вызывались.',
+    periodSessions: (count: number) => `Сессий за период: ${count}`,
   },
 
   settings: {
@@ -622,7 +627,7 @@ export const ru = {
     notifications: 'Уведомления',
     notificationsAbout:
       'Приходят, когда работа закончена, упала, ждёт разрешения или агент задал вопрос. ' +
-      'Уходит только вид события и имя папки проекта — ни текста, ни кода.',
+      'Уходит только вид события, имя папки проекта и случайный номер машины — ни текста, ни кода.',
     enableHere: 'Включить на этом телефоне',
     panelNotifies: 'Панель шлёт уведомления',
     testNotification: 'Проверочное уведомление',
@@ -653,6 +658,13 @@ export const ru = {
     noTailscale: 'Tailscale на машине не найден — снаружи адреса нет.',
     pushOn: 'Уведомления подключены',
     thisPhone: 'Телефон',
+    tabLink: 'Связь',
+    tabAlerts: 'Уведомления',
+    tabContour: 'Контур',
+    tabGeneral: 'Общее',
+    app: 'Приложение',
+    version: 'Версия',
+    devicesEmpty: 'Ни один телефон ещё не подключил уведомления.',
   },
 
   platform: {

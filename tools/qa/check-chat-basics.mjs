@@ -151,6 +151,34 @@ await runOnStand(
       );
       check('в списке слева — разговор с названием', listed);
 
+      // Отрицательная половина «поле пустеет сразу»: отказ сервера возвращает
+      // набранное. Отказ задержан, иначе он успел бы вернуть текст до замера.
+      console.log('chat-001: отказ сервера возвращает текст в поле');
+      await newChat();
+      const refused = 'отказ: этот текст обязан вернуться';
+      const refuse = async (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        await wait(1500);
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: '{"error":"отказ проверки"}',
+        });
+      };
+      await page.route('**/api/chat/send', refuse);
+      await input.fill(refused);
+      await input.press('Enter');
+      await wait(250);
+      check('отказ: до ответа поле уже пустое', (await input.inputValue()) === '');
+      let back = '';
+      for (let i = 0; i < 60 && back !== refused; i += 1) {
+        await wait(100);
+        back = await input.inputValue();
+      }
+      check('отказ: набранное вернулось в поле', back === refused, back);
+      await page.unroute('**/api/chat/send', refuse);
+      await input.fill('');
+
       // ---------------------------------------------------------------- chat-005
       console.log('chat-005: модель и глубина следующего хода');
       await newChat();

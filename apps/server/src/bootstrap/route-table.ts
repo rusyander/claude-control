@@ -72,6 +72,7 @@ import { registerMediaRoutes } from '../routes/media-routes/media-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
+import { registerPowerRoutes } from '../routes/power-routes.ts';
 import { registerMobileApkRoutes } from '../routes/mobile-apk-routes/mobile-apk-routes.ts';
 import { registerChangelogRoutes } from '../routes/changelog-routes/changelog-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
@@ -305,6 +306,14 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         },
       ),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
+    // Гибернация и сон машины с телефона; запрет на сон от локального прогона снимается перед сном.
+    (instance) =>
+      registerPowerRoutes(instance, {
+        awake: {
+          held: () => runtime.keepAwake.status().held,
+          release: () => runtime.keepAwake.stop(),
+        },
+      }),
     // Сборка APK телефона кнопкой из настроек — рядом с удалённым доступом.
     registerMobileApkRoutes,
     // Лента «Что нового»: описания из репозитория и факты из git.

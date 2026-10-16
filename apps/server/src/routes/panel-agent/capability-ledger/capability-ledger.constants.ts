@@ -751,6 +751,10 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/mobile/apk/file': 'human:download',
   'POST /api/mobile/apk/build': 'human:remote',
   'POST /api/mobile/apk/install': 'human:remote',
+  // power-routes.ts — усыпить компьютер с телефона: только человек, агент панели
+  // машину не выключает (обратно её с телефона не поднять).
+  'GET /api/power': 'human:remote',
+  'POST /api/power': 'human:remote',
   // remote-routes.ts
   'DELETE /api/remote/devices': 'human:remote',
   'GET /api/remote': 'human:remote',

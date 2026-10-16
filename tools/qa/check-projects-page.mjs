@@ -130,10 +130,12 @@ await runOnStand(
       check('«Права» считает 2 правила', /Права\D*2$/.test(permsName), permsName);
       const localName = await tabName(/^Из проекта/);
       // За числом идёт расшифровка для чтения с экрана — она и называет состав.
+      // Хуков 3: засеянный guard и два хука блока «Тесты» (SessionStart, Stop), которые
+      // панель с 15.10 пишет в .claude/settings.local.json при добавлении проекта.
       check(
-        '«Из проекта» считает 3 записи и называет состав',
-        /^Из проекта\D*3\b/.test(localName) &&
-          localName.includes('скиллов: 1, хуков: 1, правил: 1'),
+        '«Из проекта» считает 5 записей и называет состав',
+        /^Из проекта\D*5\b/.test(localName) &&
+          localName.includes('скиллов: 1, хуков: 3, правил: 1'),
         localName,
       );
 

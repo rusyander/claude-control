@@ -8,6 +8,9 @@ export const systemEn: Record<SystemMessageCode, string> = {
   'value-too-long': 'The value exceeds the allowed length.',
   'remote-settings-invalid': 'The settings are invalid',
   'remote-device-invalid': 'The device is described incorrectly',
+  'power-request-invalid': 'The sleep or hibernation request is malformed',
+  'power-unavailable':
+    'This mode is not available on the computer — check that it is enabled in the system',
   'remote-device-token-unspecified': 'No device token specified',
   'location-not-found':
     'The .claude folder was not found automatically. Specify its path manually in the app settings.',

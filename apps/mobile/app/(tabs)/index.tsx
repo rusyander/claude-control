@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
-import { Button, Empty, Icon, Loading, Segmented } from '../../src/shared/ui';
+import { Button, Chips, Empty, Icon, Loading, Segmented } from '../../src/shared/ui';
 import { colors, font, space } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
 import { useConnection, isConfigured } from '../../src/shared/api/connection';
 import { useWorkspace, newChatId, openChat } from '../../src/shared/lib/workspace';
+import { panelTitle } from '../../src/shared/api/panels';
+import { activatePanel } from '../../src/shared/lib/panel-switch';
 import { usePullRefresh } from '../../src/shared/lib/pull-refresh';
+import { useNow } from '../../src/shared/lib/useNow';
+import { baseName } from '../../src/entities/project/projectList';
 import { projectGroups } from '../../src/entities/inbox/model';
 import { ActiveChats } from '../../src/features/inbox/ActiveChats/ActiveChats';
+import { Pulse } from '../../src/features/inbox/Pulse/Pulse';
 import { AskCard } from '../../src/features/inbox/AskCard/AskCard';
 import { localChatKey } from '../../src/features/inbox/chatKey';
 import { useSent, forgetSent } from '../../src/features/inbox/sent';
@@ -23,9 +28,6 @@ import type { QuestionCardData } from '../../src/entities/inbox/questionCards';
 import { questionCards } from '../../src/entities/inbox/questionCards';
 
 type HomeTab = 'chats' | 'questions';
-
-/** Раз в полминуты: «5 мин» не должны стоять на экране, пока прошло полчаса. */
-const CLOCK_MS = 30_000;
 
 /**
  * Главная: что идёт и кто ждёт — по всем проектам сразу.
@@ -46,12 +48,14 @@ export default function HomeScreen() {
   const pull = usePullRefresh(inbox.refetch);
   const sent = useSent();
   const [tab, setTab] = useState<HomeTab>('chats');
-  const now = useClock();
+  const now = useNow();
 
   const chats = useMemo(() => inbox.data ?? [], [inbox.data]);
   const groups = useMemo(() => projectGroups(chats, sent), [chats, sent]);
   const cards = useMemo(() => questionCards(chats, sent), [chats, sent]);
   const pending = useMemo(() => pendingCount(chats, sent), [chats, sent]);
+  const running = groups.reduce((sum, group) => sum + group.running, 0);
+  const projects = groups.filter((group) => !group.isSandbox).length;
 
   // Сервер перестал отдавать отправленный вопрос — ответ дошёл, помнить его незачем.
   // Сверка — с той же сводкой, что на экране: вопрос из потока сервер ещё не
@@ -81,6 +85,21 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       {/* Фоновый наблюдатель панели: виден, только пока включён. */}
       <WatcherChip enabled={configured} />
+      {/* Спарен с несколькими компьютерами — выбор прямо здесь: главная показывает
+          работу одного из них, и надо видеть, какого. */}
+      {connection.panels.length > 1 ? (
+        <View style={styles.computers}>
+          <Chips
+            scroll
+            options={connection.panels.map((entry) => ({
+              value: entry.id,
+              label: panelTitle(entry),
+            }))}
+            value={connection.activeId}
+            onChange={(id) => void activatePanel(id)}
+          />
+        </View>
+      ) : null}
       <View style={styles.tabs}>
         <Segmented<HomeTab>
           options={[
@@ -122,6 +141,12 @@ export default function HomeScreen() {
 
         {loaded && tab === 'chats' ? (
           <>
+            <Pulse
+              running={running}
+              waiting={pending}
+              projects={projects}
+              onWaiting={() => setTab('questions')}
+            />
             <View style={styles.actions}>
               <Button
                 title={t.home.newChat}
@@ -138,6 +163,19 @@ export default function HomeScreen() {
                 onPress={() => router.push('/chats')}
               />
             </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.navigate('/projects')}
+              style={({ pressed }) => [styles.where, pressed && styles.pressed]}
+            >
+              <Icon ios="folder" android="folder" size={14} color={colors.textDim} />
+              <Text style={styles.whereText} numberOfLines={1}>
+                {workspace.projectPath
+                  ? t.home.newChatWhere(baseName(workspace.projectPath))
+                  : t.home.newChatNoProject}
+              </Text>
+              <Text style={styles.whereLink}>{t.home.changeProject}</Text>
+            </Pressable>
             {groups.length === 0 ? (
               <Empty
                 title={t.home.activeEmpty}
@@ -195,21 +233,17 @@ function QuestionsTab({
   );
 }
 
-function useClock(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), CLOCK_MS);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   grow: { flex: 1 },
   tabs: { marginHorizontal: space.lg, marginTop: space.sm, marginBottom: space.xs },
+  computers: { marginHorizontal: space.lg, marginTop: space.sm },
   content: { padding: space.lg, paddingTop: space.sm, gap: space.md },
   actions: { flexDirection: 'row', gap: space.sm },
   failed: { color: colors.danger, fontSize: font.small },
+  pressed: { opacity: 0.7 },
+  where: { flexDirection: 'row', alignItems: 'center', gap: space.xs + 2, marginTop: -space.xs },
+  whereText: { flexShrink: 1, color: colors.textDim, fontSize: font.small },
+  whereLink: { color: colors.accent, fontSize: font.small, fontWeight: '600' },
 });

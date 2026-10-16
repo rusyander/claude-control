@@ -63,7 +63,11 @@ export const phoneEn: typeof phoneRu = {
     screenHome: 'Home → «Projects & chats»',
     screenHomeText:
       'Live conversations across all projects at once: what is running, what is waiting for ' +
-      'you, what ran in the last day. Conversations of a project copy sit under their main ' +
+      'you, what ran in the last day. Paired with several computers — a row of their names sits ' +
+      'above the tabs, a tap selects one. On top, a summary: how many conversations are running, ' +
+      'how many need you (a tap leads to «Questions») and in how many projects. Under «New ' +
+      'chat» you see the project it will start in, and «change» leads to the projects. ' +
+      'Conversations of a project copy sit under their main ' +
       'project. Refreshes every 5 seconds; the number on the tab is how many answers are ' +
       'waiting for you. A conversation running in a terminal or VS Code is «working» too: its ' +
       'steps appear in the chat by themselves. With «The agent on the computer» on in Settings ' +
@@ -101,23 +105,100 @@ export const phoneEn: typeof phoneRu = {
       'is how many cards are waiting.',
     screenProjects: 'Projects',
     screenProjectsText:
-      'Recent projects and a disk browser: open a folder, start a conversation in it, look at ' +
-      'the code, the git state and the project copies.',
+      'The same projects as in the panel, with their chat count and what is running in them ' +
+      'now. «+» on a card starts a new chat in the project, «Continue» opens the latest one. A ' +
+      'tap on the card opens the project page: «Chats», «Git» and «Copies» tabs, «New chat» and ' +
+      '«Code» buttons. Folders where the agent ran but which are not among the panel projects ' +
+      'sit in the collapsed «From chat history» block — a folder can be added to the projects ' +
+      'from there. The «Folders» tab is a disk browser: open any folder, start a chat in it or ' +
+      'add it to the projects.',
     screenTests: 'Tests',
     screenTestsText:
       'Project cases by group with filters, case editing, a manual run step by step and the ' +
       'run history. The report, plans and environments stay in the panel.',
     screenAnalytics: 'Analytics',
     screenAnalyticsText:
-      'Tokens, requests, cache, spend by day, model, project, tool and skill, what is running ' +
-      'now and the latest sessions — for today, for a period or for all time.',
+      'Four tabs over one chosen period (today, 7/30/90 days, all time or your own dates): ' +
+      '«Overview» — spend, tokens, requests, cache, charts by day and by hour; «Spend» — by ' +
+      'model and project; «Tools» — tools and skills; «Sessions» — what is running now and the ' +
+      'latest sessions.',
     screenSettings: 'Settings',
     screenSettingsText:
-      'The panel address and «online / not answering», the app language, notifications, ' +
-      'devices, «The agent on the computer» (the panel writes its hooks into the Claude Code ' +
+      'Split into tabs. «Link» — the selected computer (name, «online / not answering», address, ' +
+      '«Rename», «Pair again», «Forget this computer»), the «Computers» list with selection and ' +
+      '«Add a computer», «Power» of the selected computer and outside access. «Alerts» — enable on this phone, test, devices and «The agent on the ' +
+      'computer» (the panel writes its hooks into the Claude Code ' +
       'settings itself; if they are still missing, the card shows the ready command for the ' +
       '«Hooks» section: PermissionRequest with timeout 3600, ' +
-      'PostToolUse and Stop with timeout 10), the contour state (read-only) and outside access.',
+      'PostToolUse and Stop with timeout 10). «Contour» — its state and budget, read-only; the ' +
+      'tab is absent while there are no contours. «General» — the app language and version.',
+
+    computersTitle: 'Several computers',
+    computersCaption:
+      'The phone pairs with each computer separately and always works with one — the selected one.',
+    computersColumn: 'Action',
+    computersMeaningColumn: 'How it works',
+    computersPair: 'Add',
+    computersPairText:
+      'Settings → «Link» → «Add a computer» and the code from that computer’s panel. The ' +
+      'computer joins the list under the name it gives itself; the name on the phone can be ' +
+      'changed («Rename») — the machine keeps its own.',
+    computersSwitch: 'Select',
+    computersSwitchText:
+      'A row in the «Computers» list or a name in the row on top of Home (the row appears with ' +
+      'two computers or more). Home, projects, chats, questions, tests and analytics switch to ' +
+      'the selected one at once; each computer keeps its own open project and conversation.',
+    computersRunning: 'Running work',
+    computersRunningText:
+      'Switching stops nothing: work runs on its own machine. The phone only detaches from it ' +
+      'and picks up whatever runs on the selected one.',
+    computersSame: 'Same computer, another address',
+    computersSameText:
+      'A computer is recognised by its machine number, not its address: paired again over ' +
+      'Tailscale instead of the home network, it stays one row with your name and the new address.',
+    computersForget: 'Forget',
+    computersForgetText:
+      '«Forget this computer» erases its address, token and open project from the phone. The ' +
+      'first remaining one becomes selected.',
+
+    powerTitle: 'Computer power from the phone',
+    powerCaption:
+      'Settings → «Link» → «Power»: put the selected computer to sleep. Its system decides what ' +
+      'exactly is available.',
+    powerColumn: 'System',
+    powerMeaningColumn: 'What the button does',
+    powerWindows: 'Windows',
+    powerWindowsText:
+      'Hibernate: everything open is saved to disk and the power goes off completely; the ' +
+      'power button brings it back. With hibernation off in the system there is no button and ' +
+      'the card names the command: powercfg /hibernate on in an administrator terminal. Sleep ' +
+      'is not offered on Windows: the system has no standard sleep command, and the workaround ' +
+      'call hibernates anyway while hibernation is on.',
+    powerMac: 'macOS',
+    powerMacText:
+      'Sleep (pmset sleepnow). How deep it goes is decided by hibernatemode, which the card ' +
+      'shows: 3 — the laptop default (a copy of memory on disk, survives a flat battery), 25 — ' +
+      'true hibernation, 0 — sleep without a copy. Only the owner changes the mode: sudo pmset ' +
+      '-a hibernatemode 25.',
+    powerLinux: 'Linux',
+    powerLinuxText:
+      'Hibernate and sleep through systemd-logind (systemctl hibernate / suspend) — each only ' +
+      'if the system allows it without a password. If it asks for an administrator password or ' +
+      'there is no swap for hibernation, the row names the reason and there is no button. ' +
+      'The panel never overrides the system’s own blocks (a package upgrade, a disk write): ' +
+      'the computer stays awake and the refusal shows in the card.',
+    powerOff: 'Power off completely',
+    powerOffText:
+      'Deliberately not offered: the phone cannot switch the computer back on, while hibernate ' +
+      'and sleep at least keep everything open.',
+    powerConfirm: 'Confirmation',
+    powerConfirmText:
+      'The button first opens a question with the computer’s name; the command leaves only ' +
+      'after «Yes, do it». The panel waits two seconds so the answer reaches the phone and ' +
+      'drops its own sleep block. If an agent is working, the question warns that sleep will ' +
+      'stop it. Pressing again within half a minute does not queue a second command — ' +
+      'otherwise the computer would hibernate again right after waking. A refusal by the ' +
+      'system shows in the card the next time it opens.',
 
     offlineTitle: 'When the panel does not answer',
     offlineCaption:
@@ -160,7 +241,8 @@ export const phoneEn: typeof phoneRu = {
     offlinePushText:
       'The panel sends them. If the panel is asleep nothing arrives, even if an agent is ' +
       'waiting somewhere. Tapping a notification opens its conversation: a Claude chat in its ' +
-      'project, another CLI’s conversation on its own screen. The phone itself polls the ' +
+      'project, another CLI’s conversation on its own screen; a notification from another ' +
+      'computer selects that computer first. The phone itself polls the ' +
       'computer in the background in one case only: you left an open conversation of another ' +
       'CLI in the middle of an answer — then the end of the answer and a permission request ' +
       'come as the phone’s own notification. Android 15 cuts the app’s connection a few ' +
@@ -187,8 +269,9 @@ export const phoneEn: typeof phoneRu = {
     notCloud: 'A cloud service',
     notCloudText:
       'No: requests travel over your Tailscale network straight to your machine. Only ' +
-      'notifications leave it, to the Expo service — the event kind and the project folder ' +
-      'name.',
+      'notifications leave it, to the Expo service — the event kind, the project folder name ' +
+      'and a random machine number (the phone tells by it which computer the notification is ' +
+      'from; the machine name does not leave).',
     notKeys: 'A place for keys',
     notKeysText:
       'No: the contour key, MCP secrets and integration tokens are entered only in the panel ' +
@@ -203,10 +286,13 @@ export const phoneEn: typeof phoneRu = {
     storageSettingsValue: 'state.json → remoteAccess: on or off, outside address, notifications',
     storageDevices: 'Paired devices',
     storageDevicesValue: 'state.json → push tokens of the phones that allowed notifications',
+    storageMachine: 'Machine number',
+    storageMachineValue:
+      '~/.agentdeck/machine-id — random, created on the first request; does not move with a settings transfer',
     storagePhone: 'On the phone',
     storagePhoneValue:
-      'Address and token — in the system secure storage; language and the message queue — in ' +
-      'the app storage',
+      'The computer list, the address and token of each — in the system secure storage; ' +
+      'language, the message queue and the open project of each computer — in the app storage',
     storageNever: 'Stored nowhere',
     storageNeverValue:
       'Copies of conversations, code and project files: the phone reads them from the panel ' +
@@ -308,8 +394,16 @@ export const phoneEn: typeof phoneRu = {
         'service address; yours will be the machine’s https address in Tailscale.',
       pairOnline: 'Done: «online»',
       pairOnlineText:
-        'The address and token went into the phone secure storage. Below are the app language, ' +
-        'notifications, the contour (read-only) and outside access.',
+        'The address and token went into the phone secure storage, and the computer joined the ' +
+        'list under the name it gives itself (here «desk»). Further down the «Link» tab: the ' +
+        '«Computers» list (the next one is added the same way, with the code from its panel), ' +
+        '«Power» and outside access; notifications, the contour and the language are on the ' +
+        'neighbouring tabs.',
+      pairPower: '«Power»: a question first',
+      pairPowerText:
+        'The «Hibernate» button (on a Mac or Linux «Sleep», when the system offers it) does ' +
+        'nothing at once: a question opens with the computer’s name and a warning that the ' +
+        'phone cannot switch it back on. The command leaves only after «Yes, do it».',
 
       dayTitle: 'Path 2. An ordinary day with the phone',
       dayCaption:
@@ -317,7 +411,8 @@ export const phoneEn: typeof phoneRu = {
         'the real app connected to a throwaway panel.',
       dayHome: 'Home: what is running and who is waiting',
       dayHomeText:
-        'Conversations by project: «working», «needs you» or «quiet», how long ago and how ' +
+        'On top, a summary: how many are running, how many need you, in how many projects. ' +
+        'Below, conversations by project: «working», «needs you» or «quiet», how long ago and how ' +
         'many answers are waiting. The number on the «Home» tab is every waiting answer across ' +
         'all projects.',
       dayQuestions: 'Questions: answer without opening the chat',
@@ -335,16 +430,17 @@ export const phoneEn: typeof phoneRu = {
         'card; the conversation history and the action trail are here too.',
       dayProjects: 'Projects',
       dayProjectsText:
-        'Recent projects with their conversation count: «To the chat» opens a new chat in the ' +
-        'folder, «Code» — its files.',
+        'Panel projects with their chat count: «+» starts a new chat in the project, «Continue» ' +
+        'returns to the latest one, a tap on the card opens the project page with its chats, ' +
+        'git and copies.',
       dayTests: 'Project tests',
       dayTestsText:
         'Cases by group, statuses of the last run, filters. A manual step-by-step run and the ' +
         'run history start here too.',
       dayAnalytics: 'Analytics',
       dayAnalyticsText:
-        'The same numbers as in the panel: tokens, requests, cache, by day and by model. The ' +
-        'dollar amount is an estimate at API rates, not a bill.',
+        'The same numbers as in the panel, split into «Overview», «Spend», «Tools» and ' +
+        '«Sessions» tabs. The dollar amount is an estimate at API rates, not a bill.',
 
       offTitle: 'Path 3. The panel does not answer',
       offCaption:
@@ -373,22 +469,25 @@ export const phoneEn: typeof phoneRu = {
       '05-phone-pair-screen':
         'The «Connecting» screen: the camera for the panel code and the «Or by hand» fields — address and token',
       '06-phone-online':
-        'After «Connect»: the panel address and «online», with language and notifications below',
+        'After «Connect»: the «Link» tab — computer «desk» online, its address and the «Computers» list',
+      '07-phone-power-confirm':
+        '«Power»: the question «Put “desk” to hibernate?» with a warning and the buttons «Yes, do it» and «Cancel»',
     },
     day: {
       '01-home':
-        'Home, «Projects & chats»: project conversations — working, waiting for you, the waiting count on the tab',
+        'Home, «Projects & chats»: the summary on top, project conversations below — working, waiting for you',
       '02-questions': 'Home, «Questions»: a chat card with the agent question and answer options',
       '03-chat': 'Chat on the phone: messages, the agent question in the feed and the input field',
       '04-agent': 'The «Agent» tab: a conversation with the panel agent, «History» and «Trail»',
-      '05-projects': 'The «Projects» tab: recent projects, «To the chat» and «Code»',
+      '05-projects': 'The «Projects» tab: project cards with their chat count, «+» and «Continue»',
       '06-tests': 'Project tests: cases by group and statuses of the last run',
-      '07-analytics': 'The «Analytics» tab: tokens, requests, cache and spend by day',
+      '07-analytics':
+        'The «Analytics» tab, «Overview»: spend, tokens, requests, cache and the chart by day',
     },
     offline: {
       '01-home-silent': 'The panel is stopped: home shows the last data received and says so',
       '02-settings-silent':
-        'Settings: the panel address is in place, the connection «not answering»',
+        'Settings: computer «desk» and its address are in place, the connection «not answering», no «Power» card',
     },
   },
 

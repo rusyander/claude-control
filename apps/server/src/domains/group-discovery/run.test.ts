@@ -109,6 +109,39 @@ describe('прогон обнаружения', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  // Живой прогон 16.10: поиск наборов взял в группу хуки блока «Тесты» из
+  // settings.local.json — выключенная группа сняла бы проверку конца хода.
+  it('хуки самой панели (блок «Тесты», мост окон) в опись не попадают, чужой хук рядом — попадает', async () => {
+    const shop = join(root, 'own-hooks');
+    mkdirSync(join(shop, '.claude'), { recursive: true });
+    const command = (script: string) => `node "C:/panel/tools/${script}" stop`;
+    writeFileSync(
+      join(shop, '.claude', 'settings.local.json'),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [{ hooks: [{ type: 'command', command: command('tests-hook.mjs') }] }],
+          PermissionRequest: [
+            { hooks: [{ type: 'command', command: command('outside-relay-hook.mjs') }] },
+          ],
+          Stop: [{ hooks: [{ type: 'command', command: 'node .claude/hooks/guard.mjs' }] }],
+          // Второй свой хук: опись короче двух предметов модели не уходит вовсе.
+          PreToolUse: [{ hooks: [{ type: 'command', command: 'node .claude/hooks/lint.mjs' }] }],
+        },
+      }),
+    );
+    writeFileSync(join(shop, '.claude', 'settings.json'), '{}');
+    await startDiscovery(
+      appData,
+      [spec('X:/own-hooks', shop)],
+      askWith(() => JSON.stringify({ groups: [] })),
+      'prompt',
+    );
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain('guard.mjs');
+    expect(asked[0]).not.toContain('tests-hook.mjs');
+    expect(asked[0]).not.toContain('outside-relay-hook.mjs');
+  });
+
   // Ревью 28.09 (F-05): команда хука и адрес MCP уходили модели и в кэш
   // поиска дословно — вместе с `--token x` и `?api_key=`.
   it('токены в командах хуков и адресах MCP — маской в промпте и в кэше', async () => {

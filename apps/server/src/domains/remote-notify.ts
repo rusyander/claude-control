@@ -26,6 +26,12 @@ export interface NotifierDeps {
   devices: () => PushDevice[];
   /** Сервис ответил, что токен мёртв (приложение снесли) — забыть устройство. */
   forget: (token: string) => void;
+  /**
+   * Случайный номер машины (`lib/machine-identity`). Телефон бывает спарен с
+   * несколькими панелями — по номеру нажатие на уведомление открывает нужную.
+   * Имя машины наружу не уходит: в Expo едут только вид события, папка и номер.
+   */
+  machineId?: () => string;
 }
 
 interface ExpoMessage {
@@ -74,12 +80,18 @@ export function createRunNotifier(deps: NotifierDeps): (notice: RunNotice) => vo
     if (devices.length === 0) return;
 
     const { title, body } = compose(notice);
+    const machineId = deps.machineId?.();
     const messages: ExpoMessage[] = devices.map((device) => ({
       to: device.token,
       title,
       body,
       // По этим полям приложение открывает нужный разговор, а не просто себя.
-      data: { kind: notice.kind, chatId: notice.chatId, projectPath: notice.projectPath ?? '' },
+      data: {
+        kind: notice.kind,
+        chatId: notice.chatId,
+        projectPath: notice.projectPath ?? '',
+        ...(machineId ? { machineId } : {}),
+      },
       sound: 'default',
       priority: 'high',
       // Канал заведён приложением при старте: без него Android показывает

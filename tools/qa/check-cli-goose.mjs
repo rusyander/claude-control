@@ -414,38 +414,44 @@ try {
       { mode: 0o755 },
     );
   }
-  await stand('cli-goose-oneshot', { extraPath: [shimDir] }, async ({ project, runTurn }) => {
-    const runCalls = () =>
-      (existsSync(argvLog) ? readFileSync(argvLog, 'utf8') : '')
-        .split('\n')
-        .filter(Boolean)
-        .map((row) => JSON.parse(row))
-        .filter((call) => call.args[0] === 'run');
-    const argvChecks = (call) =>
-      check(
-        'argv: `run -q --output-format stream-json`',
-        call?.args.includes('-q') &&
-          call.args[call.args.indexOf('--output-format') + 1] === 'stream-json',
-        JSON.stringify(call?.args.map((arg) => (arg.length > 80 ? `${arg.slice(0, 80)}…` : arg))),
-      );
+  // Настоящий goose из PATH оболочки скрыт: панель ищет .exe по всему PATH
+  // раньше .cmd, и goose.exe из `~/.local/bin` перекрыл бы обёртку.
+  await stand(
+    'cli-goose-oneshot',
+    { extraPath: [shimDir], hideCli: ['goose'] },
+    async ({ project, runTurn }) => {
+      const runCalls = () =>
+        (existsSync(argvLog) ? readFileSync(argvLog, 'utf8') : '')
+          .split('\n')
+          .filter(Boolean)
+          .map((row) => JSON.parse(row))
+          .filter((call) => call.args[0] === 'run');
+      const argvChecks = (call) =>
+        check(
+          'argv: `run -q --output-format stream-json`',
+          call?.args.includes('-q') &&
+            call.args[call.args.indexOf('--output-format') + 1] === 'stream-json',
+          JSON.stringify(call?.args.map((arg) => (arg.length > 80 ? `${arg.slice(0, 80)}…` : arg))),
+        );
 
-    console.log('B1. «Разрешить правки» выключено');
-    const off = await runTurn(project('oneshot-off'), false);
-    const offCall = runCalls().at(-1);
-    argvChecks(offCall);
-    check('GOOSE_MODE=chat', offCall?.mode === 'chat', String(offCall?.mode));
-    check('модель позвала оболочку', askedTool(off), JSON.stringify(off.requests));
-    check('файла нет', probeOf(off.dir) === null, String(probeOf(off.dir)));
-    answerChecks(off, 'stream');
+      console.log('B1. «Разрешить правки» выключено');
+      const off = await runTurn(project('oneshot-off'), false);
+      const offCall = runCalls().at(-1);
+      argvChecks(offCall);
+      check('GOOSE_MODE=chat', offCall?.mode === 'chat', String(offCall?.mode));
+      check('модель позвала оболочку', askedTool(off), JSON.stringify(off.requests));
+      check('файла нет', probeOf(off.dir) === null, String(probeOf(off.dir)));
+      answerChecks(off, 'stream');
 
-    console.log('\nB2. «Разрешить правки» включено');
-    const on = await runTurn(project('oneshot-on'), true);
-    const onCall = runCalls().at(-1);
-    argvChecks(onCall);
-    check('GOOSE_MODE=auto', onCall?.mode === 'auto', String(onCall?.mode));
-    check('файл записан', probeOf(on.dir) === WRITTEN, String(probeOf(on.dir)));
-    answerChecks(on, 'stream');
-  });
+      console.log('\nB2. «Разрешить правки» включено');
+      const on = await runTurn(project('oneshot-on'), true);
+      const onCall = runCalls().at(-1);
+      argvChecks(onCall);
+      check('GOOSE_MODE=auto', onCall?.mode === 'auto', String(onCall?.mode));
+      check('файл записан', probeOf(on.dir) === WRITTEN, String(probeOf(on.dir)));
+      answerChecks(on, 'stream');
+    },
+  );
   rmSync(argvLog, { force: true });
   rmSync(shimDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 

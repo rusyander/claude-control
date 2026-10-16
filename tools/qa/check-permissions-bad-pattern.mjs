@@ -3,8 +3,8 @@
  * отклоняется до записи — с объяснением, а settings.json не меняется.
  *
  * Путь настоящий: форма «Добавить правило» одноразового стенда → панель.
- * settings.json засеян известным содержимым и сравнивается побайтно: «файл не
- * изменился» проверяется файлом, а не тем, что показал экран.
+ * settings.json засеян известным правом и сравнивается побайтно со снимком перед
+ * «Сохранить»: «файл не изменился» проверяется файлом, а не тем, что показал экран.
  *
  * Запуск: `node tools/qa/check-permissions-bad-pattern.mjs` (стенд поднимается сам).
  */
@@ -34,6 +34,15 @@ await runOnStand(
       await form.getByLabel('Правило').fill(BAD);
       await form.getByRole('button', { name: 'Запрещено', exact: true }).click();
       const save = form.getByRole('button', { name: 'Сохранить' });
+      // Снимок — прямо перед «Сохранить», а не засеянное: панель на старте сама
+      // дописывает в settings.json свои хуки (мост окон вне панели, проверка тестов),
+      // и сравнение с засевом краснело на них, а не на отклонённом шаблоне.
+      const before = readFileSync(file, 'utf8');
+      check(
+        'засеянное право на месте до отправки',
+        JSON.stringify(JSON.parse(before).permissions) === JSON.stringify({ allow: ['Read'] }),
+        before,
+      );
       let answer;
       if (await save.isEnabled()) {
         const waiting = page
@@ -58,7 +67,7 @@ await runOnStand(
       );
       check(
         'settings.json не изменился ни на байт',
-        readFileSync(file, 'utf8') === SEED,
+        readFileSync(file, 'utf8') === before,
         readFileSync(file, 'utf8'),
       );
       check(

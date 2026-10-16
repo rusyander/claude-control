@@ -39,19 +39,22 @@ cdp.on('Network.responseReceived', (event) => {
 await page.goto(`${BASE}/chat`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(1500);
-const listBefore = await page.locator('main').innerText();
 
 const seenByScript = await page.evaluate(async (repeats) => {
   const out = [];
   for (let i = 0; i < repeats; i += 1) {
     const response = await fetch('/api/chats');
-    const body = await response.json();
-    out.push({ status: response.status, items: Array.isArray(body) ? body.length : -1 });
+    const text = await response.text();
+    const body = JSON.parse(text);
+    out.push({
+      status: response.status,
+      items: Array.isArray(body) ? body.length : -1,
+      etag: response.headers.get('etag') ?? '',
+      text,
+    });
   }
   return out;
 }, REPEATS);
-await page.waitForTimeout(500);
-const listAfter = await page.locator('main').innerText();
 await browser.close();
 
 let revalidated = 0;
@@ -70,11 +73,22 @@ for (const { id, etag } of responses) {
 for (const s of seenByScript)
   console.log(`fetch со страницы: status=${s.status} элементов=${s.items}`);
 const scriptOk = seenByScript.every((s) => s.status === 200 && s.items >= 0);
+// Что страница видит после 304: при том же ETag — побайтно то же тело. Прежде здесь
+// сравнивался весь текст <main>, а он на живом /chat меняется сам (время «N мин назад»,
+// статусы прогонов) и давал ложный красный; к ответу сервера он отношения не имеет.
+const bodyByEtag = new Map();
+let mismatched = 0;
+for (const s of seenByScript) {
+  if (!s.etag) continue;
+  const known = bodyByEtag.get(s.etag);
+  if (known === undefined) bodyByEtag.set(s.etag, s.text);
+  else if (known !== s.text) mismatched += 1;
+}
 console.log(
-  `304 на повторах: ${revalidated} из ${REPEATS}; список на экране тот же: ${listBefore === listAfter}`,
+  `304 на повторах: ${revalidated} из ${REPEATS}; тел с тем же ETag, но другим содержимым: ${mismatched}`,
 );
 
-if (revalidated === 0 || stale > 0 || !scriptOk || listBefore !== listAfter) {
+if (revalidated === 0 || stale > 0 || !scriptOk || mismatched > 0) {
   console.log(
     'Условный GET не работает: браузер не получил 304 при том же ETag или страница увидела другой ответ.',
   );

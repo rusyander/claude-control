@@ -39,6 +39,7 @@ import { runLegacyGroupMigrations } from '../../domains/groups/legacy-migrations
 import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { migrateLegacyIntegrations } from '@agentdeck/contracts/integrations-legacy';
 import type { CredentialsLookup } from '../../lib/credentials/credentials.ts';
+import { machineId, machineName } from '../../lib/machine-identity/machine-identity.ts';
 
 /** Источник доступа и причина с кодом — без самого токена. */
 function credentialsReply(found: CredentialsLookup) {
@@ -153,6 +154,10 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     homeDir: homedir(),
     nodeVersion: process.version,
     shell: process.platform === 'win32' ? 'PowerShell / cmd' : (process.env.SHELL ?? 'sh'),
+    // Телефон, спаренный с несколькими панелями, называет машину этим именем и
+    // узнаёт её по номеру, даже когда адрес сменился.
+    machineName: machineName(),
+    machineId: machineId(),
   }));
 
   app.patch<{ Body: unknown }>('/api/settings', (request, reply) => {

@@ -6,7 +6,8 @@ import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { createLocalMcpSource } from '../../domains/local-models/mcp-source.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import { createRunSync } from '../../domains/local-models/run-sync.ts';
-import { createKeepAwake } from '../../lib/keep-awake/keep-awake.ts';
+import { createKeepAwake, type KeepAwake } from '../../lib/keep-awake/keep-awake.ts';
+import { machineId } from '../../lib/machine-identity/machine-identity.ts';
 import { readEnvLookup } from '../../domains/env/env.ts';
 import { createGlobalLayer, type GlobalLayer } from '../../domains/global-layer/service.ts';
 import type { ProjectTestRun } from '@agentdeck/contracts';
@@ -263,6 +264,8 @@ export interface Runtime {
   watcher: BackgroundWatcher;
   /** Локальные модели: железо, сервер моделей, загрузки с прогрессом. */
   localModels: LocalModels;
+  /** Запрет на сон на время локального прогона: экран питания телефона спрашивает и снимает. */
+  keepAwake: KeepAwake;
   /** Сверка панели с глобальным слоем `~/.claude` (В5): пары, вердикт, перенос. */
   globalLayer: GlobalLayer;
   /** Встроенный набор панели (В2): режимы по CLI, копии «моё», что получает прогон. */
@@ -345,6 +348,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     isEnabled: () => ctx.store.getSettings().remoteAccess.notify,
     devices: () => ctx.store.getPushDevices(),
     forget: (token) => ctx.store.removePushDevice(token),
+    machineId: () => machineId(),
   });
   /**
    * Второй адресат тех же событий — Telegram.
@@ -1683,6 +1687,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     selfBaseUrl,
     watcher,
     localModels,
+    keepAwake,
     globalLayer,
     kit,
     runRoute: (origin) => runRoute(origin),

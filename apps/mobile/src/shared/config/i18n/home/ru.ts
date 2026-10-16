@@ -20,6 +20,14 @@ export const homeRu = {
   tabQuestionsA11y: (count: number) =>
     count > 0 ? `Вопросы: ждут ответа ${count}` : 'Вопросы: ничего не ждёт',
   newChat: 'Новый чат',
+  // Подпись под кнопкой: где начнётся новый чат и как это поменять.
+  newChatWhere: (project: string) => `Новый чат — в ${project}`,
+  newChatNoProject: 'Новый чат — без проекта',
+  changeProject: 'сменить',
+  // Сводка над списком чатов: три плитки «число + подпись».
+  pulseRunning: (count: number): string => (count === 1 ? 'работает' : 'работают'),
+  pulseWaiting: (count: number): string => (count === 1 ? 'ждёт вас' : 'ждут вас'),
+  pulseProjects: (count: number) => form(count, 'проект', 'проекта', 'проектов'),
   allChats: 'Все разговоры',
   failed: 'Панель не ответила — показано последнее, что пришло',
   failedEmpty: 'Панель не ответила. Потяните вниз, чтобы спросить ещё раз.',

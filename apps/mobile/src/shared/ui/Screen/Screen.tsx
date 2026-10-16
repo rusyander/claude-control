@@ -13,10 +13,13 @@ export function Screen({
   children,
   scroll,
   refreshControl,
+  header,
 }: {
   children: ReactNode;
   scroll?: boolean;
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  /** Закреплено над прокруткой: переключатель вкладок экрана не уезжает вместе со списком. */
+  header?: ReactNode;
 }) {
   // Над экраном уже есть шапка навигатора — она сама отступила от выреза.
   // Второй отступ сверху давал пустую полосу высотой в строку состояния.
@@ -35,6 +38,7 @@ export function Screen({
   );
   return (
     <SafeAreaView style={styles.screen} edges={headerShown ? [] : ['top']}>
+      {header ? <View style={styles.header}>{header}</View> : null}
       {content}
     </SafeAreaView>
   );

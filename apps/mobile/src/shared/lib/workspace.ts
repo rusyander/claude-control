@@ -7,9 +7,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * Это единственное состояние интерфейса, которое переживает перезапуск, — и
  * хранится оно на телефоне, а не на сервере, намеренно: «какой проект открыт у
  * меня в руке» не свойство панели, а свойство этого устройства.
+ *
+ * У каждого спаренного компьютера своё место: проекты и разговоры одной машины
+ * на другой не существуют, и открытый там чат здесь был бы пустым экраном.
  */
 
-const KEY = 'workspace.v1';
+const LEGACY_KEY = 'workspace.v1';
+const keyFor = (panelId: string): string => (panelId ? `${LEGACY_KEY}.${panelId}` : LEGACY_KEY);
+let key = LEGACY_KEY;
 
 export interface Workspace {
   /** Каталог проекта; пусто — домашний чат (без привязки к проекту). */
@@ -17,9 +22,11 @@ export interface Workspace {
   /** Открытый разговор; `new-*` — ещё не начатый. */
   chatId: string;
   ready: boolean;
+  /** Чьё это место — id компьютера из списка спаренных. */
+  panelId: string;
 }
 
-let state: Workspace = { projectPath: '', chatId: '', ready: false };
+let state: Workspace = { projectPath: '', chatId: '', ready: false, panelId: '' };
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -35,24 +42,43 @@ function snapshot(): Workspace {
   return state;
 }
 
-export async function loadWorkspace(): Promise<void> {
+/**
+ * Место компьютера `panelId`. Место из версий с одной панелью (без суффикса)
+ * достаётся первому компьютеру, который его спросит, — это тот, с которым
+ * телефон и был спарен.
+ */
+export async function loadWorkspace(panelId = ''): Promise<void> {
+  key = keyFor(panelId);
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    let raw = await AsyncStorage.getItem(key);
+    if (raw === null && panelId) {
+      raw = await AsyncStorage.getItem(LEGACY_KEY);
+      if (raw !== null) {
+        await AsyncStorage.setItem(key, raw);
+        await AsyncStorage.removeItem(LEGACY_KEY);
+      }
+    }
     const parsed = raw ? (JSON.parse(raw) as Partial<Workspace>) : {};
     state = {
       projectPath: parsed.projectPath ?? '',
       chatId: parsed.chatId ?? '',
       ready: true,
+      panelId,
     };
   } catch {
-    state = { projectPath: '', chatId: '', ready: true };
+    state = { projectPath: '', chatId: '', ready: true, panelId };
   }
   emit();
 }
 
+/** Компьютер забыт — его место тоже. */
+export function forgetWorkspace(panelId: string): Promise<void> {
+  return AsyncStorage.removeItem(keyFor(panelId));
+}
+
 function persist(): void {
   void AsyncStorage.setItem(
-    KEY,
+    key,
     JSON.stringify({ projectPath: state.projectPath, chatId: state.chatId }),
   );
 }

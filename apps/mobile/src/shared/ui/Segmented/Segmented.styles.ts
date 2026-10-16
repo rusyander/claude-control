@@ -21,8 +21,12 @@ export const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     borderRadius: 9,
   },
+  // Плотный ряд делится по длине подписей, а не поровну: «Обзор» отдаёт ширину
+  // «Уведомлениям», иначе на узком телефоне длинная подпись обрезается.
+  segmentDense: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 6, gap: 2 },
   segmentOn: { backgroundColor: colors.accentDim },
   text: { color: colors.textDim, fontSize: font.body, fontWeight: '600', flexShrink: 1 },
+  textDense: { fontSize: font.small + 1 },
   textOn: { color: colors.text },
   badge: {
     minWidth: 20,

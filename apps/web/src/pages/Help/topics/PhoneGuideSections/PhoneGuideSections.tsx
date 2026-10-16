@@ -34,6 +34,9 @@ export function PhoneGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('pairOnline')} text={g('pairOnlineText')}>
             <HelpShot topic="phone" scenario="pair" frame="06-phone-online" side="phone" />
           </GuideStep>
+          <GuideStep title={g('pairPower')} text={g('pairPowerText')}>
+            <HelpShot topic="phone" scenario="pair" frame="07-phone-power-confirm" side="phone" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

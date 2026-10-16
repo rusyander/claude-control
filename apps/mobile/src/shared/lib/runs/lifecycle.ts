@@ -14,7 +14,18 @@ import { dict } from '../../config/i18n';
 import { notifyLocally } from '../notifyLocally';
 import { persistQueue } from './persistQueue';
 import { loadQueue } from './loadQueue';
-import { emit, runs, getRun, setRun, findRunKey, lastSeqs, controllers, forgetRun } from './store';
+import {
+  emit,
+  runs,
+  getRun,
+  setRun,
+  findRunKey,
+  lastSeqs,
+  controllers,
+  forgetRun,
+  forgetAllRuns,
+  discarded,
+} from './store';
 
 /**
  * Жизненный цикл прогона: запуск, переподключение, остановка, очередь.
@@ -143,6 +154,7 @@ async function keepStreaming(
     await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
   }
 
+  if (discarded.has(controller)) return;
   finish(id);
 }
 
@@ -320,6 +332,15 @@ export async function resumeActive(): Promise<void> {
     return;
   }
   for (const info of active) attach(info.chatId, info);
+}
+
+/**
+ * Выбран другой компьютер. Прогоны прежнего продолжаются на нём самом — здесь
+ * только отцепляемся; `resumeActive` потом подхватит идущие на новом.
+ */
+export function resetRuns(): void {
+  forgetAllRuns();
+  stoppedByUser.clear();
 }
 
 /** Остановить прогон. Сервер гасит процесс, поток закрывается сам. */

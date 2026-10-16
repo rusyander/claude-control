@@ -5,6 +5,8 @@ import { panelTextsEn } from './panel-texts/texts.en.ts';
 import { homeEn } from './home/en.ts';
 import { watcherEn } from './watcher/en.ts';
 import { foreignChatEn } from './foreign-chat/en.ts';
+import { projectsEn } from './projects/en.ts';
+import { computersEn } from './computers/en.ts';
 
 /**
  * English mirrors `ru.ts` and is typed against it: a missing or renamed key
@@ -254,16 +256,8 @@ export const en: Dictionary = {
     messages: (count: number) => `${count} msg.`,
   },
 
-  projects: {
-    toChat: 'To the chat',
-    code: 'Code',
-    recent: 'Recent',
-    browse: 'Browse',
-    toDisks: 'to drives',
-    openFolder: 'Open this folder',
-    chats: (count: number) => `${count} conv.`,
-    gone: 'folder is gone',
-  },
+  projects: projectsEn,
+  computers: computersEn,
 
   git: {
     title: 'Git',
@@ -541,6 +535,16 @@ export const en: Dictionary = {
     allModels: 'All models',
     filters: 'Filters',
     nothingForFilter: 'Nothing matches these filters in this period.',
+    tabOverview: 'Overview',
+    tabSpend: 'Spend',
+    tabTools: 'Tools',
+    tabSessions: 'Sessions',
+    byHour: 'By hour',
+    byHourHint: 'Model requests over the period — which hours of the day the work happens.',
+    tapDay: 'Tap a bar to see that day.',
+    noSessions: 'No sessions in this period.',
+    noTools: 'No tools were called in this period.',
+    periodSessions: (count: number) => `Sessions in the period: ${count}`,
   },
 
   settings: {
@@ -557,7 +561,8 @@ export const en: Dictionary = {
     notifications: 'Notifications',
     notificationsAbout:
       'They arrive when work is finished, has failed, waits for a permission or the agent asks a ' +
-      'question. Only the kind of event and the project folder name leave the machine — no text, no code.',
+      'question. Only the kind of event, the project folder name and a random machine number ' +
+      'leave the machine — no text, no code.',
     enableHere: 'Enable on this phone',
     panelNotifies: 'The panel sends notifications',
     testNotification: 'Test notification',
@@ -589,6 +594,13 @@ export const en: Dictionary = {
     noTailscale: 'Tailscale was not found on the machine — there is no address from outside.',
     pushOn: 'Notifications are on',
     thisPhone: 'Phone',
+    tabLink: 'Link',
+    tabAlerts: 'Alerts',
+    tabContour: 'Contour',
+    tabGeneral: 'General',
+    app: 'App',
+    version: 'Version',
+    devicesEmpty: 'No phone has turned notifications on yet.',
   },
 
   platform: {

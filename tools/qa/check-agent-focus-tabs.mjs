@@ -406,16 +406,16 @@ if (wants('integration-focus')) {
   await page.goto(`${BASE}/`);
   await emit({
     type: 'agent-open-page',
-    page: { route: '/settings?tab=integrations', focus: 'integration:atlassian' },
+    page: { route: '/settings?tab=integrations', focus: 'integration:jira' },
   });
   await page.waitForURL((url) => url.pathname === '/settings', { timeout: 10_000 });
-  const found = await shown('[data-agent-anchor="integration:atlassian"]');
+  const found = await shown('[data-agent-anchor="integration:jira"]');
   await page.waitForTimeout(600);
   const active = await page.evaluate(() => {
     const element = document.activeElement;
     return element ? `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}` : '';
   });
-  check(found, 'якорь интеграции Atlassian показан');
+  check(found, 'якорь интеграции Jira показан');
   check(
     !/^(input|select|textarea)/.test(active),
     'фокус не поставлен в поле настроек интеграции',

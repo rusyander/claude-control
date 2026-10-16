@@ -45,7 +45,7 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { formatGb, sweepMobileBuild } from './clean-mobile-build.mjs';
+import { formatGb, lockedNote, sweepMobileBuild } from './clean-mobile-build.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const appsDir = join(root, 'apps');
@@ -173,7 +173,10 @@ if (KEEP_BUILD) {
 } else {
   console.log('\nУбираю промежуточные файлы сборки…');
   gradle(androidDir, ['--stop']);
-  const { count, bytes } = sweepMobileBuild();
+  const { count, bytes, locked } = sweepMobileBuild();
   console.log(`Освобождено ${formatGb(bytes)} в ${count} каталогах.`);
+  // APK уже лежит в корне: недоубранный каталог — повод сказать, а не провалить сборку.
+  const note = lockedNote(locked);
+  if (note) console.log(note);
   console.log('Следующая сборка будет полной — это плата за то, что диск не пухнет.');
 }

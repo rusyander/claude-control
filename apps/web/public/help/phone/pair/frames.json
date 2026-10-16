@@ -111,15 +111,15 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-11T13:42:39.545Z",
-      "text": "Настройки Панель Не подключено Спарить Спарить Язык Русский Русский English English Уведомления Приходят, когда работа закончена, упала, ждёт разрешения или агент задал вопрос. Уходит только вид события и имя папки проекта — ни текста, ни кода. Включить на этом телефоне Включить на этом телефоне AgentDeck 1.0.0 Главная  Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
+      "shotAt": "2026-10-16T08:15:22.046Z",
+      "text": "Связь Связь Уведомления Уведомления Общее Общее  Панель Не подключено Спарить Спарить Главная  Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
       "en": {
         "file": "04-phone-not-paired.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-11T13:45:05.114Z",
-        "text": "Settings Panel Not connected Pair Pair Language Русский Русский English English Notifications They arrive when work is finished, has failed, waits for a permission or the agent asks a question. Only the kind of event and the project folder name leave the machine — no text, no code. Enable on this phone Enable on this phone AgentDeck 1.0.0 Home  Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-10-16T08:16:27.741Z",
+        "text": "Link Link Alerts Alerts General General  Panel Not connected Pair Pair Home  Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
       }
     },
     {
@@ -129,15 +129,15 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-11T13:42:54.571Z",
-      "text": "Navigate up Подключение Код из панели Настройки → Удалённый доступ. Наведите камеру на код. Разрешить камеру Разрешить камеру Или руками http://10.0.2.2:59550 ••••••••••••••••••••••••••••••••••••••••••• Подключиться Подключиться Токен открывает всё API панели: он лежит в защищённом хранилище телефона и никуда больше не уходит. Потеряли телефон — смените токен в панели, и это устройство перестанет ходить.",
+      "shotAt": "2026-10-16T08:15:33.593Z",
+      "text": "Navigate up Подключение Код из панели Настройки → Удалённый доступ. Наведите камеру на код. Разрешить камеру Разрешить камеру Или руками http://10.0.2.2:55898 ••••••••••••••••••••••••••••••••••••••••••• Подключиться Подключиться Токен открывает всё API панели: он лежит в защищённом хранилище телефона и никуда больше не уходит. Потеряли телефон — смените токен в панели, и это устройство перестанет ходить.",
       "en": {
         "file": "05-phone-pair-screen.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-11T13:45:17.385Z",
-        "text": "Navigate up Connecting Code from the panel Settings → Remote access. Point the camera at the code. Allow the camera Allow the camera Or by hand http://10.0.2.2:59550 ••••••••••••••••••••••••••••••••••••••••••• Connect Connect The token opens the panel’s whole API: it lives in the phone’s secure storage and goes nowhere else. Lost the phone — rotate the token in the panel and this device stops working."
+        "shotAt": "2026-10-16T08:16:39.090Z",
+        "text": "Navigate up Connecting Code from the panel Settings → Remote access. Point the camera at the code. Allow the camera Allow the camera Or by hand http://10.0.2.2:55898 ••••••••••••••••••••••••••••••••••••••••••• Connect Connect The token opens the panel’s whole API: it lives in the phone’s secure storage and goes nowhere else. Lost the phone — rotate the token in the panel and this device stops working."
       }
     },
     {
@@ -147,15 +147,33 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-11T13:43:03.663Z",
-      "text": "Настройки Панель http://10.0.2.2:59550 на связи Спарить заново Спарить заново Отключить Отключить Язык Русский Русский English English Уведомления Приходят, когда работа закончена, упала, ждёт разрешения или агент задал вопрос. Уходит только вид события и имя папки проекта — ни текста, ни кода. Включить на этом телефоне Включить на этом телефоне Панель шлёт уведомления Панель шлёт уведомления Проверочное уведомление Проверочное уведомление Вопросы с компьютера Когда агент в терминале или VS Code задаёт вопрос, ответить можно отсюда — ответ уйдёт агенту так же, как выбор в окне на компьютере. Пока включено, вопрос ждёт здесь, а не в окне; вернуть его окну — «Отвечу на компьютере». Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
+      "shotAt": "2026-10-16T08:15:45.399Z",
+      "text": "Связь Связь Уведомления Уведомления Общее Общее  desk на связи http://10.0.2.2:55898 Переименовать Переименовать Спарить заново Спарить заново Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:55898, выбран  desk Windows · 10.0.2.2:55898 выбран Добавить компьютер Добавить компьютер Питание Гибернация Открытое — окна, файлы, вкладки — сохраняется на диск, и компьютер выключается полностью. Включается кнопкой питания, всё открытое на месте. Гибернация Гибернация Доступ снаружи Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
       "en": {
         "file": "06-phone-online.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-11T13:45:25.560Z",
-        "text": "Settings Panel http://10.0.2.2:59550 online Pair again Pair again Disconnect Disconnect Language Русский Русский English English Notifications They arrive when work is finished, has failed, waits for a permission or the agent asks a question. Only the kind of event and the project folder name leave the machine — no text, no code. Enable on this phone Enable on this phone The panel sends notifications The panel sends notifications Test notification Test notification Questions from the computer When the agent in a terminal or VS Code asks a question, you can answer it here — the answer reaches the agent just like a choice made in the window on the computer. While on, the question waits here, not in the window; «I will answer on the computer» hands it back. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-10-16T08:16:50.220Z",
+        "text": "Link Link Alerts Alerts General General  desk online http://10.0.2.2:55898 Rename Rename Pair again Pair again Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:55898, selected  desk Windows · 10.0.2.2:55898 selected Add a computer Add a computer Power Hibernate Everything open — windows, files, tabs — is saved to disk and the computer powers off completely. The power button brings it back with everything in place. Hibernate Hibernate Access from outside Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+      }
+    },
+    {
+      "id": "07-phone-power-confirm",
+      "side": "phone",
+      "file": "07-phone-power-confirm.png",
+      "masked": 1,
+      "width": 540,
+      "height": 1200,
+      "shotAt": "2026-10-16T08:15:54.650Z",
+      "text": "Связь Связь Уведомления Уведомления Общее Общее Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:55898, выбран  desk Windows · 10.0.2.2:55898 выбран Добавить компьютер Добавить компьютер Питание Гибернация Открытое — окна, файлы, вкладки — сохраняется на диск, и компьютер выключается полностью. Включается кнопкой питания, всё открытое на месте. Отправить «desk» в гибернацию? С телефона компьютер обратно не включить: пока он спит, панель, чаты и уведомления недоступны. Выключить совсем отсюда нельзя — по той же причине. Да, отправить Да, отправить Отмена Отмена Доступ снаружи Включён: панель требует токен на каждом запросе. Tailscale: https://•••••••••••• (serve работает) Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
+      "en": {
+        "file": "07-phone-power-confirm.en.png",
+        "masked": 1,
+        "width": 540,
+        "height": 1200,
+        "shotAt": "2026-10-16T08:16:59.413Z",
+        "text": "Link Link Alerts Alerts General General Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:55898, selected  desk Windows · 10.0.2.2:55898 selected Add a computer Add a computer Power Hibernate Everything open — windows, files, tabs — is saved to disk and the computer powers off completely. The power button brings it back with everything in place. Put “desk” to hibernate? The phone cannot switch the computer back on: while it sleeps, the panel, chats and notifications are unreachable. Powering off completely is not offered for the same reason. Yes, do it Yes, do it Cancel Cancel Access from outside On: the panel requires a token on every request. Tailscale: https://•••••••••••• (serve is running) Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
       }
     }
   ]

@@ -1,0 +1,98 @@
+{
+  "title": {
+    "ru": "Телефон: несколько компьютеров в одном приложении и гибернация выбранного с телефона",
+    "en": "Phone: several computers in one app and hibernating the selected one from the phone"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Телефон спаривается с несколькими компьютерами — каждый своим кодом из панели. В настройках на вкладке «Связь» — список «Компьютеры»: компьютер подписан именем, которым называет себя сам, имя на телефоне можно сменить, выбранный помечен, «Добавить компьютер» ведёт к спариванию, «Забыть этот компьютер» стирает его адрес и токен. Главная, проекты, чаты, вопросы, тесты и аналитика показывают выбранный компьютер; открытый проект и разговор у каждого свои.",
+        "en": "The phone pairs with several computers, each through the code in its own panel. Settings → «Link» holds the «Computers» list: each computer carries the name it gives itself, the name on the phone can be changed, the selected one is marked, «Add a computer» leads to pairing and «Forget this computer» erases its address and token. Home, projects, chats, questions, tests and analytics show the selected computer; each keeps its own open project and conversation."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "При двух компьютерах и больше над вкладками главной — ряд их имён, нажатие выбирает. Смена компьютера ничего не останавливает: работа идёт на своей машине, телефон отцепляется от неё и подхватывает то, что идёт на выбранном.",
+        "en": "With two computers or more, a row of their names sits above the Home tabs and a tap selects one. Switching stops nothing: work runs on its own machine, the phone detaches from it and picks up whatever runs on the selected one."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка «Питание» усыпляет выбранный компьютер: на Windows — гибернация, на macOS — сон (карточка показывает режим hibernatemode), на Linux — гибернация и сон через systemd-logind, если система разрешает их без пароля. Недоступный режим назван с причиной — например, команда включения гибернации в Windows. Команда уходит только после вопроса с именем компьютера и предупреждения, что обратно с телефона его не включить; выключить совсем отсюда нельзя по той же причине. Повторное нажатие в ближайшие полминуты вторую команду не ставит, запреты самой системы на сон (обновление пакетов на Linux) не обходятся, системные утилиты Windows и macOS вызываются полным путём из каталога системы.",
+        "en": "The «Power» card puts the selected computer to sleep: hibernate on Windows, sleep on macOS (the card shows the hibernatemode), hibernate and sleep through systemd-logind on Linux when the system allows them without a password. An unavailable mode is named with its reason, such as the command that turns hibernation on in Windows. The command leaves only after a question with the computer’s name and a warning that the phone cannot switch it back on; powering off completely is not offered for the same reason. Pressing again within half a minute does not queue a second command, the system’s own sleep blocks (a package upgrade on Linux) are never overridden, and the Windows and macOS system tools are called by their full path in the system directory."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Уведомление на телефон несёт ещё и случайный номер машины: нажатие на уведомление с другого компьютера сначала выбирает его. Имя машины наружу не уходит.",
+        "en": "A phone notification now also carries a random machine number: tapping a notification from another computer selects that computer first. The machine name does not leave the computer."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Компьютер узнаётся по номеру машины, а не по адресу: спаренный ещё раз по другому адресу (Tailscale вместо домашней сети) остаётся одной строкой со своим именем. Пара адрес-токен из прежних версий становится первым компьютером списка сама.",
+        "en": "A computer is recognised by its machine number, not its address: paired again at another address (Tailscale instead of the home network) it stays one row with its own name. The address-token pair from earlier versions becomes the first computer of the list on its own."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Поле чата пустеет сразу после отправки, а не через треть секунды, когда сервер ответит. Если сервер сообщение не принял, набранный текст возвращается в поле — если за это время не начат новый.",
+        "en": "The chat field empties right after sending instead of a third of a second later, when the server answers. When the server does not accept the message, the typed text returns to the field unless a new one has been started meanwhile."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Поиск наборов в проекте больше не предлагает включить в набор хуки самой панели — запись тестов в конце хода и пересылку вопросов на телефон.",
+        "en": "Set discovery in a project no longer offers the panel’s own hooks — the end-of-turn test record and the relay of questions to the phone — as members of a set."
+      },
+      "area": { "ru": "Наборы", "en": "Sets" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Одноразовая база для ревью считается готовой только после настоящего старта PostgreSQL. Раньше готовность приходила от временного сервера первичной настройки, и первый запрос агента по выданному адресу мог упасть.",
+        "en": "The throwaway review database counts as ready only after PostgreSQL has really started. Readiness used to come from the temporary first-setup server, and the agent’s first query to the given address could fail."
+      },
+      "area": { "ru": "Ревью", "en": "Review" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Телефон»: разделы «Несколько компьютеров» и «Питание компьютера с телефона» с режимами по системам, новый кадр вопроса перед гибернацией, номер машины в «Где это лежит».",
+        "en": "The «Phone» help: «Several computers» and «Computer power from the phone» sections with the modes per system, a new frame of the question before hibernation, the machine number in «Where it lives»."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: одна панель — адрес, «Спарить заново» и «Отключить»",
+        "en": "Before: one panel — the address, «Pair again» and «Disconnect»"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: компьютер под своим именем, список «Компьютеры» и «Питание»",
+        "en": "After: the computer under its own name, the «Computers» list and «Power»"
+      }
+    }
+  ]
+}

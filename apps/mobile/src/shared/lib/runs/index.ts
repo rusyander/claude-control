@@ -3,6 +3,7 @@ export {
   cancelQueued,
   decidePermission,
   enqueue,
+  resetRuns,
   restoreQueue,
   resumeActive,
   send,

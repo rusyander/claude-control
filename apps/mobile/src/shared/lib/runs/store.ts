@@ -317,3 +317,23 @@ export function forgetRun(id: string): void {
   controllers.delete(id);
   emit();
 }
+
+/**
+ * Потоки, оборванные сменой компьютера. Их цикл переподключения, проснувшись,
+ * не должен ни дописывать конец хода, ни слать очередь — прогон принадлежит
+ * прежней панели, а запросы уже идут в новую.
+ */
+export const discarded = new WeakSet<AbortController>();
+
+/** Сменился компьютер: все прогоны прежнего — прочь, потоки оборваны. */
+export function forgetAllRuns(): void {
+  for (const controller of controllers.values()) {
+    discarded.add(controller);
+    controller.abort();
+  }
+  runs.clear();
+  lastSeqs.clear();
+  pendingUsage.clear();
+  controllers.clear();
+  emit();
+}

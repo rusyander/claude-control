@@ -1,0 +1,92 @@
+{
+  "title": {
+    "ru": "Телефон: проекты те же, что в панели, и из карточки сразу в чат; аналитика и настройки — вкладками",
+    "en": "Phone: the same projects as in the panel and straight from a card into a chat; analytics and settings in tabs"
+  },
+  "items": [
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вкладка «Проекты» показывает проекты панели, а не недавние папки: у каждого — число чатов и то, что в нём идёт сейчас. «+» на карточке начинает новый чат в проекте, «Продолжить» открывает последний; разговоры git-копий собраны под основным проектом. Нажатие на карточку открывает страницу проекта с вкладками «Чаты», «Git» и «Копии» и кнопками «Новый чат» и «Код». Папки, где запускался агент, но которых нет среди проектов, — в свёрнутом блоке «Из истории чатов», откуда их можно добавить в проекты; обзор дисков переехал на вкладку «Папки».",
+        "en": "The «Projects» tab shows the panel projects instead of recent folders: each with its chat count and what is running in it now. «+» on a card starts a new chat in the project, «Continue» opens the latest one; conversations of git copies sit under the main project. A tap on the card opens the project page with «Chats», «Git» and «Copies» tabs and «New chat» and «Code» buttons. Folders where the agent ran but which are not among the projects sit in the collapsed «From chat history» block, where they can be added to the projects; the disk browser moved to the «Folders» tab."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Аналитика разложена по вкладкам «Обзор», «Расход», «Инструменты» и «Сессии» над одним выбранным периодом — вместо одной длинной ленты.",
+        "en": "Analytics is split into «Overview», «Spend», «Tools» and «Sessions» tabs over one chosen period instead of one long feed."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Настройки разложены по вкладкам «Связь», «Уведомления», «Контур» и «Общее»; вкладки «Контур» нет, пока контуров нет. У связи с панелью — значок «на связи / не отвечает», у списка устройств — пустое состояние, в «Общем» — версия приложения.",
+        "en": "Settings are split into «Link», «Alerts», «Contour» and «General» tabs; the «Contour» tab is absent while there are no contours. The panel link shows an «online / not answering» badge, the device list has an empty state, and «General» shows the app version."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "На главной — сводка: сколько разговоров работает, сколько ждёт ответа (нажатие ведёт во «Вопросы») и в скольких проектах. Под кнопкой «Новый чат» видно, в каком проекте он начнётся.",
+        "en": "Home shows a summary: how many conversations are running, how many wait for an answer (a tap leads to «Questions») and in how many projects. Under «New chat» you see the project it will start in."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Телефон» описывает новые вкладки, кадры пересняты; правка любого из четырёх экранов вкладок теперь требует перечитать справку.",
+        "en": "The «Phone» help describes the new tabs and its frames are re-shot; a change to any of the four tab screens now requires re-reading the help."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Уборка промежуточных файлов после сборки APK и pnpm mobile:clean больше не обрывается на первом занятом каталоге: занятый пропускается и называется, остальные убираются.",
+        "en": "Cleaning up build intermediates after an APK build and pnpm mobile:clean no longer stops at the first locked folder: a locked one is skipped and named, the rest are removed."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: недавние папки и обзор дисков одной лентой, в разговор — через отдельную карточку",
+        "en": "Before: recent folders and the disk browser in one feed, a chat only through a separate card"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: проекты панели карточками — число чатов, что идёт сейчас, «+» и «Продолжить»",
+        "en": "After: panel projects as cards — chat count, what is running now, «+» and «Continue»"
+      }
+    }
+  ]
+}

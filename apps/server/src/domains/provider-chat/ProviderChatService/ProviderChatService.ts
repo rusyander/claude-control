@@ -175,6 +175,7 @@ export type ProviderChatRunDeps = Omit<
   | 'model'
   | 'effort'
   | 'platformEnv'
+  | 'optionalEnvKeys'
   | 'supervisor'
   | 'permission'
 > & {
@@ -206,6 +207,18 @@ export interface GroupRunActivation {
   /** Заметка с отпечатком: одна строка в ленту на (разговор, отпечаток). */
   notice?: { digest: string; text: string };
   refusal?: string;
+}
+
+/**
+ * Запуск ребёнка разделения (`setChildRun`): окружение и лёгкий набор MCP —
+ * снятые серверы и строка о них к системной. Строка едет, только если CLI
+ * серверы действительно снял (`setMcpOff`).
+ */
+export interface ChildRun {
+  env?: Record<string, string>;
+  mcp?: { off: string[]; note: string };
+  /** Группа разделения (не разбор): у неё без человека выключены и фоновые вызовы CLI (6.3). */
+  group?: boolean;
 }
 
 /** Группы к старту ответа: слой на прогон вместо тумблера каталогов Claude. */
@@ -405,6 +418,18 @@ export class ProviderChatService {
   private childrenBriefOf?: (providerId: string, chatId: string) => string | undefined;
 
   /**
+   * Запуск ребёнка разделения (6.1 плана экономии): окружение — то же, что у
+   * ребёнка Claude (`childRunEnv`: потолок vitest, короткий вывод
+   * `tests-cli run`), плюс у CLI, умеющих снять сервер MCP с запуска, —
+   * лёгкий набор группы (1.2) и строка о снятом. Не ребёнок — `undefined`.
+   */
+  setChildRun(resolve: (providerId: string, chatId: string) => ChildRun | undefined): void {
+    this.childRunOf = resolve;
+  }
+
+  private childRunOf?: (providerId: string, chatId: string) => ChildRun | undefined;
+
+  /**
    * Строка о каталоге разговора (тесты проекта, папка e2e) — той же функцией,
    * что у реестра Claude (`ChatRunRegistry.setWorkspaceNote`). Где у CLI есть
    * системный канал (`setSystemNote`), она едет им; у остальных системной
@@ -415,11 +440,11 @@ export class ProviderChatService {
    * переписку она не пишется и спрашивается на КАЖДОМ сообщении; осечка
    * решателя отправку не срывает.
    */
-  setWorkspaceNote(resolve: (cwd: string) => string | undefined): void {
+  setWorkspaceNote(resolve: (cwd: string, run?: { group: boolean }) => string | undefined): void {
     this.workspaceNoteOf = resolve;
   }
 
-  private workspaceNoteOf?: (cwd: string) => string | undefined;
+  private workspaceNoteOf?: (cwd: string, run?: { group: boolean }) => string | undefined;
 
   /** Строки о тестах по разговорам: системная — одна на разговор (E6). */
   private readonly workspaceNotes = new SessionWorkspaceNotes();
@@ -466,6 +491,74 @@ export class ProviderChatService {
     env: NodeJS.ProcessEnv,
   ) => Record<string, string> | undefined;
 
+  /**
+   * Выключатель серверов MCP чужому CLI (6.1): у Codex — ключ запуска, у Qwen
+   * Code — слой настроек поверх выбранного файла. `undefined` — у этого CLI
+   * выключателя нет: серверы остаются, строки о снятых нет.
+   */
+  setMcpOff(
+    resolve: (
+      providerId: string,
+      names: readonly string[],
+      env: NodeJS.ProcessEnv,
+    ) => Record<string, string> | undefined,
+  ): void {
+    this.mcpOffOf = resolve;
+  }
+
+  private mcpOffOf?: (
+    providerId: string,
+    names: readonly string[],
+    env: NodeJS.ProcessEnv,
+  ) => Record<string, string> | undefined;
+
+  private mcpOffEnv(
+    providerId: string,
+    names: readonly string[],
+    env: Record<string, string>,
+  ): Record<string, string> | undefined {
+    try {
+      return this.mcpOffOf?.(providerId, names, { ...process.env, ...env });
+    } catch {
+      // Лёгкий набор не главнее разговора: осечка — полный набор, без строки.
+      return undefined;
+    }
+  }
+
+  /**
+   * Фоновые вызовы модели, которые CLI делает сам и панели не нужны (6.3): у Qwen
+   * Code — слой настроек поверх выбранного файла (подсказка следующей реплики; у
+   * группы ещё авто-память). `undefined` — у этого CLI такого канала нет.
+   */
+  setQuietRun(
+    resolve: (
+      providerId: string,
+      group: boolean,
+      env: NodeJS.ProcessEnv,
+    ) => Record<string, string> | undefined,
+  ): void {
+    this.quietRunOf = resolve;
+  }
+
+  private quietRunOf?: (
+    providerId: string,
+    group: boolean,
+    env: NodeJS.ProcessEnv,
+  ) => Record<string, string> | undefined;
+
+  private quietRunEnv(
+    providerId: string,
+    group: boolean,
+    env: Record<string, string>,
+  ): Record<string, string> | undefined {
+    try {
+      return this.quietRunOf?.(providerId, group, { ...process.env, ...env });
+    } catch {
+      // Тишина не главнее разговора: осечка — CLI зовёт модель, как по умолчанию.
+      return undefined;
+    }
+  }
+
   private localLimitsEnv(
     providerId: string,
     limits: { contextWindow: number; timeoutMs: number; idleMs: number },
@@ -503,10 +596,11 @@ export class ProviderChatService {
     }
   }
 
-  private workspaceNote(workdir: string | undefined): string {
+  /** `group` — ребёнок разделения: ему строка без вопросов человеку, как группе Claude. */
+  private workspaceNote(workdir: string | undefined, group: boolean): string {
     if (!workdir) return '';
     try {
-      return this.workspaceNoteOf?.(workdir) ?? '';
+      return this.workspaceNoteOf?.(workdir, { group }) ?? '';
     } catch {
       return '';
     }
@@ -612,15 +706,44 @@ export class ProviderChatService {
       ask: (request) => this.askHuman(chatId, live, request, chat.workdir),
     };
 
+    // Окружение ребёнка разделения — первым: контур и слой группы сильнее.
+    let child: ChildRun | undefined;
+    try {
+      child = this.childRunOf?.(providerId, chatId);
+    } catch {
+      // Запуск ребёнка не главнее разговора.
+    }
     // Слой группы — последним: его файл настроек решён для ЭТОГО разговора.
-    const runEnv: Record<string, string> = { ...route.env, ...route.kit?.env, ...groupEnv };
+    const runEnv: Record<string, string> = {
+      ...child?.env,
+      ...route.env,
+      ...route.kit?.env,
+      ...groupEnv,
+    };
+    // Окружение ребёнка — настройка прогона, а не условие хода: OpenCode, Kimi и Goose
+    // с одним им остаются на общем или живом сервере, как до него (ревью B2-F16).
+    const layered = { ...route.env, ...route.kit?.env, ...groupEnv };
+    const childOnly = Object.keys(child?.env ?? {}).filter((key) => !(key in layered));
     // Окно локальной модели ложится слоем настроек ДО строки о каталоге: та читает файл,
     // выбранный здесь, и дописывает свой слой поверх.
     if (route.localLimits) live.local = true;
     if (route.localLimits) {
       Object.assign(runEnv, this.localLimitsEnv(providerId, route.localLimits, runEnv));
     }
-    const current = this.workspaceNote(chat.workdir);
+    // Снятые серверы — тоже поверх выбранного файла настроек, до строки о каталоге.
+    const mcpOff = child?.mcp ? this.mcpOffEnv(providerId, child.mcp.off, runEnv) : undefined;
+    if (mcpOff) Object.assign(runEnv, mcpOff);
+    // Без лишних фоновых вызовов модели — тоже поверх, до строки о каталоге.
+    const quiet = this.quietRunEnv(providerId, child?.group === true, runEnv);
+    if (quiet) Object.assign(runEnv, quiet);
+    // Строка о снятых серверах — частью системной строки: она одна на разговор (E6),
+    // и сервер, подключённый по просьбе группы, приходит переменой в реплике.
+    const current = [
+      this.workspaceNote(chat.workdir, child?.group === true),
+      mcpOff ? child?.mcp?.note : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
     // Системная строка — одна на разговор, как у Claude (E6): перемена между
     // ходами едет в реплике, а не в системном промпте.
     const noteKey = foreignChatKey(providerId, chatId);
@@ -686,6 +809,7 @@ export class ProviderChatService {
           liveSession: previousSession ? { previous: previousSession } : {},
           // Набор панели (В2) — у Qwen Code свой `QWEN_HOME` в режиме «Наши».
           platformEnv: { ...runEnv, ...noteEnv },
+          ...(childOnly.length > 0 ? { optionalEnvKeys: childOnly } : {}),
           ...(supervisor
             ? {
                 supervisor:

@@ -30,6 +30,7 @@
     "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm compromises && pnpm negatives && pnpm shots && pnpm portability && pnpm supervisor && pnpm build",
     "doctor": "node tools/doctor.mjs",
     "tests": "node tools/tests-cli.mjs",
+    "tokens": "node tools/token-audit.mjs",
     "remote": "node tools/tailscale-serve.mjs",
     "remote:off": "node tools/tailscale-serve.mjs --off",
     "keepalive": "node tools/keepalive.mjs",

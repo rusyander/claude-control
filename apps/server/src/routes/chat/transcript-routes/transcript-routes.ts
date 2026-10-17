@@ -42,6 +42,11 @@ export function registerChatTranscriptRoutes(
   isProcessAlive: (chatId: string) => boolean = () => false,
   /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке. */
   awaitsYou: (chatId: string) => boolean = () => false,
+  /**
+   * Модель, назначенная разговору панелью вне дерева: лёгкий чат вопросов о
+   * ходе групп (5.1). Без неё следующий вопрос в нём ушёл бы на модели из настроек.
+   */
+  assignedOf: (chatId: string) => { model: string; effort: string } | undefined = () => undefined,
 ): void {
   // Тарифы достаёт слой маршрутов: кэш прайса и свои цены пользователя видны
   // только отсюда. Отдаём функцию, а не снимок, — правка цен подхватывается
@@ -185,7 +190,11 @@ export function registerChatTranscriptRoutes(
       Object.keys(pins).length === 0
         ? withLinks
         : withLinks.map((chat) => (pins[chat.id] ? { ...chat, pinnedAt: pins[chat.id] } : chat));
-    return sendConditional(request, reply, withPins);
+    const withAssigned = withPins.map((chat) => {
+      const assigned = chat.assignedModel ? undefined : assignedOf(chat.id);
+      return assigned ? { ...chat, assignedModel: assigned.model, effort: assigned.effort } : chat;
+    });
+    return sendConditional(request, reply, withAssigned);
   });
 
   /**

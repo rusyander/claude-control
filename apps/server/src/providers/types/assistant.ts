@@ -205,6 +205,12 @@ export interface ProviderAssistant {
    */
   oneShotArgs?: (prompt: string, run?: OneShotRun) => string[];
   /**
+   * Промпт одиночного запуска — в stdin, а не в argv: `oneShotArgs` называет
+   * stdin синтаксисом своего CLI (Codex: `-`), вызывающий пишет текст в поток.
+   * Нужен CLI, чья командная строка и без промпта близка к пределу Windows.
+   */
+  oneShotStdin?: boolean;
+  /**
    * Добавка к окружению ТОГО ЖЕ одиночного запуска — для CLI, которому режим
    * прогона задокументирован переменной, а флага у него нет (Goose: `GOOSE_MODE`;
    * у `goose run` флага режима нет). Читает тот же `run`, что и `oneShotArgs`;

@@ -327,7 +327,8 @@ export async function runProviderCli(
     command,
     args,
     deps,
-    undefined,
+    // Промпт в stdin — у CLI, которому argv не вместит и набор, и задание (Codex).
+    provider.assistant?.oneShotStdin ? prompt : undefined,
     cwd,
     provider.assistant?.oneShotEnv?.(run),
   );

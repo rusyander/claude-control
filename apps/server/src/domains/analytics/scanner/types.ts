@@ -33,7 +33,7 @@ export interface RawEntry {
     id?: string;
     model?: string;
     usage?: RawUsage;
-    content?: Array<{ type?: string; name?: string }>;
+    content?: Array<{ type?: string; name?: string; input?: Record<string, unknown> }>;
   };
 }
 

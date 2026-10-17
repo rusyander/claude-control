@@ -25,11 +25,26 @@ import { applyResults, createGroup, readGroup, upsertCase } from '../store/store
  */
 
 export type AgentCaseWrite =
-  | { kind: 'saved'; testCase: ProjectTestCase; created: boolean }
+  | {
+      kind: 'saved';
+      testCase: ProjectTestCase;
+      created: boolean;
+      /** id из запроса, которого в группе не было: кейс заведён под id блока. */
+      requested?: string;
+      /**
+       * Живой кейс с id в одну-две буквы от `requested` — вероятная опечатка
+       * (ревью B2-F19). Кейс всё равно заведён: `login-2` рядом с `login-1` —
+       * обычный новый кейс, и отказ стоил бы ему хода; агенту — подсказка.
+       */
+      similar?: string;
+    }
   | { kind: 'draft'; runId: string; caseId: string };
 
 /** Поля результата прогона — их пишет `record`, а не правка описания. */
 const RUN_OWNED = ['status', 'statusId', 'note', 'muted', 'muteReason', 'archived'] as const;
+
+/** Атрибут кейса с id, под которым агент просил его завести. */
+const AGENT_ID = 'agent-id';
 
 /** Завести или обновить кейс от имени агента чата. */
 export function agentUpsertCase(
@@ -41,9 +56,16 @@ export function agentUpsertCase(
   const clean: ProjectTestCaseInput = { ...input };
   for (const key of RUN_OWNED) delete clean[key];
   createGroup(root, groupId);
-  const existing = clean.id
-    ? readGroup(root, groupId).cases.find((item) => item.id === clean.id)
-    : undefined;
+  const cases = clean.id ? readGroup(root, groupId).cases : [];
+  // Придуманный агентом id помнится атрибутом заведённого кейса: повтор того же id
+  // в следующем ходе — правка этого кейса, а не ещё один такой же (ревью A2-F9).
+  const existing =
+    cases.find((item) => item.id === clean.id) ??
+    cases.find((item) => !item.archived && item.attributes?.[AGENT_ID] === clean.id);
+  if (existing && clean.id !== existing.id) {
+    clean.id = existing.id;
+    clean.attributes = { ...existing.attributes, ...clean.attributes };
+  }
   if (existing?.source === 'human') {
     // Кейс человека — предложением: библиотеку меняет его приёмка.
     const runId = `chat-edit-${existing.id}-${Date.parse(now).toString(36)}`.slice(0, 64);
@@ -66,8 +88,49 @@ export function agentUpsertCase(
     });
     return { kind: 'draft', runId, caseId: existing.id };
   }
+  // id, которого нет, у агента — придуманное имя нового кейса, а не правка
+  // удалённого (3.4 плана экономии, 17.10): отказ стоил ему хода на повтор.
+  // Хранилище отказывает по-прежнему — там это защита открытой формы.
+  const requested = clean.id && !existing ? clean.id : undefined;
+  if (requested) {
+    delete clean.id;
+    clean.attributes = { ...clean.attributes, [AGENT_ID]: requested };
+  }
+  const similar = requested
+    ? cases.find(
+        (item) =>
+          !item.archived &&
+          [item.id, item.attributes?.[AGENT_ID]].some(
+            (id) => typeof id === 'string' && withinTwoEdits(id, requested),
+          ),
+      )?.id
+    : undefined;
   const testCase = upsertCase(root, groupId, clean, now, 'agent');
-  return { kind: 'saved', testCase, created: !existing };
+  return {
+    kind: 'saved',
+    testCase,
+    created: !existing,
+    ...(requested ? { requested } : {}),
+    ...(similar ? { similar } : {}),
+  };
+}
+
+/** Расстояние Левенштейна не больше двух — без таблицы на длинные id. */
+function withinTwoEdits(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 2) return false;
+  let row = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      next[j] = Math.min(
+        row[j]! + 1,
+        next[j - 1]! + 1,
+        row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    row = next;
+  }
+  return row[b.length]! <= 2;
 }
 
 export interface AgentResult {

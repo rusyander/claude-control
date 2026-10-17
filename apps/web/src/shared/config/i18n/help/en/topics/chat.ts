@@ -475,6 +475,25 @@ export const chatEn: typeof chatRu = {
         'dialog reads PROJ-41, PROJ-42 and PROJ-43 in Jira, shows where each one ' +
         'stands and offers only statuses all three can reach. Press Move and the ' +
         'panel moves them itself; the result per task stays in the dialog.',
+      sStatusAsk: 'Ask about group progress without waking the parent',
+      sStatusAskText:
+        'The "Ask about group progress" field under the hub sends the question not ' +
+        'to the parent but to a new light chat in the same project. Every turn of ' +
+        'that chat starts with the same group summary: branch, copy, state, outcome. ' +
+        'After an hour of silence the parent has gone cold, and one question to it ' +
+        'would rewrite its whole long history; the light chat starts from scratch. ' +
+        'An empty question cannot be sent, and a server refusal keeps the text in ' +
+        'the field. To write to the parent itself, use the input below as before.',
+      sStatusChat: 'The answer arrives in the light chat',
+      sStatusChatText:
+        'The view moves to the new chat at once: the header shows Sonnet and ' +
+        '"Medium", the label says "Sonnet is thinking". This chat has no MCP ' +
+        'servers, no edit tools and no shell, and personal and built-in skills are ' +
+        'visible by name only (project skills as usual): it answers ' +
+        'from the summary and reads files in group copies when the summary is not ' +
+        'enough, but changes nothing and writes nothing to the groups. Further ' +
+        'questions in it run on the same model until you pick another, and every ' +
+        'turn gets a fresh summary.',
 
       shotsTitle: 'The screenshots are taken on an invented project',
       shotsText:
@@ -999,7 +1018,11 @@ export const chatEn: typeof chatRu = {
       'folder without local packages (no workspace, no file: to a sibling folder) gets ' +
       'node_modules as a link to the original’s node_modules: no disk space, no ' +
       'install; a package the agent installs in the copy lands in the original too. ' +
-      'Removing the copy removes only the link. A folder with local packages is not ' +
+      'Removing the copy removes only the link. If the original’s node_modules lacks a ' +
+      'package its package.json requires, or a version differs from the npm lockfile, the ' +
+      'folder is not linked: nothing is installed after a link, and the copy would get ' +
+      'incomplete packages — with npm it is seeded instead and the difference installed, ' +
+      'as below. A folder with local packages is not ' +
       'linked — the copy would load them from the original instead of its own: with ' +
       'npm its node_modules is built from hard links to the original’s files (no extra ' +
       'disk space) and npm install --no-save runs instead of npm ci, delivering only ' +
@@ -1040,7 +1063,78 @@ export const chatEn: typeof chatRu = {
       'plan, with the step name and its subagent count. A group without a plan still gets a ' +
       'number when the project skill writes .agent/steps.json in the copy — { "current": 8, ' +
       '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. A group working ' +
-      'in the shared directory gets no preamble: that environment is yours.',
+      'in the shared directory gets no preamble: that environment is yours. A group also gets ' +
+      'its own lean MCP set: the tracker, the code host and servers whose role the panel does ' +
+      'not know go into the run, design servers only when the group tasks carry a Figma link ' +
+      'or talk about a mockup or layout. Messengers, a second connector of the same tracker ' +
+      'and the claude.ai connectors (mail, calendar, drive) are off: their tools would ' +
+      'otherwise ride along in every model call. When a switched-off server is needed after ' +
+      'all, the group agent asks for it with a block at the end of its turn, and the panel ' +
+      'continues the same session with it. A group in Codex and Qwen Code drops the same ' +
+      'servers: Codex gets a switch for each one, Qwen Code an exclusion list in the group ' +
+      'settings layer; the other CLIs cannot switch servers off one by one, so their group ' +
+      'runs with the full set. A group in Qwen Code keeps no Qwen auto-memory: what an ' +
+      'unattended run concludes stays out of your memory; and no Qwen conversation in the ' +
+      'panel asks for next-reply suggestions — the panel does not show them, and each one ' +
+      'is an extra model call. Skills work the same way: delivery and review ' +
+      'skills and the panel group’s skills keep their description, other personal and ' +
+      'built-in service skills reach the agent by name only and are invoked as before; ' +
+      'project skills are untouched, and a design plugin without a mockup in the tasks and ' +
+      'messenger plugins are off for this run. The panel’s system addendum has a group edition ' +
+      'too, shorter than the chat one with the same rules: no continuation card for the human ' +
+      '(the group continues its stages itself) and no up-front question about the stand and ' +
+      'access — the group takes them from its task and the project notes. ' +
+      'It carries a spending rule instead: every model call re-reads the whole ' +
+      'conversation, so independent reads go in one batch, a file is read once before an ' +
+      'edit, code changes through edits rather than rewrites, and a running gate is awaited ' +
+      'in one call. When the conversation is compacted, the summary keeps the stages, ' +
+      'decisions with their reasons, paths and commands, stand access, open failures and an ' +
+      'extract of the current skill step, so none of it has to be re-read. ' +
+      'A test run through tests-cli run in a group prints the verdict, the first ' +
+      'failure lines and the path to a log holding the whole output; no check is dropped. ' +
+      'A green run is remembered against the content of the project files: the same ' +
+      'command on an unchanged tree answers from memory, without a run and without the ' +
+      'log, and any edit, new file or commit sends the run for real. An answer from memory ' +
+      'goes into the test history as a separate "from memory" record pointing at the real ' +
+      'run. A red one is never remembered, and the e2e folder runs against the stand every ' +
+      'time. Files git ignores (.env, build output, dependencies) are invisible to the ' +
+      'memory: after changing them, run with --fresh. ' +
+      'A status change, an assignment, a field edit or a comment in the tracker answers the group with a ' +
+      'short line (key, new status, assignee) instead of the whole issue; reading an issue ' +
+      'still returns all of it, and your own hooks keep running alongside. ' +
+      'Full gates and builds of Claude Code and Qwen Code groups run one at a time per ' +
+      'machine: a group whose gate waits in the queue makes no model calls, and the command ' +
+      'and permission rules stay as they were. It waits 25 minutes at most, then runs ' +
+      'without the queue. A failed gate frees the slot at once; one your hook refused in ' +
+      'Claude Code frees it with the same group’s next command; a slot whose end the CLI ' +
+      'never reported frees after the command timeout plus half a minute. Codex groups have ' +
+      'no queue: Codex runs project hooks only after you trust them by hand in /hooks. ' +
+      'The panel recognises heavy work by name (test runners, builds, package-manager ' +
+      'checks), quoted inside a wrapper, and by experience: a command that once ran longer ' +
+      'than a minute and a half — say, the project’s gate under its own script name, which ' +
+      'the panel cannot know — joins the queue from any copy from the next run on. One that ' +
+      'became fast leaves the queue, and experience older than a month is forgotten. A run ' +
+      'narrowed to a test file or folder skips the queue. A gate the CLI moved to the ' +
+      'background on timeout keeps its slot for the expected run time (from experience, up ' +
+      'to 30 minutes): the CLI does not report when a background command ends. A Claude ' +
+      'Code group’s command timeout ceiling is 30 minutes instead of 10, and the agent ' +
+      'starts a full gate with a 30-minute timeout: it waits in one call rather than by ' +
+      'polling, each poll re-reading the whole conversation. A higher ceiling set in your ' +
+      'settings stays; a lower one is raised to 30 minutes for groups only. ' +
+      'When the project has a ready screenshot command (a qa:shot, shot or screenshot script in ' +
+      'the package.json of the root or of a folder such as e2e), a delivering group gets it in ' +
+      'its task and takes the before and after shots with it, using the login saved in the ' +
+      'main project folder, instead of a script of its own. ' +
+      'Before its review a delivering group builds a review package: one file with the ' +
+      'commits, the changed files, the plan and the whole diff of the copy, uncommitted and new ' +
+      'files included (lockfiles by name only). Every reviewer gets its path and reads it once ' +
+      'instead of running git diff again and again; the number of reviewers and the depth of ' +
+      'the review stay the same. ' +
+      'Under a contour or local-model route the route itself decides the MCP set; the rest ' +
+      'of the above stays. A group in Codex or Qwen Code gets the task, the spend rule, the ' +
+      'short check output and the light MCP set; the skill list instead of descriptions, ' +
+      'short tracker replies, task lists without descriptions and the heavy-step queue rest ' +
+      'on Claude Code hooks and do not reach it.',
 
     splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',
     splitCaption:
@@ -1056,7 +1150,13 @@ export const chatEn: typeof chatRu = {
       'again, split and there is nothing left to ask. The same edit across ten ' +
       'files stays one task and is no reason to propose anything. You can also ' +
       'ask for it yourself — the “Split tasks across chats” button in the ' +
-      'composer, at any point in the conversation: it works after a refusal too.',
+      'composer, at any point in the conversation: it works after a refusal too. ' +
+      'While split proposals are on, issues from a tracker board or search reach ' +
+      'the agent as a list without descriptions — key, title, status, assignee — ' +
+      'and it reads the description only of those it puts into groups; a search ' +
+      'that names its fields explicitly arrives as is. Before, parsing a board ' +
+      'pulled every issue’s description, and every later model call re-read them ' +
+      'all. Claude Code groups get lists the same way.',
     splitCard: 'What the card shows',
     splitCardText:
       'Shared context on top, then the groups: a name, the branch that will be ' +
@@ -1368,7 +1468,19 @@ export const chatEn: typeof chatRu = {
       'right in the summary under the parent. A waiting group is told in its task ' +
       'who worked before it, on which branch and which files are already touched — ' +
       'from the branch comparison; the comparison did not make it in time — the ' +
-      'files are simply not named, and the launch is not held up. Every group opens ' +
+      'files are simply not named, and the launch is not held up. ' +
+      'The triage searches once for everyone: each group gets a map — the files ' +
+      'and lines where the code changes, who calls it, the reference and the check ' +
+      'commands — and all of them get the shared setup: how to start and check the ' +
+      'project, ports, the stand address and the way to log in (never the password ' +
+      'itself). All of it goes into the group’s notes, and the plan and the work ' +
+      'start from the named places instead of searching for them again. ' +
+      'The panel also puts those notes into the task notebook — the file ' +
+      '.agent/run/notebook.md in the group’s copy, hidden from git. The agent adds ' +
+      'what it finds along the way (no passwords) and after the conversation is ' +
+      'compacted reads the notebook instead of finding everything out again. In a project ' +
+      'without git there are no copies: the groups work in one folder and share one ' +
+      'notebook, each with its own section under its title. Every group opens ' +
       'with a PLAN at ' +
       'the ceiling: a short look at its own task in its own copy, no edits; the ' +
       'plan goes into the work task and the work follows it step by step. No ' +
@@ -2428,6 +2540,9 @@ export const chatEn: typeof chatRu = {
       '06-paused': 'The tree on pause: a mark on every group and the resume button',
       '07-worktrees': 'Parallel copies of the repository: path, install trace and removal',
       '08-move-tasks': 'Moving the group tasks in Jira: each status and the statuses all share',
+      '09-status-ask':
+        'The “Ask about the groups’ progress” field in the hub: the question goes to a light chat, not the parent',
+      '10-status-chat': 'A separate light chat answers from the groups’ summary',
     },
     autonomy: {
       '01-escalation': 'The main chat: a critical card from a group and the button to it',

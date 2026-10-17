@@ -15,6 +15,22 @@
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
+  "domains/analytics/token-audit/audit-files.ts": {
+    "n": 5,
+    "why": "terminal report of the token meter tools/token-audit.mjs: why a foreign group's logs were not counted (6.4), named in the meter's output; never an API reply"
+  },
+  "domains/analytics/token-audit/claude-audit.ts": {
+    "n": 2,
+    "why": "terminal report of the token meter tools/token-audit.mjs (stage 0, Russian by design for its human reader) + its parse errors; never an API reply"
+  },
+  "domains/analytics/token-audit/foreign-audit.ts": {
+    "n": 1,
+    "why": "terminal report of the token meter tools/token-audit.mjs (stage 0, Russian by design for its human reader) + its parse errors; never an API reply"
+  },
+  "domains/analytics/token-audit/report.ts": {
+    "n": 19,
+    "why": "terminal report of the token meter tools/token-audit.mjs (stage 0, Russian by design for its human reader) + its parse errors; never an API reply"
+  },
   "domains/api-explorer/load.ts": {
     "n": 5,
     "why": "fallback text of a domain error code (ApiSpecError/ApiSendError/LogsError/DbError/RunnerError kind) the web translates from its own feature dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
@@ -460,7 +476,7 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "domains/project-git/bootstrap.ts": {
-    "n": 21,
+    "n": 22,
     "why": "log lines appended to the copy-preparation log the human opens; plus the per-runtime and soft-chain notes (T1/T8/T15) shown on the copy card and in the agent preamble, written in the log language of the preparation"
   },
   "domains/project-git/language-chains.ts": {
@@ -602,6 +618,10 @@
   "domains/project-tests/store/store.ts": {
     "n": 12,
     "why": "stored defaults of a new library (group descriptions, copy suffix) + strictValue field labels (Тип, Тип ссылки, Приоритет, Готовность, Статус автоматизации)"
+  },
+  "domains/project-tests/suites/describe.ts": {
+    "n": 24,
+    "why": "suite case text built from the folder tests, written into the user project .agent/tests (case content, not a reply); moved out of suites.ts"
   },
   "domains/project-tests/suites/suites.ts": {
     "n": 4,
@@ -1034,9 +1054,5 @@
   "routes/portability-routes/portability-routes.ts": {
     "n": 4,
     "why": "server log lines only — unreadable source, rolled-back transfer, rolled-back subscription rebuild, rolled-back drift resolution; every reply carries messageCode (the parser text is deliberately kept out of the body)"
-  },
-  "domains/project-tests/suites/describe.ts": {
-    "n": 24,
-    "why": "suite case text built from the folder tests, written into the user project .agent/tests (case content, not a reply); moved out of suites.ts"
   }
 }

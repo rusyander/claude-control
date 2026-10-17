@@ -230,6 +230,7 @@ describe('ChatRunRegistry — усыновление после перезапу
         status: 'running',
         finishedAt: undefined,
         model: 'claude-opus-5',
+        effort: 'high',
         detached: true,
       },
     ]);

@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   branchTaken,
   buildGroupPrompt,
@@ -323,6 +326,12 @@ describe('потолки предложения', () => {
     expect(SPLIT_SYSTEM_PROMPT).toContain(`At most ${SPLIT_MAX_GROUPS} groups`);
     expect(SPLIT_SYSTEM_PROMPT).not.toContain('\n');
   });
+
+  // 5.2 плана экономии: разбор доски читал описание каждой задачи (190 тыс. знаков).
+  it('задачи с доски — сперва заголовки и статусы, описание только у взятых в группы', () => {
+    expect(SPLIT_SYSTEM_PROMPT).toContain('list them with titles and statuses first');
+    expect(SPLIT_SYSTEM_PROMPT).toContain('description only of the tasks you put into groups');
+  });
 });
 
 describe('имя ветки из заголовка модели', () => {
@@ -446,6 +455,77 @@ describe('разделение задач по чатам', () => {
     expect(byPlan).not.toContain(GROUP_QUESTIONS_HUMAN_LINE);
     expect(byPlan).toContain('Decide a fork for which you have a recommended option yourself');
     expect(byPlan).toContain(UNCONFIRMED_FINDING_LINE);
+  });
+
+  /**
+   * 3.5 плана экономии: снимки съедали до 17 % вызовов группы — скрипт «до»
+   * переписывался, пока подбирался вход. Готовая команда проекта (кит вне git,
+   * в основном checkout) едет строкой доставки; без доставки и без кита — нет.
+   */
+  it('готовая команда снимков проекта — в задании доставляющей группы', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'cc-split-shots-'));
+    const bare = mkdtempSync(join(tmpdir(), 'cc-split-noshots-'));
+    try {
+      mkdirSync(join(repo, 'e2e'));
+      writeFileSync(
+        join(repo, 'e2e', 'package.json'),
+        JSON.stringify({ scripts: { 'qa:shot': 'node ai-scripts/shot.mjs' } }),
+      );
+      const run = async (projectPath: string, options: { deliver?: boolean }) => {
+        const prompts: string[] = [];
+        await splitTasks({
+          projectPath,
+          proposal: PROPOSAL,
+          startRuns: true,
+          git: fakeGit(),
+          ...options,
+          start: ({ prompt }) => {
+            prompts.push(prompt);
+            return true;
+          },
+        });
+        return prompts[0] ?? '';
+      };
+      const kit = `${repo.replace(/\\/g, '/')}/e2e`;
+      const withShots = await run(repo, { deliver: true });
+      expect(withShots).toContain(`\`cd "${kit}" && npm run qa:shot --\``);
+      expect(withShots).toContain(`\`${kit}/ai-scripts/shot.mjs\``);
+      expect(withShots).toContain('never write a screenshot script of your own');
+      expect(await run(bare, { deliver: true })).not.toContain('Screenshots (before/after');
+      expect(await run(repo, {})).not.toContain('Screenshots (before/after');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(bare, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * 5.3 плана экономии: ревьюеры группы перечитывали дифф по 5–14 раз (408 тыс.
+   * знаков на шестерых). Доставляющая группа получает команду пакета ревью —
+   * настоящий скрипт панели по абсолютному пути — и правила чтения для ревьюеров.
+   */
+  it('пакет ревью и правила чтения ревьюеров — в задании доставляющей группы', async () => {
+    const run = async (options: { deliver?: boolean }) => {
+      const prompts: string[] = [];
+      await splitTasks({
+        projectPath: tmpdir(),
+        proposal: PROPOSAL,
+        startRuns: true,
+        git: fakeGit(),
+        ...options,
+        start: ({ prompt }) => {
+          prompts.push(prompt);
+          return true;
+        },
+      });
+      return prompts[0] ?? '';
+    };
+    const delivered = await run({ deliver: true });
+    const command = /`node "([^"]+review-pack\.mjs)" --plan /.exec(delivered);
+    expect(command?.[1] && existsSync(command[1])).toBe(true);
+    expect(delivered).toContain('instead of running git diff or git show');
+    expect(delivered).toContain('with its count and depth unchanged');
+    expect(await run({})).not.toContain('review-pack.mjs');
   });
 
   /**
@@ -688,6 +768,50 @@ describe('разделение задач по чатам', () => {
     expect(first?.indexOf('start with the task right away')).toBeLessThan(
       first?.indexOf(task) ?? -1,
     );
+  });
+
+  it('среды модулей вне зоны группы (`owns`) — одной строкой, своей зоны — полностью', async () => {
+    const note = (where: string) => ({
+      tool: 'go' as const,
+      where,
+      wanted: '>=1.25.0',
+      source: `${where}/go.mod go`,
+      status: 'ok' as const,
+      used: '1.27.0',
+      run: 'go test ./...',
+    });
+    const git = fakeGit({
+      addWorktree: async (_dir, branch) => ({ path: `/copies/${branch}` }),
+      bootstrap: async () => ({
+        command: 'npm ci',
+        status: 'ok',
+        startedAt: '2026-10-16T10:00:00.000Z',
+        finishedAt: '2026-10-16T10:01:00.000Z',
+        exitCode: 0,
+        logTail: '',
+        runtimes: [note('api'), note('svc-a'), note('svc-b')],
+      }),
+    });
+    const prompts: string[] = [];
+    const [login, header] = PROPOSAL.groups;
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: { ...PROPOSAL, groups: [{ ...login!, owns: ['api/internal/login'] }, header!] },
+      startRuns: true,
+      git,
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+
+    expect(prompts[0]).toContain('Go in api/: the project asks for >=1.25.0');
+    expect(prompts[0]).toContain(
+      "Outside this group's zone (not needed for its tasks): Go ready on 1.27.0 in svc-a/, svc-b/ — run: go test ./...",
+    );
+    // Группа без зоны видит все модули полностью.
+    expect(prompts[1]).toContain('Go in api/, svc-a/, svc-b/ (3 modules)');
+    expect(prompts[1]).not.toContain("Outside this group's zone");
   });
 
   it('подготовка не настроена — преамбула прямо говорит, что зависимости не ставились (Д13)', async () => {

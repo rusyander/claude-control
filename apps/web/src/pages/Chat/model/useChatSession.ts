@@ -299,10 +299,15 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
    * механизма, а не от клика по списку: уведомление о ребёнке, переезд в
    * продолженную сессию. Разговоры хук и так держит — искать их снаружи значило
    * бы носить весь список за собой ради одной строки.
+   *
+   * Разговора в списке ещё нет — его первый ход только что завёл сервер (лёгкий
+   * чат вопроса о ходе групп, 5.1): адрес называет его, и эффект адреса ниже
+   * покажет живой прогон, как только опрос прогонов его назовёт.
    */
   const openChatById = (id: string): void => {
     const found = (chats ?? []).find((chat) => chat.id === id);
     if (found) openChat(found);
+    else writeUrl(id);
   };
 
   const openProject = (project: ProjectInfo): void => {

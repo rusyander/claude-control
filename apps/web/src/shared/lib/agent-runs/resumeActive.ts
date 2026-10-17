@@ -34,6 +34,8 @@ export async function resumeActive(): Promise<void> {
     status?: 'running' | 'done';
     /** Чем прогон запущен: у подхваченного своей записи об этом нет. */
     model?: string;
+    /** На какой глубине: шапка прогона без строки в списке берёт её отсюда. */
+    effort?: string;
     /** Усыновлён сервером после его перезапуска: процесс жив, потока вывода нет. */
     detached?: true;
   }[];
@@ -92,6 +94,7 @@ export async function resumeActive(): Promise<void> {
           ...(info.chatId !== known ? { serverRunId: info.chatId } : {}),
           startedAt: info.startedAt,
           ...(info.model ? { model: info.model } : {}),
+          ...(info.effort ? { effort: info.effort } : {}),
           status: 'running',
           tailOnly: undefined,
           text: '',
@@ -131,6 +134,7 @@ export async function resumeActive(): Promise<void> {
       // Чем ведётся: событие сессии назовёт то же имя, но оно придёт с потоком,
       // а поток припаркованному прогону достаётся не сразу.
       model: info.model,
+      effort: info.effort,
       // Законченный заводим сразу законченным: «работает» у него не будет ни
       // секунды, а поток ниже дотянет только хвост — цену, расход, вопрос.
       status: finished ? 'idle' : 'running',

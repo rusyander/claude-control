@@ -17,23 +17,26 @@ import { panelSupervisorHooks } from '../portability/supervisor/panel-hooks.ts';
  * переехал в «Путь» и идёт ходами конвейера, поэтому подсказка по регулярке —
  * это дубль, который расходится с путём при первой правке.
  *
- * Доказательство — с конца пути: argv, уехавший чужому CLI. Запись группы с
- * `scenario` и триггером, записанная старой панелью, лежит в состоянии как есть.
+ * Доказательство — с конца пути: argv и stdin, уехавшие чужому CLI (Codex
+ * получает промпт в stdin — `oneShotStdin`, иначе Windows режет длинную
+ * командную строку). Запись группы с `scenario` и триггером, записанная старой
+ * панелью, лежит в состоянии как есть.
  */
 
-/** Фейковый CLI: запоминает argv и молча закрывается. */
+/** Фейковый CLI: запоминает argv вместе с тем, что пришло в stdin, и молча закрывается. */
 function recordingSpawn(argv: string[][]) {
   return ((command: string, args: string[]) => {
-    argv.push([command, ...args]);
+    const line = [command, ...args];
+    argv.push(line);
     const child = new EventEmitter() as EventEmitter & {
       stdout: EventEmitter;
       stderr: EventEmitter;
-      stdin: { write: () => void; end: () => void; on: () => void };
+      stdin: { write: (text: string) => void; end: () => void; on: () => void };
       kill: () => void;
     };
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
-    child.stdin = { write: () => {}, end: () => {}, on: () => {} };
+    child.stdin = { write: (text) => void line.push(String(text)), end: () => {}, on: () => {} };
     child.kill = () => child.emit('close', null);
     setTimeout(() => {
       child.stdout.emit('data', Buffer.from('готово'));

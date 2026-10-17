@@ -31,6 +31,19 @@ import { describe } from './items.ts';
 export const CODEX_KIT_ENV = 'AGENTDECK_CODEX_KIT';
 /** Путь к накладке групп прогона (`domains/groups/codex-layer/codex-layer.ts`). */
 export const CODEX_GROUP_ENV = 'AGENTDECK_CODEX_GROUP';
+/**
+ * Серверы MCP, снятые с прогона группы разделения (1.2 и 6.1 плана экономии):
+ * JSON-массив имён из `mcp_servers` конфига Codex. Каждое уходит ключом
+ * `-c mcp_servers.<имя>.enabled=false` — документированный выключатель сервера
+ * без удаления настройки (config reference, `mcp_servers.<id>.enabled`).
+ */
+export const CODEX_MCP_OFF_ENV = 'AGENTDECK_CODEX_MCP_OFF';
+/**
+ * Порог автосжатия группы в токенах (6.2 плана экономии, рычаг A/B того же окна,
+ * что у Claude): уходит ключом `-c model_auto_compact_token_limit=<число>`
+ * (config reference: «Token threshold that triggers automatic history compaction»).
+ */
+export const CODEX_COMPACT_LIMIT_ENV = 'AGENTDECK_CODEX_COMPACT_LIMIT';
 
 /**
  * Предел длины аргумента. Командная строка Windows — 32 767 символов на ВСЁ;
@@ -268,7 +281,8 @@ function shellExcludeArgs(home: string | undefined, names: readonly string[]): s
  * Применить наложения к запуску Codex — набор панели и группы прогона — одним
  * `-c developer_instructions=…` сразу после подкоманды (`exec` / `app-server` —
  * опции идут до промпта): текст человека, набор, группы. MCP групп — своими
- * `-c mcp_servers.…`. Переменные с путями убраны из окружения. Нет переменных —
+ * `-c mcp_servers.…`, порог сжатия группы — `-c model_auto_compact_token_limit`.
+ * Переменные с путями убраны из окружения. Нет переменных —
  * запуск как был. Файл наложения пропал между сборкой и запуском — `missing`:
  * вызывающий отказывает, а не идёт молча без того, что человек включил. Всё
  * вместе длиннее предела — `refusal` с причиной, ничего не обрезано.
@@ -277,13 +291,60 @@ export function withCodexKit(
   args: readonly string[],
   env: Record<string, string> | undefined,
   surface: 'exec' | 'appServer',
-): {
+): CodexKitRun {
+  const off = env?.[CODEX_MCP_OFF_ENV];
+  const limit = env?.[CODEX_COMPACT_LIMIT_ENV];
+  if (!env || (off === undefined && limit === undefined)) {
+    return withOverlays(args, env, surface);
+  }
+  const { [CODEX_MCP_OFF_ENV]: _off, [CODEX_COMPACT_LIMIT_ENV]: _limit, ...rest } = env;
+  const result = withOverlays(args, rest, surface);
+  const groupArgs = [
+    ...(off === undefined ? [] : mcpOffArgs(off)),
+    ...(limit === undefined ? [] : compactLimitArgs(limit)),
+  ];
+  if (groupArgs.length === 0 || result.missing || result.refusal) return result;
+  const [head, ...tail] = result.args;
+  return { ...result, args: head ? [head, ...groupArgs, ...tail] : result.args };
+}
+
+/** Порог сжатия — только целое положительное число; иное — ничего, CLI решает сам. */
+function compactLimitArgs(raw: string): string[] {
+  return /^[1-9]\d*$/.test(raw) ? ['-c', `model_auto_compact_token_limit=${raw}`] : [];
+}
+
+interface CodexKitRun {
   args: string[];
   env: Record<string, string> | undefined;
   skillRoots: string[];
   missing?: true;
   refusal?: string;
-} {
+}
+
+/** Ключ TOML для имени сервера: голое имя — как есть, остальное — в кавычках. */
+function tomlKey(name: string): string {
+  return /^[A-Za-z0-9_-]+$/.test(name) ? name : JSON.stringify(name);
+}
+
+/** `-c mcp_servers.<имя>.enabled=false` на каждое имя; битое значение — ничего. */
+function mcpOffArgs(raw: string): string[] {
+  let names: unknown;
+  try {
+    names = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(names)) return [];
+  return names
+    .filter((name): name is string => typeof name === 'string' && name.length > 0)
+    .flatMap((name) => ['-c', `mcp_servers.${tomlKey(name)}.enabled=false`]);
+}
+
+function withOverlays(
+  args: readonly string[],
+  env: Record<string, string> | undefined,
+  surface: 'exec' | 'appServer',
+): CodexKitRun {
   const kitFile = env?.[CODEX_KIT_ENV];
   const groupFile = env?.[CODEX_GROUP_ENV];
   if (!env || (kitFile === undefined && groupFile === undefined)) {

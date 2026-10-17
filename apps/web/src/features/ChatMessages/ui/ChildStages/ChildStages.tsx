@@ -4,6 +4,7 @@ import { Typography } from '@shared/ui/typography';
 import { useTickingNow } from '../../lib/useTickingNow';
 import { SplitOverlapPanel } from '../SplitOverlapPanel/SplitOverlapPanel';
 import { PlanCancel } from '../PlanCancel/PlanCancel';
+import { StatusAsk } from '../StatusAsk/StatusAsk';
 import { SplitTasksMove } from '../SplitTasksMove/SplitTasksMove';
 import { HubSummary } from '../HubSummary/HubSummary';
 import { RetiredChats } from '../RetiredChats/RetiredChats';
@@ -142,6 +143,10 @@ export function ChildStages({
       </div>
 
       <HubSummary groups={live} now={now} />
+
+      {/* Вопрос о ходе групп — в лёгкий чат со сводкой, а не в родителя (5.1).
+          Только у Claude: лёгкий чат заводит реестр прогонов Claude. */}
+      {split && !foreign && <StatusAsk parentChatId={split.parentChatId} onOpen={onOpen} />}
 
       {/* Карточки групп — с отступом друг от друга: кнопки каждой живут в её
           карточке и не читаются кнопками соседней (владелец 05.10). */}

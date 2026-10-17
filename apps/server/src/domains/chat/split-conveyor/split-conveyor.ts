@@ -3,6 +3,7 @@ import {
   scanSplitPlanBlocks,
   triageStagePrompt,
   type PredecessorNote,
+  type SplitPlan,
   type TriageGroupCatalogEntry,
 } from '@agentdeck/contracts/split-plan';
 import { safeBranchName, type TaskSplitResult } from '@agentdeck/contracts/task-split';
@@ -40,6 +41,7 @@ import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
 import type { RunFinished } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import type { SplitGroupContext } from '../ChatSplit/ChatSplit.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
+import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
 import type { GroupTestsVerdict } from '../tests-gate/tests-gate.ts';
 import { normalizePath } from '../../project-runner/targets.ts';
 import { localizeText, matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
@@ -353,6 +355,46 @@ export function interruptResumePrompt(branch: string): string {
   ].join('\n');
 }
 
+/** Продолжение группы после её просьбы о сервере вне профиля (1.2). */
+export function mcpConnectedPrompt(servers: readonly string[], branch: string): string {
+  return [
+    `The panel connected the MCP server(s) you asked for: ${servers.join(', ')}. ` +
+      'A name that is not in the MCP settings stays unavailable — then go on without it.',
+    `Continue from where you stopped on the branch ${branch}.`,
+  ].join('\n');
+}
+
+/**
+ * Подготовка и заметки разбора уходят в задание каждой группы, тетрадь, state.json
+ * и хаб. «Без самих секретов» в задании разбора — только просьба: пароль, который
+ * разбор всё же вписал, маскируется здесь, до первой записи (ревью B1-F16).
+ */
+function maskPlanSecrets(plan: SplitPlan): SplitPlan {
+  return {
+    ...plan,
+    groups: plan.groups.map((group) => ({
+      ...group,
+      ...(group.notes ? { notes: maskSecretsInText(group.notes) } : {}),
+      ...(group.map ? { map: maskSecretsInText(group.map) } : {}),
+    })),
+    ...(plan.setup ? { setup: maskSecretsInText(plan.setup) } : {}),
+  };
+}
+
+/** Предложения тикетов и шагов человеку копятся через ходы, без повторов (95b). */
+function collectProposals(group: SplitPlanGroupRecord, outcome: ChainOutcome, now: Date): void {
+  if (outcome.tickets?.length) {
+    group.tickets = mergeSplitTickets(group.tickets, outcome.tickets, now.toISOString());
+  }
+  if (outcome.humanSteps?.length) {
+    group.humanSteps = mergeSplitHumanSteps(
+      group.humanSteps,
+      outcome.humanSteps,
+      now.toISOString(),
+    );
+  }
+}
+
 /**
  * Пауза между продолжениями групп после сброса лимита (журнал 89): разом они
  * снова упёрлись бы в только что открывшийся лимит.
@@ -387,6 +429,19 @@ const PAUSABLE: readonly SplitPlanGroupRecord['status'][] = ['started', 'backgro
  * пока доработают остальные. Остановка в чате её не касается — чата у неё нет.
  */
 const PAUSABLE_BY_HUB: readonly SplitPlanGroupRecord['status'][] = [...PAUSABLE, 'pending'];
+
+/** Любой статус: профилю запуска группа нужна и на продолжении после «готово». */
+const ALL_GROUP_STATUSES: readonly SplitPlanGroupRecord['status'][] = [
+  'pending',
+  'waiting',
+  'held',
+  'started',
+  'awaiting',
+  'background',
+  'paused',
+  'done',
+  'failed',
+];
 
 /**
  * Группа хоть раз стартовала — на паузе она держит своё место (живой прогон
@@ -436,6 +491,8 @@ export interface ChainOutcome {
   sieveRows?: SieveReportRow[];
   /** Сита, выученные группой по тредам её MR, — ещё не проверенные. */
   learnedSieves?: LearnedSieveRow[];
+  /** MCP-серверы вне профиля, которые группа попросила блоком `mcp` (1.2). */
+  mcpRequests?: string[];
 }
 
 export interface SplitBeginInput {
@@ -634,7 +691,8 @@ export class SplitConveyor {
     const at = this.now().toISOString();
     const titles = record.proposal.groups.map((group) => group.title);
     const scan = finished.ok ? scanSplitPlanBlocks(finished.text, titles) : undefined;
-    const applied = scan?.plan ? applySplitPlan(record.proposal.groups, scan.plan) : undefined;
+    const plan = scan?.plan ? maskPlanSecrets(scan.plan) : undefined;
+    const applied = plan ? applySplitPlan(record.proposal.groups, plan) : undefined;
     /** Группы панели, выбранные разбором, — строкой ««группа» → набор» на каждую. */
     const picks: string[] = [];
 
@@ -820,6 +878,16 @@ export class SplitConveyor {
     );
     if (sieveRows.length > 0) group.sieveRows = sieveRows;
     if (outcome.learnedSieves?.length) this.learnSieves(record, group, outcome.learnedSieves);
+    // Просьба о сервере вне профиля (1.2): сервер заносится в профиль. Ход, который
+    // больше ничего не ждёт, — не итог: группа ждала инструмента, и та же сессия
+    // продолжает следующим ходом. Вопрос человеку, фоновая команда или названный MR
+    // судятся как обычно, а сервер приедет со следующим ходом — продолжение их
+    // проглотило бы (ревью B1-F13/A1-F15).
+    const fresh =
+      outcome.status === 'failed' ? [] : this.addMcp(record, group, outcome.mcpRequests);
+    if (fresh.length > 0 && outcome.status === 'done' && !outcome.mr) {
+      if (this.resumeWithMcp(record, group, fresh, outcome)) return;
+    }
     // «Без правок» сказано о последнем звене, а итог — о группе: ревью-звено,
     // заведённое после её коммитов, писало «без правок» ветке с двумя коммитами.
     const ownWork =
@@ -854,6 +922,69 @@ export class SplitConveyor {
       return;
     }
     this.settle(record, group, outcome);
+  }
+
+  /**
+   * Новые серверы из просьбы группы — в `mcpExtra`; возвращает новые. Уже
+   * подключённый сервер новым не считается: иначе агент, попросивший имя,
+   * которого нет в настройках, ходил бы по кругу продолжений.
+   */
+  private addMcp(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    requests: readonly string[] | undefined,
+  ): string[] {
+    const known = new Set(group.mcpExtra ?? []);
+    const fresh = (requests ?? []).filter((name) => !known.has(name));
+    if (fresh.length === 0) return [];
+    group.mcpExtra = [...known, ...fresh];
+    this.deps.store.set(record);
+    return fresh;
+  }
+
+  /**
+   * Ход продолжения с новыми серверами. Тикеты и шаги человеку из того же хода
+   * сохраняются до него — иначе пропали бы вместе с несуженным итогом. Продолжение
+   * не приняли — ход судится как обычно, а сервер приедет со следующим ходом.
+   */
+  private resumeWithMcp(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    fresh: readonly string[],
+    outcome: ChainOutcome,
+  ): boolean {
+    if (!this.deps.resume || !group.chatId || !group.path) return false;
+    collectProposals(group, outcome, this.now());
+    this.deps.store.set(record);
+    const prompt = this.withIdentity(record, group, mcpConnectedPrompt(fresh, group.branch));
+    if (this.deps.resume(group, prompt) !== 'refused') return true;
+    this.deps.log(`split conveyor: group «${group.title}» MCP resume refused`);
+    return false;
+  }
+
+  /**
+   * Что профиль запуска группы знает о ней (1.2): текст задач — по нему решается,
+   * нужны ли макеты, — и серверы, которые она уже попросила. Не группа — пусто.
+   */
+  profileInput(
+    link: ChatLink,
+  ): { tasksText: string; extra: string[]; projectPath: string } | undefined {
+    const record = this.deps.store.get(link.parentChatId);
+    if (!record) return undefined;
+    const group = this.groupOf(record, link, ALL_GROUP_STATUSES);
+    if (!group) return undefined;
+    const proposal = record.proposal.groups[group.index];
+    const tasksText = [
+      group.title,
+      ...(proposal?.tasks ?? []),
+      proposal?.brief,
+      proposal?.notes,
+      record.proposal.shared,
+      group.holdAnswer,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join('\n');
+    return { tasksText, extra: group.mcpExtra ?? [], projectPath: record.projectPath };
   }
 
   /**
@@ -915,17 +1046,7 @@ export class SplitConveyor {
     // Срок сброса лимита — только у хода, упёршегося в лимит (журнал 89).
     if (outcome.waitingFor === 'limit' && outcome.limitUntil) group.limitUntil = outcome.limitUntil;
     else delete group.limitUntil;
-    // Предложения тикетов копятся через ходы, без повторов (95b).
-    if (outcome.tickets?.length) {
-      group.tickets = mergeSplitTickets(group.tickets, outcome.tickets, this.now().toISOString());
-    }
-    if (outcome.humanSteps?.length) {
-      group.humanSteps = mergeSplitHumanSteps(
-        group.humanSteps,
-        outcome.humanSteps,
-        this.now().toISOString(),
-      );
-    }
+    collectProposals(group, outcome, this.now());
   }
 
   /** Итог хода принят: записать, освободить место, отпустить ждавших. */

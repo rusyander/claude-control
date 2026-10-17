@@ -22,6 +22,8 @@ import { readOwnerRequest } from '../../domains/chat/owner-request/owner-request
 import { projectsDir } from './paths.ts';
 import { createSplitLauncher, splitChatRefusal, type SplitLaunchDeps } from './split-launch.ts';
 import { registerSplitControlRoutes, stopChatKey } from './split-control-routes.ts';
+import { registerSplitStatusRoutes } from './split-status-routes.ts';
+import type { StatusChats } from '../../domains/chat/status-chats/status-chats.ts';
 import { codeOf, coded } from '../../lib/server-text/server-text.ts';
 import { removeGroupCopy } from '../../domains/chat/split-cleanup.ts';
 import { splitRootOf } from '../../domains/project-git/project-git.ts';
@@ -79,6 +81,8 @@ export function registerChatSplitRoutes(
     tasks?: SplitTaskTracker;
     /** Записанные вопросы деревьев: отмена плана снимает вопросы его групп. */
     asks?: Pick<PendingAsks, 'forget'>;
+    /** Лёгкие чаты вопросов о ходе групп (5.1); нет — ручка отвечает 404. */
+    statusChats?: StatusChats;
   },
 ): void {
   const tracker =
@@ -776,6 +780,8 @@ export function registerChatSplitRoutes(
 
   // Пауза, продолжение с паузы, «запустить сейчас» (журнал 81, 89).
   registerSplitControlRoutes(app, ctx, deps);
+  // Вопрос о ходе групп — в лёгкий чат, а не в родителя (5.1).
+  registerSplitStatusRoutes(app, ctx, deps);
 }
 
 /** Отказ запуска — текстом и кодом: клиент переводит код, лог читает текст. */

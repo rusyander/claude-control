@@ -7,6 +7,7 @@ import type { ProviderChatMessage } from '@agentdeck/contracts';
 import { getProvider } from '../../../providers/registry.ts';
 import { setStoredKey } from '../../../lib/provider-keys/provider-keys.ts';
 import { ProviderChatRun, type ProviderChatRunEvent } from './ProviderChatRun.ts';
+import { MAX_PROMPT_CHARS } from '../prompt/prompt.ts';
 
 /**
  * Один ответ чужого провайдера. Ни настоящего CLI, ни сети: spawn и fetch
@@ -21,18 +22,19 @@ const noCli = (): boolean => false;
 /** Фейковый CLI: печатает заданные куски и закрывается. */
 function fakeSpawn(options: { chunks?: string[]; stderr?: string; code?: number }) {
   const handles: { kill: () => void }[] = [];
+  const stdin: string[] = [];
 
   const fn = (() => {
     const child = new EventEmitter() as EventEmitter & {
       stdout: EventEmitter;
       stderr: EventEmitter;
-      stdin: { write: () => void; end: () => void; on: () => void };
+      stdin: { write: (chunk: string) => void; end: () => void; on: () => void };
       kill: () => void;
       pid?: number;
     };
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
-    child.stdin = { write: () => {}, end: () => {}, on: () => {} };
+    child.stdin = { write: (chunk) => stdin.push(chunk), end: () => {}, on: () => {} };
     child.kill = () => child.emit('close', null);
     handles.push(child);
 
@@ -47,7 +49,7 @@ function fakeSpawn(options: { chunks?: string[]; stderr?: string; code?: number 
     return child;
   }) as unknown as Parameters<ProviderChatRun['start']>[0]['spawnImpl'];
 
-  return { fn, handles };
+  return { fn, handles, stdin };
 }
 
 /**
@@ -255,7 +257,26 @@ process.stdin.on('end', () => {
     expect(line).toContain('exec');
     expect(line).toContain('-m gpt-5.3-codex-spark');
     expect(line).toContain('model_reasoning_effort=medium');
-    expect(line).toContain('Вопрос');
+    // Задание Codex — в stdin, в командной строке только «-» (`oneShotStdin`).
+    // На Windows с одной .cmd-обёрткой argv — одна строка для cmd.exe.
+    expect(line).toMatch(/\s-"?$/);
+    expect(line).not.toContain('Вопрос');
+    expect(spawn.stdin.join('')).toContain('Вопрос');
+  });
+
+  /** Ревью B2-F17: предел argv отказывал заданию, которое едет в stdin. */
+  it('задание длиннее предела командной строки уезжает в stdin Codex целиком', async () => {
+    const spawn = fakeSpawn({ chunks: ['ок'] });
+    const long = `Навык: ${'я'.repeat(MAX_PROMPT_CHARS * 3)} КОНЕЦ`;
+
+    const events = await collect('codex', {
+      detect: yesCli,
+      spawnImpl: spawn.fn,
+      history: history(long),
+    });
+
+    expect(events.find((event) => event.type === 'error')).toBeUndefined();
+    expect(spawn.stdin.join('')).toContain(long);
   });
 
   it('без подбора командная строка остаётся прежней', async () => {

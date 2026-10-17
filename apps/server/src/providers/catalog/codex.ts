@@ -119,8 +119,13 @@ export const codexProvider: ConfigProvider = {
     // неё, и `"high"` приехало бы в значение вместе с кавычками.
     //
     // Опции идут ДО позиционного промпта — так описан сам вызов
-    // (`codex exec [OPTIONS] [PROMPT]`), и промпт остаётся отдельным элементом.
-    oneShotArgs: (prompt, run) => [
+    // (`codex exec [OPTIONS] [PROMPT]`). Промпт — `-`, сам текст едет в stdin
+    // (`oneShotStdin`; справочник CLI: «Use `-` to pipe the prompt from stdin»):
+    // набор панели в `-c developer_instructions` (до 24 тыс.) и задание (до 24 тыс.)
+    // вместе не влезают в командную строку Windows (32 767) — живой прогон 17.10
+    // падал `spawn ENAMETOOLONG` на 32,6 тыс.
+    oneShotStdin: true,
+    oneShotArgs: (_prompt, run) => [
       'exec',
       ...(run?.model ? ['-m', run.model] : []),
       ...(CODEX_EFFORTS.includes(run?.effort ?? '')
@@ -132,7 +137,7 @@ export const codexProvider: ConfigProvider = {
       ...(run?.allowEdits === undefined
         ? []
         : ['--sandbox', run.allowEdits ? 'workspace-write' : 'read-only']),
-      prompt,
+      '-',
     ],
     // В1: `codex app-server` (`turn/steer`, ≥ 0.99) — сообщение посреди хода уходит в тот же ход.
     liveServer: 'codex-app-server',

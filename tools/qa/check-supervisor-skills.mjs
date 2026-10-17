@@ -80,7 +80,7 @@ setTimeout(finish, 300);
  *
  * `damage` — порча, которой пользуется только самопроверка:
  *  - `body-in-argv` кладёт тело скилла прямо в реплику, то есть ровно в тот
- *    канал, который здесь запрещён;
+ *    канал, который здесь запрещён (запрос: argv или, у Codex, stdin);
  *  - `no-expand` отключает разворачивание команды перед записью реплики.
  */
 const DRIVER = `
@@ -248,13 +248,16 @@ async function probe(dir, label, damage) {
     // Переписка здесь — единственный свидетель: если процесс не поднялся, в ней
     // лежит причина, и молчать о ней значило бы прятать настоящую поломку.
     problems.push(
-      `запущенный процесс не оставил сброса: ${error.message}; переписка: ${JSON.stringify(chat.messages ?? []).slice(0, 600)}`,
+      `запущенный процесс не оставил сброса: ${error.message}; переписка: ${JSON.stringify(chat.messages ?? []).slice(-600)}`,
     );
     return problems;
   }
 
   const argv = dump.argv ?? [];
   const argvText = argv.join('\n');
+  // Доехавшее до цели — аргументы И stdin: Codex получает запрос через stdin
+  // (`oneShotStdin`), иначе Windows режет длинную командную строку.
+  const delivered = `${argvText}\n${dump.stdin ?? ''}`;
 
   // ГЛАВНЫЙ ЗАПРЕТ: тела скилла нет ни в одном аргументе и нет в stdin.
   if (argvText.includes(BODY_MARKER)) {
@@ -266,15 +269,15 @@ async function probe(dir, label, damage) {
 
   // Путь до файла, наоборот, доехать ОБЯЗАН: иначе цели нечего читать, и
   // «тела нет в argv» стало бы правдой просто потому, что скилл не приехал вовсе.
-  if (!argvText.includes('deep-review')) {
+  if (!delivered.includes('deep-review')) {
     problems.push('имя скилла не доехало до цели вовсе — читать ей нечего');
   }
-  if (!argvText.includes(bodyPath)) {
+  if (!delivered.includes(bodyPath)) {
     problems.push('путь до файла скилла не доехал: цель не сможет прочитать тело');
   }
 
   // Бюджет каталога: отброшенная по приоритету запись до цели не доезжает.
-  if (argvText.includes(DROPPED_MARKER)) {
+  if (delivered.includes(DROPPED_MARKER)) {
     problems.push('отброшенный по приоритету скилл всё-таки уехал в каталоге');
   }
 
@@ -290,7 +293,7 @@ async function probe(dir, label, damage) {
   if (!seenByHuman) {
     problems.push('развёрнутая команда не попала в переписку — человек не видит, что ушло модели');
   }
-  if (!argvText.includes(COMMAND_MARKER)) {
+  if (!delivered.includes(COMMAND_MARKER)) {
     problems.push('развёрнутая команда не доехала до цели');
   }
 
@@ -304,7 +307,8 @@ try {
     // У каждой порчи СВОЙ след. «Хоть что-нибудь покраснело» засчитывало бы
     // порчу соседней проверке, а та, ради которой её вносят, молчала бы.
     const cases = [
-      ['body-in-argv', 'тело скилла отправлено аргументом', 'тело скилла уехало аргументом'],
+      // Тело в реплике едет туда же, куда запрос: у Codex это stdin, а не argv.
+      ['body-in-argv', 'тело скилла отправлено в запросе', 'тело скилла уехало'],
       ['no-expand', 'команда не развёрнута до записи реплики', 'не попала в переписку'],
     ];
     let missed = 0;
@@ -315,6 +319,7 @@ try {
         console.error(
           `Самопроверка: «${title}» не поймана по следу «${trace}» (покраснело ${problems.length}).`,
         );
+        for (const problem of problems) console.error(`    · ${problem}`);
         missed += 1;
       } else {
         console.log(`Самопроверка: «${title}» замечена по следу «${trace}» (${hit.length}).`);

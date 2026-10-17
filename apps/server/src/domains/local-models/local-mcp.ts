@@ -38,8 +38,11 @@ export interface McpSourceEntry {
 
 /** Откуда серверы и как их опросить; подменяется в проверках. */
 export interface LocalMcpSource {
-  /** Включённые серверы, доступные запуску проекта: пользовательские и проектного `.mcp.json` (проектный сильнее). */
-  list(project: string): McpSourceEntry[];
+  /**
+   * Включённые серверы, доступные запуску проекта: пользовательские и проектного `.mcp.json` (проектный сильнее).
+   * `approvedOnly` — из `.mcp.json` только те, что человек одобрил для этого проекта в Claude Code.
+   */
+  list(project: string, options?: { approvedOnly?: boolean }): McpSourceEntry[];
   /** Подключиться и спросить `tools/list`. Бросает, если сервер не ответил. */
   tools(entry: McpSourceEntry): Promise<McpToolDef[]>;
 }

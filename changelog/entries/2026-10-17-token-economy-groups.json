@@ -1,0 +1,146 @@
+{
+  "title": {
+    "ru": "Группы разделения тратят меньше окна на ту же работу: короче постоянная часть каждого вызова, меньше повторных поисков и прогонов",
+    "en": "Split groups spend less of the window on the same work: a shorter fixed part of every call, fewer repeated searches and runs"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Вопрос о ходе групп задаётся прямо в хабе разделения: отвечает новый лёгкий чат по сводке групп, без MCP, командной строки, права на правки и описаний личных навыков. Родительский чат с его длинной историей на такой вопрос больше не тратится; написать самому родителю можно, как прежде, полем ввода внизу.",
+        "en": "A question about the groups' progress is asked right in the split hub: a new light chat answers from the groups' summary, without MCP, a shell, the right to edit or descriptions of personal skills. The parent chat with its long history is no longer spent on such a question; the parent can still be written to through the input at the bottom."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Постоянная часть каждого вызова группы стала короче: сжатое задание группы, лёгкий набор MCP (серверы, нужные задаче, а не все подключённые), перечень навыков вместо их полных описаний и короткая системная дописка с правилом расхода. Ни проверка, ни ревью, ни снимок не убраны: урезанное агент получает сам, когда оно понадобилось.",
+        "en": "The fixed part of every group call got shorter: a condensed group task, a light MCP set (the servers the task needs rather than every connected one), a list of skills instead of their full descriptions and a short system addendum with the spend rule. No check, review or screenshot was removed: the agent fetches what was trimmed when it needs it."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Разбор при разделении ищет места один раз за всех. Каждая группа получает карту: файлы и строки, где меняется код, кто его вызывает, образец и команды проверки. Все сразу получают общую подготовку: запуск и проверку проекта, порты, адрес стенда и способ входа, без самого пароля. План и работа начинают с названных мест и ищут только неназванное.",
+        "en": "Split triage looks up the places once for everyone. Each group gets a map: the files and lines where code changes, their callers, a pattern to follow and the check commands. All of them get a shared setup: how to run and check the project, ports, the stand address and how to sign in, without the password itself. Plan and work start from the named places and search only for what is not named."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Тетрадь задачи: при старте группы в её копии заводится файл заметок с картой и подготовкой. Агент дописывает туда найденное по ходу и читает его до повторного поиска, а после сжатия разговора резюме называет путь к тетради. В коммит тетрадь не попадает, повторный старт группы её не затирает.",
+        "en": "Task notebook: when a group starts, a notes file with the map and setup is created in its copy. The agent appends what it finds along the way and reads it before searching again, and after the conversation is compacted the summary names the notebook's path. The notebook never reaches a commit, and restarting the group does not overwrite it."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Тяжёлые шаги групп в Claude Code и Qwen Code — гейты и наборы тестов — идут на машине по очереди: группа ждёт, пока чужой гейт закончит, а не делит с ним машину. Четыре группы, гонявшие гейты разом, получали таймауты тестов и повторные прогоны; при этом прежняя очередь видела лишь 8 % их тяжёлого времени — гейты проектов зовутся своими скриптами. Теперь команда, хоть раз шедшая дольше полутора минут, встаёт в очередь из любой копии (на тех же прогонах — 89 % тяжёлого времени), ставшая быстрой из неё уходит, а прогон одного файла или папки тестов идёт мимо. Гейт, который CLI сам увёл в фон по таймауту, держит место на ожидаемое время прогона, а отклонённый хуком человека отдаёт его со следующей командой группы. Сама команда не переписывается.",
+        "en": "Heavy steps of Claude Code and Qwen Code groups — gates and test suites — take turns on the machine: a group waits for another group's gate to finish instead of sharing the machine with it. Four groups running gates at once got test timeouts and repeated runs, while the old queue saw only 8% of their heavy time — project gates are called by their own scripts. Now a command that once ran longer than a minute and a half joins the queue from any copy (89% of the heavy time on the same runs), one that became fast leaves it, and a run of one test file or folder bypasses it. A gate the CLI moved to the background on timeout keeps its slot for the expected run time, and one refused by the user's hook frees it with the group's next command. The command itself is not rewritten."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Потолок таймаута команды у группы в Claude Code — 30 минут вместо 10. Под нагрузкой гейт шёл дольше десяти минут, CLI уводил его в фон, и агент ждал конца опросами со `sleep` — каждый опрос перечитывал весь разговор. Теперь полный гейт агент запускает с таймаутом 30 минут и ждёт одним вызовом; потолок выше, заданный в настройках, остаётся.",
+        "en": "A Claude Code group's command timeout ceiling is 30 minutes instead of 10. Under load a gate ran past ten minutes, the CLI moved it to the background, and the agent waited for the end by polling with `sleep` — each poll re-reading the whole conversation. The agent now starts a full gate with a 30-minute timeout and waits in one call; a higher ceiling set in the settings stays."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Копия, чей каталог подключался к `node_modules` оригинала ссылкой, получала неполные пакеты, если в оригинале не было установлено что-то из его же `package.json`: сборка в копии была красной до ручной установки. Такой каталог теперь ссылкой не подключается — у npm он сеется из оригинала с доустановкой недостающего.",
+        "en": "A copy whose folder was linked to the original's `node_modules` got incomplete packages when the original lacked something its own `package.json` requires: the build in the copy was red until a manual install. Such a folder is no longer linked — with npm it is seeded from the original and the missing packages are installed."
+      },
+      "area": { "ru": "Копии", "en": "Copies" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Ответы трекера короче: в группах Claude Code запись отвечает одной строкой, а списки задач с доски и из поиска приходят без описаний и группам, и обычному чату, пока включено предложение разделения (на три задачи ~310 знаков вместо ~14,8 тыс.). Ревьюеры получают пакет ревью одним файлом и читают дифф один раз вместо 5–14 повторов. В задании группы — готовая команда снимков проекта.",
+        "en": "Tracker replies are shorter: in Claude Code groups a write answers in one line, and task lists from a board or a search come without descriptions to groups and to an ordinary chat alike while split proposals are on (~310 characters instead of ~14.8 thousand for three tasks). Reviewers get the review package as one file and read the diff once instead of 5–14 times. The group task carries the project's ready screenshot command."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Группа получает правило, что сохранить при сжатии разговора: журнал этапов (сделано, текущий, следующий), решения с причинами, точные пути и команды, доступ к стенду, путь к тетради и открытые падения. Рычаг раннего окна сжатия заведён, но выключен, пока сравнение на настоящем прогоне не покажет выигрыш.",
+        "en": "A group gets a rule on what to keep when the conversation is compacted: the stage ledger (done, current, next), decisions with their reasons, exact paths and commands, stand access, the notebook path and open failures. The early compaction window lever exists but stays off until a comparison on a real run shows a gain."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "`tests-cli run` в группе печатает короткий итог вместо полного журнала. Зелёный итог запоминается вместе с содержимым дерева: та же команда на неизменном коде отвечает из памяти, без прогона. Любая правка, новый файл или коммит гонят по-настоящему, красный итог не запоминается, проверки по стенду идут всегда, `--fresh` гонит в любом случае. Ответ из памяти виден в истории тестов своей записью; файлы, которые git игнорирует, память не видит. Человек и CI по умолчанию гоняют как раньше.",
+        "en": "`tests-cli run` in a group prints a short result instead of the full log. A green result is remembered together with the tree content: the same command on unchanged code answers from memory, without a run. Any edit, new file or commit runs for real, a red result is not remembered, stand checks always run, `--fresh` runs regardless. An answer from memory shows in the test history as its own record; files git ignores are invisible to the memory. People and CI run as before by default."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Шлюз конца хода больше не требует кейс за неотслеживаемые подсобные скрипты хода (снимки, пробы, воспроизведения); отслеживаемый скрипт и тест по-прежнему считаются кодом. `case` с id, которого в группе нет, больше не падает с ошибкой: заводит новый кейс и называет его номер.",
+        "en": "The end-of-turn gate no longer asks for a case for a turn's untracked helper scripts (screenshots, probes, repros); a tracked script and a test still count as code. `case` with an id the group does not have no longer fails: it creates a new case and names its id."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группы в Codex и Qwen Code получают то же, что в Claude, там, где CLI это позволяет: сжатое задание, правило расхода, короткий вывод проверок, лёгкий набор MCP и, у Codex, тот же порог сжатия. Qwen Code в панели больше не просит модель угадать следующую реплику после каждого хода, а группам выключена его авто-память: фоновых вызовов на прогон стало 2 вместо 15.",
+        "en": "Groups in Codex and Qwen Code get the same as in Claude wherever the CLI allows it: the condensed task, the spend rule, short check output, the light MCP set and, for Codex, the same compaction threshold. Qwen Code in the panel no longer asks the model to guess the next reply after every turn, and its auto-memory is off for groups: background calls per run dropped from 15 to 2."
+      },
+      "area": { "ru": "Чужие CLI", "en": "Foreign CLIs" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Разговор в Codex на Windows падал с `spawn ENAMETOOLONG`, когда набор панели и задание вместе не помещались в командную строку. Задание теперь передаётся через стандартный ввод.",
+        "en": "A Codex conversation on Windows failed with `spawn ENAMETOOLONG` when the panel kit and the task together did not fit the command line. The task is now passed through standard input."
+      },
+      "area": { "ru": "Чужие CLI", "en": "Foreign CLIs" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Измеритель расхода: `pnpm tokens --split <id>` раскладывает прогон разделения по группам и видам шагов, `--compare` сравнивает его с эталоном. Группы в Codex и Qwen Code считаются по их собственным журналам; журнал, который нельзя однозначно отнести к группе, не засчитывается никому и называется в выводе.",
+        "en": "Spend meter: `pnpm tokens --split <id>` breaks a split run down by groups and kinds of steps, `--compare` sets it against a baseline. Groups in Codex and Qwen Code are counted from their own logs; a log that cannot be attributed to one group unambiguously counts for nobody and is named in the output."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "internal",
+      "text": {
+        "ru": "Тесты-потолки на всё, что панель дописывает в каждый вызов группы: длина задания, системной дописки и правил в чужих CLI, число описанных служебных навыков панели и серверов. Новая фраза в преамбуле краснит сборку, пока потолок не поднят осознанно.",
+        "en": "Ceiling tests on everything the panel adds to every group call: the length of the task, the system addendum and the rules in foreign CLIs, the number of the panel's own described skills and of servers. A new phrase in the preamble turns the build red until the ceiling is raised on purpose."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: спросить о ходе групп можно только у родительского чата",
+        "en": "Before: the groups' progress could only be asked of the parent chat"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: поле «Спросить о ходе групп» в хабе — отвечает лёгкий чат по сводке",
+        "en": "After: the «Ask about the groups' progress» field in the hub — a light chat answers from the summary"
+      }
+    }
+  ]
+}

@@ -982,6 +982,14 @@ export interface SplitPlanView {
   cancelledAt?: string;
 }
 
+/**
+ * Вопрос о ходе групп из хаба (5.1 плана экономии): заведён лёгкий чат со
+ * сводкой групп, вопрос — его первый ход. Родителя вопрос не трогает.
+ */
+export interface SplitStatusAsked {
+  chatId: string;
+}
+
 /** Итог «Отменить план»: сколько прогонов остановлено и сколько групп закрыто. */
 export interface SplitPlanCancelled {
   stopped: number;

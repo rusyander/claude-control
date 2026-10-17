@@ -500,4 +500,39 @@ describe('генерация с кодом тестов', () => {
     // Нет прав на команды — честное «не могу» и команда человеку.
     expect(line).toContain('hand the user the exact command');
   });
+
+  /**
+   * Группа разделения (1.4): вопрос на старте противоречил бы её правилу «спрашивай
+   * только необратимое», а оговорка про команды — не про Claude в авторежиме.
+   * Остальное — кейсы, стандарт, запись, прогон — то же слово в слово.
+   */
+  it('строка группы: без вопроса на старте и оговорки про команды, правила кейсов те же', () => {
+    const input = {
+      root: '/work/app',
+      folder: { state: 'missing', framework: 'unknown', specs: 0, excluded: false, git: false },
+      cliPath: '/cli.mjs',
+      hasStandUrl: false,
+      automation: { command: 'go test {packages}' },
+    } as const;
+    const chat = e2eChatLine(input);
+    const group = e2eChatLine({ ...input, group: true });
+    expect(group).not.toContain('Ask the user once');
+    expect(group).not.toContain('hand the user the exact command');
+    expect(group).toContain('Take the stand, credentials and key flows from the group task');
+    for (const kept of [
+      'go test {packages}',
+      'node "/cli.mjs" run --project "/work/app"',
+      'node "/cli.mjs" case --project "/work/app"',
+      'node "/cli.mjs" record --project "/work/app"',
+      'Never call the work tested without a recorded run.',
+      'never a reason to weaken it',
+    ]) {
+      expect(group, kept).toContain(kept);
+      expect(chat, kept).toContain(kept);
+    }
+    expect(group.length).toBeLessThan(chat.length - 250);
+    const folderless = e2eChatLine({ ...input, automation: undefined, group: true });
+    expect(folderless).toContain('do not create one: keep tests in the checks the project');
+    expect(folderless).not.toContain('one question below');
+  });
 });

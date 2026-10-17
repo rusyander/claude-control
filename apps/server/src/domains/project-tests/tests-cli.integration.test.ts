@@ -306,6 +306,28 @@ test.describe('Вход', () => {
     expect(history[0]?.scope).toContain('tests-cli run: npx --no-install playwright test');
   });
 
+  /**
+   * Память проверок (9.3) папку e2e не берёт: тесты идут по стенду, а стенд
+   * меняется без единой правки в файлах — зелёный вчерашнего стенда не ответ.
+   */
+  it('папка e2e по стенду гоняется каждый раз, даже с --memo на том же дереве', () => {
+    markRunnerInstalled(join(project, 'e2e'), 'playwright');
+    setEnv('FAKE_E2E_JUNIT', JUNIT.replace('<failure message="нет ошибки"/>', ''));
+    setEnv('FAKE_E2E_EXIT', '0');
+    const git = (...args: string[]) =>
+      spawnSync('git', ['-c', 'user.email=x@y', '-c', 'user.name=x', ...args], { cwd: project });
+    git('init', '-q', '-b', 'main');
+    git('add', '.');
+    git('commit', '-qm', 'init');
+
+    expect(cli(project, 'run', '--memo').code).toBe(0);
+    const again = cli(project, 'run', '--memo');
+
+    expect(again.code).toBe(0);
+    expect(again.out).not.toContain('Без изменений');
+    expect(readRuns(project)).toHaveLength(2);
+  });
+
   it('раннер не установлен: отказ с командой установки, ничего не запущено', () => {
     const result = cli(project, 'run');
     expect(result.code).toBe(1);
@@ -400,5 +422,49 @@ process.exit(1);
     expect(result.code).toBe(1);
     expect(result.out).toContain('automation.json: В файле команды прогона нет строки «command»');
     expect(readRuns(project)).toHaveLength(0);
+  });
+
+  /**
+   * 2.2 плана экономии: полный вывод прогона в контексте агента группы
+   * перечитывается каждым следующим вызовом. Группе (`AGENTDECK_BRIEF_OUTPUT`,
+   * его ставит панель ребёнку разделения) — итог, первые строки падений и путь
+   * к журналу, где лежит всё; `--full` возвращает прежнее, без метки — как было.
+   */
+  describe('короткий вывод для группы', () => {
+    const NOISY = `${RUNNER.replace('process.exit(1);', '')}
+for (let i = 1; i <= 300; i += 1) console.log('шум строка ' + i);
+console.error('FAIL tools/qa/search.mjs > поиск находит');
+process.exit(1);
+`;
+    const run = (env: Record<string, string>, ...args: string[]) => {
+      const result = spawnSync(process.execPath, [CLI, 'run', ...args, '--project', project], {
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, ...env },
+      });
+      return { code: result.status, out: `${result.stdout}${result.stderr}` };
+    };
+
+    beforeEach(() => writeFileSync(join(project, 'run.mjs'), NOISY));
+
+    it('с меткой группы: итог, строка падения и журнал, где лежит весь вывод', () => {
+      const result = run({ AGENTDECK_BRIEF_OUTPUT: '1' });
+      expect(result.code).toBe(1);
+      expect(result.out).not.toContain('шум строка 150');
+      expect(result.out).toContain('FAIL tools/qa/search.mjs > поиск находит');
+      const log = /Полный вывод \((\d+) строк\): (.+)$/m.exec(result.out);
+      expect(log?.[1]).toBe('301');
+      const text = readFileSync(log?.[2]?.trim() ?? '', 'utf8');
+      expect(text).toContain('шум строка 150');
+      expect(text).toContain('FAIL tools/qa/search.mjs > поиск находит');
+      // Импорт и запись истории — как без метки.
+      expect(readRuns(project)[0]).toMatchObject({ summary: { passed: 1, failed: 1 } });
+    });
+
+    it('--full и прогон без метки печатают всё, как прежде', () => {
+      expect(run({ AGENTDECK_BRIEF_OUTPUT: '1' }, '--full').out).toContain('шум строка 150');
+      expect(run({ AGENTDECK_BRIEF_OUTPUT: '' }).out).toContain('шум строка 150');
+      expect(run({ AGENTDECK_BRIEF_OUTPUT: '' }, '--brief').out).not.toContain('шум строка 150');
+    });
   });
 });

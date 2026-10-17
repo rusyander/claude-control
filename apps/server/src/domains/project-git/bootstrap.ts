@@ -29,6 +29,7 @@ import { prepareNode, realRuntimeDeps, type RuntimeDeps } from './runtimes.ts';
 import {
   LOCKFILES,
   NPM_SEEDED_INSTALL,
+  missingPackages,
   seedNodeModules,
   seedSourceFor,
   selfContained,
@@ -364,13 +365,22 @@ async function preparedInstall(
   if (!source) return INSTALL[manager];
   const target = join(dir, cwd, 'node_modules');
   if (await selfContained(source)) {
-    try {
-      await shareNodeModules(source, target);
-      write(`${tag}node_modules — ссылка на каталог оригинала, установка не нужна\n`);
-      return undefined;
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      write(`${tag}ссылка на node_modules оригинала не вышла (${reason})\n`);
+    // После ссылки установки нет: неполное дерево оригинала стало бы деревом копии.
+    const missing = await missingPackages(source, manager);
+    if (missing.length > 0) {
+      const named = missing.slice(0, 3).join(', ') + (missing.length > 3 ? ', …' : '');
+      write(
+        `${tag}в node_modules оригинала недостаёт пакетов или они не той версии (${named}) — ссылкой не подключаем\n`,
+      );
+    } else {
+      try {
+        await shareNodeModules(source, target);
+        write(`${tag}node_modules — ссылка на каталог оригинала, установка не нужна\n`);
+        return undefined;
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        write(`${tag}ссылка на node_modules оригинала не вышла (${reason})\n`);
+      }
     }
   }
   if (manager !== 'npm') return INSTALL[manager];

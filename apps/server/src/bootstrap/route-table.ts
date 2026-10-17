@@ -98,6 +98,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     treePause,
     pendingAsks,
     splitConveyor,
+    statusChats,
     splitOverlap,
     splitReview,
     recheckMr,
@@ -207,8 +208,13 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       registerKitRoutes(instance, context, kit, () => events.broadcast(['kit'], '')),
     registerProjectFilesRoutes,
     (instance, context) =>
-      registerChatRoutes(instance, context, chatRuns, chatSession, (chatId) =>
-        treePause.awaitsHuman(chatId),
+      registerChatRoutes(
+        instance,
+        context,
+        chatRuns,
+        chatSession,
+        (chatId) => treePause.awaitsHuman(chatId),
+        (chatId) => statusChats.assignedOf(chatId),
       ),
     // Правило «подбирать модель под задачу»: одно положение на проект, без
     // зависимостей — ни реестр прогонов, ни сессия ему не нужны.
@@ -225,6 +231,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         session: chatSession,
         gate: treePause,
         conveyor: splitConveyor,
+        statusChats,
         overlap: splitOverlap,
         review: splitReview,
         recheckMr,

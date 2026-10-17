@@ -322,6 +322,11 @@ export const SPLIT_SYSTEM_PROMPT =
   'it touches; a list of files, of steps of one piece of work or of items of one refactoring does ' +
   'not count as tasks. Propose at most once per conversation: declined or ignored — keep working ' +
   'yourself and do not ask again until asked. ' +
+  // Разбор доски перед разделением (замер 16.10.2026) читал поиск и доску с
+  // описанием каждой задачи — 190 тыс. знаков, перечитанных каждым следующим
+  // вызовом. Чтобы раскидать задачи по группам, хватает заголовков и статусов.
+  'Choosing tasks from a tracker board or search, list them with titles and statuses first and ' +
+  'read the description only of the tasks you put into groups. ' +
   'Group the tasks so that the groups do not overlap in files, ' +
   `and output EXACTLY ONE code block in the language ${SPLIT_BLOCK_LANG} containing JSON of the form ` +
   '{"shared":"context common to all","groups":[{"title":"name","branch":"feature/name",' +
@@ -775,6 +780,11 @@ export interface EnvironmentPreambleInput {
   mirror?: string;
   /** Итог подготовки копии; нет — команды не было. */
   bootstrap?: WorktreeBootstrapState;
+  /**
+   * Пути группы разделения (`owns`): модули вне них — одной строкой. Нет —
+   * в зоне вся копия.
+   */
+  scope?: string[];
 }
 
 /**
@@ -782,31 +792,117 @@ export interface EnvironmentPreambleInput {
  * T15). Молчаливый запуск на чужой версии стоил группе ревью `npm ci` с кодом
  * 2: агент должен знать, на чём собрана копия и как в ней запускать тесты.
  */
-function runtimeLines(notes: WorktreeRuntimeNote[] | undefined): string[] {
-  const names = { node: 'Node', python: 'Python', go: 'Go' } as const;
-  const lines: string[] = [];
-  for (const note of notes ?? []) {
-    const where = note.where ? ` in ${note.where}/` : '';
-    const head = `${names[note.tool]}${where}: the project asks for ${note.wanted} (${note.source})`;
-    const run = note.run ? ` Run it with: ${note.run}.` : '';
-    const detail = note.detail ? ` ${note.detail}` : '';
-    if (note.status === 'switched') {
-      lines.push(
-        `${head}; the panel prepared the copy on ${note.used}, the machine default is ${note.found ?? 'other'}. Use ${note.used} for installs and runs (put it first in PATH).${run}${detail}`,
-      );
-    } else if (note.status === 'missing') {
-      lines.push(
-        `⚠ ${head}, but no matching version is installed${note.found ? ` (default ${note.found})` : ''}. The copy was NOT prepared on a wrong version${note.tool === 'python' ? ' (no venv was built)' : ''} — say so in the first lines of your answer if the task needs it, and never work around it silently.${detail}`,
-      );
-    } else if (note.status === 'failed') {
-      lines.push(
-        `⚠ ${head}: preparing it failed.${detail} Decide yourself: retry or do without it.`,
-      );
-    } else {
-      lines.push(`${head}: ready on ${note.used ?? 'the default'}.${run}${detail}`);
-    }
+const RUNTIME_NAMES = { node: 'Node', python: 'Python', go: 'Go' } as const;
+
+/** Источник версии без каталога модуля: `cp-auth/go.mod go` → `go.mod go`. */
+function sourceOf(note: WorktreeRuntimeNote): string {
+  return note.where && note.source.startsWith(`${note.where}/`)
+    ? note.source.slice(note.where.length + 1)
+    : note.source;
+}
+
+/** Модули с одинаковой строкой — одна строка со списком модулей. */
+function groupRuntimes(
+  notes: WorktreeRuntimeNote[],
+): Array<{ note: WorktreeRuntimeNote; where: string[] }> {
+  const groups = new Map<string, { note: WorktreeRuntimeNote; where: string[] }>();
+  for (const note of notes) {
+    const key = JSON.stringify([
+      note.tool,
+      note.status,
+      note.wanted,
+      sourceOf(note),
+      note.used,
+      note.found,
+      note.run,
+      note.detail,
+    ]);
+    const group = groups.get(key);
+    if (group) group.where.push(note.where);
+    else groups.set(key, { note, where: [note.where] });
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Путь зоны группы так, как его пишет модель (`./api`, `/api`, `api/**`,
+ * `**\/*.go`, `API`, пояснение после пробела), — в путь от корня копии до
+ * первого шаблона. Пусто — вся копия; `undefined` — путь машины (`C:/…`),
+ * зону по нему не узнать.
+ */
+function zonePath(raw: string): string | undefined {
+  const path = (raw.trim().split(/\s/)[0] ?? '').replace(/\\/g, '/');
+  if (/^[A-Za-z]:\//.test(path)) return undefined;
+  const parts = path.split('/').filter((part) => part !== '' && part !== '.');
+  const glob = parts.findIndex((part) => /[*?[{]/.test(part));
+  return (glob < 0 ? parts : parts.slice(0, glob)).join('/').toLowerCase();
+}
+
+/**
+ * Модуль в зоне группы: корень копии, модуль, внутри которого лежит путь
+ * группы, или модуль внутри её пути. Без зоны в зоне всё — так задание
+ * обычного чата в копии остаётся прежним. Зона, которую не разобрать на путь
+ * (`.`, `*`, `**\/*.go`, путь машины), — тоже вся копия: прежде такая зона
+ * выносила за неё каждый модуль вместе с указаниями «не обходи молча» и
+ * «первым в PATH» (ревью B1-F6).
+ */
+function inScope(where: string, scope: string[] | undefined): boolean {
+  if (!scope || scope.length === 0 || !where) return true;
+  const module = where.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  return scope.some((raw) => {
+    const path = zonePath(raw);
+    if (!path) return true;
+    return path === module || path.startsWith(`${module}/`) || module.startsWith(`${path}/`);
+  });
+}
+
+/**
+ * Строки о средах. Отчёт о большом монорепозитории — по строке на каждый из
+ * ~40 модулей, 9–10 тыс. знаков в задании каждой группы и в каждом её вызове
+ * (замер 16.10.2026). Одинаковые строки склеиваются списком модулей — ни
+ * версия, ни команда запуска не теряются; модули вне зоны группы (`scope`) —
+ * одной строкой: группа их не правит, но версия и команда при ней остаются.
+ */
+function runtimeLines(notes: WorktreeRuntimeNote[] | undefined, scope?: string[]): string[] {
+  const all = notes ?? [];
+  const inside = all.filter((note) => inScope(note.where, scope));
+  const outside = all.filter((note) => !inScope(note.where, scope));
+  const lines = groupRuntimes(inside).map(({ note, where }) => runtimeLine(note, where));
+  if (outside.length > 0) {
+    const parts = groupRuntimes(outside).map(({ note, where }) => {
+      const modules = where.map((w) => `${w}/`).join(', ');
+      const name = RUNTIME_NAMES[note.tool];
+      if (note.status === 'failed')
+        return `⚠ ${name} preparation failed in ${modules}${note.detail ? ` (${note.detail})` : ''}`;
+      if (note.status === 'missing') return `⚠ ${name} ${note.wanted} not installed for ${modules}`;
+      return `${name} ready on ${note.used ?? 'the default'} in ${modules}${note.run ? ` — run: ${note.run}` : ''}`;
+    });
+    lines.push(`Outside this group's zone (not needed for its tasks): ${parts.join('; ')}.`);
   }
   return lines;
+}
+
+function runtimeLine(note: WorktreeRuntimeNote, modules: string[]): string {
+  const listed = modules.filter(Boolean);
+  const where =
+    listed.length === 0
+      ? ''
+      : listed.length === 1
+        ? ` in ${listed[0]}/`
+        : ` in ${listed.map((w) => `${w}/`).join(', ')} (${listed.length} modules)`;
+  const head = `${RUNTIME_NAMES[note.tool]}${where}: the project asks for ${note.wanted} (${listed.length > 1 ? sourceOf(note) : note.source})`;
+  const run = note.run ? ` Run it with: ${note.run}.` : '';
+  const detail = note.detail ? ` ${note.detail}` : '';
+  if (note.status === 'switched') {
+    return `${head}; the panel prepared the copy on ${note.used}, the machine default is ${note.found ?? 'other'}. Use ${note.used} for installs and runs (put it first in PATH).${run}${detail}`;
+  }
+  if (note.status === 'missing') {
+    return `⚠ ${head}, but no matching version is installed${note.found ? ` (default ${note.found})` : ''}. The copy was NOT prepared on a wrong version${note.tool === 'python' ? ' (no venv was built)' : ''} — say so in the first lines of your answer if the task needs it, and never work around it silently.${detail}`;
+  }
+  if (note.status === 'failed') {
+    return `⚠ ${head}: preparing it failed.${detail} Decide yourself: retry or do without it.`;
+  }
+  return `${head}: ready on ${note.used ?? 'the default'}.${run}${detail}`;
 }
 
 /**
@@ -863,7 +959,7 @@ ${tail}${logLine}`
       `⚠ Copy preparation: the command "${boot.command}" ${why}. Dependencies may not be installed — decide yourself: repeat the install or do without it.${evidence}`,
     );
   }
-  lines.push(...runtimeLines(boot?.runtimes));
+  lines.push(...runtimeLines(boot?.runtimes, input.scope));
   // «Не проверяй MCP» стоило ревью MR без форджа: сервер не поднялся, а агент,
   // которому сказали «всё готово», молча обходил его (12.10.2026). Готовое не
   // настраивают заново, но отсутствующий инструмент называют, а не обходят.
@@ -926,6 +1022,46 @@ export function unconfirmedFindingLine(foreign = false): string {
 
 export const UNCONFIRMED_FINDING_LINE = unconfirmedFindingLine();
 
+/** Команда снимков проекта: как её запускать и где её описание. */
+export interface ShotCommand {
+  /** Запуск в основном checkout проекта, например `cd "C:/repo/e2e" && npm run qa:shot --`. */
+  run: string;
+  /** Файл, первые строки которого описывают флаги команды. */
+  usage: string;
+}
+
+/** Строка задания группы о готовой команде снимков проекта. */
+export function shotCommandLine(shots: ShotCommand): string {
+  return (
+    `Screenshots (before/after, live check): the project has a ready command, \`${shots.run}\` — ` +
+    "it runs in the project's main checkout, where its login session is saved; give it the URL " +
+    `of the page on your stand, its flags are in the first lines of \`${shots.usage}\`. ` +
+    'Take every screenshot with it and never write a screenshot script of your own; when it lacks ' +
+    'an option you need, a thin wrapper around it, never a script that logs in by itself.'
+  );
+}
+
+/**
+ * Строка задания группы о пакете ревью (5.3 плана экономии). Замер 16.10:
+ * шесть ревьюеров сделали 57 вызовов `git diff`/`git show` — 408 тыс. знаков,
+ * треть всего, что им вернули инструменты, — потому что правило расхода
+ * группы до субагентов не доходит: у них свой системный промпт. Поэтому
+ * правило чтения едет в задании каждого ревьюера, а дифф — одним файлом.
+ * Общее начало промптов ревьюеров кеша не даёт (промпт — один блок, а кеш
+ * совпадает только по границам блоков), поэтому его здесь и не просим.
+ */
+export function reviewPackLine(command: string): string {
+  return (
+    'Review subagents (the review stage of the delivery skill, with its count and depth unchanged): ' +
+    `before spawning them, build the review package — \`${command} --plan <your plan or progress file>\` ` +
+    'writes one file with the commits, the changed files, the plan and the whole diff of the copy ' +
+    '(uncommitted and new files included) and prints its path. Give every reviewer that path and, in ' +
+    'its prompt, these reading rules: read the package once (in parts if it is long) instead of ' +
+    'running git diff or git show; batch independent reads into one call; open a file again only ' +
+    'after it changed. Rebuild the package before each new review round.'
+  );
+}
+
 /**
  * Доставка группы до готового MR (настройка проекта `SplitSettings.deliver`).
  *
@@ -948,6 +1084,10 @@ export function deliveryPreamble(input: {
    * человеку — последняя строка ответа и конец хода.
    */
   foreign?: boolean;
+  /** Готовая команда снимков проекта (3.5 плана экономии), если она есть. */
+  shots?: ShotCommand;
+  /** Команда пакета ревью (5.3): `node "<abs>/tools/review-pack.mjs"`. */
+  reviewPack?: string;
 }): string {
   const foreign = input.foreign === true;
   return [
@@ -964,6 +1104,10 @@ export function deliveryPreamble(input: {
     // «типы, линт, тесты» вообще пропускали гейт документации проекта и
     // backend-гейты, и MR уезжал с красным CI.
     DELIVERY_CHECKS_LINE,
+    // Снимки (3.5): скрипт «до» перезапускался шесть раз за шесть минут, пока
+    // подбирались вход и селекторы, — у проекта уже есть команда с готовым входом.
+    ...(input.shots ? [shotCommandLine(input.shots)] : []),
+    ...(input.reviewPack ? [reviewPackLine(input.reviewPack)] : []),
     'All tasks of the group are ONE branch and ONE MR: task keys go into the MR description, and ' +
       'each task links to the MR.',
     input.mergeRequest

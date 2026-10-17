@@ -316,3 +316,93 @@ describe('заметки и задания уровней', () => {
     expect(without.startsWith('Задание')).toBe(true);
   });
 });
+
+/**
+ * 8.3 + 8.4: разбор один раз находит места и общую подготовку, а план и работа
+ * начинают с них, а не ищут заново. Путь — блок разбора → разобранный план →
+ * заметки применённой группы → задания уровней.
+ */
+describe('карта мест и общая подготовка из разбора', () => {
+  const scanned = scanSplitPlanBlocks(
+    block(
+      SPLIT_PLAN_BLOCK_LANG,
+      JSON.stringify({
+        groups: [
+          { index: 1, notes: 'api.ts — у Шапки', map: 'src/login/form.ts:42 — валидация' },
+          { index: 2, places: 'src/header.tsx:10 — отступ' },
+        ],
+        setup: 'pnpm dev; стенд http://localhost:8888; вход через SSO',
+      }),
+    ),
+    TITLES,
+  );
+
+  it('карта читается из map и из places, подготовка — с верхнего уровня', () => {
+    expect(scanned.plan?.groups[0]?.map).toBe('src/login/form.ts:42 — валидация');
+    expect(scanned.plan?.groups[1]?.map).toBe('src/header.tsx:10 — отступ');
+    expect(scanned.plan?.setup).toBe('pnpm dev; стенд http://localhost:8888; вход через SSO');
+  });
+
+  it('длинная карта и подготовка обрезаются, а не раздувают каждую группу', () => {
+    const plan = parseSplitPlan(
+      { groups: [{ index: 1, map: 'м'.repeat(9_000) }], setup: 'п'.repeat(9_000) },
+      TITLES,
+    );
+
+    // Обрезка помечена: модель видит, что карта неполная, а не принимает хвост за конец.
+    expect(plan?.groups[0]?.map).toMatch(/^м{4000}… \[cut by the panel at 4000 of 9000 chars/);
+    expect(plan?.setup).toMatch(/^п{2000}… \[cut by the panel at 2000 of 9000 chars/);
+  });
+
+  it('карта уходит в заметки своей группы, подготовка — в заметки каждой, даже без записи в разборе', () => {
+    const plan = scanned.plan;
+    if (!plan) throw new Error('блок разбора не разобран');
+    const applied = applySplitPlan(GROUPS, plan);
+    const [login, header, tests] = applied.groups.map((group) => group.notes ?? '');
+
+    expect(login).toContain('api.ts — у Шапки');
+    expect(login).toContain('Map of places from the triage');
+    expect(login).toContain('src/login/form.ts:42');
+    expect(login).not.toContain('src/header.tsx:10');
+    expect(header).toContain('src/header.tsx:10');
+    for (const notes of [login, header, tests]) {
+      expect(notes).toContain('Shared setup, found once by the triage');
+      expect(notes).toContain('вход через SSO');
+    }
+    expect(tests).not.toContain('Map of places');
+  });
+
+  it('без карты и подготовки заметки прежние — ни пустых заголовков, ни пустых заметок', () => {
+    const applied = applySplitPlan(GROUPS, {
+      groups: [{ index: 0, owns: [], tasks: [], after: [], notes: 'только заметка' }],
+      conflicts: [],
+      order: [],
+    });
+
+    expect(applied.groups[0]?.notes).toBe('только заметка');
+    expect(applied.groups[1]?.notes).toBeUndefined();
+  });
+
+  it('заметки с картой доходят до плана и до работы', () => {
+    const notes = composeGroupNotes({ notes: 'Map of places from the triage — x:\nsrc/a.ts:1' });
+    const plan = planStagePrompt({ title: 'Шапка', task: 'Выровнять', notes });
+    const work = workAfterPlanPrompt({ task: 'Задание', plan: '## Шаги\n1. Раз', notes });
+
+    expect(plan).toContain('src/a.ts:1');
+    expect(plan).toContain('start from it: check its places and add what it missed');
+    expect(plan).toContain('the files and lines it touches');
+    expect(work).toContain('src/a.ts:1');
+    expect(work).toContain('Open the places the plan and the map name directly');
+  });
+
+  it('разбор просит карту и подготовку, но никогда не секрет', () => {
+    const prompt = triageStagePrompt({
+      shared: 'Общее',
+      groups: [{ title: 'Форма входа', branch: 'feature/login', tasks: ['починить'] }],
+    });
+
+    expect(prompt).toContain('"map":');
+    expect(prompt).toContain('"setup":');
+    expect(prompt).toMatch(/never the (password|secret)/i);
+  });
+});

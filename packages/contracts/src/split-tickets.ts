@@ -84,8 +84,29 @@ export interface SplitHumanStepView extends SplitHumanStepProposal {
   at: string;
 }
 
-/** Любой блок панели в тексте хода — тикет или шаг человеку. */
-const BLOCK = new RegExp(`<(${SPLIT_TICKET_TAG}|${SPLIT_HUMAN_TAG})>([\\s\\S]*?)</\\1>`, 'g');
+/**
+ * Просьба группы подключить MCP-сервер, которого нет в её лёгком профиле
+ * запуска (1.2): группа идёт только с трекером, хранилищем кода и макетами по
+ * делу, а нужный вне профиля сервер получает на следующем ходу. Блок, а не
+ * догадка по тексту: «нужен доступ к …» в отчёте встречается и о людях.
+ *
+ * ```
+ * <agentdeck:mcp>
+ * server: имя сервера из списка выключенных
+ * why: зачем он нужен этой задаче
+ * </agentdeck:mcp>
+ * ```
+ */
+export const SPLIT_MCP_TAG = blockLang('mcp');
+
+/** Сколько серверов за ход принимается: просьба точечная, не «верни всё». */
+export const SPLIT_MCP_REQUESTS_MAX = 5;
+
+/** Любой блок панели в тексте хода — тикет, шаг человеку или просьба о сервере. */
+const BLOCK = new RegExp(
+  `<(${SPLIT_TICKET_TAG}|${SPLIT_HUMAN_TAG}|${SPLIT_MCP_TAG})>([\\s\\S]*?)</\\1>`,
+  'g',
+);
 const FIELD = /^\s*([a-z]+)\s*:\s*(.*)$/i;
 
 /**
@@ -172,7 +193,25 @@ export function scanSplitHumanSteps(text: string): SplitHumanStepProposal[] {
 }
 
 /**
- * Текст хода без блоков панели — тикетов и шагов человеку. Итог хода читается по последнему абзацу
+ * Имена серверов из просьб группы. Имя — как в настройках MCP (буквы, цифры,
+ * `-_.`); всё прочее — не имя, а пересказ, и подключать по нему нечего. Имена
+ * делит запятая: часть с пробелом внутри — фраза, а не список. Раньше делил и
+ * пробел, и строка шаблона, повторённая моделью, давала пять «серверов»
+ * (`the`, `server`, `name`, … — ревью B1-F12).
+ */
+export function scanSplitMcpRequests(text: string): string[] {
+  const names = new Set<string>();
+  for (const fields of scanBlocks(text, SPLIT_MCP_TAG, ['server', 'why'] as const)) {
+    for (const raw of fields.server.split(/[,;]/)) {
+      const name = raw.trim().replace(/^[`"']+|[`"']+$/g, '');
+      if (/^[\w.-]{1,80}$/.test(name)) names.add(name);
+    }
+  }
+  return [...names].slice(0, SPLIT_MCP_REQUESTS_MAX);
+}
+
+/**
+ * Текст хода без блоков панели — тикетов, шагов человеку и просьб о сервере. Итог хода читается по последнему абзацу
  * (вопрос ли это, какой хвост показать, какой MR назван), и блок в конце
  * ответа читался бы вместо него: «why: … как воспроизвести?» — вопросом
  * человеку, ссылка на чужой MR в «where» — MR группы.
@@ -194,6 +233,7 @@ export function withoutSplitTickets(text: string, options?: { streaming?: boolea
         ? Math.max(
             tail.lastIndexOf(`<${SPLIT_TICKET_TAG}>`),
             tail.lastIndexOf(`<${SPLIT_HUMAN_TAG}>`),
+            tail.lastIndexOf(`<${SPLIT_MCP_TAG}>`),
           )
         : -1;
     if (open >= 0) {

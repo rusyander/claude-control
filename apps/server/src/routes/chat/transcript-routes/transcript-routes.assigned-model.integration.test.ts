@@ -6,6 +6,11 @@ import { tmpdir } from 'node:os';
 import type { ChatSummary } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
+import {
+  STATUS_EFFORT,
+  STATUS_MODEL,
+  StatusChats,
+} from '../../../domains/chat/status-chats/status-chats.ts';
 import { registerChatTranscriptRoutes } from './transcript-routes.ts';
 
 /**
@@ -20,17 +25,19 @@ describe('GET /api/chats — назначенная модель', () => {
   let app: FastifyInstance;
   let store: AppStore;
 
+  const ctx = (): ServerContext =>
+    ({
+      store,
+      location: { paths: { root, appData: join(root, 'agentdeck') } },
+      pricing: { current: () => ({ entries: [] }) },
+    }) as unknown as ServerContext;
+
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'cc-chat-model-'));
     mkdirSync(join(root, 'agentdeck'), { recursive: true });
     store = new AppStore(join(root, 'agentdeck'));
-    const ctx = {
-      store,
-      location: { paths: { root, appData: join(root, 'agentdeck') } },
-      pricing: { current: () => ({ entries: [] }) },
-    } as unknown as ServerContext;
     app = Fastify();
-    registerChatTranscriptRoutes(app, ctx);
+    registerChatTranscriptRoutes(app, ctx());
     await app.ready();
   });
 
@@ -86,5 +93,28 @@ describe('GET /api/chats — назначенная модель', () => {
 
     expect((await chat('g-2'))?.assignedModel).toBeUndefined();
     expect((await chat('plain'))?.assignedModel).toBeUndefined();
+  });
+
+  it('лёгкий чат вопросов о ходе групп — его модель под настоящим ключом разговора', async () => {
+    // Свой экземпляр маршрута: реестр лёгких чатов — настоящий файл, как в сборке.
+    const statusChats = new StatusChats(join(root, 'agentdeck', 'status-chats.json'));
+    statusChats.add('new-1-status', 'parent-1');
+    statusChats.alias('new-1-status', 'sess-status');
+    const listed = Fastify();
+    registerChatTranscriptRoutes(listed, ctx(), undefined, undefined, (chatId) =>
+      statusChats.assignedOf(chatId),
+    );
+    await listed.ready();
+    transcript('sess-status');
+    transcript('plain');
+    const response = await listed.inject({ method: 'GET', url: '/api/chats' });
+    const chats = response.json<ChatSummary[]>();
+    await listed.close();
+
+    expect(chats.find((item) => item.id === 'sess-status')).toMatchObject({
+      assignedModel: STATUS_MODEL,
+      effort: STATUS_EFFORT,
+    });
+    expect(chats.find((item) => item.id === 'plain')?.assignedModel).toBeUndefined();
   });
 });

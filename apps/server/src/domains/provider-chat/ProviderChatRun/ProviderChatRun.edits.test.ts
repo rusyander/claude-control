@@ -102,7 +102,7 @@ describe('одиночный запуск: «Разрешить правки» �
       'exec',
       '--sandbox',
       'workspace-write',
-      'P',
+      '-',
     ]);
     expect(getProvider('qwen').assistant?.oneShotArgs?.('P', { allowEdits: false })).toEqual([
       '--approval-mode',

@@ -1,0 +1,13 @@
+// «Спросить о ходе групп» — одной строкой под сводкой хаба: поле тянется,
+// кнопка стоит справа, на узком экране уходит под поле.
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  align-items: flex-end;
+}
+
+.field {
+  flex: 1 1 280px;
+  min-width: 0;
+}

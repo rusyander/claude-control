@@ -17,6 +17,7 @@ import {
   openProject,
   openChat,
 } from './chat-stubs.mjs';
+import { shotLanguage } from './kit.mjs';
 
 /**
  * Время сценария сдвинуто к моменту съёмки. Сводка групп считает «с начала …»
@@ -249,6 +250,8 @@ const TASK_OPTIONS = {
     { key: 'PROJ-43', group: B.title, status: 'Code Review' },
   ],
   statuses: ['Code Review', 'Ready for QA'],
+  // Переходы по исходным статусам: пусто — окно предлагает общий список.
+  from: [],
   unread: [],
 };
 
@@ -469,6 +472,50 @@ export async function shootSplit(browser, web, scenario) {
     await page.locator('[data-move-tasks-keys]').waitFor({ timeout: 10000 });
     await page.waitForTimeout(600);
     await scenario.shot(page, '08-move-tasks', { clip: '[role="dialog"]', padding: 160 });
+    await page.keyboard.press('Escape');
+
+    // ── 09–10. Вопрос о ходе групп — в лёгкий чат, а не в родителя ──────────
+    // Сервер заводит чат и отдаёт его ключ; прогон идёт на назначенной модели,
+    // и шапка называет её — подменены только ответы сервера.
+    const STATUS = 'new-1760000000000-status';
+    let asked = false;
+    await page.route('**/api/chat/split/*/status-ask', (route) => {
+      asked = true;
+      return route.fulfill({ json: { chatId: STATUS } });
+    });
+    await page.route('**/api/chat/active', (route) =>
+      route.fulfill({
+        json: asked
+          ? [
+              {
+                chatId: STATUS,
+                projectPath: PROJECT.path,
+                seq: 0,
+                startedAt: Date.now(),
+                status: 'running',
+                model: 'sonnet',
+                effort: 'medium',
+              },
+            ]
+          : [],
+      }),
+    );
+    await page.route(`**/api/chat/${STATUS}/stream*`, (route) =>
+      route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: '' }),
+    );
+    const question =
+      shotLanguage() === 'en' ? 'Where are the Reports tests?' : 'Что с тестами у «Отчётов»?';
+    const ask = page.locator('[data-status-ask]').first();
+    await ask.scrollIntoViewIfNeeded();
+    await ask.locator('input, textarea').first().fill(question);
+    await page.waitForTimeout(500);
+    await scenario.shot(page, '09-status-ask', { clip: '[data-status-ask]', padding: 16 });
+    await ask.locator('button[type="submit"]').click();
+    await page.waitForFunction(() => !document.querySelector('[data-child-hub]'), null, {
+      timeout: 15000,
+    });
+    await page.waitForTimeout(2500);
+    await scenario.shot(page, '10-status-chat');
   } finally {
     await page.close();
   }

@@ -625,7 +625,14 @@ export const testsEn: typeof testsRu = {
       'checks it against the set — code changed but a changed file has no case or its case ' +
       'was not run after the change; a case written whose expected names nothing — and hands ' +
       'the agent a short list of gaps ' +
-      'with exact commands; no gaps — not a word and not a single extra token. It works for ' +
+      'with exact commands; no gaps — not a word and not a single extra token. A shot or ' +
+      'probe script (shots, screenshot, snapshot, probe, repro in its name) in the root or ' +
+      'a scripts folder (e2e, qa, scripts, tools, tmp) that git does not track is not code: ' +
+      'it is turn scaffolding, like the agent’s notes. The same file under src/ or lib/ is ' +
+      'product source. Once added to ' +
+      'git, or a test file (.spec., .test.), it is code as before. A case the agent saves ' +
+      'under an invented id the group does not have is not refused: it gets the section’s ' +
+      'id and the answer names both. It works for ' +
       'any Claude Code over the project — the panel chat, VS Code, a terminal: the check is ' +
       'carried by a hook in the project’s .claude/settings.local.json (the file stays out of ' +
       'git). The panel installs it into every registry project itself, and into a new one ' +
@@ -1412,7 +1419,10 @@ export const testsEn: typeof testsRu = {
         'your message, visible in its history. A command message (/…) gets no line. The ' +
         'conversation never creates the folder itself, and the agent will not create it ' +
         'silently either: with none and a task that needs tests, it asks in that same single ' +
-        'question whether to keep them in the Tests section. Changing how the product behaves, ' +
+        'question whether to keep them in the Tests section. A split group does not ask at ' +
+        'all: it takes the stand, credentials and flows from its task and the project notes, ' +
+        'and with no folder keeps tests in the checks the project already has. Changing how ' +
+        'the product behaves, ' +
         'it adds or updates the case for the change on its own (tests-cli case) — a step per ' +
         'behaviour, each expected naming what is seen, never “all pass” — and records ' +
         'what it verified: a manual case with tests-cli record (marked “by hand”), an ' +
@@ -1431,7 +1441,11 @@ export const testsEn: typeof testsRu = {
         'pnpm tests sync --project <dir> does the same (--dir picks the folder); pnpm tests run ' +
         '--project <dir> [--group <group>] runs them: without --cmd it starts the folder runner ' +
         'from the right directory with the same command as the button, takes the report of ' +
-        'THIS run only (an old report file is never picked up) and records the exit code.',
+        'THIS run only (an old report file is never picked up) and records the exit code. ' +
+        '--memo answers a green run of the same command on an unchanged tree from memory ' +
+        '(a panel group gets this by default), --fresh runs anyway. An answer from memory ' +
+        'goes into the history as its own "from memory" record pointing at the real run; ' +
+        'files git ignores are invisible to the memory.',
       limitsTitle: 'What the sync cannot do',
       limitsText:
         'Parsing is textual, not a run: a test whose name is built from variables (a template ' +

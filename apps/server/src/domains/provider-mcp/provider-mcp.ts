@@ -39,7 +39,7 @@
 export { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 
 export type { ProviderMcpFormat, ProviderMcpSection, ProviderMcpTarget } from './types.ts';
-export { resolveProviderMcpTarget } from './target.ts';
+export { resolveProviderMcpTarget, resolveProviderMcpTargetFor } from './target.ts';
 export { McpServerExistsError, McpServerNotFoundError, parseUniversalDraft } from './draft.ts';
 export {
   deleteProviderMcpServer,

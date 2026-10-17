@@ -40,6 +40,58 @@ describe('запись в блок «Тесты» от агента чата', (
     expect(saved?.codePaths).toEqual(['src/login.tsx']);
   });
 
+  /**
+   * 3.4 плана экономии: агент, придумавший id нового кейса, получал отказ
+   * «кейса нет» и тратил ход на повтор без id. Теперь кейс заводится с
+   * идентификатором блока, а придуманный возвращается — CLI называет оба.
+   */
+  /** Ревью B2-F19: опечатка в id живого кейса заводила дубль молча. */
+  it('id в одну-две буквы от живого кейса — новый кейс, но похожий назван', () => {
+    root = mkdtempSync(join(tmpdir(), 'agent-write-'));
+    agentUpsertCase(root, 'auth', { title: 'первый' }, NOW);
+    agentUpsertCase(root, 'auth', { id: 'auth-login-enter', title: 'Вход по Enter' }, NOW);
+    const typo = agentUpsertCase(root, 'auth', { id: 'auth-01', title: 'правка' }, NOW);
+    expect(typo).toMatchObject({ kind: 'saved', created: true, similar: 'auth-001' });
+    const typoOfOwn = agentUpsertCase(root, 'auth', { id: 'auth-login-entr', title: 'x' }, NOW);
+    expect(typoOfOwn).toMatchObject({ created: true, similar: 'auth-002' });
+    const far = agentUpsertCase(root, 'auth', { id: 'billing-refund', title: 'y' }, NOW);
+    expect(far).not.toHaveProperty('similar');
+  });
+
+  it('id, которого в группе нет, — новый кейс с id блока, просимый id назван', () => {
+    root = mkdtempSync(join(tmpdir(), 'agent-write-'));
+    agentUpsertCase(root, 'auth', { title: 'первый' }, NOW);
+    const result = agentUpsertCase(
+      root,
+      'auth',
+      { id: 'auth-login-enter', title: 'Вход по Enter', steps: ['Нажать Enter'] },
+      NOW,
+    );
+    expect(result).toMatchObject({ kind: 'saved', created: true, requested: 'auth-login-enter' });
+    const cases = readGroup(root, 'auth').cases;
+    expect(cases.map((item) => item.id)).toEqual(['auth-001', 'auth-002']);
+    expect(cases[1]).toMatchObject({ title: 'Вход по Enter', source: 'agent' });
+    // Существующий id — правка того же кейса, без «просимого».
+    const again = agentUpsertCase(root, 'auth', { id: 'auth-002', title: 'Вход по Enter!' }, NOW);
+    expect(again).toMatchObject({ kind: 'saved', created: false });
+    expect(again).not.toHaveProperty('requested');
+    // Тот же придуманный id в следующем ходе — правка заведённого кейса, не дубль (ревью A2-F9).
+    const repeat = agentUpsertCase(
+      root,
+      'auth',
+      { id: 'auth-login-enter', title: 'Вход по Enter (уточнено)' },
+      NOW,
+    );
+    expect(repeat).toMatchObject({ kind: 'saved', created: false });
+    expect(repeat).not.toHaveProperty('requested');
+    const after = readGroup(root, 'auth').cases;
+    expect(after.map((item) => `${item.id}:${item.title}`)).toEqual([
+      'auth-001:первый',
+      'auth-002:Вход по Enter (уточнено)',
+    ]);
+    expect(after[1]?.attributes).toEqual({ 'agent-id': 'auth-login-enter' });
+  });
+
   it('кейс человека не переписывается — правка уходит черновиком', () => {
     root = mkdtempSync(join(tmpdir(), 'agent-write-'));
     agentUpsertCase(root, 'auth', { title: 'заготовка' }, NOW);

@@ -125,7 +125,11 @@ function projectOf(cwd: string): string | undefined {
 }
 
 /** Строка для каталога прогона; `undefined` — каталог не проект (песочница панели). */
-export function testsChatNote(deps: TestsChatWiringDeps, at: string): string | undefined {
+export function testsChatNote(
+  deps: TestsChatWiringDeps,
+  at: string,
+  group = false,
+): string | undefined {
   const cwd = projectOf(at);
   if (!cwd) return undefined;
   const folder = e2eFolderView(cwd, deps.appData);
@@ -148,6 +152,7 @@ export function testsChatNote(deps: TestsChatWiringDeps, at: string): string | u
     cliPath: testsCliPath(),
     hasStandUrl,
     automation,
+    ...(group ? { group } : {}),
   });
 }
 
@@ -175,8 +180,12 @@ export function testsChatFinished(
 export function wireTestsChatNote(deps: TestsChatWiringDeps): {
   finished: (cwd: string | undefined, startedAt: number) => ProjectTestE2eSync | undefined;
 } {
-  deps.chatRuns.setWorkspaceNote((cwd) => testsChatNote(deps, cwd));
-  deps.providerChats?.setWorkspaceNote((cwd) => testsChatNote(deps, cwd));
+  deps.chatRuns.setWorkspaceNote((cwd, run?: { group: boolean }) =>
+    testsChatNote(deps, cwd, run?.group),
+  );
+  // Группа чужого CLI — той же строкой, что группа Claude (ревью A2-F10): обычная
+  // зовёт спросить человека, а группа идёт без человека и встала бы на вопросе.
+  deps.providerChats?.setWorkspaceNote((cwd, run) => testsChatNote(deps, cwd, run?.group));
   // Тот же файл системных настроек, что везёт группы Qwen, везёт и строку — в
   // системный промпт, а не в слова человека. Незнакомый id реестр откатывает на
   // Claude, у которого слоя нет, — строка остаётся в реплике.

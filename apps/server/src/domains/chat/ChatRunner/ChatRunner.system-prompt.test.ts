@@ -308,8 +308,8 @@ describe('ChatRun: прогон ребёнка разделения', () => {
     const appended = call.args[call.args.indexOf('--append-system-prompt') + 1] ?? '';
     expect(appended.startsWith('Инициативы панели.')).toBe(true);
     // Вопрос текстом из родителя не виден: «твоего вопроса я не видел» (Д16).
-    expect(appended).toContain('ONLY with the AskUserQuestion tool');
-    expect(appended).toContain('Do not make deals with other CLI sessions');
+    expect(appended).toContain('ONLY with AskUserQuestion, never as text at the end');
+    expect(appended).toContain('Make no deals with other CLI sessions');
   });
 
   it('ребёнок узнаётся и по ключу сессии, под которым его продолжают', async () => {

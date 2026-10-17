@@ -15,6 +15,7 @@ import {
 import { DetachedRun, type DetachedRunDeps } from '../detached-run/detached-run.ts';
 import { LiveSessionPool } from '../live-session/live-session.ts';
 import { withChildrenBrief } from '../children-brief/children-brief.ts';
+import { withoutMcp, type GroupRunProfile } from '../group-profile/group-profile.ts';
 import {
   isCliCommand,
   SessionWorkspaceNotes,
@@ -158,6 +159,12 @@ export interface ActiveRunInfo {
    * ровно там, где подбор модели под задачу и разводит детей по разным моделям.
    */
   model?: string;
+  /**
+   * Глубина, на которой прогон запущен. Чат, заведённый сервером (вопрос о ходе
+   * групп, 5.1), до конца первого хода в списке не значится — шапка его прогона
+   * иначе показала бы глубину из настроек вместо настоящей.
+   */
+  effort?: string;
   /**
    * Прогон усыновлён после перезапуска панели: процесс жив, потока вывода нет.
    * Вкладка по этой метке не рисует пузырь ответа — правда в транскрипте.
@@ -684,9 +691,10 @@ export class ChatRunRegistry {
    * Правда о каталоге прогона к системному промпту (тесты проекта, папка e2e).
    * Одна точка на все старты — по той же причине, что и включение группы выше.
    */
-  private workspaceNoteOf?: (cwd: string) => string | undefined;
+  private workspaceNoteOf?: (cwd: string, run: { group: boolean }) => string | undefined;
 
-  setWorkspaceNote(resolve: (cwd: string) => string | undefined): void {
+  /** `group` — прогон группы разделения: ей строка о тестах в своей редакции (1.4). */
+  setWorkspaceNote(resolve: (cwd: string, run: { group: boolean }) => string | undefined): void {
     this.workspaceNoteOf = resolve;
   }
 
@@ -698,10 +706,15 @@ export class ChatRunRegistry {
    * сессия уходит без строки, а продолженная — со своей прежней и без
    * перемены (сбой чтения — не повод сказать агенту, что тестов больше нет).
    */
-  private workspaceTurn(cwd: string, sessionId: string | undefined, prompt: string): NoteTurn {
+  private workspaceTurn(
+    cwd: string,
+    sessionId: string | undefined,
+    prompt: string,
+    group: boolean,
+  ): NoteTurn {
     let current: string;
     try {
-      current = this.workspaceNoteOf?.(cwd) ?? '';
+      current = this.workspaceNoteOf?.(cwd, { group }) ?? '';
     } catch {
       return this.workspaceNotes.turn(sessionId, '', false);
     }
@@ -728,6 +741,19 @@ export class ChatRunRegistry {
    * между ходами, и вчерашняя сводка была бы неправдой.
    */
   private briefOf?: (keys: readonly string[]) => string | undefined;
+
+  /**
+   * Лёгкий профиль запуска группы разделения (1.2): какие MCP-серверы едут в её
+   * прогон. Спрашивается на КАЖДОМ старте — группа могла попросить сервер блоком
+   * `mcp` между ходами. Нет ответа — прогон не группы, профиль не трогается.
+   */
+  private groupProfileOf?: (keys: readonly string[], cwd: string) => GroupRunProfile | undefined;
+
+  setGroupProfileResolver(
+    resolver: (keys: readonly string[], cwd: string) => GroupRunProfile | undefined,
+  ): void {
+    this.groupProfileOf = resolver;
+  }
 
   setChildrenBriefResolver(resolver: (keys: readonly string[]) => string | undefined): void {
     this.briefOf = resolver;
@@ -1219,7 +1245,14 @@ export class ChatRunRegistry {
     // Сводка детей снимается до всего остального: под ней мог остаться блок
     // перемены прошлой попытки, и снять его можно, только пока он стоит первым.
     const said = withChildrenBrief(options.prompt, undefined);
-    const workspace = this.workspaceTurn(options.cwd, options.sessionId ?? meta.sessionId, said);
+    const keys = meta.sessionId ? [chatId, meta.sessionId] : [chatId];
+    const child = this.childOf?.(keys) ?? false;
+    const workspace = this.workspaceTurn(
+      options.cwd,
+      options.sessionId ?? meta.sessionId,
+      said,
+      child,
+    );
     const run = this.createRun();
     // Маршрут решается ЗДЕСЬ, на каждом старте: продолжение остановленного
     // прогона приходит со СТАРЫМИ параметрами (пауза дерева, продолжение в
@@ -1227,7 +1260,15 @@ export class ChatRunRegistry {
     // пережил бы снятую галочку. Пустой объект — законный ответ «не через
     // контур», и он затирает прежний.
     const route = this.platformRouting?.(meta.origin ?? 'chat', options.model ?? '') ?? { env: {} };
-    const mcp = route.localMcp?.(options.cwd);
+    // У контура и локальной модели свой `--strict-mcp-config` и свой выбор
+    // серверов: от профиля группы там остаётся всё, кроме MCP, — запрет правок
+    // лёгкого чата, хуки, очередь тяжёлых шагов, перечень навыков. Прежде такой
+    // прогон терял профиль целиком (ревью A1-F4/B1-F2).
+    const strict = Boolean(route.layers?.args.includes('--strict-mcp-config'));
+    const fromRoute = route.localMcp?.(options.cwd);
+    const resolved = this.groupProfileOf?.(keys, options.cwd);
+    const profile = resolved && (strict || fromRoute) ? withoutMcp(resolved) : resolved;
+    const mcp = fromRoute ?? profile?.mcp;
     const routed: RunOptions = {
       ...options,
       // Модель и усилие принадлежат КОНТУРУ, пока прогон идёт через него (Т6):
@@ -1246,7 +1287,7 @@ export class ChatRunRegistry {
         ? { permissionMode: 'acceptEdits' }
         : {}),
       // Набор панели (В2) едет своим полем: и мимо контура, и поверх него.
-      platformEnv: { ...route.env, ...route.kit?.env },
+      platformEnv: { ...route.env, ...route.kit?.env, ...profile?.env },
       // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
       // после выключенной галочки, обязан вернуться к промпту CLI.
       platformSystemPrompt: route.systemPrompt ?? '',
@@ -1255,27 +1296,29 @@ export class ChatRunRegistry {
       // и кладутся безусловно — прошлая жизнь прогона не переживает ни снятую
       // галочку, ни возвращённую. Сам текст дописки при этом не трогается:
       // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
-      platformArgs: [...(route.layers?.args ?? []), ...(route.kit?.args ?? [])],
+      platformArgs: [
+        ...(route.layers?.args ?? []),
+        ...(route.kit?.args ?? []),
+        ...(profile?.args ?? []),
+      ],
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
       // Блок набора к системному промпту (дисциплина локальной модели при режиме «глобальные»): решается на каждом старте, как и остальной маршрут.
       platformAppend: route.kit?.append ?? '',
+      // Строка профиля группы: что подключено, что снято и как попросить снятое.
+      profileNote: profile?.note ?? '',
+      // Перечень навыков группы (1.3) — настройками поверх личных, тоже на каждом старте.
+      platformSettings: profile?.settings ?? {},
       // MCP-серверы, взятые человеком в локальный прогон этого проекта: выбор меняется
       // между ходами, поэтому читается на каждом старте и кладётся безусловно.
       ...(mcp ? { platformMcp: mcp } : {}),
       // Одна на сессию (E6): перемена между ходами уезжает в сообщении ниже.
       workspaceNote: workspace.system,
-      child: this.childOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
+      child,
       // Метка автономии решается на КАЖДОМ старте и кладётся или снимается
       // безусловно: продолжение приходит со старыми параметрами, и метка прошлой
       // жизни пережила бы снятую галочку.
-      env: withAutonomy(
-        options.env,
-        this.autonomousOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
-      ),
-      prompt: withChildrenBrief(
-        withWorkspaceUpdate(said, workspace.update),
-        this.briefOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]),
-      ),
+      env: withAutonomy(options.env, this.autonomousOf?.(keys) ?? false),
+      prompt: withChildrenBrief(withWorkspaceUpdate(said, workspace.update), this.briefOf?.(keys)),
     };
     // Выбор, снятый между ходами, не переживает продолжение: прежние параметры несли поле.
     if (!mcp) delete routed.platformMcp;
@@ -1949,6 +1992,7 @@ export class ChatRunRegistry {
         finishedAt: run.finishedAt,
         // Пусто значит «как решит CLI» — тогда имя приедет событием сессии.
         ...(run.options.model ? { model: run.options.model } : {}),
+        ...(run.options.effort ? { effort: run.options.effort } : {}),
         ...(run.detached ? { detached: true as const } : {}),
       });
     }

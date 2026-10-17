@@ -485,7 +485,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "e23b66897db5cbed"
+          "sha": "49ecfc6a15f484be"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions/ChatPermissions.ts",
@@ -505,12 +505,12 @@
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "a233d1d2fed20900"
+          "sha": "f46782782624c87a"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "8769d0ef730d430b"
+          "sha": "4dc762e71d82d828"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -656,9 +656,34 @@
           "path": "apps/web/src/features/ChatList/lib/rowKey.ts",
           "why": "список чатов: гармошка «Ещё N», «Закреплённые» над всем, заглушка «Родительский чат удалён»",
           "sha": "bb23d4b9ff80b8e5"
+        },
+        {
+          "path": "tools/heavy-queue-hook.mjs",
+          "why": "Очередь тяжёлых шагов групп: 25 минут ожидания, отказ хука, срок аренды, фон по опыту",
+          "sha": "ff68f771f6fd4823"
+        },
+        {
+          "path": "tools/heavy-queue-classify.mjs",
+          "why": "Что очередь считает тяжёлым: имена раннеров, обёртка, опыт от полутора минут, суженный прогон",
+          "sha": "8c34a18d672e44fd"
+        },
+        {
+          "path": "apps/server/src/domains/chat/group-profile/group-profile.ts",
+          "why": "Лёгкий профиль группы: набор MCP, навыки по имени, дописка с правилом расхода, хуки трекера и очереди",
+          "sha": "e46f1dfad041048c"
+        },
+        {
+          "path": "apps/server/src/domains/chat/group-profile/bash-ceiling.ts",
+          "why": "Потолок таймаута команды группы: 30 минут, больший из ваших настроек остаётся",
+          "sha": "0cc50725d6942b1f"
+        },
+        {
+          "path": "apps/server/src/domains/project-git/seed-node-modules.ts",
+          "why": "node_modules копии ссылкой: когда подключается и когда нет (недостающий пакет, версия по lock-файлу npm)",
+          "sha": "b034e3010f237edf"
         }
       ],
-      "confirmedAt": "2026-10-15T16:41:26.825Z"
+      "confirmedAt": "2026-10-17T15:22:24.097Z"
     },
     {
       "topic": "tests",
@@ -727,7 +752,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-chat.ts",
           "why": "«Агент чата знает о папке»: что агент чата узнаёт и о чём спрашивает",
-          "sha": "151dc10535cf9926"
+          "sha": "2fd07c1414c426f2"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eCard/TestE2eCard.tsx",
@@ -752,7 +777,7 @@
         {
           "path": "apps/server/src/bootstrap/tests-chat-wiring/tests-chat-wiring.ts",
           "why": "«Кейс появился сам»: сверка папки по концу хода, пропуск при прогоне агента, копия сверяется в исходном проекте",
-          "sha": "22694455b1f2dc86"
+          "sha": "9c9fa905fffe7d3a"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eRun/TestE2eRun.tsx",
@@ -857,7 +882,7 @@
         {
           "path": "apps/server/src/domains/project-tests/turn-gate/turn-gate.ts",
           "why": "какие пробелы проверка конца хода называет агенту",
-          "sha": "4d6682fab95d0878"
+          "sha": "1acd51f554f5fbd0"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/native-reports.ts",
@@ -865,7 +890,7 @@
           "sha": "b87cc7baba498557"
         }
       ],
-      "confirmedAt": "2026-10-16T08:33:41.620Z"
+      "confirmedAt": "2026-10-17T14:42:19.913Z"
     },
     {
       "topic": "rules",
@@ -1446,7 +1471,7 @@
     {
       "topic": "analytics",
       "document": "apps/web/src/pages/Help/topics/AnalyticsTopic/AnalyticsTopic.tsx",
-      "confirmedAt": "2026-10-11T13:49:23.272Z",
+      "confirmedAt": "2026-10-17T14:42:20.015Z",
       "sources": [
         {
           "path": "apps/server/src/domains/analytics/scanner/scan.ts",
@@ -1481,7 +1506,7 @@
         {
           "path": "apps/server/src/routes/analytics-routes/analytics-routes.ts",
           "why": "«Пределы»: 25 последних сессий (те же уезжают в выгрузку), кэш на минуту, ключ кэша",
-          "sha": "e7754970c1e6c72b"
+          "sha": "67dc671377c99a8b"
         },
         {
           "path": "apps/server/src/domains/analytics/session-process.ts",
@@ -1526,7 +1551,7 @@
         {
           "path": "apps/server/src/domains/analytics/scanner/foreign.ts",
           "why": "«Codex и Qwen Code»: какие файлы сессий читаются, вычет кэша, один след на ответ",
-          "sha": "c609dd6173933832"
+          "sha": "1f2f8a55d5c4bb33"
         },
         {
           "path": "apps/mobile/src/entities/analytics/api.ts",
@@ -2889,7 +2914,7 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-15T15:22:06.188Z",
+      "confirmedAt": "2026-10-17T14:42:20.112Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
@@ -2944,7 +2969,7 @@
         {
           "path": "apps/server/src/domains/local-models/local-mcp.ts",
           "why": "«MCP-серверы локального прогона»: окно, цена каждого сервера в токенах, остаток до сжатия, порог закрытия сервера",
-          "sha": "99781a5fce2d2e2c"
+          "sha": "bcba3aa54b03054e"
         },
         {
           "path": "apps/server/src/domains/local-models/supervisor.ts",
@@ -3001,7 +3026,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-16T08:33:41.793Z",
+      "confirmedAt": "2026-10-17T15:22:24.286Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -3021,7 +3046,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "cf419b33bc6b8d7a"
+          "sha": "0af248b5df6a9616"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",
@@ -3046,7 +3071,7 @@
         {
           "path": "apps/server/src/domains/kit/codex.ts",
           "why": "«Какой CLI что умеет», строка Codex: что доезжает (правила ключом после собственных инструкций, навыки каталогом), что нет",
-          "sha": "3fdad9472eb4d581"
+          "sha": "20b384999436a3a8"
         },
         {
           "path": "apps/server/assets/kit/agentdeck-kit/hooks/lib/local-discipline.mjs",

@@ -356,6 +356,80 @@ describe('прогон с окружением контура минует об�
     expect(seen[0]?.env?.KIMI_MODEL_BASE_URL).toBe('http://127.0.0.1:1/c/v1');
   });
 
+  /**
+   * Ревью B2-F16: окружение ребёнка разделения (потолок vitest, короткий вывод
+   * тестов) есть у каждого ребёнка — и уводило всех детей OpenCode и Kimi с
+   * общего сервера. Оно необязательное; адрес контура рядом с ним — нет.
+   */
+  describe('необязательное окружение ребёнка', () => {
+    const CHILD = { VITEST_MAX_WORKERS: '2', AGENTDECK_TESTS_BRIEF: '1' };
+    const optionalEnvKeys = Object.keys(CHILD);
+
+    it('OpenCode: с одним им ход идёт сессией', async () => {
+      const ask = vi.fn(async () => ({ reply: 'сессией', sessionId: 's' }));
+      const seen: { env?: NodeJS.ProcessEnv }[] = [];
+      await new ProviderChatRun().start(
+        {
+          provider: getProvider('opencode'),
+          history,
+          chatId: 'chat',
+          appDataDir: 'C:/tmp/nowhere',
+          detect: () => true,
+          sessionServe: { ask, steer: async () => false } as unknown as OpencodeServe,
+          spawnImpl: recordingSpawn(seen),
+          timeoutMs: 2_000,
+          platformEnv: CHILD,
+          optionalEnvKeys,
+        },
+        () => {},
+      );
+      expect(ask).toHaveBeenCalledOnce();
+      expect(seen).toHaveLength(0);
+    });
+
+    it('OpenCode: с адресом контура — одиночный запуск, и окружение ребёнка доходит', async () => {
+      const ask = vi.fn(async () => ({ reply: 'мимо контура', sessionId: 's' }));
+      const seen: { env?: NodeJS.ProcessEnv }[] = [];
+      await new ProviderChatRun().start(
+        {
+          provider: getProvider('opencode'),
+          history,
+          chatId: 'chat',
+          appDataDir: 'C:/tmp/nowhere',
+          detect: () => true,
+          sessionServe: { ask, steer: async () => false } as unknown as OpencodeServe,
+          spawnImpl: recordingSpawn(seen),
+          timeoutMs: 2_000,
+          platformEnv: { ...CHILD, ...ROUTE },
+          optionalEnvKeys,
+        },
+        () => {},
+      );
+      expect(ask).not.toHaveBeenCalled();
+      expect(seen[0]?.env?.VITEST_MAX_WORKERS).toBe('2');
+    });
+
+    it('Kimi: с одним им живой сервер поднимается', async () => {
+      const liveTurn = vi.fn(() => undefined);
+      await new ProviderChatRun().start(
+        {
+          provider: getProvider('kimi'),
+          history,
+          chatId: 'chat',
+          appDataDir: 'C:/tmp/nowhere',
+          detect: () => true,
+          liveTurn,
+          spawnImpl: recordingSpawn([]),
+          timeoutMs: 2_000,
+          platformEnv: CHILD,
+          optionalEnvKeys,
+        },
+        () => {},
+      );
+      expect(liveTurn).toHaveBeenCalledOnce();
+    });
+  });
+
   it('ассистент формы: сессия OpenCode не спрашивается при окружении прогона', async () => {
     const { runAssistant } = await import('../../assistant-runner/assistant-runner.ts');
     const ask = vi.fn(async () => ({ reply: 'мимо контура', sessionId: 's' }));

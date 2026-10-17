@@ -50,6 +50,12 @@ export function e2eChatLine(input: {
   hasStandUrl: boolean;
   /** Своя команда прогона проекта; нет — только папка e2e. */
   automation?: ProjectTestAutomationCommand;
+  /**
+   * Прогон группы разделения Claude (1.4): вопросов на старте она не задаёт —
+   * её вопрос только для необратимого (`CHILD_PROMPT`), — и команды запускать
+   * умеет всегда. Строка — без вопроса и без оговорки «не можешь — скажи».
+   */
+  group?: boolean;
 }): string {
   const { root, folder, cliPath, automation } = input;
   const cli = `node "${cliPath}"`;
@@ -62,9 +68,11 @@ export function e2eChatLine(input: {
     folder.dir && folder.state !== 'missing'
       ? `e2e folder "${folder.dir}" (${folder.framework}, ${folder.specs} spec files` +
         `${folder.state === 'created' ? ', created by the panel and hidden from git' : ''})`
-      : 'no e2e folder yet — do not create one on your own: when the task needs tests, ask' +
-        ' the user (in the one question below) whether to keep them in this Tests section' +
-        ' ("e2e/" with a Playwright config) or only in the checks the project already has';
+      : input.group
+        ? 'no e2e folder yet — do not create one: keep tests in the checks the project already has'
+        : 'no e2e folder yet — do not create one on your own: when the task needs tests, ask' +
+          ' the user (in the one question below) whether to keep them in this Tests section' +
+          ' ("e2e/" with a Playwright config) or only in the checks the project already has';
   return [
     `QA workspace of this project (AgentDeck Tests section): ${where};`,
     `test cases live in ${TESTS_DIR}/<group>.tests.json and the panel shows them as groups.`,
@@ -89,16 +97,27 @@ export function e2eChatLine(input: {
     'THIS run, so results land on the cases; a runner is never installed on the fly — if it is',
     'missing, pass on the install command it prints). A red test is a finding to report, never a',
     'reason to weaken it.',
-    ownWorkLine(root, cli),
-    `Ask the user once, at task start and in one question, only what is theirs: ${askOf(input)}.`,
+    ownWorkLine(root, cli, input.group),
+    askLine(input),
   ].join(' ');
+}
+
+/** Вопрос человеку в начале задачи; группе — откуда взять то же без вопроса. */
+function askLine(input: {
+  hasStandUrl: boolean;
+  folder?: ProjectTestE2eFolder;
+  group?: boolean;
+}): string {
+  return input.group
+    ? 'Take the stand, credentials and key flows from the group task and the project notes.'
+    : `Ask the user once, at task start and in one question, only what is theirs: ${askOf(input)}.`;
 }
 
 /**
  * Кейсы и записи на любой задаче, меняющей поведение продукта: агент ведёт блок
  * сам, а кейс человека правит только предложением (черновиком на приёмку).
  */
-function ownWorkLine(root: string, cli: string): string {
+function ownWorkLine(root: string, cli: string, group = false): string {
   return [
     'Beyond test tasks: whenever you change how the product behaves, keep this Tests section in',
     'step on your own — add or update the case that covers the change',
@@ -109,10 +128,14 @@ function ownWorkLine(root: string, cli: string): string {
     'A manual case: record',
     `what you actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
     '--note "<how you checked>"; it shows as checked by hand). An automated case is never recorded —',
-    'record refuses it — run it as above. Never call the work tested',
-    'without a recorded run. If your tools here cannot run commands or write files, say so and',
-    'hand the user the exact command instead of reporting a run that did not happen.',
-  ].join(' ');
+    'record refuses it — run it as above. Never call the work tested without a recorded run.',
+    group
+      ? ''
+      : 'If your tools here cannot run commands or write files, say so and hand the user the' +
+        ' exact command instead of reporting a run that did not happen.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 /** Что спросить у человека — одним вопросом в начале задачи. */
@@ -129,7 +152,7 @@ function askOf(input: { hasStandUrl: boolean; folder?: ProjectTestE2eFolder }): 
 
 /** Строка для проекта со своей командой прогона и без папки с тестами. */
 function ownCommandLine(
-  input: { root: string; hasStandUrl: boolean },
+  input: { root: string; hasStandUrl: boolean; group?: boolean },
   automation: ProjectTestAutomationCommand,
   cli: string,
 ): string {
@@ -149,7 +172,7 @@ function ownCommandLine(
     `Run them: ${cli} run --project "${root}" [--group <group>]`,
     '(no --cmd: it runs the command above with the files of those cases and imports only the',
     'report of THIS run). A red check is a finding to report, never a reason to weaken it.',
-    ownWorkLine(root, cli),
-    `Ask the user once, at task start and in one question, only what is theirs: ${askOf(input)}.`,
+    ownWorkLine(root, cli, input.group),
+    askLine(input),
   ].join(' ');
 }

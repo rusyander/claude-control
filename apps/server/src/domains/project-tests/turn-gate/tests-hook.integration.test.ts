@@ -91,6 +91,26 @@ describe('tests-hook: проверка конца хода', () => {
     expect(stop().out).toBe('');
   });
 
+  /**
+   * 3.4 плана экономии на настоящем git: одноразовый скрипт снимков, которого
+   * git не знает, ход не останавливает; тот же файл, добавленный в индекс, — код.
+   */
+  it('неотслеживаемый скрипт снимков — тишина; добавленный в git — пропуск с командой case', () => {
+    const git = (...args: string[]) =>
+      spawnSync('git', args, { cwd: project, encoding: 'utf8' }).status;
+    expect(git('init', '-q')).toBe(0);
+    mkdirSync(join(project, 'e2e'), { recursive: true });
+    writeFileSync(join(project, 'e2e', 'login-shots.mjs'), 'console.log(1);\n');
+    turn([{ name: 'Write', input: { file_path: join(project, 'e2e', 'login-shots.mjs') } }]);
+    expect(stop().out).toBe('');
+    expect(git('add', 'e2e/login-shots.mjs')).toBe(0);
+    const out = stop().out;
+    expect(out).toContain('"decision":"block"');
+    const tracked = JSON.parse(out) as { decision: string; reason: string };
+    expect(tracked.decision).toBe('block');
+    expect(tracked.reason).toContain('"codePaths":["e2e/login-shots.mjs"]');
+  });
+
   it('ручной кейс на файл записан агентом через tests-cli record — ход закрыт', () => {
     createGroup(project, 'auth', 'Auth');
     upsertCase(

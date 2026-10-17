@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   mergeSplitTickets,
   scanSplitHumanSteps,
+  scanSplitMcpRequests,
   scanSplitTickets,
   SPLIT_HUMAN_TAG,
+  SPLIT_MCP_REQUESTS_MAX,
+  SPLIT_MCP_TAG,
   SPLIT_TICKET_TAG,
   SPLIT_TICKETS_MAX,
   withoutSplitTickets,
@@ -170,5 +173,37 @@ describe('вопрос текстом и блок тикета', () => {
     expect(asksAfter('Готово.\n\nпочему пустой файл?')).toEqual([
       expect.objectContaining({ kind: 'text' }),
     ]);
+  });
+});
+
+/**
+ * Просьба группы о сервере вне профиля запуска (1.2): имена из блока, мусор —
+ * не имя, лишнее сверх потолка не принимается; блок прячется из текста хода, и
+ * незакрытый во время ответа — тоже.
+ */
+describe('scanSplitMcpRequests', () => {
+  const mcp = (...lines: string[]) =>
+    [`<${SPLIT_MCP_TAG}>`, ...lines, `</${SPLIT_MCP_TAG}>`].join('\n');
+
+  it('имена из поля server, через запятую или пробел, без кавычек и повторов', () => {
+    const text = `${mcp('server: `telegram-inbox`, figma', 'why: письмо')}\n${mcp('server: figma')}`;
+    expect(scanSplitMcpRequests(text)).toEqual(['telegram-inbox', 'figma']);
+  });
+
+  it('пересказ вместо имени и пример в блоке кода — не просьба', () => {
+    expect(scanSplitMcpRequests(mcp('server: сервер/телеграма!', 'why: x'))).toEqual([]);
+    expect(scanSplitMcpRequests(`\`\`\`\n${mcp('server: figma')}\n\`\`\``)).toEqual([]);
+  });
+
+  it(`не больше ${SPLIT_MCP_REQUESTS_MAX} серверов за ход`, () => {
+    const names = Array.from({ length: 9 }, (_, index) => `s${index}`).join(', ');
+    expect(scanSplitMcpRequests(mcp(`server: ${names}`))).toHaveLength(SPLIT_MCP_REQUESTS_MAX);
+  });
+
+  it('блок вынимается из текста хода, незакрытый при потоке — тоже', () => {
+    expect(withoutSplitTickets(`Нужен сервер.\n${mcp('server: figma')}`)).toBe('Нужен сервер.');
+    expect(
+      withoutSplitTickets(`Нужен сервер.\n<${SPLIT_MCP_TAG}>\nserver: fi`, { streaming: true }),
+    ).toBe('Нужен сервер.');
   });
 });

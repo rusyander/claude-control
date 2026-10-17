@@ -153,6 +153,76 @@ export async function selfContained(dir: string): Promise<boolean> {
   );
 }
 
+/** Запись пакета в `packages` lock-файла npm (v2/v3). */
+interface NpmLockEntry {
+  version?: unknown;
+  optional?: unknown;
+  devOptional?: unknown;
+  link?: unknown;
+}
+
+/**
+ * Пакеты, которых нет в `node_modules` каталога или которые стоят не той версии.
+ * Совпавшие манифесты ещё не значат установленное дерево: оригинал 16.10 требовал
+ * в `package.json` `react-router-dom`, а в `node_modules` его не было — копия по
+ * ссылке получила неполные пакеты, и сборка группы была красной до ручной установки.
+ *
+ * У npm с lock-файлом сверяется всё дерево из него, вложенные пакеты тоже
+ * (прерванная установка теряет и их), кроме необязательных — те законно
+ * отсутствуют на чужой платформе. У pnpm и yarn — только наличие прямых
+ * зависимостей: `package-lock.json`, забытый рядом с их lock-файлом, о дереве
+ * ничего не говорит и стоил бы полной установки (ревью B-F07).
+ */
+export async function missingPackages(
+  dir: string,
+  manager: keyof typeof LOCKFILES = 'npm',
+): Promise<string[]> {
+  let pkg: Record<string, unknown>;
+  try {
+    pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8')) as Record<string, unknown>;
+  } catch {
+    return ['package.json'];
+  }
+  let locked: Record<string, NpmLockEntry | undefined> = {};
+  if (manager === 'npm') {
+    try {
+      const lock = JSON.parse(await readFile(join(dir, LOCKFILES.npm), 'utf8')) as {
+        packages?: typeof locked;
+      };
+      locked = lock.packages ?? {};
+    } catch {
+      // Без lock-файла — сверяется только наличие прямых зависимостей.
+    }
+  }
+  const wanted = new Map<string, string | undefined>();
+  for (const [key, entry] of Object.entries(locked)) {
+    if (!key.startsWith('node_modules/') || !entry) continue;
+    if (entry.optional === true || entry.devOptional === true || entry.link === true) continue;
+    wanted.set(key, typeof entry.version === 'string' ? entry.version : undefined);
+  }
+  // Прямая зависимость, которой нет в lock-файле, тоже обязана стоять.
+  for (const group of [pkg.dependencies, pkg.devDependencies]) {
+    if (!group || typeof group !== 'object') continue;
+    for (const name of Object.keys(group)) {
+      if (!wanted.has(`node_modules/${name}`)) wanted.set(`node_modules/${name}`, undefined);
+    }
+  }
+  const missing = await Promise.all(
+    [...wanted].map(async ([key, version]) => {
+      const name = key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length);
+      let found: unknown;
+      try {
+        const file = join(dir, key, 'package.json');
+        found = (JSON.parse(await readFile(file, 'utf8')) as { version?: unknown }).version;
+      } catch {
+        return name;
+      }
+      return version !== undefined && version !== found ? name : undefined;
+    }),
+  );
+  return [...new Set(missing.filter((name): name is string => name !== undefined))].sort();
+}
+
 /**
  * `target` — ссылка на `<source>/node_modules`. Junction на Windows: его
  * создание не требует прав администратора, а удаление снимает только ссылку.

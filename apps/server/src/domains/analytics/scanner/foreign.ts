@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { codexHome, qwenHome } from '../../../providers/catalog/config-dirs.ts';
 import type { EntrySource } from './scan-file.ts';
 import type { ForeignSource, RawEntry, RawUsage } from './types.ts';
 
@@ -58,8 +59,26 @@ function answer(
   };
 }
 
-function toolCall(base: Pick<RawEntry, 'timestamp' | 'sessionId'>, name: string): RawEntry {
-  return { ...base, type: 'tool', message: { content: [{ type: 'tool_use', name }] } };
+/**
+ * Вызов инструмента вместе с аргументами: по ним измеритель отличает гейт от
+ * чтения — у Codex и Qwen и то и другое идёт одной оболочкой (ревью A2-F12).
+ */
+function toolCall(
+  base: Pick<RawEntry, 'timestamp' | 'sessionId'>,
+  name: string,
+  input: Record<string, unknown>,
+): RawEntry {
+  return { ...base, type: 'tool', message: { content: [{ type: 'tool_use', name, input }] } };
+}
+
+/** Аргументы `function_call` Codex — JSON строкой; битая строка — без аргументов. */
+function codexArguments(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'string') return obj(value);
+  try {
+    return obj(JSON.parse(value));
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -135,7 +154,12 @@ export const codexEntries: EntrySource = async function* (lines) {
     }
     if (row.type === 'response_item' && payload.type === 'function_call') {
       const name = str(payload.name);
-      if (name) yield toolCall(base, name);
+      if (name) yield toolCall(base, name, codexArguments(payload.arguments));
+    }
+    // apply_patch свободной формы приходит своим типом, с патчем строкой в `input`.
+    if (row.type === 'response_item' && payload.type === 'custom_tool_call') {
+      const name = str(payload.name);
+      if (name) yield toolCall(base, name, { input: payload.input });
     }
   }
   if (records === 0) yield* fallback;
@@ -187,8 +211,9 @@ export const qwenEntries: EntrySource = async function* (lines) {
       ? (obj(row.message).parts as unknown[])
       : [];
     for (const part of parts) {
-      const name = str(obj(obj(part).functionCall).name);
-      if (name) yield toolCall(base, name);
+      const call = obj(obj(part).functionCall);
+      const name = str(call.name);
+      if (name) yield toolCall(base, name, obj(call.args));
     }
     const meta = obj(row.usageMetadata);
     if (Object.keys(meta).length > 0) {
@@ -208,6 +233,14 @@ export const qwenEntries: EntrySource = async function* (lines) {
   }
   if (telemetry === 0) yield* fallback;
 };
+
+/**
+ * Каталоги журналов CLI. У Qwen два дома — свой человека и `QWEN_HOME` набора
+ * панели (режим «Наши»): чат панели в нём — тоже расход человека.
+ */
+export function foreignHomes(kind: ForeignSource['kind'], appData: string): string[] {
+  return kind === 'codex' ? [codexHome()] : [qwenHome(), join(appData, 'kit', 'qwen-home')];
+}
 
 /** Файлы сессий чужого CLI, изменённые с начала периода. */
 export function collectForeignFiles(

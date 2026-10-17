@@ -6,9 +6,9 @@ import { scanAnalytics } from '../../domains/analytics/scanner.ts';
 import { getRunningAgents, getSkillUsage } from '../../domains/analytics/runtime.ts';
 import { PRICING_URL } from '../../domains/analytics/pricing-source.ts';
 import { longCacheRate, withOwnLongCacheRate } from '../../domains/analytics/pricing.ts';
+import { foreignHomes } from '../../domains/analytics/scanner/foreign.ts';
 import type { ForeignSource } from '../../domains/analytics/scanner/types.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
-import { codexHome, qwenHome } from '../../providers/catalog/config-dirs.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
@@ -101,14 +101,9 @@ function parseLocalDay(value?: string): number | undefined {
  */
 function foreignSource(ctx: ServerContext): ForeignSource | undefined {
   const id = getActiveProvider(ctx.store).id;
-  if (id === 'codex') return { kind: 'codex', homes: [codexHome()] };
-  if (id === 'qwen') {
-    return {
-      kind: 'qwen',
-      homes: [qwenHome(), join(ctx.location.paths.appData, 'kit', 'qwen-home')],
-    };
-  }
-  return undefined;
+  return id === 'codex' || id === 'qwen'
+    ? { kind: id, homes: foreignHomes(id, ctx.location.paths.appData) }
+    : undefined;
 }
 
 /**

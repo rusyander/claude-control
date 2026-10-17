@@ -1,5 +1,6 @@
 import {
   scanSplitHumanSteps,
+  scanSplitMcpRequests,
   scanSplitTickets,
   withoutSplitTickets,
 } from '@agentdeck/contracts/split-tickets';
@@ -158,6 +159,8 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
   const tickets = scanSplitTickets(input.text);
   // Шаги, которые может сделать только человек (находка 112), — по тому же правилу.
   const humanSteps = scanSplitHumanSteps(input.text);
+  // Просьба о сервере вне профиля запуска (1.2) — конвейер продолжит группу с ним.
+  const mcpRequests = scanSplitMcpRequests(input.text);
   // Лимит на исходе (аудит 25.09, L63): ход прошёл, но очередь до сброса
   // новых групп не заводит — едет с любым итогом, как и находки.
   const warningAt =
@@ -176,6 +179,7 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
     ...(mr ? { mr } : {}),
     ...(tickets.length > 0 ? { tickets } : {}),
     ...(humanSteps.length > 0 ? { humanSteps } : {}),
+    ...(mcpRequests.length > 0 ? { mcpRequests } : {}),
     // Штамп прочтения: по нему доставка судит, не устарела ли строка.
     ...(sieves.rows.length > 0
       ? { sieveRows: stampSieveRows(sieves.rows, new Date().toISOString()) }

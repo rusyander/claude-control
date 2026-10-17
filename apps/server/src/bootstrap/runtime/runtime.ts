@@ -4,11 +4,24 @@ import { appRootDir } from '../../domains/watcher/report.ts';
 import { createLocalModels, type LocalModels } from '../../domains/local-models/service.ts';
 import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { createLocalMcpSource } from '../../domains/local-models/mcp-source.ts';
-import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
+import {
+  bashCeilingsAt,
+  chatRunProfile,
+  foreignGroupMcp,
+  compactWindowOf,
+  groupRunProfile,
+  statusRunProfile,
+  type ProfileMcpEntry,
+  type SkillScopeInput,
+} from '../../domains/chat/group-profile/group-profile.ts';
+import { StatusChats, briefWithStatus } from '../../domains/chat/status-chats/status-chats.ts';
+import { readSkills } from '../../domains/skills/read.ts';
+import { childRunEnv, type RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import { createRunSync } from '../../domains/local-models/run-sync.ts';
 import { createKeepAwake, type KeepAwake } from '../../lib/keep-awake/keep-awake.ts';
 import { machineId } from '../../lib/machine-identity/machine-identity.ts';
 import { readEnvLookup } from '../../domains/env/env.ts';
+import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { createGlobalLayer, type GlobalLayer } from '../../domains/global-layer/service.ts';
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import { liveNaIds, type SieveReportRow, type SieveStage } from '@agentdeck/contracts/sieves';
@@ -62,7 +75,19 @@ import {
 } from '../../providers/registry.ts';
 import { foreignProviderId } from '@agentdeck/contracts/platform-consumers';
 import { KitService } from '../../domains/kit/service.ts';
-import { kitComposeRefusal } from '../../domains/kit/codex.ts';
+import {
+  CODEX_COMPACT_LIMIT_ENV,
+  CODEX_MCP_OFF_ENV,
+  kitComposeRefusal,
+} from '../../domains/kit/codex.ts';
+import {
+  writeQwenMcpExcluded,
+  writeQwenQuietRun,
+} from '../../domains/provider-chat/system-note/system-note.ts';
+import {
+  readProviderMcpServers,
+  resolveProviderMcpTargetFor,
+} from '../../domains/provider-mcp/provider-mcp.ts';
 import { codexHome } from '../../providers/catalog/config-dirs.ts';
 import { LOCAL_PLATFORM_ID } from '../../domains/local-models/connect.ts';
 import { AutoContinue, continueNotice } from '../../domains/chat/auto-continue/auto-continue.ts';
@@ -181,7 +206,10 @@ import {
   runPathSteps,
 } from '../../domains/chat/group-run-lines/group-run-lines.ts';
 import { storeTreeReader } from '../../domains/chat/chat-autonomy/chat-autonomy.ts';
-import { triageGroupCatalog } from '../../domains/chat/group-auto-pick/group-auto-pick.ts';
+import {
+  effectiveGroupsForRun,
+  triageGroupCatalog,
+} from '../../domains/chat/group-auto-pick/group-auto-pick.ts';
 import { readChoice } from '../../domains/groups/choice/choice.ts';
 import {
   projectTestsBusy,
@@ -233,6 +261,8 @@ export interface Runtime {
   providerChats: ProviderChatService;
   /** Конвейер уровней разделения (Т1): разбор → план → работа, ожидания между группами. */
   splitConveyor: SplitConveyor;
+  /** Лёгкие чаты вопросов о ходе групп (5.1): какой чат о каком разделении. */
+  statusChats: StatusChats;
   splitOverlap: SplitOverlap;
   /** Ревью MR по ссылке (Т7): решение человека и его исполнение. */
   splitReview: SplitReview;
@@ -310,6 +340,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * диске: родитель без прогона после перезапуска отдаёт их детям разделения.
    */
   const chatSession = new ChatSession(chatRuns, ctx.location.paths.appData);
+  // Лёгкие чаты вопросов о ходе групп (5.1) переживают и смену ключа, и перезапуск.
+  const statusChats = new StatusChats(join(ctx.location.paths.appData, 'status-chats.json'));
   // Прогоны тестов — третий такой объект: агент ходит по кейсам минутами, и
   // оборванный при выходе панели процесс остался бы висеть с полным доступом.
   //
@@ -401,6 +433,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    */
   chatRuns.setSessionListener((chatId, sessionId, from) => {
     ctx.store.linkChatSession(chatId, sessionId, from);
+    statusChats.alias(chatId, sessionId);
     // Вход первого хода записан под временным ключом — едет за настоящим (U8).
     try {
       moveRunInputs(ctx.location.paths.appData, chatId, sessionId);
@@ -412,9 +445,12 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   chatRuns.setChildResolver((keys) =>
     keys.some((key) => Boolean(ctx.store.getChatLink(key)?.parentChatId)),
   );
-  // Родитель разделения видит своих детей в начале каждого хода (Д6). Конвейер
-  // заводится ниже — к первому старту прогона он уже есть.
-  chatRuns.setChildrenBriefResolver((keys) => childrenBrief(splitConveyor.view(keys)));
+  // Родитель разделения видит своих детей в начале каждого хода (Д6), лёгкий
+  // чат вопросов о ходе — группы своего разделения (5.1). Конвейер заводится
+  // ниже — к первому старту прогона он уже есть.
+  chatRuns.setChildrenBriefResolver(
+    briefWithStatus((keys) => splitConveyor.view(keys), statusChats),
+  );
   // Ворота первой правки родителя знают о детях и о ветке MR (Д15).
   chatRuns.setBranchGateContextResolver((keys) =>
     branchGateContext(splitConveyor.view(keys), (chatId) => ctx.store.getChatLink(chatId)?.review),
@@ -1002,6 +1038,71 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   providerChats.setInputJournal((key, record) =>
     appendRunInput(ctx.location.paths.appData, key, record),
   );
+  // Ребёнок в чужом CLI получает то же окружение, что ребёнок Claude (6.1):
+  // тот же признак — связь с родителем (`setChildResolver` выше). Группа — ещё и
+  // лёгкий набор MCP (1.2): серверы конфига этого CLI, снятые тем же правилом;
+  // снимает их выключатель CLI (`setMcpOff` ниже), у кого он есть.
+  providerChats.setChildRun((providerId, chatId) => {
+    const link = ctx.store.getChatLink(foreignChatKey(providerId, chatId));
+    if (!link?.parentChatId) return undefined;
+    const env = childRunEnv(process.env);
+    const input = splitConveyor.profileInput(link);
+    if (!input) return { env };
+    // Группа и без выключателя серверов у CLI — группа: строка о тестах ей без вопросов.
+    if (!mcpOffChannel(providerId)) return { env, group: true };
+    // Порог сжатия группы (6.2) — тот же рычаг A/B, что окно Claude (2.1). Порог в
+    // токенах документирован только у Codex; у Qwen Code — лишь доля окна, а окно
+    // облачной модели панели не известно, так что туда рычаг не едет.
+    const compactWindow = compactWindowOf(process.env.AGENTDECK_GROUP_COMPACT_WINDOW);
+    if (providerId === 'codex' && compactWindow) {
+      env[CODEX_COMPACT_LIMIT_ENV] = String(compactWindow);
+    }
+    const mcp = foreignGroupMcp({ entries: providerMcpEntries(providerId), ...input });
+    return mcp.note
+      ? { env, group: true, mcp: { off: mcp.off, note: mcp.note } }
+      : { env, group: true };
+  });
+  /** Выключатель серверов: Codex — ключом запуска, Qwen Code — слоем настроек. */
+  function mcpOffChannel(providerId: string): 'codex' | 'qwen' | undefined {
+    if (providerId === 'codex') return 'codex';
+    return getProvider(providerId).groupLayer === 'qwen-system-settings' ? 'qwen' : undefined;
+  }
+  providerChats.setMcpOff((providerId, names, env) => {
+    const channel = mcpOffChannel(providerId);
+    if (channel === 'codex') return { [CODEX_MCP_OFF_ENV]: JSON.stringify(names) };
+    return channel === 'qwen'
+      ? writeQwenMcpExcluded({ appData: ctx.location.paths.appData, names, env })
+      : undefined;
+  });
+  // Очередь тяжёлых шагов (3.2): один полный гейт за раз на всю машину, каталог —
+  // в данных панели, общий для всех групп — Claude и Qwen Code. У Codex хуки
+  // требуют ручного доверия (`/hooks`), без человека они не сработают.
+  const heavyQueue = {
+    hook: `node "${fileURLToPath(new URL('../../../../../tools/heavy-queue-hook.mjs', import.meta.url))}"`,
+    dir: join(ctx.location.paths.appData, 'heavy-queue'),
+  };
+  // Фоновые вызовы модели, которые панели не нужны (6.3), — тем же слоем настроек Qwen;
+  // им же у группы едет очередь тяжёлых шагов.
+  providerChats.setQuietRun((providerId, group, env) =>
+    mcpOffChannel(providerId) === 'qwen'
+      ? writeQwenQuietRun({ appData: ctx.location.paths.appData, group, env, heavyQueue })
+      : undefined,
+  );
+  /** Серверы MCP из конфига CLI; нечитаемый конфиг — ни одного (снимать нечего). */
+  function providerMcpEntries(providerId: string): ProfileMcpEntry[] {
+    try {
+      const target = resolveProviderMcpTargetFor(
+        getProvider(providerId),
+        ctx.store.getSettings().claudeDirOverride,
+      );
+      return (target ? readProviderMcpServers(target) : []).map((server) => ({
+        id: server.name,
+        config: { url: server.url, command: server.command, args: server.args },
+      }));
+    } catch {
+      return [];
+    }
+  }
   // Родитель в чужом CLI знает о детях так же, как в Claude (Д6).
   providerChats.setChildrenBrief((providerId, chatId) =>
     childrenBrief(splitConveyor.view([foreignChatKey(providerId, chatId)])),
@@ -1292,26 +1393,101 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   } catch (error) {
     console.warn('[local-models] full-layer migration failed:', error);
   }
+  const mcpSource = createLocalMcpSource({
+    userConfig: () => ctx.location.paths.mcpConfig,
+    userSettings: () => ctx.location.paths.settings,
+    store: ctx.store,
+    appData: () => ctx.location.paths.appData,
+    envLookup: () => ({
+      ...process.env,
+      ...readEnvLookup(
+        ctx.location.paths.settings,
+        ctx.location.paths.secretsEnv,
+        ctx.location.paths.settingsLocal,
+      ),
+    }),
+    networkTimeoutMs: () => ctx.store.getSettings().mcpNetworkTimeoutMs,
+  });
+  // Лёгкий профиль запуска группы разделения (1.2): серверы из тех же файлов, что у
+  // раздела «MCP», и только нужные группе — трекер, код, макеты по делу.
+  // Навыки (1.3): описание — навыкам групп панели этого прогона и обязательным,
+  // остальным личным — только имя; плагины — из `enabledPlugins` настроек.
+  const skillScope = (keys: readonly string[], cwd: string): SkillScopeInput => ({
+    user: readSkills(ctx.location.paths.skills, ctx.store)
+      .filter((skill) => skill.isEnabled)
+      .map((skill) => skill.name),
+    group: effectiveGroupsForRun(
+      { store: ctx.store, paths: ctx.location.paths },
+      keys,
+      cwd,
+      'claude',
+    ).flatMap((group) =>
+      group.members.filter((member) => member.kind === 'skill').map((member) => member.id),
+    ),
+    plugins: Object.entries(
+      readJsonFile<{ enabledPlugins?: Record<string, unknown> }>(ctx.location.paths.settings, {})
+        .enabledPlugins ?? {},
+    )
+      .filter(([, on]) => on === true)
+      .map(([plugin]) => plugin),
+  });
+  // Окно автосжатия групп (2.1) — рычаг A/B, по умолчанию выключен: панель,
+  // запущенная с AGENTDECK_GROUP_COMPACT_WINDOW=160k, отдаёт его каждой группе.
+  const compactWindow = compactWindowOf(process.env.AGENTDECK_GROUP_COMPACT_WINDOW);
+  // Свёртка ответов записи в трекер (2.3): скрипт панели абсолютным путём — группа
+  // зовёт его из своей копии.
+  const trackerHook = `node "${fileURLToPath(new URL('../../../../../tools/tracker-brief-hook.mjs', import.meta.url))}"`;
+  // Список задач без описаний (5.2): поиск и доска трекера — заголовками, и в группе,
+  // и в обычном чате, где разделение может быть предложено.
+  const boardHook = `node "${fileURLToPath(new URL('../../../../../tools/board-fields-hook.mjs', import.meta.url))}"`;
+  chatRuns.setGroupProfileResolver((keys, cwd) => {
+    // Лёгкий чат вопросов о ходе групп (5.1): ни MCP, ни навыков, ни правок. Навыки
+    // не прочитались — перечень пуст, а запрет правок и оболочки остаётся: сбой
+    // чтения прежде бросал отсюда и отказывал в каждом старте (ревью B1-F14).
+    if (statusChats.parentOf(keys)) {
+      let scope: SkillScopeInput = { user: [], group: [], plugins: [] };
+      try {
+        scope = skillScope(keys, cwd);
+      } catch (error) {
+        console.warn('status chat: skills unreadable, run without the skill list', error);
+      }
+      return statusRunProfile(scope);
+    }
+    const link = keys.map((key) => ctx.store.getChatLink(key)).find(Boolean);
+    const input = link ? splitConveyor.profileInput(link) : undefined;
+    if (!input) {
+      return ctx.store.getSettings().taskSplitInitiative
+        ? chatRunProfile({ boardHook })
+        : undefined;
+    }
+    // Серверы — из проекта человека с ЕГО одобрением, не из копии: копия группы — новый
+    // путь, а ветка в ней (разбор чужого MR) может нести свой `.mcp.json` с любой
+    // командой, которую `--mcp-config` запустил бы без спроса. Не прочиталось —
+    // группа идёт полным запуском, как до профиля, а не не идёт вовсе.
+    try {
+      return groupRunProfile({
+        entries: mcpSource.list(input.projectPath, { approvedOnly: true }),
+        tasksText: input.tasksText,
+        extra: input.extra,
+        skills: skillScope(keys, cwd),
+        trackerHook,
+        boardHook,
+        heavyQueue,
+        bashCeilings: bashCeilingsAt(ctx.location.paths.settings, cwd),
+        ...(compactWindow ? { compactWindow } : {}),
+      });
+    } catch (error) {
+      console.warn('split group: run profile unreadable, run without it', error);
+      return undefined;
+    }
+  });
   const localModels = createLocalModels({
     appRoot: appRootDir(),
     runActive: localRunActive,
     awakeHeld: () => keepAwake.status().held,
     claude: { settingsPath: () => ctx.location.paths.settings, backupDir: () => ctx.backupDir },
     // MCP-серверы локального прогона читаются теми же файлами и тем же клиентом, что раздел «MCP».
-    mcp: createLocalMcpSource({
-      userConfig: () => ctx.location.paths.mcpConfig,
-      store: ctx.store,
-      appData: () => ctx.location.paths.appData,
-      envLookup: () => ({
-        ...process.env,
-        ...readEnvLookup(
-          ctx.location.paths.settings,
-          ctx.location.paths.secretsEnv,
-          ctx.location.paths.settingsLocal,
-        ),
-      }),
-      networkTimeoutMs: () => ctx.store.getSettings().mcpNetworkTimeoutMs,
-    }),
+    mcp: mcpSource,
   });
   // Сессии из терминала и VS Code видны телефону только через хуки панели:
   // включённой пересылке они нужны с первого сеанса, без ручной установки.
@@ -1657,6 +1833,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     pendingAsks,
     providerChats,
     splitConveyor,
+    statusChats,
     splitOverlap,
     splitReview,
     splitView: (chatIds) => {

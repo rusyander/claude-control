@@ -57,7 +57,43 @@ const RESULT: Record<NonNullable<SplitPlanView['groups'][number]['result']>['kin
 
 export function childrenBrief(split: SplitPlanView | undefined): string | undefined {
   if (!split || split.groups.length === 0) return undefined;
-  const lines = split.groups.map((group, position) => {
+  return [
+    `<${TAG}>`,
+    'The work of this conversation was handed to split groups — each has its own copy and its ' +
+      'own chat. Do not do it yourself: no edits, no new copies or branches. Answer about the ' +
+      'state from this summary. To tell a group something, output a block ```agentdeck:tell N``` ' +
+      '(N is the group number below) with the text inside: the panel delivers it to the group ' +
+      'chat at the end of your turn, and to a busy group after its turn. Answer the human in the ' +
+      'language they write in.',
+    ...groupLines(split),
+    `</${TAG}>`,
+  ].join('\n');
+}
+
+/**
+ * Сводка для лёгкого чата вопросов о ходе групп (5.1 плана экономии). Строки
+ * групп те же, что у родителя; шапка своя: этот чат групп не ведёт — блок
+ * `agentdeck:tell` из него никуда не доставляется, и обещать его нельзя.
+ * Обёртка та же, поэтому ленту чистит тот же `stripChildrenBrief`, а свежая
+ * сводка каждого хода заменяет прежнюю (`withChildrenBrief`).
+ */
+export function statusBrief(split: SplitPlanView | undefined, at: Date): string | undefined {
+  if (!split || split.groups.length === 0) return undefined;
+  return [
+    `<${TAG}>`,
+    `The human asks about the progress of split groups working on another conversation's task ` +
+      `(state as of ${at.toISOString()}). Answer from this summary; read files in a group copy ` +
+      'only when the summary does not answer. You only observe: no edits, no commands that change ' +
+      'anything, no messages to the groups — to steer a group the human writes in its chat or in ' +
+      'the parent conversation. Answer in the language the human writes in.',
+    ...groupLines(split),
+    `</${TAG}>`,
+  ].join('\n');
+}
+
+/** Строка на группу: где она, в каком состоянии и чем кончила. */
+function groupLines(split: SplitPlanView): string[] {
+  return split.groups.map((group, position) => {
     const where = [
       group.branch ? `branch ${group.branch}` : '',
       group.path ? `copy ${group.path}` : '',
@@ -75,20 +111,10 @@ export function childrenBrief(split: SplitPlanView | undefined): string | undefi
           (group.result.commits ? `, commits: ${group.result.commits}` : '')
         : '',
     ].filter(Boolean);
-    const tail = group.tail ? ` Last answer: "${clip(group.tail)}"` : '';
-    return `${position + 1}. "${group.title}" (${where.join(', ')}) — ${state.join('; ')}.${tail}`;
+    const tail = group.tail ? ` Last answer: "${defang(clip(group.tail))}"` : '';
+    const title = defang(group.title);
+    return `${position + 1}. "${title}" (${where.join(', ')}) — ${state.join('; ')}.${tail}`;
   });
-  return [
-    `<${TAG}>`,
-    'The work of this conversation was handed to split groups — each has its own copy and its ' +
-      'own chat. Do not do it yourself: no edits, no new copies or branches. Answer about the ' +
-      'state from this summary. To tell a group something, output a block ```agentdeck:tell N``` ' +
-      '(N is the group number below) with the text inside: the panel delivers it to the group ' +
-      'chat at the end of your turn, and to a busy group after its turn. Answer the human in the ' +
-      'language they write in.',
-    ...lines,
-    `</${TAG}>`,
-  ].join('\n');
 }
 
 /**
@@ -115,4 +141,13 @@ export function stripChildrenBrief(text: string): string {
 function clip(text: string): string {
   const flat = text.replace(/\s+/g, ' ').trim();
   return flat.length > TAIL_LIMIT ? `…${flat.slice(-TAIL_LIMIT)}` : flat;
+}
+
+/**
+ * Название и хвост пишет модель: тег панели в них (`</agentdeck-children>` в
+ * ответе о самой панели) закрывал бы сводку раньше конца, и снятие сводки
+ * оставляло бы её хвост в реплике (ревью B1-F15). Угловая скобка тега — похожей.
+ */
+function defang(text: string): string {
+  return text.replace(/<(\/?agentdeck-)/gi, '‹$1');
 }

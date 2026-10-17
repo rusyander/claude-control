@@ -14,7 +14,7 @@ import { chatPathSteps, scenarioLine, skillInsertsLine } from '../path-steps/pat
 import { childAppendPrompt, stageOf } from '../ChatCascadeStages/ChatCascadeStages.ts';
 import { chatGroupSettingsView, storeTreeReader } from '../chat-autonomy/chat-autonomy.ts';
 import { pinnedChoiceAt } from '../group-auto-pick/group-auto-pick.ts';
-import { FOREIGN_CHILD_PROMPT } from '../initiative/initiative.ts';
+import { FOREIGN_CHILD_PROMPT, GROUP_ECONOMY_PROMPT } from '../initiative/initiative.ts';
 
 /**
  * Строки группы в системной дописке прогона: «числа» группы, выбранной в чате
@@ -175,7 +175,10 @@ export function foreignChildExtra(
   const stage = stageOf(link);
   // Правила ребёнка — всем звеньям группы, кроме разбора: он не группа, а
   // общий прогон до них (TQ-06).
-  const child = link.parentChatId && stage !== 'triage' ? FOREIGN_CHILD_PROMPT : '';
+  const child =
+    link.parentChatId && stage !== 'triage'
+      ? `${FOREIGN_CHILD_PROMPT} ${GROUP_ECONOMY_PROMPT}`
+      : '';
   return (
     [child, childStageExtra(stage, chatKnobsLine(store, appData, [chatKey], cwd))]
       .filter(Boolean)

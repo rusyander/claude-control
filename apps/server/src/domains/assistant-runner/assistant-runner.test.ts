@@ -103,7 +103,7 @@ describe('runAssistant: CLI one-shot', () => {
     expect(argvIncludes(spawn.calls[0]!.args, '-p')).toBe(true);
   });
 
-  it('codex → argv [exec, prompt]', async () => {
+  it('codex → argv [exec, -], промпт целиком в stdin', async () => {
     const codex = getProvider('codex');
     const spawn = fakeSpawn({ stdout: 'ok' });
     const prompt = 'сделай что-то';
@@ -114,7 +114,9 @@ describe('runAssistant: CLI one-shot', () => {
     });
     expect(res.ok).toBe(true);
     expect(argvIncludes(spawn.calls[0]!.args, 'exec')).toBe(true);
-    expect(argvHasDiscrete(spawn.calls[0]!.args, prompt)).toBe(true);
+    expect(argvHasDiscrete(spawn.calls[0]!.args, '-')).toBe(true);
+    expect(argvIncludes(spawn.calls[0]!.args, prompt)).toBe(false);
+    expect(spawn.stdinChunks.join('')).toContain(prompt);
   });
 
   // AIDER-2: `--message <text>` — задокументированный one-shot Aider («отправить

@@ -550,8 +550,10 @@ describe('реестр провайдеров', () => {
       cliRunnable: true,
     });
     // One-shot-флаг задан у codex/gemini и (OPENCODE-7) у opencode — все
-    // задокументированы. Промпт всегда ОТДЕЛЬНЫМ элементом argv.
-    expect(getProvider('codex').assistant?.oneShotArgs?.('P')).toEqual(['exec', 'P']);
+    // задокументированы. Промпт всегда ОТДЕЛЬНЫМ элементом argv; у Codex это «-»,
+    // а текст едет в stdin (`oneShotStdin`): набор панели занимает argv сам.
+    expect(getProvider('codex').assistant?.oneShotArgs?.('P')).toEqual(['exec', '-']);
+    expect(getProvider('codex').assistant?.oneShotStdin).toBe(true);
     expect(getProvider('gemini').assistant?.oneShotArgs?.('P')).toEqual([
       '-o',
       'stream-json',
@@ -566,7 +568,7 @@ describe('реестр провайдеров', () => {
         model: 'gpt-5.3-codex',
         effort: 'high',
       }),
-    ).toEqual(['exec', '-m', 'gpt-5.3-codex', '-c', 'model_reasoning_effort=high', 'P']);
+    ).toEqual(['exec', '-m', 'gpt-5.3-codex', '-c', 'model_reasoning_effort=high', '-']);
     // Незадокументированный уровень глубины не передаётся вовсе: выдуманное
     // значение уронило бы прогон, а молчание значит «как настроено у человека».
     expect(
@@ -574,7 +576,7 @@ describe('реестр провайдеров', () => {
         model: 'gpt-5.3-codex',
         effort: 'xhigh',
       }),
-    ).toEqual(['exec', '-m', 'gpt-5.3-codex', 'P']);
+    ).toEqual(['exec', '-m', 'gpt-5.3-codex', '-']);
     // У Gemini аналога глубины нет — флага для неё не выдумываем.
     expect(
       getProvider('gemini').assistant?.oneShotArgs?.('P', {

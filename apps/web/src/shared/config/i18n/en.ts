@@ -1264,6 +1264,13 @@ export const en: TranslationSchema = {
         cleanupHint:
           'The group is closed. The copy leaves the disk; the branch only if it is empty. A branch with its own work and an MR branch stay, and git will not give up uncommitted changes',
         cleanupFailed: 'Could not remove the copy: {{message}}',
+        statusAsk: {
+          label: 'Ask about group progress',
+          placeholder: 'For example: how are the tests of the “Reports” group?',
+          send: 'Ask',
+          hint: 'A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below',
+          failed: 'Could not ask: {{message}}',
+        },
         cancelPlan: {
           action: 'Cancel plan',
           hint: 'Stop every group of this split and close the plan. Chats, copies and branches stay — after cancelling you can split again',

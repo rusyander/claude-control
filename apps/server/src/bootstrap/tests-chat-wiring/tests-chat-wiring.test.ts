@@ -136,17 +136,24 @@ describe('bootstrap/tests-chat-wiring', () => {
   });
 
   it('подключается к реестру чатов одним слушателем по каталогу', () => {
-    let resolve: ((cwd: string) => string | undefined) | undefined;
+    let resolve: ((cwd: string, run: { group: boolean }) => string | undefined) | undefined;
     wireTestsChatNote({
       appData,
       chatRuns: { setWorkspaceNote: (fn) => (resolve = fn) },
     });
-    expect(resolve?.(root)).toContain('QA workspace of this project');
+    const chat = resolve?.(root, { group: false });
+    expect(chat).toContain('QA workspace of this project');
+    expect(chat).toContain('Ask the user once');
+    // Группе разделения — её редакция строки (1.4): без вопроса на старте.
+    const group = resolve?.(root, { group: true });
+    expect(group).toContain('QA workspace of this project');
+    expect(group).not.toContain('Ask the user once');
+    expect(group).toContain('from the group task and the project notes');
   });
 
   it('чужие CLI получают тот же решатель; конец хода отдаётся наружу', () => {
-    let claude: ((cwd: string) => string | undefined) | undefined;
-    let foreign: ((cwd: string) => string | undefined) | undefined;
+    let claude: ((cwd: string, run: { group: boolean }) => string | undefined) | undefined;
+    let foreign: ((cwd: string, run?: { group: boolean }) => string | undefined) | undefined;
     let system: Parameters<ProviderChatService['setSystemNote']>[0] | undefined;
     let limits: Parameters<ProviderChatService['setLocalLimits']>[0] | undefined;
     const wired = wireTestsChatNote({
@@ -158,8 +165,11 @@ describe('bootstrap/tests-chat-wiring', () => {
         setLocalLimits: (fn) => (limits = fn),
       },
     });
-    expect(foreign?.(root)).toBe(claude?.(root));
+    expect(foreign?.(root)).toBe(claude?.(root, { group: false }));
     expect(foreign?.(root)).toContain('QA workspace of this project');
+    // Группа чужого CLI — строкой группы Claude, без вопроса человеку (ревью A2-F10).
+    expect(foreign?.(root, { group: true })).toBe(claude?.(root, { group: true }));
+    expect(foreign?.(root, { group: true })).not.toContain('Ask the user once');
     // Папки нет — сверять нечего, и конец хода ничего не пишет.
     expect(wired.finished(root, Date.now() - 60_000)).toBeUndefined();
     // Системный канал — только у CLI со слоем системных настроек (Qwen).

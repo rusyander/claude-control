@@ -67,6 +67,77 @@ const judge = (cases: ProjectTestCase[], runs: ProjectTestRunRecord[], paths: st
   });
 
 describe('пробелы хода агента', () => {
+  /**
+   * 3.4 плана экономии: одноразовый скрипт снимков блокировал конец хода словами
+   * «no case covers e2e/…-shots.mjs». Скрипт снимков или пробы, которого git не
+   * отслеживает, — подсобка хода, как `.agent/`; отслеживаемый, тест или
+   * обычный новый файл — код.
+   */
+  it('неотслеживаемый скрипт снимков или пробы — не код; отслеживаемый и новый исходник — код', () => {
+    const scratch = ['e2e/login-shots.mjs', 'tools/probe-auth.ts', 'scripts/screenshots.py'];
+    const quiet = judgeTurn({
+      groups: groups([]),
+      runs: [],
+      paths: scratch,
+      untracked: scratch,
+      since: SINCE,
+      changedAt: EDIT,
+      cli: CLI,
+      root: '/p',
+    });
+    expect(quiet).toEqual([]);
+    const tracked = judge([], [], ['e2e/login-shots.mjs']);
+    expect(tracked.join(String.fromCharCode(10))).toContain('no test case yet');
+    const fresh = judgeTurn({
+      groups: groups([]),
+      runs: [],
+      paths: ['src/login.ts', 'e2e/login-shots.spec.ts'],
+      untracked: ['src/login.ts', 'e2e/login-shots.spec.ts'],
+      since: SINCE,
+      changedAt: EDIT,
+      cli: CLI,
+      root: '/p',
+    });
+    expect(fresh.join(String.fromCharCode(10))).toContain('src/login.ts, e2e/login-shots.spec.ts');
+  });
+
+  /** Ревью B2-F1: имя «probe/snapshot/screenshot» у нового исходника продукта не снимает проверку. */
+  it('новый исходник с «пробным» именем вне папки скриптов — код', () => {
+    const source = [
+      'src/health/probe.ts',
+      'shared/lib/screenshot.ts',
+      'apps/web/src/e2e/snapshot.ts',
+      'services/readiness-probes.py',
+    ];
+    const gaps = judgeTurn({
+      groups: groups([]),
+      runs: [],
+      paths: [...source, 'probe-auth.mjs'],
+      untracked: [...source, 'probe-auth.mjs'],
+      since: SINCE,
+      changedAt: EDIT,
+      cli: CLI,
+      root: '/p',
+    }).join(String.fromCharCode(10));
+    expect(gaps).toContain(
+      'src/health/probe.ts, shared/lib/screenshot.ts, apps/web/src/e2e/snapshot.ts, services/readiness-probes.py',
+    );
+    expect(gaps).not.toContain('(+1)');
+    // Скрипт пробы в корне — подсобка хода.
+    expect(
+      judgeTurn({
+        groups: groups([]),
+        runs: [],
+        paths: ['probe-auth.mjs'],
+        untracked: ['probe-auth.mjs'],
+        since: SINCE,
+        changedAt: EDIT,
+        cli: CLI,
+        root: '/p',
+      }),
+    ).toEqual([]);
+  });
+
   it('правок кода нет (заметки, документы, замки) — пробелов нет', () => {
     expect(judge([], [], ['.agent/notes.md', 'docs/a.md', 'README.md', 'pnpm-lock.yaml'])).toEqual(
       [],

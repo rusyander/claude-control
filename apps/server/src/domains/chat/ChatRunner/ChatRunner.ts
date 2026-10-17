@@ -34,7 +34,7 @@ export const RUN_STDERR_MAX = 16_384;
 import { CHILD_DENIED_TOOLS, childAppend } from '../initiative/initiative.ts';
 import { SyntheticGate } from '../synthetic-gate.ts';
 import { autoPickResults, picksFor } from '../auto-pick/auto-pick.ts';
-import { AUTONOMOUS_ENV } from '@agentdeck/contracts/chat-group-settings';
+import { AUTONOMOUS_ENV, BRIEF_OUTPUT_ENV } from '@agentdeck/contracts/chat-group-settings';
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
@@ -70,6 +70,7 @@ function appendedOf(options: RunOptions): string {
           ? childAppend(options.appendSystemPrompt)
           : (options.appendSystemPrompt ?? ''),
         options.workspaceNote ?? '',
+        options.profileNote ?? '',
       ]
         .filter((part) => part.trim())
         .join('\n\n')
@@ -132,6 +133,15 @@ function childTestWorkers(base: NodeJS.ProcessEnv): Record<string, string> {
     VITEST_MAX_THREADS: workers,
     VITEST_MAX_FORKS: workers,
   };
+}
+
+/**
+ * Окружение ребёнка разделения: потолок vitest и короткий вывод `tests-cli run`
+ * (2.2 плана экономии — журнал в файл, в контекст итог). Одно на Claude и на
+ * чужие CLI (6.1): ребёнок Codex или Qwen гоняет те же проверки той же копии.
+ */
+export function childRunEnv(base: NodeJS.ProcessEnv): Record<string, string> {
+  return { ...childTestWorkers(base), [BRIEF_OUTPUT_ENV]: '1' };
 }
 
 export type { ChatEvent, RawEvent, RawUsage } from '../chat-events.ts';
@@ -229,6 +239,18 @@ export interface RunOptions {
    * КАЖДОМ старте: выбор человека меняется между ходами.
    */
   platformMcp?: { ids: string[]; config: unknown };
+  /**
+   * Строка лёгкого профиля группы разделения (1.2): какие MCP-серверы в прогоне,
+   * какие сняты и как попросить снятый. Реестр ставит её на КАЖДОМ старте вместе
+   * с профилем — состав меняется, когда группа попросила сервер.
+   */
+  profileNote?: string;
+  /**
+   * Настройки поверх личных для группы разделения (1.3): `skillOverrides`,
+   * `enabledPlugins`. Едут тем же файлом `--settings`, что и исключения
+   * `CLAUDE.md`: второй флаг `--settings` заменил бы первый.
+   */
+  platformSettings?: Record<string, unknown>;
   /**
    * Права на действия с файлами. В песочнице — acceptEdits: там файлы Claude
    * и есть результат. В настоящем проекте по умолчанию `default`: чтение
@@ -503,7 +525,7 @@ export class ChatRun {
     const { [AUTONOMOUS_ENV]: _inherited, ...parentEnv } = process.env;
     const env = {
       ...parentEnv,
-      ...(options.child ? childTestWorkers(process.env) : {}),
+      ...(options.child ? childRunEnv(process.env) : {}),
       ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
       // Строку о блоке «Тесты» чату панели даёт дописка к промпту (`workspaceNote`);
       // хук начала сессии проекта (`tools/tests-hook.mjs`) по этой метке молчит,
@@ -528,9 +550,13 @@ export class ChatRun {
       ...(userMemoryExcludes(options.platformArgs ?? [], place) ?? []),
       ...copyParityExcludes(options.platformArgs ?? [], place),
     ];
-    if (excludes.length > 0) {
+    const flagSettings = {
+      ...options.platformSettings,
+      ...(excludes.length > 0 ? { claudeMdExcludes: excludes } : {}),
+    };
+    if (Object.keys(flagSettings).length > 0) {
       const file = join(this.ensureTempDir(), 'layers-settings.json');
-      writeFileSync(file, JSON.stringify({ claudeMdExcludes: excludes }), 'utf8');
+      writeFileSync(file, JSON.stringify(flagSettings), 'utf8');
       args.push('--settings', file);
     }
 
@@ -755,6 +781,10 @@ export class ChatRun {
       platformSystemPrompt: options.platformSystemPrompt?.trim() ?? '',
       platformArgs: options.platformArgs ?? [],
       platformMcp: options.platformMcp ?? null,
+      // Только непустые: ключ, добавленный всем, сменил бы подпись живых сессий у всех.
+      ...(Object.keys(options.platformSettings ?? {}).length > 0
+        ? { platformSettings: options.platformSettings }
+        : {}),
       // Та же дописка, что уходит процессу, — со строкой о тестах проекта и
       // переводами строки: папка e2e, появившаяся между ходами, меняет промпт, и
       // живой процесс со старым промптом отдавать ходу нельзя.

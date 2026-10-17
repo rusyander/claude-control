@@ -13,8 +13,8 @@ import { runAssistant, type RunAssistantDeps } from './assistant-runner.ts';
  * которые вживую на macOS/Linux с Windows-машины не воспроизвести:
  *   • на Windows команда идёт через `cmd.exe /d /s /c` (обёртка `.cmd`), а на
  *     POSIX — напрямую, без оболочки;
- *   • запускается ИМЕННО то имя, которое детект нашёл в PATH (`codex` вместо
- *     `codex.cmd`, если стоит нативный .exe);
+ *   • запускается ИМЕННО то имя, которое детект нашёл в PATH (`qwen` вместо
+ *     `qwen.cmd`, если стоит нативный .exe);
  *   • русский ответ не бьётся на границе чтения (декодируем один раз в конце),
  *     а закрытый раньше времени stdin не роняет сервер необработанным EPIPE.
  */
@@ -86,32 +86,32 @@ describe('spawn one-shot по платформам', () => {
     withPlatform('win32');
     const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
-    const res = await runAssistant(getProvider('codex'), [{ role: 'user', content: 'привет' }], {
+    const res = await runAssistant(getProvider('qwen'), [{ role: 'user', content: 'привет' }], {
       appDataDir: dir,
-      detect: (command) => command === 'codex.cmd',
+      detect: (command) => command === 'qwen.cmd',
       spawnImpl: spawn.fn,
     });
 
     expect(res.ok).toBe(true);
     expect(spawn.calls[0]!.cmd.toLowerCase()).toContain('cmd');
     expect(spawn.calls[0]!.args.slice(0, 4)).toEqual(['/d', '/s', '/v:off', '/c']);
-    expect(spawn.calls[0]!.args[4]).toContain('codex.cmd');
+    expect(spawn.calls[0]!.args[4]).toContain('qwen.cmd');
     expect(spawn.calls[0]!.args[4]).toContain('привет');
   });
 
-  it('Windows: стоит только нативный codex.exe → запускаем «голое» имя, а не .cmd', async () => {
+  it('Windows: стоит только нативный qwen.exe → запускаем «голое» имя, а не .cmd', async () => {
     withPlatform('win32');
     const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
-    await runAssistant(getProvider('codex'), [{ role: 'user', content: 'привет' }], {
+    await runAssistant(getProvider('qwen'), [{ role: 'user', content: 'привет' }], {
       appDataDir: dir,
-      // `where codex.cmd` не находит, `where codex` — находит (PATHEXT → .exe).
-      detect: (command) => command === 'codex',
+      // `where qwen.cmd` не находит, `where qwen` — находит (PATHEXT → .exe).
+      detect: (command) => command === 'qwen',
       spawnImpl: spawn.fn,
     });
 
-    expect(spawn.calls[0]!.args[4]).toContain('codex');
-    expect(spawn.calls[0]!.args[4]).not.toContain('codex.cmd');
+    expect(spawn.calls[0]!.args[4]).toContain('qwen');
+    expect(spawn.calls[0]!.args[4]).not.toContain('qwen.cmd');
   });
 
   /**
@@ -127,9 +127,9 @@ describe('spawn one-shot по платформам', () => {
         withPlatform('win32');
         const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
-        await runAssistant(getProvider('codex'), [{ role: 'user', content: prompt }], {
+        await runAssistant(getProvider('qwen'), [{ role: 'user', content: prompt }], {
           appDataDir: dir,
-          detect: (command) => command === 'codex.cmd',
+          detect: (command) => command === 'qwen.cmd',
           spawnImpl: spawn.fn,
         });
 
@@ -147,9 +147,9 @@ describe('spawn one-shot по платформам', () => {
       withPlatform('win32');
       const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
-      await runAssistant(getProvider('codex'), [{ role: 'user', content: 'a&whoami' }], {
+      await runAssistant(getProvider('qwen'), [{ role: 'user', content: 'a&whoami' }], {
         appDataDir: dir,
-        detect: (command) => command === 'codex.cmd',
+        detect: (command) => command === 'qwen.cmd',
         spawnImpl: spawn.fn,
       });
 
@@ -183,35 +183,35 @@ describe('spawn one-shot по платформам', () => {
    */
   describe('Windows: cmd.exe только там, где без него нельзя', () => {
     it('нативный .exe на PATH запускается напрямую — cmd.exe в цепочке нет', async () => {
-      writeFileSync(join(dir, 'codex.exe'), 'фиктивный бинарь');
+      writeFileSync(join(dir, 'qwen.exe'), 'фиктивный бинарь');
       withPlatform('win32', dir);
       const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
-      await runAssistant(getProvider('codex'), [{ role: 'user', content: 'a&whoami' }], {
+      await runAssistant(getProvider('qwen'), [{ role: 'user', content: 'a&whoami' }], {
         appDataDir: dir,
-        detect: (command) => command === 'codex.cmd',
+        detect: (command) => command === 'qwen.cmd',
         spawnImpl: spawn.fn,
       });
 
-      expect(spawn.calls[0]!.cmd).toBe(join(dir, 'codex.exe'));
+      expect(spawn.calls[0]!.cmd).toBe(join(dir, 'qwen.exe'));
       // argv уходит как есть: ни кавычек, ни склейки в строку.
       expect(spawn.calls[0]!.args.at(-1)).toBe('a&whoami');
       expect(spawn.calls[0]!.options?.windowsVerbatimArguments).toBeUndefined();
     });
 
     it('многострочный промпт через .exe доходит целиком', async () => {
-      writeFileSync(join(dir, 'codex.exe'), 'фиктивный бинарь');
+      writeFileSync(join(dir, 'qwen.exe'), 'фиктивный бинарь');
       withPlatform('win32', dir);
       const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
       await runAssistant(
-        getProvider('codex'),
+        getProvider('qwen'),
         [
           { role: 'user', content: 'первый вопрос' },
           { role: 'assistant', content: 'ответ' },
           { role: 'user', content: 'второй вопрос' },
         ],
-        { appDataDir: dir, detect: (command) => command === 'codex.cmd', spawnImpl: spawn.fn },
+        { appDataDir: dir, detect: (command) => command === 'qwen.cmd', spawnImpl: spawn.fn },
       );
 
       expect(spawn.calls[0]!.args.at(-1)).toContain('второй вопрос');
@@ -222,13 +222,13 @@ describe('spawn one-shot по платформам', () => {
       const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
       const res = await runAssistant(
-        getProvider('codex'),
+        getProvider('qwen'),
         [
           { role: 'user', content: 'первый вопрос' },
           { role: 'assistant', content: 'ответ' },
           { role: 'user', content: 'второй вопрос' },
         ],
-        { appDataDir: dir, detect: (command) => command === 'codex.cmd', spawnImpl: spawn.fn },
+        { appDataDir: dir, detect: (command) => command === 'qwen.cmd', spawnImpl: spawn.fn },
       );
 
       expect(res.ok).toBe(false);
@@ -242,9 +242,9 @@ describe('spawn one-shot по платформам', () => {
       const spawn = fakeSpawn({ chunks: [Buffer.from('готово')] });
 
       await runAssistant(
-        getProvider('codex'),
+        getProvider('qwen'),
         [{ role: 'user', content: 'a" & echo INJECTED & "b' }],
-        { appDataDir: dir, detect: (command) => command === 'codex.cmd', spawnImpl: spawn.fn },
+        { appDataDir: dir, detect: (command) => command === 'qwen.cmd', spawnImpl: spawn.fn },
       );
 
       const line = spawn.calls[0]!.args[4]!;

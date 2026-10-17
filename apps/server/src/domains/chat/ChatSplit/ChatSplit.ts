@@ -31,6 +31,8 @@ import {
 } from '../../project-git/project-git.ts';
 import { describeGaps, readinessForCwd, repairCopy } from '../../project-git/copy-readiness.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { shotCommandOf } from '../shot-command/shot-command.ts';
+import { reviewPackCommand } from '../review-pack/review-pack.ts';
 import type { ReviewStand, ReviewStandContainer } from '../review-stand/review-stand.ts';
 
 /**
@@ -441,6 +443,11 @@ export async function splitTasks({
   const failures: TaskSplitFailure[] = [];
 
   const isRepo = git.isRepo(projectPath);
+  // Готовая команда снимков проекта (3.5) — строкой доставки: ищется в основном
+  // checkout, где кит снимков и его сессия входа живут и вне git.
+  const shots = shotCommandOf(projectPath);
+  // Пакет ревью (5.3): дифф одним файлом и правила чтения — в задании каждого ревьюера.
+  const reviewPack = reviewPackCommand();
   // Занятые имена читаем ОДИН раз и дальше пополняем сами: перечитывать список
   // после каждой копии — три лишних запуска git ради того, что мы и так знаем.
   const taken = new Set<string>(isRepo ? await git.takenBranches(projectPath) : []);
@@ -643,6 +650,8 @@ export async function splitTasks({
             ...(target ? { mergeRequest: target.url } : {}),
             questions: groupQuestions,
             ...(foreign ? { foreign } : {}),
+            ...(shots ? { shots } : {}),
+            reviewPack,
           })}\n\n${base}`
         : asksHuman
           ? `${groupQuestionsHumanLine(foreign)}\n\n${base}`
@@ -662,7 +671,7 @@ export async function splitTasks({
     // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в
     // общем каталоге работает в окружении человека — ей преамбула не нужна.
     const prompt = isWorktree
-      ? `${environmentPreamble({ ...(mirror ? { mirror: mirrorLineForModel(mirror) } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${withTickets}`
+      ? `${environmentPreamble({ ...(mirror ? { mirror: mirrorLineForModel(mirror) } : {}), ...(bootstrap ? { bootstrap } : {}), ...(group.owns?.length ? { scope: group.owns } : {}) })}\n\n${withTickets}`
       : withTickets;
 
     // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:

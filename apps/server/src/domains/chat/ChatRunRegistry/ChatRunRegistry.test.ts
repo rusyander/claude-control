@@ -371,6 +371,17 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     expect(registry.describe('c9')?.options.workspaceNote).toBe('');
   });
 
+  it('строка о тестах знает, группа ли прогон: группе — своя редакция (1.4)', () => {
+    registry.setChildResolver((keys) => keys.includes('g1'));
+    registry.setWorkspaceNote((_cwd, run) => (run.group ? 'QA group' : 'QA chat'));
+    registry.start('g1', { ...OPTIONS }, {});
+    registry.start('c1', { ...OPTIONS }, {});
+    expect(registry.describe('g1')?.options.workspaceNote).toBe('QA group');
+    expect(registry.describe('g1')?.options.child).toBe(true);
+    expect(registry.describe('c1')?.options.workspaceNote).toBe('QA chat');
+    expect(registry.describe('c1')?.options.child).toBe(false);
+  });
+
   /**
    * E6. Системный промпт сессии обязан совпадать байт в байт от хода к ходу —
    * иначе CLI пишет кэш всего разговора заново (замер 12.10.2026: путь папки
@@ -479,6 +490,78 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     picked = [];
     registry.start('m2', registry.describe('m1')?.options ?? OPTIONS, {});
     expect(registry.describe('m2')?.options.platformMcp).toBeUndefined();
+  });
+
+  /**
+   * 1.2: лёгкий профиль группы ложится на каждый старт — флаг, переменная,
+   * свои серверы и строка группе — и снимается, когда ключ уже не группа.
+   * Контур и локальная модель решают MCP сами, профиль поверх них не встаёт.
+   */
+  describe('лёгкий профиль группы разделения', () => {
+    const profile = {
+      args: ['--strict-mcp-config'],
+      env: { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' },
+      mcp: { ids: ['gitlab'], config: { mcpServers: { gitlab: { command: 'gl' } } } },
+      note: 'MCP servers in this run: gitlab.',
+      settings: { skillOverrides: { dataviz: 'name-only' } },
+    };
+
+    it('группа получает профиль, а не группа — нет, и продолжение его не наследует', () => {
+      const asked: [readonly string[], string][] = [];
+      registry.setGroupProfileResolver((keys, cwd) => {
+        asked.push([keys, cwd]);
+        return keys.includes('g1') ? profile : undefined;
+      });
+      registry.start('g1', OPTIONS, { sessionId: 's1' });
+      expect(asked[0]).toEqual([['g1', 's1'], OPTIONS.cwd]);
+      const group = registry.describe('g1')?.options;
+      expect(group?.platformArgs).toEqual(['--strict-mcp-config']);
+      expect(group?.platformEnv).toEqual({ ENABLE_CLAUDEAI_MCP_SERVERS: 'false' });
+      expect(group?.platformMcp?.ids).toEqual(['gitlab']);
+      expect(group?.profileNote).toBe(profile.note);
+      expect(group?.platformSettings).toEqual(profile.settings);
+
+      registry.start('p1', { ...group! }, {});
+      const plain = registry.describe('p1')?.options;
+      expect(plain?.platformArgs).toEqual([]);
+      expect(plain?.platformEnv).toEqual({});
+      expect(plain?.platformMcp).toBeUndefined();
+      expect(plain?.profileNote).toBe('');
+      expect(plain?.platformSettings).toEqual({});
+    });
+
+    /**
+     * Ревью A1-F4/B1-F2: прогон через контур или локальную модель терял профиль
+     * целиком — лёгкий чат шёл с правками, группа без очереди и хуков.
+     */
+    it('у прогона со своим --strict-mcp-config или выбором MCP от профиля снято только MCP', () => {
+      const withQueue = {
+        ...profile,
+        env: { ...profile.env, AGENTDECK_HEAVY_QUEUE_DIR: 'q' },
+        settings: { permissions: { deny: ['Edit'] } },
+      };
+      registry.setGroupProfileResolver(() => withQueue);
+      registry.setPlatformRouting(() => ({
+        env: {},
+        layers: { args: ['--strict-mcp-config'], systemPrompt: true, dropped: [] },
+      }));
+      registry.start('g2', OPTIONS, {});
+      registry.setPlatformRouting(() => ({
+        env: {},
+        localMcp: () => ({ ids: ['own'], config: { mcpServers: { own: {} } } }),
+      }));
+      registry.start('g3', OPTIONS, {});
+      for (const id of ['g2', 'g3']) {
+        const options = registry.describe(id)?.options;
+        expect(options?.platformSettings).toEqual(withQueue.settings);
+        expect(options?.platformEnv).toEqual({ AGENTDECK_HEAVY_QUEUE_DIR: 'q' });
+        expect(options?.profileNote).toBe('');
+      }
+      expect(registry.describe('g2')?.options.platformArgs).toEqual(['--strict-mcp-config']);
+      expect(registry.describe('g2')?.options.platformMcp).toBeUndefined();
+      expect(registry.describe('g3')?.options.platformArgs).toEqual([]);
+      expect(registry.describe('g3')?.options.platformMcp?.ids).toEqual(['own']);
+    });
   });
 
   it('маршрута нет — флагов нет, и дописка панели остаётся как была', () => {

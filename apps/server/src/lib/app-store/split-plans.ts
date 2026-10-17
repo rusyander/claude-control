@@ -14,8 +14,15 @@ export function getSplitPlans(state: AppState): Record<string, SplitPlanRecord> 
   return state.splitPlans ?? {};
 }
 
+/**
+ * Ключ приходит из адреса запроса: `__proto__` или `constructor` находили
+ * прототип объекта вместо записи, и маршрут падал 500 вместо 404 (ревью B1-F10).
+ */
 export function getSplitPlan(state: AppState, parentChatId: string): SplitPlanRecord | undefined {
-  return state.splitPlans?.[currentParent(state, parentChatId)];
+  const key = currentParent(state, parentChatId);
+  return state.splitPlans && Object.hasOwn(state.splitPlans, key)
+    ? state.splitPlans[key]
+    : undefined;
 }
 
 export function setSplitPlan(state: AppState, record: SplitPlanRecord): void {
@@ -32,9 +39,10 @@ export function setSplitPlan(state: AppState, record: SplitPlanRecord): void {
 function currentParent(state: AppState, parentChatId: string): string {
   let key = parentChatId;
   const seen = new Set<string>();
-  while (state.splitPlanMoves?.[key] && !seen.has(key)) {
+  const moves = state.splitPlanMoves ?? {};
+  while (Object.hasOwn(moves, key) && moves[key] && !seen.has(key)) {
     seen.add(key);
-    key = state.splitPlanMoves[key] as string;
+    key = moves[key] as string;
   }
   return key;
 }

@@ -32,8 +32,10 @@
  * решила, что он сейчас не сторожевой.
  */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -102,6 +104,10 @@ const HELP = `Тест-кейсы проекта без панели.
                     иначе npm test из package.json)
   --results <f>     где прогон оставит отчёт (по умолчанию ищется сам)
   --dry             для run: показать, что было бы запущено, и выйти
+  --brief | --full  для run: вывод раннера — в журнал, на экран итог и первые строки падений
+                    (группе панели — по умолчанию, AGENTDECK_BRIEF_OUTPUT=1) | весь, как есть
+  --memo | --fresh  для run: зелёный итог на том же дереве — из памяти, без прогона (группе
+                    панели — по умолчанию; e2e по стенду — всегда заново) | прогнать заново
   --fail-on <s>     для lint: ронять сборку с этой серьёзности (error | warning | info)
   --budget <мин>    для plan: сколько минут отведено (у «дыма» по умолчанию 30)
   --release <веха>  для plan release: чью веху собирать
@@ -180,7 +186,7 @@ async function domain(name) {
 function parseArgs(argv) {
   // Опции-флаги: у них нет значения. Остальные ждут его следующим словом.
   // Внутри функции: `main()` зовётся раньше, чем дошла бы константа модуля.
-  const FLAG_OPTIONS = new Set(['help', 'dry', 'save']);
+  const FLAG_OPTIONS = new Set(['help', 'dry', 'save', 'brief', 'full', 'memo', 'fresh']);
   const options = {};
   const positional = [];
   let command;
@@ -302,9 +308,34 @@ async function saveCase(project, options) {
     );
     return;
   }
+  if (result.requested) {
+    console.log(
+      `Кейса «${result.requested}» в группе не было — заведён новый ${group}:${result.testCase.id} — ${result.testCase.title}` +
+        (result.similar
+          ? `. Есть похожий ${group}:${result.similar}: если правка была для него, повторите её с этим id`
+          : ''),
+    );
+    return;
+  }
   console.log(
     `${result.created ? 'Заведён' : 'Обновлён'} кейс ${group}:${result.testCase.id} — ${result.testCase.title}`,
   );
+}
+
+/**
+ * Файлы хода, которых git не отслеживает (3.4): по ним шлюз отличает подсобный
+ * скрипт снимков от кода. Не репозиторий или git не ответил — список пуст, и
+ * исключения нет: лишний пробел лучше пропущенного.
+ */
+function untrackedOf(project, paths) {
+  if (paths.length === 0) return [];
+  const listed = spawnSync('git', ['ls-files', '-z', '--', ...paths], {
+    cwd: project,
+    encoding: 'utf8',
+  });
+  if (listed.status !== 0) return [];
+  const tracked = new Set(listed.stdout.split('\0').filter(Boolean));
+  return paths.filter((path) => !tracked.has(path));
 }
 
 /**
@@ -318,10 +349,12 @@ async function turnGate(project, options, positional) {
   const { judgeTurn } = await domain('turn-gate');
   const { readGroups } = await domain('store');
   const { readRuns } = await domain('runs-store');
+  const paths = positional.map((file) => toProjectRelative(project, file));
   const gaps = judgeTurn({
     groups: readGroups(project),
     runs: readRuns(project),
-    paths: positional.map((file) => toProjectRelative(project, file)),
+    paths,
+    untracked: untrackedOf(project, paths),
     since,
     ...(typeof options['changed-at'] === 'string' ? { changedAt: options['changed-at'] } : {}),
     cli: `node "${fileURLToPath(import.meta.url)}"`,
@@ -466,6 +499,66 @@ async function syncFolder(project, options) {
   }
 }
 
+/**
+ * Короткий вывод прогона (2.2 плана экономии, 17.10.2026). Агент группы читает
+ * вывод команды в контекст, и каждый следующий вызов модели перечитывает его
+ * заново: полный журнал гейта в 30 тыс. знаков стоил десятки перечитываний. В
+ * короткой форме на экран идут первые строки падений и путь к журналу, где
+ * лежит всё; итог и записи истории печатает импорт ниже — как без формы.
+ * Метку ставит панель ребёнку разделения (`ChatRunner`, `BRIEF_OUTPUT_ENV`); имя
+ * берётся из контрактов — литерал здесь разошёлся бы с панелью молча (ревью A2-F18).
+ */
+async function briefMarked() {
+  const { BRIEF_OUTPUT_ENV } = await import(
+    pathToFileURL(join(REPO, 'packages', 'contracts', 'src', 'chat-group-settings.ts')).href
+  );
+  return process.env[BRIEF_OUTPUT_ENV] === '1';
+}
+const BRIEF_MAX_BUFFER = 512 * 1024 * 1024;
+const BRIEF_FAILURES = 15;
+const FAILURE_LINE =
+  /\b(FAIL|FAILED|ERROR|Error|AssertionError|failed|panic)\b|^\s*(×|✗|✘|●)\s|\s(×|✗|✘)\s/;
+
+/** Журналов коротких прогонов хранится столько: старые убираются при записи нового. */
+const BRIEF_LOGS_KEPT = 30;
+
+/** Оставить свежие журналы: каждый — полный вывод гейта, за неделю групп — гигабайты. */
+function pruneBriefLogs(dir) {
+  try {
+    const logs = readdirSync(dir)
+      .filter((name) => name.startsWith('run-') && name.endsWith('.log'))
+      .sort();
+    for (const name of logs.slice(0, Math.max(0, logs.length - BRIEF_LOGS_KEPT))) {
+      rmSync(join(dir, name), { force: true });
+    }
+  } catch {
+    // Чужой процесс держит файл (Windows) — уберётся при следующем прогоне.
+  }
+}
+
+function briefOutput(result) {
+  const text = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  const dir = join(tmpdir(), 'agentdeck-tests-logs');
+  mkdirSync(dir, { recursive: true });
+  pruneBriefLogs(dir);
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const log = join(dir, `run-${stamp}-${process.pid}.log`);
+  writeFileSync(log, text, 'utf8');
+  const lines = text.split(/\r?\n/).filter((line) => line.trim());
+  // Зелёный прогон падений не печатает: «failed» и «Error» живут и в именах
+  // проходящих тестов, и агент читал их как падения (ревью B2-F12).
+  const failures =
+    result.status === 0
+      ? []
+      : lines.filter((line) => FAILURE_LINE.test(line)).slice(0, BRIEF_FAILURES);
+  return [
+    ...(failures.length > 0
+      ? ['Первые строки падений:', ...failures.map((line) => `  ${line.trim().slice(0, 300)}`)]
+      : []),
+    `Полный вывод (${lines.length} строк): ${log}`,
+  ].join('\n');
+}
+
 async function runTests(project, options) {
   const groups = await groupsOf(project, options);
   const automated = [];
@@ -506,14 +599,30 @@ async function runTests(project, options) {
     return;
   }
 
+  const memo = await checkMemoOf(project, options, plan, files);
+  const replay =
+    memo?.hit && memo.replay(`tests-cli run (из памяти ${memo.hit.runId}): ${plan.line}`);
+  if (replay) {
+    console.log(
+      `\nБез изменений с зелёного прогона ${memo.hit.runId} (${memo.hit.at}): файлы проекта те же, ` +
+        `прогон не повторён, итог тот же — зелёный, записан в историю как ${replay.id}. Заново — с --fresh.`,
+    );
+    printSkipped(skipped);
+    dropTemp(plan.temp);
+    process.exit(0);
+  }
+
   const started = Date.now();
+  const brief = !options.full && (Boolean(options.brief) || (await briefMarked()));
   const result = spawnSync(plan.line, {
     cwd: plan.cwd,
     env: { ...process.env, ...plan.env },
     shell: true,
-    stdio: 'inherit',
+    stdio: brief ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+    ...(brief ? { encoding: 'utf8', maxBuffer: BRIEF_MAX_BUFFER } : {}),
     ...(plan.timeout ? { timeout: plan.timeout } : {}),
   });
+  if (brief) console.log(briefOutput(result));
   if (result.error?.code === 'ETIMEDOUT') {
     console.log(`\nПрогон дольше ${plan.timeout / 60_000} мин — остановлен.`);
   }
@@ -578,9 +687,40 @@ async function runTests(project, options) {
     exitCode,
   });
   printImport(imported, `Импортировано из ${plan.temp ? 'отчёта прогона' : file} (${format})`);
+  memo?.settle(result.status === 0 && imported.read > 0 ? imported.runId : undefined);
   printSkipped(skipped);
   dropTemp(plan.temp);
   process.exit(result.status ?? 0);
+}
+
+/**
+ * Память проверок (9.3): зелёный итог команды на том же дереве отдаётся без
+ * прогона. Только группе панели (её метка `AGENTDECK_BRIEF_OUTPUT`) или по
+ * `--memo`: человек и CI гоняют всегда по-настоящему. Тесты папки e2e — мимо:
+ * они идут по стенду, а стенд меняется без единой правки в файлах. Отпечаток
+ * снимается ДО прогона — правка во время прогона не попадёт в память под
+ * чужим отпечатком.
+ */
+async function checkMemoOf(project, options, plan, files) {
+  const wanted = Boolean(options.memo) || (await briefMarked());
+  if (!wanted || options.fresh || options.dry || plan.stand) return undefined;
+  const { treeFingerprint, recall, rememberGreen, forget, replayRun } = await domain('check-memo');
+  const fingerprint = treeFingerprint(project);
+  if (!fingerprint) return undefined;
+  const key = createHash('sha256')
+    .update(`${plan.line}\0${plan.cwd}\0${[...files].sort().join('\0')}`)
+    .digest('hex');
+  return {
+    hit: recall(project, key, fingerprint),
+    // Ответ памяти — своей записью истории: проверка конца хода ждёт прогона после правки.
+    replay(scope) {
+      return this.hit ? replayRun(project, this.hit.runId, scope) : undefined;
+    },
+    settle(runId) {
+      if (runId) rememberGreen(project, { key, fingerprint, runId, at: new Date().toISOString() });
+      else forget(project, key);
+    },
+  };
 }
 
 /** Своя команда прогона: файлы — в `{files}` или в конец строки, запуск из корня. */
@@ -622,6 +762,8 @@ async function e2ePlan(project, files) {
     results: ['junit', report],
     temp,
     origin: 'e2e',
+    // Папка e2e идёт по стенду: его состояние в отпечаток дерева не входит (9.3).
+    stand: true,
   };
 }
 
@@ -632,6 +774,9 @@ async function e2ePlan(project, files) {
  * без группы: `{paths}`/`{packages}` — весь набор раннера. Сломанный файл —
  * отказ словами, а не тихий откат на npm test.
  */
+const STAND_COMMAND =
+  /https?:\/\/|\blocalhost\b|127\.0\.0\.1|--health\b|\bplaywright\b|\bcypress\b/i;
+
 async function automationPlan(project, files, whole) {
   const { readAutomation, automationCommand, clearReport, collectReport, reportTail } =
     await domain('automation');
@@ -651,6 +796,10 @@ async function automationPlan(project, files, whole) {
     reportShown: automation.report ?? own.report,
     temp,
     origin: 'e2e',
+    // Своя команда, что идёт по стенду (адрес, проверка его здоровья, браузерный
+    // раннер), памяти не подлежит, как папка e2e (ревью B2-F6): стенд меняется без
+    // единой правки в файлах.
+    stand: STAND_COMMAND.test(own.line),
     ...(automation.timeoutMinutes ? { timeout: automation.timeoutMinutes * 60_000 } : {}),
   };
 }

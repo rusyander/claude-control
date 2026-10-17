@@ -47,10 +47,18 @@ export function registerChatRoutes(
   session: ChatSession,
   /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке чатов. */
   awaitsYou?: (chatId: string) => boolean,
+  /** Модель, назначенная лёгкому чату вопросов о ходе групп (5.1). */
+  assignedOf?: (chatId: string) => { model: string; effort: string } | undefined,
 ): void {
-  registerChatTranscriptRoutes(app, ctx, (chatId) => registry.isProcessAlive(chatId), awaitsYou);
+  registerChatTranscriptRoutes(
+    app,
+    ctx,
+    (chatId) => registry.isProcessAlive(chatId),
+    awaitsYou,
+    assignedOf,
+  );
   registerChatBrowseRoutes(app, ctx);
-  registerChatRunRoutes(app, ctx, registry, session);
+  registerChatRunRoutes(app, ctx, registry, session, assignedOf);
   registerChatArtifactRoutes(app, ctx);
   registerChatCliRoutes(app, undefined, () => ctx.store);
   // Вопросы сессий из терминала и VS Code: сводка помечает те, что ждут

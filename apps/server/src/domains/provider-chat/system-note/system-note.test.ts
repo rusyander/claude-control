@@ -4,8 +4,12 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   qwenLimitLayersRoot,
+  qwenMcpLayersRoot,
   qwenNoteLayersRoot,
+  qwenQuietLayersRoot,
   writeQwenLimits,
+  writeQwenMcpExcluded,
+  writeQwenQuietRun,
   writeQwenSystemNote,
 } from './system-note.ts';
 
@@ -177,5 +181,152 @@ describe('writeQwenLimits', () => {
       env: {},
     });
     expect(other).not.toEqual(first);
+  });
+});
+
+describe('writeQwenMcpExcluded (6.1)', () => {
+  let appData: string;
+
+  beforeEach(() => {
+    appData = mkdtempSync(join(tmpdir(), 'cc-qwen-mcp-'));
+  });
+
+  afterEach(() => {
+    rmSync(appData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  const read = (env: Record<string, string> | undefined): Record<string, unknown> =>
+    JSON.parse(readFileSync(env?.QWEN_CODE_SYSTEM_SETTINGS_PATH ?? '', 'utf8')) as Record<
+      string,
+      unknown
+    >;
+
+  it('снятые серверы — в mcp.excluded слоя; исключения и серверы основы остаются', () => {
+    const group = join(appData, 'group.json');
+    writeFileSync(
+      group,
+      JSON.stringify({
+        mcpServers: { a: { command: 'a' } },
+        mcp: { allowed: ['a', 'inbox'], excluded: ['old', 'inbox'] },
+      }),
+    );
+    const env = writeQwenMcpExcluded({
+      appData,
+      names: ['inbox', 'figma'],
+      env: { QWEN_CODE_SYSTEM_SETTINGS_PATH: group },
+    });
+    expect(dirname(dirname(env?.QWEN_CODE_SYSTEM_SETTINGS_PATH ?? ''))).toBe(
+      qwenMcpLayersRoot(appData),
+    );
+    const merged = read(env);
+    expect(merged.mcpServers).toEqual({ a: { command: 'a' } });
+    expect(merged.mcp).toEqual({ allowed: ['a', 'inbox'], excluded: ['old', 'inbox', 'figma'] });
+  });
+
+  it('снимать нечего — слоя нет, прогон на прежнем файле', () => {
+    expect(writeQwenMcpExcluded({ appData, names: [], env: {} })).toBeUndefined();
+  });
+
+  it('строка о каталоге ложится поверх и выключатель не теряет', () => {
+    const off = writeQwenMcpExcluded({ appData, names: ['inbox'], env: {} });
+    const note = writeQwenSystemNote({ appData, note: 'QA', env: off ?? {} });
+    expect(read(note).mcp).toEqual({ excluded: ['inbox'] });
+  });
+});
+
+describe('writeQwenQuietRun (6.3)', () => {
+  let appData: string;
+
+  beforeEach(() => {
+    appData = mkdtempSync(join(tmpdir(), 'cc-qwen-quiet-'));
+  });
+
+  afterEach(() => {
+    rmSync(appData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  const read = (env: Record<string, string>): Record<string, unknown> =>
+    JSON.parse(readFileSync(env.QWEN_CODE_SYSTEM_SETTINGS_PATH ?? '', 'utf8')) as Record<
+      string,
+      unknown
+    >;
+
+  it('обычный разговор: подсказка следующей реплики выключена, память Qwen не тронута, основа на месте', () => {
+    const base = join(appData, 'base.json');
+    writeFileSync(
+      base,
+      JSON.stringify({
+        mcpServers: { a: { command: 'a' } },
+        ui: { theme: 'dark' },
+        memory: { enableManagedAutoMemory: true },
+      }),
+    );
+    const env = writeQwenQuietRun({
+      appData,
+      group: false,
+      env: { QWEN_CODE_SYSTEM_SETTINGS_PATH: base },
+    });
+    expect(dirname(dirname(env.QWEN_CODE_SYSTEM_SETTINGS_PATH ?? ''))).toBe(
+      qwenQuietLayersRoot(appData),
+    );
+    const merged = read(env);
+    expect(merged.ui).toEqual({ theme: 'dark', enableFollowupSuggestions: false });
+    expect(merged.memory).toEqual({ enableManagedAutoMemory: true });
+    expect(merged.mcpServers).toEqual({ a: { command: 'a' } });
+  });
+
+  it('группа: ещё и без авто-памяти, её «сна» и авто-навыков; прочие ключи памяти остаются', () => {
+    const base = join(appData, 'base.json');
+    writeFileSync(base, JSON.stringify({ memory: { enableTeamMemory: true } }));
+    const merged = read(
+      writeQwenQuietRun({ appData, group: true, env: { QWEN_CODE_SYSTEM_SETTINGS_PATH: base } }),
+    );
+    expect(merged.ui).toEqual({ enableFollowupSuggestions: false });
+    expect(merged.memory).toEqual({
+      enableTeamMemory: true,
+      enableManagedAutoMemory: false,
+      enableManagedAutoDream: false,
+      enableAutoSkill: false,
+    });
+  });
+
+  it('ложится поверх выключателя серверов, строка о каталоге — поверх неё, ничего не теряется', () => {
+    const off = writeQwenMcpExcluded({ appData, names: ['inbox'], env: {} }) ?? {};
+    const quiet = writeQwenQuietRun({ appData, group: true, env: off });
+    const note = writeQwenSystemNote({ appData, note: 'QA', env: quiet }) ?? {};
+    const merged = read(note);
+    expect(merged.mcp).toEqual({ excluded: ['inbox'] });
+    expect(merged.ui).toEqual({ enableFollowupSuggestions: false });
+    expect((merged.memory as Record<string, unknown>).enableManagedAutoMemory).toBe(false);
+  });
+
+  const heavyQueue = { hook: 'node "/panel/tools/heavy-queue-hook.mjs"', dir: '/data/heavy-queue' };
+
+  it('группа с очередью тяжёлых шагов: хуки оболочки дописаны к хукам основы, таймауты в мс, каталог в окружении', () => {
+    const base = join(appData, 'base.json');
+    const own = { matcher: 'Bash', hooks: [{ type: 'command', command: 'own', timeout: 5000 }] };
+    writeFileSync(base, JSON.stringify({ hooks: { PreToolUse: [own], Stop: [own] } }));
+    const env = writeQwenQuietRun({
+      appData,
+      group: true,
+      env: { QWEN_CODE_SYSTEM_SETTINGS_PATH: base },
+      heavyQueue,
+    });
+    expect(env.AGENTDECK_HEAVY_QUEUE_DIR).toBe('/data/heavy-queue');
+    const hooks = read(env).hooks as Record<string, unknown[]>;
+    const queued = (timeout: number) => ({
+      matcher: 'Bash',
+      hooks: [{ type: 'command', command: heavyQueue.hook, timeout }],
+    });
+    expect(hooks.PreToolUse).toEqual([own, queued(1_800_000)]);
+    expect(hooks.PostToolUse).toEqual([queued(10_000)]);
+    expect(hooks.PostToolUseFailure).toEqual([queued(10_000)]);
+    expect(hooks.Stop).toEqual([own]);
+  });
+
+  it('обычный разговор очередь не получает: ни хуков, ни каталога', () => {
+    const env = writeQwenQuietRun({ appData, group: false, env: {}, heavyQueue });
+    expect(env.AGENTDECK_HEAVY_QUEUE_DIR).toBeUndefined();
+    expect(read(env).hooks).toBeUndefined();
   });
 });

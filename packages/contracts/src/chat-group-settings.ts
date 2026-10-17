@@ -48,6 +48,14 @@ export interface ChatGroupSettingsView {
  */
 export const AUTONOMOUS_ENV = 'AGENTDECK_AUTONOMOUS';
 
+/**
+ * Метка «вывод тяжёлых команд — коротко» (2.2 плана экономии): панель ставит её
+ * ребёнку разделения, `tools/tests-cli.mjs run` по ней уводит вывод раннера в
+ * журнал и печатает итог, первые строки падений и путь. Имя повторено в
+ * tests-cli строкой — он не импортирует контракты.
+ */
+export const BRIEF_OUTPUT_ENV = 'AGENTDECK_BRIEF_OUTPUT';
+
 /** Действующие значения из своего и родительского — чистая функция для сервера и тестов. */
 export function resolveChatGroupSettings(
   own: StoredChatGroupSettings | undefined,

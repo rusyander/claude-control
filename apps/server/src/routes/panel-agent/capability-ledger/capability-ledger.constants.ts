@@ -113,6 +113,9 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/split/:parent/tickets/file': 'human:outward',
   'GET /api/chat/split/:parent/tasks': 'human:outward',
   'POST /api/chat/split/:parent/tasks/move': 'human:outward',
+  // chat/split-status-routes.ts: вопрос человека о ходе групп из хаба — лёгкий чат-помощник
+  // по сводке, как `/api/assist`; агенту панели не нужен — сводку он читает сам.
+  'POST /api/chat/split/:parent/status-ask': 'internal:assistant',
   // global-layer-routes.ts (В5): чтение и сверка — пробел агента; запись в слой ~/.claude — человек.
   'GET /api/global-layer': 'gap:P3',
   'POST /api/global-layer/:id/compare': 'gap:P3',

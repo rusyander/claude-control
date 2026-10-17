@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProviderChatEvent } from '@agentdeck/contracts';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
-import { ProviderChatService, type ProviderChatSubscriber } from './ProviderChatService.ts';
+import {
+  ProviderChatService,
+  type ChildRun,
+  type ProviderChatSubscriber,
+} from './ProviderChatService.ts';
 import type {
   ProviderChatRunEvent,
   ProviderChatRunLike,
@@ -243,6 +247,26 @@ describe('ProviderChatService', () => {
     ]);
   });
 
+  /** Ревью A2-F10: группа чужого CLI получала строку обычного чата — «спросите человека». */
+  it('решатель строки знает, что разговор — группа разделения', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setWorkspaceNote((_cwd, run) => (run?.group ? 'QA group' : 'QA chat'));
+    service.send(dir, 'codex', 'wd', { text: 'a' }, { provider: PROVIDER });
+    expect((run.options as { history: { content: string }[] }).history.at(-1)?.content).toContain(
+      'QA chat',
+    );
+    run.emit?.({ type: 'done', reply: 'ok', transport: 'stream' });
+    run.finish();
+
+    run = new FakeRun();
+    createChat(dir, 'codex', { id: 'g1', workdir: dir });
+    service.setChildRun(() => ({ group: true }));
+    service.send(dir, 'codex', 'g1', { text: 'b' }, { provider: PROVIDER });
+    expect((run.options as { history: { content: string }[] }).history.at(-1)?.content).toContain(
+      'QA group',
+    );
+  });
+
   it('надзирателю уходят слова человека без строки панели о каталоге', () => {
     createChat(dir, 'codex', { id: 'wd', workdir: dir });
     service.setWorkspaceNote(() => 'QA workspace: no e2e folder');
@@ -353,6 +377,136 @@ describe('ProviderChatService', () => {
     const options = run.options as { platformEnv: Record<string, string> };
     expect(options.platformEnv.QWEN_CODE_SYSTEM_SETTINGS_PATH).toBe('/note.json');
     expect(options.platformEnv.OPENAI_BASE_URL).toBe('http://127.0.0.1:1/x');
+  });
+
+  /**
+   * 6.1: лёгкий набор MCP ребёнка разделения. Выключатель CLI видит файл настроек
+   * после слоя группы, строка о снятых едет системной вместе со строкой о
+   * каталоге — и только если выключатель сработал: у CLI без него серверы
+   * остаются, и сказать модели «выключены» значило бы соврать.
+   */
+  it('снятые серверы ребёнка: выключатель поверх слоя группы, строка — только когда снято', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    const notes: string[] = [];
+    let offBase: string | undefined;
+    service.setWorkspaceNote(() => 'QA workspace: e2e');
+    service.setGroupActivation(() => ({ env: { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/group.json' } }));
+    service.setChildRun(() => ({
+      env: { AGENTDECK_BRIEF_OUTPUT: '1' },
+      mcp: { off: ['inbox'], note: 'Switched off: inbox.' },
+    }));
+    service.setSystemNote((_providerId, note) => {
+      notes.push(note);
+      return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/note.json' };
+    });
+    service.setMcpOff((_providerId, names, env) => {
+      offBase = env.QWEN_CODE_SYSTEM_SETTINGS_PATH;
+      return { AGENTDECK_OFF: names.join(',') };
+    });
+    service.send(dir, 'codex', 'wd', { text: 'первый' }, { provider: PROVIDER });
+    const options = run.options as { platformEnv: Record<string, string> };
+    expect(offBase).toBe('/group.json');
+    expect(options.platformEnv.AGENTDECK_OFF).toBe('inbox');
+    expect(options.platformEnv.AGENTDECK_BRIEF_OUTPUT).toBe('1');
+    expect(notes).toEqual(['QA workspace: e2e\n\nSwitched off: inbox.']);
+  });
+
+  /** Ревью B2-F16: окружение ребёнка — необязательное, пока его не задал другой слой. */
+  it('окружение ребёнка уходит прогону необязательным; ключ слоя группы — нет', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setGroupActivation(() => ({ env: { SHARED: 'группа' } }));
+    service.setChildRun(() => ({ env: { AGENTDECK_BRIEF_OUTPUT: '1', SHARED: 'ребёнок' } }));
+    service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+    const options = run.options as { optionalEnvKeys?: string[] };
+    expect(options.optionalEnvKeys).toEqual(['AGENTDECK_BRIEF_OUTPUT']);
+  });
+
+  /** Ревью B2-F15: запуск ребёнка не главнее разговора. */
+  it('решатель ребёнка упал — ход идёт обычным разговором', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setChildRun(() => {
+      throw new Error('boom');
+    });
+    service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+    const options = run.options as { platformEnv: Record<string, string> };
+    expect(options.platformEnv).toEqual({});
+    expect(options).not.toHaveProperty('optionalEnvKeys');
+  });
+
+  const offRefusals: [string, () => Record<string, string> | undefined][] = [
+    ['выключателя у CLI нет', () => undefined],
+    [
+      'выключатель упал',
+      () => {
+        throw new Error('boom');
+      },
+    ],
+  ];
+  for (const [title, off] of offRefusals) {
+    it(`${title} — строки о снятых нет`, () => {
+      createChat(dir, 'codex', { id: 'wd', workdir: dir });
+      const notes: string[] = [];
+      service.setWorkspaceNote(() => 'QA workspace: e2e');
+      service.setChildRun(() => ({ mcp: { off: ['inbox'], note: 'Switched off: inbox.' } }));
+      service.setSystemNote((_providerId, note) => {
+        notes.push(note);
+        return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/note.json' };
+      });
+      service.setMcpOff(off);
+      service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+      expect(notes).toEqual(['QA workspace: e2e']);
+    });
+  }
+
+  /**
+   * 6.3: фоновые вызовы модели CLI выключаются слоем поверх выключателя серверов
+   * и под строкой о каталоге; решатель знает, группа ли это.
+   */
+  it('тишина фоновых вызовов: поверх выключателя, под строкой о каталоге, с признаком группы', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    const calls: string[] = [];
+    let noteBase: string | undefined;
+    service.setWorkspaceNote(() => 'QA workspace: e2e');
+    service.setChildRun(() => ({ group: true, mcp: { off: ['inbox'], note: 'Switched off.' } }));
+    service.setMcpOff(() => ({ QWEN_CODE_SYSTEM_SETTINGS_PATH: '/off.json' }));
+    service.setQuietRun((providerId, group, env) => {
+      calls.push(`${providerId}:${group}:${env.QWEN_CODE_SYSTEM_SETTINGS_PATH ?? ''}`);
+      return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/quiet.json' };
+    });
+    service.setSystemNote((_providerId, _note, env) => {
+      noteBase = env.QWEN_CODE_SYSTEM_SETTINGS_PATH;
+      return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/note.json' };
+    });
+    service.send(dir, 'codex', 'wd', { text: 'первый' }, { provider: PROVIDER });
+    expect(calls).toEqual(['codex:true:/off.json']);
+    expect(noteBase).toBe('/quiet.json');
+  });
+
+  const quietCases: [string, () => ChildRun | undefined, boolean][] = [
+    ['обычный разговор', () => undefined, false],
+    ['разбор (ребёнок, не группа)', () => ({ env: { AGENTDECK_BRIEF_OUTPUT: '1' } }), false],
+  ];
+  for (const [title, child, group] of quietCases) {
+    it(`тишина фоновых вызовов: ${title} — не группа`, () => {
+      createChat(dir, 'codex', { id: 'wd', workdir: dir });
+      const seen: boolean[] = [];
+      service.setChildRun(child);
+      service.setQuietRun((_providerId, isGroup) => {
+        seen.push(isGroup);
+        return undefined;
+      });
+      service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+      expect(seen).toEqual([group]);
+    });
+  }
+
+  it('тишина фоновых вызовов упала — ход всё равно отправлен', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setQuietRun(() => {
+      throw new Error('boom');
+    });
+    service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+    expect(run.options).toBeDefined();
   });
 
   /** L4b: запрет сна и отложенный перезапуск сервера спрашивают, идёт ли ход чужого CLI на локальной модели. */

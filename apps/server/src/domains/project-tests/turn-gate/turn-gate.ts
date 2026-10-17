@@ -24,6 +24,11 @@ export interface TurnGateInput {
   since: string;
   /** Последняя правка хода: прогон до неё не видел того, что сдаётся. */
   changedAt?: string;
+  /**
+   * Файлы хода, которых git не отслеживает (3.4): скрипт снимков или пробы среди
+   * них — подсобка хода, не код. Нет поля — исключения нет.
+   */
+  untracked?: readonly string[];
   /** `node "<…>/tests-cli.mjs"` — как агенту его вызвать. */
   cli: string;
   root: string;
@@ -33,6 +38,20 @@ export interface TurnGateInput {
 const NOT_CODE =
   /^(\.agent|\.claude|\.git|\.vscode|\.idea|docs|changelog)\/|\.(md|mdx|txt|rst|adoc)$|(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|go\.sum|Cargo\.lock|poetry\.lock|uv\.lock)$/i;
 
+/**
+ * Скрипт снимков или пробы по имени (3.4 плана экономии, 17.10.2026): одноразовый
+ * `e2e/login-shots.mjs` останавливал конец хода требованием кейса. Не код он
+ * только неотслеживаемым И лежащим там, где живут подсобные скрипты, — в корне
+ * или в папке скриптов, не под `src/`/`lib/`: новый `src/health/probe.ts` или
+ * `shared/lib/screenshot.ts` — исходник продукта, и проверку с него не снять.
+ * Отслеживаемый скрипт и тест (`.spec.`, `.test.`) — код.
+ */
+const SCRATCH_SCRIPT =
+  /(^|\/)[^/]*(shots?|screenshots?|snapshots?|probes?|repro)[^/]*\.(mjs|cjs|js|ts|py|sh)$/i;
+const SCRATCH_DIR = /(^|\/)(e2e|qa|scripts?|tools|tmp|temp|scratch)\//i;
+const SOURCE_DIR = /(^|\/)(src|lib)\//i;
+const TEST_FILE = /\.(spec|test)\.[^/]+$/i;
+
 /** Сколько назвать по имени: дальше — числом. Длинный пропуск — лишние токены каждый раз. */
 const NAMED = 4;
 
@@ -41,9 +60,17 @@ function named(items: readonly string[]): string {
   return items.length > NAMED ? `${head} (+${items.length - NAMED})` : head;
 }
 
-export function codePathsOf(paths: readonly string[]): string[] {
-  return [...new Set(paths.map((path) => path.replace(/\\/g, '/').replace(/^\.\//, '')))].filter(
-    (path) => path && !path.startsWith('../') && !NOT_CODE.test(path),
+const normal = (path: string): string => path.replace(/\\/g, '/').replace(/^\.\//, '');
+
+export function codePathsOf(paths: readonly string[], untracked: readonly string[] = []): string[] {
+  const loose = new Set(untracked.map(normal));
+  const scratch = (path: string) =>
+    loose.has(path) &&
+    SCRATCH_SCRIPT.test(path) &&
+    !TEST_FILE.test(path) &&
+    (!path.includes('/') || (SCRATCH_DIR.test(path) && !SOURCE_DIR.test(path)));
+  return [...new Set(paths.map(normal))].filter(
+    (path) => path && !path.startsWith('../') && !NOT_CODE.test(path) && !scratch(path),
   );
 }
 
@@ -91,7 +118,7 @@ function weakCases(input: TurnGateInput): string[] {
 
 export function judgeTurn(input: TurnGateInput): string[] {
   const weak = weakCases(input);
-  const code = codePathsOf(input.paths);
+  const code = codePathsOf(input.paths, input.untracked);
   if (code.length === 0) return weak;
   const project = `--project "${input.root}"`;
   const caseCmd = (file: string) =>

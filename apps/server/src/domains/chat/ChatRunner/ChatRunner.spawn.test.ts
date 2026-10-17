@@ -284,6 +284,14 @@ describe('ChatRun.start: потолок рабочих процессов vitest
     for (const key of KEYS) expect(env[key]).toBeUndefined();
   });
 
+  it('ребёнку — метка короткого вывода tests-cli (2.2)', async () => {
+    expect((await spawnedEnv({ child: true })).AGENTDECK_BRIEF_OUTPUT).toBe('1');
+  });
+
+  it('обычному чату метки короткого вывода нет', async () => {
+    expect((await spawnedEnv()).AGENTDECK_BRIEF_OUTPUT).toBeUndefined();
+  });
+
   it('потолок из окружения панели сильнее нашего', async () => {
     process.env.VITEST_MAX_WORKERS = '7';
     const env = await spawnedEnv({ child: true });

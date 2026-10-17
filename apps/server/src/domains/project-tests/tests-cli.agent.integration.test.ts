@@ -59,6 +59,20 @@ describe('tests-cli case / record', () => {
     ]);
   });
 
+  it('case с придуманным id — новый кейс, вывод называет оба id (3.4)', () => {
+    const created = cli(
+      project,
+      'case',
+      '--group',
+      'gui',
+      '--json',
+      '{"id":"gui-exit","title":"Выход"}',
+    );
+    expect(created.code, created.out).toBe(0);
+    expect(created.out).toContain('Кейса «gui-exit» в группе не было — заведён новый gui:gui-002');
+    expect(titles()).toEqual(['Вход', 'Выход']);
+  });
+
   it('record с красным результатом — код 1', () => {
     const recorded = cli(project, 'record', 'gui:gui-001=failed');
     expect(recorded.code).toBe(1);

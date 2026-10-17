@@ -45,8 +45,16 @@ const ANSI = new RegExp(
 );
 const stripAnsi = (text: string): string => text.replace(ANSI, '');
 
-const hasEnv = (env: Record<string, string> | undefined): boolean =>
-  env !== undefined && Object.keys(env).length > 0;
+/**
+ * Окружение, без которого ход идти не может (адрес контура, слой группы), —
+ * оно уводит ход с общего сервера в одиночный запуск. Необязательные ключи
+ * (`optionalEnvKeys`) не в счёт: настройку прогона ребёнка общий сервер
+ * просто не получит, как до неё (ревью B2-F16).
+ */
+const bindsEnv = (options: ProviderChatRunOptions): boolean => {
+  const optional = new Set(options.optionalEnvKeys ?? []);
+  return Object.keys(options.platformEnv ?? {}).some((key) => !optional.has(key));
+};
 
 /** Откуда прогон берёт каталог скиллов и тело названного (П3.4). */
 export interface SkillTurnSource {
@@ -141,6 +149,12 @@ export interface ProviderChatRunOptions {
    * платный запрос в корпоративный шлюз.
    */
   platformEnv?: Record<string, string>;
+  /**
+   * Ключи `platformEnv`, без которых ход может идти общим сервером сессий или
+   * живым сервером: настройка прогона ребёнка разделения (потолок vitest,
+   * короткий вывод тестов). Одиночный запуск их получает, общий сервер — нет.
+   */
+  optionalEnvKeys?: readonly string[];
   /**
    * Надзиратель рантайма (П3.2): события вокруг ЭТОГО прогона.
    *
@@ -381,7 +395,12 @@ export class ProviderChatRun implements ProviderChatRunLike {
         ...(options.permission ? { allowEdits: options.permission.allowEdits } : {}),
         ...(options.workdir ? { workdir: options.workdir } : {}),
       };
-      const built = buildPrompt(options.history);
+      // Предел — длина командной строки. Промпт в stdin (`oneShotStdin`, Codex) им
+      // не ограничен: отказ по нему не пускал длинное задание навыка (ревью B2-F17).
+      const built = buildPrompt(
+        options.history,
+        provider.assistant?.oneShotStdin ? Number.POSITIVE_INFINITY : MAX_PROMPT_CHARS,
+      );
       if (built.overflow !== undefined && provider.assistant?.oneShotArgs) {
         onEvent({
           type: 'error',
@@ -557,7 +576,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
     // Сервер сессий общий на все разговоры: окружение ЭТОГО прогона (адрес
     // контура в `OPENCODE_CONFIG_CONTENT`) до него не доходит, и ход ушёл бы
     // провайдером человека. С окружением — только одиночный запуск.
-    if (hasEnv(options.platformEnv)) return undefined;
+    if (bindsEnv(options)) return undefined;
 
     const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
     if (!lastUser?.content.trim()) return undefined;
@@ -609,7 +628,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
     // с адресом контура не проверены, а `kimi web` вдобавок берёт модель из своего
     // `/config`, то есть из конфига человека. Ход идёт одиночным запуском — этот
     // путь проверен живьём (`check-run-endpoint-cli.mjs`).
-    if (options.provider.runEndpoint && hasEnv(options.platformEnv)) return false;
+    if (options.provider.runEndpoint && bindsEnv(options)) return false;
     const factory = options.liveTurn ?? (options.spawnImpl ? undefined : createLiveTurn);
     const turn = factory?.(kind);
     if (!turn) return false;
@@ -828,7 +847,9 @@ export class ProviderChatRun implements ProviderChatRunLike {
     // Промпт — в argv, stdin этому прогону не нужен, и его надо ЗАКРЫТЬ: CLI,
     // читающий stdin, когда это не терминал (`opencode run`, проверено 1.18.34),
     // иначе ждёт его конца вечно. Ошибка потока (CLI уже вышел) — не событие.
+    // CLI с промптом в stdin (`oneShotStdin`, Codex) получает текст и тот же конец.
     child.stdin?.on('error', () => {});
+    if (options.provider.assistant?.oneShotStdin && input !== undefined) child.stdin?.write(input);
     child.stdin?.end();
 
     return new Promise<void>((resolve) => {

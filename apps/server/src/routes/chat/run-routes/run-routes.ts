@@ -176,6 +176,11 @@ export function registerChatRunRoutes(
   // объект (его делит и продолжение в чистой сессии); тесты, поднимающие одни
   // эти маршруты, получают собственный.
   session: ChatSession,
+  /**
+   * Модель лёгкого чата вопросов о ходе групп (5.1): есть — разговор этот чат.
+   * Его ходы идут без дописки панели, как первый ход из хаба, и на его модели.
+   */
+  statusOf?: (chatId: string) => { model: string; effort: string } | undefined,
 ): void {
   const guardMainOf = cachedMainOf(mainCheckoutOf);
   // Реестр считает расход, но тарифов не знает: прайс и свои цены пользователя
@@ -510,6 +515,10 @@ export function registerChatRunRoutes(
       // переезжает на второй, но вкладка ещё помнит первый.
       const assigned =
         ctx.store.getChatLink(chatId) ?? (sessionId ? ctx.store.getChatLink(sessionId) : undefined);
+      // Лёгкий чат вопросов о ходе групп: первый ход ушёл без дописки, и второй
+      // получал инициативу (разделить, довести до MR) — системный промпт менялся
+      // между ходами, а чат только для чтения звали делить и доставлять (ревью A1-F3).
+      const status = statusOf?.(chatId) ?? (sessionId ? statusOf?.(sessionId) : undefined);
 
       // Потолок для подбора — модель этого разговора: оверрайд шапки, иначе
       // настройка. Правило выключено в проекте → `undefined`, и про классы
@@ -563,26 +572,27 @@ export function registerChatRunRoutes(
             cwd,
             parentChatId && parentChatId !== chatId ? parentChatId : undefined,
           );
-      const appendSystemPrompt =
-        (assigned && !workspace.isSandbox
-          ? // Та же сборка, что у продолжения сессии панелью (`review-starter.ts`):
-            // разойдись они, ход менял бы системный промпт сессии (E6).
-            linkedChildAppend(
-              ctx.store,
-              ctx.location.paths.appData,
-              ctx.store.getSettings(),
-              sessionId ? [chatId, sessionId] : [chatId],
-              cwd,
-              parentChatId && parentChatId !== chatId ? parentChatId : undefined,
-            )
-          : [
-              initiative ?? '',
-              lowered ? loweredWorkPrompt(undefined, { review: false }) : '',
-              pathHint ?? '',
-              knobsLine ?? '',
-            ]
-              .filter(Boolean)
-              .join(' ')) || undefined;
+      const appendSystemPrompt = status
+        ? undefined
+        : (assigned && !workspace.isSandbox
+            ? // Та же сборка, что у продолжения сессии панелью (`review-starter.ts`):
+              // разойдись они, ход менял бы системный промпт сессии (E6).
+              linkedChildAppend(
+                ctx.store,
+                ctx.location.paths.appData,
+                ctx.store.getSettings(),
+                sessionId ? [chatId, sessionId] : [chatId],
+                cwd,
+                parentChatId && parentChatId !== chatId ? parentChatId : undefined,
+              )
+            : [
+                initiative ?? '',
+                lowered ? loweredWorkPrompt(undefined, { review: false }) : '',
+                pathHint ?? '',
+                knobsLine ?? '',
+              ]
+                .filter(Boolean)
+                .join(' ')) || undefined;
 
       // Алиас CLI — это «рекомендованная модель уровня», не последняя в
       // семействе: `--model sonnet` уводил прогон на прошлое поколение при
@@ -591,9 +601,10 @@ export function registerChatRunRoutes(
       // и у выбора человека в шапке: пункт «Sonnet» человек читает как «свежий
       // Sonnet» (живой прогон 29.09: выбран Sonnet, шёл Sonnet 5 при вышедшем
       // 5.5). Конкретное имя модели — его точный выбор, оно едет как есть.
-      const runModel = model
-        ? expandAssignedModel(ctx.models.current(provider.modelVendors ?? []).models, model)
-        : model;
+      const wantedModel = model || status?.model;
+      const runModel = wantedModel
+        ? expandAssignedModel(ctx.models.current(provider.modelVendors ?? []).models, wantedModel)
+        : wantedModel;
 
       // Связь с родителем — СТРОГО до запуска. Прогон называет свой настоящий
       // `sessionId` через пару секунд, и перенос связи ищет запись по временному
@@ -648,7 +659,7 @@ export function registerChatRunRoutes(
           // шлёт всегда, а телефон и API-клиенты — нет, и без этого их сообщения
           // молча возвращали бы разговор на дефолт из настроек.
           model: runModel || assigned?.model,
-          effort: effort || assigned?.effort,
+          effort: effort || assigned?.effort || status?.effort,
           // Инициативы панели (разделить задачи, закрыть этап чистой сессией) —
           // одной строкой к системному промпту. Тумблеры в настройках, потому что
           // уместны они не всякому: кто ведёт один короткий разговор, увидит в них

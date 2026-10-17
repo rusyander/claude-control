@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  CODEX_COMPACT_LIMIT_ENV,
   CODEX_KIT_ARG_LIMIT,
   CODEX_KIT_ENV,
+  CODEX_MCP_OFF_ENV,
   CODEX_SKILL_DESCRIPTION_MAX,
   CodexKitTooLarge,
   buildCodexOverlay,
@@ -150,6 +152,83 @@ describe('withCodexKit', () => {
       'exec',
     );
     expect(result.missing).toBe(true);
+  });
+
+  it('выключенные серверы группы: ключ на каждый сразу за подкомандой, имя с точкой — в кавычках', () => {
+    const result = withCodexKit(
+      ['exec', '-m', 'gpt-5', 'привет'],
+      {
+        [CODEX_MCP_OFF_ENV]: JSON.stringify(['telegram-inbox', 'figma.dev']),
+        OPENAI_BASE_URL: 'x',
+      },
+      'exec',
+    );
+    expect(result.args).toEqual([
+      'exec',
+      '-c',
+      'mcp_servers.telegram-inbox.enabled=false',
+      '-c',
+      'mcp_servers."figma.dev".enabled=false',
+      '-m',
+      'gpt-5',
+      'привет',
+    ]);
+    expect(result.env).toEqual({ OPENAI_BASE_URL: 'x' });
+  });
+
+  it('выключатели и набор вместе: оба ключа за подкомандой, набор не потерян', () => {
+    const result = withCodexKit(
+      ['exec', 'привет'],
+      { [CODEX_KIT_ENV]: overlayFile(), [CODEX_MCP_OFF_ENV]: '["inbox"]' },
+      'exec',
+    );
+    expect(result.args.slice(0, 3)).toEqual(['exec', '-c', 'mcp_servers.inbox.enabled=false']);
+    expect(result.args[3]).toBe('-c');
+    expect(result.args[4]?.startsWith('developer_instructions="')).toBe(true);
+    expect(result.args.at(-1)).toBe('привет');
+    expect(result.env).toEqual({});
+  });
+
+  it('битый список выключателей — запуск как был, переменная всё равно убрана', () => {
+    for (const raw of ['не json', '{"inbox":true}', '[1, ""]']) {
+      const result = withCodexKit(['exec', 'привет'], { [CODEX_MCP_OFF_ENV]: raw }, 'exec');
+      expect(result.args).toEqual(['exec', 'привет']);
+      expect(result.env).toEqual({});
+    }
+  });
+
+  it('набор пропал — missing без выключателей: вызывающий откажет целиком', () => {
+    const result = withCodexKit(
+      ['exec', 'привет'],
+      { [CODEX_KIT_ENV]: join(root, 'gone.json'), [CODEX_MCP_OFF_ENV]: '["inbox"]' },
+      'exec',
+    );
+    expect(result.missing).toBe(true);
+    expect(result.args).toEqual(['exec', 'привет']);
+  });
+
+  it('порог сжатия группы (6.2): ключ сразу за подкомандой, после выключателей; переменная убрана', () => {
+    const result = withCodexKit(
+      ['app-server'],
+      { [CODEX_MCP_OFF_ENV]: '["inbox"]', [CODEX_COMPACT_LIMIT_ENV]: '160000', X: '1' },
+      'appServer',
+    );
+    expect(result.args).toEqual([
+      'app-server',
+      '-c',
+      'mcp_servers.inbox.enabled=false',
+      '-c',
+      'model_auto_compact_token_limit=160000',
+    ]);
+    expect(result.env).toEqual({ X: '1' });
+  });
+
+  it('порог сжатия не целое положительное — ключа нет, переменная убрана', () => {
+    for (const raw of ['', '0', '160k', '-5', '1e5', '12.5']) {
+      const result = withCodexKit(['exec', '-'], { [CODEX_COMPACT_LIMIT_ENV]: raw }, 'exec');
+      expect(result.args).toEqual(['exec', '-']);
+      expect(result.env).toEqual({});
+    }
   });
 });
 

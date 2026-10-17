@@ -58,6 +58,7 @@ import { useLocalRun } from '../model/useLocalRun';
 import { useStreamState } from '../model/useStreamState';
 import { downloadChatExport } from '../lib/downloadChatExport';
 import { keepPending } from '../lib/pending';
+import { runAssignment } from '../lib/runAssignment';
 import { withoutLiveTurn } from '../lib/liveTurn';
 import styles from './ChatPage.module.scss';
 import { isStreamShown } from '../../../shared/lib/chat-stream';
@@ -118,8 +119,9 @@ export function ChatPage() {
   const fromWindow = useAskFromWindow(draft, () => setProjectWindow(undefined));
 
   // Модель и глубина продумывания: общий дефолт из настроек, глубина, назначенная
-  // разговору панелью, и выбор этого разговора (подробности — в хуке).
-  const models = useChatModelPrefs(draftKey, settings, activeChat);
+  // разговору панелью, и выбор этого разговора (подробности — в хуке). Прогон
+  // без строки в списке назначен сервером — его модель тоже назначенная.
+  const models = useChatModelPrefs(draftKey, settings, runAssignment(activeChat, run));
   // Кто ответит: подпись ожидания называет модель, а через контур — модель контура.
   const modelName = useRunModelName({
     consumer: activeChat?.parentId ? 'groups' : 'chat',

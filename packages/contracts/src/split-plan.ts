@@ -36,6 +36,12 @@ const MAX_TASK = OWNER_TEXT_MAX;
 const MAX_OWNS = 40;
 const MAX_OWN = 200;
 const MAX_NOTES = OWNER_TEXT_MAX;
+/**
+ * Карта мест группы и общая подготовка (8.3, 8.4): места и способы, а не код —
+ * длиннее уже пересказ файлов, который группа всё равно прочтёт сама.
+ */
+const MAX_MAP = 4_000;
+const MAX_SETUP = 2_000;
 const MAX_QUESTION = 600;
 const MAX_CONFLICTS = 40;
 const MAX_WHY = 400;
@@ -61,6 +67,12 @@ export interface SplitPlanGroup {
   tasks: string[];
   /** Что делают соседи, на какие интерфейсы полагаться, чего не трогать. */
   notes?: string;
+  /**
+   * Карта мест (8.3): файлы и строки правки, где вызывается изменяемое, образец
+   * в репозитории, команды проверки этих мест. Разбор читает код ради
+   * пересечений всё равно — найденное уходит группе, а не ищется заново.
+   */
+  map?: string;
   /** Группы, чья работа должна лечь раньше: копия ветвится от их ветки. */
   after: number[];
   /** Вопрос человеку — группа не стартует, пока не ответят. */
@@ -86,6 +98,11 @@ export interface SplitPlan {
   conflicts: SplitPlanConflict[];
   /** Порядок старта/слияния — индексы групп. */
   order: number[];
+  /**
+   * Общая подготовка (8.4), одна на разделение: как поднять и проверить проект,
+   * адреса и порты, способ входа на стенд — без самих секретов.
+   */
+  setup?: string;
 }
 
 function text(value: unknown, limit: number): string | undefined {
@@ -191,6 +208,7 @@ export function parseSplitPlan(raw: unknown, titles?: readonly string[]): SplitP
           ? text((holdRaw as { question?: unknown }).question, MAX_QUESTION)
           : undefined;
     const notes = prose(group.notes ?? group.note, MAX_NOTES);
+    const map = prose(group.map ?? group.places, MAX_MAP);
     const groupKey = text(group.groupKey, MAX_GROUP_KEY);
 
     groups.push({
@@ -198,6 +216,7 @@ export function parseSplitPlan(raw: unknown, titles?: readonly string[]): SplitP
       owns: list(group.owns ?? group.files, MAX_OWNS, MAX_OWN),
       tasks: list(group.tasks, MAX_TASKS, MAX_TASK, prose),
       ...(notes ? { notes } : {}),
+      ...(map ? { map } : {}),
       after: refList(group.after ?? group.dependsOn, titles).filter((ref) => ref !== index),
       ...(hold ? { hold } : {}),
       ...(groupKey ? { groupKey } : {}),
@@ -220,7 +239,8 @@ export function parseSplitPlan(raw: unknown, titles?: readonly string[]): SplitP
     });
   }
 
-  return { groups, conflicts, order: refList(source.order, titles) };
+  const setup = prose(source.setup, MAX_SETUP);
+  return { groups, conflicts, order: refList(source.order, titles), ...(setup ? { setup } : {}) };
 }
 
 /** Что осталось от ответа после вырезания блока и что из него разобрано. */
@@ -369,6 +389,22 @@ function sameTask(a: string, b: string): boolean {
 }
 
 /**
+ * Заметки группы из разбора: его слова о соседях, карта мест группы и общая
+ * подготовка. Всё — заметками, а не отдельными полями: заметки уже доходят до
+ * плана, работы, поднятой работы и группы в чужом CLI (`composeGroupNotes`).
+ */
+function triageNotes(planned: SplitPlanGroup | undefined, setup: string | undefined): string {
+  return [
+    planned?.notes,
+    planned?.map &&
+      `Map of places from the triage — start from it, do not search again for what it names:\n${planned.map}`,
+    setup && `Shared setup, found once by the triage for every group:\n${setup}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
  * Применить разбор к предложению. Чистая функция — сюда не входит ни git, ни
  * хранилище; результат идёт и в запуск, и в запись конвейера, и на экран.
  *
@@ -478,11 +514,12 @@ export function applySplitPlan(
   return {
     groups: groups.map((_, index) => {
       const planned = byIndex.get(index);
+      const notes = triageNotes(planned, plan.setup);
       return {
         index,
         tasks: tasksOf[index] ?? [],
         owns: planned?.owns ?? [],
-        ...(planned?.notes ? { notes: planned.notes } : {}),
+        ...(notes ? { notes } : {}),
         after: after[index] ?? [],
         ...(planned?.hold ? { hold: planned.hold } : {}),
         ...(planned?.groupKey ? { groupKey: planned.groupKey } : {}),
@@ -576,7 +613,10 @@ export function triageStagePrompt(input: {
     ...groups,
     '',
     'Do this:',
-    '1. For each task, find the files and modules it will touch.',
+    '1. For each task, find the files and modules it will touch. Keep what you found for the ' +
+      "group's map: file:line of what changes, where the changed code is called, the reference in " +
+      'the repository to copy, the test and screenshot commands for those places. The group starts ' +
+      'from the map instead of searching again — places and commands only, no code and no retelling.',
     '2. Find the overlaps between groups: one file, one module, one contract shared by two groups.',
     "3. Give each overlap to ONE owner group; write into the neighbours' notes what to rely on " +
       "and what not to touch, and if their work is impossible without the owner's changes, give them after.",
@@ -584,12 +624,18 @@ export function triageStagePrompt(input: {
       'task text VERBATIM. Do not change group names or branches.',
     '5. hold — only for a question you cannot decide (two incompatible readings, a product ' +
       'decision). What you can decide yourself — decide and write it into notes.',
+    '6. Once for all groups, the setup every group would otherwise find out on its own: how the ' +
+      'project is started and checked here (commands, dev-server ports, stand addresses) and how ' +
+      'to log in to the stand — name the method or the file that holds the access, never the ' +
+      'secret itself. Only what you saw in the repository; leave out what you did not find.',
     '',
     `End your answer with EXACTLY ONE code block in the language ${SPLIT_PLAN_BLOCK_LANG} containing JSON of the form ` +
       '{"groups":[{"index":1,"owns":["path/or/module"],"tasks":["task verbatim"],' +
       '"notes":"what the neighbours do, which interfaces to rely on, what not to touch",' +
+      '"map":"file:line — what changes; callers; reference; check commands",' +
       '"after":[2],"hold":{"question":"question to the human"}}],' +
-      '"conflicts":[{"paths":["file"],"resolvedBy":1,"why":"why this group"}],"order":[2,1,3]}. ' +
+      '"conflicts":[{"paths":["file"],"resolvedBy":1,"why":"why this group"}],"order":[2,1,3],' +
+      '"setup":"start and check commands, ports, stand address, login method"}. ' +
       'Group numbers as above, starting from one. after — the numbers of groups whose work must land ' +
       "first (this group's copy branches off their branch). order — the order of start and merge. " +
       'Do not set hold or after without need: a group without them starts at once.',
@@ -725,10 +771,11 @@ export function planStagePrompt(input: {
     input.kind ? `Class of work in the panel's view: ${input.kind}.` : '',
     '',
     'Write the plan so that one can work by it without seeing this conversation:',
-    '1. Code analysis for the task: which modules are touched, how they are built, where the input and output are.',
+    '1. Code analysis for the task: which modules are touched, how they are built, where the input and output are. ' +
+      'When the triage notes carry a map of places, start from it: check its places and add what it missed — do not search again for what it names.',
     '2. References in the repository: how similar things are already done here (files, patterns) — the work copies them rather than inventing.',
     '3. At least two approaches with their strengths and weaknesses, and the choice of the strong one with the reasoning.',
-    '4. Steps in order, each with the files it touches and a check after it (a command or what to look at).',
+    '4. Steps in order, each with the files and lines it touches and a check after it (a command or what to look at).',
     // U13: критерии — по пунктам владельца, иначе ревью сверяет работу с
     // пересказом плана, а не с тем, что просили; уровень проверки называется до
     // первой правки (глобальное правило владельца), а не подбирается под итог.
@@ -765,7 +812,8 @@ export function workAfterPlanPrompt(input: {
     input.plan
       ? 'The plan was written in advance by the ceiling model in this same copy — follow it step by ' +
         'step, with a check after each step. Deviate only if the code says otherwise, and name the ' +
-        'deviation in your answer.\n\n' +
+        'deviation in your answer. Open the places the plan and the map name directly; search the ' +
+        'repository only for what they do not name.\n\n' +
         `Plan:\n${input.plan}`
       : "The panel did not receive this group's plan (the plan run gave no block or did not finish) — " +
         'plan yourself: first the code analysis and references, then steps with a check after each.',

@@ -291,7 +291,7 @@
       "light-ru": {
         "file": "01-proposal.png",
         "width": 905,
-        "height": 900
+        "height": 879
       },
       "light-en": {
         "file": "01-proposal.en.png",
@@ -301,7 +301,7 @@
       "dark-ru": {
         "file": "01-proposal.dark.png",
         "width": 905,
-        "height": 900
+        "height": 879
       },
       "dark-en": {
         "file": "01-proposal.dark.en.png",
@@ -335,22 +335,22 @@
       "light-ru": {
         "file": "03-hub.png",
         "width": 832,
-        "height": 388
+        "height": 493
       },
       "light-en": {
         "file": "03-hub.en.png",
         "width": 832,
-        "height": 388
+        "height": 493
       },
       "dark-ru": {
         "file": "03-hub.dark.png",
         "width": 832,
-        "height": 388
+        "height": 493
       },
       "dark-en": {
         "file": "03-hub.dark.en.png",
         "width": 832,
-        "height": 388
+        "height": 493
       }
     },
     "split/04-child-ask": {
@@ -401,22 +401,22 @@
       "light-ru": {
         "file": "06-paused.png",
         "width": 832,
-        "height": 450
+        "height": 555
       },
       "light-en": {
         "file": "06-paused.en.png",
         "width": 832,
-        "height": 450
+        "height": 555
       },
       "dark-ru": {
         "file": "06-paused.dark.png",
         "width": 832,
-        "height": 450
+        "height": 555
       },
       "dark-en": {
         "file": "06-paused.dark.en.png",
         "width": 832,
-        "height": 450
+        "height": 555
       }
     },
     "split/07-worktrees": {
@@ -461,6 +461,50 @@
         "file": "08-move-tasks.dark.en.png",
         "width": 940,
         "height": 880
+      }
+    },
+    "split/09-status-ask": {
+      "light-ru": {
+        "file": "09-status-ask.png",
+        "width": 806,
+        "height": 135
+      },
+      "light-en": {
+        "file": "09-status-ask.en.png",
+        "width": 806,
+        "height": 135
+      },
+      "dark-ru": {
+        "file": "09-status-ask.dark.png",
+        "width": 806,
+        "height": 135
+      },
+      "dark-en": {
+        "file": "09-status-ask.dark.en.png",
+        "width": 806,
+        "height": 135
+      }
+    },
+    "split/10-status-chat": {
+      "light-ru": {
+        "file": "10-status-chat.png",
+        "width": 1440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "10-status-chat.en.png",
+        "width": 1440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "10-status-chat.dark.png",
+        "width": 1440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "10-status-chat.dark.en.png",
+        "width": 1440,
+        "height": 900
       }
     }
   }

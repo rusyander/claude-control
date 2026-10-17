@@ -5,6 +5,7 @@ export { useCleanupGroup } from './api/useCleanupGroup';
 export { useDismissAutoNotices } from './api/useDismissAutoNotices';
 export { useAcceptGroup } from './api/useAcceptGroup';
 export { useCancelSplitPlan } from './api/useCancelSplitPlan';
+export { useAskSplitStatus } from './api/useAskSplitStatus';
 export { useRecheckGroup } from './api/useRecheckGroup';
 export { useContinueGroup } from './api/useContinueGroup';
 export { useDropGroup } from './api/useDropGroup';

@@ -16,7 +16,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WorktreeBootstraps, detectBootstrapPlan } from './bootstrap.ts';
 import { removeWorktree } from './project-git.ts';
-import { seedNodeModules, seedSourceFor, selfContained } from './seed-node-modules.ts';
+import {
+  missingPackages,
+  seedNodeModules,
+  seedSourceFor,
+  selfContained,
+} from './seed-node-modules.ts';
 
 /**
  * Посев `node_modules` копии из оригинала. Всё настоящее: жёсткие ссылки на
@@ -121,6 +126,76 @@ describe('seedSourceFor', () => {
   });
 });
 
+describe('missingPackages', () => {
+  it('нет пакета или версия не та, что в lock-файле — назван; полное дерево — пусто', async () => {
+    const dir = join(root, 'app');
+    put(
+      join(dir, 'package.json'),
+      JSON.stringify({ dependencies: { a: '^1.0.0', b: '^2.0.0' }, devDependencies: { c: '3' } }),
+    );
+    put(
+      join(dir, 'package-lock.json'),
+      JSON.stringify({ packages: { 'node_modules/a': { version: '1.2.0' } } }),
+    );
+    put(join(dir, 'node_modules', 'a', 'package.json'), '{"version":"1.1.0"}');
+    put(join(dir, 'node_modules', 'b', 'package.json'), '{"version":"2.0.0"}');
+    expect(await missingPackages(dir)).toEqual(['a', 'c']);
+    put(join(dir, 'node_modules', 'a', 'package.json'), '{"version":"1.2.0"}');
+    put(join(dir, 'node_modules', 'c', 'package.json'), '{"version":"3.0.0"}');
+    expect(await missingPackages(dir)).toEqual([]);
+  });
+
+  it('npm: сверяется всё дерево lock-файла, вложенные тоже; необязательные и ссылки — нет', async () => {
+    const dir = join(root, 'tree');
+    put(join(dir, 'package.json'), JSON.stringify({ dependencies: { a: '^1.0.0' } }));
+    put(
+      join(dir, 'package-lock.json'),
+      JSON.stringify({
+        packages: {
+          '': { name: 'tree' },
+          'node_modules/a': { version: '1.0.0' },
+          'node_modules/dep': { version: '2.0.0' },
+          'node_modules/a/node_modules/nested': { version: '3.0.0' },
+          'node_modules/fsevents': { version: '2.3.3', optional: true },
+          'node_modules/types-only': { version: '1.0.0', devOptional: true },
+          'node_modules/local': { resolved: 'packages/local', link: true },
+        },
+      }),
+    );
+    put(join(dir, 'node_modules', 'a', 'package.json'), '{"version":"1.0.0"}');
+    expect(await missingPackages(dir, 'npm')).toEqual(['dep', 'nested']);
+    put(join(dir, 'node_modules', 'dep', 'package.json'), '{"version":"2.0.0"}');
+    put(
+      join(dir, 'node_modules', 'a', 'node_modules', 'nested', 'package.json'),
+      '{"version":"3.1.0"}',
+    );
+    expect(await missingPackages(dir, 'npm')).toEqual(['nested']);
+    put(
+      join(dir, 'node_modules', 'a', 'node_modules', 'nested', 'package.json'),
+      '{"version":"3.0.0"}',
+    );
+    expect(await missingPackages(dir, 'npm')).toEqual([]);
+  });
+
+  it('pnpm и yarn: забытый рядом package-lock.json о дереве не говорит — только наличие прямых', async () => {
+    const dir = join(root, 'pnpm');
+    put(join(dir, 'package.json'), JSON.stringify({ dependencies: { gd: '^1.0.0' } }));
+    put(
+      join(dir, 'package-lock.json'),
+      JSON.stringify({
+        packages: {
+          'node_modules/gd': { version: '0.9.0' },
+          'node_modules/gone': { version: '1.0.0' },
+        },
+      }),
+    );
+    put(join(dir, 'node_modules', 'gd', 'package.json'), '{"version":"1.0.0"}');
+    expect(await missingPackages(dir, 'pnpm')).toEqual([]);
+    expect(await missingPackages(dir, 'yarn')).toEqual([]);
+    expect(await missingPackages(dir, 'npm')).toEqual(['gd', 'gone']);
+  });
+});
+
 describe('selfContained', () => {
   const pkg = (deps: Record<string, string>, extra = {}): string => {
     const dir = join(root, `p${Math.random().toString(36).slice(2)}`);
@@ -194,6 +269,26 @@ describe('подготовка копии на npm', () => {
     expect(readFileSync(join(main, 'web', 'node_modules', 'tiny', 'index.js'), 'utf8')).toBe(
       'module.exports = 42;',
     );
+  }, 180_000);
+
+  /**
+   * Оригинал 16.10: манифест требовал пакет, которого в `node_modules` не было;
+   * ссылка отдала копии неполное дерево, и сборка группы была красной.
+   */
+  it('в node_modules оригинала недостаёт пакета из манифеста — не ссылка, а посев с доустановкой', async () => {
+    const { main, copy } = project({ tiny: 'file:./tiny-1.0.0.tgz' });
+    rmSync(join(main, 'web', 'node_modules', 'tiny'), { recursive: true, force: true });
+
+    const boots = new WorktreeBootstraps(join(root, 'logs'));
+    const state = await boots.run(copy, detectBootstrapPlan(copy)!);
+
+    expect(state.status).toBe('ok');
+    const log = boots.log(copy);
+    expect(log).toContain('недостаёт пакетов или они не той версии (tiny)');
+    expect(log).not.toContain('ссылка на каталог оригинала');
+    expect(lstatSync(join(copy, 'web', 'node_modules')).isSymbolicLink()).toBe(false);
+    expect(sh(join(copy, 'web'), 'node', ['-p', "require('tiny')"]).trim()).toBe('42');
+    expect(existsSync(join(main, 'web', 'node_modules', 'tiny'))).toBe(false);
   }, 180_000);
 
   it('каталог с соседней папкой по file: — посев жёсткими ссылками, папка своя, не оригинала', async () => {

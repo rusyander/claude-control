@@ -36,6 +36,7 @@ import {
   type SplitStart,
 } from '../../domains/chat/ChatSplit/ChatSplit.ts';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
+import { seedTaskNotebook } from '../../domains/chat/task-notebook/task-notebook.ts';
 import {
   chatKnobsLine,
   childStageExtra,
@@ -753,6 +754,21 @@ export function createSplitLauncher(
     // У Claude ключ ребёнка и связь уже есть (`link` зовётся до `start`); у
     // чужого CLI ключ выдаёт его хранилище — выбор ложится внутри `startForeign`.
     if (!isForeign) applyPick(input.chatId, input.group);
+    // Тетрадь задачи (9.2) — до старта: первое же чтение агента её находит.
+    try {
+      seedTaskNotebook(
+        input.cwd,
+        composeGroupNotes({
+          ...(input.group.notes ? { notes: input.group.notes } : {}),
+          ...(input.context?.predecessors ? { predecessors: input.context.predecessors } : {}),
+          ...(input.context?.base ? { base: input.context.base } : {}),
+          ...(input.context?.holdAnswer ? { holdAnswer: input.context.holdAnswer } : {}),
+        }),
+        input.title,
+      );
+    } catch (error) {
+      deps.log.warn({ err: error }, 'task notebook not seeded');
+    }
     const started = isForeign ? startForeign(input) : startClaude(input);
     // Заметка — ПОСЛЕ старта: до него прогона в реестре нет. У чужого CLI его
     // нет вовсе, и `emitExternal` честно отвечает «сказать некуда» — факт

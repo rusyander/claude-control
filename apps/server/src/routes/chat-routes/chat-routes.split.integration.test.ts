@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -20,6 +28,7 @@ import { storeTreeReader } from '../../domains/chat/chat-autonomy/chat-autonomy.
 import { readChoice, writeChoice } from '../../domains/groups/choice/choice.ts';
 import { createSplitLauncher, launchFromRecord } from '../chat/split-launch.ts';
 import { createReviewStarter } from '../chat/review-starter.ts';
+import { TASK_NOTEBOOK } from '../../domains/chat/task-notebook/task-notebook.ts';
 import { pauseResumePrompt } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import { wireGroupActivation } from '../../bootstrap/group-activation-wiring/group-activation-wiring.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
@@ -984,6 +993,80 @@ describe('POST /api/chat/split', () => {
       expect(store.getChatLink(started[1]?.chatId ?? '')?.notes).toContain(
         'Before this group, these worked: "Раз"',
       );
+    });
+
+    /**
+     * 8.3, 8.4 и 9.2 одним путём: блок разбора → конвейер → запуск. Карта своей
+     * группы и общая подготовка доходят и до задания плана, и в тетрадь в
+     * каталоге группы — она переживает сжатие, задание — нет.
+     */
+    it('карта и подготовка разбора — в задании плана и в тетради группы', async () => {
+      const conveyor = withConveyor();
+      const instance = await withRoutes(conveyor);
+      const first = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      await instance.close();
+      const triageId = (first.json() as { triage: { chatId: string } }).triage.chatId;
+      started.length = 0;
+
+      const block = [
+        '```agentdeck:split-plan',
+        JSON.stringify({
+          groups: [
+            { index: 1, map: 'src/rename.ts:12 — переименование' },
+            { index: 2, map: 'src/crash.ts:40 — падение; password: Qwerty12345' },
+          ],
+          setup: 'pnpm dev; стенд http://localhost:8888; вход — файл .env.stand, pass=hunter2xyz',
+        }),
+        '```',
+      ].join('\n');
+      conveyor.onTriageFinished(
+        {
+          chatId: triageId,
+          projectPath: project,
+          text: block,
+          ok: true,
+          startedAt: 1,
+          options: { prompt: '', cwd: project },
+          contextTokens: 0,
+        },
+        [triageId],
+      );
+      await new Promise((done) => setTimeout(done, 30));
+
+      const run = started.find((item) => item.prompt.includes('Work plan for the group "Раз"'));
+      expect(run?.prompt).toContain('src/rename.ts:12 — переименование');
+      expect(run?.prompt).toContain('вход — файл .env.stand');
+      const notebook = readFileSync(join(run?.cwd ?? '', TASK_NOTEBOOK), 'utf8');
+      expect(notebook).toContain('src/rename.ts:12 — переименование');
+      expect(notebook).toContain('Shared setup, found once by the triage');
+      expect(notebook).toContain('вход — файл .env.stand');
+      // Каталог без git: копий нет, обе группы в одном каталоге и делят тетрадь —
+      // посев второй дописан своим разделом, а не потерян за первым (ревью A1-F6/B1-F4).
+      const second = started.find((item) => item.prompt.includes('Work plan for the group "Два"'));
+      expect(second?.cwd).toBe(run?.cwd);
+      const shared = readFileSync(join(second?.cwd ?? '', TASK_NOTEBOOK), 'utf8');
+      expect(shared).toContain('## From the panel at the start — Раз');
+      expect(shared).toContain('## From the panel at the start — Два');
+      expect(shared).toContain('src/crash.ts:40 — падение');
+      // Пароль, вписанный разбором вопреки заданию, не доходит ни до задания, ни до
+      // тетради, ни до записи разделения (ревью B1-F16).
+      const state = JSON.stringify(store.getSplitPlan('parent-1') ?? null);
+      expect(state).toContain('pass=••••••');
+      for (const text of [run?.prompt ?? '', second?.prompt ?? '', shared, state]) {
+        expect(text).not.toContain('hunter2xyz');
+        expect(text).not.toContain('Qwerty12345');
+      }
+      expect(run?.prompt).toContain('pass=••••••');
     });
 
     /**

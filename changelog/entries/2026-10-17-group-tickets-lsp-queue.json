@@ -1,7 +1,7 @@
 {
   "title": {
-    "ru": "Группы разделения быстрее: задачи трекера уже в копии, поиск по коду через LSP, два гейта разом, тёплая проверка типов",
-    "en": "Split groups run faster: tracker issues already in the copy, code search through LSP, two gates at once, a warm type check"
+    "ru": "Группы разделения быстрее: задачи трекера уже в копии, поиск по коду через LSP, два гейта разом",
+    "en": "Split groups run faster: tracker issues already in the copy, code search through LSP, two gates at once"
   },
   "items": [
     {
@@ -10,7 +10,10 @@
         "ru": "При старте группы панель кладёт её задачи трекера в копию файлом `.agent/run/tickets.md`: описание, последние 15 комментариев, вложения и связи, время чтения в шапке. Группа не перечитывает их в трекере и ходит туда только за изменениями. До восьми задач на группу, длинное описание обрезано с пометкой, сбой одной задачи назван с причиной; повторный старт переписывает файл свежим чтением.",
         "en": "When a group starts, the panel puts its tracker issues into the copy as `.agent/run/tickets.md`: description, last 15 comments, attachments and links, with the read time in the header. The group does not re-read them from the tracker and goes there only for changes. Up to eight issues per group, a long description is cut with a mark, a failure on one issue is named with its reason; a restart rewrites the file with a fresh read."
       },
-      "area": { "ru": "Группы", "en": "Groups" }
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
     },
     {
       "kind": "improved",
@@ -18,7 +21,10 @@
         "ru": "Группа в Claude Code ищет, где объявлено и кто вызывает, сперва через LSP, а grep — когда LSP не помог. Первый ответ свежей сессии бывает неполным (только объявление): правило велит повторить вызов, прежде чем идти в grep.",
         "en": "A Claude Code group looks up where something is declared and who calls it through LSP first, and uses grep when LSP does not help. A fresh session's first answer can be incomplete (the declaration only): the rule says to call again before falling back to grep."
       },
-      "area": { "ru": "Группы", "en": "Groups" }
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
     },
     {
       "kind": "changed",
@@ -26,15 +32,10 @@
         "ru": "Тяжёлые шаги групп идут не больше двух разом вместо одного, а vitest групп больше не урезается до четверти ядер. На гейтах четырёх UI-проектов пара разом шла 131 и 296 с против 171 и 387 подряд, а четыре гейта с урезанным vitest — 669 с, дольше, чем один за другим (558 с). Своё число мест задаёт `AGENTDECK_HEAVY_SLOTS` в окружении панели.",
         "en": "Heavy group steps run at most two at a time instead of one, and group vitest is no longer cut to a quarter of the cores. On the gates of four UI projects a pair at once took 131 and 296 s against 171 and 387 in a row, while four gates with cut vitest took 669 s, longer than one after another (558 s). `AGENTDECK_HEAVY_SLOTS` in the panel's environment sets your own number of slots."
       },
-      "area": { "ru": "Группы", "en": "Groups" }
-    },
-    {
-      "kind": "improved",
-      "text": {
-        "ru": "Посев `node_modules` копии переносит память tsc (`.tsbuildinfo`) — копией, не ссылкой, так что оригинал не меняется. Первая проверка типов свежей копии шла 20 с, теперь 5 с.",
-        "en": "Seeding a copy's `node_modules` carries over tsc's memory (`.tsbuildinfo`) — as a copy, not a link, so the original stays unchanged. A fresh copy's first type check took 20 s, now 5 s."
-      },
-      "area": { "ru": "Копии", "en": "Copies" }
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
     }
   ]
 }

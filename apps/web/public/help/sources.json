@@ -680,10 +680,10 @@
         {
           "path": "apps/server/src/domains/project-git/seed-node-modules.ts",
           "why": "node_modules копии ссылкой: когда подключается и когда нет (недостающий пакет, версия по lock-файлу npm)",
-          "sha": "7dc6fcd59397ed27"
+          "sha": "b034e3010f237edf"
         }
       ],
-      "confirmedAt": "2026-10-17T18:14:54.353Z"
+      "confirmedAt": "2026-10-17T20:15:09.918Z"
     },
     {
       "topic": "tests",

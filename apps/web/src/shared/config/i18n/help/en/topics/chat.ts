@@ -1026,8 +1026,8 @@ export const chatEn: typeof chatRu = {
       'linked — the copy would load them from the original instead of its own: with ' +
       'npm its node_modules is built from hard links to the original’s files (no extra ' +
       'disk space) and npm install --no-save runs instead of npm ci, delivering only ' +
-      'the difference; bundler caches are not carried over, except tsc’s memory ' +
-      '(.tsbuildinfo — with it a copy’s first type check is several times faster), service folders such as ' +
+      'the difference; bundler caches are not carried over (the original’s tsc memory ' +
+      'usually lags behind the copy and only slows its first type check), service folders such as ' +
       '.prisma are copied. None in the root — the same in ' +
       'each first-level folder (frontend/, web/…), up to four at once; a local library ' +
       'its neighbours depend on through file:, whose entry (dist) is not built in a ' +

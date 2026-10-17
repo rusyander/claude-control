@@ -49,18 +49,15 @@ import { git } from './exec/exec.ts';
 /**
  * Кэши сборщиков: в копии они собираются заново, чужие только мешают. Имена у
  * инструментов свои (`.experimental-vitest-cache` у vitest 3) — поэтому и по слову.
+ *
+ * Память `tsc --incremental` (`.tmp/*.tsbuildinfo`) тоже чужая: замер 17.10.2026 на
+ * настоящем оригинале — его память отстала от дерева копии, и первая проверка типов
+ * с ней шла 19 с против 14 с с нуля. Тёплой (5 с) копия становится сама, после
+ * первого прогона. Кэши eslint и prettier ключуются абсолютным путём — в копии они
+ * бесполезны при любой свежести.
  */
-const SKIP_DOT_DIRS = new Set(['.vite', '.vite-temp', '.turbo', '.angular']);
+const SKIP_DOT_DIRS = new Set(['.vite', '.vite-temp', '.tmp', '.turbo', '.angular']);
 const CACHE_NAME = /cache/i;
-/**
- * Исключение из кэшей — память `tsc --incremental` (`tsBuildInfoFile` шаблона Vite
- * лежит в `node_modules/.tmp`), и только копией: tsc переписывает её на месте.
- * Пути в ней относительные, версия файла — хеш содержимого, так что правки копии
- * tsc перепроверит сам. Замер 17.10.2026: проверка типов свежей копии — 20 с без
- * неё, 5 с с ней. Кэши eslint и prettier копии не помогут: их ключи — абсолютные пути.
- */
-const TS_BUILD_INFO_DIR = '.tmp';
-const TS_BUILD_INFO = /\.tsbuildinfo$/;
 /** Сколько файловых операций идёт разом: больше — диск не быстрее, меньше — медленно. */
 const SEED_CONCURRENCY = 32;
 
@@ -257,26 +254,6 @@ async function drain(jobs: Job[]): Promise<void> {
   await Promise.all(Array.from({ length: SEED_CONCURRENCY }, worker));
 }
 
-/** Из `.tmp` оригинала — только `*.tsbuildinfo`, копией; прочее там пропущено. */
-async function seedBuildInfo(
-  src: string,
-  dst: string,
-  files: Job[],
-  report: SeedReport,
-): Promise<void> {
-  const entries = await readdir(src, { withFileTypes: true });
-  const infos = entries.filter((entry) => entry.isFile() && TS_BUILD_INFO.test(entry.name));
-  if (infos.length < entries.length) report.skipped.push(src);
-  if (infos.length === 0) return;
-  await mkdir(dst, { recursive: true });
-  for (const entry of infos) {
-    files.push(async () => {
-      await copyFile(join(src, entry.name), join(dst, entry.name));
-      report.copied++;
-    });
-  }
-}
-
 /**
  * Посеять `to` из `from`. Отказ ссылки на другой том (EXDEV) или любой другой
  * сбой — исключение, и вызывающий ставит пакеты как раньше; недосеянный
@@ -300,10 +277,6 @@ export async function seedNodeModules(from: string, to: string): Promise<SeedRep
       }
       if (entry.isDirectory()) {
         const dotted = top && entry.name.startsWith('.') && entry.name !== '.bin';
-        if (dotted && entry.name === TS_BUILD_INFO_DIR) {
-          await seedBuildInfo(from, into, files, report);
-          continue;
-        }
         if (dotted && (SKIP_DOT_DIRS.has(entry.name) || CACHE_NAME.test(entry.name))) {
           report.skipped.push(from);
           continue;

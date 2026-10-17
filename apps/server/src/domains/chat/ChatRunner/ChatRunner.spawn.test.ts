@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { availableParallelism } from 'node:os';
 
 /**
  * Падение запуска CLI не должно уносить сервер.
@@ -229,12 +228,13 @@ describe('ChatRun.start: имя модели, отброшенное грамм�
 });
 
 /**
- * Находка 46 живого прогона: параллельные группы разделения гоняли vitest каждая
- * на все ядра — около сорока рабочих процессов разом. Ребёнку разделения панель
- * ставит потолок в окружение CLI; обычному чату — нет.
+ * Тяжёлые шаги групп разделения идут через очередь хука; сколько мест в ней,
+ * панель ставит ребёнку в окружение CLI (замер 17.10: два места снимают четверть
+ * ожидания), обычному чату — нет. Потолка vitest больше нет: с ним четыре гейта
+ * шли дольше, чем подряд.
  */
-describe('ChatRun.start: потолок рабочих процессов vitest', () => {
-  const KEYS = ['VITEST_MAX_WORKERS', 'VITEST_MAX_THREADS', 'VITEST_MAX_FORKS'] as const;
+describe('ChatRun.start: места очереди тяжёлых шагов', () => {
+  const KEYS = ['AGENTDECK_HEAVY_SLOTS', 'VITEST_MAX_WORKERS'] as const;
 
   /** Окружение, с которым CLI реально запущен. */
   async function spawnedEnv(
@@ -273,13 +273,13 @@ describe('ChatRun.start: потолок рабочих процессов vitest
     }
   });
 
-  it('ребёнку разделения — четверть ядер, во всех трёх именах', async () => {
+  it('ребёнку разделения — два места очереди и никакого потолка vitest', async () => {
     const env = await spawnedEnv({ child: true });
-    const expected = String(Math.max(1, Math.floor(availableParallelism() / 4)));
-    for (const key of KEYS) expect(env[key]).toBe(expected);
+    expect(env.AGENTDECK_HEAVY_SLOTS).toBe('2');
+    expect(env.VITEST_MAX_WORKERS).toBeUndefined();
   });
 
-  it('обычный чат потолка не получает', async () => {
+  it('обычный чат мест очереди не получает', async () => {
     const env = await spawnedEnv();
     for (const key of KEYS) expect(env[key]).toBeUndefined();
   });
@@ -292,16 +292,14 @@ describe('ChatRun.start: потолок рабочих процессов vitest
     expect((await spawnedEnv()).AGENTDECK_BRIEF_OUTPUT).toBeUndefined();
   });
 
-  it('потолок из окружения панели сильнее нашего', async () => {
-    process.env.VITEST_MAX_WORKERS = '7';
-    const env = await spawnedEnv({ child: true });
-    expect(env.VITEST_MAX_WORKERS).toBe('7');
-    expect(env.VITEST_MAX_THREADS).toBeUndefined();
+  it('число мест из окружения панели сильнее нашего', async () => {
+    process.env.AGENTDECK_HEAVY_SLOTS = '1';
+    expect((await spawnedEnv({ child: true })).AGENTDECK_HEAVY_SLOTS).toBe('1');
   });
 
   it('окружение прогона сильнее нашего', async () => {
-    const env = await spawnedEnv({ child: true, env: { VITEST_MAX_WORKERS: '3' } });
-    expect(env.VITEST_MAX_WORKERS).toBe('3');
+    const env = await spawnedEnv({ child: true, env: { AGENTDECK_HEAVY_SLOTS: '3' } });
+    expect(env.AGENTDECK_HEAVY_SLOTS).toBe('3');
   });
 });
 

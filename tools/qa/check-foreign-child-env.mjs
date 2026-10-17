@@ -1,8 +1,9 @@
 /**
  * Живое доказательство 6.1 плана экономии: ребёнок разделения в чужом CLI
  * получает то же окружение, что ребёнок Claude, — короткий вывод
- * `tests-cli run` (`AGENTDECK_BRIEF_OUTPUT=1`, пункт 2.2) и потолок vitest
- * (`VITEST_MAX_WORKERS`), а обычный разговор того же CLI — нет. Группа ещё и
+ * `tests-cli run` (`AGENTDECK_BRIEF_OUTPUT=1`, пункт 2.2) и два места очереди
+ * тяжёлых шагов (`AGENTDECK_HEAVY_SLOTS=2`) без потолка vitest, а обычный
+ * разговор того же CLI — ничего из этого. Группа ещё и
  * без лишних серверов MCP (1.2): мессенджер и макеты без макета в задачах
  * выключены, трекер остался, а строка о снятых доехала до модели. Выключатель
  * свой у каждого CLI: Codex — ключ `-c mcp_servers.<имя>.enabled=false`, Qwen
@@ -72,8 +73,8 @@ appendFileSync(
   JSON.stringify({
     argv,
     brief: pick('AGENTDECK_BRIEF_OUTPUT'),
+    slots: pick('AGENTDECK_HEAVY_SLOTS'),
     workers: pick('VITEST_MAX_WORKERS'),
-    forks: pick('VITEST_MAX_FORKS'),
     excluded: settings.mcp?.excluded ?? [],
     threshold: settings.context?.autoCompactThreshold ?? null,
     queueDir: pick('AGENTDECK_HEAVY_QUEUE_DIR'),
@@ -138,9 +139,10 @@ const OFF = {
   qwen: (call) => call.excluded,
 };
 
-// Потолок vitest, заданный в окружении того, кто запускает проверку, панель по
-// замыслу не трогает (`childRunEnv`), — стенд его наследовать не должен.
-for (const name of ['VITEST_MAX_WORKERS', 'VITEST_MAX_THREADS', 'VITEST_MAX_FORKS']) {
+// Места очереди и потолок vitest, заданные в окружении того, кто запускает
+// проверку, панель по замыслу не трогает (`childRunEnv`), — стенд их
+// наследовать не должен.
+for (const name of ['AGENTDECK_HEAVY_SLOTS', 'VITEST_MAX_WORKERS']) {
   delete process.env[name];
 }
 
@@ -209,8 +211,8 @@ await runOnStand(
       );
     }
     check(
-      'обычный разговор: короткого вывода и потолка vitest нет',
-      plain.length > 0 && plain.every((call) => call.brief === null && call.workers === null),
+      'обычный разговор: короткого вывода и мест очереди нет',
+      plain.length > 0 && plain.every((call) => call.brief === null && call.slots === null),
       brief(plain),
     );
 
@@ -243,9 +245,8 @@ await runOnStand(
       brief(kids),
     );
     check(
-      'каждый запуск звена: потолок vitest задан',
-      kids.length > 0 &&
-        kids.every((call) => /^\d+$/.test(call.workers ?? '') && call.forks === call.workers),
+      'каждый запуск звена: два места очереди, потолка vitest нет',
+      kids.length > 0 && kids.every((call) => call.slots === '2' && call.workers === null),
       brief(kids),
     );
 

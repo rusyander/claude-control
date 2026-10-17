@@ -7,6 +7,7 @@ import {
 } from '@agentdeck/contracts/chat-handoff';
 import { cascadeSystemPrompt, type CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
+import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
 
 /**
  * Инициативы, которые панель дописывает прогону: разделить список задач по
@@ -234,6 +235,10 @@ const groupSwaps = (): readonly (readonly [string, string])[] => [
  * фон (ревью B-F05). Ни одна проверка не снимается: меняется только то, сколько
  * её вывода едет в контекст.
  *
+ * Задачи трекера (9.5) панель кладёт в копию сама: ответ трекера через MCP с
+ * описанием и комментариями ложился в контекст группы и перечитывался каждым
+ * вызовом — файл читается один раз и только при нужде.
+ *
  * Последняя фраза — для сжатия (2.1, 2.4): дописка едет и в запрос резюме
  * (проверено на CLI 2.1.286 стабом модели), так что она правит каждое сжатие,
  * автоматическое и `/compact`; без неё навык доставки перечитывался целиком
@@ -247,10 +252,26 @@ export const GROUP_ECONOMY_PROMPT =
   'path; give a gate or build timeout 1800000 (30 min), await it in one call, without ' +
   'polling. Each fact you had to find out ' +
   `(stand access, commands, ports, places, decisions) goes as one line into ${TASK_NOTEBOOK}, ` +
-  'never a secret; read it before searching again. When the conversation is ' +
+  `never a secret; read it before searching again. Tracker tasks: read ${TASK_TICKETS} first. ` +
+  'When the conversation is ' +
   'compacted, the summary keeps the stage ledger (done, current, next), decisions with their ' +
   'reasons, exact paths and commands, stand access, the notebook path, open failures and a ' +
   'short extract of the current skill step.';
+
+/**
+ * Индекс кода для Claude (9.1 плана экономии, 17.10.2026) — его инструмент LSP
+ * (плагины языковых серверов человека, `typescript-lsp` и др.): «где объявлено»
+ * и «кто вызывает» одним вызовом вместо `grep` и чтения десятка файлов, и точнее
+ * поиска по тексту. Только Claude: у чужих CLI такого инструмента нет.
+ *
+ * Живой факт (claude 2.1.286, 17.10): первый вызов в свежей сессии вернул 1
+ * ссылку из 12 — сервер ещё грузил проект, повтор через 20 с дал все 12. Отсюда
+ * последняя фраза: одно объявление без ссылок — не «нигде не используется».
+ */
+export const GROUP_LSP_PROMPT =
+  'Where a symbol is declared, used or called: the LSP tool (findReferences, goToDefinition, ' +
+  'incomingCalls) before grep. A first call finding only the declaration may be partial ' +
+  '(server loading): call again, then grep.';
 
 /**
  * Одна подмена. Снятая фраза уносит один пробел рядом с собой — и только его:
@@ -270,7 +291,7 @@ function swap(text: string, [from, to]: readonly [string, string]): string {
  */
 export function childAppend(append: string | undefined): string {
   const base = groupSwaps().reduce(swap, append ?? '');
-  return [base, CHILD_PROMPT, SPLIT_FOREGROUND_PROMPT, GROUP_ECONOMY_PROMPT]
+  return [base, CHILD_PROMPT, SPLIT_FOREGROUND_PROMPT, GROUP_ECONOMY_PROMPT, GROUP_LSP_PROMPT]
     .map((part) => part.trim())
     .filter(Boolean)
     .join(' ');

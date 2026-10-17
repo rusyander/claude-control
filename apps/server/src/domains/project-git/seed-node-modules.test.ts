@@ -87,6 +87,31 @@ describe('seedNodeModules', () => {
     expect(report.skipped).toHaveLength(3);
   });
 
+  /** Замер 17.10: проверка типов свежей копии 20 с без памяти tsc, 5 с с ней. */
+  it('память tsc из .tmp — копией, не ссылкой; прочее в .tmp — мимо', async () => {
+    const from = join(root, 'orig', 'node_modules');
+    put(
+      join(from, '.tmp', 'tsconfig.app.tsbuildinfo'),
+      '{"fileNames":["../typescript/lib/lib.d.ts"]}',
+    );
+    put(join(from, '.tmp', 'scratch.txt'), 'x');
+    const to = join(root, 'copy', 'node_modules');
+
+    const report = await seedNodeModules(from, to);
+
+    const info = join(to, '.tmp', 'tsconfig.app.tsbuildinfo');
+    expect(links(info)).toBe(1);
+    expect(readFileSync(info, 'utf8')).toContain('../typescript/lib');
+    expect(existsSync(join(to, '.tmp', 'scratch.txt'))).toBe(false);
+    // tsc переписывает файл на месте — у оригинала он остаётся своим.
+    writeFileSync(info, 'copy rewrote it');
+    expect(readFileSync(join(from, '.tmp', 'tsconfig.app.tsbuildinfo'), 'utf8')).toContain(
+      'fileNames',
+    );
+    expect(report).toMatchObject({ copied: 1 });
+    expect(report.skipped).toEqual([join(from, '.tmp')]);
+  });
+
   it('сбой посредине — недосеянный каталог убран', async () => {
     const to = join(root, 'copy', 'node_modules');
     await expect(seedNodeModules(join(root, 'нет-такого'), to)).rejects.toThrow();

@@ -137,6 +137,63 @@ export async function readIssue(access: AtlassianAccess, key: string): Promise<J
   return toIssue(access, issue);
 }
 
+interface RawBriefIssue extends RawIssue {
+  fields?: RawIssue['fields'] & {
+    comment?: {
+      comments?: { author?: { displayName?: string }; created?: string; body?: unknown }[];
+    };
+    attachment?: { filename?: string; mimeType?: string; size?: number }[];
+    issuelinks?: {
+      type?: { inward?: string; outward?: string };
+      inwardIssue?: { key?: string; fields?: { summary?: string } };
+      outwardIssue?: { key?: string; fields?: { summary?: string } };
+    }[];
+  };
+}
+
+/** Задача для копии группы: то, что агент иначе читал бы из трекера сам. */
+export interface JiraIssueBrief extends JiraIssue {
+  comments: { author: string; created: string; body: string }[];
+  attachments: { name: string; mimeType?: string }[];
+  links: { relation: string; key: string; summary: string }[];
+}
+
+const BRIEF_FIELDS = `${ISSUE_FIELDS},comment,attachment,issuelinks`;
+
+/**
+ * Задача целиком для копии группы (9.5): поля, комментарии, имена вложений,
+ * связи — одним запросом. Без комментариев группа всё равно шла бы в трекер:
+ * приёмку и уточнения часто пишут именно там.
+ */
+export async function readIssueBrief(
+  access: AtlassianAccess,
+  key: string,
+): Promise<JiraIssueBrief> {
+  const issue = await call<RawBriefIssue>(access, {
+    url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}?fields=${BRIEF_FIELDS}`,
+    system: 'Jira',
+  });
+  const fields = issue.fields ?? {};
+  return {
+    ...toIssue(access, issue),
+    comments: (fields.comment?.comments ?? []).map((comment) => ({
+      author: comment.author?.displayName ?? '',
+      created: comment.created ?? '',
+      body: fromAdf(comment.body) ?? '',
+    })),
+    attachments: (fields.attachment ?? []).map((file) => ({
+      name: file.filename ?? '',
+      ...(file.mimeType ? { mimeType: file.mimeType } : {}),
+    })),
+    links: (fields.issuelinks ?? []).flatMap((link) => {
+      const other = link.outwardIssue ?? link.inwardIssue;
+      if (!other?.key) return [];
+      const relation = (link.outwardIssue ? link.type?.outward : link.type?.inward) ?? '';
+      return [{ relation, key: other.key, summary: other.fields?.summary ?? '' }];
+    }),
+  };
+}
+
 export interface NewIssue {
   projectKey: string;
   summary: string;

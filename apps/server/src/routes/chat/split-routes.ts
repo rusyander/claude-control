@@ -30,6 +30,7 @@ import { splitRootOf } from '../../domains/project-git/project-git.ts';
 import { conversationKeys } from '../../lib/app-store/chat-links.ts';
 import {
   atlassianTaskTracker,
+  atlassianTicketSource,
   atlassianTicketTracker,
   type SplitTicketTracker,
 } from '../../domains/chat/split-ticket-tracker.ts';
@@ -153,7 +154,16 @@ export function registerChatSplitRoutes(
     const wantRuns = startRuns !== false;
     const launcher = createSplitLauncher(
       ctx,
-      { ...deps, log: app.log },
+      {
+        ...deps,
+        log: app.log,
+        tickets:
+          deps.tickets ??
+          atlassianTicketSource(
+            () => ctx.store,
+            () => ctx.location.paths.appData,
+          ),
+      },
       {
         projectPath: root,
         // Настройки — по пути, который открыл человек, а не по верху репозитория (m6).

@@ -144,6 +144,7 @@ import { projectsDir } from '../../routes/chat/paths.ts';
 import { syncRelayHooks } from '../../routes/chat/outside-relay-routes/outside-relay-routes.ts';
 import {
   atlassianTaskTracker,
+  atlassianTicketSource,
   atlassianTicketTracker,
 } from '../../domains/chat/split-ticket-tracker.ts';
 import { closeReviewGroup } from '../../domains/chat/review-close/review-close.ts';
@@ -552,6 +553,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    */
   const launchDeps = {
     runs: chatRuns,
+    // Текст задач группы в её копию (9.5) — тем же доступом к Jira, что перевод задач.
+    tickets: atlassianTicketSource(
+      () => ctx.store,
+      () => ctx.location.paths.appData,
+    ),
     providerChats,
     session: chatSession,
     gate: treePause,

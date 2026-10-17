@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { HANDOFF_BLOCK_LANG, HANDOFF_SYSTEM_PROMPT } from '@agentdeck/contracts/chat-handoff';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
+import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
 import {
   BACKGROUND_PROMPT,
   CHILD_PROMPT,
   FOREIGN_CHILD_PROMPT,
   GROUP_ECONOMY_PROMPT,
+  GROUP_LSP_PROMPT,
   SPLIT_FOREGROUND_PROMPT,
   QUESTION_PROMPT,
   STEER_PROMPT,
@@ -29,19 +31,47 @@ describe('дописка группы разделения', () => {
    * 3000 — редакция 1.4 (было 4133); +500 — правило расхода (2.2, 2.4, 3.1, 3.3,
    * 4.1): строка в каждом вызове окупается одним несделанным вызовом на ~170 тыс.;
    * +200 — что сохранить при сжатии (2.1): окупается одним неперечитанным навыком;
-   * +150 — тетрадь задачи (9.2): окупается одним поиском, не повторённым после сжатия.
+   * +150 — тетрадь задачи (9.2): окупается одним поиском, не повторённым после сжатия;
+   * +50 — задачи трекера в файле копии (9.5): окупается одним ответом трекера, не
+   * легшим в контекст; +220 — LSP вместо grep (9.1): окупается одним поиском по
+   * репозиторию, которого не было.
    */
-  it('не длиннее 3850 знаков при обоих тумблерах', () => {
-    expect(group.length).toBeLessThanOrEqual(3850);
+  it('не длиннее 4120 знаков при обоих тумблерах', () => {
+    expect(group.length).toBeLessThanOrEqual(4120);
   });
 
   /**
    * Группа в Codex и Qwen Code (6.1) получает правила первой репликой
    * переписки, и они так же едут в каждом её вызове (этап 7): 1557 знаков на 17.10,
-   * +200 — тетрадь задачи (9.2).
+   * +200 — тетрадь задачи (9.2), +50 — задачи трекера (9.5). LSP (9.1) сюда не
+   * едет: у чужих CLI такого инструмента нет.
    */
-  it('правила группы в чужом CLI — не длиннее 1800 знаков', () => {
-    expect(`${FOREIGN_CHILD_PROMPT} ${GROUP_ECONOMY_PROMPT}`.length).toBeLessThanOrEqual(1800);
+  it('правила группы в чужом CLI — не длиннее 1850 знаков', () => {
+    expect(`${FOREIGN_CHILD_PROMPT} ${GROUP_ECONOMY_PROMPT}`.length).toBeLessThanOrEqual(1850);
+    expect(`${FOREIGN_CHILD_PROMPT} ${GROUP_ECONOMY_PROMPT}`).not.toContain('LSP');
+  });
+
+  /** 9.5: задачи трекера панель кладёт в копию — группа читает файл раньше трекера. */
+  it('правило задач трекера: файл копии раньше трекера', () => {
+    expect(GROUP_ECONOMY_PROMPT).toContain(`Tracker tasks: read ${TASK_TICKETS} first`);
+    expect(group).toContain(TASK_TICKETS);
+  });
+
+  /**
+   * 9.1: где объявлено и кто вызывает — LSP раньше grep; первый вызов свежей сессии
+   * бывает неполным (живой замер 17.10: 1 ссылка из 12), поэтому повтор перед выводом.
+   */
+  it('правило LSP: раньше grep, неполный первый ответ повторяется', () => {
+    expect(group.split(GROUP_LSP_PROMPT)).toHaveLength(2);
+    for (const anchor of [
+      'findReferences',
+      'goToDefinition',
+      'incomingCalls',
+      'before grep',
+      'call again, then grep',
+    ]) {
+      expect(GROUP_LSP_PROMPT, anchor).toContain(anchor);
+    }
   });
 
   /**

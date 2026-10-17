@@ -5,9 +5,11 @@ import {
   createIssue,
   listTransitions,
   readIssue,
+  readIssueBrief,
 } from '../integrations/atlassian/jira.ts';
 import { linkForCwd } from '../integrations/links.ts';
 import type { SplitTaskTracker } from './split-tasks/split-tasks.ts';
+import type { TicketSource } from './task-tickets/task-tickets.types.ts';
 
 /**
  * Трекер для тикетов, предложенных группами разделения (L277): куда их можно
@@ -67,5 +69,27 @@ export function atlassianTaskTracker(
     status: async (key) => (await readIssue(access(), key)).status,
     transitions: (key) => listTransitions(access(), key),
     apply: (key, id) => applyTransition(access(), key, id),
+  };
+}
+
+/**
+ * Текст задач группы для её копии (9.5): тот же доступ, что у перевода задач,
+ * чтение — с комментариями, вложениями и связями.
+ */
+export function atlassianTicketSource(
+  store: () => AppStore,
+  appDataDir: () => string,
+): TicketSource {
+  const access = () => jiraAccessFrom(store(), appDataDir());
+  return {
+    connected: () => {
+      try {
+        access();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    read: (key) => readIssueBrief(access(), key),
   };
 }

@@ -17,6 +17,7 @@ import {
   listProjects,
   listTransitions,
   readIssue,
+  readIssueBrief,
   searchIssues,
 } from './jira.ts';
 import {
@@ -322,6 +323,75 @@ describe('atlassian/jira', () => {
       assignee: 'Ольга',
       description: 'шаги внутри',
     });
+  });
+
+  it('задача для копии группы (9.5): комментарии, вложения и связи одним запросом, в обоих диалектах', async () => {
+    const cloud = stubApi([
+      [
+        /issue\/PRJ-8/,
+        {
+          body: {
+            key: 'PRJ-8',
+            fields: {
+              summary: 'Экспорт',
+              status: { name: 'В работе' },
+              description: toAdf('сделать экспорт'),
+              comment: {
+                comments: [
+                  {
+                    author: { displayName: 'Ольга' },
+                    created: '2026-10-01',
+                    body: toAdf('приёмка: CSV'),
+                  },
+                  { created: '2026-10-02' },
+                ],
+              },
+              attachment: [{ filename: 'макет.png', mimeType: 'image/png', size: 10 }, {}],
+              issuelinks: [
+                {
+                  type: { outward: 'blocks' },
+                  outwardIssue: { key: 'PRJ-9', fields: { summary: 'Импорт' } },
+                },
+                { type: { inward: 'is blocked by' }, inwardIssue: { key: 'PRJ-1' } },
+                { type: { outward: 'relates' } },
+              ],
+            },
+          },
+        },
+      ],
+    ]);
+    await expect(readIssueBrief(CLOUD, 'PRJ-8')).resolves.toMatchObject({
+      key: 'PRJ-8',
+      description: 'сделать экспорт',
+      comments: [
+        { author: 'Ольга', created: '2026-10-01', body: 'приёмка: CSV' },
+        { author: '', created: '2026-10-02', body: '' },
+      ],
+      attachments: [{ name: 'макет.png', mimeType: 'image/png' }, { name: '' }],
+      links: [
+        { relation: 'blocks', key: 'PRJ-9', summary: 'Импорт' },
+        { relation: 'is blocked by', key: 'PRJ-1', summary: '' },
+      ],
+    });
+    expect(cloud.calls[0]!.url).toContain(
+      'fields=summary,status,issuetype,assignee,updated,description,comment,attachment,issuelinks',
+    );
+
+    stubApi([
+      [
+        /issue\/PRJ-3/,
+        {
+          body: {
+            key: 'PRJ-3',
+            fields: { summary: 'S', comment: { comments: [{ body: 'текст своей установки' }] } },
+          },
+        },
+      ],
+    ]);
+    const server = await readIssueBrief(SERVER, 'PRJ-3');
+    expect(server.comments[0]?.body).toBe('текст своей установки');
+    expect(server.attachments).toEqual([]);
+    expect(server.links).toEqual([]);
   });
 
   it('создание: облаку уходит документ, своей установке — текст; тип по умолчанию Bug', async () => {

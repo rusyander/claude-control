@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { availableParallelism, homedir, tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ChatEvent, RawEvent } from '../chat-events.ts';
@@ -107,41 +107,34 @@ function signatureOf(snapshot: unknown): string {
 }
 
 /**
- * Какую долю ядер отдать тестам одного ребёнка разделения.
+ * Сколько тяжёлых шагов групп разделения идёт на машине разом — мест очереди
+ * `tools/heavy-queue-hook.mjs` (у самого хука по умолчанию одно).
  *
- * Дети идут параллельно (до `parallel` групп), и каждый гоняет проверки своей
- * копии. Vitest по умолчанию берёт почти все ядра на КАЖДЫЙ запуск: в живом
- * прогоне 24.09.2026 (находка 46) две группы с mustfail+vitest подняли около
- * сорока рабочих процессов, и соседняя группа почти восемь минут ждала prettier.
- * Четверть — компромисс: проверки редко совпадают у всех групп разом, а
- * одиночный прогон ребёнка от четверти ядер не становится мучительным.
+ * Замер 17.10.2026, 16 ядер, гейт (проверки + vitest) четырёх UI-проектов:
+ * пары разом 131 и 296 с против 171 и 387 подряд, четыре разом 367 против 558,
+ * загрузка до 67%, новых таймаутов нет. Два места, а не четыре: e2e и сборки
+ * параллельно не мерились, а пара уже снимает четверть ожидания.
+ *
+ * Потолка рабочих процессов vitest здесь больше нет: в том же замере четыре
+ * гейта с четвертью ядер на каждый шли 669 с — дольше, чем подряд, — а пара с
+ * половиной ядер 340 против 296 без потолка. Тесты UI ждут ввод-вывод и
+ * трансформацию, и лишние рабочие процессы простаивают меньше, чем урезанные.
  */
-const CHILD_TEST_SHARE = 4;
+const HEAVY_SLOTS_ENV = 'AGENTDECK_HEAVY_SLOTS';
+const CHILD_HEAVY_SLOTS = '2';
 
 /**
- * Потолок рабочих процессов vitest для ребёнка разделения. `VITEST_MAX_WORKERS`
- * читает vitest 4 (им же идут и UI-проекты), `VITEST_MAX_THREADS` и
- * `VITEST_MAX_FORKS` — vitest до 4-й версии. Заданный человеком в окружении
- * панели потолок не трогаем; `options.env` прогона, идущий позже, сильнее.
- */
-function childTestWorkers(base: NodeJS.ProcessEnv): Record<string, string> {
-  if (base.VITEST_MAX_WORKERS || base.VITEST_MAX_THREADS || base.VITEST_MAX_FORKS) return {};
-  const cores = availableParallelism();
-  const workers = String(Math.max(1, Math.floor(cores / CHILD_TEST_SHARE)));
-  return {
-    VITEST_MAX_WORKERS: workers,
-    VITEST_MAX_THREADS: workers,
-    VITEST_MAX_FORKS: workers,
-  };
-}
-
-/**
- * Окружение ребёнка разделения: потолок vitest и короткий вывод `tests-cli run`
- * (2.2 плана экономии — журнал в файл, в контекст итог). Одно на Claude и на
- * чужие CLI (6.1): ребёнок Codex или Qwen гоняет те же проверки той же копии.
+ * Окружение ребёнка разделения: места очереди тяжёлых шагов и короткий вывод
+ * `tests-cli run` (2.2 плана экономии — журнал в файл, в контекст итог). Одно
+ * на Claude и на чужие CLI (6.1): ребёнок Codex или Qwen гоняет те же проверки
+ * той же копии. Заданное человеком в окружении панели число мест не трогаем;
+ * `options.env` прогона, идущий позже, сильнее.
  */
 export function childRunEnv(base: NodeJS.ProcessEnv): Record<string, string> {
-  return { ...childTestWorkers(base), [BRIEF_OUTPUT_ENV]: '1' };
+  return {
+    ...(base[HEAVY_SLOTS_ENV] ? {} : { [HEAVY_SLOTS_ENV]: CHILD_HEAVY_SLOTS }),
+    [BRIEF_OUTPUT_ENV]: '1',
+  };
 }
 
 export type { ChatEvent, RawEvent, RawUsage } from '../chat-events.ts';

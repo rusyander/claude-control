@@ -37,6 +37,9 @@ import {
 } from '../../domains/chat/ChatSplit/ChatSplit.ts';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
 import { seedTaskNotebook } from '../../domains/chat/task-notebook/task-notebook.ts';
+import { seedTaskTickets } from '../../domains/chat/task-tickets/task-tickets.ts';
+import type { TicketSource } from '../../domains/chat/task-tickets/task-tickets.types.ts';
+import { trackerKeys } from '../../domains/chat/tracker-keys.ts';
 import {
   chatKnobsLine,
   childStageExtra,
@@ -94,6 +97,8 @@ export interface SplitLaunchDeps {
   stands?: Pick<SplitGit, 'reviewEnvironment' | 'releaseReviewStand'>;
   /** Куда писать сбой включения набора — форма и у fastify, и у консоли одна. */
   log: { warn: (detail: { err: unknown }, message: string) => void };
+  /** Текст задач трекера группы в её копию (9.5); нет — группа читает трекер сама. */
+  tickets?: TicketSource;
 }
 
 /** Что человек попросил при разделении — то, что конвейер хранит в записи. */
@@ -769,6 +774,13 @@ export function createSplitLauncher(
     } catch (error) {
       deps.log.warn({ err: error }, 'task notebook not seeded');
     }
+    // Задачи трекера (9.5) — не дожидаясь: CLI поднимается секунды, чтение Jira
+    // занимает доли секунды, а файл пишется целиком через временный. Не успел —
+    // группа читает трекер, как до 9.5; ничего не теряется.
+    const ticketKeys = trackerKeys([...input.group.tasks, input.branch, input.title].join('\n'));
+    void seedTaskTickets(input.cwd, ticketKeys, deps.tickets).catch((error: unknown) => {
+      deps.log.warn({ err: error }, 'task tickets not seeded');
+    });
     const started = isForeign ? startForeign(input) : startClaude(input);
     // Заметка — ПОСЛЕ старта: до него прогона в реестре нет. У чужого CLI его
     // нет вовсе, и `emitExternal` честно отвечает «сказать некуда» — факт

@@ -1026,7 +1026,8 @@ export const chatEn: typeof chatRu = {
       'linked — the copy would load them from the original instead of its own: with ' +
       'npm its node_modules is built from hard links to the original’s files (no extra ' +
       'disk space) and npm install --no-save runs instead of npm ci, delivering only ' +
-      'the difference; bundler caches are not carried over, service folders such as ' +
+      'the difference; bundler caches are not carried over, except tsc’s memory ' +
+      '(.tsbuildinfo — with it a copy’s first type check is several times faster), service folders such as ' +
       '.prisma are copied. None in the root — the same in ' +
       'each first-level folder (frontend/, web/…), up to four at once; a local library ' +
       'its neighbours depend on through file:, whose entry (dist) is not built in a ' +
@@ -1102,8 +1103,8 @@ export const chatEn: typeof chatRu = {
       'A status change, an assignment, a field edit or a comment in the tracker answers the group with a ' +
       'short line (key, new status, assignee) instead of the whole issue; reading an issue ' +
       'still returns all of it, and your own hooks keep running alongside. ' +
-      'Full gates and builds of Claude Code and Qwen Code groups run one at a time per ' +
-      'machine: a group whose gate waits in the queue makes no model calls, and the command ' +
+      'Full gates and builds of Claude Code and Qwen Code groups run at most two at a time ' +
+      'per machine: a group whose gate waits in the queue makes no model calls, and the command ' +
       'and permission rules stay as they were. It waits 25 minutes at most, then runs ' +
       'without the queue. A failed gate frees the slot at once; one your hook refused in ' +
       'Claude Code frees it with the same group’s next command; a slot whose end the CLI ' +
@@ -1184,9 +1185,10 @@ export const chatEn: typeof chatRu = {
       'MR branch itself. If the project is not a repository, the chats ' +
       'are created in the same directory, with no copies. One group failing does ' +
       'not cancel the rest: a separate toast says so, and the other chats stay. ' +
-      'Groups run in parallel and each runs the checks of its own copy, so each ' +
-      'group’s vitest gets a quarter of the machine’s cores (VITEST_MAX_WORKERS and ' +
-      'its siblings) — unless you set your own cap in the panel’s environment.',
+      'Groups run in parallel and each runs the checks of its own copy; heavy checks ' +
+      'go through a shared queue, two at a time (AGENTDECK_HEAVY_SLOTS in the panel’s ' +
+      'environment sets your own number). Vitest cores are not cut: with them cut, four ' +
+      'checks took longer than running one after another.',
     splitDeliver: 'Up to a ready MR, and the group queue',
     splitDeliverText:
       'The “To MR” button in a project chat header shows how a task will end: “on”, ' +
@@ -1480,7 +1482,14 @@ export const chatEn: typeof chatRu = {
       'what it finds along the way (no passwords) and after the conversation is ' +
       'compacted reads the notebook instead of finding everything out again. In a project ' +
       'without git there are no copies: the groups work in one folder and share one ' +
-      'notebook, each with its own section under its title. Every group opens ' +
+      'notebook, each with its own section under its title. ' +
+      'The group’s tracker tasks (keys like PROJ-123 in its tasks, branch and title) ' +
+      'are read by the panel itself at the start, through its own Jira connection, ' +
+      'and put beside it in .agent/run/tickets.md: description, latest comments, ' +
+      'attachment names and links, with the time they were read. The group reads ' +
+      'that file and goes to the tracker only for attachment images, for a task not ' +
+      'in it, and for changes after that time. Jira not connected or no keys — no ' +
+      'file, and the group reads the tracker itself as before. Every group opens ' +
       'with a PLAN at ' +
       'the ceiling: a short look at its own task in its own copy, no edits; the ' +
       'plan goes into the work task and the work follows it step by step. No ' +

@@ -34,6 +34,7 @@ export const RUN_STDERR_MAX = 16_384;
 import { CHILD_DENIED_TOOLS, childAppend } from '../initiative/initiative.ts';
 import { SyntheticGate } from '../synthetic-gate.ts';
 import { autoPickResults, picksFor } from '../auto-pick/auto-pick.ts';
+import { withChatNode } from '../../project-git/chat-node.ts';
 import { AUTONOMOUS_ENV, BRIEF_OUTPUT_ENV } from '@agentdeck/contracts/chat-group-settings';
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 
@@ -308,6 +309,12 @@ export interface RunOptions {
    * параметры, и прошлое решение пережило бы переезд связи.
    */
   child?: boolean;
+  /**
+   * Инструменты, снятые настройкой панели `chatLeanTools` (`UNUSED_HEAVY_TOOLS`).
+   * Решает реестр на каждом старте: выключенная настройка возвращает их уже
+   * следующему ходу, а не новому разговору.
+   */
+  deniedTools?: readonly string[];
 }
 
 /** Сборка запуска CLI: общая у разового прогона и живой сессии. */
@@ -448,7 +455,12 @@ export class ChatRun {
     // и пробел), так что отбрасывать такое имя правильно, а молчать о нём — нет.
     this.modelNotice(options, onEvent);
     if (effort) args.push('--effort', effort);
-    if (options.child) args.push('--disallowedTools', CHILD_DENIED_TOOLS.join(','));
+    // Один флаг на всё снятое: ребёнку — обмен между сессиями, всем — тяжёлые
+    // неиспользуемые схемы (настройка `chatLeanTools`).
+    const denied = [
+      ...new Set([...(options.child ? CHILD_DENIED_TOOLS : []), ...(options.deniedTools ?? [])]),
+    ];
+    if (denied.length) args.push('--disallowedTools', denied.join(','));
 
     // Свой промпт контура — ВМЕСТО промпта CLI, и только файлом: текст
     // многострочный и с примерами JSON, а разбор кавычек в командной строке
@@ -616,7 +628,13 @@ export class ChatRun {
     // Имя чата — обычный текст с пробелами, а оболочка Windows разобрала бы
     // его как несколько аргументов, поэтому аргументы квотируются.
     const command = options.command ?? defaultCliCommand();
-    return { command, args: shellArgs(args), env, ...(runIdFile ? { runIdFile } : {}) };
+    // Node, которого просит проект, — первым в PATH: агенту не искать его самому.
+    return {
+      command,
+      args: shellArgs(args),
+      env: withChatNode(options.cwd, env, command),
+      ...(runIdFile ? { runIdFile } : {}),
+    };
   }
 
   /**
@@ -774,6 +792,8 @@ export class ChatRun {
       platformSystemPrompt: options.platformSystemPrompt?.trim() ?? '',
       platformArgs: options.platformArgs ?? [],
       platformMcp: options.platformMcp ?? null,
+      // Снятые схемы стоят в флагах запуска — их смена требует нового процесса.
+      ...(options.deniedTools?.length ? { deniedTools: [...options.deniedTools] } : {}),
       // Только непустые: ключ, добавленный всем, сменил бы подпись живых сессий у всех.
       ...(Object.keys(options.platformSettings ?? {}).length > 0
         ? { platformSettings: options.platformSettings }

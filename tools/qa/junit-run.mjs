@@ -320,7 +320,11 @@ function runVitest(file, cases) {
       suite.cases.push({ caseId, name: file, file, seconds, ...whole });
       continue;
     }
-    const hit = tests.find((test) => same(test.name, testName));
+    // Имя блока describe связывает кейс со всеми тестами под ним: красный любой — красный кейс.
+    const nested = tests.filter((test) => under(test.name, testName));
+    const hit =
+      tests.find((test) => same(test.name, testName)) ??
+      (nested.length > 0 ? worst(nested) : undefined);
     suite.cases.push(
       hit
         ? { caseId, name: `${file} › ${testName}`, file, ...hit }
@@ -517,9 +521,17 @@ function parseJUnitCases(xml) {
   return list;
 }
 
+function norm(value) {
+  return value.trim().toLowerCase().replace(/[›»>]/g, '>').replace(/\s+/g, ' ');
+}
+
 function same(left, right) {
-  const norm = (value) => value.trim().toLowerCase().replace(/[›»>]/g, '>').replace(/\s+/g, ' ');
   return norm(left) === norm(right);
+}
+
+/** Тест лежит внутри блока describe с этим именем. */
+function under(name, block) {
+  return norm(name).startsWith(`${norm(block)} > `);
 }
 
 /** Строки, в которых скрипт сам назвал провал; иначе — хвост вывода. */

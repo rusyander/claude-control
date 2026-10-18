@@ -5,10 +5,12 @@
 // output in the context window permanently.
 //
 // The rule is deliberately asymmetric, because the two situations are not symmetric:
-//   • last run FAILED  → always allowed. Fixing errors needs a tight loop; blocking that would
-//                        make the model work blind, which costs far more than it saves.
-//   • last run PASSED  → allowed again only once enough edits piled up, or when the whole gate
-//                        is run as one batched command (`type-check && lint && test`).
+//   • last run FAILED  → allowed once anything was edited. Fixing errors needs a tight loop; blocking
+//                        it would make the model work blind. With NO edit since, the re-run only
+//                        re-reads the same output (measured: a 410 s whole-project lint
+//                        re-run to grep one rule) — denied, the output is already in the transcript.
+//   • last run PASSED  → allowed again only once enough edits piled up.
+//   • a batched gate (two or more check kinds in one command) belongs to gate-at-end.mjs.
 import {
   readTail,
   sinceLastCompact,
@@ -21,7 +23,6 @@ import {
 } from './transcript.mjs';
 
 const MIN_EDITS_AFTER_GREEN = 4;
-const STALE_MS = 30 * 60 * 1000;
 
 // Commands that are clearly something else, even when the word "test" or "lint" appears in them.
 const NOT_VERIFY =
@@ -45,9 +46,10 @@ const VERIFY_PATTERNS = [
   /\bdotnet\s+test\b/i,
 ];
 
-// An explicit request from the user always wins over the guard.
+// An explicit request from the user always wins over the guard. Imperative only: a bare «тест» or
+// «lint» inside a pasted bug report used to switch the guard off for the whole turn.
 const USER_ASKED =
-  /прогони|запусти|проверь|прогнать|тайпчек|typecheck|type-check|тест|test|линт|lint|гейт|gate/i;
+  /(прогони|запусти|перезапусти|прогнать|гони|проверь)\S*\s+(\S+\s+)?(тест|тайпчек|линт|гейт|typecheck|type-check|lint|test|gate)|\b(re)?run\s+(the\s+)?(tests?|lint|typecheck|type-check|gate)\b/i;
 
 export default function verifyThrottle(input) {
   const tool = input?.tool_name;
@@ -61,7 +63,7 @@ export default function verifyThrottle(input) {
   const segments = splitSegments(command);
   const verifySegments = segments.filter(isVerifySegment);
   if (verifySegments.length === 0) return null;
-  // A batched gate is exactly the behaviour we want to encourage — never stand in its way.
+  // A batched gate is gate-at-end's to judge (once, at the end of the whole task).
   if (verifySegments.length >= 2) return null;
 
   const records = sinceLastCompact(readTail(input.transcript_path));
@@ -89,18 +91,23 @@ export default function verifyThrottle(input) {
   const res = resultFor(events.slice(prevIndex), prev.id);
   if (!res) return null; // no recorded outcome — do not guess
   if (res.body && res.body.includes('[ctx-guard]')) return null; // that one was refused, not run
-  if (looksFailed(res)) return null; // red → fixing loop, stay out of the way
-
-  if (prev.ts && Date.now() - prev.ts > STALE_MS) return null; // long gap — likely a new task
-
   const edits = countEdits(events.slice(prevIndex));
+  if (looksFailed(res)) {
+    if (edits > 0) return null; // red → fixing loop, stay out of the way
+    return deny(
+      `this check failed and nothing was edited since — re-running it only re-reads the same output, which ` +
+        `is already above (or in its log). Fix first, then re-run only the failing part, narrowed to its files. ` +
+        `Suspected flaky run — repeat this same call.`,
+    );
+  }
+
   if (edits >= MIN_EDITS_AFTER_GREEN) return null;
 
   const what = edits === 0 ? 'no edits since' : `${edits} edit(s) since`;
   return deny(
     `this check already passed green this session, ${what}. Every run's output stays in the context ` +
-      `for good and the run itself is slow. Batch the edits and run the gate once at task end as one ` +
-      `command (type-check && lint && test) — a combined run is always allowed. ` +
+      `for good and the run itself is slow. Check edits narrowly (the touched files) and leave the full ` +
+      `gate for the end of the whole task, once. ` +
       `Needed right now — repeat this same call.`,
   );
 }

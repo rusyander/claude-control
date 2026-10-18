@@ -51,6 +51,33 @@ export interface SpikeInfo {
   causes: string[];
 }
 
+/** Время по транскрипту (мс от эпохи и длительности); `busy` — отрезки занятости. */
+export interface SessionTime {
+  firstMs: number;
+  lastMs: number;
+  /** Модель пишет ответ. */
+  modelMs: number;
+  /** Идут инструменты (параллельные вызовы складываются). */
+  toolMs: number;
+  busy: Array<[number, number]>;
+}
+
+/** Метрики плана экономии окна: каждая — след своей меры (`economy.ts`). */
+export interface EconomyMetrics {
+  /** Доля прочитанного контекста, которую занимает постоянная часть, %. */
+  prefixShare: number;
+  /** Проверки одного рода на весь проект посреди работы: прогоны и минуты. */
+  wholeChecks: { runs: number; minutes: number };
+  /** Команды, убитые по таймауту: число и минуты до убийства. */
+  capKills: { count: number; minutes: number };
+  /** Минуты в `sleep`. */
+  sleepMinutes: number;
+  /** Доля вызовов с одним инструментом подряд за таким же, %. */
+  singleRunShare: number;
+  /** Блоки правил, пришедшие на черновик (temp, scratchpad, `.agent/`) или тело heredoc. */
+  falseRules: number;
+}
+
 export interface SessionAudit {
   id: string;
   /** `claude` / `codex` / `qwen`: у чужих CLI нет хуков и вложений — их поля пусты. */
@@ -89,4 +116,8 @@ export interface SessionAudit {
   cacheWriteSpikes: SpikeInfo[];
   /** Вложенные агенты (ревьюеры, разведчики) этой сессии. */
   subagents: SessionAudit[];
+  /** Время по часам и занятость; у журналов Codex/Qwen нет. */
+  time?: SessionTime;
+  /** Метрики плана экономии; у журналов Codex/Qwen нет. */
+  economy?: EconomyMetrics;
 }

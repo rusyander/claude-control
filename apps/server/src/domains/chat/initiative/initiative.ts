@@ -304,6 +304,14 @@ export function childAppend(append: string | undefined): string {
 export const CHILD_DENIED_TOOLS = ['SendMessage', 'ListAgents'] as const;
 
 /**
+ * Тяжёлые схемы, которые чатам панели не нужны (настройка `chatLeanTools`).
+ * Замерено 18.10.2026 настоящим `claude` 2.1.299: Artifact и Workflow — около
+ * 10,6 тыс. токенов в начале КАЖДОГО запроса, за неделю — ноль вызовов.
+ * Флагом, а не правилом в настройках человека: чужие `settings.json` — не наши.
+ */
+export const UNUSED_HEAVY_TOOLS = ['Artifact', 'Workflow'] as const;
+
+/**
  * Чем брокер прав отвечает на вызов `AskUserQuestion` — сразу, не показывая
  * карточку прав.
  *

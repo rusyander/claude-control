@@ -81,7 +81,9 @@ async function runOn(
   const child = new FakeChild();
 
   vi.resetModules();
-  vi.doMock('node:child_process', () => ({
+  // Остальное — настоящее: локальный слой проекта зовёт git через execFile.
+  vi.doMock('node:child_process', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('node:child_process')>()),
     spawn: (_command: string, args: string[]) => {
       call.args = args;
       for (const arg of args) {
@@ -253,6 +255,7 @@ async function viaRegistry(
   sessionId?: string,
   brief?: (keys: readonly string[]) => string | undefined,
   prompt = 'задача',
+  denied?: () => readonly string[],
 ): Promise<SpawnCall> {
   const original = Object.getOwnPropertyDescriptor(process, 'platform');
   Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
@@ -264,7 +267,9 @@ async function viaRegistry(
   };
 
   vi.resetModules();
-  vi.doMock('node:child_process', () => ({
+  // Остальное — настоящее: локальный слой проекта зовёт git через execFile.
+  vi.doMock('node:child_process', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('node:child_process')>()),
     spawn: (_command: string, args: string[]) => {
       call.args = args;
       queueMicrotask(() => {
@@ -283,6 +288,7 @@ async function viaRegistry(
     const registry = new ChatRunRegistry(() => new ChatRun());
     registry.setChildResolver((keys) => keys.some((key) => childKeys.includes(key)));
     if (brief) registry.setChildrenBriefResolver(brief);
+    if (denied) registry.setDeniedToolsResolver(denied);
     registry.start(
       chatId,
       { prompt, cwd: process.cwd(), appendSystemPrompt: 'Инициативы панели.' },
@@ -323,6 +329,38 @@ describe('ChatRun: прогон ребёнка разделения', () => {
 
     expect(call.args).not.toContain('--disallowedTools');
     expect(call.args[call.args.indexOf('--append-system-prompt') + 1]).toBe('Инициативы панели.');
+  });
+});
+
+describe('ChatRun: облегчённый набор инструментов (chatLeanTools)', () => {
+  const lean = () => ['Artifact', 'Workflow'] as const;
+
+  it('обычный разговор запускается без тяжёлых схем', async () => {
+    const call = await viaRegistry(['other'], 'new-1', undefined, undefined, 'задача', lean);
+
+    expect(call.args[call.args.indexOf('--disallowedTools') + 1]?.split(',')).toEqual([
+      'Artifact',
+      'Workflow',
+    ]);
+  });
+
+  it('ребёнку — один флаг на обмен между сессиями и тяжёлые схемы', async () => {
+    const call = await viaRegistry(['new-1'], 'new-1', undefined, undefined, 'задача', lean);
+
+    // Второй `--disallowedTools` CLI принял бы вместо первого — ребёнок вернул бы себе SendMessage.
+    expect(call.args.filter((arg) => arg === '--disallowedTools')).toHaveLength(1);
+    expect(call.args[call.args.indexOf('--disallowedTools') + 1]?.split(',')).toEqual([
+      'SendMessage',
+      'ListAgents',
+      'Artifact',
+      'Workflow',
+    ]);
+  });
+
+  it('выключенная настройка возвращает полный набор', async () => {
+    const call = await viaRegistry(['other'], 'new-1', undefined, undefined, 'задача', () => []);
+
+    expect(call.args).not.toContain('--disallowedTools');
   });
 });
 

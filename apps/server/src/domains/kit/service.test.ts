@@ -458,6 +458,7 @@ describe('runExtras: что получает прогон', () => {
       'UserPromptSubmit',
       'PreToolUse',
       'PostToolUse',
+      'PostToolUseFailure',
       'Stop',
       'PreCompact',
       'PostCompact',

@@ -89,6 +89,9 @@ await runOnStand(
       await dialog.getByRole('button', { name: 'Агенты' }).click();
       const toggle = dialog.getByRole('switch', { name: 'Проверять конец хода агента' });
       await toggle.waitFor();
+      // Пока статус хуков грузится, переключатель неактивен и не отмечен —
+      // читать его состояние имеет смысл только после загрузки.
+      for (let left = 50; left > 0 && (await toggle.isDisabled()); left -= 1) await wait(200);
       check(
         'переключатель показывает «включена»',
         (await toggle.getAttribute('aria-checked')) === 'true',

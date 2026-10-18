@@ -9,6 +9,8 @@
 // the CLI itself where it allows it (Claude: CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY=1, set by the panel
 // on local runs). Outside the local variant this item is silent.
 
+import { backgroundParam } from './kit-paths.mjs';
+
 /** @returns {null | {decision:'deny', reason:string}} */
 export default function localDiscipline(input) {
   if ((process.env.AGENTDECK_KIT_VARIANT ?? '').trim() !== 'local') return null;
@@ -16,10 +18,11 @@ export default function localDiscipline(input) {
   const arg = input?.tool_input ?? {};
   if (arg.run_in_background !== true && arg.run_in_background !== 'true') return null;
   if (tool === 'Agent' || tool === 'Task') return null;
+  // Qwen reaches here normalised (`is_background` → run_in_background); the text names ITS flag.
   return {
     decision: 'deny',
     reason:
       'Local model: no background commands — polling one burns the context window. ' +
-      'Repeat the same call without run_in_background and wait for its result.',
+      `Repeat the same call without ${backgroundParam(input) ?? 'run_in_background'} and wait for its result.`,
   };
 }

@@ -363,12 +363,16 @@ export const SPLIT_SYSTEM_PROMPT =
   'request — group what is reviewed and merged together, not merely what is similar in topic. Write ' +
   'a tracker task with its key (ABC-123) and link: the group takes the task into work by them. ' +
   'After the block, stop and wait for the decision. ' +
-  // Ревью по ссылке (Т7) — единственный случай, когда одна группа законна:
-  // MR и есть отдельная работа в своей копии на его ветке. Без этой оговорки
-  // модель послушно требовала трёх задач и ревьюила один MR прямо в разговоре.
-  'A special case — links to merge requests (MR/PR) with a request to review them: then make one ' +
-  'group per EACH link, and a single link also makes a split — the three-task rule does not apply ' +
-  'here. Such a group has kind: "review", review: {"url":"the full link"}, title — the MR title or ' +
+  // Ревью по ссылкам (Т7): несколько MR — по группе на каждый. Одна ссылка
+  // разделением больше не считается (живое ревью MR, 18.10.2026: «сделай ревью»
+  // по одной ссылке ушло карточкой с единственной группой, и человек получил
+  // лишний шаг вместо работы) — одну задачу не делят никогда.
+  'Never propose a split of a single task: one task — one ticket, one MR, one review — is done ' +
+  'here, in this conversation. ' +
+  'A special case — TWO or more links to merge requests (MR/PR) with a request to review them: then ' +
+  'make one group per EACH link — the three-task rule does not apply here. A single link is one ' +
+  'task: review it here, no block. ' +
+  'Such a group has kind: "review", review: {"url":"the full link"}, title — the MR title or ' +
   'its number, tasks — what exactly to check. The panel creates the MR branch and a copy on it from ' +
   'the link. ' +
   // Несколько MR на работу (конфликты, замечания, rebase) — второй такой
@@ -620,12 +624,9 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
   }
 
   // Одна группа — это не разделение, а обычный разговор: карточка с единственной
-  // кнопкой «разделить на 1 чат» только сбивала бы с толку. Ревью по ссылке —
-  // исключение, и единственное (Т7): один MR — это уже отдельная работа в своей
-  // копии на его ветке, ради которой разговор человека прерывать не надо.
-  if (groups.length < 2 && !groups.some((group) => group.review && !group.review.work))
-    return undefined;
-  if (groups.length === 0) return undefined;
+  // кнопкой «разделить на 1 чат» только сбивала бы с толку. Ревью по одной ссылке
+  // больше не исключение (живое ревью MR, 18.10.2026): одна задача не делится.
+  if (groups.length < 2) return undefined;
 
   const shared = textOrList(source.shared ?? source.context, MAX_SHARED);
   const droppedGroups = Math.max(0, list.length - SPLIT_MAX_GROUPS);

@@ -99,8 +99,9 @@ export default function verifyAtStop(input) {
     decision: 'block',
     reason:
       `verify-at-stop: this turn edited ${names.length} code file${names.length > 1 ? 's' : ''} (${shown}) and no check ` +
-      'ran after the last edit. Run the gate that covers them NOW — the project type-check/lint/test, or the suite ' +
-      "for these files — and read its whole output. Then finish with the summary in the user's language, stating what was executed " +
+      'ran after the last edit. Check them NOW, narrowly: the tests of these files (`vitest related <files> --run`, ' +
+      '`pytest <file>`), lint/type-check of the files or their package — the FULL gate is once, at the end of the ' +
+      "whole task (gate-at-end), and is not owed per follow-up. Read the whole output, then finish with the summary in the user's language, stating what was executed " +
       'and whether it was green. If no check can run here, say so explicitly in the summary with the reason. ' +
       'Do not redo anything else.',
   };

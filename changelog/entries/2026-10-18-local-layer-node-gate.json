@@ -1,0 +1,156 @@
+{
+  "title": {
+    "ru": "Локальный слой проекта, нужный проекту Node в каждом чате и проверки один раз в конце задачи",
+    "en": "A project's local layer, the Node a project asks for in every chat, and checks run once at the end of a task"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Локальный слой проекта: командные инструкции, правила, хуки, навыки и серверы MCP собираются копией в .agent/local-layer/ и уходят в чаты панели вместо самих командных файлов. Так агент работает на сжатых инструкциях или на ускоренных хуках из ещё не влитой ветки, а репозиторий не меняется. Сжатый кусок действует, только пока сделан из текущего текста; замена хука — только пока команда не меняла тот же файл. Режим «Авто» подключает слой, лишь когда тот что-то даёт. Карточка на вкладке «Из проекта» показывает режим, состав слоя, ждущие пересжатия куски и состояние каждой замены.",
+        "en": "A project's local layer: team instructions, rules, hooks, skills and MCP servers are assembled as a copy in .agent/local-layer/ and reach panel chats instead of the team files themselves. The agent can then work on compressed instructions or on faster hooks from a not-yet-merged branch without touching the repository. A compressed piece applies only while it was made from the current text, a hook replacement only while the team has not changed the same file. Auto mode attaches the layer only when it has something to offer. A card on the «From the project» tab shows the mode, what the layer holds, pieces awaiting re-compression and the state of every replacement."
+      },
+      "how": {
+        "ru": "Замена хука сливается с командной версией пофайлово: файл, который ветка не трогала, берётся у команды, поэтому чужие правки рядом не отменяют всю замену.",
+        "en": "A hook replacement merges with the team version file by file: a file the branch left alone comes from the team, so unrelated edits next to it do not cancel the whole replacement."
+      },
+      "area": { "ru": "Проекты", "en": "Projects" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Чат проекта сразу получает ту версию Node, которую проект просит в .nvmrc, .node-version, .tool-versions, volta или engines: она стоит первой в PATH процесса CLI, и агенту не нужно искать её самому. Вне панели то же делает пункт набора на старте сессии.",
+        "en": "A project's chat gets the Node version the project asks for in .nvmrc, .node-version, .tool-versions, volta or engines from the start: it comes first in the CLI process's PATH, so the agent never hunts for it. Outside the panel a kit item does the same at session start."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Строка «Кому раздана работа» показывает, чем каждый агент занят сейчас и сколько, а агента, который только ждёт чужой результат, отмечает отдельно.",
+        "en": "The «Who got the work» row shows what each agent is doing right now and for how long, and marks an agent that is only waiting for someone else's result."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Разделение больше не предлагается для одной задачи: группы появляются только тогда, когда задач две и больше, а одна ссылка на ревью разбирается в том же чате.",
+        "en": "A split is no longer proposed for a single task: groups appear only for two or more tasks, and a single review link is handled in the same chat."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Набор: полная проверка идёт один раз в конце всей задачи и в фоне, повтор зелёной без новых правок отклоняется, ожидание долгих команд через sleep запрещено; mustfail меряет базу один раз на весь набор файлов и показывает ход по файлам; инструменты ревью сами собирают задания дорожек и каркас отчёта.",
+        "en": "Kit: the full check runs once at the end of the whole task and in the background, a repeat of a green one without new edits is refused, waiting on long commands with sleep is denied; mustfail measures its baseline once for the whole file set and reports progress per file; the review tools assemble lane prompts and the report skeleton themselves."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Набор бережёт окно модели: проверка всего проекта посреди задачи отклоняется с готовой узкой командой на тронутые файлы; команда, которая здесь уже шла дольше пяти минут или упиралась в потолок, отправляется в фон, а слишком короткий таймаут называется до запуска; три хода подряд по одному короткому чтению дают подсказку собрать чтения в один вызов; правка файла через sed -i или встроенный код python и node отклоняется в пользу Edit и Write, кроме черновых файлов. Повтор той же команды проходит всегда.",
+        "en": "The kit saves the model's window: a whole-project check mid-task is refused with a ready narrow command for the touched files; a command that already ran here for over five minutes or hit the cap goes to the background, and a timeout too short for it is named before the run; three turns in a row of one short read each get a hint to batch reads into one call; editing a file through sed -i or inline python and node code is refused in favour of Edit and Write, scratch files excepted. Repeating the same command always passes."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Охранники набора снова пропускают повтор отказанной команды: CLI стал записывать отказ с вводной «PreToolUse:<инструмент> hook error:», и повтор, который должен проходить, отклонялся заново.",
+        "en": "Kit guards let a refused command through on repeat again: the CLI began recording a refusal with a «PreToolUse:<tool> hook error:» lead-in, and the repeat that should pass was refused again."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Охранники набора ошибаются реже. Упавшая команда больше не записывается как убитая на потолке и не отправляется из-за этого в фон. Пара узких проверок и проверка одного пакета не считаются полным гейтом, а прогон всех тестов с перенаправлением вывода (2>&1) больше не проходит как узкий. Тайпчек и тесты всего проекта отклоняются, только когда известно, что здесь они идут дольше 45 секунд. Heredoc с кодом, который тут же запускается, снова получает свои правила, субагент находит свой отказ в собственном журнале, а гейт с замаскированным кодом выхода читается по его выводу — по каждому логу команды, в том числе записанному по относительному пути после cd в начале, и по строкам вида «EXIT 1» и «GATE_EXIT=1».",
+        "en": "Kit guards misjudge less. A failed command is no longer recorded as killed at the cap and sent to the background for it. A pair of narrow checks and a one-package type-check are not taken for a full gate, and a whole test run with redirected output (2>&1) no longer passes as narrow. A whole-project type-check or test run is refused only once it is known to take over 45 seconds here. A code heredoc that is run right away gets its rules again, a subagent finds its own refusal in its own transcript, and a gate with a masked exit code is judged by its output — by every log the command writes, including one at a relative path after a leading cd, and by lines like «EXIT 1» and «GATE_EXIT=1»."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Набор в Qwen Code и Codex: повтор отказанной команды проходит и там. Раньше отказ искался в журнале Claude, и на этих CLI повтор отклонялся снова и снова. Охранники называют фоновый флаг так, как его пишет модель этого CLI (у Qwen — is_background). У Codex флага фона и таймаута команды нет, поэтому совет уйти в фон или поднять таймаут ему больше не даётся, а полный гейт идёт на переднем плане. Упавшая команда Codex закрывается обычным PostToolUse: отдельного события для неё у Codex нет.",
+        "en": "The kit in Qwen Code and Codex: repeating a refused command passes there too. The refusal used to be looked up in Claude's transcript, so on these CLIs a repeat was refused again and again. Guards name the background flag the way this CLI's model writes it (is_background for Qwen). Codex has neither a background flag nor a command timeout, so it no longer gets advice to background a command or raise its timeout, and its full gate runs in the foreground. A failed Codex command is closed by the regular PostToolUse: Codex has no separate event for it."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Охранники набора точнее. Запись в файл .md через heredoc, перенаправление, tee или Set-Content отклоняется в пользу Write и Edit (кроме черновиков), чтобы не обходить проверки языка и места документа. Узкая команда проверки называет только файлы, правленные этой сессией, а не чужие изменения в дереве, и у каждого -p tsc своя память. Скрипт проверки, вызванный по пути (node scripts/lint.mjs), считается проверкой всего проекта. console.log( в пробе после sleep не принимается за чтение журнала. Подсказка «полный гейт уже был» звучит один раз на гейт, а не на каждое следующее сообщение. Срочная просьба обновить PROGRESS.md перед сжатием приходит на 87 % окна сжатия из настроек, а не на постоянных 260 тыс., которые при окне меньше 300 тыс. не наступали.",
+        "en": "Kit guards judge more precisely. Writing a .md file through a heredoc, a redirect, tee or Set-Content is refused in favour of Write and Edit (scratch files excepted), so the doc language and location checks are not bypassed. A narrow check command names only the files this session edited, not someone else's changes in the tree, and each tsc -p gets its own memory. A check script called by path (node scripts/lint.mjs) counts as a whole-project check. console.log( in a probe after sleep is not taken for reading a log. The «full gate already ran» hint is said once per gate, not on every later message. The urgent request to update PROGRESS.md before compaction comes at 87% of the compaction window from the settings, not at a fixed 260k that never arrived with a window under 300k."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Настройка «Облегчённый набор инструментов в чатах» на вкладке моделей (включена по умолчанию): чаты панели запускаются без схем Artifact и Workflow, которыми не пользуются, и начало каждого запроса становится примерно на 14 тыс. токенов короче. Снятая галочка возвращает инструменты со следующего хода.",
+        "en": "A «Lean tool set in chats» setting on the models tab (on by default): panel chats start without the Artifact and Workflow schemas they do not use, cutting about 14k tokens from the start of every request. Unticking it brings the tools back from the next turn."
+      },
+      "area": { "ru": "Настройки", "en": "Settings" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Набор в Codex больше не отказывает в запуске, когда у человека длинный собственный текст инструкций: список навыков ужимается ступенями до одних имён, правила набора не режутся.",
+        "en": "The kit in Codex no longer refuses to start when the user's own instructions are long: the skill list shrinks in steps down to names only, and the kit rules are never cut."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Инструмент проб для живых проверок держит браузер тёплым между запусками: каждая проба получает чистый контекст, вход сохраняется один раз и переиспользуется флагом, печатается только то, что проба вернула. Повторный запуск — доли секунды вместо перезапуска браузера и нового входа.",
+        "en": "A probe tool for live checks keeps the browser warm between runs: every probe gets a fresh context, the login is saved once and reused by a flag, and only what the probe returns is printed. A repeat run takes a fraction of a second instead of a browser relaunch and a new login."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Хук сессии вне панели больше не обращается к серверу на каждом шаге: сервер помечает сессию, для которой с телефона пришло сообщение, и только она его забирает. Конец хода по-прежнему спрашивает сервер всегда.",
+        "en": "The hook of a session outside the panel no longer calls the server on every step: the server flags the session a phone message is waiting for, and only that session picks it up. The end of a turn still always asks the server."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "pnpm tokens считает строку экономии: долю постоянной части контекста, долю ходов с одним шагом, проверки всего проекта и их минуты, команды, убитые на потолке, минуты ожидания через sleep и правила, сработавшие на черновиках. Проверку всего проекта и ход с одним коротким чтением строка судит тем же кодом, что и охранники набора, поэтому цифры совпадают с тем, на что охранник действительно отвечает. Повторным чтением больше не считается чтение после записи файла через Bash, другой кусок файла, чтение после сжатия и после смены ветки.",
+        "en": "pnpm tokens reports an economy line: the share of the fixed context prefix, the share of single-step turns, whole-project checks and their minutes, commands killed at the cap, minutes spent waiting with sleep, and rules that fired on scratch files. Whole-project checks and single-short-read turns are judged by the same code as the kit guards, so the numbers match what a guard actually acts on. A read after a Bash write to the file, a different slice of the file, a read after compaction and after a branch switch no longer count as re-reads."
+      },
+      "area": { "ru": "Аналитика", "en": "Analytics" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "pnpm tokens показывает время: от начала до конца, сколько из него хоть кто-то работал и сумму времени агентов, отдельно модель и инструменты.",
+        "en": "pnpm tokens reports time: start to end, how much of it anyone was working and the sum of agent time, with model and tools apart."
+      },
+      "area": { "ru": "Аналитика", "en": "Analytics" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Кейс блока тестов, привязанный к блоку describe, больше не краснеет как «тест не найден»: он покрывает все тесты внутри блока и красный, если красный любой из них.",
+        "en": "A Tests-block case linked to a describe block no longer goes red as «test not found»: it covers every test inside the block and is red when any of them is."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка: локальный слой в разделе «Проекты» со снимком карточки, Node в чатах и то, что сборка слоя в копии проекта не переносится.",
+        "en": "Help: the local layer in the «Projects» topic with a shot of the card, Node in chats, and that the layer build is never carried into a project copy."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

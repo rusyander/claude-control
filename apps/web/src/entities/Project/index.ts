@@ -45,6 +45,7 @@ export { useUpdateProjectRules } from './api/useUpdateProjectRules';
 // Собственный `.claude` проекта (скиллы, хуки, правила) — только чтение, два адреса
 // одного ответа: по id из реестра и по абсолютному пути привязки группы.
 export { useProjectLocal } from './api/ProjectLocalApi';
+export { useProjectLocalLayer, useSetLocalLayerMode } from './api/ProjectLocalLayerApi';
 export { useProjectLocalByPath } from './api/useProjectLocalByPath';
 export { ProjectLocalConfigView } from './ui/ProjectLocalConfigView/ProjectLocalConfigView';
 export type { ProjectLocalConfigViewProps } from './ui/ProjectLocalConfigView/ProjectLocalConfigView.types';

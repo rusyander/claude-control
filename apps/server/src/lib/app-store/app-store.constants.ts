@@ -67,6 +67,8 @@ export const DEFAULT_STATE: AppState = {
     autoApproveRules: {},
     // Авторежим прав в чатах — из коробки включён (владелец, 24.09.2026).
     chatAutoMode: true,
+    // Облегчённый набор инструментов в чатах — из коробки включён (владелец, 18.10.2026).
+    chatLeanTools: true,
     modelPricing: {},
     encryptSecretBackups: false,
     taskSplitInitiative: true,

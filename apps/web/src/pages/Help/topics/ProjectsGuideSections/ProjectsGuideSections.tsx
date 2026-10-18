@@ -71,6 +71,9 @@ export function ProjectsGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('lRules')} text={g('lRulesText')}>
             <HelpShot topic="projects" scenario="local" frame="04-rules" side="panel" />
           </GuideStep>
+          <GuideStep title={g('lLayer')} text={g('lLayerText')}>
+            <HelpShot topic="projects" scenario="local" frame="05-layer" side="panel" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

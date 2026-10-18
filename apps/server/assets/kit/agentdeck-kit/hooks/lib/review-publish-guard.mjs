@@ -145,6 +145,8 @@ const CARD = [
   [/^[^\n]*\*\*[^*\n]+\*\*/, 'bold one-line thesis on the first line'],
   [/[^\s`(]+\.\w+:\d+(?:-\d+)?/, 'the location as `path:start-end`'],
 ];
+/** The opening of a review summary (gitlab-publish.md §5): a heading or a verdict line, no severity marker. */
+const SUMMARY_HEAD = /^\s*(?:#{1,3}\s*(?:Review|Summary|Ревью|Итог|Сводка)|\*\*(?:Summary|Итог))/iu;
 const CLEAN_CLAIM =
   /\bno\s+(?:blocking|blockers|findings|issues|remarks)\b|\bLGTM\b|(?:блокер[а-яё]*|замечани[а-яё]*|находок)\s+нет|нет\s+(?:ни\s+)?(?:блокер|замечани)|(?<![а-яё])чисто(?![а-яё])/iu;
 const COVERAGE = /\*\*(?:Ledger|Coverage|Журнал|Покрытие):\*\*/i;
@@ -292,6 +294,17 @@ function shapeRefusal(tool, input, cli) {
   }
   if (thread) {
     const missing = CARD.filter(([re]) => !re.test(body)).map(([, what]) => what);
+    // A summary sent as a thread because the note tool was not loaded yet: «not a finding card» sent the
+    // model to rewrite a summary into a card (18.10.2026).
+    if (missing.length && SUMMARY_HEAD.test(body)) {
+      return {
+        decision: 'deny',
+        reason:
+          'This body is the review SUMMARY, not a finding: it goes out as a non-positional note via ' +
+          '`create_merge_request_note` — not loaded → `discover_tools` category `merge_requests` first. ' +
+          'Threads carry finding cards only (gitlab-publish.md §2, §5).',
+      };
+    }
     if (missing.length) {
       return {
         decision: 'deny',

@@ -979,14 +979,18 @@ describe('порция групп для конвейера уровней', () 
 describe('ссылка на MR в блоке предложения', () => {
   const MR = 'https://gitlab.com/team/app/-/merge_requests/42';
 
-  /** Разбор одной группы: всё остальное здесь неважно. */
+  /** Разбор первой группы; вторая — только чтобы предложение было разделением. */
   const groupOf = (extra: Record<string, unknown>) =>
     parseSplitProposal({
-      groups: [{ title: 'Ревью MR', tasks: ['посмотри'], ...extra }],
+      groups: [
+        { title: 'Ревью MR', tasks: ['посмотри'], ...extra },
+        { title: 'Другая', tasks: ['что-то'] },
+      ],
     })?.groups[0];
 
-  it('одна ревью-группа — законное предложение: обычная одиночка им не считается', () => {
-    expect(groupOf({ review: MR })).toBeTruthy();
+  it('одна ревью-группа — не разделение: одну задачу не делят (живое ревью 18.10)', () => {
+    const one = { title: 'Ревью MR', tasks: ['посмотри'], review: MR };
+    expect(parseSplitProposal({ groups: [one] })).toBeUndefined();
     expect(parseSplitProposal({ groups: [{ title: 'Одна', tasks: ['что-то'] }] })).toBeUndefined();
   });
 
@@ -1247,6 +1251,15 @@ describe('работа в нескольких MR', () => {
       'implementation',
       'review',
     ]);
+  });
+
+  it('одна ссылка на ревью — не разделение: одну задачу не делят (живое ревью 18.10)', () => {
+    const one = { title: '!1029', tasks: ['сделай ревью'], kind: 'review', review: { url: MR1 } };
+    expect(parseSplitProposal({ groups: [one] })).toBeUndefined();
+    const two = { ...one, title: '!1030', review: { url: MR2 } };
+    expect(parseSplitProposal({ groups: [one, two] })?.groups).toHaveLength(2);
+    expect(SPLIT_SYSTEM_PROMPT).toContain('Never propose a split of a single task');
+    expect(SPLIT_SYSTEM_PROMPT).not.toContain('a single link also makes a split');
   });
 
   it('одна ссылка на работу — не разделение: это обычная работа в этом разговоре', () => {

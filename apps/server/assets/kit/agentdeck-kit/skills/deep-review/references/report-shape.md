@@ -8,7 +8,10 @@ does not show, and nothing that restates it.
 
 `.agent/reviews/<scope-slug>.agent.md`, slug = branch, MR iid or module path. Structured keys and
 values below are fixed English tokens (the tools parse them); the prose under them — theses, reasons,
-fixes — is in the user's language. The guard checks the file at Write, and at Stop when a shell
+fixes — is in the user's language. **Start from `node <kit>/tools/review-plan.mjs skeleton --plan
+<plan.json> <lane reports…> --tier T2`**: every header line below, the computable ones filled, the
+rest `⟨fill: …⟩` blanks the guard refuses until filled — one Write, not a refused draft and a
+rewrite. The guard checks the file at Write, and at Stop when a shell
 command wrote it. Refused: a missing `Tier` · `Radius` · `Verified` · `Taken on trust` · `Score`; a
 finding without `Where` / `Axis` / `Status`; a 🔴/🟡 without `Evidence`; T2 with a `Live` line naming
 fewer than two variation classes and no "not run — <why>"; a T2 🔴/🟡 naming no rung (`L1`…`L4`, or

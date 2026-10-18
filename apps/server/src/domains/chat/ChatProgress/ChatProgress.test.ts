@@ -73,7 +73,13 @@ describe('buildProgress', () => {
       ]),
     ]);
     expect(started.agents).toEqual([
-      { id: 'call-1', kind: 'Explore', description: 'найти вызовы', status: 'running' },
+      {
+        id: 'call-1',
+        kind: 'Explore',
+        description: 'найти вызовы',
+        status: 'running',
+        startedAt: '2026-08-01T10:00:00Z',
+      },
     ]);
 
     const finished = buildProgress([

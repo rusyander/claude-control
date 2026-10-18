@@ -86,7 +86,12 @@ perf   from ['"](lucide-react|@mui/material|lodash|react-icons)['"]   barrel imp
 - **P4** `vi.useFakeTimers({ shouldAdvanceTime: true })` with `userEvent.setup({ advanceTimers:
 vi.advanceTimersByTime })`.
 - **P5 Playwright:** `page.route` fulfilling 403 or delaying 1500 ms; two contexts for a lost update;
-  `clock.install()` + `fastForward` for expiry; `toBeFocused()` after Escape.
+  `clock.install()` + `fastForward` for expiry; `toBeFocused()` after Escape. Against a stand:
+  `node <kit>/tools/probe.mjs run <scenario.mjs> --state auth.json -- <args>` — the browser stays
+  warm between runs, each run gets a fresh context, the login is done once (`--save-state auth.json`)
+  and reused, only what the scenario returns is printed (return saved files by path — the screenshot
+  is read by the printed name); `probe.mjs stop` when the review ends. Seven runs at ~60 s each once re-launched the browser and logged in, the script
+  regex-patched between runs, and a guessed screenshot name (dash for a space) failed the read.
 - **P6 bundle diff:** base via `git archive` into `$S`, `vite build --sourcemap` per side,
   `source-map-explorer --json`, totals compared.
 - **P7 render count:** `<Profiler onRender>` inside P1, the same interaction at base and head.

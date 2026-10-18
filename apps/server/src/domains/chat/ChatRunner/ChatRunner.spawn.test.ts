@@ -59,6 +59,12 @@ vi.mock('node:child_process', () => ({
   spawnSync: () => ({ status: 0 }),
 }));
 
+// Node проекта в PATH чата: подмена видна по метке, если запуск идёт через неё.
+vi.mock('../../project-git/chat-node.ts', () => ({
+  withChatNode: (cwd: string, env: NodeJS.ProcessEnv, command: string) =>
+    command === 'node-wired-cli' ? { ...env, CHAT_NODE_CWD: cwd } : env,
+}));
+
 const { ChatRun, RUN_STDERR_MAX } = await import('./ChatRunner.ts');
 
 beforeEach(() => {
@@ -300,6 +306,26 @@ describe('ChatRun.start: места очереди тяжёлых шагов', (
   it('окружение прогона сильнее нашего', async () => {
     const env = await spawnedEnv({ child: true, env: { AGENTDECK_HEAVY_SLOTS: '3' } });
     expect(env.AGENTDECK_HEAVY_SLOTS).toBe('3');
+  });
+
+  it('CLI получает окружение после подстановки Node проекта, с каталогом чата', async () => {
+    const run = new ChatRun();
+    const finished = run.start(
+      { prompt: 'привет', cwd: process.cwd(), command: 'node-wired-cli' },
+      () => undefined,
+    );
+    process.nextTick(() => {
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 0);
+    });
+    await finished;
+    const call = spawnMock.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(call[2].env.CHAT_NODE_CWD).toBe(process.cwd());
   });
 });
 

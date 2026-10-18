@@ -213,3 +213,45 @@ describe('review-position', () => {
     expect(r.stderr).toMatch(/not a commit/);
   });
 });
+
+describe('review-plan: промпт полосы и заготовка отчёта', () => {
+  const repo = makeRepo('plan');
+  put(repo, 'svc/a.ts', nums(5));
+  const base = commit(repo, 'base');
+  put(repo, 'svc/a.ts', nums(40));
+  put(repo, 'ui/b.tsx', nums(30));
+  const head = commit(repo, 'head');
+  const out = join(repo, '.plan');
+  const run = (...a: string[]) =>
+    spawnSync(process.execPath, [join(TOOLS, 'review-plan.mjs'), ...a], { encoding: 'utf8' });
+  const planFile = join(out, 'plan.json');
+  run('plan', '--repo', repo, '--base', base, '--out', out, '--slug', 'mr-7', '--scope', 'MR !7');
+
+  it('plan --slug пишет промпт первого раунда на каждую полосу', () => {
+    const r = run('prompt', '--plan', planFile, '--lane', 'B', '--slug', 'mr-7');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('[return-format]');
+    expect(r.stdout).toContain('[no-subagents]');
+    expect(r.stdout).toContain('.agent/tmp/review-mr-7/lane-B.md');
+    expect(r.stdout).toContain(`head ${head}`);
+    expect(r.stdout).toContain('svc/a.ts');
+    expect(r.stdout).toContain('ui/b.tsx');
+    expect(r.stdout).toContain('never run it here');
+    expect(r.stdout).toContain('never sleep-poll');
+  });
+
+  it('неизвестная полоса — код 2', () => {
+    expect(run('prompt', '--plan', planFile, '--lane', 'Z').status).toBe(2);
+  });
+
+  it('заготовка несёт все ключи стража, остальное — пустые ⟨fill⟩, которые страж отклоняет', async () => {
+    const r = run('skeleton', '--plan', planFile, '--tier', 'T2');
+    expect(r.status).toBe(0);
+    for (const k of ['promises', 'attacker', 'siblings', 'contract', '**Ledger:**', '**Dropped:**'])
+      expect(r.stdout).toContain(k);
+    const report = (await import(
+      pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'review-report.mjs')).href
+    )) as { writeProblems: (text: string) => string[] };
+    expect(report.writeProblems(r.stdout).join(' ')).toContain('skeleton blank');
+  });
+});

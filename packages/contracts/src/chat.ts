@@ -381,6 +381,21 @@ export const progressTaskSchema = object({
 export type ProgressTask = Infer<typeof progressTaskSchema>;
 
 /** Субагент, запущенный вызовом Task, — ветка дерева оркестрации. */
+/** Вызов инструмента, который ещё не вернул результат, — «что агент делает сейчас». */
+export const progressActiveToolSchema = object({
+  name: string(),
+  /** Команда, путь или описание — первая строка того, чем вызван инструмент. */
+  summary: string(),
+  startedAt: string().optional(),
+  /**
+   * Вызов только ждёт — `sleep`, чтение вывода фоновой задачи (живое ревью MR,
+   * 18.10.2026: полоса пять раз подряд опрашивала фоновый mustfail сном).
+   */
+  waiting: boolean().optional(),
+});
+
+export type ProgressActiveTool = Infer<typeof progressActiveToolSchema>;
+
 export const progressAgentSchema = object({
   id: string(),
   /** Тип субагента (`general-purpose`, `Explore`, свой) — как его назвал агент. */
@@ -400,6 +415,14 @@ export const progressAgentSchema = object({
    * `subagents/agent-*.jsonl`): «жив ли он ещё» видно без живого потока.
    */
   lastActivityAt: string().optional(),
+  /** Когда главный агент его запустил (ISO) — сколько субагент уже работает. */
+  startedAt: string().optional(),
+  /**
+   * Что идущий субагент делает сейчас: его последний вызов без результата
+   * (живое ревью MR, 18.10.2026: полоса 26 минут из 42 ждала mustfail, а строка
+   * говорила только «работает»).
+   */
+  activity: progressActiveToolSchema.optional(),
 });
 
 export type ProgressAgent = Infer<typeof progressAgentSchema>;
@@ -433,16 +456,6 @@ export const progressShellSchema = object({
 });
 
 export type ProgressShell = Infer<typeof progressShellSchema>;
-
-/** Вызов инструмента, который ещё не вернул результат, — «что агент делает сейчас». */
-export const progressActiveToolSchema = object({
-  name: string(),
-  /** Команда, путь или описание — первая строка того, чем вызван инструмент. */
-  summary: string(),
-  startedAt: string().optional(),
-});
-
-export type ProgressActiveTool = Infer<typeof progressActiveToolSchema>;
 
 export const chatProgressSchema = object({
   /** Чекпоинты последнего плана агента (перезаписывается каждым TodoWrite). */

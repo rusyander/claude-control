@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
 import { checkProjectDir } from '../domains/projects/projects.ts';
 import { readProjectLocalConfig } from '../domains/project-local/project-local.ts';
+import { localLayerStatus, writeLayerMode } from '../domains/local-layer/local-layer.ts';
 import { requireClaudeProvider, requireProject } from './project-access.ts';
 
 /**
@@ -32,4 +33,28 @@ export function registerProjectLocalRoutes(app: FastifyInstance, ctx: ServerCont
     if (!project) return reply;
     return readProjectLocalConfig(project.path, ctx.store);
   });
+
+  // Локальный слой проекта (`domains/local-layer`): состояние и режим. Чтение
+  // собирает слой, если командный слой изменился, — тот же путь, что у старта чата.
+  app.get<{ Params: { id: string } }>('/api/projects/:id/local-layer', (request, reply) => {
+    const project = requireProject(ctx, request.params.id, reply);
+    if (!project) return reply;
+    return localLayerStatus(project.path);
+  });
+
+  app.put<{ Params: { id: string }; Body: { mode?: unknown } }>(
+    '/api/projects/:id/local-layer',
+    (request, reply) => {
+      const project = requireProject(ctx, request.params.id, reply);
+      if (!project) return reply;
+      const mode = request.body?.mode;
+      if (mode !== 'auto' && mode !== 'on' && mode !== 'off') {
+        return reply
+          .code(400)
+          .send({ error: 'invalid_mode', message: 'Режим слоя: auto, on или off.' });
+      }
+      writeLayerMode(project.path, mode);
+      return localLayerStatus(project.path);
+    },
+  );
 }

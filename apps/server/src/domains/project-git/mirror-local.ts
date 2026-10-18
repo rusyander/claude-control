@@ -91,6 +91,8 @@ export const DEFAULT_EXCLUDE: readonly string[] = [
   '.agent/screenshots/**',
   '.agent/archive/**',
   '.agent/PROGRESS*.md',
+  // Сборка локального слоя несёт абсолютные пути оригинала; копия собирает свою.
+  '.agent/local-layer/build/**',
 ];
 
 /**

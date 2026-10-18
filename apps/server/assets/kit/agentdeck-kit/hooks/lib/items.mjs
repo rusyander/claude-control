@@ -10,7 +10,8 @@
 //   rules        PreToolUse, after the verdict, only when every guard stayed silent → string | null
 //   post-edit    PostToolUse on Write/Edit → string | null
 //   post-any     PostToolUse on any tool → string | null
-//   stop         Stop               → null | {decision:'block', reason}
+//   post-fail    PostToolUseFailure (a call that ended non-zero gets only this) → string | null
+//   stop        Stop               → null | {decision:'block', reason}
 //   prompt       UserPromptSubmit   (input, prompt) → string | null
 //   session      SessionStart       → string | null
 //   precompact   PreCompact         → string | null
@@ -18,10 +19,11 @@
 //
 // Input arrives in whatever shape the calling CLI uses; `normalize` (kit-paths.mjs) turns it into
 // Claude's, and a Codex `apply_patch` over N files becomes N calls judged one by one.
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { KIT_ROOT, cliOf, normalize } from './kit-paths.mjs';
+import { KIT_ROOT, cliOf, logSessionEvent, normalize, sessionEvents } from './kit-paths.mjs';
 import { CAP, cap, readInput } from './dispatch.mjs';
 import recordPrompt from './prompt/record-prompt.mjs';
 import { isSyntheticPrompt } from './transcript.mjs';
@@ -34,6 +36,8 @@ export const MANIFEST = {
     'git-guard',
     'destructive-consent',
     'secret-guard',
+    'bg-wait-guard',
+    'inline-edit-guard',
     'import-weight-guard',
     'agent-doc-location',
     'review-report-guard',
@@ -44,6 +48,8 @@ export const MANIFEST = {
     'doc-size-guard',
     'read-discipline',
     'todo-throttle',
+    'gate-at-end',
+    'check-cost',
     'verify-throttle',
     'search-discipline',
     'review-publish-guard',
@@ -51,19 +57,23 @@ export const MANIFEST = {
     // Last on purpose: the only item that may touch the network (one `git fetch` before a publish),
     // so every cheaper refusal — git-guard's consent above all — gets to refuse first.
     'push-sieves',
+    // After every verdict: it stamps the start of a call that will run, so nothing may refuse after it.
+    'cmd-duration',
   ],
   rules: ['rule-injector'],
   'post-edit': ['format-on-edit', 'doc-bloat-guard', 'doc-daily-review'],
-  'post-any': ['context-watch', 'review-publish-guard'],
+  'post-any': ['context-watch', 'review-publish-guard', 'cmd-duration', 'batch-nudge'],
+  'post-fail': ['cmd-duration'],
   // verify-at-stop first: its block makes the model run the gate and write the summary again, and
   // that summary is what reply-language judges — the other order costs a possible third turn.
   stop: ['verify-at-stop', 'review-report-guard', 'reply-language'],
-  prompt: ['figma-hint', 'verify-hard-hint', 'docs-order-hint', 'skill-hint'],
+  prompt: ['figma-hint', 'verify-hard-hint', 'gate-defer-hint', 'docs-order-hint', 'skill-hint'],
   session: [
     'context-budget',
     'project-onboard-check',
     'doc-hygiene-autoclean',
     'review-sync-brief',
+    'node-need-brief',
   ],
   precompact: ['rule-injector', 'precompact-checkpoint'],
   postcompact: ['clear-advisor'],
@@ -73,6 +83,7 @@ const EVENT_NAME = {
   pre: 'PreToolUse',
   'post-edit': 'PostToolUse',
   'post-any': 'PostToolUse',
+  'post-fail': 'PostToolUseFailure',
   stop: 'Stop',
   prompt: 'UserPromptSubmit',
   session: 'SessionStart',
@@ -89,6 +100,44 @@ export const TOOLS = {
   FORGE: /^mcp__[^_]*(?:gitlab|github|atlassian|jira|confluence)[^_]*__/i,
 };
 
+const BASH_EDIT = new RegExp(`${TOOLS.BASH.source}|${TOOLS.EDIT.source}`);
+
+/**
+ * The tools each pre item judges, known BEFORE its import: a call imports only the items it can reach.
+ * Importing all ~23 on every call cost a Read 123 ms against 92 ms for a per-tool dispatcher (measured
+ * 18.10.2026). Mirrors each item's own `hooks.pre.tools` — a kit test compares the two, so a new or
+ * widened item fails the suite instead of silently skipping a tool. An item absent here is always
+ * imported.
+ */
+export const PRE_TOOLS = {
+  'git-guard': TOOLS.BASH,
+  'destructive-consent': TOOLS.BASH,
+  'secret-guard': BASH_EDIT,
+  'bg-wait-guard': TOOLS.BASH,
+  'inline-edit-guard': TOOLS.BASH,
+  'import-weight-guard': TOOLS.EDIT,
+  'agent-doc-location': TOOLS.EDIT,
+  'review-report-guard': TOOLS.EDIT,
+  'language-guard': TOOLS.EDIT,
+  'agent-prompt-guard': TOOLS.SPAWN,
+  'spawn-cost-guard': TOOLS.SPAWN,
+  'local-discipline': /^(Bash|PowerShell|Agent|Task)$/,
+  'doc-size-guard': TOOLS.CTX,
+  'read-discipline': TOOLS.CTX,
+  'todo-throttle': TOOLS.CTX,
+  'gate-at-end': TOOLS.CTX,
+  'check-cost': TOOLS.BASH,
+  'verify-throttle': TOOLS.CTX,
+  'search-discipline': TOOLS.CTX,
+  'review-publish-guard': new RegExp(
+    `${TOOLS.BASH.source}|${TOOLS.EDIT.source}|${TOOLS.FORGE.source}`,
+    'i',
+  ),
+  'pipeline-watch-guard': new RegExp(`${TOOLS.BASH.source}|${TOOLS.FORGE.source}`, 'i'),
+  'push-sieves': TOOLS.BASH,
+  'cmd-duration': TOOLS.BASH,
+};
+
 /** `<kit>` in any text the model reads → the real kit root, so a printed command runs as is. */
 const ROOT = KIT_ROOT.split('\\').join('/');
 export const withRoot = (text) =>
@@ -96,11 +145,16 @@ export const withRoot = (text) =>
     .split('<kit>')
     .join(ROOT);
 
-/** The item modules of one event, in manifest order; `only` restricts to one item (standalone run). */
-async function itemsFor(event, only = null) {
+/**
+ * The item modules of one event, in manifest order; `only` restricts to one item (standalone run);
+ * `tools` (pre) = the tool names of this call — items that judge none of them are not even imported.
+ */
+async function itemsFor(event, only = null, tools = null) {
   const out = [];
   for (const name of MANIFEST[event] ?? []) {
     if (only && name !== only.name) continue;
+    const reach = event === 'pre' && tools ? PRE_TOOLS[name] : null;
+    if (reach && !tools.some((t) => reach.test(t))) continue;
     let mod = only?.module ?? null;
     if (!mod) {
       const file = join(HOOKS_DIR, `${name}.mjs`);
@@ -133,25 +187,100 @@ function attempt(fn, ...args) {
 
 const write = (obj) => process.stdout.write(JSON.stringify(obj));
 
+/**
+ * Guards whose refusal promises «repeat the identical call to go through». Each keeps that promise by
+ * finding its own refusal in Claude's transcript (`wasJustRefused`); Qwen and Codex write theirs in
+ * other formats, so there every repeat was refused again — the escape was a lie on 2 of 3 CLIs. On
+ * those the dispatcher keeps the promise from the kit's session log instead. Consent gates are not
+ * here: a repeat never opens them, the user's word does.
+ */
+export const REPEAT_ESCAPE = new Set([
+  'bg-wait-guard',
+  'inline-edit-guard',
+  'import-weight-guard',
+  'read-discipline',
+  'todo-throttle',
+  'gate-at-end',
+  'check-cost',
+  'verify-throttle',
+  'search-discipline',
+  'cmd-duration',
+]);
+
+const callKey = (call) =>
+  createHash('sha1')
+    .update(`${call?.tool_name ?? ''}|${JSON.stringify(call?.tool_input ?? {})}`)
+    .digest('hex')
+    .slice(0, 16);
+
+/**
+ * The item whose escapable refusal this identical call repeats, from the session log — the same rule
+ * `wasJustRefused` applies to Claude's transcript: the latest identical call among the last `window`
+ * calls of this tool decides, and only if it was refused.
+ */
+export function repeatedRefusal(events, call, window = 40) {
+  const tool = String(call?.tool_name ?? '');
+  const key = callKey(call);
+  let seen = 0;
+  for (let i = events.length - 1; i >= 0 && seen < window; i--) {
+    const e = events[i];
+    if ((e.kind !== 'call' && e.kind !== 'deny') || e.tool !== tool) continue;
+    seen++;
+    if (e.key !== key) continue;
+    return e.kind === 'deny' && REPEAT_ESCAPE.has(e.item) ? e.item : null;
+  }
+  return null;
+}
+
 /** PreToolUse: first deny wins, otherwise the first ask; silence → situational rules may ride in. */
 async function runPre(input, only) {
   const calls = normalize(input);
-  const items = await itemsFor('pre', only);
+  const items = await itemsFor(
+    'pre',
+    only,
+    calls.map((c) => String(c?.tool_name ?? '')),
+  );
+  // Standalone item runs stay out of the log: the dispatcher of the same call already writes it.
+  const logged = !only && cliOf(input) !== 'claude';
+  const events = logged ? sessionEvents(input) : [];
   let ask = null;
   let deny = null;
+  let denied = null;
   for (const call of calls) {
     const tool = String(call?.tool_name ?? '');
+    const escaped = logged ? repeatedRefusal(events, call) : null;
     for (const item of items) {
       if (item.tools && !item.tools.test(tool)) continue;
+      if (item.name === escaped) continue;
+      // cmd-duration stamps the start of a call that will run; a consent ask the user may decline
+      // would leave a stamp that later reads as a cap kill.
+      if (item.name === 'cmd-duration' && ask) continue;
       const v = attempt(item.run, call);
       if (!v) continue;
       if (v.decision === 'deny') {
         deny = v;
+        denied = { call, item: item.name };
         break;
       }
       ask ??= v;
     }
     if (deny) break;
+  }
+  if (logged) {
+    if (denied)
+      logSessionEvent(input, {
+        kind: 'deny',
+        tool: String(denied.call?.tool_name ?? ''),
+        key: callKey(denied.call),
+        item: denied.item,
+      });
+    else
+      for (const call of calls)
+        logSessionEvent(input, {
+          kind: 'call',
+          tool: String(call?.tool_name ?? ''),
+          key: callKey(call),
+        });
   }
   const sieves = items.find((i) => i.name === 'push-sieves')?.module;
   const note = sieves?.takeNote ? attempt(sieves.takeNote) : null;
@@ -199,7 +328,7 @@ async function runPre(input, only) {
 }
 
 async function runText(event, input, only, prompt) {
-  const calls = event === 'post-edit' || event === 'post-any' ? normalize(input) : [input];
+  const calls = event.startsWith('post-') ? normalize(input) : [input];
   const out = [];
   for (const item of await itemsFor(event, only))
     for (const call of calls) {
@@ -248,7 +377,7 @@ export async function runEvent(event, input, only = null) {
   if (!text) return;
   // PreCompact output is plain text: its JSON shape is not the same on every CLI build.
   if (event === 'precompact') return void process.stdout.write(text);
-  const max = event === 'post-edit' || event === 'post-any' ? CAP.post : 4000;
+  const max = event.startsWith('post-') ? CAP.post : 4000;
   write({
     hookSpecificOutput: { hookEventName: EVENT_NAME[event], additionalContext: cap(text, max) },
   });
@@ -266,6 +395,7 @@ function eventOf(input, hooks) {
       : has('post-any')
         ? 'post-any'
         : null;
+  if (name === 'PostToolUseFailure') return has('post-fail') ? 'post-fail' : null;
   if (name === 'Stop') return has('stop') ? 'stop' : null;
   if (name === 'UserPromptSubmit') return has('prompt') ? 'prompt' : null;
   if (name === 'SessionStart') return has('session') ? 'session' : null;

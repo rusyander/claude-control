@@ -20,8 +20,8 @@
 
 - Search the symbol, then read with offset/limit; a whole file only when it is small. Never re-read a
   file unchanged since you read it.
-- Run the project gate once at task end, batched (`type-check && lint && test`); a green re-run with
-  no new edits proves nothing.
+- Full gate, mustfail, shots, sieves: ONCE, at the end of the WHOLE task, in the background, not
+  polled. Mid-task checks stay narrow; a red one re-runs only after an edit.
 - Plan a todo list once, update in batches, close it with one write.
 - The user's WHOLE task closed (or a context nudge fired) → the first line of the reply names the
   closed task and suggests `/clear`, then "continue from `.agent/PROGRESS.md`". A finished stage of an

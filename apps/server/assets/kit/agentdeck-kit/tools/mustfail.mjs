@@ -14,7 +14,9 @@
 //   node <kit>/tools/mustfail.mjs --cmd "..." --mutate src/x.ts --find "a >= b" --replace "a > b" [--test "name"]
 //
 // {file} (relative to --cwd) and {abs} in --cmd make every run about ONE file: its own baseline, its
-// own revert. Measured 18.09.2026: four files against a one-minute suite took 5m21s, because every
+// own revert (for vitest/jest/pytest one baseline over all files replaces the per-file ones; a line
+// per file prints the pace). Many files and a slow suite → `--quick` first: one run answers whether
+// the change is covered at all, per-file runs only name WHICH file is not. Measured 18.09.2026: four files against a one-minute suite took 5m21s, because every
 // revert re-ran everything. Narrowed by the import graph the same verdicts cost seconds — and a tool
 // that takes five minutes is a tool that gets skipped, which is the only way this check ever fails.
 // Un-narrowed and more than two files: one combined revert runs first, because GREEN there already is
@@ -639,11 +641,22 @@ const cmdFor = (path) =>
     '{abs}',
     join(root, path),
   );
+// Runners that take many files at once and say so when a file has no test. For them the per-file
+// baselines collapse into ONE run over every file (a green union means no file's related tests fail),
+// and the only other reason a narrowed run is red — no test for that file — is read from the output.
+// Measured: 16 files × (own baseline + revert) × ~50 s = 26 min; this halves it.
+const MULTI_FILE = /\b(vitest|jest|pytest)\b/i;
+const NO_TESTS = /No test files found|No tests found|no tests ran|collected 0 items/i;
+const cmdForMany = (paths) =>
+  CMD.replaceAll('{file}', paths.map((p) => posix.relative(PREFIX || '.', p)).join(' ')).replaceAll(
+    '{abs}',
+    paths.map((p) => join(root, p)).join(' '),
+  );
 let spent = 0;
 
-const run = (path = null) => {
+const run = (path = null, command = null) => {
   const started = Date.now();
-  const r = spawnSync(path && TEMPLATED ? cmdFor(path) : CMD, {
+  const r = spawnSync(command ?? (path && TEMPLATED ? cmdFor(path) : CMD), {
     cwd: CWD,
     shell: SHELL,
     encoding: 'utf8',
@@ -769,9 +782,32 @@ try {
           rows.push([f, 'GREEN', 'the combined revert does not break the check — NONE is covered']);
       }
     }
-    for (const path of nothingCovered ? [] : list) {
+    // One baseline for all narrowed runs, where the runner allows it (see MULTI_FILE).
+    let unionGreen = false;
+    if (TEMPLATED && list.length > 1 && MULTI_FILE.test(CMD)) {
+      unionGreen = run(null, cmdForMany(list)).status === 0;
+      process.stdout.write(
+        `· one baseline over ${list.length} files: ${unionGreen ? 'green — no per-file baselines needed' : 'red — every file gets its own'} (${Math.round(spent / 1000)} s)\n`,
+      );
+    }
+    const todo = nothingCovered ? [] : list;
+    const startedAt = Date.now();
+    todo.forEach((path, i) => {
+      const before = rows.length;
+      const t0 = Date.now();
+      judge(path);
+      // A line per file: a long run watched from outside (a background task, a lane) shows its pace
+      // instead of sitting silent until the table.
+      const done = i + 1;
+      const left = Math.round((((Date.now() - startedAt) / done) * (todo.length - done)) / 1000);
+      const row = rows[before];
+      process.stdout.write(
+        `[${done}/${todo.length}] ${path} → ${row ? row[1] : '?'} (${Math.round((Date.now() - t0) / 1000)} s${todo.length > done ? `, ≈${left} s left` : ''})\n`,
+      );
+    });
+    function judge(path) {
       save(path);
-      if (TEMPLATED) {
+      if (TEMPLATED && !unionGreen) {
         const own = run(path);
         if (own.status !== 0) {
           rows.push([
@@ -780,7 +816,7 @@ try {
             'the narrowed check is red before the revert: no related tests, or they already fail',
           ]);
           exitCode = 1;
-          continue;
+          return;
         }
       }
       const kind = revert(path);
@@ -790,7 +826,7 @@ try {
           'SKIP',
           'new file — reverting it breaks the build, not a coverage signal',
         ]);
-        continue;
+        return;
       }
       const r = run(path);
       // Put this file back before the next one, so each verdict is about one file alone. A file the
@@ -800,7 +836,10 @@ try {
       else writeFileSync(full, before);
       if (r.status !== 0) {
         const out = (r.stdout || '') + (r.stderr || '');
-        if (SYMBOL_RED.test(out))
+        if (unionGreen && NO_TESTS.test(out)) {
+          rows.push([path, 'NO-BASE', 'no related tests — a red run without a single test']);
+          exitCode = 1;
+        } else if (SYMBOL_RED.test(out))
           rows.push([
             path,
             'RED·symbol',

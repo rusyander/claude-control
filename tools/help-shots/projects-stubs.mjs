@@ -113,6 +113,45 @@ export const PROJECT_PERMISSIONS = [
 ];
 
 /**
+ * Локальный слой проекта: режим «авто», слой подключён — действует замена хука
+ * из коммита ещё не влитого MR, один раздел инструкций сжат, второй ждёт нового
+ * сжатия, потому что командный текст изменился.
+ */
+export const PROJECT_LOCAL_LAYER = {
+  root: PROJECT.path,
+  mode: 'auto',
+  configured: true,
+  used: true,
+  reason: 'gain',
+  builtAt: '2026-10-18T09:00:00.000Z',
+  instructions: {
+    files: 3,
+    teamChars: 18420,
+    layerChars: 9310,
+    sections: 14,
+    compressed: 9,
+    pending: ['CLAUDE.md → ## Релизы'],
+  },
+  pathRules: 4,
+  skills: ['release-notes', 'storefront-review'],
+  agents: 0,
+  commands: 0,
+  mcpServers: ['tracker'],
+  hooks: 6,
+  overrides: [
+    {
+      ref: '4f2c9a1e7b3d',
+      entries: ['scripts/lint_guard.mjs'],
+      why: 'MR 214: кэш списка файлов',
+      state: 'active',
+      improved: ['scripts/lint_guard.mjs', 'scripts/file_cache.mjs'],
+    },
+  ],
+  orphans: [],
+  excluded: 0,
+};
+
+/**
  * Собственный `.claude` проекта — то, что Claude Code берёт из репозитория
  * поверх пользовательского набора, а панель только показывает.
  */
@@ -570,6 +609,8 @@ export async function panelShell(page, state) {
   await json(page, '**/api/projects/*/permissions*', () => PROJECT_PERMISSIONS);
   await json(page, '**/api/projects/*/local*', () => PROJECT_LOCAL);
   await json(page, '**/api/projects/local?*', () => PROJECT_LOCAL);
+  // Позже общего `local*`: тот тоже совпал бы с `/local-layer`.
+  await json(page, '**/api/projects/*/local-layer', () => PROJECT_LOCAL_LAYER);
 
   await json(page, '**/api/fs/roots*', () => FS_ROOTS);
   await page.route('**/api/fs/list*', (route) => {

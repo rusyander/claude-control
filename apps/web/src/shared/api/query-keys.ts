@@ -219,6 +219,8 @@ export const queryKeys = {
   projectLocal: (id: string) => ['projects', id, 'local'] as const,
   /** То же по абсолютному пути — для карточки группы, где привязка хранит путь. */
   projectLocalByPath: (path: string) => ['projects', 'local', 'by-path', path] as const,
+  /** Локальный слой проекта (`.agent/local-layer/`): состояние и режим. */
+  projectLocalLayer: (id: string) => ['projects', id, 'local-layer'] as const,
   /** Что активный провайдер умеет на уровне проекта (COMMON-2). */
   projectProvider: (id: string) => ['projects', id, 'provider'] as const,
   /** Инструкции проекта у активного провайдера (AGENTS.md / GEMINI.md). */

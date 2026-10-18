@@ -451,6 +451,9 @@ function resultingText(toolName, ti, onDisk) {
 /** Everything a whole report is checked for — at Write, and at Stop for one written around Write. */
 export function writeProblems(next) {
   const problems = [];
+  // `review-plan.mjs skeleton` marks what the reviewer still owes; a blank passes every `\S` check below.
+  const blanks = String(next).match(/⟨fill:[^⟩\n]*⟩/g);
+  if (blanks) problems.push(`${blanks.length} skeleton blank(s) unfilled, first: ${blanks[0]}`);
   const parsed = parseReport(next);
   const computed = scoreLines(parsed);
   for (const r of REQUIRED)

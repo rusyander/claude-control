@@ -77,7 +77,11 @@ function hookAsync(input: object, extra: Record<string, string> = {}) {
 }
 
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
-const leaseFiles = () => (existsSync(join(dir, 'leases')) ? readdirSync(join(dir, 'leases')) : []);
+// `.tmp` — недописанная аренда атомарной записи: под нагрузкой её видно между write и rename.
+const leaseFiles = () =>
+  existsSync(join(dir, 'leases'))
+    ? readdirSync(join(dir, 'leases')).filter((name) => !name.endsWith('.tmp'))
+    : [];
 const leaseUntil = (name: string) =>
   (JSON.parse(readFileSync(join(dir, 'leases', name), 'utf8')) as { until: number }).until -
   Date.now();
@@ -278,12 +282,14 @@ describe('heavy-queue-hook: очередь', () => {
    * очереди. Здесь то же разом у шести групп: каждая отпускается, пока
    * остальные опрашивают каталог.
    */
-  it('шесть групп разом: аренда по одной, ни одна не уходит без неё', async () => {
+  // signal: по таймауту vitest цикл не останавливает, а `dir` к тому времени уже
+  // каталог следующего теста — цикл-сирота отпускал там чужую аренду (полный прогон, 18.10).
+  it('шесть групп разом: аренда по одной, ни одна не уходит без неё', async ({ signal }) => {
     const ids = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'];
     const exits = ids.map((id) => hookAsync(pre(`s-${id}`, `toolu_${id}`)));
     const served: string[] = [];
     let most = 0;
-    for (let t = 0; t < 40_000 && served.length < ids.length; t += 20) {
+    for (let t = 0; t < 40_000 && served.length < ids.length && !signal.aborted; t += 20) {
       const now = leaseFiles();
       most = Math.max(most, now.length);
       const [lease] = now;
@@ -300,7 +306,7 @@ describe('heavy-queue-hook: очередь', () => {
     await Promise.all(exits);
     expect(most).toBe(1);
     expect(served.sort()).toEqual(ids.map((id) => `s-${id}.toolu_${id}.json`));
-  }, 60_000);
+  }, 120_000);
 
   /** Ревью A2-F6 / A-F09: свой билет, убранный чужим читателем, вперёд очереди не пускает. */
   it('пропавший свой билет возвращается: ожидающий ждёт дальше, а не идёт вперёд', async () => {

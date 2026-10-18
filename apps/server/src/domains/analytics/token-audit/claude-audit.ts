@@ -1,4 +1,6 @@
+import { economyOf } from './economy.ts';
 import { stepClass, type ToolUseLike } from './step-class.ts';
+import { sessionTime } from './time.ts';
 import type { AuditCall, ConstantPart, SessionAudit, SpikeInfo } from './token-audit.types.ts';
 
 /**
@@ -79,18 +81,32 @@ export function parseTranscript(text: string): Row[] {
 const fileKey = (path: string): string =>
   path.replace(/\\/g, '/').split('/').filter(Boolean).slice(-3).join('/');
 
-/** Файлы, которые команда Bash показывает целиком или куском: `cat`, `sed -n`, `head`, `tail`. */
-function bashViews(command: string): string[] {
-  const files: string[] = [];
+/**
+ * Файлы, которые команда Bash показывает целиком или куском: `cat`, `sed -n`,
+ * `head`, `tail`. Кусок — сама команда с ключами: `sed -n 1,40p` и
+ * `sed -n 41,80p` одного файла — разные куски, не повтор.
+ */
+function bashViews(command: string): Array<[string, string]> {
+  const views: Array<[string, string]> = [];
   for (const match of command.matchAll(
-    /(?:^|[;&|]\s*)(?:cat|sed -n\s+\S+|head|tail)((?:\s+[^\s|;&>]+)+)/g,
+    /(?:^|[;&|]\s*)(cat|sed -n\s+\S+|head|tail)((?:\s+[^\s|;&>]+)+)/g,
   )) {
-    for (const arg of match[1]!.trim().split(/\s+/)) {
-      if (!arg.startsWith('-') && /[./]/.test(arg) && !/^\d/.test(arg)) files.push(arg);
+    const args = match[2]!.trim().split(/\s+/);
+    const range = [match[1]!, ...args.filter((arg) => arg.startsWith('-') || /^\d/.test(arg))];
+    for (const arg of args) {
+      if (!arg.startsWith('-') && /[./]/.test(arg) && !/^\d/.test(arg)) {
+        views.push([arg, range.join(' ')]);
+      }
     }
   }
-  return files;
+  return views;
 }
+
+/** Bash меняет файлы: `sed -i`, перенаправление, `tee`, запись из скрипта, `mv`/`cp`. */
+const BASH_WRITE =
+  /\bsed\s+-i|\bperl\s+-\w*i|(?<![0-9&])>\s*[^\s&>|]|\btee\b|writeFileSync|write_text|\bopen\([^)]*['"][wa]|\b(?:mv|cp)\s/;
+/** Дерево меняется целиком: всё прочитанное до этого может быть другим. */
+const TREE_WRITE = /\bgit\s+(?:checkout|restore|stash|apply|pull|rebase|reset|merge)\b/;
 
 function deferredSource(name: string): string {
   const match = /^mcp__([^_]+(?:_[^_]+)*?)__/.exec(name);
@@ -290,10 +306,21 @@ export function auditClaudeRows(id: string, rows: Row[]): SessionAudit {
   }
 
   collectResults(rows, uses, audit);
-  collectRereads(calls, audit);
-  audit.compactions = rows.filter((row) => row.isCompactSummary === true).length;
+  const compacts = rows.flatMap((row, index) => (row.isCompactSummary === true ? [index] : []));
+  collectRereads(calls, compacts, audit);
+  audit.compactions = compacts.length;
   audit.cacheWriteSpikes = spikes(rows, calls);
   audit.constant = constantPart(rows, calls[0]!.index, calls[0]!.context);
+  const time = sessionTime(rows);
+  if (time) audit.time = time;
+  audit.economy = economyOf(
+    rows,
+    calls.map((call) => ({
+      uses: call.uses.map((block) => ({ name: block.name ?? '', input: block.input ?? {} })),
+      context: call.context,
+    })),
+    calls[0]!.context,
+  );
   return audit;
 }
 
@@ -338,12 +365,18 @@ function collectResults(rows: Row[], uses: Map<string, Block>, audit: SessionAud
 /**
  * Повторные просмотры файлов. `unchanged` — повтор того же куска файла, когда
  * между просмотрами его никто не правил: только такой повтор — чистая потеря,
- * перечитать после правки агенту бывает нужно.
+ * перечитать после правки агенту бывает нужно. Правкой считается и запись
+ * через Bash, а сжатие стирает прочитанное из окна — после него повтор честный.
  */
-function collectRereads(calls: CallDraft[], audit: SessionAudit): void {
+function collectRereads(calls: CallDraft[], compacts: number[], audit: SessionAudit): void {
   const views = new Map<string, number>();
   const lastRange = new Map<string, string>();
+  let compact = 0;
   for (const call of calls) {
+    while (compact < compacts.length && compacts[compact]! < call.index) {
+      lastRange.clear();
+      compact += 1;
+    }
     for (const use of call.uses) {
       const input = use.input ?? {};
       const seen: Array<[string, string]> = [];
@@ -354,7 +387,14 @@ function collectRereads(calls: CallDraft[], audit: SessionAudit): void {
         ]);
       }
       if (use.name === 'Bash' && typeof input.command === 'string') {
-        for (const file of bashViews(input.command)) seen.push([fileKey(file), 'bash']);
+        const command = input.command;
+        if (TREE_WRITE.test(command)) lastRange.clear();
+        else if (BASH_WRITE.test(command)) {
+          for (const token of command.split(/[\s"'=(),]+/)) {
+            if (/[./]/.test(token) && !token.startsWith('-')) lastRange.delete(fileKey(token));
+          }
+        }
+        for (const [file, range] of bashViews(command)) seen.push([fileKey(file), range]);
       }
       if (
         ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(use.name ?? '') &&

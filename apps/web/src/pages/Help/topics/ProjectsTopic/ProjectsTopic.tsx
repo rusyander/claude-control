@@ -81,6 +81,7 @@ export function ProjectsTopic() {
               isMono: true,
             },
             { label: tr('storageLocal'), value: tr('storageLocalValue') },
+            { label: tr('storageLayer'), value: tr('storageLayerValue') },
             {
               label: tr('storageBackup'),
               value: tr('storageBackupValue'),

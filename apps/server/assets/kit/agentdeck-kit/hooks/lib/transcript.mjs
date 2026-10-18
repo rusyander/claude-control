@@ -5,7 +5,7 @@
 // boundaries explicitly, and it can never drift from reality the way a side-car state file can.
 //
 // Transcripts reach 100+ MB, so we only ever read a tail slice and only parse the last N records.
-import { openSync, readSync, closeSync, statSync, readFileSync } from 'node:fs';
+import { openSync, readSync, closeSync, statSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { STATE_DIR } from './kit-paths.mjs';
 
@@ -13,6 +13,26 @@ const TAIL_BYTES = 3 * 1024 * 1024;
 const MAX_RECORDS = 400;
 
 /** Parse the tail of a .jsonl transcript. Returns records oldest→newest; [] on any problem. */
+/** Raw text of the last `tailBytes` of a file; '' on any problem. Never reads the whole file. */
+export function readTailText(transcriptPath, tailBytes = TAIL_BYTES) {
+  if (!transcriptPath) return '';
+  let fd;
+  try {
+    const size = statSync(transcriptPath).size;
+    const start = Math.max(0, size - tailBytes);
+    const len = size - start;
+    if (len <= 0) return '';
+    const buf = Buffer.alloc(len);
+    fd = openSync(transcriptPath, 'r');
+    readSync(fd, buf, 0, len, start);
+    return buf.toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
 export function readTail(transcriptPath, tailBytes = TAIL_BYTES, maxRecords = MAX_RECORDS) {
   if (!transcriptPath) return [];
   let fd;
@@ -163,7 +183,11 @@ export const GUARD_MARK = '[ctx-guard]';
  * guard would silently stop counting that file as "already read".
  */
 export function isRefusal(body) {
-  const head = String(body || '').trimStart();
+  // The CLI records a PreToolUse deny as `PreToolUse:<Tool> hook error: <reason>` (seen 18.10.2026);
+  // only that exact lead-in is skipped, so the test stays a prefix test.
+  const head = String(body || '')
+    .trimStart()
+    .replace(/^PreToolUse:[^\s:]+ hook error:\s*/, '');
   return head.startsWith(GUARD_MARK) || head.startsWith('[doc-size-guard]');
 }
 
@@ -209,6 +233,20 @@ export function inSubagent(input) {
   return (
     Boolean(input?.agent_id) || /[\\/]subagents[\\/]/.test(String(input?.transcript_path ?? ''))
   );
+}
+
+/**
+ * The transcript of the agent the call belongs to: a subagent's own file
+ * `<parent dir>/<parent id>/subagents/agent-<agent_id>.jsonl` when it exists, else transcript_path.
+ * The repeat escape needs it — the refusal it looks for sits in the child's own history, and judged
+ * against the parent's every "repeat this exact call" in a subagent was denied again (live 18.10.2026).
+ */
+export function ownTranscript(input) {
+  const path = String(input?.transcript_path ?? '');
+  const agent = String(input?.agent_id ?? '').replace(/[^\w-]/g, '');
+  if (!agent || !path || /[\\/]subagents[\\/]/.test(path)) return path;
+  const own = join(path.replace(/\.jsonl$/i, ''), 'subagents', `agent-${agent}.jsonl`);
+  return existsSync(own) ? own : path;
 }
 
 /**

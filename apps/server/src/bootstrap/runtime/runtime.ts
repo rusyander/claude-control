@@ -34,6 +34,8 @@ import {
   type RunNotice,
 } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { appendLoweredRun } from '../../domains/chat/lowered-journal/lowered-journal.ts';
+import { UNUSED_HEAVY_TOOLS } from '../../domains/chat/initiative/initiative.ts';
+import { localLayerRun } from '../../domains/local-layer/local-layer.ts';
 import { appendRunInput, moveRunInputs } from '../../domains/chat/run-input/run-input.ts';
 import {
   adoptableEntries,
@@ -457,6 +459,19 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     branchGateContext(splitConveyor.view(keys), (chatId) => ctx.store.getChatLink(chatId)?.review),
   );
   chatRuns.setFirstEditListener((keys, at) => ctx.store.markChatFirstEdit(keys, at));
+  // Локальный слой проекта (`.agent/local-layer/`): сломанный слой не мешает
+  // чату — прогон идёт на командном слое, как без него.
+  // Тяжёлые неиспользуемые схемы (Artifact, Workflow) — флагом каждому прогону Claude.
+  chatRuns.setDeniedToolsResolver(() =>
+    ctx.store.getSettings().chatLeanTools ? UNUSED_HEAVY_TOOLS : [],
+  );
+  chatRuns.setLocalLayerResolver((cwd) => {
+    try {
+      return localLayerRun(cwd);
+    } catch {
+      return undefined;
+    }
+  });
   /**
    * Журнал понижённых прогонов: чем вели и видела ли панель проверки. Путь до
    * каталога данных знает bootstrap, а не реестр, — тем же приёмом, что и

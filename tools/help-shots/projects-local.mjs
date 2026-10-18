@@ -64,6 +64,13 @@ export async function shootLocal(browser, web, scenario) {
       clip: 'section[aria-label="Правила"], section[aria-label="Rules"]',
       padding: 140,
     });
+
+    // ── 05. Локальный слой: режим, что в нём и действующая замена хука ───────
+    await page.getByTestId('local-layer-card').scrollIntoViewIfNeeded();
+    await scenario.shot(page, '05-layer', {
+      clip: '[data-testid="local-layer-card"]',
+      padding: 24,
+    });
   } finally {
     await page.close();
   }

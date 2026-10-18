@@ -28,7 +28,7 @@
     "why": "terminal report of the token meter tools/token-audit.mjs (stage 0, Russian by design for its human reader) + its parse errors; never an API reply"
   },
   "domains/analytics/token-audit/report.ts": {
-    "n": 19,
+    "n": 23,
     "why": "terminal report of the token meter tools/token-audit.mjs (stage 0, Russian by design for its human reader) + its parse errors; never an API reply"
   },
   "domains/api-explorer/load.ts": {
@@ -210,6 +210,10 @@
   "domains/integrations/tms/zephyr.ts": {
     "n": 2,
     "why": "run description written INTO the foreign TMS"
+  },
+  "domains/local-layer/overrides.ts": {
+    "n": 6,
+    "why": "hook-override detail beside its state code (missing-ref, retired, …) — the local-layer card translates the state; the text is the fallback detail"
   },
   "domains/logs/logs.ts": {
     "n": 5,
@@ -1054,5 +1058,9 @@
   "routes/portability-routes/portability-routes.ts": {
     "n": 4,
     "why": "server log lines only — unreadable source, rolled-back transfer, rolled-back subscription rebuild, rolled-back drift resolution; every reply carries messageCode (the parser text is deliberately kept out of the body)"
+  },
+  "routes/project-local-routes.ts": {
+    "n": 1,
+    "why": "400 invalid_mode for a raw API caller; the panel only sends auto/on/off from a fixed control"
   }
 }

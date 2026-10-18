@@ -9,7 +9,8 @@
 //
 // Аргументы: --url <адрес панели> --token-file <файл токена>
 /* global process, fetch, AbortSignal, setTimeout, Buffer */
-import { closeSync, fstatSync, openSync, readFileSync, readSync } from 'node:fs';
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
   findToolUseId,
   hasToolResult,
@@ -131,6 +132,20 @@ async function permission(base, token, input) {
   await release();
 }
 
+/**
+ * Шаг сессии без сообщения с телефона — на сервер не ходим. Флаг сессии сервер
+ * кладёт в `outside-queue` рядом с файлом токена, пока сообщение ждёт; метка
+ * `.server` — знак, что сервер флаги пишет (без неё спрашиваем каждый раз).
+ * Конец хода спрашивает всегда: раз за ход, и он страхует пропущенный флаг.
+ * Правило имени — `relayFlagName` в `outside-relay.ts`.
+ */
+function nothingQueued(input, tokenFile) {
+  if (input.hook_event_name !== 'PostToolUse' || !tokenFile) return false;
+  const dir = join(dirname(tokenFile), 'outside-queue');
+  const flag = String(input.session_id).replace(/[^a-zA-Z0-9-]/g, '');
+  return Boolean(flag) && existsSync(join(dir, '.server')) && !existsSync(join(dir, flag));
+}
+
 async function messages(base, token, input) {
   if (!input.session_id) return;
   // Хук стоит на каждом шаге каждой сессии: панель не ответила быстро — шаг не ждёт.
@@ -148,13 +163,15 @@ async function messages(base, token, input) {
 
 async function main() {
   const base = arg('--url') ?? 'http://127.0.0.1:5178';
+  const tokenFile = arg('--token-file') ?? '';
+  const input = JSON.parse((await readStdin()) || '{}');
+  if (nothingQueued(input, tokenFile)) return;
   let token = '';
   try {
-    token = readFileSync(arg('--token-file') ?? '', 'utf8').trim();
+    token = readFileSync(tokenFile, 'utf8').trim();
   } catch {
     // Без токена панель с включённым шлюзом ответит 401 — и всё решает окно.
   }
-  const input = JSON.parse((await readStdin()) || '{}');
   if (input.hook_event_name === 'PermissionRequest') return permission(base, token, input);
   if (input.hook_event_name === 'PostToolUse' || input.hook_event_name === 'Stop') {
     return messages(base, token, input);

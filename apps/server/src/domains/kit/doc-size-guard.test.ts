@@ -50,6 +50,13 @@ describe('doc-size-guard: окна чтения в отказе', () => {
     expect(v?.reason).toContain('persisted tool result is read to the end');
   });
 
+  it('результат инструмента до 96 КБ читается целиком; тот же размер вне tool-results — отказ', () => {
+    const mid = join(dir, 'tool-results', 'diff-mid.txt');
+    writeFileSync(mid, rows(1000));
+    expect(guard(read(mid))).toBeNull();
+    expect(guard(read(big))?.decision).toBe('deny');
+  });
+
   it('чтение окном проходит', () => {
     expect(guard(read(big, { offset: 1, limit: 400 }))).toBeNull();
   });

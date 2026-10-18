@@ -329,12 +329,15 @@ export const chatEn: typeof chatRu = {
         'started here shows up in the terminal. There is one CLI process for the ' +
         'whole conversation: the next message goes into the same process, and a new ' +
         'one starts only on Stop or when the launch itself changes (model, effort, ' +
-        'permissions, group, autonomy). That is why an agent’s background ' +
+        'permissions, group, autonomy, the light tool set setting). That is why an agent’s background ' +
         'command survives the end of a ' +
         'turn: when it finishes, the CLI starts a turn with its result on its own, ' +
         'and that turn lands in this same conversation. A background subagent lives the ' +
         'same way: the turn progress marks it “in background” with the time of its ' +
-        'last record. If it asks for permission after the main turn has ended, the chat ' +
+        'last record. Under a running subagent’s row: what it is doing now and for how ' +
+        'long, next to it how long it has worked in total; a sleep or reading a ' +
+        'background task’s output is marked “only waiting”. If it asks for permission ' +
+        'after the main turn has ended, the chat ' +
         'shows the card with a note on whose work it is; if the process closed before ' +
         'the subagent finished, it is marked “lost” instead of an endless “thinking”. ' +
         'On every start the agent ' +
@@ -949,7 +952,8 @@ export const chatEn: typeof chatRu = {
       'drag them in: the ban stands before the list. The reason is not size: inside are ' +
       'the original’s absolute paths and binaries for one platform, so such a directory ' +
       'has to be BUILT in the copy (that is what the post-create command does) rather than ' +
-      'received ready-made. Also never: *.log, files over 8 MB and links. In the mirror ' +
+      'received ready-made. For the same reason the local layer build .agent/local-layer/build ' +
+      'is never copied — the copy builds its own at its first chat. Also never: *.log, files over 8 MB and links. In the mirror ' +
       'report the build environment stands as its own explanatory line, not among the ' +
       'skipped: in an ordinary project it lands there every time, and a healthy copy must ' +
       'not look broken. “Left behind” then keeps only what you can actually add to the ' +
@@ -1044,7 +1048,8 @@ export const chatEn: typeof chatRu = {
       'and in the log. ' +
       'The Node version comes from .nvmrc, .node-version, .tool-versions, volta or engines and ' +
       'the install runs on it when the machine has one (nvm, fnm, volta); when none is found the ' +
-      'install runs on what exists and a line under the card says so. A Python service gets a ' +
+      'install runs on what exists and a line under the card says so. The same Node comes first ' +
+      'in PATH for the CLI process of every chat in the project, so the agent never hunts for it. A Python service gets a ' +
       '.venv and pip install from requirements*.txt (uv sync with uv.lock), but only on a ' +
       'matching version; Go gets its module cache warmed; these steps never fail the ' +
       'preparation. A command set under “Copy settings” turns auto-detection off. The full ' +
@@ -1272,7 +1277,8 @@ export const chatEn: typeof chatRu = {
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
-      'one group per link, even for a single link. The copy of such a group is put on ' +
+      'one group per link when there are two or more; a single link is reviewed right in ' +
+      'the chat, with no split. The copy of such a group is put on ' +
       'the MR branch itself: the panel finds it in git — by the MR ref on the remote — ' +
       'instead of trusting the agent’s word, and needs no integration for it. If the ' +
       'branch is already open in another copy, the new one sits on the same MR head ' +

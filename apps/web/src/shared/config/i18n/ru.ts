@@ -13,6 +13,7 @@ import { watcherRu } from './watcher/ru.ts';
 import { devRestartRu } from './dev-restart/ru.ts';
 import { environmentRu } from './environment/ru.ts';
 import { projectsPageRu } from './projects/ru.ts';
+import { localLayerRu } from './local-layer/ru.ts';
 import { contourConfigRu } from './contour-config/ru.ts';
 import { presetsRu } from './presets/ru.ts';
 import { localModelsRu } from './local-models/ru.ts';
@@ -53,6 +54,8 @@ export const ru = {
   environment: environmentRu,
   /** Раздел «Проекты — конфигурация»: шапка проекта, вкладки, документ инструкций — `projects/ru.ts`. */
   projectsPage: projectsPageRu,
+  /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/ru.ts`. */
+  localLayer: localLayerRu,
   /** Контур: разделы на карточке, чьи правила действуют, кто берёт верх — `contour-config/ru.ts`. */
   contourConfig: contourConfigRu,
   /** Готовые заготовки прав, MCP-серверов, хуков и событий хуков по id — `presets/ru.ts`, вызов через `preset-text.ts`. */
@@ -1753,6 +1756,9 @@ export const ru = {
       },
       agentBackground: 'в фоне',
       agentQuiet: 'писал {{ago}} назад',
+      agentTotal: 'в работе {{for}}',
+      agentNow: 'сейчас {{what}} — {{for}}',
+      agentWaiting: 'только ждёт',
       agentsLost: 'Субагент оборван: {{count}}',
       agentsLostHint:
         'Фоновый субагент живёт, пока жив процесс CLI разговора. Процесс закрылся раньше, чем субагент кончил: его итога не будет. Отправьте сообщение — агент продолжит и увидит, что работа субагента оборвалась.',
@@ -5271,6 +5277,12 @@ export const ru = {
       'незакоммиченного, затирание истории) и ваши правила ask/deny по-прежнему ждут вас. Для ' +
       'моделей без авторежима (haiku) и чужих CLI то же даёт автоподтверждение панели. Тумблер ' +
       '«Права» в меню чата сильнее этой настройки в обе стороны.',
+    chatLeanTools: 'Облегчённый набор инструментов в чатах',
+    chatLeanToolsHint:
+      'Включено из коробки: чаты Claude из панели запускаются без инструментов Artifact и Workflow. ' +
+      'Их описания занимают около 10 тыс. токенов в начале каждого запроса, а пользуются ими редко. ' +
+      'Выключите, если агенту нужно публиковать страницы или запускать сценарии из нескольких ' +
+      'агентов, — со следующего хода он получит полный набор.',
     chatEffortAuto: 'По умолчанию CLI',
     pricingTitle: 'Тарифы для оценки стоимости',
     pricingHint:

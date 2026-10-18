@@ -16,6 +16,8 @@
  * хода) отдаёт его агенту — тот читает его на ближайшем шаге, не дожидаясь
  * конца хода.
  */
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Сколько запрос ждёт телефона, прежде чем хук отпустит его. Копия — `MAX_MS`
@@ -85,7 +87,21 @@ export interface OutsideRelayDeps {
   /** Сессия — прогон самой панели: её вопросы закрывает брокер панели. */
   ownSession: (sessionId: string) => boolean;
   now?: () => number;
+  /**
+   * Папка флагов очереди: файл сессии лежит, пока для неё есть сообщение. Хук
+   * `PostToolUse` стоит на каждом шаге каждой сессии и без флага не ходит на
+   * сервер вовсе — хук с HTTP шёл 80 мс, без него 47 мс (медиана 15 запусков,
+   * 18.10.2026), а сообщение с телефона бывает редко. Нет папки — хук
+   * спрашивает каждый раз.
+   */
+  flagDir?: string;
 }
+
+/** Метка в папке флагов: сервер их пишет, отсутствие флага значит «пусто». */
+export const RELAY_FLAG_MARKER = '.server';
+
+/** Имя флага сессии — то же правило в `outside-relay-hook.mjs`. */
+export const relayFlagName = (sessionId: string): string => sessionId.replace(/[^a-zA-Z0-9-]/g, '');
 
 export class OutsideRelay {
   private readonly asks = new Map<string, Entry>();
@@ -99,6 +115,23 @@ export class OutsideRelay {
   constructor(deps: OutsideRelayDeps) {
     this.deps = deps;
     this.now = deps.now ?? Date.now;
+    // Старые флаги не чистятся: лишний флаг стоит хуку один запрос, и этот же
+    // запрос его снимает, а чистка из второй панели (прогоны QA) сняла бы чужой.
+    this.flagFile(RELAY_FLAG_MARKER, 'write');
+  }
+
+  private flagFile(name: string, op: 'write' | 'remove'): void {
+    const dir = this.deps.flagDir;
+    if (!dir || !name) return;
+    try {
+      if (op === 'remove') rmSync(join(dir, name), { force: true });
+      else {
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, name), '');
+      }
+    } catch {
+      // Флаг — ускорение: без него хук просто идёт на сервер.
+    }
   }
 
   /** Хук сообщил о запросе. `false` — перехвата нет, решает только окно. */
@@ -174,6 +207,7 @@ export class OutsideRelay {
     this.counter += 1;
     const message: Message = { id: `m${this.now()}-${this.counter}`, text, queuedAt: this.now() };
     this.messages.set(sessionId, [...(this.messages.get(sessionId) ?? []), message]);
+    this.flagFile(relayFlagName(sessionId), 'write');
     return message;
   }
 
@@ -188,6 +222,7 @@ export class OutsideRelay {
       (message) => message.deliveredAt === undefined,
     );
     for (const message of fresh) message.deliveredAt = this.now();
+    this.flagFile(relayFlagName(sessionId), 'remove');
     return fresh.map((message) => message.text);
   }
 

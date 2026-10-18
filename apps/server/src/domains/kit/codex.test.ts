@@ -98,6 +98,26 @@ body
     );
   });
 
+  it('длинный свой текст человека ужимает список навыков, а не отказывает (W10)', () => {
+    for (let i = 0; i < 40; i++) {
+      mkdirSync(join(kitDir, 'skills', `skill-${i}`), { recursive: true });
+      writeFileSync(
+        join(kitDir, 'skills', `skill-${i}`, 'SKILL.md'),
+        `---\nname: skill-${i}\ndescription: "${'Use when a long trigger phrase applies. '.repeat(12)}"\n---\nbody\n`,
+      );
+    }
+    const full = buildCodexOverlay({ kitDir, local: false, codexHome }).exec;
+    // Свой текст такой длины, что полный список уже не помещается рядом с ним.
+    const own = 'O'.repeat(CODEX_KIT_ARG_LIMIT - full.length + 2000);
+    writeFileSync(join(codexHome, 'config.toml'), `developer_instructions = "${own}"\n`);
+
+    const exec = buildCodexOverlay({ kitDir, local: false, codexHome }).exec;
+    expect(exec.startsWith(own)).toBe(true);
+    expect(exec).toContain('- RULE-STANDARD');
+    for (let i = 0; i < 40; i++) expect(exec).toContain(`- skill-${i} `);
+    expect(exec).not.toContain('Use when a long trigger phrase applies. '.repeat(12));
+  });
+
   it('не помещается в командную строку — отказ, а не урезанные правила', () => {
     writeFileSync(join(kitDir, 'rules', 'huge.md'), 'x'.repeat(CODEX_KIT_ARG_LIMIT));
     expect(() => buildCodexOverlay({ kitDir, local: false, codexHome })).toThrow(CodexKitTooLarge);

@@ -51,6 +51,12 @@ import {
 import { picksFor } from '../auto-pick/auto-pick.ts';
 import { withAutonomy } from '../chat-autonomy/chat-autonomy.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import {
+  mergeFlagSettings,
+  withoutMcpConfig,
+  withoutProjectSource,
+} from '../../local-layer/local-layer.ts';
+import type { LayerRunExtras } from '../../local-layer/local-layer.types.ts';
 
 /**
  * Реестр прогонов Claude Code, отвязанный от HTTP-запроса.
@@ -755,6 +761,20 @@ export class ChatRunRegistry {
     this.groupProfileOf = resolver;
   }
 
+  /** Локальный слой проекта по рабочей папке прогона (`domains/local-layer`); спрашивается на каждом старте. */
+  private localLayerOf?: (cwd: string) => LayerRunExtras | undefined;
+
+  setLocalLayerResolver(resolver: (cwd: string) => LayerRunExtras | undefined): void {
+    this.localLayerOf = resolver;
+  }
+
+  /** Схемы, снятые настройкой панели `chatLeanTools`; спрашивается на каждом старте. */
+  private deniedToolsOf?: () => readonly string[];
+
+  setDeniedToolsResolver(resolver: () => readonly string[]): void {
+    this.deniedToolsOf = resolver;
+  }
+
   setChildrenBriefResolver(resolver: (keys: readonly string[]) => string | undefined): void {
     this.briefOf = resolver;
   }
@@ -1269,6 +1289,23 @@ export class ChatRunRegistry {
     const resolved = this.groupProfileOf?.(keys, options.cwd);
     const profile = resolved && (strict || fromRoute) ? withoutMcp(resolved) : resolved;
     const mcp = fromRoute ?? profile?.mcp;
+    const baseArgs = [
+      ...(route.layers?.args ?? []),
+      ...(route.kit?.args ?? []),
+      ...(profile?.args ?? []),
+    ];
+    // Локальный слой проекта: командный слой из `.agent/local-layer/` вместо
+    // самого командного (`--setting-sources` без `project`). Песочница со своим
+    // каталогом конфигурации и маршрут, уже снявший `project`, его не получают —
+    // и слой для них даже не собирается.
+    const layerSources =
+      options.configDir || options.settingSources ? undefined : withoutProjectSource(baseArgs);
+    const layered = layerSources ? this.localLayerOf?.(options.cwd) : undefined;
+    const layerArgs = layered
+      ? baseArgs.includes('--strict-mcp-config')
+        ? withoutMcpConfig(layered.args)
+        : layered.args
+      : [];
     const routed: RunOptions = {
       ...options,
       // Модель и усилие принадлежат КОНТУРУ, пока прогон идёт через него (Т6):
@@ -1296,24 +1333,30 @@ export class ChatRunRegistry {
       // и кладутся безусловно — прошлая жизнь прогона не переживает ни снятую
       // галочку, ни возвращённую. Сам текст дописки при этом не трогается:
       // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
-      platformArgs: [
-        ...(route.layers?.args ?? []),
-        ...(route.kit?.args ?? []),
-        ...(profile?.args ?? []),
-      ],
+      platformArgs: layered && layerSources ? [...layerSources, ...layerArgs] : baseArgs,
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
       // Блок набора к системному промпту (дисциплина локальной модели при режиме «глобальные»): решается на каждом старте, как и остальной маршрут.
-      platformAppend: route.kit?.append ?? '',
+      // Инструкции локального слоя едут сюда же: слой «системный промпт» их не снимает —
+      // это правила проекта, а не наша дописка.
+      platformAppend: [route.kit?.append ?? '', layered?.append ?? '']
+        .filter((part) => part.trim())
+        .join('\n\n'),
       // Строка профиля группы: что подключено, что снято и как попросить снятое.
       profileNote: profile?.note ?? '',
       // Перечень навыков группы (1.3) — настройками поверх личных, тоже на каждом старте.
-      platformSettings: profile?.settings ?? {},
+      // Командные настройки слоя — снизу, профиль группы — сверху.
+      platformSettings: layered
+        ? mergeFlagSettings(layered.settings, profile?.settings ?? {})
+        : (profile?.settings ?? {}),
       // MCP-серверы, взятые человеком в локальный прогон этого проекта: выбор меняется
       // между ходами, поэтому читается на каждом старте и кладётся безусловно.
       ...(mcp ? { platformMcp: mcp } : {}),
       // Одна на сессию (E6): перемена между ходами уезжает в сообщении ниже.
       workspaceNote: workspace.system,
       child,
+      // Настройка панели читается на каждом старте и кладётся безусловно: снятая
+      // галочка возвращает инструменты следующему ходу, а не новому разговору.
+      deniedTools: this.deniedToolsOf?.() ?? [],
       // Метка автономии решается на КАЖДОМ старте и кладётся или снимается
       // безусловно: продолжение приходит со старыми параметрами, и метка прошлой
       // жизни пережила бы снятую галочку.

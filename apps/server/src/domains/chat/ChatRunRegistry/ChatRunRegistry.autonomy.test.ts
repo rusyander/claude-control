@@ -247,3 +247,23 @@ describe('ChatRunRegistry — автономия чата', () => {
     expect(registry.isAutonomous('c1')).toBe(false);
   });
 });
+
+describe('ChatRunRegistry — снятые тяжёлые схемы (chatLeanTools)', () => {
+  it('настройка читается на каждом старте: снятая галочка возвращает инструменты следующему ходу', () => {
+    const runs: FakeRun[] = [];
+    const registry = new ChatRunRegistry(() => {
+      const run = new FakeRun();
+      runs.push(run);
+      return run;
+    });
+    let lean = true;
+    registry.setDeniedToolsResolver(() => (lean ? ['Artifact', 'Workflow'] : []));
+    registry.start('c1', OPTIONS, {});
+    expect(runs[0]?.options?.deniedTools).toEqual(['Artifact', 'Workflow']);
+    runs[0]?.finish();
+
+    lean = false;
+    registry.start('c2', { ...OPTIONS, deniedTools: ['Artifact'] }, {});
+    expect(runs[1]?.options?.deniedTools).toEqual([]);
+  });
+});

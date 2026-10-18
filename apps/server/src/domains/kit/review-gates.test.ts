@@ -155,6 +155,20 @@ describe('страж публикации ревью в наборе', () => {
     expect(write(THREAD, id, CARD)).toBeNull();
   });
 
+  it('сводка, отправленная тредом, — отказ с инструментом заметки и discover_tools', () => {
+    const id = session();
+    loadSkill(id);
+    for (const body of [
+      '## Review: head `22f51a04`\n\n**Summary:** three 🟡.',
+      '**Итог:** три 🟡.',
+    ]) {
+      const verdict = write(THREAD, id, body);
+      expect(verdict?.decision, body).toBe('deny');
+      expect(verdict?.reason, body).toContain('create_merge_request_note');
+      expect(verdict?.reason, body).toContain('discover_tools');
+    }
+  });
+
   it('«блокеров нет» без строки покрытия — отказ, со строкой — проходит', () => {
     const id = session();
     loadSkill(id);

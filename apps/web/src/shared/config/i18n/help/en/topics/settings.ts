@@ -91,7 +91,9 @@ export const settingsEn: typeof settingsRu = {
       'Choosing a CLI, checking it on this machine, provider keys and the config format check.',
     tabModels: 'Models',
     tabModelsText:
-      'Default model and effort, the model catalog, a custom endpoint and MCP server checks.',
+      'Default model and effort, auto permission mode and the lean tool set in chats (no ' +
+      'Artifact or Workflow — about 10k tokens at the start of every request), the model ' +
+      'catalog, a custom endpoint and MCP server checks.',
     tabPrompts: 'Prompts',
     tabPromptsText:
       'The texts the panel speaks to the model with, not on your behalf: the tool protocol, ' +

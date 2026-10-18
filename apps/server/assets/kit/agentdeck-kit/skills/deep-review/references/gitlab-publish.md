@@ -20,7 +20,13 @@ of the commits. Check both before writing "you did …".
 line or is rejected outright. A head that moved since the review started (a bot commit, a force-push)
 is said out loud — the findings are about the sha that was read, not the one that is current.
 
-**Take the versions at the START of the review**, right after the MR read, not at publish time: the shas pin what is being read, and a head that moves later is only visible against them. The version tools sit in the `merge_requests` category — not listed in the session → `discover_tools` for that category first, never fall back to a shell guess of the shas.
+**Take the versions at the START of the review**, right after the MR read, not at publish time: the shas pin what is being read, and a head that moves later is only visible against them. The version tools sit in the `merge_requests` category — not listed in the session → `discover_tools` for that category first, never fall back to a shell guess of the shas. The same call loads `create_merge_request_note`, the summary's tool — found missing at publish time it cost two tool-search misses and a summary refused as a thread.
+
+The threads read, ready to paste — the answer is `{items, pagination}`, so a projection starts at `items` (one from the root, `[?…]` or `[].notes[]`, returns `null`):
+
+```
+jmespath: {total: pagination.x_total, pages: pagination.x_total_pages, human: items[?notes[0].system==`false`].{id: id, author: notes[0].author.username, path: notes[0].position.new_path, line: notes[0].position.new_line, resolved: notes[0].resolved, n: length(notes), last: notes[-1].body}}
+```
 
 Then `mr_discussions` again, **immediately before the first write**, and every finding is diffed
 against what is already there. Reviews land while yours is being written: on one real MR the list read

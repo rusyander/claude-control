@@ -13,6 +13,11 @@ const EXEMPT =
   /\.(png|jpe?g|gif|webp|bmp|ico|svg|pdf|zip|gz|tgz|tar|7z|rar|mp4|mov|mp3|wav|woff2?|ttf|otf|eot|xlsx?|docx?|pptx?|exe|dll|so|dylib|bin|lock)$/i;
 
 const MAX_BYTES = 30 * 1024;
+// A persisted tool result (`tool-results/*.txt` — an MR diff the MCP could not inline) is read to the end
+// anyway: refusing it whole only splits the same bytes into more calls (a 31 KB diff cost a refusal plus
+// two windows, 18.10.2026). Above ~Read's own token cap it still gets the windows.
+const PERSISTED_MAX = 96 * 1024;
+const PERSISTED = /[\\/]tool-results[\\/]/;
 
 export default function docSizeGuard(input) {
   if (process.env.AGENTDECK_KIT_DOC_SIZE === '0' || process.env.CLAUDE_DOC_SIZE === '0')
@@ -33,7 +38,7 @@ export default function docSizeGuard(input) {
   } catch {
     return null; // missing/unreadable — let Read produce the real error
   }
-  if (size <= MAX_BYTES) return null;
+  if (size <= (PERSISTED.test(filePath) ? PERSISTED_MAX : MAX_BYTES)) return null;
 
   const kb = Math.round(size / 1024);
   return {
@@ -68,7 +73,7 @@ function windows(filePath, size) {
   for (let k = 0; k < Math.min(total, SHOWN); k++)
     shown.push(`offset=${k * WINDOW + 1} limit=${WINDOW}`);
   const more = total > SHOWN ? `, … ${total - SHOWN} more (${total} windows)` : '';
-  const persisted = /[\\/]tool-results[\\/]/.test(filePath)
+  const persisted = PERSISTED.test(filePath)
     ? ' A persisted tool result is read to the end in these windows — a diff skimmed by grep alone is not read.'
     : '';
   return ` ${lines} lines; ${WINDOW}-line windows: ${shown.join('; ')}${more}.${persisted}`;

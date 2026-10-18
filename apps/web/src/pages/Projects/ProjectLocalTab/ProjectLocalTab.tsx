@@ -4,6 +4,7 @@ import { Typography } from '@shared/ui/typography';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { ProjectLocalConfigView, useProjectLocal } from '@entities/Project';
 import { SourceLine } from '../SourceLine/SourceLine';
+import { LocalLayerCard } from '../LocalLayerCard/LocalLayerCard';
 import type { ProjectTabProps } from '../ProjectRulesTab.types';
 import styles from './ProjectLocalTab.module.scss';
 
@@ -37,6 +38,8 @@ export function ProjectLocalTab({ projectId }: ProjectTabProps) {
       </div>
 
       <ProjectLocalConfigView config={data} />
+
+      <LocalLayerCard projectId={projectId} />
     </Stack>
   );
 }

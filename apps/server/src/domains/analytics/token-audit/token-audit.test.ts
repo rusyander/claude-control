@@ -19,6 +19,8 @@ import {
   totalHeadline,
 } from './token-audit.ts';
 import { foreignToolUse } from './step-class.ts';
+import { economyOf, wholeProjectCheck } from './economy.ts';
+import { formatSession } from './report.ts';
 import { appendMessage, createChat } from '../../provider-chat/store/store.ts';
 
 /**
@@ -248,6 +250,170 @@ describe('token-audit — транскрипт Claude', () => {
     expect(() => auditClaudeRows('x', [{ type: 'user', message: { content: 'hi' } }])).toThrow(
       /не транскрипт Claude Code/,
     );
+  });
+});
+
+describe('token-audit — повторы и метрики плана экономии', () => {
+  const tiny = { input: 1, read: 1, write: 1, out: 1 };
+  const bash = (id: string, minute: number, command: string) =>
+    assistant(id, minute, tiny, [use(`u-${id}`, 'Bash', { command })]);
+  const readFile = (id: string, minute: number) =>
+    assistant(id, minute, tiny, [use(`u-${id}`, 'Read', { file_path: FILE })]);
+  const PATH = 'C:/repo/src/feature/thing.ts';
+  const unchanged = (rows: Array<Record<string, unknown>>): number =>
+    auditClaudeRows('r', rows).rereads.unchanged;
+
+  it('запись через Bash, другой кусок, сжатие и смена дерева — не повтор без правки', () => {
+    // Контроль: тот же `cat` дважды подряд — повтор.
+    expect(unchanged([bash('a', 1, `cat ${PATH}`), bash('b', 2, `cat ${PATH}`)])).toBe(1);
+    const python = `python -c "open('${PATH}','w').write('x')"`;
+    expect(
+      unchanged([bash('a', 1, `cat ${PATH}`), bash('w', 2, python), bash('b', 3, `cat ${PATH}`)]),
+    ).toBe(0);
+    expect(
+      unchanged([
+        bash('a', 1, `cat ${PATH}`),
+        bash('w', 2, `sed -i 's/a/b/' ${PATH}`),
+        bash('b', 3, `cat ${PATH}`),
+      ]),
+    ).toBe(0);
+    expect(
+      unchanged([
+        bash('a', 1, `cat ${PATH}`),
+        bash('g', 2, 'git checkout other'),
+        bash('b', 3, `cat ${PATH}`),
+      ]),
+    ).toBe(0);
+    // Соседние куски одного файла — разные, тот же кусок — повтор.
+    expect(
+      unchanged([bash('a', 1, `sed -n 1,40p ${PATH}`), bash('b', 2, `sed -n 41,80p ${PATH}`)]),
+    ).toBe(0);
+    expect(
+      unchanged([bash('a', 1, `sed -n 1,40p ${PATH}`), bash('b', 2, `sed -n 1,40p ${PATH}`)]),
+    ).toBe(1);
+    // Сжатие стёрло прочитанное из окна: следующий просмотр честный.
+    const compact = { type: 'user', isCompactSummary: true, message: { content: 'summary' } };
+    expect(unchanged([readFile('a', 1), compact, readFile('b', 3)])).toBe(0);
+    expect(unchanged([readFile('a', 1), readFile('b', 3)])).toBe(1);
+  });
+
+  it('проверка на весь проект — одна, без сужения и не гейт', () => {
+    expect(wholeProjectCheck('npx vitest run 2>&1 | tail -5')).toBe(true);
+    expect(wholeProjectCheck('pnpm lint')).toBe(true);
+    // Суд тот же, что у check-cost: проверка одного пакета и список файлов в переменной — узкие.
+    expect(wholeProjectCheck('cd apps/server && npx tsc --noEmit')).toBe(false);
+    expect(wholeProjectCheck('npx tsc --noEmit -p packages/food')).toBe(false);
+    expect(wholeProjectCheck('npx eslint $FILES')).toBe(false);
+    expect(wholeProjectCheck('npx vitest run economy')).toBe(false);
+    expect(wholeProjectCheck('npx vitest run src/domains/analytics/')).toBe(false);
+    expect(wholeProjectCheck('npx eslint src/a.ts')).toBe(false);
+    expect(wholeProjectCheck('npx tsc --noEmit --incremental')).toBe(false);
+    expect(wholeProjectCheck('pnpm lint && pnpm test && pnpm type-check')).toBe(false);
+    // Скрипт гейта плюс одна проверка — забота меры о гейте, не этой.
+    expect(wholeProjectCheck('pnpm verify && npx vitest run')).toBe(false);
+    expect(wholeProjectCheck('node tests/lint.test.mjs')).toBe(false);
+    expect(wholeProjectCheck('git status')).toBe(false);
+  });
+
+  it('метрики: постоянная часть, одиночные шаги, проверки, таймауты, sleep, правила на черновиках', () => {
+    const scratch = 'C:\\Users\\u\\AppData\\Local\\Temp\\claude\\x\\scratchpad\\probe.mjs';
+    const rule = (toolUseID: string, content: string) => ({
+      type: 'attachment',
+      attachment: { type: 'hook_additional_context', hookEvent: 'PreToolUse', toolUseID, content },
+    });
+    const at = (row: Record<string, unknown>, minute: number) => ({
+      ...row,
+      timestamp: TS(minute),
+    });
+    const rows = [
+      assistant('c1', 1, { input: 0, read: 0, write: 40_000, out: 1 }, [
+        use('v1', 'Bash', { command: 'npx vitest run 2>&1 | tail -5' }),
+      ]),
+      at(result('v1', 'ok'), 5),
+      assistant('c2', 6, { input: 0, read: 40_000, write: 20_000, out: 1 }, [
+        use('v2', 'Bash', { command: 'npx vitest run src/a.test.ts' }),
+        use('k1', 'Bash', { command: 'pnpm build' }),
+      ]),
+      result('v2', 'ok'),
+      result('k1', 'Command timed out after 10m 0s'),
+      assistant('c3', 17, { input: 0, read: 60_000, write: 0, out: 1 }, [
+        use('s1', 'Bash', { command: 'sleep 120; sleep 1m; ls' }),
+      ]),
+      result('s1', 'ok'),
+      assistant('c4', 20, { input: 0, read: 60_000, write: 0, out: 1 }, [
+        use('w1', 'Write', { file_path: scratch, content: 'x' }),
+      ]),
+      rule('w1', '# Before/after shots\n…'),
+      result('w1', 'ok'),
+      assistant('c5', 21, { input: 0, read: 60_000, write: 0, out: 1 }, [
+        use('w2', 'Write', { file_path: FILE, content: 'x' }),
+      ]),
+      // Правило на настоящем файле и не-правило на черновике не в счёт.
+      rule('w2', '# Before/after shots\n…'),
+      result('w2', 'ok'),
+      assistant('c6', 22, { input: 0, read: 60_000, write: 0, out: 1 }, [
+        use('h1', 'Bash', { command: `cat > ${PATH} <<'EOF'\nx\nEOF` }),
+      ]),
+      rule('h1', '# Frontend doctrine\n…'),
+      rule('w1', 'plain hint'),
+      result('h1', 'ok'),
+    ];
+    const audit = auditClaudeRows('e', rows);
+    expect(audit.economy).toEqual({
+      // min(40k, контекст) по вызовам / сумма контекстов: 240k / 340k.
+      prefixShare: 71,
+      wholeChecks: { runs: 1, minutes: 4 },
+      capKills: { count: 1, minutes: 10 },
+      sleepMinutes: 3,
+      // Ни одного короткого чтения: sleep, запись, heredoc и проверки — не то, что batch-nudge сложил бы.
+      singleRunShare: 0,
+      falseRules: 2,
+    });
+    const head = headline({ ...audit, subagents: [audit] });
+    expect([head.wholeCheckRuns, head.capKillMinutes, head.falseRules]).toEqual([2, 20, 4]);
+    expect(head.prefixShare).toBe(71);
+    expect(formatSession(audit).some((line) => line.includes('правила на черновиках 2'))).toBe(
+      true,
+    );
+  });
+
+  it('одиночные шаги — короткие чтения подряд, как их видит batch-nudge', () => {
+    const bash = (command: string) => ({ name: 'Bash', input: { command } });
+    const call = (...uses: { name: string; input: Record<string, unknown> }[]) => ({
+      uses,
+      context: 1,
+    });
+    const share = (calls: ReturnType<typeof call>[]) => economyOf([], calls, 1).singleRunShare;
+    // ls → git status → grep: два вызова продолжают ряд; текст без инструментов ряд не рвёт.
+    expect(
+      share([call(bash('ls')), call(), call(bash('git status')), call(bash('grep -n x a.ts'))]),
+    ).toBe(67);
+    // Запись, проверка, два чтения в одном вызове и длинная строка — не одиночные чтения.
+    expect(share([call(bash('ls')), call(bash('cp a b'))])).toBe(0);
+    expect(share([call(bash('cp a b')), call(bash('ls'))])).toBe(0);
+    expect(share([call(bash('ls')), call(bash('pnpm test'))])).toBe(0);
+    expect(share([call(bash('ls')), call(bash('ls'), bash('pwd'))])).toBe(0);
+    expect(share([call(bash('ls')), call(bash(`cat ${'x'.repeat(220)}`))])).toBe(0);
+  });
+
+  it('правило на heredoc ложное, только когда heredoc — данные', () => {
+    const rows = (command: string) => [
+      assistant('c1', 1, { input: 0, read: 0, write: 1, out: 1 }, [use('h', 'Bash', { command })]),
+      {
+        type: 'attachment',
+        attachment: {
+          type: 'hook_additional_context',
+          hookEvent: 'PreToolUse',
+          toolUseID: 'h',
+          content: '# Verification depth\n…',
+        },
+      },
+    ];
+    const falseRules = (command: string) => auditClaudeRows('e', rows(command)).economy?.falseRules;
+    expect(falseRules("cat >> notes.md <<'EOF'\npnpm test\nEOF")).toBe(1);
+    expect(falseRules("node - <<'EOF'\nconsole.log(1)\nEOF")).toBe(0);
+    expect(falseRules("cat > x.mjs <<'EOF'\nconsole.log(1)\nEOF\nnode x.mjs")).toBe(0);
+    expect(falseRules("cat <<'EOF' | python3\nprint(1)\nEOF")).toBe(0);
   });
 });
 
@@ -701,5 +867,64 @@ describe('token-audit — журналы разговоров Codex и Qwen', ()
     );
     expect(report.total.calls).toBe(7);
     expect(out.stderr).toContain('qwen:gone: разговора нет');
+  });
+});
+
+describe('token-audit — время по часам и занятость', () => {
+  const U = { input: 1, read: 0, write: 0, out: 1 };
+  const prompt = (minute: number) => ({
+    type: 'user',
+    timestamp: TS(minute),
+    message: { role: 'user', content: 'сделай' },
+  });
+  const done = (id: string, minute: number) => ({ ...result(id, 'ok'), timestamp: TS(minute) });
+  const end = (id: string, minute: number) => {
+    const row = assistant(id, minute, U, [{ type: 'text', text: 'готово' }]);
+    (row.message as Record<string, unknown>).stop_reason = 'end_turn';
+    return row;
+  };
+
+  // Главный: промпт 0, модель до 1, инструмент 1→5, модель до 6, конец хода; простой
+  // 6→20; промпт 20, модель до 21, конец. Агент: 2→10, инструмент 3→9.
+  const main = auditClaudeRows('main', [
+    prompt(0),
+    assistant('m1', 1, U, [use('t1', 'Bash', { command: 'pnpm test' })]),
+    done('t1', 5),
+    end('m2', 6),
+    prompt(20),
+    end('m3', 21),
+  ] as never);
+  const agent = auditClaudeRows('agent', [
+    prompt(2),
+    assistant('a1', 3, U, [use('t2', 'Bash', { command: 'node mustfail.mjs' })]),
+    done('t2', 9),
+    end('a2', 10),
+  ] as never);
+  main.subagents.push(agent);
+
+  it('стена — от первой записи до последней, с агентами; простой между ходами не занятость', () => {
+    const h = headline(main);
+    expect(h.wallMs).toBe(21 * 60_000);
+    // Занят хоть кто-то: 0→10 (главный 0→6 и агент 2→10 перекрылись) + 20→21.
+    expect(h.activeMs).toBe(11 * 60_000);
+    // Сумма по агентам: главный 6+1 мин, агент 8 мин — больше занятости.
+    expect(h.agentTimeMs).toBe(15 * 60_000);
+    expect(h.toolMs).toBe(4 * 60_000 + 6 * 60_000);
+    expect(h.modelMs).toBe(h.agentTimeMs - h.toolMs);
+  });
+
+  it('вызов без результата занят до последней записи, не «до сейчас»', () => {
+    const cut = auditClaudeRows('cut', [
+      prompt(0),
+      assistant('c1', 1, U, [use('t9', 'Bash', { command: 'sleep 600' })]),
+      prompt(4),
+    ] as never);
+    expect(cut.time?.toolMs).toBe(3 * 60_000);
+  });
+
+  it('итог разделения: сессии разом — стена и занятость общие, не сумма', () => {
+    const t = totalHeadline([main, agent]);
+    expect(t.wallMs).toBe(21 * 60_000);
+    expect(t.activeMs).toBe(11 * 60_000);
   });
 });

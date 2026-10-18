@@ -48,11 +48,28 @@ export const sessionKey = (input) => String(input?.session_id ?? '').replace(/[^
 export function cliOf(input) {
   const forced = String(process.env.AGENTDECK_KIT_CLI ?? '').toLowerCase();
   if (forced === 'claude' || forced === 'qwen' || forced === 'codex') return forced;
+  // A call `normalize` already rewrote carries its CLI: a Qwen shell is `Bash` by then.
+  const stamped = input?.agentdeck_cli;
+  if (stamped === 'claude' || stamped === 'qwen' || stamped === 'codex') return stamped;
   const tool = String(input?.tool_name ?? '');
   if (input?.turn_id !== undefined || tool === 'apply_patch') return 'codex';
   if (/^[a-z]+(?:_[a-z]+)+$/.test(tool) || /^(edit|glob|agent|skill)$/.test(tool)) return 'qwen';
   return 'claude';
 }
+
+/**
+ * The shell's background flag as THIS CLI's model must write it, or null where the shell has none:
+ * Codex's `Bash` input is `{command}` only (hooks docs), so a «run it in the background» refusal there
+ * could never be obeyed. Claude: `run_in_background`; Qwen: `is_background`.
+ */
+export function backgroundParam(input) {
+  const cli = cliOf(input);
+  if (cli === 'codex') return null;
+  return cli === 'qwen' ? 'is_background' : 'run_in_background';
+}
+
+/** The shell takes a per-call `timeout` in ms: Claude and Qwen (bundle 0.25) do, Codex's input has none. */
+export const hasShellTimeout = (input) => cliOf(input) !== 'codex';
 
 const QWEN_TOOLS = {
   run_shell_command: 'Bash',
@@ -102,6 +119,9 @@ export function normalize(input) {
       ...ti,
       ...(file !== undefined && name !== 'Grep' && name !== 'Glob' ? { file_path: file } : {}),
     };
+    // Qwen's shell names its background flag `is_background` (bundle 0.25); every guard reads Claude's.
+    if (name === 'Bash' && ti.is_background !== undefined && ti.run_in_background === undefined)
+      tool_input.run_in_background = ti.is_background === true || ti.is_background === 'true';
     if (name === 'Agent' && ti.prompt === undefined && ti.task !== undefined)
       tool_input.prompt = ti.task;
     return [{ ...input, tool_name: name, tool_input, agentdeck_cli: cli }];

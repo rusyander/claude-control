@@ -14,6 +14,7 @@ import { watcherEn } from './watcher/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
 import { projectsPageEn } from './projects/en.ts';
+import { localLayerEn } from './local-layer/en.ts';
 import { contourConfigEn } from './contour-config/en.ts';
 import { presetsEn } from './presets/en.ts';
 import { localModelsEn } from './local-models/en.ts';
@@ -42,6 +43,8 @@ export const en: TranslationSchema = {
   devRestart: devRestartEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
+  /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/en.ts`. */
+  localLayer: localLayerEn,
   contourConfig: contourConfigEn,
   presets: presetsEn,
   common: {
@@ -1604,6 +1607,9 @@ export const en: TranslationSchema = {
       },
       agentBackground: 'in background',
       agentQuiet: 'last wrote {{ago}} ago',
+      agentTotal: 'working for {{for}}',
+      agentNow: 'now {{what}} for {{for}}',
+      agentWaiting: 'only waiting',
       agentsLost: 'Subagent lost: {{count}}',
       agentsLostHint:
         'A background subagent lives as long as the CLI process of the conversation. The process closed before the subagent finished: its result will not come. Send a message — the agent continues and sees that the subagent was cut off.',
@@ -5009,6 +5015,12 @@ export const en: TranslationSchema = {
       '(deletion, rolling back uncommitted work, rewriting history) and your ask/deny rules still ' +
       'wait for you. For models without auto mode (haiku) and other CLIs, the panel’s auto-approve ' +
       'does the same. The permissions toggle in the chat menu beats this setting either way.',
+    chatLeanTools: 'Lean tool set in chats',
+    chatLeanToolsHint:
+      'On out of the box: Claude chats started from the panel run without the Artifact and Workflow ' +
+      'tools. Their descriptions take about 10k tokens at the start of every request and are rarely ' +
+      'used. Turn this off when the agent needs to publish pages or run multi-agent workflows — it ' +
+      'gets the full set from its next turn.',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:

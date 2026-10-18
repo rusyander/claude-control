@@ -60,21 +60,60 @@ export function withAgentActivity(
   } catch {
     return agents;
   }
-  const activity = new Map<string, string>();
+  const logs = new Map<string, { log: string; mtimeMs: number }>();
   for (const name of files) {
     try {
       const meta = JSON.parse(readFileSync(join(dir, name), 'utf8')) as { toolUseId?: unknown };
       if (typeof meta.toolUseId !== 'string') continue;
       const log = join(dir, name.replace(/\.meta\.json$/, '.jsonl'));
-      activity.set(meta.toolUseId, statSync(log).mtime.toISOString());
+      logs.set(meta.toolUseId, { log, mtimeMs: statSync(log).mtimeMs });
     } catch {
       // Файл пишется прямо сейчас или его ещё нет — без времени, не без агента.
     }
   }
   return agents.map((agent) => {
-    const at = activity.get(agent.id);
-    return at ? { ...agent, lastActivityAt: at } : agent;
+    const file = logs.get(agent.id);
+    if (!file) return agent;
+    const withTime = { ...agent, lastActivityAt: new Date(file.mtimeMs).toISOString() };
+    if (agent.status !== 'running') return withTime;
+    const activity = agentActivity(file.log, file.mtimeMs);
+    return activity ? { ...withTime, activity } : withTime;
   });
+}
+
+/**
+ * Что субагент делает сейчас — тем же разбором, что и у главного разговора
+ * (`activeTool`), по его собственному транскрипту. Разбор кэшируется по времени
+ * правки: панель опрашивает прогресс часто, а транскрипт полосы — мегабайты.
+ */
+const activityCache = new Map<string, { mtimeMs: number; tool: ProgressActiveTool | undefined }>();
+
+function agentActivity(log: string, mtimeMs: number): ProgressActiveTool | undefined {
+  const cached = activityCache.get(log);
+  if (cached?.mtimeMs === mtimeMs) return cached.tool;
+  let tool: ProgressActiveTool | undefined;
+  try {
+    tool = buildProgress(readTranscriptRecords(log)).activeTool;
+  } catch {
+    tool = undefined;
+  }
+  activityCache.set(log, { mtimeMs, tool });
+  return tool;
+}
+
+/** Инструменты, которые только ждут чужой работы. */
+const WAIT_TOOLS = new Set(['TaskOutput', 'BashOutput', 'Monitor']);
+
+/**
+ * Ожидание без работы: чтение вывода фоновой задачи или `sleep` — один или
+ * перед чтением вывода (`sleep 60 && tail out.log`). Так полоса на живом ревью
+ * опрашивала фоновый mustfail пять раз подряд.
+ */
+export function isWaiting(name: string, input: Record<string, unknown>): boolean {
+  if (WAIT_TOOLS.has(name)) return true;
+  return (
+    name === 'Bash' && typeof input.command === 'string' && /^\s*sleep\s+\d/.test(input.command)
+  );
 }
 
 export function buildProgress(records: TranscriptRecord[]): ChatProgress {
@@ -112,7 +151,7 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
 
     for (const block of content) {
       if (block.type === 'tool_use') {
-        applyToolUse(block, agents, (next) => (tasks = next));
+        applyToolUse(block, agents, (next) => (tasks = next), record.timestamp);
         shells.use(block, record.timestamp);
         skill = skillOf(block, record.timestamp) ?? skill;
       }
@@ -189,7 +228,12 @@ class Shells {
     if (!block.id || !block.name) return;
     const input = (block.input ?? {}) as Record<string, unknown>;
     const summary = toolSummary(input);
-    this.pending.set(block.id, { name: block.name, summary, ...(at ? { startedAt: at } : {}) });
+    this.pending.set(block.id, {
+      name: block.name,
+      summary,
+      ...(at ? { startedAt: at } : {}),
+      ...(isWaiting(block.name, input) ? { waiting: true } : {}),
+    });
     if (STOP_TOOLS.has(block.name)) {
       this.stopTask(input);
       return;
@@ -525,6 +569,7 @@ function applyToolUse(
   block: TranscriptBlock,
   agents: Map<string, ProgressAgent>,
   setTasks: (tasks: ProgressTask[]) => void,
+  at?: string,
 ): void {
   if (block.name === 'TodoWrite') {
     const todos = (block.input as { todos?: unknown })?.todos;
@@ -553,6 +598,7 @@ function applyToolUse(
           : '',
     ),
     status: 'running',
+    ...(at ? { startedAt: at } : {}),
   });
 }
 

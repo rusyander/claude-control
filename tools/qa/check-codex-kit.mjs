@@ -295,8 +295,11 @@ async function scenario(mode, cliDir) {
       readFileSync(join(home, 'config.toml'), 'utf8') === config,
     );
     // Codex сам пишет в свой дом (клон плагинов, миграции) — критерий не «ничего
-    // нового», а «ни один файл дома не несёт метку набора».
+    // нового», а «ни один файл дома не несёт метку набора». Журнал разговора
+    // (sessions/…/rollout-*.jsonl) записывает то, что видела модель, вместе с
+    // меткой — это след запуска, а не установка набора.
     const marked = listFiles(home).filter((file) => {
+      if (/^[\\/]?(archived_)?sessions[\\/]/.test(file)) return false;
       try {
         const text = readFileSync(join(home, file), 'utf8');
         return text.includes(RULE) || text.includes(SKILL);

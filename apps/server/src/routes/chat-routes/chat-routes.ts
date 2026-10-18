@@ -1,4 +1,6 @@
+import { dirname, join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import { apiTokenPath } from '../../lib/api-token/api-token.ts';
 import type { ServerContext } from '../../context.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import type { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
@@ -66,6 +68,8 @@ export function registerChatRoutes(
   const relay = new OutsideRelay({
     enabled: () => ctx.store.getOutsideRelay(),
     ownSession: (sessionId) => registry.active().some((run) => run.sessionId === sessionId),
+    // Рядом с токеном: хук находит папку от своего `--token-file`.
+    flagDir: join(dirname(apiTokenPath()), 'outside-queue'),
   });
   registerChatInboxRoutes(app, ctx, registry, session, relay);
   registerOutsideRelayRoutes(app, ctx, relay);

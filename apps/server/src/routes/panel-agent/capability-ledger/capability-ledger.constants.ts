@@ -453,6 +453,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   // project-local-routes.ts
   'GET /api/projects/:id/local': 'action:read_project_local_config',
   'GET /api/projects/local': 'action:read_project_local_config',
+  'GET /api/projects/:id/local-layer': 'gap:P3',
+  'PUT /api/projects/:id/local-layer': 'gap:P3',
   // project-routes.ts
   'DELETE /api/projects/:id': 'action:delete_project',
   'DELETE /api/projects/:id/mcp/:serverId': 'action:delete_project_mcp_server',

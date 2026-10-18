@@ -11,7 +11,16 @@
 // file keyed by session + bucket. Worst case over a session that runs 150k -> 400k: 10 messages.
 // Reads the usage blocks of a Claude-shaped transcript; on a CLI whose transcript carries none it
 // stays silent. Kill-switch: AGENTDECK_KIT_CONTEXT_WATCH=0 (CLAUDE_CONTEXT_WATCH=0 too).
-import { existsSync, writeFileSync, openSync, readSync, fstatSync, closeSync } from 'node:fs';
+import {
+  existsSync,
+  writeFileSync,
+  openSync,
+  readFileSync,
+  readSync,
+  fstatSync,
+  closeSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stateDir } from './kit-paths.mjs';
 
@@ -27,11 +36,19 @@ const URGENT = 260_000; // auto-compact is close — stop deferring the write
  * No readable window → the cloud numbers.
  * @returns {{floor:number, bucket:number, urgent:number, window:number|null}}
  */
-export function limitsFor(env = process.env) {
+export function limitsFor(env = process.env, settingsWindow = configWindow(env)) {
   const local = String(env.AGENTDECK_KIT_VARIANT ?? '').trim() === 'local';
   const window = Number(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW);
   if (!local || !Number.isFinite(window) || window < 8_000) {
-    return { floor: FLOOR, bucket: BUCKET, urgent: URGENT, window: null };
+    // Cloud: the floor stays absolute (it is about cost, not the window), the urgent mark follows the
+    // window the CLI actually compacts at — a fixed 260k never fired under a 250k window (owner 18.10).
+    const cloud = Number.isFinite(window) && window >= 8_000 ? window : settingsWindow;
+    return {
+      floor: FLOOR,
+      bucket: BUCKET,
+      urgent: cloud ? Math.round(cloud * 0.87) : URGENT,
+      window: null,
+    };
   }
   return {
     floor: Math.round(window * 0.5),
@@ -39,6 +56,19 @@ export function limitsFor(env = process.env) {
     urgent: Math.round(window * 0.85),
     window,
   };
+}
+
+/** `autoCompactWindow` from the run's config dir settings.json; null when unset or unreadable. */
+function configWindow(env) {
+  const dir = env.CLAUDE_CONFIG_DIR || join(env.USERPROFILE || env.HOME || homedir(), '.claude');
+  try {
+    const value = Number(
+      JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')).autoCompactWindow,
+    );
+    return Number.isFinite(value) && value >= 8_000 ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 /** @returns {string|null} one short instruction, or null. */

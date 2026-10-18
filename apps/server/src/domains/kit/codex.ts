@@ -179,6 +179,19 @@ export function codexSkillIndex(
   ].join('\n');
 }
 
+/** Последняя ступень списка: только имена и пути — когда подходит, модель читает описание в самом SKILL.md. */
+export function codexSkillNames(
+  skills: readonly CodexSkillLine[],
+  heading = 'agentdeck kit skills',
+): string {
+  if (skills.length === 0) return '';
+  return [
+    `## ${heading}`,
+    'Names only (the full list did not fit). Before a task, open the SKILL.md whose name fits it and follow it.',
+    ...skills.map((skill) => `- ${skill.name} (${skill.path})`),
+  ].join('\n');
+}
+
 const joinParts = (...parts: string[]): string => parts.filter(Boolean).join('\n\n');
 
 /** Длина аргумента `-c developer_instructions=…` для частей текста. */
@@ -216,7 +229,17 @@ export function buildCodexOverlay(input: {
     ? `# agentdeck kit rules\n\n${rules.replace(/^# agentdeck kit rules\s*/, '')}`
     : '';
   const appServer = join2(own, kitRules);
-  const exec = join2(own, kitRules, codexSkillIndex(skills, undefined, input.local));
+  // Список навыков ужимается ступенями, а не отказом: свой текст человека из config.toml
+  // едет в тот же аргумент, и уже ~2,5 тыс. знаков своего текста не пускали прогон
+  // (ревью W10, 18.10.2026). Правила не режутся никогда — отказ остаётся, когда не
+  // помещаются они сами даже с одними именами навыков.
+  const tiers = [
+    codexSkillIndex(skills, undefined, input.local),
+    codexSkillIndex(skills, undefined, true),
+    codexSkillNames(skills),
+  ].map((index) => join2(own, kitRules, index));
+  const exec =
+    tiers.find((text) => argLength(text) <= CODEX_KIT_ARG_LIMIT) ?? (tiers.at(-1) as string);
   const longest = Math.max(argLength(appServer), argLength(exec));
   if (longest > CODEX_KIT_ARG_LIMIT) throw new CodexKitTooLarge(longest);
   return { appServer, exec, ...(skills.length > 0 ? { skillsDir } : {}) };

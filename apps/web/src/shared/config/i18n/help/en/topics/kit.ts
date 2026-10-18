@@ -44,9 +44,11 @@ export const kitEn: typeof kitRu = {
       'assembled home directory for that launch. Codex receives the rules through a launch key, ' +
       'after your own instructions, and the skills as the kit folder; its folder and ' +
       '`config.toml` stay unchanged. If the folder fails to build, the run does not ' +
-      'start and says why, instead of silently running on your global layer; for Codex a kit ' +
-      'whose rules together with the skill list exceed 24,000 characters is refused the same ' +
-      'way — the command line holds no more, and the panel will not trim the rules silently; ' +
+      'start and says why, instead of silently running on your global layer. For Codex the ' +
+      'command line holds 24,000 characters: when the skill list does not fit next to the rules ' +
+      'and your own instructions, it shrinks — descriptions cut to 240 characters, then names ' +
+      'and paths only; a kit whose rules exceed the limit even then is refused the same way, ' +
+      'because the panel will not trim the rules silently; ' +
       'that refusal names the limit and the kit size. The way out is the «Yours only» mode; for ' +
       'a kit too large also switching off rules in it, for a folder that failed — another try.',
 
@@ -98,7 +100,7 @@ export const kitEn: typeof kitRu = {
       'the `developer_instructions` key for that launch, after your own from `config.toml`; the ' +
       'skills as the kit folder: in the chat (codex app-server) Codex sees them as its own ' +
       'skills, and in a one-off launch (codex exec) it gets them as a «name — description — ' +
-      'path to SKILL.md» list in the same instructions; on a local model the description is cut to 240 characters so that the kit stays within the limit. Pipelines and subagents do ' +
+      'path to SKILL.md» list in the same instructions; on a local model, or when the list does not fit the limit, its descriptions are cut to 240 characters, and if it still does not fit only names and paths remain. Pipelines and subagents do ' +
       'not: Codex cannot take them for one launch. Hooks neither: Codex runs a hook only after ' +
       'it is approved in Codex itself. The panel does not touch `~/.codex`.',
     cliOther: 'The rest',

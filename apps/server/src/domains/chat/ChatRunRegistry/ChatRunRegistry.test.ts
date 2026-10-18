@@ -564,6 +564,80 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     });
   });
 
+  /**
+   * Локальный слой проекта ложится на каждый старт: источник `project` снят,
+   * флаги слоя, его инструкции и командные настройки — под профилем группы.
+   * Песочница со своим каталогом и маршрут без `project` слоя не получают.
+   */
+  describe('локальный слой проекта', () => {
+    const layer = {
+      args: ['--plugin-dir', 'P', '--mcp-config', 'M'],
+      append: 'Contents of /p/CLAUDE.md (project instructions, checked into the codebase):\n\nTEAM',
+      settings: { model: 'team', hooks: { Stop: ['team'] } },
+      status: {} as never,
+    };
+
+    it('обычный прогон получает слой, профиль группы — поверх командных настроек', () => {
+      const asked: string[] = [];
+      registry.setLocalLayerResolver((cwd) => {
+        asked.push(cwd);
+        return layer;
+      });
+      registry.setGroupProfileResolver(() => ({
+        args: [],
+        env: {},
+        note: '',
+        settings: { model: 'group', hooks: { Stop: ['group'] } },
+      }));
+      registry.start('l1', OPTIONS, {});
+      const options = registry.describe('l1')?.options;
+      expect(asked).toEqual([OPTIONS.cwd]);
+      expect(options?.platformArgs).toEqual(['--setting-sources', 'user,local', ...layer.args]);
+      expect(options?.platformAppend).toBe(layer.append);
+      expect(options?.platformSettings).toEqual({
+        model: 'group',
+        hooks: { Stop: ['team', 'group'] },
+      });
+    });
+
+    it('строгий MCP маршрута снимает только MCP слоя', () => {
+      registry.setLocalLayerResolver(() => layer);
+      registry.setPlatformRouting(() => ({
+        env: {},
+        layers: { args: ['--strict-mcp-config'], systemPrompt: true, dropped: [] },
+      }));
+      registry.start('l2', OPTIONS, {});
+      expect(registry.describe('l2')?.options.platformArgs).toEqual([
+        '--strict-mcp-config',
+        '--setting-sources',
+        'user,local',
+        '--plugin-dir',
+        'P',
+      ]);
+    });
+
+    it('песочница и маршрут без project слоя не получают', () => {
+      let asked = 0;
+      registry.setLocalLayerResolver(() => {
+        asked += 1;
+        return layer;
+      });
+      registry.start('l3', { ...OPTIONS, configDir: '/sandbox' }, {});
+      registry.start('l4', { ...OPTIONS, settingSources: 'user' }, {});
+      expect(asked).toBe(0);
+      registry.setPlatformRouting(() => ({
+        env: {},
+        layers: { args: ['--setting-sources', 'user,local'], systemPrompt: true, dropped: [] },
+      }));
+      registry.start('l5', OPTIONS, {});
+      expect(asked).toBe(0);
+      const options = registry.describe('l5')?.options;
+      expect(options?.platformArgs).toEqual(['--setting-sources', 'user,local']);
+      expect(options?.platformAppend).toBe('');
+      expect(options?.platformSettings).toEqual({});
+    });
+  });
+
   it('маршрута нет — флагов нет, и дописка панели остаётся как была', () => {
     registry.start('c5', { ...OPTIONS, appendSystemPrompt: 'инициатива панели' }, {});
     const options = registry.describe('c5')?.options;

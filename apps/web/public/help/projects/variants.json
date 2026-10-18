@@ -89,6 +89,28 @@
         "height": 537
       }
     },
+    "local/05-layer": {
+      "light-ru": {
+        "file": "05-layer.png",
+        "width": 840,
+        "height": 542
+      },
+      "light-en": {
+        "file": "05-layer.en.png",
+        "width": 840,
+        "height": 524
+      },
+      "dark-ru": {
+        "file": "05-layer.dark.png",
+        "width": 840,
+        "height": 542
+      },
+      "dark-en": {
+        "file": "05-layer.dark.en.png",
+        "width": 840,
+        "height": 524
+      }
+    },
     "setup/01-empty": {
       "light-ru": {
         "file": "01-empty.png",

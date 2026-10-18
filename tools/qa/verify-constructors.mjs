@@ -126,6 +126,9 @@ function ok(name, cond, detail = '') {
 }
 // ── 7. ПЕРЕМЕННЫЕ: пакет (settings + secrets) ──
 {
+  // Уборка записывается ДО создания: упавшая проверка ниже оставляла
+  // QA_VERIFY_PLAIN в настоящем settings.json человека.
+  cleanup.push(['env', 'QA_VERIFY_PLAIN|settings'], ['env', 'QA_VERIFY_TOKEN|secrets']);
   await req('POST', '/env', {
     key: 'QA_VERIFY_PLAIN',
     value: 'x',
@@ -143,7 +146,6 @@ function ok(name, cond, detail = '') {
   const secret = list.find((x) => x.key === 'QA_VERIFY_TOKEN');
   ok('Переменная settings', plain?.source === 'settings');
   ok('Переменная secrets (маска)', secret?.source === 'secrets' && secret?.isSecret === true);
-  cleanup.push(['env', 'QA_VERIFY_PLAIN|settings'], ['env', 'QA_VERIFY_TOKEN|secrets']);
 }
 
 // ── УБОРКА ──

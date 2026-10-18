@@ -136,6 +136,12 @@ export function ModelsTab({ settings, patch }: SettingsTabProps) {
             checked={settings.chatAutoMode}
             onChange={(chatAutoMode) => patch({ chatAutoMode })}
           />
+          <SettingToggleRow
+            label={t('settings.chatLeanTools')}
+            hint={t('settings.chatLeanToolsHint')}
+            checked={settings.chatLeanTools}
+            onChange={(chatLeanTools) => patch({ chatLeanTools })}
+          />
         </Stack>
       </Card>
 

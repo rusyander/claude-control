@@ -388,6 +388,7 @@ export const settingsPatchSchema = object({
   // бы из патча новое правило и молча возвращал бы тумблер назад.
   autoApproveRules: record(string(), boolean()),
   chatAutoMode: boolean(),
+  chatLeanTools: boolean(),
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),

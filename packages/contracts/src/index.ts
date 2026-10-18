@@ -61,6 +61,7 @@ export * from './plugins';
 export * from './chat';
 export * from './projects';
 export * from './project-local';
+export * from './local-layer';
 export * from './project-runner';
 export * from './compose';
 export * from './database';

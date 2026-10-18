@@ -145,6 +145,21 @@ export const projectsEn: typeof projectsRu = {
         'Read recursively, .claude/rules/**/*.md: a nested folder shows in the file path ' +
         '(release/commits.md in the frame). Under the heading are the path globs the ' +
         'rule is bound to, and the text opens with the button next to the heading.',
+      lLayer: 'Local layer — the same set, loaded as a copy',
+      lLayerText:
+        'The project team layer (CLAUDE.md, rules, hooks and permissions from ' +
+        '.claude/settings.json, skills, .mcp.json servers) is assembled as a copy in ' +
+        '.agent/local-layer/ and goes to panel chats instead of the team files themselves. ' +
+        'The agent then works on compressed instructions or on faster hooks from a ' +
+        'not-yet-merged MR, and the repository does not change. The layer exists only when ' +
+        'the project has .agent/local-layer/layer.json — «Create layer» writes it. «Auto» mode ' +
+        'uses the layer only when it gives something: an active hook replacement or ' +
+        'instruction compression of 500 characters or more. Before every chat start the team ' +
+        'files are compared, and the layer is rebuilt if they changed. A compressed section is ' +
+        'used only while it was made from the current text (in the frame one section awaits ' +
+        're-compression and is sent verbatim); a hook replacement only while the team file is ' +
+        'the one it improves. Path rules reach the agent on the first touch of a matching ' +
+        'file, as without the layer.',
 
       shotsTitle: 'The frames are real',
       shotsText:
@@ -165,6 +180,9 @@ export const projectsEn: typeof projectsRu = {
     storagePerms: 'Permissions',
     storageLocal: 'The «From the project» tab',
     storageLocalValue: 'skills, hooks and rule files from the repository’s .claude — read-only',
+    storageLayer: 'Local layer',
+    storageLayerValue:
+      '<project>/.agent/local-layer/ — layer.json, compressed/, build/ (built automatically)',
     storageBackup: 'Backups',
     storageCreate: 'The .claude directory',
     storageCreateValue: 'created on the first write if the project does not have it yet',
@@ -228,10 +246,12 @@ export const projectsEn: typeof projectsRu = {
     noteLocalText:
       'The panel shows the skills, hooks and rules from the project’s .claude but does ' +
       'not edit them: they belong to the project’s git and change there — in the editor ' +
-      'and by commit, like the rest of the code. That is why the tab has no toggles or ' +
+      'and by commit, like the rest of the code. That is why these sections have no toggles or ' +
       'forms, and a hook from settings.local.json is marked with the file name. Rule files ' +
       'are read recursively — .claude/rules/**/*.md, a nested folder shows in the file path; ' +
-      'a disabled skill from .claude/skills-disabled is listed too, marked “disabled”.',
+      'a disabled skill from .claude/skills-disabled is listed too, marked “disabled”. The ' +
+      'tab’s only control is the local layer mode at the bottom: it writes nothing but ' +
+      '.agent/local-layer/layer.json, which git does not see.',
     noteWriteTitle: 'You are editing someone else’s working tree',
     noteWriteText:
       'A save changes the repository’s file right now. If work is going on there or an ' +
@@ -317,6 +337,8 @@ export const projectsEn: typeof projectsRu = {
         'The repository’s hooks: PreToolUse · Bash and a Stop from settings.local.json marked «script not found»',
       '04-rules':
         'Rule files: the src/**/*.tsx glob on the first and the nested release/commits.md path on the second',
+      '05-layer':
+        'The local layer is in use in «Auto» mode: 9 of 14 sections compressed, one awaits re-compression, the lint_guard.mjs replacement from the MR is active',
     },
   },
 

@@ -23,7 +23,10 @@ process.env.AGENTDECK_KIT_STATE = state;
 const LIB = join(builtinKitDir(), 'hooks', 'lib');
 const watch = (await import(pathToFileURL(join(LIB, 'context-watch.mjs')).href)) as {
   default: (input: unknown) => string | null;
-  limitsFor: (env: Record<string, string>) => {
+  limitsFor: (
+    env: Record<string, string>,
+    settingsWindow?: number | null,
+  ) => {
     floor: number;
     bucket: number;
     urgent: number;
@@ -66,9 +69,27 @@ const run = (tokens: number): string | null => {
 describe('context-watch: пороги по окну', () => {
   it('облако: 150k — нижняя граница, меньше — тишина', () => {
     delete process.env.AGENTDECK_KIT_VARIANT;
-    expect(watch.limitsFor({})).toMatchObject({ floor: 150_000, urgent: 260_000, window: null });
+    expect(watch.limitsFor({}, null)).toMatchObject({
+      floor: 150_000,
+      urgent: 260_000,
+      window: null,
+    });
     expect(run(60_000)).toBeNull();
     expect(run(160_000)).toContain('re-billed');
+  });
+
+  it('облако: срочная отметка — 87 % окна из settings.json своего каталога конфигурации', () => {
+    // Окно 250k с прежней отметкой 260k: срочная просьба не приходила никогда.
+    const config = mkdtempSync(join(state, 'config-'));
+    writeFileSync(join(config, 'settings.json'), JSON.stringify({ autoCompactWindow: 250_000 }));
+    expect(watch.limitsFor({ CLAUDE_CONFIG_DIR: config })).toMatchObject({
+      floor: 150_000,
+      urgent: 217_500,
+    });
+    // Переменная CLI сильнее настройки, как и у самого CLI.
+    expect(
+      watch.limitsFor({ CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '200000' }),
+    ).toMatchObject({ urgent: 174_000 });
   });
 
   it('локальный прогон с окном 64k: пороги в тех же долях — 32k / 54k, а не 150k', () => {

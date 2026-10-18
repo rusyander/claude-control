@@ -71,6 +71,9 @@ const DOC_FILE = /\.mdx?$/i;
 // The invariant itself stays in CLAUDE.md; this delivers the steps.
 const UI_SOURCE = /\.(tsx?|jsx?|vue|svelte|css|scss|less)$/i;
 
+// Probe and scratch files are not the product's UI (measured: scratchpad .js probes pulled this rule).
+const SCRATCH_PATH = /[\\/](?:Temp|tmp|scratchpad)[\\/]|[\\/]\.agent[\\/]/i;
+
 // Hook authoring: the contract matters at exactly one moment — a hook script or its wiring is being
 // written. The dispatcher already enforces what a hook may cost; this delivers what its author has to
 // hold to, including the one failure mode hooks have, which is dying without a sound.
@@ -200,9 +203,51 @@ const WRAPPER = /^(time|sudo|env|command|exec|nohup|\w+=\S*)$/;
 const LIST_KEYWORD = /^(for|select|case)$/;
 const OPEN_KEYWORD = /^(if|then|elif|else|do|while|until|!|\{|\()$/;
 const CLOSE_KEYWORD = /^(done|fi|esac|\}|\))$/;
+// A heredoc body is DATA unless an interpreter reads it: `cat >> notes.md <<EOF … pnpm test … EOF` and a
+// commit message carrying "vitest" ran nothing, yet pulled the verification and live-check rules in —
+// 21% of all injected rule text in a measured week (measured). `node - <<EOF` keeps its body.
+const HEREDOC = /(^|\n)([^\n]*?)<<-?\s*['"]?(\w+)['"]?([^\n]*)\n[\s\S]*?\n\s*\3(?=\s|$)/g;
+const INTERPRETER =
+  /^(?:node|nodejs|deno|bun|tsx|python3?|py|bash|sh|zsh|pwsh|powershell|ruby|perl|php|psql|sqlite3|mysql)(?:\.exe)?$/i;
+const commandWord = (text) => {
+  const words = text.trim().split(/\s+/);
+  while (words.length && WRAPPER.test(words[0])) words.shift();
+  return words;
+};
+// Code heredocs run too: piped into an interpreter (`cat <<EOF | node`), or written to a file the same
+// command then runs (`cat > x.mjs <<EOF … EOF; node x.mjs`) — dropping those lost 134 true fires a week.
+function runsLater(before, after, rest) {
+  const pipe = /\|\s*([^|;&]+)/.exec(after);
+  if (pipe && INTERPRETER.test(commandWord(pipe[1])[0] ?? '')) return true;
+  const file = />{1,2}\s*["']?([^\s"';&|]+)/.exec(before)?.[1];
+  if (!file) return false;
+  const base = file.split(/[\\/]/).pop();
+  return rest.split(/&&|\|\||[;\n]/).some((seg) => {
+    const words = commandWord(seg);
+    return (
+      INTERPRETER.test(words[0] ?? '') &&
+      words.slice(1).some((w) => w.replace(/["']/g, '').endsWith(base))
+    );
+  });
+}
+export function dropDataHeredocs(cmd) {
+  return cmd.replace(HEREDOC, (whole, lead, before, _tag, after, offset) => {
+    const words = commandWord(before.split(/[|;&]/).pop());
+    if (INTERPRETER.test(words[0] ?? '')) return whole;
+    if (runsLater(before, after, cmd.slice(offset + whole.length))) return whole;
+    return `${lead}${before} ${after}`;
+  });
+}
+
+// A quoted phrase handed to a non-interpreter is data: `node inspect.mjs calls.jsonl "npx vitest run …"`
+// pulled the verification rule in. Code after -c/-e stays; a quoted single word (a URL, a path) stays.
+const QUOTED = /(\s-(?:c|e|-eval|Command)\s+)?("(?:[^"\\]|\\.)*"|'[^']*')/g;
+const keepQuoted = (_m, flag, q) =>
+  flag || !/\s/.test(q.slice(1, -1)) ? `${flag ?? ''}${q.replace(/[|;&\n]/g, ' ')}` : ' ';
+
 export function runnable(cmd) {
-  return String(cmd ?? '')
-    .replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, (q) => q.replace(/[|;&\n]/g, ' '))
+  return dropDataHeredocs(String(cmd ?? ''))
+    .replace(QUOTED, keepQuoted)
     .split(/&&|\|\||[;|\n]/)
     .map((seg) => seg.trim())
     .filter((seg) => {
@@ -235,7 +280,8 @@ export default function ruleInjector(input) {
   if (LOCAL_MODEL_CMD.test(run)) wanted.push({ rule: 'local-models' });
   if (WRITE_TOOL.test(tool) && HOOK_SOURCE.test(editPath)) wanted.push({ rule: 'hook-authoring' });
   if (WRITE_TOOL.test(tool) && CONFIG_SOURCE.test(editPath)) wanted.push({ rule: 'config-work' });
-  if (UI_TOOL.test(tool) && UI_SOURCE.test(editPath)) wanted.push({ rule: 'visible-fix-shots' });
+  if (UI_TOOL.test(tool) && UI_SOURCE.test(editPath) && !SCRATCH_PATH.test(editPath))
+    wanted.push({ rule: 'visible-fix-shots' });
   if (VERIFY_CMD.test(run) || (TEST_TOOL.test(tool) && TEST_FILE.test(editPath)))
     wanted.push({ rule: 'verification-depth' });
   if (REVIEW_MCP.test(tool) || REVIEW_CMD.test(cmd) || REVIEW_FORGE_CMD.test(run))

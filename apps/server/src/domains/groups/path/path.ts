@@ -1,6 +1,6 @@
 import type { GroupPathView, PathEntry, PathStep } from '@agentdeck/contracts/group-path';
 import { PATH_ANCHORS } from '@agentdeck/contracts/group-path';
-import type { GroupFlow } from '@agentdeck/contracts';
+import type { Group, GroupFlow } from '@agentdeck/contracts';
 import { skillStepHeadings, type SkillStepHeading } from '@agentdeck/contracts/skill-steps';
 
 /**
@@ -38,6 +38,24 @@ export function skillSteps(body: string): string[] {
 /** Шаги скилла с номером строки заголовка — тем, кому нужен сам текст шага. */
 export function stepHeadings(body: string): SkillStepHeading[] {
   return skillStepHeadings(body);
+}
+
+/**
+ * Скиллы, в чей порядок встал шаг группы, но не участники (встроенные группы
+ * доставки: участник гас бы глобально вместе с группой). Один список на путь и
+ * на описания шагов: путь рисует их шаги, значит, описаны они должны быть так
+ * же, как шаги участника, — иначе в русском интерфейсе навсегда «Шаг N скилла»
+ * (владелец 20.10).
+ */
+export function withinHostSkills(
+  group: Pick<Group, 'members' | 'path'>,
+): { kind: 'skill'; id: string }[] {
+  const ids = new Set(
+    (group.path?.steps ?? []).flatMap((step) => (step.within ? [step.within.skillId] : [])),
+  );
+  return [...ids]
+    .filter((id) => !group.members.some((member) => member.kind === 'skill' && member.id === id))
+    .map((id) => ({ kind: 'skill' as const, id }));
 }
 
 /** Свои шаги стадии (без шагов внутри скиллов) в порядке `order`, при равенстве — порядок в массиве. */

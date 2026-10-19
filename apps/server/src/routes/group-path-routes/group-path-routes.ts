@@ -17,7 +17,7 @@ import {
   resourceCatalogView,
 } from '../../domains/groups/describe-views.ts';
 import { groupPrompt, type GroupAsk } from '../../domains/groups/model.ts';
-import { buildPath, type PathSkill } from '../../domains/groups/path/path.ts';
+import { buildPath, withinHostSkills, type PathSkill } from '../../domains/groups/path/path.ts';
 import { normalizePathSteps, withPathSteps } from '../../domains/groups/path-edit.ts';
 import { runLegacyGroupMigrations } from '../../domains/groups/legacy-migrations.ts';
 import { promotePathStep } from '../../domains/groups/promote/promote.ts';
@@ -63,19 +63,11 @@ function pathSkills(
         : [],
     ),
   );
-  // Скилл, в чей порядок встал шаг группы, но не участник (встроенные группы
-  // доставки: участник гас бы глобально вместе с группой), — его шаги тоже
-  // рисуются: иначе путь из одного шага не показывал, внутри чего тот идёт
-  // (владелец 20.10). Только показ: прогон шаги скилла не дописывает.
+  // Шаги скилла, внутри которого идёт шаг группы, тоже рисуются: иначе путь из
+  // одного шага не показывал, внутри чего тот идёт. Только показ: прогон шаги
+  // скилла не дописывает.
   const members = group.members.filter((member) => member.kind === 'skill');
-  const hosts = [
-    ...new Set(
-      (group.path?.steps ?? []).flatMap((step) => (step.within ? [step.within.skillId] : [])),
-    ),
-  ]
-    .filter((id) => !members.some((member) => member.id === id))
-    .map((id) => ({ kind: 'skill' as const, id }));
-  return [...members, ...hosts]
+  return [...members, ...withinHostSkills(group)]
     .filter((member) => !referenced.has(member.id))
     .flatMap((member) => {
       const content = memberContent(deps, memberScope(group, member), member, () =>

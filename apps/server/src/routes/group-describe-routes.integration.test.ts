@@ -221,6 +221,39 @@ describe('маршруты описаний: участники, каталог,
     expect((await members()).pending).toEqual(['skill:ship', 'step:ship']);
   });
 
+  // 20.10: встроенная группа без участников — шаг внутри скилла; путь рисует шаги
+  // скилла, и без описания они в русском интерфейсе навсегда «Шаг N скилла».
+  it('скилл, внутри которого идёт шаг группы, описывает свои шаги, хоть он и не участник', async () => {
+    writeSkill(join(root, 'skills'), 'ship', '## 1. Branch\nCut it.\n\n## 2. Review\nTwo agents.');
+    saveGroup({
+      path: {
+        steps: [
+          {
+            id: 's1',
+            anchor: 'work',
+            order: 0,
+            kind: 'prompt',
+            title: { ru: 'Профиль', en: 'Profile' },
+            prompt: { ru: 'Быстро', en: 'Fast' },
+            source: 'en',
+            createdAt: '2026-10-20T00:00:00.000Z',
+            within: { skillId: 'ship', index: -1, after: '' },
+          },
+        ],
+      },
+    });
+    await boot();
+    expect((await members()).pending).toEqual(['step:ship']);
+    await describeIdle();
+    const view = await members();
+    expect(view.pending).toBeUndefined();
+    expect(view.members).toEqual([]);
+    expect(view.steps).toEqual([
+      { skillId: 'ship', index: 0, title: line('step Branch'), summary: line('does Branch') },
+      { skillId: 'ship', index: 1, title: line('step Review'), summary: line('does Review') },
+    ]);
+  });
+
   it('хук: модели уходят событие, фильтр, команда и текст скрипта с маской секрета; правка скрипта — новое описание', async () => {
     const script = writeScript(
       'notify.mjs',

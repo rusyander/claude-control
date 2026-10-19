@@ -28,6 +28,7 @@ import {
 import { resourceSource } from './describe-sources.ts';
 import { memberBriefs } from './member-briefs/member-briefs.ts';
 import { memberScope, type MemberDeps } from './members/members.ts';
+import { withinHostSkills } from './path/path.ts';
 
 /**
  * Описания в ответах маршрутов: участники группы с шагами скиллов, каталог
@@ -70,6 +71,20 @@ export function groupMembersView(
     );
     return { ...brief, ...describedFields(state) };
   });
+  // Скилл, внутри которого идёт шаг группы, — не участник, но его шаги путь
+  // рисует: описываются они тем же кэшем, что шаги участника.
+  for (const host of withinHostSkills(group)) {
+    const source = resourceSource(deps, memberScope(group, host), host);
+    if (!source || source.steps.length === 0) continue;
+    const state = describeOrQueue(describer, cache, source);
+    if (state === 'pending' || (typeof state !== 'string' && 'refreshing' in state)) {
+      pending.push(`step:${host.id}`);
+    }
+    if (typeof state === 'string') continue;
+    (state.steps ?? []).forEach((step, stepIndex) =>
+      steps.push({ skillId: host.id, index: stepIndex, ...step }),
+    );
+  }
   return { groupId: group.id, members, steps, ...(pending.length > 0 ? { pending } : {}) };
 }
 

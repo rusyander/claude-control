@@ -81,6 +81,7 @@ export * from './history';
 export * from './changelog';
 export * from './remote';
 export * from './power';
+export * from './usage-limits';
 export * from './compromises';
 export * from './api';
 export * from './server-messages';

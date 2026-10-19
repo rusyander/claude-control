@@ -200,6 +200,9 @@ describe('shouldAutoApprove', () => {
     expect(ruleFor('mcp__atlassian__jira_delete_issue', {})).toBe('externalDestroy');
     expect(ruleFor('mcp__gitlab__get_merge_request', {})).toBeUndefined();
     expect(ruleFor('mcp__gitlab__create_merge_request_note', {})).toBe('externalWrite');
+    // «Принять MR» в GitLab — это слияние: запись наружу «С отметкой» его не пропустит.
+    expect(ruleFor('mcp__gitlab__accept_merge_request', {})).toBe('externalDestroy');
+    expect(ruleFor('mcp__github__accept_pull_request', {})).toBe('externalDestroy');
   });
 
   /**
@@ -253,5 +256,32 @@ describe('shouldAutoApprove', () => {
     expect(shouldAutoApprove({ ...base, toolName: 'Write', input: { file_path: 'a.ts' } })).toBe(
       true,
     );
+  });
+});
+
+describe('ruleFor — слияние через API и запись в базу (просьба владельца 19.10)', () => {
+  it('слияние MR/PR запросом к API хостинга — снос на хостинге', () => {
+    for (const command of [
+      'curl -X PUT -H "PRIVATE-TOKEN: x" https://git.example.com/api/v4/projects/1/merge_requests/5/merge',
+      'gh api -X PUT repos/team/repo/pulls/5/merge',
+      'glab api -X PUT projects/1/merge_requests/5/merge',
+    ]) {
+      expect(ruleFor('Bash', { command }), command).toBe('externalDestroy');
+    }
+    // Чтение списка MR — не слияние.
+    const list = 'curl https://git.example.com/api/v4/projects/1/merge_requests?state=opened';
+    expect(ruleFor('Bash', { command: list })).toBeUndefined();
+  });
+
+  it('запись данных и схемы — правило базы', () => {
+    for (const command of [
+      'psql -c "insert into users values (1)"',
+      'psql -c "UPDATE users SET name = 1"',
+      'psql -c "alter table users add column x int"',
+      'sqlite3 app.db "create table t (x)"',
+    ]) {
+      expect(ruleFor('Bash', { command }), command).toBe('database');
+    }
+    expect(ruleFor('Bash', { command: 'psql -c "select * from users"' })).toBeUndefined();
   });
 });

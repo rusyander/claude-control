@@ -77,6 +77,59 @@ function baseGroup(patch) {
   };
 }
 
+/**
+ * Две встроенные группы доставки так, как их кладёт сервер: без участников,
+ * один шаг внутри скилла доставки. Одна изменена человеком, одна удалена —
+ * карточка показывает пометку, шапка — «Вернуть встроенные (1)».
+ */
+export function builtinGroupsFixture() {
+  const groups = [
+    baseGroup({
+      id: 'builtin-delivery',
+      name: 'Задача → MR (быстро)',
+      description:
+        'Любая задача трекера до готового MR: каждая проверка один раз, одно глубокое ревью, один полный прогон проверок перед пушем.',
+      when: 'a tracker ticket or task to deliver end to end into an MR',
+      flow: 'conveyor',
+      order: 10,
+    }),
+    baseGroup({
+      id: 'builtin-delivery-frontend',
+      name: 'Задача → MR: фронт',
+      description: 'Правки только во фронте: снимки до и после, проход в браузере.',
+      when: 'tickets whose every change is frontend',
+      flow: 'conveyor',
+      order: 11,
+    }),
+  ];
+  // У каждой встроенной ровно один свой шаг — профиль на стадии «Работа».
+  const paths = {
+    'builtin-delivery': [
+      step(
+        'builtin-delivery:profile',
+        'work',
+        0,
+        { ru: 'Быстрый путь, профиль по §3', en: 'Fast flow, profile by §3' },
+        { ru: 'Каждая проверка один раз…', en: 'Every check once…' },
+      ),
+    ],
+    'builtin-delivery-frontend': [
+      step(
+        'builtin-delivery-frontend:profile',
+        'work',
+        0,
+        { ru: 'Профиль: фронт', en: 'Profile: frontend' },
+        { ru: 'Профиль закреплён: фронт…', en: 'Profile pinned: frontend…' },
+      ),
+    ],
+  };
+  return {
+    groups,
+    paths,
+    status: { removed: ['builtin-mr-review'], edited: ['builtin-delivery'] },
+  };
+}
+
 function step(id, anchor, order, title, prompt, extra = {}) {
   return {
     id,
@@ -737,6 +790,14 @@ export async function installGroupStubs(page, state = makeGroupState(), options 
       if (path === '/automations' && method === 'GET') return json(route, []);
       if (path === '/groups' && method === 'GET') return json(route, state.groups);
       if (path === '/groups/discovery' && method === 'GET') return json(route, state.discovery);
+      // Встроенные: иначе адрес ушёл бы в «группу по id» с id `builtin`.
+      if (path === '/groups/builtin' && method === 'GET') {
+        return json(route, state.builtin ?? { removed: [], edited: [] });
+      }
+      if (path === '/groups/builtin/restore' && method === 'POST') {
+        state.builtin = { ...(state.builtin ?? { edited: [] }), removed: [] };
+        return json(route, { restored: [] });
+      }
       if (path === '/groups/discovery/run' && method === 'POST') {
         state.discovery = {
           ...state.discovery,

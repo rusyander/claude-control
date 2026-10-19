@@ -464,7 +464,9 @@ describe('heavy-queue-hook: очередь', () => {
     expect(run.ms).toBeLessThan(5_000);
     expect(leaseFiles()).toEqual(['s1.toolu_hold.json']);
     expect(readdirSync(join(dir, 'tickets'))).toEqual([]);
-    expect(readFileSync(join(dir, 'bypass.log'), 'utf8')).toMatch(/ timeout pnpm test\n$/);
+    expect(readFileSync(join(dir, 'bypass.log'), 'utf8')).toMatch(
+      / timeout pnpm test \| держали: s1 «pnpm test» с \d\d:\d\d до \d\d:\d\d\n$/,
+    );
   });
 
   /** Шесть групп разом 17.10: уборка удаляла чужой недописанный файл, и сосед шёл без аренды. */
@@ -490,6 +492,93 @@ describe('heavy-queue-hook: очередь', () => {
     // Уведённая — уже фон: следующий вызов линии её не отдаёт.
     hookSync(pre('s1', 'toolu_after', 'git status'));
     expect(leaseFiles()).toEqual(['s1.toolu_moved.json']);
+  });
+
+  /** Три чужие аренды, которые ещё идут: занимают три места. */
+  const foreignLeases = () => {
+    mkdirSync(join(dir, 'leases'), { recursive: true });
+    for (const id of ['a', 'b', 'c']) {
+      writeFileSync(
+        join(dir, 'leases', `f${id}.toolu_${id}.json`),
+        JSON.stringify({
+          session: `f${id}`,
+          command: `pnpm test ${id}`,
+          since: Date.now() - 60_000,
+          until: Date.now() + 600_000,
+        }),
+      );
+    }
+  };
+  const writeConfig = (value: unknown) =>
+    writeFileSync(join(dir, 'config.json'), JSON.stringify(value));
+
+  /**
+   * Журнал 19.10 20:25–20:40: мест стало четыре (код и перезапуск панели), а
+   * идущие группы держали два из окружения, снятого при их запуске, и стояли в
+   * очереди по 10–15 минут при свободных ядрах. Число мест — из файла очереди.
+   */
+  it('число мест — из файла очереди, а не из окружения запуска группы', () => {
+    foreignLeases();
+    writeConfig({ slots: 4 });
+    const run = hookSync(pre('s1', 'toolu_mine'), {
+      AGENTDECK_HEAVY_SLOTS: '2',
+      AGENTDECK_HEAVY_MAX_WAIT_MS: '3000',
+    });
+    expect(run.ms).toBeLessThan(2_500);
+    expect(leaseFiles()).toContain('s1.toolu_mine.json');
+    expect(existsSync(join(dir, 'bypass.log'))).toBe(false);
+  });
+
+  it('смена числа мест доходит до уже ждущей группы за один опрос', async () => {
+    foreignLeases();
+    writeConfig({ slots: 2 });
+    const waiting = hookAsync(pre('s1', 'toolu_wait'), {
+      AGENTDECK_HEAVY_SLOTS: '2',
+      AGENTDECK_HEAVY_MAX_WAIT_MS: '20000',
+    });
+    await wait(800);
+    expect(leaseFiles()).not.toContain('s1.toolu_wait.json');
+    const raised = Date.now();
+    writeConfig({ slots: 4 });
+    const passed = await waiting;
+    expect(passed - raised).toBeLessThan(5_000);
+    expect(leaseFiles()).toContain('s1.toolu_wait.json');
+    expect(existsSync(join(dir, 'bypass.log'))).toBe(false);
+  }, 30_000);
+
+  it('битый или пустой файл очереди — число мест из окружения', () => {
+    foreignLeases();
+    for (const broken of ['{', JSON.stringify({ slots: 0 }), JSON.stringify({ slots: 'x' })]) {
+      writeFileSync(join(dir, 'config.json'), broken);
+      const run = hookSync(pre('s1', `toolu_${broken.length}`), {
+        AGENTDECK_HEAVY_SLOTS: '4',
+        AGENTDECK_HEAVY_MAX_WAIT_MS: '3000',
+      });
+      expect(run.ms, broken).toBeLessThan(2_500);
+      hookSync(post('s1', `toolu_${broken.length}`));
+    }
+  });
+
+  /** Ожидающая группа прежде ничего не говорила: кто держит места и с каких пор. */
+  it('состояние очереди: места, кто их держит и кто ждёт', async () => {
+    foreignLeases();
+    writeConfig({ slots: 3 });
+    const waiting = hookAsync(pre('s9', 'toolu_w', 'pnpm build'), {
+      AGENTDECK_HEAVY_MAX_WAIT_MS: '1500',
+    });
+    await wait(700);
+    const status = spawnSync(process.execPath, [HOOK, 'status', dir], { encoding: 'utf8' });
+    expect(status.status).toBe(0);
+    expect(status.stdout).toMatch(/3 из 3/);
+    expect(status.stdout).toContain('pnpm test a');
+    expect(status.stdout).toMatch(/fa .*с \d\d:\d\d/);
+    expect(status.stdout).toContain('s9');
+    expect(status.stdout).toContain('pnpm build');
+    await waiting;
+    // Ушёл по пределу — в журнале обходов те, кто держал места.
+    const log = readFileSync(join(dir, 'bypass.log'), 'utf8');
+    expect(log).toMatch(/ timeout pnpm build/);
+    expect(log).toContain('pnpm test a');
   });
 
   it('лёгкая команда, чужой инструмент, нет каталога очереди, битый вход — тишина и код 0', () => {

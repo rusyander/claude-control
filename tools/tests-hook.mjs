@@ -83,7 +83,20 @@ function stop() {
   if (files.length === 0) return;
   const result = spawnSync(
     process.execPath,
-    [CLI, 'gate', '--project', root, '--since', turn.since, '--changed-at', changedAt, ...files],
+    [
+      CLI,
+      'gate',
+      '--project',
+      root,
+      '--since',
+      turn.since,
+      '--changed-at',
+      changedAt,
+      // Группа прогоняет автоматические кейсы один раз перед «доставлено»
+      // (`chat/tests-gate`) — конец её хода их не требует; метку ставит профиль группы.
+      ...(process.env.AGENTDECK_TESTS_RUNS_AT_DELIVERY ? ['--defer-runs'] : []),
+      ...files,
+    ],
     { encoding: 'utf8', timeout: 30_000, windowsHide: true },
   );
   // Сбой самой проверки ход не держит: молчаливый пропуск честнее, чем пропуск ни о чём.

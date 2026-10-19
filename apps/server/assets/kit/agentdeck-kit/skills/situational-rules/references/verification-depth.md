@@ -89,7 +89,8 @@ run to the reverted file (`--cmd "npx vitest related {file} --run"` — for vite
 baseline + one all-reverted run attributed through vitest's module graph, `--trust-green` right after a
 green gate, `--budget <min>`; a verdict is memoised per tree, never re-proven). GREEN after a revert means that
 file's behaviour is untested whatever `@covers` claims — the suite may not be quoted as evidence for
-it. Run it at T2, and on any single file whose bug was just fixed.
+it. Run it ONLY on the files that carry a bug fix (`--files <file>`) — never on a whole diff, refactor
+or feature (whole-diff runs cost split groups hours a day); default `--budget` 8 min.
 
 A new test over UNCHANGED code has no base to fail against: its proof is a planned mutant —
 `--mutants plan.json`, each entry a one-line break of the behaviour its named test claims; the tool

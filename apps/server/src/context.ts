@@ -10,6 +10,8 @@ import {
 } from './lib/safe-io/safe-io.ts';
 import { AppStore } from './lib/app-store/app-store.ts';
 import { stateFilePath } from './lib/app-store/state-file.ts';
+import { readPulledSnapshot } from './lib/app-store/settings-snapshot.ts';
+import { importStateSchema } from './providers/settings-validation/settings-validation.ts';
 import { PricingStore } from './domains/analytics/pricing-source.ts';
 import { ModelCatalogStore } from './domains/models/model-store.ts';
 import { FormatCheckStore } from './domains/format-check/format-check.ts';
@@ -170,7 +172,32 @@ function worktreeLogsDir(appData: string): string {
 
 function createStoreAt(appData: string): AppStore {
   mkdirSync(appData, { recursive: true });
-  return new AppStore(appData);
+  const store = new AppStore(appData);
+  adoptPulledSnapshot(store, appData);
+  return store;
+}
+
+/**
+ * Снимок настроек, принесённый git с другой машины, применяется при старте —
+ * через ту же проверку, что и импорт состояния. Поля вне схемы (их чтение
+ * прощающее) идут как есть: схема срезала бы их молча. Испорченный снимок не
+ * применяется: панель стартует со своим и говорит об этом в лог.
+ */
+function adoptPulledSnapshot(store: AppStore, appData: string): void {
+  const pulled = readPulledSnapshot(appData);
+  if (pulled.kind === 'none') return;
+  if (pulled.kind === 'invalid') {
+    console.warn('settings snapshot not applied:', pulled.reason);
+    store.releaseSettingsSnapshot();
+    return;
+  }
+  const parsed = importStateSchema.safeParse(pulled.state);
+  if (!parsed.success) {
+    console.warn('settings snapshot not applied:', parsed.error.message);
+    store.releaseSettingsSnapshot();
+    return;
+  }
+  store.adoptSettingsSnapshot({ ...pulled.state, ...parsed.data } as typeof pulled.state);
 }
 
 /** Сравнение каталогов: на Windows регистр и слэши в пути — не разница. */

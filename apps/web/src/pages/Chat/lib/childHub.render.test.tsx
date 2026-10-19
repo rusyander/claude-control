@@ -420,3 +420,78 @@ describe('хаб разделения — колонки и шаг группы'
     expect(renderWith({ tasks: [], agents: [] })).not.toContain('data-hub-step');
   });
 });
+
+// Индикатор группы (19.10.2026): полоса «сделано из скольких» с процентом,
+// состояние с его временем и чем группа занята прямо сейчас — одним взглядом
+// на хаб, без захода в каждый чат.
+describe('хаб разделения — индикатор группы', () => {
+  const work = chat({
+    id: 'g0',
+    stage: 'work',
+    groupTitle: 'CP-admin-UI',
+    createdAt: '2026-09-24T10:00:00.000Z',
+    updatedAt: '2026-09-24T11:58:00.000Z',
+  });
+  const steps = { current: 8, total: 14, title: 'Прогон тестов' };
+  const bash = { name: 'Bash', summary: 'pnpm test', startedAt: '2026-09-24T11:57:00.000Z' };
+
+  function renderWith(progress: unknown, runs: ActiveRunView[]): string {
+    const client = new QueryClient();
+    client.setQueryData(['chats', 'g0', 'progress'], progress);
+    return renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <ChildStages groups={collectChildStages([work], 'parent', runs)} onOpen={() => {}} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('идёт: полоса 7 из 14 — 50 %, «работает» со временем, вызов и его длительность', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
+    const html = renderWith({ tasks: [], agents: [], steps, activeTool: bash }, [running('g0')]);
+    expect(html).toContain('data-group-progress="working"');
+    expect(html).toMatch(/role="progressbar"[^>]*aria-valuenow="50"/);
+    expect(textOf(html)).toContain('работает · 2ч 00м');
+    expect(textOf(html)).toContain('7 из 14 · 50 %');
+    expect(textOf(html)).toContain('Bash: pnpm test · 3м 00с');
+  });
+
+  it('билет очереди тяжёлых шагов: «ждёт очередь», сколько впереди', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
+    const html = renderWith(
+      {
+        tasks: [],
+        agents: [],
+        steps,
+        activeTool: bash,
+        heavyQueue: { since: '2026-09-24T11:58:30.000Z', ahead: 2 },
+      },
+      [running('g0')],
+    );
+    expect(html).toContain('data-group-progress="queued"');
+    expect(textOf(html)).toContain('ждёт очередь · 1м 30с · впереди 2');
+  });
+
+  it('запрос прав: «ждёт разрешения» с момента вызова', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
+    const waiting = {
+      id: 'g0',
+      status: 'waiting',
+      permissions: [{ toolName: 'Bash', input: {}, toolUseId: 't1' }],
+    } as ActiveRunView;
+    const html = renderWith({ tasks: [], agents: [], steps, activeTool: bash }, [waiting]);
+    expect(html).toContain('data-group-progress="permission"');
+    expect(textOf(html)).toContain('ждёт разрешения · 3м 00с');
+  });
+
+  it('не идёт — «стоит» с последней записи, без вызова', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
+    const html = renderWith({ tasks: [], agents: [], steps, activeTool: bash }, []);
+    expect(html).toContain('data-group-progress="stalled"');
+    expect(textOf(html)).toContain('стоит · 2м 00с');
+    expect(textOf(html)).not.toContain('Bash: pnpm test');
+  });
+});

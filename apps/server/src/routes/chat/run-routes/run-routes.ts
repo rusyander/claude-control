@@ -14,6 +14,13 @@ import { genTimeSink } from '../../../domains/chat/gen-time-ledger/gen-time-ledg
 import type { ChatRunRegistry } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
 import { RUN_UNKNOWN_DENIED } from '../../../domains/chat/run-ledger/run-ledger.ts';
+import {
+  conflictsWith,
+  isMainSyncRequest,
+  isSoleSync,
+  MAIN_SYNC_DENIED,
+  syncTarget,
+} from '../../../domains/chat/main-sync/main-sync.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { apiTokenPath, readApiToken } from '../../../lib/api-token/api-token.ts';
 import {
@@ -38,7 +45,10 @@ import {
   GitError,
   removeWorktree,
 } from '../../../domains/project-git/project-git.ts';
-import { createGuardedPatternsReader } from '../../../domains/permissions/permissions.ts';
+import {
+  createAllowedMcpToolsReader,
+  createGuardedPatternsReader,
+} from '../../../domains/permissions/permissions.ts';
 import { chatDirectory } from '../../../domains/chat/ChatArtifacts/ChatArtifacts.ts';
 import { findTranscript } from '../../../domains/chat/ChatTranscriptFile/ChatTranscriptFile.ts';
 import {
@@ -88,6 +98,7 @@ import {
   groupAutoApproveFor,
   groupDecision,
   needsMrState,
+  withWorktree,
   recordGroupAutoNotice,
   type GroupAutoApprove,
 } from '../../../domains/chat/group-permissions.ts';
@@ -231,6 +242,13 @@ export function registerChatRunRoutes(
    * первой правки самих файлов настроек (см. `createGuardedPatternsReader`).
    */
   const guardedPatterns = createGuardedPatternsReader(() => ({
+    settings: ctx.location.paths.settings,
+    settingsLocal: ctx.location.paths.settingsLocal,
+    store: ctx.store,
+  }));
+  // MCP-инструменты, разрешённые по имени: брокер применяет их сам, когда сервер
+  // отдан ему правилом `ask` (см. `createAllowedMcpToolsReader`).
+  const allowedMcpTools = createAllowedMcpToolsReader(() => ({
     settings: ctx.location.paths.settings,
     settingsLocal: ctx.location.paths.settingsLocal,
     store: ctx.store,
@@ -981,12 +999,34 @@ export function registerChatRunRoutes(
     // человек ВКЛЮЧИЛ в чате группы сам; унаследованный от родителя или
     // выключенный (ответ из хаба шлёт его выключенным) — не в счёт.
     const humanOn = auto?.enabled === true && auto.inherited !== true;
-    const found = humanOn ? undefined : groupAutoApproveFor(ctx.store, [runId, held?.key]);
+    const linked = humanOn ? undefined : groupAutoApproveFor(ctx.store, [runId, held?.key]);
+    // Своя ветка группы — у git её копии, не из текста команды (`withWorktree`).
+    const found = linked && (await withWorktree(linked, held.options.cwd, { toolName, input }));
     const group =
       found && (await withMrState(ctx.store, ctx.location.paths.appData, found, toolName, input));
     const groupLevel = group
-      ? groupDecision(group, { toolName, input, guardedPatterns: guardedPatterns() })
+      ? groupDecision(group, {
+          toolName,
+          input,
+          guardedPatterns: guardedPatterns(),
+          allowedTools: allowedMcpTools(),
+        })
       : 'human';
+    // Догон main группой — только при конфликте с ним, без карточки
+    // (`main-sync.ts`): отставший MR без конфликта человек обновит сам.
+    const syncCommand = String((input as { command?: unknown } | null)?.command ?? '');
+    const syncRef =
+      !guard && group && isMainSyncRequest(toolName, input) ? syncTarget(syncCommand) : undefined;
+    if (syncRef && held) {
+      const conflict = await conflictsWith(held.options.cwd, syncRef);
+      if (conflict === false) return reply.send({ behavior: 'deny', message: MAIN_SYNC_DENIED });
+      // Конфликт группа чинит сразу и без карточки: разбор команды счёл бы
+      // `git merge origin/main` опасным слиянием и спросил человека.
+      if (conflict === true && group && isSoleSync(syncCommand)) {
+        recordGroupAutoNotice(ctx.store, group, { toolName, input });
+        return reply.send({ behavior: 'allow', updatedInput: input });
+      }
+    }
     if (!guard && group && groupLevel !== 'human') {
       // «С отметкой»: прошло без человека, но хаб родителя это покажет.
       if (groupLevel === 'notify') recordGroupAutoNotice(ctx.store, group, { toolName, input });
@@ -1000,6 +1040,7 @@ export function registerChatRunRoutes(
         toolName,
         input,
         guardedPatterns: guardedPatterns(),
+        allowedTools: allowedMcpTools(),
         allowEdits: auto?.allowEdits ?? false,
         // Правила читаются на КАЖДЫЙ запрос (`rules` выше): тумблер щёлкают
         // ровно тогда, когда надоела карточка, и действовать он обязан со

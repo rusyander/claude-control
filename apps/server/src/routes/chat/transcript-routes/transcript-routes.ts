@@ -14,6 +14,7 @@ import { summarizedMessageIds } from '../../../domains/platform/gateway/summariz
 import { genTimesById } from '../../../domains/chat/gen-time-ledger/gen-time-ledger.ts';
 import { readChatProgress } from '../../../domains/chat/ChatProgress/ChatProgress.ts';
 import { readStepsFile } from '../../../domains/chat/steps-file/steps-file.ts';
+import { heavyQueueDir, heavyQueueWait } from '../../../domains/group-progress/heavy-wait.ts';
 import { searchChats } from '../../../domains/chat/ChatSearch/ChatSearch.ts';
 import { listProjects } from '../../../domains/chat/ChatProjects/ChatProjects.ts';
 import { buildChatExport, type ExportFormat } from '../../../domains/chat/ChatExport/ChatExport.ts';
@@ -326,9 +327,16 @@ export function registerChatTranscriptRoutes(
         : file;
     // Фон в транскрипте числится идущим и после смерти процесса: уведомление об
     // обрыве пишет только СЛЕДУЮЩИЙ процесс. Правду знает реестр.
+    // Очередь тяжёлых шагов (3.2): хук ждёт места, а транскрипт показывает
+    // обычный незакрытый вызов. Каталог — тот же, что раздаёт группам панель.
+    const heavyQueue = heavyQueueWait(
+      heavyQueueDir(ctx.location.paths.appData),
+      request.params.chatId,
+    );
     return {
       ...progress,
       ...(steps ? { steps } : {}),
+      ...(heavyQueue ? { heavyQueue } : {}),
       processAlive: isProcessAlive(request.params.chatId),
     };
   });

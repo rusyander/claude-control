@@ -69,7 +69,7 @@ if (has('help') || argv.includes('-h')) {
   console.log(
     `${head.join('\n')}\n\nFlags: --cmd (required) --base <rev> --cwd <dir> --files a,b --max <n, default 6> --quick --mutants <plan.json> --mutate/--find/--replace [--test] --timeout <ms per run> --recover\n` +
       `Vitest «related {file}» → graph mode (2 runs + tie-breaks, no --max cap): --trust-green (gate just green, skip baseline) ` +
-      `--budget <min, default 20> --no-graph (old per-file runs). Verdicts are memoised per tree; --fresh ignores the memo.`,
+      `--budget <min, default 8> --no-graph (old per-file runs). Verdicts are memoised per tree; --fresh ignores the memo.`,
   );
   process.exit(0);
 }
@@ -83,7 +83,8 @@ const QUICK = has('quick');
 // tie-break runs stop and the rest are printed as not checked instead of blocking (owner 19.10.2026:
 // ~90 % of the verdicts in ~20 min beats 100 % in 5 h that nobody waits for).
 const TRUST_GREEN = has('trust-green');
-const BUDGET_MS = Number(flag('budget', '20')) * 60_000;
+// 8, not 20: whole-diff runs cost split groups hours a day; bug-fix files only.
+const BUDGET_MS = Number(flag('budget', '8')) * 60_000;
 
 // ---- crash journal (finding 54, live split run 24.09.2026) -------------------------------------------
 // A split group's CLI ended its turn under a background mustfail; the kill ran no handler and the tree

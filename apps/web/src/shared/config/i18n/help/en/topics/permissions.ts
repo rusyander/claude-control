@@ -336,8 +336,11 @@ export const permissionsEn: typeof permissionsRu = {
       'safe side. Auto-approve silently lets through only what is reversible: reading ' +
       'always passes, even with the toggle off, while anything irreversible (deleting, ' +
       'wiping history, publishing outward) asks whatever the toggle says. Your own “ask” ' +
-      'and “deny” rules outrank auto-approve — a matching call brings the card back. The ' +
-      'edit toggle is an extra “read only” fuse, not a replacement for confirmation.',
+      'and “deny” rules outrank auto-approve — a matching call brings the card back. Your ' +
+      '“allow” on an MCP tool by name (mcp__server__tool) the panel applies even where the ' +
+      'whole server is handed to it to decide — in split groups: such a tool runs without ' +
+      'a card, except deleting and merging. An allow on the whole server does not count ' +
+      'here. The edit toggle is an extra “read only” fuse, not a replacement for confirmation.',
     noteProviderTitle: 'Other providers use a different model',
     noteProviderText:
       'With the Codex provider these are not allow/ask/deny lists but two config.toml keys: ' +

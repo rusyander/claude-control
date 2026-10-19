@@ -195,6 +195,46 @@ describe('пробелы хода агента', () => {
     expect(judge(cases, [before, after], ['src/auth/login.ts'])).toEqual([]);
   });
 
+  it('конец хода требует не больше 5 кейсов, самые узкие первыми, и без кейсов по зоне-слову', () => {
+    // 19.10: правка run-routes.ts требовала 48 кейсов — папки и зоны размножали требование.
+    const wide = Array.from({ length: 8 }, (_, i) => auto(`wide-00${i}`, ['src']));
+    const exact = auto('auth-009', ['src/auth/login.ts']);
+    const byArea = testCase('area-001', {
+      area: 'auth',
+      automation: { status: 'automated', file: 'x.test.ts' },
+    });
+    const gap = judge([...wide, exact, byArea], [], ['src/auth/login.ts']).join('\n');
+    const command = gap.match(/--case (\S+)/)?.[1] ?? '';
+    expect(command.split(',')).toHaveLength(5);
+    expect(command.startsWith('auth:auth-009,')).toBe(true);
+    expect(command).not.toContain('area-001');
+  });
+
+  it('ход группы (deferRuns): прогон автокейса не требуется, кейс, ручная запись и красное — требуются', () => {
+    // Пункт A 19.10: 879 прогонов блока за три дня — группа прогоняет их перед «доставлено».
+    const deferred = (cases: ProjectTestCase[], runs: ProjectTestRunRecord[], paths: string[]) =>
+      judgeTurn({
+        groups: groups(cases),
+        runs,
+        paths,
+        since: SINCE,
+        changedAt: EDIT,
+        cli: CLI,
+        root: '/p',
+        deferRuns: true,
+      });
+    const cases = [
+      auto('auth-001', ['src/auth']),
+      testCase('auth-002', { codePaths: ['src/auth'] }),
+    ];
+    const gap = deferred(cases, [], ['src/auth/login.ts']).join('\n');
+    expect(gap).not.toContain('not run after the last edit');
+    expect(gap).toContain('record --project "/p" auth:auth-002=passed');
+    expect(deferred(cases, [], ['src/billing/pay.ts']).join('\n')).toContain('no case covers');
+    const red = run('2026-10-15T10:06:00.000Z', [['auth-001', 'failed']]);
+    expect(deferred([cases[0]!], [red], ['src/auth/a.ts']).join('\n')).toContain('red this turn');
+  });
+
   it('запись словом (attested) автокейс не закрывает', () => {
     const cases = [auto('auth-001', ['src/auth'])];
     const word = run('2026-10-15T10:06:00.000Z', [['auth-001', 'passed']], {

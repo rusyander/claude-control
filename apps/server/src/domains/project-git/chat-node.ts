@@ -98,6 +98,21 @@ function holdsCli(dir: string, command: string, deps: ChatNodeDeps): boolean {
   return CLI_SUFFIXES.some((ext) => deps.exists(join(dir, `${command}${ext}`)));
 }
 
+const EXACT = /^v?(\d+)\.\d+\.\d+$/;
+
+/**
+ * Точная версия из `.nvmrc` («22.22.2») на машине не стоит — берётся новейшая той же
+ * мажорной не ниже её. Без этого чат в монорепозитории оставался на Node по умолчанию:
+ * корневой `.nvmrc` просит точную версию, а подготовка копии читает `engines` модулей
+ * (`>=22.22.2 <23`) и ставит 22.23.2 — и задание велело агенту ставить её в PATH
+ * руками, приставкой к каждому Bash (R7, живое ревью 19.10).
+ */
+function sameMajorOf(wanted: string, installed: InstalledRuntime[]): InstalledRuntime | undefined {
+  const major = EXACT.exec(wanted.trim())?.[1];
+  if (!major) return undefined;
+  return bestMatching(installed, `>=${wanted.trim().replace(/^v/, '')} <${Number(major) + 1}`);
+}
+
 function resolveDirs(
   cwd: string,
   env: NodeJS.ProcessEnv,
@@ -112,7 +127,8 @@ function resolveDirs(
   const fits = current ? satisfiesRange(current, need.wanted) : undefined;
   // Требование не разобрано или уже выполнено — менять нечего.
   if (fits !== false && current) return undefined;
-  const best = bestMatching(deps.installed(env), need.wanted);
+  const installed = deps.installed(env);
+  const best = bestMatching(installed, need.wanted) ?? sameMajorOf(need.wanted, installed);
   if (!best) return undefined;
   // Голое имя CLI ищется по PATH: свой `claude` в каталоге Node перехватил бы запуск.
   const bare = basename(command) === command;

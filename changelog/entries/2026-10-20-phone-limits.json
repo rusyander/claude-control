@@ -1,0 +1,24 @@
+{
+  "title": {
+    "ru": "Лимиты подписки на телефоне и спокойные фишки хаба в тёмной теме",
+    "en": "Subscription limits on the phone and calmer hub chips in the dark theme"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Приложение на телефоне показывает, сколько лимита подписки ушло за сессию (5 часов) и за неделю, и через сколько окно сбросится: на главной — плитками над вкладками, в чате — строкой под шапкой. Неделя одной модели появляется, только пока она ограничивает. От 75 % процент жёлтый, от 90 % — красный, как в панели.",
+        "en": "The phone app shows how much of the subscription limit the session (5 hours) and the week have used and when each window resets: as tiles above the tabs on the home screen and as a line under the header in a chat. A single model's week appears only while it is the limiting one. From 75 % the percentage turns yellow, from 90 % red, as in the panel."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "В тёмной теме фишки строки группы в хабе — «закончила · 1 ч назад», «много сжатий» и вопросы к вам — больше не горят ярче заголовка: тон заливки остался, но тише, текст приглушён.",
+        "en": "In the dark theme the hub's group row chips — «finished · 1 h ago», «many compactions» and questions for you — no longer glare brighter than the group title: the fill keeps its hue but quieter, the text is muted."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    }
+  ]
+}

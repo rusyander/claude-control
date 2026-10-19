@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -67,15 +68,23 @@ describe('маршрут прав: строки вкладки «Группы»'
       url: '/api/chat/permission-request',
       payload: { runId: chatId, toolName, input, toolUseId },
     });
-    const settled = await Promise.race([
-      pending.then((res) => res.json<{ behavior: string }>().behavior),
-      new Promise<string>((done) => setTimeout(() => done('pending'), 300)),
-    ]);
+    const hasCard = (): boolean =>
+      events.some(
+        (event) =>
+          event.kind === 'permission' && (event as { toolUseId?: string }).toolUseId === toolUseId,
+      );
+    // Ждём того, что случится: ответа маршрута или карточки. Маршрут перед
+    // решением читает git копии, и фиксированное окно под нагрузкой путало
+    // «ещё думает» с «придержан без карточки».
+    const answered = pending.then((res) => res.json<{ behavior: string }>().behavior);
+    const deadline = Date.now() + 10_000;
+    let settled = 'pending';
+    void answered.then((behavior) => (settled = behavior));
+    while (settled === 'pending' && !hasCard() && Date.now() < deadline) {
+      await new Promise((done) => setTimeout(done, 10));
+    }
     if (settled !== 'pending') return settled;
-    const card = events.find(
-      (event) =>
-        event.kind === 'permission' && (event as { toolUseId?: string }).toolUseId === toolUseId,
-    );
+    const card = hasCard();
     session.abort(chatId);
     await pending;
     return card ? 'card' : 'pending-without-card';
@@ -86,7 +95,14 @@ describe('маршрут прав: строки вкладки «Группы»'
     project = join(root, 'repo');
     copy = join(root, 'repo-group');
     mkdirSync(project, { recursive: true });
-    mkdirSync(copy, { recursive: true });
+    // Копия группы — настоящая копия git (worktree) проекта: свою ветку маршрут
+    // читает у git, как у живой группы.
+    const git = (cwd: string, args: string[]): void => {
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd });
+    };
+    git(project, ['init', '-q']);
+    git(project, ['commit', '-q', '--allow-empty', '-m', 'init']);
+    git(project, ['worktree', 'add', '-q', '-b', 'feature/a', copy]);
     mkdirSync(join(root, 'agentdeck'), { recursive: true });
     store = new AppStore(join(root, 'agentdeck'));
     store.setSplitPlan({
@@ -145,12 +161,22 @@ describe('маршрут прав: строки вкладки «Группы»'
     expect(await ask(GROUP, 'psql -c "drop table users"')).toBe('card');
   });
 
-  it('запись в MR и трекер из коробки — карточка человеку, их чтение — само (журнал 19.10)', async () => {
-    // Продолжение группы ответило в тредах MR и переписало его описание без
-    // единой карточки: запись наружу из коробки шла строкой «сама».
-    expect(await ask(GROUP, '', 'mcp__gitlab__create_merge_request_note')).toBe('card');
-    expect(await ask(GROUP, '', 'mcp__gitlab__update_merge_request')).toBe('card');
-    expect(await ask(GROUP, '', 'mcp__atlassian__jira_transition_issue')).toBe('card');
+  it('запись в MR и трекер из коробки — сама с отметкой, слияние и удаление — карточка (политика 19.10)', async () => {
+    // Политика владельца 19.10: карточка — только удаление, слияние, пуш в
+    // основную ветку и принудительный пуш. Запись наружу идёт сама, но каждая
+    // остаётся отметкой в хабе родителя — ответ в треде MR не пройдёт незаметно.
+    expect(await ask(GROUP, '', 'mcp__gitlab__create_merge_request_note')).toBe('allow');
+    expect(await ask(GROUP, '', 'mcp__gitlab__update_merge_request')).toBe('allow');
+    expect(await ask(GROUP, '', 'mcp__atlassian__jira_transition_issue')).toBe('allow');
+    const notices = store.getSplitPlan('parent')?.groups[0]?.autoNotices ?? [];
+    expect(notices.map((notice) => notice.summary)).toEqual([
+      'mcp__gitlab__create_merge_request_note',
+      'mcp__gitlab__update_merge_request',
+      'mcp__atlassian__jira_transition_issue',
+    ]);
+    expect(await ask(GROUP, '', 'mcp__gitlab__merge_merge_request')).toBe('card');
+    expect(await ask(GROUP, '', 'mcp__gitlab__delete_branch')).toBe('card');
+    expect(await ask(GROUP, '', 'mcp__atlassian__jira_delete_issue')).toBe('card');
     expect(await ask(GROUP, '', 'mcp__gitlab__get_merge_request')).toBe('allow');
     expect(await ask(GROUP, '', 'mcp__atlassian__jira_get_issue')).toBe('allow');
   });
@@ -237,6 +263,108 @@ describe('маршрут прав: строки вкладки «Группы»'
     // Пуш у человека — и аренда своей ветки тоже.
     store.setSplitSettings(project, { deliver: true, permissions: { gitWrite: 'human' } });
     expect(await ask(GROUP, 'git push --force-with-lease origin feature/a')).toBe('card');
+  });
+
+  /**
+   * Просьба владельца 19.10: человека заваливало карточками на рутине группы.
+   * Пример с карточки — составная команда в своей копии, ветка группы заведена
+   * по правилу проекта (ключи через запятую), а не та, что в записи разделения.
+   */
+  const OWN = 'fix-GOR-1567,GOR-1589,GOR-1626/kb-models-upload-errors';
+  const checkout = (branch: string): void => {
+    execFileSync('git', ['symbolic-ref', 'HEAD', `refs/heads/${branch}`], { cwd: copy });
+  };
+  const at = (): string => copy.replace(/\\/g, '/');
+  const inCopy = (inner: string): string => `cd "${at()}" && ${inner} 2>&1 | tail -5`;
+
+  it('рутина в своей копии — сама: пример с карточки владельца и составные команды', async () => {
+    checkout(OWN);
+    expect(
+      await ask(
+        GROUP,
+        `cd "${at()}" && git push --force-with-lease origin "HEAD:${OWN}" 2>&1 | tail -5 # sieve-ack: @.agent/tmp/sieve-ack.txt`,
+      ),
+    ).toBe('allow');
+    expect(await ask(GROUP, inCopy(`git push origin "HEAD:${OWN}"`))).toBe('allow');
+    expect(await ask(GROUP, `git push --force-with-lease=${OWN} origin ${OWN}`)).toBe('allow');
+    expect(await ask(GROUP, 'git push -u origin HEAD')).toBe('allow');
+    // Слова сообщения коммита — не команда: «drop» и «rm -rf» в нём не база и не удаление.
+    expect(await ask(GROUP, inCopy('git add -A && git commit -m "drop the rm -rf step"'))).toBe(
+      'allow',
+    );
+    expect(await ask(GROUP, inCopy('git fetch origin && git rebase origin/main'))).toBe('allow');
+    expect(await ask(GROUP, 'git stash push -m "wip" && git stash pop')).toBe('allow');
+    expect(await ask(GROUP, 'rm -rf .agent/tmp/probe')).toBe('allow');
+    // Политика 19.10: обычный пуш рабочей ветки — сам, и не только своей.
+    expect(await ask(GROUP, inCopy('git push origin HEAD:feature/other'))).toBe('allow');
+    expect(await ask(GROUP, `git -C "${at()}" push origin "HEAD:${OWN}"`)).toBe('allow');
+    expect(await ask(GROUP, inCopy('rm -rf dist coverage && rm -f build.log'))).toBe('allow');
+  });
+
+  it('опасное в той же форме, что пример владельца, — карточка', async () => {
+    checkout(OWN);
+    const cards = [
+      inCopy('git push origin HEAD:main'),
+      'git push origin main',
+      'git push origin master',
+      inCopy('git push --force-with-lease origin HEAD:main'),
+      inCopy(`git push --force origin "HEAD:${OWN}"`),
+      inCopy(`git push -f origin "HEAD:${OWN}"`),
+      `git -C "${at()}" push origin main`,
+      `git -C "${at()}" push origin HEAD:main`,
+      inCopy('git fetch && git push origin HEAD:develop'),
+      inCopy(`git push --force-with-lease origin "HEAD:${OWN}" "HEAD:feature/other"`),
+      inCopy('git merge origin/main'),
+      inCopy('git branch -d feature/old'),
+      inCopy('git push origin :feature/old'),
+      inCopy('git stash drop'),
+      inCopy('rm -rf src'),
+      inCopy('rm -f notes.txt'),
+      'psql -c "drop table users"',
+      'gh pr merge 5 --squash',
+      inCopy(`git push origin --delete "${OWN}"`),
+      inCopy(`git push origin ":${OWN}"`),
+      inCopy(`git push origin "+HEAD:${OWN}"`),
+      inCopy(`git push upstream "HEAD:${OWN}"`),
+      inCopy(`git push -o merge_request.merge_when_pipeline_succeeds origin "HEAD:${OWN}"`),
+      inCopy(`git checkout main && git merge "${OWN}"`),
+      inCopy('git reset --hard origin/main'),
+      inCopy('git clean -fd'),
+      inCopy(`git branch -D "${OWN}"`),
+      inCopy('git tag -d v1'),
+      'curl -X PUT -H "PRIVATE-TOKEN: x" https://git.example.com/api/v4/projects/1/merge_requests/5/merge',
+      'gh api -X PUT repos/team/repo/pulls/5/merge',
+      'psql -c "insert into users values (1)"',
+      'psql -c "update users set name = 1"',
+      inCopy('rm -rf ../repo'),
+      `rm -rf "${root.replace(/\\/g, '/')}/repo"`,
+    ];
+    for (const command of cards)
+      expect(`${command} → ${await ask(GROUP, command)}`).toBe(`${command} → card`);
+    expect(await ask(GROUP, '', 'mcp__gitlab__merge_merge_request')).toBe('card');
+  });
+
+  it('своя ветка — та, что стоит в копии по git, а не названная в команде', async () => {
+    // В записи разделения — feature/a, в копии — feature/b: своя — feature/b.
+    checkout('feature/b');
+    expect(await ask(GROUP, 'git push --force-with-lease origin HEAD:feature/a')).toBe('card');
+    // Обычный пуш в другую рабочую ветку — перемотка вперёд, сам (политика 19.10).
+    expect(await ask(GROUP, 'git push origin HEAD:feature/a')).toBe('allow');
+    expect(await ask(GROUP, 'git push --force-with-lease origin HEAD:feature/b')).toBe('allow');
+    // В копии основная ветка — пуш в неё и слияние в неё у человека, в какой форме ни будь.
+    checkout('main');
+    expect(await ask(GROUP, 'git push origin HEAD')).toBe('card');
+    expect(await ask(GROUP, 'git push')).toBe('card');
+    expect(await ask(GROUP, 'git merge feature/a')).toBe('card');
+    // Пуш из чужого каталога — уже не своя копия.
+    checkout('feature/a');
+    expect(
+      await ask(
+        GROUP,
+        `cd "${project.replace(/\\/g, '/')}" && git push --force-with-lease origin HEAD:feature/a`,
+      ),
+    ).toBe('card');
+    expect(await ask(GROUP, `git -C "${project}" push origin HEAD:feature/a`)).toBe('card');
   });
 
   /**

@@ -163,6 +163,8 @@ export const queryKeys = {
   outsideRelay: ['outside-relay'] as const,
   watcher: ['watcher'] as const,
   watcherReport: ['watcher', 'report'] as const,
+  /** Лимиты подписки Claude в боковой панели: сессия, неделя, неделя модели. */
+  usageLimits: ['usage-limits'] as const,
   /** Отложенный перезапуск dev-сервера: ждут ли правки живых ходов. */
   devRestart: ['dev-restart'] as const,
   /** Сверка форматов чужих CLI с их официальными схемами: кэш на неделю. */
@@ -189,6 +191,8 @@ export const queryKeys = {
   groupDelivery: (id: string, provider: string) => ['groups', 'delivery', id, provider] as const,
   /** Каталог «Выбрать готовый»: общие ресурсы и — с путём — ресурсы проекта. */
   groupResourceCatalog: (path: string) => ['groups', 'resource-catalog', path] as const,
+  /** Встроенные группы: удалённые человеком и изменённые им — под `groups`, удаление их обновляет. */
+  groupBuiltin: ['groups', 'builtin'] as const,
   /** Сводка ресурса кэшируется сервером по хэшу содержимого — у клиента ключ по типу и id. */
   resourceSummary: (type: string, id: string) => ['resource-summary', type, id] as const,
   /** Группа и автономность чата — по обоим ключам разговора. */
@@ -353,6 +357,9 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   globalLayer: [queryKeys.globalLayer],
   // Набор панели изменён в другой вкладке или агентом панели (В2).
   kit: [queryKeys.kit],
+  // Окна подписки сдвинулись: сервер спросил Anthropic сам и рассылает домен
+  // без файла (`domains/usage-limits`), вкладка перечитывает свой снимок.
+  'usage-limits': [queryKeys.usageLimits],
   // Транскриптов здесь намеренно нет: разговоров сотни, и правка одного не
   // повод перечитывать открытый — обновление идёт адресно, по пути из события
   // (см. FileWatchProvider).

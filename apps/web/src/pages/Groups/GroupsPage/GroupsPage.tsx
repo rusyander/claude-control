@@ -28,6 +28,7 @@ import { CopyGroupDialog } from '../CopyGroupDialog/CopyGroupDialog';
 import type { AdviceMode } from '../AdviceModal.types';
 import { CreateGroupChooser } from '../CreateGroupChooser/CreateGroupChooser';
 import { GroupsProviderNote } from '../GroupsProviderNote/GroupsProviderNote';
+import { BuiltinRestoreButton } from '../BuiltinRestoreButton/BuiltinRestoreButton';
 import type { CreateGroupKind } from '../CreateGroupChooser/CreateGroupChooser.types';
 import styles from './GroupsPage.module.scss';
 import type { OpenedItem } from './GroupsPage.types';
@@ -205,6 +206,7 @@ export function GroupsPage() {
             >
               {isDiscovering ? t('groupSources.discovering') : t('groupSources.discover')}
             </Button>
+            <BuiltinRestoreButton />
             <Button
               variant="primary"
               leftIcon={<Icon name="plus" size={20} />}

@@ -19,7 +19,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { slash } = require('./checks.cjs');
+const { slash, gitTimeoutMs } = require('./checks.cjs');
 
 const VERSION = 1;
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -126,14 +126,18 @@ function git(cwd, args, extraEnv) {
     stdio: ['ignore', 'pipe', 'ignore'],
     windowsHide: true,
     maxBuffer: 256 * 1024 * 1024,
+    timeout: gitTimeoutMs(),
   });
 }
 
 /**
- * Репозиторий процесса. Хранилище — `git-path agentdeck-verify`: у копии
- * (`git worktree`) своё, умирает вместе с ней, `git clean` его не трогает, в
- * отпечаток дерева не попадает. С подмодулями журнал молчит: gitlink прячет
- * грязный подмодуль.
+ * Репозиторий процесса. Хранилище записей — `<git-common-dir>/agentdeck-verify`,
+ * общее для основной папки и всех копий (`git worktree`): ключ — содержимое дерева,
+ * а не путь, так что зелёный прогон копии годен любой копии с тем же деревом
+ * (владелец 19.10: копии игнорировались, каждая гоняла всё заново). `local` —
+ * своё у каждой копии, там живёт указатель «последний зелёный» для сужения.
+ * `git clean` хранилище не трогает, в отпечаток дерева оно не попадает. С
+ * подмодулями журнал молчит: gitlink прячет грязный подмодуль.
  */
 function repoOf(cwd) {
   let lines;
@@ -145,6 +149,7 @@ function repoOf(cwd) {
       'agentdeck-verify',
       '--git-path',
       'index',
+      '--git-common-dir',
     ])
       .trim()
       .split(/\r?\n/);
@@ -153,7 +158,9 @@ function repoOf(cwd) {
   }
   const top = realDir(lines[0]);
   if (fs.existsSync(path.join(top, '.gitmodules'))) return { off: 'submodules', top };
-  return { top, store: path.resolve(cwd, lines[1]), index: path.resolve(cwd, lines[2]) };
+  const local = path.resolve(cwd, lines[1]);
+  const store = lines[3] ? path.resolve(cwd, lines[3], 'agentdeck-verify') : local;
+  return { top, store, local, index: path.resolve(cwd, lines[2]) };
 }
 
 /** Строки `ls-files --debug`: путь и его mtime/size — правка с откатом меняет mtime. */
@@ -305,10 +312,18 @@ function ignoredInputs(top, cwd, declared) {
   return out;
 }
 
-/** Наш `--require` из NODE_OPTIONS не в ключе: иначе ключ зависел бы от версии журнала. */
+/**
+ * Наш `--require` из NODE_OPTIONS не в ключе: иначе ключ зависел бы от версии журнала.
+ * Preload `local-overlay` — тоже обвязка машины, не вход проверки: одна сессия держала
+ * его в NODE_OPTIONS, группа сняла, и тот же прогон на том же дереве давал другой
+ * ключ — ни одного попадания у группы за вечер (журнал 19.10 20:23).
+ */
 function stripPreload(value) {
   return String(value ?? '')
-    .replace(/--require[= ]("[^"]*verify-ledger[^"]*"|\S*verify-ledger\S*)/g, '')
+    .replace(
+      /--require[= ]("[^"]*(?:verify-ledger|local-overlay)[^"]*"|\S*(?:verify-ledger|local-overlay)\S*)/g,
+      '',
+    )
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -330,6 +345,133 @@ function normalizeArgs(args, top) {
     const s = slash(a);
     return s.toLowerCase().startsWith(topSlash) ? s.slice(topSlash.length) : s;
   });
+}
+
+/** Путь файла отчёта не меняет того, что проверено: в ключе — метка вместо пути. */
+function maskReports(args, reports) {
+  if (!reports?.length) return args;
+  const out = [...args];
+  for (const r of reports) out[r.at] = r.sep ? '<report>' : `${r.flag}=<report>`;
+  return out;
+}
+
+/**
+ * Артефакты текущего запуска: отчёты и каталоги сборки. Байты пишутся в запись,
+ * повтор кладёт их по путям ЭТОГО запуска.
+ */
+const reportArtifacts = (match) => [
+  ...(match.reports ?? []).map((r, i) => ({ report: i, path: r.file })),
+  ...(match.outputs ?? []).map((dir, i) => ({ output: i, dir })),
+];
+
+/** Запись годится для запуска с отчётами и сборкой, только если в ней есть байты каждого. */
+const coversReports = (record, match) =>
+  (match.reports ?? []).every((_, i) =>
+    (record.art ?? []).some((a) => a.spec?.report === i && !a.absent),
+  ) &&
+  (match.outputs ?? []).every((_, i) =>
+    (record.art ?? []).some((a) => a.spec?.output === i && !a.absent && !a.unusable),
+  );
+
+/** Каталог сборки больше этого не хранится: повтор не должен стоить гигабайт. */
+const DIR_CAP = 64 * 1024 * 1024;
+
+/**
+ * Каталог сборки одним сжатым файлом: строка-оглавление `[[путь, байт], …]`, затем
+ * байты подряд. `null` — каталога нет, он больше предела или прогон в нём ничего не
+ * написал (сборка ушла в другой каталог — повторять было бы нечего).
+ */
+function packDir(dir, since) {
+  const rows = [];
+  let total = 0;
+  let fresh = false;
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile()) {
+        const st = fs.statSync(p);
+        total += st.size;
+        if (total > DIR_CAP) throw new Error('dir-cap');
+        if (st.mtimeMs >= since - 2000) fresh = true;
+        rows.push({ p: slash(path.relative(dir, p)), body: fs.readFileSync(p) });
+      }
+    }
+  };
+  try {
+    walk(dir);
+  } catch {
+    return null;
+  }
+  if (rows.length === 0 || !fresh) return null;
+  const head = Buffer.from(`${JSON.stringify(rows.map((r) => [r.p, r.body.length]))}\n`);
+  return zlib.gzipSync(Buffer.concat([head, ...rows.map((r) => r.body)]));
+}
+
+/** Каталог сборки на место — ровно таким, каким был записан: прежнее содержимое снимается. */
+function unpackDir(packed, dir) {
+  const raw = zlib.gunzipSync(packed);
+  const nl = raw.indexOf(10);
+  const list = JSON.parse(raw.subarray(0, nl).toString('utf8'));
+  const rootDir = path.resolve(dir);
+  fs.rmSync(rootDir, { recursive: true, force: true });
+  let at = nl + 1;
+  for (const [rel, size] of list) {
+    const file = path.resolve(rootDir, rel);
+    if (!file.startsWith(rootDir + path.sep)) throw new Error('artifact path escapes its dir');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, raw.subarray(at, at + size));
+    at += size;
+  }
+}
+
+/** Конфиги пакета, в которых живут пути к соседям (paths, alias, extends). */
+const SCOPE_CONFIG =
+  /^(tsconfig[^/]*\.json|(vite|vitest)[^/]*\.(config|workspace)\.[cm]?[jt]s|eslint\.config\.[cm]?[jt]s|\.eslintrc[^/]*|\.prettierrc[^/]*|prettier\.config\.[cm]?[jt]s|package\.json)$/;
+
+/**
+ * Дерево, которое видит общий инструмент в пакете монорепо: сам пакет, связанные
+ * пакеты рабочей области, каталоги из `../`-путей его конфигов и файлы корня.
+ * Правка в чужом пакете ключ не меняет (19.10: правка mdx в inst-docs-ui гнала
+ * tsc/eslint/prettier всех пакетов). Чего не разобрать — всё дерево целиком.
+ */
+function scopeTree(repo, tree, cwd, match) {
+  if (match.entry || !tree) return tree;
+  const top = realDir(repo.top);
+  const pkgAbs = realDir(cwd);
+  const pkgRel = slash(path.relative(top, pkgAbs));
+  if (!pkgRel || pkgRel.startsWith('..') || !fs.existsSync(path.join(pkgAbs, 'package.json')))
+    return tree;
+  const dirs = new Set([pkgRel, ...require('./delta.cjs').linkedDirs(top, pkgAbs)]);
+  for (const name of fs.readdirSync(pkgAbs)) {
+    if (!SCOPE_CONFIG.test(name)) continue;
+    let text;
+    try {
+      text = fs.readFileSync(path.join(pkgAbs, name), 'utf8');
+    } catch {
+      return tree;
+    }
+    for (const m of text.matchAll(/['"`](\.\.\/[^'"`*]*)/g)) {
+      const rel = slash(path.relative(top, path.resolve(pkgAbs, m[1])));
+      if (rel.startsWith('..')) return tree;
+      // Каталог верхнего уровня целиком — грубо, зато без догадок о вложенности;
+      // файл корня (`../tsconfig.base.json`) и так в ключе.
+      const first = rel.split('/')[0];
+      if (!rel) return tree;
+      if (fs.statSync(path.join(top, first), { throwIfNoEntry: false })?.isDirectory())
+        dirs.add(first);
+    }
+  }
+  let listing;
+  try {
+    const roots = git(top, ['ls-tree', tree])
+      .split('\n')
+      .filter((l) => / blob /.test(l));
+    listing = [...roots, git(top, ['ls-tree', tree, '--', ...[...dirs].sort()])].join('\n');
+  } catch {
+    return tree;
+  }
+  return `scope:${sha(listing)}`;
 }
 
 /**
@@ -359,9 +501,9 @@ function keyParts({
   return {
     v: VERSION,
     check: match.id,
-    args: normalizeArgs(match.args, repo.top),
+    args: normalizeArgs(maskReports(match.args, match.reports), repo.top),
     cwd: slash(path.relative(repo.top, path.resolve(cwd))),
-    tree,
+    tree: scopeTree(repo, tree, cwd, match),
     base: entry?.base ? baseTree(repo, entry.base) : null,
     ignored: ignoredInputs(repo.top, cwd, entry?.inputs),
     tool: {
@@ -460,6 +602,7 @@ function decide(repo, key, { now = Date.now(), flaky = false } = {}) {
       return { hit: null, reason: 'output-missing' };
   }
   for (const a of newest.art ?? []) {
+    if (a.unusable) return { hit: null, reason: 'artifact-unusable' };
     if (!a.absent && !fs.existsSync(path.join(artDir(repo, newest.runId), String(a.i)))) {
       return { hit: null, reason: 'artifact-missing' };
     }
@@ -490,6 +633,18 @@ function writeRecord(repo, record, { stdout, stderr, complete }, artifacts = [])
   writeAtomic(outFile(repo, runId, 'stdout'), zlib.gzipSync(stdout));
   writeAtomic(outFile(repo, runId, 'stderr'), zlib.gzipSync(stderr));
   const art = artifacts.map((spec, i) => {
+    if (spec.dir !== undefined) {
+      // Каталог сборки — только внутри репозитория и не сам его корень. Короткий путь
+      // Windows (`RUSYAN~1`) у cwd против длинного корня от git — тот же каталог.
+      const rel = slash(path.relative(repo.top, realDir(spec.dir)));
+      const stored = { output: spec.output, dir: rel };
+      if (!rel || rel.startsWith('..') || path.isAbsolute(rel))
+        return { i, spec: stored, unusable: true };
+      const packed = packDir(spec.dir, record.startedAt ?? Date.now());
+      if (!packed) return { i, spec: stored, unusable: true };
+      writeAtomic(path.join(artDir(repo, runId), String(i)), packed);
+      return { i, spec: stored, sha: sha(packed) };
+    }
     const src = artifactPath(repo, spec);
     if (!fs.existsSync(src)) return { i, spec, absent: true };
     const body = fs.readFileSync(src);
@@ -522,9 +677,16 @@ function markFlaky(repo, record) {
 }
 
 /** Повтор: артефакты на место, вывод как был, код как был. */
-function replayBodies(repo, hit) {
+function replayBodies(repo, hit, match = null) {
   for (const a of hit.art ?? []) {
-    const dst = artifactPath(repo, a.spec);
+    if (a.spec?.dir !== undefined) {
+      const dir = match?.outputs?.[a.spec.output] ?? path.resolve(repo.top, a.spec.dir);
+      unpackDir(fs.readFileSync(path.join(artDir(repo, hit.runId), String(a.i))), dir);
+      continue;
+    }
+    // Отчёт — по пути этого запуска, не того, что записан.
+    const current = a.spec?.report !== undefined ? match?.reports?.[a.spec.report] : null;
+    const dst = current ? current.file : artifactPath(repo, a.spec);
     if (a.absent) fs.rmSync(dst, { force: true });
     else {
       fs.mkdirSync(path.dirname(dst), { recursive: true });
@@ -584,6 +746,8 @@ module.exports = {
   decide,
   writeRecord,
   replayBodies,
+  reportArtifacts,
+  coversReports,
   appendEvent,
   heartbeat,
   stripPreload,

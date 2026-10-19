@@ -11,6 +11,7 @@ import { changelogEn } from './changelog/en.ts';
 import { panelUpdateEn } from './panel-update/en.ts';
 import { chatProjectsEn } from './chat-projects/en.ts';
 import { watcherEn } from './watcher/en.ts';
+import { usageLimitsEn } from './usage-limits/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
 import { projectsPageEn } from './projects/en.ts';
@@ -40,6 +41,7 @@ export const en: TranslationSchema = {
   /** Проекты чата и страница «Проекты» — `chat-projects/en.ts`. */
   chatProjects: chatProjectsEn,
   watcher: watcherEn,
+  usageLimits: usageLimitsEn,
   devRestart: devRestartEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
@@ -49,6 +51,12 @@ export const en: TranslationSchema = {
   presets: presetsEn,
   common: {
     duration: { h: 'h', m: 'm', s: 's' },
+    ago: {
+      justNow: 'just now',
+      minutes: '{{count}} min ago',
+      hours: '{{count}} h ago',
+      at: '{{date}}',
+    },
     milliseconds: '{{ms}} ms',
     appName: 'AgentDeck',
     loadError: 'Could not load this section',
@@ -1097,6 +1105,18 @@ export const en: TranslationSchema = {
         stepAgents_few: '{{count}} agents',
         stepAgents_many: '{{count}} agents',
         stepAgents_other: '{{count}} agents',
+        progress: {
+          state: {
+            working: 'working',
+            queued: 'waiting in queue',
+            permission: 'waiting for permission',
+            stalled: 'stopped',
+            finished: 'finished',
+          },
+          ahead: '{{count}} ahead',
+          count: '{{done}} of {{total}} · {{percent}} %',
+          bar: 'Group steps done',
+        },
         triageRunningFor: 'triage in progress · {{time}}',
         summary: {
           accepted_one: 'accepted: {{count}}',
@@ -1300,6 +1320,11 @@ export const en: TranslationSchema = {
           undo: 'Remove mark',
           undoHint: 'Remove the «accepted» mark from the group',
           marker: 'accepted',
+          markDone: 'Mark done',
+          markDoneHint:
+            'Close the group yourself: it becomes «done» and accepted, moves to the bottom of the list, and groups waiting for it start. «Remove mark» returns it to its previous state',
+          markedUndoHint: 'Return the group to the state it was in before the mark',
+          markedMarker: 'done by hand',
           failed: 'Failed: {{message}}',
         },
         recheck: {
@@ -4580,7 +4605,8 @@ export const en: TranslationSchema = {
     subtitle: 'Application, accessibility and configuration path',
     tabsLabel: 'Settings sections',
     tab_general: 'General',
-    tabHint_general: 'Theme, accent, language, accessibility and the editor project files open in.',
+    tabHint_general:
+      'Theme, accent, language, accessibility, the panel as an app and the editor project files open in.',
     tab_access: 'Access',
     tabHint_access:
       'The Claude Code account, where the panel takes access from, which configuration directory it reads and who it lets in from outside.',
@@ -4977,6 +5003,16 @@ export const en: TranslationSchema = {
     watchHint: 'Refresh the interface when configs are edited outside the app',
     revealSecrets: 'Reveal secrets by default',
     revealSecretsHint: 'Otherwise values stay masked',
+    installAppTitle: 'Panel as an app',
+    installAppHint:
+      'Its own window without tabs and an icon in the taskbar that you can pin. The browser asks for confirmation.',
+    installAppAction: 'Install',
+    installAppInstalled:
+      'The panel is open as an app. To pin the icon, right-click it in the taskbar.',
+    installAppManual:
+      'This browser does not offer installation. Open http://127.0.0.1:8888 in Chrome or Edge and choose «Install AgentDeck» in the menu — or the panel is already installed and open in a tab.',
+    installAppStartup:
+      'Open the window when Windows starts: pnpm keepalive:app in the panel folder (undo with pnpm keepalive:app:off). The window appears once per boot, when the stand already answers.',
     editorTitle: 'Code editor',
     editorHint: 'Used by the "Open in editor" button. Editors installed on your system are shown.',
     editorAuto: 'Auto',

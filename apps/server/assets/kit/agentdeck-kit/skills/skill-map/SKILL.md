@@ -30,9 +30,11 @@ are for ambiguous, risky or user-visible work. "just do it" / "no ceremony" from
    UI change → `agentdeck-kit:mr-visual-report` (before/after per page, QA steps + test data on top).
 
 **A whole ticket handed over** ("do task X", "take it") runs all of this as one fixed
-conveyor instead → `agentdeck-kit:ticket-delivery`: claim, branch, shots, fix, discovered gates, draft MR,
-two-agent review, live run, finish. It subsumes steps 4–6 and `agentdeck-kit:prepare-mr`; a project's own ticket skill takes
-precedence.
+conveyor instead → `agentdeck-kit:ticket-delivery`: claim, branch, plan + risk tier, fix, review
+sized by tier, live run, ONE gate, MR, finish — then DONE. Its §3 picks a profile page (frontend,
+backend, design = screens from a Figma mock, fullstack); an MR with reviewer threads runs its
+follow-up mode. It subsumes steps 4–6 and `agentdeck-kit:prepare-mr`; a project's own ticket skill
+takes precedence.
 
 ## On-ramps
 

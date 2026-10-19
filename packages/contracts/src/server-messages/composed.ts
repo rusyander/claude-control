@@ -98,6 +98,7 @@ export const composedMessageParams = {
   'split-triage-interrupted-notice': ['groups'],
   'split-groups-interrupted-notice': ['groups', 'resumed'],
   'split-group-stalled-notice': ['group', 'minutes', 'resumed'],
+  'split-group-stalled-log-notice': ['group', 'minutes', 'resumed', 'log'],
   'child-tell-notice': ['sent', 'queued', 'refused'],
   'split-triage-groups-picked-notice': ['picks'],
   'path-step-started-notice': ['step'],

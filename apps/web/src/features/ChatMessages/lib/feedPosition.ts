@@ -8,10 +8,12 @@ import type { FeedAnchor, FeedProbe, FeedRow, FeedSnapshot } from './feedPositio
  * читал, надо искать заново. Это повторяется на каждый переход, а детей у
  * родителя бывает по полтора десятка.
  *
- * Помним в памяти модуля, а не в sessionStorage: после перезагрузки страницы
- * разговор открывается «впервые», как и раньше, — внизу. Разговор, который
- * человек не листал (стоял у низа), не запоминается вовсе и при возврате
- * по-прежнему едет за ответом.
+ * Память живёт в sessionStorage вкладки (владелец 20.10): после перезагрузки
+ * страницы родитель встаёт туда, где человек читал, а не в самый низ — раньше
+ * место помнила только память модуля, и каждое F5 бросало вниз. Новая вкладка
+ * открывает разговор у низа, как и раньше. Разговор, который человек не листал
+ * (стоял у низа), не запоминается вовсе и при возврате по-прежнему едет за
+ * ответом.
  *
  * Место держим якорем «сообщение + сдвиг», а не голым `scrollTop`: пока
  * человек был у ребёнка, в родителя дописывались сообщения, а окно последних
@@ -28,9 +30,40 @@ export const FEED_MEMORY_LIMIT = 50;
 /** Порог «у низа», px: ближе — лента держится низа (тот же, что был в прокрутке ленты). */
 export const PINNED_THRESHOLD = 160;
 
-/** Память «id разговора → значение» с вытеснением самого давнего. */
-export function createFeedMemory<T>(limit = FEED_MEMORY_LIMIT) {
-  const entries = new Map<string, T>();
+/** Хранилище, переживающее перезагрузку: sessionStorage вкладки или подмена в тесте. */
+export interface FeedStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+/** sessionStorage, если он есть и доступен (приватный режим, node-тесты — нет). */
+function sessionStore(): FeedStorage | undefined {
+  try {
+    return typeof sessionStorage === 'undefined' ? undefined : sessionStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Память «id разговора → значение» с вытеснением самого давнего. С `persist`
+ * — ещё и в хранилище под этим ключом: прочитана при создании, переписана на
+ * каждом изменении. Битая или чужая запись — пустая память, а не сбой ленты.
+ */
+export function createFeedMemory<T>(
+  limit = FEED_MEMORY_LIMIT,
+  persist?: { key: string; storage?: FeedStorage },
+) {
+  const storage = persist ? (persist.storage ?? sessionStore()) : undefined;
+  const entries = new Map<string, T>(load<T>(storage, persist?.key).slice(-limit));
+  const save = (): void => {
+    if (!storage || !persist) return;
+    try {
+      storage.setItem(persist.key, JSON.stringify([...entries]));
+    } catch {
+      // Переполнено или запрещено — место просто не переживёт перезагрузку.
+    }
+  };
   return {
     get: (id: string): T | undefined => entries.get(id),
     set: (id: string, value: T): void => {
@@ -41,23 +74,40 @@ export function createFeedMemory<T>(limit = FEED_MEMORY_LIMIT) {
         const oldest = entries.keys().next().value;
         if (oldest !== undefined) entries.delete(oldest);
       }
+      save();
     },
     delete: (id: string): void => {
-      entries.delete(id);
+      if (entries.delete(id)) save();
     },
     size: (): number => entries.size,
   };
 }
 
+function load<T>(storage: FeedStorage | undefined, key: string | undefined): [string, T][] {
+  if (!storage || !key) return [];
+  try {
+    const raw: unknown = JSON.parse(storage.getItem(key) ?? '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (entry): entry is [string, T] =>
+        Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
 /** Места в лентах: есть запись — разговор листали и при возврате вернём туда же. */
-export const feedPositions = createFeedMemory<FeedSnapshot>();
+export const feedPositions = createFeedMemory<FeedSnapshot>(FEED_MEMORY_LIMIT, {
+  key: 'agentdeck:feed-positions',
+});
 
 /**
  * Размер окна ленты («Загрузить ещё»). Без него возврат к месту в ранней части
  * длинного разговора не сработал бы: окно при смене разговора сбрасывается к
  * последним сообщениям, и якоря в нём просто нет.
  */
-const feedLimits = createFeedMemory<number>();
+const feedLimits = createFeedMemory<number>(FEED_MEMORY_LIMIT, { key: 'agentdeck:feed-limits' });
 
 /** Запомнить окно разговора после «Загрузить ещё». */
 export function rememberFeedLimit(chatId: string | undefined, limit: number): void {

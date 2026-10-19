@@ -209,8 +209,9 @@ export function registerSplitControlRoutes(
     },
   );
 
-  // «Принять» доставленную группу и «Снять отметку» (`accepted: false`) —
-  // ручная приёмка человека; запись плана разделения держит отметку.
+  // «Принять» доставленную группу, «Отметить готовой» остановившуюся и «Снять
+  // отметку» (`accepted: false`) — ручное решение человека; запись плана
+  // разделения держит отметку, отмеченная готовой отпускает ждавших её.
   app.post<{ Params: { parent: string }; Body: { index?: number; accepted?: boolean } }>(
     '/api/chat/split/:parent/accept',
     (request, reply) => {
@@ -227,6 +228,8 @@ export function registerSplitControlRoutes(
             index: found.index,
             accepted: request.body?.accepted !== false,
           },
+          undefined,
+          (record) => found.conveyor.afterMarkedDone(record),
         );
       } catch (error) {
         return refuse(reply, error);
@@ -318,6 +321,27 @@ export function pauseOnHumanStop(
       if (link && link.stage !== 'triage' && conveyor.pauseByLink(link)) return;
     }
   };
+}
+
+/**
+ * Разговор принадлежит группе на паузе — по любому его ключу (`new-…`, sessionId).
+ * Пауза — решение человека («Стоп» в чате или «Пауза» в хабе), и снимает её только
+ * он: «Продолжить» или своё сообщение в чат группы. Самостоятельные старты — повтор
+ * упавшего хода, слово родителя (`agentdeck:tell`) — спрашивают здесь и группу
+ * не будят (живое наблюдение 19.10, R13).
+ */
+export function pausedGroupOf(
+  store: {
+    getChatLink: (key: string) => ChatLink | undefined;
+    getChatLinks: () => Record<string, ChatLink>;
+  },
+  conveyor: Pick<SplitConveyor, 'isPaused'>,
+): (chatId: string) => boolean {
+  return (chatId) =>
+    [chatId, ...conversationKeys(store.getChatLinks(), chatId)].some((key) => {
+      const link = store.getChatLink(key);
+      return Boolean(link && conveyor.isPaused(link));
+    });
 }
 
 /**

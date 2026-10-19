@@ -206,6 +206,22 @@ describe('verify-ledger: ключ видит то, что видит прове�
     expect(reused(run({ CI: '1' }))).toBe(false);
   });
 
+  /** Журнал 19.10 20:23: сессия с preload overlay и группа без него — разные ключи на том же дереве. */
+  it('preload local-overlay в NODE_OPTIONS — повтор; чужой --require — промах', () => {
+    const overlay = join(root, 'local-overlay', 'preload.cjs').replace(/\\/g, '/');
+    const other = join(root, 'other', 'preload.cjs').replace(/\\/g, '/');
+    for (const file of [overlay, other]) {
+      mkdirSync(join(file, '..'), { recursive: true });
+      writeFileSync(file, '');
+    }
+    expect(run().code).toBe(0);
+    const withOverlay = `--require "${PRELOAD}" --require "${overlay}"`;
+    expect(reused(run({ NODE_OPTIONS: withOverlay }))).toBe(true);
+    expect(reused(run({ NODE_OPTIONS: `--require "${PRELOAD}" --require "${other}"` }))).toBe(
+      false,
+    );
+  });
+
   it('T10: правка игнорируемой машинерии (модуль, который импортирует проверка) — промах', () => {
     run();
     writeFileSync(join(repo, '.claude/tools/helper.mjs'), 'export const helper = () => "v2";\n');
@@ -315,6 +331,68 @@ describe('verify-ledger: запись только честного прогон
     expect(events().some((e) => e.reason === 'output-incomplete')).toBe(false);
   });
 
+  it('повтор в stdout, который никто не читает (EAGAIN), — не крутит ядро и выходит', () => {
+    // Граница подмены — системный вызов записи: шим отвечает EAGAIN на fd 1, как
+    // неблокирующий канал, который читатель перестал опустошать. Прежний writeAll
+    // повторял без паузы и без срока — процесс не выходил никогда (spawnSync ниже
+    // срубал его по таймауту), крутя миллионы попыток.
+    const shim = join(root, 'eagain-shim.cjs').replace(/\\/g, '/');
+    const calls = join(root, 'eagain-calls.txt');
+    writeFileSync(
+      shim,
+      `const fs = require('node:fs');
+if (process.env.FAKE_EAGAIN) {
+  const original = fs.writeSync;
+  let n = 0;
+  fs.writeSync = function (fd, ...rest) {
+    if (fd !== 1) return original.call(fs, fd, ...rest);
+    n += 1;
+    const e = new Error('EAGAIN: resource temporarily unavailable, write');
+    e.code = 'EAGAIN';
+    throw e;
+  };
+  process.on('exit', () => fs.writeFileSync(process.env.FAKE_EAGAIN, String(n)));
+}
+`,
+    );
+    const both = { NODE_OPTIONS: `--require "${shim}" --require "${PRELOAD}"` };
+    expect(run(both).code).toBe(0);
+    const startedAt = Date.now();
+    const r = spawnSync(process.execPath, ['.claude/tools/check.mjs'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ...both,
+        AGENTDECK_VERIFY_LEDGER_HOME: home,
+        AGENTDECK_VERIFY_LEDGER: 'on',
+        AGENTDECK_VERIFY_LEDGER_WRITE_MS: '300',
+        FAKE_EAGAIN: calls,
+      },
+      timeout: 10_000,
+    });
+    expect(r.error).toBeUndefined();
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('[verify-ledger] reused green');
+    expect(Date.now() - startedAt).toBeLessThan(8_000);
+    // Сон между попытками: за ~300 мс — десятки попыток, не миллионы.
+    const attempts = Number(readFileSync(calls, 'utf8'));
+    expect(attempts).toBeGreaterThan(1);
+    expect(attempts).toBeLessThan(200);
+  });
+
+  it('git журнала со сроком: не успел — проверка идёт как есть, причина в ленте', () => {
+    // Срок 1 мс не успевает ни один настоящий git: без срока журнал записал бы
+    // прогон как обычно (miss → record), со сроком — отступает и не держит проверку.
+    const r = run({ AGENTDECK_VERIFY_LEDGER_GIT_MS: '1' });
+    expect(r.code).toBe(0);
+    expect(reused(r)).toBe(false);
+    const kinds = events().map((e) => e.kind);
+    expect(kinds).not.toContain('record');
+    expect(kinds).toContain('off');
+    expect(recordCount()).toBe(0);
+  });
+
   it('T19: подложенная руками запись без подписи не считается', () => {
     run({ AGENTDECK_VERIFY_LEDGER: 'off', FAKE_EXIT: '1' });
     const dir = join(storeOf().store, 'v1', 'runs');
@@ -347,12 +425,20 @@ describe('verify-ledger: артефакты и флаги', () => {
     expect(recognize(argv('run'), repo)?.noSkip).toBeNull();
     for (const flags of [
       ['run', '--coverage'],
-      ['run', '--outputFile=x.xml'],
       ['run', '-u'],
+    ]) {
+      expect(recognize(argv(...flags), repo)?.noSkip).toBeTruthy();
+    }
+    // Отчёт в файл или в stdout — повтор можно (байты отчёта в записи), сужение нельзя.
+    for (const flags of [
+      ['run', '--outputFile=x.xml'],
+      ['run', '--outputFile.junit', 'x.xml'],
       ['run', '--reporter', 'junit'],
       ['run', '--reporter=junit'],
     ]) {
-      expect(recognize(argv(...flags), repo)?.noSkip).toBeTruthy();
+      const m = recognize(argv(...flags), repo) as { noSkip: null; wholeOnly: boolean } | null;
+      expect(m?.noSkip).toBeNull();
+      expect(m?.wholeOnly).toBe(true);
     }
     expect(recognize(argv(), repo)).toBeNull();
     expect(recognize(argv('related', 'a.ts'), repo)).toBeNull();

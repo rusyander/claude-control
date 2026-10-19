@@ -7,6 +7,36 @@ import type { GroupAcceptanceProps } from '../GroupAcceptance.types';
 import styles from './GroupAcceptance.module.scss';
 import { toErrorMessage } from '../../../../shared/api/toErrorMessage';
 
+/** Четыре состояния кнопки: принята, отмечена вручную, можно отметить, можно принять. */
+type AcceptMode = 'accepted' | 'marked' | 'markable' | 'open';
+
+function acceptMode(accepted: boolean, marked: boolean, markable: boolean): AcceptMode {
+  if (accepted) return marked ? 'marked' : 'accepted';
+  return markable ? 'markable' : 'open';
+}
+
+const ACCEPT_HINT: Record<AcceptMode, string> = {
+  accepted: 'chat.cascade.hub.accept.undoHint',
+  marked: 'chat.cascade.hub.accept.markedUndoHint',
+  markable: 'chat.cascade.hub.accept.markDoneHint',
+  open: 'chat.cascade.hub.accept.hint',
+};
+
+const ACCEPT_LABEL: Record<AcceptMode, string> = {
+  accepted: 'chat.cascade.hub.accept.undo',
+  marked: 'chat.cascade.hub.accept.undo',
+  markable: 'chat.cascade.hub.accept.markDone',
+  open: 'chat.cascade.hub.accept.action',
+};
+
+/** Метка для проверок: открытая — `open`, отмеченная вручную — `marked`. */
+const ACCEPT_STATE: Record<AcceptMode, string> = {
+  accepted: 'accepted',
+  marked: 'marked',
+  markable: 'open',
+  open: 'open',
+};
+
 /**
  * «Принять» доставленную группу и «Снять отметку» — в строке хаба (TK-accepted).
  *
@@ -33,16 +63,19 @@ export function GroupAcceptance({ acceptance }: GroupAcceptanceProps) {
     );
   };
 
+  const marked = Boolean(acceptance.markedDoneAt);
+  const mode = acceptMode(accepted, marked, Boolean(acceptance.markable));
+
   return (
-    <div className={styles.holdActions} data-accept-group={accepted ? 'accepted' : 'open'}>
+    <div className={styles.holdActions} data-accept-group={ACCEPT_STATE[mode]}>
       <Button
         size="sm"
         variant={accepted ? 'ghost' : 'secondary'}
         isLoading={accept.isPending}
-        title={t(accepted ? 'chat.cascade.hub.accept.undoHint' : 'chat.cascade.hub.accept.hint')}
+        title={t(ACCEPT_HINT[mode])}
         onClick={toggle}
       >
-        {t(accepted ? 'chat.cascade.hub.accept.undo' : 'chat.cascade.hub.accept.action')}
+        {t(ACCEPT_LABEL[mode])}
       </Button>
     </div>
   );

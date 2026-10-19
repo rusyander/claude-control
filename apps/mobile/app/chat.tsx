@@ -56,6 +56,7 @@ import { UserBubble } from '../src/features/chat/UserBubble/UserBubble';
 import { RestartSession } from '../src/features/chat/RestartSession/RestartSession';
 import { restartChat } from '../src/entities/chat/restartChat';
 import { applyRestart } from '../src/features/chat/RestartSession/applyRestart';
+import { LimitsStrip } from '../src/features/usage-limits/LimitsStrip/LimitsStrip';
 
 /**
  * Разговор — то, ради чего приложение существует: видеть, что делает агент,
@@ -348,6 +349,9 @@ export default function ChatScreen() {
           ) : null}
         </Row>
       </View>
+      {/* Лимиты подписки — строкой под шапкой: хватит ли на следующий ход, видно
+          до отправки, не уходя из разговора. */}
+      <LimitsStrip compact />
 
       {/* Вкладок под экраном стека нет, а нижний системный отступ уже взял
           `SafeAreaView`: смещение считается от рамки этого блока, и лишнее

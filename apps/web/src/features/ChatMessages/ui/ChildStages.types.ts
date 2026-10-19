@@ -56,6 +56,8 @@ export interface ChildStageGroup {
   startedAt?: string;
   lastAt?: string;
   isRunning: boolean;
+  /** Прогон группы стоит на запросе прав — ждёт решения человека. */
+  awaitingPermission?: boolean;
   /**
    * Состояние группы по записи конвейера (Д3). Нужно сводке хаба: «готово» по
    * строке с чатом иначе не отличить от «стоит».

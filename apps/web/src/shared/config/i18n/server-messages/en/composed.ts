@@ -125,6 +125,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Group processes were cut short mid-turn: {{groups}}. The panel resumes them itself with a state rebuild (resumed: {{resumed}}); the rest wait for the «Resume» button in the hub.',
   'split-group-stalled-notice':
     'Group «{{group}}» was silent for {{minutes}} min — longer than any call, its turn hung. The panel stopped the process and resumes the group with a state rebuild (resumed: {{resumed}}); one not resumed waits for the «Resume» button in the hub.',
+  'split-group-stalled-log-notice':
+    'Group «{{group}}» was silent for {{minutes}} min — longer than any call, its turn hung. The panel stopped the process and resumes the group with a state rebuild (resumed: {{resumed}}); one not resumed waits for the «Resume» button in the hub. What held the call (process tree before the stop): {{log}}',
   'child-tell-notice':
     'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
   'split-triage-groups-picked-notice': 'The triage picked panel groups: {{picks}}.',

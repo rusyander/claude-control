@@ -35,6 +35,8 @@
     "remote:off": "node tools/tailscale-serve.mjs --off",
     "keepalive": "node tools/keepalive.mjs",
     "keepalive:install": "node tools/keepalive.mjs --install",
+    "keepalive:app": "node tools/keepalive.mjs --install --app",
+    "keepalive:app:off": "node tools/keepalive.mjs --app-off",
     "keepalive:off": "node tools/keepalive.mjs --uninstall",
     "keepalive:status": "node tools/keepalive.mjs --status",
     "mobile": "npm --prefix apps/mobile run android",

@@ -281,3 +281,40 @@ export interface GroupDuplicateResult {
   group: Group;
   sourceId: string;
 }
+
+/**
+ * Встроенные группы панели (каталог доставки, 20.10.2026): id с этим префиксом
+ * засевает сервер, у пользовательских групп id — `randomUUID()`, так что
+ * совпасть они не могут. По префиксу плитка рисует метку, а удаление
+ * запоминает отказ — удалённая встроенная сама не возвращается.
+ */
+export const BUILTIN_GROUP_PREFIX = 'builtin-';
+
+export function isBuiltinGroupId(id: string): boolean {
+  return id.startsWith(BUILTIN_GROUP_PREFIX);
+}
+
+/** Что со встроенными у этого каталога настроек: удалённые и изменённые человеком. */
+export interface BuiltinGroupsStatus {
+  /** Удалённые человеком — вернёт только «Вернуть встроенные». */
+  removed: string[];
+  /** Изменённые человеком — обновления каталога их больше не трогают. */
+  edited: string[];
+}
+
+/**
+ * Запись о встроенных в `state.json` каталога настроек. Отпечаток — только
+ * содержимого (имя, описание, `when`, путь…): включение, порядок и проекты
+ * человека в него не входят и при обновлении каталога сохраняются.
+ */
+export interface BuiltinGroupsRecord {
+  /** id → отпечаток содержимого, записанного панелью последним. */
+  seeded: Record<string, string>;
+  /** Удалённые человеком — не засеваются, пока он их не вернёт. */
+  removed: string[];
+}
+
+/** Ответ «Вернуть встроенные»: имена вернувшихся групп. */
+export interface BuiltinGroupsRestoreResult {
+  restored: string[];
+}

@@ -87,9 +87,13 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
             as="span"
             className={styles.chip}
             title={new Date(group.acceptance.acceptedAt).toLocaleString(i18n.language)}
-            data-hub-accepted
+            data-hub-accepted={group.acceptance.markedDoneAt ? 'marked' : 'accepted'}
           >
-            {t('chat.cascade.hub.accept.marker')}
+            {t(
+              group.acceptance.markedDoneAt
+                ? 'chat.cascade.hub.accept.markedMarker'
+                : 'chat.cascade.hub.accept.marker',
+            )}
           </Typography>
         )}
         {/* MR влит или закрыт — перепроверять его нечего, и строка это говорит. */}

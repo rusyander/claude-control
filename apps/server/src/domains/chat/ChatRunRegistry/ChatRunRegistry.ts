@@ -1187,6 +1187,17 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Номера процессов идущего прогона разговора — посредник, оболочка, сам CLI:
+   * корни дерева, которое сторож повисших групп пишет в журнал перед снятием.
+   */
+  processRootsOf(chatId: string): number[] {
+    const run = this.runs.get(this.resolveKey(chatId));
+    if (!run) return [];
+    const pids = [run.run.live?.pid, run.run.pid, run.cliPid, ...(run.pids ?? [])];
+    return [...new Set(pids.filter((pid): pid is number => typeof pid === 'number' && pid > 0))];
+  }
+
+  /**
    * Фоновые команды живого процесса разговора (описания, без вывода): что
    * умрёт, если процесс остановить. Пауза группы называет их продолжению (L7.6).
    */

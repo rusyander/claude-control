@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { availableParallelism } from 'node:os';
 import { PassThrough } from 'node:stream';
 
 /**
@@ -279,9 +280,11 @@ describe('ChatRun.start: места очереди тяжёлых шагов', (
     }
   });
 
-  it('ребёнку разделения — два места очереди и никакого потолка vitest', async () => {
+  it('ребёнку разделения — четверть ядер мест очереди (не меньше двух) и никакого потолка vitest', async () => {
     const env = await spawnedEnv({ child: true });
-    expect(env.AGENTDECK_HEAVY_SLOTS).toBe('2');
+    expect(env.AGENTDECK_HEAVY_SLOTS).toBe(
+      String(Math.max(2, Math.floor(availableParallelism() / 4))),
+    );
     expect(env.VITEST_MAX_WORKERS).toBeUndefined();
   });
 

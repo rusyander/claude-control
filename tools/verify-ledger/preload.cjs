@@ -56,7 +56,8 @@ function main() {
     now: startedAt,
     flaky: L.isFlaky(repo, checkId, startedAt),
   });
-  const hit = decision.hit && !match.noSkip ? decision.hit : null;
+  const hit =
+    decision.hit && !match.noSkip && L.coversReports(decision.hit, match) ? decision.hit : null;
   const base = {
     key,
     checkId,
@@ -72,7 +73,7 @@ function main() {
   const event = { check: match.id, repo: repo.top, key: key.slice(0, 12) };
 
   if (hit && mode === 'on') {
-    const bodies = L.replayBodies(repo, hit);
+    const bodies = L.replayBodies(repo, hit, match);
     writeAll(1, bodies.stdout);
     writeAll(2, bodies.stderr);
     const at = new Date(hit.startedAt).toISOString();
@@ -167,7 +168,7 @@ function narrow(L, D, { repo, delta, base, event, startedAt }) {
 
 /** Зелёный прогон — новая точка отсчёта для сужения того же семейства. */
 function rememberGreen(D, { repo, match, parts, cwd, start, delta, base, runId }) {
-  if (match.id !== 'vitest' || match.noSkip) return;
+  if (match.id !== 'vitest' || match.noSkip || match.wholeOnly) return;
   const shape = delta?.shape ?? D.vitestShape(match.args);
   if (!shape) return;
   const family = delta?.family ?? D.familyOf(parts, shape);
@@ -216,7 +217,7 @@ function finish(L, { repo, match, start, base, event, hit, mode, capture, code }
       stderr: Buffer.concat(capture.err),
       complete: !capture.inherit,
     },
-    match.entry?.artifacts ?? [],
+    [...(match.entry?.artifacts ?? []), ...L.reportArtifacts(match)],
   );
   L.appendEvent({ ...event, kind: 'record', exit: code, ms });
   return record;
@@ -304,15 +305,48 @@ function watchInherit(capture) {
   require('node:module').syncBuiltinESMExports();
 }
 
-/** Синхронная запись целиком: повтор идёт до main и до выхода. */
+/**
+ * Синхронная запись целиком: повтор идёт до main и до выхода.
+ *
+ * Неблокирующий stdout (канал, который читатель перестал опустошать) отвечает
+ * EAGAIN. Прежде здесь был повтор без паузы и без срока: процесс-повтор крутил
+ * ядро на 100 % и не выходил никогда. Теперь между попытками — сон (Atomics.wait,
+ * 1→50 мс), а без продвижения дольше `WRITE_STALL_MS` (или дольше `WRITE_TOTAL_MS`
+ * всего) запись молча бросается: недописанный вывод повтора лучше вечного
+ * процесса. Любая другая ошибка (EPIPE — читателя нет) — тоже тишина, а не
+ * исключение: оно оборвало бы повтор на середине и запустило проверку заново.
+ * `AGENTDECK_VERIFY_LEDGER_WRITE_MS` укорачивает оба срока (тесты).
+ */
 function writeAll(fd, buf) {
+  // Сроки — внутри функции, не константами модуля: writeAll зовётся из main(), а
+  // main() стоит в начале файла, до объявлений ниже, — `const` модуля здесь ещё в
+  // «мёртвой зоне», и каждый повтор без ручки падал ReferenceError (тест с ручкой
+  // этого не видел: до константы ветка не доходила).
+  /** Сколько ждать читателя, который перестал забирать вывод: от последнего продвижения… */
+  const WRITE_STALL_MS = 10_000;
+  /** …и всего на одну запись повтора. */
+  const WRITE_TOTAL_MS = 60_000;
   const fs = require('node:fs');
+  const knob = Number(process.env.AGENTDECK_VERIFY_LEDGER_WRITE_MS);
+  const stallMs = knob > 0 ? knob : WRITE_STALL_MS;
+  const start = Date.now();
+  const total = start + (knob > 0 ? knob * 6 : WRITE_TOTAL_MS);
+  let stalledAt = start + stallMs;
   let off = 0;
+  let pause = 1;
+  let sleeper;
   while (off < buf.length) {
     try {
       off += fs.writeSync(fd, buf, off, buf.length - off);
+      pause = 1;
+      stalledAt = Date.now() + stallMs;
     } catch (e) {
-      if (e.code !== 'EAGAIN') throw e;
+      const now = Date.now();
+      if (e?.code !== 'EAGAIN' || now >= stalledAt || now >= total) return false;
+      sleeper ??= new Int32Array(new SharedArrayBuffer(4));
+      Atomics.wait(sleeper, 0, 0, pause);
+      pause = Math.min(pause * 2, 50);
     }
   }
+  return true;
 }

@@ -270,8 +270,41 @@ export interface GuardedPatternsSource {
  * переключения кэш от прежнего каталога отвечал бы за чужие права.
  */
 export function createGuardedPatternsReader(read: () => GuardedPatternsSource): () => string[] {
+  return createRulesReader(read, (rules) =>
+    rules.filter((rule) => rule.decision !== 'allow').map((rule) => rule.pattern),
+  );
+}
+
+/**
+ * Читатель MCP-инструментов, которые человек разрешил ПО ИМЕНИ (`allow` на
+ * `mcp__<сервер>__<инструмент>`, включённое). Группе сервер хранилища кода и
+ * трекера целиком отдан брокеру правилом `ask` (L6.2), и CLI уже не применяет
+ * этот список сам — брокер обязан применить его вместо него. Без этого чтение с
+ * именем без глагола (`mr_discussions`) вставало карточкой на каждом вызове
+ * (журнал 19.10 19:41). Правило на весь сервер (`mcp__jira`) сюда не входит: оно
+ * пустило бы и запись, ради которой `ask` и ставили.
+ */
+export function createAllowedMcpToolsReader(
+  read: () => GuardedPatternsSource,
+): () => ReadonlySet<string> {
+  return createRulesReader(
+    read,
+    (rules) =>
+      new Set(
+        rules
+          .filter((rule) => rule.decision === 'allow' && rule.isEnabled)
+          .map((rule) => rule.pattern.trim())
+          .filter((pattern) => /^mcp__[^_]+(?:_[^_]+)*__\S+$/.test(pattern)),
+      ),
+  );
+}
+
+function createRulesReader<T>(
+  read: () => GuardedPatternsSource,
+  select: (rules: PermissionRule[]) => T,
+): () => T {
   let stamp: string | undefined;
-  let patterns: string[] = [];
+  let patterns: T | undefined;
 
   const stampOf = (path: string | undefined): string => {
     if (!path) return '';
@@ -287,11 +320,9 @@ export function createGuardedPatternsReader(read: () => GuardedPatternsSource): 
   return () => {
     const { settings, settingsLocal, store } = read();
     const current = `${stampOf(settings)}|${stampOf(settingsLocal)}`;
-    if (current === stamp) return patterns;
+    if (current === stamp && patterns !== undefined) return patterns;
 
-    patterns = readPermissions(settings, store, settingsLocal)
-      .filter((rule) => rule.decision !== 'allow')
-      .map((rule) => rule.pattern);
+    patterns = select(readPermissions(settings, store, settingsLocal));
     stamp = current;
 
     return patterns;

@@ -6,7 +6,7 @@ import type {
 } from '../../../lib/app-store/app-store.types.ts';
 import type { MrReview, MrReviewThread } from '../../integrations/mr-review/mr-review.ts';
 import { SplitConveyor, type DeliveryVerdict } from '../split-conveyor/split-conveyor.ts';
-import { recheckDeliveredMr } from './split-recheck.ts';
+import { recheckDeliveredMr, type RecheckScope } from './split-recheck.ts';
 
 /**
  * «Продолжить» недоделанной группы и «Перепроверить MR» доставленной
@@ -70,6 +70,10 @@ function build(
     resume?: 'sent' | 'queued' | 'refused';
     parallel?: number;
     verdict?: DeliveryVerdict;
+    /** Охват копии (`MrRecheckDeps.scope`): значение, сбой или не задан. */
+    scope?: RecheckScope | Error;
+    /** Новый разговор перепроверки (`SplitConveyorDeps.recheck`) и его ответ. */
+    fresh?: 'sent' | 'queued' | 'refused';
   } = {},
 ) {
   const records = new Map<string, SplitPlanRecord>();
@@ -86,6 +90,8 @@ function build(
     findByTriage: () => undefined,
   };
   const resumed: { index: number; prompt: string }[] = [];
+  const fresh: { index: number; prompt: string }[] = [];
+  const logs: string[] = [];
   const conveyor = new SplitConveyor({
     store,
     launch: async () => ({ chats: [], failures: [] }),
@@ -96,6 +102,14 @@ function build(
       return outcome;
     },
     ...(options.parallel ? { parallel: () => options.parallel as number } : {}),
+    ...(options.fresh
+      ? {
+          recheck: (_record: SplitPlanRecord, group: SplitPlanGroupRecord, prompt: string) => {
+            if (options.fresh !== 'refused') fresh.push({ index: group.index, prompt });
+            return options.fresh ?? 'refused';
+          },
+        }
+      : {}),
     delivery: {
       facts: async () => options.verdict ?? { missing: [], mr: MR },
       nudge: () => 'refused',
@@ -115,7 +129,15 @@ function build(
           return options.review;
         },
         recheck: (parent, index, prompt) => conveyor.recheckDelivered(parent, index, prompt),
-        log: () => undefined,
+        ...(options.scope
+          ? {
+              scope: async () => {
+                if (options.scope instanceof Error) throw options.scope;
+                return options.scope;
+              },
+            }
+          : {}),
+        log: (message) => void logs.push(message),
       },
       'parent',
       0,
@@ -129,7 +151,7 @@ function build(
     stage: 'work',
   });
   const flush = () => new Promise((done) => setTimeout(done, 5));
-  return { conveyor, recheck, resumed, reads, group, link, flush, records };
+  return { conveyor, recheck, resumed, fresh, logs, reads, group, link, flush, records };
 }
 
 const codeOf = (error: unknown) => (error as { messageCode?: string }).messageCode;
@@ -350,5 +372,85 @@ describe('«Продолжить» группы, остановившейся н
       expect.objectContaining({ messageCode: 'split-resume-refused' }),
     );
     expect(t.group().retries).toBe(3);
+  });
+});
+
+describe('«Перепроверить MR»: охват и новый разговор (R2/R5, 19.10)', () => {
+  const scope = (files: number, outside: number): RecheckScope => ({
+    base: 'origin/main',
+    files: Array.from({ length: files }, (_, index) => `web/f${index}.tsx`),
+    outside: Array.from({ length: outside }, (_, index) => `svc/o${index}.go`),
+  });
+
+  it('охват списком: файлы MR, файлы мимо него, длинные списки — головой и «+N more»', async () => {
+    const t = build({ scope: scope(45, 23) });
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain(
+      'changes against origin/main count (git diff --name-only origin/main...HEAD)',
+    );
+    expect(prompt).toContain('In scope (45):');
+    expect(prompt).toContain('   - web/f39.tsx');
+    expect(prompt).not.toContain('   - web/f40.tsx');
+    expect(prompt).toContain('   - +5 more');
+    expect(prompt).toContain('not part of this MR (23):');
+    expect(prompt).toContain('   - svc/o19.go');
+    expect(prompt).not.toContain('   - svc/o20.go');
+    expect(prompt).toContain('   - +3 more');
+    expect(prompt).toContain('never git add -A, git add . or commit -a');
+  });
+
+  it('ровно на границе: 40 — целиком, 41 — сорок и «+1 more»', async () => {
+    const full = build({ scope: scope(40, 20) });
+    await full.recheck();
+    expect(full.resumed[0]!.prompt).not.toMatch(/\+\d+ more/);
+    expect(full.resumed[0]!.prompt).toContain('   - web/f39.tsx');
+    const over = build({ scope: scope(41, 21) });
+    await over.recheck();
+    const prompt = over.resumed[0]!.prompt;
+    expect(prompt.match(/ {3}- \+1 more/g)).toHaveLength(2);
+    expect(prompt).not.toContain('   - web/f40.tsx');
+  });
+
+  it('пустой охват — «none», мимо охвата нет — строки о нём нет', async () => {
+    const t = build({ scope: scope(0, 0) });
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain('In scope (0):\n   - none');
+    expect(prompt).not.toContain('Outside the scope');
+  });
+
+  it('охват не задан или не прочитан — правила без списка, сбой в журнале, слово уходит', async () => {
+    const none = build();
+    await none.recheck();
+    expect(none.resumed[0]!.prompt).toContain(
+      'against the MR target count (git diff --name-only <target>...HEAD)',
+    );
+    expect(none.resumed[0]!.prompt).toContain('Stage paths by name');
+
+    const broken = build({ scope: new Error('git died') });
+    await expect(broken.recheck()).resolves.toMatchObject({ outcome: 'sent' });
+    expect(broken.logs).toContain('mr recheck: scope unreadable');
+    expect(broken.resumed[0]!.prompt).toContain('<target>...HEAD');
+  });
+
+  it('новый разговор задан — слово перепроверки идёт в него, не продолжением сессии', async () => {
+    const t = build({ fresh: 'sent' });
+    await expect(t.recheck()).resolves.toMatchObject({ outcome: 'sent' });
+    expect(t.fresh).toHaveLength(1);
+    expect(t.fresh[0]!.prompt).toContain('recheck its delivered MR');
+    expect(t.resumed).toEqual([]);
+    expect(t.group().recheckSentAt).toBe(NOW);
+  });
+
+  it('новый разговор отказал — отметка перепроверки снята, отказ с кодом', async () => {
+    const t = build({ fresh: 'refused' });
+    await expect(t.recheck()).rejects.toSatisfy(
+      (error) => codeOf(error) === 'split-resume-refused',
+    );
+    expect(t.resumed).toEqual([]);
+    expect(t.group().recheckRequestedAt).toBeUndefined();
+    expect(t.group().recheckSentAt).toBeUndefined();
+    expect(t.group().recheckedAt).toBe('old');
   });
 });

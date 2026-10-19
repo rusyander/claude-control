@@ -1,15 +1,17 @@
 # Ledger, stages §1–§5 and §13, red flags — the detail behind each gate
 
 Stages with a page of their own: §6/§11 gates.md · §9 review.md · §10 live-run.md · §7/§8/§12/§14
-texts artifacts.md.
+texts artifacts.md. Run order (SKILL.md): §1–§5 → §9 → §10 with §7 → §6 → §8 → §11 → §12 → §13 →
+§14 — each check once, the full gate last before the push.
 
 ## Ledger statuses
 
 `ok` · `red` (attempt recorded, stage still open) · `skip` (not applicable, say why) · `stop`
 (halted with a question; halts only while it is the last line). No tracker key → a slug is the key. A ledger filled in one sitting at the
-end is a story, not evidence — `add` says so itself from the fourth stage stamped in one minute.
+end is a story, not evidence — `add` refuses the fourth stage stamped in one minute.
 
-**One `add` per stage, as that stage's last act** — the next stage starts after it, never before.
+**One `add` per stage, as that stage's last act** — the next stage starts after it, never before. A
+`skip` is written when its stage's turn comes in the run order, not batched at the end.
 A stage whose moment passed unrecorded (crash, stop, resume) is written from its ORIGINAL evidence —
 the command output, sha and time it ran — with the note `late`; no evidence left → re-run the stage.
 Stage ids are the canonical ones `check` prints (`07-after`, `12-finish`), never a local synonym.
@@ -17,7 +19,9 @@ Stage ids are the canonical ones `check` prints (`07-after`, `12-finish`), never
 ## §1 Read the task, classify by CODE, claim it
 
 Body and every comment — a returned ticket carries the QA reason there — then locate the defect in
-code. **The classification comes from the code, not the description.** Read-only first:
+code. **The classification comes from the code, not the description.** In a panel group the panel
+has already written the tracker text (body, recent comments) into `.agent/run/tickets.md`: read that,
+and go to the tracker only for attachments, a ticket missing there, or changes since. Read-only first:
 `node <kit>/tools/ticket-preflight.mjs <keys>`; a `STOP` line means nothing is claimed. **The
 claim is the FIRST write of the run**: held by somebody else → not mine, `stop`, name who holds it;
 unassigned → assign to me, move to in-progress. Status is not a claim, only the assignee is.
@@ -33,22 +37,29 @@ rest, then ask once (kit safety rules).
 
 `git status --short` empty — a dirty tree stops the run, never stashed silently. `git fetch`, branch
 off the FRESH trunk head. The project's written convention names it; none → `<type>-<KEY>/<slug>`,
-several keys comma-separated after the one prefix, no ticket → `<type>/<slug>`.
+several keys comma-separated after the one prefix, no ticket → `<type>/<slug>`. A panel group (its
+own worktree) already sits on the branch the panel made — keep it, record it.
 
 ## §3 Decompose before the first edit
 
 A numbered plan in the ledger: file → what changes → how it is verified. The expected result becomes
 **checkable statements**, each a future row of the §10 table, at least one negative. Ambiguous after
 every comment → ask NOW. `node <kit>/tools/risk-tier.mjs` prints T0/T1/T2 and the blast radius —
-consumers §9 owes a verdict each, entry points §10 a walk each, capped by tier, the rest named.
-Budget 2–3× a plain run, never 10×.
+consumers §9 owes a verdict each, entry points §10 a walk each, capped by tier, the rest named. It
+runs ONCE: its tier sizes the §9 reviewers, the §10 walk and `mustfail` for the whole run; a later
+recompute only when the diff grew past the radius it printed. Budget 2–3× a plain run, never 10×.
 
 ## §4 BEFORE shots
 
 Visible change only. Unrecoverable later: an AFTER with no BEFORE is one-sided and is reported as
 one. One script taking `BEFORE|AFTER`, output into `.agent/screenshots/before-after/<key>-<slug>/`,
 asserting the defect text from the DOM and logging it — that line is the evidence the shot is of the
-right thing.
+right thing. The logged run is also the §10 red run when the walk uses the same assertions.
+
+Shoot once, scoped to the change: one BEFORE|AFTER pair per screen/state the change touches — a wider
+sweep stays in the folder, never in the MR. A later fix (review, live run) re-shoots ONLY the screens
+whose code it touched. Nothing is uploaded before §8; each file is uploaded once there, and the
+README keeps `file → URL` for every MR edit.
 
 ## §5 Fix
 
@@ -58,7 +69,10 @@ Backend half, item by item: validation before the service layer, error mapping, 
 ownership, nothing silently ignored, a declared right on every new route, contract first with the
 drift fixed in the same MR, l10n, counters. The project's backend canon (`docs/rules/<lang>.md`,
 `*STANDARDS*.md`, CLAUDE.md checklists) first; `<kit>/skills/deep-review/references/backend.md`
-is the floor under it — its sweep runs over your own added lines before §6.
+is the floor under it — its sweep runs over your own added lines before §9.
+
+Between edits only narrow checks — the touched files' tests and the touched package's
+type-check/lint (SKILL.md §Working discipline); the full gate waits for §6. Local commits are free.
 
 Before calling the fix done, the six classes human reviewers keep catching
 (`<kit>/skills/deep-review/references/axis-1.md` §Six miss classes) are asked of your own diff:
@@ -67,10 +81,13 @@ error code or field you emit), the request that hangs, work placed before its ga
 dependency, spec ↔ validator. The answers are one ledger row `classes` — per class the grep run or
 the `file:line` read, «n/a» with the search that shows it; a row without them is a story.
 
+Last act of §5: `agentdeck-kit:style-conformance-review` over the whole diff (review.md §Style
+self-review), so the §9 reviewer reads code that already matches the team's profile.
+
 ## §13 Cleanup — same turn, nothing left running
 
 Kill what THIS ticket started and nothing else: dev servers, watchers and tunnels started here, the
-two §9 subagents, one-off containers, data seeded for the walk, the throwaway probes from §10 —
+§9 subagents, one-off containers, data seeded for the walk, the throwaway probes from §10 —
 leaving the shots script and the folder README. Always kept: images, named volumes, models, caches,
 and any stand the user was already running. Unsure → keep it and say so.
 
@@ -102,3 +119,8 @@ memory of the main clone is the leak.
 - The ledger written at the end in one go.
 - Shipped on a red gate «with an escape planned»; `11-pipeline ok` on a running pipeline.
 - A finished run parked on «undraft — your decision»; a test entity or dev server left behind.
+- A second full gate with no edit between the two; a full gate run between edits instead of the
+  narrow checks.
+- More reviewers than the tier sizes, or a §9 spawn when a panel review stage follows.
+- A rebase onto a trunk that moved without a conflict; the MR pushed again only to chase the trunk.
+- The pipeline read, polled or waited on when nobody asked.

@@ -7,7 +7,13 @@ import {
 } from '@agentdeck/contracts/split-groups';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
+import { git } from '../project-git/exec/exec.ts';
 import { isReadOnlyTool, ruleFor, shouldAutoApprove } from './auto-approve/auto-approve.ts';
+import {
+  groupCommandVerdict,
+  isProtectedBranch,
+  type GroupCommandVerdict,
+} from './group-command/group-command.ts';
 
 /**
  * Разрешения группы разделения — строки вкладки «Группы».
@@ -44,8 +50,18 @@ export interface GroupAutoApprove {
   rows: Record<GroupRequestId, GroupPermissionLevel>;
   /** Правки разрешены запросом разделения — иначе группа «только чтение». */
   allowEdits: boolean;
-  /** Ветка группы — исключение для пуша арендой своей ветки. */
+  /** Ветка группы из записи разделения. Для решения о пуше — не она, а `ownBranch`. */
   branch?: string;
+  /** Копия группы — каталог прогона (`withWorktree`). */
+  worktree?: string;
+  /**
+   * Своя ветка группы — та, на которой копия стоит по git (`withWorktree`), если
+   * она не основная. Из текста команды не берётся никогда: группа могла завести
+   * ветку по правилу проекта, а не ту, что в записи разделения.
+   */
+  ownBranch?: string;
+  /** Ветка по умолчанию у `origin` — защищена, как `main` (`withWorktree`). */
+  base?: string;
   /** MR группы из записи разделения: у ветки на ревью исключения нет (L7.12). */
   mr?: string;
   /**
@@ -97,19 +113,50 @@ export function groupAutoApproveFor(
   return undefined;
 }
 
+/** Нужна ли команде своя ветка копии: пуш — да (слияние — человеку при любой ветке). */
+function needsBranch(command: string): boolean {
+  return /\bgit\b[\s\S]*\bpush\b/.test(command);
+}
+
 /**
- * Пуш арендой СВОЕЙ ветки группы после rebase (решение владельца, W3-3): одна
- * команда целиком, без звеньев `&&`/`;`/`|`, в `origin` и ровно в ветку группы.
- * Строка «затирание истории» у человека (аудит 25.09, L163), но без этого пуша
- * группа, догнавшая основную ветку, встала бы на карточке у самого MR, а чужую
- * ветку так не затереть: имя сверяется с веткой из записи разделения.
+ * Копия и своя ветка группы — у git копии, а не из команды (просьба владельца
+ * 19.10). Git читается только когда в команде пуш: на каждое разрешение
+ * процесс не нужен. Ветка основная или защищённая (`main`, `master`,
+ * `develop`, `release/…`, ветка по умолчанию у `origin`), отсоединённая HEAD
+ * или git не ответил — своей ветки нет, и пуш без явной цели уходит человеку.
  */
-function isOwnBranchLeasePush(command: string | undefined, branch: string | undefined): boolean {
-  if (!command || !branch) return false;
-  const escaped = branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(
-    `^\\s*git\\s+push\\s+--force-with-lease\\s+origin\\s+(?:HEAD:)?${escaped}\\s*$`,
-  ).test(command);
+export async function withWorktree(
+  group: GroupAutoApprove,
+  cwd: string | undefined,
+  request: { toolName: string; input: unknown },
+): Promise<GroupAutoApprove> {
+  if (!cwd) return group;
+  const placed = { ...group, worktree: cwd };
+  const command = request.toolName === 'Bash' ? commandOf(request.input) : undefined;
+  if (!command || !needsBranch(command)) return placed;
+  const read = async (args: string[]): Promise<string> =>
+    (await git(cwd, args, 5_000).catch(() => '')).trim();
+  const [branch, remoteHead] = await Promise.all([
+    read(['symbolic-ref', '--quiet', '--short', 'HEAD']),
+    read(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']),
+  ]);
+  const base = remoteHead.replace(/^origin\//, '');
+  const known = base ? { ...placed, base } : placed;
+  if (!branch || isProtectedBranch(branch, base)) return known;
+  return { ...known, ownBranch: branch };
+}
+
+function verdictOf(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+): GroupCommandVerdict | undefined {
+  const command = request.toolName === 'Bash' ? commandOf(request.input) : undefined;
+  if (command === undefined) return undefined;
+  return groupCommandVerdict(command, {
+    ...(group.worktree ? { worktree: group.worktree } : {}),
+    ...(group.ownBranch ? { branch: group.ownBranch } : {}),
+    ...(group.base ? { base: group.base } : {}),
+  });
 }
 
 /**
@@ -125,11 +172,9 @@ export function needsMrState(
   group: GroupAutoApprove,
   request: { toolName: string; input: unknown },
 ): boolean {
-  return (
-    Boolean(group.mr) &&
-    ruleFor(request.toolName, request.input) === 'gitHistory' &&
-    isOwnBranchLeasePush(commandOf(request.input), group.branch)
-  );
+  if (!group.mr) return false;
+  const verdict = verdictOf(group, request);
+  return verdict?.kind === 'routine' && verdict.lease;
 }
 
 /** MR известен, а снят ли с черновика — нет (не читали, сбой форджа): считаем «на ревью». */
@@ -151,24 +196,49 @@ function commandOf(input: unknown): string | undefined {
  */
 export function groupDecision(
   group: GroupAutoApprove,
-  request: { toolName: string; input: unknown; guardedPatterns: string[] },
+  request: {
+    toolName: string;
+    input: unknown;
+    guardedPatterns: string[];
+    allowedTools?: ReadonlySet<string>;
+  },
 ): GroupPermissionLevel {
-  const read = isReadOnlyTool(request.toolName);
-  const named = ruleFor(request.toolName, request.input);
+  const ruled = ruleFor(request.toolName, request.input);
+  // MCP-инструмент, разрешённый человеком по имени, для строк группы — чтение:
+  // свой список `allow` к серверу под `ask` (L6.2) CLI уже не применяет.
+  const allowedByName =
+    ruled === 'externalWrite' && request.allowedTools?.has(request.toolName) === true;
+  const read = isReadOnlyTool(request.toolName) || allowedByName;
+  const named = allowedByName ? undefined : ruled;
   // Правка основной копии — не строка группы: группа пишет только в своей.
   if (named === 'editInMainCopy') return 'human';
-  let rule: GroupRequestId | undefined = named;
-  const rows = { ...group.rows };
-  if (
-    rule === 'gitHistory' &&
-    rows.gitWrite !== 'human' &&
-    !branchUnderReview(group) &&
-    isOwnBranchLeasePush(commandOf(request.input), group.branch)
-  ) {
-    // Решает строка пуша, а не затирания: это обычная доставка своей ветки.
-    rows.gitHistory = rows.gitWrite;
-    rule = 'gitWrite';
+  const rows = group.rows;
+  // Команда оболочки разобрана по звеньям (`group-command.ts`): опасное —
+  // человеку при любых строках, рутина своей копии — строкой пуша/коммита или
+  // «обычной работы», прочее — правилами чата ниже.
+  const verdict = verdictOf(group, request);
+  if (verdict?.kind === 'danger') return 'human';
+  if (verdict?.kind === 'routine') {
+    // Аренда своей ветки, чей MR на ревью (L7.12), затирает то, что читают ревьюеры.
+    if (verdict.lease && branchUnderReview(group)) return 'human';
+    // Уборка временного — строкой «удаление файлов», пуш и коммит — «записью в git».
+    const level = verdict.writes
+      ? rows.gitWrite
+      : verdict.deletes
+        ? rows.filesDelete
+        : rows.routine;
+    if (level === 'human') return 'human';
+    // Правило чата здесь не решает (оно видело `--force` в `--force-with-lease`
+    // и «drop» в сообщении коммита), а `ask`/`deny` из settings.json — решают.
+    const everyRule = new Set<string>(GROUP_REQUEST_IDS);
+    const allowed = shouldAutoApprove({
+      ...request,
+      allowEdits: group.allowEdits,
+      allowedRules: everyRule,
+    });
+    return allowed ? level : 'human';
   }
+  const rule: GroupRequestId | undefined = named;
   const level: GroupPermissionLevel = read ? 'auto' : rows[rule ?? 'routine'];
   if (level === 'human') return 'human';
   const allowedRules = new Set<string>(

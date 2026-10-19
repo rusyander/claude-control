@@ -64,7 +64,12 @@ export const phoneEn: typeof phoneRu = {
     screenHomeText:
       'Live conversations across all projects at once: what is running, what is waiting for ' +
       'you, what ran in the last day. Paired with several computers — a row of their names sits ' +
-      'above the tabs, a tap selects one. On top, a summary: how many conversations are running, ' +
+      'above the tabs, a tap selects one. Above the tabs sit the selected computer’s ' +
+      'subscription limits: how much the session (5 hours) and the week have used and when ' +
+      'each resets; from 75 % the percentage turns yellow, from 90 % red. The same line sits ' +
+      'under a chat’s header. A single model’s week shows only while it is the limiting one; a ' +
+      'CLI signed in with an API key has no subscription limits, and then there is no line. ' +
+      'On top, a summary: how many conversations are running, ' +
       'how many need you (a tap leads to «Questions») and in how many projects. Under «New ' +
       'chat» you see the project it will start in, and «change» leads to the projects. ' +
       'Conversations of a project copy sit under their main ' +

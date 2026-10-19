@@ -429,7 +429,8 @@ export const panelAgentEn: typeof panelAgentRu = {
       'overlaps of split groups are reads; overlaps are recomputed as when the hub opens the ' +
       'check: the result is saved and a new overlap is named once in the parent chat. “Close stage” is ' +
       'dangerous: the request goes to the chat’s agent in the same session. Turning on picking ' +
-      'the model per task, accepting a delivered group and “Resume” of interrupted groups are ' +
+      'the model per task, accepting a delivered group, “Mark done” on a stopped or stuck one (its ' +
+      'waiters start; the agent never marks a running group) and “Resume” of interrupted groups are ' +
       'changes; “Start now” and relaunching groups stay with you.',
     secAnalyticsPortability: 'Analytics and transfer',
     secAnalyticsPortabilityText:

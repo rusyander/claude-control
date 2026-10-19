@@ -113,4 +113,18 @@ describe('skillSteps — ревью 28.09', () => {
     const body = ['## 1. A', '```md', '~~~', '## 2. fake', '```', '## 2. B'].join('\n');
     expect(skillSteps(body)).toEqual(['A', 'B']);
   });
+
+  // 20.10: разделы держат номера, а идут в другом порядке (ticket-delivery) —
+  // полный прогон и MR не выпадают; вложенный список с 1 по-прежнему не шаг.
+  it('переставленные номера того же уровня остаются шагами', () => {
+    const body = [
+      '## 9. Review',
+      '### 1. sub',
+      '## 10. Gate',
+      '## 7. Push',
+      '## 6. Live',
+      '## 8. MR',
+    ].join('\n');
+    expect(skillSteps(body)).toEqual(['Review', 'Gate', 'Push', 'Live', 'MR']);
+  });
 });

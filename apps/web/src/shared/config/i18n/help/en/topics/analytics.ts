@@ -154,8 +154,9 @@ export const analyticsEn: typeof analyticsRu = {
       'visible in the Anthropic account and will not match these numbers.',
     notLimits: 'The remaining limits',
     notLimitsText:
-      'Limits live on Anthropic’s servers and never reach local files. The exact figures ' +
-      'come from the /usage command inside Claude Code.',
+      'Subscription limits are shown not here but at the top of the sidebar, on every ' +
+      'page: the session window (5 hours), the week, and the model week when the server ' +
+      'counts it separately.',
     notChat: 'The content of conversations',
     notChatText:
       'Only the service usage data is taken from the transcripts. Reading or searching a ' +
@@ -217,8 +218,8 @@ export const analyticsEn: typeof analyticsRu = {
     canExport: 'Export the report as a file — CSV or JSON',
 
     cantLimits:
-      'Learn the remaining subscription limits: they are kept on Anthropic’s servers and ' +
-      'are not available locally',
+      'See subscription limits finer than a whole percent: Anthropic’s server returns ' +
+      'whole numbers, and the panel adds no decimals of its own',
     cantBill:
       'See the real bill: this is tokens recomputed at Anthropic’s list price, not a ' +
       'statement — discounts, batch pricing and account terms are not in it',
@@ -378,10 +379,12 @@ export const analyticsEn: typeof analyticsRu = {
       'not be in it, and an empty card on an old project means “no lowerings since then”, ' +
       'not “never any”.',
 
-    noteLimitsTitle: 'The remaining subscription limits cannot be shown',
+    noteLimitsTitle: 'Subscription limits are at the top of the sidebar',
     noteLimitsText:
-      'They live on Anthropic’s servers and never reach local files. All that is ever ' +
-      'visible is the limit reset time, when one was hit right inside the chat.',
+      'The panel asks Anthropic’s server for each window’s percent and reset time under ' +
+      'the Claude Code login — the same answer /usage shows — once a minute while the ' +
+      'panel is open. Precision is whole percents, as the server returns them. No answer ' +
+      'shows the last known sample marked “stale”.',
     noteCostTitle: 'The cost is an estimate, not a bill',
     noteCostText:
       'Tokens are recomputed at API rates. On a subscription none of these sums are ' +

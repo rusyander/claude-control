@@ -1,0 +1,52 @@
+{
+  "title": {
+    "ru": "Настройки панели переезжают на другой компьютер через git, а группы реже ждут лишних проверок",
+    "en": "Panel settings move to another computer through git, and groups wait less on needless checks"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Панель держит переносимую часть своих настроек в agentdeck/settings-snapshot.json рядом со state.json: группы, отметки «выключено», проекты, правила групп разделения и настройки панели. Ссылок чатов, каталога конфигурации, заданного вручную, адреса удалённого доступа и секретов в снимке нет, а пути под домашним каталогом записаны меткой. Если каталог конфигурации — git-репозиторий, снимок уезжает вместе с ним, и на другой машине панель применяет его при старте. Шаги для второго компьютера — в docs/SETUP.ru.md.",
+        "en": "The panel keeps the portable part of its settings in agentdeck/settings-snapshot.json beside state.json: groups, «disabled» marks, projects, split-group rules and the panel settings. Chat links, a manually set config directory, the remote access address and secrets stay out, and paths under the home directory are written as a token. If the config directory is a git repository, the snapshot travels with it and the panel on the other machine applies it at start. Steps for a second computer are in docs/SETUP.md."
+      },
+      "how": {
+        "ru": "state.json целиком в git не годится: в нём вперемешку настройки и состояние машины, и две машины спорили бы о каждой строке. Снимок, который эта машина сама записала или уже применила, повторно не применяется; снимок с конфликтом слияния не применяется вовсе, и панель стартует со своими настройками.",
+        "en": "state.json as a whole does not belong in git: it mixes settings with machine state, and two machines would fight over every line. A snapshot this machine wrote or already applied is not applied again; a snapshot with a merge conflict is not applied at all, and the panel starts with its own settings."
+      },
+      "area": { "ru": "Настройки", "en": "Settings" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа разделения больше не прогоняет автоматические кейсы блока «Тесты» в конце каждого хода: она прогоняет их один раз перед «доставлено». Кейс на изменённый файл, запись ручной проверки и красный результат по-прежнему держат её ход. За ход требуется не больше пяти кейсов, привязанных к изменённому файлу путём, самые узкие первыми.",
+        "en": "A split group no longer runs the Tests block's automated cases at the end of every turn: it runs them once before «delivered». A case for a changed file, a manual check record and a red result still hold its turn. A turn asks for at most five cases bound to a changed file by path, the narrowest first."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Прежде чем снять зависшую группу, панель пишет журнал: дерево процессов группы и процессы вне дерева, которые работают в её копии. Уведомление о снятии называет путь к журналу. Если за время записи журнала группа ожила, её не снимают.",
+        "en": "Before stopping a hung group, the panel writes a log: the group's process tree and the processes outside it that work in its copy. The stop notice names the log's path. A group that came back to life while the log was written is not stopped."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Журнал проверок снова повторяет зелёные прогоны. Из-за ошибки порядка объявлений модуль журнала падал на каждом повторе, и проверка молча шла целиком. Прогон тестов с отчётом junit теперь тоже повторяется: путь отчёта больше не входит в ключ. Прогон с явно выключенным покрытием можно повторить, а запись в вывод, который никто не читает, больше не крутит процессор. Вызовы git у журнала получили срок 60 с.",
+        "en": "The verify ledger replays green runs again. An ordering error made the ledger module crash on every replay, and the check silently ran in full. A test run with a junit report is replayed too: the report path is no longer part of the key. A run with coverage explicitly off can be replayed, and writing to output nobody reads no longer spins the CPU. The ledger's git calls got a 60 s limit."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Сторож pnpm keepalive называет в журнале, какой порт молчал: сервер панели или шлюз.",
+        "en": "The pnpm keepalive watchdog names in its log which port went silent: the panel server or the gateway."
+      },
+      "area": { "ru": "Запуск", "en": "Startup" }
+    }
+  ]
+}

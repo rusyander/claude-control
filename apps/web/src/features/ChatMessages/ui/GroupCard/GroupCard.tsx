@@ -18,7 +18,7 @@ import { isMrSettled } from '../../lib/isMrSettled';
 import { hubBucket } from '../../lib/hubBucket';
 import { statusTone } from '../../lib/statusTone';
 import { HoldAnswer } from './HoldAnswer/HoldAnswer';
-import { GroupStepLine } from '../GroupStepLine/GroupStepLine';
+import { GroupProgress } from '../GroupProgress/GroupProgress';
 import { RunInputs } from '../RunInputs/RunInputs';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 
@@ -92,10 +92,7 @@ export function GroupCard({
               data-hub-open
               onClick={() => onOpen?.(chatId)}
             >
-              <GroupText
-                group={group}
-                step={<GroupStepLine chatId={chatId} isRunning={group.isRunning} />}
-              />
+              <GroupText group={group} step={<GroupProgress chatId={chatId} group={group} />} />
             </button>
           ) : (
             <GroupText group={group} />

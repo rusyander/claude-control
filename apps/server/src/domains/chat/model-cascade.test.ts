@@ -627,9 +627,19 @@ describe('тексты звеньев', () => {
     expect(namesProjectChecks(fixStagePrompt(['x']))).toBe(true);
 
     const short = loweredWorkPrompt('mechanical', { checksInTask: true });
-    expect(short).toContain('run the project checks your task names');
+    expect(short).toContain('run the checks your task names, at the scope and moment it names');
     expect(short).not.toContain('run the project checks its rules name');
     expect(loweredWorkPrompt('mechanical')).toContain('run the project checks its rules name');
+  });
+
+  // Владелец 20.10: замер 19.10 — работа, правки и доставка гнали полный гейт
+  // каждое, три прогона на один MR. Правки перед доставкой — только узкие.
+  it('правки перед доставкой — узкие проверки, полный гейт остаётся доставке', () => {
+    const before = fixStagePrompt(['x'], { deliver: true });
+    expect(before).toContain("The project's full checks run ONCE, in the delivery stage");
+    expect(before).not.toContain('run the project checks its rules name');
+    expect(namesProjectChecks(before)).toBe(true);
+    expect(fixStagePrompt(['x'])).toContain('run the project checks its rules name');
   });
 
   it('источники правил названы и для чужих CLI', () => {

@@ -96,6 +96,19 @@ describe('orderHubGroups', () => {
     expect(titles(orderHubGroups(plan({ acceptance: accepted })))).toEqual(['В', 'Б', 'А']);
   });
 
+  it('отмеченная готовой вручную — в самом низу, под принятыми (владелец 20.10)', () => {
+    const groups = [
+      row('А', {
+        status: 'done',
+        acceptance: { parentChatId: 'p', index: 0, acceptedAt: 'x', markedDoneAt: 'x' },
+      }),
+      row('Б', { status: 'done', acceptance: { parentChatId: 'p', index: 1, acceptedAt: 'x' } }),
+      row('В', { status: 'done' }),
+      row('Г', { isRunning: true }),
+    ];
+    expect(titles(orderHubGroups(groups))).toEqual(['Г', 'В', 'Б', 'А']);
+  });
+
   it('отменённая планом и с убранной копией — внизу, вместе с влитыми', () => {
     const groups = [
       row('отменена', { status: 'failed', errorCode: 'split-group-plan-cancelled' }),

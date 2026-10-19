@@ -1,0 +1,118 @@
+{
+  "title": {
+    "ru": "Группы спрашивают только об опасном, показывают свой ход, перепроверяют MR новым разговором; лимиты подписки видны в боковой панели",
+    "en": "Groups ask only about what is dangerous, show their own progress and recheck an MR in a new conversation; plan usage limits are visible in the sidebar"
+  },
+  "items": [
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Разрешения групп разбирают команду по частям, а не одним шаблоном. Пуш своей ветки в origin, в том числе с --force-with-lease, после cd в копию, в кавычках, с конвейером или комментарием, идёт без карточки. Пуш в main или в чужую ветку, удаление ветки, слияние, рекурсивное удаление вне копии или самой копии и неразобранная команда всегда поднимают карточку человеку. Слова «drop» или «rm -rf» внутри сообщения коммита больше не принимаются за удаление.",
+        "en": "Group permissions take a command apart instead of matching it with one pattern. A push of the group's own branch to origin, --force-with-lease included, after a cd into the copy, quoted, piped or with a comment, goes through without a card. A push to main or to another branch, a branch deletion, a merge, a recursive delete outside the copy or of the copy itself and an unparsed command always raise a card for the human. The words «drop» or «rm -rf» inside a commit message no longer count as a deletion."
+      },
+      "how": {
+        "ru": "Свою ветку панель читает из git копии, а не из плана: группы называют ветку по правилам проекта.",
+        "en": "The panel reads the group's own branch from the copy's git rather than from the plan: groups name their branch by the project's rules."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Запись во внешние сервисы по умолчанию идёт «С отметкой», а удаление и слияние там — через вопрос, в том числе слияние MR через curl, gh api или glab api. Инструмент MCP, разрешённый по имени, теперь действует и в группах, а ответы в обсуждениях MR и их правка, правка комментариев и вложения в задачу трекера карточки не поднимают.",
+        "en": "Writes to external services default to «With a note», while deletions and merges there go through a question, a merge of an MR through curl, gh api or glab api included. An MCP tool allowed by name now applies in groups too, and replies in MR threads and edits of them, comment edits and attachments to a tracker issue raise no card."
+      },
+      "area": { "ru": "Разрешения", "en": "Permissions" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Группа больше не догоняет целевую ветку, если конфликта с ней нет: rebase, merge или pull main отклоняются без карточки, и задача доводится на своей базе. Есть конфликт — догон одной командой проходит сам, с отметкой в сводке родителя, и группа чинит конфликт сразу.",
+        "en": "A group no longer catches up with the target branch when there is no conflict with it: a rebase, merge or pull of main is refused without a card, and the task is finished on its own base. With a conflict, a catch-up as one command goes through by itself, marked in the parent's summary, and the group fixes the conflict at once."
+      },
+      "how": {
+        "ru": "Панель сверяет конфликт сама через git merge-tree в копии группы. Целевую ветку заливают постоянно, и каждый догон без конфликта означал новый полный прогон проверок на 13–20 минут.",
+        "en": "The panel checks for a conflict itself with git merge-tree in the group's copy. The target branch moves constantly, and every conflict-free catch-up meant another full check run of 13–20 minutes."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Каждая группа в хабе показывает своё состояние со временем: работает, ждёт очередь тяжёлых шагов (и сколько групп впереди), ждёт разрешения, стоит или закончила, а рядом — сколько шагов сделано из скольких и полосу.",
+        "en": "Every group in the hub shows its state with its time: working, waiting in the heavy-step queue (and how many groups are ahead), waiting for permission, stalled or finished, plus how many steps are done out of how many and a bar."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Лимиты подписки Claude видны в боковой панели: окно пяти часов и недельные окна с процентом и временем сброса; в свёрнутой панели — целый процент, точный в подсказке. Панель спрашивает их не чаще раза в минуту и только пока страница открыта, токен с сервера не уходит.",
+        "en": "Claude plan usage limits are shown in the sidebar: the five-hour window and the weekly windows with a percentage and a reset time; the collapsed sidebar shows a whole percentage with the exact one in the tooltip. The panel asks for them at most once a minute and only while a page is open, and the token never leaves the server."
+      },
+      "area": { "ru": "Интерфейс", "en": "Interface" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "«Перепроверить MR» начинает новый разговор в той же копии, а не продолжает старую сессию: ему передаются ветка, MR, задание группы и охват — файлы, которые ветка меняет против цели MR. Файлы вне охвата не попадают ни в индекс, ни в коммит, ни в откат. Группа в ходе или в другом CLI получает слово в прежний разговор, как раньше.",
+        "en": "«Recheck MR» starts a new conversation in the same copy instead of resuming the old session: it gets the branch, the MR, the group's task and the scope, the files the branch changes against the MR target. Files outside the scope never reach the index, a commit or a revert. A group that is running or works in another CLI gets the message in its old conversation, as before."
+      },
+      "how": {
+        "ru": "Перепроверку жмут через часы, и продолжение старой сессии заново читало почти весь её контекст и подхватывало давно закрытые нити.",
+        "en": "A recheck is usually pressed hours later, and resuming the old session re-read almost all of its context and picked up long-closed threads."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа, остановленная человеком, больше не просыпается от сообщения родителя: сообщение ждёт и доходит после «Продолжить».",
+        "en": "A group stopped by the human no longer wakes up on a message from the parent: the message waits and arrives after «Continue»."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Когда точная версия Node из .nvmrc не установлена, чат берёт самую новую установленную той же старшей версии, а не остаётся на чужой. Группы больше не дописывают export PATH перед каждой командой: задание говорит, что нужная Node уже первая в PATH.",
+        "en": "When the exact Node version from .nvmrc is not installed, the chat takes the newest installed one of the same major instead of staying on a different one. Groups no longer prepend export PATH to every command: the task says the right Node is already first in PATH."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Число мест в очереди тяжёлых шагов панель пишет в файл очереди при старте, и уже идущие группы подхватывают его за секунду. Команда node tools/heavy-queue-hook.mjs status показывает, кто держит места и кто ждёт; строка о таймауте в журнале обхода называет держателей.",
+        "en": "The panel writes the number of heavy-step queue slots to the queue file at start, and groups already running pick it up within a second. The command node tools/heavy-queue-hook.mjs status shows who holds the slots and who waits; the timeout line in the bypass log names the holders."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Журнал проверок повторяет и сборку vite на том же дереве: второй раз она не идёт, а каталог сборки возвращается побайтно таким, каким его оставил зелёный прогон. outDir или root в конфиге vite и режим --watch оставляют сборку настоящей.",
+        "en": "The verify ledger replays a vite build on the same tree too: it does not run a second time, and the build folder comes back byte for byte as the green run left it. outDir or root in the vite config and --watch mode keep the build real."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: у группы только номер шага, не видно, работает она, ждёт очередь или разрешения",
+        "en": "Before: a group shows only its step number, with no sign whether it works or waits for the queue or a permission"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: состояние со временем, место в очереди, сделано из скольких и полоса",
+        "en": "After: the state with its time, the queue position, steps done out of how many and a bar"
+      }
+    }
+  ]
+}

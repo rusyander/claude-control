@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
+import { MAIN_SYNC_ASK } from '../main-sync/main-sync.ts';
 import {
   chatRunProfile,
   foreignGroupMcp,
   compactWindowOf,
-  FORCE_PUSH_ASK,
+  GROUP_DANGER_ASK,
   GROUP_SKILLS,
   groupMcpProfile,
   groupRunProfile,
@@ -137,14 +138,20 @@ describe('foreignGroupMcp (6.1)', () => {
 const CEILING = { env: { BASH_MAX_TIMEOUT_MS: '1800000' } };
 /** Трекер и хранилище кода из `ENTRIES` — правилом `ask` (журнал 19.10). */
 const OUTWARD = {
-  permissions: { ask: ['mcp__atlassian-work', 'mcp__gitlab-work', ...FORCE_PUSH_ASK] },
+  permissions: {
+    ask: ['mcp__atlassian-work', 'mcp__gitlab-work', ...GROUP_DANGER_ASK, ...MAIN_SYNC_ASK],
+  },
 };
 
 describe('groupRunProfile', () => {
   it('флаг строгого набора, подключения claude.ai сняты, оставленные — своим файлом', () => {
     const run = groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [] });
     expect(run.args).toEqual(['--strict-mcp-config']);
-    expect(run.env).toEqual({ ENABLE_CLAUDEAI_MCP_SERVERS: 'false' });
+    // Метка хука блока «Тесты»: автокейсы группа прогоняет перед «доставлено» (пункт A 19.10).
+    expect(run.env).toEqual({
+      ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+      AGENTDECK_TESTS_RUNS_AT_DELIVERY: '1',
+    });
     expect(run.mcp.ids).toEqual(['atlassian-work', 'gitlab-work', 'sentry']);
     expect(run.mcp.config).toEqual({
       mcpServers: {
@@ -167,33 +174,39 @@ describe('groupRunProfile', () => {
       tasksText: '',
       extra: [],
     });
-    expect(odd.settings.permissions).toEqual({ ask: ['mcp__gitlab_work', ...FORCE_PUSH_ASK] });
-    // Без хранилища кода и трекера остаётся правило принудительного пуша (L7.12).
+    expect(odd.settings.permissions).toEqual({
+      ask: ['mcp__gitlab_work', ...GROUP_DANGER_ASK, ...MAIN_SYNC_ASK],
+    });
+    // Без хранилища кода и трекера остаются правила опасных команд оболочки и догона main.
     const none = groupRunProfile({ entries: [ENTRIES[6]!], tasksText: '', extra: [] });
-    expect(none.settings.permissions).toEqual({ ask: [...FORCE_PUSH_ASK] });
+    expect(none.settings.permissions).toEqual({ ask: [...GROUP_DANGER_ASK, ...MAIN_SYNC_ASK] });
   });
 
-  it('принудительный пуш оболочкой — правилом ask: --force*, -f, +refspec, через git -C (L7.12)', () => {
-    // Журнал 19.10 02:17:02: группа в авторежиме переписала ветку MR на ревью
-    // `git push --force-with-lease` без карточки. Формы проверены настоящим CLI
-    // в tools/qa/check-group-forge-ask.mjs; обычный `git push` правилом не задет.
+  it('пуш, слияние, удаление и снос базы оболочкой — правилом ask к брокеру (политика 19.10)', () => {
+    // Авторежим CLI решает сам всё, что не задето правилом `ask`: с одним
+    // принудительным пушем в списке `git push origin main`, `git merge`,
+    // `git branch -D` и `rm -rf src` проходили без карточки. Формы проверены
+    // настоящим CLI в tools/qa/check-group-forge-ask.mjs.
     const settings = groupRunProfile({ entries: [], tasksText: '', extra: [] }).settings as {
       permissions?: { ask?: string[] };
     };
     const ask = settings.permissions?.ask;
     expect(ask).toEqual(
       expect.arrayContaining([
-        'Bash(git push *--force*)',
-        'Bash(git push -f*)',
-        'Bash(git push * -f*)',
-        'Bash(git push * +*)',
-        'Bash(git -C * push *--force*)',
-        'Bash(git -C * push * +*)',
+        'Bash(git push*)',
+        'Bash(git -C * push*)',
+        'Bash(git merge*)',
+        'Bash(git -C * merge*)',
+        'Bash(git branch *)',
+        'Bash(rm *)',
+        'Bash(Remove-Item *)',
+        'Bash(psql*)',
+        'Bash(gh *)',
+        'Bash(glab *)',
       ]),
     );
-    expect(ask?.some((rule) => rule === 'Bash(git push:*)' || rule === 'Bash(git push *)')).toBe(
-      false,
-    );
+    // Рутина правилом не задета: её решает авторежим, как раньше.
+    expect(ask?.some((rule) => /^Bash\((git (commit|add|status)|pnpm|npm)/.test(rule))).toBe(false);
   });
 
   it('строка группе называет оставленные и снятые серверы и блок просьбы', () => {
@@ -206,7 +219,7 @@ describe('groupRunProfile', () => {
 
   it('просьба claude.ai возвращает подключения claude.ai', () => {
     const run = groupRunProfile({ entries: ENTRIES, tasksText: '', extra: ['claude.ai'] });
-    expect(run.env).toEqual({});
+    expect(run.env).toEqual({ AGENTDECK_TESTS_RUNS_AT_DELIVERY: '1' });
     expect(run.note).not.toContain('claude.ai (all');
   });
 
@@ -242,6 +255,7 @@ describe('groupRunProfile', () => {
     });
     expect(run.env).toEqual({
       ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+      AGENTDECK_TESTS_RUNS_AT_DELIVERY: '1',
       CLAUDE_CODE_AUTO_COMPACT_WINDOW: '160000',
     });
     expect(groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [] }).env).not.toHaveProperty(

@@ -12,8 +12,22 @@ export const RULE_SOURCES =
  * Проверки проекта в преамбуле доставки (U7): те, что названы в его правилах,
  * все и по порядку. Строка общая — по ней понижённая планка сдачи узнаёт, что
  * задание уже их назвало, и не повторяет определение (TQ-10).
+ *
+ * И когда их гнать (владелец 18–20.10: полные проверки ОДИН раз на задачу).
+ * Замер 19.10: звенья работы, правок и доставки гнали весь гейт каждое — три
+ * полных прогона на один MR, 13–20 мин каждый, при одном и том же дереве.
  */
-export const DELIVERY_CHECKS_LINE = `The project's checks are the ones its rules name (${RULE_SOURCES}) — all of them, in the order named, frontend and backend alike; any red check means no MR until it is green.`;
+export const DELIVERY_CHECKS_LINE = `The project's checks are the ones its rules name (${RULE_SOURCES}) — all of them, in the order named, frontend and backend alike, run ONCE on the final tree right before the push (between edits only the touched package's own); any red check means no MR until it is green.`;
+
+/**
+ * Догон основной ветки — только при настоящем конфликте с ней (владелец 19.10,
+ * MUST #1). Без конфликта брокер всё равно откажет (`MAIN_SYNC_DENIED`), и
+ * задание, велящее догонять, стоило бы хода на отказ и гейта заново.
+ */
+export const SYNC_ON_CONFLICT_LINE =
+  '`git fetch origin`; `git merge-tree --write-tree --quiet HEAD origin/<main>` exit 0 = no ' +
+  'conflict: stay on the current base, never rebase, merge or pull main; exit 1 = a real ' +
+  'conflict: `git rebase origin/<main>` and resolve it.';
 
 /**
  * Нижняя планка качества заданий, которые панель пишет агентам (владелец, 12.10.2026:

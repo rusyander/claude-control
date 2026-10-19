@@ -49,11 +49,19 @@ export function headingLevels(lines: readonly string[]): number[] {
  * блоков кода, номера строго по возрастанию — сравнение с последним ПРИНЯТЫМ
  * шагом, а не с сырым соседом (F-257): «## 2024. Итоги» посреди текста — не шаг.
  * Меньше двух — это не порядок работы, а просто пронумерованный раздел.
+ *
+ * Исключение — скилл, чьи разделы держат номера, а идут в другом порядке
+ * (ticket-delivery: §9 → §10 → §7 → §6 → §8 — номера строк журнала): номер
+ * меньше прежнего принимается, если такого ещё не было и заголовок того же
+ * уровня, что первый шаг. Без этого из пути выпадали полный прогон проверок и
+ * MR (владелец 20.10). Вложенный список, начатый заново с 1, этим не проходит:
+ * его номера уже заняты.
  */
 export function skillStepHeadings(text: string): SkillStepHeading[] {
   const lines = text.split(/\r?\n/);
   const levels = headingLevels(lines);
   const ordered: SkillStepHeading[] = [];
+  let stepLevel = 0;
   lines.forEach((line, at) => {
     if (levels[at] === 0) return;
     const match = STEP_HEADING.exec(line);
@@ -61,7 +69,11 @@ export function skillStepHeadings(text: string): SkillStepHeading[] {
     if (!match || !title) return;
     const number = Number(match[1]);
     const last = ordered.at(-1);
-    if (!last || number > last.number) ordered.push({ line: at, number, title });
+    const fresh = !ordered.some((step) => step.number === number);
+    if (!last || (fresh && (number > last.number || levels[at] === stepLevel))) {
+      if (!last) stepLevel = levels[at] ?? 0;
+      ordered.push({ line: at, number, title });
+    }
   });
   return ordered.length >= 2 ? ordered : [];
 }

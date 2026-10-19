@@ -43,6 +43,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/changelog/assets/:id/:file': 'internal:media',
   'GET /api/panel-update': 'internal:ui-state',
   'POST /api/panel-update': 'human:code-write',
+  // usage-limits-routes.ts — окна подписки для боковой панели, только чтение.
+  'GET /api/usage-limits': 'internal:ui-state',
   // chat/artifact-routes.ts
   'DELETE /api/chat/:chatId/artifact': 'action:delete_chat_artifact',
   'GET /api/chat/:chatId/artifact': 'action:read_chat_artifact',
@@ -285,6 +287,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   // group-routes.ts
   'DELETE /api/groups/:id': 'action:delete_group',
   'GET /api/groups': 'action:list_groups',
+  'GET /api/groups/builtin': 'internal:ui-state',
+  'POST /api/groups/builtin/restore': 'gap:P3',
   'GET /api/groups/:id/delete-effect': 'internal:preview',
   'POST /api/groups': 'action:save_group,draft_group,draft_scenario',
   'POST /api/groups/:id/enabled': 'action:toggle_group',

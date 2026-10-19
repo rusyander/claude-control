@@ -4,6 +4,17 @@ Not a re-read of the code and not another screenshot: the stand runs and the flo
 verdict is a table, not a sentence — what did not make it into the table was not verified, and that
 is visible to everyone, the agent included.
 
+## By tier — the §3 tier, computed once
+
+- **T0** → no walk: `10-live skip "T0: <why nothing behaviour-bearing changed>"`; §7 still shoots a
+  visible change.
+- **T1** → one positive and one negative row, plus a `walked` row per entry under the cap; red run in
+  its cheapest form (§Red run).
+- **T2** → plus two variations, and the full red run against the pre-fix state.
+
+The §7 AFTER shots are taken inside the same walk by the §4 script in AFTER mode — one stand boot,
+one browser session.
+
 ## The suite
 
 ```js
@@ -57,13 +68,19 @@ in the artifact, AND everything the artifact changed the authority authorised. T
 from exactly the rows that grant permission, never a looser source — scope drift is invisible to the
 first direction alone, and a check built that way can only ever confirm.
 
-## The table itself is unverified code — show it red before quoting it green
+## Red run — the table is unverified code, show it red before quoting it green
 
 An acceptance script is written once, for one ticket, and nothing tests it; every bug in it — a
 selector that silently matches nothing, a field read off the wrong object, an `undefined` compared
-to `undefined` — makes the run GREENER. So the table is run once against the state the fix removed:
-the pre-fix revision, the pre-fix container image, the branch point. Rows that must fail then fail,
-by name, and the count is recorded in the ledger beside the green one.
+to `undefined` — makes the run GREENER. So the table is run once against the state the fix removed,
+and the rows that must fail fail, by name; the count goes into the ledger beside the green one.
+
+- **T2** → the whole table against the pre-fix revision, image or branch point.
+- **T1** → the cheapest real red: the §4 BEFORE log when the table asserts the same text with the
+  same selectors; otherwise the fix-asserting rows against the branch point when that needs no
+  rebuild (an env override of the base URL or image). Neither possible without a rebuild → the ledger
+  says «red run: not run — <why>», and the table is quoted with that note beside the `mustfail`
+  verdict, never alone.
 
 Keep the target selectable rather than hard-coded — an env override for the image or base URL costs
 one line and is what makes the red run possible at all. Stays green on the old state ⇒ the table
@@ -75,11 +92,13 @@ In the ticket's own folder under the project's e2e or scripts root, named by the
 harness root: that is where graveyards of abandoned one-off probes come from. They are deleted at
 §13, leaving the shots script and the folder README.
 
-A bug found during the walk is fixed on the spot, the §6 gates run again, and **only the spot it
-touched is retested** — not the whole walk. Both the bug and its retest go into the ledger.
+A bug found during the walk is fixed on the spot with narrow checks — the full gate is §6, once,
+after the walk — and **only the rows it touched are retested**, not the whole walk. Both the bug and
+its retest go into the ledger.
 
 ## The `10-live` note — what §12 and §13 read later
 
 The head sha the table ran on · the PID and port of any dev server started for the walk · the id of
-every entity the walk created on a shared stand, named `qa-<KEY>-<what>`. A commit after the run
-means the table runs again on the new head — the touched rows at least — and a new note names it.
+every entity the walk created on a shared stand, named `qa-<KEY>-<what>`. A behaviour-bearing commit
+after the run (a walk fix, a §6 fix) means the touched rows run again on the new head and a new note
+names it; the MR's table carries the sha that was pushed.

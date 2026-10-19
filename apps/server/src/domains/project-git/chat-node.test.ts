@@ -63,6 +63,20 @@ describe('chat-node: Node проекта первым в PATH чата', () => {
     expect(chatNodeDirs(project('20'), ENV, 'claude', deps())).toBeUndefined();
   });
 
+  it('точная версия .nvmrc не стоит — новейшая той же мажорной не ниже неё (R7, 19.10)', () => {
+    // Корень монорепозитория: `.nvmrc` 22.22.2, на машине 22.23.2 — подготовка копии
+    // уже поставила её модулям, чат обязан идти на ней же, а не на 24 по умолчанию.
+    const env = withChatNode(project('22.22.2'), ENV, 'claude', deps());
+    expect(env.PATH?.split(delimiter)[0]).toBe(NODE22);
+    resetChatNodeCache();
+    expect(chatNodeDirs(project('v22.22.2'), ENV, 'claude', deps())).toEqual([NODE22]);
+    resetChatNodeCache();
+    // Ниже точной версии и чужая мажорная не подходят: 22.23.2 < 22.24.0, 24 — другая.
+    expect(chatNodeDirs(project('22.24.0'), ENV, 'claude', deps())).toBeUndefined();
+    resetChatNodeCache();
+    expect(chatNodeDirs(project('23.1.0'), ENV, 'claude', deps())).toBeUndefined();
+  });
+
   it('свой claude в каталоге Node (nvm-windows) — впереди встаёт каталог прежнего CLI', () => {
     const npm = join('C:', 'npm');
     const env = { PATH: [join('C:', 'empty'), npm, '/usr/bin'].join(delimiter) };

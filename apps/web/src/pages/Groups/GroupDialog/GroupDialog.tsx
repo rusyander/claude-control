@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { scopeOf, scopeProvider } from '@agentdeck/contracts';
+import { isBuiltinGroupId, scopeOf, scopeProvider } from '@agentdeck/contracts';
 import { Modal } from '@shared/ui/modal';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -98,7 +98,11 @@ export function GroupDialog({
           )}
           <DeleteButton
             entityName={group.name}
-            description={t('common.deleteGroup')}
+            description={
+              isBuiltinGroupId(group.id)
+                ? `${t('common.deleteGroup')} ${t('groupsPage.builtin.deleteNote')}`
+                : t('common.deleteGroup')
+            }
             onDelete={() => deleteGroup.mutate(group.id, { onSuccess: onClose })}
             isPending={deleteGroup.isPending}
           />

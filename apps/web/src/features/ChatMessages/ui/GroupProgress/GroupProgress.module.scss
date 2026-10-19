@@ -1,0 +1,88 @@
+// Индикатор — строчные элементы внутри кнопки карточки, разложенные блоками:
+// строка состояния и шага, полоса, строка вызова.
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  // Полоса — во всю ширину текста карточки, а не по длине строки состояния:
+  // иначе 50 % у короткой строки выглядели бы короче 20 % у длинной.
+  align-self: stretch;
+  width: 100%;
+  max-width: 480px;
+  min-width: 0;
+  --progress-tone: var(--color-accent);
+  --progress-bg: var(--color-accent-subtle);
+
+  &[data-group-progress='queued'],
+  &[data-group-progress='permission'] {
+    --progress-tone: var(--color-warning);
+    --progress-bg: var(--color-warning-subtle);
+  }
+
+  &[data-group-progress='finished'] {
+    --progress-tone: var(--color-success);
+    --progress-bg: var(--color-success-subtle);
+  }
+
+  &[data-group-progress='stalled'] {
+    --progress-tone: var(--color-fg-muted);
+    --progress-bg: var(--color-surface-sunken);
+  }
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--spacing-xs);
+  min-width: 0;
+}
+
+// Состояние — первым и фишкой своего цвета: его ищут глазами раньше шага.
+.badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--progress-bg);
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+// В тёмной теме насыщенная заливка со светлым текстом горела ярче заголовка
+// группы (владелец 20.10): фишка тише — полупрозрачный тон и приглушённый текст.
+:global(:root[data-theme='dark']) .badge {
+  background: color-mix(in srgb, var(--progress-bg) 55%, transparent);
+  color: var(--color-fg-muted);
+}
+
+.count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.track {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  // Карточка группы сама на утопленном фоне — несделанная часть полосы видна
+  // только цветом границы (живой снимок 19.10: на sunken её не было видно).
+  background-color: var(--color-border);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background-color: var(--progress-tone);
+  transition: width var(--duration-normal, 200ms) ease;
+}
+
+// Команда вызова переносится, а не режется: это данные, не проза (как у шага).
+.tool {
+  max-width: none;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}

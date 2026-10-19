@@ -1,11 +1,17 @@
 import { useTranslation } from 'react-i18next';
-import { scopeOf } from '@agentdeck/contracts';
+import { isBuiltinGroupId, scopeOf } from '@agentdeck/contracts';
 import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { Typography } from '@shared/ui/typography';
 import { ownStepCount } from '@features/GroupPath';
-import { useGroupMembers, useGroupPath, useSetGroupEnabled } from '@entities/Group';
+import {
+  useBuiltinGroups,
+  useGroupMembers,
+  useGroupPath,
+  useSetGroupEnabled,
+} from '@entities/Group';
 import { activeProvider, useProviders } from '@entities/Provider';
 import { TileFacts } from '../TileFacts/TileFacts';
 import { usePairSide } from '../model/usePairSide';
@@ -35,6 +41,10 @@ export function GroupTile({ group, pair, onOpen, onCopy }: GroupTileProps) {
   const when = shown.when ?? shown.scenario?.when ?? '';
   const changed = group.originChanged ?? [];
   const isScenario = shown.flow === 'scenario';
+  // Встроенная, изменённая человеком, больше не обновляется каталогом — это видно на карточке.
+  const isBuiltin = isBuiltinGroupId(group.id);
+  const builtin = useBuiltinGroups();
+  const isEditedBuiltin = isBuiltin && Boolean(builtin.data?.edited.includes(group.id));
   // Названия шагов скиллов — из описаний состава (тот же запрос, что у окна группы).
   const described = useGroupMembers(shown.id);
   // Состав не прочитался — ждать слов нечего: оригинальные названия лучше пустой карточки.
@@ -89,6 +99,7 @@ export function GroupTile({ group, pair, onOpen, onCopy }: GroupTileProps) {
         <>
           <Badge tone={scope.kind === 'project' ? 'info' : 'accent'}>{scopeLabel(t, scope)}</Badge>
           {isScenario && <Badge tone="accent">{t('groupsPage.tile.scenarioBadge')}</Badge>}
+          {isBuiltin && <Badge tone="neutral">{t('groupsPage.tile.builtinBadge')}</Badge>}
           {pair && <Badge tone="info">{t('groupSources.pairBadge')}</Badge>}
           {toggle.shown && !toggle.checked && <Badge tone="neutral">{t('common.disabled')}</Badge>}
         </>
@@ -132,6 +143,11 @@ export function GroupTile({ group, pair, onOpen, onCopy }: GroupTileProps) {
         pinned={Object.keys(shown.knobs ?? {}).length}
         projects={shown.projectPaths}
       />
+      {isEditedBuiltin && (
+        <Typography variant="caption" color="subtle" as="p">
+          {t('groupsPage.tile.builtinEdited')}
+        </Typography>
+      )}
     </TileFrame>
   );
 }

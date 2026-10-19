@@ -1,5 +1,6 @@
 import type { EntityToggleDeps } from '../entity-toggle.ts';
 import { migrateAutomations } from './automation-migration.ts';
+import { seedBuiltinGroups } from './builtin-groups/builtin-groups.ts';
 import { migrateGroupPaths } from './path-migration.ts';
 
 /** Куда писать итог: у маршрутов это `app.log` Fastify. */
@@ -31,5 +32,13 @@ export function runLegacyGroupMigrations(deps: EntityToggleDeps, log: MigrationL
   } catch (error) {
     // Не удался — автоматизации остались в состоянии и перенесутся при следующем проходе.
     log.warn({ err: error }, 'automation migration failed');
+  }
+  // Встроенные группы доставки: у каждого каталога настроек свой state.json — и свой засев.
+  try {
+    const report = seedBuiltinGroups({ store: deps.store, skillsDir: deps.paths.skills });
+    if (report.added.length + report.updated.length > 0) log.info({ report }, 'builtin groups');
+  } catch (error) {
+    // Не засеялись — панель работает без них, следующий старт попробует снова.
+    log.warn({ err: error }, 'builtin groups seed failed');
   }
 }

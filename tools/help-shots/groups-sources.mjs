@@ -12,7 +12,7 @@
  * ней же): находки требуют проектов на диске и модели, копия пишет в ~/.claude.
  * Кадры сняты после настоящих щелчков по настоящему интерфейсу.
  */
-import { installGroupStubs, openGroup } from '../qa/group-stubs.mjs';
+import { builtinGroupsFixture, installGroupStubs, openGroup } from '../qa/group-stubs.mjs';
 import { makeState, settings, panelShell, open } from './projects-stubs.mjs';
 
 const PAIR = '[data-agent-anchor="qa-shop-order-global"]';
@@ -38,7 +38,7 @@ export async function shootSources(browser, web, scenario) {
   try {
     await settings(page);
     await panelShell(page, makeState());
-    await installGroupStubs(page);
+    const state = await installGroupStubs(page);
 
     // ── 01. Сетка карточек и ход обнаружения ─────────────────────────────────
     await open(page, web, '/groups');
@@ -99,6 +99,19 @@ export async function shootSources(browser, web, scenario) {
     );
     await page.waitForTimeout(300);
     await scenario.shot(page, '07-duplicate', { clip: TOP_DIALOG, padding: 40 });
+    await closeTop(page);
+    if (await manual.isVisible()) await closeTop(page);
+
+    // ── 08. Встроенные группы: пометка, «изменена вами», «Вернуть встроенные» ─
+    const builtin = builtinGroupsFixture();
+    state.groups.push(...builtin.groups);
+    state.builtin = builtin.status;
+    Object.assign(state.paths, builtin.paths);
+    await open(page, web, '/groups');
+    await page.locator('[data-agent-anchor="builtin-delivery"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-agent-anchor="builtin-delivery"]').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    await scenario.shot(page, '08-builtin');
   } finally {
     await page.close();
   }

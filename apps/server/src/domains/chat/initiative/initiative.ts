@@ -253,7 +253,9 @@ const groupSwaps = (): readonly (readonly [string, string])[] => [
 export const GROUP_ECONOMY_PROMPT =
   'Every call re-reads the whole context, so keep it lean: batch independent reads and ' +
   'searches into one call; read a file once (whole or the needed range), again only after it ' +
-  'changed; edit code, write a whole file only when the file is new; send long output (gate, ' +
+  'changed; edit with Edit (one call per file, also for the same change in ru/en/uz), never ' +
+  'through the shell (sed -i, heredoc, a script writing a file): guards refuse it, the turn is ' +
+  'lost; write a whole file only when the file is new; send long output (gate, ' +
   'tests, build) to a log file, keep the verdict, counts, the first failure lines and the log ' +
   'path; give a gate or build timeout 1800000 (30 min), await it in one call, without ' +
   'polling. Between fixes check only what they touched (tests of the changed files); the ' +

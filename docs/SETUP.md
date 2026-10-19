@@ -21,6 +21,7 @@ Everything needed to get AgentDeck running. Not running — [Troubleshooting](TR
   - [Setting access by hand](#setting-access-by-hand)
   - [Linux and Windows](#linux-and-windows)
 - [First run](#first-run)
+- [A second computer with the same settings](#a-second-computer-with-the-same-settings)
 - [Verifying it works](#verifying-it-works)
 - [Undoing things](#undoing-things)
 
@@ -255,6 +256,44 @@ state in `~/.agentdeck/data`, and `source: not-found` is not an error here. Firs
 asks which CLI to use; with another CLI it has three steps — the Claude access step is gone. The
 directory card on Overview is grey, "Claude Code not in use", not red. `pnpm doctor` passes once the
 chosen CLI is found.
+
+## A second computer with the same settings
+
+Claude Code's settings are files in `~/.claude`, and the panel's settings live next to them, in
+`~/.claude/agentdeck/`. If your `~/.claude` is a git repository, the panel's settings travel with it.
+
+**What travels.** `state.json` as a whole does not belong in git: it mixes settings with this
+machine's state (chat links, plans, caches). So the panel keeps `agentdeck/settings-snapshot.json`
+beside it — groups, "disabled" marks, projects, split-group rules and the panel settings. Chat
+links, a manually set config directory, the remote access address and secrets stay out. Paths under
+the home directory are written as `<HOME>` and expand to the other machine's home.
+
+**Once, on the first machine** — allow the file in the `.gitignore` whitelist of the `~/.claude`
+repository and commit it:
+
+```gitignore
+!/agentdeck/
+/agentdeck/*
+!/agentdeck/settings-snapshot.json
+!/agentdeck/dlp-rules.json
+!/agentdeck/sieves.json
+!/agentdeck/skill-knobs.json
+```
+
+**On the new machine:**
+
+1. Install Node 22.6+, pnpm 10 and Claude Code, sign in (`claude`).
+2. Clone your `~/.claude` repository into the home directory — before the panel's first start.
+3. Carry the secrets by hand: `.mcp-secrets.env`, provider keys and tokens never go into git.
+4. Clone AgentDeck, `pnpm install`, `pnpm dev` — the panel applies the snapshot at start.
+5. Projects outside the home directory must sit at the same paths, otherwise the panel shows them as
+   missing. Phone remote access is set up on each machine separately.
+
+**Afterwards.** Changed settings on one machine — commit `settings-snapshot.json` and push; on the
+other, pull and restart the panel. The snapshot is applied only at start and only if this machine
+has not seen it yet, so its own file is never re-applied. A snapshot with a merge conflict is not
+applied: the panel starts with its own settings, logs `settings snapshot not applied` and overwrites
+the file with its own.
 
 ## Verifying it works
 

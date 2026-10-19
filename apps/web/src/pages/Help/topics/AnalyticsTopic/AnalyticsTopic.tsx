@@ -86,7 +86,7 @@ export function AnalyticsTopic() {
 
       <HelpSection title={common('notesTitle')}>
         <Stack gap="var(--spacing-xs)">
-          <Callout tone="warning" title={tr('noteLimitsTitle')}>
+          <Callout tone="info" title={tr('noteLimitsTitle')}>
             {tr('noteLimitsText')}
           </Callout>
           <Callout tone="warning" title={tr('noteCostTitle')}>

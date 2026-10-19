@@ -27,7 +27,7 @@ export const styles = StyleSheet.create({
     width: TICK_LENGTH,
     height: TICK_WIDTH,
     borderRadius: TICK_WIDTH / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: '#ffffff',
   },
   dot: {
     width: DOT,

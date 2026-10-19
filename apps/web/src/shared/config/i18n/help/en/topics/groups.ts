@@ -498,6 +498,41 @@ export const groupsEn: typeof groupsRu = {
       'files are shared by every running session, and switching off would hit someone ' +
       'else’s live agent. Switching off is manual only.',
 
+    builtinTitle: 'Built-in groups',
+    builtinCaption:
+      'The panel itself puts eight delivery groups marked «built-in» into the list: ' +
+      '«Ticket → MR (fast)» for any tracker ticket — small or large, frontend, backend ' +
+      'or both: it reads the side from the code itself; «Ticket → MR (strict)» for ' +
+      'risky tickets; three narrow ones — frontend, backend, frontend and backend — ' +
+      '«Screens from a Figma mock», «MR review comments» and «Review someone’s MR». ' +
+      'Each is one step inside the delivery skill, and the «Path» tab shows it among ' +
+      'the skill’s own steps: plan, fix, review, live run, full check run, MR. In both ' +
+      'general ones the live run always happens, once, on the final code: backend by ' +
+      'requests to the real endpoint, frontend by a browser walk, both sides by the UI ' +
+      'against the real backend, with a negative row. Strict adds the boundary, two ' +
+      'variations, a walk of every entry, mustfail per fixed bug and a re-check of ' +
+      'every review finding.',
+    builtinMembers: 'No members',
+    builtinMembersText:
+      'A built-in group carries no skills and no rules: it only adds its step to the ' +
+      'run. So switching it off turns nothing off in Claude Code’s files — your ' +
+      'skills stay as they were.',
+    builtinAuto: '«Auto» picks them last',
+    builtinAutoText:
+      'When a group is picked for a task, a built-in one is the fallback: if your own ' +
+      'group fits by «When» just as well, yours is picked.',
+    builtinDelete: 'A deleted one does not come back by itself',
+    builtinDeleteText:
+      'Delete a built-in group and the panel never puts it back. Changed your mind — ' +
+      'the «Restore built-ins (N)» button in the page header; it is absent while ' +
+      'nothing was deleted.',
+    builtinEdited: 'An edited one is left alone',
+    builtinEditedText:
+      'While a built-in group is untouched, the panel updates it with the version and ' +
+      'the interface language, keeping your switch, order and projects. Change its ' +
+      'name, «When» or step and the card says «edited by you» — updates no longer ' +
+      'touch it.',
+
     toggleTitle: 'Who overrides whom: a group and a single toggle',
     toggleCaption:
       'An entity has two independent reasons to be off: you switched it off yourself, or ' +
@@ -717,6 +752,9 @@ export const groupsEn: typeof groupsRu = {
       '07-duplicate':
         'The Copy group window: what goes into the copy, that it is switched off and switches ' +
         'nothing off, and the suggested “(copy)” name',
+      '08-builtin':
+        'Built-in groups on the page: the «built-in» mark, the «edited by you» line on the ' +
+        'edited one and the «Restore built-ins (1)» button in the header',
     },
     path: {
       '01-path':

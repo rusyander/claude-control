@@ -24,12 +24,66 @@ import type { SplitConveyorStore } from '../split-conveyor/split-conveyor.ts';
  * ставит отметку со временем (`recheckedAt`, `SplitConveyor.apply`).
  */
 
+/**
+ * Охват перепроверки — файлы MR (живое наблюдение 19.10.2026, R5/R6): группа
+ * фронтового MR без единой правки в Go гоняла Go-наборы утренней работы, а
+ * чужие `go.mod` из дерева копии ехали в коммит через `rebase --autostash`.
+ */
+export interface RecheckScope {
+  /** Против чего считан охват — цель MR в том виде, в каком её знают ссылки копии. */
+  base: string;
+  /** Что ветка меняет против `base` (`git diff --name-only base...HEAD`). */
+  files: readonly string[];
+  /** Изменённые и неотслеживаемые файлы копии вне охвата — не этот MR. */
+  outside: readonly string[];
+}
+
+/** Длинный список — головой и счётом: охват в 2000 файлов не должен съесть задание. */
+const SCOPE_FILES_MAX = 40;
+const OUTSIDE_FILES_MAX = 20;
+
+function listed(paths: readonly string[], max: number): string[] {
+  const shown = paths.slice(0, max).map((path) => `   - ${path}`);
+  return paths.length > max ? [...shown, `   - +${paths.length - max} more`] : shown;
+}
+
+/** Абзац охвата: всегда — правила; прочитан список — и сам список. */
+function scopeLines(scope: RecheckScope | undefined): string[] {
+  const lines = scope
+    ? [
+        `Scope: only the files this branch changes against ${scope.base} count ` +
+          `(git diff --name-only ${scope.base}...HEAD).`,
+        `   In scope (${scope.files.length}):`,
+        ...(scope.files.length > 0 ? listed(scope.files, SCOPE_FILES_MAX) : ['   - none']),
+      ]
+    : [
+        'Scope: only the files this branch changes against the MR target count ' +
+          '(git diff --name-only <target>...HEAD).',
+      ];
+  if (scope && scope.outside.length > 0) {
+    lines.push(
+      `   Outside the scope — dirty or untracked in the copy, not part of this MR (${scope.outside.length}):`,
+      ...listed(scope.outside, OUTSIDE_FILES_MAX),
+    );
+  }
+  lines.push(
+    "Run the checks of the scope only; a red check outside it is not this MR's — note it with " +
+      'its log line, never re-run or fix it here. Do not pick up earlier threads of work: this ' +
+      'recheck is the four checks below.',
+    'Stage paths by name — never git add -A, git add . or commit -a; never stage, commit, ' +
+      'revert or delete a file outside the scope.',
+  );
+  return lines;
+}
+
 /** Задание перепроверки доставленного MR: что увидел фордж — списком, остальное группа смотрит сама. */
 export function recheckPrompt(input: {
   branch: string;
   mr: string;
   /** Нет — фордж прочитать нечем (интеграция выключена или упала): группа читает MR сама. */
   review?: { threads: readonly MrReviewThread[]; red?: MrReviewPipeline; conflicts?: boolean };
+  /** Нет — охват прочитать не удалось: правила охвата едут без списка. */
+  scope?: RecheckScope;
 }): string {
   const { review } = input;
   const lines = [
@@ -41,6 +95,7 @@ export function recheckPrompt(input: {
         'you have access to.',
     );
   }
+  lines.push('', ...scopeLines(input.scope));
   lines.push(
     '',
     'Check, in this order:',
@@ -71,7 +126,9 @@ export function recheckPrompt(input: {
     "4. Completeness. Go through every task of the group against the branch's diff and the MR " +
       'description: is each one done in full, checked and described? Finish what is missing.',
     '',
-    'Nothing found — change nothing, give one line per check, and the MR link as the last line.',
+    // «one line» — фраза, однажды уже сузившая работу (`NARROWING_PHRASES`).
+    'Nothing found — change nothing, name each check with its result, and give the MR link as ' +
+      'the last line.',
     `Something fixed — commit, push the branch ${input.branch} to the same MR, re-read the ` +
       'discussions once more (anything new is yours too), and give the MR link as the last line.',
   );
@@ -101,6 +158,11 @@ export interface MrRecheckDeps {
   read: (mrUrl: string) => Promise<MrReview | undefined>;
   /** Отметка и слово группе (`SplitConveyor.recheckDelivered`); отказ — исключением. */
   recheck: (parentChatId: string, index: number, prompt: string) => SplitGroupRechecked;
+  /** Охват по копии группы (`readRecheckScope`); не задан или не прочитан — правила без списка. */
+  scope?: (
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+  ) => Promise<RecheckScope | undefined>;
   log: (message: string, error?: unknown) => void;
 }
 
@@ -150,6 +212,16 @@ export async function recheckDeliveredMr(
       ? coded(new Error('MR уже влит — перепроверять нечего'), 'split-recheck-merged')
       : coded(new Error('MR закрыт — перепроверять нечего'), 'split-recheck-closed');
   }
+  let scope: RecheckScope | undefined;
+  if (deps.scope) {
+    const read = target(deps, parentChatId, index);
+    try {
+      scope = await deps.scope(read.record, read.group);
+    } catch (error) {
+      // Охват не прочитан — правила охвата едут без списка: перепроверка не ждёт git.
+      deps.log('mr recheck: scope unreadable', error);
+    }
+  }
 
   // За время чтения группу могли продолжить, закрыть или убрать её копию.
   const { record, group } = target(deps, parentChatId, index);
@@ -161,6 +233,7 @@ export async function recheckDeliveredMr(
   const prompt = recheckPrompt({
     branch: group.branch,
     mr,
+    ...(scope ? { scope } : {}),
     ...(review
       ? {
           review: {

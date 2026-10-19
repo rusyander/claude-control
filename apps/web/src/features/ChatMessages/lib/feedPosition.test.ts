@@ -108,6 +108,29 @@ describe('createFeedMemory', () => {
     expect(memory.get('c')).toBe(4);
     expect(memory.size()).toBe(2);
   });
+
+  // Владелец 20.10: место в ленте родителя терялось при перезагрузке страницы.
+  it('с хранилищем место переживает перезагрузку: новая память читает записанное', () => {
+    const data = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => void data.set(key, value),
+    };
+    const before = createFeedMemory<number>(2, { key: 'k', storage });
+    before.set('parent', 7482);
+    before.set('other', 1);
+    before.delete('other');
+    const after = createFeedMemory<number>(2, { key: 'k', storage });
+    expect(after.get('parent')).toBe(7482);
+    expect(after.get('other')).toBeUndefined();
+  });
+
+  it('битая или чужая запись в хранилище — пустая память, не сбой', () => {
+    for (const raw of ['{', '{"a":1}', '[["a"],[1,2]]']) {
+      const storage = { getItem: () => raw, setItem: () => undefined };
+      expect(createFeedMemory<number>(2, { key: 'k', storage }).size()).toBe(0);
+    }
+  });
 });
 
 describe('окно ленты при возврате', () => {

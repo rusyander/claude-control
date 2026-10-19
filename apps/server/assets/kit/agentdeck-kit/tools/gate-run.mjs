@@ -18,12 +18,15 @@
  *   node <kit>/tools/gate-run.mjs "go build ./..." "go test ./..."     # label = the command
  *   node <kit>/tools/gate-run.mjs --dry ...          # show the plan only
  *   node <kit>/tools/gate-run.mjs --no-ledger ...    # do not write the ledger row
+ *   node <kit>/tools/gate-run.mjs --fresh ...        # rerun gates already green on this tree
  *   node <kit>/tools/gate-run.mjs --cwd services/api --stage 06-gates ...
  *
  * Exit: 0 all green · 1 at least one red · 2 bad invocation.
  */
 import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const LEDGER = join(dirname(fileURLToPath(import.meta.url)), 'ticket-ledger.mjs');
@@ -46,6 +49,7 @@ const has = (name) => args.includes(name);
 
 const DRY = has('--dry');
 const NO_LEDGER = has('--no-ledger');
+const FRESH = has('--fresh');
 const STAGE = flag('--stage', '06-gates');
 const CWD = flag('--cwd', '');
 
@@ -92,6 +96,70 @@ function keysFromBranch() {
   return [...new Set(ids)].join(',');
 }
 
+// ---- green memo: a gate already green on this exact tree is not run again ------------------------
+// Key = (tree, cwd, command). The tree is the working copy as `git add -A` would write it (a temp index,
+// the real one untouched): a commit does not change it, any edited byte does. Only green is remembered,
+// and only when the run left the tree as it found it (an autofix that rewrote files proved the old tree).
+// `--fresh` ignores the memo.
+function gitIn(argv, env) {
+  return spawnSync('git', argv, { cwd: ROOT, encoding: 'utf8', env });
+}
+
+const STATE = (() => {
+  const r = gitIn(['rev-parse', '--git-path', 'gate-run']);
+  return r.status === 0 ? resolve(ROOT, String(r.stdout).trim()) : null;
+})();
+
+function treeKey() {
+  if (!STATE || FRESH) return null;
+  const idx = join(STATE, `idx-${process.pid}`);
+  try {
+    mkdirSync(STATE, { recursive: true });
+    const real = resolve(ROOT, String(gitIn(['rev-parse', '--git-path', 'index']).stdout).trim());
+    if (existsSync(real)) copyFileSync(real, idx);
+    const env = { ...process.env, GIT_INDEX_FILE: idx };
+    if (gitIn(['-c', 'core.autocrlf=false', 'add', '-A', '--', ':/'], env).status !== 0)
+      return null;
+    return String(gitIn(['write-tree'], env).stdout).trim() || null;
+  } catch {
+    return null;
+  } finally {
+    rmSync(idx, { force: true });
+  }
+}
+
+const memoFile = (tree, gate) =>
+  join(
+    STATE,
+    'memo',
+    `${createHash('sha256')
+      .update(JSON.stringify([tree, CWD, gate.cmd]))
+      .digest('hex')
+      .slice(0, 32)}.json`,
+  );
+
+function recall(tree, gate) {
+  if (!tree) return null;
+  try {
+    return JSON.parse(readFileSync(memoFile(tree, gate), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function remember(tree, gate) {
+  if (!tree) return;
+  try {
+    mkdirSync(join(STATE, 'memo'), { recursive: true });
+    writeFileSync(
+      memoFile(tree, gate),
+      JSON.stringify({ at: new Date().toISOString().slice(0, 16).replace('T', ' ') }),
+    );
+  } catch {
+    /* a memo that cannot be written only costs the next run time */
+  }
+}
+
 function run(gate) {
   const started = Date.now();
   const r = spawnSync(gate.cmd, {
@@ -115,9 +183,23 @@ if (DRY) {
 
 const results = [];
 let red = 0;
+let tree = treeKey();
 for (const gate of gates) {
+  const memo = recall(tree, gate);
+  if (memo) {
+    results.push({ label: gate.label, code: 0, seconds: '0.0', out: '', cached: true });
+    process.stdout.write(
+      `  ok   ${gate.label} (cached: green on this same tree at ${memo.at}; --fresh reruns)\n`,
+    );
+    continue;
+  }
   process.stdout.write(`  … ${gate.label}\n`);
   const r = run(gate);
+  if (tree) {
+    const after = treeKey();
+    if (r.code === 0 && after === tree) remember(tree, gate);
+    tree = after;
+  }
   results.push({ label: gate.label, ...r });
   if (r.code !== 0) red++;
   process.stdout.write(
@@ -129,7 +211,9 @@ for (const gate of gates) {
   }
 }
 
-const summary = results.map((r) => `${r.label} ${r.code}`).join(' · ');
+const summary = results
+  .map((r) => `${r.label} ${r.code}${r.cached ? ' (cached)' : ''}`)
+  .join(' · ');
 process.stdout.write(`\nVERDICT: ${red === 0 ? 'green' : `red (${red})`} — ${summary}\n`);
 
 const ticket = flag('--ticket', keysFromBranch());

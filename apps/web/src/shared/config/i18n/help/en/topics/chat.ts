@@ -1053,7 +1053,8 @@ export const chatEn: typeof chatRu = {
       'The Node version comes from .nvmrc, .node-version, .tool-versions, volta or engines and ' +
       'the install runs on it when the machine has one (nvm, fnm, volta); when none is found the ' +
       'install runs on what exists and a line under the card says so. The same Node comes first ' +
-      'in PATH for the CLI process of every chat in the project, so the agent never hunts for it. A Python service gets a ' +
+      'in PATH for the CLI process of every chat in the project, so the agent never hunts for it; ' +
+      'an exact .nvmrc version missing from the machine is replaced by the newest one of the same major, not lower. A Python service gets a ' +
       '.venv and pip install from requirements*.txt (uv sync with uv.lock), but only on a ' +
       'matching version; Go gets its module cache warmed; these steps never fail the ' +
       'preparation. A command set under “Copy settings” turns auto-detection off. The full ' +
@@ -1086,7 +1087,14 @@ export const chatEn: typeof chatRu = {
       '«0 %»: older CLIs do not send them, and readings are kept for a week. ' +
       'A group without a plan still gets a ' +
       'number when the project skill writes .agent/steps.json in the copy — { "current": 8, ' +
-      '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. A group working ' +
+      '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. Next to the ' +
+      'step every group carries an indicator: its state and how long it has lasted («working · ' +
+      '42m 10s», «waiting in queue · 1m 30s · 2 ahead» — a heavy command waits in the heavy-step ' +
+      'queue, «waiting for permission» — a permission card waits for you, «stopped», ' +
+      '«finished»), a bar «7 of 14 · 50 %» and the call the group is busy with right now, with ' +
+      'its time — «Bash: pnpm test · 3m 00s». Done is counted from the steps file (the running ' +
+      'step is not done yet) or from the closed plan items; with neither there is no bar — the ' +
+      'panel does not invent percentages. A group working ' +
       'in the shared directory gets no preamble: that environment is yours. A group also gets ' +
       'its own lean MCP set: the tracker, the code host and servers whose role the panel does ' +
       'not know go into the run, design servers only when the group tasks carry a Figma link ' +
@@ -1130,8 +1138,9 @@ export const chatEn: typeof chatRu = {
       'A status change, an assignment, a field edit or a comment in the tracker answers the group with a ' +
       'short line (key, new status, assignee) instead of the whole issue; reading an issue ' +
       'still returns all of it, and your own hooks keep running alongside. ' +
-      'Full gates and builds of Claude Code and Qwen Code groups run at most two at a time ' +
-      'per machine: a group whose gate waits in the queue makes no model calls, and the command ' +
+      'Full gates and builds of Claude Code and Qwen Code groups run at most a quarter of the ' +
+      'machine’s cores at a time (at least two, four on 16 cores), and a stopped or crashed group ' +
+      'frees its slot at once: a group whose gate waits in the queue makes no model calls, and the command ' +
       'and permission rules stay as they were. It waits 25 minutes at most, then runs ' +
       'without the queue. A failed gate frees the slot at once; one your hook refused in ' +
       'Claude Code frees it with the same group’s next command; a slot whose end the CLI ' +
@@ -1213,8 +1222,11 @@ export const chatEn: typeof chatRu = {
       'are created in the same directory, with no copies. One group failing does ' +
       'not cancel the rest: a separate toast says so, and the other chats stay. ' +
       'Groups run in parallel and each runs the checks of its own copy; heavy checks ' +
-      'go through a shared queue, two at a time (AGENTDECK_HEAVY_SLOTS in the panel’s ' +
-      'environment sets your own number). Vitest cores are not cut: with them cut, four ' +
+      'go through a shared queue, a quarter of the cores at a time but at least two (AGENTDECK_HEAVY_SLOTS in the panel’s ' +
+      'environment sets your own number). A new number reaches groups already running too: the ' +
+      'panel writes it into the queue directory at startup, and the queue rereads it every ' +
+      'second. Who holds the slots, since when, and who is waiting is shown by node ' +
+      'tools/heavy-queue-hook.mjs status <the heavy-queue directory in the panel’s data>. Vitest cores are not cut: with them cut, four ' +
       'checks took longer than running one after another.',
     splitDeliver: 'Up to a ready MR, and the group queue',
     splitDeliverText:
@@ -1307,12 +1319,18 @@ export const chatEn: typeof chatRu = {
       'run together with a fingerprint of the tree — the working files, regardless of ' +
       'line-ending settings — and notices when the same run already happened. A green run ' +
       'on the same tree does not run twice: the ledger returns the recorded output and exit ' +
-      'code, and its first line names the run it replayed. After an edit, vitest runs not ' +
+      'code, and its first line names the run it replayed. A vite build is replayed the ' +
+      'same way and puts the whole build folder back exactly as it was; a folder set in ' +
+      'the vite config (outDir or root) the ledger does not guess — such a build runs ' +
+      'again. After an edit, vitest runs not ' +
       'the whole suite but only the tests related to the files changed since the last green ' +
       'run (the “delta since green” line gives their count); an edit to dependencies, ' +
       'configs, setup files or snapshots, a deleted file, a junit report, a rerun after a ' +
       'red narrowed run, and ten narrowed runs in a row or a day without a whole run bring ' +
-      'the whole run back. Settings → Groups → Verify ledger shows ' +
+      'the whole run back. The ledger is shared by the main folder and all its copies: a ' +
+      'green run in one copy counts for any other with the same tree. The last green run ' +
+      'for narrowing is each copy’s own, and a new copy’s first run narrows from a ' +
+      'neighbour’s. Settings → Groups → Verify ledger shows ' +
       'how many runs were replayed, how many minutes that saved, how many times a record ' +
       'disagreed with the real run and under which CLIs the ledger fired. Panel environment ' +
       'variable AGENTDECK_VERIFY_LEDGER: empty or on — replays and narrowing, off or ' +
@@ -1652,7 +1670,16 @@ export const chatEn: typeof chatRu = {
       'repeats (after one minute, five, fifteen, then every fifteen minutes for up to ' +
       'four hours) and only then gives up with the reason. The “Accept” button in a ' +
       'group’s row is your “I looked at the delivery and agree” mark: the panel never ' +
-      'sets it by itself. Defects outside the tasks that groups found along the way ' +
+      'sets it by itself. For a group the conveyor did not bring to “done” (stopped, ' +
+      'stuck, failed, waiting for you) the same button reads “Mark done”: the group ' +
+      'becomes done and accepted, drops to the very bottom marked “done by hand”, and ' +
+      'groups waiting for it start. “Remove mark” returns it to the state it was in. ' +
+      'While a group has a turn or a background command running there is no button. ' +
+      'A finished group says how long ago: “finished · 36 min ago”, older than a day — ' +
+      'the date and time. The parent’s feed remembers where you were reading: going to ' +
+      'a child and back, and reloading the page, return it to the same place, not to ' +
+      'the very bottom. ' +
+      'Defects outside the tasks that groups found along the way ' +
       'collect in “Suggested tickets: N” — copy them, or “File in ‹project›” through ' +
       'the tracker integration, only after you confirm. Steps a group cannot take (a ' +
       'dependency between MRs, access, someone else’s service) collect in “For you to ' +
@@ -1667,10 +1694,18 @@ export const chatEn: typeof chatRu = {
       'review of an owner request whose requirement-trace block is missing or could not be parsed is asked once more, then the report is marked ' +
       'incomplete. A delivered group has “Recheck ' +
       'MR”: the panel reads the MR — conflicts with the target branch, every pending ' +
-      'reviewer comment, a red pipeline — and hands that to the group’s own ' +
-      'conversation together with a request to check every task is done; what is ' +
+      'reviewer comment, a red pipeline — and hands that to a new conversation in ' +
+      'the same copy together with a request to check every task is done; the ' +
+      'previous conversation stays in the group’s path. A recheck usually comes ' +
+      'hours later, and resuming the old session then re-reads almost its whole ' +
+      'context and picks up long-finished threads, so the new one gets the facts ' +
+      'instead: branch, copy, MR, the group’s task and the scope — the files the ' +
+      'branch changes against the MR target. Checks run on the scope only; files ' +
+      'outside it are named and never staged, committed or reverted. What is ' +
       'found the group fixes and delivers again, and finding nothing it touches ' +
-      'nothing. The MR could not be read — the agent reads it itself. The group’s ' +
+      'nothing. The group is mid-turn or runs another CLI — the word goes to its ' +
+      'own conversation as before. The MR could not be read — the agent reads it ' +
+      'itself. The group’s ' +
       'conversation file is gone from disk (deleted outside the panel) — the turn ' +
       'runs as a new conversation in the same copy: it is given the branch, the MR ' +
       'and the group’s tasks, and a note about it appears in the chat. A merged or ' +
@@ -1703,7 +1738,8 @@ export const chatEn: typeof chatRu = {
       'commands (a stand server, a long check); “Resume” names the killed commands to ' +
       'the agent one by one, so it restarts the ones it needs instead of guessing from ' +
       'a cut-off call. A queued group can be paused too — it does not start until you ' +
-      '“Resume” it back into the queue. While the panel prepares a copy (branch and ' +
+      '“Resume” it back into the queue. A message from the main chat to a paused group ' +
+      'does not wake it: it waits and goes out after the turn you start. While the panel prepares a copy (branch and ' +
       'dependency install — minutes) the row says “preparing the copy”; a pause holds ' +
       'during it, and “Resume” later starts the group in the ready copy. A paused ' +
       'group holds its slot, so next to “Resume” it has “Remove” — close a group you ' +
@@ -1736,19 +1772,50 @@ export const chatEn: typeof chatRu = {
       'A group has no human by construction, so its permissions are decided by the ' +
       'tab’s rows, each in one of three positions: “Itself”, “With a note” (also on ' +
       'its own, but the parent’s summary keeps an “Allowed automatically” line you can ' +
-      '“Dismiss”) and “Human” — a card and a wait. Out of the box a group does by ' +
-      'itself ordinary work, writes to git and deletes files in its own copy; a human ' +
-      'gets outward writes (replies in MR threads, edits of its description, tracker ' +
-      'comments and status changes), git history rewrites, databases, infrastructure, ' +
-      'package publishing, deletion on the hosting and running downloaded code. Other ' +
-      'people see an outward write and it cannot be undone, so a group gets a card for ' +
-      'it even in the CLI’s auto mode; if you want delivery to the MR without stops, ' +
-      'set that row to “With a note”. Reading MRs and issues raises no card. The ' +
-      'single exception is a lease push of the group’s OWN branch after a rebase, ' +
-      'while its MR is a draft or not open yet. Reviewers read the branch of an MR ' +
-      'taken out of draft: rewriting it is a card, and so is the case where the panel ' +
-      'could not ask GitLab/GitHub whether it is a draft (no key, a failure). A force ' +
-      'push (--force, -f, +branch) gets a card even in the CLI’s auto mode. ' +
+      '“Dismiss”) and “Human” — a card and a wait. A card asks you only about what ' +
+      'cannot be undone: deletion (branches locally and on the remote, tags, copies, ' +
+      'real files and directories, tables and databases), merging (git merge, an MR ' +
+      'merge through the hosting API, CLI or MCP), a push to a main or protected ' +
+      'branch and a force push. Everything else a group does by itself. Out of the ' +
+      'box it does by itself ordinary work, writes to git and temp cleanup; “With a ' +
+      'note” covers outward writes (replies in MR threads and edits of them, edits of ' +
+      'the MR description, tracker comments, attachments and status changes): the group writes on its own and every ' +
+      'such write stays as a line in the parent’s summary; a human gets deletion and ' +
+      'merging on the hosting, git history rewrites (reset --hard, clean), database ' +
+      'writes, infrastructure, package publishing and running downloaded code. ' +
+      'Reading MRs and issues raises no card, MR threads included; an MCP tool you ' +
+      'allowed by name in settings.json runs without a card too, except deleting and ' +
+      'merging. These cards come in the CLI’s auto mode ' +
+      'too: the panel takes push, merge, branch and file deletion, database clients ' +
+      'and hosting CLIs away from auto mode and decides them by parsing the command. ' +
+      'Routine goes without a card even as one compound command — ' +
+      '`cd <own copy> && …`, `git -C <copy> …`, `2>&1 | tail -5`, a trailing ' +
+      '`# comment`: add, commit (the words of its message are not commands), fetch, ' +
+      'stash push/pop, an ordinary push of a work branch ' +
+      '(its own or a new one) and deletion of temporary things — build output and ' +
+      'caches (dist, build, coverage, node_modules), .agent/tmp, *.log, /tmp/…. A ' +
+      'lease push (--force-with-lease) goes by itself only to the group’s OWN branch ' +
+      '— the one checked out in the copy according to git, never the one named in ' +
+      'the command — and only while its MR is a draft or not open yet. Reviewers read ' +
+      'the branch of an MR taken out of draft: rewriting it is a card, and so is the ' +
+      'case where the panel could not ask GitLab/GitHub whether it is a draft (no key, ' +
+      'a failure). Always a card, whatever the rows say: a push to main, master, ' +
+      'develop, release/… or origin’s default branch in any form (HEAD:main, ' +
+      'git -C … push origin main, inside &&), --force, -f, +branch, a lease on ' +
+      'someone else’s branch, --delete and :branch, git branch -d/-D, git tag -d, ' +
+      'git worktree remove, git stash drop/clear, a push from another directory, a ' +
+      'remote other than origin, forge push options (-o), any git merge (except ' +
+      '--abort), an MR merge through the hosting API or CLI, deletion of a ' +
+      'non-temporary file or directory inside the copy or outside it, and dropping a ' +
+      'database (DROP, TRUNCATE, DELETE FROM, dropdb, prisma migrate reset). ' +
+      'Catching up with the target branch (rebase, merge or pull of main, ' +
+      'origin/main, develop…) the panel checks itself: `git merge-tree` in the ' +
+      'group’s copy. No conflict — refused without a card: you update an MR that ' +
+      'merely fell behind yourself, when you want to, and the group finishes the task ' +
+      'on its own base instead of re-running checks because main moved. A conflict — ' +
+      'a bare catch-up as one command goes without a card, marked in the parent’s ' +
+      'summary, and the group fixes the conflict at once; a catch-up inside a ' +
+      'compound command goes through the usual parsing. ' +
       'A group’s continuation in a clean session gets the previous session’s proposal ' +
       'as a quote: “as the owner asked” in it is that session’s words, not yours, and ' +
       'an outward write from it reaches you as a “For you to do” line. ' +
@@ -2449,7 +2516,8 @@ export const chatEn: typeof chatRu = {
     spendLimit: 'The limit badge',
     spendLimitText:
       'Appears only when a limit was hit: it shows when the limit resets. How much of ' +
-      'the limit is left cannot be found out locally.',
+      'each subscription window is used is shown by the «Plan usage limits» block at the ' +
+      'top of the sidebar.',
     spendStep: 'The numbers to the right of an action',
     spendStepText:
       'The price of every step, right in the feed: the muted number is the whole ' +

@@ -63,8 +63,20 @@ function pathSkills(
         : [],
     ),
   );
-  return group.members
-    .filter((member) => member.kind === 'skill' && !referenced.has(member.id))
+  // Скилл, в чей порядок встал шаг группы, но не участник (встроенные группы
+  // доставки: участник гас бы глобально вместе с группой), — его шаги тоже
+  // рисуются: иначе путь из одного шага не показывал, внутри чего тот идёт
+  // (владелец 20.10). Только показ: прогон шаги скилла не дописывает.
+  const members = group.members.filter((member) => member.kind === 'skill');
+  const hosts = [
+    ...new Set(
+      (group.path?.steps ?? []).flatMap((step) => (step.within ? [step.within.skillId] : [])),
+    ),
+  ]
+    .filter((id) => !members.some((member) => member.id === id))
+    .map((id) => ({ kind: 'skill' as const, id }));
+  return [...members, ...hosts]
+    .filter((member) => !referenced.has(member.id))
     .flatMap((member) => {
       const content = memberContent(deps, memberScope(group, member), member, () =>
         onUnreadable(member.id),

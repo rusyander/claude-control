@@ -124,6 +124,20 @@ describe('mergeSplitGroups — управление группой', () => {
     expect(setup[0]?.control?.actions).toEqual(['resume', 'drop']);
   });
 
+  it('группа без чата: на паузе — «Отметить готовой», отмеченная — закончена, без «ждёт разбора» (владелец 20.10)', () => {
+    const paused = mergeSplitGroups(new Map(), plan([group(8, { status: 'paused' })]));
+    expect(paused[0]?.acceptance).toEqual({ parentChatId: 'parent', index: 8, markable: true });
+
+    const marked = mergeSplitGroups(
+      new Map(),
+      plan([group(8, { status: 'done', acceptedAt: 'a', markedDoneAt: 'a' })]),
+    );
+    expect(marked[0]?.pending).toBeUndefined();
+    expect(marked[0]?.status).toBe('done');
+    expect(marked[0]?.control).toBeUndefined();
+    expect(marked[0]?.acceptance).toMatchObject({ acceptedAt: 'a', markedDoneAt: 'a' });
+  });
+
   it('чат группы ещё не доехал до списка — не «подготовка» и не «оборвана до чата»', () => {
     const started = mergeSplitGroups(
       new Map(),

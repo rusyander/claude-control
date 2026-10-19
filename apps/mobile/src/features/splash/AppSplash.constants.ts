@@ -15,18 +15,26 @@ export const SPLASH_BACKGROUND = '#4f46e5';
 
 /**
  * Размеры — те же доли радиуса, что в `favicon.svg` и в
- * `tools/make-mobile-icons.mjs`: штрих 0.235 радиуса, деление 0.4, точка 0.376.
- * Делений семь — столько укладывается по окружности при таком шаге.
+ * `tools/make-mobile-icons.mjs`: штрих 0.326 радиуса, точка 0.384. Деление там
+ * — штрих 0.488 со скруглёнными концами, то есть видимая длина 0.814 радиуса.
+ * Делений шесть — столько укладывается по окружности при таком шаге.
  */
 export const RADIUS = 62;
 
-export const TICKS = 7;
+export const TICKS = 6;
 
-export const TICK_LENGTH = Math.round(RADIUS * 0.4);
+export const TICK_LENGTH = Math.round(RADIUS * 0.814);
 
-export const TICK_WIDTH = Math.round(RADIUS * 0.235);
+export const TICK_WIDTH = Math.round(RADIUS * 0.326);
 
-export const DOT = Math.round(RADIUS * 0.376) * 2;
+export const DOT = Math.round(RADIUS * 0.384) * 2;
+
+/**
+ * Где стоит первое деление, в градусах от верха по часовой. В `favicon.svg`
+ * пунктир начинается справа и повёрнут на −75°, середина первого штриха — на
+ * 14° дальше: 90 − 75 + 14 = 29.
+ */
+export const FIRST_TICK = 29;
 
 /** Растянуть на весь родитель: типы RN больше не отдают готовый объект. */
 export const FILL = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 } as const;

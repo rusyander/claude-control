@@ -1021,6 +1021,12 @@ export interface SplitPlanView {
        */
       acceptedAt?: string;
       /**
+       * «Готово» поставил человек кнопкой «Отметить готовой», а не конвейер
+       * (ISO, владелец 20.10): застрявшую или остановленную группу он закрыл
+       * сам. Вместе с ней всегда стоит `acceptedAt`.
+       */
+      markedDoneAt?: string;
+      /**
        * Человек нажал «Перепроверить MR» (ISO): группа сверяет MR — конфликты,
        * замечания ревьюера, готовность задач — и правит найденное. Снимается,
        * когда ход кончился доставкой (`recheckedAt`) или сбоем.
@@ -1163,6 +1169,8 @@ export interface SplitTasksMoved {
 export interface SplitGroupAccepted {
   index: number;
   acceptedAt?: string;
+  /** Группу закрыл «готово» человек, а не конвейер (владелец 20.10). */
+  markedDone?: true;
 }
 
 /**

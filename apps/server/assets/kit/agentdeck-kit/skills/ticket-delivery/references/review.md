@@ -1,9 +1,23 @@
-# §9 — the two review agents, the design re-check, the proof
+# §9 — one deep review, the design re-check, the proof
 
-Two agents means two ENTRY POINTS. The same prompt twice buys correlated findings and one shared
-blind spot; half the files each buys two shallow passes. Depth is 1: neither may spawn its own.
+## Sizing — one `deep-review` per task, it sizes itself
 
-## The prompts
+- **T0 trivial** (copy, spacing, typo; nothing behaviour-bearing) → no review. The author answers the
+  surface list (placement, canon, i18n in every locale, docs surface, the radius) as ONE ledger row
+  `09-review ok "T0 self: …"`, each item with its grep or `file:line`.
+- **Everything else** → the `deep-review` skill, invoked ONCE, own-code mode, scope = the branch diff.
+  Hand it the §3 tier, the radius rows and the profile lens (`frontend.md` / `backend.md` /
+  `data-deploy.md`) as hints; the agent count, lanes and rounds are ITS decision (its `lanes.md`),
+  never fixed here. Its fix loop is the §9 fix loop; a review fix never triggers a second review.
+- The panel's prompt says a review stage of its own follows → no spawn here,
+  `09-review skip "panel review stage"`; that stage's findings are handled per §Findings below.
+- `deep-review` absent (discovery.md) → the fallback below: one agent at T1, two at T2, named in the
+  report as the reduced review.
+
+Spawn `description` tags follow deep-review's own (`deep-review r<N> …`, `deep-review verify …`),
+all lane-high; the 40-per-session review cap counts them.
+
+## Fallback without `deep-review` — reduced, named as such
 
 Each prompt is English, names the tier and the radius rows that agent owes, points at the project's
 own rules files by absolute path, says «Read-only: edit no file — findings only», and carries these
@@ -16,35 +30,25 @@ two blocks **verbatim** — a spawn without them is denied:
 task size. Do the work yourself in this context and report back.
 ```
 
-**A — from the diff, correctness.** Start at `git diff <base>...HEAD`. Logic, regressions, edge
-cases, error mapping and status codes (a 5xx for a client error is a bug), contract drift, existence
-plus ownership checks, permissions, parsed-but-unused fields, counters and aggregates. Then four
-classes of `<kit>/skills/deep-review/references/axis-1.md` §Six miss classes — siblings, hang,
-before the gate, environment — each answered in one line carrying the command run or the `file:line`
-read («n/a» names the search that shows it); a backend diff also runs the sweep of
-`<kit>/skills/deep-review/references/backend.md`. Owed rows: the consumers of the §3 radius.
-
-**B — from the frame, canon and surface.** Start at the ticket, the spec and the package rules, and
-answer where this has to live and who else renders or calls it BEFORE opening the diff. Then
-layering and import direction, code standards, file placement, decomposition, i18n in every locale,
-accessibility, form/modal/table patterns, the docs surface. This is the pass that finds the third
-screen nobody changed; reading the diff harder never finds it. Owns the other two classes, same
-one-line answers: parity both ways (every other caller of a changed endpoint or mutation handles what
-the new one handles; every new error code, enum member or field reaches each consumer map) and
-contract ↔ validator, field by field — both need the frame, not the diff.
-
-Every radius row comes back as `checked at file:line`, `unaffected, because …` or `not checked`.
-Couplings the import graph cannot see — i18n keys, query keys, routes, permission strings — are
-grepped by hand, once per changed literal.
+T1 → ONE agent: the frame first (where this has to live, who else renders or calls it — answered
+before the diff is opened; an agent that opens the diff first never comes back to the frame), then the
+diff — logic, regressions, edge cases, error mapping, contract drift, ownership, permissions — then
+the six miss classes of `deep-review/references/axis-1.md`, one line each with its command or
+`file:line`. T2 → two agents, two ENTRY POINTS: **A** from the diff (correctness + siblings, hang,
+before the gate, environment), **B** from the frame (canon, placement, i18n, a11y, docs surface,
+parity both ways, contract ↔ validator). Every radius row comes back as `checked at file:line`,
+`unaffected, because …` or `not checked`; couplings the import graph cannot see (i18n keys, query
+keys, routes, permission strings) are grepped by hand, once per changed literal.
 
 ## Findings are claims, not facts
 
 Verify each at its `file:line` yourself before fixing anything: a review agent that has not run the
 code produces false positives, and a fix applied to one costs more than the finding was worth. Each
 confirmed one is then swept for siblings — the same shape in the same function, file and parallel
-handler — before its fix: a human reviewer finds the second copy otherwise. Merge
-the two reports, drop duplicates, record a verdict per finding, and end with one summary line —
-**raised N · confirmed M · rejected K**.
+handler — before its fix: a human reviewer finds the second copy otherwise. Merge the reports, drop
+duplicates, record a verdict per finding, and end with one summary line —
+**raised N · confirmed M · rejected K**. Fixes take narrow checks only (SKILL.md §Working
+discipline); the full gate is §6.
 
 ## Rejected claims — the evidence is the answer, the scope stays
 
@@ -55,14 +59,15 @@ image, browser runner or build-config rewrite that no CONFIRMED finding needs is
 in the report, recommended no, asked before its first edit (SKILL.md §Stop and ask). One run added two
 devDeps, +1858 lockfile lines and a CI image change to keep a test for a claim that did not reproduce.
 
-## Human threads — re-read as the last act before the undraft (§12)
+## Human threads — read when they can exist (§12), and after the task closes
 
-Reviewers post while the run is still going, and a thread that lands after the run closes reaches
-nobody. So right before the §12 undraft — and again after any push made to answer one — list the MR
-discussions from the forge and take every unresolved human thread: confirmed → fixed, §6, the touched
-spot retested, then answered (rule `published-text` §Review replies); rejected → answered with the
-counter-evidence (above). The undraft happens at 0 unresolved; `12-finish` names the count read and
-the thread ids handled. A blocking thread posted minutes before a group closed once stayed unread.
+A fresh MR opened at §8 and taken out of draft in the same sitting has no human thread to read. Read
+the discussions — ONE list call, unresolved human threads only — when the MR pre-existed this run (a
+returned ticket, a resumed run) or a thread arrived during it. Each thread: confirmed → fixed, the
+touched packages' checks, the touched spot retested, pushed, answered (rule `published-text` §Review
+replies); rejected → answered with the counter-evidence (above). `12-finish` names the count read and
+the thread ids handled. A thread that lands after the task is DONE reopens it the same way, and only
+it.
 
 ## Design re-check — OFF by default, one question at §1
 
@@ -84,26 +89,30 @@ it into the shot folder once and compare against that file rather than re-fetchi
 Asked for but impossible (no mock reachable, Figma MCP not attached) ⇒ say so in one line and stop
 there; that report line exists because the user asked, not because the step exists.
 
-## Style self-review — every run, no question
+## Style self-review — every run, no question, at the end of §5
 
-Not part of the design re-check. After the §9 fixes are green, `agentdeck-kit:style-conformance-review` runs over the
-whole diff, subagents' edits included: its Phase 0 pulls reviewer remarks into the profile first, so
-the pass checks what this team's reviewers actually ask for. Style asks recur on almost every front MR
-and none was caught before review (one real team over a month: ~17 style asks + 7 stale comments
-among 103 human notes). Its fixes are pure
-refactors → §6 re-run; the report carries one line — checked N files, fixed K, profile rules added M.
+Not part of the design re-check. `agentdeck-kit:style-conformance-review` runs over the whole diff as
+the last act of §5, before §9 — the reviewer then reads code that already matches the team's profile
+instead of reporting style. Its Phase 0 refreshes the profile from reviewer remarks only when the
+harvest is older than 7 days (that skill's own rule). Style asks recur on almost every front MR and
+none was caught before review (one real team over a month: ~17 style asks + 7 stale comments among
+103 human notes). Its fixes are pure refactors → narrow checks; a §9 fix does not re-run the pass, its
+own lines follow the profile. The report carries one line — checked N files, fixed K, profile rules
+added M.
 
 ## A defect that was not caught by a test gets one
 
 A real bug — from the review or from §10 — means a test that is red before the fix and green after,
-in the package's own idiom. Proved rather than asserted: the revert has to break it.
+in the package's own idiom. Proved rather than asserted: the revert has to break it. `mustfail` runs
+ONCE, after the §9 fixes, batched over every bug-fixed file; T2 adds the change's behaviour-bearing
+files. A bug found later in §10 adds one call over its own file only.
 
 ```bash
-node <kit>/tools/mustfail.mjs --cmd "<the project's test command>" --files <path to the fixed file>
+node <kit>/tools/mustfail.mjs --cmd "<the project's test command>" --files <fixed1>,<fixed2>
 ```
 
 GREEN there means the suite does not actually cover that file, and it may not be quoted as evidence.
-At T2 run it over the whole change, not just the fixed file. Purely visual regressions are covered
-by the before/after shots instead, and that is recorded as such.
+Purely visual regressions are covered by the before/after shots instead, and that is recorded as such.
 
-Everything confirmed is fixed HERE, before the live run; then the §6 gates run again.
+Everything confirmed is fixed HERE, before the live run, with narrow checks; then a local commit —
+the one handoff point (artifacts.md §Handoff). The full gate is §6, once, after §10.

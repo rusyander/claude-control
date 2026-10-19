@@ -42,6 +42,7 @@ export function SettingsLimitsSections({ tr, common, platform }: SectionProps) {
             { label: tr('storageApp'), value: tr('storageAppValue') },
             { label: tr('storageManual'), value: tr('storageManualValue'), isMono: true },
             { label: tr('storageBackups'), value: tr('storageBackupsValue'), isMono: true },
+            { label: tr('storageSnapshot'), value: tr('storageSnapshotValue'), isMono: true },
             { label: tr('storageApply'), value: tr('storageApplyValue') },
           ]}
         />
@@ -61,6 +62,7 @@ export function SettingsLimitsSections({ tr, common, platform }: SectionProps) {
             tr('canEncrypt'),
             tr('canRevertHunk'),
             tr('canTransfer'),
+            tr('canGitSnapshot'),
             tr('canEnvTransfer'),
             tr('canModels'),
             tr('canCheck'),

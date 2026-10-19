@@ -4,7 +4,7 @@
  * `.agent/tmp/verify-ledger-design.agent.md` §2 «Registry»).
  *
  * Панель знает только общие инструменты (vitest run, tsc --noEmit, eslint без
- * --fix, prettier --check): код панели не знает ни одного проекта. Проверки
+ * --fix, prettier --check, vite build): код панели не знает ни одного проекта. Проверки
  * проекта, их входы вне дерева и артефакты описывает сам проект —
  * `.claude/tools/verify-checks.json` (обычно вне git).
  *
@@ -29,6 +29,7 @@ const TOOLS = [
   { id: 'tsc', re: /node_modules\/typescript\/bin\/tsc$/ },
   { id: 'eslint', re: /node_modules\/eslint\/bin\/eslint\.js$/ },
   { id: 'prettier', re: /node_modules\/prettier\/bin\/prettier\.cjs$/ },
+  { id: 'vite', re: /node_modules\/vite\/bin\/vite\.js$/ },
 ];
 
 /**
@@ -36,13 +37,62 @@ const TOOLS = [
  * (отчёт, покрытие, снимки): такой прогон записывается, но не заменяется
  * повтором — иначе потребитель отчёта прочёл бы старый файл.
  */
-const VITEST_NO_SKIP = [
-  /^--outputFile/,
-  /^--coverage/,
-  /^-u$/,
-  /^--update$/,
-  /^--reporter[= ]?junit/,
-];
+const VITEST_NO_SKIP = [/^-u$/, /^--update$/];
+
+/** Значение ключа покрытия: `false`/`0` — выключено, остальное (и пусто) — включено. */
+const OFF_VALUE = /^(false|0)$/i;
+
+/**
+ * Покрытие пишет файлы, но ВЫКЛЮЧЕННОЕ покрытие не пишет ничего. Блок Tests
+ * (`tools/qa/junit-run.mjs`) передаёт `--coverage.enabled=false` на каждом прогоне,
+ * а прежнее `/^--coverage/` считало и его пишущим: 19.10 — 115 прогонов за день
+ * записаны промахом `vitest --coverage.enabled=false`, ни один не повторён.
+ * Решает последний включатель (`--coverage`, `--coverage.enabled`, `--no-coverage`,
+ * с `=значением` или значением следующим аргументом), как у самого vitest. Прочие
+ * `--coverage.*` без явного выключения — не повтор: конфиг может включать покрытие сам.
+ */
+function coverageNoSkip(args) {
+  let toggle = null;
+  let other = null;
+  args.forEach((a, i) => {
+    if (a === '--no-coverage') {
+      toggle = { on: false };
+      return;
+    }
+    const m = /^--coverage(\.enabled)?(?:=(.*))?$/.exec(a);
+    if (m) {
+      const next = args[i + 1];
+      const value =
+        m[2] ?? (m[1] && next !== undefined && /^(true|false|0|1)$/i.test(next) ? next : '');
+      toggle = { on: !OFF_VALUE.test(value), flag: a };
+      return;
+    }
+    if (/^--coverage\./.test(a) && !other) other = a;
+  });
+  if (toggle) return toggle.on ? toggle.flag : null;
+  return other;
+}
+
+/**
+ * Файлы отчёта (`--outputFile`, `--outputFile.junit=…`): журнал хранит их байты и
+ * при повторе кладёт по пути ТЕКУЩЕГО запуска, а сам путь в ключ не входит —
+ * блок Tests каждый раз даёт новый временный путь, и прогон с отчётом прежде не
+ * повторялся никогда (19.10: 15 промахов `vitest --reporter=junit` за час).
+ */
+const REPORT_FLAG = /^--outputFile(\.[\w-]+)?$/;
+
+function reportsOf(args) {
+  const out = [];
+  args.forEach((a, i) => {
+    const eq = a.indexOf('=');
+    const flag = eq < 0 ? a : a.slice(0, eq);
+    if (!REPORT_FLAG.test(flag)) return;
+    const value = eq < 0 ? args[i + 1] : a.slice(eq + 1);
+    if (value && !value.startsWith('-'))
+      out.push({ at: eq < 0 ? i + 1 : i, sep: eq < 0, flag, value });
+  });
+  return out;
+}
 
 function hasFlag(args, names) {
   return args.some((a) => names.some((n) => a === n || a.startsWith(`${n}=`)));
@@ -54,8 +104,13 @@ function vitestMatch(args) {
   const runs = positional[0] === 'run' || hasFlag(args, ['--run']);
   if (!runs || ['bench', 'list', 'init'].includes(positional[0] ?? '')) return null;
   const joined = args.map((a, i) => (a === '--reporter' ? `--reporter=${args[i + 1] ?? ''}` : a));
-  const noSkip = joined.find((a) => VITEST_NO_SKIP.some((re) => re.test(a)));
-  return { noSkip: noSkip ? `vitest ${noSkip}` : null };
+  const noSkip =
+    coverageNoSkip(args) ?? joined.find((a) => VITEST_NO_SKIP.some((re) => re.test(a)));
+  const reports = reportsOf(args);
+  // Машинный отчёт (в файл или в stdout) читают целиком: сужать такой прогон нельзя.
+  const wholeOnly =
+    reports.length > 0 || joined.some((a) => /^--reporter[= ]?(junit|json|tap|html)/.test(a));
+  return { noSkip: noSkip ? `vitest ${noSkip}` : null, reports, wholeOnly };
 }
 
 function tscMatch(args) {
@@ -75,11 +130,79 @@ function prettierMatch(args) {
   return { noSkip: null };
 }
 
+/**
+ * Ключи `vite build` со значением (у части оно необязательно — cac берёт следующее
+ * слово, если оно не ключ): без них значение `--mode staging` читалось бы корнем.
+ */
+const VITE_VALUE_FLAGS = new Set([
+  '--config',
+  '-c',
+  '--base',
+  '--mode',
+  '-m',
+  '--outDir',
+  '--assetsDir',
+  '--assetsInlineLimit',
+  '--logLevel',
+  '-l',
+  '--filter',
+  '--target',
+  '--sourcemap',
+  '--minify',
+  '--manifest',
+  '--ssrManifest',
+  '--ssr',
+  '--configLoader',
+]);
+
+function flagValue(args, name) {
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === name) return args[i + 1];
+    if (args[i].startsWith(`${name}=`)) return args[i].slice(name.length + 1);
+  }
+  return undefined;
+}
+
+/**
+ * Сборка vite (владелец 19.10: гейт групп гонял ту же сборку на том же дереве по
+ * нескольку раз). Повтор обязан вернуть не только вывод, но и каталог сборки —
+ * его читают следующие шаги (preview, e2e), поэтому каталог — артефакт записи.
+ * Где он, журнал знает наверняка только из `--outDir` или по умолчанию (`dist` у
+ * корня); конфиг, задающий `outDir` или `root`, — прогон пишется, но не
+ * повторяется: восстановить не тот каталог хуже, чем собрать заново.
+ */
+function viteMatch(args, cwd) {
+  const positional = args.filter(
+    (a, i) => !a.startsWith('-') && !(i > 0 && VITE_VALUE_FLAGS.has(args[i - 1])),
+  );
+  if (positional[0] !== 'build') return null;
+  if (hasFlag(args, ['--watch', '-w'])) return null;
+  const root = path.resolve(cwd, positional[1] ?? '.');
+  const outDir = flagValue(args, '--outDir');
+  const configArg = flagValue(args, '--config') ?? flagValue(args, '-c');
+  const config = configArg
+    ? path.resolve(cwd, configArg)
+    : fs
+        .readdirSync(root)
+        .filter((n) => /^vite\.config\.[cm]?[jt]s$/.test(n))
+        .map((n) => path.join(root, n))[0];
+  let text;
+  try {
+    text = config ? fs.readFileSync(config, 'utf8') : '';
+  } catch {
+    return { noSkip: 'vite config unreadable', outputs: [] };
+  }
+  if (/\broot\s*:/.test(text)) return { noSkip: 'vite root from config', outputs: [] };
+  if (!outDir && /\boutDir\b/.test(text)) return { noSkip: 'vite outDir from config', outputs: [] };
+  return { noSkip: null, outputs: [path.resolve(root, outDir ?? 'dist')] };
+}
+
 const MATCHERS = {
   vitest: vitestMatch,
   tsc: tscMatch,
   eslint: eslintMatch,
   prettier: prettierMatch,
+  vite: viteMatch,
 };
 
 /** Реестр проекта: ближайший `.claude/tools/verify-checks.json` вверх от cwd. */
@@ -117,8 +240,19 @@ function recognize(argv, cwd) {
   const args = argv.slice(2);
   for (const tool of TOOLS) {
     if (!tool.re.test(file)) continue;
-    const m = MATCHERS[tool.id](args);
-    return m ? { id: tool.id, script: file, args, noSkip: m.noSkip, entry: null } : null;
+    const m = MATCHERS[tool.id](args, cwd);
+    return m
+      ? {
+          id: tool.id,
+          script: file,
+          args,
+          noSkip: m.noSkip,
+          reports: (m.reports ?? []).map((r) => ({ ...r, file: path.resolve(cwd, r.value) })),
+          outputs: m.outputs ?? [],
+          wholeOnly: Boolean(m.wholeOnly),
+          entry: null,
+        }
+      : null;
   }
   const found = findRegistry(cwd);
   if (!found) return null;
@@ -144,4 +278,16 @@ function recognize(argv, cwd) {
   };
 }
 
-module.exports = { recognize, findRegistry, slash, TOOLS };
+/**
+ * Срок одного вызова git из preload (снимок дерева, сужение). Preload сидит в
+ * каждой проверке: git без срока (чужая блокировка индекса, зависший помощник
+ * учётных данных, антивирус на `add -A` большого дерева) держал бы саму проверку,
+ * а с ней — вызов инструмента агента. По сроку git бросает, журнал пишет причину
+ * в ленту и пропускает проверку как есть. `AGENTDECK_VERIFY_LEDGER_GIT_MS` — для тестов.
+ */
+function gitTimeoutMs(env = process.env) {
+  const knob = Number(env.AGENTDECK_VERIFY_LEDGER_GIT_MS);
+  return knob > 0 ? knob : 60_000;
+}
+
+module.exports = { recognize, findRegistry, slash, gitTimeoutMs, TOOLS };

@@ -11,6 +11,18 @@ import type { FeedScrollSignals } from './useFeedScroll.types';
  */
 const RESTORE_WAIT_MS = 10_000;
 
+/**
+ * Сколько после возврата к месту держать ленту на нём, мс. Под сообщениями
+ * родителя дорисовывается сводка групп, картинки и блоки кода догружаются:
+ * высота растёт уже после возврата, и место, поставленное по неполной ленте,
+ * съезжало (после перезагрузки — каждый раз, владелец 20.10). Любое действие
+ * человека в ленте держание снимает сразу.
+ */
+const SETTLE_MS = 4_000;
+
+/** События, которыми человек сам двигает ленту: после них место решает он. */
+const USER_SCROLL_EVENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+
 /** Атрибут сообщения ленты, по которому ищется якорь (ставит `MessageBubble`). */
 const ROW_ATTR = 'data-feed-message';
 
@@ -44,6 +56,33 @@ export function useFeedScroll({
   // Место, к которому возвращаемся, пока его переписка не нарисована.
   const pending = useRef<{ snapshot: FeedSnapshot; since: number } | undefined>(undefined);
   const captureFrame = useRef<number | undefined>(undefined);
+  // Место уже вернули, но лента ещё дорисовывается: держим его до `until`.
+  const settle = useRef<{ snapshot: FeedSnapshot; until: number } | undefined>(undefined);
+  const settleFrame = useRef<number | undefined>(undefined);
+
+  /** Каждый кадр окна держания — снова к месту, если высота ленты сдвинула его. */
+  const holdPlace = (): void => {
+    settleFrame.current = undefined;
+    const list = listRef.current;
+    const hold = settle.current;
+    if (!list || !hold) return;
+    if (Date.now() > hold.until) {
+      settle.current = undefined;
+      return;
+    }
+    const target = restoreTarget(hold.snapshot, probeFeed(list, hold.snapshot));
+    if (target !== undefined && Math.abs(list.scrollTop - target) > 1) {
+      list.scrollTop = target;
+      isPinned.current = isPinnedAt(list);
+    }
+    settleFrame.current = requestAnimationFrame(holdPlace);
+  };
+
+  const stopHolding = (): void => {
+    settle.current = undefined;
+    if (settleFrame.current !== undefined) cancelAnimationFrame(settleFrame.current);
+    settleFrame.current = undefined;
+  };
 
   const toBottom = (): void => {
     isPinned.current = true;
@@ -65,6 +104,9 @@ export function useFeedScroll({
     pending.current = undefined;
     list.scrollTop = target;
     isPinned.current = isPinnedAt(list);
+    stopHolding();
+    settle.current = { snapshot: wait.snapshot, until: Date.now() + SETTLE_MS };
+    settleFrame.current = requestAnimationFrame(holdPlace);
   };
 
   // Смена разговора. Ключ — id разговора, а не первого сообщения: при подгрузке
@@ -75,6 +117,7 @@ export function useFeedScroll({
   useLayoutEffect(() => {
     shownId.current = conversationId;
     restoreScroll.current = undefined;
+    stopHolding();
     const snapshot = conversationId ? feedPositions.get(conversationId) : undefined;
     restoresOnSwitch.current = Boolean(snapshot);
     pending.current = snapshot ? { snapshot, since: Date.now() } : undefined;
@@ -109,18 +152,32 @@ export function useFeedScroll({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messageCount]);
 
-  // Заказанный кадр снимка не должен пережить ленту.
+  // Заказанные кадры не должны пережить ленту.
   useEffect(
     () => () => {
       if (captureFrame.current !== undefined) cancelAnimationFrame(captureFrame.current);
+      stopHolding();
     },
     [],
   );
+
+  // Человек сам тронул ленту — держание места кончилось, решает он.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return undefined;
+    const release = (): void => stopHolding();
+    for (const name of USER_SCROLL_EVENTS) list.addEventListener(name, release, { passive: true });
+    return () => {
+      for (const name of USER_SCROLL_EVENTS) list.removeEventListener(name, release);
+    };
+  }, [conversationId]);
 
   /** Запомнить место (или забыть: у низа разговор едет за ответом, как при первом открытии). */
   const capture = (list: HTMLDivElement, id: string | undefined): void => {
     captureFrame.current = undefined;
     if (!id || id !== shownId.current || pending.current) return;
+    // Пока место держим, прокрутку двигаем мы, а не человек: снимок не нужен.
+    if (settle.current) return;
     if (isPinned.current) feedPositions.delete(id);
     else feedPositions.set(id, snapshotOf(readRows(list), list.scrollTop));
   };

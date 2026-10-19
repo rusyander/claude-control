@@ -9,31 +9,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1100,
-      "shotAt": "2026-09-28T14:33:15.032Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 2 В проектах 1 Найдено 2 Обнаружение 1 ошибка Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Фронтенд-работа глобальная Когда: не указано — «Авто» эту группу не выберет Первые шаги Прогнать линт сервер 1 1 шаг · 1 участник Порядок задачи (общий) глобальная пара с проектом Когда: задача с номером тикета в любом проекте Первые шаги Взять тикет и завести ветку Сделать и проверить Прогнать e2e и ещё 1 скилл 1 · правило 1 4 шага · 2 участника В проекте изменилось: 1",
+      "shotAt": "2026-10-19T20:48:03.927Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 2 В проектах 1 Найдено 2 Обнаружение 1 ошибка Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Фронтенд-работа глобальная Когда: не указано — «Авто» эту группу не выберет Первые шаги Прогнать линт сервер 1 1 шаг · 1 участник Порядок задачи (общий) глобальная пара с проектом Когда: задача с номером тикета в любом проекте Первые шаги Взять тикет и завести ветку Сделать и проверить Прогнать e2e и ещё 1 скилл 1 · правило 1 4 шага · 2 участника В проекте изменилось: 1",
       "en": {
         "file": "01-sections.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-28T14:35:22.510Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 2 In projects 1 Found 2 Discovery 1 error Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Фронтенд-работа global When: not set — “Auto” will not pick this group First steps Run lint 1 server 1 step · 1 member Порядок задачи (общий) global paired with a project When: задача с номером тикета в любом проекте First steps Взять тикет и завести ветку Сделать и проверить Run e2e and 1 more 1 skill · 1 rule 4 steps · 2 members Changed in the project: 1"
+        "shotAt": "2026-10-19T20:49:28.125Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 2 In projects 1 Found 2 Discovery 1 error Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Фронтенд-работа global When: not set — “Auto” will not pick this group First steps Run lint 1 server 1 step · 1 member Порядок задачи (общий) global paired with a project When: задача с номером тикета в любом проекте First steps Взять тикет и завести ветку Сделать и проверить Run e2e and 1 more 1 skill · 1 rule 4 steps · 2 members Changed in the project: 1"
       },
       "dark": {
         "file": "01-sections.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-28T14:37:29.956Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 2 В проектах 1 Найдено 2 Обнаружение 1 ошибка Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Фронтенд-работа глобальная Когда: не указано — «Авто» эту группу не выберет Первые шаги Прогнать линт сервер 1 1 шаг · 1 участник Порядок задачи (общий) глобальная пара с проектом Когда: задача с номером тикета в любом проекте Первые шаги Взять тикет и завести ветку Сделать и проверить Прогнать e2e и ещё 1 скилл 1 · правило 1 4 шага · 2 участника В проекте изменилось: 1"
+        "shotAt": "2026-10-19T20:50:31.265Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 2 В проектах 1 Найдено 2 Обнаружение 1 ошибка Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Фронтенд-работа глобальная Когда: не указано — «Авто» эту группу не выберет Первые шаги Прогнать линт сервер 1 1 шаг · 1 участник Порядок задачи (общий) глобальная пара с проектом Когда: задача с номером тикета в любом проекте Первые шаги Взять тикет и завести ветку Сделать и проверить Прогнать e2e и ещё 1 скилл 1 · правило 1 4 шага · 2 участника В проекте изменилось: 1"
       },
       "darkEn": {
         "file": "01-sections.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-28T14:39:34.397Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 2 In projects 1 Found 2 Discovery 1 error Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Фронтенд-работа global When: not set — “Auto” will not pick this group First steps Run lint 1 server 1 step · 1 member Порядок задачи (общий) global paired with a project When: задача с номером тикета в любом проекте First steps Взять тикет и завести ветку Сделать и проверить Run e2e and 1 more 1 skill · 1 rule 4 steps · 2 members Changed in the project: 1"
+        "shotAt": "2026-10-19T20:51:34.588Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 2 In projects 1 Found 2 Discovery 1 error Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Фронтенд-работа global When: not set — “Auto” will not pick this group First steps Run lint 1 server 1 step · 1 member Порядок задачи (общий) global paired with a project When: задача с номером тикета в любом проекте First steps Взять тикет и завести ветку Сделать и проверить Run e2e and 1 more 1 skill · 1 rule 4 steps · 2 members Changed in the project: 1"
       }
     },
     {
@@ -43,14 +43,14 @@
       "masked": 0,
       "width": 928,
       "height": 768,
-      "shotAt": "2026-09-28T14:33:22.911Z",
+      "shotAt": "2026-10-19T20:48:11.794Z",
       "text": "Выпуск релиза Импортировать Когда: подготовка релиза магазина Почему это набор: скилл выпуска вызывает правило версий и хук тегов по порядку Порядок работы Состав 1 Поднять версию скилл · release 2 Поставить тег скилл · release",
       "en": {
         "file": "02-found.en.png",
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:35:30.367Z",
+        "shotAt": "2026-10-19T20:49:36.010Z",
         "text": "Store release Import When: preparing a store release Why it is a bundle: the release skill calls the version rule and the tag hook in order Working order Members 1 Поднять версию skill · release 2 Поставить тег skill · release"
       },
       "dark": {
@@ -58,7 +58,7 @@
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:37:37.812Z",
+        "shotAt": "2026-10-19T20:50:39.228Z",
         "text": "Выпуск релиза Импортировать Когда: подготовка релиза магазина Почему это набор: скилл выпуска вызывает правило версий и хук тегов по порядку Порядок работы Состав 1 Поднять версию скилл · release 2 Поставить тег скилл · release"
       },
       "darkEn": {
@@ -66,7 +66,7 @@
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:39:42.258Z",
+        "shotAt": "2026-10-19T20:51:42.487Z",
         "text": "Store release Import When: preparing a store release Why it is a bundle: the release skill calls the version rule and the tag hook in order Working order Members 1 Поднять версию skill · release 2 Поставить тег skill · release"
       }
     },
@@ -77,14 +77,14 @@
       "masked": 0,
       "width": 928,
       "height": 768,
-      "shotAt": "2026-09-28T14:33:28.034Z",
+      "shotAt": "2026-10-19T20:48:16.897Z",
       "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 4 шага Свернуть все Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА ticket-delivery 2 шага чужой скилл 3 настраиваемых числа 1 Взять тикет и завести ветку чужой скилл Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Проверяющих Авто (в скилле: 1) 0 1 2 3 2 Сделать и проверить чужой скилл РЕВЬЮ 3 Прогнать e2e промпт Прогони e2e и приложи отчёт. Готово, когда: отчёт e2e зелёный ПРАВКИ ДОСТАВКА 4 Заметки к релизу чужой скилл у скилла нет настраиваемых чисел",
       "en": {
         "file": "03-pair.en.png",
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:35:35.456Z",
+        "shotAt": "2026-10-19T20:49:41.094Z",
         "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 4 steps Collapse all Add step TRIAGE PLAN WORK ticket-delivery 2 steps foreign skill 3 adjustable numbers 1 Взять тикет и завести ветку foreign skill Review rounds Auto (skill: 2) 1 2 3 4 5 Agents per round Auto (skill: 2) 1 2 3 4 5 6 Verifiers Auto (skill: 1) 0 1 2 3 2 Сделать и проверить foreign skill REVIEW 3 Run e2e prompt Run e2e and attach the report. Done when: e2e report is green FIXES DELIVERY 4 Release notes foreign skill the skill has no adjustable numbers"
       },
       "dark": {
@@ -92,7 +92,7 @@
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:37:42.885Z",
+        "shotAt": "2026-10-19T20:50:44.275Z",
         "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 4 шага Свернуть все Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА ticket-delivery 2 шага чужой скилл 3 настраиваемых числа 1 Взять тикет и завести ветку чужой скилл Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Проверяющих Авто (в скилле: 1) 0 1 2 3 2 Сделать и проверить чужой скилл РЕВЬЮ 3 Прогнать e2e промпт Прогони e2e и приложи отчёт. Готово, когда: отчёт e2e зелёный ПРАВКИ ДОСТАВКА 4 Заметки к релизу чужой скилл у скилла нет настраиваемых чисел"
       },
       "darkEn": {
@@ -100,7 +100,7 @@
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:39:47.345Z",
+        "shotAt": "2026-10-19T20:51:47.613Z",
         "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 4 steps Collapse all Add step TRIAGE PLAN WORK ticket-delivery 2 steps foreign skill 3 adjustable numbers 1 Взять тикет и завести ветку foreign skill Review rounds Auto (skill: 2) 1 2 3 4 5 Agents per round Auto (skill: 2) 1 2 3 4 5 6 Verifiers Auto (skill: 1) 0 1 2 3 2 Сделать и проверить foreign skill REVIEW 3 Run e2e prompt Run e2e and attach the report. Done when: e2e report is green FIXES DELIVERY 4 Release notes foreign skill the skill has no adjustable numbers"
       }
     },
@@ -111,14 +111,14 @@
       "masked": 0,
       "width": 960,
       "height": 800,
-      "shotAt": "2026-09-28T14:33:35.286Z",
+      "shotAt": "2026-10-19T20:48:24.270Z",
       "text": "Копия «Документация сайта» в общие Все скиллы, правила и хуки группы копируются в общие каталоги выбранного провайдера. Проект не меняется; в нём начнёт действовать глобальная копия. «rule:review-checklist»: имя занято в общих, взято «review-checklist-2» Что советует агент Отметьте, что применить. Правки лягут только в глобальную копию. ticket-delivery улучшить Шаг ветки завязан на путь магазина — обобщить. review-checklist взять наш Глобальный список ревью полнее и уже покрывает этот. Взамен: code-review PostToolUse:lint оставить менять нечего Хук проектный по сути: команда линта своя у каждого проекта. PreToolUse:format улучшить Форматировать только изменённые файлы. Будет выполняться на этой машине — прочитайте перед тем, как отметить { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Готово Применить отмеченное: 2",
       "en": {
         "file": "04-copy.en.png",
         "masked": 0,
         "width": 960,
         "height": 800,
-        "shotAt": "2026-09-28T14:35:42.722Z",
+        "shotAt": "2026-10-19T20:49:48.420Z",
         "text": "Copy “Документация сайта” to global All skills, rules and hooks of the group are copied to the chosen provider’s global directories. The project is not changed; the global copy becomes the active one there. “rule:review-checklist”: the name is taken in global, used “review-checklist-2” What the agent advises Tick what to apply. Changes land only in the global copy. ticket-delivery improve Шаг ветки завязан на путь магазина — обобщить. review-checklist use ours Глобальный список ревью полнее и уже покрывает этот. Instead: code-review PostToolUse:lint keep nothing to change Хук проектный по сути: команда линта своя у каждого проекта. PreToolUse:format improve Форматировать только изменённые файлы. This will run on this machine — read it before ticking { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Done Apply ticked: 2"
       },
       "dark": {
@@ -126,7 +126,7 @@
         "masked": 0,
         "width": 960,
         "height": 800,
-        "shotAt": "2026-09-28T14:37:50.071Z",
+        "shotAt": "2026-10-19T20:50:51.585Z",
         "text": "Копия «Документация сайта» в общие Все скиллы, правила и хуки группы копируются в общие каталоги выбранного провайдера. Проект не меняется; в нём начнёт действовать глобальная копия. «rule:review-checklist»: имя занято в общих, взято «review-checklist-2» Что советует агент Отметьте, что применить. Правки лягут только в глобальную копию. ticket-delivery улучшить Шаг ветки завязан на путь магазина — обобщить. review-checklist взять наш Глобальный список ревью полнее и уже покрывает этот. Взамен: code-review PostToolUse:lint оставить менять нечего Хук проектный по сути: команда линта своя у каждого проекта. PreToolUse:format улучшить Форматировать только изменённые файлы. Будет выполняться на этой машине — прочитайте перед тем, как отметить { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Готово Применить отмеченное: 2"
       },
       "darkEn": {
@@ -134,7 +134,7 @@
         "masked": 0,
         "width": 960,
         "height": 800,
-        "shotAt": "2026-09-28T14:39:54.530Z",
+        "shotAt": "2026-10-19T20:51:54.842Z",
         "text": "Copy “Документация сайта” to global All skills, rules and hooks of the group are copied to the chosen provider’s global directories. The project is not changed; the global copy becomes the active one there. “rule:review-checklist”: the name is taken in global, used “review-checklist-2” What the agent advises Tick what to apply. Changes land only in the global copy. ticket-delivery improve Шаг ветки завязан на путь магазина — обобщить. review-checklist use ours Глобальный список ревью полнее и уже покрывает этот. Instead: code-review PostToolUse:lint keep nothing to change Хук проектный по сути: команда линта своя у каждого проекта. PreToolUse:format improve Форматировать только изменённые файлы. This will run on this machine — read it before ticking { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Done Apply ticked: 2"
       }
     },
@@ -145,14 +145,14 @@
       "masked": 0,
       "width": 960,
       "height": 800,
-      "shotAt": "2026-09-28T14:33:52.717Z",
+      "shotAt": "2026-10-19T20:48:42.499Z",
       "text": "Слияние изменений проекта в «Порядок задачи (общий)» Агент предлагает, как перенести правки оригинала, не потеряв наших. Ничего не записано, пока вы не примените. Что советует агент Отметьте, что применить. Правки лягут только в глобальную копию. ticket-delivery улучшить Шаг ветки завязан на путь магазина — обобщить. review-checklist взять наш Глобальный список ревью полнее и уже покрывает этот. Взамен: code-review PreToolUse:format улучшить Форматировать только изменённые файлы. Будет выполняться на этой машине — прочитайте перед тем, как отметить { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Готово Применить отмеченное: 2",
       "en": {
         "file": "05-merge.en.png",
         "masked": 0,
         "width": 960,
         "height": 800,
-        "shotAt": "2026-09-28T14:36:00.127Z",
+        "shotAt": "2026-10-19T20:50:07.003Z",
         "text": "Merge project changes into “Порядок задачи (общий)” The agent proposes how to carry the original’s changes over without losing ours. Nothing is written until you apply. What the agent advises Tick what to apply. Changes land only in the global copy. ticket-delivery improve Шаг ветки завязан на путь магазина — обобщить. review-checklist use ours Глобальный список ревью полнее и уже покрывает этот. Instead: code-review PreToolUse:format improve Форматировать только изменённые файлы. This will run on this machine — read it before ticking { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Done Apply ticked: 2"
       },
       "dark": {
@@ -160,7 +160,7 @@
         "masked": 0,
         "width": 960,
         "height": 800,
-        "shotAt": "2026-09-28T14:38:07.550Z",
+        "shotAt": "2026-10-19T20:51:10.349Z",
         "text": "Слияние изменений проекта в «Порядок задачи (общий)» Агент предлагает, как перенести правки оригинала, не потеряв наших. Ничего не записано, пока вы не примените. Что советует агент Отметьте, что применить. Правки лягут только в глобальную копию. ticket-delivery улучшить Шаг ветки завязан на путь магазина — обобщить. review-checklist взять наш Глобальный список ревью полнее и уже покрывает этот. Взамен: code-review PreToolUse:format улучшить Форматировать только изменённые файлы. Будет выполняться на этой машине — прочитайте перед тем, как отметить { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Готово Применить отмеченное: 2"
       },
       "darkEn": {
@@ -168,7 +168,7 @@
         "masked": 0,
         "width": 960,
         "height": 800,
-        "shotAt": "2026-09-28T14:40:11.914Z",
+        "shotAt": "2026-10-19T20:52:13.363Z",
         "text": "Merge project changes into “Порядок задачи (общий)” The agent proposes how to carry the original’s changes over without losing ours. Nothing is written until you apply. What the agent advises Tick what to apply. Changes land only in the global copy. ticket-delivery improve Шаг ветки завязан на путь магазина — обобщить. review-checklist use ours Глобальный список ревью полнее и уже покрывает этот. Instead: code-review PreToolUse:format improve Форматировать только изменённые файлы. This will run on this machine — read it before ticking { \"event\": \"PreToolUse\", \"matcher\": \"Edit\", \"command\": \"npx prettier --write \\\"$FILE\\\"\" } Done Apply ticked: 2"
       }
     },
@@ -179,14 +179,14 @@
       "masked": 0,
       "width": 928,
       "height": 768,
-      "shotAt": "2026-09-28T14:33:53.881Z",
+      "shotAt": "2026-10-19T20:48:43.629Z",
       "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Глобальная копия порядка магазина: подходит любому проекту с тикетами. Состав Скилл ticket-delivery доводит тикет до MR: ветка, правка, проверки, описание. Правило review-checklist список того, что смотреть на ревью. Найдено в C:/work/shop Используется в C:/work/shop C:/work/blog",
       "en": {
         "file": "06-details.en.png",
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:36:01.278Z",
+        "shotAt": "2026-10-19T20:50:08.177Z",
         "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members Глобальная копия порядка магазина: подходит любому проекту с тикетами. Members Skill ticket-delivery доводит тикет до MR: ветка, правка, проверки, описание. Rule review-checklist список того, что смотреть на ревью. Found in C:/work/shop Used in C:/work/shop C:/work/blog"
       },
       "dark": {
@@ -194,7 +194,7 @@
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:38:08.701Z",
+        "shotAt": "2026-10-19T20:51:11.549Z",
         "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Глобальная копия порядка магазина: подходит любому проекту с тикетами. Состав Скилл ticket-delivery доводит тикет до MR: ветка, правка, проверки, описание. Правило review-checklist список того, что смотреть на ревью. Найдено в C:/work/shop Используется в C:/work/shop C:/work/blog"
       },
       "darkEn": {
@@ -202,7 +202,7 @@
         "masked": 0,
         "width": 928,
         "height": 768,
-        "shotAt": "2026-09-28T14:40:13.059Z",
+        "shotAt": "2026-10-19T20:52:14.520Z",
         "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members Глобальная копия порядка магазина: подходит любому проекту с тикетами. Members Skill ticket-delivery доводит тикет до MR: ветка, правка, проверки, описание. Rule review-checklist список того, что смотреть на ревью. Found in C:/work/shop Used in C:/work/shop C:/work/blog"
       }
     },
@@ -213,14 +213,14 @@
       "masked": 0,
       "width": 700,
       "height": 640,
-      "shotAt": "2026-09-28T14:33:55.092Z",
+      "shotAt": "2026-10-19T20:48:44.792Z",
       "text": "Копировать группу «Фронтенд-работа» Рядом появится независимая копия: те же участники, шаги «Порядка работы», числа и «Когда». Правка копии оригинал не меняет. Привязка к проектам не копируется. Копия создаётся выключенной и ничего не гасит: общие с оригиналом скиллы и правила остаются как есть, пока вы сами её не включите. Имя копии Отмена Копировать",
       "en": {
         "file": "07-duplicate.en.png",
         "masked": 0,
         "width": 700,
         "height": 640,
-        "shotAt": "2026-09-28T14:36:02.471Z",
+        "shotAt": "2026-10-19T20:50:09.375Z",
         "text": "Copy group “Фронтенд-работа” An independent copy appears next to it: the same members, Working order steps, pinned skill numbers and “When”. Editing the copy never changes the original. The project binding is not copied. The copy is created switched off and switches nothing off: skills and rules shared with the original stay as they are until you switch it on yourself. Name of the copy Cancel Copy"
       },
       "dark": {
@@ -228,7 +228,7 @@
         "masked": 0,
         "width": 700,
         "height": 640,
-        "shotAt": "2026-09-28T14:38:09.878Z",
+        "shotAt": "2026-10-19T20:51:12.791Z",
         "text": "Копировать группу «Фронтенд-работа» Рядом появится независимая копия: те же участники, шаги «Порядка работы», числа и «Когда». Правка копии оригинал не меняет. Привязка к проектам не копируется. Копия создаётся выключенной и ничего не гасит: общие с оригиналом скиллы и правила остаются как есть, пока вы сами её не включите. Имя копии Отмена Копировать"
       },
       "darkEn": {
@@ -236,8 +236,42 @@
         "masked": 0,
         "width": 700,
         "height": 640,
-        "shotAt": "2026-09-28T14:40:14.242Z",
+        "shotAt": "2026-10-19T20:52:15.756Z",
         "text": "Copy group “Фронтенд-работа” An independent copy appears next to it: the same members, Working order steps, pinned skill numbers and “When”. Editing the copy never changes the original. The project binding is not copied. The copy is created switched off and switches nothing off: skills and rules shared with the original stay as they are until you switch it on yourself. Name of the copy Cancel Copy"
+      }
+    },
+    {
+      "id": "08-builtin",
+      "side": "panel",
+      "file": "08-builtin.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 1100,
+      "shotAt": "2026-10-19T20:48:49.395Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Вернуть встроенные (1) Создать группу Зачем это Глобальные 5 В проектах 0 Найдено 2 Обнаружение 1 ошибка Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Фронтенд-работа глобальная Когда: не указано — «Авто» эту группу не выберет Первые шаги Прогнать линт сервер 1 1 шаг · 1 участник Порядок задачи (общий) глобальная пара с проектом Когда: задача с номером тикета в любом проекте Первые шаги Взять тикет и завести ветку Сделать и проверить Прогнать e2e и ещё 1 скилл 1 · правило 1 4 шага · 2 участника В проекте изменилось: 1 Документация сайта (общий) глобальная пара с проектом Когда: не указано — «Авто» эту группу не выберет Своих шагов нет — только стадии конвейера. скилл 1 1 участник Задача → MR (быстро) глобальная встроенная Когда: a tracker ticket or task to deliver end to end into an MR Первые шаги Быстрый путь, профиль по §3 участников нет изменена вами — обновления встроенных её не трогают 1 шаг · 0 участников Задача → MR: фронт глобальная встроенная Когда: tickets whose every change is frontend Первые шаги Профиль: фронт участников нет 1 шаг · 0 участников",
+      "en": {
+        "file": "08-builtin.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-10-19T20:50:14.364Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Groups Your own structure across rules, hooks, skills and servers Discover groups Restore built-ins (1) Create group Why this exists Global 5 In projects 0 Found 2 Discovery 1 error Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Фронтенд-работа global When: not set — “Auto” will not pick this group First steps Run lint 1 server 1 step · 1 member Порядок задачи (общий) global paired with a project When: задача с номером тикета в любом проекте First steps Взять тикет и завести ветку Сделать и проверить Run e2e and 1 more 1 skill · 1 rule 4 steps · 2 members Changed in the project: 1 Документация сайта (общий) global paired with a project When: not set — “Auto” will not pick this group No own steps — pipeline stages only. 1 skill 1 member Задача → MR (быстро) global built-in When: a tracker ticket or task to deliver end to end into an MR First steps Fast flow, profile by §3 no members edited by you — built-in updates leave it alone 1 step · 0 members Задача → MR: фронт global built-in When: tickets whose every change is frontend First steps Profile: frontend no members 1 step · 0 members"
+      },
+      "dark": {
+        "file": "08-builtin.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-10-19T20:51:17.760Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Вернуть встроенные (1) Создать группу Зачем это Глобальные 5 В проектах 0 Найдено 2 Обнаружение 1 ошибка Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Фронтенд-работа глобальная Когда: не указано — «Авто» эту группу не выберет Первые шаги Прогнать линт сервер 1 1 шаг · 1 участник Порядок задачи (общий) глобальная пара с проектом Когда: задача с номером тикета в любом проекте Первые шаги Взять тикет и завести ветку Сделать и проверить Прогнать e2e и ещё 1 скилл 1 · правило 1 4 шага · 2 участника В проекте изменилось: 1 Документация сайта (общий) глобальная пара с проектом Когда: не указано — «Авто» эту группу не выберет Своих шагов нет — только стадии конвейера. скилл 1 1 участник Задача → MR (быстро) глобальная встроенная Когда: a tracker ticket or task to deliver end to end into an MR Первые шаги Быстрый путь, профиль по §3 участников нет изменена вами — обновления встроенных её не трогают 1 шаг · 0 участников Задача → MR: фронт глобальная встроенная Когда: tickets whose every change is frontend Первые шаги Профиль: фронт участников нет 1 шаг · 0 участников"
+      },
+      "darkEn": {
+        "file": "08-builtin.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-10-19T20:52:20.413Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Groups Your own structure across rules, hooks, skills and servers Discover groups Restore built-ins (1) Create group Why this exists Global 5 In projects 0 Found 2 Discovery 1 error Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Фронтенд-работа global When: not set — “Auto” will not pick this group First steps Run lint 1 server 1 step · 1 member Порядок задачи (общий) global paired with a project When: задача с номером тикета в любом проекте First steps Взять тикет и завести ветку Сделать и проверить Run e2e and 1 more 1 skill · 1 rule 4 steps · 2 members Changed in the project: 1 Документация сайта (общий) global paired with a project When: not set — “Auto” will not pick this group No own steps — pipeline stages only. 1 skill 1 member Задача → MR (быстро) global built-in When: a tracker ticket or task to deliver end to end into an MR First steps Fast flow, profile by §3 no members edited by you — built-in updates leave it alone 1 step · 0 members Задача → MR: фронт global built-in When: tickets whose every change is frontend First steps Profile: frontend no members 1 step · 0 members"
       }
     }
   ]

@@ -6,6 +6,7 @@ import {
   OWNER_TEXT_MAX,
   RULE_SOURCES,
   SKILL_ROUTE_LINE,
+  SYNC_ON_CONFLICT_LINE,
   withoutPrecedence,
 } from './quality-floor.ts';
 
@@ -700,11 +701,23 @@ export const PROJECT_CHECKS_LINE =
 
 /** Ссылка вместо определения, когда задание прогона проверки уже назвало (TQ-10). */
 const CHECKS_NAMED_IN_TASK =
-  'Before you say "done", run the project checks your task names — all of them, in the order named.';
+  'Before you say "done", run the checks your task names, at the scope and moment it names.';
+
+/**
+ * Правкам перед звеном доставки — только узкие проверки: полный гейт гонит
+ * доставка, один раз (владелец 20.10; замер 19.10 — три полных прогона на MR).
+ */
+const FIX_CHECKS_BEFORE_DELIVERY =
+  "Check your fixes with the checks of what they touch — its tests, the touched package's " +
+  "type-check and lint. The project's full checks run ONCE, in the delivery stage after your turn.";
 
 /** Задание уже несёт определение проверок проекта — планке сдачи его не повторять. */
 export function namesProjectChecks(prompt: string): boolean {
-  return prompt.includes(PROJECT_CHECKS_LINE) || prompt.includes(DELIVERY_CHECKS_LINE);
+  return (
+    prompt.includes(PROJECT_CHECKS_LINE) ||
+    prompt.includes(DELIVERY_CHECKS_LINE) ||
+    prompt.includes(FIX_CHECKS_BEFORE_DELIVERY)
+  );
 }
 
 export const EMPTY_REVIEW_LINE =
@@ -995,8 +1008,9 @@ export function reviewStagePrompt(input: {
     `This is a new session: the work was done${by}${where}; you do not have its context — read ` +
       'the code and the diff.',
     '',
-    'Review it with the deep-review skill on this branch at the depth its risk tier demands, in ' +
-      'report mode: no fix loop, nothing written into any MR. No such skill — do the same yourself: ' +
+    'Review it with the deep-review skill on this branch, once and in full, in report mode: no fix ' +
+      'loop, nothing written into any MR. The skill plans its own lanes, agent count and rounds; ' +
+      'the risk tier is its hint, never a cap. No such skill — do the same yourself: ' +
       'git status, git diff and git log of this branch, every touched file read in full together ' +
       'with its callers, tests, docs and locales, and the project checks run.',
     ...(input.delta ? reviewDeltaLines(input.delta) : []),
@@ -1157,7 +1171,7 @@ export function fixStagePrompt(
     'A finding that does not reproduce for you is no reason to change infrastructure: no new ' +
       'dependencies, CI, tsconfig or test harness edits. Say what did not reproduce and how much ' +
       `would have to be added, and ask the human ${foreign ? 'in the last line of your answer' : 'with the AskUserQuestion tool'}.`,
-    PROJECT_CHECKS_LINE,
+    deliver ? FIX_CHECKS_BEFORE_DELIVERY : PROJECT_CHECKS_LINE,
     ANSWER_LANGUAGE_LINE,
     ESCALATE_LINE,
     OWNER_PRECEDENCE_LINE,
@@ -1241,19 +1255,18 @@ export function deliverStagePrompt(input: {
     '',
     '1. `git status`: commit the work of the group following the project convention for ' +
       'messages; do not put temporary files, screenshots or .agent/ notes into the commit.',
-    '2. Fresh main branch: `git fetch origin`, the name of the main branch is `git symbolic-ref ' +
-      'refs/remotes/origin/HEAD`, then `git rebase origin/<main>` — both when the branch is not ' +
-      'pushed yet and when it is pushed but behind the main branch.',
+    `2. Main branch: ${SYNC_ON_CONFLICT_LINE}`,
     '3. A rebase conflict of a not-yet-pushed branch within the tasks of the group — resolve it ' +
       `yourself. The branch was already pushed — a conflict of that rebase: ${ask} with a ` +
       'recommended option (`git rebase --abort` returns the branch as it was). A decision that ' +
       `belongs to the human or to another group (foreign code, a product choice) — also ${ask}, ` +
       'not a report.',
     `4. Run the project's checks — the ones its rules name (${RULE_SOURCES}), all of them,` +
-      ' in the order named, frontend and backend alike; fix what is red ' +
-      'without going beyond the tasks of the group. Any check still red — no MR.',
+      ' in the order named, frontend and backend alike, ONCE on this final tree (the earlier ' +
+      'stages ran only narrow ones); fix what is red without going beyond the tasks of the ' +
+      'group, re-running only the red ones. Any check still red — no MR.',
     `5. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
-      `a pushed branch after the rebase — \`git push --force-with-lease origin ${target}\`, and ` +
+      `a pushed branch after a conflict rebase — \`git push --force-with-lease origin ${target}\`, and ` +
       "only your own group branch, never the main, a protected or another group's branch. Open " +
       'the MR by the project delivery skill (or update the open one): task keys in the ' +
       'description, decisions taken without the human listed there too. Stages of the skill not ' +

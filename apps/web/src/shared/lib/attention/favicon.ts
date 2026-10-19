@@ -9,10 +9,13 @@ import type { AttentionTone } from './attention.types';
  */
 
 const BASE_ART =
-  '<rect width="32" height="32" rx="9" fill="#4f46e5"/>' +
-  '<circle cx="16" cy="16" r="8.5" fill="none" stroke="#ffffff" stroke-width="2" ' +
-  'stroke-linecap="round" stroke-dasharray="3.4 4.2" opacity="0.75"/>' +
-  '<circle cx="16" cy="16" r="3.2" fill="#ffffff"/>';
+  '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+  '<stop offset="0" stop-color="#7c78ff"/><stop offset="1" stop-color="#4338ca"/>' +
+  '</linearGradient></defs>' +
+  '<rect width="32" height="32" rx="8" fill="url(#g)"/>' +
+  '<circle cx="16" cy="16" r="8.6" fill="none" stroke="#ffffff" stroke-width="2.8" ' +
+  'stroke-linecap="round" stroke-dasharray="4.2 4.8" transform="rotate(-75 16 16)"/>' +
+  '<circle cx="16" cy="16" r="3.3" fill="#ffffff"/>';
 
 /** Цвета метки берём фиксированными: значок живёт вне темы страницы. */
 const TONE_COLOR: Record<AttentionTone, string> = { warning: '#f59e0b', danger: '#ef4444' };

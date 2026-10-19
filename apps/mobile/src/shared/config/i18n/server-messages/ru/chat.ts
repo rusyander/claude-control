@@ -134,7 +134,7 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'split-start-not-queued': 'Группа не в очереди — запускать нечего',
   'split-start-triage':
     'Разбор задач ещё идёт — порядок групп решит он; запуск станет доступен после него',
-  'split-accept-not-done': 'Принять нечего: группы нет или она ещё не доставлена',
+  'split-accept-not-done': 'Отметить нечего: группы нет или она сейчас работает',
   'split-group-no-slot': 'Все места заняты: работает {{running}} из {{limit}}',
   'split-group-no-slot-paused':
     'Все места заняты: работает {{running}}, на паузе {{paused}} из {{limit}} — место освободит «Продолжить» или «Убрать» у группы на паузе',

@@ -183,6 +183,16 @@ export interface SplitConveyorDeps {
    */
   resume?: (group: SplitPlanGroupRecord, prompt: string) => 'sent' | 'queued' | 'refused';
   /**
+   * Слово «Перепроверить MR» — новым разговором группы с вводной (R2/R5, 19.10:
+   * продолжение после часов простоя — промах кэша и давние нити контекста).
+   * Не задан — продолжением сессии, как любое слово панели (`resume`).
+   */
+  recheck?: (
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    prompt: string,
+  ) => 'sent' | 'queued' | 'refused';
+  /**
    * Таймер ожидания сброса лимита (журнал 89). Сам срок лежит в записи, таймер
    * только будит; не задан — `setTimeout`.
    */
@@ -1703,6 +1713,7 @@ export class SplitConveyor {
     delete group.blockedSince;
     // Принимали прошлую работу: новый ход её меняет, отметка снимается.
     delete group.acceptedAt;
+    delete group.markedDone;
     // Проверяли тоже прошлую: зелёная отметка уходит, идущая перепроверка — нет.
     delete group.recheckedAt;
     // Слово перепроверки уже у сессии — этот ход и есть перепроверка.
@@ -1900,6 +1911,7 @@ export class SplitConveyor {
         'cleaned',
         'mrWatch',
         'acceptedAt',
+        'markedDone',
         'recheckRequestedAt',
         'recheckSentAt',
         'recheckRunning',
@@ -2051,6 +2063,7 @@ export class SplitConveyor {
         ...(group.limitUntil ? { limitUntil: group.limitUntil } : {}),
         ...(group.parked ? { parkedAt: group.parked.at } : {}),
         ...(group.acceptedAt ? { acceptedAt: group.acceptedAt } : {}),
+        ...(group.markedDone ? { markedDoneAt: group.markedDone.at } : {}),
         ...(group.recheckRequestedAt ? { recheckRequestedAt: group.recheckRequestedAt } : {}),
         ...(group.recheckedAt ? { recheckedAt: group.recheckedAt } : {}),
         ...(group.mrClosed ? { mrClosed: group.mrClosed } : {}),
@@ -2422,10 +2435,12 @@ export class SplitConveyor {
         this.deps.store.set(record);
       }
     }
-    const outcome = this.deps.resume(
-      this.deps.store.get(parentChatId)?.groups[group.index] ?? group,
-      prompt,
-    );
+    const current = this.deps.store.get(parentChatId);
+    const target = current?.groups[group.index] ?? group;
+    const outcome =
+      recheck && this.deps.recheck && current
+        ? this.deps.recheck(current, target, prompt)
+        : this.deps.resume(target, prompt);
     if (recheck && outcome === 'refused') {
       const record = this.deps.store.get(parentChatId);
       const own = record?.groups[group.index];
@@ -2761,6 +2776,17 @@ export class SplitConveyor {
    * уходит очереди, ждавшие её — дальше (как после любого сбоя); копия, если
    * она есть, убирается обычной кнопкой уборки закрытой группы.
    */
+  /**
+   * Человек отметил группу готовой (`split-acceptance.ts`): ждавшие её больше
+   * не ждут, а место, которое она держала, свободно — очередь двигается так же,
+   * как после «готово» конвейера.
+   */
+  afterMarkedDone(record: SplitPlanRecord): void {
+    void this.launchNext(record).catch((error) => {
+      this.deps.log('split conveyor: launch after manual done failed', error);
+    });
+  }
+
   dropGroup(parentChatId: string, index: number): void {
     const record = this.deps.store.get(parentChatId);
     const group = record?.groups[index];

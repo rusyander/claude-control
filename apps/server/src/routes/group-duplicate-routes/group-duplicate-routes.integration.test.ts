@@ -3,7 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Group } from '@agentdeck/contracts';
+import { isBuiltinGroupId, type Group } from '@agentdeck/contracts';
 import { groupCopyName } from '@agentdeck/contracts/groups';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import { AppStore } from '../../lib/app-store/app-store.ts';
@@ -133,7 +133,15 @@ describe('маршрут копии группы', () => {
     expect(group.members).toEqual([{ kind: 'skill', id: 'ladder' }]);
     expect(group.projectPaths).toEqual([]);
     expect(group.origin).toBeUndefined();
-    expect(group.order).toBe(5);
+    // Копия встаёт в конец списка — после групп человека и встроенных.
+    expect(group.order).toBe(
+      Math.max(
+        ...store
+          .getGroups()
+          .filter((g) => g.id !== group.id)
+          .map((g) => g.order),
+      ) + 1,
+    );
     const steps = group.path?.steps ?? [];
     expect(steps.map((item) => item.title.ru)).toEqual(['шаг s1', 'шаг s2']);
     expect(steps[1]!.within).toEqual({ skillId: 'ladder', index: 0, after: 'Read' });
@@ -215,6 +223,6 @@ describe('маршрут копии группы', () => {
     expect((await duplicate('nope')).statusCode).toBe(404);
     const bad = await duplicate('src', { lang: 'de' });
     expect(bad.statusCode).toBe(400);
-    expect(store.getGroups()).toHaveLength(1);
+    expect(store.getGroups().filter((g) => !isBuiltinGroupId(g.id))).toHaveLength(1);
   });
 });

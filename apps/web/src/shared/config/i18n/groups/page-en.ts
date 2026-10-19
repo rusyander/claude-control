@@ -29,6 +29,8 @@ export const groupsPageEn: typeof groupsPageRu = {
     pinned_many: '{{count}} skill numbers pinned',
     pinned_other: '{{count}} skill numbers pinned',
     scenarioBadge: 'scenario',
+    builtinBadge: 'built-in',
+    builtinEdited: 'edited by you — built-in updates leave it alone',
     kind: {
       skill_one: '{{count}} skill',
       skill_few: '{{count}} skills',
@@ -118,6 +120,13 @@ export const groupsPageEn: typeof groupsPageRu = {
     confirm: 'Copy',
     cancel: 'Cancel',
     done: 'Created “{{name}}” — switched off',
+  },
+  builtin: {
+    restore: 'Restore built-ins ({{count}})',
+    restoreHint: 'Built-in groups you deleted come back — with their catalog texts',
+    restoreDone: 'Restored: {{names}}',
+    deleteNote:
+      'A built-in group does not come back by itself — restore it with «Restore built-ins» on the groups page.',
   },
   providerNote: {
     runLayer:

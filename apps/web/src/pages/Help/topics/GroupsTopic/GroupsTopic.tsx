@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../../ui';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, HelpShot } from '../../ui';
 import { GroupsGuideSections } from '../GroupsGuideSections/GroupsGuideSections';
 import { GroupsLimitsSections } from '../GroupsLimitsSections/GroupsLimitsSections';
 
@@ -91,6 +91,19 @@ export function GroupsTopic() {
             { title: tr('bindNoOff'), text: tr('bindNoOffText') },
           ]}
         />
+      </HelpSection>
+
+      <HelpSection title={tr('builtinTitle')} caption={tr('builtinCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('builtinMembers'), text: tr('builtinMembersText') },
+            { title: tr('builtinAuto'), text: tr('builtinAutoText') },
+            { title: tr('builtinDelete'), text: tr('builtinDeleteText') },
+            { title: tr('builtinEdited'), text: tr('builtinEditedText') },
+          ]}
+        />
+        <HelpShot topic="groups" scenario="sources" frame="08-builtin" side="panel" />
       </HelpSection>
 
       <HelpSection title={tr('toggleTitle')} caption={tr('toggleCaption')}>

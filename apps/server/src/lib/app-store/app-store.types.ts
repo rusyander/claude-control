@@ -1,3 +1,4 @@
+import type { BuiltinGroupsRecord } from '@agentdeck/contracts/groups';
 import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
 import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
@@ -422,6 +423,18 @@ export interface SplitPlanGroupRecord {
   };
   /** Человек принял доставленную группу (ISO); новый ход группы отметку снимает. */
   acceptedAt?: string;
+  /**
+   * Человек сам отметил готовой группу, которую конвейер «готово» не закрыл
+   * (владелец 20.10): когда, и в каком состоянии она стояла — «Снять отметку»
+   * возвращает именно его, а не выдуманное «в очереди».
+   */
+  markedDone?: {
+    at: string;
+    from: SplitGroupStatus;
+    waitingFor?: SplitGroupWait;
+    error?: string;
+    doneAt?: string;
+  };
   /** «Перепроверить MR» нажата (ISO); снимается концом хода — доставкой или сбоем. */
   recheckRequestedAt?: string;
   /**
@@ -904,6 +917,8 @@ export interface AppState {
    * список чистится по ответу сервиса, а не руками.
    */
   pushDevices?: PushDevice[];
+  /** Встроенные группы доставки: что панель засеяла и что человек удалил. */
+  builtinGroups?: BuiltinGroupsRecord;
   /**
    * Пересылка сессий из терминала и VS Code на телефон (вопросы, права,
    * сообщения посреди хода). Нет поля — включено; `false` — человек выключил.

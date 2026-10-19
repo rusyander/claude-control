@@ -43,9 +43,13 @@ describe('правки группы с доставкой (журнал 59d)', (
 describe('звено доставки (журнал 59a, 61b)', () => {
   const prompt = deliverStagePrompt({ branch: 'fix-PROJ-7', after: 'fix' });
 
-  it('свежая основная ветка до пуша: fetch и rebase неотправленной ветки', () => {
+  // Владелец 19.10 (MUST #1): основную догоняют только при конфликте с ней —
+  // без него брокер откажет, и задание «догони» стоило бы хода и гейта заново.
+  it('основная до пуша: fetch, проверка конфликта, rebase только при нём', () => {
     expect(prompt).toContain('git fetch origin');
-    expect(prompt).toContain('git rebase origin/<main>');
+    expect(prompt).toContain('git merge-tree --write-tree --quiet HEAD origin/<main>');
+    expect(prompt).toContain('stay on the current base, never rebase');
+    expect(prompt).not.toContain('pushed but behind the main branch');
     // Отправленную отставшую — тоже, но пуш только с арендой (W3-3); `--force` — никогда.
     expect(prompt).toContain('force-push without a lease (`--force`) is always forbidden');
   });
@@ -54,11 +58,20 @@ describe('звено доставки (журнал 59a, 61b)', () => {
     expect(prompt).toContain('AskUserQuestion');
   });
 
-  it('группа без звена доставки (работа на потолке) тоже берёт свежую основную до пуша', () => {
+  it('группа без звена доставки (работа на потолке) тоже сверяет конфликт до пуша', () => {
     const preamble = deliveryPreamble({ branch: 'fix-PROJ-7' });
 
     expect(preamble).toContain('git fetch origin');
-    expect(preamble).toContain('rebase the branch onto the fresh main branch');
+    expect(preamble).toContain('exit 1 = a real conflict');
+    expect(preamble).not.toContain('has fallen behind main');
+  });
+
+  // Владелец 18–20.10: полные проверки один раз на задачу, в доставке.
+  it('полные проверки — один раз: преамбула велит узкие между правками', () => {
+    const preamble = deliveryPreamble({ branch: 'fix-PROJ-7' });
+
+    expect(preamble).toContain('run ONCE on the final tree right before the push');
+    expect(prompt).toContain('ONCE on this final tree');
   });
 
   it('пуш своей ветки обычным push, MR и ссылка последней строкой', () => {

@@ -16,16 +16,21 @@
  * `groupDecision` над строками группы из коробки — тем же путём, что маршрут
  * `/api/chat/permission-request`.
  *
- * Случаи:
+ * Случаи (политика владельца 19.10: карточка — только удаление, слияние, пуш
+ * в основную ветку и принудительный пуш):
  * - запись в тред MR и правка описания доходят до панели запросом прав, панель
- *   решает «человеку» (карточка), до сервера запись не доходит;
+ *   решает «с отметкой» — запись исполнена, хаб её покажет;
+ * - слияние MR инструментом форджа — «человеку», до сервера не доходит;
  * - чтение MR исполняется без карточки;
  * - принудительный пуш оболочкой (`--force`, `--force-with-lease`, `-f`,
  *   `+refspec`, `git -C`, внутри составной команды) — тоже запрос прав панели
  *   с решением «человеку», ветка на удалённом не тронута (журнал 19.10 02:17:02,
  *   L7.12: группа переписала ветку MR, стоявшего на ревью, без карточки);
- * - `git status` исполняется без карточки — правило не задевает обычную работу.
- *   Обычный `git push` проверка не судит: его судьба — решение владельца.
+ * - пуш в main (в том числе `git -C`, в составной команде), удаление ветки на
+ *   удалённом (`--delete`, `:ветка`) и локально, `git merge`, `rm -rf src` —
+ *   «человеку», и ничего из этого не исполнено;
+ * - обычный пуш рабочей ветки и `rm -rf dist` доходят до панели, решаются сами и
+ *   исполнены; `git status` исполняется без карточки.
  *
  * Запуск: `node tools/qa/check-group-forge-ask.mjs`. Нужен установленный
  * `claude` (путь — `CLAUDE_CLI`); стенд и настройки человека не трогаются.
@@ -48,7 +53,10 @@ const CALLS = [
   ['get_merge_request', { iid: '1018' }],
   ['create_merge_request_note', { iid: '1018', body: 'Ответ в тред' }],
   ['update_merge_request', { iid: '1018', body: 'Новое описание' }],
+  ['merge_merge_request', { iid: '1018' }],
 ];
+/** Ветка группы — та, на которой копия стоит по git. */
+const OWN = 'fix/forge-ask';
 
 /**
  * Принудительные пуши оболочкой: ветка удалённого на каждый случай своя, и по
@@ -62,11 +70,28 @@ const FORCE_PUSHES = [
   ['f5', 'git status --short && git push --force origin HEAD:f5'],
   ['f6', 'git -C . push --force-with-lease origin HEAD:f6'],
 ];
-/** Обычный пуш правилом `ask` не задет: его судьба — решение владельца (Door C). */
+/**
+ * Опасное по политике 19.10: каждое — карточкой, и по репозиторию видно, что
+ * команда не исполнилась (`intact` — проверка после прогона).
+ */
+const DANGER = [
+  ['git push origin HEAD:main', 'main'],
+  ['git -C . push origin HEAD:main', 'main'],
+  ['git status --short && git push origin HEAD:main', 'main'],
+  ['git push origin --delete del1', 'del1'],
+  ['git push origin :del2', 'del2'],
+  ['git branch -D keepme', 'keepme'],
+  ['git merge side', 'merge'],
+  ['rm -rf src', 'src'],
+];
+/** Рутина: доходит до панели правилом `ask`, решается сама и исполнена. */
 const PLAIN_PUSH = 'git push origin HEAD:plain';
+const TEMP_CLEANUP = 'rm -rf dist';
 const BASH_CALLS = [
   ...FORCE_PUSHES.map(([, command]) => command),
+  ...DANGER.map(([command]) => command),
   PLAIN_PUSH,
+  TEMP_CLEANUP,
   'git status --short',
 ];
 
@@ -262,8 +287,8 @@ function startStub() {
  * `groupDecision` над строками группы из коробки. «Человеку» — запись о
  * карточке и отказ (человек в проверке не нажимает), иначе — разрешение.
  */
-async function startPanel() {
-  const { groupDecision } = await import(
+async function startPanel(project) {
+  const { groupDecision, withWorktree } = await import(
     pathToFileURL(join(SERVER_SRC, 'domains', 'chat', 'group-permissions.ts')).href
   );
   const { resolveGroupPermissions, SPLIT_DEFAULTS_BUILTIN } = await import(
@@ -272,7 +297,7 @@ async function startPanel() {
   const group = {
     rows: resolveGroupPermissions(SPLIT_DEFAULTS_BUILTIN.permissions, undefined),
     allowEdits: true,
-    branch: 'fix/forge-ask',
+    branch: OWN,
     parentChatId: 'parent',
     groupIndex: 1,
   };
@@ -280,9 +305,11 @@ async function startPanel() {
   const server = createServer((req, res) => {
     const chunks = [];
     req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
+    req.on('end', async () => {
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-      const level = groupDecision(group, {
+      // Копия и своя ветка — у git копии, как в маршруте `/api/chat/permission-request`.
+      const placed = await withWorktree(group, project, body);
+      const level = groupDecision(placed, {
         toolName: body.toolName,
         input: body.input,
         guardedPatterns: [],
@@ -320,28 +347,47 @@ async function main() {
     pathToFileURL(join(SERVER_SRC, 'domains', 'chat', 'group-profile', 'group-profile.ts')).href
   );
   const stub = await startStub();
-  const panel = await startPanel();
   const work = mkdtempSync(join(workBase(), PREFIX));
   console.log(`CLI: ${exe}\nКаталог: ${work}\n`);
   const home = join(work, 'home');
   const project = join(work, 'proj');
   mkdirSync(home, { recursive: true });
   mkdirSync(project, { recursive: true });
+  const panel = await startPanel(project);
   writeFileSync(join(home, 'settings.json'), '{}');
   const forgeLog = join(work, 'forge.log');
-  // Ветка MR на удалённом: по ветке на случай, все на первом коммите; локальная
-  // голова переписана — обычный пуш туда не пройдёт, только принудительный.
+  // main, del1, del2 на удалённом — на коммите zero; ветка группы растёт от него,
+  // так что пуш HEAD:main прошёл бы перемоткой — не исполнен он только без разрешения.
   const remote = join(work, 'remote.git');
   git(work, 'init', '-q', '--bare', remote);
   git(project, 'init', '-q', '-b', 'main');
-  writeFileSync(join(project, 'a.txt'), 'one\n');
+  writeFileSync(join(project, 'a.txt'), 'zero\n');
   git(project, 'add', '.');
-  git(project, 'commit', '-qm', 'one');
+  git(project, 'commit', '-qm', 'zero');
+  const zero = git(project, 'rev-parse', 'HEAD');
   git(project, 'remote', 'add', 'origin', remote);
+  git(project, 'push', '-q', 'origin', 'HEAD:main', 'HEAD:del1', 'HEAD:del2');
+  git(project, 'branch', 'keepme');
+  // `side` — ветка со своим коммитом: исполненный `git merge side` сдвинул бы HEAD.
+  git(project, 'checkout', '-q', '-b', 'side');
+  writeFileSync(join(project, 'b.txt'), 'side\n');
+  git(project, 'add', '.');
+  git(project, 'commit', '-qm', 'side');
+  git(project, 'checkout', '-q', '-b', OWN, zero);
+  writeFileSync(join(project, 'a.txt'), 'one\n');
+  git(project, 'commit', '-qam', 'one');
+  // Ветки MR на удалённом: по ветке на случай; локальная голова переписана —
+  // обычный пуш туда не пройдёт, только принудительный.
   for (const [branch] of FORCE_PUSHES) git(project, 'push', '-q', 'origin', `HEAD:${branch}`);
   const before = git(project, 'rev-parse', 'HEAD');
   writeFileSync(join(project, 'a.txt'), 'two\n');
   git(project, 'commit', '-qam', 'rewritten', '--amend');
+  const head = git(project, 'rev-parse', 'HEAD');
+  // Настоящий каталог и временный: первый удалять — карточка, второй — уборка.
+  mkdirSync(join(project, 'src'), { recursive: true });
+  writeFileSync(join(project, 'src', 'keep.ts'), 'export {};\n');
+  mkdirSync(join(project, 'dist'), { recursive: true });
+  writeFileSync(join(project, 'dist', 'out.js'), '//\n');
   // Неотслеживаемый файл — чтобы исполненный `git status` было видно по выводу.
   writeFileSync(join(project, 'untracked.txt'), 'x\n');
 
@@ -447,11 +493,43 @@ async function main() {
     const ask = panel.asked.find((entry) => entry.tool.endsWith(`__${write}`));
     check(Boolean(ask), `${write}: запрос прав дошёл до панели`);
     check(
-      ask?.level === 'human',
-      `${write}: панель решила «человеку» (${ask?.level ?? 'нет запроса'})`,
+      ask?.level === 'notify',
+      `${write}: панель решила «с отметкой» (${ask?.level ?? 'нет запроса'})`,
     );
-    check(!executed.includes(write), `${write}: без ответа человека до сервера не дошло`);
+    check(executed.includes(write), `${write}: исполнено сервером`);
   }
+  {
+    const merge = 'merge_merge_request';
+    const ask = panel.asked.find((entry) => entry.tool.endsWith(`__${merge}`));
+    check(ask?.level === 'human', `${merge}: «человеку» (${ask?.level ?? 'нет запроса'})`);
+    check(!executed.includes(merge), `${merge}: без ответа человека до сервера не дошло`);
+  }
+  for (const [command] of DANGER) {
+    const ask = panel.asked.find((entry) => entry.command === command);
+    check(
+      ask?.level === 'human',
+      `${command}: запрос прав в панели, «человеку» (${ask?.level ?? 'нет запроса'})`,
+    );
+  }
+  const remoteHas = (branch) =>
+    spawnSync('git', ['rev-parse', '--verify', '-q', branch], { cwd: remote }).status === 0;
+  check(git(remote, 'rev-parse', 'main') === zero, 'main на удалённом не тронута');
+  check(remoteHas('del1') && remoteHas('del2'), 'del1 и del2 на удалённом не удалены');
+  check(git(project, 'rev-parse', '--verify', '-q', 'keepme') === zero, 'keepme не удалена');
+  check(git(project, 'rev-parse', 'HEAD') === head, 'git merge side не исполнен');
+  check(existsSync(join(project, 'src', 'keep.ts')), 'src не удалён');
+  for (const command of [PLAIN_PUSH, TEMP_CLEANUP]) {
+    const ask = panel.asked.find((entry) => entry.command === command);
+    check(
+      ask?.level === 'auto',
+      `${command}: дошёл до панели и решён сам (${ask?.level ?? 'нет запроса'})`,
+    );
+  }
+  check(
+    remoteHas('plain') && git(remote, 'rev-parse', 'plain') === head,
+    `${PLAIN_PUSH}: исполнен`,
+  );
+  check(!existsSync(join(project, 'dist')), `${TEMP_CLEANUP}: исполнен`);
   for (const [branch, command] of FORCE_PUSHES) {
     const ask = panel.asked.find((entry) => entry.command === command);
     check(
@@ -465,11 +543,6 @@ async function main() {
   check(!status || status.level === 'auto', 'git status: без карточки');
   // Итог вызова — из потока CLI: `tool_result` с номером вызова модели-стаба.
   const statusId = `toolu_fa${CALLS.length + BASH_CALLS.length - 1}`;
-  // Обычный пуш правилом `ask` к панели не идёт: решает режим CLI, как до L7.12.
-  check(
-    !panel.asked.some((entry) => entry.command === PLAIN_PUSH),
-    `${PLAIN_PUSH}: правилом ask не задет`,
-  );
   const statusResult = toolResults(output).get(statusId) ?? '';
   check(
     statusResult.includes('untracked.txt'),

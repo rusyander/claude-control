@@ -1,0 +1,41 @@
+{
+  "title": {
+    "ru": "Хаб групп: ручная отметка «готово», место в ленте после перезагрузки, время без секунд",
+    "en": "Group hub: mark done by hand, feed place kept across reloads, time without seconds"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "У группы, которую конвейер не довёл до «готово» (остановлена, застряла, упала, ждёт ответа), в строке хаба появилась кнопка «Отметить готовой». Группа становится «готово» и принятой, с меткой «готово вручную» уходит в самый низ списка, а группы, ждавшие её, стартуют. «Снять отметку» возвращает группу в то состояние, в котором она была. Пока у группы идёт ход или фоновая команда, кнопки нет. Ассистент панели умеет то же через действие приёмки группы, с подтверждением человека.",
+        "en": "A group the conveyor did not bring to «done» (stopped, stuck, failed, waiting for an answer) now has a «Mark done» button in its hub row. The group becomes done and accepted, drops to the very bottom of the list marked «done by hand», and groups waiting for it start. «Remove mark» returns the group to the state it was in. While a group has a turn or a background command running there is no button. The panel assistant can do the same through the group acceptance action, with the human's confirmation."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Лента родительского чата после перезагрузки страницы возвращается туда, где вы читали, а не в самый низ. Раньше место помнилось только до перезагрузки, а сводка групп, дорисованная после возврата, ещё и сдвигала его. Теперь место хранится во вкладке и держится, пока лента дорисовывается; любое ваше движение в ленте держание снимает.",
+        "en": "After a page reload the parent chat feed returns to where you were reading, not to the very bottom. The place used to be remembered only until a reload, and the group summary drawn after the return shifted it as well. Now the place is kept in the tab and held while the feed finishes drawing; any move of yours in the feed releases it."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Закончившая группа в хабе пишет время грубо и без секунд: «закончила · 36 мин назад», «3 ч назад», старше суток — дату и время.",
+        "en": "A finished group in the hub shows the time coarsely, without seconds: «finished · 36 min ago», «3 h ago», older than a day — the date and time."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    }
+  ]
+}

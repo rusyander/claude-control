@@ -101,6 +101,14 @@ function groupRow(
       (run) => (run.id === chat.id || run.sessionId === chat.id) && run.status === 'running',
     ),
   );
+  // Прогон на запросе прав числится не «running», а «waiting» — без этого флага
+  // индикатор группы прочёл бы его как «стоит» (19.10.2026).
+  const awaitingPermission = ordered.some((chat) =>
+    runs.some(
+      (run) =>
+        (run.id === chat.id || run.sessionId === chat.id) && (run.permissions?.length ?? 0) > 0,
+    ),
+  );
 
   return {
     chatId: last.id,
@@ -122,6 +130,7 @@ function groupRow(
     // Ключ прогона сверяется дважды: разговор, заведённый панелью, живёт под
     // временным `new-…`, пока CLI не назовёт настоящий `sessionId`.
     isRunning,
+    ...(awaitingPermission ? { awaitingPermission } : {}),
     // Звено спросило человека инструментом и стоит (Д16): из транскрипта, а не
     // из конвейера — вопрос бывает и у разговора, продолженного руками.
     ...(last.awaitingReply && !isRunning ? { waitingFor: 'question' as const } : {}),

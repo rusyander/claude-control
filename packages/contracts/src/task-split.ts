@@ -31,6 +31,7 @@ import {
   OWNER_PRECEDENCE_LINE,
   OWNER_TEXT_MAX,
   SKILL_ROUTE_LINE,
+  SYNC_ON_CONFLICT_LINE,
 } from './quality-floor.ts';
 
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
@@ -883,6 +884,14 @@ function runtimeLines(notes: WorktreeRuntimeNote[] | undefined, scope?: string[]
   return lines;
 }
 
+/**
+ * Чат, который панель запускает в копии, уже получает Node проекта первым в PATH
+ * (`chat-node`). Без этой оговорки «put it first in PATH» агенты приписывали
+ * `export PATH=…` к КАЖДОМУ Bash — 37 раз за одну группу (R7, живое ревью 19.10).
+ */
+const NODE_IN_CHAT =
+  ' A chat the panel starts here already has it first in PATH: check `node -v` once and prefix PATH only if it differs — never on every command.';
+
 function runtimeLine(note: WorktreeRuntimeNote, modules: string[]): string {
   const listed = modules.filter(Boolean);
   const where =
@@ -895,7 +904,7 @@ function runtimeLine(note: WorktreeRuntimeNote, modules: string[]): string {
   const run = note.run ? ` Run it with: ${note.run}.` : '';
   const detail = note.detail ? ` ${note.detail}` : '';
   if (note.status === 'switched') {
-    return `${head}; the panel prepared the copy on ${note.used}, the machine default is ${note.found ?? 'other'}. Use ${note.used} for installs and runs (put it first in PATH).${run}${detail}`;
+    return `${head}; the panel prepared the copy on ${note.used}, the machine default is ${note.found ?? 'other'}. Use ${note.used} for installs and runs (put it first in PATH).${note.tool === 'node' ? NODE_IN_CHAT : ''}${run}${detail}`;
   }
   if (note.status === 'missing') {
     return `⚠ ${head}, but no matching version is installed${note.found ? ` (default ${note.found})` : ''}. The copy was NOT prepared on a wrong version${note.tool === 'python' ? ' (no venv was built)' : ''} — say so in the first lines of your answer if the task needs it, and never work around it silently.${detail}`;
@@ -1180,11 +1189,9 @@ export function deliveryPreamble(input: {
         'the project convention requires a different name, rename this one before the first push (`git branch -m`).',
     // Свежая основная до первого пуша (журнал 61b): основная уходит вперёд, пока
     // группы работают, и конфликт, найденный при слиянии, стоит человеку дороже.
-    'Before the first push — `git fetch origin` and rebase the branch onto the fresh main branch of ' +
-      "the remote; resolve a conflict within the group's tasks yourself.",
-    // Отправленная и отставшая ветка (решение владельца, W3-3): ветка группы —
-    // её собственная, и переписать её арендой не значит тронуть общую историю.
-    'If the branch is already pushed and has fallen behind main — the same rebase, then ' +
+    // Отправленная ветка (решение владельца, W3-3): ветка группы — её
+    // собственная, и переписать её арендой не значит тронуть общую историю.
+    `Before the push — ${SYNC_ON_CONFLICT_LINE} Already pushed → after that rebase ` +
       '`git push --force-with-lease origin <group branch>`: only your own branch, never the main, ' +
       "a protected branch or another group's branch; a conflict in such a rebase is a question to " +
       'the human with a recommended option.',

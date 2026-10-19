@@ -24,6 +24,8 @@ import {
   parseSplitProposal,
   SPLIT_SYSTEM_PROMPT,
 } from '@agentdeck/contracts/task-split';
+import { recheckFreshBrief } from './split-recheck/recheck-session.ts';
+import { recheckPrompt } from './split-recheck/split-recheck.ts';
 
 /**
  * Нижняя планка заданий панели (владелец, 12.10.2026: «группа может только
@@ -46,6 +48,12 @@ const OWNER_B = `SECOND-START ${'Проверь документацию и ло
 
 const GROUP = { title: 'Группа', branch: 'feat/a', tasks: [OWNER, OWNER_B] };
 const GROUP_TASK = buildGroupPrompt(GROUP, 'Общий контекст разделения.');
+const RECHECK_GROUP = {
+  title: 'Группа',
+  branch: 'feat/a',
+  path: '/c',
+  mr: 'https://x/-/merge_requests/1',
+};
 const HANDOFF = {
   done: 'Этап закрыт',
   next: 'Дальше — второй этап',
@@ -129,6 +137,35 @@ const BUILDERS: { name: string; prompt: string; owner: string[] }[] = [
     name: 'buildHandoffPrompt',
     prompt: buildHandoffPrompt(HANDOFF, OWNER),
     owner: [OWNER],
+  },
+  {
+    // Задание в связи группы хранится без строки старшинства (`withoutPrecedence`).
+    name: 'recheckFreshBrief + recheckPrompt',
+    prompt:
+      recheckFreshBrief({
+        previous: 's1',
+        group: RECHECK_GROUP,
+        task: [OWNER, OWNER_B].join('\n'),
+        tasks: [],
+        progress: true,
+      }) +
+      '\n\n' +
+      recheckPrompt({
+        branch: 'feat/a',
+        mr: RECHECK_GROUP.mr,
+        scope: { base: 'origin/main', files: ['web/a.tsx'], outside: ['svc/go.mod'] },
+      }),
+    owner: [OWNER, OWNER_B],
+  },
+  {
+    name: 'recheckFreshBrief (proposal tasks)',
+    prompt: recheckFreshBrief({
+      previous: 's1',
+      group: RECHECK_GROUP,
+      tasks: [OWNER, OWNER_B],
+      progress: false,
+    }),
+    owner: [OWNER, OWNER_B],
   },
 ];
 

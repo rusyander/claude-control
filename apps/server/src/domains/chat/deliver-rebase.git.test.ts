@@ -7,10 +7,10 @@ import { deliverStagePrompt } from '@agentdeck/contracts/model-cascade';
 import { deliveryPreamble } from '@agentdeck/contracts/task-split';
 
 /**
- * Отправленная ветка группы отстала от основной (решение владельца, W3-3):
- * звено доставки переносит её на свежую основную и отправляет
- * `--force-with-lease` — только СВОЮ ветку. Раньше задание запрещало переписывать
- * отправленную историю, и звено стояло с вопросом на каждой отставшей группе.
+ * Отправленная ветка группы отстала от основной. С 20.10 (владелец 19.10,
+ * MUST #1) её переносят ТОЛЬКО при настоящем конфликте с основной: без него
+ * брокер откажет в rebase, а перенос гнал бы гейт заново. При конфликте звено
+ * переносит её и отправляет `--force-with-lease` — только СВОЮ ветку (W3-3).
  *
  * Команды берутся ИЗ ТЕКСТА задания и исполняются на настоящем git с голым
  * удалённым: проверяется не формулировка, а то, что сказанное агенту проходит.
@@ -72,21 +72,52 @@ describe('доставка отставшей отправленной ветк�
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('rebase и пуш из задания проходят: ветка на удалённом стоит на свежей основной', () => {
+  it('без конфликта основную не догоняют: проверка из задания отвечает 0, ветка на своей базе', () => {
+    const prompt = deliverStagePrompt({ branch: BRANCH, after: 'fix' });
+    const commands = commandsOf(prompt);
+    const mainBefore = git(origin, 'rev-parse', 'main').trim();
+    const branchBefore = git(origin, 'rev-parse', BRANCH).trim();
+
+    runFromPrompt(copy, 'git fetch origin', 'main');
+    const check = commands.find((command) => command.startsWith('git merge-tree'));
+    expect(check).toBeDefined();
+    // Код 0 — execFileSync не бросает: конфликта нет, и задание велит стоять.
+    runFromPrompt(copy, check ?? '', 'main');
+    expect(prompt).toContain('exit 0 = no conflict: stay on the current base, never rebase');
+
+    expect(git(origin, 'rev-parse', BRANCH).trim()).toBe(branchBefore);
+    expect(git(origin, 'rev-parse', 'main').trim()).toBe(mainBefore);
+  }, 30_000);
+
+  it('с конфликтом проверка отвечает 1, и rebase с пушем из задания проходят', () => {
+    commit(seed, { 'web/a.ts': 'a main\n' }, 'main touched the same line');
+    git(seed, 'push', '-q', 'origin', 'main');
     const prompt = deliverStagePrompt({ branch: BRANCH, after: 'fix' });
     const commands = commandsOf(prompt);
     const mainBefore = git(origin, 'rev-parse', 'main').trim();
 
     runFromPrompt(copy, 'git fetch origin', 'main');
-    const head = git(copy, 'symbolic-ref', 'refs/remotes/origin/HEAD').trim();
-    const main = head.replace('refs/remotes/origin/', '');
+    const check = commands.find((command) => command.startsWith('git merge-tree'));
+    expect(() => runFromPrompt(copy, check ?? '', 'main')).toThrow();
     const rebase = commands.find((command) => command.startsWith('git rebase origin/'));
     expect(rebase).toBeDefined();
-    runFromPrompt(copy, rebase ?? '', main);
-    // Пуш отправленной ветки после rebase — тот, что задание велит для этого случая.
+    // Агент решает конфликт; здесь — берём сторону группы и продолжаем.
+    expect(() => runFromPrompt(copy, rebase ?? '', 'main')).toThrow();
+    writeFileSync(join(copy, 'web/a.ts'), 'a group\n');
+    git(copy, 'add', 'web/a.ts');
+    execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], {
+      cwd: copy,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        GIT_EDITOR: 'true',
+        GIT_COMMITTER_NAME: 't',
+        GIT_COMMITTER_EMAIL: 't@t',
+      },
+    });
     const pushes = commands.filter((command) => command.startsWith('git push'));
     const push = pushes.find((command) => command.includes('--force-with-lease')) ?? pushes[0];
-    runFromPrompt(copy, push ?? '', main);
+    runFromPrompt(copy, push ?? '', 'main');
 
     // Удалённая ветка группы — поверх свежей основной, основная не тронута.
     git(origin, 'merge-base', '--is-ancestor', 'main', BRANCH);

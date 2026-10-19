@@ -874,10 +874,16 @@ describe('panel-agent actions: configuration', () => {
     ).json<PanelActionResult>();
     expect(edit.outcome).toBe('failed');
     expect(await pending.list()).toEqual([]);
+    // Смену CLI сделал сам тест: состояние и его переносимый снимок меняет он, а не отказ.
+    const ownWrites = ['state.json', 'settings-snapshot.json', 'settings-snapshot.seen'].map(
+      (name) => relative(base, join(appData, name)),
+    );
     const after = snapshot();
-    delete after[relative(base, join(appData, 'state.json'))];
     const expected = { ...before };
-    delete expected[relative(base, join(appData, 'state.json'))];
+    for (const key of ownWrites) {
+      delete after[key];
+      delete expected[key];
+    }
     expect(after).toEqual(expected);
   });
 

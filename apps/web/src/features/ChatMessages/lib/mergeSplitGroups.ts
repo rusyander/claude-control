@@ -218,7 +218,9 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
     ...(group.branch ? { branch: group.branch } : {}),
     stages: [],
     isRunning: false,
-    pending,
+    // Отмеченная готовой вручную (владелец 20.10) — закончена, хоть чата у неё
+    // и нет: строка «ждёт итога разбора» была бы неправдой, а место — внизу.
+    ...(group.markedDoneAt ? { status: group.status } : { pending }),
     // Номер группы в конвейере: им адресуются обе двери к стоящей группе —
     // ответ на вопрос разбора и «отпустить», не дожидаясь предшественников.
     groupIndex: group.index,
@@ -248,7 +250,9 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
           },
         }
       : {}),
-    ...(pending !== 'pending' ? controlOf(group, split, false) : {}),
+    ...(pending !== 'pending' && !group.markedDoneAt ? controlOf(group, split, false) : {}),
+    // «Отметить готовой» — и у группы без чата: стоит она так же, как с чатом.
+    ...acceptanceOf(group, split, false),
   };
 }
 

@@ -1,6 +1,6 @@
 /**
- * MCP-сервер хранилища кода — заглушка: stdio, чтение MR и две записи (ответ в
- * тред MR и правка описания MR).
+ * MCP-сервер хранилища кода — заглушка: stdio, чтение MR, две записи (ответ в
+ * тред MR и правка описания MR) и слияние MR.
  *
  * Нужен `check-group-forge-ask.mjs`: доказать, что запись в хранилище кода из
  * группы разделения доходит до человека карточкой, а не проходит молча. Каждый
@@ -13,16 +13,20 @@ import readline from 'node:readline';
 const send = (message) => process.stdout.write(JSON.stringify(message) + '\n');
 const LOG = process.env.FORGE_STUB_LOG ?? '';
 
-const TOOLS = ['get_merge_request', 'create_merge_request_note', 'update_merge_request'].map(
-  (name) => ({
-    name,
-    description: `stub ${name}`,
-    inputSchema: {
-      type: 'object',
-      properties: { iid: { type: 'string' }, body: { type: 'string' } },
-    },
-  }),
-);
+const TOOLS = [
+  'get_merge_request',
+  'create_merge_request_note',
+  'update_merge_request',
+  // Слияние MR — удаление и слияние на форже у человека при записи наружу «С отметкой».
+  'merge_merge_request',
+].map((name) => ({
+  name,
+  description: `stub ${name}`,
+  inputSchema: {
+    type: 'object',
+    properties: { iid: { type: 'string' }, body: { type: 'string' } },
+  },
+}));
 
 readline.createInterface({ input: process.stdin }).on('line', (line) => {
   if (!line.trim()) return;

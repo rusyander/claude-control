@@ -164,7 +164,9 @@ describe('verify-ledger: сужение от последнего зелёног
     const r = vitest(['run']);
     expect(r.args).toEqual(['run']);
     expect(r.code).toBe(0);
-    expect(r.err).toContain('nothing the tests can see changed');
+    // Ключ пакета теперь — его дерево, а не всё: правка вне пакета даёт прямой повтор
+    // ещё до сужения (verify-ledger.copies.integration.test.ts).
+    expect(r.err).toContain('[verify-ledger] reused green');
   });
 
   it('AGENTDECK_VERIFY_LEDGER_DELTA=off — целиком', () => {

@@ -3,7 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Group } from '@agentdeck/contracts';
+import { isBuiltinGroupId, type Group } from '@agentdeck/contracts';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
@@ -57,6 +57,11 @@ describe('panel-agent actions: groups', () => {
     mcpConfig: join(base, '.claude.json'),
   });
   const disk = () => new AppStore(appData);
+  // Встроенные группы панель засевает сама на старте — считаем только группы человека.
+  const ownGroups = (): Group[] =>
+    disk()
+      .getGroups()
+      .filter((group) => !isBuiltinGroupId(group.id));
   const diskGroup = (name: string): Group | undefined =>
     disk()
       .getGroups()
@@ -232,7 +237,7 @@ describe('panel-agent actions: groups', () => {
   it('draft_group отклонён — на диске ничего', async () => {
     const { result } = await decided('draft_group', { name: 'Нет', steps: [STEP] }, 'reject');
     expect(result.outcome).toBe('rejected');
-    expect(disk().getGroups()).toEqual([]);
+    expect(ownGroups()).toEqual([]);
   });
 
   it('read_group: участники с описанием, путь по порядку, числа «Авто» и закреплённые', async () => {
@@ -623,7 +628,7 @@ describe('panel-agent actions: groups', () => {
     });
     expect(card).toBeUndefined();
     expect(result.outcome).toBe('failed');
-    expect(disk().getGroups()).toEqual([]);
+    expect(ownGroups()).toEqual([]);
   });
 
   /** F-17. Соседние чтения маскируют текст; шаги и подписи группы — тоже. */
@@ -650,7 +655,7 @@ describe('panel-agent actions: groups', () => {
     });
     expect(card).toBeUndefined();
     expect(result.outcome).toBe('failed');
-    expect(disk().getGroups()).toEqual([]);
+    expect(ownGroups()).toEqual([]);
   });
 
   it('read_group: описанный участник — с именем и строкой на двух языках', async () => {
@@ -766,7 +771,7 @@ describe('panel-agent actions: groups', () => {
     expect(answer.statusCode).toBe(200);
     const result = (await running).json<PanelActionResult>();
     expect(result).toMatchObject({ outcome: 'failed', messageCode: 'stale_preview' });
-    expect(disk().getGroups()).toHaveLength(1);
+    expect(ownGroups()).toHaveLength(1);
   });
 
   it('copy_group: отказ — на диске одна группа; занятое имя — отказ до карточки', async () => {
@@ -774,11 +779,11 @@ describe('panel-agent actions: groups', () => {
     const id = diskGroup('Флот')!.id;
     const { result } = await decided('copy_group', { id }, 'reject');
     expect(result.outcome).toBe('rejected');
-    expect(disk().getGroups()).toHaveLength(1);
+    expect(ownGroups()).toHaveLength(1);
 
     const taken = await decided('copy_group', { id, name: ' флот ' });
     expect(taken.card).toBeUndefined();
     expect(taken.result.outcome).toBe('failed');
-    expect(disk().getGroups()).toHaveLength(1);
+    expect(ownGroups()).toHaveLength(1);
   });
 });

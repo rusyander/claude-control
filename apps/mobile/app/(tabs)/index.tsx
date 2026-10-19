@@ -21,6 +21,7 @@ import { localChatKey } from '../../src/features/inbox/chatKey';
 import { useSent, forgetSent } from '../../src/features/inbox/sent';
 import { useInboxChats } from '../../src/features/inbox/useInboxChats';
 import { WatcherChip } from '../../src/features/watcher/WatcherChip';
+import { LimitsStrip } from '../../src/features/usage-limits/LimitsStrip/LimitsStrip';
 import { stableChatKey } from '../../src/entities/inbox/stableChatKey';
 import { pendingCount } from '../../src/entities/inbox/pendingCount';
 import { staleSent } from '../../src/entities/inbox/staleSent';
@@ -100,6 +101,10 @@ export default function HomeScreen() {
           />
         </View>
       ) : null}
+      {/* Лимиты подписки выбранного компьютера — над вкладками, видны в обеих. */}
+      <View style={styles.limits}>
+        <LimitsStrip />
+      </View>
       <View style={styles.tabs}>
         <Segmented<HomeTab>
           options={[
@@ -239,6 +244,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   tabs: { marginHorizontal: space.lg, marginTop: space.sm, marginBottom: space.xs },
   computers: { marginHorizontal: space.lg, marginTop: space.sm },
+  limits: { marginHorizontal: space.lg, marginTop: space.sm },
   content: { padding: space.lg, paddingTop: space.sm, gap: space.md },
   actions: { flexDirection: 'row', gap: space.sm },
   failed: { color: colors.danger, fontSize: font.small },

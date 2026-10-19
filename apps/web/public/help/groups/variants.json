@@ -682,6 +682,28 @@
         "width": 700,
         "height": 640
       }
+    },
+    "sources/08-builtin": {
+      "light-ru": {
+        "file": "08-builtin.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "08-builtin.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "08-builtin.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "08-builtin.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
     }
   }
 }

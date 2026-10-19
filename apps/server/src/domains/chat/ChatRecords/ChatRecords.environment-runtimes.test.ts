@@ -159,6 +159,9 @@ describe('преамбула окружения: монорепозиторий 
     expect(text).toContain(`Go in ${GO.map((m) => `${m}/`).join(', ')} (25 modules)`);
     expect(text).toContain('(go.mod go): ready on 1.27.0. Run it with: go test ./...');
     expect(text.match(/Use 22\.23\.2 for installs and runs/g)).toHaveLength(1);
+    // R7: чат панели уже на этой версии — проверить раз, не приписывать PATH к каждому Bash.
+    expect(text).toContain('already has it first in PATH: check `node -v` once');
+    expect(text.match(/check `node -v` once/g)).toHaveLength(1);
     expect(text).toContain('Node in shared-ui/, admin-ui/, chat-ui/ (3 modules)');
     expect(text.match(/preparing it failed/g)).toHaveLength(1);
     expect(text).toContain(

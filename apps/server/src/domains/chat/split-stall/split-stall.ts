@@ -42,11 +42,23 @@ export interface SplitStallDeps {
   stop: (chatId: string) => StallStopOutcome;
   /** Путь оборванного хода; `undefined` — группа уже не «работает». */
   interrupt: (parentChatId: string, index: number) => { resumed: boolean } | undefined;
+  /**
+   * Снимок того, что держало вызов (`stall-diagnostic.ts`), ДО снятия процесса:
+   * снятие стирает улики. Ответ — путь журнала; `undefined` или сбой — без него.
+   */
+  diagnose?: (input: {
+    key: string;
+    record: SplitPlanRecord;
+    group: SplitPlanGroupRecord;
+    chatIds: readonly string[];
+    silentMs: number;
+  }) => Promise<string | undefined>;
   notify: (
     parentChatId: string,
     group: SplitPlanGroupRecord,
     silentMs: number,
     resumed: boolean,
+    logPath?: string,
   ) => void;
   log: (message: string, error?: unknown) => void;
   now?: () => number;
@@ -62,12 +74,24 @@ export interface SplitStallDeps {
  * простой такого процесса ограничивает пул живых сессий (6 ч) — его закрытие и
  * так ведёт в обрыв. Без живого процесса пробуждения не будет никогда.
  */
-export function createSplitStallWatch(deps: SplitStallDeps): () => string[] {
+export function createSplitStallWatch(deps: SplitStallDeps): () => Promise<string[]> {
   const seen = new Map<string, { status: string; since: number }>();
+  /** Журнал уже снят для этого обрыва (повтор после «не снят» не пишет второй). */
+  const diagnosed = new Map<string, string | undefined>();
   const limit = deps.silentMs ?? STALL_SILENT_MS;
-  return () => {
-    const now = deps.now?.() ?? Date.now();
-    const fired: string[] = [];
+  let busy = false;
+
+  interface Stalled {
+    key: string;
+    record: SplitPlanRecord;
+    group: SplitPlanGroupRecord;
+    ids: string[];
+    last: number;
+    silent: number;
+  }
+
+  const collect = (now: number): Stalled[] => {
+    const found: Stalled[] = [];
     const watched = new Set<string>();
     for (const record of deps.plans()) {
       for (const group of record.groups) {
@@ -77,6 +101,7 @@ export function createSplitStallWatch(deps: SplitStallDeps): () => string[] {
         const mark = seen.get(key);
         if (!mark || mark.status !== group.status) {
           seen.set(key, { status: group.status, since: now });
+          diagnosed.delete(key);
           continue;
         }
         const ids = deps.chatIdsOf(record, group);
@@ -89,22 +114,68 @@ export function createSplitStallWatch(deps: SplitStallDeps): () => string[] {
         if (silent < limit) continue;
         if (group.status === 'background' && deps.processAlive(ids)) continue;
         if (deps.waitingOnHuman(ids)) continue;
-        // Процесс, который панель не смогла снять, работает дальше без присмотра —
-        // второй CLI в той же копии правил бы то же дерево наперегонки.
-        const outcomes = ids.map((id) => deps.stop(id));
-        if (outcomes.includes('unconfirmed')) {
-          deps.log(`split stall: process of ${key} not confirmed stopped, retry next pass`);
-          continue;
-        }
-        const result = deps.interrupt(record.parentChatId, group.index);
-        seen.delete(key);
-        if (!result) continue;
-        fired.push(key);
-        deps.notify(record.parentChatId, group, silent, result.resumed);
+        found.push({ key, record, group, ids, last, silent });
       }
     }
-    for (const key of seen.keys()) if (!watched.has(key)) seen.delete(key);
-    return fired;
+    for (const key of seen.keys()) {
+      if (watched.has(key)) continue;
+      seen.delete(key);
+      diagnosed.delete(key);
+    }
+    return found;
+  };
+
+  const settle = async (item: Stalled): Promise<boolean> => {
+    const { key, record, group, ids, silent } = item;
+    if (deps.diagnose && !diagnosed.has(key)) {
+      let path: string | undefined;
+      try {
+        path = await deps.diagnose({ key, record, group, chatIds: ids, silentMs: silent });
+      } catch (error) {
+        deps.log(`split stall: diagnostic of ${key} failed`, error);
+      }
+      diagnosed.set(key, path);
+      // Пока снимался список процессов (~1 с), группа могла ожить или смениться.
+      const latest = deps.lastActivity(ids);
+      const fresh = deps
+        .plans()
+        .find((plan) => plan.parentChatId === record.parentChatId)
+        ?.groups.find((candidate) => candidate.index === group.index);
+      if ((latest !== undefined && latest > item.last) || fresh?.status !== group.status) {
+        diagnosed.delete(key);
+        return false;
+      }
+    }
+    // Процесс, который панель не смогла снять, работает дальше без присмотра —
+    // второй CLI в той же копии правил бы то же дерево наперегонки.
+    const outcomes = ids.map((id) => deps.stop(id));
+    if (outcomes.includes('unconfirmed')) {
+      deps.log(`split stall: process of ${key} not confirmed stopped, retry next pass`);
+      return false;
+    }
+    const result = deps.interrupt(record.parentChatId, group.index);
+    seen.delete(key);
+    const logPath = diagnosed.get(key);
+    diagnosed.delete(key);
+    if (!result) return false;
+    deps.notify(record.parentChatId, group, silent, result.resumed, logPath);
+    return true;
+  };
+
+  // Обход асинхронный (снимок процессов), а таймер не ждёт: второй обход поверх
+  // идущего снимал бы ту же группу дважды.
+  return async () => {
+    if (busy) return [];
+    busy = true;
+    try {
+      const fired: string[] = [];
+      for (const item of collect(deps.now?.() ?? Date.now())) {
+        if (await settle(item)) fired.push(item.key);
+      }
+      return fired;
+    } finally {
+      busy = false;
+    }
   };
 }
 

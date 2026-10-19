@@ -193,7 +193,16 @@ async function domain(name) {
 function parseArgs(argv) {
   // Опции-флаги: у них нет значения. Остальные ждут его следующим словом.
   // Внутри функции: `main()` зовётся раньше, чем дошла бы константа модуля.
-  const FLAG_OPTIONS = new Set(['help', 'dry', 'save', 'brief', 'full', 'memo', 'fresh']);
+  const FLAG_OPTIONS = new Set([
+    'help',
+    'dry',
+    'save',
+    'brief',
+    'full',
+    'memo',
+    'fresh',
+    'defer-runs',
+  ]);
   const options = {};
   const positional = [];
   let command;
@@ -395,6 +404,7 @@ async function turnGate(project, options, positional) {
     untracked: untrackedOf(project, paths),
     since,
     ...(typeof options['changed-at'] === 'string' ? { changedAt: options['changed-at'] } : {}),
+    ...(options['defer-runs'] ? { deferRuns: true } : {}),
     cli: `node "${fileURLToPath(import.meta.url)}"`,
     root: project,
   });

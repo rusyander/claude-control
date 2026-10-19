@@ -20,7 +20,7 @@ const { execFileSync } = require('node:child_process');
 const nodeCrypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { slash } = require('./checks.cjs');
+const { slash, gitTimeoutMs } = require('./checks.cjs');
 
 /** Цепочка сужений длиннее или старше — следующий прогон целиком: ошибки сужения не копятся. */
 const MAX_CHAIN = 10;
@@ -53,6 +53,7 @@ function git(cwd, args) {
     stdio: ['ignore', 'pipe', 'ignore'],
     windowsHide: true,
     maxBuffer: 64 * 1024 * 1024,
+    timeout: gitTimeoutMs(),
   });
 }
 
@@ -107,22 +108,29 @@ function realDir(dir) {
   }
 }
 
-const lastFile = (repo, family) => path.join(repo.store, 'v1', 'last', `${family}.json`);
+/** Свой указатель у копии; общий — запасной: первый прогон новой копии сужается от соседней. */
+const lastFile = (repo, family, shared = false) =>
+  path.join(shared ? repo.store : (repo.local ?? repo.store), 'v1', 'last', `${family}.json`);
 
 function readLast(repo, family) {
-  try {
-    return JSON.parse(fs.readFileSync(lastFile(repo, family), 'utf8'));
-  } catch {
-    return null;
+  for (const shared of [false, true]) {
+    try {
+      return JSON.parse(fs.readFileSync(lastFile(repo, family, shared), 'utf8'));
+    } catch {
+      /* нет — следующий */
+    }
   }
+  return null;
 }
 
 function writeLast(repo, family, body) {
-  const file = lastFile(repo, family);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(body));
-  fs.renameSync(tmp, file);
+  const files = new Set([lastFile(repo, family), lastFile(repo, family, true)]);
+  for (const file of files) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(body));
+    fs.renameSync(tmp, file);
+  }
 }
 
 /** Каталоги `setupFiles` из конфига vitest пакета: правка внутри — всё целиком. */
@@ -178,6 +186,8 @@ function linkedDirs(top, pkgAbs) {
  */
 function plan({ repo, parts, match, cwd, tree, now = Date.now(), env = process.env }) {
   if (match.id !== 'vitest' || match.noSkip) return { why: 'not-vitest' };
+  // Суженный прогон дал бы отчёт лишь о части тестов — потребитель счёл бы прочие пропавшими.
+  if (match.wholeOnly) return { why: 'report' };
   if (String(env.AGENTDECK_VERIFY_LEDGER_DELTA ?? '').toLowerCase() === 'off')
     return { why: 'delta-off' };
   const shape = vitestShape(match.args);
@@ -241,6 +251,7 @@ function claimFiles(shape, cwd) {
 }
 
 module.exports = {
+  linkedDirs,
   plan,
   narrowedArgs,
   claimFiles,

@@ -1,0 +1,114 @@
+// Блок стоит в боковой панели между шапкой и пунктами: тот же горизонтальный
+// отступ, что у строк навигации, чтобы колонка читалась ровно. Ширина — блока
+// постоянной ширины панели (244px); в свёрнутой рейке видны первые ~44px.
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-2xs) var(--spacing-xs) var(--spacing-xs);
+  margin-bottom: var(--spacing-2xs);
+  border-bottom: 1px solid var(--color-border);
+
+  &[data-collapsed] {
+    // В рейке шириной 60px видно 44px содержимого: проценты встают по центру
+    // колонки значков, а не прилипают к левому краю.
+    width: 44px;
+    padding-inline: 0;
+    align-items: center;
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.stale {
+  color: var(--color-warning);
+}
+
+.empty {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.window {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  width: 100%;
+  cursor: default;
+  --limit-fill: var(--color-accent);
+  --limit-percent: var(--color-fg);
+
+  &[data-tone='warning'] {
+    --limit-fill: var(--color-warning);
+    --limit-percent: var(--color-warning);
+  }
+
+  &[data-tone='danger'] {
+    --limit-fill: var(--color-danger);
+    --limit-percent: var(--color-danger);
+  }
+
+  &[data-stale] {
+    opacity: 0.7;
+  }
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+  white-space: nowrap;
+  font-size: var(--font-size-body-sm);
+}
+
+.label {
+  color: var(--color-fg);
+}
+
+.reset {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.percent {
+  color: var(--limit-percent);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+
+  [data-collapsed] & {
+    font-size: var(--font-size-caption);
+  }
+}
+
+.track {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: var(--color-surface-sunken);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background-color: var(--limit-fill);
+  transition: width var(--duration-normal, 200ms) ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}

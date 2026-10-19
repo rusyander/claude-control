@@ -1,5 +1,6 @@
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
+import { MAIN_SYNC_ASK } from '../main-sync/main-sync.ts';
 import { BASH_MAX_TIMEOUT_ENV, bashCeilingMs } from './bash-ceiling.ts';
 
 export { bashCeilingsAt } from './bash-ceiling.ts';
@@ -322,6 +323,12 @@ function wantsConnectors(extra: readonly string[]): boolean {
 
 /** Переменная CLI (2.1.286): окно автосжатия, сильнее настройки `autoCompactWindow`. */
 const COMPACT_WINDOW_ENV = 'CLAUDE_CODE_AUTO_COMPACT_WINDOW';
+/**
+ * Метка для хука конца хода блока «Тесты» (`tools/tests-hook.mjs`): автоматические
+ * кейсы группа прогоняет один раз перед «доставлено» (`chat/tests-gate`), не в
+ * конце каждого хода (решение владельца 19.10, пункт A).
+ */
+export const TESTS_RUNS_AT_DELIVERY_ENV = 'AGENTDECK_TESTS_RUNS_AT_DELIVERY';
 const COMPACT_WINDOW_MIN = 100_000;
 const COMPACT_WINDOW_MAX = 1_000_000;
 
@@ -356,29 +363,62 @@ function outwardAsk(kept: readonly ProfileMcpEntry[]): { permissions: { ask: str
       return role === 'forge' || role === 'tracker';
     })
     .map((entry) => `mcp__${entry.id.replace(/[^A-Za-z0-9_-]/g, '_')}`);
-  return { permissions: { ask: [...servers, ...FORCE_PUSH_ASK] } };
+  return { permissions: { ask: [...servers, ...GROUP_DANGER_ASK, ...MAIN_SYNC_ASK] } };
 }
 
 /**
- * Принудительный пуш оболочкой — тоже к брокеру прав (журнал 19.10 02:17:02,
- * L7.12): группа в авторежиме сделала `git push --force-with-lease` в ветку MR,
- * уже снятого с черновика и стоявшего на ревью, — классификатор пропустил, карточки
- * не было. У брокера команда — правило `gitHistory` (по умолчанию «человеку»).
- * Обычный `git push` правилом не задет: его судьба — решение владельца (Door C).
- * `*` в правиле CLI — любая строка, пустая тоже; составную команду CLI проверяет
- * по звеньям. Формы проверены настоящим CLI в `tools/qa/check-group-forge-ask.mjs`.
+ * Команды оболочки, которые решает брокер прав, а не авторежим CLI (политика
+ * владельца 19.10). В авторежиме (`--permission-mode auto`) до брокера доходит
+ * только то, что задето правилом `ask`: раньше это был лишь принудительный пуш
+ * (журнал 19.10 02:17:02, L7.12), и `git push origin main`, `git merge`,
+ * `git branch -D`, `rm -rf src` проходили без карточки.
+ *
+ * Правило лишь ведёт вызов к брокеру; решает разбор команды
+ * (`group-command.ts`): удаление настоящего, слияние, пуш в основную или
+ * защищённую ветку и принудительный пуш — карточкой, пуш рабочей ветки, уборка
+ * временного и чтение — сами, без человека. `*` в правиле CLI — любая строка,
+ * пустая тоже; составную команду CLI проверяет по звеньям. Формы проверены
+ * настоящим CLI в `tools/qa/check-group-forge-ask.mjs`.
  */
-export const FORCE_PUSH_ASK: readonly string[] = [
-  // --force, --force-with-lease, --force-if-includes — в любом месте строки.
-  'Bash(git push *--force*)',
-  'Bash(git push -f*)',
-  'Bash(git push * -f*)',
-  // `+ветка` в refspec — тот же принудительный пуш без флага.
-  'Bash(git push * +*)',
-  'Bash(git -C * push *--force*)',
-  'Bash(git -C * push -f*)',
-  'Bash(git -C * push * -f*)',
-  'Bash(git -C * push * +*)',
+export const GROUP_DANGER_ASK: readonly string[] = [
+  // Пуш любой формы: куда и как — решает разбор у брокера.
+  'Bash(git push*)',
+  'Bash(git -C * push*)',
+  // Слияние, удаление веток, меток, копий, тайника.
+  'Bash(git merge*)',
+  'Bash(git -C * merge*)',
+  'Bash(git branch *)',
+  'Bash(git -C * branch *)',
+  'Bash(git tag *)',
+  'Bash(git -C * tag *)',
+  'Bash(git worktree remove*)',
+  'Bash(git -C * worktree remove*)',
+  'Bash(git stash drop*)',
+  'Bash(git stash clear*)',
+  // Удаление файлов и каталогов.
+  'Bash(rm *)',
+  'Bash(rmdir *)',
+  'Bash(rd *)',
+  'Bash(del *)',
+  'Bash(unlink *)',
+  'Bash(Remove-Item *)',
+  'Bash(find * -delete*)',
+  'Bash(xargs *)',
+  'Bash(sudo *)',
+  // Базы: снос схемы и данных.
+  'Bash(psql*)',
+  'Bash(mysql*)',
+  'Bash(sqlite3*)',
+  'Bash(mongosh*)',
+  'Bash(redis-cli*)',
+  'Bash(dropdb*)',
+  'Bash(docker exec *)',
+  'Bash(* prisma migrate reset*)',
+  // Слияние и удаление на форже: CLI форджа и прямой запрос к API.
+  'Bash(gh *)',
+  'Bash(glab *)',
+  'Bash(curl *merge*)',
+  'Bash(curl *DELETE*)',
 ];
 
 /** Профиль в виде, в каком его кладёт в запуск реестр прогонов. */
@@ -391,6 +431,7 @@ export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
     args: ['--strict-mcp-config'],
     env: {
       ...(connectors ? {} : { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' }),
+      [TESTS_RUNS_AT_DELIVERY_ENV]: '1',
       ...(input.compactWindow ? { [COMPACT_WINDOW_ENV]: String(input.compactWindow) } : {}),
       ...(input.heavyQueue ? { [HEAVY_QUEUE_ENV]: input.heavyQueue.dir } : {}),
     },

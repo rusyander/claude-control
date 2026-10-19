@@ -77,6 +77,9 @@ import { registerPowerRoutes } from '../routes/power-routes.ts';
 import { registerMobileApkRoutes } from '../routes/mobile-apk-routes/mobile-apk-routes.ts';
 import { registerChangelogRoutes } from '../routes/changelog-routes/changelog-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
+import { registerUsageLimitsRoutes } from '../routes/usage-limits-routes/usage-limits-routes.ts';
+import { createUsageLimits } from '../domains/usage-limits/usage-limits.ts';
+import { readClaudeCredentials } from '../lib/credentials/credentials.ts';
 import { registerWatcherRoutes } from '../routes/watcher-routes/watcher-routes.ts';
 import { registerDevRestartRoutes } from '../routes/dev-restart-routes/dev-restart-routes.ts';
 import { registerPanelAgentRoutes } from '../routes/panel-agent/panel-agent-routes/panel-agent-routes.ts';
@@ -336,6 +339,18 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Поток событий об изменениях файлов: подписчиков держит хаб, рассылку по
     // нему ведёт наблюдатель за конфигами.
     (instance, context) => registerEventsRoutes(instance, context, events),
+    // Лимиты подписки в боковой панели: один кэш на сервер, запрос к Anthropic —
+    // только отсюда и не чаще раза в минуту, пока поток кто-то слушает.
+    (instance, context) =>
+      registerUsageLimitsRoutes(
+        instance,
+        createUsageLimits({
+          credentials: () => readClaudeCredentials(context.location.paths.root),
+          appDataDir: () => context.location.paths.appData,
+          listeners: () => events.size(),
+          changed: () => events.broadcast(['usage-limits'], ''),
+        }),
+      ),
     // Фоновый наблюдатель: тумблер, статус и сбои со страницы. Сам объект живёт
     // дольше запроса — его разбор идёт, пока тумблер включён.
     (instance, context) => registerWatcherRoutes(instance, context, runtime.watcher),

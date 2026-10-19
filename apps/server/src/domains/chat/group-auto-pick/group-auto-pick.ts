@@ -1,3 +1,4 @@
+import { isBuiltinGroupId } from '@agentdeck/contracts/groups';
 import type { Group } from '@agentdeck/contracts';
 import {
   effectivePairSide,
@@ -62,6 +63,7 @@ export function pickableGroups(
       name: group.name,
       ...(group.when?.trim() ? { when: group.when.trim() } : {}),
       ...(group.flow === 'scenario' ? { scenario: true as const } : {}),
+      ...(isBuiltinGroupId(group.id) ? { builtin: true as const } : {}),
     }));
 }
 

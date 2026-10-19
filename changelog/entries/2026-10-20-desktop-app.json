@@ -1,0 +1,62 @@
+{
+  "title": {
+    "ru": "Панель ставится как приложение и открывается своим окном при старте Windows; новый значок",
+    "en": "The panel installs as an app and opens in its own window at Windows start; a new icon"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Панель ставится как приложение из Chrome или Edge: своё окно без вкладок и адресной строки, свой значок в панели задач, который можно закрепить. Кнопка «Установить» — в «Настройки» → «Общие» → «Панель как приложение».",
+        "en": "The panel installs as an app from Chrome or Edge: its own window without tabs or an address bar and its own taskbar icon that can be pinned. The «Install» button is in «Settings» → «General» → «Panel as an app»."
+      },
+      "area": { "ru": "Интерфейс", "en": "Interface" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "pnpm keepalive:app ставит сторож стенда в автозапуск и открывает окно панели при входе в Windows: один раз за загрузку, только когда обе половины стенда отвечают, установленным приложением или окном Edge/Chrome в режиме приложения, но не вкладкой. pnpm keepalive:app:off снимает окно, сторож остаётся.",
+        "en": "pnpm keepalive:app puts the stand watchdog into autostart and opens the panel window at Windows sign-in: once per boot, only when both halves of the stand answer, as the installed app or an Edge/Chrome app window, never as a tab. pnpm keepalive:app:off removes the window and keeps the watchdog."
+      },
+      "how": {
+        "ru": "Сторож перезапускается раз в 5 минут, поэтому отметка «окно уже открывали» привязана к моменту загрузки системы: закрытое окно само не возвращается.",
+        "en": "The watchdog is restarted every 5 minutes, so the «window already opened» mark is tied to the moment the system booted: a closed window does not come back by itself."
+      },
+      "area": { "ru": "Запуск", "en": "Startup" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Перезапуск фронтенда больше не открывает новую вкладку браузера: раньше каждый подъём стенда сторожем добавлял ещё одну. Прежнее поведение — VITE_OPEN=1.",
+        "en": "A frontend restart no longer opens a new browser tab: every time the watchdog brought the stand up, another one appeared. The old behaviour is VITE_OPEN=1."
+      },
+      "area": { "ru": "Запуск", "en": "Startup" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Новый значок панели: плитка с градиентом, кольцо с делениями толще и без прозрачности, поэтому знак читается на вкладке и в панели задач уже с 16 пикселей. Тот же знак — в боковой панели, у приложения на телефоне и на его заставке.",
+        "en": "A new panel icon: a gradient tile and a thicker ring of ticks without transparency, so the mark reads on a tab and in the taskbar from 16 pixels up. The same mark is in the sidebar, on the phone app and on its splash screen."
+      },
+      "area": { "ru": "Интерфейс", "en": "Interface" }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: тонкое полупрозрачное кольцо на 16–24 пикселях сливается в пятно",
+        "en": "Before: the thin translucent ring blurs into a blot at 16–24 pixels"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: деления различимы на светлой и тёмной полосе вкладок с 16 пикселей",
+        "en": "After: the ticks are distinct on light and dark tab strips from 16 pixels up"
+      }
+    }
+  ]
+}

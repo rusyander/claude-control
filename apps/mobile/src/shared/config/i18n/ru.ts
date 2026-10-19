@@ -3,6 +3,7 @@ import { serverMessagesRu } from './server-messages/ru.ts';
 import { panelTextsRu } from './panel-texts/texts.ru.ts';
 import { homeRu } from './home/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
+import { usageLimitsRu } from './usage-limits/ru.ts';
 import { foreignChatRu } from './foreign-chat/ru.ts';
 import { projectsRu } from './projects/ru.ts';
 import { computersRu } from './computers/ru.ts';
@@ -33,6 +34,8 @@ export const ru = {
   home: homeRu,
   // Фоновый наблюдатель панели — отдельным модулем (`watcher/`).
   watcher: watcherRu,
+  // Лимиты подписки — отдельным модулем (`usage-limits/`).
+  usageLimits: usageLimitsRu,
   // Разговор с чужим CLI — отдельным модулем (`foreign-chat/`).
   foreignChat: foreignChatRu,
   tabs: {

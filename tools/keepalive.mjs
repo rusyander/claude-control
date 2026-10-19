@@ -25,6 +25,8 @@
  *
  *   pnpm keepalive           запустить в этом окне (Ctrl+C — выход, стенд гасится)
  *   pnpm keepalive:install   автозапуск: «Автозагрузка» + подхват раз в 5 минут
+ *   pnpm keepalive:app       то же + окно панели как приложения при старте Windows
+ *   pnpm keepalive:app:off   окно при старте больше не открывать (сторож остаётся)
  *   pnpm keepalive:off       снять автозапуск
  *   pnpm keepalive:status    что сейчас живо
  *
@@ -45,7 +47,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { connect } from 'node:net';
-import { homedir, platform } from 'node:os';
+import { homedir, platform, uptime } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -57,6 +59,16 @@ import {
   resolveBrandDir,
 } from '../apps/server/src/lib/brand.mjs';
 import { killChildProcessTree, killProcessTree } from '../apps/server/src/lib/kill-tree.mjs';
+import {
+  bootTime,
+  launchApp,
+  openAppEnabled,
+  openedThisBoot,
+  readMarker,
+  resolveAppLaunch,
+  setOpenApp,
+  writeMarker,
+} from './keepalive-app.mjs';
 
 const WIN = platform() === 'win32';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -253,7 +265,8 @@ function dropAdopted(unit) {
 function restart(unit) {
   const wait = unit.backoffMs ?? BACKOFF_MIN_MS;
   if (unit.nextStartAt && Date.now() < unit.nextStartAt) return;
-  log(`${unit.id}: порт ${unit.port} молчит — перезапуск`);
+  const port = unit.silentPort || unit.port;
+  log(`${unit.id}: порт ${port}${port === unit.port ? '' : ' (шлюз)'} молчит — перезапуск`);
   stop(unit);
   dropAdopted(unit);
   start(unit);
@@ -321,13 +334,40 @@ function readState(path) {
   }
 }
 
+/** Окно приложения ещё предстоит открыть в эту загрузку (см. `keepalive-app.mjs`). */
+let appPending = false;
+
+function openAppOnce() {
+  appPending = false;
+  // Отметку ставим и тогда, когда открыть нечем: иначе сторож, поднятый
+  // подхватом через 5 минут, искал бы браузер заново каждый раз.
+  writeMarker(STATE_DIR, bootTime(Date.now(), uptime()));
+  const launch = resolveAppLaunch(process.env);
+  if (!launch) {
+    log('окно приложения: нет ни установленной панели, ни Edge/Chrome — не открываю');
+    return;
+  }
+  try {
+    launchApp(launch);
+    log(`окно приложения открыто: ${launch.how}`);
+  } catch (error) {
+    log(`окно приложения не открылось: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
 async function tick() {
   const gateway = gatewayPort();
 
   for (const unit of UNITS) {
     // Шлюз поднимает серверная половина: его молчание лечится её перезапуском.
     const extra = unit.id === 'server' && gateway ? gateway : 0;
-    const alive = (await probe(unit.port)) && (!extra || (await probe(extra)));
+    // Какой порт молчит — в журнал: 19.10 перезапуск записан как «порт 5178 молчит»,
+    // а молчать мог и шлюз, — по журналу причину было не различить.
+    let silent = 0;
+    if (!(await probe(unit.port))) silent = unit.port;
+    else if (extra && !(await probe(extra))) silent = extra;
+    const alive = silent === 0;
+    unit.silentPort = silent;
     if (alive) {
       unit.failures = 0;
       if (!unit.healthySince) unit.healthySince = Date.now();
@@ -340,6 +380,8 @@ async function tick() {
     unit.failures = (unit.failures ?? 0) + 1;
     if (unit.failures >= FAILS_TO_RESTART) restart(unit);
   }
+  // Окно — только когда отвечают обе половины: раньше оно показало бы ошибку.
+  if (appPending && UNITS.every((unit) => unit.silentPort === 0)) openAppOnce();
 }
 
 // === Автозапуск ===
@@ -376,7 +418,7 @@ function removeLegacyAutostart() {
   }
 }
 
-function install() {
+function install({ app = false } = {}) {
   if (!WIN) {
     console.error(
       'Автозапуск сделан под Windows. На других системах: pnpm keepalive под supervisor/systemd.',
@@ -405,12 +447,15 @@ function install() {
   // (упал, убит уборщиком, снят руками). Лишний экземпляр молча выходит по
   // pid-файлу, так что холостой запуск ничего не стоит и ничего не ломает.
   schtasks(['/create', '/tn', TASK_WATCH, '/tr', action, '/sc', 'MINUTE', '/mo', '5', '/f']);
+  mkdirSync(STATE_DIR, { recursive: true });
+  if (app) setOpenApp(STATE_DIR, true);
   schtasks(['/run', '/tn', TASK_WATCH]);
 
   console.log(`\n✓ Сторож установлен.
 
   Автозагрузка   ${startup}
   ${TASK_WATCH}  — подхват раз в 5 минут, если сторож умер
+  Окно панели при старте Windows: ${openAppEnabled(STATE_DIR) ? 'да (снять: pnpm keepalive:app:off)' : 'нет (включить: pnpm keepalive:app)'}
 
   Журнал:  ${LOG_PATH}
   Статус:  pnpm keepalive:status
@@ -420,6 +465,7 @@ function install() {
 
 function uninstall() {
   removeLegacyAutostart();
+  setOpenApp(STATE_DIR, false);
   for (const name of [TASK_MAIN, TASK_WATCH]) {
     try {
       schtasks(['/delete', '/tn', name, '/f']);
@@ -470,14 +516,22 @@ async function status() {
   } catch {
     // Файла нет — сторож не запускался.
   }
-  console.log(`\n${lines.join('\n')}\n  сторож  ${watchdog}\n  журнал  ${LOG_PATH}\n`);
+  const app = openAppEnabled(STATE_DIR) ? '✓ открывается при старте Windows' : '— не открывается';
+  console.log(
+    `\n${lines.join('\n')}\n  сторож  ${watchdog}\n  окно    ${app}\n  журнал  ${LOG_PATH}\n`,
+  );
 }
 
 // === Точка входа ===
 
 const mode = process.argv[2] ?? '';
 if (mode === '--install') {
-  install();
+  install({ app: process.argv.includes('--app') });
+} else if (mode === '--app-off') {
+  setOpenApp(STATE_DIR, false);
+  console.log(
+    '\n✓ Окно панели при старте Windows больше не открывается. Сторож работает как прежде.\n',
+  );
 } else if (mode === '--uninstall' || mode === '--off') {
   uninstall();
 } else if (mode === '--status') {
@@ -496,6 +550,10 @@ if (mode === '--install') {
     // Первый запуск.
   }
   writeFileSync(PID_PATH, String(process.pid));
+  appPending =
+    WIN &&
+    openAppEnabled(STATE_DIR) &&
+    !openedThisBoot(readMarker(STATE_DIR), bootTime(Date.now(), uptime()));
 
   log(`сторож поднялся, корень ${ROOT}`);
   for (const unit of UNITS) {

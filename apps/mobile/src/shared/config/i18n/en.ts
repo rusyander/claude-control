@@ -4,6 +4,7 @@ import { serverMessagesEn } from './server-messages/en.ts';
 import { panelTextsEn } from './panel-texts/texts.en.ts';
 import { homeEn } from './home/en.ts';
 import { watcherEn } from './watcher/en.ts';
+import { usageLimitsEn } from './usage-limits/en.ts';
 import { foreignChatEn } from './foreign-chat/en.ts';
 import { projectsEn } from './projects/en.ts';
 import { computersEn } from './computers/en.ts';
@@ -17,6 +18,7 @@ export const en: Dictionary = {
   panelTexts: panelTextsEn,
   home: homeEn,
   watcher: watcherEn,
+  usageLimits: usageLimitsEn,
   foreignChat: foreignChatEn,
   tabs: {
     home: 'Home',

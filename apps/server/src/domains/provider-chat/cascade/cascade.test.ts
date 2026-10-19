@@ -416,7 +416,7 @@ describe('foreignStagePrefix', () => {
     }) as ForeignStagePlan;
 
     const prefix = foreignStagePrefix(plan, settings);
-    expect(prefix).toContain('run the project checks');
+    expect(prefix).toContain('run the checks your task names');
     expect(prefix).not.toContain('When you finish, the panel itself starts a review');
     expect(prefix).toContain('one verification pass over your fixes');
     expect(plan.cascade.fixFindings).toEqual(['поправь']);

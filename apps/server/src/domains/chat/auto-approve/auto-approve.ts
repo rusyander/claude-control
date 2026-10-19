@@ -66,6 +66,13 @@ export interface AutoApproveInput {
    * значения по умолчанию из контрактов (см. `allowedPermissionRules`).
    */
   allowedRules?: ReadonlySet<string>;
+  /**
+   * MCP-инструменты, разрешённые человеком по имени в settings.json. Под правило
+   * записи наружу они не идут: человек сам назвал их безопасными, а CLI этот
+   * список не применяет, когда сервер отдан брокеру правилом `ask` (L6.2).
+   * Снос (`externalDestroy`) спрашивается всё равно.
+   */
+  allowedTools?: ReadonlySet<string>;
 }
 
 /**
@@ -107,7 +114,8 @@ export function isReadOnlyTool(toolName: string): boolean {
  * инструмент вокруг merge request'ов останавливал прогон карточкой. Ровно на
  * этом человек и уставал жать «Разрешить».
  */
-const MCP_DESTRUCTIVE = /^(delete|remove|destroy|purge|drop|merge|unpublish|revoke)(_|$)/i;
+const MCP_DESTRUCTIVE =
+  /^(delete|remove|destroy|purge|drop|merge|unpublish|revoke)(_|$)|^accept_(merge_request|mr|pull_request|pr)\b/i;
 
 /**
  * Инструмент MCP, который только СМОТРИТ. Чтение на той стороне отменять нечего
@@ -116,7 +124,15 @@ const MCP_DESTRUCTIVE = /^(delete|remove|destroy|purge|drop|merge|unpublish|revo
  * каждом `get_merge_request`, то есть на самой частой операции.
  */
 const MCP_READ =
-  /^(get|list|search|read|fetch|find|show|view|describe|query|count|check|validate|verify|discover|download|health|whoami|my)(_|$)/i;
+  /^(get|list|search|read|fetch|find|show|view|describe|query|count|check|validate|verify|discover|download|health|whoami|my|wait)(_|$)/i;
+
+/**
+ * Чтение, имя которого начинается не с глагола: обсуждения MR у сервера GitLab
+ * (`mr_discussions`) и пакетное чтение трекера (`batch_get_changelogs`). По
+ * глаголу они были записью наружу, и группа вставала карточкой на каждом
+ * просмотре тредов (журнал 19.10 19:41).
+ */
+const MCP_READ_NAMES = /^((mr|merge_request)_(discussions|notes|changes|diffs)|batch_get_\w+)$/i;
 
 /** Имя продукта перед глаголом в имени инструмента: `jira_get_issue`, `confluence_search`. */
 const MCP_PRODUCT_PREFIX =
@@ -189,6 +205,11 @@ const COMMAND_RULES: RuleMatcher[] = [
     segment: [
       /\b(drop|truncate)\b/i,
       /\bdelete\s+from\b/i,
+      // Запись данных и схемы (просьба владельца 19.10: запись в базу — человеку):
+      // `psql -c "insert …"` проходил строкой «обычная работа».
+      /\binsert\s+into\b/i,
+      /\bupdate\s+[\w."`[\]]+\s+set\b/i,
+      /\b(alter|create)\s+(table|index|schema|database|view)\b/i,
       /\b(migrate|migration)\b.*\b(down|reset|fresh)\b/i,
       /\bprisma\s+migrate\s+reset\b/i,
     ],
@@ -216,7 +237,12 @@ const COMMAND_RULES: RuleMatcher[] = [
     // Хостинги репозиториев и трекеры через их CLI: удаление и слияние.
     // Остальное (комментарий, MR, тикет) — обычная работа, см. `externalWrite`.
     id: 'externalDestroy',
-    segment: [/\b(gh|glab)\s+[a-z-]+\s+(delete|merge)\b/i],
+    segment: [
+      /\b(gh|glab)\s+[a-z-]+\s+(delete|merge)\b/i,
+      // Слияние через API хостинга (`…/merge_requests/5/merge`, `…/pulls/5/merge`):
+      // запрос к API шёл обычной работой, и слияние MR проходило без человека.
+      /\b(curl|wget|iwr|irm|Invoke-WebRequest|Invoke-RestMethod|(gh|glab)\s+api)\b[^\n]*\/merge\b/i,
+    ],
   },
   {
     // Скачал и сразу исполнил, удалил по сети. Не файлы на диске, но и не то,
@@ -266,7 +292,7 @@ export function ruleFor(toolName: string, input: unknown): PermissionRuleId | un
     // `create_merge_request_note` слиянием.
     const verb = name.replace(MCP_PRODUCT_PREFIX, '');
     if (MCP_DESTRUCTIVE.test(verb)) return 'externalDestroy';
-    return MCP_READ.test(verb) ? undefined : 'externalWrite';
+    return MCP_READ.test(verb) || MCP_READ_NAMES.test(verb) ? undefined : 'externalWrite';
   }
 
   if (toolName !== 'Bash') return undefined;
@@ -339,7 +365,7 @@ function matchesRule(pattern: string, toolName: string, input: unknown): boolean
  * раньше.
  */
 export function shouldAutoApprove(request: AutoApproveInput): boolean {
-  const { toolName, input, guardedPatterns, allowEdits, allowedRules } = request;
+  const { toolName, input, guardedPatterns, allowEdits, allowedRules, allowedTools } = request;
 
   // Вопрос человеку не подтверждается автоматически НИКОГДА. «Разрешить» здесь
   // значит «пусть CLI спросит сам», а в режиме `-p` спрашивать ему не у кого:
@@ -359,7 +385,8 @@ export function shouldAutoApprove(request: AutoApproveInput): boolean {
   // Незнакомая форма Bash-вызова: что исполнится — неизвестно, спрашиваем.
   if (toolName === 'Bash' && bashCommand(input) === undefined) return false;
 
-  const rule = ruleFor(toolName, input);
+  const named = ruleFor(toolName, input);
+  const rule = named === 'externalWrite' && allowedTools?.has(toolName) ? undefined : named;
   if (rule && !(allowedRules ?? DEFAULT_ALLOWED).has(rule)) return false;
 
   return !guardedPatterns.some((pattern) => matchesRule(pattern, toolName, input));

@@ -628,6 +628,10 @@ export const testsEn: typeof testsRu = {
       'with exact commands; no gaps — not a word and not a single extra token. Unrun cases ' +
       'are named one by one (run --case), not as their whole group: a group may hold long ' +
       'live checks against the stand, and running "the whole group" would load it mid-work. ' +
+      'A turn demands at most five cases tied to the changed file by path, the narrowest ' +
+      'first; the rest are checked at the end of the task. A split group does not run its ' +
+      'automated cases at the end of each turn: it runs them once before "delivered", while ' +
+      'a case for the change, a recorded manual check and a red result still hold its turn. ' +
       'A shot or ' +
       'probe script (shots, screenshot, snapshot, probe, repro in its name) in the root or ' +
       'a scripts folder (e2e, qa, scripts, tools, tmp) that git does not track is not code: ' +

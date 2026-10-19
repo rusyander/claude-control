@@ -78,6 +78,7 @@ export function SettingsTopic() {
             { title: tr('cardDir'), text: tr('cardDirText') },
             { title: tr('cardCreds'), text: tr('cardCredsText') },
             { title: tr('cardEditor'), text: tr('cardEditorText') },
+            { title: tr('cardInstallApp'), text: tr('cardInstallAppText') },
           ]}
         />
       </HelpSection>

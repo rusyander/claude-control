@@ -10,7 +10,7 @@ import Animated, {
 // Возврат с потока анимации в обычный: `runOnJS` в Reanimated 4 объявлен
 // устаревшим, замена живёт в самих worklets.
 import { scheduleOnRN } from 'react-native-worklets';
-import { RADIUS, TICKS } from './AppSplash.constants';
+import { FIRST_TICK, RADIUS, TICKS } from './AppSplash.constants';
 import type { AppSplashProps } from './AppSplash.types';
 import { styles } from './AppSplash.styles';
 
@@ -66,7 +66,10 @@ export function AppSplash({ onDone }: AppSplashProps) {
                 {
                   // Сначала поворот, потом вынос наружу: длинная сторона
                   // деления оказывается ВДОЛЬ окружности, а не лучом от центра.
-                  transform: [{ rotate: `${(360 / TICKS) * index}deg` }, { translateY: -RADIUS }],
+                  transform: [
+                    { rotate: `${FIRST_TICK + (360 / TICKS) * index}deg` },
+                    { translateY: -RADIUS },
+                  ],
                 },
               ]}
             />

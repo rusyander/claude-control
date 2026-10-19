@@ -414,7 +414,7 @@ describe('stageAppendPrompt', () => {
     const run = `${fix ? stageAppendPrompt(fix, settings) : ''}\n${fix?.prompt ?? ''}`;
 
     expect(run.split('run the project checks its rules name').length - 1).toBe(1);
-    expect(run).toContain('run the project checks your task names');
+    expect(run).toContain('run the checks your task names, at the scope and moment it names');
   });
 
   it('делить звено дальше не предлагается: чат уже выделен под одну группу', () => {

@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { availableParallelism, homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ChatEvent, RawEvent } from '../chat-events.ts';
@@ -114,8 +114,9 @@ function signatureOf(snapshot: unknown): string {
  *
  * Замер 17.10.2026, 16 ядер, гейт (проверки + vitest) четырёх UI-проектов:
  * пары разом 131 и 296 с против 171 и 387 подряд, четыре разом 367 против 558,
- * загрузка до 67%, новых таймаутов нет. Два места, а не четыре: e2e и сборки
- * параллельно не мерились, а пара уже снимает четверть ожидания.
+ * загрузка до 67%, новых таймаутов нет. Мест — четверть ядер, не меньше двух
+ * (16 ядер — четыре): при двух местах четыре группы 19.10 стояли в очереди по
+ * 9 минут, пока соседи гоняли гейты, а четыре разом в замере шли быстрее подряд.
  *
  * Потолка рабочих процессов vitest здесь больше нет: в том же замере четыре
  * гейта с четвертью ядер на каждый шли 669 с — дольше, чем подряд, — а пара с
@@ -123,7 +124,16 @@ function signatureOf(snapshot: unknown): string {
  * трансформацию, и лишние рабочие процессы простаивают меньше, чем урезанные.
  */
 const HEAVY_SLOTS_ENV = 'AGENTDECK_HEAVY_SLOTS';
-const CHILD_HEAVY_SLOTS = '2';
+const CHILD_HEAVY_SLOTS = String(Math.max(2, Math.floor(availableParallelism() / 4)));
+
+/**
+ * Число мест очереди на этой машине: заданное человеком в окружении панели, иначе
+ * четверть ядер. Его панель пишет в файл очереди при старте — хук читает файл.
+ */
+export function heavySlots(base: NodeJS.ProcessEnv): number {
+  const own = Number(base[HEAVY_SLOTS_ENV]);
+  return Number.isInteger(own) && own > 0 ? own : Number(CHILD_HEAVY_SLOTS);
+}
 
 /**
  * Окружение ребёнка разделения: места очереди тяжёлых шагов и короткий вывод

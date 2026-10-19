@@ -15,18 +15,19 @@ export function AppMark({ size = 32 }: AppMarkProps) {
       aria-hidden
       style={{ flexShrink: 0 }}
     >
-      <rect width="32" height="32" rx="9" fill="var(--color-accent)" />
+      {/* Геометрия — как у `public/favicon.svg`; заливка — акцент темы, а не градиент значка. */}
+      <rect width="32" height="32" rx="8" fill="var(--color-accent)" />
       <circle
         cx="16"
         cy="16"
-        r="8.5"
+        r="8.6"
         stroke="var(--color-accent-fg)"
-        strokeWidth="2"
+        strokeWidth="2.8"
         strokeLinecap="round"
-        strokeDasharray="3.4 4.2"
-        opacity="0.75"
+        strokeDasharray="4.2 4.8"
+        transform="rotate(-75 16 16)"
       />
-      <circle cx="16" cy="16" r="3.2" fill="var(--color-accent-fg)" />
+      <circle cx="16" cy="16" r="3.3" fill="var(--color-accent-fg)" />
     </svg>
   );
 }

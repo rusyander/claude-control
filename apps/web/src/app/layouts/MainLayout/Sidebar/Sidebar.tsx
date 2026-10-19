@@ -12,6 +12,7 @@ import { PanelAgentLauncher } from '@features/PanelAgentWindow';
 import { WatcherIndicator } from '@features/WatcherIndicator';
 import { useOverview } from '@entities/AppConfig';
 import { usePanelUpdate } from '@entities/Changelog';
+import { UsageLimitsMeter } from '@entities/UsageLimits';
 import {
   useProviders,
   activeProvider,
@@ -110,6 +111,9 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
             </Typography>,
           )}
         </Stack>
+
+        {/* Лимиты подписки Claude: видны на каждой странице, обновляются сами. */}
+        <UsageLimitsMeter isCollapsed={isCollapsed} />
 
         {/*
           Сворачивание — такая же строка, как пункты меню: значок всегда на

@@ -29,6 +29,13 @@ export interface TurnGateInput {
    * них — подсобка хода, не код. Нет поля — исключения нет.
    */
   untracked?: readonly string[];
+  /**
+   * Ход группы разделения (решение владельца 19.10, пункт A): автоматические
+   * кейсы она прогоняет один раз перед «доставлено» (`chat/tests-gate`), а не в
+   * конце каждого хода — 879 прогонов блока за три дня. Кейс на изменённое,
+   * запись ручного и красный по-прежнему держат ход.
+   */
+  deferRuns?: boolean;
   /** `node "<…>/tests-cli.mjs"` — как агенту его вызвать. */
   cli: string;
   root: string;
@@ -54,6 +61,9 @@ const TEST_FILE = /\.(spec|test)\.[^/]+$/i;
 
 /** Сколько назвать по имени: дальше — числом. Длинный пропуск — лишние токены каждый раз. */
 const NAMED = 4;
+
+/** Сколько кейсов конец хода требует прогнать или записать — остальное ждёт конца задачи. */
+const DEMAND = 5;
 
 function named(items: readonly string[]): string {
   const head = items.slice(0, NAMED).join(', ');
@@ -175,14 +185,36 @@ export function judgeTurn(input: TurnGateInput): string[] {
     );
   }
 
+  // Конец ХОДА требует прогон только кейсов, привязанных к правленому файлу путём
+  // (не зоной-словом), самых узких первыми, и не больше `DEMAND` (решение
+  // владельца 19.10): одна правка `run-routes.ts` требовала 48 кейсов, группа CP
+  // отдала прогонам блока 472 минуты за день. Полный набор связанных — один раз
+  // в конце задачи (`chat/tests-gate` у группы, гейт у чата).
+  const specificity = (item: (typeof touched)[number]): number =>
+    Math.max(
+      -1,
+      ...(byKey.get(`${item.groupId}:${item.caseId}`)?.codePaths ?? []).map((path) => {
+        const needle = normal(path).replace(/\/+$/, '');
+        return code.some((file) => file === needle || file.startsWith(`${needle}/`))
+          ? needle.length
+          : -1;
+      }),
+    );
+  const direct = touched
+    .map((item) => ({ item, rank: specificity(item) }))
+    .filter(({ rank }) => rank >= 0)
+    .sort((a, b) => b.rank - a.rank)
+    .map(({ item }) => item);
   const unrunKeys: string[] = [];
   const unrun: string[] = [];
   const unrecorded: string[] = [];
-  for (const item of touched) {
+  for (const item of direct) {
+    if (unrunKeys.length + unrecorded.length >= DEMAND) break;
     const key = `${item.groupId}:${item.caseId}`;
     const testCase = byKey.get(key);
     if (!testCase || testCase.muted) continue;
     if (testCase.automation?.status === 'automated') {
+      if (input.deferRuns) continue;
       const status = executed.get(key);
       if (!status || status === 'skipped' || status === 'unknown') {
         unrun.push(item.caseId);

@@ -218,6 +218,27 @@ describe('маршруты «Пути» группы', () => {
     expect(entries[work + 1]!.title).toBe('Read the ticket');
   });
 
+  it('шаг внутри скилла-НЕучастника (встроенная группа) показывает шаги этого скилла вокруг себя', async () => {
+    writeSkill('ladder', '## 1. Read the ticket\n\n## 2. Open a branch');
+    saveGroup({
+      members: [],
+      path: {
+        steps: [
+          step({ id: 's1', anchor: 'work', within: { skillId: 'ladder', index: -1, after: '' } }),
+        ],
+      },
+    });
+    await boot();
+    const res = await app.inject({ method: 'GET', url: '/api/groups/g1/path' });
+    const entries = res.json().entries as { kind: string; stage?: string; title?: string }[];
+    const work = entries.findIndex((entry) => entry.kind === 'builtin' && entry.stage === 'work');
+    expect(entries.slice(work + 1, work + 4).map((entry) => entry.title ?? entry.kind)).toEqual([
+      'custom',
+      'Read the ticket',
+      'Open a branch',
+    ]);
+  });
+
   it('скилл, чей текст есть, но не читается, назван в unreadable, а не пропадает молча; пропавший — нет', async () => {
     writeSkill('ladder', '## 1. Read the ticket\n\n## 2. Open a branch');
     // SKILL.md — каталог: чтение падает на настоящей файловой системе (EISDIR).

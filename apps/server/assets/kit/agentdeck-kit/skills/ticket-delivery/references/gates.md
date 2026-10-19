@@ -1,4 +1,13 @@
-# Gates and pipeline — §6 in CI's image and red blocks, §11 not watched, `rules:` width
+# Gates and pipeline — §6 once, in CI's image when needed, red blocks the push; §11 not read
+
+## When the full gate runs (§6)
+
+ONCE per task, on the final tree: after §9 and §10 are closed and committed, right before the §8
+push. Everything earlier takes narrow checks (SKILL.md §Working discipline). The runner memoises per
+tree, so a green run on an unchanged tree is reused, never repeated. It runs again only after an
+edit; an edit made after the MR — a reviewer thread, a §11 conflict — re-runs only the touched
+packages' checks, unless the edit reaches a shared config, lockfile or contract, which takes the full
+gate again. Two full runs with no edit between them is a red flag (stages.md).
 
 ## A gate the local machine cannot run (§6)
 
@@ -12,24 +21,32 @@ in CI's image before calling it absent (§14, discovery.md §What degrades).
 
 ## A red gate blocks (§6)
 
-Nothing is committed, pushed or undrafted on a red row. An escape (`Docs-Impact: none — <reason>`,
-`Tests-Impact: none — …`) is an INPUT the gate reads: it goes into the commit message first, the
-gate is re-run, and only its green verdict counts. «Red, escape planned» or «red, explained in the
-MR» is still red — the gate reads the commit, not the reasoning.
+Nothing is pushed or undrafted on a red row; local commits stay free. An escape (`Docs-Impact: none —
+<reason>`, `Tests-Impact: none — …`) is an INPUT the gate reads: it goes into the commit message
+first, the gate is re-run, and only its green verdict counts. «Red, escape planned» or «red,
+explained in the MR» is still red — the gate reads the commit, not the reasoning.
 
-## Pipeline (§11) — not watched
+## Pipeline (§11) — not read
 
-The user reads CI themselves and reports a red job; a rerun is cheap. So: no polling loop, no `sleep`
-between reads, no background watcher, no turn spent waiting. One snapshot read at §12 is allowed,
-none when the task says not to track the pipeline. A read is a snapshot: `created` / `pending` /
-`running` is recorded as that state, and only `success` on the head sha may be called green or
-stamped `11-pipeline ok`. The undraft and review move never wait on it (§12).
+The user reads CI themselves and reports a red job; a rerun is cheap. So: no read, no polling loop,
+no `sleep`, no background watcher, no turn spent waiting — `11-pipeline skip "not read"`. A read
+happens only when the user asks for one, and is then a snapshot: `created` / `pending` / `running` is
+recorded as that state, and only `success` on the head sha may be called green or stamped
+`11-pipeline ok`. The undraft and review move never wait on it (§12).
 
-## Red jobs (§11) — when the user reports one, or the snapshot shows it
+## Target branch (§11) — only a conflict moves the MR
+
+The MR conflicts with the target → `fetch`, `rebase` onto it, the touched packages' checks, `push
+--force-with-lease` to this ticket's own branch (git-guard treats the lease as an ordinary push; a
+bare `--force` is refused). No conflict → the MR is not updated however far the trunk moved: the
+user updates it on their own word — chasing the trunk re-runs the gate around the clock.
+
+## Red jobs (§11) — when the user reports one
 
 Classify every red job before saying anything about it:
 
-- **my code or a skipped gate** → fix, re-run §6, push; never dismissed as flakiness;
+- **my code or a skipped gate** → fix, the touched packages' checks (full gate if the cause is
+  shared), push; never dismissed as flakiness;
 - **the runner died** → retry once; a second infra death on the same job is reported, not retried
   (Stop and ask).
 

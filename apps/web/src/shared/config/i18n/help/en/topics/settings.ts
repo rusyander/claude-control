@@ -23,7 +23,7 @@ export const settingsEn: typeof settingsRu = {
     whyComfort: 'It fits the panel to you',
     whyComfortText:
       'Theme, language, large text, reduced motion, higher contrast — and the editor your ' +
-      'projects open in.',
+      'projects open in, and installing the panel as an app of its own.',
 
     canPath: 'Set the configuration directory by hand and switch between sets',
     canTheme: 'Pick a theme, a language and accessibility options',
@@ -37,6 +37,11 @@ export const settingsEn: typeof settingsRu = {
     canRevertHunk: 'Revert a single change out of a backup without bringing back the whole file',
     canTransfer:
       'Move the panel settings to another machine: export and import the state.json file',
+    canGitSnapshot:
+      'Carry the panel settings through git: the panel keeps their portable part in ' +
+      'agentdeck/settings-snapshot.json (groups, marks, projects, split-group rules — ' +
+      'without chat links, the remote access address or secrets, the home directory ' +
+      'written as a token) and applies a snapshot that came from another machine at start',
     canEnvTransfer:
       'Pack any provider’s environment into an archive and unpack it on another machine',
     canModels: 'Refresh the provider’s model list and move the default onto a newer model',
@@ -51,8 +56,8 @@ export const settingsEn: typeof settingsRu = {
       'See the Claude Code access token: the server reports only the source, never the value. ' +
       'The remote-access token is a different one; the panel shows it behind the pairing button',
     cantSync:
-      'Sync settings between machines automatically: there is no live sync, only a ' +
-      'manual file transfer',
+      'Sync settings between machines live: the git snapshot is applied only when the ' +
+      'panel starts, and commit, push and pull are yours to run',
     cantChange:
       'Edit Claude Code settings field by field: this section is about the panel itself, ' +
       'while the configuration is edited in its own sections',
@@ -63,6 +68,8 @@ export const settingsEn: typeof settingsRu = {
     storageManualValue: '~/.agentdeck/credentials.json',
     storageBackups: 'Backups',
     storageBackupsValue: '~/.claude/agentdeck/backups/',
+    storageSnapshot: 'Snapshot for git',
+    storageSnapshotValue: '~/.claude/agentdeck/settings-snapshot.json',
     storageApply: 'When it applies',
     storageApplyValue: 'at once: changing the directory needs no restart',
 
@@ -142,6 +149,12 @@ export const settingsEn: typeof settingsRu = {
     cardEditorText:
       'Editors installed on the system are highlighted, missing ones are dimmed. “Auto” ' +
       'takes the first one found, but you can give your own command.',
+    cardInstallApp: 'Panel as an app',
+    cardInstallAppText:
+      'Its own window without tabs and an icon in the taskbar. The «Install» button is ' +
+      'there while Chrome or Edge is ready to install the panel; otherwise the card says ' +
+      'where to do it in the browser menu. The window at Windows start is pnpm ' +
+      'keepalive:app: once per boot, when the stand already answers, and never as a plain tab.',
 
     firstRunTitle: 'First run',
     firstRunCaption:

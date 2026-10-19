@@ -389,10 +389,13 @@ describe('panel-agent actions: chat gaps (lane A)', () => {
       expect(none.message).toContain('no split plan');
     });
 
-    it('split_accept_group: delivered group accepted and unaccepted by approval; undelivered refused before a card', async () => {
-      const notDone = await h.call('split_accept_group', { chat: ids.parent, group: 1 });
-      expect(notDone.outcome).toBe('failed');
-      expect(notDone.message).toContain('not delivered');
+    it('split_accept_group: delivered group accepted and unaccepted by approval; a running one refused before a card', async () => {
+      const record = store.getSplitPlan(ids.parent)!;
+      record.groups[1]!.status = 'started';
+      store.setSplitPlan(record);
+      const running = await h.call('split_accept_group', { chat: ids.parent, group: 1 });
+      expect(running.outcome).toBe('failed');
+      expect(running.message).toContain('working right now');
 
       const rejected = await h.decided(
         'split_accept_group',

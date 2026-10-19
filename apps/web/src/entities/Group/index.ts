@@ -21,6 +21,7 @@ export { useSaveGroupPathSteps } from './api/useSaveGroupPathSteps';
 export { useGroupKnobs } from './api/GroupKnobsApi';
 export { useSetGroupKnobs } from './api/useSetGroupKnobs';
 export { useGroupDelivery } from './api/GroupDeliveryApi';
+export { useBuiltinGroups, useRestoreBuiltinGroups } from './api/BuiltinGroupsApi';
 export {
   useGroupMembers,
   type GroupMemberBrief,

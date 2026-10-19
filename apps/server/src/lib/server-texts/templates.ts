@@ -1242,6 +1242,10 @@ export const serverTextTemplates = {
     ru: 'Группа «{{group}}» молчала {{minutes}} мин — дольше любого вызова, её ход повис. Панель сняла процесс и продолжает группу с восстановлением состояния (продолжено: {{resumed}}); не продолженная ждёт кнопки «Продолжить» в хабе.',
     en: 'Group «{{group}}» was silent for {{minutes}} min — longer than any call, its turn hung. The panel stopped the process and resumes the group with a state rebuild (resumed: {{resumed}}); one not resumed waits for the «Resume» button in the hub.',
   },
+  'split-group-stalled-log-notice': {
+    ru: 'Группа «{{group}}» молчала {{minutes}} мин — дольше любого вызова, её ход повис. Панель сняла процесс и продолжает группу с восстановлением состояния (продолжено: {{resumed}}); не продолженная ждёт кнопки «Продолжить» в хабе. Что держало вызов (дерево процессов до снятия): {{log}}',
+    en: 'Group «{{group}}» was silent for {{minutes}} min — longer than any call, its turn hung. The panel stopped the process and resumes the group with a state rebuild (resumed: {{resumed}}); one not resumed waits for the «Resume» button in the hub. What held the call (process tree before the stop): {{log}}',
+  },
   'child-tell-notice': {
     ru: 'Родитель написал группам. Передано: {{sent}} · в очереди до конца их хода: {{queued}} · не доставлено (у группы нет чата или копии): {{refused}}.',
     en: 'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',

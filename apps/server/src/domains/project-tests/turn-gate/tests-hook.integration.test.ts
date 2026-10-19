@@ -131,6 +131,32 @@ describe('tests-hook: проверка конца хода', () => {
     expect(stop().out).toBe('');
   });
 
+  it('ход группы (метка профиля): прогон автокейса не требуется; без метки — требуется', () => {
+    // Пункт A 19.10: автокейсы группа прогоняет один раз перед «доставлено».
+    createGroup(project, 'auth', 'Auth');
+    upsertCase(
+      project,
+      'auth',
+      {
+        title: 'Вход',
+        steps: ['войти'],
+        codePaths: ['src/login.ts'],
+        automation: { status: 'automated', file: 'src/login.test.ts' },
+      },
+      start,
+    );
+    turn([{ name: 'Edit', input: { file_path: join(project, 'src', 'login.ts') } }]);
+    const chat = stop();
+    expect(chat.out).toContain('not run after the last edit');
+    const group = hook(
+      'stop',
+      { transcript_path: transcript, cwd: project },
+      { AGENTDECK_TESTS_RUNS_AT_DELIVERY: '1' },
+    );
+    expect(group.code, group.err).toBe(0);
+    expect(group.out).toBe('');
+  });
+
   it('начало сессии: строка о блоке; в чате панели (строка уже в промпте) — тишина', () => {
     const line = hook('session', { cwd: project });
     expect(line.out).toContain('AgentDeck Tests block is on');

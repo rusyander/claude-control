@@ -123,7 +123,37 @@ describe('POST /api/chat/split/:parent/accept', () => {
     expect((second.json() as { acceptedAt?: string }).acceptedAt).toBe(first.acceptedAt);
   });
 
-  it('недоставленную группу принять нельзя — отказ с кодом, отметки нет', async () => {
+  it('остановленную группу человек отмечает готовой; «Снять отметку» возвращает как было', async () => {
+    const record = store.getSplitPlan('parent-1')!;
+    record.groups.push(
+      { ...group(2, 'paused'), pausedAt: '2026-10-19T00:00:00.000Z', error: 'стоп' },
+      { ...group(3, 'waiting'), chatId: undefined, after: [2] },
+    );
+    record.order = [0, 1, 2, 3];
+    store.setSplitPlan(record);
+
+    const response = await accept(2);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ index: 2, markedDone: true });
+    const marked = store.getSplitPlan('parent-1')!.groups[2]!;
+    expect(marked.status).toBe('done');
+    expect(marked.error).toBeUndefined();
+    expect(viewOf(2)?.markedDoneAt).toBe(marked.acceptedAt);
+    // Ждавшая её группа больше не ждёт: предшественник закрыт.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(store.getSplitPlan('parent-1')!.groups[3]!.status).not.toBe('waiting');
+
+    const undo = await accept(2, false);
+    expect(undo.statusCode).toBe(200);
+    const back = store.getSplitPlan('parent-1')!.groups[2]!;
+    expect(back.status).toBe('paused');
+    expect(back.error).toBe('стоп');
+    expect(back.acceptedAt).toBeUndefined();
+    expect(back.markedDone).toBeUndefined();
+    expect(viewOf(2)?.markedDoneAt).toBeUndefined();
+  });
+
+  it('идущую группу отметить нельзя — отказ с кодом, отметки нет', async () => {
     const response = await accept(1);
 
     expect(response.statusCode).toBe(409);

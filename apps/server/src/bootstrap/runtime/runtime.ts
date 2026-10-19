@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appRootDir } from '../../domains/watcher/report.ts';
+import { heavyQueueDir } from '../../domains/group-progress/heavy-wait.ts';
 import { createLocalModels, type LocalModels } from '../../domains/local-models/service.ts';
 import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { createLocalMcpSource } from '../../domains/local-models/mcp-source.ts';
@@ -15,9 +16,17 @@ import {
   type SkillScopeInput,
 } from '../../domains/chat/group-profile/group-profile.ts';
 import { stageOf } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
+import {
+  releaseSessionLeases,
+  writeHeavyQueueConfig,
+} from '../../domains/chat/heavy-queue-leases/heavy-queue-leases.ts';
 import { StatusChats, briefWithStatus } from '../../domains/chat/status-chats/status-chats.ts';
 import { readSkills } from '../../domains/skills/read.ts';
-import { childRunEnv, type RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
+import {
+  childRunEnv,
+  heavySlots,
+  type RunOptions,
+} from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import { createRunSync } from '../../domains/local-models/run-sync.ts';
 import { createKeepAwake, type KeepAwake } from '../../lib/keep-awake/keep-awake.ts';
 import { machineId } from '../../lib/machine-identity/machine-identity.ts';
@@ -149,6 +158,7 @@ import {
   createSplitStallWatch,
   transcriptActivity,
 } from '../../domains/chat/split-stall/split-stall.ts';
+import { writeStallLog } from '../../domains/chat/split-stall/stall-diagnostic.ts';
 import { createHandoffPlanner } from '../../routes/chat/handoff-routes.ts';
 import { projectsDir } from '../../routes/chat/paths.ts';
 import { syncRelayHooks } from '../../routes/chat/outside-relay-routes/outside-relay-routes.ts';
@@ -168,6 +178,10 @@ import { copyRootOf, SplitConveyor } from '../../domains/chat/split-conveyor/spl
 import { MrWatch } from '../../domains/chat/mr-watch/mr-watch.ts';
 import { MrStateRefresh } from '../../domains/chat/mr-state-refresh/mr-state-refresh.ts';
 import { recheckDeliveredMr } from '../../domains/chat/split-recheck/split-recheck.ts';
+import {
+  createRecheckSession,
+  readRecheckScope,
+} from '../../domains/chat/split-recheck/recheck-session.ts';
 import { SieveStore } from '../../domains/chat/sieve-store/sieve-store.ts';
 import { sieveDeliveryGaps, sievePrompt } from '../../domains/chat/sieve-gate/sieve-gate.ts';
 import { testsDeliveryGaps } from '../../domains/chat/tests-gate/tests-gate.ts';
@@ -182,7 +196,11 @@ import {
   retryForeignRun,
   retryOutcome,
 } from '../../domains/chat/run-retry/run-retry.ts';
-import { pauseOnForeignStop, pauseOnHumanStop } from '../../routes/chat/split-control-routes.ts';
+import {
+  pausedGroupOf,
+  pauseOnForeignStop,
+  pauseOnHumanStop,
+} from '../../routes/chat/split-control-routes.ts';
 import {
   continueOnBackgroundLost,
   interruptOnBackgroundLost,
@@ -801,6 +819,18 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       fresh: lostConversationBrief(group, tasks),
     });
   };
+  // Оборванная группа (WP1c) продолжается своей же сессией. Сессии нет —
+  // процесс умер в первом ходе, продолжать нечего: ждёт человека, а не
+  // очередь, которую никто не разберёт.
+  const resumeGroup = (
+    group: SplitPlanGroupRecord,
+    prompt: string,
+  ): 'sent' | 'queued' | 'refused' => {
+    if (!group.chatId || !group.path) return 'refused';
+    const keys = conversationKeys(ctx.store.getChatLinks(), group.chatId);
+    if (![group.chatId, ...keys].some((key) => !key.startsWith('new-'))) return 'refused';
+    return tellGroup(group, group.chatId, group.path, prompt);
+  };
   const splitConveyor = new SplitConveyor({
     backgroundTasks: (chatId) => chatRuns.backgroundTasksOf(chatId),
     store: {
@@ -947,15 +977,17 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       nudge: (group, prompt): 'sent' | 'queued' | 'refused' =>
         group.chatId && group.path ? tellGroup(group, group.chatId, group.path, prompt) : 'refused',
     },
-    // Оборванная группа (WP1c) продолжается своей же сессией. Сессии нет —
-    // процесс умер в первом ходе, продолжать нечего: ждёт человека, а не
-    // очередь, которую никто не разберёт.
-    resume: (group, prompt): 'sent' | 'queued' | 'refused' => {
-      if (!group.chatId || !group.path) return 'refused';
-      const keys = conversationKeys(ctx.store.getChatLinks(), group.chatId);
-      if (![group.chatId, ...keys].some((key) => !key.startsWith('new-'))) return 'refused';
-      return tellGroup(group, group.chatId, group.path, prompt);
-    },
+    resume: resumeGroup,
+    // «Перепроверить MR» — новым разговором с вводной (R2/R5, 19.10.2026).
+    recheck: createRecheckSession({
+      links: () => ctx.store.getChatLinks(),
+      setLink: (chatId, link) => ctx.store.setChatLink(chatId, link),
+      removeLink: (chatId) => ctx.store.clearChatLink(chatId),
+      running: (chatId) => chatRuns.isRunning(chatId),
+      start: createReviewStarter(ctx, launchDeps),
+      resume: resumeGroup,
+      log: (message, error) => console.warn(message, error),
+    }),
     // Ожидание сброса лимита (журнал 89): срок в записи, таймер только будит.
     schedule: (run, ms) => setTimeout(run, ms).unref(),
     notify: (parentChatId, event) => void sayToParent(parentChatId, event),
@@ -1009,12 +1041,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // через паузу или в момент сброса лимита. Стоящее дерево повтор не будит:
   // старт ложится в очередь паузы и уйдёт по «Продолжить всё».
   // Группа на паузе (журнал 81a) повтором не продолжается: её остановил
-  // человек, и продолжит тоже он.
-  const pausedGroup = (chatId: string): boolean =>
-    [chatId, ...conversationKeys(ctx.store.getChatLinks(), chatId)].some((key) => {
-      const link = ctx.store.getChatLink(key);
-      return Boolean(link && splitConveyor.isPaused(link));
-    });
+  // человек, и продолжит тоже он. Тот же вопрос задаёт слово родителя (R13).
+  const pausedGroup = pausedGroupOf(ctx.store, splitConveyor);
   const runRetry = new RunRetry({
     start: (chatId, options, meta) =>
       pausedGroup(chatId) ||
@@ -1120,8 +1148,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // требуют ручного доверия (`/hooks`), без человека они не сработают.
   const heavyQueue = {
     hook: `node "${fileURLToPath(new URL('../../../../../tools/heavy-queue-hook.mjs', import.meta.url))}"`,
-    dir: join(ctx.location.paths.appData, 'heavy-queue'),
+    dir: heavyQueueDir(ctx.location.paths.appData),
   };
+  // Число мест — файлом очереди: его видят и группы, запущенные до этого старта.
+  writeHeavyQueueConfig(heavyQueue.dir, heavySlots(process.env));
   // Фоновые вызовы модели, которые панели не нужны (6.3), — тем же слоем настроек Qwen;
   // им же у группы едет очередь тяжёлых шагов.
   providerChats.setQuietRun((providerId, group, env) =>
@@ -1170,6 +1200,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       };
     },
     start: createReviewStarter(ctx, launchDeps),
+    // Группу на паузе слово родителя не будит — ждёт хода, заведённого человеком.
+    held: pausedGroup,
     notify: (keys, event) => {
       keys.some((key) => sayToParent(key, event));
     },
@@ -1255,6 +1287,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   chatRuns.setHandoffPlanner((finished) => {
     // Агент трогал папку e2e — её тесты в кейсы сразу, без просьбы человека.
     testsChat.finished(finished.options.cwd, finished.startedAt);
+    // Убитый посреди тяжёлого шага CLI аренду очереди не отдаст — отдаём за него.
+    if (finished.sessionId) releaseSessionLeases(heavyQueue.dir, finished.sessionId);
     const keys = finished.sessionId ? [finished.chatId, finished.sessionId] : [finished.chatId];
     tellsOnFinish(keys, finished.ok, finished.text);
     chatAutonomy.finished(keys, finished.text);
@@ -1567,23 +1601,37 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       chatSession.pendingPermissions().some((pending) => ids.includes(pending.runId)),
     stop: (chatId) => chatRuns.stop(chatId),
     interrupt: (parentChatId, index) => splitConveyor.interruptStalled(parentChatId, index),
-    notify: (parentChatId, group, silentMs, resumed) => {
+    // Что держало вызов — до снятия: снятие стирает улики (журнал 19.10, 4 ч и 7,7 ч ожидания).
+    diagnose: ({ key, group, chatIds, silentMs }) =>
+      writeStallLog(join(ctx.location.paths.appData, 'split-stall'), {
+        key,
+        group: group.title,
+        chatIds,
+        silentMs,
+        copyPath: group.path,
+        roots: [...new Set(chatIds.flatMap((id) => chatRuns.processRootsOf(id)))],
+      }),
+    notify: (parentChatId, group, silentMs, resumed, logPath) => {
       const params = {
         group: group.title,
         minutes: String(Math.round(silentMs / 60_000)),
         resumed: resumed ? '1' : '0',
       };
+      const textCode = logPath ? 'split-group-stalled-log-notice' : 'split-group-stalled-notice';
+      const textParams = logPath ? { ...params, log: logPath } : params;
       sayToParent(parentChatId, {
         kind: 'notice',
         code: 'groupStalled',
-        text: serverText('split-group-stalled-notice', params),
-        textCode: 'split-group-stalled-notice',
-        textParams: params,
+        text: serverText(textCode, textParams),
+        textCode,
+        textParams,
       });
     },
     log: (message, error) => console.warn(message, error ?? ''),
   });
-  const stallTimer = setInterval(stallWatch, STALL_POLL_MS);
+  const stallTimer = setInterval(() => {
+    stallWatch().catch((error: unknown) => console.warn('split stall: pass failed', error));
+  }, STALL_POLL_MS);
   stallTimer.unref();
   // Включённому «Claude на локальной модели» нужен живой сервер с первого сеанса.
   void localModels.resume().catch((error: unknown) => {
@@ -1929,6 +1977,14 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           },
           read: readMr,
           recheck: (parent, at, prompt) => splitConveyor.recheckDelivered(parent, at, prompt),
+          scope: (record, group) =>
+            group.path
+              ? readRecheckScope({
+                  mainDir: copyRootOf(record),
+                  copy: group.path,
+                  ...(group.base ? { base: group.base } : {}),
+                })
+              : Promise.resolve(undefined),
           log: (message, error) => console.warn(message, error),
         },
         parentChatId,

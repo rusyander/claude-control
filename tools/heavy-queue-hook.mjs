@@ -28,6 +28,9 @@
  * код 0: очередь экономит, но никогда не останавливает работу. Обход очереди
  * (ожидание вышло, сбой) пишется строкой в `bypass.log`: сама очередь иначе не
  * знает, сколько тяжёлого прошло мимо неё.
+ *
+ * Число мест — `config.json` каталога очереди (пишет панель), читается на каждом
+ * опросе; `node tools/heavy-queue-hook.mjs status [каталог]` — кто держит и кто ждёт.
  */
 import { createHash } from 'node:crypto';
 import {
@@ -251,15 +254,37 @@ function tickets(dir, now, maxAge) {
   return out;
 }
 
+/**
+ * Сколько мест в очереди: файл `config.json` каталога очереди (его пишет панель при
+ * старте), иначе `AGENTDECK_HEAVY_SLOTS`, иначе одно. Файл — первым и на каждом
+ * опросе: окружение снято в миг запуска CLI группы, и 19.10 места подняли до
+ * четырёх, а идущие группы держали два и стояли по 10–15 минут при свободных ядрах.
+ */
+export function slotsOf(dir) {
+  return configuredSlots(dir) ?? numberEnv('AGENTDECK_HEAVY_SLOTS', 1);
+}
+/** Число мест из файла очереди или `null` — файла нет, он битый или число не целое. */
+function configuredSlots(dir) {
+  const value = Number(readJson(join(dir, 'config.json'))?.slots);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+const clock = (at) => (Number.isFinite(at) ? new Date(at).toTimeString().slice(0, 5) : '?');
+/** Кто держит место — строкой для человека: сессия, команда, с каких пор, до каких. */
+const holder = (lease) =>
+  `${String(lease.session ?? '?').slice(0, 12)} «${lease.command ?? '?'}» с ${clock(lease.since)} до ${clock(lease.until)}`;
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Фон по просьбе модели: у Claude — `run_in_background`, у Qwen Code — `is_background`. */
 const inBackground = (input) =>
   input.tool_input?.run_in_background === true || input.tool_input?.is_background === true;
 
-/** Ждать места и взять аренду. Вернёт, сколько ждали, или `null` — ушли без аренды. */
-export async function acquire(dir, input, now = Date.now, learned = undefined) {
-  const slots = numberEnv('AGENTDECK_HEAVY_SLOTS', 1);
+/**
+ * Ждать места и взять аренду. Вернёт, сколько ждали, или `null` — ушли без аренды;
+ * `held` (если передан) получает, кто держал места на последнем опросе.
+ */
+export async function acquire(dir, input, now = Date.now, learned = undefined, held = []) {
   // 25 мин — под таймаутом хука в 30. Аренда гейта с потолком группы живёт до
   // 30,5 мин, так что ждущий может уйти раньше неё и пойти разом: осознанно —
   // хук, убитый CLI по таймауту, пустил бы команду без билета и без следа в bypass.log.
@@ -276,7 +301,9 @@ export async function acquire(dir, input, now = Date.now, learned = undefined) {
   const start = now();
   const ticket = `${String(start).padStart(15, '0')}-${process.pid}-${id}.json`;
   const ticketPath = join(dir, 'tickets', ticket);
-  const own = { pid: process.pid, session, created: start };
+  // Команда — в билете: состояние очереди (`status`) показывает, кто чего ждёт.
+  const command = shownCommand(input.tool_input?.command);
+  const own = { pid: process.pid, session, created: start, command };
   writeAtomic(ticketPath, own);
   // Свой билет живёт, пока ждём: срок — само ожидание с запасом на опрос.
   const maxAge = maxWait + poll * 2 + MARGIN_MS;
@@ -289,7 +316,10 @@ export async function acquire(dir, input, now = Date.now, learned = undefined) {
       const queue = tickets(dir, time, maxAge).filter(
         (item) => item.session !== session || item.name === ticket,
       );
-      const busy = leases(dir, time).filter((lease) => lease.session !== session).length;
+      const foreign = leases(dir, time).filter((lease) => lease.session !== session);
+      held.splice(0, held.length, ...foreign);
+      const busy = foreign.length;
+      const slots = slotsOf(dir);
       const position = queue.findIndex((item) => item.name === ticket);
       // Своего билета нет (его убрал чужой читатель) — вернуть на то же место и
       // ждать дальше: позиция −1 прежде пускала команду вперёд очереди (ревью A2-F6).
@@ -301,8 +331,9 @@ export async function acquire(dir, input, now = Date.now, learned = undefined) {
           lane: laneOf(input),
           toolUseId: input.tool_use_id ?? null,
           foreground: !background,
+          since: time,
           until: time + span,
-          command: shownCommand(input.tool_input?.command),
+          command,
         });
         return time - start;
       }
@@ -349,14 +380,18 @@ export function stampStart(dir, input, now = Date.now()) {
   }
 }
 
-/** Строка в журнал обходов: команда прошла без аренды. */
-export function noteBypass(dir, input, reason, now = Date.now()) {
+/**
+ * Строка в журнал обходов: команда прошла без аренды. `held` — кто держал места,
+ * когда ожидание вышло: без них по журналу не понять, чего ждали 25 минут.
+ */
+export function noteBypass(dir, input, reason, now = Date.now(), held = []) {
   try {
     const path = join(dir, 'bypass.log');
     if (existsSync(path) && statSync(path).size > BYPASS_LOG_MAX) {
       renameSync(path, `${path}.old`);
     }
-    const line = `${new Date(now).toISOString()} ${reason} ${shownCommand(input.tool_input?.command)}`;
+    const holders = held.length > 0 ? ` | держали: ${held.map(holder).join('; ')}` : '';
+    const line = `${new Date(now).toISOString()} ${reason} ${shownCommand(input.tool_input?.command)}${holders}`;
     appendFileSync(path, `${line.replace(/\s+/g, ' ')}\n`);
   } catch {
     // Журнал — по возможности.
@@ -425,7 +460,48 @@ export function finish(dir, input, now = Date.now()) {
  */
 const SHELL_TOOLS = new Set(['Bash', 'run_shell_command']);
 
+/** Файлы `.json` подкаталога как есть — только чтение, без уборки. */
+function readAll(dir, sub) {
+  return listDir(join(dir, sub))
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => readJson(join(dir, sub, name)))
+    .filter(Boolean);
+}
+
+const minutes = (ms) => `${Math.floor(ms / 60_000)} мин ${Math.floor((ms % 60_000) / 1_000)} с`;
+
+/**
+ * Состояние очереди для человека: сколько мест и откуда число, кто их держит и с
+ * каких пор, кто ждёт и сколько (`node tools/heavy-queue-hook.mjs status [каталог]`).
+ * Ждущая группа в чате видна лишь идущей командой — 19.10 две группы стояли по
+ * 10–15 минут, и понять, чего они ждут, было не по чему. Только читает.
+ */
+export function queueStatus(dir, now = Date.now()) {
+  const fromFile = configuredSlots(dir) !== null;
+  const slots = slotsOf(dir);
+  const live = readAll(dir, 'leases').filter((lease) => lease.until > now);
+  const waiting = readAll(dir, 'tickets').filter((ticket) => alive(ticket.pid));
+  const source = fromFile ? 'файл очереди' : 'окружение';
+  const lines = [
+    `Очередь тяжёлых шагов: занято ${live.length} из ${slots} (число мест: ${source})`,
+  ];
+  lines.push(live.length > 0 ? 'Держат:' : 'Никто не держит.');
+  for (const lease of live) lines.push(`  ${holder(lease)}`);
+  lines.push(waiting.length > 0 ? 'Ждут:' : 'Никто не ждёт.');
+  for (const ticket of waiting) {
+    const who = String(ticket.session ?? '?').slice(0, 12);
+    lines.push(`  ${who} «${ticket.command ?? '?'}» ждёт ${minutes(now - ticket.created)}`);
+  }
+  return lines.join('\n');
+}
+
 async function main() {
+  if (process.argv[2] === 'status') {
+    const target = process.argv[3] ?? process.env.AGENTDECK_HEAVY_QUEUE_DIR;
+    process.stdout.write(target ? `${queueStatus(target)}\n` : 'Каталог очереди не задан.\n');
+    return;
+  }
   const dir = process.env.AGENTDECK_HEAVY_QUEUE_DIR;
   if (!dir) return;
   const input = JSON.parse(readFileSync(0, 'utf8'));
@@ -444,9 +520,10 @@ async function main() {
   }
   const learned = loadLearned(dir);
   if (isHeavy(input.tool_input?.command, learned)) {
+    const held = [];
     try {
-      const waited = await acquire(dir, input, Date.now, learned);
-      if (waited === null) noteBypass(dir, input, 'timeout');
+      const waited = await acquire(dir, input, Date.now, learned, held);
+      if (waited === null) noteBypass(dir, input, 'timeout', Date.now(), held);
     } catch (error) {
       noteBypass(dir, input, `error:${error?.code ?? 'unknown'}`);
     }

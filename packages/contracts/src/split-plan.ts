@@ -552,6 +552,11 @@ export interface TriageGroupCatalogEntry {
    * дополняет его.
    */
   scenario?: true;
+  /**
+   * Встроенная группа панели (каталог доставки): запасная. Своя группа человека
+   * или проекта с подходящим `when` выигрывает у неё.
+   */
+  builtin?: true;
 }
 
 /**
@@ -565,14 +570,18 @@ function catalogLines(catalog: readonly TriageGroupCatalogEntry[]): string[] {
     'Panel group catalog. A panel group is a bundle of rules, skills and path steps a split group ' +
       'can run under. For each split group, pick one ONLY when its "when" clearly fits the ' +
       'tasks of that group; otherwise pick none. A group listed without "when" is picked only when its ' +
-      'name alone makes the fit obvious. Never invent a key.',
+      'name alone makes the fit obvious. Never invent a key.' +
+      (catalog.some((entry) => entry.builtin)
+        ? ' A built-in group is a fallback: a project or user group whose "when" fits as well wins.'
+        : ''),
     ...catalog.slice(0, TRIAGE_CATALOG_MAX).map((entry) => {
       const line = entry.when?.trim()
         ? `- ${entry.key} — ${entry.name} — when: ${entry.when.trim()}`
         : `- ${entry.key} — ${entry.name}`;
+      const marked = entry.builtin ? `${line} — built-in` : line;
       return entry.scenario
-        ? `${line} — scenario: its steps, in order, are the whole work of the group`
-        : line;
+        ? `${marked} — scenario: its steps, in order, are the whole work of the group`
+        : marked;
     }),
     'Put the pick as "groupKey":"<key from this list>" in the object of that group in the block; ' +
       'leave the field out when nothing clearly fits.',

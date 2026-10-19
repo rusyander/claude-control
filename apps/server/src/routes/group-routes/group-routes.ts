@@ -1,3 +1,8 @@
+import {
+  builtinGroupsStatus,
+  rememberBuiltinRemoved,
+  restoreBuiltinGroups,
+} from '../../domains/groups/builtin-groups/builtin-groups.ts';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Group, GroupDraft, GroupScenario } from '@agentdeck/contracts';
@@ -364,11 +369,19 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     applyGroupEnvState(deps, group, false);
 
     ctx.store.deleteGroup(group.id);
+    // Встроенная, удалённая человеком, сама больше не вернётся.
+    rememberBuiltinRemoved(ctx.store, group.id);
     // Скилл сценария остаётся на диске: это обычный скилл, и удалять чужую
     // работу вместе с группой панель не вправе. Уцелевшие триггеры уходят.
     retireScenarioHooks(deps);
     return { ok: true, ...effect };
   });
+
+  app.get('/api/groups/builtin', () => builtinGroupsStatus(ctx.store));
+
+  app.post('/api/groups/builtin/restore', () => ({
+    restored: restoreBuiltinGroups({ store: ctx.store, skillsDir: ctx.location.paths.skills }),
+  }));
 
   // Автоматизаций больше нет: при старте они разово стали хуками и шагами «Хук»
   // (`groups/automation-migration.ts`), сборки в settings.json нет.

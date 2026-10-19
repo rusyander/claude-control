@@ -1,0 +1,67 @@
+{
+  "title": {
+    "ru": "Встроенные группы доставки и быстрый путь до MR без повторных проверок",
+    "en": "Built-in delivery groups and a fast path to the MR without repeated checks"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "На странице групп появились семь встроенных групп доставки: «Задача → MR (быстро)» для любой задачи трекера, узкие «фронт», «бэкенд», «фронт и бэкенд», «Экраны по макету Figma», «Замечания к MR» и «Ревью чужого MR». Каждая — один шаг внутри скилла доставки, без участников: её выключение ничего не гасит в файлах Claude Code. «Авто» выбирает встроенную только как запасную — своя группа с подходящим «Когда» побеждает.",
+        "en": "The groups page now has seven built-in delivery groups: «Ticket → MR (fast)» for any tracker ticket, narrow «frontend», «backend», «frontend and backend», «Screens from a Figma mock», «MR review comments» and «Review someone's MR». Each is one step inside the delivery skill with no members: switching it off turns nothing off in Claude Code's files. «Auto» picks a built-in group only as a fallback — your own group with a fitting «When» wins."
+      },
+      "how": {
+        "ru": "Панель засевает группы в каждый каталог настроек на языке интерфейса. Удалённая встроенная сама не возвращается — для этого есть кнопка «Вернуть встроенные (N)»; изменённую вами панель больше не обновляет и помечает «изменена вами», а нетронутую обновляет, сохраняя включение, порядок и проекты.",
+        "en": "The panel seeds the groups into every settings directory in the interface language. A deleted built-in group does not come back by itself — that is what «Restore built-ins (N)» is for; one you edited is never updated again and is marked «edited by you», an untouched one is updated keeping your switch, order and projects."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Восьмая встроенная группа «Задача → MR (строго)» — для рискованных задач: доступ, деньги, данные, контракты, миграции. Тот же путь, но уровень риска не ниже T2, живой прогон всех входов с вариациями, mustfail на каждую исправленную ошибку и холодная перепроверка каждого замечания ревью. Быстрая группа тоже обязана один раз пройти задачу вживую целиком — по бэкенду, фронту или обеим сторонам.",
+        "en": "An eighth built-in group «Ticket → MR (strict)» is for risky tickets: access, money, data, contracts, migrations. The same path, but the risk tier never drops below T2, every entry gets a live run with variations, every fixed bug gets mustfail and every review finding gets a cold re-check. The fast group must now also walk the task live end to end once — backend, frontend or both."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вкладка «Путь» встроенной группы показывает этапы скилла, внутри которого идёт её шаг, — от разбора задачи до полного прогона проверок, MR и отчёта. Разделы скилла, идущие не по порядку номеров, больше не выпадают из пути.",
+        "en": "The «Path» tab of a built-in group shows the stages of the skill its step runs within — from reading the ticket to the full check run, the MR and the report. Skill sections numbered out of order no longer drop out of the path."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Доставка группы разделения больше не гоняет полные проверки проекта трижды: стадия исправлений проверяет только затронутое, а полный прогон идёт один раз — на итоговом дереве прямо перед пушем. Ревью — одно полное адаптивное на задачу: число агентов и кругов решает сам скилл ревью, пропускает его только тривиальная правка текста или отступов.",
+        "en": "Split group delivery no longer runs the project's full checks three times: the fix stage checks only what it touched, and the full run happens once — on the final tree right before the push. Review is one full adaptive pass per task: the review skill decides its agents and rounds, and only a trivial copy or spacing change skips it."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Перед пушем группа догоняет основную ветку только при настоящем конфликте: ветка без конфликта остаётся на своей базе, и её MR не перестраивается ради каждого нового коммита основной.",
+        "en": "Before the push a group catches up with the main branch only on a real conflict: a conflict-free branch stays on its base, and its MR is not rebuilt for every new commit to main."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    }
+  ]
+}

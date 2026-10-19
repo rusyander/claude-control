@@ -1,3 +1,6 @@
+import type { BuiltinGroupsRecord } from '@agentdeck/contracts/groups';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
 import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
@@ -148,6 +151,13 @@ import {
   withCurrentPlatformDrivers,
 } from './state-file.ts';
 import {
+  acceptSnapshot,
+  readPulledSnapshot,
+  applyPortable,
+  snapshotText,
+  writeSnapshotIfChanged,
+} from './settings-snapshot.ts';
+import {
   getWorktreeMirror as readWorktreeMirror,
   setWorktreeMirror as writeWorktreeMirror,
 } from './worktree-mirror.ts';
@@ -245,6 +255,7 @@ export class AppStore {
     // Node исполняет TypeScript в режиме strip-only: он только срезает типы и
     // не поддерживает parameter properties, поэтому поле присваиваем вручную.
     this.appDataDir = appDataDir;
+    this.snapshotHeld = readPulledSnapshot(appDataDir).kind !== 'none';
     const loaded = readStateFile(appDataDir);
     this.state = mergeState(loaded);
     // Контур под прежним именем драйвера и интеграции в прежнем виде
@@ -252,6 +263,8 @@ export class AppStore {
     const integrations = withCurrentIntegrations(loaded);
     if (integrations.changed) moveLegacyIntegrationTokens(appDataDir, integrations.tokens);
     if (withCurrentPlatformDrivers(loaded).changed || integrations.changed) this.persist();
+    // Снимок настроек появляется с первого старта, а не с первой правки.
+    else this.writeSettingsSnapshot();
   }
 
   private get stateFile(): string {
@@ -268,6 +281,49 @@ export class AppStore {
   private persist(): void {
     if (this.isDetached) return;
     writeJsonFile(this.stateFile, this.state);
+    this.writeSettingsSnapshot();
+  }
+
+  /** Последний текст снимка настроек: сохранение чата не должно перечитывать файл. */
+  private snapshotWritten?: string;
+
+  /**
+   * Снимок принесён git и ещё не применён: писать свой поверх нельзя — старт
+   * затёр бы чужие настройки раньше, чем успел их прочитать.
+   */
+  private snapshotHeld: boolean;
+
+  /** Снимок настроек для git (`settings-snapshot.ts`) — только когда переносимое изменилось. */
+  private writeSettingsSnapshot(): void {
+    // Каталога ещё нет — хранилище ничего не сохраняло; первый `persist` создаст его.
+    if (this.snapshotHeld || !existsSync(this.appDataDir)) return;
+    const text = snapshotText(this.state, { home: homedir(), platform: process.platform });
+    if (text === this.snapshotWritten) return;
+    try {
+      writeSnapshotIfChanged(this.appDataDir, text);
+      this.snapshotWritten = text;
+    } catch (error) {
+      // Снимок — копия для git; его сбой не должен ронять сохранение самих настроек.
+      console.warn('settings snapshot not written:', error);
+    }
+  }
+
+  /**
+   * Снимок настроек, принесённый git с другой машины (проверен схемой выше по
+   * слоям): переносимые поля — из него, здешние — свои.
+   */
+  adoptSettingsSnapshot(portable: Partial<AppState>): void {
+    const context = { home: homedir(), platform: process.platform };
+    this.state = mergeState(applyPortable(this.state, portable, context));
+    this.snapshotHeld = false;
+    this.persist();
+    acceptSnapshot(this.appDataDir);
+  }
+
+  /** Принесённый снимок не прошёл проверку: панель живёт со своим и пишет свой. */
+  releaseSettingsSnapshot(): void {
+    this.snapshotHeld = false;
+    this.writeSettingsSnapshot();
   }
 
   /**
@@ -523,6 +579,16 @@ export class AppStore {
 
   deleteGroup(id: string): void {
     deleteGroupRecord(this.state, id);
+    this.persist();
+  }
+
+  /** Запись о встроенных группах; нет — ещё не засевали. */
+  getBuiltinGroups(): BuiltinGroupsRecord {
+    return this.state.builtinGroups ?? { seeded: {}, removed: [] };
+  }
+
+  setBuiltinGroups(record: BuiltinGroupsRecord): void {
+    this.state.builtinGroups = record;
     this.persist();
   }
 

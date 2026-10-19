@@ -11,7 +11,8 @@ import { hubBucket } from './hubBucket';
  * 1. в работе — идёт, стоит, ждёт ответа, на паузе, оборвано, в очереди;
  * 2. доставлено и ждёт приёмки человеком;
  * 3. принято человеком, но MR ещё не влит — ждёт слияния;
- * 4. закрыто: MR влит или закрыт, план отменён, копия убрана.
+ * 4. закрыто: MR влит или закрыт, план отменён, копия убрана, человек сам
+ *    отметил группу готовой (владелец 20.10: отмеченные — всегда внизу).
  *
  * Принятая отдельно от доставленной (09.10): в одной части они стояли
  * вперемешку по плану, и «Принять» не меняло на экране ничего — непонятно было,
@@ -29,7 +30,7 @@ export function orderHubGroups(groups: readonly ChildStageGroup[]): ChildStageGr
 
 function tierOf(group: ChildStageGroup): number {
   if (!isFinishedGroup(group)) return 0;
-  if (isMrSettled(group) || group.copy?.cleaned) return 3;
+  if (isMrSettled(group) || group.copy?.cleaned || group.acceptance?.markedDoneAt) return 3;
   const bucket = hubBucket(group);
   if (bucket === 'cancelled') return 3;
   return bucket === 'accepted' ? 2 : 1;

@@ -417,7 +417,9 @@ const acceptInput = z.object({
   accepted: z
     .boolean()
     .default(true)
-    .describe('true = mark a delivered group accepted; false = remove the mark'),
+    .describe(
+      'true = accept a delivered group, or mark a stopped/stuck one done by hand; false = remove the mark (a hand-marked group returns to its previous state)',
+    ),
 });
 type AcceptInput = z.infer<typeof acceptInput>;
 
@@ -425,9 +427,9 @@ async function acceptTarget(inject: InjectRoute, input: AcceptInput) {
   const { chat, plan } = await planOf(inject, input.chat);
   if (plan.cancelledAt) throw new Error('This split plan was cancelled by the human.');
   const group = groupOf(plan, input.group);
-  if (input.accepted && group.status !== 'done') {
+  if (input.accepted && (group.status === 'started' || group.status === 'background')) {
     throw new Error(
-      `Group «${maskedTitle(group)}» is not delivered yet (status ${group.status}): only a done group is accepted.`,
+      `Group «${maskedTitle(group)}» is working right now (status ${group.status}): a running group is neither accepted nor marked done.`,
     );
   }
   if (input.accepted === Boolean(group.acceptedAt)) {
@@ -444,7 +446,9 @@ const splitAcceptGroup = definePanelAction({
   risk: 'change',
   title: 'journal-split-accept-group',
   description:
-    'Mark a delivered (done) split group accepted — the hub’s «Принять» — or remove the mark ' +
+    'Mark a delivered (done) split group accepted — the hub’s «Принять»; a stopped, stuck or failed ' +
+    'one is marked done by hand («Отметить готовой»: it becomes done + accepted and its waiters start). ' +
+    'accepted=false removes the mark ' +
     '(accepted=false, «Снять отметку»). Only the plan’s mark changes; branch, copy and chat stay. ' +
     'Needs the human’s confirmation.',
   input: acceptInput,

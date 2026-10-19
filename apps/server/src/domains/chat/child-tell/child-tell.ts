@@ -70,6 +70,14 @@ export interface ChildTellDeps {
    * завершения, и новый старт того же разговора там заменил бы закрывающийся.
    */
   defer?: (run: () => void) => void;
+  /**
+   * Группу остановил человек (пауза): слово родителя её не будит, а ждёт в очереди
+   * и уходит после хода, который заведёт сам человек — «Продолжить» или своё
+   * сообщение. Иначе агент-родитель снимал паузу, которую человек только что
+   * поставил (R13, 19.10). Слова самой панели (`send`) сюда не смотрят: их
+   * конвейер шлёт по статусу группы, а «Продолжить» с паузы идёт как раз этим путём.
+   */
+  held?: (chatId: string) => boolean;
 }
 
 interface Pending {
@@ -108,14 +116,18 @@ export class ChildTells {
         by.refused.push(title);
         continue;
       }
-      by[
-        this.deliver({
-          chatId: group.chatId,
-          prompt: tellPrompt(tell.text),
-          cwd: group.path,
-          title,
-        })
-      ].push(title);
+      const pending = {
+        chatId: group.chatId,
+        prompt: tellPrompt(tell.text),
+        cwd: group.path,
+        title,
+      };
+      if (this.deps.held?.(group.chatId)) {
+        this.queue.push(pending);
+        by.queued.push(title);
+        continue;
+      }
+      by[this.deliver(pending)].push(title);
     }
 
     const params = {
@@ -138,6 +150,9 @@ export class ChildTells {
       this.deps.aliasesOf(pending.chatId).some((key) => keys.includes(key)),
     );
     if (index < 0) return;
+    // Ход кончился уже на паузе (ход, который «Стоп» снять не смог, F-145): очередь
+    // ждёт старта, который заведёт человек.
+    if (this.deps.held?.(this.queue[index]?.chatId ?? '')) return;
     const [pending] = this.queue.splice(index, 1);
     if (!pending) return;
     const run = (): void => {

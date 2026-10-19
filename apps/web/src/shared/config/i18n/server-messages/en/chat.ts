@@ -141,7 +141,7 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'split-start-not-queued': 'The group is not queued — nothing to start',
   'split-start-triage':
     'Task triage is still running — it decides the group order; starting becomes available after it',
-  'split-accept-not-done': 'Nothing to accept: the group does not exist or is not delivered yet',
+  'split-accept-not-done': 'Nothing to mark: the group does not exist or is working right now',
   'split-group-no-slot': 'All slots are taken: {{running}} of {{limit}} running',
   'split-group-no-slot-paused':
     'All slots are taken: {{running}} running, {{paused}} paused, of {{limit}} — Resume or Remove on a paused group frees a slot',

@@ -10,6 +10,7 @@ import { changelogRu } from './changelog/ru.ts';
 import { panelUpdateRu } from './panel-update/ru.ts';
 import { chatProjectsRu } from './chat-projects/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
+import { usageLimitsRu } from './usage-limits/ru.ts';
 import { devRestartRu } from './dev-restart/ru.ts';
 import { environmentRu } from './environment/ru.ts';
 import { projectsPageRu } from './projects/ru.ts';
@@ -48,6 +49,8 @@ export const ru = {
   chatProjects: chatProjectsRu,
   /** Фоновый наблюдатель: его страница и строка в боковой панели — `watcher/ru.ts`. */
   watcher: watcherRu,
+  /** Лимиты подписки Claude в боковой панели — `usage-limits/ru.ts`. */
+  usageLimits: usageLimitsRu,
   /** Плашка «правки сервера ждут перезапуска» — `dev-restart/ru.ts`. */
   devRestart: devRestartRu,
   /** Окно «Окружение» из чата проекта — `environment/ru.ts`. */
@@ -63,6 +66,13 @@ export const ru = {
   common: {
     /** Короткая длительность: `4с`, `1м 12с`, `1ч 03м`. */
     duration: { h: 'ч', m: 'м', s: 'с' },
+    /** Сколько прошло с события — грубо, без секунд (владелец 20.10). */
+    ago: {
+      justNow: 'только что',
+      minutes: '{{count}} мин назад',
+      hours: '{{count}} ч назад',
+      at: '{{date}}',
+    },
     milliseconds: '{{ms}} мс',
     appName: 'AgentDeck',
     loadError: 'Не удалось загрузить данные раздела',
@@ -1204,6 +1214,20 @@ export const ru = {
         stepAgents_few: '{{count}} агента',
         stepAgents_many: '{{count}} агентов',
         stepAgents_other: '{{count}} агента',
+        /** Индикатор группы: состояние с его временем, «сделано из скольких», полоса. */
+        progress: {
+          state: {
+            working: 'работает',
+            queued: 'ждёт очередь',
+            permission: 'ждёт разрешения',
+            stalled: 'стоит',
+            finished: 'закончила',
+          },
+          /** Сколько чужих ожидающих в очереди тяжёлых шагов встали раньше. */
+          ahead: 'впереди {{count}}',
+          count: '{{done}} из {{total}} · {{percent}} %',
+          bar: 'Сделано шагов группы',
+        },
         /** Сколько уже идёт разбор (L13): он молчит минутами. */
         triageRunningFor: 'идёт разбор · {{time}}',
         /** Сводка хаба одной строкой (L37): счётчики по состояниям и время разделения. */
@@ -1423,6 +1447,11 @@ export const ru = {
           undo: 'Снять отметку',
           undoHint: 'Снять с группы отметку «принято»',
           marker: 'принято',
+          markDone: 'Отметить готовой',
+          markDoneHint:
+            'Закрыть группу самому: она станет «готово» и принятой, уйдёт вниз списка, а ждавшие её группы стартуют. «Снять отметку» вернёт её в прежнее состояние',
+          markedUndoHint: 'Вернуть группу в состояние, в котором она была до отметки',
+          markedMarker: 'готово вручную',
           failed: 'Не вышло: {{message}}',
         },
         /** «Перепроверить MR» доставленной группы: конфликты, замечания, готовность. */
@@ -4847,7 +4876,7 @@ export const ru = {
     tabsLabel: 'Разделы настроек',
     tab_general: 'Общие',
     tabHint_general:
-      'Тема, акцент, язык, доступность и редактор, в котором открываются файлы проекта.',
+      'Тема, акцент, язык, доступность, панель как приложение и редактор, в котором открываются файлы проекта.',
     tab_access: 'Доступ',
     tabHint_access:
       'Аккаунт Claude Code, откуда панель берёт доступ, какой каталог конфигурации читает и кого пускает к себе снаружи.',
@@ -5241,6 +5270,16 @@ export const ru = {
     watchHint: 'Обновлять интерфейс, если конфиги правили мимо приложения',
     revealSecrets: 'Показывать секреты сразу',
     revealSecretsHint: 'Иначе значения скрыты за маской',
+    installAppTitle: 'Панель как приложение',
+    installAppHint:
+      'Своё окно без вкладок и значок в панели задач — его можно закрепить. Браузер спросит подтверждение.',
+    installAppAction: 'Установить',
+    installAppInstalled:
+      'Панель открыта как приложение. Закрепить значок: правой кнопкой по нему в панели задач.',
+    installAppManual:
+      'Этот браузер установку не предлагает. Откройте http://127.0.0.1:8888 в Chrome или Edge и выберите в меню «Установить AgentDeck» — или панель уже установлена и открыта вкладкой.',
+    installAppStartup:
+      'Открывать окно при старте Windows: pnpm keepalive:app в каталоге панели (снять — pnpm keepalive:app:off). Окно появляется один раз за загрузку, когда стенд уже отвечает.',
     editorTitle: 'Редактор кода',
     editorHint:
       'В нём открывается проект по кнопке «Открыть в редакторе». Показаны установленные в системе.',

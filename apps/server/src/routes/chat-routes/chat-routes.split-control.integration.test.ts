@@ -9,7 +9,9 @@ import type { ServerContext } from '../../context.ts';
 import { registerChatSplitRoutes } from '../chat/split-routes.ts';
 import { recheckDeliveredMr } from '../../domains/chat/split-recheck/split-recheck.ts';
 import { registerChatRunRoutes } from '../chat/run-routes/run-routes.ts';
-import { pauseOnHumanStop } from '../chat/split-control-routes.ts';
+import { pausedGroupOf, pauseOnHumanStop } from '../chat/split-control-routes.ts';
+import { ChildTells } from '../../domains/chat/child-tell/child-tell.ts';
+import { conversationKeys } from '../../lib/app-store/chat-links.ts';
 import {
   ChatRunRegistry,
   type RunLike,
@@ -222,6 +224,60 @@ describe('разделение: пауза, продолжение, запуск
     expect(res.json()).toEqual({ ok: true });
     expect(group(0)?.status).toBe('paused');
     expect(group(1)?.status).toBe('pending');
+  });
+
+  it('«Стоп» человека держится: слово родителя группу на паузе не будит, ждёт «Продолжить» (R13)', async () => {
+    // Старт прогона в чате группы снимает паузу (`onChainResumed`) — как в runtime.
+    registry.setStartListener((keys) => {
+      for (const key of keys) {
+        const link = store.getChatLink(key);
+        if (link) return conveyor.onChainResumed(link, key);
+      }
+    });
+    const starts: string[] = [];
+    const tells = new ChildTells({
+      split: (keys) => conveyor.view(keys),
+      aliasesOf: (chatId) => {
+        const keys = conversationKeys(store.getChatLinks(), chatId);
+        return keys.length > 0 ? keys : [chatId];
+      },
+      settingsOf: () => ({}),
+      start: (input) => {
+        const started = registry.start(input.chatId, { prompt: input.prompt, cwd: input.cwd }, {});
+        if (started) starts.push(input.chatId);
+        return { started, busy: !started };
+      },
+      held: pausedGroupOf(store, conveyor),
+      notify: () => undefined,
+      log: () => undefined,
+      defer: (run) => run(),
+    });
+
+    const stop = await app.inject({ method: 'POST', url: '/api/chat/chat-0/stop' });
+    expect(stop.json()).toEqual({ ok: true });
+    await settle();
+    expect(group(0)?.status).toBe('paused');
+
+    // Агент-родитель кончил ход со словом остановленной группе.
+    tells.parentFinished([PARENT], '```agentdeck:tell 1\nПродолжай с места остановки.\n```');
+    await settle();
+    expect(starts).toEqual([]);
+    expect(registry.isRunning('chat-0')).toBe(false);
+    expect(group(0)?.status).toBe('paused');
+    // Конец хода, который «Стоп» не снял, на паузе очередь тоже не трогает.
+    tells.childFinished(['chat-0']);
+    expect(starts).toEqual([]);
+    expect(group(0)?.status).toBe('paused');
+
+    // Человек нажал «Продолжить»: ход идёт, по его концу слово родителя доходит.
+    expect((await post('resume-paused', { index: 0 })).json()).toEqual({
+      index: 0,
+      outcome: 'sent',
+    });
+    conveyor.onChainResumed(store.getChatLink('chat-0')!, 'chat-0');
+    expect(group(0)?.status).toBe('started');
+    tells.childFinished(['chat-0']);
+    expect(starts).toEqual(['chat-0']);
   });
 
   it('«Продолжить» сдавшуюся группу: место отдано — 409 с числами, с согласием — слово группе', async () => {

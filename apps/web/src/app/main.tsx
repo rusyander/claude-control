@@ -1,5 +1,8 @@
 // Первым: переносит ключи браузерного хранилища до того, как их прочтут модули ниже.
 import '@shared/lib/legacy-storage';
+// Рано: браузер присылает предложение установить приложение один раз, сразу
+// после загрузки, — до того, как ленивая страница настроек успела бы его услышать.
+import '@shared/lib/install-app';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';

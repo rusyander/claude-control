@@ -87,14 +87,17 @@ describe('потолок задания группы', () => {
      * 6250 — редакция 17.10 (6235 знаков в самом длинном варианте: копия,
      * доставка, снимки 3.5, пакет ревью 5.3, тикеты); запас — на правку слова, не на новую фразу.
      * Новый абзац в каждое задание — сначала замер, что он окупается.
+     * 6400 — 20.10: +~120 знаков «полные проверки один раз» и «основную — только
+     * при конфликте». Окупается замером 19.10: каждая группа гнала полный гейт
+     * трижды на MR (13–20 мин прогон) и тратила ход на отказ брокера в rebase.
      */
-    it(`доставляющая группа в копии, ${name}: не длиннее 6250 знаков`, async () => {
+    it(`доставляющая группа в копии, ${name}: не длиннее 6400 знаков`, async () => {
       const prompt = await firstPrompt(options);
       expect(prompt).toContain('PROJ-1');
       expect(prompt).toContain('npm run qa:shot');
       expect(prompt).toContain('review-pack.mjs');
       expect(prompt).toContain('<agentdeck:ticket>');
-      expect(panelText(prompt).length).toBeLessThanOrEqual(6250);
+      expect(panelText(prompt).length).toBeLessThanOrEqual(6400);
     });
   }
 });

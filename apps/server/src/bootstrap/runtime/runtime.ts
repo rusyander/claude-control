@@ -14,6 +14,7 @@ import {
   type ProfileMcpEntry,
   type SkillScopeInput,
 } from '../../domains/chat/group-profile/group-profile.ts';
+import { stageOf } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
 import { StatusChats, briefWithStatus } from '../../domains/chat/status-chats/status-chats.ts';
 import { readSkills } from '../../domains/skills/read.ts';
 import { childRunEnv, type RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
@@ -34,6 +35,7 @@ import {
   type RunNotice,
 } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { appendLoweredRun } from '../../domains/chat/lowered-journal/lowered-journal.ts';
+import { appendLimitRun } from '../../domains/chat/limit-journal/limit-journal.ts';
 import { UNUSED_HEAVY_TOOLS } from '../../domains/chat/initiative/initiative.ts';
 import { localLayerRun } from '../../domains/local-layer/local-layer.ts';
 import { appendRunInput, moveRunInputs } from '../../domains/chat/run-input/run-input.ts';
@@ -137,6 +139,7 @@ import {
   readWorktreeHead,
   readDeliveryFacts,
   readMergeTarget,
+  readReviewDelta,
   resolveProjectDelivery,
 } from '../../domains/project-git/project-git.ts';
 import { readLastAssistantTurn } from '../../domains/chat/ChatHistory/ChatHistory.ts';
@@ -223,6 +226,8 @@ import {
 import { ActivatingTestRunRegistry } from '../activating-test-runs/activating-test-runs.ts';
 import { createReviewStarter } from '../../routes/chat/review-starter.ts';
 import { lostConversationBrief } from '../../domains/chat/split-continue.ts';
+import { activateLedger } from '../../domains/verify-ledger/verify-ledger.ts';
+import type { LedgerInstall } from '../../domains/verify-ledger/verify-ledger.types.ts';
 
 /**
  * Объекты, живущие дольше запроса. Создаются при сборке приложения — только
@@ -303,6 +308,8 @@ export interface Runtime {
   globalLayer: GlobalLayer;
   /** Встроенный набор панели (В2): режимы по CLI, копии «моё», что получает прогон. */
   kit: KitService;
+  /** Журнал проверок: установленный preload (или почему его нет) — для сводки. */
+  verifyLedger: LedgerInstall;
   /**
    * Маршрут прогона по потребителю (`foreign:<cli>`, `tests`, …) — тот же, что
    * спрашивают чат и тесты. Нужен лёгкому окну панели (помощники формы и
@@ -325,6 +332,12 @@ export interface Runtime {
 const LOCAL_RUN_POLL_MS = 5_000;
 
 export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime {
+  // Журнал проверок (стадия 0 — тень): preload уходит в окружение самой панели
+  // и оттуда — каждому её запуску.
+  const verifyLedger = activateLedger(
+    ctx.location.paths.appData,
+    fileURLToPath(new URL('../../../../../tools/verify-ledger', import.meta.url)),
+  );
   // Реестр dev-серверов проектов — иначе спавненные процессы осиротеют; порт
   // становится известен уже после ответа на запуск (его печатает сам
   // dev-сервер), поэтому запоминает его реестр — через узкий колбэк, а не зная
@@ -478,6 +491,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * уведомления.
    */
   chatRuns.setLoweredJournal((record) => appendLoweredRun(ctx.location.paths.appData, record));
+  chatRuns.setLimitJournal((record) => appendLimitRun(ctx.location.paths.appData, record));
   // «Что получил агент» (U8): под настоящим ключом, если он уже известен.
   chatRuns.setInputJournal((keys, record) =>
     appendRunInput(ctx.location.paths.appData, keys.at(-1) ?? '', record),
@@ -783,6 +797,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     });
   };
   const splitConveyor = new SplitConveyor({
+    backgroundTasks: (chatId) => chatRuns.backgroundTasksOf(chatId),
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),
       set: (record) => ctx.store.setSplitPlan(record),
@@ -1209,6 +1224,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         }
       },
       hasWork: (cwd, since) => hasWorkSince(cwd, since),
+      reviewDelta: (cwd, since) => readReviewDelta(cwd, since),
       settings: () => ctx.store.getSettings(),
       // Сита перед MR в задании звена: по путям копии и выученным ситам проекта.
       sieves: stageSieves,
@@ -1491,6 +1507,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         tasksText: input.tasksText,
         extra: input.extra,
         skills: skillScope(keys, cwd),
+        // Звено (L1.2, L1.3): план и ревью — MCP наружу только на чтение; ревью,
+        // правки и доставка — описания только своих навыков.
+        ...(link ? { stage: stageOf(link) } : {}),
         trackerHook,
         boardHook,
         heavyQueue,
@@ -1888,6 +1907,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     keepAwake,
     globalLayer,
     kit,
+    verifyLedger,
     runRoute: (origin) => runRoute(origin),
     gatewayPort: platformRouting.gatewayPort,
     claudeSettingsRoute: platformRouting.claudeSettingsRoute,

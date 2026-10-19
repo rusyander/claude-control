@@ -283,6 +283,9 @@ describe('всё, что панель шлёт модели, — по-англи
       retry: retryPrompt('boom'),
       identity: groupIdentityLine('b', ['PROJ-1']),
       nudge: deliveryNudgePrompt('b', [gap]),
+      nudgeReport: deliveryNudgePrompt('b', [
+        serverText('tests-gap-unrun', { cases: 'a-1', command: 'node t.mjs run --case g:a-1' }),
+      ]),
       interrupt: interruptResumePrompt('b'),
       limit: limitResumePrompt('b'),
       pause: pauseResumePrompt('b'),

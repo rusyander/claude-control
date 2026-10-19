@@ -48,9 +48,13 @@ import {
   stageAppendPrompt,
   stageOf,
 } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
+import {
+  readStageArtifacts,
+  writeGroupPlanFile,
+} from '../../domains/chat/ChatCascadeStages/stage-files.ts';
 import { childStageExtra } from '../../domains/chat/group-run-lines/group-run-lines.ts';
 import { planPathTurn } from '../../domains/chat/path-steps/path-steps.ts';
-import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
+import type { CascadeStage, ReviewDelta } from '@agentdeck/contracts/model-cascade';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
@@ -224,6 +228,11 @@ export interface CascadeStageDeps {
   markPlanned?: (aliases: string[], at: string) => void;
   /** Изменила ли работа что-нибудь в копии: пустой дифф проверять незачем. */
   hasWork: (cwd: string, since?: string) => boolean;
+  /**
+   * Что работа изменила против опубликованной ветки (L7.13): пустой rebase
+   * доставленной группы ревью не заводит, частичный — ревью только дельты.
+   */
+  reviewDelta?: (cwd: string, since?: string) => ReviewDelta;
   /** Настройки — из них собирается системная дописка звена. */
   settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>;
   /** Абзац сит перед MR для звена ревью или доставки (`sievePromptBlock`). */
@@ -283,6 +292,14 @@ export function createHandoffPlanner({
       text: finished.text,
       task: finished.options.prompt ?? '',
       hasWork: () => cascade.hasWork(cwd, link?.createdAt),
+      // План группы файлом в копии (L2.1): звенья после работы несут текстом
+      // только §5–§8, начало открывают по пути. Не игнорируется git — файла нет,
+      // звено получит план целиком. Артефакты прошлых звеньев — путями (L7.4).
+      planFile: (groupPlan) => writeGroupPlanFile(cwd, groupPlan),
+      artifacts: () => readStageArtifacts(cwd, link?.createdAt),
+      ...(cascade.reviewDelta
+        ? { reviewDelta: () => cascade.reviewDelta!(cwd, link?.createdAt) }
+        : {}),
       // Сита — только там, где их отчёт судит доставка группы: абзац обещает, что
       // несданное сито держит «готово», а в обычном чате с подбором модели его
       // никто не проверил бы (ревью сит, 28.09).
@@ -604,6 +621,8 @@ export function createHandoffPlanner({
       ok: finished.ok,
       hasProject: Boolean(finished.projectPath),
     });
+    // Закрытое предложение (`closed`, L7.2) повод по порогу не перебивает:
+    // `evaluateHandoff` отвечает на него как на ответ без блока.
     const proposal = own ?? (rotation.kind === 'propose' ? rotation.proposal : undefined);
 
     const verdict = evaluateHandoff({

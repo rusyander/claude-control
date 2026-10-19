@@ -118,6 +118,10 @@ const MCP_DESTRUCTIVE = /^(delete|remove|destroy|purge|drop|merge|unpublish|revo
 const MCP_READ =
   /^(get|list|search|read|fetch|find|show|view|describe|query|count|check|validate|verify|discover|download|health|whoami|my)(_|$)/i;
 
+/** Имя продукта перед глаголом в имени инструмента: `jira_get_issue`, `confluence_search`. */
+const MCP_PRODUCT_PREFIX =
+  /^(jira|confluence|gitlab|github|bitbucket|gitea|linear|youtrack|redmine|slack|notion)_/i;
+
 /** Имя инструмента без префикса `mcp__<сервер>__` — глагол ищется в нём. */
 function mcpVerbPart(toolName: string): string {
   return toolName.split('__').at(-1) ?? '';
@@ -138,6 +142,13 @@ interface RuleMatcher {
   /** Проверяется по команде целиком: конвейер сам по себе и есть признак. */
   whole?: RegExp[];
 }
+
+/**
+ * `git` и его глобальные опции до подкоманды: `-C <каталог>`, `-c <ключ=знач>`,
+ * `--git-dir=…`, `--no-pager`. Без них `git -C ../copy push --force` не был ни
+ * затиранием истории, ни даже обычным пушем.
+ */
+const GIT = String.raw`\bgit(?:\s+-[Cc]\s+\S+|\s+--[\w-]+(?:=\S+)?)*\s+`;
 
 const COMMAND_RULES: RuleMatcher[] = [
   {
@@ -166,8 +177,11 @@ const COMMAND_RULES: RuleMatcher[] = [
       /\bgit\s+worktree\s+(remove|prune)\b/i,
       /\bgit\s+reflog\s+(expire|delete)\b/i,
     ],
-    // Принудительный пуш: чужая работа исчезает из ветки.
-    whole: [/\bgit\s+push\b[^\n]*(--force|--force-with-lease|-f)\b/i],
+    // Принудительный пуш: чужая работа исчезает из ветки. Флаг в любом месте
+    // строки, `+ветка` в refspec и глобальные опции git перед `push`
+    // (`git -C ../copy push`): этих двух форм правило не узнавало, и группа
+    // переписала ветку MR на ревью без карточки (журнал 19.10, L7.12).
+    whole: [new RegExp(`${GIT}push\\b[^\\n]*(\\s--force\\b|\\s-f\\b|\\s\\+\\S)`, 'i')],
   },
   {
     // База данных: схема и данные.
@@ -216,7 +230,9 @@ const COMMAND_RULES: RuleMatcher[] = [
     // ВЫБОРА: кому нужен просмотр каждого коммита и пуша — выключает тумблер, и
     // они снова спрашивают.
     id: 'gitWrite',
-    segment: [/\bgit\s+(commit|push|merge|rebase|cherry-pick|revert|tag|branch|switch)\b/i],
+    segment: [
+      new RegExp(`${GIT}(commit|push|merge|rebase|cherry-pick|revert|tag|branch|switch)\\b`, 'i'),
+    ],
   },
 ];
 
@@ -242,7 +258,13 @@ function segments(command: string): string[] {
  */
 export function ruleFor(toolName: string, input: unknown): PermissionRuleId | undefined {
   if (toolName.startsWith('mcp__')) {
-    const verb = mcpVerbPart(toolName);
+    const name = mcpVerbPart(toolName);
+    // Глагол — первым словом или сразу за именем продукта: сервер трекера зовёт
+    // инструменты `jira_get_issue`, `confluence_search`, и по первому слову
+    // каждое его чтение было записью наружу (журнал 19.10). Срезается только
+    // имя продукта из списка: срез любого первого слова сделал бы
+    // `create_merge_request_note` слиянием.
+    const verb = name.replace(MCP_PRODUCT_PREFIX, '');
     if (MCP_DESTRUCTIVE.test(verb)) return 'externalDestroy';
     return MCP_READ.test(verb) ? undefined : 'externalWrite';
   }

@@ -65,6 +65,7 @@ export {
   type DeliveryFacts,
 } from './delivery-facts/delivery-facts.ts';
 export { readSieveFacts, touchedPaths, type SieveFacts } from './sieve-facts/sieve-facts.ts';
+export { readReviewDelta } from './review-delta.ts';
 export {
   parseBranches,
   parseNumstat,

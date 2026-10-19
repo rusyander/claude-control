@@ -172,7 +172,7 @@ export const testsEn: Record<TestsMessageCode, string> = {
     'Case “{{caseId}}” is not in group “{{groupId}}”: a new case is saved without an id.',
   'case-not-in-named-group': 'Case “{{caseId}}” is not in group “{{groupId}}”.',
   'record-automated-case':
-    'Automated cases are not recorded by word: {{cases}}. Their test checks them — run the group ({{groups}}) with the run command.',
+    'Automated cases are not recorded by word: {{cases}}. Their test checks them — run exactly these cases: run --case.',
   'bulk-action-unknown': 'Unknown action “{{action}}”.',
   'bulk-none-selected': 'No test selected.',
   'bulk-mute-reason-required':

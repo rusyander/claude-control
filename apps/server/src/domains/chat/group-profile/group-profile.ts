@@ -1,3 +1,4 @@
+import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
 import { BASH_MAX_TIMEOUT_ENV, bashCeilingMs } from './bash-ceiling.ts';
 
@@ -151,6 +152,120 @@ export const GROUP_SKILLS = [
 ] as const;
 
 /**
+ * Навыки звена с описанием (L1.3, журнал 19.10: 37 описаний ≈ 10 тыс. токенов в
+ * каждом вызове, звену нужны единицы). Подмножество `GROUP_SKILLS`: остальным —
+ * только имя, вызвать их звено может и так. Работа, план и разбор — весь набор
+ * группы: их задание шире одного навыка. Проверка правок — тоже `review`.
+ */
+export const STAGE_SKILLS: Partial<Record<CascadeStage, readonly GroupSkill[]>> = {
+  review: [
+    'skill-map',
+    'deep-review',
+    'style-conformance-review',
+    'unit-integration-tests',
+    'log-forensics',
+  ],
+  fix: [
+    'skill-map',
+    'ticket-delivery',
+    'unit-integration-tests',
+    'bug-regression-test',
+    'playwright-e2e-tests',
+    'resolving-merge-conflicts',
+    'log-forensics',
+  ],
+  deliver: [
+    'skill-map',
+    'ticket-delivery',
+    'prepare-mr',
+    'changelog-builder',
+    'mr-visual-report',
+    'style-conformance-review',
+    'resolving-merge-conflicts',
+    'log-forensics',
+  ],
+};
+
+type GroupSkill = (typeof GROUP_SKILLS)[number];
+
+/** Навыки с описанием для звена; звено без своего набора — весь набор группы. */
+export function stageSkills(stage: CascadeStage | undefined): readonly string[] {
+  return (stage && STAGE_SKILLS[stage]) ?? GROUP_SKILLS;
+}
+
+/**
+ * Звенья, которым MCP трекера, хранилища кода и макетов нужен только на чтение
+ * (L1.2): план читает задачи, ревью и проверка правок — задачи и MR. Пишут в
+ * трекер и в MR работа, правки и доставка.
+ */
+const READ_ONLY_STAGES: ReadonlySet<CascadeStage> = new Set(['plan', 'review']);
+
+/**
+ * Глаголы записи в именах инструментов MCP. Имён сервера до его запуска панель не
+ * знает, поэтому запрет — шаблоном `*` по имени (CLI сверяет шаблон с именем
+ * целиком и снимает подходящий инструмент из запроса вовсе, и из списка
+ * отложенных тоже — замерено 2.1.286, `tools/qa/check-run-layers.mjs`, случай
+ * «звено группы»). Глагол — в начале имени или после `_`, и за ним `_`:
+ * `jira_create_issue`, `create_merge_request_note`. `merge` и `link` — только в
+ * начале: `list_merge_requests` и `jira_get_link_types` — чтение. `batch` нет
+ * вовсе: `jira_batch_get_changelogs` — тоже чтение.
+ */
+const WRITE_VERBS = [
+  'create',
+  'update',
+  'delete',
+  'add',
+  'edit',
+  'remove',
+  'transition',
+  'push',
+  'fork',
+  'upload',
+  'publish',
+  'approve',
+  'unapprove',
+  'resolve',
+  'retry',
+  'cancel',
+  'play',
+  'promote',
+  'assign',
+  'move',
+  'execute',
+] as const;
+const START_ONLY_WRITE_VERBS = ['merge', 'link'] as const;
+
+/** Строка звену только на чтение: почему инструментов записи нет и где они будут. */
+const READ_ONLY_NOTE =
+  'This stage reads the tracker, the code host and the designs only: their write tools are not ' +
+  'in this run. Tracker and merge-request writes belong to the work, fix and delivery stages.';
+
+/** Роли серверов, у которых запись — наружу: трекер, хранилище кода, макеты. */
+const OUTWARD_ROLES: ReadonlySet<McpRole> = new Set(['tracker', 'forge', 'design']);
+
+/** Имя сервера, как его пишет CLI в имени инструмента. */
+function cliServerName(id: string): string {
+  return id.replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+/** Правила `deny` на запись в MCP наружу для звена только на чтение; иначе пусто. */
+export function readOnlyMcpDeny(
+  kept: readonly ProfileMcpEntry[],
+  stage: CascadeStage | undefined,
+): string[] {
+  if (!stage || !READ_ONLY_STAGES.has(stage)) return [];
+  return kept
+    .filter((entry) => OUTWARD_ROLES.has(mcpRole(entry)))
+    .flatMap((entry) => {
+      const server = `mcp__${cliServerName(entry.id)}__`;
+      return [
+        ...WRITE_VERBS.flatMap((verb) => [`${server}${verb}_*`, `${server}*_${verb}_*`]),
+        ...START_ONLY_WRITE_VERBS.map((verb) => `${server}${verb}_*`),
+      ];
+    });
+}
+
+/**
  * Встроенные навыки CLI, которым в работе группы над задачей делать нечего:
  * графики, настройка самого CLI, расписания, авторство плагинов (замер 16.10,
  * 2.1.286 — 5,5 тыс. знаков описаний в каждом вызове). Ревью-навыки CLI
@@ -177,8 +292,12 @@ const IDLE_BUNDLED = [
  * проекта не трогаются вовсе: их поставил сам репозиторий. Плагин макетов без
  * макета в задачах и плагин-мессенджер выключаются на этот прогон.
  */
-export function skillSettings(skills: SkillScopeInput, design: boolean): Record<string, unknown> {
-  const keep = new Set<string>([...GROUP_SKILLS, ...skills.group]);
+export function skillSettings(
+  skills: SkillScopeInput,
+  design: boolean,
+  stage?: CascadeStage,
+): Record<string, unknown> {
+  const keep = new Set<string>([...stageSkills(stage), ...skills.group]);
   const overrides = Object.fromEntries(
     [...skills.user, ...IDLE_BUNDLED]
       .filter((name) => !keep.has(name))
@@ -219,10 +338,55 @@ export function compactWindowOf(raw: string | undefined): number | undefined {
   return tokens >= COMPACT_WINDOW_MIN && tokens <= COMPACT_WINDOW_MAX ? tokens : undefined;
 }
 
+/**
+ * Правила `ask` на хранилище кода и трекер группы — на весь сервер (журнал 19.10,
+ * L6.2): в авторежиме CLI (`--permission-mode auto`) классификатор сам разрешил
+ * продолжению группы ответить в тредах MR и переписать его описание, и до брокера
+ * прав панели вызов не дошёл — строки вкладки «Группы» не решали ничего. Правило
+ * `ask` сильнее режима (проверено живьём, `tools/qa/check-group-forge-ask.mjs`):
+ * вызов идёт к брокеру, там чтение проходит само, а запись решает строка
+ * `externalWrite`. На весь сервер, а не по именам записи: имён инструментов
+ * сервера до его запуска панель не знает. Имя — как его пишет CLI: знаки вне
+ * `[A-Za-z0-9_-]` становятся `_`.
+ */
+function outwardAsk(kept: readonly ProfileMcpEntry[]): { permissions: { ask: string[] } } {
+  const servers = kept
+    .filter((entry) => {
+      const role = mcpRole(entry);
+      return role === 'forge' || role === 'tracker';
+    })
+    .map((entry) => `mcp__${entry.id.replace(/[^A-Za-z0-9_-]/g, '_')}`);
+  return { permissions: { ask: [...servers, ...FORCE_PUSH_ASK] } };
+}
+
+/**
+ * Принудительный пуш оболочкой — тоже к брокеру прав (журнал 19.10 02:17:02,
+ * L7.12): группа в авторежиме сделала `git push --force-with-lease` в ветку MR,
+ * уже снятого с черновика и стоявшего на ревью, — классификатор пропустил, карточки
+ * не было. У брокера команда — правило `gitHistory` (по умолчанию «человеку»).
+ * Обычный `git push` правилом не задет: его судьба — решение владельца (Door C).
+ * `*` в правиле CLI — любая строка, пустая тоже; составную команду CLI проверяет
+ * по звеньям. Формы проверены настоящим CLI в `tools/qa/check-group-forge-ask.mjs`.
+ */
+export const FORCE_PUSH_ASK: readonly string[] = [
+  // --force, --force-with-lease, --force-if-includes — в любом месте строки.
+  'Bash(git push *--force*)',
+  'Bash(git push -f*)',
+  'Bash(git push * -f*)',
+  // `+ветка` в refspec — тот же принудительный пуш без флага.
+  'Bash(git push * +*)',
+  'Bash(git -C * push *--force*)',
+  'Bash(git -C * push -f*)',
+  'Bash(git -C * push * -f*)',
+  'Bash(git -C * push * +*)',
+];
+
 /** Профиль в виде, в каком его кладёт в запуск реестр прогонов. */
 export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
   const profile = groupMcpProfile(input);
   const connectors = wantsConnectors(input.extra);
+  const outward = outwardAsk(profile.kept);
+  const readOnly = readOnlyMcpDeny(profile.kept, input.stage);
   return {
     args: ['--strict-mcp-config'],
     env: {
@@ -236,11 +400,20 @@ export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
         mcpServers: Object.fromEntries(profile.kept.map((entry) => [entry.id, entry.config])),
       },
     },
-    note: groupProfileNote(profile, connectors),
+    note:
+      readOnly.length > 0
+        ? `${groupProfileNote(profile, connectors)}\n${READ_ONLY_NOTE}`
+        : groupProfileNote(profile, connectors),
     settings: {
       env: { [BASH_MAX_TIMEOUT_ENV]: String(bashCeilingMs(input.bashCeilings)) },
-      ...(input.skills ? skillSettings(input.skills, needsDesign(input.tasksText)) : {}),
+      ...(input.skills
+        ? skillSettings(input.skills, needsDesign(input.tasksText), input.stage)
+        : {}),
       ...groupHooks(input),
+      permissions: {
+        ...outward.permissions,
+        ...(readOnly.length > 0 ? { deny: readOnly } : {}),
+      },
     },
   };
 }

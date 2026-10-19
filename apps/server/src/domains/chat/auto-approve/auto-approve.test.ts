@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldAutoApprove, isReadOnlyTool } from './auto-approve.ts';
+import { shouldAutoApprove, isReadOnlyTool, ruleFor } from './auto-approve.ts';
 
 const base = { guardedPatterns: [] as string[], allowEdits: true };
 
@@ -50,6 +50,30 @@ describe('shouldAutoApprove', () => {
     expect(bash('git clean -fd')).toBe(false);
     expect(bash('git restore src/app.ts')).toBe(false);
     expect(bash('git worktree remove ../copy')).toBe(false);
+  });
+
+  /**
+   * L7.12 (журнал 19.10 02:17:02): группа переписала ветку MR на ревью
+   * принудительным пушем. Формы, в которых его не узнавало правило:
+   * `+ветка` в refspec и глобальные опции git между `git` и `push`.
+   */
+  it('принудительный пуш в любой форме — затирание истории, а не обычный пуш', () => {
+    for (const command of [
+      'git push --force-with-lease origin HEAD:f1',
+      'git push origin HEAD:f2 --force',
+      'git push -f origin HEAD:f3',
+      'git push origin +HEAD:f4',
+      'git status --short && git push --force origin HEAD:f5',
+      'git -C . push --force-with-lease origin HEAD:f6',
+      'git -C ../copy push origin +main',
+      'git -c core.askPass= push --force-if-includes origin x',
+    ]) {
+      expect(ruleFor('Bash', { command }), command).toBe('gitHistory');
+    }
+    // Обычный пуш, в том числе с git -C и веткой с «-f» в имени, — обычная работа.
+    expect(ruleFor('Bash', { command: 'git -C ../copy push origin main' })).toBe('gitWrite');
+    expect(ruleFor('Bash', { command: 'git push origin feature-fix' })).toBe('gitWrite');
+    expect(ruleFor('Bash', { command: 'git push --follow-tags origin main' })).toBe('gitWrite');
   });
 
   it('оставляет человеку снос данных, инфраструктуры и публикацию', () => {
@@ -163,6 +187,19 @@ describe('shouldAutoApprove', () => {
     expect(mcp('mcp__gitlab__list_merge_requests')).toBe(true);
     expect(mcp('mcp__gitlab__merge_merge_request')).toBe(false);
     expect(mcp('mcp__confluence__delete_page')).toBe(false);
+  });
+
+  it('глагол после имени продукта (`jira_get_issue`) — тот же глагол: чтение остаётся чтением', () => {
+    // Сервер трекера зовёт инструменты `jira_*`/`confluence_*`; глагол искался
+    // только первым словом, и каждое чтение задачи шло записью наружу — с
+    // записью «человеку» (журнал 19.10) группа вставала бы на каждом чтении.
+    expect(ruleFor('mcp__atlassian__jira_get_issue', {})).toBeUndefined();
+    expect(ruleFor('mcp__atlassian__confluence_search', {})).toBeUndefined();
+    expect(ruleFor('mcp__atlassian__jira_transition_issue', {})).toBe('externalWrite');
+    expect(ruleFor('mcp__atlassian__jira_add_comment', {})).toBe('externalWrite');
+    expect(ruleFor('mcp__atlassian__jira_delete_issue', {})).toBe('externalDestroy');
+    expect(ruleFor('mcp__gitlab__get_merge_request', {})).toBeUndefined();
+    expect(ruleFor('mcp__gitlab__create_merge_request_note', {})).toBe('externalWrite');
   });
 
   /**

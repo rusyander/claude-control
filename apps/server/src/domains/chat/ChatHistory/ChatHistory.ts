@@ -410,16 +410,28 @@ export function readLastAssistantTurn(
   const asked = new Set<string>();
   // Последняя осмысленная запись — ход агента. Пока false, накопленное не в счёт.
   let closing = false;
+  // Итог, после которого хук Stop вернул замечание (L7.2): ответ на замечание
+  // его не заменяет, а дописывает. Реплика человека начинает ход заново.
+  let beforeStop: string[] = [];
 
   for (const record of readRecords(path, 0)) {
-    if (record.isSidechain || record.isMeta || record.isCompactSummary) continue;
+    if (record.isSidechain || record.isCompactSummary) continue;
+    if (record.isMeta) {
+      if (closing && !calledTool && isStopFeedback(record.message?.content)) {
+        beforeStop = [...beforeStop, ...parts];
+      }
+      continue;
+    }
     if (!record.message) continue;
     if (record.type !== 'assistant' && record.type !== 'user') continue;
     // Заглушку CLI модель не писала (журнал 96): концом хода она не бывает.
     if (isSyntheticReply(record)) continue;
     if (record.type === 'user' || record.isApiErrorMessage) {
       closing = false;
-      if (record.type === 'user' && isHumanPrompt(record.message.content)) asked.clear();
+      if (record.type === 'user' && isHumanPrompt(record.message.content)) {
+        asked.clear();
+        beforeStop = [];
+      }
       // Вопрос закрыт автономией — человека он не ждёт.
       for (const pick of autoPickResults(record.message.content)) asked.delete(pick.toolUseId);
       continue;
@@ -450,7 +462,7 @@ export function readLastAssistantTurn(
 
   if (!closing || calledTool) return undefined;
   // Хвостом, как копит текст реестр прогонов: разборщикам нужен конец ответа.
-  const text = parts.join('\n').trim().slice(-cap);
+  const text = [...beforeStop, ...parts].join('\n').trim().slice(-cap);
   return text ? { text, ...(asked.size > 0 ? { asked: true } : {}) } : undefined;
 }
 
@@ -467,6 +479,17 @@ export interface ClosingTurn {
 function isHumanPrompt(content: string | ContentBlock[] | undefined): boolean {
   if (typeof content === 'string') return content.trim().length > 0;
   return Array.isArray(content) && content.some((block) => block.type !== 'tool_result');
+}
+
+/** Замечание хука Stop: служебная запись CLI, текст начинается этой строкой (CLI 2.1.286). */
+function isStopFeedback(content: string | ContentBlock[] | undefined): boolean {
+  const text =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content.map((block) => (block.type === 'text' ? (block.text ?? '') : '')).join('')
+        : '';
+  return text.trimStart().startsWith('Stop hook feedback');
 }
 
 export type TranscriptRecord = Record;

@@ -3,10 +3,12 @@ import {
   deliverStagePrompt,
   fixStagePrompt,
   loweredWorkPrompt,
+  planSections,
   reviewStagePrompt,
   scanReviewBlocks,
   verifyStagePrompt,
   type CascadeStage,
+  type ReviewDelta,
   type StageContext,
   type TaskKind,
 } from '@agentdeck/contracts/model-cascade';
@@ -97,6 +99,12 @@ export interface CascadeStageInput {
    */
   hasWork: () => boolean;
   /**
+   * Что работа изменила против опубликованной ветки (L7.13, `readReviewDelta`).
+   * Функция по той же причине, что `hasWork`: ответ стоит запуска git и нужен
+   * только перед ревью. Нет — ревью всей работы, как раньше.
+   */
+  reviewDelta?: () => ReviewDelta;
+  /**
    * Ход кончился паузой, а не итогом: вопросом человеку или с фоновой
    * командой, которая ещё идёт (Д3). Следующего звена тогда не заводим.
    */
@@ -118,6 +126,19 @@ export interface CascadeStageInput {
    * ответ стоит запуска git, а нужен только звеньям ревью и доставки.
    */
   sieves?: (stage: SieveStage, done: readonly SieveReportRow[]) => string;
+  /**
+   * Положить план группы файлом в копию и вернуть его путь от корня копии
+   * (L2.1, `writeGroupPlanFile`). Зовётся, только когда план разложен по
+   * разделам: тогда ревью, правки, проверка и доставка получают текстом §5–§8, а
+   * начало — ссылкой. `undefined` — файла нет, и звено получает план целиком.
+   */
+  planFile?: (plan: string) => string | undefined;
+  /**
+   * Пути того, что прошлые звенья оставили в копии (L7.4, `readStageArtifacts`):
+   * снимки, журнал проверок, прогоны тестов, логи гейтов. Функция — ответ стоит
+   * чтения каталогов и нужен только звеньям после работы.
+   */
+  artifacts?: () => readonly string[];
   /** Часы — в тесте фиксируются. */
   now?: () => Date;
 }
@@ -220,12 +241,53 @@ function stageContextOf(
   link: ChatLink,
   task: string | undefined,
   previous: StageContext['previous'],
+  files: StageFiles,
 ): StageContext {
   return {
     ...(task ? { task } : {}),
-    ...(link.planSummary ? { plan: link.planSummary } : {}),
+    ...planContext(link, files),
     ...(link.branch ? { branch: link.branch } : {}),
     ...(previous?.text.trim() ? { previous } : {}),
+  };
+}
+
+/** Файлы копии для контекста звена: путь плана и артефакты, оба — по запросу. */
+interface StageFiles {
+  planFile: () => string | undefined;
+  artifacts: () => readonly string[];
+}
+
+/**
+ * Ответы `planFile`/`artifacts` на один вызов планировщика: запись файла и
+ * чтение каталогов — по одному разу, и только если звено до них дошло.
+ */
+function stageFilesOf(link: ChatLink, input: CascadeStageInput): StageFiles {
+  let planFile: { value: string | undefined } | undefined;
+  let artifacts: readonly string[] | undefined;
+  return {
+    planFile: () => {
+      planFile ??= {
+        // Файл пишется, только когда ссылка на него будет в задании: план без
+        // разделов звено получает целиком, и файл ему не нужен.
+        value:
+          link.planSummary && planSections(link.planSummary)
+            ? input.planFile?.(link.planSummary)
+            : undefined,
+      };
+      return planFile.value;
+    },
+    artifacts: () => (artifacts ??= input.artifacts?.() ?? []),
+  };
+}
+
+/** План группы и что о копии известно — общая часть контекста всех звеньев после работы. */
+function planContext(link: ChatLink, files: StageFiles): Omit<StageContext, 'task' | 'branch'> {
+  const planFile = files.planFile();
+  const artifacts = files.artifacts();
+  return {
+    ...(link.planSummary ? { plan: link.planSummary } : {}),
+    ...(planFile ? { planFile } : {}),
+    ...(artifacts.length > 0 ? { artifacts } : {}),
   };
 }
 
@@ -435,8 +497,9 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
   };
   const sievesFor = (stage: SieveStage): string | undefined =>
     input.sieves?.(stage, sieveRows) || undefined;
+  const files = stageFilesOf(link, input);
   const contextAfter = (previousText: string): StageContext =>
-    stageContextOf(link, groupTask, { stage, text: previousText });
+    stageContextOf(link, groupTask, { stage, text: previousText }, files);
 
   // План — единственное звено, после которого следующее стартует и при неудаче.
   if (stage === 'plan') return afterPlan(link, ok, text, base, Boolean(input.paused));
@@ -489,6 +552,11 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
         ? undefined
         : link.effort;
     if (!hasWork()) return raisedPlan(link, base, text);
+    // Ветка была опубликована до этой работы, и патчи те же — пустой rebase
+    // (журнал 19.10 02:19, L7.13): ревью читать нечего. Голова уже на удалённом —
+    // и доставлять нечего; нет — доставка её отправит.
+    const delta = input.reviewDelta?.();
+    if (delta?.kind === 'none') return delta.published ? undefined : deliverNow();
     const reviewSieves = sievesFor('review');
 
     return {
@@ -497,11 +565,12 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
       effort: reviewerEffort ?? '',
       prompt: reviewStagePrompt({
         task: groupTask ?? task,
+        ...(delta?.kind === 'delta' ? { delta } : {}),
         ...(link.model ? { model: link.model } : {}),
         ...(kind ? { kind } : {}),
         ...(link.branch ? { branch: link.branch } : {}),
         context: {
-          ...(link.planSummary ? { plan: link.planSummary } : {}),
+          ...planContext(link, files),
           ...(text.trim() ? { previous: { stage, text } } : {}),
         },
         ...(reviewSieves ? { sieves: reviewSieves } : {}),
@@ -568,7 +637,10 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
       ...(input.deliver ? { deliver: true } : {}),
       // Проход проверки будет, если есть кем проверять — ревьюер этой связи.
       ...(link.ceilingModel ? { verify: true } : {}),
-      context: contextAfter(scanReviewBlocks(text).text),
+      // Без хвоста ответа ревью (L2.2): замечания уже стоят в задании полными
+      // карточками, а слова ревьюера вокруг блока их только пересказывали — до
+      // 24 000 знаков в каждом ходе правок.
+      context: stageContextOf(link, groupTask, undefined, files),
     }),
     findings,
     link: {

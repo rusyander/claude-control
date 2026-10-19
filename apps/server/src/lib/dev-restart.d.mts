@@ -19,6 +19,8 @@ export interface DevRestartView {
 
 export declare const DEV_RESTART_STATE: string;
 export declare const DEV_RESTART_REQUEST: string;
+export declare const DEV_WATCH_LOG: string;
+export declare function appendDevLog(appData: string, line: string): void;
 
 export declare function writeRestartState(appData: string, state: DevRestartFileState): void;
 export declare function clearRestartState(appData: string): void;

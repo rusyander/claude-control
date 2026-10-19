@@ -10,6 +10,12 @@ import readline from 'node:readline';
 
 const send = (message) => process.stdout.write(JSON.stringify(message) + '\n');
 
+// `--tools a,b` — вместо одной метки набор инструментов с этими именами: звено
+// группы (`check-run-layers.mjs`, случай 0) проверяет, какие из них снимает запрет
+// записи по шаблону, а это видно только на именах чтения и записи рядом.
+const toolsAt = process.argv.indexOf('--tools');
+const NAMES = toolsAt > 0 ? process.argv[toolsAt + 1].split(',') : ['marker'];
+
 readline.createInterface({ input: process.stdin }).on('line', (line) => {
   if (!line.trim()) return;
   let message;
@@ -37,13 +43,11 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       jsonrpc: '2.0',
       id: message.id,
       result: {
-        tools: [
-          {
-            name: 'marker',
-            description: 'метка для проверки слоёв прогона',
-            inputSchema: { type: 'object', properties: {} },
-          },
-        ],
+        tools: NAMES.map((name) => ({
+          name,
+          description: 'метка для проверки слоёв прогона',
+          inputSchema: { type: 'object', properties: {} },
+        })),
       },
     });
     return;

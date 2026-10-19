@@ -18,6 +18,7 @@ export { projectGitKey } from './api/ProjectGitApi.constants';
 export { useSplitDefaults } from './api/SplitDefaultsApi';
 export { useSaveSplitDefaults } from './api/useSaveSplitDefaults';
 export { useSieves } from './api/SievesApi';
+export { useVerifyLedger } from './api/VerifyLedgerApi';
 export { useAcceptLearnedSieve } from './api/useAcceptLearnedSieve';
 export { useDeleteLearnedSieve } from './api/useDeleteLearnedSieve';
 export type {

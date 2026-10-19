@@ -139,7 +139,7 @@ export const testsMessageParams = {
   'case-duration-invalid': ['value'],
   'case-id-not-in-group': ['caseId', 'groupId'],
   'case-not-in-named-group': ['caseId', 'groupId'],
-  'record-automated-case': ['cases', 'groups'],
+  'record-automated-case': ['cases'],
   'bulk-action-unknown': ['action'],
   'bulk-none-selected': [],
   'bulk-mute-reason-required': [],

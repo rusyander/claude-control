@@ -1,0 +1,23 @@
+{
+  "title": {
+    "ru": "Журнал проверок считает, сколько прогонов гейта и тестов повторялись на том же коде",
+    "en": "The verify ledger counts how many gate and test runs repeated on the same code"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Панель подмешивает своим запускам (Claude, другим CLI, локальным и контурным прогонам) небольшой модуль node, который записывает каждый прогон проверки вместе с отпечатком дерева файлов и замечает, когда такой же прогон уже был. Пока журнал только замеряет: проверки идут как обычно, а плитка «Журнал проверок» в «Настройки» → «Группы» показывает, сколько прогонов он повторил бы, сколько минут это сэкономило бы, сколько раз запись разошлась с настоящим прогоном и под какими CLI он срабатывал. По этим числам решается, включать ли повторы.",
+        "en": "The panel adds a small node module to its launches (Claude, other CLIs, local and contour runs) that records every check run with a fingerprint of the file tree and notices when the same run already happened. For now the ledger only measures: checks run as usual, and the «Verify ledger» tile in «Settings» → «Groups» shows how many runs it would have replayed, how many minutes that would have saved, how many times a record disagreed with the real run and under which CLIs it fired. These numbers decide whether replays get switched on."
+      },
+      "how": {
+        "ru": "Модуль ставится отдельной копией по версии содержимого и при старте панели проходит самопроверку живым node; не прошёл — не подмешивается никому, а плитка пишет «Не работает» с причиной. Отпечаток не зависит от настроек переводов строк, учитывает игнорируемые .env и скрытые lock-файлы, а красный прогон на том же коде запрещает повтор навсегда.",
+        "en": "The module is installed as a separate copy per content version and passes a self-test with a live node at panel start; if it fails, nobody gets it and the tile says «Not working» with the reason. The fingerprint ignores line-ending settings, includes ignored .env files and hidden lock files, and a red run on the same code forbids a replay for good."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    }
+  ]
+}

@@ -207,7 +207,8 @@ const GROUP_HANDOFF =
   'with JSON {"done":"what is closed","next":"a specific next step, not just continue",' +
   `"checkpoint":"${HANDOFF_DEFAULT_CHECKPOINT}","pruned":"what was cleaned out"}, values in the ` +
   "human's language; the panel continues in a clean session itself, so do not retell the JSON. " +
-  'Never before the checkpoint is updated in this run, never while waiting for an answer.';
+  'Never before the checkpoint is updated in this run, never while waiting for an answer. Task ' +
+  'closed and verified → add "closed":true (no new session).';
 
 /**
  * Что в общей склейке группе заменяется: все редакции источника и три правила.
@@ -251,7 +252,7 @@ export const GROUP_ECONOMY_PROMPT =
   'tests, build) to a log file, keep the verdict, counts, the first failure lines and the log ' +
   'path; give a gate or build timeout 1800000 (30 min), await it in one call, without ' +
   'polling. Each fact you had to find out ' +
-  `(stand access, commands, ports, places, decisions) goes as one line into ${TASK_NOTEBOOK}, ` +
+  `(stand access, commands, ports, places, decisions): one line into ${TASK_NOTEBOOK}, ` +
   `never a secret; read it before searching again. Tracker tasks: read ${TASK_TICKETS} first. ` +
   'When the conversation is ' +
   'compacted, the summary keeps the stage ledger (done, current, next), decisions with their ' +

@@ -16,6 +16,7 @@ import {
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { defaultCliCommand } from '../../../providers/cli/cli.ts';
 import { TurnTracker } from '../stream-usage/stream-usage.ts';
+import { limitSampleOf } from '../limit-journal/limit-journal.ts';
 import { userMemoryExcludes } from '../../platform/layers/layers.ts';
 import { copyParityExcludes } from '../copy-parity/copy-parity.ts';
 import {
@@ -26,7 +27,7 @@ import {
 } from '../live-session/live-session.ts';
 import { isRelayLost } from '../live-transport/live-transport.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
-import { watchCliChild } from '../../../lib/cli-spawn/cli-spawn.ts';
+import { ledgerCliMarker, watchCliChild } from '../../../lib/cli-spawn/cli-spawn.ts';
 import type { LedgerRelay } from '../run-ledger/run-ledger.ts';
 
 /** Сколько последних знаков stderr разового прогона хранится до выхода процесса. */
@@ -530,6 +531,9 @@ export class ChatRun {
     const { [AUTONOMOUS_ENV]: _inherited, ...parentEnv } = process.env;
     const env = {
       ...parentEnv,
+      // Метка пульса журнала — по CLI, а не по пути: команда здесь бывает node
+      // с JS-входом Claude.
+      ...ledgerCliMarker('claude'),
       ...(options.child ? childRunEnv(process.env) : {}),
       ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
       // Строку о блоке «Тесты» чату панели даёт дописка к промпту (`workspaceNote`);
@@ -1048,12 +1052,15 @@ export function translate(raw: RawEvent): ChatEvent[] {
   }
 
   if (raw.type === 'rate_limit_event' && raw.rate_limit_info) {
+    // Замер загрузки окон — для доли лимита у разговора (`limit-journal.ts`).
+    const sample = limitSampleOf(raw.rate_limit_info, Date.now());
     return [
       {
         kind: 'limit',
         resetsAt: raw.rate_limit_info.resetsAt ?? 0,
         type: raw.rate_limit_info.rateLimitType ?? '',
         status: raw.rate_limit_info.status ?? '',
+        ...(sample ? { sample } : {}),
       },
     ];
   }

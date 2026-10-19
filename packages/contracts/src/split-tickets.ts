@@ -178,15 +178,24 @@ export function scanSplitTickets(text: string): SplitTicketProposal[] {
   return found;
 }
 
+/**
+ * Шаг человеку с полями, приведёнными к потолкам списка. Один на блок
+ * `human` и на шаг, который панель выводит сама (ожидание события, L7.17), —
+ * иначе у двух источников разошлись бы обрезка и пробелы.
+ */
+export function humanStep(fields: SplitHumanStepProposal): SplitHumanStepProposal {
+  return {
+    action: clip(fields.action, FIELD_MAX.title),
+    where: clip(fields.where, FIELD_MAX.where),
+    why: clip(fields.why, FIELD_MAX.why),
+  };
+}
+
 /** Шаги человеку из текста хода. Без самого шага (`action`) показывать нечего. */
 export function scanSplitHumanSteps(text: string): SplitHumanStepProposal[] {
   const found: SplitHumanStepProposal[] = [];
   for (const fields of scanBlocks(text, SPLIT_HUMAN_TAG, ['action', 'where', 'why'] as const)) {
-    const step = {
-      action: clip(fields.action, FIELD_MAX.title),
-      where: clip(fields.where, FIELD_MAX.where),
-      why: clip(fields.why, FIELD_MAX.why),
-    };
+    const step = humanStep(fields);
     if (step.action) found.push(step);
   }
   return found;

@@ -6,6 +6,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
@@ -416,6 +417,90 @@ process.exit(1);
     expect(argv()).toEqual(['tools/qa/open.mjs', 'tools/qa/search.mjs']);
   });
 
+  /** Раннер, пишущий отчёт туда, куда велит строка: `--out=<путь>`. */
+  const GREEN = `import { writeFileSync } from 'node:fs';
+const out = process.argv.find((arg) => arg.startsWith('--out=')).slice(6);
+writeFileSync('argv.json', JSON.stringify(process.argv.slice(2)));
+writeFileSync(out, '<testsuites><testsuite name="qa">' +
+  '<testcase name="[qa-001] панель открывается" classname="qa"/>' +
+  '<testcase name="[qa-002] поиск находит" classname="qa"/></testsuite></testsuites>');
+`;
+  const commitAll = () => {
+    const git = (...args: string[]) =>
+      spawnSync('git', ['-c', 'user.email=x@y', '-c', 'user.name=x', ...args], { cwd: project });
+    // След раннера — не правка дерева.
+    writeFileSync(join(project, '.gitignore'), 'argv.json\n');
+    git('init', '-q', '-b', 'main');
+    git('add', '.');
+    git('commit', '-qm', 'init');
+  };
+
+  /**
+   * Живой прогон 19.10.2026: `run --cmd "… --outputFile={report}"` отдал
+   * раннеру `{report}` буквально — отчёт лёг в копию файлом с этим именем,
+   * статусы не проставились.
+   */
+  it('--cmd с {report}: отчёт этого прогона во временном файле, импортирован, в проекте ничего', () => {
+    writeFileSync(join(project, 'green.mjs'), GREEN);
+    const result = cli(
+      project,
+      'run',
+      '--group',
+      'qa',
+      '--cmd',
+      'node green.mjs {paths} --out={report}',
+    );
+    expect(result.code).toBe(0);
+    const args = argv();
+    expect(args.slice(0, 2)).toEqual(['tools/qa/open.mjs', 'tools/qa/search.mjs']);
+    expect(args[2]).toMatch(/^--out=.*cc-tests-run-.*junit\.xml$/);
+    expect(existsSync(join(project, '{report}'))).toBe(false);
+    const [record] = readRuns(project);
+    expect(record).toMatchObject({ origin: 'ci', exitCode: 0, summary: { passed: 2 } });
+  });
+
+  /**
+   * Память проверок (9.3) отвечает на тот же прогон того же дерева. Путь
+   * отчёта в строке — свежий временный каталог: ключ с ним не совпадал ни разу.
+   */
+  it('--memo: своя команда с {report} на том же дереве второй раз отвечает из памяти', () => {
+    writeFileSync(join(project, 'green.mjs'), GREEN);
+    automation({ version: 1, command: 'node green.mjs {files} --out={report}' });
+    commitAll();
+    expect(cli(project, 'run', '--memo').code).toBe(0);
+    const again = cli(project, 'run', '--memo');
+    expect(again.code).toBe(0);
+    expect(again.out).toContain('Без изменений с зелёного прогона');
+    const viaCmd = cli(project, 'run', '--memo', '--cmd', 'node green.mjs --out={report}');
+    expect(viaCmd.out).not.toContain('Без изменений');
+    expect(cli(project, 'run', '--memo', '--cmd', 'node green.mjs --out={report}').out).toContain(
+      'Без изменений с зелёного прогона',
+    );
+  });
+
+  /**
+   * L7.3 плана экономии групп: проверка доставки просила прогнать кейсы
+   * изменённых файлов, а единственной командой был прогон всех кейсов копии.
+   */
+  it('--case сужает прогон до названных кейсов; голый id — если он один в проекте', () => {
+    // {paths} пуст у прогона без выбора: выбор кейсами обязан до него дойти.
+    automation({ version: 1, command: 'node run.mjs {paths}' });
+    const result = cli(project, 'run', '--case', 'qa:qa-002,ot-001');
+    expect(result.out).toContain('Кейсов с автотестом: 2, файлов: 2');
+    expect(argv()).toEqual(['tools/qa/other.mjs', 'tools/qa/search.mjs']);
+    expect(readRuns(project)[0]?.scope).toBe(
+      'tests-cli run: node run.mjs tools/qa/other.mjs tools/qa/search.mjs',
+    );
+  });
+
+  it('--case с кейсом, которого нет, — отказ словами, ничего не запущено', () => {
+    const result = cli(project, 'run', '--case', 'qa:qa-001,qa:nope');
+    expect(result.code).toBe(1);
+    expect(result.out).toContain('Кейсов нет в проекте: qa:nope');
+    expect(existsSync(join(project, 'argv.json'))).toBe(false);
+    expect(readRuns(project)).toHaveLength(0);
+  });
+
   it('сломанный automation.json — отказ словами, а не тихий откат на npm test', () => {
     automation({ version: 1 });
     const result = cli(project, 'run');
@@ -466,5 +551,204 @@ process.exit(1);
       expect(run({ AGENTDECK_BRIEF_OUTPUT: '' }).out).toContain('шум строка 150');
       expect(run({ AGENTDECK_BRIEF_OUTPUT: '' }, '--brief').out).not.toContain('шум строка 150');
     });
+  });
+});
+
+/**
+ * Монорепозиторий (19.10.2026): кейсы-наборы двух пакетов с одним ключом от
+ * корня пакета. `import`/`run` с `--group` кладут результат на набор этой
+ * группы — без неё ключ двусмыслен, и группа переписывала отчёт своим скриптом.
+ */
+describe('tests-cli: наборы пакетов монорепозитория', () => {
+  let project = '';
+  const REPORT =
+    '<testsuites><testsuite name="vitest">' +
+    '<testcase classname="src/models/a.test.ts" name="a &gt; считает"/>' +
+    '</testsuite></testsuites>';
+  const status = (group: string) =>
+    readGroups(project).find((g) => g.id === group)?.cases[0]?.status;
+
+  beforeEach(() => {
+    project = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-tests-cli-mono-')));
+    for (const [group, pkg] of [
+      ['suites-admin', 'admin-ui'],
+      ['suites-chat', 'chat-ui'],
+    ] as const) {
+      const automation = { status: 'automated', file: `${pkg}/src/models/`, suite: 'src/models' };
+      writeGroup(project, {
+        ...createGroup(project, group, group),
+        cases: [{ id: `${group}-001`, title: `${pkg}: models`, automation }].flatMap(
+          (raw, index) => parseCase(raw, index) ?? [],
+        ),
+      });
+    }
+    writeFileSync(join(project, 'report.xml'), REPORT);
+    writeFileSync(
+      join(project, 'pkg.mjs'),
+      `import { copyFileSync } from 'node:fs';\ncopyFileSync('report.xml', process.argv.at(-1));\n`,
+    );
+  });
+
+  afterEach(() => {
+    rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('import --group: результат на наборе группы, чужой не тронут', () => {
+    const result = cli(
+      project,
+      'import',
+      '--format',
+      'junit',
+      '--file',
+      'report.xml',
+      '--group',
+      'suites-admin',
+    );
+    expect(result.code).toBe(0);
+    expect(status('suites-admin')).toBe('passed');
+    expect(status('suites-chat')).toBe('unknown');
+  });
+
+  it('import --group несуществующей группы — отказ словами, статусы не тронуты', () => {
+    const result = cli(
+      project,
+      'import',
+      '--format',
+      'junit',
+      '--file',
+      'report.xml',
+      '--group',
+      'nope',
+    );
+    expect(result.code).toBe(1);
+    expect(result.out).toContain('Группы «nope» в проекте нет');
+    expect(readRuns(project)).toHaveLength(0);
+  });
+
+  it('run --group: отчёт прогона ложится на набор этой группы', () => {
+    const result = cli(
+      project,
+      'run',
+      '--group',
+      'suites-chat',
+      '--cmd',
+      'node pkg.mjs {paths} {report}',
+    );
+    expect(result.code).toBe(0);
+    expect(status('suites-chat')).toBe('passed');
+    expect(status('suites-admin')).toBe('unknown');
+  });
+});
+
+/**
+ * Кейсы vitest в проекте, чья своя команда — цепочка `go test` (19.10.2026:
+ * `{go-modules}` отдавал `*.test.ts` в go, и группа собирала JUnit руками).
+ * Настоящий vitest панели: в каждый пакет — ссылка на node_modules сервера.
+ */
+describe('tests-cli run: кейсы vitest мимо своей команды Go', () => {
+  let project = '';
+  const MODULES = resolve(__dirname, '../../../node_modules');
+  const status = (id: string) =>
+    readGroups(project)
+      .flatMap((g) => g.cases)
+      .find((c) => c.id === id)?.status;
+  const run = (group: string) => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'run', '--group', group, '--project', project],
+      { encoding: 'utf8', timeout: 120_000 },
+    );
+    return { code: result.status, out: `${result.stdout}${result.stderr}` };
+  };
+
+  beforeEach(() => {
+    project = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-tests-cli-vitest-')));
+    for (const [pkg, body] of [
+      ['admin', `describe('a', () => { it('считает', () => expect(1 + 1).toBe(2)); });`],
+      ['chat', `describe('b', () => { it('падает', () => expect(1).toBe(2)); });`],
+    ] as const) {
+      mkdirSync(join(project, pkg, 'src'), { recursive: true });
+      writeFileSync(join(project, pkg, 'package.json'), `{"name":"${pkg}","type":"module"}`);
+      writeFileSync(
+        join(project, pkg, 'src', `${pkg}.test.ts`),
+        `import { describe, it, expect } from 'vitest';\n${body}\n`,
+      );
+      symlinkSync(MODULES, join(project, pkg, 'node_modules'), 'junction');
+    }
+    writeGroup(project, {
+      ...createGroup(project, 'web', 'web'),
+      cases: [
+        {
+          id: 'web-001',
+          title: 'админка считает',
+          automation: {
+            status: 'automated',
+            file: 'admin/src/admin.test.ts',
+            testName: 'a > считает',
+          },
+        },
+        {
+          id: 'web-002',
+          title: 'чат падает',
+          automation: {
+            status: 'automated',
+            file: 'chat/src/chat.test.ts',
+            testName: 'b > падает',
+          },
+        },
+      ].flatMap((raw, index) => parseCase(raw, index) ?? []),
+    });
+    // Наборы с одним ключом `src` в двух пакетах: без перевода classname к корню
+    // проекта ключ двусмыслен, и оба итога терялись.
+    writeGroup(project, {
+      ...createGroup(project, 'suites', 'suites'),
+      cases: ['admin', 'chat']
+        .map((pkg) => ({
+          id: `suites-${pkg}`,
+          title: `${pkg}: src`,
+          automation: { status: 'automated', file: `${pkg}/src/`, suite: 'src' },
+        }))
+        .flatMap((raw, index) => parseCase(raw, index) ?? []),
+    });
+    writeFileSync(
+      join(project, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({ version: 1, command: '{go-modules}', format: 'go-test-json' }),
+    );
+  });
+
+  afterEach(() => {
+    for (const pkg of ['admin', 'chat'])
+      rmSync(join(project, pkg, 'node_modules'), { force: true });
+    rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('каждый пакет — своим vitest, итоги на кейсах, провал одного пакета — код 1', () => {
+    const result = run('web');
+    expect(result.out).toMatch(
+      /Команда: \(.*vitest.* run --root .*admin.* \|\| echo -\) && \(.*--root .*chat.* \|\| echo -\)/,
+    );
+    expect(result.out).not.toContain('go test');
+    expect(result.code).toBe(1);
+    expect(status('web-001')).toBe('passed');
+    expect(status('web-002')).toBe('failed');
+    expect(readRuns(project)[0]).toMatchObject({ exitCode: 1, summary: { passed: 1, failed: 1 } });
+  }, 150_000);
+
+  it('наборы-каталоги пакетов с одним ключом src — итог каждому своему', () => {
+    const result = run('suites');
+    expect(result.code).toBe(1);
+    expect(status('suites-admin')).toBe('passed');
+    expect(status('suites-chat')).toBe('failed');
+  }, 150_000);
+
+  it('своя команда JUnit — по-прежнему она, даже для файлов vitest', () => {
+    writeFileSync(
+      join(project, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({ version: 1, command: 'node run.mjs {files}' }),
+    );
+    const result = cli(project, 'run', '--group', 'web', '--dry');
+    expect(result.out).toContain(
+      'Команда: node run.mjs admin/src/admin.test.ts chat/src/chat.test.ts',
+    );
   });
 });

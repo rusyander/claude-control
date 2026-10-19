@@ -1,14 +1,29 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import { feedPositions, isPinnedAt, restoreTarget, snapshotOf } from './feedPosition';
+import type { FeedProbe, FeedRow, FeedSnapshot } from './feedPosition.types';
 import type { FeedScrollSignals } from './useFeedScroll.types';
 
 /**
- * Прокрутка ленты: держаться низа, пока человек внизу, и не прыгать при
- * подгрузке более ранних сообщений.
+ * Сколько ждать, пока на экране появится переписка, к месту в которой
+ * возвращаемся, мс. Пока её грузят, показано окно прошлого разговора, и ставить
+ * ленту по нему нельзя. Дольше — значит, переписку переписали (якоря больше
+ * нет нигде), и лента ведёт себя как при первом открытии.
+ */
+const RESTORE_WAIT_MS = 10_000;
+
+/** Атрибут сообщения ленты, по которому ищется якорь (ставит `MessageBubble`). */
+const ROW_ATTR = 'data-feed-message';
+
+/**
+ * Прокрутка ленты: держаться низа, пока человек внизу, не прыгать при
+ * подгрузке более ранних сообщений и возвращать место при возврате в разговор.
  *
  * Пока пользователь внизу — лента едет за ответом; стоит ему отлистать вверх,
  * чтобы перечитать, — отпускаем (раньше лента тянула вниз на каждом слове, и
  * читать прошлое во время ответа было нельзя). Подгруженные сверху сообщения
  * сдвигают содержимое вниз — позицию восстанавливаем по приросту высоты.
+ * Отлистанный разговор запоминает место (`feedPosition.ts`): ушли к ребёнку и
+ * вернулись в родителя — лента стоит там же, а не внизу.
  */
 export function useFeedScroll({
   conversationId,
@@ -23,14 +38,56 @@ export function useFeedScroll({
   const isPinned = useRef(true);
   // Высота ленты в момент клика «Загрузить ещё»; есть — идёт восстановление.
   const restoreScroll = useRef<number | undefined>(undefined);
+  // Разговор, чьё место пишут события прокрутки. Свой, а не из пропсов в
+  // замыкании: кадр снимка мог быть заказан ещё в прошлом разговоре.
+  const shownId = useRef(conversationId);
+  // Место, к которому возвращаемся, пока его переписка не нарисована.
+  const pending = useRef<{ snapshot: FeedSnapshot; since: number } | undefined>(undefined);
+  const captureFrame = useRef<number | undefined>(undefined);
 
-  // Смена разговора — снова к последнему сообщению. Ключ — id разговора, а не
-  // первого сообщения: при подгрузке более ранних первое сообщение меняется, но
-  // прокрутку к низу это запускать не должно.
-  useEffect(() => {
+  const toBottom = (): void => {
     isPinned.current = true;
-    restoreScroll.current = undefined;
     bottomRef.current?.scrollIntoView({ block: 'end' });
+  };
+
+  /** Вернуть ленту к месту снимка, если его переписка уже на экране. */
+  const tryRestore = (): void => {
+    const list = listRef.current;
+    const wait = pending.current;
+    if (!list || !wait) return;
+    const target = restoreTarget(wait.snapshot, probeFeed(list, wait.snapshot));
+    if (target === undefined) {
+      if (Date.now() - wait.since <= RESTORE_WAIT_MS) return;
+      pending.current = undefined;
+      toBottom();
+      return;
+    }
+    pending.current = undefined;
+    list.scrollTop = target;
+    isPinned.current = isPinnedAt(list);
+  };
+
+  // Смена разговора. Ключ — id разговора, а не первого сообщения: при подгрузке
+  // более ранних первое сообщение меняется, но прокрутку это запускать не
+  // должно. Отлистанный раньше разговор — к его месту, layout-эффектом: место
+  // ставится до отрисовки, без мигания низом.
+  const restoresOnSwitch = useRef(false);
+  useLayoutEffect(() => {
+    shownId.current = conversationId;
+    restoreScroll.current = undefined;
+    const snapshot = conversationId ? feedPositions.get(conversationId) : undefined;
+    restoresOnSwitch.current = Boolean(snapshot);
+    pending.current = snapshot ? { snapshot, since: Date.now() } : undefined;
+    isPinned.current = !snapshot;
+    if (snapshot) tryRestore();
+    // tryRestore читает только ref'ы — повторный запуск нужен лишь на смене разговора.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  // Остальные (и первое открытие) — к последнему сообщению, как и было, тем же
+  // пассивным эффектом: момент прокрутки к низу не сдвигаем.
+  useEffect(() => {
+    if (!restoresOnSwitch.current) toBottom();
   }, [conversationId]);
 
   useEffect(() => {
@@ -41,13 +98,32 @@ export function useFeedScroll({
   }, [messageCount, streamText, streamToolCount, stalled, permissionCount]);
 
   // Восстановление позиции после подгрузки более ранних: держим на экране то же
-  // сообщение, что и было, компенсируя прокрутку приростом высоты сверху.
+  // сообщение, что и было, компенсируя прокрутку приростом высоты сверху. И
+  // второй случай — возврат в разговор, чья переписка доехала только сейчас.
   useLayoutEffect(() => {
     const list = listRef.current;
+    if (pending.current) tryRestore();
     if (!list || restoreScroll.current === undefined) return;
     list.scrollTop += list.scrollHeight - restoreScroll.current;
     restoreScroll.current = undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messageCount]);
+
+  // Заказанный кадр снимка не должен пережить ленту.
+  useEffect(
+    () => () => {
+      if (captureFrame.current !== undefined) cancelAnimationFrame(captureFrame.current);
+    },
+    [],
+  );
+
+  /** Запомнить место (или забыть: у низа разговор едет за ответом, как при первом открытии). */
+  const capture = (list: HTMLDivElement, id: string | undefined): void => {
+    captureFrame.current = undefined;
+    if (!id || id !== shownId.current || pending.current) return;
+    if (isPinned.current) feedPositions.delete(id);
+    else feedPositions.set(id, snapshotOf(readRows(list), list.scrollTop));
+  };
 
   return {
     bottomRef,
@@ -56,9 +132,43 @@ export function useFeedScroll({
     rememberHeight: () => {
       if (listRef.current) restoreScroll.current = listRef.current.scrollHeight;
     },
-    /** Прокрутка человека: у низа — снова держимся, отлистал — отпускаем. */
+    /** Прокрутка человека: у низа — снова держимся, отлистал — отпускаем и запоминаем место. */
     onScroll: (list: HTMLDivElement) => {
-      isPinned.current = list.scrollHeight - list.scrollTop - list.clientHeight < 160;
+      // Пока ждём переписку для возврата, на экране чужое окно: его прокрутка
+      // ничего не значит. Ждём слишком долго — отпускаем, решает человек.
+      if (pending.current) {
+        if (Date.now() - pending.current.since <= RESTORE_WAIT_MS) return;
+        pending.current = undefined;
+      }
+      isPinned.current = isPinnedAt(list);
+      // Снимок — раз в кадр: читать положение всех сообщений на каждое событие
+      // прокрутки незачем, их приходит по несколько за кадр.
+      if (captureFrame.current !== undefined) return;
+      const id = shownId.current;
+      captureFrame.current = requestAnimationFrame(() => capture(list, id));
     },
+  };
+}
+
+/** Сообщения ленты с их положением относительно верха видимой части. */
+function readRows(list: HTMLDivElement): FeedRow[] {
+  const top = list.getBoundingClientRect().top;
+  return [...list.querySelectorAll<HTMLElement>(`[${ROW_ATTR}]`)].map((row) => {
+    const rect = row.getBoundingClientRect();
+    return { id: row.getAttribute(ROW_ATTR) ?? '', top: rect.top - top, bottom: rect.bottom - top };
+  });
+}
+
+/** Что из снимка нарисовано сейчас и где. */
+function probeFeed(list: HTMLDivElement, snapshot: FeedSnapshot): FeedProbe {
+  const find = (id: string | undefined) =>
+    id ? list.querySelector<HTMLElement>(`[${ROW_ATTR}="${CSS.escape(id)}"]`) : null;
+  const anchor = find(snapshot.anchor?.id);
+  const top = list.getBoundingClientRect().top;
+  return {
+    ...(anchor ? { anchorTop: anchor.getBoundingClientRect().top - top } : {}),
+    hasLast: Boolean(find(snapshot.lastId)),
+    scrollTop: list.scrollTop,
+    maxScroll: list.scrollHeight - list.clientHeight,
   };
 }

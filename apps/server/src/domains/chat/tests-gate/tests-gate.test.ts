@@ -5,7 +5,7 @@ import type {
   ProjectTestRunRecord,
   ProjectTestStatus,
 } from '@agentdeck/contracts';
-import { judgeTests } from './tests-gate.ts';
+import { judgeTests, narrowedCommand } from './tests-gate.ts';
 
 /**
  * Вердикт группы разделения из блока «Тесты» её копии (решение владельца
@@ -73,7 +73,8 @@ describe('вердикт группы из блока «Тесты»', () => {
     });
     expect(verdict.missing).toHaveLength(1);
     expect(verdict.missing[0]).toContain('auth-001, auth-002');
-    expect(verdict.missing[0]).toContain(COMMAND);
+    // L7.3: команда сужена до кейсов изменённых файлов, а не «все кейсы копии».
+    expect(verdict.missing[0]).toContain(`${COMMAND} --case auth:auth-001,auth:auth-002`);
     expect(verdict.verdict).toEqual({ cases: 2, passed: 0 });
   });
 
@@ -124,6 +125,8 @@ describe('вердикт группы из блока «Тесты»', () => {
       command: COMMAND,
     });
     expect(verdict.missing).toEqual([expect.stringContaining('auth-002')]);
+    expect(verdict.missing[0]).toContain(`${COMMAND} --case auth:auth-002`);
+    expect(verdict.missing[0]).not.toContain('auth:auth-001');
     expect(verdict.verdict).toMatchObject({ cases: 2, passed: 1 });
   });
 
@@ -204,7 +207,7 @@ describe('вердикт группы из блока «Тесты»', () => {
     expect(verdict.missing).toHaveLength(1);
     expect(verdict.missing[0]).toContain('r1');
     expect(verdict.missing[0]).toContain('src/auth/login.ts');
-    expect(verdict.missing[0]).toContain(COMMAND);
+    expect(verdict.missing[0]).toContain(`${COMMAND} --case auth:auth-001`);
     expect(verdict.verdict).toMatchObject({ cases: 1, passed: 0, runId: 'r1' });
   });
 
@@ -241,5 +244,14 @@ describe('вердикт группы из блока «Тесты»', () => {
     });
     expect(verdict.missing).toEqual([expect.stringContaining('auth-002')]);
     expect(verdict.verdict).toMatchObject({ cases: 2, passed: 1 });
+  });
+});
+
+describe('команда записи прогона в пробеле (L7.3)', () => {
+  it('сужена до названных кейсов; без кейсов и при списке длиннее строки оболочки — как есть', () => {
+    expect(narrowedCommand(COMMAND, ['auth:auth-001'])).toBe(`${COMMAND} --case auth:auth-001`);
+    expect(narrowedCommand(COMMAND, [])).toBe(COMMAND);
+    const many = Array.from({ length: 300 }, (_, index) => `auth:auth-${index}`);
+    expect(narrowedCommand(COMMAND, many)).toBe(COMMAND);
   });
 });

@@ -327,6 +327,35 @@ describe('ChatRun.start: места очереди тяжёлых шагов', (
     ];
     expect(call[2].env.CHAT_NODE_CWD).toBe(process.cwd());
   });
+
+  // L6.3: продолженная группа (`--resume` после паузы, повтора или перезапуска
+  // панели) — новый процесс того же разговора; Node проекта ему тоже положен,
+  // иначе агент сам экспортирует PATH в каждой команде.
+  it('продолжение разговора (--resume) получает Node проекта так же', async () => {
+    const run = new ChatRun();
+    const finished = run.start(
+      {
+        prompt: 'продолжай',
+        cwd: process.cwd(),
+        command: 'node-wired-cli',
+        sessionId: '0b7e2f9a-1c3d-4e5f-8a9b-0c1d2e3f4a5b',
+      },
+      () => undefined,
+    );
+    process.nextTick(() => {
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 0);
+    });
+    await finished;
+    const call = spawnMock.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(call[1].join(' ')).toContain('--resume 0b7e2f9a-1c3d-4e5f-8a9b-0c1d2e3f4a5b');
+    expect(call[2].env.CHAT_NODE_CWD).toBe(process.cwd());
+  });
 });
 
 /**

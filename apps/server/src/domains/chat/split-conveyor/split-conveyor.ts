@@ -90,6 +90,8 @@ export interface SplitConveyorStore {
 
 export interface SplitConveyorDeps {
   store: SplitConveyorStore;
+  /** Фоновые команды живого процесса разговора группы — что убьёт пауза (L7.6). */
+  backgroundTasks?: (chatId: string) => readonly string[];
   /**
    * Проект трекера для тикетов групп по пути проекта: привязан и интеграция
    * подключена. Нет зависимости или ответа — завести тикет из хаба нельзя.
@@ -324,13 +326,62 @@ function withoutMr(outcome: ChainOutcome): ChainOutcome {
   return rest;
 }
 
+/**
+ * Пробелы, которые закрываются отчётом или прогоном, без единой правки кода:
+ * строка сита или пункта владельца, запись прогона блока «Тесты». Только такие
+ * пробелы — напоминание не велит коммитить, отправлять ветку и трогать MR
+ * (L7.3 плана экономии групп, 19.10 01:46): по строке «commit, push, update the
+ * MR» доставленная группа делала fetch, rebase, три гейта заново (~12 мин) и
+ * переотправку ветки MR, который уже стоял на ревью, — ради блока отчёта.
+ * Белый список, а не чёрный: незнакомая строка (чужой текст, новый код) ведёт
+ * к прежнему напоминанию о доставке целиком.
+ */
+const REPORT_ONLY_GAPS: ReadonlySet<string> = new Set([
+  'sieve-gap-unreported',
+  'sieve-gap-no-evidence',
+  'sieve-gap-stale',
+  'sieve-gap-checks',
+  'sieve-gap-no-run',
+  'sieve-gap-run-missing',
+  'sieve-gap-run-stale',
+  'delivery-gap-owner-unreported',
+  'delivery-gap-owner-no-evidence',
+  'tests-gap-no-run',
+  'tests-gap-word-only',
+  'tests-gap-stale',
+  'tests-gap-unrun',
+]);
+
+/** Все пробелы — отчётные (см. `REPORT_ONLY_GAPS`). */
+export function reportOnlyGaps(missing: readonly string[]): boolean {
+  return (
+    missing.length > 0 &&
+    missing.every((line) => {
+      const code = matchText(line)?.messageCode;
+      return code !== undefined && REPORT_ONLY_GAPS.has(code);
+    })
+  );
+}
+
 /** Напоминание группе: чего не хватает, и что делать, если доставка невозможна. */
 export function deliveryNudgePrompt(branch: string, missing: readonly string[]): string {
-  return [
+  const lines = [
     "The panel checked the group's delivery against git — it is not finished. Missing:",
     // Строки пробелов — тексты сервера (русские, с кодом): модели — их английская сторона.
     ...missing.map((line) => `- ${localizeText(line, 'en')}`),
     '',
+  ];
+  if (reportOnlyGaps(missing)) {
+    return [
+      ...lines,
+      `Git is in order: the branch ${branch} and its MR are delivered. Only the report is ` +
+        'missing — run what a line above names (the exact command it gives) and answer with ' +
+        'the missing rows. Do not commit, push, rebase or touch the MR for this: nothing in ' +
+        'the code changes.',
+    ].join('\n');
+  }
+  return [
+    ...lines,
     `Finish it with the delivery skill: commit the work, push the branch ${branch}, open an MR ` +
       '(or update the existing one) and give its link as the last line. If delivery is ' +
       "impossible (no access, the decision is the human's) — ask the human with a question, not a report.",
@@ -412,11 +463,24 @@ export function limitResumePrompt(branch: string): string {
   ].join('\n');
 }
 
-/** Продолжение группы после паузы человека. */
-export function pauseResumePrompt(branch: string): string {
+/** Сколько фоновых команд паузы назвать агенту: дальше — длина без пользы. */
+const MAX_PAUSED_TASKS = 8;
+
+/**
+ * Продолжение группы после паузы человека. Убитые паузой фоновые команды —
+ * поимённо: сервер стенда посреди приёмки агент иначе искал по оборванному
+ * вызову и поднимал заново наугад (L7.6, 19.10.2026).
+ */
+export function pauseResumePrompt(branch: string, killed: readonly string[] = []): string {
   return [
     'The human paused the group and is now resuming it. The turn that was running before the ' +
       'pause was stopped: whatever was not written to files may be lost.',
+    ...(killed.length > 0
+      ? [
+          'The pause also killed these background commands; restart the ones the work still ' +
+            `needs before relying on them: ${killed.join('; ')}.`,
+        ]
+      : []),
     'First check the state against the facts (git status, git log, your transcript), then ' +
       `continue from where you stopped on the branch ${branch}.`,
   ].join('\n');
@@ -2593,7 +2657,15 @@ export class SplitConveyor {
       );
       return 'sent';
     }
-    const prompt = this.withIdentity(record, group, pauseResumePrompt(group.branch));
+    const prompt = this.withIdentity(
+      record,
+      group,
+      pauseResumePrompt(group.branch, group.pausedTasks),
+    );
+    if (group.pausedTasks) {
+      delete group.pausedTasks;
+      this.deps.store.set(record);
+    }
     const outcome =
       this.deps.resume && group.chatId && group.path ? this.deps.resume(group, prompt) : 'refused';
     if (outcome === 'refused') {
@@ -2770,6 +2842,11 @@ export class SplitConveyor {
 
   /** Пауза: запись и место в очереди (без остановки прогона — это дело маршрута). */
   private hold(record: SplitPlanRecord, group: SplitPlanGroupRecord): void {
+    // Пауза зовётся ДО остановки процесса (кнопка хаба и «Стоп» в чате), поэтому
+    // фон ещё жив и его можно назвать.
+    const killed = group.chatId ? (this.deps.backgroundTasks?.(group.chatId) ?? []) : [];
+    if (killed.length > 0) group.pausedTasks = killed.slice(0, MAX_PAUSED_TASKS);
+    else delete group.pausedTasks;
     group.status = 'paused';
     group.pausedAt = this.now().toISOString();
     delete group.waitingFor;

@@ -91,7 +91,7 @@ export function MessageBubble({
   const notices = useMemo(() => taskNoticesOf(message), [message]);
   if (notices) {
     return (
-      <div className={styles.row}>
+      <div className={styles.row} data-feed-message={message.id}>
         <div className={styles.taskNotice} role="status">
           {notices.map((notice, index) => (
             <div key={index} className={styles.taskNoticeLine}>
@@ -105,8 +105,10 @@ export function MessageBubble({
     );
   }
 
+  // `data-feed-message` — якорь места в ленте: по нему она возвращается к
+  // прочитанному, когда человек приходит обратно в разговор (`useFeedScroll`).
   return (
-    <div className={`${styles.row} ${isUser ? styles.rowUser : ''}`}>
+    <div className={`${styles.row} ${isUser ? styles.rowUser : ''}`} data-feed-message={message.id}>
       <div className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}>
         <div className={styles.actions}>
           <Button

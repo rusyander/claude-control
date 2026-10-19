@@ -625,7 +625,10 @@ export const testsEn: typeof testsRu = {
       'checks it against the set — code changed but a changed file has no case or its case ' +
       'was not run after the change; a case written whose expected names nothing — and hands ' +
       'the agent a short list of gaps ' +
-      'with exact commands; no gaps — not a word and not a single extra token. A shot or ' +
+      'with exact commands; no gaps — not a word and not a single extra token. Unrun cases ' +
+      'are named one by one (run --case), not as their whole group: a group may hold long ' +
+      'live checks against the stand, and running "the whole group" would load it mid-work. ' +
+      'A shot or ' +
       'probe script (shots, screenshot, snapshot, probe, repro in its name) in the root or ' +
       'a scripts folder (e2e, qa, scripts, tools, tmp) that git does not track is not code: ' +
       'it is turn scaffolding, like the agent’s notes. The same file under src/ or lib/ is ' +
@@ -1439,9 +1442,19 @@ export const testsEn: typeof testsRu = {
       cliTitle: 'Without the panel',
       cliText:
         'pnpm tests sync --project <dir> does the same (--dir picks the folder); pnpm tests run ' +
-        '--project <dir> [--group <group>] runs them: without --cmd it starts the folder runner ' +
+        '--project <dir> [--group <group>] [--case <group:case,…>] runs them (--case runs only ' +
+        'the named cases; a bare case id works when it is unique in the project): without --cmd it starts the folder runner ' +
         'from the right directory with the same command as the button, takes the report of ' +
         'THIS run only (an old report file is never picked up) and records the exit code. ' +
+        '--cmd takes the same {files}, {paths} and {report} substitutions: {report} is the ' +
+        'JUnit report of this run in a temporary file, and that is what the import reads. With ' +
+        '--group, run and import put results on that group’s cases only: in a monorepo the ' +
+        'same suite directory (src/models) can exist in two packages, and without a group such ' +
+        'a result is ambiguous and skipped. Vitest cases (*.test.ts files and suite ' +
+        'directories inside a package) that the project’s own command cannot run — it writes a ' +
+        'Go or Cargo report, or there is none and the root has no scripts.test — are run by ' +
+        'the vitest of the nearest package.json, one package after another; a failure in one ' +
+        'package does not stop the rest, and the exit code is 1. ' +
         '--memo answers a green run of the same command on an unchanged tree from memory ' +
         '(a panel group gets this by default), --fresh runs anyway. An answer from memory ' +
         'goes into the history as its own "from memory" record pointing at the real run; ' +

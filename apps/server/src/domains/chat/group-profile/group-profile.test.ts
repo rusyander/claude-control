@@ -4,6 +4,7 @@ import {
   chatRunProfile,
   foreignGroupMcp,
   compactWindowOf,
+  FORCE_PUSH_ASK,
   GROUP_SKILLS,
   groupMcpProfile,
   groupRunProfile,
@@ -134,6 +135,10 @@ describe('foreignGroupMcp (6.1)', () => {
 
 /** Потолок Bash группы (3.1) — в каждых настройках флага её прогона. */
 const CEILING = { env: { BASH_MAX_TIMEOUT_MS: '1800000' } };
+/** Трекер и хранилище кода из `ENTRIES` — правилом `ask` (журнал 19.10). */
+const OUTWARD = {
+  permissions: { ask: ['mcp__atlassian-work', 'mcp__gitlab-work', ...FORCE_PUSH_ASK] },
+};
 
 describe('groupRunProfile', () => {
   it('флаг строгого набора, подключения claude.ai сняты, оставленные — своим файлом', () => {
@@ -148,6 +153,47 @@ describe('groupRunProfile', () => {
         sentry: ENTRIES[6]!.config,
       },
     });
+  });
+
+  it('хранилище кода и трекер — правилом ask на весь сервер: авторежим CLI не решит их запись сам', () => {
+    // Журнал 19.10: в авторежиме классификатор CLI сам разрешил ответ в тред MR и
+    // правку описания — до брокера панели вызов не дошёл. Правило `ask` сильнее
+    // режима и ведёт вызов к брокеру, где решает строка группы.
+    const run = groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [] });
+    expect(run.settings.permissions).toEqual(OUTWARD.permissions);
+    // Имя сервера с недопустимыми для инструмента знаками — так, как его пишет CLI.
+    const odd = groupRunProfile({
+      entries: [{ id: 'gitlab.work', config: { command: 'npx', args: ['mcp-gitlab'] } }],
+      tasksText: '',
+      extra: [],
+    });
+    expect(odd.settings.permissions).toEqual({ ask: ['mcp__gitlab_work', ...FORCE_PUSH_ASK] });
+    // Без хранилища кода и трекера остаётся правило принудительного пуша (L7.12).
+    const none = groupRunProfile({ entries: [ENTRIES[6]!], tasksText: '', extra: [] });
+    expect(none.settings.permissions).toEqual({ ask: [...FORCE_PUSH_ASK] });
+  });
+
+  it('принудительный пуш оболочкой — правилом ask: --force*, -f, +refspec, через git -C (L7.12)', () => {
+    // Журнал 19.10 02:17:02: группа в авторежиме переписала ветку MR на ревью
+    // `git push --force-with-lease` без карточки. Формы проверены настоящим CLI
+    // в tools/qa/check-group-forge-ask.mjs; обычный `git push` правилом не задет.
+    const settings = groupRunProfile({ entries: [], tasksText: '', extra: [] }).settings as {
+      permissions?: { ask?: string[] };
+    };
+    const ask = settings.permissions?.ask;
+    expect(ask).toEqual(
+      expect.arrayContaining([
+        'Bash(git push *--force*)',
+        'Bash(git push -f*)',
+        'Bash(git push * -f*)',
+        'Bash(git push * +*)',
+        'Bash(git -C * push *--force*)',
+        'Bash(git -C * push * +*)',
+      ]),
+    );
+    expect(ask?.some((rule) => rule === 'Bash(git push:*)' || rule === 'Bash(git push *)')).toBe(
+      false,
+    );
   });
 
   it('строка группе называет оставленные и снятые серверы и блок просьбы', () => {
@@ -220,6 +266,7 @@ describe('хук ответов трекера', () => {
     });
     expect(run.settings).toEqual({
       ...CEILING,
+      ...OUTWARD,
       hooks: {
         PostToolUse: [
           {
@@ -241,7 +288,12 @@ describe('хук ответов трекера', () => {
       skills,
       trackerHook: COMMAND,
     });
-    expect(Object.keys(both.settings).sort()).toEqual(['env', 'hooks', 'skillOverrides']);
+    expect(Object.keys(both.settings).sort()).toEqual([
+      'env',
+      'hooks',
+      'permissions',
+      'skillOverrides',
+    ]);
     const none = groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [], skills });
     expect(none.settings).not.toHaveProperty('hooks');
   });
@@ -259,6 +311,7 @@ describe('очередь тяжёлых шагов', () => {
     const hook = [{ type: 'command', command: QUEUE.hook }];
     expect(run.settings).toEqual({
       ...CEILING,
+      ...OUTWARD,
       hooks: {
         PreToolUse: [{ matcher: 'Bash', hooks: [{ ...hook[0], timeout: 1800 }] }],
         PostToolUse: [{ matcher: 'Bash', hooks: [{ ...hook[0], timeout: 10 }] }],
@@ -379,9 +432,10 @@ describe('skillSettings', () => {
   });
 
   it('профиль без сведений о навыках настроек навыков не несёт — только потолок Bash', () => {
-    expect(groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [] }).settings).toEqual(
-      CEILING,
-    );
+    expect(groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [] }).settings).toEqual({
+      ...CEILING,
+      ...OUTWARD,
+    });
     const run = groupRunProfile({
       entries: ENTRIES,
       tasksText: 'макет',

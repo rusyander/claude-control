@@ -65,7 +65,7 @@ function session() {
       `add or update the covering case — ${cli} case ${project} --group <g> --json '{"title":"…","steps":["…"],"expected":"…","codePaths":["<changed path>"]}' ` +
       `(an existing test → add "automation":{"status":"automated","file":"<test path>"}); ` +
       `one step per behaviour, each expected = what is actually seen, never "all pass"/"works" (standard: ${cli} help); ` +
-      `run automated cases — ${cli} run ${project} --group <g>; record a manual check — ${cli} record ${project} <g>:<id>=passed --note "<how>". ` +
+      `run the automated cases you touched — ${cli} run ${project} --case <g>:<id>,… (a whole --group may carry live QA against the stand); record a manual check — ${cli} record ${project} <g>:<id>=passed --note "<how>". ` +
       `The turn end checks this and names any gap.\n`,
   );
 }

@@ -423,7 +423,14 @@ export function evaluateHandoff({
   stat = statMtime,
   hash = hashFile,
 }: HandoffCheckInput): HandoffVerdict {
-  if (!proposal) return { ok: false, reason: 'no_block' };
+  // Закрытая работа (`closed`, L7.2) — то же, что ответ без блока: дальше
+  // конвейер и итог группы, а новой сессии читать нечего. Молча, как и без
+  // блока: «продолжения не будет» закрытой работе в ленте не нужно. Для чата
+  // Claude и для чужого CLI — одна проверка. Шаг, ждущий внешнего события
+  // (`waits`, L7.17), — так же: новая сессия только проверила бы, что событие
+  // не случилось, и заново прогнала проверки. Группе он уходит шагом человеку
+  // (`chainOutcomeOf`), карточка с кнопкой остаётся.
+  if (!proposal || proposal.closed || proposal.waits) return { ok: false, reason: 'no_block' };
   if (!auto) return { ok: false, reason: 'auto_off', proposal };
   if (!ok) return { ok: false, reason: 'run_failed', proposal };
   if (!cwd) return { ok: false, reason: 'no_project', proposal };

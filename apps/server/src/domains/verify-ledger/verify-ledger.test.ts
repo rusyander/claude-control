@@ -1,0 +1,124 @@
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  copyFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { installLedger, ledgerEnv, ledgerSummary, withPreload } from './verify-ledger.ts';
+
+/**
+ * Установка журнала проверок панелью (T17, T29 из `.agent/tmp/verify-ledger-tests.agent.md`):
+ * копия preload в данных панели, живая самопроверка `node -e`, NODE_OPTIONS без потерь.
+ */
+const SOURCE = resolve(__dirname, '../../../../../tools/verify-ledger');
+
+let appData: string;
+beforeEach(() => {
+  appData = mkdtempSync(join(tmpdir(), 'cc-ledger-install-'));
+});
+afterEach(() => rmSync(appData, { recursive: true, force: true }));
+
+describe('installLedger', () => {
+  it('ставит копию по версии содержимого и проходит самопроверку живым node', () => {
+    const install = installLedger({ appData, sourceDir: SOURCE });
+    expect(install.reason).toBeUndefined();
+    expect(install.preload).toMatch(/verify-ledger\/bin\/[0-9a-f]{12}\/preload\.cjs$/);
+    expect(install.preload).not.toContain('\\');
+    expect(existsSync(install.preload!)).toBe(true);
+    // Повтор той же версии — тот же каталог, без второй копии.
+    installLedger({ appData, sourceDir: SOURCE });
+    expect(readdirSync(join(appData, 'verify-ledger', 'bin'))).toHaveLength(1);
+  });
+
+  it('T17: preload, роняющий node, не ставится — панель ничего не подмешивает', () => {
+    const broken = join(appData, 'src');
+    mkdirSync(broken);
+    for (const name of ['checks.cjs', 'ledger.cjs']) {
+      copyFileSync(join(SOURCE, name), join(broken, name));
+    }
+    // Ошибка вне try/catch preload — то, что уронило бы КАЖДЫЙ процесс node.
+    writeFileSync(join(broken, 'preload.cjs'), 'process.exit(3)');
+    const install = installLedger({ appData, sourceDir: broken });
+    expect(install.preload).toBeNull();
+    expect(install.reason).toMatch(/self-test failed/);
+    expect(ledgerEnv(install, appData, {})).toEqual({});
+  });
+
+  it('выключатель disabled — без установки', () => {
+    const install = installLedger({
+      appData,
+      sourceDir: SOURCE,
+      env: { AGENTDECK_VERIFY_LEDGER: 'disabled' },
+    });
+    expect(install).toEqual({ preload: null, reason: 'disabled' });
+  });
+
+  it('T17: окружение запусков сохраняет чужие ключи и реально грузится в node', () => {
+    const install = installLedger({ appData, sourceDir: SOURCE });
+    const env = ledgerEnv(install, appData, { NODE_OPTIONS: '--max-old-space-size=2048' });
+    expect(env.NODE_OPTIONS).toContain('--max-old-space-size=2048');
+    const r = spawnSync(
+      process.execPath,
+      ['-e', 'console.log(require("v8").getHeapStatistics().heap_size_limit > 1.5e9)'],
+      { env: { ...process.env, ...env }, encoding: 'utf8' },
+    );
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('true');
+  });
+});
+
+describe('withPreload', () => {
+  it('старая версия журнала заменяется, а не копится', () => {
+    const once = withPreload('--inspect=0', 'C:/a/verify-ledger/bin/old/preload.cjs');
+    const twice = withPreload(once, 'C:/a/verify-ledger/bin/new/preload.cjs');
+    expect(twice).toBe('--inspect=0 --require "C:/a/verify-ledger/bin/new/preload.cjs"');
+  });
+
+  it('пустые NODE_OPTIONS — только наш ключ', () => {
+    expect(withPreload(undefined, '/p/verify-ledger/preload.cjs')).toBe(
+      '--require "/p/verify-ledger/preload.cjs"',
+    );
+  });
+});
+
+describe('ledgerSummary', () => {
+  it('считает тень, экономию и расхождения за окно; битые строки пропускает', () => {
+    const home = join(appData, 'verify-ledger');
+    mkdirSync(join(home, 'seen'), { recursive: true });
+    const now = 1_000_000_000_000;
+    const line = (o: object) => JSON.stringify({ at: now - 1000, repo: 'r1', ...o });
+    writeFileSync(
+      join(home, 'events.jsonl'),
+      [
+        line({ kind: 'record' }),
+        line({ kind: 'would-skip', savedMs: 60_000 }),
+        line({ kind: 'mismatch' }),
+        line({ kind: 'off', reason: 'tree-changed' }),
+        line({ kind: 'hit', savedMs: 30_000, repo: 'r2' }),
+        JSON.stringify({ at: now - 30 * 24 * 3600e3, kind: 'would-skip', savedMs: 999 }),
+        '{"half',
+      ].join('\n'),
+    );
+    writeFileSync(join(home, 'seen', 'claude.json'), JSON.stringify({ cli: 'claude', at: now }));
+    const s = ledgerSummary(appData, { preload: '/x', version: 'abc' }, now);
+    expect(s).toMatchObject({
+      active: true,
+      version: 'abc',
+      records: 1,
+      wouldSkip: 1,
+      hits: 1,
+      mismatches: 1,
+      savedMs: 90_000,
+      repos: 2,
+      offReasons: { 'tree-changed': 1 },
+      seen: [{ cli: 'claude', at: now }],
+    });
+  });
+});

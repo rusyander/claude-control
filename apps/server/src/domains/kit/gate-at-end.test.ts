@@ -224,6 +224,28 @@ describe('gate-at-end: полный гейт один раз в конце вс�
     expect(pre({ command: 'sleep 5; curl -s localhost:3000' }, [prompt('сделай')])).toBeUndefined();
   });
 
+  it('ожидание СВОЕЙ фоновой задачи не снимается повтором; чужой вывод — снимается', () => {
+    // Группа повторила отказанный цикл через 5 с и прождала его целиком (18.10).
+    const loop =
+      'for i in $(seq 1 115); do grep -q "^exit" "C:/x/tasks/b7own.output" && break; sleep 5; done';
+    const started = [
+      prompt('сделай'),
+      use('Bash', { command: 'node check.mjs', run_in_background: true }, 'bg1'),
+      result('bg1', 'Command running in background with ID: b7own. Output is being written to: …'),
+    ];
+    const refused = [
+      use('Bash', { command: loop }, 'p1'),
+      result('p1', '[ctx-guard] bg-wait-guard: …'),
+    ];
+    expect(pre({ command: loop }, [...started, ...refused])).toBe('deny');
+    const foreign = loop.replace('b7own', 'b7other');
+    const refusedForeign = [
+      use('Bash', { command: foreign }, 'p2'),
+      result('p2', '[ctx-guard] bg-wait-guard: …'),
+    ];
+    expect(pre({ command: foreign }, [...started, ...refusedForeign])).toBeUndefined();
+  });
+
   it('console.log( в пробе после sleep — не чтение журнала, файл .log — чтение', () => {
     // `.log\b` ловил `console.log(` в node -e и отказывал живой пробе стенда (18.10).
     expect(
@@ -232,6 +254,29 @@ describe('gate-at-end: полный гейт один раз в конце вс�
       ]),
     ).toBeUndefined();
     expect(pre({ command: 'sleep 30; cat build.log' }, [prompt('сделай')])).toBe('deny');
+  });
+
+  it('короткие sleep в цикле над выводом задачи складываются; проба сервера — тишина', () => {
+    // Группа ждала гейт циклом из 115 раундов по `sleep 5` (16.10): порог одного sleep его не видел.
+    const loop =
+      'for i in $(seq 1 115); do [ -s "C:/x/tasks/b1.output" ] && break; sleep 5; done; cat "C:/x/tasks/b1.output"';
+    expect(pre({ command: loop }, [prompt('сделай')])).toBe('deny');
+    expect(
+      pre({ command: 'while [ ! -s gates.log ]; do sleep 3; done; tail gates.log' }, [
+        prompt('сделай'),
+      ]),
+    ).toBe('deny');
+    expect(
+      pre({ command: 'until curl -s localhost:3000; do sleep 2; done; tail -5 server.log' }, [
+        prompt('сделай'),
+      ]),
+    ).toBeUndefined();
+    expect(
+      pre(
+        { command: 'for i in $(seq 1 3); do sleep 2; [ -s C:/x/tasks/b.output ] && break; done' },
+        [prompt('сделай')],
+      ),
+    ).toBeUndefined();
   });
 
   it('подсказка «гейт уже был» звучит один раз на гейт, новый гейт — снова', () => {

@@ -1,3 +1,5 @@
+import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
+
 /** Запись MCP-сервера, как её видит профиль: имя и настройка из файла. */
 export interface ProfileMcpEntry {
   id: string;
@@ -16,6 +18,13 @@ export interface GroupProfileInput {
   extra: readonly string[];
   /** Навыки и плагины прогона (1.3); нет — перечень навыков не трогается. */
   skills?: SkillScopeInput;
+  /**
+   * Звено цепочки, которое пойдёт этим прогоном (L1.2, L1.3): план и ревью
+   * (проверка правок — тоже ревью) получают MCP трекера и хранилища кода только
+   * на чтение; ревью, правки и доставка — описания только своих навыков. Нет —
+   * профиль группы целиком, как до разбивки по звеньям.
+   */
+  stage?: CascadeStage;
   /**
    * Окно автосжатия группы в токенах (2.1, рычаг A/B): `CLAUDE_CODE_AUTO_COMPACT_WINDOW`
    * прогона. Нет — CLI решает сам, как до плана.

@@ -425,7 +425,11 @@ export const chatEn: typeof chatRu = {
         'The "stage closed — continue in a clean session" card with the counter ' +
         '"step 1 of 8" carries the checkpoint — here .agent/PROGRESS.md — and what ' +
         'to do next. Continue opens the next conversation with that checkpoint; ' +
-        'Stay here leaves everything as it is.',
+        'Stay here leaves everything as it is. When the next step waits for an ' +
+        'outside event — "When the MR is merged: …", an answer from a person, a ' +
+        'deploy — the panel starts no new session by itself: for a group the step ' +
+        'lands under "For you to do" with that event, and the card button continues ' +
+        'once it has happened.',
 
       splitTitle: 'When one conversation becomes several',
       splitCaption:
@@ -1061,12 +1065,26 @@ export const chatEn: typeof chatRu = {
       'was mirrored, which command installed the dependencies, which lockfiles were ' +
       'reverted, and — if the preparation failed — the tail of its log. It ends with a ' +
       'direct “the environment is ready — do not check or set it up, start with the task”. ' +
+      'Later sessions of the same group get it compacted: identical version lines are merged ' +
+      'into one module list, and a failed preparation keeps its reason, first error and log ' +
+      'path — without the command list. ' +
       'Before it, an agent in a fresh copy brought up MCP itself, mirrored .claude/, ' +
       'installed dependencies and reverted lockfiles — minutes and context on every child. ' +
       'How much that helped shows in the parent’s group summary: the “To first edit” column ' +
       '— from the work link’s creation to the agent’s first Edit/Write call. Next to it: the ' +
       'model with its reasoning effort, the run time and “Step 8 of 14” from the group agent’s ' +
-      'plan, with the step name and its subagent count. A group without a plan still gets a ' +
+      'plan, with the step name and its subagent count. The run time is how long the agent ' +
+      'actually worked, from the chain’s transcripts: model replies and tool calls. Idle time ' +
+      'between turns does not count at all, and one reply or call counts for at most 15 ' +
+      'minutes (subagents excepted), so a cut-off call never stretches over a night. ' +
+      'The «Subscription limit» column is how much of the 5-hour and weekly subscription ' +
+      'windows the group’s chain used. Claude reports the load of the windows during a run; ' +
+      'the growth between readings is split among all runs that went at the same time, ' +
+      'ordinary chats and other groups included, by their tokens, so three groups in ' +
+      'parallel do not each count the whole spend. Growth while no panel run was going ' +
+      '(terminal, another client) goes to nobody. No readings means an empty cell, not ' +
+      '«0 %»: older CLIs do not send them, and readings are kept for a week. ' +
+      'A group without a plan still gets a ' +
       'number when the project skill writes .agent/steps.json in the copy — { "current": 8, ' +
       '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. A group working ' +
       'in the shared directory gets no preamble: that environment is yours. A group also gets ' +
@@ -1086,7 +1104,11 @@ export const chatEn: typeof chatRu = {
       'skills and the panel group’s skills keep their description, other personal and ' +
       'built-in service skills reach the agent by name only and are invoked as before; ' +
       'project skills are untouched, and a design plugin without a mockup in the tasks and ' +
-      'messenger plugins are off for this run. The panel’s system addendum has a group edition ' +
+      'messenger plugins are off for this run. Chain stages narrow it further: the plan and ' +
+      'the review (fix verification included) get the tracker, the code host and the designs ' +
+      'read-only — their run has no write tools, writing is for the work, fixes and delivery; ' +
+      'the review, fixes and delivery keep descriptions only for their own stage’s skills, ' +
+      'the rest by name. The panel’s system addendum has a group edition ' +
       'too, shorter than the chat one with the same rules: no continuation card for the human ' +
       '(the group continues its stages itself) and no up-front question about the stand and ' +
       'access — the group takes them from its task and the project notes. ' +
@@ -1271,9 +1293,26 @@ export const chatEn: typeof chatRu = {
       'file in the working tree — and their latest result must not be red ' +
       '(quarantine does not hold). No run, a run older than the change, a touched case not run, a red case, or a diff ' +
       'covered by no case while cases are linked to files — the group gets a reminder with ' +
-      'the command that records a run, and the group row in the hub reads “Tests block: N ' +
-      'of M green”. No cases in the copy at all — nothing to check with, and it does not ' +
+      'the command that records a run, narrowed to the cases of its changed files (--case), ' +
+      'and the group row in the hub reads “Tests block: N of M green”. When the branch is ' +
+      'pushed and the MR is in place and only the report is missing — sieve rows, task ' +
+      'points or a recorded run — the reminder says so outright: leave git alone, no ' +
+      'commit, no push, no MR edit. No cases in the copy at all — nothing to check with, and it does not ' +
       'hold the group.',
+    splitLedger: 'Verify ledger',
+    splitLedgerText:
+      'A gate or a test suite run on the same tree content a second time tells nothing ' +
+      'new: the result would be the same. The panel adds a small node module to all of ' +
+      'its launches (Claude, other CLIs, local and contour runs) that records every check ' +
+      'run together with a fingerprint of the tree — the working files, regardless of ' +
+      'line-ending settings — and notices when the same run already happened. For now the ' +
+      'ledger only measures: checks run as usual, and Settings → Groups → Verify ledger ' +
+      'shows how many runs it would have replayed, how many minutes that would have saved, ' +
+      'how many times a record disagreed with the real run (must be 0, otherwise replays ' +
+      'stay off) and under which CLIs it actually fired. Replays are switched on by the ' +
+      'panel environment variable AGENTDECK_VERIFY_LEDGER=on, off keeps recording only, ' +
+      'disabled turns the ledger off entirely. If the module fails its self-test at panel ' +
+      'start, nothing gets it, and the tile says “Not working” with the reason.',
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
@@ -1447,7 +1486,11 @@ export const chatEn: typeof chatRu = {
       'findings and change nothing. The review follows EVERY piece of work, the one ' +
       'that ran at the ceiling itself too: a fresh session reads the diff without ' +
       'the history of writing it, and on the same model that is a second pair of ' +
-      'eyes. Findings exist → a third link, FIXES by that list, back on the work ' +
+      'eyes. If the branch was already on the remote when the work began (the MR ' +
+      'was sent earlier), the review reads only what the work changed — by git ' +
+      'range-diff of the old and new commit series; work that only moved the branch ' +
+      'onto a fresh main with no new edits gets no review at all. ' +
+      'Findings exist → a third link, FIXES by that list, back on the work ' +
       'model, and after them one VERIFICATION PASS on the reviewer: it re-runs the ' +
       'evidence of every finding on the branch (attempted is not fixed) and reads ' +
       'the fix diff for new breakage. It starts no second round of fixes: what is ' +
@@ -1456,7 +1499,18 @@ export const chatEn: typeof chatRu = {
       'chat list the links are labelled “review” and “fixes”, each with its own ' +
       'model, and the review feed carries a card with what was found. No new ' +
       'parallel agents appear: the links run one after another, and the split card ' +
-      'states before the button how many runs that is at worst: up to four per group.',
+      'states before the button how many runs that is at worst: up to four per group. ' +
+      'Every link after the work gets only what it needs, because a link’s task ' +
+      'stays in its context for the whole conversation: the owner’s words and the ' +
+      'group task in full, and from the plan, as text, the acceptance criteria, the ' +
+      'verification level, “do not touch” and the decisions. Analysis, references, ' +
+      'approaches and steps sit as a file in the copy’s .agent/plans/, opened only ' +
+      'when a step is unclear; a plan without sections, or a copy where git does not ' +
+      'ignore that file, gets the whole plan as before. Fixes get the findings as ' +
+      'cards, without the reviewer’s prose around them. The link’s task ends with ' +
+      'the paths of what earlier links left in the copy — before/after shots, the ' +
+      'verification ledger, recorded test runs and gate logs — so nobody searches ' +
+      'for them again.',
     cascadeLevels: 'Levels: one triage for the whole split and a plan per group',
     cascadeLevelsText:
       'With model selection on, the groups do not start at once. First a TRIAGE ' +
@@ -1484,7 +1538,7 @@ export const chatEn: typeof chatRu = {
       'itself). All of it goes into the group’s notes, and the plan and the work ' +
       'start from the named places instead of searching for them again. ' +
       'The panel also puts those notes into the task notebook — the file ' +
-      '.agent/run/notebook.md in the group’s copy, hidden from git. The agent adds ' +
+      '.agent/run/notebook.agent.md in the group’s copy, hidden from git. The agent adds ' +
       'what it finds along the way (no passwords) and after the conversation is ' +
       'compacted reads the notebook instead of finding everything out again. In a project ' +
       'without git there are no copies: the groups work in one folder and share one ' +
@@ -1632,7 +1686,10 @@ export const chatEn: typeof chatRu = {
       'A group’s row has “Pause”, “Resume” in the same session and “Start now” past ' +
       'the queue. Pausing a running group does not give away its slot: the queue moves ' +
       'when a group finishes, not when you stop it, so stopping every group starts ' +
-      'nothing new. A queued group can be paused too — it does not start until you ' +
+      'nothing new. A pause stops the agent’s process together with its background ' +
+      'commands (a stand server, a long check); “Resume” names the killed commands to ' +
+      'the agent one by one, so it restarts the ones it needs instead of guessing from ' +
+      'a cut-off call. A queued group can be paused too — it does not start until you ' +
       '“Resume” it back into the queue. While the panel prepares a copy (branch and ' +
       'dependency install — minutes) the row says “preparing the copy”; a pause holds ' +
       'during it, and “Resume” later starts the group in the ready copy. A paused ' +
@@ -1667,10 +1724,21 @@ export const chatEn: typeof chatRu = {
       'tab’s rows, each in one of three positions: “Itself”, “With a note” (also on ' +
       'its own, but the parent’s summary keeps an “Allowed automatically” line you can ' +
       '“Dismiss”) and “Human” — a card and a wait. Out of the box a group does by ' +
-      'itself ordinary work, writes to git, the MR and the tracker, and deletes files ' +
-      'in its own copy; a human gets git history rewrites, databases, infrastructure, ' +
-      'package publishing, deletion on the hosting and running downloaded code. The ' +
-      'single exception is a lease push of the group’s OWN branch after a rebase. ' +
+      'itself ordinary work, writes to git and deletes files in its own copy; a human ' +
+      'gets outward writes (replies in MR threads, edits of its description, tracker ' +
+      'comments and status changes), git history rewrites, databases, infrastructure, ' +
+      'package publishing, deletion on the hosting and running downloaded code. Other ' +
+      'people see an outward write and it cannot be undone, so a group gets a card for ' +
+      'it even in the CLI’s auto mode; if you want delivery to the MR without stops, ' +
+      'set that row to “With a note”. Reading MRs and issues raises no card. The ' +
+      'single exception is a lease push of the group’s OWN branch after a rebase, ' +
+      'while its MR is a draft or not open yet. Reviewers read the branch of an MR ' +
+      'taken out of draft: rewriting it is a card, and so is the case where the panel ' +
+      'could not ask GitLab/GitHub whether it is a draft (no key, a failure). A force ' +
+      'push (--force, -f, +branch) gets a card even in the CLI’s auto mode. ' +
+      'A group’s continuation in a clean session gets the previous session’s proposal ' +
+      'as a quote: “as the owner asked” in it is that session’s words, not yours, and ' +
+      'an outward write from it reaches you as a “For you to do” line. ' +
       '“Group decision points”: decide by the plan itself (the recommended option, ' +
       'with the decision written into the MR) or ask you and wait. The same tab holds ' +
       'how many groups run at once on a light and a heavy project and what counts as ' +
@@ -1874,7 +1942,13 @@ export const chatEn: typeof chatRu = {
       'order: its continuation (except for plan and triage) the panel carries out ' +
       'without the toggle — a group has no human — its cap is three continuations, and ' +
       'the task in the continuation prompt is a boundary for it rather than a guide. ' +
-      'Past the cap the turn ends, and the pipeline takes the group from there.',
+      'Past the cap the turn ends, and the pipeline takes the group from there. ' +
+      'Work the agent itself marked closed and verified (“nothing to continue”) is not ' +
+      'continued by the panel at all — neither in a chat nor in a group: a new session ' +
+      'would only read the checkpoint file and say everything is done. The card stays, ' +
+      'and the button still continues it. If a Stop hook returned a remark to the agent ' +
+      'after its summary, the panel judges the summary together with the reply to the ' +
+      'remark, not the reply alone.',
     handoffTidy: 'Tidying the working files — half the point',
     handoffTidyText:
       'A clean session reads exactly the checkpoint file (.agent/PROGRESS.md by ' +

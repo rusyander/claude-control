@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SPLIT_DEFAULTS_BUILTIN } from '@agentdeck/contracts/split-groups';
@@ -13,6 +15,7 @@ import {
 } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
+import { writeSettings, writeToken } from '../../../domains/integrations/store/store.ts';
 import { registerChatRunRoutes } from './run-routes.ts';
 import { registerSplitControlRoutes } from '../split-control-routes.ts';
 
@@ -142,6 +145,16 @@ describe('маршрут прав: строки вкладки «Группы»'
     expect(await ask(GROUP, 'psql -c "drop table users"')).toBe('card');
   });
 
+  it('запись в MR и трекер из коробки — карточка человеку, их чтение — само (журнал 19.10)', async () => {
+    // Продолжение группы ответило в тредах MR и переписало его описание без
+    // единой карточки: запись наружу из коробки шла строкой «сама».
+    expect(await ask(GROUP, '', 'mcp__gitlab__create_merge_request_note')).toBe('card');
+    expect(await ask(GROUP, '', 'mcp__gitlab__update_merge_request')).toBe('card');
+    expect(await ask(GROUP, '', 'mcp__atlassian__jira_transition_issue')).toBe('card');
+    expect(await ask(GROUP, '', 'mcp__gitlab__get_merge_request')).toBe('allow');
+    expect(await ask(GROUP, '', 'mcp__atlassian__jira_get_issue')).toBe('allow');
+  });
+
   it('обычный чат без тумблера — как раньше: коммит карточкой', async () => {
     expect(await ask(PLAIN, 'git commit -m "чат"')).toBe('card');
   });
@@ -224,6 +237,71 @@ describe('маршрут прав: строки вкладки «Группы»'
     // Пуш у человека — и аренда своей ветки тоже.
     store.setSplitSettings(project, { deliver: true, permissions: { gitWrite: 'human' } });
     expect(await ask(GROUP, 'git push --force-with-lease origin feature/a')).toBe('card');
+  });
+
+  /**
+   * Журнал 19.10 02:17:02 (L7.12): доставленная группа после пустого rebase
+   * переписала арендой ветку MR, снятого с черновика и стоявшего на ревью.
+   * Состояние MR знает только фордж — здесь это заглушка GitLab на свободном
+   * порту, а маршрут прав и хранилище настоящие.
+   */
+  it('аренда своей ветки при MR на ревью — карточка; черновик — сама; фордж молчит — карточка', async () => {
+    let draft = true;
+    let reads = 0;
+    const forge = createServer((req, res) => {
+      if (!req.url?.includes('/merge_requests/5')) {
+        res.writeHead(404).end('{}');
+        return;
+      }
+      reads += 1;
+      res.writeHead(200, { 'content-type': 'application/json' }).end(
+        JSON.stringify({
+          iid: 5,
+          title: 'Группа A',
+          state: 'opened',
+          draft,
+          source_branch: 'feature/a',
+          target_branch: 'main',
+          web_url: mrUrl,
+        }),
+      );
+    });
+    await new Promise<void>((done) => forge.listen(0, '127.0.0.1', done));
+    const site = `http://127.0.0.1:${(forge.address() as AddressInfo).port}`;
+    const mrUrl = `${site}/team/repo/-/merge_requests/5`;
+    try {
+      const plan = store.getSplitPlan('parent') as SplitPlanRecord;
+      store.setSplitPlan({
+        ...plan,
+        groups: plan.groups.map((group) => ({ ...group, mr: mrUrl })),
+      } as SplitPlanRecord);
+      const lease = 'git push --force-with-lease origin feature/a';
+
+      // Ключа к форджу нет — состояние MR неизвестно, решает человек.
+      expect(await ask(GROUP, lease)).toBe('card');
+      expect(reads).toBe(0);
+
+      writeSettings(store, 'gitlab', { enabled: true, baseUrl: site, repo: '' });
+      writeToken(join(root, 'agentdeck'), 'gitlab', 'stub-key');
+      expect(await ask(GROUP, lease)).toBe('allow');
+      expect(reads).toBe(1);
+
+      draft = false;
+      expect(await ask(GROUP, lease)).toBe('card');
+      expect(await ask(GROUP, 'git push --force-with-lease origin HEAD:feature/a')).toBe('card');
+      // Обычный коммит фордж не спрашивает: сеть — только когда она решает исход.
+      reads = 0;
+      expect(await ask(GROUP, 'git commit -m "группа"')).toBe('allow');
+      expect(reads).toBe(0);
+
+      // Фордж не ответил — тоже карточка, а не молчаливое «можно».
+      forge.closeAllConnections();
+      await new Promise<void>((done) => forge.close(() => done()));
+      draft = true;
+      expect(await ask(GROUP, lease)).toBe('card');
+    } finally {
+      if (forge.listening) await new Promise<void>((done) => forge.close(() => done()));
+    }
   });
 
   /** Аудит 25.09, L20: «с отметкой» — прошло само, но хаб родителя это видит. */

@@ -153,8 +153,10 @@ describe('project-tests/automation/recipes: готовые команды бэк
     expect(recipes.map((recipe) => recipe.id)).toEqual(['go:*', 'go:api', 'go:svc']);
     const own = recipes[0]?.automation ?? { command: '' };
     expect(own).toMatchObject({ command: '{go-modules}', format: 'go-test-json' });
+    // Каждое звено в скобках: cmd читает `A || echo - && B` как `A || (echo - && B)`,
+    // и после зелёного первого модуля остальные не запускались.
     expect(automationCommand(root, own, [], 'r.json', true).line).toBe(
-      'go test -C api -json ./... > r.json || echo - && go test -C svc -json ./... >> r.json || echo -',
+      '(go test -C api -json ./... > r.json || echo -) && (go test -C svc -json ./... >> r.json || echo -)',
     );
     // Кейс-набор каталога (`file` кончается `/`) и обычный файл теста — оба к пакету.
     const narrowed = automationCommand(

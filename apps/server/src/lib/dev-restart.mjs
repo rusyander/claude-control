@@ -8,13 +8,43 @@
  * читает так же, файлом в каталоге данных панели.
  */
 /* global process */
-import { readFileSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import {
+  appendFileSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 /** Состояние отложенного перезапуска: пишет сторож, читает сервер. */
 export const DEV_RESTART_STATE = 'dev-restart.json';
 /** Запрос человека «перезапустить сейчас»: оставляет сервер, забирает сторож. */
 export const DEV_RESTART_REQUEST = 'dev-restart.request';
+/**
+ * Журнал решений сторожа: что перезапустило сервер, что отложено, почему.
+ * Сторож под `pnpm keepalive` идёт с выброшенным stdout — без файла причину
+ * перезапуска посреди групп было не восстановить (журнал 19.10, L6.1).
+ */
+export const DEV_WATCH_LOG = 'dev-watch.log';
+const DEV_WATCH_LOG_MAX = 512 * 1024;
+
+/** Строка в журнал сторожа; больше предела — прежний уходит в `.1`. */
+export function appendDevLog(appData, line) {
+  try {
+    mkdirSync(appData, { recursive: true });
+    const file = join(appData, DEV_WATCH_LOG);
+    if (existsSync(file) && statSync(file).size > DEV_WATCH_LOG_MAX) {
+      renameSync(file, `${file}.1`);
+    }
+    appendFileSync(file, `${new Date().toISOString()} ${line}\n`);
+  } catch {
+    // Каталог только для чтения — строка остаётся в stdout сторожа.
+  }
+}
 
 function pidAlive(pid) {
   try {

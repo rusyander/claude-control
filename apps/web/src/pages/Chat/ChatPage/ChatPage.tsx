@@ -15,13 +15,7 @@ import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ProjectGitControls } from '@features/ProjectGit';
 import { useRunModelName } from '@features/ChatModelPicker';
-import {
-  useChats,
-  useChatMessages,
-  useChatAutoRefresh,
-  useChatProgress,
-  CHAT_PAGE_SIZE,
-} from '@entities/Chat';
+import { useChats, useChatMessages, useChatAutoRefresh, useChatProgress } from '@entities/Chat';
 import { useProjects, useOpenInEditor } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
 import { useChatAutoMode, useSetChatAutoMode } from '@entities/ChatAutoMode';
@@ -54,6 +48,7 @@ import { useChildHub } from '../model/useChildHub';
 import { useChatDots } from '../model/useChatDots';
 import { useProjectShelf } from '../model/useProjectShelf';
 import { useChatModelPrefs } from '../model/useChatModelPrefs';
+import { useMessagesLimit } from '../model/useMessagesLimit';
 import { useLocalRun } from '../model/useLocalRun';
 import { useStreamState } from '../model/useStreamState';
 import { downloadChatExport } from '../lib/downloadChatExport';
@@ -140,14 +135,10 @@ export function ChatPage() {
   // человек видит и в группе, а её состояние лежит в дереве родителя.
   const child = useChildHub(chats.data, activeChat?.id, activeRuns, activeChat?.parentId);
 
-  // Размер окна ленты. Растёт кнопкой «Загрузить ещё»: каждый шаг подтягивает
-  // более ранние сообщения. При смене разговора возвращаемся к последнему окну.
-  const [messagesLimit, setMessagesLimit] = useState(CHAT_PAGE_SIZE);
-  useEffect(() => {
-    setMessagesLimit(CHAT_PAGE_SIZE);
-  }, [activeChat?.id]);
-
-  const messages = useChatMessages(activeChat?.id, messagesLimit);
+  // Размер окна ленты: «Загрузить ещё» растит его, возврат в отлистанный
+  // разговор возвращает и его окно (подробности — в хуке).
+  const messagesLimit = useMessagesLimit(activeChat?.id);
+  const messages = useChatMessages(activeChat?.id, messagesLimit.limit);
   const messageList = messages.data?.messages ?? [];
   // Пока потоковый пузырь на экране, текущий ход агента рисует он один: из
   // истории такой ход убираем, иначе перечитка ленты посреди прогона
@@ -419,7 +410,7 @@ export function ChatPage() {
             isLoading={messages.isLoading}
             hasMore={messages.data?.hasMore}
             isLoadingMore={messages.isFetching}
-            onLoadMore={() => setMessagesLimit((limit) => limit + CHAT_PAGE_SIZE)}
+            onLoadMore={messagesLimit.loadMore}
             onEdit={editMessage}
             onPickOption={answerQuestion}
             isRunning={isRunning}

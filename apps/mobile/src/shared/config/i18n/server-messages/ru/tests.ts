@@ -167,7 +167,7 @@ export const testsRu: Record<TestsMessageCode, string> = {
     'Кейса «{{caseId}}» в группе «{{groupId}}» нет: новый кейс сохраняют без id.',
   'case-not-in-named-group': 'Кейса «{{caseId}}» в группе «{{groupId}}» нет.',
   'record-automated-case':
-    'Автокейсы не записываются словом: {{cases}}. Их проверяет тест — прогоните группу ({{groups}}) командой run.',
+    'Автокейсы не записываются словом: {{cases}}. Их проверяет тест — прогоните именно эти кейсы: run --case.',
   'bulk-action-unknown': 'Неизвестное действие «{{action}}».',
   'bulk-none-selected': 'Не выбрано ни одного теста.',
   'bulk-mute-reason-required':

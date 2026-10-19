@@ -56,6 +56,20 @@ function named(ids: readonly string[]): string {
   return ids.length > NAMED ? `${head} (+${ids.length - NAMED})` : head;
 }
 
+/** Длиннее — список кейсов не влезет в строку оболочки: команда без выбора. */
+const NARROW_LIMIT = 2000;
+
+/**
+ * Команда записи прогона, суженная до кейсов изменённых файлов (L7.3 плана
+ * экономии групп): без `--case` группа гоняла ВСЕ кейсы копии — 128 с там,
+ * где хватало секунд, — потому что другой команды пробел не называл.
+ */
+export function narrowedCommand(command: string, keys: readonly string[]): string {
+  if (keys.length === 0) return command;
+  const narrowed = `${command} --case ${keys.join(',')}`;
+  return narrowed.length > NARROW_LIMIT ? command : narrowed;
+}
+
 /**
  * Последний результат кейса по прогонам группы (новые первыми). Прогон
  * записан раньше старта группы — не её прогон, а чужой, и не в счёт.
@@ -129,7 +143,7 @@ export function judgeTests(input: {
     missing.push(
       serverText(own.length > 0 ? 'tests-gap-word-only' : 'tests-gap-no-run', {
         cases: named(automated.map((key) => key.split(':')[1] ?? key)),
-        command: input.command,
+        command: narrowedCommand(input.command, automated),
       }),
     );
   } else if (automated.length > 0 && fresh.length === 0) {
@@ -137,7 +151,7 @@ export function judgeTests(input: {
       serverText('tests-gap-stale', {
         run: executed[0]?.id ?? '',
         files: named(code),
-        command: input.command,
+        command: narrowedCommand(input.command, automated),
       }),
     );
   } else {
@@ -149,7 +163,7 @@ export function judgeTests(input: {
       missing.push(
         serverText('tests-gap-unrun', {
           cases: named(unrun.map((key) => key.split(':')[1] ?? key)),
-          command: input.command,
+          command: narrowedCommand(input.command, unrun),
         }),
       );
     }

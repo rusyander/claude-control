@@ -428,3 +428,63 @@ describe('импорт результатов: ключи id и allure_id', () =
     expect(statuses(root)['gui-001']).toBe('passed');
   });
 });
+
+/**
+ * Монорепозиторий (19.10.2026): у кейсов-наборов двух пакетов один ключ от корня
+ * пакета, а vitest пакета пишет classname от того же корня. На весь проект ключ
+ * двусмыслен, и импорт его пропускал; группа переписывала отчёт своим скриптом.
+ */
+describe('импорт результатов в группу пакета', () => {
+  let root = '';
+  const suite = (id: string, pkg: string) => ({
+    id,
+    title: `${pkg}: models`,
+    steps: [],
+    automation: { status: 'automated', file: `${pkg}/src/models/`, suite: 'src/models' },
+    status: 'unknown',
+  });
+  const REPORT =
+    '<testsuites><testsuite name="vitest">' +
+    '<testcase classname="src/models/a.test.ts" name="a &gt; считает"/>' +
+    '<testcase classname="src/models/b.test.ts" name="b &gt; падает"><failure message="нет"/></testcase>' +
+    '</testsuite></testsuites>';
+  const status = (group: string) => readGroups(root).find((g) => g.id === group)?.cases[0]?.status;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'import-group-'));
+    const dir = join(root, '.agent', 'tests');
+    mkdirSync(dir, { recursive: true });
+    for (const [group, pkg] of [
+      ['suites-admin', 'admin-ui'],
+      ['suites-chat', 'chat-ui'],
+    ] as const) {
+      writeFileSync(
+        join(dir, `${group}.tests.json`),
+        JSON.stringify({ version: 1, title: group, cases: [suite(`${group}-001`, pkg)] }),
+      );
+    }
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('без группы ключ двусмыслен: ни один набор не тронут', () => {
+    const result = importResults(root, { format: 'junit', content: REPORT, now: NOW });
+    expect(result.matched).toBe(0);
+    expect(status('suites-admin')).toBe('unknown');
+    expect(status('suites-chat')).toBe('unknown');
+  });
+
+  it('с группой ключ однозначен: результат ложится на набор её пакета, чужой не тронут', () => {
+    const result = importResults(root, {
+      format: 'junit',
+      content: REPORT,
+      now: NOW,
+      groups: ['suites-admin'],
+    });
+    expect(result.matched).toBe(1);
+    expect(status('suites-admin')).toBe('failed');
+    expect(status('suites-chat')).toBe('unknown');
+  });
+});

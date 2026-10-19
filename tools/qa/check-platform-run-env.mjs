@@ -188,7 +188,20 @@ async function helperRun(dir, marker, run, resetLookup) {
   }
 }
 
+/**
+ * Каждая выгрузка, которую дождалась проверка, — с папкой прогона: в конце у всех
+ * разом сверяется preload журнала проверок (Т29). Путь запуска, который собрал
+ * окружение заново и потерял NODE_OPTIONS, виден здесь, где бы он ни стоял.
+ */
+const seenDumps = [];
+
 async function waitForDump(dir, seconds = 30) {
+  const dump = await waitForDumpFile(dir, seconds);
+  if (dump) seenDumps.push({ dir, dump });
+  return dump;
+}
+
+async function waitForDumpFile(dir, seconds) {
   // Фальшивый CLI пишет выгрузку в два шага: окружение, затем строку argv.
   // Файл появляется после первого — ждём последнюю строку, иначе argv
   // читается пустым у того прогона, которому не повезло с моментом.
@@ -325,6 +338,11 @@ async function main() {
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
 
+  const { activateLedger } =
+    await import('../../apps/server/src/domains/verify-ledger/verify-ledger.ts');
+  /** Журнал подмешивает preload в окружение процесса; после прогона — как было. */
+  const nodeOptionsBefore = process.env.NODE_OPTIONS;
+
   const appData = mkdtempSync(join(tmpdir(), 'cc-t3-appdata-'));
   const configDir = mkdtempSync(join(tmpdir(), 'cc-t3-config-'));
   const bin = mkdtempSync(join(tmpdir(), 'cc-t3-bin-'));
@@ -372,6 +390,17 @@ async function main() {
       .split(isWindows ? ';' : ':')
       .filter((dir) => dir && !realCopy(dir));
     process.env.PATH = [bin, ...rest].join(isWindows ? ';' : ':');
+
+    // Журнал проверок — той же функцией, что и `bootstrap/runtime/runtime.ts`:
+    // настоящая установка версии preload и подмешивание в окружение панели.
+    const ledger = activateLedger(
+      appData,
+      fileURLToPath(new URL('../verify-ledger', import.meta.url)),
+    );
+    check(
+      Boolean(ledger.preload),
+      `журнал проверок установлен: ${ledger.preload ?? ledger.reason}`,
+    );
 
     // ── Состояние панели: контур сохранён, активен, ключ на месте ────────────
     const store = new AppStore(appData);
@@ -1206,7 +1235,31 @@ async function main() {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+
+    // ── Т29: preload журнала доехал до каждого пути запуска ──────────────────
+    check(seenDumps.length > 0, `выгрузок окружения для сверки журнала: ${seenDumps.length}`);
+    for (const { dir, dump } of seenDumps) {
+      const options = dump.env.get('NODE_OPTIONS') ?? '';
+      const where = dir.replace(/^.*[\\/]cc-t\d+-/, '').replace(/-[^-]{6}$/, '');
+      const marker = dump.env.get('AGENTDECK_VERIFY_LEDGER_CLI') ?? '';
+      // Наблюдатель — окружение по белому списку (`panelAgentEnv`) и только
+      // Read/Grep/Glob: проверок он не гоняет, журнала у него быть не должно.
+      if (/watch/.test(where)) {
+        check(
+          !options.includes('verify-ledger') && !marker,
+          `${where}: окружение по списку, журнала нет: ${options || '—'} ${marker || '—'}`,
+        );
+        continue;
+      }
+      check(
+        Boolean(ledger.preload) && options.includes(ledger.preload),
+        `${where}: NODE_OPTIONS несёт preload журнала: ${options || '—'}`,
+      );
+      check(/^[\w.-]+$/.test(marker), `${where}: метка CLI для пульса журнала: ${marker || '—'}`);
+    }
   } finally {
+    if (nodeOptionsBefore === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = nodeOptionsBefore;
     await gateway.stop();
     await wait(500);
     for (const dir of [

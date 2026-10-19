@@ -125,6 +125,9 @@ const WHOLE = [
   ]),
 ];
 
+/** Вводный абзац продолжения в чистой сессии: за ним — предложение цитатой. */
+const HANDOFF_OPENER = openers([buildHandoffPrompt(HANDOFF)]);
+
 /** Начала строки ветки группы: с веткой и без неё (одни ключи задач). */
 const IDENTITY = [
   ...openers([groupIdentityLine(MARK, []), groupIdentityLine('', [MARK])]),
@@ -146,12 +149,20 @@ export function withoutPanelPreamble(text: string): string {
   if (startsWithAny(lines.find((line) => line.trim()) ?? '', IDENTITY)) return '';
   const paragraphs = withoutPanelTail(text).split(/\n[ \t]*\n/);
   let first = 0;
-  while (first < paragraphs.length && startsWithAny(paragraphs[first] ?? '', LEADING)) first += 1;
+  let handoff = false;
+  while (first < paragraphs.length && startsWithAny(paragraphs[first] ?? '', LEADING)) {
+    handoff ||= startsWithAny(paragraphs[first] ?? '', HANDOFF_OPENER);
+    first += 1;
+  }
   // Задание звена начинает реплику — сразу за вводными абзацами панели. Та же
   // строка ниже, среди слов человека, — его цитата (G1, 12.10.2026): раньше
   // любая такая строка выбрасывала реплику целиком.
   if (startsWithAny(paragraphs[first] ?? '', WHOLE)) return '';
-  return paragraphs.slice(first).join('\n\n');
+  const rest = paragraphs.slice(first);
+  // Предложение прошлой сессии продолжение несёт цитатой (`quoteProposal`,
+  // журнал 19.10): знак цитаты — разметка для модели, в названии чата он лишний.
+  if (handoff && rest[0]) rest[0] = rest[0].replace(/^>[ \t]?/gm, '');
+  return rest.join('\n\n');
 }
 
 /**

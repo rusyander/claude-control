@@ -2,6 +2,7 @@ import { Stack } from '@shared/ui/stack';
 import { GroupsDefaultsCard } from '../GroupsDefaultsCard/GroupsDefaultsCard';
 import { GroupsProjectCard } from '../GroupsProjectCard/GroupsProjectCard';
 import { SievesCard } from '../SievesCard/SievesCard';
+import { VerifyLedgerCard } from '../VerifyLedgerCard/VerifyLedgerCard';
 
 /**
  * Раздел «Группы»: одно место для работы с разделением. Сверху — общие
@@ -14,6 +15,7 @@ export function GroupsTab() {
       <GroupsDefaultsCard />
       <GroupsProjectCard />
       <SievesCard />
+      <VerifyLedgerCard />
     </Stack>
   );
 }

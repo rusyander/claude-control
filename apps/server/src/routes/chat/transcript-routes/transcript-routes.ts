@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ChatSummary } from '@agentdeck/contracts';
 import type { ServerContext } from '../../../context.ts';
@@ -27,6 +28,8 @@ import {
 } from '../../../domains/chat/constants.ts';
 import { sendConditional } from '../../../lib/conditional-get/conditional-get.ts';
 import { projectsDir } from '../paths.ts';
+import { chatActiveMs } from '../../../domains/chat/chat-active-time/chat-active-time.ts';
+import { createLimitShareReader } from '../../../domains/chat/limit-journal/limit-journal.ts';
 
 /**
  * Группа в работе: идёт ход, ждёт человека или доводит фоновую команду.
@@ -55,6 +58,9 @@ export function registerChatTranscriptRoutes(
     overrides: ctx.store.getSettings().modelPricing,
     entries: ctx.pricing.current().entries,
   }));
+  // Доли окон лимита подписки по разговорам — из журнала прогонов, с памятью по
+  // mtime: деление идёт по всем записям недели, а список спрашивают часто.
+  const limitShares = createLimitShareReader(ctx.location.paths.appData);
 
   /**
    * Список разговоров. Транскрипты — источник правды по содержимому, но не по
@@ -79,6 +85,19 @@ export function registerChatTranscriptRoutes(
     const retired = ctx.store.getRetiredChatLinks();
     // Звено без своих слов (задание ревью, правок, доставки пишет панель) —
     // именем группы, а не заглушкой-проектом.
+    const shares = limitShares();
+    const activeOf = (
+      chat: ChatSummary,
+      group: boolean,
+    ): Pick<ChatSummary, 'activeMs' | 'limitShare'> => {
+      if (!group || !chat.project) return {};
+      const activeMs = chatActiveMs(join(projectsDir(ctx), chat.project, `${chat.id}.jsonl`));
+      const limitShare = shares.get(chat.id);
+      return {
+        ...(activeMs === undefined ? {} : { activeMs }),
+        ...(limitShare ? { limitShare } : {}),
+      };
+    };
     const named = (chat: ChatSummary, groupTitle?: string) =>
       chat.untitled && groupTitle ? { title: groupTitle } : {};
     const withLinks =
@@ -181,6 +200,10 @@ export function registerChatTranscriptRoutes(
               // считает, а по разнице с заведением ребёнка сводка у родителя
               // показывает, сколько ушло на обживание копии.
               ...(link.firstEditAt ? { firstEditAt: link.firstEditAt } : {}),
+              // Время работы звена группы — по транскрипту, без пауз и простоя;
+              // доля окон лимита — по журналу прогонов. Только у групп: весь
+              // транскрипт разбирается, а прочим связям карточки группы нет.
+              ...activeOf(chat, typeof link.groupIndex === 'number'),
             };
           });
     // Закреплённые человеком — меткой на выдаче, как и связи: транскрипт о

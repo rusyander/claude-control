@@ -987,6 +987,69 @@ ${tail}${logLine}`
   return lines.join('\n');
 }
 
+const PREAMBLE_START = /^The panel (prepared this copy|created this copy of the repository)/;
+const PREAMBLE_END = 'If a tool the task needs is missing';
+const RUNTIME_ROW =
+  /^(⚠ )?(Node|Python|Go) in (.+?): the project asks for (.*?) \(([^()]*)\)([;:,] .*)$/;
+const COPY_PREP_ROW =
+  /^⚠ Copy preparation: the command ".*" (was stopped at the 10-minute ceiling|exited with code \S+)\. (.*)$/;
+
+/**
+ * Преамбула окружения в задании, которое продолжение группы получает заново.
+ * Первая сессия читает её целиком; продолжению хватает того же без повторов:
+ * у живой группы базы знаний (18.10.2026) было 10,8 тыс. знаков — 30 строк Go
+ * «ready on 1.27.0», семь одинаковых провалов Python и 2,5 тыс. знаков списка
+ * команд подготовки — в каждом первом промпте каждой следующей сессии.
+ * Одинаковые строки склеиваются списком модулей (так же, как `groupRuntimes`
+ * склеивает новые задания; старые хранятся несклеенными), из провала
+ * подготовки уходит только список команд — причина, первая ошибка и путь к
+ * логу остаются. Повторный вызов ничего не меняет; текст без преамбулы — тоже.
+ */
+export function continuationEnvironment(task: string): string {
+  const lines = task.split('\n');
+  const start = lines.findIndex((line) => PREAMBLE_START.test(line));
+  if (start < 0) return task;
+  const end = lines.findIndex((line, i) => i > start && line.startsWith(PREAMBLE_END));
+  if (end < 0) return task;
+  type Row = { head: string; rest: string; where: string[]; wanted: string[] };
+  const out: Array<string | Row> = [];
+  const groups = new Map<string, Row>();
+  for (const line of lines.slice(start, end)) {
+    const prep = COPY_PREP_ROW.exec(line);
+    if (prep) {
+      out.push(`⚠ Copy preparation ${prep[1]} when the group started. ${prep[2]}`);
+      continue;
+    }
+    const row = RUNTIME_ROW.exec(line);
+    if (!row) {
+      out.push(line);
+      continue;
+    }
+    const [, warn = '', name, where = '', wanted = '', , rest = ''] = row;
+    const key = `${warn}${name}${rest}`;
+    const modules = where.replace(/ \(\d+ modules\)$/, '').split(', ');
+    // Модуль без объявленной версии пишется «asks for  ()» — в склейке он не версия.
+    const asked = wanted.split(' or ').filter(Boolean);
+    const group = groups.get(key);
+    if (group) {
+      group.where.push(...modules.filter((m) => !group.where.includes(m)));
+      for (const w of asked) if (!group.wanted.includes(w)) group.wanted.push(w);
+    } else {
+      const fresh = { head: `${warn}${name}`, rest, where: modules, wanted: asked };
+      groups.set(key, fresh);
+      out.push(fresh);
+    }
+  }
+  const block = out.map((g) => {
+    if (typeof g === 'string') return g;
+    const where =
+      g.where.length > 1 ? `${g.where.join(', ')} (${g.where.length} modules)` : g.where[0];
+    const asked = g.wanted.length > 0 ? `: the project asks for ${g.wanted.join(' or ')}` : '';
+    return `${g.head} in ${where}${asked}${g.rest}`;
+  });
+  return [...lines.slice(0, start), ...block, ...lines.slice(end)].join('\n');
+}
+
 /**
  * Развилки группы — человеку (вкладка «Группы», `groupQuestions: 'human'`,
  * аудит 25.09, L40). Строка главнее правила ребёнка «работай автономно»

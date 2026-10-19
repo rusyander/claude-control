@@ -1,3 +1,4 @@
+import type { LimitShare } from '@agentdeck/contracts';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type {
   ChatTreeView,
@@ -42,6 +43,11 @@ export interface ChildStageGroup {
   firstEditAfterMs?: number;
   /** Сумма времени цепочки (мс): у каждого звена от заведения до последней записи. */
   workMs?: number;
+  /**
+   * Доля окон лимита подписки (0..1), потраченная звеньями группы, — сумма их
+   * `ChatSummary.limitShare`. Нет замеров ни у одного звена — поля нет.
+   */
+  limitShare?: LimitShare;
   /**
    * Когда заведено первое звено цепочки и когда была последняя запись в ней
    * (ISO). По ним хаб считает, сколько идёт разбор и всё разделение: `workMs`

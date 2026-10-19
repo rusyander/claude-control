@@ -127,7 +127,7 @@ export function judgeTurn(input: TurnGateInput): string[] {
   const hasCases = live.some((group) => group.cases.some((item) => !item.archived));
   if (!hasCases) {
     return [
-      `Tests block: code changed (${named(code)}) but the project has no test case yet — add one for the change: ${caseCmd(code[0] ?? '')}. An existing test file → add "automation":{"status":"automated","file":"<path>"} and run it: ${input.cli} run ${project} --group <group>.`,
+      `Tests block: code changed (${named(code)}) but the project has no test case yet — add one for the change: ${caseCmd(code[0] ?? '')}. An existing test file → add "automation":{"status":"automated","file":"<path>"} and run it: ${input.cli} run ${project} --case <group>:<id>.`,
     ];
   }
 
@@ -175,7 +175,7 @@ export function judgeTurn(input: TurnGateInput): string[] {
     );
   }
 
-  const unrunGroups = new Set<string>();
+  const unrunKeys: string[] = [];
   const unrun: string[] = [];
   const unrecorded: string[] = [];
   for (const item of touched) {
@@ -186,18 +186,17 @@ export function judgeTurn(input: TurnGateInput): string[] {
       const status = executed.get(key);
       if (!status || status === 'skipped' || status === 'unknown') {
         unrun.push(item.caseId);
-        unrunGroups.add(item.groupId);
+        unrunKeys.push(key);
       }
     } else if (!anyResult.has(key)) {
       unrecorded.push(key);
     }
   }
   if (unrun.length > 0) {
-    const groups = [...unrunGroups];
-    const command =
-      groups.length === 1
-        ? `${input.cli} run ${project} --group ${groups[0]}`
-        : `${input.cli} run ${project}`;
+    // Ровно эти кейсы, не их группа: группа `chat` смешивает юнит-кейсы с живыми
+    // QA на стенде, и прогон «всей группы» по подсказке грузил стенд посреди
+    // работы групп (журнал 19.10, L6.2).
+    const command = `${input.cli} run ${project} --case ${unrunKeys.join(',')}`;
     gaps.push(
       `Tests block: automated cases for the changed code were not run after the last edit (${named(unrun)}) — run: ${command}`,
     );

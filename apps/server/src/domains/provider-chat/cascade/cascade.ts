@@ -440,7 +440,9 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
       reviewer: 'cli',
       ...(input.deliver ? { deliver: true } : {}),
       verify: true,
-      context: contextAfter(reviewed.text),
+      // Замечания уже в задании карточками — прозу ревью вокруг них правки не
+      // получают (L2.2, как у Claude): до 24 тыс. знаков в каждом ходе правок.
+      context: contextAfter(''),
     }),
     ...(model ? { model } : {}),
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),

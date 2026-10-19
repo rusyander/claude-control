@@ -686,7 +686,144 @@ ${MARK.ancestor}
     }
   };
 
+  /**
+   * Звено группы (L1.2, L1.3): профиль считает НАСТОЯЩИЙ `groupRunProfile`, кладёт
+   * в запуск настоящий реестр — тем же резолвером профиля, что ставит `runtime.ts`.
+   * Сервер выдаёт себя хранилищем кода (`gitlab` в имени) и несёт имена чтения и
+   * записи рядом; навыки группы — личными навыками с меткой в описании.
+   */
+  const STAGE_DESC = 'T8STAGEDESC';
+  const STAGE_TOOLS = {
+    read: ['get_issue', 'list_merge_requests', 'jira_get_link_types'],
+    write: [
+      'create_issue',
+      'jira_create_issue',
+      'update_merge_request',
+      'merge_merge_request',
+      'create_merge_request_note',
+      'jira_transition_issue',
+      'execute_graphql',
+    ],
+  };
+  const runStage = async (stage) => {
+    const { groupRunProfile, GROUP_SKILLS } =
+      await import('../../apps/server/src/domains/chat/group-profile/group-profile.ts');
+    const work = buildProjectDir();
+    const home = buildConfigDir(work);
+    for (const name of GROUP_SKILLS) {
+      mkdirSync(join(home, 'skills', name), { recursive: true });
+      writeFileSync(
+        join(home, 'skills', name, 'SKILL.md'),
+        `---\nname: ${name}\ndescription: ${STAGE_DESC}-${name}\n---\n\nНичего не делает.\n`,
+        'utf8',
+      );
+    }
+    const profile = groupRunProfile({
+      entries: [
+        {
+          id: 't8-gitlab',
+          config: {
+            command: process.execPath,
+            args: [MCP_SERVER, '--tools', [...STAGE_TOOLS.read, ...STAGE_TOOLS.write].join(',')],
+          },
+        },
+      ],
+      tasksText: 'PROJ-1',
+      extra: [],
+      skills: { user: [...GROUP_SKILLS], group: [], plugins: [] },
+      stage,
+    });
+    const runs = new ChatRunRegistry();
+    runs.setPlatformRouting(() => ({ env: { ...stubEnv } }));
+    runs.setGroupProfileResolver(() => profile);
+    const from = stub.seen.length;
+    runs.start(
+      `layers-stage-${stage}`,
+      {
+        prompt: 'скажи ок',
+        cwd: work,
+        configDir: home,
+        ...(process.env.CLAUDE_CLI ? { command: process.env.CLAUDE_CLI } : {}),
+        permissionMode: 'default',
+        permissionPrompt: { runId: `layers-stage-${stage}`, baseUrl: 'http://127.0.0.1:1' },
+      },
+      { origin: 'chat' },
+    );
+    for (let i = 0; i < 4 * 120 && stub.seen.length === from; i += 1) await wait(250);
+    runs.stopAll?.();
+    await wait(300);
+    const body = stub.seen[from];
+    removeDir(work);
+    removeDir(home);
+    if (!body) return undefined;
+    const all = JSON.stringify(body);
+    const tool = (name) => all.includes(`mcp__t8-gitlab__${name}`);
+    return {
+      chars: all.length,
+      read: STAGE_TOOLS.read.filter(tool),
+      write: STAGE_TOOLS.write.filter(tool),
+      described: GROUP_SKILLS.filter((name) => all.includes(`${STAGE_DESC}-${name}`)),
+      named: GROUP_SKILLS.filter((name) => all.includes(name)),
+    };
+  };
+
   try {
+    // ── 0. Звено группы: MCP наружу на чтение и свои навыки (L1.2, L1.3) ─────
+    // Работа — контроль: весь набор записи и все описания доезжают, иначе пропажа
+    // ниже значила бы, что проба их просто не видит.
+    const stageWork = await runStage('work');
+    const stageReview = await runStage('review');
+    const stageDeliver = await runStage('deliver');
+    check(
+      Boolean(stageWork && stageReview && stageDeliver),
+      'звено группы: запросы работы, ревью и доставки записаны',
+    );
+    if (stageWork && stageReview && stageDeliver) {
+      const all = (list, of) => list.length === of.length;
+      check(
+        all(stageWork.read, STAGE_TOOLS.read) && all(stageWork.write, STAGE_TOOLS.write),
+        `звено группы, работа: все инструменты сервера в запросе: ${[...stageWork.read, ...stageWork.write].join(', ')}`,
+      );
+      check(
+        stageWork.described.length === 12,
+        `звено группы, работа: описания всех навыков группы: ${stageWork.described.length}`,
+      );
+      check(
+        all(stageReview.read, STAGE_TOOLS.read),
+        `звено группы, ревью: инструменты чтения на месте: ${stageReview.read.join(', ')}`,
+      );
+      check(
+        stageReview.write.length === 0,
+        `звено группы, ревью: инструментов записи нет: ${stageReview.write.join(', ') || '—'}`,
+      );
+      check(
+        stageReview.described.includes('deep-review') &&
+          !stageReview.described.includes('prepare-mr') &&
+          stageReview.named.includes('prepare-mr'),
+        `звено группы, ревью: описания только своих навыков, прочим — имя: ${stageReview.described.join(', ')}`,
+      );
+      check(
+        all(stageDeliver.write, STAGE_TOOLS.write),
+        `звено группы, доставка: инструменты записи на месте: ${stageDeliver.write.join(', ')}`,
+      );
+      check(
+        stageDeliver.described.includes('prepare-mr') &&
+          !stageDeliver.described.includes('deep-review') &&
+          stageDeliver.named.includes('deep-review'),
+        `звено группы, доставка: описания только своих навыков, прочим — имя: ${stageDeliver.described.join(', ')}`,
+      );
+      console.log(
+        `     тело запроса: работа ${stageWork.chars} знаков, ревью ${stageReview.chars}, доставка ${stageDeliver.chars}`,
+      );
+    }
+    // `--group-stage` — только этот случай: доказательство профиля звена за минуту,
+    // без полутора десятков прогонов остальных слоёв.
+    if (process.argv.includes('--group-stage')) {
+      stub.close();
+      removeDir(kitData);
+      finish();
+    }
+
     // ── 1. Всё наше на месте: метки должны найтись ВСЕ ────────────────────────
     // Без этой строки любая «зелень» ниже ничего не стоит: она докажет, что
     // метки вообще доезжают, а не что флаг их снял.
@@ -1004,7 +1141,11 @@ ${MARK.ancestor}
     stub.close();
     removeDir(kitData);
   }
+  finish();
+}
 
+/** Итог прогона: строка и код выхода — общие для полного прогона и `--group-stage`. */
+function finish() {
   console.log(
     bad === 0
       ? '\nКаждый флаг уносит ровно тот слой, который подписан на карточке.'

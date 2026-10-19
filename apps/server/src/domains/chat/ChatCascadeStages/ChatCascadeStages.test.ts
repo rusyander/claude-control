@@ -168,6 +168,21 @@ describe('planCascadeStage: после работы', () => {
     expect(plan({ deliver: true })?.stage).toBe('review');
   });
 
+  // L7.13: дельту против опубликованной ветки считает `readReviewDelta` (там же
+  // путь инцидента на настоящем git); здесь — что планировщик с ней делает.
+  it('пустой rebase: ревью нет, незапушенную голову отправит доставка', () => {
+    const ceiling = workLink({ lowered: false });
+    const none = (published: boolean) => () =>
+      ({ kind: 'none', from: 'abc123', published }) as const;
+    expect(plan({ link: ceiling, deliver: true, reviewDelta: none(true) })).toBeUndefined();
+    expect(plan({ link: ceiling, deliver: true, reviewDelta: none(false) })?.stage).toBe('deliver');
+    expect(plan({ link: ceiling, reviewDelta: none(false) })).toBeUndefined();
+    // Всю работу — как раньше, без рамки дельты.
+    const whole = plan({ link: ceiling, reviewDelta: () => ({ kind: 'whole' }) });
+    expect(whole?.stage).toBe('review');
+    expect(whole?.prompt).not.toContain('Review ONLY');
+  });
+
   it('обычный чат вне разделения конвейера не знает', () => {
     expect(planCascadeStage({ ok: true, text: '', task: '', hasWork: () => true })).toBeUndefined();
   });
@@ -535,7 +550,7 @@ describe('planCascadeStage: контекст следующего звена', (
     });
   });
 
-  it('правки получают задание, план, ветку и вывод ревью; связь несёт их дальше', () => {
+  it('правки получают задание, план, ветку и замечания — без хвоста ответа ревью (L2.2)', () => {
     const staged = plan({
       link: workLink({
         stage: 'review',
@@ -558,8 +573,10 @@ describe('planCascadeStage: контекст следующего звена', (
     expect(staged?.prompt).toContain('Переименуй foo в bar');
     expect(staged?.prompt).toContain('2. Заменить на bar');
     expect(staged?.prompt).toContain('Group branch: split/rename.');
-    expect(staged?.prompt).toContain('Outcome of the previous stage (review):');
-    expect(staged?.prompt).toContain('переименование неполное');
+    // Замечание — карточкой в задании; слова ревьюера вокруг блока не едут.
+    expect(staged?.prompt).toContain('1. b.ts:3 — остался foo');
+    expect(staged?.prompt).not.toContain('Outcome of the previous stage');
+    expect(staged?.prompt).not.toContain('переименование неполное');
     expect(staged?.link).toMatchObject({ task: 'Переименуй foo в bar', planSummary: PLAN });
     // Аудит 25.09, L258: не воспроизвелось — не повод тянуть инфраструктуру.
     expect(staged?.prompt).toContain('is no reason to change infrastructure');

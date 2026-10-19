@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent-images": "./src/agent-images.ts",
+    "./verify-ledger": "./src/verify-ledger.ts",
     "./api-explorer": "./src/api-explorer.ts",
     "./logs": "./src/logs.ts",
     "./backend-guard": "./src/backend-guard.ts",
@@ -39,6 +40,7 @@
     "./media": "./src/media.ts",
     "./media-block": "./src/media-block.ts",
     "./media-deck": "./src/media-deck.ts",
+    "./limit-share": "./src/limit-share.ts",
     "./model-cascade": "./src/model-cascade.ts",
     "./models": "./src/models.ts",
     "./panel-agent": "./src/panel-agent.ts",

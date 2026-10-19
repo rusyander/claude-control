@@ -1,4 +1,4 @@
-import type { ChatSummary } from '@agentdeck/contracts';
+import { sumLimitShares, type ChatSummary, type LimitShare } from '@agentdeck/contracts';
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { CASCADE_STAGES, type CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
@@ -113,6 +113,9 @@ function groupRow(
     stages: ordered.map(stageOf),
     ...firstEditDelay(ordered.find((chat) => stageOf(chat) === 'work')),
     ...workTime(ordered),
+    // Доля окон подписки — сумма звеньев: каждое сервер уже очистил от того,
+    // что тратили параллельно соседние группы (`limit-share.ts`).
+    ...limitShareOf(ordered),
     ...chainSpan(ordered),
     ...(last.model ? { model: last.model } : {}),
     ...(last.effort ? { effort: last.effort } : {}),
@@ -144,21 +147,35 @@ function firstEditDelay(work: ChatSummary | undefined): { firstEditAfterMs?: num
 }
 
 /**
- * Сколько группа проработала — сумма по звеньям от заведения разговора до его
- * последней записи. Паузы между звеньями (ревью ждало человека) в сумму не
- * входят: это время человека, а не агента. Звено без дат сумму не портит, а
- * пропускается; нет ни одного измеримого — поля нет, не «0».
+ * Сколько группа проработала — сумма по звеньям. Звено с `activeMs` (сервер
+ * посчитал по транскрипту, когда модель писала или шёл инструмент) даёт его:
+ * разница «заведено → последняя запись» включала паузу на дни, ожидание лимита
+ * и простой между ходами (владелец, 19.10.2026: 52 ч у группы, работавшей ~4 ч).
+ * Без него — та разница, как и прежде. Паузы между звеньями (ревью ждало
+ * человека) не входят ни так, ни так. Звено без дат пропускается; нет ни одного
+ * измеримого — поля нет, не «0».
  */
 function workTime(chain: ChatSummary[]): { workMs?: number } {
   let total = 0;
   let measured = false;
   for (const chat of chain) {
+    if (chat.activeMs !== undefined) {
+      total += chat.activeMs;
+      measured = true;
+      continue;
+    }
     const span = Date.parse(chat.updatedAt) - Date.parse(chat.createdAt);
     if (!Number.isFinite(span) || span < 0) continue;
     total += span;
     measured = true;
   }
   return measured ? { workMs: total } : {};
+}
+
+/** Доля окон лимита у цепочки; ни у одного звена нет замеров — поля нет. */
+function limitShareOf(chain: ChatSummary[]): { limitShare?: LimitShare } {
+  const share = sumLimitShares(chain.map((chat) => chat.limitShare));
+  return share ? { limitShare: share } : {};
 }
 
 /**

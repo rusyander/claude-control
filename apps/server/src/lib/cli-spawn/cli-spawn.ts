@@ -203,6 +203,20 @@ function watchExit(
   });
 }
 
+/**
+ * Метка CLI для пульса журнала проверок: preload, загрузившийся в проверке под
+ * этим CLI, отмечает «журнал здесь работает». Без неё покрытие было бы
+ * предположением. Только когда журнал подмешан в окружение панели — иначе
+ * метка ничего не значит и лишь меняла бы окружение запуска.
+ */
+export function ledgerCliMarker(command: string): Record<string, string> {
+  if (!process.env.AGENTDECK_VERIFY_LEDGER_HOME) return {};
+  const cli = (command.split(/[\\/]/).pop() ?? '')
+    .replace(/\.(exe|cmd|bat|ps1)$/i, '')
+    .toLowerCase();
+  return /^[\w.-]+$/.test(cli) ? { AGENTDECK_VERIFY_LEDGER_CLI: cli } : {};
+}
+
 export function spawnCliProcess(
   command: string,
   args: string[],
@@ -242,7 +256,13 @@ function spawnUnobserved(
     // увёл бы трафик мимо контура. Сборка внутри try: у запуска один ответ
     // (`CliSpawnOutcome`), и падение сборщика окружения обязано приехать
     // ошибкой, а не исключением наружу.
-    const extra = { ...options.portableEnv?.(), ...options.env };
+    // Метка журнала — снизу: заданная прогоном явно сильнее. Агенту панели
+    // (`inheritEnv: false`) не ставится — журнала в его окружении нет.
+    const extra = {
+      ...(options.inheritEnv === false ? {} : ledgerCliMarker(command)),
+      ...options.portableEnv?.(),
+      ...options.env,
+    };
 
     // `env` уходит в spawn ТОЛЬКО целиком: node не умеет «добавить переменную», он
     // заменяет окружение целиком. Поэтому добавку кладём поверх копии process.env —

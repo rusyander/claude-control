@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { TASK_NOTEBOOK, seedTaskNotebook } from './task-notebook.ts';
 
 /**
@@ -94,5 +94,24 @@ describe('тетрадь задачи', () => {
     git(repo, 'worktree', 'remove', copy);
 
     expect(existsSync(copy)).toBe(false);
+  });
+
+  it('имя агентское (.agent.md): слой правил даёт агенту писать в тетрадь через Write', () => {
+    expect(TASK_NOTEBOOK).toMatch(/\/notebook\.agent\.md$/);
+  });
+
+  it('тетрадь под старым именем notebook.md переезжает целиком, посев дописывается к ней', () => {
+    const { copy } = repoWithCopy();
+    const legacy = join(copy, TASK_NOTEBOOK.replace(/notebook\.agent\.md$/, 'notebook.md'));
+    mkdirSync(dirname(legacy), { recursive: true });
+    writeFileSync(legacy, '# Task notebook\n\n- вход на стенд: admin\n');
+
+    seedTaskNotebook(copy, 'карта отчётов', 'Отчёты');
+
+    expect(existsSync(legacy)).toBe(false);
+    const text = readFileSync(join(copy, TASK_NOTEBOOK), 'utf8');
+    expect(text).toContain('- вход на стенд: admin');
+    expect(text).toContain('## From the panel at the start — Отчёты\n\nкарта отчётов');
+    expect(text.match(/# Task notebook/g)).toHaveLength(1);
   });
 });

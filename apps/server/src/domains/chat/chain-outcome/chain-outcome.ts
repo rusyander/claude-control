@@ -3,7 +3,10 @@ import {
   scanSplitMcpRequests,
   scanSplitTickets,
   withoutSplitTickets,
+  humanStep,
+  type SplitHumanStepProposal,
 } from '@agentdeck/contracts/split-tickets';
+import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { scanSieveBlocks, stampSieveRows, withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
@@ -143,6 +146,19 @@ export interface ChainOutcomeInput {
 }
 
 /**
+ * Предложение продолжить, ждущее внешнего события (`waits`, L7.17), — шаг
+ * человеку: панель новой сессии не заводит (`evaluateHandoff`), и без этой
+ * строки группа молча стояла бы до утра. Действие — следующий шаг словами
+ * группы, «зачем» — событие, которого он ждёт; продолжить можно кнопкой
+ * карточки, когда событие случится.
+ */
+function waitingSteps(text: string): SplitHumanStepProposal[] {
+  const waiting = scanHandoffBlocks(text).proposals.filter((proposal) => proposal.waits);
+  const last = waiting.at(-1);
+  return last?.waits ? [humanStep({ action: last.next, where: '', why: last.waits })] : [];
+}
+
+/**
  * Итог хода для группы. Порядок проверок — от самого надёжного факта: сбой,
  * фон, ревью (его итог в связи), вопрос текстом, и только потом «готово».
  */
@@ -158,7 +174,7 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
   // пропадает оттого, что ход кончился вопросом или сбоем.
   const tickets = scanSplitTickets(input.text);
   // Шаги, которые может сделать только человек (находка 112), — по тому же правилу.
-  const humanSteps = scanSplitHumanSteps(input.text);
+  const humanSteps = [...scanSplitHumanSteps(input.text), ...waitingSteps(input.text)];
   // Просьба о сервере вне профиля запуска (1.2) — конвейер продолжит группу с ним.
   const mcpRequests = scanSplitMcpRequests(input.text);
   // Лимит на исходе (аудит 25.09, L63): ход прошёл, но очередь до сброса

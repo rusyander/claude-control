@@ -87,8 +87,13 @@ import { mainCheckoutOf } from '../../../domains/project-tests/project-tests.ts'
 import {
   groupAutoApproveFor,
   groupDecision,
+  needsMrState,
   recordGroupAutoNotice,
+  type GroupAutoApprove,
 } from '../../../domains/chat/group-permissions.ts';
+import { readMergeRequestByUrl } from '../../../domains/integrations/forge.ts';
+import { forgeTokenForUrl } from '../../../domains/integrations/forge-pick.ts';
+import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import {
   autoApproveBodySchema,
   branchDecisionBodySchema,
@@ -167,6 +172,31 @@ const refuseExpired = (reply: FastifyReply): FastifyReply =>
  * на другую вкладку не убивают агента, а к идущему прогону можно переподключиться
  * потоком, догнав пропущенное. Остановка — только по явной кнопке.
  */
+/**
+ * Снят ли MR группы с черновика — для пуша арендой её ветки (L7.12, журнал 19.10
+ * 02:17:02). Фордж читается только когда этот вопрос решает исход
+ * (`needsMrState`): сеть на каждый запрос прав — лишняя. Ключа нет или фордж не
+ * ответил — состояние неизвестно, и решает человек (`mrInReview` не ставится).
+ */
+async function withMrState(
+  store: AppStore,
+  appData: string,
+  group: GroupAutoApprove,
+  toolName: string,
+  input: unknown,
+): Promise<GroupAutoApprove> {
+  if (!group.mr || !needsMrState(group, { toolName, input })) return group;
+  const token = forgeTokenForUrl(store, appData, group.mr);
+  if (!token) return group;
+  try {
+    const mr = await readMergeRequestByUrl(group.mr, token);
+    return mr ? { ...group, mrInReview: mr.state === 'open' && !mr.draft } : group;
+  } catch (error) {
+    console.warn('group permissions: MR state unreadable', error);
+    return group;
+  }
+}
+
 export function registerChatRunRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
@@ -951,7 +981,9 @@ export function registerChatRunRoutes(
     // человек ВКЛЮЧИЛ в чате группы сам; унаследованный от родителя или
     // выключенный (ответ из хаба шлёт его выключенным) — не в счёт.
     const humanOn = auto?.enabled === true && auto.inherited !== true;
-    const group = humanOn ? undefined : groupAutoApproveFor(ctx.store, [runId, held?.key]);
+    const found = humanOn ? undefined : groupAutoApproveFor(ctx.store, [runId, held?.key]);
+    const group =
+      found && (await withMrState(ctx.store, ctx.location.paths.appData, found, toolName, input));
     const groupLevel = group
       ? groupDecision(group, { toolName, input, guardedPatterns: guardedPatterns() })
       : 'human';

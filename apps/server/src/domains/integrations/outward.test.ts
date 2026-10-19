@@ -261,10 +261,32 @@ describe('domains/integrations/forge: запрос на слияние по сс
       title: 'Вход',
       url: 'https://git.acme.local/mr/42',
       state: 'open',
+      draft: false,
     });
     expect(calls[0]!.url).toBe(
       'https://git.acme.local/api/v4/projects/team%2Fapp/merge_requests/42',
     );
+  });
+
+  // L7.12: ветку MR, снятого с черновика, принудительный пуш группы не трогает —
+  // черновик узнаётся по полю форджа, а без поля — по приставке заголовка.
+  it.each([
+    [{ draft: true, title: 'Вход' }, true],
+    [{ work_in_progress: true, title: 'Вход' }, true],
+    [{ title: 'Draft: Вход' }, true],
+    [{ title: '[WIP] Вход' }, true],
+    [{ draft: false, title: 'Draft: Вход' }, false],
+    [{ title: 'Drafting Вход' }, false],
+  ])('черновик MR: %j → %s', async (fields, draft) => {
+    stubApi([
+      [
+        /merge_requests\/42/,
+        { body: { ...fields, state: 'opened', source_branch: 'f', target_branch: 'main' } },
+      ],
+    ]);
+    await expect(
+      readMergeRequestByUrl('https://git.acme.local/team/app/-/merge_requests/42', 'T'),
+    ).resolves.toMatchObject({ draft });
   });
 
   it('GitHub называет ветку своими полями, а `open` у него без хвоста', async () => {

@@ -46,7 +46,10 @@ describe('маршруты чата: проекты и ФС', () => {
     );
 
     store = new AppStore(join(root, 'agentdeck'));
-    const ctx = { location: { paths: { root } }, store } as unknown as ServerContext;
+    const ctx = {
+      location: { paths: { root, appData: join(root, 'agentdeck') } },
+      store,
+    } as unknown as ServerContext;
 
     app = Fastify();
     const empty = new ChatRunRegistry();
@@ -242,7 +245,7 @@ describe('маршруты чата: отказы отправки и смена
     });
 
     ctx = {
-      location: { paths: { root } },
+      location: { paths: { root, appData: join(root, 'agentdeck') } },
       store: new AppStore(join(root, 'agentdeck')),
     } as unknown as ServerContext;
 
@@ -423,7 +426,7 @@ describe('POST /api/chat/send: связь с родителем', () => {
 
     store = new AppStore(join(root, 'agentdeck'));
     const ctx = {
-      location: { paths: { root } },
+      location: { paths: { root, appData: join(root, 'agentdeck') } },
       store,
     } as unknown as ServerContext;
 
@@ -518,7 +521,7 @@ describe('POST /api/chat/send: понижённый веер', () => {
     }));
 
     const ctx = {
-      location: { paths: { root } },
+      location: { paths: { root, appData: join(root, 'agentdeck') } },
       store: new AppStore(join(root, 'agentdeck')),
       // Каталог: в семействе две модели, и свежая — не та, на которую CLI
       // разворачивает алиас сам. Ради этого различия шаг и существует.

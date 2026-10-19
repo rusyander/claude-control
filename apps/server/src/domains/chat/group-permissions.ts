@@ -32,7 +32,7 @@ export interface GroupPermissionSource {
     | {
         projectPath: string;
         request: { allowEdits?: boolean };
-        groups: { index: number; branch: string }[];
+        groups: { index: number; branch: string; mr?: string }[];
       }
     | undefined;
   getSplitSettings(path: string): StoredSplitSettings;
@@ -46,6 +46,14 @@ export interface GroupAutoApprove {
   allowEdits: boolean;
   /** Ветка группы — исключение для пуша арендой своей ветки. */
   branch?: string;
+  /** MR группы из записи разделения: у ветки на ревью исключения нет (L7.12). */
+  mr?: string;
+  /**
+   * MR группы открыт и снят с черновика — по форджу, прочитан маршрутом прав
+   * перед решением (`needsMrState`). `undefined` — не читали или прочитать не
+   * удалось: при известном MR это «на ревью» (решает человек).
+   */
+  mrInReview?: boolean;
   /** Разделение и номер группы — куда писать отметку «разрешено автоматически». */
   parentChatId: string;
   groupIndex: number;
@@ -81,6 +89,7 @@ export function groupAutoApproveFor(
       rows: resolveGroupPermissions(source.getSplitDefaults().permissions, stored.permissions),
       allowEdits: plan.request.allowEdits === true,
       branch: group.branch || link.branch,
+      ...(group.mr ? { mr: group.mr } : {}),
       parentChatId: link.parentChatId,
       groupIndex: group.index,
     };
@@ -101,6 +110,31 @@ function isOwnBranchLeasePush(command: string | undefined, branch: string | unde
   return new RegExp(
     `^\\s*git\\s+push\\s+--force-with-lease\\s+origin\\s+(?:HEAD:)?${escaped}\\s*$`,
   ).test(command);
+}
+
+/**
+ * Пуш арендой своей ветки, у которой уже есть MR (журнал 19.10 02:17:02,
+ * L7.12): доставленная группа после пустого rebase переписала ветку MR, снятого
+ * с черновика и стоявшего на ревью, — исключение W3-3 пропустило это молча.
+ * Исключение писалось для ветки, которую группа ещё доводит до MR; ветку, что
+ * читают ревьюеры, затирает только человек. Состояние MR знает лишь фордж —
+ * маршрут прав читает его, когда этот вопрос задан (`true`), и кладёт в
+ * `mrInReview`. Черновик — исключение действует, как прежде.
+ */
+export function needsMrState(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+): boolean {
+  return (
+    Boolean(group.mr) &&
+    ruleFor(request.toolName, request.input) === 'gitHistory' &&
+    isOwnBranchLeasePush(commandOf(request.input), group.branch)
+  );
+}
+
+/** MR известен, а снят ли с черновика — нет (не читали, сбой форджа): считаем «на ревью». */
+function branchUnderReview(group: GroupAutoApprove): boolean {
+  return Boolean(group.mr) && group.mrInReview !== false;
 }
 
 function commandOf(input: unknown): string | undefined {
@@ -128,6 +162,7 @@ export function groupDecision(
   if (
     rule === 'gitHistory' &&
     rows.gitWrite !== 'human' &&
+    !branchUnderReview(group) &&
     isOwnBranchLeasePush(commandOf(request.input), group.branch)
   ) {
     // Решает строка пуша, а не затирания: это обычная доставка своей ветки.

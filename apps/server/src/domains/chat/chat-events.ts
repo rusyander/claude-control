@@ -1,5 +1,6 @@
 import type { PermissionGuardReason } from '@agentdeck/contracts/backend-guard';
 import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
+import type { LimitSample } from '@agentdeck/contracts/limit-share';
 import type { CascadeStage, ReviewDepthGap } from '@agentdeck/contracts/model-cascade';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import type { BranchGateChild } from './ChatBranchGate/ChatBranchGate.ts';
@@ -33,7 +34,11 @@ export type ChatEvent =
   | { kind: 'steer'; text: string; at: string }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
-  | { kind: 'limit'; resetsAt: number; type: string; status: string }
+  /**
+   * Событие лимита подписки. `sample` — загрузка окон в момент события
+   * (`unifiedWindows`); у CLI старше этого поля его нет, и прогон замеров не ставит.
+   */
+  | { kind: 'limit'; resetsAt: number; type: string; status: string; sample?: LimitSample }
   /**
    * Расход одного шага модели. `toolIds` — вызовы, рождённые ЭТИМ шагом: по ним
    * интерфейс ставит цифру у конкретного действия. Вызовов бывает несколько
@@ -283,6 +288,12 @@ export interface RawUsage {
   cache_creation?: { ephemeral_1h_input_tokens?: number };
 }
 
+/** Окно подписки в `rate_limit_event` (схема CLI 2.1.286). */
+export interface RawLimitWindow {
+  utilization?: number;
+  resetsAt?: number;
+}
+
 /**
  * Строка потока `stream-json` — только те поля, которые панель читает.
  * Экспортируется ради трекера ходов (`stream-usage.ts`) и тестов разбора.
@@ -325,7 +336,13 @@ export interface RawEvent {
   };
   /** Заполнен у строк субагента: ход принадлежит вложенному прогону, не этому. */
   parent_tool_use_id?: string | null;
-  rate_limit_info?: { resetsAt?: number; rateLimitType?: string; status?: string };
+  rate_limit_info?: {
+    resetsAt?: number;
+    rateLimitType?: string;
+    status?: string;
+    /** Загрузка окон подписки: `utilization` 0..1, `resetsAt` — секунды эпохи. */
+    unifiedWindows?: Partial<Record<'five_hour' | 'seven_day', RawLimitWindow>>;
+  };
   /** У `result` хода, начатого самим CLI (уведомление о фоне), — откуда он; у хода по сообщению нет. */
   origin?: { kind?: string };
   total_cost_usd?: number;

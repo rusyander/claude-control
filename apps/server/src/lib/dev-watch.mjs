@@ -37,6 +37,7 @@ import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { appDataDirOf } from './brand.mjs';
 import {
+  appendDevLog,
   clearRestartState,
   deferReason,
   takeRestartRequest,
@@ -276,7 +277,10 @@ function main() {
   clearRestartState(appData);
   takeRestartRequest(appData);
   const defer = process.env.AGENTDECK_DEV_DEFER !== '0';
-  const log = (line) => console.log(`[dev-watch] ${line}`);
+  const log = (line) => {
+    console.log(`[dev-watch] ${line}`);
+    appendDevLog(appData, line);
+  };
   const pending = new Set();
   let child;
   let deferredSince;
@@ -296,6 +300,7 @@ function main() {
       // собственный каталог данных может переехать настройкой.
       env: { ...process.env, AGENTDECK_DEV_RESTART_DIR: appData },
     });
+    appendDevLog(appData, `сервер запущен (pid ${child.pid}, сторож ${process.pid})`);
     const current = child;
     current.on('exit', (code, signal) => {
       if (current !== child) return;

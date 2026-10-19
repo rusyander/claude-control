@@ -1278,6 +1278,7 @@ describe('planForeignStage — контекст звеньев (F2, парите
     link: Partial<ChatLink>;
     text: string;
     previous?: string;
+    absent?: string;
   }[] = [
     {
       name: 'ревью работы',
@@ -1291,8 +1292,9 @@ describe('planForeignStage — контекст звеньев (F2, парите
       stage: 'fix',
       cascade: { ...WORK, stage: 'review' },
       link: { stage: 'review' },
-      text: reviewBlock(['src/a.ts: не переименован bar']),
-      previous: 'Посмотрел.',
+      text: `Посмотрел.\n${reviewBlock(['src/a.ts: не переименован bar'])}`,
+      // Замечания — карточками, прозы ревью вокруг них правки не получают (L2.2).
+      absent: 'Посмотрел.',
     },
     {
       name: 'проверка правок',
@@ -1329,6 +1331,7 @@ describe('planForeignStage — контекст звеньев (F2, парите
       expect(prompt).toContain(TASK);
       expect(prompt).toContain(PLAN);
       if (c.previous) expect(prompt).toContain(c.previous);
+      if (c.absent) expect(prompt).not.toContain(c.absent);
     }
   });
 });

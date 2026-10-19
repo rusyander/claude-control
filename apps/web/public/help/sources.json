@@ -485,7 +485,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "17d781235b1df3a0"
+          "sha": "7b90f65579d7face"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions/ChatPermissions.ts",
@@ -495,12 +495,12 @@
         {
           "path": "apps/server/src/domains/chat/auto-approve/auto-approve.ts",
           "why": "«Меню разговора»: тумблеры прав и правила, разрешающие без вопроса",
-          "sha": "6840d2d24db9ae47"
+          "sha": "5df6b4c4fb8bd085"
         },
         {
           "path": "apps/server/src/domains/chat/ChatHandoff/ChatHandoff.ts",
           "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
-          "sha": "53dd2e0d73968293"
+          "sha": "4461be1af9ef447e"
         },
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
@@ -510,12 +510,22 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "4dc762e71d82d828"
+          "sha": "cd90464b94ced87a"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
           "why": "«Перепроверить MR»: что панель читает из MR и когда отказывает",
           "sha": "1ac309092d6d4631"
+        },
+        {
+          "path": "apps/server/src/domains/verify-ledger/verify-ledger.ts",
+          "why": "«Журнал проверок»: установка, самопроверка, кому подмешивается, сводка плитки",
+          "sha": "9a0c65d3a66a3a85"
+        },
+        {
+          "path": "tools/verify-ledger/preload.cjs",
+          "why": "«Журнал проверок»: режимы shadow/on/off, когда прогон записывается и когда повторяется",
+          "sha": "91ae2dbe9fa85ae6"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap/split-overlap.ts",
@@ -670,7 +680,7 @@
         {
           "path": "apps/server/src/domains/chat/group-profile/group-profile.ts",
           "why": "Лёгкий профиль группы: набор MCP, навыки по имени, дописка с правилом расхода, хуки трекера и очереди",
-          "sha": "e46f1dfad041048c"
+          "sha": "6c23a5207bb31792"
         },
         {
           "path": "apps/server/src/domains/chat/group-profile/bash-ceiling.ts",
@@ -683,7 +693,7 @@
           "sha": "b034e3010f237edf"
         }
       ],
-      "confirmedAt": "2026-10-18T18:31:12.682Z"
+      "confirmedAt": "2026-10-19T04:19:38.105Z"
     },
     {
       "topic": "tests",
@@ -722,7 +732,7 @@
         {
           "path": "apps/server/src/domains/project-tests/import-results/import-results.ts",
           "why": "«Импорт из CI»: отчёт junit становится записью прогона",
-          "sha": "8f7de747fca77d69"
+          "sha": "b27a308d82f650c7"
         },
         {
           "path": "apps/server/src/domains/project-tests/coverage-matrix/coverage-matrix.ts",
@@ -792,7 +802,7 @@
         {
           "path": "apps/server/src/domains/project-tests/automation/automation.ts",
           "why": "«Тесты бэкенда»: запись и снятие команды, {files}/{packages}/{report}, виды отчёта",
-          "sha": "3e3ce41ba5a69cfb"
+          "sha": "38662e10c9029654"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/report.ts",
@@ -867,7 +877,7 @@
         {
           "path": "apps/server/src/lib/dev-watch.mjs",
           "why": "«Проверка набора поломкой»: перезапуск dev-сервера панели ждёт конца идущих проверок",
-          "sha": "fa4b9ad2f98e961d"
+          "sha": "70cdfeaece464809"
         },
         {
           "path": "apps/server/src/domains/project-tests/suites/suites.ts",
@@ -882,7 +892,7 @@
         {
           "path": "apps/server/src/domains/project-tests/turn-gate/turn-gate.ts",
           "why": "какие пробелы проверка конца хода называет агенту",
-          "sha": "1acd51f554f5fbd0"
+          "sha": "c6d72f21f4a193ae"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/native-reports.ts",
@@ -890,7 +900,7 @@
           "sha": "b87cc7baba498557"
         }
       ],
-      "confirmedAt": "2026-10-17T14:42:19.913Z"
+      "confirmedAt": "2026-10-19T03:01:33.755Z"
     },
     {
       "topic": "rules",
@@ -1073,10 +1083,10 @@
         {
           "path": "apps/server/src/domains/chat/auto-approve/auto-approve.ts",
           "why": "«Разрешения в разговоре»: что автоодобрение пропускает молча и что всё равно останавливает прогон",
-          "sha": "6840d2d24db9ae47"
+          "sha": "5df6b4c4fb8bd085"
         }
       ],
-      "confirmedAt": "2026-10-08T12:34:14.779Z"
+      "confirmedAt": "2026-10-18T23:07:52.360Z"
     },
     {
       "topic": "mcp",
@@ -3026,7 +3036,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-18T18:31:12.774Z",
+      "confirmedAt": "2026-10-19T04:19:38.193Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -3046,7 +3056,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "cc3bd7f4201fb2e2"
+          "sha": "26df40d3fc4d42c0"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

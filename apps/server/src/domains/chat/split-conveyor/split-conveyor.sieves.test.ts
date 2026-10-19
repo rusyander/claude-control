@@ -220,6 +220,9 @@ describe('SplitConveyor: след требований владельца', () =
     expect(owned.group()?.status).toBe('awaiting');
     expect(owned.nudges).toHaveLength(1);
     expect(owned.nudges[0]).toContain('owner-1');
+    // L7.3: git в порядке, не хватает только строк отчёта — без «commit, push, MR».
+    expect(owned.nudges[0]).toContain('Do not commit, push, rebase or touch the MR');
+    expect(owned.nudges[0]).not.toContain('commit the work');
   });
 
   it('пункт с «fail» держит группу; досдан с доказательством — группа готова', async () => {
@@ -234,6 +237,8 @@ describe('SplitConveyor: след требований владельца', () =
     await t.settle();
     expect(t.group()?.status).toBe('awaiting');
     expect(t.nudges[0]).toContain('тест логина не написан');
+    // Невыполненный пункт — правка кода, а с ней и доставка целиком.
+    expect(t.nudges[0]).toContain('commit the work');
 
     t.conveyor.onChainResumed(deliver);
     t.conveyor.onChainEnded(

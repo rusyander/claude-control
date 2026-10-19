@@ -27,7 +27,15 @@ interface Timer {
   run: () => void;
 }
 
-function build(options: { parallel?: number; groups?: number; refuse?: boolean } = {}) {
+function build(
+  options: {
+    parallel?: number;
+    groups?: number;
+    refuse?: boolean;
+    /** Фоновые команды живого процесса по чату — что убьёт пауза. */
+    background?: Record<string, string[]>;
+  } = {},
+) {
   const records = new Map<string, SplitPlanRecord>();
   const launches: number[][] = [];
   const resumed: { index: number; prompt: string }[] = [];
@@ -78,6 +86,9 @@ function build(options: { parallel?: number; groups?: number; refuse?: boolean }
     },
     notify: (parent, event) => void notices.push({ parent, event }),
     log: () => undefined,
+    ...(options.background
+      ? { backgroundTasks: (chatId: string) => options.background?.[chatId] ?? [] }
+      : {}),
     now: () => new Date(clock.now),
   };
   const conveyor = new SplitConveyor(deps);
@@ -196,6 +207,23 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
     expect(t.resumed[0]?.index).toBe(0);
     expect(t.resumed[0]?.prompt).toMatch(/^Group branch: feature\/one\. Group tasks: PROJ-1\./);
     expect(t.resumed[0]?.prompt).toMatch(/paused the group/);
+    expect(t.resumed[0]?.prompt).not.toMatch(/killed these background commands/);
+  });
+
+  it('продолжение называет фоновые команды, которые убила пауза, — один раз', async () => {
+    const t = build({ background: { 'chat-0': ['dev server :5173', 'gate check-ticket'] } });
+    await t.begin();
+    // «Стоп» в чате группы: слушатель зовётся ДО остановки процесса.
+    expect(t.conveyor.pauseByLink(t.link(0))).toBe(true);
+    expect(t.group(0)?.pausedTasks).toEqual(['dev server :5173', 'gate check-ticket']);
+
+    expect(t.conveyor.resumePaused(PARENT, 0)).toBe('sent');
+    expect(t.resumed[0]?.prompt).toContain(
+      'killed these background commands; restart the ones the work still needs before relying ' +
+        'on them: dev server :5173; gate check-ticket.',
+    );
+    // Продолжение их назвало — в записи их больше нет: следующая пауза без фона чиста.
+    expect(t.group(0)?.pausedTasks).toBeUndefined();
   });
 
   it('«Продолжить» при свободном месте — сразу; не на паузе — отказ', async () => {

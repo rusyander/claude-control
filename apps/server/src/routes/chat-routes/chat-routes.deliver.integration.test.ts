@@ -115,40 +115,39 @@ function build(
     });
     return start(chatId, opts, meta);
   };
-  registry.setHandoffPlanner(
-    createHandoffPlanner({
-      runs: registry,
-      chains,
-      session: new ChatSession(registry),
-      selfBaseUrl: 'http://127.0.0.1:5178',
-      stat: () => options.mtime,
-      carryLink: (from, to) => {
-        const link = from.map((key) => links.get(key)).find(Boolean);
-        if (link) links.set(to, link);
+  const planner = createHandoffPlanner({
+    runs: registry,
+    chains,
+    session: new ChatSession(registry),
+    selfBaseUrl: 'http://127.0.0.1:5178',
+    stat: () => options.mtime,
+    carryLink: (from, to) => {
+      const link = from.map((key) => links.get(key)).find(Boolean);
+      if (link) links.set(to, link);
+    },
+    cascade: {
+      linkOf: (aliases) => aliases.map((key) => links.get(key)).find(Boolean),
+      saveLink: (chatId, link) => {
+        links.set(chatId, link);
+        saved.push(link);
       },
-      cascade: {
-        linkOf: (aliases) => aliases.map((key) => links.get(key)).find(Boolean),
-        saveLink: (chatId, link) => {
-          links.set(chatId, link);
-          saved.push(link);
-        },
-        markReviewed: () => undefined,
-        hasWork: () => true,
-        settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
-        ...(options.sieves
-          ? { sieves: (_cwd: string, _link: ChatLink, stage: string) => options.sieves!(stage) }
-          : {}),
-      },
-      split: {
-        onTriageFinished: () => undefined,
-        onChainEnded: (link, outcome) =>
-          void ended.push({ ...(link.stage ? { stage: link.stage } : {}), status: outcome.status }),
-        identityOf: () => 'Group branch: split/rename. Group tasks: PROJ-7.',
-        delivers: () => options.delivers ?? false,
-      },
-    }),
-  );
-  return { registry, links, runs, ended, saved };
+      markReviewed: () => undefined,
+      hasWork: () => true,
+      settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
+      ...(options.sieves
+        ? { sieves: (_cwd: string, _link: ChatLink, stage: string) => options.sieves!(stage) }
+        : {}),
+    },
+    split: {
+      onTriageFinished: () => undefined,
+      onChainEnded: (link, outcome) =>
+        void ended.push({ ...(link.stage ? { stage: link.stage } : {}), status: outcome.status }),
+      identityOf: () => 'Group branch: split/rename. Group tasks: PROJ-7.',
+      delivers: () => options.delivers ?? false,
+    },
+  });
+  registry.setHandoffPlanner(planner);
+  return { registry, planner, links, runs, ended, saved };
 }
 
 async function run(registry: ChatRunRegistry, chatId: string, permissionMode?: string) {
@@ -182,6 +181,30 @@ describe('звено доставки группы разделения', () => 
     expect(deliver?.prompt).toContain('MR');
     // Итог группы сказал конец доставки, а не правок.
     expect(ended).toEqual([{ stage: 'deliver', status: 'done' }]);
+  });
+
+  // L3.2: ход кончился, а фоновая команда агента ещё идёт — это пауза, не итог
+  // правок: доставка рано, группа стоит «в фоне» до хода пробуждения.
+  it('конец хода правок при живом фоне не заводит доставку: группа ждёт фон', () => {
+    const { planner, links, runs, ended } = build('', { delivers: true });
+    links.set('чат-правки', FIX_LINK);
+    const finished = {
+      chatId: 'чат-правки',
+      sessionId: 'sess-правки',
+      projectPath: CWD,
+      text: 'Проверка идёт в фоне, жду уведомление.',
+      ok: true,
+      startedAt: Date.now(),
+      contextTokens: 0,
+      options: { prompt: FIRST_PROMPT, cwd: CWD },
+    };
+    planner({ ...finished, background: true });
+    expect(stageRuns(runs)).toEqual([]);
+    expect(ended).toEqual([{ stage: 'fix', status: 'background' }]);
+
+    // Ход пробуждения — уже без фона: он и есть итог правок, доставка заводится.
+    planner(finished);
+    expect(links.get(stageRuns(runs)[0]?.chatId ?? '')?.stage).toBe('deliver');
   });
 
   // Ревью сит, 28.09, п. 12: пути копии читаются асинхронно — git на большой копии

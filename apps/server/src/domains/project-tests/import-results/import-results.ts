@@ -89,6 +89,13 @@ export interface ImportResultsInput {
   scope?: string;
   /** Код выхода команды, чей это отчёт: красный набор и упавший раннер — не одно. */
   exitCode?: number;
+  /**
+   * Только кейсы этих групп. Ключ набора от корня пакета (`src/entities/models`)
+   * в монорепозитории есть у двух пакетов и на весь проект двусмыслен — импорт
+   * его пропускал, и группа переписывала classname отчёта своим скриптом
+   * (19.10.2026). Внутри группы одного пакета тот же ключ однозначен.
+   */
+  groups?: string[];
 }
 
 /** Насколько результат «хуже»: при двух результатах на кейс побеждает худший. */
@@ -502,7 +509,8 @@ export function prepareResultsForRun(
   const sources = readSources(root, input);
   const parsed = parseByFormat(input.format, sources);
 
-  const groups = readGroups(root);
+  const scope = input.groups?.length ? new Set(input.groups) : undefined;
+  const groups = readGroups(root).filter((group) => !scope || scope.has(group.id));
   const index = buildIndex(groups);
   const matched = new Map<string, { ref: CaseRef; result: ImportedTestResult }>();
   // Счёт тестов кейса-набора: «упало 3 из 40» — первое, что спрашивают о каталоге.

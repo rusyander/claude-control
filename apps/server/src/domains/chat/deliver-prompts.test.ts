@@ -3,10 +3,12 @@ import { deliverStagePrompt, fixStagePrompt } from '@agentdeck/contracts/model-c
 import { deliveryPreamble } from '@agentdeck/contracts/task-split';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { asksDelivery, planCascadeStage } from './ChatCascadeStages/ChatCascadeStages.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { CHILD_PROMPT } from './initiative/initiative.ts';
 import {
   SplitConveyor,
   deliveryNudgePrompt,
+  reportOnlyGaps,
   type SplitConveyorDeps,
 } from './split-conveyor/split-conveyor.ts';
 
@@ -151,5 +153,41 @@ describe('доставка раз на круг (W3-3)', () => {
 
     expect(planCascadeStage(input)).toBeUndefined();
     expect(planCascadeStage({ ...input, redeliver: true })?.stage).toBe('deliver');
+  });
+});
+
+/**
+ * L7.3 плана экономии групп (19.10 01:46): доставленной группе не хватало
+ * только блока отчёта и записи прогона, а напоминание велело «commit, push,
+ * update the MR» — группа сделала fetch, rebase, три гейта заново и
+ * переотправила ветку MR, стоявшего на ревью.
+ */
+describe('напоминание о доставке, когда не хватает только отчёта', () => {
+  const unreported = serverText('sieve-gap-unreported', {
+    sieve: 'project-checks',
+    lang: 'agentdeck-sieves',
+  });
+  const owner = serverText('delivery-gap-owner-unreported', { lang: 'agentdeck-sieves' });
+  const tests = serverText('tests-gap-word-only', {
+    cases: 'auth-001',
+    command: 'node tests-cli.mjs run --project . --case auth:auth-001',
+  });
+
+  it('только отчёт и прогон — без git: не коммитить, не отправлять, MR не трогать', () => {
+    const prompt = deliveryNudgePrompt('fix-PROJ-7', [unreported, owner, tests]);
+    expect(reportOnlyGaps([unreported, owner, tests])).toBe(true);
+    expect(prompt).toContain('Do not commit, push, rebase or touch the MR');
+    expect(prompt).not.toContain('commit the work');
+    expect(prompt).toContain('--case auth:auth-001');
+  });
+
+  it('есть пробел git или чужая строка — прежнее напоминание о доставке целиком', () => {
+    const dirty = serverText('delivery-gap-dirty', { files: 'a.ts' });
+    expect(deliveryNudgePrompt('b', [unreported, dirty])).toContain(
+      'commit the work, push the branch b',
+    );
+    expect(reportOnlyGaps([unreported, 'нет MR'])).toBe(false);
+    expect(reportOnlyGaps([serverText('tests-gap-failed', { cases: 'auth-001' })])).toBe(false);
+    expect(reportOnlyGaps([])).toBe(false);
   });
 });

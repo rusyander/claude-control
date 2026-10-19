@@ -46,6 +46,7 @@ export function ChatParallelSections() {
             { title: tr('splitWhat'), text: tr('splitWhatText') },
             { title: tr('splitDeliver'), text: tr('splitDeliverText') },
             { title: tr('splitSieves'), text: tr('splitSievesText') },
+            { title: tr('splitLedger'), text: tr('splitLedgerText') },
             { title: tr('splitReview'), text: tr('splitReviewText') },
             { title: tr('splitTree'), text: tr('splitTreeText') },
             { title: tr('splitParent'), text: tr('splitParentText') },

@@ -3,7 +3,11 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ChatRunRegistry, type BufferedEvent } from '../ChatRunRegistry/ChatRunRegistry.ts';
+import {
+  ChatRunRegistry,
+  type BufferedEvent,
+  type RunFinished,
+} from '../ChatRunRegistry/ChatRunRegistry.ts';
 
 /**
  * Живая сессия разговора — настоящий процесс, настоящие каналы, настоящий
@@ -95,6 +99,39 @@ describe('живая сессия разговора', { timeout: 30_000 }, () =
     expect(registry.isProcessAlive(SESSION)).toBe(true);
     registry.livePool.closeAll();
     expect(registry.isProcessAlive(SESSION)).toBe(false);
+  });
+
+  // L7.6: пауза группы называет продолжению фоновые команды, которые она убьёт.
+  it('реестр называет фоновые команды живого процесса по ключу чата и по сессии', async () => {
+    fresh();
+    expect(registry.backgroundTasksOf('new-bg')).toEqual([]);
+    await turn('new-bg', `BGASK ${join(cwd, 'never')}`);
+    await waitFor(() => registry.livePool.backgroundOf(SESSION));
+    expect(registry.backgroundTasksOf('new-bg')).toEqual(['Fetch MR']);
+    expect(registry.backgroundTasksOf(SESSION)).toEqual(['Fetch MR']);
+    // Прогон ушёл из буфера догона, процесс жив: находим по записи ждущей сессии.
+    expect(registry.discardFinished('new-bg')).toBe(true);
+    expect(registry.backgroundTasksOf('new-bg')).toEqual(['Fetch MR']);
+    registry.livePool.closeAll();
+    expect(registry.backgroundTasksOf('new-bg')).toEqual([]);
+  });
+
+  // L3.2: ход группы, кончившийся при живом фоне, — пауза, а не итог стадии;
+  // итог несёт ход пробуждения, и он приходит уже без флага фона.
+  it('конец хода при живом фоне помечен фоном, ход пробуждения — нет', async () => {
+    fresh();
+    const finished: RunFinished[] = [];
+    registry.setHandoffPlanner((done) => {
+      finished.push(done);
+      return undefined;
+    });
+    await turn('new-late', 'LATEWAKE');
+    expect(finished).toHaveLength(1);
+    expect(finished[0]).toMatchObject({ ok: true, background: true });
+    await waitFor(() => finished.length === 2);
+    expect(finished[1]?.text).toMatch(/woke pid/);
+    expect(finished[1]?.background).toBeUndefined();
+    registry.livePool.closeAll();
   });
 
   // Аудит 25.09, L280: заглушка CLI в живом потоке — ни текста, ни шага расхода.

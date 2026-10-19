@@ -80,6 +80,56 @@ describe('collectChildStages', () => {
     expect(b?.workMs).toBeUndefined();
   });
 
+  it('время работы звена — его activeMs с сервера, а не заведение → последняя запись', () => {
+    // Группа на паузе двое суток (19.10): по датам 52 ч, по транскрипту 3,5 ч.
+    const chats = [
+      chat({
+        id: 'work',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'work',
+        createdAt: '2026-10-16T15:00:00.000Z',
+        updatedAt: '2026-10-18T19:30:00.000Z',
+        activeMs: 12_600_000,
+      }),
+      chat({
+        id: 'review',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'review',
+        createdAt: '2026-10-18T19:40:00.000Z',
+        updatedAt: '2026-10-18T19:45:00.000Z',
+      }),
+    ];
+    const [a] = collectChildStages(chats, 'parent', []);
+    expect(a?.workMs).toBe(12_600_000 + 300_000);
+  });
+
+  it('доля окон лимита группы — сумма звеньев; ни у кого нет — поля нет', () => {
+    const chats = [
+      chat({
+        id: 'work',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'work',
+        limitShare: { fiveHour: 0.03, sevenDay: 0.004 },
+      }),
+      chat({ id: 'review', parentId: 'parent', branch: 'probe/a', stage: 'review' }),
+      chat({
+        id: 'fix',
+        parentId: 'parent',
+        branch: 'probe/a',
+        stage: 'fix',
+        limitShare: { fiveHour: 0.01 },
+      }),
+      chat({ id: 'other', parentId: 'parent', branch: 'probe/b', stage: 'work' }),
+    ];
+    const [a, b] = collectChildStages(chats, 'parent', []);
+    expect(a?.limitShare?.fiveHour).toBeCloseTo(0.04);
+    expect(a?.limitShare?.sevenDay).toBeCloseTo(0.004);
+    expect(b && 'limitShare' in b).toBe(false);
+  });
+
   it('без родителя и без детей молчит', () => {
     expect(collectChildStages([chat({ id: 'a' })], undefined, [])).toEqual([]);
     expect(collectChildStages([chat({ id: 'a' })], 'parent', [])).toEqual([]);

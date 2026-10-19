@@ -73,6 +73,22 @@ describe('tests-cli case / record', () => {
     expect(titles()).toEqual(['Вход', 'Выход']);
   });
 
+  // L6.2: подсказка называет кейсы, а не группу — группа может нести живые QA.
+  it('record автокейсов — отказ с командой run --case ровно этих кейсов', () => {
+    for (const title of ['Юнит', 'Ещё юнит']) {
+      const json = JSON.stringify({
+        title,
+        automation: { status: 'automated', file: 'src/a.test.ts' },
+      });
+      expect(cli(project, 'case', '--group', 'gui', '--json', json).code).toBe(0);
+    }
+    const recorded = cli(project, 'record', 'gui:gui-002=passed', 'gui:gui-003=passed');
+    expect(recorded.code).not.toBe(0);
+    expect(recorded.out).toContain(`run --project "${project}" --case gui:gui-002,gui:gui-003`);
+    expect(recorded.out).not.toContain('--group');
+    expect(readRuns(project)).toEqual([]);
+  });
+
   it('record с красным результатом — код 1', () => {
     const recorded = cli(project, 'record', 'gui:gui-001=failed');
     expect(recorded.code).toBe(1);

@@ -18,6 +18,7 @@
  *   node tools/tests-cli.mjs sync --project .
  *   node tools/tests-cli.mjs show gui-001
  *   node tools/tests-cli.mjs run --group e2e
+ *   node tools/tests-cli.mjs run --case chat:chat-001,chat:chat-007
  *   node tools/tests-cli.mjs import --format junit --file test-results/junit.xml
  *   node tools/tests-cli.mjs export --group gui --format md --out gui.md
  *   node tools/tests-cli.mjs report --reporter junit --out report.xml
@@ -44,6 +45,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -94,14 +96,19 @@ const HELP = `Тест-кейсы проекта без панели.
 Опции:
   --project <dir>   каталог проекта (по умолчанию текущий)
   --group <id>      только эта группа
+  --case <g:id,…>   для run: только эти кейсы (группа:кейс через запятую; id без группы —
+                    если он один такой в проекте)
   --format <f>      junit | playwright | allure | csv | xlsx | testrail-csv | testrail | allure-testops | md
   --file <f>        файл или каталог с отчётом (путь от корня проекта)
   --dir <d>         для sync: папка e2e (по умолчанию ищется сама)
   --reporter <r>    text | junit — вид отчёта команд report и diff
   --out <f>         писать результат в файл вместо экрана
   --cmd "<...>"     команда прогона (по умолчанию: кейсы папки e2e — её раннером,
+                    кейсы *.test.ts(x), которые своя команда не прогонит (отчёт Go/Cargo
+                    или её нет и нет scripts.test), — vitest ближайшего package.json,
                     иначе своя команда из .agent/tests/automation.json,
-                    иначе npm test из package.json)
+                    иначе npm test из package.json); {files}/{paths} — файлы кейсов
+                    (нет подстановки — в конец строки), {report} — отчёт JUnit этого прогона
   --results <f>     где прогон оставит отчёт (по умолчанию ищется сам)
   --dry             для run: показать, что было бы запущено, и выйти
   --brief | --full  для run: вывод раннера — в журнал, на экран итог и первые строки падений
@@ -229,6 +236,37 @@ function projectFile(project, file) {
     throw new Error(`Файл кейса вне проекта: ${file}. Нужен путь внутри ${project}.`);
   }
   return target;
+}
+
+/**
+ * `run --case g:id,g:id` (L7.3 плана экономии групп): проверка доставки
+ * группы просила прогнать кейсы её изменённых файлов, а давала команду без
+ * выбора, и группа гоняла ВСЕ кейсы копии (128 с вместо секунд). Ключ —
+ * «группа:кейс», как в истории; голый id принимается, если в проекте он один.
+ * Неизвестный ключ — отказ словами: молча прогнать меньше просимого хуже.
+ */
+function pickedCases(groups, raw) {
+  if (raw === undefined) return undefined;
+  const wanted = String(raw)
+    .split(',')
+    .map((key) => key.trim())
+    .filter(Boolean);
+  if (wanted.length === 0) throw new Error('--case ждёт кейсы: группа:кейс через запятую.');
+  const live = groups.flatMap((group) =>
+    group.cases.filter((item) => !item.archived).map((item) => `${group.id}:${item.id}`),
+  );
+  const keys = new Set();
+  const unknown = [];
+  for (const key of wanted) {
+    const match = key.includes(':')
+      ? live.filter((full) => full === key)
+      : live.filter((full) => full.slice(full.indexOf(':') + 1) === key);
+    if (match.length === 1) keys.add(match[0]);
+    else
+      unknown.push(match.length > 1 ? `${key} (есть в нескольких группах — назовите группу)` : key);
+  }
+  if (unknown.length > 0) throw new Error(`Кейсов нет в проекте: ${unknown.join(', ')}`);
+  return keys;
 }
 
 /** Группы проекта, при желании суженные до одной. */
@@ -425,11 +463,10 @@ async function recordResults(project, options, positional) {
   } catch (error) {
     if (error?.messageCode !== 'record-automated-case') throw error;
     // Автокейс проверяет его тест: агенту — готовая команда, а не «нельзя».
-    const groups = String(error.params.groups).split(', ');
+    // Ровно эти кейсы, не их группа: группа может нести живые QA на стенде (L6.2).
+    const cases = String(error.params.cases).split(', ').join(',');
     throw new Error(
-      `автокейсы не записываются словом — ${error.params.cases}. Их проверяет тест, прогоните: ${groups
-        .map((group) => `node tools/tests-cli.mjs run --project "${project}" --group ${group}`)
-        .join('; ')}`,
+      `автокейсы не записываются словом — ${error.params.cases}. Их проверяет тест, прогоните: node tools/tests-cli.mjs run --project "${project}" --case ${cases}`,
       { cause: error },
     );
   }
@@ -561,11 +598,13 @@ function briefOutput(result) {
 
 async function runTests(project, options) {
   const groups = await groupsOf(project, options);
+  const picked = pickedCases(groups, options.case);
   const automated = [];
   const skipped = [];
   for (const group of groups) {
     for (const item of group.cases) {
       if (item.archived) continue;
+      if (picked && !picked.has(`${group.id}:${item.id}`)) continue;
       if (item.automation?.file) automated.push({ group: group.id, item });
       else skipped.push({ group: group.id, item });
     }
@@ -586,7 +625,8 @@ async function runTests(project, options) {
   const plan = options.cmd
     ? commandPlan(options.cmd, files, project)
     : ((await e2ePlan(project, files)) ??
-      (await automationPlan(project, files, !options.group)) ??
+      (await vitestPlan(project, files)) ??
+      (await automationPlan(project, files, !options.group && !picked)) ??
       commandPlan(projectTestCommand(project), files, project));
 
   console.log(`Кейсов с автотестом: ${automated.length}, файлов: ${files.length}`);
@@ -676,21 +716,25 @@ async function runTests(project, options) {
     process.exit(result.status || 1);
   }
 
+  const content = plan.temp ? readFileSync(path, 'utf8') : undefined;
+  // Цепочка пакетов гасит код провала — красное из самого отчёта, и в историю тоже.
+  const status = plan.failed?.(content) ? 1 : result.status;
   const { importResults } = await domain('import-results');
   const imported = importResults(project, {
     format,
-    ...(plan.temp
-      ? { content: readFileSync(path, 'utf8') }
-      : { file: toProjectRelative(project, file) }),
+    ...(content !== undefined ? { content } : { file: toProjectRelative(project, file) }),
     origin: plan.origin,
     scope: `tests-cli run: ${plan.line}`,
-    exitCode,
+    exitCode: status ?? exitCode,
+    // Прогон части (--group, --case) — результаты на кейсы этих групп: одинаковый
+    // ключ набора двух пакетов на весь проект двусмыслен, и его результат терялся.
+    ...(options.group || picked ? { groups: [...new Set(automated.map((e) => e.group))] } : {}),
   });
   printImport(imported, `Импортировано из ${plan.temp ? 'отчёта прогона' : file} (${format})`);
-  memo?.settle(result.status === 0 && imported.read > 0 ? imported.runId : undefined);
+  memo?.settle(status === 0 && imported.read > 0 ? imported.runId : undefined);
   printSkipped(skipped);
   dropTemp(plan.temp);
-  process.exit(result.status ?? 0);
+  process.exit(status ?? 0);
 }
 
 /**
@@ -707,8 +751,14 @@ async function checkMemoOf(project, options, plan, files) {
   const { treeFingerprint, recall, rememberGreen, forget, replayRun } = await domain('check-memo');
   const fingerprint = treeFingerprint(project);
   if (!fingerprint) return undefined;
+  // Отчёт прогона лежит в свежем временном каталоге, и его путь сидит в строке
+  // (`{report}`, `{go-modules}`): ключ со случайным путём не совпадал ни разу,
+  // и своя команда проекта из памяти не отвечала никогда (19.10.2026).
+  const stable = plan.temp
+    ? plan.line.replaceAll(plan.temp, '{temp}').replaceAll(plan.temp.replace(/\\/g, '/'), '{temp}')
+    : plan.line;
   const key = createHash('sha256')
-    .update(`${plan.line}\0${plan.cwd}\0${[...files].sort().join('\0')}`)
+    .update(`${stable}\0${plan.cwd}\0${[...files].sort().join('\0')}`)
     .digest('hex');
   return {
     hit: recall(project, key, fingerprint),
@@ -723,12 +773,29 @@ async function checkMemoOf(project, options, plan, files) {
   };
 }
 
-/** Своя команда прогона: файлы — в `{files}` или в конец строки, запуск из корня. */
+/**
+ * Своя команда прогона: файлы — в `{files}`/`{paths}` или в конец строки, запуск
+ * из корня. `{report}` — отчёт JUnit этого прогона во временном файле (и в
+ * `AGENTDECK_JUNIT_REPORT`), как у команды из automation.json: без подстановки
+ * `vitest --outputFile={report}` записал отчёт в копию группы файлом с
+ * буквальным именем `{report}`, а снести его агенту не дал страж rm (19.10.2026).
+ */
 function commandPlan(command, files, project) {
-  const line = command.includes('{files}')
-    ? command.replace('{files}', files.join(' '))
-    : `${command} ${files.join(' ')}`;
-  return { line, cwd: project, env: {}, origin: 'ci' };
+  const list = files.join(' ');
+  const line = /\{files\}|\{paths\}/.test(command)
+    ? command.replaceAll('{files}', list).replaceAll('{paths}', list)
+    : `${command} ${list}`;
+  if (!line.includes('{report}')) return { line, cwd: project, env: {}, origin: 'ci' };
+  const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
+  const report = join(temp, 'junit.xml');
+  return {
+    line: line.replaceAll('{report}', /[\s"'&|<>^]/.test(report) ? `"${report}"` : report),
+    cwd: project,
+    env: { AGENTDECK_JUNIT_REPORT: report },
+    results: ['junit', report],
+    temp,
+    origin: 'ci',
+  };
 }
 
 /**
@@ -803,6 +870,140 @@ async function automationPlan(project, files, whole) {
     ...(automation.timeoutMinutes ? { timeout: automation.timeoutMinutes * 60_000 } : {}),
   };
 }
+
+/** Файл набора vitest/jest по имени: `*.test.ts(x)` и родня, без `*.spec` — их ведёт папка e2e. */
+const VITEST_FILE = /\.test\.[cm]?[jt]sx?$/;
+
+/**
+ * Кейсы vitest там, где своя команда проекта их не прогонит: она пишет родной
+ * отчёт Go или Cargo (`{go-modules}` отдал бы `*.test.ts` в `go test` пакетом),
+ * или её нет вовсе, а у корня нет scripts.test. Тогда каждый файл идёт vitest
+ * ближайшего к нему package.json — так группа не собирает JUnit руками и не
+ * ищет, как его импортировать (19.10.2026: пять ходов и три чтения справки).
+ * Пакеты — цепочкой, как `{go-modules}`: провал одного не обрывает остальные,
+ * красное видно по отчёту. classname vitest пишет от корня пакета, а кейсы
+ * знают путь от корня проекта — отчёт переписывается к нему.
+ */
+async function vitestPlan(project, files) {
+  // Кейс-набор (`file` — каталог) тоже: внутри JS-пакета, не в корне проекта.
+  const vitestCase = (file) =>
+    VITEST_FILE.test(file) || (file.endsWith('/') && packageRootOf(project, `${file}x`) !== '');
+  if (!files.every(vitestCase)) return undefined;
+  const { readAutomation } = await domain('automation');
+  const { automation } = readAutomation(project);
+  const native = automation?.format && automation.format !== 'junit';
+  if (automation && !native) return undefined;
+  if (!automation && rootTestScript(project)) return undefined;
+  // Пути файлов пишет и агент (`automation.file`): та же защита от подстановок оболочки, что у `{files}`.
+  const { shellArg } = await domain('e2e-command');
+
+  const byPackage = new Map();
+  for (const file of files) {
+    const dir = packageRootOf(project, file);
+    byPackage.set(dir, [...(byPackage.get(dir) ?? []), dir ? file.slice(dir.length + 1) : file]);
+  }
+  const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
+  const runs = [...byPackage].sort(([a], [b]) => a.localeCompare(b));
+  const parts = runs.map(([dir, inside], index) => {
+    const cwd = join(project, dir);
+    const bin = vitestEntry(cwd);
+    if (!bin) {
+      dropTemp(temp);
+      throw new Error(
+        `vitest не установлен в ${dir || '.'}, а сам он не ставится. Установите зависимости пакета и повторите.`,
+      );
+    }
+    const report = join(temp, `vitest-${index}.xml`);
+    return (
+      `${shellQuote(process.execPath)} ${shellQuote(bin)} run --root ${shellQuote(cwd)} ` +
+      `--reporter=default --reporter=junit ` +
+      `--outputFile.junit=${shellQuote(report)} ${inside.filter(Boolean).map(shellArg).join(' ')}`
+    );
+  });
+  const chained = parts.length > 1;
+  let missing = false;
+  return {
+    // Звено в скобках, как у `{go-modules}`: без них cmd пропускал всё после зелёного звена.
+    line: chained ? parts.map((part) => `(${part} || echo -)`).join(' && ') : parts[0],
+    cwd: project,
+    env: {},
+    temp,
+    origin: 'ci',
+    reportShown: `${temp}/vitest-*.xml`,
+    // Цепочка гасит код провала (`|| echo -`): красное — из самого отчёта, и пакет
+    // без отчёта (упал до тестов) тоже красный.
+    failed: (content) => chained && (missing || /<(failure|error)\b/.test(content)),
+    collect: (started) => {
+      const bodies = [];
+      for (const [index, [dir]] of runs.entries()) {
+        const path = join(temp, `vitest-${index}.xml`);
+        if (!freshSince(path, started)) {
+          console.log(`Пакет ${dir || '.'}: vitest отчёта не записал — его кейсы не тронуты.`);
+          missing = true;
+          continue;
+        }
+        const xml = readFileSync(path, 'utf8')
+          .replace(/<\?xml[^>]*\?>/g, '')
+          .replace(/<\/?testsuites\b[^>]*>/g, '');
+        bodies.push(dir ? rootRelativeSuites(xml, dir) : xml.trim());
+      }
+      if (bodies.length === 0) return undefined;
+      return {
+        content: `<testsuites>\n${bodies.join('\n')}\n</testsuites>\n`,
+        files: bodies.length,
+      };
+    },
+  };
+}
+
+/** classname и имя набора vitest — от корня пакета; кейсы знают путь от корня проекта. */
+function rootRelativeSuites(xml, dir) {
+  const prefix = `${dir}/`;
+  return xml
+    .replace(/(<testsuite\b[^>]*?\bname=")([^"]*)"/g, (all, head, name) =>
+      name.startsWith(prefix) ? all : `${head}${prefix}${name}"`,
+    )
+    .replace(/(\bclassname=")([^"]*)"/g, (all, head, name) =>
+      name.startsWith(prefix) ? all : `${head}${prefix}${name}"`,
+    )
+    .trim();
+}
+
+/**
+ * Входной файл vitest, видимый из пакета: его bin из package.json. Не обёртка
+ * `.bin/vitest.cmd` — cmd, вызвав `.cmd` без `call`, назад в цепочку не
+ * возвращается, и второй пакет не запускался вовсе.
+ */
+function vitestEntry(cwd) {
+  try {
+    const manifest = createRequire(join(cwd, 'package.json')).resolve('vitest/package.json');
+    const bin = JSON.parse(readFileSync(manifest, 'utf8')).bin;
+    const entry = typeof bin === 'string' ? bin : bin?.vitest;
+    return entry ? join(dirname(manifest), entry) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Каталог ближайшего к файлу package.json от корня проекта (`''` — сам корень). */
+function packageRootOf(project, file) {
+  const parts = file.split('/').slice(0, -1);
+  for (let depth = parts.length; depth > 0; depth--) {
+    const dir = parts.slice(0, depth).join('/');
+    if (existsSync(join(project, dir, 'package.json'))) return dir;
+  }
+  return '';
+}
+
+function rootTestScript(project) {
+  try {
+    return Boolean(JSON.parse(readFileSync(join(project, 'package.json'), 'utf8'))?.scripts?.test);
+  } catch {
+    return false;
+  }
+}
+
+const shellQuote = (value) => (/[\s"'&|<>^()]/.test(value) ? `"${value}"` : value);
 
 /** Файл или каталог (Allure) изменён не раньше старта прогона. */
 function freshSince(path, started) {
@@ -881,7 +1082,13 @@ async function importFile(project, options) {
 
   if (format === 'junit' || format === 'playwright' || format === 'allure') {
     const { importResults } = await domain('import-results');
-    return printImport(importResults(project, { format, file: inside }), 'Результаты приняты');
+    // --group — кейсы только этой группы: ключ набора пакета двусмыслен на весь монорепозиторий.
+    if (options.group && options.group !== true) await groupsOf(project, options);
+    const groups = options.group && options.group !== true ? { groups: [options.group] } : {};
+    return printImport(
+      importResults(project, { format, file: inside, ...groups }),
+      'Результаты приняты',
+    );
   }
 
   if (format === 'testrail' || format === 'allure-testops') {

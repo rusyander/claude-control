@@ -1,5 +1,6 @@
 import type { RemoteNotifyKind } from '@agentdeck/contracts';
 import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
+import type { LimitSample } from '@agentdeck/contracts/limit-share';
 import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumers';
 // Только тип маршрута: про контуры, шлюз и ключи реестр по-прежнему не знает
 // ничего — решение принимает домен платформы, реестр лишь передаёт его прогону.
@@ -26,6 +27,7 @@ import {
 import type { BranchGateContext } from '../ChatBranchGate/ChatBranchGate.ts';
 import type { ClosingTurn } from '../ChatHistory/ChatHistory.ts';
 import { looksLikeCheck } from '../lowered-journal/lowered-journal.ts';
+import type { LimitRunRecord } from '../limit-journal/limit-journal.ts';
 import { normalizePath } from '../../project-runner/targets.ts';
 import {
   adoptableEntries,
@@ -273,6 +275,8 @@ interface RegisteredRun {
   /** Текст последней ошибки и последний лимит хода — надзору повторов (Д10). */
   lastError?: string;
   limit?: { resetsAt: number; status: string };
+  /** Первый и последний замер загрузки окон подписки — журналу доли лимита. */
+  limitSamples?: LimitSample[];
   /** Ход звал `AskUserQuestion` — см. `RunFinished.asked`. */
   asked?: boolean;
   /** Тела вызовов `AskUserQuestion` по id: по ним автовыбор узнаёт `critical`. */
@@ -542,6 +546,17 @@ export class ChatRunRegistry {
 
   setLoweredJournal(write: (record: LoweredRunRecord) => void): void {
     this.journal = write;
+  }
+
+  /**
+   * Куда записать завершившийся прогон для доли лимита подписки
+   * (`limit-journal.ts`): интервал, токены и замеры окон. Любой прогон с
+   * токенами или замером, не только звенья групп, — загрузка окна общая.
+   */
+  private limitJournal?: (record: LimitRunRecord) => void;
+
+  setLimitJournal(write: (record: LimitRunRecord) => void): void {
+    this.limitJournal = write;
   }
 
   /**
@@ -1172,6 +1187,21 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Фоновые команды живого процесса разговора (описания, без вывода): что
+   * умрёт, если процесс остановить. Пауза группы называет их продолжению (L7.6).
+   */
+  backgroundTasksOf(chatId: string): string[] {
+    const ids = new Set([this.runs.get(this.resolveKey(chatId, chatId))?.sessionId, chatId]);
+    for (const [session, last] of this.wakeable) if (last.chatId === chatId) ids.add(session);
+    for (const id of ids) {
+      const session = this.livePool.waking(id);
+      if (!session?.alive || session.backgroundList.length === 0) continue;
+      return session.backgroundList.map((task) => task.description || task.id).filter(Boolean);
+    }
+    return [];
+  }
+
+  /**
    * Сообщение человека посреди идущего хода — агенту сразу, а не после конца
    * хода: агент дочитывает текущий шаг, видит сообщение и учитывает его, как в
    * самом Claude Code. Событие `steer` уходит в поток прогона — вкладки
@@ -1557,6 +1587,12 @@ export class ChatRunRegistry {
       run.lastError = event.message;
     }
     if (event.kind === 'limit') run.limit = { resetsAt: event.resetsAt, status: event.status };
+    // Держим первый и последний замер: прирост между ними и есть трата прогона
+    // вместе с соседями; промежуточные деление не уточняют настолько, чтобы их копить.
+    if (event.kind === 'limit' && event.sample) {
+      const first = run.limitSamples?.[0];
+      run.limitSamples = first ? [first, event.sample] : [event.sample];
+    }
     // Вопрос, который автономия закроет сама (есть рекомендация на каждый), —
     // не ожидание человека: ни точки, ни пуша, ни записи для хаба. Но только
     // пока автовыбор не опроверг себя: сигнал отложен до результата вызова.
@@ -1872,6 +1908,23 @@ export class ChatRunRegistry {
         });
       } catch {
         // Молча: журнал — наблюдение, а не часть работы прогона.
+      }
+    }
+
+    const samples = run.limitSamples ?? [];
+    if (this.limitJournal && !run.detached && (run.spentTokens > 0 || samples.length > 0)) {
+      try {
+        this.limitJournal({
+          id: `${run.chatId}:${run.startedAt}`,
+          chatId: run.chatId,
+          ...(run.sessionId ? { sessionId: run.sessionId } : {}),
+          startedAt: run.startedAt,
+          endedAt: run.finishedAt ?? Date.now(),
+          tokens: run.spentTokens,
+          samples,
+        });
+      } catch {
+        // Молча, как журнал понижений: наблюдение не держит завершение прогона.
       }
     }
 

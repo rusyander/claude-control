@@ -5,6 +5,8 @@ import {
   OWNER_PRECEDENCE_LINE,
   OWNER_TEXT_MAX,
   RULE_SOURCES,
+  SKILL_ROUTE_LINE,
+  withoutPrecedence,
 } from './quality-floor.ts';
 
 export { OWNER_PRECEDENCE_LINE } from './quality-floor.ts';
@@ -721,10 +723,123 @@ export interface StageContext {
   task?: string;
   /** План группы от звена плана (выжимка). */
   plan?: string;
+  /**
+   * Где в копии лежит план целиком (L2.1, путь от корня копии). Есть путь и план
+   * разложен по разделам — в задание идут только разделы с §5, начало — ссылкой
+   * на файл. Нет пути — план целиком, как раньше: молча терять разделы нельзя.
+   */
+  planFile?: string;
   /** Ветка копии группы. */
   branch?: string;
   /** Итог прошлого звена: какое звено и чем кончило ответ. */
   previous?: { stage: CascadeStage; text: string };
+  /**
+   * Что прошлые звенья оставили в копии (L7.4): снимки до/после, журнал
+   * проверок, записанные прогоны тестов, логи гейтов — только пути. Без списка
+   * доставка 19.10 пять ходов искала снимки `ls`/`grep` по копии и основному
+   * каталогу.
+   */
+  artifacts?: readonly string[];
+}
+
+/**
+ * Раздел плана, с которого начинается то, что звеньям после работы нужно
+ * ВСЕГДА: §5 критерии приёмки, дальше уровень проверки, «не трогать», решения.
+ * Узнаётся по номеру И по смыслу заголовка: голый номер совпал бы с пунктом
+ * шагов §4 («5. Прогнать тесты»).
+ */
+const CRITERIA_TITLE =
+  /acceptance|criteri|definition of done|done when|критери|приёмк|приемк|готовност/i;
+
+/**
+ * Заголовок раздела плана: `## 5. …`, `**5. …**`, `§5 …`. Голая нумерация
+ * («5. …» без решётки, жирного или §) заголовком не считается: так же выглядят
+ * пункты списков внутри разделов, и разрез по ним потерял бы часть плана.
+ */
+const PLAN_HEADING =
+  /^ {0,3}(?:(#{1,6})[ \t]+)?(\*\*|__)?[ \t]*(§)?[ \t]*(\d{1,2})[ \t]*[.):—–-]?[ \t]*(?:\*\*|__)?[ \t]*(.*)$/;
+
+/**
+ * Начало плана короче этого ссылкой не заменяется: экономия меньше строки
+ * ссылки и лишнего чтения файла не стоит.
+ */
+const PLAN_HEAD_MIN = 2_000;
+
+/** План, разрезанный перед §5: начало (§0–§4) и то, что звено читает всегда. */
+export interface PlanSections {
+  head: string;
+  tail: string;
+}
+
+/**
+ * Разрез плана перед разделом критериев (L2.1). `undefined` — разреза нет, и
+ * звено получает план целиком: заголовки не узнаны, номера идут не по порядку,
+ * перед §5 нет ни одного раздела того же вида или начало слишком короткое.
+ * Всё сомнительное решается в пользу целого плана — потерять раздел хуже, чем
+ * переплатить токенами.
+ */
+export function planSections(plan: string): PlanSections | undefined {
+  const lines = plan.split('\n');
+  const headings: { at: number; num: number; style: string; title: string }[] = [];
+  lines.forEach((line, at) => {
+    const match = PLAN_HEADING.exec(line);
+    if (!match) return;
+    const [, hashes, bold, section, digits, title = ''] = match;
+    if (!hashes && !bold && !section) return;
+    headings.push({
+      at,
+      num: Number(digits),
+      style: `${hashes ?? ''}|${bold ?? ''}|${section ?? ''}`,
+      title,
+    });
+  });
+  const criteria = headings.find((head) => head.num === 5 && CRITERIA_TITLE.test(head.title));
+  if (!criteria) return undefined;
+  const sameStyle = headings.filter((head) => head.style === criteria.style);
+  const ordered = sameStyle.every(
+    (head, index) => index === 0 || head.num > (sameStyle[index - 1]?.num ?? -1),
+  );
+  if (!ordered || !sameStyle.some((head) => head.at < criteria.at && head.num <= 4)) {
+    return undefined;
+  }
+  const head = lines.slice(0, criteria.at).join('\n').trim();
+  const tail = lines.slice(criteria.at).join('\n').trim();
+  if (head.length < PLAN_HEAD_MIN || !tail) return undefined;
+  return { head, tail };
+}
+
+/** Сколько путей артефактов звено видит: список — подсказка, а не опись копии. */
+export const STAGE_ARTIFACTS_MAX = 10;
+
+/**
+ * Задание группы внутри задания звена (L2.3). Слова владельца остаются всегда —
+ * они связывают каждое звено. Строку старшинства звено ставит одну, последней,
+ * и повтор внутри задания ничего не добавляет. Общую строку навыков снимаем
+ * только там, где звено само называет свой навык (ревью — deep-review,
+ * доставка — навык доставки проекта): иначе она оставалась бы единственной
+ * подсказкой.
+ */
+function stageTaskText(task: string, skillNamed: boolean): string {
+  const text = withoutPrecedence(task);
+  return skillNamed
+    ? text
+        .split(SKILL_ROUTE_LINE)
+        .join('')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    : text;
+}
+
+/** План в контексте звена: разделы с §5 — текстом, начало — ссылкой на файл. */
+function planLines(plan: string, planFile: string | undefined): string[] {
+  const sections = planFile ? planSections(plan) : undefined;
+  if (!planFile || !sections) return ['Group plan:', excerpt(plan, PLAN_EXCERPT)];
+  return [
+    'Group plan from §5 on (acceptance criteria, verification level, do-not-touch, decisions):',
+    excerpt(sections.tail, PLAN_EXCERPT),
+    `The rest of the plan (§0–§4: analysis, references, approaches, steps) is in the plan file ` +
+      `${planFile} of this copy — the whole plan, verbatim; read its §4 only if a step is unclear.`,
+  ];
 }
 
 /**
@@ -767,21 +882,36 @@ function excerpt(text: string, limit: number, fromEnd = false): string {
 }
 
 /** Блок «контекст группы» последним абзацем задания звена; пусто — нечего сказать. */
-export function stageContextBlock(context: StageContext | undefined): string {
+export function stageContextBlock(
+  context: StageContext | undefined,
+  options: {
+    /** Задание звена само называет свой навык — общая строка навыков лишняя (L2.3). */
+    skillNamed?: boolean;
+  } = {},
+): string {
   if (!context) return '';
   const lines: string[] = [];
   if (context.branch) lines.push(`Group branch: ${context.branch}.`);
   if (context.task?.trim()) {
-    lines.push('Group task:', excerpt(context.task, TASK_EXCERPT));
+    const task = stageTaskText(context.task, Boolean(options.skillNamed));
+    lines.push('Group task:', excerpt(task, TASK_EXCERPT));
   }
-  if (context.plan?.trim()) {
-    lines.push('Group plan:', excerpt(context.plan, PLAN_EXCERPT));
-  }
+  if (context.plan?.trim()) lines.push(...planLines(context.plan, context.planFile));
   if (context.previous?.text.trim()) {
     // Хвост, а не начало: итог и вывод звено пишет в конце ответа.
     lines.push(
       `Outcome of the previous stage (${STAGE_NAMES[context.previous.stage]}):`,
       excerpt(context.previous.text, PREVIOUS_TAIL, true),
+    );
+  }
+  const artifacts = (context.artifacts ?? [])
+    .filter((path) => path.trim())
+    .slice(0, STAGE_ARTIFACTS_MAX);
+  if (artifacts.length > 0) {
+    lines.push(
+      'Artifacts the earlier stages left in this copy — open these paths instead of searching ' +
+        'for them:',
+      ...artifacts.map((path) => `- ${path}`),
     );
   }
   if (lines.length === 0) return '';
@@ -804,9 +934,46 @@ export function stageContextBlock(context: StageContext | undefined): string {
  * потоком), а не системная дописка в argv, где перевод строки рвёт командную
  * строку на Windows.
  */
+/**
+ * Что изменила работа против ОПУБЛИКОВАННОГО состояния ветки (L7.13, журнал
+ * 19.10 02:19): доставленная группа после пустого rebase получала ревью всего MR
+ * заново — 49 файлов и гейты на тех же патчах. Сравнение — `git range-diff`
+ * старой и новой серии коммитов над их базами: rebase меняет sha, но не патчи.
+ *
+ * - `whole` — опубликованного начала нет (ветки на удалённом не было, копия
+ *   грязная, git не ответил): ревью всей работы, как раньше;
+ * - `none` — патчи те же (`=` у каждого коммита): ревью нечего читать;
+ *   `published` — голова уже на удалённом, и доставлять тоже нечего;
+ * - `delta` — ревью только изменённого: `command` показывает его целиком,
+ *   `changes` — строки range-diff, отличные от `=`.
+ */
+export type ReviewDelta =
+  | { kind: 'whole' }
+  | { kind: 'none'; from: string; published: boolean }
+  | { kind: 'delta'; from: string; command: string; changes: string[] };
+
+/** Абзац ревью по дельте: рамка «читай только это» и сама команда. */
+function reviewDeltaLines(delta: Extract<ReviewDelta, { kind: 'delta' }>): string[] {
+  return [
+    `The branch was already published at ${delta.from} when this work began, and the work ` +
+      'delivered then is not under review again. Review ONLY what changed since: ' +
+      `\`${delta.command}\` shows it — a commit marked \`!\` was changed (by the work or by a ` +
+      'rebase conflict), `>` is new, `<` was dropped; `=` is the same patch on a new base and is ' +
+      'not yours to re-read. Read in full only the files these commits touch, and run only the ' +
+      'checks those files feed.',
+    'Changed commits:',
+    ...delta.changes.map((line) => `- ${line}`),
+  ];
+}
+
 export function reviewStagePrompt(input: {
   /** Задание, с которого шла работа: по нему и сверяется сделанное. */
   task: string;
+  /**
+   * Ветка была опубликована до этой работы (L7.13): ревью — только изменённых
+   * патчей, а не всего MR заново.
+   */
+  delta?: Extract<ReviewDelta, { kind: 'delta' }>;
   /** Чем работу вели — ревьюеру полезно знать, где искать типичные пропуски. */
   model?: string;
   /** Класс работы, если он был распознан. */
@@ -818,7 +985,9 @@ export function reviewStagePrompt(input: {
   /** Абзац сит перед MR (`sievePromptBlock` из `@agentdeck/contracts/sieves`). */
   sieves?: string;
 }): string {
-  const task = labelledCut(input.task.trim(), TASK_EXCERPT);
+  // Ревью само называет свой навык (deep-review) — общая строка навыков в
+  // задании группы ему лишняя (L2.3); слова владельца остаются.
+  const task = labelledCut(stageTaskText(input.task.trim(), true), TASK_EXCERPT);
   const by = input.model ? ` by the model ${input.model}` : ' by another model';
   const where = input.branch ? ` on the branch ${input.branch}` : ' in this working copy';
 
@@ -830,6 +999,7 @@ export function reviewStagePrompt(input: {
       'report mode: no fix loop, nothing written into any MR. No such skill — do the same yourself: ' +
       'git status, git diff and git log of this branch, every touched file read in full together ' +
       'with its callers, tests, docs and locales, and the project checks run.',
+    ...(input.delta ? reviewDeltaLines(input.delta) : []),
     'Check the work against EVERY point of the task below, one by one: a point not done or done ' +
       'differently is a finding.',
     // U13: план называет критерии приёмки и уровень проверки — ревью сверяет и с
@@ -1044,7 +1214,8 @@ export function deliverStagePrompt(input: {
   sieves?: string;
 }): string {
   const branch = input.branch ? `the branch ${input.branch}` : 'the branch of this copy';
-  const context = stageContextBlock(input.context);
+  // Шаг 5 сам называет навык доставки проекта (L2.3).
+  const context = stageContextBlock(input.context, { skillNamed: true });
   const target = input.branch ?? 'HEAD';
   const ask = input.foreign
     ? 'a question to the human as the last line of the answer'

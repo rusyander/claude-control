@@ -136,6 +136,9 @@ describe('tests-hook: проверка конца хода', () => {
     expect(line.out).toContain('AgentDeck Tests block is on');
     expect(line.out).toContain('one step per behaviour, each expected = what is actually seen');
     expect(line.out).toContain(`--project "${project}"`);
+    // L6.2: прогон — тронутых кейсов, не всей группы (группа может нести живые QA).
+    expect(line.out).toContain(`run --project "${project}" --case <g>:<id>`);
+    expect(line.out).not.toMatch(/run --project "[^"]*" --group/);
     expect(hook('session', { cwd: project }, { AGENTDECK_TESTS_NOTE: '1' }).out).toBe('');
   });
 });

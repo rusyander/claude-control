@@ -162,7 +162,7 @@ export const COMMAND_LINE_LIMIT = 8000;
 /** Путь к файлу со списком прогона (по строке на путь), когда он не влез в строку. */
 export const RUN_FILES_ENV = 'AGENTDECK_TEST_FILES';
 
-const quote = (value: string): string => (/[\s"'&|<>^]/.test(value) ? `"${value}"` : value);
+const quote = (value: string): string => (/[\s"'&|<>^()]/.test(value) ? `"${value}"` : value);
 
 /**
  * Каталоги пакетов Go для выбранных файлов: `./internal/orders`. Пусто — весь
@@ -186,8 +186,12 @@ function packageDir(file: string): string {
 /**
  * `{go-modules}` — все модули Go проекта одной цепочкой, для репозитория из
  * многих `go.mod` без `go.work`. `go test -C <модуль>` дописывает отчёт по
- * очереди; `|| echo -` не даёт провалу модуля оборвать цепочку — так читают и
- * cmd, и sh (`&&`/`||` слева направо), красное видно по отчёту. С выбором —
+ * очереди; `|| echo -` не даёт провалу модуля оборвать цепочку, красное видно
+ * по отчёту. Звено — в скобках: cmd читает `A || echo - && B` как
+ * `A || (echo - && B)`, и после зелёного первого модуля остальные не
+ * запускались вовсе (19.10.2026); `(A || echo -) && (B || echo -)` одинаково
+ * читают и cmd, и sh. Скобка без кавычек в пути сломала бы это в cmd — `quote`
+ * её кавычит. С выбором —
  * только модули выбранных кейсов и только их пакеты: агенту после правки одного
  * пакета не нужен прогон всего репозитория.
  */
@@ -208,14 +212,14 @@ function goModulesChain(root: string, files: string[], report: string): string {
       picked.set(module, packages);
     }
   }
-  return [...picked]
+  const links = [...picked]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([module, packages], index) => {
       const at = module ? shellArg(module) : '.';
       const into = index === 0 ? '>' : '>>';
       return `go test -C ${at} -json ${[...packages].join(' ')} ${into} ${quote(report)} || echo -`;
-    })
-    .join(' && ');
+    });
+  return links.length > 1 ? links.map((link) => `(${link})`).join(' && ') : (links[0] ?? '');
 }
 
 /**

@@ -299,6 +299,12 @@ describe('dev-сторож как процесс', () => {
     expect(log).toMatch(/по просьбе из панели/);
     expect(existsSync(stateFile)).toBe(false);
     expect(existsSync(join(appData, 'dev-restart.request'))).toBe(false);
+    // L6.1: под keepalive stdout сторожа выброшен — решения остаются в файле.
+    const journal = readFileSync(join(appData, 'dev-watch.log'), 'utf8');
+    expect(journal.match(/сервер запущен \(pid \d+, сторож \d+\)/g)).toHaveLength(2);
+    expect(journal).toMatch(/без предела/);
+    expect(journal).toMatch(/по просьбе из панели/);
+    expect(journal).toMatch(/перезапуск: .*part\.ts/);
   }, 120_000);
 
   // Ф11: перезапуск посреди автотестов или проверки поломкой рвал прогон и

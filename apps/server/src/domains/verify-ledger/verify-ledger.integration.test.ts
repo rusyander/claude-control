@@ -1,0 +1,398 @@
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+/**
+ * Журнал проверок (`tools/verify-ledger/`) живыми процессами node с настоящим
+ * `--require` и настоящим git: каждый тест — одноразовый репозиторий и
+ * поддельная проверка проекта, которая печатает итог и выходит с заданным кодом.
+ * Номера T — из `.agent/tmp/verify-ledger-tests.agent.md`; у каждого названа
+ * наивная реализация, на которой тест обязан покраснеть.
+ */
+const DIR = resolve(__dirname, '../../../../../tools/verify-ledger');
+const PRELOAD = join(DIR, 'preload.cjs').replace(/\\/g, '/');
+const load = createRequire(__filename);
+const ledger = load(join(DIR, 'ledger.cjs')) as {
+  repoOf: (cwd: string) => { top: string; store: string; index: string; off?: string };
+  records: (repo: object, key: string) => Array<{ exit: number; runId: string }>;
+  decide: (repo: object, key: string, o?: object) => { hit: unknown; reason: string };
+  writeRecord: (repo: object, r: object, out: object, art?: object[]) => { runId: string };
+};
+const { recognize } = load(join(DIR, 'checks.cjs')) as {
+  recognize: (argv: string[], cwd: string) => { id: string; noSkip: string | null } | null;
+};
+
+let root: string;
+let repo: string;
+let home: string;
+
+/** Поддельная проверка: печать, необязательная пауза и правка дерева посреди прогона. */
+const CHECK = `
+import fs from 'node:fs';
+import { helper } from './helper.mjs';
+const e = process.env;
+console.log('Test Files  3 passed ' + helper());
+console.error('note on stderr');
+if (e.FAKE_INHERIT) (await import('node:child_process')).spawnSync(process.execPath, ['-e', 'console.log(1)'], { stdio: 'inherit' });
+if (e.FAKE_BIG) process.stdout.write('x'.repeat(Number(e.FAKE_BIG)));
+if (e.FAKE_EDIT) { fs.writeFileSync('src.txt', 'B\\n'); if (e.FAKE_REVERT) { await new Promise((r) => setTimeout(r, 30)); fs.writeFileSync('src.txt', 'A\\n'); } }
+if (e.FAKE_STAMP) fs.writeFileSync(e.FAKE_STAMP, 'stamp-' + fs.readFileSync('src.txt', 'utf8'));
+if (e.FAKE_SLEEP) await new Promise((r) => setTimeout(r, Number(e.FAKE_SLEEP)));
+process.exitCode = Number(e.FAKE_EXIT || 0);
+`;
+
+function git(...args: string[]) {
+  const r = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+  return r.stdout.trim();
+}
+
+function registry(extra: object = {}) {
+  writeFileSync(
+    join(repo, '.claude/tools/verify-checks.json'),
+    JSON.stringify({ checks: [{ id: 'fake', script: '.claude/tools/check.mjs', ...extra }] }),
+  );
+}
+
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), 'cc-ledger-'));
+  repo = join(root, 'repo');
+  home = join(root, 'home');
+  // Прямые вызовы библиотеки (T12, T19) берут ключ подписи из окружения этого процесса.
+  process.env.AGENTDECK_VERIFY_LEDGER_HOME = home;
+  mkdirSync(join(repo, '.claude/tools'), { recursive: true });
+  git('init', '-q');
+  git('config', 'user.email', 't@example.com');
+  git('config', 'user.name', 't');
+  writeFileSync(join(repo, '.gitattributes'), '* text=auto eol=lf\n');
+  writeFileSync(join(repo, '.gitignore'), '.claude/\n.env*\nnode_modules/\n');
+  writeFileSync(join(repo, 'src.txt'), 'A\n');
+  writeFileSync(join(repo, '.claude/tools/check.mjs'), CHECK);
+  writeFileSync(join(repo, '.claude/tools/helper.mjs'), 'export const helper = () => "v1";\n');
+  registry();
+  git('add', '-A');
+  git('commit', '-qm', 'init');
+});
+afterEach(() => {
+  delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
+  rmSync(root, { recursive: true, force: true });
+});
+
+type Run = { code: number | null; out: string; err: string };
+
+function run(env: Record<string, string> = {}, args: string[] = []): Run {
+  const r = spawnSync(process.execPath, ['.claude/tools/check.mjs', ...args], {
+    cwd: repo,
+    encoding: 'utf8',
+    // Предел spawnSync по умолчанию — 1 МБ: больший вывод (T15) убивал бы ребёнка,
+    // и «записи нет» доказывало бы убийство, а не предел захвата журнала.
+    maxBuffer: 64 * 1024 * 1024,
+    env: {
+      ...process.env,
+      NODE_OPTIONS: `--require "${PRELOAD}"`,
+      AGENTDECK_VERIFY_LEDGER_HOME: home,
+      AGENTDECK_VERIFY_LEDGER: 'on',
+      ...env,
+    },
+    timeout: 30_000,
+  });
+  return { code: r.status, out: r.stdout, err: r.stderr };
+}
+
+const reused = (r: Run) => r.err.includes('[verify-ledger] reused green');
+const events = () =>
+  existsSync(join(home, 'events.jsonl'))
+    ? readFileSync(join(home, 'events.jsonl'), 'utf8')
+        .trim()
+        .split('\n')
+        .map((l) => JSON.parse(l) as { kind: string; reason?: string; mode?: string })
+    : [];
+const storeOf = () => ledger.repoOf(repo);
+const recordCount = () => {
+  const dir = join(storeOf().store, 'v1', 'runs');
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir).reduce((n, d) => n + readdirSync(join(dir, d)).length, 0);
+};
+
+describe('verify-ledger: повтор при том же содержимом', () => {
+  it('второй прогон того же дерева — повтор с тем же выводом и кодом', () => {
+    const first = run();
+    expect(first.code).toBe(0);
+    expect(reused(first)).toBe(false);
+    const second = run();
+    expect(reused(second)).toBe(true);
+    expect(second.code).toBe(0);
+    expect(second.out).toBe(first.out);
+    expect(second.err.startsWith(first.err)).toBe(true);
+  });
+
+  it('T21: коммит и amend без правок содержимого — повтор (ключ не sha)', () => {
+    writeFileSync(join(repo, 'src.txt'), 'C\n');
+    run();
+    git('add', '-A');
+    git('commit', '-qm', 'c');
+    git('commit', '--amend', '-qm', 'c2');
+    expect(reused(run())).toBe(true);
+  });
+
+  it('тень (по умолчанию): прогон идёт, в ленте «повторил бы» и совпадение', () => {
+    run({ AGENTDECK_VERIFY_LEDGER: '' });
+    const second = run({ AGENTDECK_VERIFY_LEDGER: '' });
+    expect(reused(second)).toBe(false);
+    const kinds = events().map((e) => e.kind);
+    expect(kinds).toContain('would-skip');
+    expect(kinds).toContain('shadow-ok');
+    expect(kinds).not.toContain('mismatch');
+  });
+
+  it('T26: тень замечает расхождение кода прогона с записью', () => {
+    run();
+    // Тот же ключ, другой исход: код берётся из окружения, которого нет в списке значимых.
+    run({ AGENTDECK_VERIFY_LEDGER: '', FAKE_EXIT: '1' });
+    expect(events().map((e) => e.kind)).toContain('mismatch');
+  });
+
+  it('T20: off — прогон как есть и запись, повтора нет', () => {
+    run();
+    const before = recordCount();
+    const r = run({ AGENTDECK_VERIFY_LEDGER: 'off' });
+    expect(reused(r)).toBe(false);
+    expect(recordCount()).toBe(before + 1);
+    // Режим в ленте — «off», а не тень: иначе плитка выдала бы выключенный журнал за замер.
+    expect(events().find((e) => e.kind === 'would-skip')?.mode).toBe('off');
+  });
+});
+
+describe('verify-ledger: ключ видит то, что видит проверка', () => {
+  it('T1: правка LF→CRLF — промах', () => {
+    run();
+    writeFileSync(join(repo, 'src.txt'), 'A\r\n');
+    expect(reused(run())).toBe(false);
+  });
+
+  it('T2: игнорируемый .env.local — промах', () => {
+    writeFileSync(join(repo, '.env.local'), 'VITE_X=1\n');
+    run();
+    writeFileSync(join(repo, '.env.local'), 'VITE_X=2\n');
+    expect(reused(run())).toBe(false);
+  });
+
+  it('T3: скрытый lock-файл node_modules — промах', () => {
+    mkdirSync(join(repo, 'node_modules'));
+    writeFileSync(join(repo, 'node_modules/.package-lock.json'), '{"v":1}');
+    run();
+    writeFileSync(join(repo, 'node_modules/.package-lock.json'), '{"v":2}');
+    expect(reused(run())).toBe(false);
+  });
+
+  it('T5: TZ и CI — промах; слоты очереди и id сессии — повтор', () => {
+    run();
+    expect(reused(run({ AGENTDECK_HEAVY_SLOTS: '7', AGENTDECK_VERIFY_LEDGER_SESSION: 'x' }))).toBe(
+      true,
+    );
+    expect(reused(run({ TZ: 'Asia/Tokyo' }))).toBe(false);
+    expect(reused(run({ CI: '1' }))).toBe(false);
+  });
+
+  it('T10: правка игнорируемой машинерии (модуль, который импортирует проверка) — промах', () => {
+    run();
+    writeFileSync(join(repo, '.claude/tools/helper.mjs'), 'export const helper = () => "v2";\n');
+    const r = run();
+    expect(reused(r)).toBe(false);
+    expect(r.out).toContain('v2');
+  });
+
+  it('T9: двинулась база проверки «относительно ветки» — промах', () => {
+    registry({ base: 'base-ref' });
+    git('branch', 'base-ref');
+    run();
+    expect(reused(run())).toBe(true);
+    // База уходит вперёд, а слияние `-s ours` оставляет рабочее дерево прежним:
+    // содержимое то же, merge-base — другой коммит с другим деревом.
+    git('checkout', '-q', 'base-ref');
+    writeFileSync(join(repo, 'other.txt'), 'x\n');
+    git('add', '-A');
+    git('commit', '-qm', 'moves base');
+    git('checkout', '-q', '-');
+    git('merge', '-q', '-s', 'ours', 'base-ref', '-m', 'keep ours');
+    expect(existsSync(join(repo, 'other.txt'))).toBe(false);
+    expect(reused(run())).toBe(false);
+  });
+
+  it('T30: неотслеживаемый файл больше предела — журнал молчит; .gitmodules — тоже', () => {
+    writeFileSync(join(repo, 'big.log'), Buffer.alloc(6 * 1024 * 1024));
+    run();
+    expect(recordCount()).toBe(0);
+    expect(events().some((e) => e.reason === 'untracked-large')).toBe(true);
+    rmSync(join(repo, 'big.log'));
+    writeFileSync(join(repo, '.gitmodules'), '');
+    run();
+    expect(events().some((e) => e.reason === 'submodules')).toBe(true);
+  });
+});
+
+describe('verify-ledger: запись только честного прогона', () => {
+  it('T6: правка дерева посреди прогона — записи нет', () => {
+    run({ FAKE_EDIT: '1' });
+    expect(recordCount()).toBe(0);
+  });
+
+  it('T7: правка с откатом посреди прогона (A→B→A) — записи нет', () => {
+    run({ FAKE_EDIT: '1', FAKE_REVERT: '1' });
+    expect(readFileSync(join(repo, 'src.txt'), 'utf8')).toBe('A\n');
+    expect(recordCount()).toBe(0);
+    expect(reused(run())).toBe(false);
+  });
+
+  it('T8: убитый процесс — записи нет', async () => {
+    const child = spawn(process.execPath, ['.claude/tools/check.mjs'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        NODE_OPTIONS: `--require "${PRELOAD}"`,
+        AGENTDECK_VERIFY_LEDGER_HOME: home,
+        FAKE_SLEEP: '5000',
+      },
+      stdio: 'ignore',
+    });
+    await new Promise((r) => setTimeout(r, 1500));
+    child.kill('SIGKILL');
+    await new Promise((r) => child.on('close', r));
+    expect(recordCount()).toBe(0);
+  });
+
+  it('T11: красный на ключе — повтора нет никогда, даже после зелёного', () => {
+    run({ FAKE_EXIT: '1' });
+    run({ AGENTDECK_VERIFY_LEDGER: 'off' });
+    const r = run();
+    expect(reused(r)).toBe(false);
+    expect(events().some((e) => e.reason === 'red-at-key')).toBe(true);
+  });
+
+  it('T12: красный и зелёный разом на одном ключе — обе записи целы', () => {
+    const store = storeOf();
+    const key = 'f'.repeat(64);
+    const base = { key, checkId: 'c', check: 'fake', startedAt: Date.now(), ms: 1 };
+    const out = { stdout: Buffer.from('a'), stderr: Buffer.alloc(0), complete: true };
+    ledger.writeRecord(store, { ...base, exit: 0, reusedFrom: null }, out);
+    ledger.writeRecord(store, { ...base, exit: 1, reusedFrom: null }, out);
+    expect(
+      ledger
+        .records(store, key)
+        .map((r) => r.exit)
+        .sort(),
+    ).toEqual([0, 1]);
+    expect(ledger.decide(store, key).reason).toBe('red-at-key');
+  });
+
+  it('T15: вывод больше предела — записи нет; ребёнок с inherit — без повтора', () => {
+    run({ FAKE_BIG: String(5 * 1024 * 1024) });
+    expect(recordCount()).toBe(0);
+    // Причина — именно предел захвата: без него захват копил бы весь вывод в память.
+    expect(events().some((e) => e.reason === 'output-cap')).toBe(true);
+    run({ FAKE_INHERIT: '1' });
+    expect(recordCount()).toBe(1);
+    expect(reused(run({ FAKE_INHERIT: '1' }))).toBe(false);
+    expect(events().some((e) => e.reason === 'output-incomplete')).toBe(true);
+  });
+
+  it('T19: подложенная руками запись без подписи не считается', () => {
+    run({ AGENTDECK_VERIFY_LEDGER: 'off', FAKE_EXIT: '1' });
+    const dir = join(storeOf().store, 'v1', 'runs');
+    const sub = readdirSync(dir)[0]!;
+    const name = readdirSync(join(dir, sub))[0]!;
+    const rec = JSON.parse(readFileSync(join(dir, sub, name), 'utf8')) as Record<string, unknown>;
+    // Подделка: красный переписан в зелёный под тем же ключом, подпись старая.
+    writeFileSync(join(dir, sub, name), JSON.stringify({ ...rec, exit: 0 }));
+    expect(ledger.records(storeOf(), rec.key as string)).toHaveLength(0);
+  });
+});
+
+describe('verify-ledger: артефакты и флаги', () => {
+  it('T16: штамп под git-path возвращается к байтам своего дерева', () => {
+    const stamp = join(repo, '.git', 'stamp.json');
+    registry({ artifacts: [{ gitPath: 'stamp.json' }] });
+    run({ FAKE_STAMP: stamp });
+    expect(readFileSync(stamp, 'utf8')).toBe('stamp-A\n');
+    writeFileSync(join(repo, 'src.txt'), 'B\n');
+    run({ FAKE_STAMP: stamp });
+    expect(readFileSync(stamp, 'utf8')).toBe('stamp-B\n');
+    writeFileSync(join(repo, 'src.txt'), 'A\n');
+    expect(reused(run({ FAKE_STAMP: stamp }))).toBe(true);
+    expect(readFileSync(stamp, 'utf8')).toBe('stamp-A\n');
+  });
+
+  it('T13: флаги, пишущие файлы, — никогда не повтор; watch и --write — не проверка', () => {
+    const vitest = join(repo, 'node_modules/vitest/vitest.mjs');
+    const argv = (...a: string[]) => ['node', vitest, ...a];
+    expect(recognize(argv('run'), repo)?.noSkip).toBeNull();
+    for (const flags of [
+      ['run', '--coverage'],
+      ['run', '--outputFile=x.xml'],
+      ['run', '-u'],
+      ['run', '--reporter', 'junit'],
+      ['run', '--reporter=junit'],
+    ]) {
+      expect(recognize(argv(...flags), repo)?.noSkip).toBeTruthy();
+    }
+    expect(recognize(argv(), repo)).toBeNull();
+    expect(recognize(argv('related', 'a.ts'), repo)).toBeNull();
+    expect(recognize(argv('related', 'a.ts', '--run'), repo)?.id).toBe('vitest');
+    const prettier = join(repo, 'node_modules/prettier/bin/prettier.cjs');
+    expect(recognize(['node', prettier, '--check', '.'], repo)?.id).toBe('prettier');
+    expect(recognize(['node', prettier, '--write', '.'], repo)).toBeNull();
+    const eslint = join(repo, 'node_modules/eslint/bin/eslint.js');
+    expect(recognize(['node', eslint, '--fix', '.'], repo)).toBeNull();
+    const tsc = join(repo, 'node_modules/typescript/bin/tsc');
+    expect(recognize(['node', tsc, '--noEmit'], repo)?.id).toBe('tsc');
+    expect(recognize(['node', tsc, '-b'], repo)).toBeNull();
+  });
+});
+
+describe('verify-ledger: preload никогда не роняет node', () => {
+  it('T17: сломанный модуль журнала — процесс всё равно идёт', () => {
+    const broken = join(root, 'broken');
+    mkdirSync(broken);
+    writeFileSync(join(broken, 'preload.cjs'), readFileSync(join(DIR, 'preload.cjs')));
+    writeFileSync(join(broken, 'checks.cjs'), 'throw new Error("boom")');
+    const r = spawnSync(process.execPath, ['-e', 'console.log("alive")'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_OPTIONS: `--require "${join(broken, 'preload.cjs').replace(/\\/g, '/')}"`,
+      },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('alive');
+  });
+
+  it('T18: обычный процесс node — без git и без записи в ленту', () => {
+    const r = spawnSync(
+      process.execPath,
+      ['-e', 'new (require("worker_threads").Worker)("1", { eval: true }); console.log("ok")'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          NODE_OPTIONS: `--require "${PRELOAD}"`,
+          AGENTDECK_VERIFY_LEDGER_HOME: home,
+        },
+      },
+    );
+    expect(r.stdout.trim()).toBe('ok');
+    expect(events()).toHaveLength(0);
+    expect(existsSync(join(repo, '.git', 'agentdeck-verify'))).toBe(false);
+  });
+});

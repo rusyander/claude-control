@@ -59,6 +59,7 @@ import { registerLogsRoutes } from '../routes/logs-routes/logs-routes.ts';
 import { registerProjectGitRoutes } from '../routes/project-git-routes/project-git-routes.ts';
 import { registerSplitDefaultsRoutes } from '../routes/split-defaults-routes/split-defaults-routes.ts';
 import { registerSieveRoutes } from '../routes/sieve-routes.ts';
+import { registerVerifyLedgerRoutes } from '../routes/verify-ledger-routes.ts';
 import { registerProjectFilesRoutes } from '../routes/project-files-routes/project-files-routes.ts';
 import { registerProjectTestsRoutes } from '../routes/project-tests-routes/project-tests-routes.ts';
 import { registerProjectTestsPublishRoutes } from '../routes/project-tests/publish-routes.ts';
@@ -118,6 +119,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     localModels,
     globalLayer,
     kit,
+    verifyLedger,
   } = runtime;
   // Маршрут и порт спрашиваются на каждом запросе окна, а не здесь: галочка
   // контура, снятая минуту назад, уже действует.
@@ -201,6 +203,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       registerSplitDefaultsRoutes(instance, context, (path) => splitConveyor.kickProject(path)),
     // Сита перед MR: выученные по тредам MR и счёт блокеров — та же вкладка «Группы».
     registerSieveRoutes,
+    // Журнал проверок: сводка тени и повторов для плитки вкладки «Группы».
+    (instance, context) => registerVerifyLedgerRoutes(instance, context, verifyLedger),
     // Сверка сит панели с их копией в глобальном слое — вкладка «Глобальный слой».
     (instance, context) => registerGlobalLayerRoutes(instance, context, globalLayer),
     // Встроенный набор панели (В2): своя страница, режимы по CLI, копии «моё».

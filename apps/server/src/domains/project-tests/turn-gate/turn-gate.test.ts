@@ -186,9 +186,11 @@ describe('пробелы хода агента', () => {
   it('автокейс прогнан до правки — пробел; после правки зелёным — чисто', () => {
     const cases = [auto('auth-001', ['src/auth'])];
     const before = run('2026-10-15T10:01:00.000Z', [['auth-001', 'passed']]);
-    expect(judge(cases, [before], ['src/auth/login.ts']).join('\n')).toContain(
-      'were not run after the last edit (auth-001)',
-    );
+    const gap = judge(cases, [before], ['src/auth/login.ts']).join('\n');
+    expect(gap).toContain('were not run after the last edit (auth-001)');
+    // L6.2: команда называет кейсы, не группу — группа может нести живые QA.
+    expect(gap).toMatch(/run --project "\/p" --case auth:auth-001$/);
+    expect(gap).not.toContain('--group');
     const after = run('2026-10-15T10:06:00.000Z', [['auth-001', 'passed']]);
     expect(judge(cases, [before, after], ['src/auth/login.ts'])).toEqual([]);
   });

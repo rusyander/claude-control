@@ -69,6 +69,15 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   /**
+   * Журнал проверок подгружается в чужие процессы через `NODE_OPTIONS=--require`,
+   * а `--require` берёт только CommonJS — ESM туда не подставить.
+   */
+  {
+    files: ['tools/verify-ledger/**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  /**
    * Приложение на React Native. Правила хуков те же, что у фронта: расхождение
    * означало бы, что одна и та же ошибка ловится в браузере и проходит на
    * телефоне. Экспорт по умолчанию здесь не запрещён — его требует expo-router:

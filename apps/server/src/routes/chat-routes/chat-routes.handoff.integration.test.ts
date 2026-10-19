@@ -539,6 +539,31 @@ describe('планировщик продолжения', () => {
     expect(chains.depth([next?.chatId ?? ''])).toBeLessThanOrEqual(HANDOFF_MAX_CHAIN);
   });
 
+  /**
+   * Журнал 19.10 01:44 (L7.2): доставленная группа закрыла ход блоком
+   * «Группа закрыта. Если откроют снова: …», панель завела новую сессию, и та
+   * за шесть ходов (305k прочитанного кэша) выяснила, что делать нечего.
+   * Закрытое предложение (`"closed":true`) продолжения не заводит — ни у
+   * обычного чата, ни у группы; карточка остаётся, нажать её может человек.
+   */
+  it('закрытое предложение («closed»: true) новой сессии не заводит', async () => {
+    const { chains, registry } = build(
+      `Готово.\n\n${block({ ...PROPOSAL, next: 'Группа закрыта, делать нечего', closed: true })}`,
+      Date.now() + 10_000,
+    );
+    chains.setAuto(['чат-закрыт'], true);
+    const seen = watch(registry, 'чат-закрыт');
+    registry.start(
+      'чат-закрыт',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      { projectPath: 'C:/work/проект' },
+    );
+    await new Promise((done) => setTimeout(done, 20));
+    expect(registry.active().some((run) => run.chatId.startsWith('new-'))).toBe(false);
+    // Отказ молчаливый: «продолжения не будет» в ленте закрытой работе не нужно.
+    expect(seen).toEqual([]);
+  });
+
   it('«не перезапускай» продолжения не заводит', async () => {
     const { chains, registry } = build(
       'Не перезапускай сессию — я продолжаю здесь.',

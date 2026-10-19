@@ -1,0 +1,316 @@
+{
+  "title": {
+    "ru": "Группа не пишет в MR без вашего «да» и не тратит сессии впустую",
+    "en": "A group no longer writes to an MR without your yes or spends sessions for nothing"
+  },
+  "items": [
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Запись наружу — ответы в тредах MR, правка его описания, комментарии и смена статуса в трекере — у групп теперь по умолчанию «Человеку»: группа показывает карточку и ждёт. Такую запись видят другие люди, и отменить её нельзя. Кому нужна доставка до MR без остановок, ставит строке «С отметкой» в «Настройки» → «Группы».",
+        "en": "Outward writes — replies in MR threads, edits of an MR description, tracker comments and status changes — now default to «Human» for groups: the group shows a card and waits. Other people see such a write and it cannot be undone. If you want delivery to the MR without stops, set the row to «With a note» in «Settings» → «Groups»."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа в авторежиме CLI отвечала в тредах MR и переписывала его описание без единой карточки: решение принимал сам CLI, и до правил панели запрос не доходил. Теперь серверы хранилища кода и трекера в прогоне группы стоят под правилом «спрашивать», и каждая их запись приходит в панель.",
+        "en": "A group in the CLI's auto mode replied in MR threads and rewrote the MR description without a single card: the CLI decided on its own and the request never reached the panel's rules. Code hosting and tracker servers in a group run now sit under an «ask» rule, so every write of theirs reaches the panel."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Продолжение в чистой сессии получает предложение прошлой сессии цитатой, а обороты вроде «по просьбе владельца» в нём помечены как слова той сессии. Раньше продолжение принимало такую фразу за вашу просьбу и шло писать в MR.",
+        "en": "A continuation in a clean session gets the previous session's proposal as a quote, with phrases like «as the owner asked» marked as that session's words. Before, the continuation took such a phrase for your request and went on to write to the MR."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чтение задач трекера (jira_get_issue, confluence_search) больше не считается записью во внешний сервис и не останавливает прогон карточкой.",
+        "en": "Reading tracker issues (jira_get_issue, confluence_search) no longer counts as a write to an external service and does not stop the run with a card."
+      },
+      "area": {
+        "ru": "Права",
+        "en": "Permissions"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Работу, которую агент отметил закрытой и проверенной, панель больше не продолжает сама в новой сессии: раньше доставленная группа получала ещё одну сессию, которая только читала файл-опору и отвечала, что всё сделано. Карточка остаётся, продолжить кнопкой можно.",
+        "en": "Work the agent marked closed and verified is no longer continued by the panel in a new session on its own: a delivered group used to get one more session that only read the checkpoint file and replied that everything was done. The card stays, and the button still continues it."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Если после итогового ответа хук Stop вернул агенту замечание, панель после своего перезапуска судит по итогу вместе с ответом на замечание: блоки сит, предложения и ссылки из итога больше не теряются.",
+        "en": "When a Stop hook returned a remark to the agent after its final answer, the panel, after its own restart, judges the summary together with the reply to the remark: sieve, proposal and link blocks from the summary are no longer lost."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Доставленной группе, которой не хватает только отчёта (строк сит, пунктов задания, записи прогона), напоминание больше не велит коммитить, отправлять ветку и обновлять MR. Раньше по нему группа заново переносила ветку на основную, гоняла все проверки и переотправляла MR, уже стоявший на ревью.",
+        "en": "A delivered group that lacks only its report (sieve rows, task points, a recorded run) no longer gets a reminder telling it to commit, push and update the MR. Before, it rebased the branch again, re-ran every check and re-pushed an MR that was already in review."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Принудительный push группы (--force, --force-with-lease, -f, +ветка) в ветку MR, снятого с черновика, теперь всегда проходит через карточку. Раньше группа после пустого rebase молча переписала ветку MR, который уже был на ревью: в авторежиме CLI решал сам и до панели не спрашивал, а аренда своей ветки разрешалась без проверки состояния MR. Пока MR черновик, аренда своей ветки проходит сама, как прежде; если панель не смогла узнать состояние MR (нет ключа к GitLab/GitHub, сбой), решаете вы.",
+        "en": "A group's force push (--force, --force-with-lease, -f, +branch) onto the branch of an MR taken out of draft now always goes through a card. Before, after a no-op rebase a group silently rewrote the branch of an MR already in review: in the CLI's auto mode the CLI decided on its own without asking the panel, and a lease push of the group's own branch was allowed without checking the MR state. While the MR is a draft, a lease push of the own branch passes by itself as before; if the panel could not learn the MR state (no GitLab/GitHub key, a failure), you decide."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа, чья ветка уже лежала на удалённом до начала работы, получает ревью только того, что работа поменяла: панель сравнивает старую и новую серию коммитов через git range-diff. Работа, которая лишь перенесла ветку на свежую основную, ревью не получает вовсе. Раньше после такого переноса панель заводила ревью всего MR заново — с перечитыванием всех файлов и повторным прогоном проверок на тех же правках.",
+        "en": "A group whose branch was already on the remote when the work began gets a review of only what the work changed: the panel compares the old and new commit series with git range-diff. Work that only moved the branch onto a fresh main gets no review at all. Before, such a move made the panel review the whole MR again, re-reading every file and re-running the checks on the same edits."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "pnpm tests run --case группа:кейс,… прогоняет только названные кейсы, и напоминание группе о блоке «Тесты» даёт команду, суженную до кейсов её изменённых файлов, а не прогон всех кейсов копии.",
+        "en": "pnpm tests run --case group:case,… runs only the named cases, and a group's Tests-block reminder gives a command narrowed to the cases of its changed files instead of running every case of the copy."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сессия группы, закончившая работу шагом «Когда MR вольётся: …», заводила новую сессию, хотя MR ещё открыт, и та заново гоняла проверки. Теперь шаг, ждущий внешнего события, новой сессии не заводит: он встаёт в «Сделать человеку» вместе с этим событием, а продолжить можно кнопкой карточки, когда оно случится.",
+        "en": "A group session that finished with a step like «When the MR is merged: …» started a new session while the MR was still open, and that session re-ran the checks. A step waiting for an outside event now starts no new session: it lands under «For you to do» together with the event, and the card button continues once it has happened."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Следующая сессия группы получает описание окружения копии сжатым: одинаковые строки о версиях склеены списком модулей, из провала подготовки ушёл список команд. В большом монорепозитории первый промпт продолжения стал короче примерно на 8 тысяч знаков.",
+        "en": "A group's next session gets the copy's environment description compacted: identical version lines are merged into one module list, and a failed preparation no longer carries the command list. In a large monorepo the first prompt of a continuation is about 8 thousand characters shorter."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "pnpm tests run --cmd \"… {report}\" отдавал раннеру {report} буквально: отчёт ложился в проект файлом с таким именем, а статусы кейсов не проставлялись. Теперь {report} — временный файл этого прогона, его и читает импорт; {paths} в --cmd тоже подставляется.",
+        "en": "pnpm tests run --cmd \"… {report}\" passed {report} to the runner literally: the report landed in the project as a file with that name and case statuses were not set. {report} is now this run's temporary file, which the import reads; {paths} in --cmd is substituted too."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Память проверок не отвечала на свою команду проекта, если в её строке был путь отчёта ({report} или цепочка модулей Go): путь каждый раз новый, и прогон на неизменном дереве повторялся целиком. Теперь путь отчёта в ключ памяти не входит.",
+        "en": "The check memory never answered for the project's own command when its line carried the report path ({report} or the Go module chain): the path is new every time, so a run on an unchanged tree was repeated in full. The report path is no longer part of the memory key."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Тетрадь задачи группы называется теперь notebook.agent.md: под прежним именем notebook.md правила агента не давали в неё писать, и группа тратила ходы на обход, а найденное уходило мимо тетради. Тетрадь под старым именем при следующем запуске группы переезжает целиком.",
+        "en": "A group's task notebook is now called notebook.agent.md: under the old name notebook.md the agent's rules blocked writing to it, so the group spent turns working around that and its findings missed the notebook. A notebook under the old name moves over whole on the group's next start."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В монорепозитории, где у двух пакетов есть каталог набора с одним путём (src/models), результат такого набора терялся при импорте как двусмысленный. pnpm tests import и run с --group теперь кладут результаты только на кейсы названной группы, и набор пакета узнаётся.",
+        "en": "In a monorepo where two packages have a suite directory with the same path (src/models), that suite's result was dropped on import as ambiguous. pnpm tests import and run with --group now put results on the named group's cases only, and the package suite is recognised."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "pnpm tests run прогоняет кейсы vitest и там, где своя команда проекта их не берёт (она пишет отчёт Go или Cargo, или её нет): каждый пакет — своим vitest из ближайшего package.json, итоги ложатся на кейсы. Раньше файлы *.test.ts уходили в go test, и отчёт для блока «Тесты» приходилось собирать вручную.",
+        "en": "pnpm tests run now runs vitest cases where the project's own command does not take them (it writes a Go or Cargo report, or there is none): each package with the vitest of its nearest package.json, and the results land on the cases. Before, *.test.ts files went to go test and the report for the Tests block had to be put together by hand."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Прогон по своей команде из многих модулей Go на Windows останавливался после первого зелёного модуля: остальные модули не запускались, и их кейсы оставались без итога. Теперь гоняются все модули по очереди.",
+        "en": "A run of the project's own command over many Go modules stopped after the first green module on Windows: the other modules never ran and their cases got no result. All modules now run one after another."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "«Продолжить» после паузы группы называет агенту фоновые команды, которые пауза остановила (сервер стенда, долгая проверка). Раньше агент узнавал о них по оборванному вызову и поднимал заново наугад.",
+        "en": "“Resume” after a group pause names to the agent the background commands the pause stopped (a stand server, a long check). Before, the agent learned of them from a cut-off call and restarted them by guesswork."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Время работы» в сводке групп показывало весь срок жизни цепочки вместе с ночами простоя: у группы, проработавшей три с половиной часа, выходило 52 часа. Теперь считается только время, когда агент действительно работал: ответы модели и вызовы инструментов. Простой между ходами не считается, а один ответ или вызов — не дольше 15 минут, кроме субагентов.",
+        "en": "“Run time” in the group summary showed the chain’s whole lifespan, idle nights included: a group that worked three and a half hours showed 52 hours. It now counts only the time the agent actually worked: model replies and tool calls. Idle time between turns does not count, and one reply or call counts for at most 15 minutes, subagents excepted."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Проверка в конце хода и отказ записать автокейс словом называют для прогона сами кейсы (run --case), а не их группу. Раньше подсказка вела к прогону всей группы, а в группе бывают долгие живые проверки на стенде, и он нагружался посреди работы.",
+        "en": "The end-of-turn check and the refusal to record an automated case by word now name the cases themselves for the run (run --case), not their group. Before, the hint led to running the whole group, which may hold long live checks against the stand, loading it mid-work."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Звенья группы после работы — ревью, правки, проверка и доставка — получают из плана текстом только критерии приёмки, уровень проверки, «не трогать» и решения; анализ, подходы и шаги лежат файлом в копии, и звено открывает его, когда шаг неясен. Задание звена висит в контексте каждого хода, и на плане в 28 тыс. знаков это около 22 тыс. знаков меньше в каждом ходе. План без разделов по-прежнему уходит целиком.",
+        "en": "Group links after the work — review, fixes, verification and delivery — get only the acceptance criteria, verification level, «do not touch» and decisions of the plan as text; analysis, approaches and steps sit as a file in the copy, opened when a step is unclear. A link's task stays in the context of every turn, so with a 28k-char plan that is about 22k chars less per turn. A plan without sections still goes whole."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Звено правок получает замечания ревью карточками, без пересказа ревьюера вокруг них: до 24 тыс. знаков в каждом ходе правок, которые только повторяли карточки. Так же теперь и в Codex и Qwen Code.",
+        "en": "The fixes link gets the review findings as cards, without the reviewer's prose around them: up to 24k chars per fixes turn that only repeated the cards. Codex and Qwen Code now do the same."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Задание звена заканчивается путями того, что прошлые звенья оставили в копии: снимки до/после, журнал проверок, записанные прогоны тестов, логи гейтов. Доставка больше не тратит ходы на поиск снимков по копии и основному каталогу.",
+        "en": "A link's task ends with the paths of what earlier links left in the copy: before/after shots, the verification ledger, recorded test runs, gate logs. Delivery no longer spends turns searching the copy and the main folder for shots."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "План и ревью группы, включая проверку правок, получают трекер, хранилище кода и макеты только на чтение: инструментов записи в их запуске нет, и их имена не едут в каждом вызове модели. Пишут в трекер и в MR работа, правки и доставка.",
+        "en": "A group's plan and review, fix verification included, get the tracker, the code host and the designs read-only: their run has no write tools, and those names no longer ride along in every model call. The work, fixes and delivery write to the tracker and the MR."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Ревью, правки и доставка группы видят описания только навыков своего звена; остальные навыки группы им видны по имени и вызываются, как раньше.",
+        "en": "A group's review, fixes and delivery see descriptions only for their own stage's skills; the rest of the group's skills are visible by name and are invoked as before."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В сводке групп у родителя — колонка «Лимит подписки»: сколько пятичасового и недельного окна подписки ушло на цепочку группы. Прирост загрузки окна делится между всеми прогонами, шедшими в это время, по их токенам, поэтому параллельные группы и обычные чаты не насчитывают себе общую трату. Нет замеров (старый CLI) — ячейка пустая, а не «0 %».",
+        "en": "The parent's group summary has a «Subscription limit» column: how much of the 5-hour and weekly subscription windows the group's chain used. Growth of the window load is split among all runs going at that time by their tokens, so parallel groups and ordinary chats do not each count the shared spend. No readings (older CLI) means an empty cell, not «0 %»."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Возврат в чат, который был прокручен вверх, открывает его на том же сообщении, а не внизу: например, из родительского чата в дочерний и обратно. Чат, оставленный внизу, и первое открытие — внизу, как раньше. Место помнится до перезагрузки страницы.",
+        "en": "Returning to a chat that was scrolled up opens it at the same message instead of the bottom — for example, from a parent chat to a child and back. A chat left at the bottom, and a first open, land at the bottom as before. The place is kept until the page reloads."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    }
+  ]
+}

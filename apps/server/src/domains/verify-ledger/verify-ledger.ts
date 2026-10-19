@@ -1,0 +1,201 @@
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import type { LedgerInstall, LedgerSummary, LedgerEvent } from './verify-ledger.types.ts';
+
+/**
+ * Журнал проверок со стороны панели (стадия 0, `.agent/tmp/verify-ledger-design.agent.md`
+ * §2 «Enforcement»): копия preload в данных панели, самопроверка и окружение,
+ * которое панель отдаёт всем, кого запускает, — Claude, чужим CLI, локальным и
+ * контурным прогонам.
+ *
+ * Копия, а не путь в репозитории: `--require` на несуществующий файл роняет
+ * КАЖДЫЙ процесс node, включая сам CLI (проверено 19.10), а смена ветки
+ * панели удалила бы файл из-под живых сессий. Каталог версии — по отпечатку
+ * содержимого, старые версии не удаляются: их ещё держат запущенные сессии.
+ */
+
+const FILES = ['checks.cjs', 'ledger.cjs', 'preload.cjs'] as const;
+const LEDGER_ENV = 'AGENTDECK_VERIFY_LEDGER';
+
+export function ledgerHome(appData: string): string {
+  return join(appData, 'verify-ledger');
+}
+
+/** Путь для NODE_OPTIONS: обратный слеш там — экранирование (проверено 19.10), значит только `/`. */
+const forNodeOptions = (path: string) => path.replace(/\\/g, '/');
+
+/**
+ * Ставит версию preload и проверяет её живым `node -e 0`. Не прошла — `preload: null`
+ * и причина: панель тогда ничего не подмешивает, проверки идут как раньше.
+ */
+export function installLedger(opts: {
+  appData: string;
+  sourceDir: string;
+  nodePath?: string;
+  env?: NodeJS.ProcessEnv;
+}): LedgerInstall {
+  const env = opts.env ?? process.env;
+  if (String(env[LEDGER_ENV] ?? '').toLowerCase() === 'disabled') {
+    return { preload: null, reason: 'disabled' };
+  }
+  try {
+    const bodies = FILES.map((name) => readFileSync(join(opts.sourceDir, name)));
+    const hash = createHash('sha256');
+    for (const body of bodies) hash.update(body);
+    const version = hash.digest('hex').slice(0, 12);
+    const dir = join(ledgerHome(opts.appData), 'bin', version);
+    if (!FILES.every((name) => existsSync(join(dir, name)))) {
+      const tmp = `${dir}.${process.pid}.tmp`;
+      rmSync(tmp, { recursive: true, force: true });
+      mkdirSync(tmp, { recursive: true });
+      for (const name of FILES) copyFileSync(join(opts.sourceDir, name), join(tmp, name));
+      rmSync(dir, { recursive: true, force: true });
+      renameSync(tmp, dir);
+    }
+    const preload = forNodeOptions(join(dir, 'preload.cjs'));
+    const probe = spawnSync(
+      opts.nodePath ?? process.execPath,
+      ['-e', 'process.stdout.write("ok")'],
+      {
+        env: { ...env, NODE_OPTIONS: withPreload(env.NODE_OPTIONS, preload) },
+        encoding: 'utf8',
+        timeout: 15_000,
+        windowsHide: true,
+      },
+    );
+    if (probe.status !== 0 || probe.stdout !== 'ok') {
+      return { preload: null, reason: `self-test failed (${probe.status ?? probe.signal})` };
+    }
+    return { preload, version };
+  } catch (error) {
+    return { preload: null, reason: `install failed: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * NODE_OPTIONS с нашим `--require`: прежние ключи остаются (`--max-old-space-size`
+ * человека не теряется), чужая версия журнала — заменяется, а не копится.
+ */
+export function withPreload(existing: string | undefined, preload: string): string {
+  const rest = String(existing ?? '')
+    .replace(/--require[= ]("[^"]*verify-ledger[^"]*"|\S*verify-ledger\S*)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return `${rest ? `${rest} ` : ''}--require "${preload}"`;
+}
+
+/**
+ * Окружение для всех запусков панели. Метку CLI ставит тот, кто запускает:
+ * по ней preload пишет пульс — видно, у какого CLI журнал реально работает.
+ */
+export function ledgerEnv(
+  install: LedgerInstall,
+  appData: string,
+  base: NodeJS.ProcessEnv,
+): Record<string, string> {
+  if (!install.preload) return {};
+  return {
+    NODE_OPTIONS: withPreload(base.NODE_OPTIONS, install.preload),
+    AGENTDECK_VERIFY_LEDGER_HOME: ledgerHome(appData),
+  };
+}
+
+/**
+ * Установить и подмешать в окружение самой панели: дальше его наследует каждый
+ * запуск — Claude, чужие CLI, локальные и контурные прогоны — без списка путей
+ * запуска, который отстал бы от первого нового. Сама панель preload не грузит:
+ * NODE_OPTIONS читается при старте процесса. Одна функция и для `runtime.ts`,
+ * и для проверки окружения прогонов — проверка видит ровно то, что делает панель.
+ */
+export function activateLedger(appData: string, sourceDir: string): LedgerInstall {
+  const install = installLedger({ appData, sourceDir });
+  Object.assign(process.env, ledgerEnv(install, appData, process.env));
+  return install;
+}
+
+function readEvents(home: string): LedgerEvent[] {
+  const out: LedgerEvent[] = [];
+  for (const name of ['events.jsonl.1', 'events.jsonl']) {
+    let text: string;
+    try {
+      text = readFileSync(join(home, name), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        out.push(JSON.parse(line) as LedgerEvent);
+      } catch {
+        /* строка, дописанная наполовину, — не событие */
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Сводка для плитки: сколько прогонов журнал повторил бы (или повторил), сколько
+ * минут это сэкономило бы и сколько раз тень разошлась с настоящим прогоном —
+ * последнее число обязано быть нулём, иначе включать повторы нельзя.
+ */
+export function ledgerSummary(
+  appData: string,
+  install: LedgerInstall,
+  now = Date.now(),
+  windowMs = 7 * 24 * 3600e3,
+): LedgerSummary {
+  const home = ledgerHome(appData);
+  const events = readEvents(home).filter((e) => now - e.at <= windowMs);
+  const count = (kind: string) => events.filter((e) => e.kind === kind).length;
+  const saved = events
+    .filter((e) => e.kind === 'would-skip' || e.kind === 'hit')
+    .reduce((sum, e) => sum + (e.savedMs ?? 0), 0);
+  const offReasons: Record<string, number> = {};
+  for (const e of events) {
+    if (e.kind === 'off' && e.reason) offReasons[e.reason] = (offReasons[e.reason] ?? 0) + 1;
+  }
+  const repos = new Set(events.map((e) => e.repo).filter(Boolean));
+  let seen: LedgerSummary['seen'] = [];
+  try {
+    seen = readdirSync(join(home, 'seen'))
+      .filter((n) => n.endsWith('.json'))
+      .map(
+        (n) =>
+          JSON.parse(readFileSync(join(home, 'seen', n), 'utf8')) as { cli: string; at: number },
+      )
+      .map(({ cli, at }) => ({ cli, at }));
+  } catch {
+    /* ещё ни одного пульса */
+  }
+  return {
+    active: Boolean(install.preload),
+    reason: install.reason ?? null,
+    version: install.version ?? null,
+    mode: modeOf(process.env[LEDGER_ENV]),
+    windowDays: Math.round(windowMs / (24 * 3600e3)),
+    records: count('record'),
+    wouldSkip: count('would-skip'),
+    hits: count('hit'),
+    mismatches: count('mismatch'),
+    savedMs: saved,
+    repos: repos.size,
+    offReasons,
+    seen,
+  };
+}
+
+function modeOf(value: string | undefined): LedgerSummary['mode'] {
+  const v = String(value ?? '').toLowerCase();
+  return v === 'on' || v === 'off' || v === 'disabled' ? v : 'shadow';
+}

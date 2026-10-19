@@ -168,13 +168,12 @@ export function recordAgentResults(
   // прогона — иначе в истории лежала бы «проверка», которой тест не делал.
   if (automated.size > 0) {
     const cases = [...automated];
-    const groups = [...new Set(cases.map((item) => item.split(':')[0]))];
     throw coded(
       new ProjectTestsError(
-        `Automated cases are not recorded by word: ${cases.join(', ')}. Run them instead: ${groups.map((group) => `tests-cli run --group ${group}`).join('; ')}.`,
+        `Automated cases are not recorded by word: ${cases.join(', ')}. Run them instead: tests-cli run --case ${cases.join(',')}.`,
       ),
       'record-automated-case',
-      { cases: cases.join(', '), groups: groups.join(', ') },
+      { cases: cases.join(', ') },
     );
   }
   const id = randomUUID();

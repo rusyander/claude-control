@@ -399,6 +399,12 @@ export interface ForgeMergeRequest {
   title: string;
   url: string;
   state: 'open' | 'closed';
+  /**
+   * Черновик: GitLab `draft` (раньше `work_in_progress`), GitHub `draft`; без
+   * поля — по приставке заголовка «Draft:» / «WIP:». Права группы (L7.12): ветку
+   * MR, снятого с черновика, принудительный пуш группы без человека не трогает.
+   */
+  draft: boolean;
 }
 
 /**
@@ -427,6 +433,8 @@ export async function readMergeRequest(
   const mr = parseJson<{
     title?: string;
     state?: string;
+    draft?: boolean;
+    work_in_progress?: boolean;
     html_url?: string;
     web_url?: string;
     source_branch?: string;
@@ -453,6 +461,8 @@ export async function readMergeRequest(
     // У GitHub `open`/`closed`, у GitLab `opened`/`merged`/`closed`/`locked`.
     // Панели важно одно: ревьюить закрытый MR смысла нет.
     state: mr.state === 'opened' || mr.state === 'open' ? 'open' : 'closed',
+    draft:
+      mr.draft ?? mr.work_in_progress ?? /^\s*(\[?draft\]?:?|\[?wip\]?:?)\s/i.test(mr.title ?? ''),
   };
 }
 

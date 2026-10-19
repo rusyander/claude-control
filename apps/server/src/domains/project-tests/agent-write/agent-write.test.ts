@@ -198,7 +198,7 @@ describe('запись в блок «Тесты» от агента чата', (
     expect(thrown).toMatchObject({
       statusCode: 400,
       messageCode: 'record-automated-case',
-      params: { cases: 'auth:auth-002', groups: 'auth' },
+      params: { cases: 'auth:auth-002' },
     });
     expect(readRuns(root)).toEqual([]);
     expect(readGroup(root, 'auth').cases.map((item) => [item.id, item.status])).toEqual([

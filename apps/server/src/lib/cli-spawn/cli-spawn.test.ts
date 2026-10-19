@@ -61,3 +61,41 @@ describe('lib/cli-spawn: окружение доходит до процесса
     expect(child.path.length).toBeGreaterThan(0);
   });
 });
+
+/** Метка CLI, которую видит сам процесс, при журнале в окружении сервера и без него. */
+async function ledgerMarker(home: string | undefined, inheritEnv?: boolean): Promise<string> {
+  const before = process.env.AGENTDECK_VERIFY_LEDGER_HOME;
+  if (home === undefined) delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
+  else process.env.AGENTDECK_VERIFY_LEDGER_HOME = home;
+  try {
+    const spawned = spawnCliProcess(
+      process.execPath,
+      ['-e', 'process.stdout.write(process.env.AGENTDECK_VERIFY_LEDGER_CLI ?? "")'],
+      inheritEnv === false ? { inheritEnv: false, env: { PATH: process.env.PATH ?? '' } } : {},
+    );
+    if (spawned.error) throw spawned.error;
+    let out = '';
+    spawned.child.stdout.on('data', (chunk: Buffer) => {
+      out += chunk.toString('utf8');
+    });
+    await new Promise((resolve) => spawned.child.on('close', resolve));
+    return out;
+  } finally {
+    if (before === undefined) delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
+    else process.env.AGENTDECK_VERIFY_LEDGER_HOME = before;
+  }
+}
+
+describe('lib/cli-spawn: метка CLI для пульса журнала проверок', () => {
+  it('журнал подмешан — процесс видит имя своего CLI без пути и расширения', async () => {
+    expect(await ledgerMarker('/tmp/ledger-home')).toBe('node');
+  });
+
+  it('журнала нет — метки нет', async () => {
+    expect(await ledgerMarker(undefined)).toBe('');
+  });
+
+  it('агент панели (inheritEnv: false) метку не получает', async () => {
+    expect(await ledgerMarker('/tmp/ledger-home', false)).toBe('');
+  });
+});

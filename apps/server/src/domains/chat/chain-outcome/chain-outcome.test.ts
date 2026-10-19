@@ -200,6 +200,39 @@ describe('chainOutcomeOf', () => {
 });
 
 // Аудит 25.09, L63 и L110: предупреждение лимита и число замечаний ревью едут с итогом.
+// Журнал 19.10 (L7.17): шаг «Когда MR 932 вольётся: …» ушёл в новую сессию
+// группы. Теперь новой сессии нет — и шаг обязан встать перед человеком.
+describe('chainOutcomeOf: продолжение ждёт внешнего события', () => {
+  const next =
+    'Когда MR 932 вольётся: git fetch и rebase на origin/main, три гейта, push --force-with-lease';
+  const handoff = (json: object): string =>
+    ['Доставка закончена.', '', '```agentdeck:handoff', JSON.stringify(json), '```'].join('\n');
+
+  it('шаг становится шагом человеку: что сделать и чего он ждёт', () => {
+    const outcome = chainOutcomeOf({
+      link: WORK,
+      ok: true,
+      text: handoff({ done: 'MR открыт', next, checkpoint: '.agent/PROGRESS.md' }),
+    });
+    expect(outcome.humanSteps).toEqual([{ action: next, where: '', why: 'Когда MR 932 вольётся' }]);
+  });
+
+  it('обычное продолжение и закрытая работа шагом человеку не становятся', () => {
+    const plain = handoff({ done: 'этап', next: 'Продолжай по чекпойнту' });
+    expect(chainOutcomeOf({ link: WORK, ok: true, text: plain }).humanSteps).toBeUndefined();
+    const closed = handoff({ done: 'этап', next, closed: true });
+    expect(chainOutcomeOf({ link: WORK, ok: true, text: closed }).humanSteps).toBeUndefined();
+  });
+
+  it('длинный шаг режется по потолку действия, условие — целиком', () => {
+    const long = `Когда релиз выложат: ${'проверить экран. '.repeat(30)}`;
+    const step = chainOutcomeOf({ link: WORK, ok: true, text: handoff({ done: 'э', next: long }) })
+      .humanSteps?.[0];
+    expect(step?.action.length).toBeLessThanOrEqual(200);
+    expect(step?.why).toBe('Когда релиз выложат');
+  });
+});
+
 describe('chainOutcomeOf: лимит на исходе и вердикт ревью', () => {
   it('allowed_warning даёт срок сброса; обычное allowed — нет', () => {
     const resetsAt = Date.UTC(2026, 8, 25, 18, 0) / 1000;

@@ -5,6 +5,7 @@
 // `sleep 120…280; tail <output>` rounds; a session slept 200 s on its own gate). Denied:
 // `sleep`/`Start-Sleep` of 20 s or more whose command then reads a task output or a log. A fixed wait
 // for a server to boot stays allowed — poll the condition instead (`until curl -s …; do sleep 2; done`).
+// Also denied: `sleep` ≥ 60 s then a read of `.agent/tmp/` while an agent this session spawned runs.
 // Subagents are covered too (measured week: 93 sleeps / 206 min in lanes): a lane is not reliably woken by
 // its own background command, so its denial says the other way — run the long check in the FOREGROUND with
 // a timeout and read the output once.
@@ -62,6 +63,19 @@ export function ownTaskPolled(command, transcriptText) {
   return [...command.matchAll(TASK_ID)].some(([, id]) => transcriptText.includes(`ID: ${id}`));
 }
 
+// Waiting on a spawned agent's deliverable: a review sat 9× `sleep 240…295; ls|wc .agent/tmp/…/lane-B.md`
+// (16.10) while its lane ran — no task output named, so the checks above never saw it.
+const AGENT_TMP =
+  /\b(?:ls|wc|cat|test|stat|head|tail|grep|find)\b[^;&|\n]*\.agent[\\/]tmp[\\/]|\[\s+-[sfe]\s+[^\]]*\.agent[\\/]tmp[\\/]/;
+
+/** Agent ids this session launched in the background and that have not notified yet. */
+export function runningAgents(transcriptText) {
+  const ids = [
+    ...transcriptText.matchAll(/Async agent launched successfully[\s\S]{0,200}?agentId: (\w+)/g),
+  ].map((m) => m[1]);
+  return [...new Set(ids)].filter((id) => !transcriptText.includes(`<task-id>${id}</task-id>`));
+}
+
 const ownTaskReason = (wait) =>
   `bg-wait-guard: sleeping ${wait} on the output of a background command THIS session started is blind ` +
   'polling, and repeating the call does not lift it: the CLI wakes the session with a completion ' +
@@ -71,6 +85,22 @@ export default function bgWaitGuard(input) {
   const tool = input?.tool_name;
   if (tool !== 'Bash' && tool !== 'PowerShell') return null;
   const command = String(input.tool_input?.command ?? '');
+  const slept = Number(SLEEP.exec(bareCommand(command))?.[1] ?? 0);
+  if (slept >= 60 && AGENT_TMP.test(command) && !inSubagent(input)) {
+    try {
+      const transcript = ownTranscript(input);
+      const events = toolEvents(readTail(transcript));
+      const repeated = wasJustRefused(events, tool, (o) => String(o?.command ?? '') === command);
+      if (!repeated && runningAgents(readTailText(transcript, OWN_TASK_BYTES)).length)
+        return deny(
+          `bg-wait-guard: sleeping ${slept} s then reading .agent/tmp/ while an agent this session spawned is ` +
+            'running is blind polling: its completion notification (and handback) wakes you. Do other work, or ' +
+            'end the turn saying what is running. Repeat this exact call if the wait is on something else.',
+        );
+    } catch {
+      /* no transcript → nothing known of agents */
+    }
+  }
   const total = sleepTotal(command);
   if (total < 20) return null;
   const wait = Number.isFinite(total) ? `${Math.round(total)} s` : 'an unbounded loop';

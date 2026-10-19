@@ -308,12 +308,25 @@ export function headerMismatch(text, parsed = parseReport(text)) {
  */
 export function shapeProblems(text, parsed = parseReport(text)) {
   const out = [];
-  const names = (list) =>
-    list
-      .slice(0, 4)
-      .map((f) => f.id)
-      .join(', ') + (list.length > 4 ? ` +${list.length - 4}` : '');
+  // Every id, never "+N": a capped list made a review rewrite the same report 3× in 2 min.
+  const names = (list) => list.map((f) => f.id).join(', ');
   const flag = (list, what) => list.length && out.push(`${names(list)} — no "${what}" line`);
+  // Shapes the parser does not read as findings, named so the first deny already says so.
+  const src = String(text ?? '');
+  const ranges = [
+    ...src.matchAll(/^\s*(?:#{2,4}|[-*])\s+\**(F-\d+\s*(?:\.\.\.?|…|–)\s*F-\d+)/gm),
+  ].map((m) => m[1]);
+  const items = [...src.matchAll(/^\s*[-*]\s+\**(F-\d+)\**[\s·—:-]*(?:🔴|🟡|🟢|❓)/gmu)].map(
+    (m) => m[1],
+  );
+  if (items.length)
+    out.push(
+      `${items.join(', ')} — written as a list item, read as no finding: each is a heading "### F-NN <severity> <thesis>" with its Where/Axis/Status lines`,
+    );
+  if (ranges.length)
+    out.push(
+      `"${ranges.join('", "')}" — a range is no finding: each finding is its own block (heading + fields), or the minor ones go to "What was checked"`,
+    );
   flag(
     parsed.findings.filter((f) => !f.where),
     'Where',

@@ -19,7 +19,8 @@
 // THIS session must write an open run ledger (`.agent/tickets/<KEY>.agent.md`, see ticket-run.mjs),
 // the USER'S OWN words in this window must carry that key (a compaction that erased them leaves the
 // ledger alone as the record), and only ops that stay inside the feature branch qualify.
-// Merge, force-push, branch deletion, reset --hard, tag and stash drop keep their old doors.
+// Merge, force-push, branch deletion, reset --hard, tag and stash drop keep their old doors — bar
+// `stash drop` of an entry this session tagged with `stash push -m` (`ownStashDrop`, C and C′ alike).
 // A push whose destination is main/master never rides Door C, whatever its source.
 //
 // Door C′ — the split branch (live split run). The agentdeck panel's split runs each group in
@@ -34,10 +35,18 @@
 // Attribution trailers: the harness asks for `Co-Authored-By` / "Generated with Claude
 // Code", the published-text rule forbids both, and that rule is delivered only WITH the commit call —
 // too late, the message is written. A commit / PR command carrying one is refused before any door.
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { consentGate, ASK_THE_USER } from './consent.mjs';
-import { readTail, sinceLastCompact, currentUserPrompt, userSpeech, deny } from './transcript.mjs';
+import {
+  readTail,
+  sinceLastCompact,
+  currentUserPrompt,
+  userSpeech,
+  toolEvents,
+  deny,
+} from './transcript.mjs';
 import { executedText, commandText } from './shell-text.mjs';
 import { liveTicketRuns, branchLedgers } from './ticket-run.mjs';
 import {
@@ -163,6 +172,49 @@ function pushesProtected(call) {
 function ticketGrant(input, op, forced, call) {
   if (forced || !TICKET_OPS.has(op)) return false;
   if (op === 'push' && pushesProtected(call)) return false;
+  return ticketWindow(input);
+}
+
+/** Door C/C′ for `git stash drop`: only an entry carrying a message this session gave it
+ *  (`git stash push -m <tag>`) — a group's own stash was left behind for want of an answer. */
+const OWN_STASH_TAG =
+  /\bstash\s+(?:push|save)\b[^\n|;&]*?(?:-m|--message)(?:=|\s+)(?:"([^"\n]+)"|'([^'\n]+)'|([^\s"';|&]+))/g;
+
+function ownStashDrop(input, call, original) {
+  if (call?.sub !== 'stash' || call.args[0] !== 'drop' || !call.dir) return false;
+  if (!ownSplitAt(call.dir, input?.cwd) && !ticketWindow(input)) return false;
+  const tags = new Set();
+  for (const e of toolEvents(readTail(input?.transcript_path))) {
+    if (e.kind !== 'use' || typeof e.input?.command !== 'string') continue;
+    for (const m of e.input.command.matchAll(OWN_STASH_TAG)) tags.add(m[1] ?? m[2] ?? m[3]);
+  }
+  if (!tags.size) return false;
+  const out = spawnSync('git', ['-C', call.dir, 'stash', 'list', '--format=%gd%x1f%H%x1f%gs'], {
+    encoding: 'utf8',
+    timeout: 5000,
+    windowsHide: true,
+  });
+  if (out.status !== 0) return false;
+  const entries = String(out.stdout)
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      const [gd, sha, msg] = l.split('\x1f');
+      return { gd, sha, tag: [...tags].find((t) => msg === t || msg.endsWith(`: ${t}`)) };
+    });
+  const refs = call.args.slice(1).filter((a) => !a.startsWith('-'));
+  if (refs.length > 1) return false;
+  const ref = refs[0] ?? 'stash@{0}';
+  // A ref the shell computes (`"$N"` from `stash list | grep <tag>`): own only when the command
+  // selects it by an own tag that names an existing entry.
+  if (/[$`]/.test(ref)) return entries.some((e) => e.tag && original.includes(e.tag));
+  const want = /^\d+$/.test(ref) ? `stash@{${ref}}` : ref;
+  const hit = entries.find((e) => e.gd === want || (want.length >= 7 && e.sha.startsWith(want)));
+  return Boolean(hit?.tag);
+}
+
+/** The ticket grant's window: an open run ledger of this session, its key in the user's words. */
+function ticketWindow(input) {
   // The run's own ledger, written by THIS session and still open — nothing else is a grant.
   const live = liveTicketRuns(input);
   if (!live.length) return false;
@@ -288,6 +340,8 @@ function judge(input, op, forced, call) {
     !rule.reconfirm &&
     (splitGrant(call, op, forced, input) || ticketGrant(input, op, forced, call))
   )
+    return null;
+  if (op === 'stash' && ownStashDrop(input, call, String(input?.tool_input?.command ?? '')))
     return null;
 
   const intent = rule.intent && CLASS_OPS.has(op) && !forced ? withClass(rule.intent) : rule.intent;

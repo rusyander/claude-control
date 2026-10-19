@@ -52,9 +52,14 @@ const ENV_ALLOW = [
   /^NODE_OPTIONS$/,
 ];
 
-/** Кэши и отчёты проверок — не входы: иначе прогон менял бы собственный ключ. */
+/**
+ * Кэши и отчёты проверок — не входы: иначе прогон менял бы собственный ключ.
+ * Только glob с `**` в начале: буквальный путь (`:(exclude).agent`) к каталогу,
+ * который `.gitignore` уже игнорирует, `git add` встречает отказом «paths are
+ * ignored» — так 19.10 журнал молча не видел ни одного прогона копий большого проекта.
+ */
 const EXCLUDES = [
-  ':(exclude).agent',
+  ':(exclude,glob)**/.agent/**',
   ':(exclude,glob)**/node_modules/**',
   ':(exclude,glob)**/*.tsbuildinfo',
   ':(exclude,glob)**/.eslintcache',
@@ -71,6 +76,15 @@ const HIDDEN_LOCKS = [
 
 const sha = (data) => nodeCrypto.createHash('sha256').update(data).digest('hex');
 
+/** Каталог в длинной форме, как его отдаёт git (на Windows cwd бывает `RUSYAN~1`). */
+function realDir(dir) {
+  try {
+    return fs.realpathSync.native(path.resolve(dir));
+  } catch {
+    return path.resolve(dir);
+  }
+}
+
 /** JSON с ключами по алфавиту: один и тот же набор частей — одна и та же строка. */
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -81,14 +95,21 @@ function canonical(value) {
   return JSON.stringify(value ?? null);
 }
 
+/** Без переменной — каталог, где лежит сама копия preload (`<home>/bin/<ver>/`): одна лента на всех. */
 function homeDir(env = process.env) {
-  return env.AGENTDECK_VERIFY_LEDGER_HOME || path.join(os.homedir(), '.agentdeck', 'verify-ledger');
+  if (env.AGENTDECK_VERIFY_LEDGER_HOME) return env.AGENTDECK_VERIFY_LEDGER_HOME;
+  if (path.basename(path.dirname(__dirname)) === 'bin')
+    return path.dirname(path.dirname(__dirname));
+  return path.join(os.homedir(), '.agentdeck', 'verify-ledger');
 }
 
-/** `off` — не повторять (но записывать), `on` — повторять, иначе тень: только замер. */
+/**
+ * `off` — не повторять (но записывать), `shadow` — только замер, иначе `on`:
+ * повтор и сужение (решение владельца 19.10 — тень за неделю не сэкономила ни минуты).
+ */
 function modeOf(env = process.env) {
   const v = String(env.AGENTDECK_VERIFY_LEDGER ?? '').toLowerCase();
-  return v === 'off' || v === 'on' ? v : 'shadow';
+  return v === 'off' || v === 'shadow' ? v : 'on';
 }
 
 /** Окружение git без индекса вызывающего (pre-commit lint-staged задаёт свой). */
@@ -130,7 +151,7 @@ function repoOf(cwd) {
   } catch {
     return { off: 'not-git' };
   }
-  const top = path.resolve(lines[0]);
+  const top = realDir(lines[0]);
   if (fs.existsSync(path.join(top, '.gitmodules'))) return { off: 'submodules', top };
   return { top, store: path.resolve(cwd, lines[1]), index: path.resolve(cwd, lines[2]) };
 }
@@ -316,7 +337,17 @@ function normalizeArgs(args, top) {
  * уже в скрытом lock-файле); проверка проекта — весь её каталог и запись
  * реестра: машинерия обычно вне git и в дерево не попадает.
  */
-function keyParts({ repo, match, cwd, tree, env = process.env, execArgv = process.execArgv }) {
+function keyParts({
+  repo,
+  match,
+  cwd: rawCwd,
+  tree,
+  env = process.env,
+  execArgv = process.execArgv,
+}) {
+  // Короткий путь Windows (`RUSYAN~1`) не начинается с длинного корня от git: без
+  // приведения `.env` пакета выпадал из ключа, а один запуск давал два разных ключа.
+  const cwd = realDir(rawCwd);
   const entry = match.entry;
   const script = entry
     ? {

@@ -19,20 +19,20 @@
 // its tracker key (`split-worktree.mjs`), and routine recovery there kept
 // stopping on a card — `git checkout HEAD -- <file>` mid-rebase, deleting a probe it had written
 // itself. Two narrow passes, both only inside that worktree: a discard of NAMED FILES (no `.`, no
-// directory, no glob, no `-f`, no switch), and a delete of files THIS session created (Write tool or a
-// shell redirect in the transcript) that git does not track. A tracked file, a directory, a file the
-// session never wrote, the main clone, a branch with no tracker key — the ordinary doors.
+// directory, no glob, no `-f`, no switch), and a delete of an untracked file that is the session's
+// throwaway: created by THIS session (Write, redirect or cp anywhere in the transcript, compactions
+// included), probe-named, or created earlier in the same command. A tracked file, a directory, any
+// other untracked file, the main clone, a branch with no tracker key — the ordinary doors.
 //
 // A scratch clone or worktree the session made itself (`git worktree add`, `git clone` in the
 // transcript, `scratch-zone.mjs`) is an agent zone like a temp dir: deletes, `git clean` and discards
 // inside it need no yes. Never the cwd, its ancestors, the main repo, home or a drive root.
 import { consentGate, ASK_THE_USER } from './consent.mjs';
 import { commandText, executedText } from './shell-text.mjs';
-import { readTail, sinceLastCompact } from './transcript.mjs';
 import { shellWords, gitCall, ownSplitAt, slash } from './split-worktree.mjs';
 import { inScratchZone } from './scratch-zone.mjs';
 import path from 'node:path';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { homedir } from 'node:os';
 
@@ -200,8 +200,9 @@ export default function destructiveGuard(input) {
       const hit = [...command.matchAll(find)].find((m) => {
         const rest = simpleCommand(command, m.index);
         if (unless?.test(original.slice(m.index, m.index + rest.length))) return false;
+        const before = original.slice(0, m.index);
         return !targets(original, m, rest.length, input).every(
-          (t) => inAgentZone(t) || ownScratch(t, input) || inScratchZone(t, input),
+          (t) => inAgentZone(t) || ownScratch(t, input, before) || inScratchZone(t, input),
         );
       });
       if (!hit) continue;
@@ -220,7 +221,7 @@ export default function destructiveGuard(input) {
       intent,
       asked,
       reconfirm,
-      reason: `${why}. The user has not authorised it in this turn. ${ASK_THE_USER}${id === 'rm' ? ' Probes and scratch files belong in the session scratchpad or <repo>/.agent/tmp/ — deletes there need no answer.' : ''}`,
+      reason: `${why}. The user has not authorised it in this turn. ${ASK_THE_USER}${id === 'rm' ? ' Probes and scratch files belong in the session scratchpad or <repo>/.agent/tmp/ — deletes there need no answer.' + (ownSplitAt(input?.cwd, input?.cwd) ? ' Split group (no human watching): untracked probe-named or self-made files pass; anything else — leave it and name it in the stage report.' : '') : ''}`,
     });
   }
   return null;
@@ -449,48 +450,109 @@ const same = (p) => {
   return process.platform === 'win32' ? n.toLowerCase() : n;
 };
 
-/** Absolute paths this session created, from the transcript (cached per hook call). */
-function madeThisSession(input) {
-  if (made.has(input)) return made.get(input);
-  const out = new Set();
-  const cwd = slash(input?.cwd || process.cwd());
-  for (const r of sinceLastCompact(readTail(input?.transcript_path))) {
+// `cp <src> <dst>` — the destination is a file the shell created.
+const COPY = /(?<![\w-])cp\s+([^;&|\n]+)/g;
+const WHOLE_MAX = 64 * 1024 * 1024;
+
+/**
+ * Does the session's WHOLE transcript show it creating `abs`? Compactions included: a file written
+ * before one is still the session's own (a group wrote a probe, compacted, and its `rm` was refused
+ * twice — with no human to ask, the probe stayed behind). Only lines naming the file's base name are
+ * parsed, so a large transcript costs one read.
+ */
+function madeThisSession(input, abs) {
+  const key = same(abs);
+  let cache = made.get(input);
+  if (!cache) made.set(input, (cache = new Map()));
+  if (cache.has(key)) return cache.get(key);
+  const name = path.basename(abs);
+  let text = '';
+  try {
+    const p = String(input?.transcript_path || '');
+    if (p && statSync(p).size <= WHOLE_MAX) text = readFileSync(p, 'utf8');
+  } catch {
+    /* no readable transcript: nothing written by this session can be proven */
+  }
+  let hit = false;
+  for (const line of text.split('\n')) {
+    if (hit) break;
+    if (!line.includes(name) || !line.includes('"tool_use"')) continue;
+    let r;
+    try {
+      r = JSON.parse(line);
+    } catch {
+      continue;
+    }
     const content = r?.type === 'assistant' ? r.message?.content : null;
     if (!Array.isArray(content)) continue;
+    const cwd = slash(r.cwd || input?.cwd || process.cwd());
+    const is = (w) => w && !/[$`]/.test(w) && same(path.resolve(cwd, slash(w))) === key;
     for (const c of content) {
       if (c?.type !== 'tool_use') continue;
-      if (WRITE_TOOLS.test(c.name) && typeof c.input?.file_path === 'string')
-        out.add(same(path.resolve(cwd, slash(c.input.file_path))));
-      if (SHELL_TOOLS.test(c.name) && typeof c.input?.command === 'string') {
-        for (const m of c.input.command.matchAll(REDIRECT)) {
-          const w = shellWords(m[1] ?? m[2])[0];
-          if (w && !/[$`]/.test(w)) out.add(same(path.resolve(cwd, slash(w))));
-        }
-      }
+      if (WRITE_TOOLS.test(c.name) && is(c.input?.file_path)) hit = true;
+      if (!SHELL_TOOLS.test(c.name) || typeof c.input?.command !== 'string') continue;
+      for (const m of c.input.command.matchAll(REDIRECT))
+        if (is(shellWords(m[1] ?? m[2])[0])) hit = true;
+      for (const m of c.input.command.matchAll(COPY))
+        if (
+          is(
+            shellWords(m[1])
+              .filter((w) => !w.startsWith('-'))
+              .pop(),
+          )
+        )
+          hit = true;
     }
   }
-  made.set(input, out);
-  return out;
+  cache.set(key, hit);
+  return hit;
 }
 
-/** An untracked file THIS session created inside the own split worktree. */
-function ownScratch(target, input) {
+// A throwaway by its name (`_probe1681.mjs`, `gor1567-probe.mjs`, `zz-probe.test.tsx`).
+const PROBE_NAME = /probe|^_?zz[-_.]/i;
+
+/** The nearest existing directory at or above `p`. */
+function existingDir(p) {
+  for (let d = p; ; d = path.dirname(d)) {
+    try {
+      if (statSync(d).isDirectory()) return d;
+    } catch {
+      /* not there yet: try the parent */
+    }
+    if (path.dirname(d) === d) return d;
+  }
+}
+
+/**
+ * A file git does not track inside the own split worktree that is the session's throwaway: probe-named,
+ * created by this session (whole transcript), or — not on disk yet — created by this same command
+ * before the delete (`cat > zz.ts …; rm zz.ts`; never via `mv`, which could launder a real file).
+ */
+function ownScratch(target, input, before = '') {
   try {
     if (!target || /[$`]/.test(target)) return false;
     const abs = path.resolve(slash(target));
-    const own = ownSplitAt(path.dirname(abs), input?.cwd);
+    const own = ownSplitAt(existingDir(path.dirname(abs)), input?.cwd);
     if (!own) return false;
     const rel = path.relative(path.resolve(own.root), abs);
     if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
-    if (!statSync(abs).isFile()) return false;
-    if (!madeThisSession(input).has(same(abs))) return false;
+    let exists = true;
+    try {
+      if (!statSync(abs).isFile()) return false;
+    } catch {
+      exists = false;
+    }
+    const madeHere =
+      before.includes(path.basename(abs)) && !/(?<![\w-])(?:mv|Move-Item|move)\s/i.test(before);
+    if (!exists && !madeHere) return false;
     // 1 = not in the index; 0 = tracked; anything else (no git, timeout) = cannot tell, so ask.
     const r = spawnSync('git', ['-C', own.root, 'ls-files', '--error-unmatch', '--', slash(rel)], {
       encoding: 'utf8',
       timeout: 5000,
       windowsHide: true,
     });
-    return r.status === 1;
+    if (r.status !== 1) return false;
+    return !exists || PROBE_NAME.test(path.basename(abs)) || madeThisSession(input, abs);
   } catch {
     return false;
   }

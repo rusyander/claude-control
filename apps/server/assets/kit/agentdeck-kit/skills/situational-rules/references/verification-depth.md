@@ -85,7 +85,9 @@ node <kit>/tools/mustfail.mjs --cmd "<the narrowed test command>" [--base HEAD] 
 
 It reverts each changed file to the base revision (default `origin/main`; `--base HEAD` for
 uncommitted edits), re-runs the check, and puts the file back; `{file}` in the command narrows each
-run to the reverted file (`--cmd "npx vitest related {file} --run"`). GREEN after a revert means that
+run to the reverted file (`--cmd "npx vitest related {file} --run"` — for vitest that is graph mode: one
+baseline + one all-reverted run attributed through vitest's module graph, `--trust-green` right after a
+green gate, `--budget <min>`; a verdict is memoised per tree, never re-proven). GREEN after a revert means that
 file's behaviour is untested whatever `@covers` claims — the suite may not be quoted as evidence for
 it. Run it at T2, and on any single file whose bug was just fixed.
 

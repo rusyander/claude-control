@@ -43,9 +43,11 @@ import {
   readdirSync,
   renameSync,
   realpathSync,
+  copyFileSync,
 } from 'node:fs';
 import { join, dirname, posix, resolve, basename, isAbsolute, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 const argv = process.argv.slice(2);
 const flag = (name, fallback = null) => {
@@ -54,11 +56,34 @@ const flag = (name, fallback = null) => {
 };
 const has = (name) => argv.includes(`--${name}`);
 
+// --help prints the header above (usage, modes, exit codes, safety). Without it a lane asked for help,
+// got only "--cmd is required" and read the source instead (live review 18.10.2026: 3 calls, 5k chars).
+if (has('help') || argv.includes('-h')) {
+  const head = [];
+  for (const line of readFileSync(new URL(import.meta.url), 'utf8')
+    .split(/\r?\n/)
+    .slice(1)) {
+    if (!line.startsWith('//')) break;
+    head.push(line.replace(/^\/\/ ?/, ''));
+  }
+  console.log(
+    `${head.join('\n')}\n\nFlags: --cmd (required) --base <rev> --cwd <dir> --files a,b --max <n, default 6> --quick --mutants <plan.json> --mutate/--find/--replace [--test] --timeout <ms per run> --recover\n` +
+      `Vitest «related {file}» → graph mode (2 runs + tie-breaks, no --max cap): --trust-green (gate just green, skip baseline) ` +
+      `--budget <min, default 20> --no-graph (old per-file runs). Verdicts are memoised per tree; --fresh ignores the memo.`,
+  );
+  process.exit(0);
+}
+
 const CMD = flag('cmd');
 const BASE = flag('base');
 const CWD = flag('cwd', process.cwd());
 const MAX = Number(flag('max', '6'));
 const QUICK = has('quick');
+// Graph mode knobs: the gate just went green → no baseline run; a wall budget past which the per-file
+// tie-break runs stop and the rest are printed as not checked instead of blocking (owner 19.10.2026:
+// ~90 % of the verdicts in ~20 min beats 100 % in 5 h that nobody waits for).
+const TRUST_GREEN = has('trust-green');
+const BUDGET_MS = Number(flag('budget', '20')) * 60_000;
 
 // ---- crash journal (finding 54, live split run 24.09.2026) -------------------------------------------
 // A split group's CLI ended its turn under a background mustfail; the kill ran no handler and the tree
@@ -237,6 +262,45 @@ const SYMBOL_RED =
 // a one-line break of exactly the behaviour the test claims, which must turn the check RED on an
 // assertion. Real reviews found the survivors by hand (a race test green on the pre-fix tree; a
 // condition made unconditional, suite still green); this makes that a command.
+// Async, because a timeout must kill the whole tree: spawnSync's timeout kills only the shell, and the
+// test runner under it kept spinning (fixture run 23.09.2026) — a mutant loop would burn a core for good.
+function killTree(pid) {
+  if (process.platform === 'win32')
+    spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true });
+  else
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      /* already gone */
+    }
+}
+function execTree(cmd, timeout, env) {
+  return new Promise((done) => {
+    const t0 = Date.now();
+    const child = spawn(cmd, {
+      cwd: CWD,
+      shell: SHELL,
+      windowsHide: true,
+      detached: process.platform !== 'win32',
+      env: env ? { ...process.env, ...env } : process.env,
+    });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (out += d));
+    let timedOut = false;
+    const timer = timeout
+      ? setTimeout(() => {
+          timedOut = true;
+          killTree(child.pid);
+        }, timeout)
+      : null;
+    child.on('close', (status) => {
+      clearTimeout(timer);
+      done({ status: status ?? 1, timedOut, out, ms: Date.now() - t0 });
+    });
+  });
+}
+
 if (flag('mutants') || argv.includes('--mutate')) process.exit(await runMutants());
 
 async function runMutants() {
@@ -327,43 +391,11 @@ async function runMutants() {
       ? CMD.replaceAll('{file}', m.file.replaceAll('\\', '/')).replaceAll('{abs}', m.full)
       : CMD;
   let spentMs = 0;
-  // Async, because a timeout must kill the whole tree: spawnSync's timeout kills only the shell, and the
-  // test runner under it kept spinning (fixture run 23.09.2026) — a mutant loop would burn a core for good.
-  const killTree = (pid) => {
-    if (process.platform === 'win32')
-      spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true });
-    else
-      try {
-        process.kill(-pid, 'SIGKILL');
-      } catch {
-        /* already gone */
-      }
+  const exec = async (cmd, timeout) => {
+    const r = await execTree(cmd, timeout);
+    spentMs += r.ms;
+    return r;
   };
-  const exec = (cmd, timeout) =>
-    new Promise((done) => {
-      const t0 = Date.now();
-      const child = spawn(cmd, {
-        cwd: CWD,
-        shell: SHELL,
-        windowsHide: true,
-        detached: process.platform !== 'win32',
-      });
-      let out = '';
-      child.stdout.on('data', (d) => (out += d));
-      child.stderr.on('data', (d) => (out += d));
-      let timedOut = false;
-      const timer = timeout
-        ? setTimeout(() => {
-            timedOut = true;
-            killTree(child.pid);
-          }, timeout)
-        : null;
-      child.on('close', (status) => {
-        clearTimeout(timer);
-        spentMs += Date.now() - t0;
-        done({ status: status ?? 1, timedOut, out });
-      });
-    });
 
   process.stdout.write(`mustfail · mutants · ${muts.length} · ${CMD}\n`);
   // Baseline per distinct command: every mutant is judged against a run that was green untouched.
@@ -605,7 +637,12 @@ function targets() {
       refuse(
         `--files entry not found in the tree or at ${base}: ${missing.join(', ')} (relative to --cwd, to the repository root, or absolute)`,
       );
-    return out;
+    // The same behaviour filter as discovery: a locale JSON passed by hand made `vitest related` walk
+    // the whole suite for a file no assertion can be about (L7.15, live group 19.10.2026).
+    const dropped = out.filter((f) => !SOURCE.test(f) || NOT_BEHAVIOUR.test(f));
+    if (dropped.length)
+      process.stdout.write(`mustfail: not behaviour, skipped: ${dropped.join(', ')}\n`);
+    return out.filter((f) => !dropped.includes(f));
   }
   const seen = new Set();
   for (const args of [
@@ -627,6 +664,62 @@ if (!files.length) {
     `mustfail: no behaviour-bearing changed source files against ${base} — nothing to prove`,
   );
   process.exit(2);
+}
+
+// ---- verdict memo (verify-ledger design §3, row «mustfail»: S1 per-file verdict memo) ---------------
+// The ledger replays a check at an identical tree, but mustfail MUTATES the tree, so no run of it ever
+// meets its own key — the proof was redone from scratch on every stage, review and resume (measured:
+// mustfail twice over the same tree, ~13 min each). A verdict is a fact about (tree, base, command,
+// file): any byte of the tree changes the key (the test closure is the whole tree). Stored beside the
+// journal, per worktree. `--fresh` ignores it. A budget-cut run resumes here: judged files stay judged.
+function treeKey() {
+  const idx = join(STATE, `idx-${process.pid}`);
+  try {
+    mkdirSync(STATE, { recursive: true });
+    const real = resolve(CWD, git(['rev-parse', '--git-path', 'index']).stdout.trim());
+    if (existsSync(real)) copyFileSync(real, idx);
+    const env = { ...process.env, GIT_INDEX_FILE: idx };
+    if (git(['-c', 'core.autocrlf=false', 'add', '-A', '--', ':/'], { env }).status !== 0)
+      return null;
+    return git(['write-tree'], { env }).stdout.trim() || null;
+  } catch {
+    return null;
+  } finally {
+    rmSync(idx, { force: true });
+  }
+}
+const MEMO = join(STATE, 'memo');
+const TREE = QUICK || has('fresh') ? null : treeKey();
+const memoFile = (f) =>
+  join(MEMO, `${sha(Buffer.from(JSON.stringify([TREE, base, CMD, f])))}.json`);
+const MEMOABLE = new Set(['RED', 'RED·symbol', 'GREEN', 'NO-BASE']);
+function remember(f, verdict, note) {
+  if (!TREE || !MEMOABLE.has(verdict)) return;
+  try {
+    mkdirSync(MEMO, { recursive: true });
+    writeFileSync(
+      memoFile(f),
+      JSON.stringify({ verdict, note, at: new Date().toISOString().slice(0, 16) }),
+    );
+  } catch {
+    /* a memo that cannot be written only costs the next run time */
+  }
+}
+const rows = [];
+if (TREE) {
+  for (const f of [...files]) {
+    try {
+      const m = JSON.parse(readFileSync(memoFile(f), 'utf8'));
+      rows.push([f, m.verdict, `${m.note} (verdict from ${m.at}, same tree)`]);
+      files.splice(files.indexOf(f), 1);
+    } catch {
+      /* not judged at this tree yet */
+    }
+  }
+  if (rows.length)
+    process.stdout.write(
+      `mustfail: ${rows.length} file(s) already proven at this very tree — no run\n`,
+    );
 }
 
 /** Content of a path at the base revision, or null when the file did not exist there. */
@@ -675,7 +768,7 @@ if (TEMPLATED && QUICK) {
 // ---- baseline: the check must be green before a mutation means anything -------------------------
 process.stdout.write(`mustfail · base ${base} · ${files.length} file(s) · ${CMD}\n`);
 // A templated command has no single baseline: each file is measured against its own narrowed run.
-const baseline = TEMPLATED ? { status: 0 } : run();
+const baseline = TEMPLATED || !files.length ? { status: 0 } : run();
 const baselineMs = spent;
 if (baseline.status !== 0) {
   const tail = (baseline.stdout || '').split('\n').slice(-12).join('\n');
@@ -741,11 +834,165 @@ function revert(path) {
   return 'reverted';
 }
 
-const rows = [];
 let exitCode = 0;
 
+// Vitest narrowed by `related {file}`: one graph run instead of a spawn per file (see graphMode).
+const GRAPH =
+  TEMPLATED && /\bvitest\b/.test(CMD) && /\brelated\s+\{file\}/.test(CMD) && !has('no-graph');
+
+/**
+ * Graph mode (measured: 118–177 s per `vitest related {file}`, 22 files ≈ 45 min).
+ * 1. Baseline over ALL files at once with mustfail-graph-reporter: green check + the module graph
+ *    «which test files reach which target» — vitest's own watcher walk. `--trust-green` skips it.
+ * 2. ONE run with every file reverted. Per file: no related test → NO-BASE; none of its related tests
+ *    failed → GREEN; a failed test reached by THIS file alone → RED.
+ * 3. Only a file whose failures are all shared with other reverted files gets its own run: revert it
+ *    alone, run just those failed test files by name (no `related` graph walk). Past --budget these are
+ *    printed «UNCHECKED» and never block. Runs bypass the verify ledger: a replay skips the reporter.
+ */
+async function graphMode() {
+  const started = Date.now();
+  const left = () => BUDGET_MS - (Date.now() - started);
+  const reporter = fileURLToPath(new URL('./mustfail-graph-reporter.mjs', import.meta.url)).replace(
+    /\\/g,
+    '/',
+  );
+  const graphOut = join(STATE, `graph-${process.pid}.json`);
+  const abs = (p) => join(root, p).replace(/\\/g, '/');
+  const env = { MUSTFAIL_GRAPH_OUT: graphOut, AGENTDECK_VERIFY_LEDGER: 'off' };
+  const graphRun = async (label, targets) => {
+    mkdirSync(STATE, { recursive: true });
+    rmSync(graphOut, { force: true });
+    env.MUSTFAIL_TARGETS = JSON.stringify(targets.map(abs));
+    const r = await execTree(
+      `${cmdForMany(targets)} --reporter=default --reporter="${reporter}"`,
+      Math.max(left(), 60_000),
+      env,
+    );
+    spent += r.ms;
+    let g = null;
+    try {
+      g = JSON.parse(readFileSync(graphOut, 'utf8'));
+    } catch {
+      /* no graph: the reporter never ran (crash before the run, or an old vitest) */
+    }
+    rmSync(graphOut, { force: true });
+    const state = r.timedOut ? 'cut by budget' : r.status === 0 ? 'green' : 'red';
+    process.stdout.write(
+      `· ${label}: ${state}, test files ${g ? g.tests.length : '?'} (${Math.round(r.ms / 1000)} s)\n`,
+    );
+    return { r, g };
+  };
+  const unchecked = (list, why) => list.forEach((f) => rows.push([f, 'UNCHECKED', why]));
+  const redKind = (texts) => (texts.every((t) => SYMBOL_RED.test(t)) ? 'RED·symbol' : 'RED');
+  const RED_NOTE = {
+    RED: 'the revert breaks the check — covered',
+    'RED·symbol': 'the import of a vanished symbol failed, not a behaviour check',
+  };
+
+  let graph = null;
+  const baseFailed = new Set();
+  if (!TRUST_GREEN) {
+    const { r, g } = await graphRun('baseline with graph', files);
+    if (!g || r.timedOut) {
+      process.stdout.write(`${(r.out || '').split('\n').slice(-15).join('\n')}\n`);
+      return unchecked(files, 'the baseline produced no graph — rerun with --no-graph');
+    }
+    for (const t of g.tests) if (t.failed) baseFailed.add(t.file);
+    graph = g.related;
+  }
+
+  const reverted = [];
+  for (const f of files) {
+    save(f);
+    if (revert(f) === 'new')
+      rows.push([f, 'SKIP', 'new file — reverting it breaks the build, not a coverage signal']);
+    else reverted.push(f);
+  }
+  const putBack = (f) => {
+    const { full, before } = saved.get(f);
+    if (before === null) {
+      if (existsSync(full)) unlinkSync(full);
+    } else writeFileSync(full, before);
+  };
+  if (!reverted.length) return files.forEach(putBack);
+  const { r, g } = await graphRun('all files reverted at once', reverted);
+  files.forEach(putBack);
+  if (!g || r.timedOut) {
+    process.stdout.write(`${(r.out || '').split('\n').slice(-15).join('\n')}\n`);
+    return unchecked(reverted, 'the reverted run produced no graph or was cut by budget');
+  }
+  graph ??= g.related;
+  const failed = new Map(
+    g.tests.filter((t) => t.failed && !baseFailed.has(t.file)).map((t) => [t.file, t.text || '']),
+  );
+  const related = (f) => (graph[abs(f)] ?? []).filter((t) => !baseFailed.has(t));
+  const owners = new Map();
+  for (const f of reverted)
+    for (const t of related(f)) owners.set(t, [...(owners.get(t) ?? []), f]);
+
+  const tieBreak = [];
+  for (const f of reverted) {
+    const mine = related(f);
+    if (!mine.length) {
+      const why = (graph[abs(f)] ?? []).length
+        ? 'every related test fails before the revert'
+        : 'no related tests';
+      rows.push([f, 'NO-BASE', why]);
+      continue;
+    }
+    const hit = mine.filter((t) => failed.has(t));
+    if (!hit.length)
+      rows.push([
+        f,
+        'GREEN',
+        `the revert does not break the check — NOT covered (related test files: ${mine.length})`,
+      ]);
+    else if (hit.some((t) => owners.get(t).length === 1)) {
+      const kind = redKind(hit.filter((t) => owners.get(t).length === 1).map((t) => failed.get(t)));
+      rows.push([f, kind, RED_NOTE[kind]]);
+    } else tieBreak.push([f, hit]);
+  }
+
+  // Shared failures only: which of the reverted files broke them is unknown — one narrow run each.
+  for (const [i, [f, hit]] of tieBreak.entries()) {
+    if (left() < 30_000) {
+      unchecked(
+        [f],
+        `--budget ${BUDGET_MS / 60_000} min spent — run again, proven files are not repeated`,
+      );
+      continue;
+    }
+    // The runner's own absolute ids: a path re-derived against --cwd breaks on an 8.3 short spelling.
+    const tests = hit.map((t) => `"${t}"`).join(' ');
+    revert(f);
+    const own = await execTree(CMD.replace(/\brelated\s+\{file\}/, tests), left(), {
+      AGENTDECK_VERIFY_LEDGER: 'off',
+    });
+    putBack(f);
+    spent += own.ms;
+    if (own.timedOut) unchecked([f], 'own run cut by budget');
+    else if (own.status === 0)
+      rows.push([
+        f,
+        'GREEN',
+        'the revert alone does not break the check — NOT covered (failed only together with others)',
+      ]);
+    else {
+      const kind = redKind([own.out]);
+      rows.push([f, kind, RED_NOTE[kind]]);
+    }
+    process.stdout.write(
+      `[${i + 1}/${tieBreak.length}] ${f} → ${rows.at(-1)[1]} (${Math.round(own.ms / 1000)} s)\n`,
+    );
+  }
+}
 try {
-  if (QUICK) {
+  if (!files.length) {
+    /* every verdict came from the memo */
+  } else if (GRAPH) {
+    await graphMode();
+  } else if (QUICK) {
     // One run with everything reverted: cheap, and a GREEN here is already a verdict — nothing in the
     // whole change is covered. A RED only says *something* is, which is why it is not the default.
     for (const f of files) save(f);
@@ -861,6 +1108,9 @@ try {
   if (!restore()) process.exit(2);
 }
 
+for (const [f, v, note] of rows) if (!note.includes('same tree')) remember(f, v, note);
+if (rows.some(([, v]) => v === 'GREEN' || v === 'NO-BASE')) exitCode = 1;
+
 // ---- report ---------------------------------------------------------------------------------------
 const w = Math.max(...rows.map(([f]) => f.length), 6);
 process.stdout.write(`\n| ${'File'.padEnd(w)} | Revert to base | What it means  |\n`);
@@ -873,7 +1123,7 @@ const symbolRed = rows.filter(([, v]) => v === 'RED·symbol').length;
 const noBase = rows.filter(([, v]) => v === 'NO-BASE').length;
 process.stdout.write(
   `\nMUSTFAIL: ${rows.filter(([, v]) => v.startsWith('RED')).length} red${symbolRed ? ` (${symbolRed} of them by symbol)` : ''} · ${green} green · ` +
-    `${noBase ? `${noBase} without a base check · ` : ''}${rows.filter(([, v]) => v === 'SKIP').length} skipped · ${Math.round(spent / 1000)} s\n`,
+    `${noBase ? `${noBase} without a base check · ` : ''}${rows.some(([, v]) => v === 'UNCHECKED') ? `${rows.filter(([, v]) => v === 'UNCHECKED').length} UNCHECKED (budget) · ` : ''}${rows.filter(([, v]) => v === 'SKIP').length} skipped · ${Math.round(spent / 1000)} s\n`,
 );
 if (!TEMPLATED && baselineMs > 30_000)
   process.stdout.write(

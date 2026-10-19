@@ -35,7 +35,7 @@
 //
 // Cost when the command is not a publish: one regex over the raw command, no process spawned.
 import { spawnSync } from 'node:child_process';
-import { closeSync, openSync, readSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { executedText, commandText } from './shell-text.mjs';
 import { gitCall, repoAt, shellWords, slash } from './split-worktree.mjs';
@@ -71,14 +71,33 @@ export function gitTooOld(versionText) {
   return maj < MIN_GIT[0] || (maj === MIN_GIT[0] && min < MIN_GIT[1]);
 }
 
-/** Files named on `# sieve-ack:` comment lines of the raw command. */
-export function ackedFiles(raw) {
+/** Files named on `# sieve-ack:` comment lines of the raw command; `@<file>` adds every line of that file. */
+export function ackedFiles(raw, cwd) {
   const out = new Set();
+  const add = (f) => f && out.add(slash(f).replace(/^\.\//, ''));
   for (const m of String(raw ?? '').matchAll(ACK)) {
-    for (const f of m[1].split(/[\s,]+/)) if (f) out.add(slash(f).replace(/^\.\//, ''));
+    for (const f of m[1].split(/[\s,]+/)) {
+      if (!f.startsWith('@')) add(f);
+      else
+        try {
+          for (const line of readFileSync(
+            path.resolve(String(cwd ?? '.'), f.slice(1)),
+            'utf8',
+          ).split(/\r?\n/))
+            add(line.trim());
+        } catch {
+          add(f);
+        }
+    }
   }
   return out;
 }
+
+// Comment lines are text: an apostrophe in a prose `# sieve-ack:` broke the parse and hid the push.
+const noComments = (raw) =>
+  String(raw)
+    .replace(/^[ \t]*#[^\n]*$/gm, '')
+    .replace(/[ \t]#\s*sieve-ack:[^\n]*/g, '');
 
 /** `git diff -U0` → removed hunks `{path, start, count}` (line numbers on the old side). */
 export function removedHunks(diff) {
@@ -167,8 +186,8 @@ const CLI_FLAGS = {
 
 /** Every publish in the command: `{dir, remote, ref, target, label}`; target null = main. */
 export function publishTargets(raw, cwd) {
-  const executed = executedText(raw, { code: 'spawn' });
-  const original = commandText(raw);
+  const executed = executedText(noComments(raw), { code: 'spawn' });
+  const original = commandText(noComments(raw));
   const out = [];
   for (const m of executed.matchAll(GIT_WORD)) {
     let call = null;
@@ -506,6 +525,21 @@ function mainAtStart(git, cwd, mainRef, branch, since) {
   return git(cwd, ['merge-base', '--octopus', ...found]).stdout.trim() || byDate;
 }
 
+/** The flagged files, one per line, in the repo's `.agent/tmp/sieve-ack.txt`; the path as the ack names it, or null. */
+function writeAckList(cwd, dir, files) {
+  try {
+    const root = repoAt(dir)?.root;
+    if (!root) return null;
+    const file = path.join(root, '.agent', 'tmp', 'sieve-ack.txt');
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, `${files.join('\n')}\n`);
+    const rel = slash(path.relative(path.resolve(String(cwd ?? root)), file));
+    return /\s/.test(rel) ? null : rel;
+  } catch {
+    return null;
+  }
+}
+
 const list = (files) =>
   files.slice(0, LIST_MAX).join(', ') +
   (files.length > LIST_MAX ? ` (+${files.length - LIST_MAX} more)` : '');
@@ -532,7 +566,7 @@ export default function pushSieves(input) {
     return null;
   }
 
-  const acked = ackedFiles(raw);
+  const acked = ackedFiles(raw, input?.cwd);
   const results = targets.slice(0, REFS_MAX).map((t) => sieve(git, t, input));
   const conflicts = results.filter((r) => r.conflicts.length);
   if (conflicts.length && !acked.has('conflict')) {
@@ -553,16 +587,27 @@ export default function pushSieves(input) {
     .filter((r) => r.open.length);
   if (foreign.length) {
     const r0 = foreign[0];
+    // Escape first, full list last and in a file: a capped list made the agent rebuild it by hand,
+    // and a prose ack read as file names cost a second identical deny.
+    const all = [...new Set(foreign.flatMap((r) => r.open))];
+    const ackFile = writeAckList(input?.cwd, targets[0].dir, all);
+    const flagged = new Set(results.flatMap((r) => r.foreign));
+    const named = [...acked].filter((a) => a !== 'conflict');
+    const prose = named.length && !named.some((a) => flagged.has(a));
     return deny(
       'push-sieves(foreign-removal) ' +
+        (prose
+          ? `the \`# sieve-ack:\` line names none of the flagged files («${named.join(' ').slice(0, 60)}») — it takes paths. `
+          : '') +
+        `Removal intended → add the comment line \`# sieve-ack: ${ackFile ? `@${ackFile}` : '<every file below>'}\`` +
+        `${ackFile ? ` (it lists all ${all.length} flagged files)` : ''} and run it again. Otherwise restore what was not yours: ` +
+        `usually lost to a rebase or a file rewritten from a stale copy; \`git log -p ${r0.startSha}..${r0.mainShort} -- <file>\` shows what landed. ` +
         foreign
           .map(
             (r) =>
-              `\`${r.label}\` deletes lines that reached ${r.main} after this task began (${r.since}) — someone else's work: ${list(r.open)}.`,
+              `\`${r.label}\` deletes lines that reached ${r.main} after this task began (${r.since}) — someone else's work: ${r.open.join(', ')}.`,
           )
-          .join(' ') +
-        ` Usually lost to a rebase or a file rewritten from a stale copy; \`git log -p ${r0.startSha}..${r0.mainShort} -- <file>\` shows what landed. Restore what was not yours to remove. ` +
-        'A removal that IS intended: name every such file on a comment line of the command, `# sieve-ack: <file> <file>`, and run it again.',
+          .join(' '),
     );
   }
   // 3. Content sieves over what the branch adds (push-sieves-scan.mjs). A thrown scan is a note, never a deny.

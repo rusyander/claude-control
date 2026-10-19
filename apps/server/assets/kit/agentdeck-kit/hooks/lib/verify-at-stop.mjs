@@ -7,7 +7,8 @@
 //
 // What counts as a check: any Bash/PowerShell call AFTER the last code edit whose command runs a
 // test runner, a type-checker, a linter, a build, or a node/python script that is itself a test or
-// check (tests/ folder, *.test.*, check-/verify-/audit-/parity-named). A red run counts too — the
+// check (tests/ folder, *.test.*, check-/verify-/audit-/parity-named), or that executes an edited file
+// itself (`node bl/accept.mjs` after editing it). A red run counts too — the
 // point is that a real path executed and its output was read, not that it was green.
 // What does not count: edits under .agent/, scratchpad or temp folders, node_modules, build output,
 // and documents (.md, .json, .txt) — those are not code. The user can switch the gate off for one
@@ -47,6 +48,15 @@ const VERIFY = new RegExp(
 const OPT_OUT =
   /(?<![а-яё])(не\s+(нужно\s+|надо\s+)?(проверя|запуска|прогоня|тестир)|без\s+(проверк|тестов|прогон))|\b(no|skip|without)\s+(the\s+)?(tests?|checks?|verification)\b/i;
 const EDIT_TOOL = /^(Write|Edit|MultiEdit|NotebookEdit)$/;
+// Running an edited file itself is its check (an acceptance script edited and re-run green was still
+// blocked). Interpreter, its flags, then the file; matched by base name.
+const RUNNER =
+  /(?:^|[\s;&|(])(?:node|tsx|ts-node|bun|deno\s+run|python3?|py|bash|sh|pwsh|powershell|ruby|php|go\s+run)(?:\s+-{1,2}[\w-]+(?:=\S+)?)*\s+["']?([^\s"'|&;<>]+)/gi;
+const base = (p) => String(p).split(/[\\/]/).pop().toLowerCase();
+const runsEdited = (command, edits) => {
+  const names = new Set(edits.map(base));
+  return [...command.matchAll(RUNNER)].some((m) => names.has(base(m[1])));
+};
 
 export function editedCodeWithoutCheck(records) {
   const { index } = lastUserSpeech(records);
@@ -61,14 +71,11 @@ export function editedCodeWithoutCheck(records) {
     lastEdit = i;
   });
   if (!edits.length) return null;
-  const checked = events
-    .slice(lastEdit + 1)
-    .some(
-      (e) =>
-        e.kind === 'use' &&
-        /^(Bash|PowerShell)$/.test(String(e.name ?? '')) &&
-        VERIFY.test(String(e.input?.command ?? '')),
-    );
+  const checked = events.slice(lastEdit + 1).some((e) => {
+    if (e.kind !== 'use' || !/^(Bash|PowerShell)$/.test(String(e.name ?? ''))) return false;
+    const command = String(e.input?.command ?? '');
+    return VERIFY.test(command) || runsEdited(command, edits);
+  });
   return checked ? null : edits;
 }
 

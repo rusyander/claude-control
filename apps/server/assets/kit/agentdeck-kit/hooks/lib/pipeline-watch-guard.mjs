@@ -32,6 +32,24 @@ export function isPipelineRead(name, toolInput) {
   return CLI_READ.test(executedText(String(toolInput?.command ?? '')) || '');
 }
 
+// A read that showed no pipeline is not a snapshot: a short sha returned `[]`, both retries by ref
+// were denied, and the delivery recorded "skipped" for a pipeline that existed.
+function showedNothing(res) {
+  if (res.isError) return true;
+  const body = String(res.body ?? '').trim();
+  if (!body) return true;
+  try {
+    const v = JSON.parse(body);
+    if (v === null) return true;
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === 'object')
+      return Object.values(v).every((x) => x === null || (Array.isArray(x) && !x.length));
+  } catch {
+    /* not JSON: a text answer is a snapshot, not an empty one */
+  }
+  return false;
+}
+
 /** @returns {null | {decision:'deny', reason:string}} */
 export default function pipelineWatchGuard(input) {
   const name = String(input?.tool_name ?? '');
@@ -52,7 +70,7 @@ export default function pipelineWatchGuard(input) {
   const earlier = events.filter((e) => {
     if (e.kind !== 'use' || !isPipelineRead(e.name, e.input)) return false;
     const res = resultFor(events, e.id);
-    return Boolean(res) && !isRefusal(res.body);
+    return Boolean(res) && !isRefusal(res.body) && !showedNothing(res);
   });
   if (!earlier.length) return null;
   return deny(

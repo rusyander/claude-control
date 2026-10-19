@@ -1305,14 +1305,21 @@ export const chatEn: typeof chatRu = {
       'new: the result would be the same. The panel adds a small node module to all of ' +
       'its launches (Claude, other CLIs, local and contour runs) that records every check ' +
       'run together with a fingerprint of the tree — the working files, regardless of ' +
-      'line-ending settings — and notices when the same run already happened. For now the ' +
-      'ledger only measures: checks run as usual, and Settings → Groups → Verify ledger ' +
-      'shows how many runs it would have replayed, how many minutes that would have saved, ' +
-      'how many times a record disagreed with the real run (must be 0, otherwise replays ' +
-      'stay off) and under which CLIs it actually fired. Replays are switched on by the ' +
-      'panel environment variable AGENTDECK_VERIFY_LEDGER=on, off keeps recording only, ' +
-      'disabled turns the ledger off entirely. If the module fails its self-test at panel ' +
-      'start, nothing gets it, and the tile says “Not working” with the reason.',
+      'line-ending settings — and notices when the same run already happened. A green run ' +
+      'on the same tree does not run twice: the ledger returns the recorded output and exit ' +
+      'code, and its first line names the run it replayed. After an edit, vitest runs not ' +
+      'the whole suite but only the tests related to the files changed since the last green ' +
+      'run (the “delta since green” line gives their count); an edit to dependencies, ' +
+      'configs, setup files or snapshots, a deleted file, a junit report, a rerun after a ' +
+      'red narrowed run, and ten narrowed runs in a row or a day without a whole run bring ' +
+      'the whole run back. Settings → Groups → Verify ledger shows ' +
+      'how many runs were replayed, how many minutes that saved, how many times a record ' +
+      'disagreed with the real run and under which CLIs the ledger fired. Panel environment ' +
+      'variable AGENTDECK_VERIFY_LEDGER: empty or on — replays and narrowing, off or ' +
+      'shadow — recording and comparison only, disabled — no ledger at all; ' +
+      'AGENTDECK_VERIFY_LEDGER_DELTA=off keeps replays but runs tests whole. If the module ' +
+      'fails its self-test at panel start, nothing gets it, and the tile says “Not working” ' +
+      'with the reason.',
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
@@ -1620,7 +1627,13 @@ export const chatEn: typeof chatRu = {
       'process death is retried by the panel itself, continuing the same session: ' +
       'up to three times with a pause, and on a limit at the moment it resets; the ' +
       'row says “waiting for a retry”. A real error is not retried, and a group that ' +
-      'gave up shows the reason and the number of retries.',
+      'gave up shows the reason and the number of retries. A turn that hangs without ' +
+      'failing is caught by a watchdog: a working group whose conversation (its subagents ' +
+      'included) stays silent for over an hour gets its process stopped and the same ' +
+      'session resumed with a request to rerun the interrupted checks, and the parent feed ' +
+      'gets a line “Group … was silent for N min”. A background group with a live process, ' +
+      'one waiting for your answer to a permission request, and a foreign-CLI group with no ' +
+      'conversation on disk are left alone.',
     cascadeDelivery: 'Delivery is checked by git, “accepted” is yours to set',
     cascadeDeliveryText:
       'With delivery on, the work (and the review with its fixes) is followed by a ' +

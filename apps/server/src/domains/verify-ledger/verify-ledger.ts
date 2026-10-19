@@ -8,6 +8,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import type { LedgerInstall, LedgerSummary, LedgerEvent } from './verify-ledger.types.ts';
@@ -24,11 +25,36 @@ import type { LedgerInstall, LedgerSummary, LedgerEvent } from './verify-ledger.
  * содержимого, старые версии не удаляются: их ещё держат запущенные сессии.
  */
 
-const FILES = ['checks.cjs', 'ledger.cjs', 'preload.cjs'] as const;
+const FILES = ['checks.cjs', 'delta.cjs', 'ledger.cjs', 'preload.cjs'] as const;
 const LEDGER_ENV = 'AGENTDECK_VERIFY_LEDGER';
+
+/**
+ * Постоянный вход `bin/preload.cjs`: на него указывает и окружение панели, и
+ * `env.NODE_OPTIONS` в настройках CLI (VS Code, терминал — без панели). Файл
+ * никогда не удаляется и грузит версию из `bin/current`; любой сбой — тишина,
+ * иначе `--require` уронил бы каждый процесс node, включая хуки.
+ */
+const STABLE_SHIM = `'use strict';
+// Stable entry of the verify ledger (written by the agentdeck panel). Version lives in ./current.
+try {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const v = fs.readFileSync(path.join(__dirname, 'current'), 'utf8').trim();
+  if (/^[0-9a-f]{12}$/.test(v)) require(path.join(__dirname, v, 'preload.cjs'));
+} catch {
+  /* no version, no ledger: the check runs as is */
+}
+`;
 
 export function ledgerHome(appData: string): string {
   return join(appData, 'verify-ledger');
+}
+
+/** Запись через переименование: процесс, читающий вход прямо сейчас, не увидит половину файла. */
+function writeAtomic(file: string, body: string): void {
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, body);
+  renameSync(tmp, file);
 }
 
 /** Путь для NODE_OPTIONS: обратный слеш там — экранирование (проверено 19.10), значит только `/`. */
@@ -76,7 +102,13 @@ export function installLedger(opts: {
     if (probe.status !== 0 || probe.stdout !== 'ok') {
       return { preload: null, reason: `self-test failed (${probe.status ?? probe.signal})` };
     }
-    return { preload, version };
+    // Версия прошла самопроверку — только теперь постоянный вход переключается на неё.
+    const bin = join(ledgerHome(opts.appData), 'bin');
+    writeAtomic(join(bin, 'current'), version);
+    const shim = join(bin, 'preload.cjs');
+    if (!existsSync(shim) || readFileSync(shim, 'utf8') !== STABLE_SHIM)
+      writeAtomic(shim, STABLE_SHIM);
+    return { preload: forNodeOptions(shim), version };
   } catch (error) {
     return { preload: null, reason: `install failed: ${(error as Error).message}` };
   }
@@ -197,5 +229,6 @@ export function ledgerSummary(
 
 function modeOf(value: string | undefined): LedgerSummary['mode'] {
   const v = String(value ?? '').toLowerCase();
-  return v === 'on' || v === 'off' || v === 'disabled' ? v : 'shadow';
+  // Пусто — значит on, как modeOf в самом preload (ledger.cjs): плитка не врёт о режиме.
+  return v === 'shadow' || v === 'off' || v === 'disabled' ? v : 'on';
 }

@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
   copyFileSync,
@@ -29,18 +30,42 @@ describe('installLedger', () => {
   it('ставит копию по версии содержимого и проходит самопроверку живым node', () => {
     const install = installLedger({ appData, sourceDir: SOURCE });
     expect(install.reason).toBeUndefined();
-    expect(install.preload).toMatch(/verify-ledger\/bin\/[0-9a-f]{12}\/preload\.cjs$/);
+    // Подмешивается постоянный вход, а он ведёт на проверенную версию.
+    expect(install.preload).toMatch(/verify-ledger\/bin\/preload\.cjs$/);
     expect(install.preload).not.toContain('\\');
     expect(existsSync(install.preload!)).toBe(true);
+    const bin = join(appData, 'verify-ledger', 'bin');
+    expect(readFileSync(join(bin, 'current'), 'utf8')).toBe(install.version);
+    expect(existsSync(join(bin, install.version!, 'delta.cjs'))).toBe(true);
     // Повтор той же версии — тот же каталог, без второй копии.
     installLedger({ appData, sourceDir: SOURCE });
-    expect(readdirSync(join(appData, 'verify-ledger', 'bin'))).toHaveLength(1);
+    expect(readdirSync(bin).filter((n) => /^[0-9a-f]{12}$/.test(n))).toHaveLength(1);
+  });
+
+  it('постоянный вход грузит версию из current и ставит общий дом ленты', () => {
+    const install = installLedger({ appData, sourceDir: SOURCE });
+    const probe = spawnSync(
+      process.execPath,
+      ['-e', 'process.stdout.write(String(globalThis[Symbol.for("agentdeck.verify-ledger")]))'],
+      {
+        env: { ...process.env, NODE_OPTIONS: `--require "${install.preload}"` },
+        encoding: 'utf8',
+      },
+    );
+    expect(probe.stdout).toBe('true');
+    // Без current вход молчит, а node живёт: битая установка не роняет хуки.
+    rmSync(join(appData, 'verify-ledger', 'bin', 'current'));
+    const bare = spawnSync(process.execPath, ['-e', 'process.stdout.write("ok")'], {
+      env: { ...process.env, NODE_OPTIONS: `--require "${install.preload}"` },
+      encoding: 'utf8',
+    });
+    expect(bare.stdout).toBe('ok');
   });
 
   it('T17: preload, роняющий node, не ставится — панель ничего не подмешивает', () => {
     const broken = join(appData, 'src');
     mkdirSync(broken);
-    for (const name of ['checks.cjs', 'ledger.cjs']) {
+    for (const name of ['checks.cjs', 'delta.cjs', 'ledger.cjs']) {
       copyFileSync(join(SOURCE, name), join(broken, name));
     }
     // Ошибка вне try/catch preload — то, что уронило бы КАЖДЫЙ процесс node.

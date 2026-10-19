@@ -400,6 +400,7 @@ export type ChatEvent =
        * 'modelDropped' — имя модели не прошло грамматику аргументов;
        * 'childTold' — родитель написал группам блоком `agentdeck:tell` (Д7);
        * 'groupsInterrupted' — процессы групп оборвались посреди хода (WP1c);
+       * 'groupStalled' — группа молчала дольше любого вызова, сторож снял её процесс;
        * 'groupsLimited' — группы ждут сброса лимита подписки (журнал 89);
        * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
        * 'mrWatchInfra' — CI упал на инфраструктуре: панель повторила задания сама / второе падение (E3);
@@ -430,6 +431,7 @@ export type ChatEvent =
         | 'modelDropped'
         | 'childTold'
         | 'groupsInterrupted'
+        | 'groupStalled'
         | 'groupsLimited'
         | 'mrWatchLimit'
         | 'mrWatchInfra'

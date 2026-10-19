@@ -143,7 +143,12 @@ import {
   resolveProjectDelivery,
 } from '../../domains/project-git/project-git.ts';
 import { readLastAssistantTurn } from '../../domains/chat/ChatHistory/ChatHistory.ts';
-import { groupTokenLedger } from '../../domains/chat/token-ledger/group-ledger.ts';
+import { groupChatIds, groupTokenLedger } from '../../domains/chat/token-ledger/group-ledger.ts';
+import {
+  STALL_POLL_MS,
+  createSplitStallWatch,
+  transcriptActivity,
+} from '../../domains/chat/split-stall/split-stall.ts';
 import { createHandoffPlanner } from '../../routes/chat/handoff-routes.ts';
 import { projectsDir } from '../../routes/chat/paths.ts';
 import { syncRelayHooks } from '../../routes/chat/outside-relay-routes/outside-relay-routes.ts';
@@ -1547,6 +1552,39 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   });
   const localRunTimer = setInterval(syncLocalRun, LOCAL_RUN_POLL_MS);
   localRunTimer.unref();
+  // Сторож повисших групп (строка 8 плана скорости гейтов): молчание дольше любого
+  // законного вызова — обрыв с продолжением, а не часы «работает» до глаз человека.
+  const stallWatch = createSplitStallWatch({
+    plans: () => Object.values(ctx.store.getSplitPlans()),
+    chatIdsOf: (record, group) => {
+      const links = ctx.store.getChatLinks();
+      const ids = groupChatIds(links, record, group);
+      return [...new Set(ids.flatMap((id) => [id, ...conversationKeys(links, id)]))];
+    },
+    lastActivity: (ids) => transcriptActivity(projectsDir(ctx), ids),
+    processAlive: (ids) => ids.some((id) => chatRuns.isProcessAlive(id)),
+    waitingOnHuman: (ids) =>
+      chatSession.pendingPermissions().some((pending) => ids.includes(pending.runId)),
+    stop: (chatId) => chatRuns.stop(chatId),
+    interrupt: (parentChatId, index) => splitConveyor.interruptStalled(parentChatId, index),
+    notify: (parentChatId, group, silentMs, resumed) => {
+      const params = {
+        group: group.title,
+        minutes: String(Math.round(silentMs / 60_000)),
+        resumed: resumed ? '1' : '0',
+      };
+      sayToParent(parentChatId, {
+        kind: 'notice',
+        code: 'groupStalled',
+        text: serverText('split-group-stalled-notice', params),
+        textCode: 'split-group-stalled-notice',
+        textParams: params,
+      });
+    },
+    log: (message, error) => console.warn(message, error ?? ''),
+  });
+  const stallTimer = setInterval(stallWatch, STALL_POLL_MS);
+  stallTimer.unref();
   // Включённому «Claude на локальной модели» нужен живой сервер с первого сеанса.
   void localModels.resume().catch((error: unknown) => {
     console.warn('local models: server for the Claude switch did not start', error);
@@ -1855,6 +1893,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // новый процесс панели подхватит его по записи.
     localModels.shutdown();
     clearInterval(localRunTimer);
+    clearInterval(stallTimer);
     keepAwake.stop();
   };
 

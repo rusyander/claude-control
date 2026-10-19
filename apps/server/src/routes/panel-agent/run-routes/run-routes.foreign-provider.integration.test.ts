@@ -278,6 +278,9 @@ describe('POST /api/agent/run — агент у чужого CLI', () => {
   it('Qwen Code не на PATH — cli_not_found с именем CLI', async () => {
     store.updateSettings({ provider: 'qwen' });
     rmSync(join(bin, isWindows ? 'qwen.cmd' : 'qwen'));
+    // Каталог node на PATH — он же каталог глобальных пакетов npm (nvm): установленный там
+    // настоящий qwen нашёлся бы вместо отказа. До отказа node не нужен — только наш bin.
+    process.env.PATH = bin;
     resetCliLookupCache();
     const response = await run();
     expect(response.statusCode).toBe(409);

@@ -45,6 +45,7 @@ const e = process.env;
 console.log('Test Files  3 passed ' + helper());
 console.error('note on stderr');
 if (e.FAKE_INHERIT) (await import('node:child_process')).spawnSync(process.execPath, ['-e', 'console.log(1)'], { stdio: 'inherit' });
+if (e.FAKE_ESBUILD) (await import('node:child_process')).spawnSync('node_modules/@esbuild/win32-x64/esbuild.exe', ['--version'], { stdio: ['pipe', 'pipe', 'inherit'] });
 if (e.FAKE_BIG) process.stdout.write('x'.repeat(Number(e.FAKE_BIG)));
 if (e.FAKE_EDIT) { fs.writeFileSync('src.txt', 'B\\n'); if (e.FAKE_REVERT) { await new Promise((r) => setTimeout(r, 30)); fs.writeFileSync('src.txt', 'A\\n'); } }
 if (e.FAKE_STAMP) fs.writeFileSync(e.FAKE_STAMP, 'stamp-' + fs.readFileSync('src.txt', 'utf8'));
@@ -146,9 +147,9 @@ describe('verify-ledger: повтор при том же содержимом', 
     expect(reused(run())).toBe(true);
   });
 
-  it('тень (по умолчанию): прогон идёт, в ленте «повторил бы» и совпадение', () => {
-    run({ AGENTDECK_VERIFY_LEDGER: '' });
-    const second = run({ AGENTDECK_VERIFY_LEDGER: '' });
+  it('тень (shadow): прогон идёт, в ленте «повторил бы» и совпадение', () => {
+    run({ AGENTDECK_VERIFY_LEDGER: 'shadow' });
+    const second = run({ AGENTDECK_VERIFY_LEDGER: 'shadow' });
     expect(reused(second)).toBe(false);
     const kinds = events().map((e) => e.kind);
     expect(kinds).toContain('would-skip');
@@ -159,7 +160,7 @@ describe('verify-ledger: повтор при том же содержимом', 
   it('T26: тень замечает расхождение кода прогона с записью', () => {
     run();
     // Тот же ключ, другой исход: код берётся из окружения, которого нет в списке значимых.
-    run({ AGENTDECK_VERIFY_LEDGER: '', FAKE_EXIT: '1' });
+    run({ AGENTDECK_VERIFY_LEDGER: 'shadow', FAKE_EXIT: '1' });
     expect(events().map((e) => e.kind)).toContain('mismatch');
   });
 
@@ -305,6 +306,13 @@ describe('verify-ledger: запись только честного прогон
     expect(recordCount()).toBe(1);
     expect(reused(run({ FAKE_INHERIT: '1' }))).toBe(false);
     expect(events().some((e) => e.reason === 'output-incomplete')).toBe(true);
+  });
+
+  it('служба esbuild со stderr inherit не делает вывод неполным — vitest повторяется', () => {
+    run({ FAKE_ESBUILD: '1' });
+    expect(recordCount()).toBe(1);
+    expect(reused(run({ FAKE_ESBUILD: '1' }))).toBe(true);
+    expect(events().some((e) => e.reason === 'output-incomplete')).toBe(false);
   });
 
   it('T19: подложенная руками запись без подписи не считается', () => {

@@ -1,18 +1,44 @@
 {
   "title": {
-    "ru": "Журнал проверок считает, сколько прогонов гейта и тестов повторялись на том же коде",
-    "en": "The verify ledger counts how many gate and test runs repeated on the same code"
+    "ru": "Журнал проверок не гоняет второй раз зелёный прогон на том же коде и сужает тесты до изменённого",
+    "en": "The verify ledger does not rerun a green run on the same code and narrows tests to what changed"
   },
   "items": [
     {
       "kind": "added",
       "text": {
-        "ru": "Панель подмешивает своим запускам (Claude, другим CLI, локальным и контурным прогонам) небольшой модуль node, который записывает каждый прогон проверки вместе с отпечатком дерева файлов и замечает, когда такой же прогон уже был. Пока журнал только замеряет: проверки идут как обычно, а плитка «Журнал проверок» в «Настройки» → «Группы» показывает, сколько прогонов он повторил бы, сколько минут это сэкономило бы, сколько раз запись разошлась с настоящим прогоном и под какими CLI он срабатывал. По этим числам решается, включать ли повторы.",
-        "en": "The panel adds a small node module to its launches (Claude, other CLIs, local and contour runs) that records every check run with a fingerprint of the file tree and notices when the same run already happened. For now the ledger only measures: checks run as usual, and the «Verify ledger» tile in «Settings» → «Groups» shows how many runs it would have replayed, how many minutes that would have saved, how many times a record disagreed with the real run and under which CLIs it fired. These numbers decide whether replays get switched on."
+        "ru": "Панель подмешивает своим запускам (Claude, другим CLI, локальным и контурным прогонам) небольшой модуль node, который записывает каждый прогон проверки вместе с отпечатком дерева файлов. Зелёный прогон гейта или тестов на том же дереве второй раз не идёт: журнал отдаёт записанный вывод и код выхода и первой строкой называет, какой прогон повторил. Плитка «Журнал проверок» в «Настройки» → «Группы» показывает, сколько прогонов повторено, сколько минут это сэкономило, сколько раз запись разошлась с настоящим прогоном и под какими CLI журнал срабатывал. AGENTDECK_VERIFY_LEDGER=off или shadow оставляет только запись и сверку, disabled выключает журнал совсем.",
+        "en": "The panel adds a small node module to its launches (Claude, other CLIs, local and contour runs) that records every check run with a fingerprint of the file tree. A green gate or test run on the same tree does not run twice: the ledger returns the recorded output and exit code and its first line names the run it replayed. The «Verify ledger» tile in «Settings» → «Groups» shows how many runs were replayed, how many minutes that saved, how many times a record disagreed with the real run and under which CLIs the ledger fired. AGENTDECK_VERIFY_LEDGER=off or shadow keeps recording and comparison only, disabled turns the ledger off entirely."
       },
       "how": {
         "ru": "Модуль ставится отдельной копией по версии содержимого и при старте панели проходит самопроверку живым node; не прошёл — не подмешивается никому, а плитка пишет «Не работает» с причиной. Отпечаток не зависит от настроек переводов строк, учитывает игнорируемые .env и скрытые lock-файлы, а красный прогон на том же коде запрещает повтор навсегда.",
         "en": "The module is installed as a separate copy per content version and passes a self-test with a live node at panel start; if it fails, nobody gets it and the tile says «Not working» with the reason. The fingerprint ignores line-ending settings, includes ignored .env files and hidden lock files, and a red run on the same code forbids a replay for good."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Тесты vitest после правки идут не целиком, а только связанные с файлами, изменёнными с последнего зелёного прогона: строка «delta since green» называет их число. Правка зависимостей, конфигов, setup-файлов или снимков, удаление файла, отчёт junit, повтор после красного сужения и десять сужений подряд или сутки без полного прогона возвращают прогон целиком; AGENTDECK_VERIFY_LEDGER_DELTA=off отключает сужение.",
+        "en": "After an edit, vitest runs not the whole suite but only the tests related to files changed since the last green run; the «delta since green» line gives their count. An edit to dependencies, configs, setup files or snapshots, a deleted file, a junit report, a rerun after a red narrowed run, and ten narrowed runs in a row or a day without a whole run bring the whole run back; AGENTDECK_VERIFY_LEDGER_DELTA=off turns narrowing off."
+      },
+      "how": {
+        "ru": "Тест вне графа импортов изменённых файлов не видел ни одной правки, поэтому его вердикт из зелёного прогона в силе; всё, чего граф не видит, расширяет прогон до целого.",
+        "en": "A test outside the import graph of the changed files saw none of the edits, so its verdict from the green run still holds; whatever the graph cannot see widens the run to the whole suite."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Журнал не экономил ни одного прогона по двум причинам. В копиях групп он выключался сам: короткое имя каталога Windows и игнорируемый .agent в списке путей роняли снимок дерева. А служба esbuild, которую vitest оставляет жить, держала вывод открытым, и каждый прогон тестов считался недописанным и не записывался. Теперь прогон связанных тестов, шедший 63 с, на том же дереве возвращается за 2 с.",
+        "en": "The ledger saved no run at all, for two reasons. In group copies it switched itself off: the Windows short directory name and the ignored .agent in the path list broke the tree snapshot. And the esbuild service that vitest leaves running kept the output open, so every test run counted as incomplete and was never recorded. Now a related-tests run that took 63 s returns in 2 s on the same tree."
       },
       "area": {
         "ru": "Группы",

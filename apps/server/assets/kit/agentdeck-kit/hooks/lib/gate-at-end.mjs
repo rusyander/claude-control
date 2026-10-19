@@ -45,8 +45,10 @@ const KINDS = [
   ['build', /\b(npm|pnpm|yarn|bun)\s+(run\s+)?build\b|\bgo\s+build\b|\bcargo\s+build\b/i],
   ['shots', /\b(npm|pnpm|yarn|bun)\s+(run\s+)?shots\b/i],
 ];
+// `check-ticket` = a per-ticket gate script (canon + tests + docs, ~8–13 min). Unrecognised, it ran 11×
+// per split group — fix → full gate → fix — instead of once per stage; `--dry` only prints a plan.
 const GATE_SCRIPT =
-  /\b(npm|pnpm|yarn|bun)\s+(run\s+)?(gate|verify|ci|validate|check-all)\b|\bmake\s+(check|ci|verify|gate)\b|\bgate-run(\.mjs)?\b/i;
+  /\b(npm|pnpm|yarn|bun)\s+(run\s+)?(gate|verify|ci|validate|check-all)\b|\bmake\s+(check|ci|verify|gate)\b|\bgate-run(\.mjs)?\b|\bcheck-ticket(\.mjs)?\b(?![^\n;&|]*\s--dry\b)/i;
 const NOT_CHECK =
   /^\s*(git|grep|rg|cat|ls|dir|echo|type|find|curl|which|where|sed|head|tail|mkdir|rm|cp|mv|touch|ps|kill|taskkill|command|for)\b|\b(install|add|remove|uninstall|upgrade|update|outdated)\b|\s--version\b/i;
 const TRUNCATED = /\|\s*(tail|head|grep|rg|findstr|select-string|select-object)\b/i;

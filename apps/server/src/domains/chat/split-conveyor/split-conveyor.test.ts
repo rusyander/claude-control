@@ -1053,6 +1053,22 @@ describe('SplitConveyor: обрыв процесса группы (WP1c)', () =>
     });
   });
 
+  it('повисшая группа (сторож молчания) идёт путём обрыва; не «работающую» сторож не трогает', async () => {
+    const { conveyor, records, wait, h } = await running('sent', 1);
+
+    expect(conveyor.interruptStalled('родитель', 0)).toEqual({ resumed: true });
+    await wait();
+    expect(h.calls[0]?.statusAtCall).toBe('awaiting/interrupted');
+    expect(records.get('родитель')?.groups[0]).toMatchObject({
+      status: 'started',
+      interruptResumes: 1,
+    });
+
+    expect(conveyor.interruptStalled('родитель', 1)).toBeUndefined();
+    expect(conveyor.interruptStalled('нет-такого', 0)).toBeUndefined();
+    expect(h.calls).toHaveLength(1);
+  });
+
   it(`после ${MAX_INTERRUPT_RESUMES} продолжений подряд — ждёт человека; «Продолжить» даёт попытки снова, законченный ход обнуляет счёт`, async () => {
     const { conveyor, records, link, wait, h } = await running();
 

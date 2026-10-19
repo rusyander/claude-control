@@ -236,6 +236,11 @@ const groupSwaps = (): readonly (readonly [string, string])[] => [
  * фон (ревью B-F05). Ни одна проверка не снимается: меняется только то, сколько
  * её вывода едет в контекст.
  *
+ * Полный гейт — раз на этап (строка 6 плана скорости гейтов, 19.10.2026): группа
+ * гоняла его после каждой правки — 11 прогонов по 8–13 минут на группу, — хотя
+ * между правками хватает тестов изменённых файлов. Красный гейт после починки
+ * перезапускается: сначала он сам гоняет упавшие в прошлый раз, это секунды.
+ *
  * Задачи трекера (9.5) панель кладёт в копию сама: ответ трекера через MCP с
  * описанием и комментариями ложился в контекст группы и перечитывался каждым
  * вызовом — файл читается один раз и только при нужде.
@@ -251,7 +256,9 @@ export const GROUP_ECONOMY_PROMPT =
   'changed; edit code, write a whole file only when the file is new; send long output (gate, ' +
   'tests, build) to a log file, keep the verdict, counts, the first failure lines and the log ' +
   'path; give a gate or build timeout 1800000 (30 min), await it in one call, without ' +
-  'polling. Each fact you had to find out ' +
+  'polling. Between fixes check only what they touched (tests of the changed files); the ' +
+  "project's full gate runs once per stage, at its end, and after a red one again once fixed. " +
+  'Each fact you had to find out ' +
   `(stand access, commands, ports, places, decisions): one line into ${TASK_NOTEBOOK}, ` +
   `never a secret; read it before searching again. Tracker tasks: read ${TASK_TICKETS} first. ` +
   'When the conversation is ' +

@@ -1523,6 +1523,21 @@ export class SplitConveyor {
   }
 
   /**
+   * Сторож повисших групп (`split-stall.ts`): группа молчит дольше любого
+   * законного вызова, её процесс уже снят — дальше путь оборванного хода.
+   * `undefined` — группа за это время перестала «работать», трогать нечего.
+   */
+  interruptStalled(parentChatId: string, index: number): { resumed: boolean } | undefined {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups.find((item) => item.index === index);
+    if (!record || !group || (group.status !== 'started' && group.status !== 'background')) {
+      return undefined;
+    }
+    this.interrupt(record, group);
+    return { resumed: this.autoResume(parentChatId, index) };
+  }
+
+  /**
    * После перезапуска панели, ПОСЛЕ усыновления живых прогонов: группа, чей
    * прогон не пережил перезапуск, прервана. Сюда же — ждавшая повтора: таймер
    * повтора жил в памяти прежнего процесса и уже не сработает.

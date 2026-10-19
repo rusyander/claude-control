@@ -311,6 +311,32 @@
         "ru": "Чат",
         "en": "Chat"
       }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Группа, чей ход повис без падения, больше не стоит сутками: если её разговор вместе с субагентами молчит дольше часа, панель снимает процесс, продолжает ту же сессию с просьбой заново прогнать оборванные проверки и пишет родителю «Группа … молчала N мин». Группу в фоне с живым процессом, ждущую ответа на запрос прав и группу чужого CLI без разговора на диске сторож не трогает.",
+        "en": "A group whose turn hung without failing no longer stands still for days: when its conversation, subagents included, stays silent for over an hour, the panel stops the process, resumes the same session with a request to rerun the interrupted checks and tells the parent «Group … was silent for N min». A background group with a live process, one waiting for an answer to a permission request and a foreign-CLI group with no conversation on disk are left alone."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Проверка «тест умеет покраснеть» из набора панели при команде `vitest related {file}` делает два прогона на все изменённые файлы вместо прогона на каждый, а вердикты по файлу из графа модулей vitest. Повторный запуск на том же дереве берёт вердикты из памяти без прогона. Прерванный по бюджету `--budget` запуск продолжает с недоказанных файлов. Связанные тесты находятся и тогда, когда путь к проекту записан в коротком виде Windows (имя папки с `~1`).",
+        "en": "The panel kit's “a test can go red” check, given `vitest related {file}`, makes two runs over all changed files instead of one per file, and takes per-file verdicts from vitest's module graph. A repeat run at the same tree takes the verdicts from memory without running. A run cut by `--budget` resumes from the files not yet proven. Related tests are found even when the project path is written in the short Windows form (a folder name with `~1`)."
+      },
+      "how": {
+        "ru": "Замер на группе с 22 файлами: 118–177 с на файл, около 45 минут; в режиме графа — около 8 минут.",
+        "en": "Measured on a group with 22 files: 118–177 s per file, about 45 minutes; in graph mode, about 8 minutes."
+      },
+      "area": {
+        "ru": "Набор панели",
+        "en": "Panel kit"
+      }
     }
   ]
 }

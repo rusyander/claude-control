@@ -23,6 +23,10 @@ try {
 
 function main() {
   if (!require('node:worker_threads').isMainThread) return;
+  // Два пути подключения (окружение панели и `settings.json` CLI) не дают двойной записи.
+  const LOADED = Symbol.for('agentdeck.verify-ledger');
+  if (globalThis[LOADED]) return;
+  globalThis[LOADED] = true;
   const { recognize } = require('./checks.cjs');
   const cwd = process.cwd();
   const match = recognize(process.argv, cwd);
@@ -32,7 +36,16 @@ function main() {
   const startedAt = Date.now();
   const repo = L.repoOf(cwd);
   if (repo.off) return L.appendEvent({ kind: 'off', reason: repo.off, check: match.id });
-  const start = L.snapshot(repo);
+  let start;
+  try {
+    start = L.snapshot(repo);
+  } catch (error) {
+    // Молчаливый сбой снимка 19.10 спрятал от журнала все прогоны групп: причина — в ленту.
+    const reason = `snapshot-failed: ${String(error?.message ?? error)
+      .split('\n')[0]
+      .slice(0, 160)}`;
+    return L.appendEvent({ kind: 'off', reason, check: match.id, repo: repo.top });
+  }
   if (start.off)
     return L.appendEvent({ kind: 'off', reason: start.off, check: match.id, repo: repo.top });
   const parts = L.keyParts({ repo, match, cwd, tree: start.tree });
@@ -86,13 +99,89 @@ function main() {
     L.appendEvent({ ...event, kind: 'would-skip', recordedExit: hit.exit, savedMs: hit.ms, mode });
   else L.appendEvent({ ...event, kind: 'miss', reason: match.noSkip ?? decision.reason, mode });
 
+  const D = require('./delta.cjs');
+  const delta =
+    !hit && mode === 'on' && decision.reason === 'no-record'
+      ? D.plan({ repo, parts, match, cwd, tree: start.tree, now: startedAt })
+      : null;
+  if (delta?.files) narrow(L, D, { repo, delta, base, event, startedAt });
+
   const capture = startCapture();
   process.on('exit', (code) => {
     try {
-      finish(L, { repo, match, start, base, event, hit, mode, capture, code });
+      const record = finish(L, { repo, match, start, base, event, hit, mode, capture, code });
+      if (code === 0 && record)
+        rememberGreen(D, { repo, match, parts, cwd, start, delta, base, runId: record.runId });
     } catch {
       /* сбой записи — прогона просто нет в журнале */
     }
+  });
+}
+
+/**
+ * Сужение от последнего зелёного (`delta.cjs`): argv становится `vitest related <Δ>`.
+ * Внутри пакета не изменилось ничего видимого тестам — повтор зелёного G, как при
+ * совпадении ключа. Строка о сужении печатается всегда: прогон уже не тот, что набран.
+ */
+function narrow(L, D, { repo, delta, base, event, startedAt }) {
+  const { last } = delta;
+  const at = new Date(last.at).toISOString();
+  if (delta.files.length === 0) {
+    const green = L.records(repo, last.key).find((r) => r.runId === last.runId);
+    if (!green) return;
+    const bodies = L.replayBodies(repo, green);
+    writeAll(1, bodies.stdout);
+    writeAll(2, bodies.stderr);
+    writeAll(
+      2,
+      Buffer.from(
+        `[verify-ledger] nothing the tests can see changed since green ${last.runId} from ${at}; reused. AGENTDECK_VERIFY_LEDGER_DELTA=off forces a run\n`,
+      ),
+    );
+    const empty = Buffer.alloc(0);
+    L.writeRecord(
+      repo,
+      {
+        ...base,
+        exit: 0,
+        ms: Date.now() - startedAt,
+        reusedFrom: last.runId,
+        scope: `delta:${last.tree.slice(0, 12)}`,
+      },
+      { stdout: empty, stderr: empty, complete: false },
+    );
+    L.appendEvent({ ...event, kind: 'hit', savedMs: green.ms, delta: 0 });
+    process.exit(0);
+  }
+  process.argv = [process.argv[0], process.argv[1], ...D.narrowedArgs(delta.shape, delta.files)];
+  base.scope = `delta:${last.tree.slice(0, 12)}`;
+  base.chain = (last.chain ?? 0) + 1;
+  writeAll(
+    2,
+    Buffer.from(
+      `[verify-ledger] delta since green ${last.runId} from ${at}: vitest related on ${delta.files.length} changed file(s) (${delta.files.slice(0, 5).join(', ')}${delta.files.length > 5 ? ', …' : ''}); AGENTDECK_VERIFY_LEDGER_DELTA=off runs the whole set\n`,
+    ),
+  );
+  L.appendEvent({ ...event, kind: 'delta', files: delta.files.length, chain: base.chain });
+}
+
+/** Зелёный прогон — новая точка отсчёта для сужения того же семейства. */
+function rememberGreen(D, { repo, match, parts, cwd, start, delta, base, runId }) {
+  if (match.id !== 'vitest' || match.noSkip) return;
+  const shape = delta?.shape ?? D.vitestShape(match.args);
+  if (!shape) return;
+  const family = delta?.family ?? D.familyOf(parts, shape);
+  const narrowed = Boolean(delta?.files);
+  const prev = narrowed ? delta.last : null;
+  const files = D.claimFiles(shape, cwd);
+  D.writeLast(repo, family, {
+    key: base.key,
+    runId,
+    tree: start.tree,
+    at: base.startedAt,
+    files: files ? [...new Set([...(prev?.files ?? []), ...files])] : null,
+    chain: narrowed ? base.chain : 0,
+    fullAt: narrowed ? prev.fullAt : base.startedAt,
   });
 }
 
@@ -119,7 +208,7 @@ function finish(L, { repo, match, start, base, event, hit, mode, capture, code }
   if (end.off || end.tree !== start.tree || end.stat !== start.stat) {
     return L.appendEvent({ ...event, kind: 'off', reason: 'tree-changed' });
   }
-  L.writeRecord(
+  const record = L.writeRecord(
     repo,
     { ...base, exit: code, ms, reusedFrom: null },
     {
@@ -130,6 +219,7 @@ function finish(L, { repo, match, start, base, event, hit, mode, capture, code }
     match.entry?.artifacts ?? [],
   );
   L.appendEvent({ ...event, kind: 'record', exit: code, ms });
+  return record;
 }
 
 /**
@@ -177,6 +267,14 @@ function inherits(options, forkDefault) {
   );
 }
 
+/**
+ * Служба esbuild (её поднимает каждый vite и vitest) стартует со stderr `inherit`,
+ * но пишет туда только о собственном падении — а упавший esbuild роняет и прогон.
+ * Считать её «пишущей мимо» значило не повторять ни одного прогона vitest: так
+ * журнал 19.10 за неделю не сэкономил ни минуты.
+ */
+const QUIET_CHILD = /(^|[\\/])esbuild(\.exe)?$/i;
+
 /** Обёртка над child_process: заметить ребёнка, пишущего прямо в наш stdout. */
 function watchInherit(capture) {
   const cp = require('node:child_process');
@@ -185,6 +283,7 @@ function watchInherit(capture) {
     if (typeof original !== 'function') return;
     cp[name] = function patched(...args) {
       try {
+        if (QUIET_CHILD.test(String(args[0] ?? ''))) return original.apply(this, args);
         const options = args.find(
           (a, i) => i > 0 && a && typeof a === 'object' && !Array.isArray(a),
         );

@@ -8,7 +8,7 @@
 // Allowed: a narrowed command (file args, `related`, `--changed`, `-t`, `--filter`), nothing touched in
 // git, the user asking for the check or delivery this prompt, and a repeat of the identical call.
 import { execFileSync } from 'node:child_process';
-import { commandKey, learned, loadStore } from './cmd-duration.mjs';
+import { knownFor, loadStore } from './cmd-duration.mjs';
 import { allNarrow, bareCommand, gateKinds, isFullGate } from './gate-at-end.mjs';
 import {
   deny,
@@ -67,7 +67,7 @@ export function wholeProjectCheck(command) {
 
 /** Known quick here (learned median under SLOW_S), or not known and not a lint → let it run. */
 function quickEnough(kind, cwd, command) {
-  const known = learned(loadStore().keys[commandKey(cwd, command)]);
+  const known = knownFor(loadStore(), cwd, command);
   return known ? known.median < SLOW_S && known.kills === 0 : kind !== 'lint';
 }
 

@@ -327,15 +327,27 @@ async function runPre(input, only) {
     });
 }
 
+// SessionStart lines for a human: a split group (the panel sets its heavy-queue dir) has nobody to
+// act on them, and each is billed on every turn; an onboarding offer even pulls a stage off its task.
+const HUMAN_SESSION = new Set([
+  'context-budget',
+  'project-onboard-check',
+  'doc-hygiene-autoclean',
+  'review-sync-brief',
+]);
+
 async function runText(event, input, only, prompt) {
   const calls = event.startsWith('post-') ? normalize(input) : [input];
   const out = [];
-  for (const item of await itemsFor(event, only))
+  const group = event === 'session' && Boolean(process.env.AGENTDECK_HEAVY_QUEUE_DIR);
+  for (const item of await itemsFor(event, only)) {
+    if (group && HUMAN_SESSION.has(item.name)) continue;
     for (const call of calls) {
       if (item.tools && !item.tools.test(String(call?.tool_name ?? ''))) continue;
       const msg = attempt(item.run, call, prompt);
       if (msg) out.push(msg);
     }
+  }
   return out.length ? withRoot(out.join('\n\n')) : null;
 }
 

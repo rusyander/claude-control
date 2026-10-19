@@ -23,7 +23,8 @@
   `cherry-pick` pass unasked; MR/tracker writes of that ticket too. **C′**: in a split worktree
   (`<repo>-worktrees/<dir>`) on a branch named after a tracker key, `commit`, `cherry-pick`, `rebase`
   and `push` (`--force-with-lease` included) to THAT branch pass unasked. Merge, `--force`/`+ref`,
-  branch -D, reset --hard, tag, stash drop keep their doors.
+  branch -D, reset --hard, tag, stash drop keep their doors — bar `stash drop` of an entry this
+  session tagged via `git stash push -m <tag>` (C and C′).
 - **Tracker link = the MR, never the branch.** Anything attached to a tracker issue (remote link,
   comment, description) points at the MR/PR: the branch is deleted on merge and its URL rots. Same
   wherever a reference must outlive the work.

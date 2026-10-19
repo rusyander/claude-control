@@ -65,6 +65,9 @@ describe('lib/cli-spawn: окружение доходит до процесса
 /** Метка CLI, которую видит сам процесс, при журнале в окружении сервера и без него. */
 async function ledgerMarker(home: string | undefined, inheritEnv?: boolean): Promise<string> {
   const before = process.env.AGENTDECK_VERIFY_LEDGER_HOME;
+  // Запуск из сессии CLI с глобальным журналом приносит его метку в окружение — тест видел бы её, а не нашу.
+  const inherited = process.env.AGENTDECK_VERIFY_LEDGER_CLI;
+  delete process.env.AGENTDECK_VERIFY_LEDGER_CLI;
   if (home === undefined) delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
   else process.env.AGENTDECK_VERIFY_LEDGER_HOME = home;
   try {
@@ -83,6 +86,7 @@ async function ledgerMarker(home: string | undefined, inheritEnv?: boolean): Pro
   } finally {
     if (before === undefined) delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
     else process.env.AGENTDECK_VERIFY_LEDGER_HOME = before;
+    if (inherited !== undefined) process.env.AGENTDECK_VERIFY_LEDGER_CLI = inherited;
   }
 }
 

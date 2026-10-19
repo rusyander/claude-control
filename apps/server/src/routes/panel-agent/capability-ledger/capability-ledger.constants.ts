@@ -807,6 +807,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   // dev-restart-routes.ts
   'GET /api/dev-restart': 'internal:ui-state',
   'POST /api/dev-restart': 'human:dev-restart',
+  // verify-ledger-routes.ts — плитка журнала проверок: действия на чтение у агента пока нет.
+  'GET /api/verify-ledger': 'gap:P3',
   // watcher-routes.ts
   'GET /api/watcher': 'action:watcher_status',
   'POST /api/watcher': 'action:set_watcher',

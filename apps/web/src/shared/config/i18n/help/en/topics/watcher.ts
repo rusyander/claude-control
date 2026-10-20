@@ -116,7 +116,10 @@ export const watcherEn: typeof watcherRu = {
       'settings show spend in money — is an estimate at API rates, not a bill: on a ' +
       'subscription and on a local model nothing is charged. No problems — no model calls; ' +
       'problems are analysed in batches, at most twelve analyses an hour — beyond the cap ' +
-      'they wait, and the summary says so in words.',
+      'they wait, and the summary says so in words. A repeat of an already analysed section ' +
+      'with the same error text (numbers and ids aside) only raises its repeat count; it is ' +
+      'analysed again when the text or the CLI output changed, six hours have passed since ' +
+      'the analysis, or a person reported the bug again.',
     trouble: 'When the watcher cannot work',
     troubleText:
       'The CLI the analysis runs with is not on PATH — problems are written to the report without analysis. The ' +

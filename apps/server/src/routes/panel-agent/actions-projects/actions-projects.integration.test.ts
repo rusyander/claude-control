@@ -19,6 +19,7 @@ import { registerAccessGate } from '../../../lib/access-gate/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../../lib/empty-body.ts';
 import { createEventHub, type EventHub } from '../../../lib/event-hub/event-hub.ts';
 import { allowedOrigins } from '../../../lib/origin-guard/origin-guard.ts';
+import { removeWhenFree } from '../../../lib/remove-when-free.ts';
 import { resetCliLookupCache } from '../../../providers/detect/detect.ts';
 import { ChatRunRegistry } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
@@ -126,27 +127,6 @@ async function fakeGone(pidFile: string): Promise<void> {
   for (let waited = 0; isAlive(pid) && waited < 3000; waited += 50) await sleep(50);
   // Обёртка `cmd.exe` уходит следом за node и тоже держит каталог.
   await sleep(200);
-}
-
-/**
- * Снять каталог, который ещё держит уходящий CLI. Папка чата лежит в настоящем
- * `~/.agentdeck/chats` и служит CLI рабочим каталогом; обёртка `cmd.exe` живёт
- * дольше node, чей pid ждёт `fakeGone`, и под нагрузкой полного прогона Windows
- * отдаёт каталог через секунды — `maxRetries` у `rmSync` в это окно не
- * укладывался (EPERM). Ждём освобождения до 15 с; не освободился — падаем
- * настоящей ошибкой, а не оставляем папку в домашнем каталоге молча.
- */
-async function removeWhenFree(dir: string): Promise<void> {
-  for (let waited = 0; ; waited += 200) {
-    try {
-      rmSync(dir, { recursive: true, force: true });
-      return;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if ((code !== 'EPERM' && code !== 'EBUSY') || waited >= 15_000) throw error;
-      await sleep(200);
-    }
-  }
 }
 
 describe('panel-agent actions: projects & chat', () => {
@@ -259,9 +239,7 @@ describe('panel-agent actions: projects & chat', () => {
     // Под нагрузкой снятие деревом не укладывалось ни в какую фиксированную паузу:
     // ждём самого выхода, а не дождавшись — снимаем сами, процесс наш.
     await fakeGone(`${dumpFile}.pid`);
-    for (const dir of [root, projectDir, bin]) {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-    }
+    for (const dir of [root, projectDir, bin]) await removeWhenFree(dir);
     // Папку вложений маршрут отправки заводит на каждый ключ — убираем свои.
     for (const key of chatKeys.splice(0)) await removeWhenFree(join(sandboxRoot(), key));
   });

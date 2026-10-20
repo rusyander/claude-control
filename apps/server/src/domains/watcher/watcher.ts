@@ -204,7 +204,7 @@ export class BackgroundWatcher {
       ...(state.enabled && state.since ? { since: state.since } : {}),
       serverNow: this.now(),
       analyzing: this.current !== undefined,
-      pending: state.enabled ? this.events.pending().length : 0,
+      pending: state.enabled ? this.events.pending(Date.parse(this.now())).length : 0,
       findings: counts.findings,
       remarks: counts.remarks,
       thresholds: this.thresholds,
@@ -256,7 +256,7 @@ export class BackgroundWatcher {
     this.reapOrphans();
     if (!this.isEnabled()) return;
     this.checkCli();
-    if (this.events.pending().length > 0) this.schedule();
+    if (this.events.pending(Date.parse(this.now())).length > 0) this.schedule();
   }
 
   /**
@@ -438,7 +438,7 @@ export class BackgroundWatcher {
   /** Разобрать пачку сейчас (паузу уже выждали). */
   async runOnce(): Promise<void> {
     if (this.current || !this.isEnabled()) return;
-    const pending = this.events.pending().slice(0, WATCH_BATCH_MAX);
+    const pending = this.events.pending(Date.parse(this.now())).slice(0, WATCH_BATCH_MAX);
     if (pending.length === 0) return;
     // Маршрут — до потолка и до записи времени разбора: отказ не тратит разбор
     // из часового потолка и не запускает процесс мимо выбранного маршрута.
@@ -509,7 +509,7 @@ export class BackgroundWatcher {
     if (outcome.stopped || generation !== this.generation) return;
     this.applyOutcome(batch, seen, outcome);
     // Не всё уместилось в пачку — следующая пачка, без новой паузы на сигнал.
-    if (outcome.ok && this.events.pending().length > 0) this.schedule();
+    if (outcome.ok && this.events.pending(Date.parse(this.now())).length > 0) this.schedule();
   }
 
   private forgetOwnPidsLater(): void {
@@ -555,7 +555,7 @@ export class BackgroundWatcher {
         verdict: 'unclear',
       } satisfies WatchFinding);
     }
-    this.events.markAnalyzed(seen, findings);
+    this.events.markAnalyzed(seen, findings, this.now());
 
     const touched = new Set(batch.map((event) => event.id));
     const merges = new Map(outcome.merges ?? []);

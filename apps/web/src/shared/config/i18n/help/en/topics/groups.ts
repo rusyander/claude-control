@@ -536,7 +536,8 @@ export const groupsEn: typeof groupsRu = {
       'While a built-in group is untouched, the panel updates it with the version and ' +
       'the interface language, keeping your switch, order and projects. Change its ' +
       'name, «When» or step and the card says «edited by you» — updates no longer ' +
-      'touch it. Once it matches the panel’s version again (you made the same edit ' +
+      'touch it. Opening and saving it without a change is not an edit — no mark ' +
+      'appears. Once it matches the panel’s version again (you made the same edit ' +
       'before the panel did), the mark goes and updates return.',
 
     toggleTitle: 'Who overrides whom: a group and a single toggle',

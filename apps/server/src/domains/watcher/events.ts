@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { WatchSeverity } from '@agentdeck/contracts';
 import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
-import { fingerprintOf, remarkFingerprint } from './fingerprint.ts';
+import { fingerprintOf, normalizeText, remarkFingerprint } from './fingerprint.ts';
 import type { WatchEvent, WatchFinding, WatchRemark, WatchSignal } from './types.ts';
 
 /**
@@ -36,6 +37,21 @@ export const WATCH_EVENTS_FLUSH_MS = 250;
 const MESSAGE_MAX = 2000;
 const STACK_MAX = 4000;
 const REF_PREFIX = 'WR-';
+/** Разбор старше этого повторяется и на том же тексте: код за это время мог измениться. */
+export const WATCH_REANALYZE_AFTER_MS = 6 * 60 * 60_000;
+
+/** Отпечаток того, что видит модель: текст ошибки, стек и хвост вывода без чисел и id. */
+function textDigest(event: WatchEvent): string {
+  const text = [event.message, event.stack ?? '', event.output ?? ''].map(normalizeText);
+  return createHash('sha256').update(text.join('\n')).digest('hex').slice(0, 16);
+}
+
+/** Сбой уже разобран на этом же тексте, и разбор свежий — повтор нового не стоит. */
+function settled(event: WatchEvent, now: number): boolean {
+  if (event.kind === 'user-report' || !event.analyzedAt || !event.analyzedDigest) return false;
+  if (now - Date.parse(event.analyzedAt) >= WATCH_REANALYZE_AFTER_MS) return false;
+  return event.analyzedDigest === textDigest(event);
+}
 
 /** Важность до разбора — по виду сигнала; модель потом может её поправить. */
 const DEFAULT_SEVERITY: Record<WatchEvent['kind'], WatchSeverity> = {
@@ -171,10 +187,17 @@ export class WatchEventStore {
     return this.read().events.map(snapshot);
   }
 
-  /** Сбои, чьи повторы модель ещё не видела. Замечания разбора не ждут. */
-  pending(): WatchEvent[] {
+  /**
+   * Сбои, чьи повторы модель ещё не видела. Замечания разбора не ждут, а
+   * разобранный сбой с тем же текстом — тоже, пока разбор свежий: полный разбор
+   * повторял тот же вывод, и ошибка раз в несколько минут съедала весь часовой
+   * потолок (WR-9: 54 повтора за 8 минут). Жалоба человека разбирается всегда —
+   * он нажал кнопку и ждёт ответа.
+   */
+  pending(now = Date.now()): WatchEvent[] {
     return this.list().filter(
-      (event) => event.entryClass !== 'remark' && event.count > event.analyzedCount,
+      (event) =>
+        event.entryClass !== 'remark' && event.count > event.analyzedCount && !settled(event, now),
     );
   }
 
@@ -311,16 +334,19 @@ export class WatchEventStore {
     return { event: snapshot(event), isNew: !found, kept: data.events.includes(event) };
   }
 
-  /** Модель разобрала эти сбои: запомнить вердикт и сколько повторов она видела. */
+  /** Модель разобрала эти сбои: запомнить вердикт, сколько повторов и какой текст она видела. */
   markAnalyzed(
     seen: ReadonlyMap<string, number>,
     findings: ReadonlyMap<string, WatchFinding>,
+    now = new Date().toISOString(),
   ): void {
     const data = this.read();
     for (const event of data.events) {
       const count = seen.get(event.id);
       if (count === undefined) continue;
       event.analyzedCount = Math.max(event.analyzedCount, count);
+      event.analyzedAt = now;
+      event.analyzedDigest = textDigest(event);
       const finding = findings.get(event.id);
       if (finding) {
         event.finding = maskedFinding(finding);

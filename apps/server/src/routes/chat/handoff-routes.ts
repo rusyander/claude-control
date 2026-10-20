@@ -300,9 +300,16 @@ export function createHandoffPlanner({
     for (const [key, warm] of warmSessions) {
       if (now - warm.at >= WARM_SESSION_MAX_AGE_MS) warmSessions.delete(key);
     }
+    // Через контур в параметрах хода модель маршрута и пустая глубина: просили
+    // тогда ту пару связи, из которой и доставка выберет свою (`deliverPlan`).
+    const asked = finished.routed
+      ? { model: link.workModel ?? link.model, effort: link.workEffort ?? link.effort }
+      : finished.options;
     warmSessions.set(groupKey(link), {
       sessionId: finished.sessionId,
       options: finished.options,
+      model: asked.model ?? '',
+      effort: asked.effort ?? '',
       at: now,
       contextTokens: finished.contextTokens,
     });
@@ -392,9 +399,6 @@ export function createHandoffPlanner({
     // Ревью сюда не попадает никогда: его ценность — свежий взгляд. Дерево на
     // паузе — тоже с чистого листа: звено ляжет в очередь до «Продолжить всё»,
     // часто на часы, и ответвление тогда переписывало бы в кэш всё окно заново.
-    // Через контур тёплой доставки не бывает: в параметрах прогона модель
-    // контура, а не та, что просили, и сравнение с моделью доставки не сходится —
-    // доставка идёт с чистого листа, как до E2.
     const warm =
       plan.stage === 'deliver' && link?.parentChatId && !gate?.paused?.(chatId)
         ? warmDeliverSession({
@@ -414,9 +418,12 @@ export function createHandoffPlanner({
     if (!warm) {
       delete options.sessionId;
       delete options.fork;
-      options.model = plan.model;
-      options.effort = plan.effort;
     }
+    // Модель — та, что просили: в тёплых параметрах через контур лежит модель
+    // маршрута, а маршрут старт решает заново по просьбе — и мимо контура,
+    // выключенного за этот час, ответвление не ушло бы с его именем к вендору.
+    options.model = plan.model;
+    options.effort = plan.effort;
     delete options.name;
     options.permissionPrompt = { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() };
     // Группа разделения идёт в авторежиме (split-launch.ts), и звено обязано его

@@ -88,6 +88,13 @@ export interface WatchEvent {
   count: number;
   /** Сколько повторов уже видела модель; меньше `count` — сбой ждёт разбора. */
   analyzedCount: number;
+  /** Когда модель разбирала раздел последний раз (ISO). */
+  analyzedAt?: string;
+  /**
+   * Отпечаток текста ошибки и хвоста вывода, который видела модель (числа и
+   * id сняты). Тот же текст и разбор свежий — повтор только растит счётчик.
+   */
+  analyzedDigest?: string;
   finding?: WatchFinding;
   /** Для замечания — что сказала модель. */
   remark?: WatchRemark;

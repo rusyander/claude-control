@@ -1,0 +1,28 @@
+{
+  "title": {
+    "ru": "Наблюдатель не разбирает заново повтор того же сбоя",
+    "en": "The watcher no longer re-analyses a repeat of the same failure"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Повтор уже разобранного раздела с тем же текстом ошибки (числа и id не в счёт) только растит число повторов. Раньше каждый повтор снова ставил раздел в очередь, и наблюдатель тратил разбор на тот же вывод — до двенадцати разборов в час. Разбор идёт снова, если изменились текст ошибки, стек или вывод CLI, с разбора прошло шесть часов или о баге снова написал человек.",
+        "en": "A repeat of an already analysed section with the same error text (numbers and ids aside) only raises its repeat count. Every repeat used to queue the section again, and the watcher spent an analysis on the same output — up to twelve analyses an hour. It is analysed again when the error text, the stack or the CLI output changed, six hours have passed since the analysis, or a person reported the bug again."
+      },
+      "how": {
+        "ru": "Раздел помнит время разбора и отпечаток текста, который видела модель; отпечаток снимается с того же нормализованного текста, что склеивает одинаковые сбои.",
+        "en": "A section keeps the time of its analysis and a fingerprint of the text the model saw; the fingerprint is taken from the same normalised text that merges identical failures."
+      },
+      "area": { "ru": "Наблюдатель", "en": "Watcher" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Наблюдатель» говорит, когда повтор разбирается заново.",
+        "en": "The Watcher help says when a repeat is analysed again."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

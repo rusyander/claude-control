@@ -474,11 +474,14 @@ describe.skipIf(!GIT_AVAILABLE)('pull на настоящих репозитор
  */
 describe('parseDirtyPaths', () => {
   it('обычные записи отдают путь без буквы состояния', () => {
-    expect(parseDirtyPaths(' M  src/a.ts ?? src/new.ts ')).toEqual(['src/a.ts', 'src/new.ts']);
+    expect(parseDirtyPaths('\u0000M  src/a.ts\u0000?? src/new.ts\u0000')).toEqual([
+      'src/a.ts',
+      'src/new.ts',
+    ]);
   });
 
   it('переименование считается обоими путями — сосед конфликтует и со старым', () => {
-    expect(parseDirtyPaths('R  src/new.ts src/old.ts A  src/x.ts ')).toEqual([
+    expect(parseDirtyPaths('R  src/new.ts\u0000src/old.ts\u0000A  src/x.ts\u0000')).toEqual([
       'src/new.ts',
       'src/old.ts',
       'src/x.ts',

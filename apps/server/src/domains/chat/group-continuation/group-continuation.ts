@@ -144,6 +144,13 @@ export interface WarmGroupSession {
   sessionId: string;
   /** Параметры хода ровно в том виде, в каком он шёл: дописка — байт в байт. */
   options: RunOptions;
+  /**
+   * Модель и глубина, которые ход ПРОСИЛ. Через контур в `options` лежат
+   * модель маршрута и пустая глубина, и сравнение с назначением доставки не
+   * сходилось бы никогда (ревью E1–E7, L1).
+   */
+  model: string;
+  effort: string;
   /** Конец хода — с него отсчитывается жизнь кэша. */
   at: number;
   contextTokens: number;
@@ -185,8 +192,8 @@ export function warmDeliverSession({
   if (now - warm.at >= WARM_SESSION_MAX_AGE_MS) return undefined;
   const ceiling = Math.min(WARM_DELIVER_MAX_CONTEXT, compactWindow * GROUP_FRESH_SESSION_SHARE);
   if (warm.contextTokens <= 0 || warm.contextTokens >= ceiling) return undefined;
-  if ((warm.options.model ?? '') !== (model ?? '')) return undefined;
-  if ((warm.options.effort ?? '') !== (effort ?? '')) return undefined;
+  if (warm.model !== (model ?? '')) return undefined;
+  if (warm.effort !== (effort ?? '')) return undefined;
   return warm;
 }
 

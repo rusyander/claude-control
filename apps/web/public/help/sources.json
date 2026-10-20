@@ -762,7 +762,7 @@
         {
           "path": "apps/server/src/domains/project-tests/export-cases/export-cases.ts",
           "why": "«Выгрузка junit»: карантинный кейс уезжает как skipped с причиной",
-          "sha": "bf07f8bbc3145c2a"
+          "sha": "f0f356b9b5ebe839"
         },
         {
           "path": "apps/server/src/domains/project-tests/import-results/import-results.ts",
@@ -935,7 +935,7 @@
           "sha": "b87cc7baba498557"
         }
       ],
-      "confirmedAt": "2026-10-20T07:15:46.094Z"
+      "confirmedAt": "2026-10-20T13:46:22.715Z"
     },
     {
       "topic": "rules",
@@ -1784,12 +1784,12 @@
     {
       "topic": "watcher",
       "document": "apps/web/src/pages/Help/topics/WatcherTopic/WatcherTopic.tsx",
-      "confirmedAt": "2026-10-10T10:31:20.712Z",
+      "confirmedAt": "2026-10-20T12:12:53.124Z",
       "sources": [
         {
           "path": "apps/server/src/domains/watcher/watcher.ts",
           "why": "«Запустить»: запуск с нулевым счётом, продолжение после перезапуска, проблемы и отказ от повтора упавшего разбора, потолок разборов в час, слияние и замечания",
-          "sha": "a226353225aee7f2"
+          "sha": "7c60fe1d898b71b0"
         },
         {
           "path": "apps/server/src/domains/watcher/report.ts",
@@ -2412,7 +2412,7 @@
         {
           "path": "apps/server/src/domains/portability/plan.ts",
           "why": "«План: что именно изменится в файлах»: исходы записей, счётчики и дифф по файлу",
-          "sha": "5c298621f531df5f"
+          "sha": "13848c0e0648c82b"
         },
         {
           "path": "apps/server/src/domains/portability/apply.ts",
@@ -2445,7 +2445,7 @@
           "sha": "c8960379be2d0e95"
         }
       ],
-      "confirmedAt": "2026-10-10T18:38:36.934Z"
+      "confirmedAt": "2026-10-20T13:46:22.855Z"
     },
     {
       "topic": "groups",
@@ -2474,7 +2474,7 @@
         {
           "path": "apps/server/src/domains/groups/builtin-groups/builtin-groups.ts",
           "why": "«Встроенные группы»: засев, удалённая не возвращается, изменённая не обновляется, поля человека сохраняются",
-          "sha": "16f363d38a80585b"
+          "sha": "95ab0a5eab1dcc7a"
         },
         {
           "path": "apps/server/src/domains/group-activation/group-activation.ts",
@@ -2842,7 +2842,7 @@
           "sha": "b280d6dc187cf339"
         }
       ],
-      "confirmedAt": "2026-10-20T08:39:38.177Z"
+      "confirmedAt": "2026-10-20T12:01:39.513Z"
     },
     {
       "topic": "phone",

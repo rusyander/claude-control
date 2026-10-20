@@ -700,7 +700,8 @@ function remember(f, verdict, note) {
     mkdirSync(MEMO, { recursive: true });
     writeFileSync(
       memoFile(f),
-      JSON.stringify({ verdict, note, at: new Date().toISOString().slice(0, 16) }),
+      // Local wall-clock time: the stamp is printed to a human, and UTC read as local was hours off.
+      JSON.stringify({ verdict, note, at: new Date().toLocaleString('sv-SE').slice(0, 16) }),
     );
   } catch {
     /* a memo that cannot be written only costs the next run time */

@@ -190,9 +190,10 @@ function remember(tree, gate) {
   if (!tree) return;
   try {
     mkdirSync(join(STATE, 'memo'), { recursive: true });
+    // Local wall-clock time: the stamp is printed to a human, and UTC read as local was hours off.
     writeFileSync(
       memoFile(tree, gate),
-      JSON.stringify({ at: new Date().toISOString().slice(0, 16).replace('T', ' ') }),
+      JSON.stringify({ at: new Date().toLocaleString('sv-SE').slice(0, 16) }),
     );
   } catch {
     /* a memo that cannot be written only costs the next run time */

@@ -18,9 +18,8 @@ import { run as git, touchedPaths } from '../../project-git/sieve-facts/sieve-fa
  * Что требуется перед «доставлено»:
  * - задетые диффом группы кейсы находятся по `codePaths` (или зоне);
  * - автоматические среди них прогнаны прогоном, записанным ПОСЛЕ старта
- *   группы и после её последней правки кода (Ф23, проект
- *   `.agent/item17-tests-block-design.agent.md`: «no run recorded after its last
- *   commit»), и последний их результат не красный (карантин не держит);
+ *   группы и после её последней правки кода (Ф23: «no run recorded after its
+ *   last commit»), и последний их результат не красный (карантин не держит);
  * - красный кейс любого прогона группы — тоже пробел, даже не задетый диффом;
  * - проект, где кейсы привязаны к файлам, но дифф группы не покрыт ни одним, —
  *   пробел «заведите кейс».
@@ -199,7 +198,7 @@ async function lastChangeAt(cwd: string, paths: readonly string[]): Promise<stri
   const dirty = await git(cwd, ['status', '--porcelain', '-z', '--untracked-files=all']);
   if (dirty.code === 0) {
     const touched = new Set(paths);
-    for (const entry of dirty.stdout.split(' ')) {
+    for (const entry of dirty.stdout.split('\u0000')) {
       const path = entry.slice(3).trim();
       if (!path || !touched.has(path)) continue;
       try {

@@ -474,6 +474,35 @@ describe('звено доставки группы разделения', () => 
       expect(deliver).toMatchObject({ model: 'sonnet' });
       expect(deliver?.sessionId).toBeUndefined();
     });
+
+    // Ревью E1–E7, L1: через контур ход идёт моделью маршрута без глубины, и
+    // сравнение с моделью доставки не сходилось никогда — выигрыш E2 был нулём.
+    it('через контур доставка тоже ответвляется и просит модель работы, а не маршрута', async () => {
+      const { registry, links, runs } = build('Поправил.', { delivers: true, context: 30_000 });
+      registry.setPlatformRouting((_origin, asked) => ({
+        env: {},
+        model: { model: 'contour-model', asked, source: 'mapped', replaced: true },
+        effort: false,
+      }));
+      links.set('чат-правки', FIX_LINK);
+
+      await start(registry, 'чат-правки', {
+        model: 'sonnet',
+        effort: 'medium',
+        appendSystemPrompt: FIX_APPEND,
+      });
+
+      const deliver = stageRuns(runs)[0];
+      expect(links.get(deliver?.chatId ?? '')?.stage).toBe('deliver');
+      expect(deliver).toMatchObject({
+        sessionId: 'sess-звено',
+        fork: true,
+        model: 'sonnet',
+        effort: 'medium',
+        append: FIX_APPEND,
+      });
+      expect(deliver?.prompt).toContain(WARM_DELIVER_LINE);
+    });
   });
 
   it('правки группы с доставкой знают, что доставка идёт следом (журнал 59d)', async () => {

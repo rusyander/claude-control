@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { removeWhenFree } from '../../lib/remove-when-free.ts';
 import {
   adbDevices,
   apkStatus,
@@ -64,7 +65,7 @@ afterEach(async () => {
   while (pid && running(pid) && Date.now() < deadline) {
     await new Promise((done) => setTimeout(done, 50));
   }
-  rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  await removeWhenFree(root);
 });
 
 describe('mobile-apk', () => {

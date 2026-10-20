@@ -122,6 +122,8 @@ describe('доставка тёплой сессией (E2)', () => {
   const warm = {
     sessionId: 'sess-правки',
     options: { prompt: 'правки', cwd: '/w', model: 'sonnet', effort: 'medium' },
+    model: 'sonnet',
+    effort: 'medium',
     at: now - 5 * 60_000,
     contextTokens: 60_000,
   };
@@ -159,6 +161,12 @@ describe('доставка тёплой сессией (E2)', () => {
   it('другая модель или глубина — другой кэш: с чистого листа', () => {
     expect(ask({ model: 'opus' })).toBeUndefined();
     expect(ask({ effort: 'high' })).toBeUndefined();
+  });
+
+  it('через контур ход шёл моделью маршрута без глубины — сравнивается то, что просили', () => {
+    const routed = { ...warm, options: { ...warm.options, model: 'contour-model', effort: '' } };
+    expect(ask({ warm: routed })).toBe(routed);
+    expect(ask({ warm: routed, model: 'contour-model', effort: '' })).toBeUndefined();
   });
 
   it('тёплой сессии нет — с чистого листа', () => {

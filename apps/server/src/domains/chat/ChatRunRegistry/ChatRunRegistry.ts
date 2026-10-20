@@ -122,6 +122,11 @@ export interface RunFinished {
    * маршрут как «чат» — то есть меняла бы провайдера посреди цепочки.
    */
   origin?: PlatformRunConsumer;
+  /**
+   * Модель прогона подставил маршрут контура: в `options` модель маршрута и
+   * пустая глубина, а не то, что просили.
+   */
+  routed?: true;
   /** Прогон шёл на локальной модели (`RunMeta.local`). */
   local?: true;
   /** Сколько инструментов отработало за ход: у продолжения — «успело поработать». */
@@ -262,6 +267,8 @@ interface RegisteredRun {
   options: RunOptions;
   /** Старт был пробуждением — ход начал сам CLI. Отметка этого старта, в `options` её нет. */
   woken?: true;
+  /** Модель старта подставил маршрут контура — см. `RunFinished.routed`. */
+  routed?: true;
   /** Момент старта (мс) — по нему видно, обновлён ли файл-опора этим прогоном. */
   startedAt: number;
   /** Хвост ответа агента: в нём ищется блок предложения продолжить. */
@@ -352,7 +359,6 @@ interface RegisteredRun {
   workspace?: SessionNote;
 }
 
-/** Куда реестр пишет идущие прогоны, чтобы пережить перезапуск (см. `run-ledger.ts`). */
 /** Снимок параметров прогона для тех, кто перезапускает его снаружи (пауза дерева). */
 export interface RunSnapshot {
   key: string;
@@ -364,6 +370,7 @@ export interface RunSnapshot {
   woken?: true;
 }
 
+/** Куда реестр пишет идущие прогоны, чтобы пережить перезапуск (см. `run-ledger.ts`). */
 export interface RunLedgerSink {
   /** Перечитать журнал: поздний подхват ищет в нём запись по ключу прогона. */
   read(): RunLedgerEntry[];
@@ -1441,6 +1448,7 @@ export class ChatRunRegistry {
       meta: routedMeta,
       options: kept,
       ...(routed.wake ? { woken: true as const } : {}),
+      ...(route.model?.model ? { routed: true as const } : {}),
       startedAt: Date.now(),
       text: '',
       events: [],
@@ -1895,6 +1903,7 @@ export class ChatRunRegistry {
           ...(asked ? { asked: true } : {}),
           ...(interrupted ? { interrupted: true as const } : {}),
           ...(run.meta.origin ? { origin: run.meta.origin } : {}),
+          ...(run.routed ? { routed: true as const } : {}),
           ...(run.meta.local ? { local: true as const } : {}),
           ...(run.toolResults ? { toolResults: run.toolResults } : {}),
           ...(run.lastError ? { error: run.lastError } : {}),

@@ -194,7 +194,7 @@ function fingerprintOf(
       // руками, и сторож устаревшего плана молчал бы именно там, где файл
       // велик настолько, что править его руками опаснее всего.
       file.hashes ? `${file.hashes.before}:${file.hashes.after}` : '',
-      file.lines.map((line) => `${line.kind} ${line.text}`),
+      file.lines.map((line) => `${line.kind}\u0000${line.text}`),
     ]),
   };
   return createHash('sha256').update(JSON.stringify(shape)).digest('hex');

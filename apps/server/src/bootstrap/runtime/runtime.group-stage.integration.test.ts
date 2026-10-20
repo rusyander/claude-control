@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../../lib/app-store/app-store.ts';
@@ -9,6 +9,7 @@ import type { RunLike } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry
 import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { registerChatRoutes } from '../../routes/chat-routes/chat-routes.ts';
+import { removeWhenFree } from '../../lib/remove-when-free.ts';
 import { createRuntime, type Runtime } from './runtime.ts';
 
 /**
@@ -130,7 +131,7 @@ describe('звено группы получает свой профиль за�
     runtime.chatRuns.stopAll();
     runtime.shutdown();
     await app.close();
-    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    await removeWhenFree(root);
   });
 
   /** Ход в чат звена — настройки, с которыми сборка его запустила. */

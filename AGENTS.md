@@ -35,20 +35,16 @@ default and the only verified one. No database — **source of truth = Claude Co
 - `packages/contracts` — shared types + zod schemas
 - `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs), `tailscale-serve.mjs`
   (`pnpm remote` / `off`), `keepalive.mjs` (`pnpm keepalive[:install|:off|:status]` — watchdog over
-  both dev halves, see the entry below), `build-mobile-apk.mjs`, `clean-mobile-build.mjs` (Gradle hides native
-  intermediates in `node_modules/*/android/{build,.cxx}` — ~10 GB per release build, in neither APK
-  nor repo; the build sweeps them itself, `--keep-build` opts out, `--dry` measures),
-  `make-mobile-icons.mjs` (one SVG mark → every icon/splash size, so launcher, splash and favicon
-  cannot drift), `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record` —
-  the QA workspace of a project without the panel; CI gates on the exit code: `report` 1 on a failure
-  outside quarantine, `diff` 1 on NEW failures only, `lint` 1 only when asked via `--fail-on`),
-  `docs/` — the human's PDF guides, two of them: `shots-chat-guide.mjs` (14 frames) and
-  `shots-tests-guide.mjs` (30) shoot a fully stubbed panel, `build-guide.mjs` prints through
-  Chromium and each `build-*-guide.mjs` is only its three values (source, out, footer) →
-  `docs/CHAT-GUIDE.ru.pdf`, `docs/TESTS-GUIDE.ru.pdf`. Sources and frames live in
-  `.agent/{chat,tests}-guide/`, OUT of git — git carries the finished PDFs only; a fresh clone
-  re-shoots against a running stand. `PAGES=<dir>` also rasterises the print page by page — a PDF
-  handed to the human is looked at page by page, never shipped unseen
+  both dev halves), `build-mobile-apk.mjs`, `clean-mobile-build.mjs` (Gradle native intermediates in
+  `node_modules/*/android/{build,.cxx}`, ~10 GB per release build; the build sweeps them, `--keep-build` opts
+  out, `--dry` measures), `make-mobile-icons.mjs` (one SVG mark → every icon/splash size),
+  `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record` — the QA workspace
+  of a project without the panel; CI exit codes: `report` 1 on a failure outside quarantine, `diff` 1 on NEW
+  failures only, `lint` 1 only with `--fail-on`), `docs/` — PDF guides: `shots-{chat,tests}-guide.mjs` shoot a
+  fully stubbed panel, `build-guide.mjs` prints through Chromium (`build-*-guide.mjs` = source, out, footer) →
+  `docs/{CHAT,TESTS}-GUIDE.ru.pdf`; sources and frames in `.agent/{chat,tests}-guide/`, OUT of git (a fresh
+  clone re-shoots against a running stand). `PAGES=<dir>` rasterises page by page — every page is looked at
+  before a PDF is handed over
 
 Needs **Node 22.6+** (server runs with `--experimental-strip-types`), pnpm 10, `claude` in PATH.
 
@@ -62,30 +58,24 @@ curl http://127.0.0.1:5178/api/system      # platform, home, shell
 curl http://127.0.0.1:5178/api/credentials # access source (token is NEVER returned)
 ```
 
-`{"error":"Нужен токен доступа"}` (401) on all four is not a fault: the remote gate is on, and these
-need `-H "Authorization: Bearer $(cat ~/.agentdeck/api-token)"`. The browser is exempt — it passes
-the origin allowlist instead.
+401 `{"error":"Нужен токен доступа"}` = remote gate on, not a fault: add
+`-H "Authorization: Bearer $(cat ~/.agentdeck/api-token)"` (the browser passes the origin allowlist instead).
 
-`/api/location` answers most questions on its own. No match in the symptom files → narrow: server vs front (`curl`
-the API), panel vs CLI (`claude --version` in the terminal that started the server). Fixed →
-**verify by running**, then report what was verified and what stayed unverified.
+No match in the symptom files → narrow: server vs front (`curl` the API), panel vs CLI (`claude --version` in
+the terminal that started the server). Fixed → **verify by running**; report verified and unverified.
 
 Fix without asking: project code, deps, build config, launch env. Ask first: files in `~/.claude` —
 the user's real config, not test data (reading is free, hand-editing goes through the panel's API).
 
 QA runs live in `tools/qa/` and need `pnpm dev` up + `pnpm qa:setup`; each drives the real UI of one
-area. A third of them behave unlike the rest — every `check-tests-*` bar `check-tests-exchange.mjs`
-and `check-tests-baselines.mjs`, plus the newer chat/project ones, stub their own API
-(`grep -l page.route tools/qa` names them; a list here would go stale within a batch), and
-`check-worktrees.mjs` builds its own git repository in temp,
-so they depend on no particular history, on no installed CLI, and leave neither branches nor copies
-behind. `panel-pages.mjs` is the ONE route list the a11y (axe, both themes, create modals) and
-keyboard (Tab order, focus ring, Escape + focus return) sweeps share — a new section goes there or
-neither audit ever sees it.
+area. About a third stub their own API (`grep -l page.route tools/qa` names them) and `check-worktrees.mjs`
+builds its own git repo in temp — those need no history, no installed CLI and leave nothing behind.
+`panel-pages.mjs` is the ONE route list the a11y (axe, both themes, create modals) and keyboard (Tab order,
+focus ring, Escape + focus return) sweeps share — a new section goes there or neither audit sees it.
 
 ## Symptom → cause → fix
 
-Moved to `.agent/` 2026-09-22 — one file per area, 34 entries. Grep the symptom text across them;
+Moved to `.agent/` 2026-09-22, one file per area. Grep the symptom text across them;
 a new entry goes into the area file, never back here.
 
 - **boot** [agents-symptoms-boot.agent.md](.agent/agents-symptoms-boot.agent.md) — `--experimental-strip-types`, contracts barrel at runtime, APK bundle, post-rename settings, wrong config dir
@@ -102,21 +92,17 @@ a new entry goes into the area file, never back here.
 - Verify by running, not by reasoning — `tools/qa/` drives the real UI per area.
 - Never repeat failed logins (brute-force lockouts).
 - Help is part of the code: documents `pages/Help/topics/*.tsx`, texts
-  `shared/config/i18n/help/{ru,en}/topics/<topic>.ts` (one module per topic, carrying that topic's
-  shot and diagram captions too; `{ru,en}.ts` are only the composers, and `en` stays typed against
-  `ru` per topic). Change a section's behaviour → change its help document —
-  the user reads help inside the panel, drift here beats a stale README in damage. New document =
-  entry in `HELP_GROUPS` + component beside it; index, `?topic=`, "?" button and next-section link
-  follow automatically.
+  `shared/config/i18n/help/{ru,en}/topics/<topic>.ts` (one module per topic incl. shot and diagram captions;
+  `{ru,en}.ts` only compose, `en` typed against `ru` per topic). Change a section's behaviour → change its
+  help document (the user reads help in the panel; drift there hurts more than a stale README). New
+  document = entry in `HELP_GROUPS` + component beside it; index, `?topic=`, "?" and next-link follow.
 - **That "change its help document" is GATED, not remembered.** `apps/web/public/help/sources.json`
   holds, per topic, the modules whose BEHAVIOUR the document describes + a content fingerprint of each
-  (EOL and comment-only lines ignored — a rule reddening on every refactor gets ignored). One of them
-  moves ⇒ `pnpm shots` RED, naming topic, files and command. Clearing it is a human act: re-read the
-  document, fix the text, then `node tools/help-shots/sources.mjs <topic>` (rewrites the fingerprints;
-  nothing auto-heals). Seeded with `platform` only — an unwatched topic never reddens and the guard
-  prints how many are watched. **Adding a topic = ONE entry** (topic id from `HELP_GROUPS`, document
-  path, narrow `path`+`why` list, empty `sha`) then that command. Narrow = the modules carrying what
-  the human reads about, never a whole tree.
+  (EOL and comment-only lines ignored). One moves ⇒ `pnpm shots` RED, naming topic, files and command.
+  Clearing it: re-read the document, fix the text, then `node tools/help-shots/sources.mjs <topic>`
+  (rewrites the fingerprints; nothing auto-heals). 32 topics watched (20.10); an unwatched topic never
+  reddens. **Adding a topic = ONE entry** (topic id from `HELP_GROUPS`, document path, narrow `path`+`why`
+  list, empty `sha`) then that command — narrow = the modules carrying what the human reads, never a tree.
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 - **Changelog travels with the change** (owner 12.10.2026). Tab «Что нового» (default tab of `/history`) = curated
   `changelog/entries/<YYYY-MM-DD>-<slug>.json` (one per push/MR) + git facts; commits without an entry show
@@ -128,45 +114,39 @@ a new entry goes into the area file, never back here.
   the approach matters to a reader; a visible fix carries its before/after pair in `changelog/assets/<id>/`
   (≤400 KB, stubbed data only — public repo). Text = published text: Russian, impersonal, what + why, no
   authorship, no process narration, no company/contour names, no local paths. Format change → contracts
-  schema + this rule + help topic `history` in one pass. Built 12.10: map entries in `code-map.agent.md` /
-  `code-map-web.agent.md`, spec `.agent/changelog-page-plan.agent.md`. The page shows git whole (every commit
-  body paragraph, numbers per commit); a description without a commit shows NO numbers — uncommitted numbers
-  live on the single «Незакоммиченные правки» card. `pnpm changelog:remind` runs in pre-commit (warns, never blocks).
+  schema + this rule + help topic `history` in one pass. Map: `code-map.agent.md` / `code-map-web.agent.md`,
+  spec `.agent/changelog-page-plan.agent.md`. Uncommitted numbers live only on the «Незакоммиченные правки»
+  card. `pnpm changelog:remind` runs in pre-commit (warns, never blocks).
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && pnpm compromises
 && pnpm negatives && pnpm shots && pnpm brand && pnpm mobile:contracts && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
 tools/qa/check-etag.mjs` (the last four drive the live stand; `check-etag` reads the wire status through CDP,
 because Playwright reports a 304 revalidation as the cached 200). `pnpm test` measures coverage every run and fails below the thresholds
 pinned in each `vitest.config.ts` (raise them when coverage grows, never lower silently). The same
-gate runs unattended: pre-commit (husky + lint-staged: eslint, prettier check, LF check —
+gate runs unattended: pre-commit (husky + lint-staged: eslint, prettier check, LF + raw-NUL check —
 `tools/check-lf.mjs`) and `.github/workflows/ci.yml` (format:check → type-check → lint → test →
-depcruise, plus mobile type-check + tests). Touched help → also `node tools/qa/check-help.mjs`: it looks for on-page
-`help.…` strings, i.e. a key called under a name that doesn't exist (`tsc` checks the dictionary, not
-call sites). Touched the contour (`domains/platform/**`) → also `node tools/qa/check-platform-wire.mjs`:
-it boots its own throwaway panel plus `tools/qa/stub-platform.mjs` as the upstream and drives the whole
-socket path client → gateway → contour, so it needs no stand and no installed CLI — **and `node
-tools/qa/check-platform-run-env.mjs`**, which is the only check that sees what reaches a real process:
-its own throwaway panel, a gateway on port 0 and fake CLIs on PATH that dump their own env and argv.
-Touched our layers (`domains/platform/layers/layers.ts`, the run registry's flags) → **`node
-tools/qa/check-run-layers.mjs`**, the only check that answers what a launch flag actually REMOVES:
-the real `claude` with a throwaway config dir carrying a unique marker in every layer, a stub for the
-model, and the body of the request that went up as the sole evidence. It needs an installed CLI
-(`CLAUDE_CLI` overrides the path) and touches no stand of the user's.
-Touched images (`domains/media/**`, the composer's mode menu, the gateway's content parts) → **`node
-tools/qa/check-chat-media.mjs`**, whose evidence is the FILE on disk: its own throwaway panel and stub
-upstream, 18 assertions, and the drawn bytes compared to what the upstream returned — plus `state.json`
-and the request trace searched for base64, because "no image in the settings" cannot be proved by
-reading code. No stand, no installed CLI.
-Everything else about the contour is proved on frames built inside the test that reads them — green
-there is compatible with nothing passing over a real wire.
+depcruise, plus mobile type-check + tests). Area checks on top — each is the only one that sees its real path;
+none needs the stand:
+
+- help → `node tools/qa/check-help.mjs` (on-page `help.…` keys called under a missing name; `tsc` checks the
+  dictionary, not call sites);
+- contour `domains/platform/**` → `node tools/qa/check-platform-wire.mjs` (throwaway panel + `stub-platform.mjs`,
+  whole socket path client → gateway → contour) **and** `check-platform-run-env.mjs` (fake CLIs on PATH dump the
+  env and argv that reached a real process);
+- our layers (`domains/platform/layers/layers.ts`, run registry flags) → `check-run-layers.mjs` (real `claude`,
+  throwaway config dir with a marker per layer, stub model; the request body is the evidence of what a flag
+  REMOVES; needs an installed CLI, `CLAUDE_CLI` overrides);
+- images (`domains/media/**`, composer mode menu, gateway content parts) → `check-chat-media.mjs` (the file on
+  disk vs the upstream bytes, `state.json` + request trace searched for base64).
+  Every other contour test builds its frames inside itself — green there proves nothing about a real wire.
 
 ## Tests block — agentdeck tests itself through it
 
 Owner 27.09.2026: the Tests block is the product, so agentdeck's own QA runs THROUGH it — a check
 run beside it proves nothing about the block. Store: `.agent/tests/` (cases, groups, history).
 
-- A case is linked by `automation={status:'automated', file, testName?}` (testName = vitest
-  "describe > it" for unit files). Run: `node tools/tests-cli.mjs run --project . [--group g]`;
+- A case is linked by `automation={status:'automated', file, testName?}` (testName = the FULL vitest
+  path from the outermost describe, "a > b > it"; a describe path covers every test under it). Run: `node tools/tests-cli.mjs run --project . [--group g]`;
   `tools/qa/junit-run.mjs` turns exit-code scripts and vitest into JUnit `[caseId]` testcases,
   `--health <url>` records a stand restart as skipped, never failed.
 - A verdict on a case comes only from a run recorded in the block's history, not from a local run.
@@ -177,10 +157,9 @@ run beside it proves nothing about the block. Store: `.agent/tests/` (cases, gro
 
 ## Layer boundaries — checked, not just described
 
-Both apps' layer maps are machine-enforced by `.dependency-cruiser.cjs` (`pnpm depcruise`), NOT by
-ESLint — only dependency-cruiser has a path resolver (`tsconfig.depcruise.json`) and can tell an
-import into a foreign slice from a sibling of one's own folder. `eslint.config.mjs` keeps only what
-needs no resolver (no default exports, no nested ternaries, `max-lines` 400 as a warning).
+Both apps' layer maps are enforced by `.dependency-cruiser.cjs` (`pnpm depcruise`, path resolver
+`tsconfig.depcruise.json`), NOT ESLint; `eslint.config.mjs` keeps only resolver-free rules (no default
+exports, no nested ternaries, `max-lines` 400 as a warning).
 
 - **Web**: `app → pages → features → entities → shared`, downward only, cross-feature forbidden
   (one exception, `features/ResourceFiles`, documented in the config); a foreign slice is reachable
@@ -206,9 +185,8 @@ Own database (source of truth is Claude Code's files) · own login (the CLI auth
 serving the built front from the server (`pnpm start` = API only; dev front lives on Vite,
 production must serve `dist` separately).
 
-**Stays a local single-user app — decided 2026-08-06, do not re-litigate.** The truth is the files
-on THIS machine and access comes from the CLI's own login, so hosting it would first mean inventing
-auth, tenants and isolation nothing here needs. Remote (2026-08-09) does not change that: loopback
-bind, Tailscale Serve terminating on this machine, the phone as the SAME user with one opt-in
-Bearer token. Electron was weighed and dropped (fixes nothing, costs signing + ~180 MB + an update
-channel); shipping to another person would be an `npx` wrapper booting the server.
+**Stays a local single-user app — decided 2026-08-06, do not re-litigate.** The truth is the files on THIS
+machine and access is the CLI's own login; hosting would mean inventing auth, tenants and isolation. Remote
+(2026-08-09) keeps that: loopback bind, Tailscale Serve on this machine, the phone as the SAME user with one
+opt-in Bearer token. Electron dropped (signing + ~180 MB + update channel, fixes nothing); shipping to another
+person = an `npx` wrapper booting the server.

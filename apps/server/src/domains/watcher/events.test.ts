@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WATCH_EVENTS_FILE, WATCH_EVENTS_FLUSH_MS, WatchEventStore } from './events.ts';
+import {
+  WATCH_EVENTS_FILE,
+  WATCH_EVENTS_FLUSH_MS,
+  WATCH_REANALYZE_AFTER_MS,
+  WatchEventStore,
+} from './events.ts';
 import { fingerprintOf, normalizePath, topFrame } from './fingerprint.ts';
 import type { WatchSignal } from './types.ts';
 
@@ -266,20 +271,56 @@ describe('кольцо сбоев наблюдателя', () => {
     expect(merged?.into.merged).toEqual([]);
   });
 
-  it('разобранный сбой не ждёт разбора, пока не повторится', () => {
-    const store = new WatchEventStore(() => dir);
-    const { event } = store.record(server500('x'));
-    expect(store.pending()).toHaveLength(1);
-    store.markAnalyzed(
-      new Map([[event.id, 1]]),
-      new Map([
-        [event.id, { title: 't', happened: 'h', context: '', verdict: 'confirmed' as const }],
-      ]),
-    );
-    expect(store.pending()).toHaveLength(0);
-    expect(store.list()[0]!.finding?.verdict).toBe('confirmed');
-    store.record(server500('x'));
-    expect(store.pending()).toHaveLength(1);
+  // TASKS «Поправить позже» (16.10): повтор разобранного раздела снова ставил его
+  // в очередь, и разбор повторял тот же вывод — до всего часового потолка.
+  describe('повтор разобранного сбоя', () => {
+    const T0 = Date.parse('2026-10-20T10:00:00.000Z');
+    const finding = { title: 't', happened: 'h', context: '', verdict: 'confirmed' as const };
+
+    function analyzed(signal: WatchSignal) {
+      const store = new WatchEventStore(() => dir);
+      const { event } = store.record(signal);
+      expect(store.pending(T0)).toHaveLength(1);
+      store.markAnalyzed(
+        new Map([[event.id, 1]]),
+        new Map([[event.id, finding]]),
+        new Date(T0).toISOString(),
+      );
+      expect(store.pending(T0)).toHaveLength(0);
+      return store;
+    }
+
+    it('тот же текст — только счётчик, разбора не ждёт; другие числа — тот же текст', () => {
+      const store = analyzed(server500('ENOENT: port 5178 pid 1234'));
+      store.record(server500('ENOENT: port 5178 pid 1234'));
+      store.record(server500('ENOENT: port 5178 pid 9876'));
+      expect(store.pending(T0 + 60_000)).toHaveLength(0);
+      expect(store.list()[0]!.count).toBe(3);
+      expect(store.list()[0]!.finding?.verdict).toBe('confirmed');
+    });
+
+    it('изменился стек — разбор идёт снова', () => {
+      const store = analyzed({ ...server500('boom'), stack: 'Error: boom\n    at a (a.ts:1)' });
+      store.record({
+        ...server500('boom'),
+        stack: 'Error: boom\n    at a (a.ts:1)\n  cause: disk',
+      });
+      expect(store.pending(T0 + 60_000)).toHaveLength(1);
+    });
+
+    it('тот же текст, но разбор старше шести часов — разбор идёт снова', () => {
+      const store = analyzed(server500('x'));
+      store.record(server500('x'));
+      expect(store.pending(T0 + WATCH_REANALYZE_AFTER_MS - 1)).toHaveLength(0);
+      expect(store.pending(T0 + WATCH_REANALYZE_AFTER_MS)).toHaveLength(1);
+    });
+
+    it('жалоба человека теми же словами разбирается снова: он нажал и ждёт', () => {
+      const report: WatchSignal = { source: 'user', kind: 'user-report', message: 'кнопка молчит' };
+      const store = analyzed(report);
+      store.record(report);
+      expect(store.pending(T0 + 60_000)).toHaveLength(1);
+    });
   });
 });
 

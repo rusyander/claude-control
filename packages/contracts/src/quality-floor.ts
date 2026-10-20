@@ -57,11 +57,11 @@ export const OWNER_PRECEDENCE_LINE = `Precedence: the global and project rules (
  * Навык по роду работы (U12). Ревью и доставку задания стадий называли и раньше,
  * а работа группы шла без строки о навыках вовсе: тесты, конфликт слияния,
  * баг с неизвестной причиной делались «на глаз», хотя набор панели везёт для них
- * свои навыки. Строка общая, без проекта: проектный вариант навыка главнее
- * общего, нет навыка — те же шаги руками, и это сказано вслух.
+ * свои навыки. Строка общая, без проекта: общий навык и навык панели главнее
+ * проектного (владелец 20.10), нет навыка — те же шаги руками, и это сказано вслух.
  */
 export const SKILL_ROUTE_LINE =
-  'Skills: before acting, load the skill this kind of work calls for — the one the task names, else the one the skill router (skill-map) points to: a review → deep-review; merge conflicts → resolving-merge-conflicts; a ticket or delivery to an MR → the project delivery skill (`<project>-ticket-delivery` wins over `ticket-delivery`); tests → unit-integration-tests; a bug of unknown cause → log-forensics; a visible UI fix → before/after screenshots as the rules say. A skill not installed here — go through the same steps yourself and say so.';
+  'Skills: before acting, load the skill this kind of work calls for — the one the task names, else the one the skill router (skill-map) points to: a review → deep-review; merge conflicts → resolving-merge-conflicts; a ticket or delivery to an MR → the delivery skill of the panel group, else the global `ticket-delivery` (a project one only supplies facts); tests → unit-integration-tests; a bug of unknown cause → log-forensics; a visible UI fix → before/after screenshots as the rules say. A skill not installed here — go through the same steps yourself and say so.';
 
 /**
  * Текст без строки старшинства. Задание группы её уже несёт (`buildGroupPrompt`),

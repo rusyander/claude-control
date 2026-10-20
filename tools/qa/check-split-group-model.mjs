@@ -234,28 +234,40 @@ try {
   check(triage.length >= 1, 'разбор запущен в корне репозитория', triage.length);
   check(triage[0]?.model === CEILING.model, 'разбор идёт на потолке разговора', triage[0]?.model);
 
-  // 2–3. В каждой копии: первый ход — план (потолок), следующий — работа.
+  // 2–3. Понижённая группа: первый ход — план (потолок), следующий — работа.
+  // Группа, чья работа идёт на потолке, плана не получает: один ход — сразу
+  // работа на потолке. Ждём её ПОСЛЕ плана и работы первой: обе стартуют
+  // вместе, и при старом поведении у неё к этому времени было бы два хода.
   const inCopy = (branch) => (turn) =>
     norm(turn.cwd) !== norm(project) && norm(turn.cwd).includes(branch.split('/').pop());
-  const expected = { 'split/labels': /sonnet/i, 'split/discount': undefined };
   const workModels = {};
   for (const group of GROUPS) {
-    const seen = await waitTurns(inCopy(group.branch), 2, 90);
-    check(seen.length >= 2, `«${group.title}»: план и работа запущены`, seen.length);
-    check(seen[0]?.model === CEILING.model, `«${group.title}»: план на потолке`, seen[0]?.model);
-    workModels[group.branch] = seen[1]?.model;
+    const lowered = group.kind === 'mechanical';
+    const seen = await waitTurns(inCopy(group.branch), lowered ? 2 : 1, 90);
+    if (lowered) {
+      check(seen.length >= 2, `«${group.title}»: план и работа запущены`, seen.length);
+      check(seen[0]?.model === CEILING.model, `«${group.title}»: план на потолке`, seen[0]?.model);
+      workModels[group.branch] = seen[1]?.model;
+    } else {
+      check(
+        seen.length === 1,
+        `«${group.title}»: работа на потолке — без плана, один ход`,
+        seen.length,
+      );
+      workModels[group.branch] = seen[0]?.model;
+    }
     console.log(
       `     «${group.title}»: ходы в копии — ${seen.map((t) => t.model || '(без --model)').join(', ')}`,
     );
   }
   check(
-    expected['split/labels'].test(workModels['split/labels'] ?? ''),
+    /sonnet/i.test(workModels['split/labels'] ?? ''),
     'механическая группа РАБОТАЕТ на sonnet, как показала карточка',
     workModels['split/labels'],
   );
   check(
-    Boolean(workModels['split/discount']),
-    'группа реализации работает с явной моделью',
+    workModels['split/discount'] === CEILING.model,
+    'группа реализации работает на потолке',
     workModels['split/discount'],
   );
 

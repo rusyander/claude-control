@@ -7,6 +7,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
@@ -717,8 +718,14 @@ describe('tests-cli run: кейсы vitest мимо своей команды Go
   });
 
   afterEach(() => {
+    // unlink, а не rmSync: на Windows ссылка — junction, и rmSync без recursive отказывает
+    // «Path is a directory», роняя тест после зелёных проверок.
     for (const pkg of ['admin', 'chat'])
-      rmSync(join(project, pkg, 'node_modules'), { force: true });
+      try {
+        unlinkSync(join(project, pkg, 'node_modules'));
+      } catch {
+        // ссылки нет — тест упал раньше, чем её создал
+      }
     rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 

@@ -506,12 +506,15 @@ export const groupsEn: typeof groupsRu = {
       'risky tickets; three narrow ones — frontend, backend, frontend and backend — ' +
       '«Screens from a Figma mock», «MR review comments» and «Review someone’s MR». ' +
       'Each is one step inside the delivery skill, and the «Path» tab shows it among ' +
-      'the skill’s own steps: plan, fix, review, live run, full check run, MR. In both ' +
+      'the skill’s own steps: plan, fix, review, live run, check run, MR. In both ' +
       'general ones the live run always happens, once, on the final code: backend by ' +
       'requests to the real endpoint, frontend by a browser walk, both sides by the UI ' +
-      'against the real backend, with a negative row. Strict adds the boundary, two ' +
-      'variations, a walk of every entry, mustfail per fixed bug and a re-check of ' +
-      'every review finding.',
+      'against the real backend, with a negative row. In the fast one the check run ' +
+      'locally covers only the touched parts of the project and those depending on ' +
+      'them; it runs the whole set only when the change reached something shared — ' +
+      'root settings, lockfiles, CI — and says why. CI runs everything. Strict always ' +
+      'runs the whole set and adds the boundary, two variations, a walk of every ' +
+      'entry, mustfail per fixed bug and a re-check of every review finding.',
     builtinMembers: 'No members',
     builtinMembersText:
       'A built-in group carries no skills and no rules: it only adds its step to the ' +

@@ -505,7 +505,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "f46782782624c87a"
+          "sha": "de463475601a6dd4"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
@@ -728,7 +728,7 @@
           "sha": "0360f22c1d409f51"
         }
       ],
-      "confirmedAt": "2026-10-19T21:07:03.447Z"
+      "confirmedAt": "2026-10-20T07:46:01.867Z"
     },
     {
       "topic": "tests",
@@ -912,7 +912,7 @@
         {
           "path": "apps/server/src/lib/dev-watch.mjs",
           "why": "«Проверка набора поломкой»: перезапуск dev-сервера панели ждёт конца идущих проверок",
-          "sha": "70cdfeaece464809"
+          "sha": "7f8498e63a07754e"
         },
         {
           "path": "apps/server/src/domains/project-tests/suites/suites.ts",
@@ -935,7 +935,7 @@
           "sha": "b87cc7baba498557"
         }
       ],
-      "confirmedAt": "2026-10-19T21:07:03.542Z"
+      "confirmedAt": "2026-10-20T07:15:46.094Z"
     },
     {
       "topic": "rules",
@@ -2842,7 +2842,7 @@
           "sha": "b280d6dc187cf339"
         }
       ],
-      "confirmedAt": "2026-10-19T20:44:43.948Z"
+      "confirmedAt": "2026-10-19T22:34:08.381Z"
     },
     {
       "topic": "phone",

@@ -62,6 +62,65 @@
         "ru": "Чат",
         "en": "Chat"
       }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Быстрая группа доставки проверяет перед пушем только затронутые части проекта и те, что от них зависят; весь набор проверок она запускает, лишь когда правка задела общее (корневые настройки, lock-файлы, CI), и называет причину. Целиком всё прогоняет CI. Строгая группа по-прежнему гоняет полный набор.",
+        "en": "The fast delivery group checks only the touched parts of the project and those depending on them before the push; it runs the whole set only when the change reached something shared (root settings, lockfiles, CI), and names the reason. CI runs everything. The strict group still runs the whole set."
+      },
+      "how": {
+        "ru": "Карта частей проекта строится из манифестов пакетов и модулей без настройки, сама обновляется при их изменении и учитывает зависимости между частями; ручные уточнения живут в отдельном файле и при обновлении не теряются.",
+        "en": "The map of project parts is derived from package and module manifests with no setup, refreshes itself when they change and follows dependencies between parts; manual overrides live in a separate file and survive every refresh."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Доставка до MR идёт по навыку, который называет группа панели, иначе по общему ticket-delivery. Собственный навык доставки проекта больше не ведёт этапы — из него берутся только факты проекта: команды проверок, статусы трекера, стенд. Так группа не уходит в устаревший проектный порядок работы мимо уровней риска и однократных проверок.",
+        "en": "Delivery to an MR follows the skill the panel group names, else the general ticket-delivery. A project's own delivery skill no longer drives the stages — only project facts come from it: check commands, tracker statuses, the stand. This keeps a group from slipping into an outdated project workflow that bypasses risk tiers and one-time checks."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Перезапуск dev-сервера панели больше не срывает идущие ходы и группы: журнал процессов, который в этот момент переписывают, сторож читает повторно, а нечитаемый считает занятым, а не пустым.",
+        "en": "Restarting the panel's dev server no longer cuts off running turns and groups: the watcher re-reads a process journal that is being rewritten at that moment and treats an unreadable one as busy, not empty."
+      },
+      "area": {
+        "ru": "Запуск",
+        "en": "Startup"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Подпись сброса у лимитов в боковой панели снова читается при устаревших данных: устаревание гасит только полосу, а не всю строку.",
+        "en": "The reset caption of the sidebar limits stays readable when the data is stale: staleness now dims only the bar, not the whole line."
+      },
+      "area": {
+        "ru": "Интерфейс",
+        "en": "Interface"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа, чья работа и так идёт на модели-потолке, больше не начинает с отдельного плана: та же модель планирует сама, а лишний прогон съедал четверть расхода группы. Границы и заметки разбора едут прямо в задание работы.",
+        "en": "A group whose work runs on the ceiling model anyway no longer opens with a separate plan: the same model plans for itself, and the extra run ate a quarter of the group's spend. The triage boundaries and notes go straight into the work task."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
     }
   ]
 }

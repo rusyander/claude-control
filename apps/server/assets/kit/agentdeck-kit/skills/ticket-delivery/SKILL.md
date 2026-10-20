@@ -7,8 +7,9 @@ description: "Use when a ticket or task is handed over to deliver end to end —
 
 One conveyor, identical every run, end to end, asking only at the stops at the bottom. **Nothing
 about the project is assumed**: tracker, forge, gates, branch convention and stand are DISCOVERED at
-the stage that needs them; an absent one degrades that stage and is named in the report. A project's
-own delivery skill outranks this one.
+the stage that needs them; an absent one degrades that stage and is named in the report. This skill
+outranks a project's own delivery skill: that one only supplies project facts — gate commands,
+tracker statuses, the stand — and its gates join the pre-push run.
 
 **Fast by construction**: every check runs ONCE, at the depth the §3 risk tier buys, and the MR is
 the finish line. ONE `deep-review` per task, adaptive (T0 trivial: none) · one full gate per task, on the
@@ -44,7 +45,7 @@ assign, comment, link and the §1 move to in-progress (every LATER status change
 frontend code the fix needs · **backend** (Go/Python/SQL/Helm/CI) only after ONE yes, asked in §1 —
 the global read-only default holds until then; a no → the frontend part ships, the backend fix is
 named at `file:line` in the report · review subagents in §9 as `deep-review` plans them, nowhere else. A
-project's own ticket skill and its grants take precedence.
+project's own grants (a standing backend yes, say) still apply under this skill.
 
 Never authorised: merging · deleting a branch, tag, issue or page · any other force-push (bare
 `--force`, `+refspec`, a branch not this ticket's) · DDL or any data write. DB stays
@@ -137,15 +138,21 @@ artifacts.md §Shots.
 
 **Gate:** the logged DOM text now matches the expected result.
 
-## 6. The gate — ONE full run on the final tree, right before the push
+## 6. The gate — ONE run on the final tree, right before the push
 
-Exactly what CI runs, never invented, as one command:
+Exactly what CI runs, never invented, as one command; `--affected` keeps it inside the touched zones
+when the change allows (CI runs everything on the push):
 
 ```bash
-node <kit>/tools/gate-run.mjs --ticket PROJ-777 "lint=npm run lint" "test=npm run test:ci"
+node <kit>/tools/gate-run.mjs --affected --ticket PROJ-777 "lint=npm run lint" "test=npm run test:ci"
 ```
 
-The runner writes `06-gates` from REAL exit codes; an autofix is not the verdict. It runs once, after
+The positionals are the FULL gate. `affected.mjs` (zone map derived from manifests, rebuilt by itself)
+picks SCOPED — the touched zones plus their dependents, each with its own commands — or FULL with the
+reason printed (root config, lockfile, CI file, code outside every zone, no CI running tests, ≥60% of
+zones, a full gate cheap enough). The verdict is not argued with; `--full` / `.agent/affected.json`
+`alwaysFull` when the user wants everything. Gates CI cannot see (brand, a11y on a stand) go in as
+`"always:label=cmd"`. The runner writes `06-gates` from REAL exit codes; an autofix is not the verdict. It runs once, after
 §9 and §10 are closed and committed; a green run on an unchanged tree is reused, never repeated (the
 runner memoises per tree, a commit does not change it; `--fresh` only on an explicit ask). Re-run
 only after an edit. Not runnable locally → CI's image, never `skip`. **Red blocks** the push and the

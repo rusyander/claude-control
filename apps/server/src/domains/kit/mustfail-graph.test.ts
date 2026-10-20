@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +28,13 @@ const CMD = `node "${join(VITEST, 'vitest.mjs').replace(/\\/g, '/')}" related {f
 const repo = realpathSync(mkdtempSync(join(tmpdir(), 'kit-mustfail-graph-')));
 afterAll(() => {
   // Сначала ссылку на vitest сервера: рекурсивное удаление не должно даже пытаться зайти в пакет.
-  rmSync(join(repo, 'node_modules', 'vitest'), { force: true });
+  // unlink, а не rmSync: на Windows ссылка — junction, и rmSync без recursive отказывает
+  // «Path is a directory», роняя весь файл после зелёных тестов.
+  try {
+    unlinkSync(join(repo, 'node_modules', 'vitest'));
+  } catch {
+    // ссылки нет — тест упал раньше, чем её создал
+  }
   rmSync(repo, { recursive: true, force: true });
 });
 

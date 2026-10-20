@@ -750,6 +750,18 @@ function boundaries(input: { owns?: string[]; notes?: string }): string[] {
 }
 
 /**
+ * Задание работы, начатой без плана (работа на потолке план пропускает):
+ * границы и заметки разбора, которые иначе дошли бы до неё только через план.
+ */
+export function withGroupBoundaries(
+  prompt: string,
+  input: { owns?: string[]; notes?: string },
+): string {
+  const lines = boundaries(input);
+  return lines.length > 0 ? `${prompt}\n\n${lines.join('\n\n')}` : prompt;
+}
+
+/**
  * Задание уровня 2 — план группы на потолке в её копии, без права правок.
  * Первое сообщение чата «<группа> · план».
  */

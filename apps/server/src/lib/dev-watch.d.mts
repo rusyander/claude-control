@@ -10,6 +10,20 @@ export declare function busyRun(
   isAlive: (pid: number) => boolean,
 ): boolean;
 
+/** Чтение атомарно переписываемого JSON с повтором промаха переименования (Windows). */
+export declare function readJsonSteady(
+  file: string,
+  read?: (file: string, encoding: 'utf8') => string,
+  attempts?: number,
+): { value: unknown; unreadable?: undefined } | { unreadable: true; value?: undefined };
+
+/** Идёт ли ход по журналу процессов; нечитаемый журнал — занято. */
+export declare function ledgerBusy(
+  file: string,
+  isAlive: (pid: number) => boolean,
+  read?: (file: string, encoding: 'utf8') => string,
+): boolean;
+
 /** Группа разделения готовит копию (стартовала, чата нет, моложе получаса). */
 export declare function splitSetupRunning(state: unknown, now: number): boolean;
 

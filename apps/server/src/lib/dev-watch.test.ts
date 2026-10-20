@@ -8,6 +8,7 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -15,6 +16,8 @@ import {
   SourceWatcher,
   busyRun,
   isWatched,
+  ledgerBusy,
+  readJsonSteady,
   splitSetupRunning,
 } from './dev-watch.mjs';
 import {
@@ -131,6 +134,84 @@ describe('dev-сторож сервера', () => {
     expect(splitSetupRunning({}, now)).toBe(false);
     expect(splitSetupRunning(null, now)).toBe(false);
   });
+});
+
+// 20.10: чтение журнала в момент атомарной перезаписи (Windows) давало ENOENT,
+// сторож видел «ходов нет» и перезапускал сервер посреди живых ходов.
+describe('журнал ходов, который переписывают прямо сейчас', () => {
+  const enoent = () => Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+
+  it('промах переименования повторяется, а не читается как пустой журнал', () => {
+    let calls = 0;
+    const read = () => {
+      calls += 1;
+      if (calls < 3) throw enoent();
+      return '[{"pid":1}]';
+    };
+    expect(readJsonSteady('runs.json', read)).toEqual({ value: [{ pid: 1 }] });
+    expect(calls).toBe(3);
+  });
+
+  it('файла нет на всех попытках — его нет; нечитаемый — занято', () => {
+    expect(
+      readJsonSteady(
+        'runs.json',
+        () => {
+          throw enoent();
+        },
+        2,
+      ),
+    ).toEqual({ value: undefined });
+    expect(readJsonSteady('runs.json', () => '{обрыв', 2)).toEqual({ unreadable: true });
+    expect(
+      ledgerBusy(
+        'runs.json',
+        () => true,
+        () => '{обрыв',
+      ),
+    ).toBe(true);
+    expect(
+      ledgerBusy(
+        'runs.json',
+        () => true,
+        () => {
+          throw enoent();
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it('четыре процесса переписывают журнал — живой ход виден на каждом чтении', async (ctx) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dw-race-'));
+    const file = join(dir, 'runs.json');
+    const busy = JSON.stringify([{ pid: 1, idle: false }]);
+    writeFileSync(file, busy);
+    // Пишут так же, как safe-io: временный файл рядом и переименование поверх.
+    const writer = `const fs=require('fs');const f=process.argv[1];let n=0;const end=Date.now()+2500;
+      while(Date.now()<end){const t=f+'.tmp-'+process.pid+'-'+(++n);fs.writeFileSync(t,${JSON.stringify(busy)});
+      for(let a=0;a<5;a++){try{fs.renameSync(t,f);break}catch{}}}`;
+    const writers = Array.from({ length: 4 }, () =>
+      spawn(process.execPath, ['-e', writer, file], { stdio: 'ignore' }),
+    );
+    try {
+      await new Promise((done) => setTimeout(done, 300));
+      let idleSeen = 0;
+      let rawMisses = 0;
+      const end = Date.now() + 1500;
+      while (Date.now() < end) {
+        if (!ledgerBusy(file, () => true)) idleSeen += 1;
+        // Контроль: одно чтение без повтора — так читал прежний сторож.
+        if (readJsonSteady(file, readFileSync, 1).value === undefined) rawMisses += 1;
+      }
+      expect(idleSeen).toBe(0);
+      // Гонка есть только на Windows и ловится не каждый прогон: не пойманная контролем —
+      // прогон ничего не доказал, и он помечается пропущенным, а не зелёным.
+      if (rawMisses === 0) ctx.skip();
+    } finally {
+      await Promise.all(writers.map((child) => new Promise((done) => child.once('exit', done))));
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 15_000);
 });
 
 // Решение 30.09: перезапуск ждёт живые ходы без предела, панель видит ожидание.

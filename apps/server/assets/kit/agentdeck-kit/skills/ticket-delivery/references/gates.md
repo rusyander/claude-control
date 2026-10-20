@@ -9,6 +9,17 @@ edit; an edit made after the MR — a reviewer thread, a §11 conflict — re-ru
 packages' checks, unless the edit reaches a shared config, lockfile or contract, which takes the full
 gate again. Two full runs with no edit between them is a red flag (stages.md).
 
+**Scope is computed, not chosen** — locally the touched zones, CI everything. `gate-run --affected`
+asks `<kit>/tools/affected.mjs`: zones = dirs with a manifest, edges = one manifest naming another,
+dependents transitive; SCOPED runs each reached zone's own commands (a check only the workspace root
+has — root-only lint — is inherited once). FULL whenever the scope cannot be proved, reason printed.
+The map (`.agent/affected.map.json`) is generated on first use and rebuilt when manifests, lockfiles
+or CI files move; human overrides live in `.agent/affected.json` (`alwaysFull`, `ignore`, per-zone
+`commands`, `cheapSeconds`) and survive every rebuild. A green FULL run records its duration — under
+`cheapSeconds` (180) the next verdict is FULL, the scope not being worth a miss. A changed zone with
+no derivable command is FULL plus a hint naming the override. The review (§9) and the live run (§10)
+follow the same map: the zones it names are the radius.
+
 ## A gate the local machine cannot run (§6)
 
 It is REPRODUCED, not skipped — wrong runtime major, a missing interpreter, a toolchain that will not

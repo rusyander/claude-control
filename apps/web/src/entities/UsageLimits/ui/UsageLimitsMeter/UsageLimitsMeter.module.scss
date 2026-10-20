@@ -55,8 +55,10 @@
     --limit-percent: var(--color-danger);
   }
 
+  // Устаревшие данные гасят только полосу: прозрачность всей строки роняла
+  // контраст подписи сброса ниже 4.5:1 (axe, обе темы).
   &[data-stale] {
-    opacity: 0.7;
+    --limit-fill: var(--color-fg-subtle);
   }
 }
 

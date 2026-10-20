@@ -1268,7 +1268,7 @@ export function deliverStagePrompt(input: {
     `5. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
       `a pushed branch after a conflict rebase — \`git push --force-with-lease origin ${target}\`, and ` +
       "only your own group branch, never the main, a protected or another group's branch. Open " +
-      'the MR by the project delivery skill (or update the open one): task keys in the ' +
+      'the MR by the delivery skill (or update the open one): task keys in the ' +
       'description, decisions taken without the human listed there too. Stages of the skill not ' +
       'passed yet (live check after the edits, before/after shots, tracker) are yours as well.',
     // Итог по MR без его обсуждений (аудит 25.09, L199): ревьюер оставил тред,

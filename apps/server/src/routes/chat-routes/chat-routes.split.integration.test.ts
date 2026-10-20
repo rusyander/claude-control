@@ -860,6 +860,11 @@ describe('POST /api/chat/split', () => {
       return conveyor;
     }
 
+    /** Прогон группы по её связи: план и работа без плана пишут задание по-разному. */
+    function runOf(title: string) {
+      return started.find((run) => store.getChatLink(run.chatId)?.title === title);
+    }
+
     function launchDeps() {
       return {
         runs: registry,
@@ -993,6 +998,16 @@ describe('POST /api/chat/split', () => {
       expect(store.getChatLink(started[1]?.chatId ?? '')?.notes).toContain(
         'Before this group, these worked: "Раз"',
       );
+      // Исследование идёт на потолке — плана у него нет: работа стартует сразу,
+      // и заметка о предшественнике едет в её собственном задании.
+      expect(started[1]?.prompt).not.toContain('Work plan for the group');
+      expect(started[1]?.prompt).toContain('Before this group, these worked: "Раз"');
+      expect(started[1]?.model).toBe('claude-opus-5');
+      expect(store.getChatLink(started[1]?.chatId ?? '')).toMatchObject({
+        stage: 'work',
+        lowered: false,
+        ceilingModel: 'claude-opus-5',
+      });
     });
 
     /**
@@ -1052,7 +1067,10 @@ describe('POST /api/chat/split', () => {
       expect(notebook).toContain('вход — файл .env.stand');
       // Каталог без git: копий нет, обе группы в одном каталоге и делят тетрадь —
       // посев второй дописан своим разделом, а не потерян за первым (ревью A1-F6/B1-F4).
-      const second = started.find((item) => item.prompt.includes('Work plan for the group "Два"'));
+      // «Два» идёт на потолке, без плана: карта разбора — в задании самой работы.
+      const second = runOf('Два');
+      expect(second?.prompt).not.toContain('Work plan for the group');
+      expect(second?.prompt).toContain('src/crash.ts:40 — падение');
       expect(second?.cwd).toBe(run?.cwd);
       const shared = readFileSync(join(second?.cwd ?? '', TASK_NOTEBOOK), 'utf8');
       expect(shared).toContain('## From the panel at the start — Раз');
@@ -1137,8 +1155,8 @@ describe('POST /api/chat/split', () => {
       expect(triagePrompt).toContain(
         '- global:review — Review loop — when: reviewing a merge request',
       );
-      const one = started.find((run) => run.prompt.includes('"Раз"'));
-      const two = started.find((run) => run.prompt.includes('"Два"'));
+      const one = runOf('Раз');
+      const two = runOf('Два');
       expect(one).toMatchObject({ groupChoiceAtStart: 'global:review' });
       expect(one?.enabledAtStart).toContain('review');
       // Второй группе разбор ничего не выбрал — своего выбора у неё нет.
@@ -1217,7 +1235,7 @@ describe('POST /api/chat/split', () => {
         [triageId],
       );
       await new Promise((done) => setTimeout(done, 30));
-      const one = started.find((run) => run.prompt.includes('"Раз"'));
+      const one = runOf('Раз');
       expect(one).toBeDefined();
       expect(one).toMatchObject({ groupChoiceAtStart: 'global:mine-copy' });
       // Действующая сторона — глобальная копия, и включена к старту она.

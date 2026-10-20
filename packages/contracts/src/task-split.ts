@@ -1168,11 +1168,15 @@ export function deliveryPreamble(input: {
       'their permission to commit, push, create and update the MR and to move the tracker tasks of ' +
       'this group. Merging and deleting branches stay forbidden; so does force-push, except for the ' +
       'one case below about your own branch.',
-    "Take the group's tasks through the task delivery skill (a project variant, e.g. " +
-      '`<project>-ticket-delivery`, wins over the general `ticket-delivery`; no skill — go through ' +
-      "the same stages yourself): tracker tasks into work on yourself, the change, the project's " +
-      'checks, commit, push, draft MR, review, live check, design comparison if a mockup is attached ' +
-      'to the task, fixing what was found, the MR description — and take the draft off when all is clean.',
+    // Старшинство (владелец 20.10): общий навык и навык панели главнее проектного —
+    // проектный навык доставки только источник фактов, стадии ведёт общий: иначе
+    // группа шла по устаревшему проектному конвейеру мимо уровней риска и экономии проверок.
+    "Take the group's tasks through the delivery skill the panel group names, else the global " +
+      '`ticket-delivery` (none — the same stages yourself; a project delivery skill only supplies ' +
+      'facts): tracker tasks into work on yourself, the ' +
+      "change, the project's checks, commit, push, draft MR, review, live check, design comparison " +
+      'if a mockup is attached to the task, fixing what was found, the MR description — and take the ' +
+      'draft off when all is clean.',
     // Проверки проекта — те, что названы в его правилах, все и по порядку (U7):
     // «типы, линт, тесты» вообще пропускали гейт документации проекта и
     // backend-гейты, и MR уезжал с красным CI.
@@ -1268,10 +1272,13 @@ export function splitTicketPreamble(input: { readOnly?: boolean } = {}): string 
  * аргумент идёт через оболочку, и перевод строки разорвал бы команду.
  */
 export function chatDeliveryPrompt(input: { skill?: string; foreign?: boolean }): string {
+  // Найденный проектный навык не ведёт стадии (владелец 20.10) — только факты проекта.
   const skill = input.skill
-    ? `with the project skill \`${input.skill}\``
-    : 'with the task delivery skill (a project variant, e.g. `<project>-ticket-delivery`, wins over ' +
-      'the general `ticket-delivery`; no skill — go through the same stages yourself)';
+    ? 'with the global task delivery skill `ticket-delivery` (a global or panel skill outranks a ' +
+      `project one: the project skill \`${input.skill}\` does not drive the stages — open it only ` +
+      'for the project facts it holds: gate commands, tracker statuses, the stand)'
+    : 'with the global task delivery skill `ticket-delivery` (no skill — go through the same stages ' +
+      'yourself)';
   const ask = input.foreign
     ? 'a question to the human'
     : 'a question to the human with the AskUserQuestion tool';

@@ -817,9 +817,10 @@ export const en: TranslationSchema = {
         'Plain chat: the agent takes a code-change task to an MR — branch, checks, commit, push, MR, review, description; questions and reviews without edits open no MR. Split: each group is one branch and one MR, its link shows in the group summary',
       noRemote:
         'The repository has no remote (git remote) — there is nowhere to open an MR, delivery is off',
-      skill: 'Project delivery skill: `{{name}}`',
+      skill:
+        'Delivery follows the general `ticket-delivery`; the project skill `{{name}}` is a source of project facts',
       skillNone:
-        'The project has no delivery skill of its own — the agent follows the general `ticket-delivery` or the same stages by itself',
+        'Delivery follows the general `ticket-delivery`; the project has no delivery skill of its own',
       parallel: 'Split groups at once',
       parallelHint: 'Set by hand. The rest wait in a queue: 1 to {{max}}',
       parallelAuto:
@@ -5041,7 +5042,7 @@ export const en: TranslationSchema = {
     deliverToMrHint:
       'On — a project chat header shows the “To MR” button: that is where delivery is turned on and off ' +
       'for this project (on out of the box). The agent takes a code-change task to a ready MR by the ' +
-      'project delivery skill, each split group to its own MR; questions and reviews without edits open ' +
+      'general delivery skill, each split group to its own MR; questions and reviews without edits open ' +
       'no MR. Off — no button, and no project delivers.',
     taskSplitInitiative: 'Offer to split tasks across chats',
     taskSplitInitiativeHint:

@@ -701,6 +701,12 @@ export async function splitTasks({
     // Ревью чужого MR — всегда на потолке, какой бы класс ни назвал агент (Д14:
     // ревью !773 с `kind: "implementation"` ушло на sonnet при потолке opus).
     const assignment = assign?.(review ? { ...group, kind: 'review' } : group, prompt, index);
+    // План нужен там, где работа пойдёт НИЖЕ потолка: сильная модель готовит
+    // путь слабой. Работа на потолке спланирует себя сама — отдельный план на
+    // той же модели лишь второй раз собирал бы тот же контекст (≈22–28% расхода
+    // группы, журнал 20.10). Ревью после работы заводится по потолку связи.
+    const runStage =
+      groupStage === 'plan' && assignment && !assignment.lowered ? 'work' : groupStage;
     // Родство — ПЕРЕД запуском: прогон назовёт настоящий ключ сессии сам, и к
     // этому моменту переносить должно быть что (см. `SplitLink`).
     link?.({
@@ -709,7 +715,7 @@ export async function splitTasks({
       branch,
       path: cwd,
       ...(assignment ? { assignment } : {}),
-      stage: groupStage,
+      stage: runStage,
       group,
       index,
       prompt,
@@ -726,7 +732,7 @@ export async function splitTasks({
           cwd,
           branch,
           ...(assignment ? { assignment } : {}),
-          stage: groupStage,
+          stage: runStage,
           group,
           index,
           ...(context ? { context } : {}),
@@ -744,7 +750,7 @@ export async function splitTasks({
       isWorktree,
       started,
       prompt,
-      stage: groupStage,
+      stage: runStage,
       ...(stand?.container && started ? { reviewStand: stand.container } : {}),
       ...(assignment
         ? {

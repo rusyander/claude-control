@@ -194,17 +194,42 @@ export function splitSetupRunning(state, now) {
   );
 }
 
-function readJson(file) {
-  try {
-    return JSON.parse(readFileSync(file, 'utf8'));
-  } catch {
-    return undefined;
+const READ_ATTEMPTS = 5;
+const READ_PAUSE_MS = 20;
+
+/**
+ * Чтение файла, который сервер переписывает атомарно (временный + переименование
+ * поверх). На Windows чтение, попавшее в момент переименования, получает ENOENT:
+ * при четырёх пишущих процессах так кончались ~4 % чтений (проба 20.10). Сторож
+ * принимал такой промах за «ходов нет» и перезапускал сервер посреди живых ходов.
+ * Поэтому промах повторяется; не прочиталось и после повторов — `unreadable`,
+ * и это считается «занято»: лишняя отсрочка дешевле оборванного хода. Файла нет
+ * на всех попытках — его правда нет (`value: undefined`).
+ */
+export function readJsonSteady(file, read = readFileSync, attempts = READ_ATTEMPTS) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return { value: JSON.parse(read(file, 'utf8')) };
+    } catch (error) {
+      if (attempt >= attempts) {
+        return error?.code === 'ENOENT' ? { value: undefined } : { unreadable: true };
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, READ_PAUSE_MS);
+    }
   }
 }
 
-function readEntries(file) {
-  const parsed = readJson(file);
-  return Array.isArray(parsed) ? parsed : [];
+/** Идёт ли ход по журналу процессов; нечитаемый журнал — занято. */
+export function ledgerBusy(file, isAlive, read = readFileSync) {
+  const result = readJsonSteady(file, read);
+  if (result.unreadable) return true;
+  return busyRun(Array.isArray(result.value) ? result.value : [], isAlive);
+}
+
+/** Готовится ли копия группы; нечитаемое состояние — занято. */
+function setupBusy(file, now) {
+  const result = readJsonSteady(file);
+  return result.unreadable === true || splitSetupRunning(result.value, now);
 }
 
 function pidAlive(pid) {
@@ -358,9 +383,9 @@ function main() {
     const waitingFor =
       defer && !forced
         ? deferReason(
-            busyRun(readEntries(ledgerFile), pidAlive),
-            splitSetupRunning(readJson(stateFile), now),
-            checkLedgers.some((file) => busyRun(readEntries(file), pidAlive)),
+            ledgerBusy(ledgerFile, pidAlive),
+            setupBusy(stateFile, now),
+            checkLedgers.some((file) => ledgerBusy(file, pidAlive)),
           )
         : undefined;
     if (waitingFor) {

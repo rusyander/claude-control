@@ -37,8 +37,8 @@ threads. The conveyor runs short; the ledger key is the MR's ticket (no ticket �
 - **§4/§7** only for a thread asking for a visible change.
 - **§9** no review agent: the human reviewer IS the review. A behaviour-bearing fix → one `deep-review` over the fix diff.
 - **§10** only the rows the fixes touch.
-- **§6** the touched packages' checks; the full gate only when a fix reaches a shared config,
-  lockfile or contract (gates.md §When the full gate runs).
+- **§6** `gate-run --affected` — the touched zones and their dependents; FULL only when it says so
+  (shared config, lockfile, CI file — gates.md §When the full gate runs).
 - **§8** push to the MR's branch; the description changes only where its Verification table did.
 - **§12** a reply per thread — what changed with `file:line`, or the reasoned disagreement. Replies
   are drafted into the ledger and posted after the user's yes for the batch, unless a project grant

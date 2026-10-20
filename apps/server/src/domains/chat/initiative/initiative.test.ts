@@ -138,6 +138,10 @@ describe('строка инициатив для прогона', () => {
     const line = initiativePrompt(settings, { delivery }) ?? '';
     expect(line).toContain('enabled delivery up to an MR on this project');
     expect(line).toContain('`acme-ticket-delivery`');
+    // Старшинство (владелец 20.10): стадии ведёт общий навык, проектный — только факты.
+    expect(line).toContain('with the global task delivery skill `ticket-delivery`');
+    expect(line).toContain('`acme-ticket-delivery` does not drive the stages');
+    expect(line).not.toContain('with the project skill');
     expect(line).toContain('code-change task');
     expect(line).toContain('needs no MR');
     expect(line).toContain('merging, deleting branches and force-push are forbidden');

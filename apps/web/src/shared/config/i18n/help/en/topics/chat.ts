@@ -1233,8 +1233,8 @@ export const chatEn: typeof chatRu = {
       'The “To MR” button in a project chat header shows how a task will end: “on”, ' +
       '“off” or “nowhere” (the repository has no remote). Delivery is on out of the ' +
       'box; to turn it off everywhere — “Settings” → “Models” → “Take tasks to a ready ' +
-      'MR”. Delivery follows the project delivery skill (the panel finds its name by ' +
-      'itself and shows it in the button panel): in a plain chat the agent takes a ' +
+      'MR”. Delivery follows the general `ticket-delivery` skill (a project delivery ' +
+      'skill, if any, is only a source of project facts; its name shows in the button panel):in a plain chat the agent takes a ' +
       'code-change task to an MR — branch, checks, commit, push, MR, review, ' +
       'description — while questions and reviews without edits open no MR; in a split ' +
       'each group is one branch and one MR, and the group summary shows its link as ' +
@@ -1574,10 +1574,13 @@ export const chatEn: typeof chatRu = {
       'attachment names and links, with the time they were read. The group reads ' +
       'that file and goes to the tracker only for attachment images, for a task not ' +
       'in it, and for changes after that time. Jira not connected or no keys — no ' +
-      'file, and the group reads the tracker itself as before. Every group opens ' +
-      'with a PLAN at ' +
+      'file, and the group reads the tracker itself as before. A group whose work ' +
+      'runs BELOW the ceiling opens with a PLAN at ' +
       'the ceiling: a short look at its own task in its own copy, no edits; the ' +
-      'plan goes into the work task and the work follows it step by step. No ' +
+      'plan goes into the work task and the work follows it step by step. A group ' +
+      'whose work runs at the ceiling anyway gets no plan: the same model plans for ' +
+      'itself, and a separate plan would only build the same context twice. Its ' +
+      'boundaries and triage notes go straight into the work task. No ' +
       'triage or a broken one — the groups start as proposed; no plan — the work ' +
       'goes without it, and that chat’s feed says so in one line: a level never ' +
       'blocks the work. A triage cut short by a panel restart is its own case: no ' +

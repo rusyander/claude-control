@@ -16,6 +16,7 @@ import {
   composeGroupNotes,
   planStagePrompt,
   TASK_MAX_CHARS,
+  withGroupBoundaries,
 } from '@agentdeck/contracts/split-plan';
 import { labelledCut } from '@agentdeck/contracts/quality-floor';
 import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
@@ -177,6 +178,26 @@ export function splitChatRefusal(
     message: serverText('provider-chat-unsupported', params),
     messageCode: 'provider-chat-unsupported',
     params,
+  };
+}
+
+/**
+ * Границы группы из разбора — зона правок и заметки (свои, предшественников,
+ * ответ на вопрос разбора). Одни и те же для связи, плана и работы без плана.
+ */
+function groupBoundsOf(
+  group: TaskSplitGroup,
+  context: SplitGroupContext | undefined,
+): { owns?: string[]; notes?: string } {
+  const notes = composeGroupNotes({
+    ...(group.notes ? { notes: group.notes } : {}),
+    ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
+    ...(context?.base ? { base: context.base } : {}),
+    ...(context?.holdAnswer ? { holdAnswer: context.holdAnswer } : {}),
+  });
+  return {
+    ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
+    ...(notes ? { notes } : {}),
   };
 }
 
@@ -344,12 +365,7 @@ export function createSplitLauncher(
     // Номер группы в разделении — ключ её строки в хабе (Д12): ветку агент
     // волен переключить, а звенья одной группы от этого не становятся чужими.
     const groupIndex = { groupIndex: index };
-    const notes = composeGroupNotes({
-      ...(group.notes ? { notes: group.notes } : {}),
-      ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
-      ...(context?.base ? { base: context.base } : {}),
-      ...(context?.holdAnswer ? { holdAnswer: context.holdAnswer } : {}),
-    });
+    const bounds = groupBoundsOf(group, context);
     const ceilingFields = runnableCeiling
       ? { ceilingModel: runnableCeiling.model, ceilingEffort: runnableCeiling.effort }
       : {};
@@ -374,8 +390,7 @@ export function createSplitLauncher(
         ...ceilingFields,
         task: labelledCut(prompt, TASK_MAX_CHARS),
         ...groupTask,
-        ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
-        ...(notes ? { notes } : {}),
+        ...bounds,
       };
     }
     // Ревью по ссылке (Т7): стадия у группы своя, и в связь ложится всё, из
@@ -436,6 +451,8 @@ export function createSplitLauncher(
             ...ceilingFields,
           }
         : {}),
+      // Работа без плана держит границы сама — как их держала бы связь плана.
+      ...bounds,
     };
   };
 
@@ -517,25 +534,19 @@ export function createSplitLauncher(
           }
         : {}),
     };
+    const bounds = groupBoundsOf(group, context);
     const runPrompt = isPlan
       ? planStagePrompt({
           title,
           task: prompt,
           branch,
-          ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
-          ...(() => {
-            const notes = composeGroupNotes({
-              ...(group.notes ? { notes: group.notes } : {}),
-              ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
-              ...(context?.base ? { base: context.base } : {}),
-              ...(context?.holdAnswer ? { holdAnswer: context.holdAnswer } : {}),
-            });
-            return notes ? { notes } : {};
-          })(),
+          ...bounds,
           ...(assignment.kind ? { kind: assignment.kind } : {}),
           workModel: assignment.model,
         })
-      : prompt;
+      : input.review
+        ? prompt
+        : withGroupBoundaries(prompt, bounds);
     const options = {
       prompt: runPrompt,
       cwd,
@@ -566,24 +577,20 @@ export function createSplitLauncher(
     // назначение работы уезжает в шапку разговора: по нему конвейер заведёт
     // работу, когда план кончится (`domains/provider-chat/cascade/cascade.ts`).
     const isPlan = stage === 'plan' && Boolean(assignment) && canPlan;
-    const notes = composeGroupNotes({
-      ...(group.notes ? { notes: group.notes } : {}),
-      ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
-      ...(context?.base ? { base: context.base } : {}),
-      ...(context?.holdAnswer ? { holdAnswer: context.holdAnswer } : {}),
-    });
+    const bounds = groupBoundsOf(group, context);
     const runPrompt =
       isPlan && assignment
         ? planStagePrompt({
             title,
             task: prompt,
             branch,
-            ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
-            ...(notes ? { notes } : {}),
+            ...bounds,
             ...(assignment.kind ? { kind: assignment.kind } : {}),
             workModel: assignment.model,
           })
-        : prompt;
+        : input.review
+          ? prompt
+          : withGroupBoundaries(prompt, bounds);
     // Шапка звена. У плана в ней лежит то, чем пойдёт РАБОТА, а не он сам:
     // `lowered` здесь читается как «работа пойдёт ниже настройки CLI», и
     // планировщик перенесёт это на работу вместе с моделью. Шапку получает и

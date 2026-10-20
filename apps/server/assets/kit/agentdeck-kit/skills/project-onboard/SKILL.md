@@ -28,7 +28,9 @@ phase; don't load them all upfront.
    commands, ownership zones; large codebases → sampled recon (subagents only with a go-ahead); seed
    `.agent/glossary.md` (detail in the same `references/analysis.md`). Done when every workspace
    package/service appears in the map with path → purpose → stack → verify command; none marked
-   TODO.
+   TODO. Start from `node <kit>/tools/affected.mjs --init`: it writes the generated zone map
+   (zones, edges, per-zone commands, CI-runs-tests) that `gate-run --affected` scopes the gate by; a
+   zone it prints with NO COMMANDS gets them in `.agent/affected.json`, never in the generated map.
 3. **Phase 2 — materialize `.claude/project-profile.md`.** Terse, link-based, only relevant
    sections (header+HEAD, package map, conventions, zones, bindings, links).
    Gate: every verify command entering the profile executed once first (or its `--help`/dry form),

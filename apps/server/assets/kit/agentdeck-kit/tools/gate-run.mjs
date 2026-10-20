@@ -20,6 +20,12 @@
  *   node <kit>/tools/gate-run.mjs --no-ledger ...    # do not write the ledger row
  *   node <kit>/tools/gate-run.mjs --fresh ...        # rerun gates already green on this tree
  *   node <kit>/tools/gate-run.mjs --cwd services/api --stage 06-gates ...
+ *   node <kit>/tools/gate-run.mjs --affected [--base main] "type=pnpm type-check" "always:brand=pnpm brand"
+ *
+ * `--affected`: the positionals are the FULL gate; `affected.mjs` decides whether the change lets the
+ * run stay inside the touched zones (their own commands replace the positionals — CI still runs
+ * everything) or must run full, and says why. `always:` gates run in both modes. A green full run
+ * records its duration, a green scoped run each zone's — the next verdict weighs real numbers.
  *
  * Exit: 0 all green · 1 at least one red · 2 bad invocation.
  */
@@ -27,9 +33,11 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const LEDGER = join(dirname(fileURLToPath(import.meta.url)), 'ticket-ledger.mjs');
+/** Beside this file: the kit copy runs its own sibling, not the home one. */
+const AFFECTED = join(dirname(fileURLToPath(import.meta.url)), 'affected.mjs');
 /** How many trailing lines of a red gate are worth paying for: fixes come from the end. */
 const TAIL = 40;
 
@@ -52,9 +60,10 @@ const NO_LEDGER = has('--no-ledger');
 const FRESH = has('--fresh');
 const STAGE = flag('--stage', '06-gates');
 const CWD = flag('--cwd', '');
+const AFFECTED_MODE = has('--affected');
 
 /** Positionals are the gates; everything consumed by a flag is dropped. */
-const VALUED = new Set(['--ticket', '--stage', '--cwd']);
+const VALUED = new Set(['--ticket', '--stage', '--cwd', '--base']);
 const positional = [];
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -75,13 +84,37 @@ if (positional.length === 0) {
   process.exit(2);
 }
 
-/** `label=command`, or a bare command that labels itself. */
-const gates = positional.map((raw) => {
-  const m = raw.match(/^([\w.:-]{1,24})=(.+)$/s);
-  return m
+const DEFAULT_CWD = CWD ? join(ROOT, CWD) : ROOT;
+
+/** `label=command`, or a bare command that labels itself; `always:` marks a gate scoping never drops. */
+const declared = positional.map((raw) => {
+  const always = raw.startsWith('always:');
+  const body = always ? raw.slice('always:'.length) : raw;
+  const m = body.match(/^([\w.:-]{1,24})=(.+)$/s);
+  const gate = m
     ? { label: m[1], cmd: m[2] }
-    : { label: raw.length > 28 ? `${raw.slice(0, 27)}…` : raw, cmd: raw };
+    : { label: body.length > 28 ? `${body.slice(0, 27)}…` : body, cmd: body };
+  return { ...gate, always, cwd: DEFAULT_CWD };
 });
+
+let gates = declared;
+let scope = null;
+if (AFFECTED_MODE) {
+  const { computeAffected, formatAffected } = await import(pathToFileURL(AFFECTED).href);
+  scope = computeAffected({ cwd: ROOT, base: flag('--base', undefined) });
+  process.stdout.write(`${formatAffected(scope)}\n`);
+  if (scope.verdict !== 'full') {
+    const zoneGates = (scope.zones ?? []).flatMap((z) =>
+      z.commands.map((c) => ({
+        label: `${z.dir === '.' ? 'root' : z.dir.split('/').pop()}:${c.label}`,
+        cmd: c.cmd,
+        cwd: join(ROOT, z.dir),
+        zone: z.dir,
+      })),
+    );
+    gates = [...declared.filter((g) => g.always), ...zoneGates];
+  }
+}
 
 /**
  * Every tracker key in the branch name, comma-separated: with `fix-A-1,A-2/<slug>` the gate row is
@@ -133,7 +166,13 @@ const memoFile = (tree, gate) =>
     STATE,
     'memo',
     `${createHash('sha256')
-      .update(JSON.stringify([tree, CWD, gate.cmd]))
+      .update(
+        JSON.stringify([
+          tree,
+          resolve(gate.cwd) === resolve(ROOT) ? '' : resolve(gate.cwd),
+          gate.cmd,
+        ]),
+      )
       .digest('hex')
       .slice(0, 32)}.json`,
   );
@@ -163,9 +202,10 @@ function remember(tree, gate) {
 function run(gate) {
   const started = Date.now();
   const r = spawnSync(gate.cmd, {
-    cwd: CWD ? join(ROOT, CWD) : ROOT,
+    cwd: gate.cwd,
     encoding: 'utf8',
     shell: true,
+    maxBuffer: 64 * 1024 * 1024,
   });
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   const out = String(r.stdout || '') + String(r.stderr || '');
@@ -174,10 +214,13 @@ function run(gate) {
   return { code, seconds, out };
 }
 
-process.stdout.write(`gate-run: ${gates.length} gate(s) in ${CWD ? join(ROOT, CWD) : ROOT}\n`);
+process.stdout.write(`gate-run: ${gates.length} gate(s) in ${DEFAULT_CWD}\n`);
 
 if (DRY) {
-  for (const g of gates) process.stdout.write(`  plan: ${g.label} → ${g.cmd}\n`);
+  for (const g of gates)
+    process.stdout.write(
+      `  plan: ${g.label} → ${g.cmd}${resolve(g.cwd) === resolve(DEFAULT_CWD) ? '' : ` (in ${g.cwd})`}\n`,
+    );
   process.exit(0);
 }
 
@@ -200,7 +243,7 @@ for (const gate of gates) {
     if (r.code === 0 && after === tree) remember(tree, gate);
     tree = after;
   }
-  results.push({ label: gate.label, ...r });
+  results.push({ label: gate.label, zone: gate.zone, ...r });
   if (r.code !== 0) red++;
   process.stdout.write(
     `  ${r.code === 0 ? 'ok  ' : 'RED '} ${gate.label} (${r.seconds}s, exit ${r.code})\n`,
@@ -211,10 +254,27 @@ for (const gate of gates) {
   }
 }
 
-const summary = results
-  .map((r) => `${r.label} ${r.code}${r.cached ? ' (cached)' : ''}`)
-  .join(' · ');
+const scopeTag = scope
+  ? `affected ${scope.verdict}${scope.verdict === 'scoped' ? ` ${scope.affected.length}/${scope.total}` : ''}: `
+  : '';
+const summary =
+  scopeTag +
+  (results.map((r) => `${r.label} ${r.code}${r.cached ? ' (cached)' : ''}`).join(' · ') ||
+    'nothing to check');
 process.stdout.write(`\nVERDICT: ${red === 0 ? 'green' : `red (${red})`} — ${summary}\n`);
+
+// Timings feed affected.mjs: only fresh green runs measure anything (a cached gate took 0 s).
+if (scope && red === 0 && results.length && results.every((r) => !r.cached)) {
+  const { writeTiming } = await import(pathToFileURL(AFFECTED).href);
+  if (scope.verdict === 'full') {
+    writeTiming(ROOT, { full: results.reduce((s, r) => s + Number(r.seconds), 0) });
+  } else {
+    const zones = {};
+    for (const r of results.filter((r) => r.zone))
+      zones[r.zone] = (zones[r.zone] ?? 0) + Number(r.seconds);
+    writeTiming(ROOT, { zones });
+  }
+}
 
 const ticket = flag('--ticket', keysFromBranch());
 if (!NO_LEDGER && ticket) {

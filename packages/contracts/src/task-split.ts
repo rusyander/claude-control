@@ -787,6 +787,8 @@ export interface EnvironmentPreambleInput {
    * в зоне вся копия.
    */
   scope?: string[];
+  /** Корень копии на этой машине: путь зоны внутри него — путь от корня копии. */
+  root?: string;
 }
 
 /**
@@ -829,12 +831,23 @@ function groupRuntimes(
 /**
  * Путь зоны группы так, как его пишет модель (`./api`, `/api`, `api/**`,
  * `**\/*.go`, `API`, пояснение после пробела), — в путь от корня копии до
- * первого шаблона. Пусто — вся копия; `undefined` — путь машины (`C:/…`),
- * зону по нему не узнать.
+ * первого шаблона. Пусто — вся копия; `undefined` — путь машины вне копии
+ * (`C:/…`, `/home/…`), зону по нему не узнать. Путь внутри копии `root`
+ * становится путём от её корня — на Linux/macOS он начинается с `/` так же,
+ * как `/api` модели, и без корня читался бы как модуль `home/u/…`.
  */
-function zonePath(raw: string): string | undefined {
-  const path = (raw.trim().split(/\s/)[0] ?? '').replace(/\\/g, '/');
-  if (/^[A-Za-z]:\//.test(path)) return undefined;
+function zonePath(raw: string, root?: string): string | undefined {
+  let path = (raw.trim().split(/\s/)[0] ?? '').replace(/\\/g, '/');
+  const base = root?.replace(/\\/g, '/').replace(/\/+$/, '');
+  // Регистр складывается только у корня с буквой диска: на Linux `/home/u/App` и `/home/u/app` — разные.
+  const fold = (text: string) => (base && /^[A-Za-z]:/.test(base) ? text.toLowerCase() : text);
+  const inRoot =
+    !!base &&
+    fold(path.slice(0, base.length)) === fold(base) &&
+    (path.length === base.length || path[base.length] === '/');
+  if (inRoot) path = path.slice(base.length);
+  else if (/^[A-Za-z]:\/|^\/(?:home|Users|tmp|private|var|mnt|opt|srv|root|Volumes)\//.test(path))
+    return undefined;
   const parts = path.split('/').filter((part) => part !== '' && part !== '.');
   const glob = parts.findIndex((part) => /[*?[{]/.test(part));
   return (glob < 0 ? parts : parts.slice(0, glob)).join('/').toLowerCase();
@@ -848,11 +861,11 @@ function zonePath(raw: string): string | undefined {
  * выносила за неё каждый модуль вместе с указаниями «не обходи молча» и
  * «первым в PATH» (ревью B1-F6).
  */
-function inScope(where: string, scope: string[] | undefined): boolean {
+function inScope(where: string, scope: string[] | undefined, root?: string): boolean {
   if (!scope || scope.length === 0 || !where) return true;
   const module = where.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
   return scope.some((raw) => {
-    const path = zonePath(raw);
+    const path = zonePath(raw, root);
     if (!path) return true;
     return path === module || path.startsWith(`${module}/`) || module.startsWith(`${path}/`);
   });
@@ -865,10 +878,14 @@ function inScope(where: string, scope: string[] | undefined): boolean {
  * версия, ни команда запуска не теряются; модули вне зоны группы (`scope`) —
  * одной строкой: группа их не правит, но версия и команда при ней остаются.
  */
-function runtimeLines(notes: WorktreeRuntimeNote[] | undefined, scope?: string[]): string[] {
+function runtimeLines(
+  notes: WorktreeRuntimeNote[] | undefined,
+  scope?: string[],
+  root?: string,
+): string[] {
   const all = notes ?? [];
-  const inside = all.filter((note) => inScope(note.where, scope));
-  const outside = all.filter((note) => !inScope(note.where, scope));
+  const inside = all.filter((note) => inScope(note.where, scope, root));
+  const outside = all.filter((note) => !inScope(note.where, scope, root));
   const lines = groupRuntimes(inside).map(({ note, where }) => runtimeLine(note, where));
   if (outside.length > 0) {
     const parts = groupRuntimes(outside).map(({ note, where }) => {
@@ -969,7 +986,7 @@ ${tail}${logLine}`
       `⚠ Copy preparation: the command "${boot.command}" ${why}. Dependencies may not be installed — decide yourself: repeat the install or do without it.${evidence}`,
     );
   }
-  lines.push(...runtimeLines(boot?.runtimes, input.scope));
+  lines.push(...runtimeLines(boot?.runtimes, input.scope, input.root));
   // «Не проверяй MCP» стоило ревью MR без форджа: сервер не поднялся, а агент,
   // которому сказали «всё готово», молча обходил его (12.10.2026). Готовое не
   // настраивают заново, но отсутствующий инструмент называют, а не обходят.

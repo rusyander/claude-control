@@ -46,6 +46,9 @@ function strings(value: unknown): string[] {
 }
 
 const slash = (path: string): string => path.replaceAll('\\', '/');
+/** Ключ файла для сравнения: регистр складывается только там, где его не различает диск. */
+const fileKey = (path: string, caseless: boolean): string =>
+  caseless ? slash(path).toLowerCase() : slash(path);
 
 /** Файлы настроек трёх источников — те же, что читает CLI. */
 export function settingsFiles(root: string, place: TeamPlace): string[] {
@@ -127,11 +130,12 @@ function withImports(
   files: readonly string[],
   home: string,
   excluded: (file: string) => boolean,
+  caseless: boolean,
 ): TextEntry[] {
   const seen = new Set<string>();
   const out: TextEntry[] = [];
   const add = (file: string, depth: number): void => {
-    const key = slash(file).toLowerCase();
+    const key = fileKey(file, caseless);
     if (seen.has(key) || excluded(file)) return;
     seen.add(key);
     const text = readFileSync(file, 'utf8');
@@ -215,12 +219,12 @@ export function readTeamLayer(root: string, place: TeamPlace): TeamLayer {
 
   // Цепочка инструкций: `CLAUDE.md` предков и самого проекта. Ни одного —
   // CLI читает `AGENTS.md` той же цепочкой.
-  const personal = slash(join(place.home, '.claude', 'CLAUDE.md')).toLowerCase();
-  const configMemory = slash(join(place.configDir, 'CLAUDE.md')).toLowerCase();
+  const personal = fileKey(join(place.home, '.claude', 'CLAUDE.md'), place.caseless);
+  const configMemory = fileKey(join(place.configDir, 'CLAUDE.md'), place.caseless);
   const named = (name: string): string[] =>
     chain(root).flatMap((dir) =>
       [join(dir, name), join(dir, '.claude', name)].filter((file) => {
-        const key = slash(file).toLowerCase();
+        const key = fileKey(file, place.caseless);
         return key !== personal && key !== configMemory && existsSync(file);
       }),
     );
@@ -237,7 +241,7 @@ export function readTeamLayer(root: string, place: TeamPlace): TeamLayer {
     else always.push(file);
   }
   const instructions = [
-    ...withImports(starts, place.home, excluded),
+    ...withImports(starts, place.home, excluded, place.caseless),
     ...always.map((file) => ({ path: file, text: parseRule(readFileSync(file, 'utf8')).body })),
   ];
   for (const file of nestedFiles(root).filter(keep)) pathRules.push(nestedRule(root, file));

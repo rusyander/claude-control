@@ -1,6 +1,6 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { chatNodeDirs, resetChatNodeCache, withChatNode, type ChatNodeDeps } from './chat-node.ts';
 
@@ -10,7 +10,9 @@ import { chatNodeDirs, resetChatNodeCache, withChatNode, type ChatNodeDeps } fro
  * просит другую версию и она стоит на машине; свой CLI в её каталоге её отменяет.
  */
 
-const NODE22 = join('C:', 'nvm', 'v22.23.2');
+// Корень диска этой ОС: `C:` в пути на POSIX резал бы PATH по разделителю `:`.
+const ROOT = resolve('/');
+const NODE22 = join(ROOT, 'nvm', 'v22.23.2');
 
 function project(nvmrc?: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'chat-node-'));
@@ -30,7 +32,7 @@ function deps(over: Partial<ChatNodeDeps> = {}): ChatNodeDeps & { calls: number 
       {
         version: [24, 13, 0],
         text: '24.13.0',
-        dir: join('C:', 'nvm', 'v24.13.0'),
+        dir: join(ROOT, 'nvm', 'v24.13.0'),
         manager: 'nvm-windows',
       },
     ],
@@ -78,13 +80,13 @@ describe('chat-node: Node проекта первым в PATH чата', () => {
   });
 
   it('свой claude в каталоге Node (nvm-windows) — впереди встаёт каталог прежнего CLI', () => {
-    const npm = join('C:', 'npm');
-    const env = { PATH: [join('C:', 'empty'), npm, '/usr/bin'].join(delimiter) };
+    const npm = join(ROOT, 'npm');
+    const env = { PATH: [join(ROOT, 'empty'), npm, '/usr/bin'].join(delimiter) };
     const files = new Set([join(NODE22, 'claude.cmd'), join(npm, 'claude.cmd')]);
     const own = deps({ exists: (p) => files.has(p) });
     expect(chatNodeDirs(project('22'), env, 'claude', own)).toEqual([npm, NODE22]);
     const wired = withChatNode(project('22'), env, 'claude', own).PATH?.split(delimiter);
-    expect(wired?.slice(0, 3)).toEqual([npm, NODE22, join('C:', 'empty')]);
+    expect(wired?.slice(0, 3)).toEqual([npm, NODE22, join(ROOT, 'empty')]);
     resetChatNodeCache();
     // Рядом с прежним CLI свой Node — впереди он снова дал бы не ту версию.
     files.add(join(npm, 'node.exe'));
@@ -94,7 +96,7 @@ describe('chat-node: Node проекта первым в PATH чата', () => {
     expect(chatNodeDirs(project('22'), ENV, 'claude', own)).toBeUndefined();
     resetChatNodeCache();
     // Абсолютный путь CLI по PATH не ищется — подмена безопасна.
-    expect(chatNodeDirs(project('22'), ENV, join('C:', 'bin', 'claude.exe'), own)).toEqual([
+    expect(chatNodeDirs(project('22'), ENV, join(ROOT, 'bin', 'claude.exe'), own)).toEqual([
       NODE22,
     ]);
   });

@@ -1,0 +1,88 @@
+{
+  "title": {
+    "ru": "Панель на Linux и macOS: пути, процессы и права файлов",
+    "en": "The panel on Linux and macOS: paths, processes and file permissions"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проекты, чьи пути отличаются только регистром (`/work/App` и `/work/app`), больше не сливаются в одну вкладку, одну строку списка на телефоне, одну запись снимка настроек или журнала расхода. Регистр складывается только у путей Windows — с буквой диска или UNC, на любой машине одинаково.",
+        "en": "Projects whose paths differ only in letter case (`/work/App` and `/work/app`) no longer merge into one tab, one row of the phone list, one settings-snapshot entry or one usage-ledger entry. Case is folded only for Windows paths — with a drive letter or UNC — the same way on every machine."
+      },
+      "area": { "ru": "Проекты", "en": "Projects" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Копия проекта под каталогом-ссылкой (на macOS временные каталоги лежат в `/private/var`) узнаётся по путям, которые печатает git, и закрытие ревью сравнивает настоящие пути, а не написание.",
+        "en": "A project copy under a symlinked directory (on macOS temporary directories live in `/private/var`) is recognised by the paths git prints, and review close compares real paths rather than spelling."
+      },
+      "area": { "ru": "Копии", "en": "Copies" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Локальные модели: на Linux с NVIDIA библиотеки CUDA ложатся рядом с llama-server и подхватываются при запуске; сервер модели, который не удалось запустить, больше не роняет панель — запуск просто завершается ошибкой.",
+        "en": "Local models: on Linux with NVIDIA the CUDA libraries land beside llama-server and are picked up at launch; a model server that fails to start no longer brings the panel down — the launch just ends with an error."
+      },
+      "area": { "ru": "Локальные модели", "en": "Local models" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Linux без `xdg-open` больше не роняет сервер при попытке открыть браузер. Файлы подмены хуков получают право на запуск. Node, поставленный через fnm, находится без переменной `FNM_DIR`. `gradlew` и `mvnw` без права на запуск стартуют через `sh`, а не падают с EACCES.",
+        "en": "Linux without `xdg-open` no longer crashes the server when it tries to open a browser. Hook override files get the execute bit. Node installed through fnm is found without `FNM_DIR`. `gradlew` and `mvnw` without the execute bit start through `sh` instead of failing with EACCES."
+      },
+      "area": { "ru": "Linux и macOS", "en": "Linux and macOS" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Цепочки проверок языка и автоматизация экранируют аргументы для `/bin/sh`: путь пакета со знаком `$`, обратной кавычкой или `;` больше не разбирается оболочкой. Зона группы понимает абсолютный путь машины на Linux и macOS, а не считает каждый модуль внешним.",
+        "en": "Language check chains and automation quote arguments for `/bin/sh`: a package path with `$`, a backtick or `;` is no longer parsed by the shell. A group's zone understands an absolute machine path on Linux and macOS instead of treating every module as outside."
+      },
+      "area": { "ru": "Группы и проверки", "en": "Groups and checks" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Журнал проверок работает с git старше 2.40 (штатный git macOS и Ubuntu 22.04), узнаёт инструменты, запущенные через ссылки `node_modules/.bin`, и видит правку того же размера, сделанную в ту же секунду, что и запись индекса.",
+        "en": "The verify ledger works with git older than 2.40 (stock git on macOS and Ubuntu 22.04), recognises tools launched through `node_modules/.bin` links, and sees an edit of the same size made in the same second as the index write."
+      },
+      "area": { "ru": "Журнал проверок", "en": "Verify ledger" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Хуки экономии окна: временное состояние у каждого пользователя своё и закрыто от остальных, ключи выученной длительности различают регистр там, где его различает диск, хук запускается и через каталог-ссылку. Аудит расхода считает временный каталог macOS черновым.",
+        "en": "Window-economy hooks: temporary state is per user and closed to others, learned-duration keys keep case where the disk does, and a hook runs through a linked directory too. The usage audit counts the macOS temporary directory as scratch."
+      },
+      "area": { "ru": "Набор хуков", "en": "Hook kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Запуск проекта на Linux без `lsof` находит процесс, держащий порт, по `/proc`, а остановка дерева процессов не ломается на урезанном `ps` (busybox).",
+        "en": "The project runner on Linux without `lsof` finds the process holding a port through `/proc`, and stopping a process tree no longer breaks on a reduced `ps` (busybox)."
+      },
+      "area": { "ru": "Запуск проекта", "en": "Project runner" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка описывает поведение на Linux и macOS: библиотеки CUDA рядом с llama-server и ошибку незапустившегося сервера модели, обёртку Gradle и Maven без права на запуск, кавычки пути отчёта в команде прогона, инструменты из ссылок `node_modules/.bin` в журнале проверок.",
+        "en": "Help describes the behaviour on Linux and macOS: CUDA libraries beside llama-server and the error of a model server that fails to start, a Gradle or Maven wrapper without the execute bit, quoting of the report path in the run command, tools from `node_modules/.bin` links in the verify ledger."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    },
+    {
+      "kind": "internal",
+      "text": {
+        "ru": "Проверки QA на Linux и macOS: стенд прячет claude, не теряя node и git, снимает своих ретрансляторов и сервер по SIGTERM, процессы чужих CLI снимаются всем деревом без соседей, рабочие каталоги — в `/tmp`, Android SDK на macOS находится сам.",
+        "en": "QA checks on Linux and macOS: the stand hides claude without losing node and git, stops its relays and server on SIGTERM, foreign CLI processes are stopped as a whole tree without neighbours, work dirs live in `/tmp`, the Android SDK on macOS is found on its own."
+      },
+      "area": { "ru": "Проверки", "en": "Checks" }
+    }
+  ]
+}

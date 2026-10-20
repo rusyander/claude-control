@@ -18,8 +18,15 @@ import { DEFAULT_MASKS, SHOT_LANGS, applyShotLanguage, openScenario, shotTheme }
 import { shotCard } from './access-providers-fixture.mjs';
 
 const CHAT = 'help-mascot-chat';
-/** Каталог стенда на обзоре — путь с именем пользователя машины съёмки. */
-const MASKS = [...DEFAULT_MASKS, String.raw`[A-Za-z]:\\Users\\\S+`];
+/**
+ * Каталог стенда на обзоре — путь машины съёмки: на Windows с именем пользователя, на
+ * Linux и macOS — временный со случайным хвостом, и без маски снимок менялся бы каждый прогон.
+ */
+const MASKS = [
+  ...DEFAULT_MASKS,
+  String.raw`[A-Za-z]:\\Users\\\S+`,
+  String.raw`(?:/private)?/(?:tmp|var/folders|home|Users)/\S+`,
+];
 const TITLE = { ru: 'Починить вход в систему', en: 'Fix the sign-in flow' };
 const CARD =
   'xpath=//*[@role="switch" and (@aria-label="Показывать Деку" or @aria-label="Show Decky")]' +

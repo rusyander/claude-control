@@ -131,7 +131,8 @@ function build(projectsDir: string, links: Record<string, ChatLink>) {
 function seedPeers(
   records: Map<string, SplitPlanRecord>,
   starts: number[],
-  projectPath = 'c:\\repo\\',
+  // Другое написание того же каталога; регистр не различается только на Windows.
+  projectPath = process.platform === 'win32' ? 'c:\\repo\\' : 'C:/repo/',
 ): void {
   starts.forEach((coldStart, n) => {
     const ledger: SplitTokenLedger = {

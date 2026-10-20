@@ -1,3 +1,4 @@
+import { normalizeProjectPath } from '../../../lib/app-store/projects.ts';
 import { layoutForCwd } from '../../project-git/copy-readiness.ts';
 
 /**
@@ -26,7 +27,7 @@ export function sessionHome(
   return within(first, mainDir) ? copyDir : first;
 }
 
-const norm = (path: string): string => path.split('\\').join('/').replace(/\/+$/, '').toLowerCase();
+const norm = normalizeProjectPath;
 
 function same(a: string, b: string): boolean {
   return norm(a) === norm(b);

@@ -161,7 +161,14 @@ export function processTree(rows: readonly StallProcess[], roots: readonly numbe
   return out;
 }
 
-const slashLower = (text: string): string => text.replace(/\\/g, '/').toLowerCase();
+/** Путь Windows — с буквой диска или UNC: только там регистр не различает папки. */
+const WINDOWS_PATH = /^[A-Za-z]:([\\/]|$)|^\\\\/;
+
+/** Прямые черты; регистр складывается только у копии Windows — на Linux `App` и `app` разные копии. */
+const comparable = (text: string, fold: boolean): string => {
+  const slashed = text.replace(/\\/g, '/');
+  return fold ? slashed.toLowerCase() : slashed;
+};
 
 /** Процессы вне дерева, чья командная строка называет копию группы. */
 export function straysOf(
@@ -171,7 +178,8 @@ export function straysOf(
   selfPid = process.pid,
 ): StallProcess[] {
   if (!copyPath) return [];
-  const needle = slashLower(copyPath).replace(/\/+$/, '');
+  const fold = WINDOWS_PATH.test(copyPath);
+  const needle = comparable(copyPath, fold).replace(/\/+$/, '');
   if (needle.length < 4) return [];
   const inTree = new Set(tree.map((entry) => entry.process.pid));
   return rows.filter(
@@ -179,7 +187,7 @@ export function straysOf(
       !inTree.has(row.pid) &&
       row.pid !== selfPid &&
       row.command !== undefined &&
-      slashLower(row.command).includes(needle),
+      comparable(row.command, fold).includes(needle),
   );
 }
 

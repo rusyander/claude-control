@@ -40,6 +40,14 @@ describe('mergeProjects', () => {
     expect(merged[0]?.id).toBe('r1');
   });
 
+  it('на Linux вкладка `App` рядом с проектом `app` — свой проект', () => {
+    const merged = mergeProjects(
+      [{ id: 'r', name: 'app', path: '/home/u/app' }] as Project[],
+      [{ id: 'tab', name: 'App', path: '/home/u/App' }] as Project[],
+    );
+    expect(merged.map((item) => item.path)).toEqual(['/home/u/app', '/home/u/App']);
+  });
+
   it('без вкладок список равен реестру', () => {
     expect(mergeProjects(registry, [])).toEqual(registry);
   });

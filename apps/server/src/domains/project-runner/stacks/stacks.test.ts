@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { detectCandidates, pickCandidate } from './stacks.ts';
@@ -163,11 +163,25 @@ describe('Rust, JVM, .NET', () => {
     put('services/api/build.gradle.kts', 'plugins { id("org.springframework.boot") }\n');
     put(IS_WINDOWS ? 'gradlew.bat' : 'gradlew');
     const [candidate] = detectCandidates({ dir: join(root, 'services/api'), root }, noTool);
-    expect(candidate?.args).toEqual([':services:api:bootRun']);
+    // POSIX: файл без права на исполнение (как после коммита с Windows) — через sh.
+    expect(candidate?.file).toBe(IS_WINDOWS ? join(root, 'gradlew.bat') : 'sh');
+    expect(candidate?.args).toEqual([
+      ...(IS_WINDOWS ? [] : [join(root, 'gradlew')]),
+      ':services:api:bootRun',
+    ]);
     expect(candidate?.cwd).toBe(root);
     expect(candidate?.available).toBe(true);
     expect(candidate?.framework).toBe('Spring Boot');
     expect(candidate?.pinPort?.(8081)).toEqual({ env: { SERVER_PORT: '8081' } });
+  });
+
+  it.skipIf(IS_WINDOWS)('обёртка с правом на исполнение запускается сама', () => {
+    put('pom.xml', '<plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin>');
+    put('mvnw');
+    chmodSync(join(root, 'mvnw'), 0o755);
+    const [candidate] = detectCandidates({ dir: root, root }, noTool);
+    expect(candidate?.file).toBe(join(root, 'mvnw'));
+    expect(candidate?.args).toEqual(['spring-boot:run']);
   });
 
   it('Gradle без Spring и без application — не запускаемое', () => {
@@ -268,10 +282,12 @@ describe('describeRunner: стек, варианты, недостающая п�
 
     put('manage.py');
     put('pyproject.toml', '[project]\nname = "x"\ndependencies = ["django"]\n');
-    const django = resolveRunCommand(root, 'python manage.py runserver', root, () => true);
+    // Находка зовёт системный Python так, как он называется на этой ОС (python.ts).
+    const py = process.platform === 'win32' ? 'python' : 'python3';
+    const django = resolveRunCommand(root, `${py} manage.py runserver`, root, () => true);
     expect(django.pinPort?.(8123)).toEqual({ args: ['127.0.0.1:8123'] });
     // Строка, которой среди находок нет, — своя команда без чужих правил порта.
-    expect(resolveRunCommand(root, 'python manage.py runserver 0:9', root).pinPort).toBeUndefined();
+    expect(resolveRunCommand(root, `${py} manage.py runserver 0:9`, root).pinPort).toBeUndefined();
   });
 });
 

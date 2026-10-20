@@ -676,7 +676,7 @@ export async function splitTasks({
     // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в
     // общем каталоге работает в окружении человека — ей преамбула не нужна.
     const prompt = isWorktree
-      ? `${environmentPreamble({ ...(mirror ? { mirror: mirrorLineForModel(mirror) } : {}), ...(bootstrap ? { bootstrap } : {}), ...(group.owns?.length ? { scope: group.owns } : {}) })}\n\n${withTickets}`
+      ? `${environmentPreamble({ ...(mirror ? { mirror: mirrorLineForModel(mirror) } : {}), ...(bootstrap ? { bootstrap } : {}), ...(group.owns?.length ? { scope: group.owns, root: cwd } : {}) })}\n\n${withTickets}`
       : withTickets;
 
     // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:

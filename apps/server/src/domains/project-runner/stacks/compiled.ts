@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { isExecutableFile } from '../../../lib/path-lookup.mjs';
 import { findUp, isFile, listDir, readText, relPath, shownPath } from './fs-probe.ts';
 import type { PinPort, StackCandidate, StackProbe } from './stacks.types.ts';
 
@@ -33,11 +34,19 @@ export function rustCandidates({ dir }: StackProbe): StackCandidate[] {
   ];
 }
 
-/** Обёртка сборщика от каталога цели вверх до корня: `{ dir, path }` или undefined. */
+/**
+ * Обёртка сборщика от каталога цели вверх до корня: `{ dir, path, run }` или undefined.
+ * `run` — файл и первые аргументы запуска: обёртка без права на исполнение (закоммичена
+ * с Windows как 100644, распакована из zip) идёт через `sh` — иначе spawn EACCES.
+ */
 function wrapper(dir: string, root: string, posix: string, windows: string) {
   const name = IS_WINDOWS ? windows : posix;
   const at = findUp(dir, root, [name]);
-  return at ? { dir: at, path: join(at, name) } : undefined;
+  if (!at) return undefined;
+  const path = join(at, name);
+  const run =
+    IS_WINDOWS || isExecutableFile(path) ? { file: path, args: [] } : { file: 'sh', args: [path] };
+  return { dir: at, path, run };
 }
 
 function gradleCandidates({ dir, root }: StackProbe): StackCandidate[] {
@@ -59,8 +68,8 @@ function gradleCandidates({ dir, root }: StackProbe): StackCandidate[] {
       stack: 'java',
       ...(spring ? { framework: 'Spring Boot' } : {}),
       evidence: [buildFile, ...(wrap ? [wrap.path] : [])],
-      file: wrap ? wrap.path : 'gradle',
-      args: [taskRef],
+      file: wrap ? wrap.run.file : 'gradle',
+      args: [...(wrap ? wrap.run.args : []), taskRef],
       ...(wrap ? { cwd: wrap.dir, toolPath: wrap.path } : { tool: 'gradle' }),
       display: `${shown} ${taskRef}`,
       ...(spring ? { pinPort: springPort } : {}),
@@ -79,8 +88,8 @@ function mavenCandidates({ dir, root }: StackProbe): StackCandidate[] {
       stack: 'java',
       framework: 'Spring Boot',
       evidence: [pom, ...(wrap ? [wrap.path] : [])],
-      file: wrap ? wrap.path : 'mvn',
-      args: ['spring-boot:run'],
+      file: wrap ? wrap.run.file : 'mvn',
+      args: [...(wrap ? wrap.run.args : []), 'spring-boot:run'],
       ...(wrap ? { toolPath: wrap.path } : { tool: 'mvn' }),
       display: `${shown} spring-boot:run`,
       pinPort: springPort,

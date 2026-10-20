@@ -1,11 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
@@ -321,6 +323,16 @@ describe('замена хуков действует только против �
     // Перенесённая копия запускается и видит корень оригинала.
     const out = execFileSync(process.execPath, [copy], { encoding: 'utf8' });
     expect(out.trim()).toBe(`${root.replaceAll('\\', '/')} 1`);
+  });
+
+  // Linux/macOS: хук, вызванный прямо, без бита исполнения падал с кодом 126.
+  it.skipIf(process.platform === 'win32')('исполняемый командный файл — копия тоже', () => {
+    withOverride();
+    chmodSync(join(root, 'scripts', 'guard.mjs'), 0o755);
+    localLayerRun(root, place);
+    const copy = join(root, '.agent', 'local-layer', 'build', 'overrides', 'scripts');
+    expect(statSync(join(copy, 'guard.mjs')).mode & 0o111).not.toBe(0);
+    expect(statSync(join(copy, 'lib.mjs')).mode & 0o111).toBe(0);
   });
 
   it('ветка правит файл, который замена не трогает, — в копии командная правка', () => {

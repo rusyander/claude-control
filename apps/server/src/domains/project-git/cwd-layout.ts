@@ -1,5 +1,5 @@
-import { readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 
 function isDir(path: string): boolean {
@@ -74,7 +74,39 @@ function fromGitFile(copyDir: string, marker: string): CwdLayout {
     return {};
   }
 
-  const mainDir = resolve(dirname(commonDir));
+  const mainDir = inSpellingOf(copyDir, resolve(dirname(commonDir)));
   if (normalizeProjectPath(mainDir) === normalizeProjectPath(copyDir)) return {};
   return { mainDir, copyDir };
+}
+
+/**
+ * git пишет в указатель копии настоящий путь, раскрыв ссылки (Linux 20.10: корень
+ * `/work → /real/work` дал `gitdir: /real/work/…`; на macOS так раскрывается
+ * `/tmp → /private/tmp`), а реестр проектов и панель знают проект по пути через
+ * ссылку — основная копия не находила свой проект. Она возвращается в написании
+ * копии: общий хвост настоящего и данного пути копии — одно место дерева, выше
+ * меняется только префикс; итог сверяется с диском. Windows не трогаем: там
+ * разница написаний — регистр и 8.3, их сравнение и так складывает.
+ */
+function inSpellingOf(copyDir: string, mainDir: string): string {
+  if (process.platform === 'win32') return mainDir;
+  try {
+    const realCopy = realpathSync.native(copyDir);
+    if (realCopy === copyDir) return mainDir;
+    const given = copyDir.split(sep);
+    const real = realCopy.split(sep);
+    let tail = 0;
+    while (
+      tail < given.length - 1 &&
+      tail < real.length - 1 &&
+      given[given.length - 1 - tail] === real[real.length - 1 - tail]
+    )
+      tail += 1;
+    const rel = relative(real.slice(0, real.length - tail).join(sep) || sep, mainDir);
+    if (rel.startsWith('..') || isAbsolute(rel)) return mainDir;
+    const candidate = join(given.slice(0, given.length - tail).join(sep) || sep, rel);
+    return realpathSync.native(candidate) === realpathSync.native(mainDir) ? candidate : mainDir;
+  } catch {
+    return mainDir;
+  }
 }

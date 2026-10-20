@@ -415,6 +415,29 @@ describe('token-audit — повторы и метрики плана эконо
     expect(falseRules("cat > x.mjs <<'EOF'\nconsole.log(1)\nEOF\nnode x.mjs")).toBe(0);
     expect(falseRules("cat <<'EOF' | python3\nprint(1)\nEOF")).toBe(0);
   });
+
+  // На macOS `os.tmpdir()` — `/var/folders/…/T/`: запись туда считалась правкой проекта.
+  it('правило на записи во временный каталог Linux и macOS — ложное', () => {
+    const falseRules = (file_path: string) =>
+      auditClaudeRows('e', [
+        assistant('c1', 1, { input: 0, read: 0, write: 1, out: 1 }, [
+          use('w', 'Write', { file_path, content: 'x' }),
+        ]),
+        {
+          type: 'attachment',
+          attachment: {
+            type: 'hook_additional_context',
+            hookEvent: 'PreToolUse',
+            toolUseID: 'w',
+            content: '# Before/after shots\n…',
+          },
+        },
+      ]).economy?.falseRules;
+    expect(falseRules('/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/probe.mjs')).toBe(1);
+    expect(falseRules('/private/var/folders/zz/abc/T/claude/x/probe.mjs')).toBe(1);
+    expect(falseRules('/tmp/claude/x/probe.mjs')).toBe(1);
+    expect(falseRules('/Users/u/work/app/src/T/probe.mjs')).toBe(0);
+  });
 });
 
 describe('token-audit — классы шагов', () => {

@@ -11,7 +11,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { fitModel, modelNeedGb, type HardwareGpu } from '@agentdeck/contracts/local-models';
@@ -359,6 +359,45 @@ describe('сборка llama.cpp', () => {
     expect(existsSync(join(paths.downloads, 'cudart-llama-bin-win-cuda-13.4-x64.zip'))).toBe(false);
   });
 
+  // Linux NVIDIA: у каждого tar свой верхний каталог; libcublas вне каталога сервера не грузилась.
+  it('Linux: библиотеки CUDA ложатся рядом с llama-server, а не в соседний каталог', async () => {
+    const paths = localPaths(temp(), {});
+    const release = loadRelease();
+    const linux = {
+      'llama-b11583-bin-ubuntu-cuda-13.4-x64.tar.gz': Buffer.from('server-archive'),
+      'cudart-llama-b11583-bin-ubuntu-cuda-13.4-x64.tar.gz': Buffer.from('cudart-archive'),
+    };
+    const net = stubs.fakeNet({ release: { ...release, assets: linux } });
+    // Раскладка настоящих архивов b11583: верхний каталог в каждом.
+    const tarLayout = async (archive: string, dest: string): Promise<void> => {
+      if (archive.includes('cudart')) {
+        const top = join(dest, 'cudart-llama-b11583-bin-ubuntu-cuda-13.4-x64');
+        mkdirSync(top, { recursive: true });
+        writeFileSync(join(top, 'libcublas.so.13'), 'so');
+      } else {
+        mkdirSync(join(dest, 'llama-b11583'), { recursive: true });
+        writeFileSync(join(dest, 'llama-b11583', 'llama-server'), 'binary');
+      }
+    };
+    let binary = '';
+    const job = await runJob(async (handle) => {
+      binary = await installPanelRuntime({
+        paths,
+        os: 'linux',
+        cpu: 'x64',
+        gpus,
+        cuda: [13, 4],
+        release,
+        handle,
+        fetchImpl: net.fetchImpl,
+        extract: tarLayout,
+      });
+    });
+    expect(job.state).toBe('done');
+    expect(existsSync(join(dirname(binary), 'libcublas.so.13'))).toBe(true);
+    expect(existsSync(join(paths.runtime, 'llama-b11583', '.cudart'))).toBe(false);
+  });
+
   it('архив с чужим содержимым — сумма не сошлась, готового каталога нет', async () => {
     const paths = localPaths(temp(), {});
     const release = loadRelease();
@@ -658,6 +697,16 @@ describe('пробная загрузка GGUF', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.ok ? '' : result.reason).toContain("unknown model architecture: 'foo'");
+  });
+
+  // Linux/macOS: бинарь без права на исполнение или стёртый — ошибка запуска ронял сервер панели.
+  it('бинарь не запускается — причина в ответе, процесс панели жив', async () => {
+    const missing = join(tmpdir(), `no-llama-server-${process.pid}`);
+    const started = Date.now();
+    const result = await testLoadModel({ binary: missing, file: '/m/x.gguf', timeoutMs: 20_000 });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? '' : result.reason).toContain('ENOENT');
+    expect(Date.now() - started).toBeLessThan(10_000);
   });
 });
 

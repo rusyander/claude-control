@@ -1,4 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -48,5 +50,40 @@ describe('verify-ledger checks: покрытие и повтор', () => {
       expect(noSkipOf('run', ...flags), flags.join(' ')).toMatch(/^vitest --coverage/);
     }
     expect(noSkipOf('run', '-u')).toBe('vitest -u');
+  });
+});
+
+/** Символьная ссылка файла; Windows без режима разработчика её не даёт — тест молчит. */
+function canLink(): boolean {
+  const dir = mkdtempSync(join(tmpdir(), 'cc-ledger-link-'));
+  try {
+    writeFileSync(join(dir, 'a'), '');
+    symlinkSync(join(dir, 'a'), join(dir, 'b'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// npm, yarn и bun на Linux/macOS: `.bin/vitest` — ссылка, argv[1] остаётся её путём.
+describe.skipIf(!canLink())('verify-ledger checks: запуск через node_modules/.bin', () => {
+  it('ссылка .bin узнаётся по настоящему файлу пакета', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-ledger-bin-'));
+    try {
+      mkdirSync(join(dir, 'node_modules/vitest'), { recursive: true });
+      mkdirSync(join(dir, 'node_modules/.bin'));
+      writeFileSync(join(dir, 'node_modules/vitest/vitest.mjs'), '');
+      symlinkSync('../vitest/vitest.mjs', join(dir, 'node_modules/.bin/vitest'));
+      const hit = recognize(['node', join(dir, 'node_modules/.bin/vitest'), 'run'], dir) as {
+        id: string;
+        script: string;
+      } | null;
+      expect(hit?.id).toBe('vitest');
+      expect(hit?.script).toMatch(/node_modules\/vitest\/vitest\.mjs$/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

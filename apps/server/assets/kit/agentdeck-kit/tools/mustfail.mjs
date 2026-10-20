@@ -250,8 +250,16 @@ if (!CMD) {
 // command handed to it can SUCCEED where it was meant to fail. Measured 18.09.2026 while testing this
 // very tool — `node -e 'process.exit(1)'` exited 0 under cmd.exe, because the single quotes became part
 // of the script and nothing ever called exit. A false green inside the thing that exists to catch false
-// greens is the worst possible bug here, so the user's own shell wins when there is one.
-const SHELL = process.env.SHELL && existsSync(process.env.SHELL) ? process.env.SHELL : true;
+// greens is the worst possible bug here, so the user's own shell wins when there is one. On POSIX only
+// a POSIX-family one: fish or nu as the login shell broke every bash-shaped check line.
+const POSIX_SHELL = /(?:^|\/)(?:ba|z|da|k|a)?sh$/;
+function checkShell() {
+  const login = process.env.SHELL;
+  const found = Boolean(login) && existsSync(login);
+  if (process.platform === 'win32') return found ? login : true;
+  return found && POSIX_SHELL.test(login) ? login : '/bin/sh';
+}
+const SHELL = checkShell();
 // A revert that deletes an export or a module makes the check fail on IMPORT, before any assertion
 // runs. That red proves the symbol existed, not that its behaviour is checked — a test that computes
 // its expectation the way the code does earns it exactly like a real one. Named apart in the table.

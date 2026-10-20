@@ -20,9 +20,9 @@
 // Input arrives in whatever shape the calling CLI uses; `normalize` (kit-paths.mjs) turns it into
 // Claude's, and a Codex `apply_patch` over N files becomes N calls judged one by one.
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { KIT_ROOT, cliOf, logSessionEvent, normalize, sessionEvents } from './kit-paths.mjs';
 import { CAP, cap, readInput } from './dispatch.mjs';
 import recordPrompt from './prompt/record-prompt.mjs';
@@ -419,12 +419,30 @@ function eventOf(input, hooks) {
 }
 
 /**
+ * Is the module at `url` the process entry point. Node resolves symlinks for `import.meta.url` but keeps
+ * argv[1] as given, so a symlinked `~/.claude` (stow, dotfile repos) never matched and the hook did nothing;
+ * both sides are compared real. Case folds only on Windows, where paths ignore it.
+ */
+export function isEntry(url, argv1 = process.argv[1], platform = process.platform) {
+  if (!argv1) return false;
+  const real = (path) => {
+    try {
+      return realpathSync.native(path);
+    } catch {
+      return path;
+    }
+  };
+  const entry = real(argv1);
+  const own = real(fileURLToPath(url));
+  return platform === 'win32' ? entry.toLowerCase() === own.toLowerCase() : entry === own;
+}
+
+/**
  * Called at the bottom of every item file: when THAT file is the process entry point (wired directly
  * in a CLI's hook config, or run by hand), read stdin and run just this item.
  */
 export async function runIfMain(url, name, module) {
-  const entry = process.argv[1] ? pathToFileURL(process.argv[1]).href : '';
-  if (entry.toLowerCase() !== String(url).toLowerCase()) return;
+  if (!isEntry(url)) return;
   const input = await readInput();
   const event = input ? eventOf(input, module.hooks ?? {}) : null;
   if (event) await runEvent(event, input, { name, module });

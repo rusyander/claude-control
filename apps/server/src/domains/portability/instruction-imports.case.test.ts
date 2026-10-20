@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expandInstructionText } from './instruction-imports.ts';
@@ -23,6 +23,10 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'imports-case-'));
   file = join(dir, 'CLAUDE.md');
   writeFileSync(file, 'тело файла\n', 'utf8');
+  // ФС с регистром (Linux): `claude.md` — другой файл, и его надо создать, чтобы
+  // импорт было что раскрывать; без регистра (Windows, macOS) он уже есть.
+  const twin = join(dir, 'claude.md');
+  if (!existsSync(twin)) writeFileSync(twin, 'тело файла\n', 'utf8');
 });
 
 afterEach(() => {

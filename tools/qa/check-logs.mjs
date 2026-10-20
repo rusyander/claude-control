@@ -455,22 +455,32 @@ await runOnStand(
 
       // Веб-цель на стенде не открывает браузер ОС (AGENTDECK_OPEN_BROWSER=0): иначе
       // окно с домом стенда в профиле висит у человека и держит каталог стенда.
-      if (process.platform === 'win32') {
-        const stray = spawnSync(
-          'powershell',
-          [
-            '-NoProfile',
-            '-Command',
-            `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match ':${port}/' -and $_.Name -notmatch '^(node|powershell)' } | Select-Object -ExpandProperty Name`,
-          ],
-          { encoding: 'utf8', windowsHide: true, timeout: 30_000 },
-        );
-        check(
-          'браузер ОС не открывался на адрес цели',
-          stray.status === 0 && stray.stdout.trim() === '',
-          stray.stdout.trim() || stray.stderr.trim(),
-        );
-      }
+      // POSIX — то же по `ps`: там браузер открывают `xdg-open` и `open`.
+      const stray =
+        process.platform === 'win32'
+          ? spawnSync(
+              'powershell',
+              [
+                '-NoProfile',
+                '-Command',
+                `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match ':${port}/' -and $_.Name -notmatch '^(node|powershell)' } | Select-Object -ExpandProperty Name`,
+              ],
+              { encoding: 'utf8', windowsHide: true, timeout: 30_000 },
+            )
+          : spawnSync('ps', ['-eo', 'args='], { encoding: 'utf8', timeout: 30_000 });
+      const strayNames =
+        process.platform === 'win32'
+          ? stray.stdout.trim()
+          : stray.stdout
+              .split('\n')
+              .map((row) => row.trim())
+              .filter((row) => row.includes(`:${port}/`) && !/^(?:\S*\/)?node\s/.test(row))
+              .join('\n');
+      check(
+        'браузер ОС не открывался на адрес цели',
+        stray.status === 0 && strayNames === '',
+        strayNames || stray.stderr.trim(),
+      );
 
       /* ── API: остановка и перезапуск ──────────────────────────────── */
       const lastCursor = (await logs(runSource.id)).body?.cursor;

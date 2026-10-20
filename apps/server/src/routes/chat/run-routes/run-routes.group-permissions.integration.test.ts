@@ -337,7 +337,9 @@ describe('маршрут прав: строки вкладки «Группы»'
       'psql -c "insert into users values (1)"',
       'psql -c "update users set name = 1"',
       inCopy('rm -rf ../repo'),
-      `rm -rf "${root.replace(/\\/g, '/')}/repo"`,
+      // На Linux tmpdir — сам `/tmp`, а путь, записанный как `/tmp/…`, временный по
+      // замыслу (paths.ts `TEMP_PREFIX`): по тексту копию в нём от мусора не отличить.
+      ...(/^\/(var\/)?tmp\//.test(root) ? [] : [`rm -rf "${root.replace(/\\/g, '/')}/repo"`]),
     ];
     for (const command of cards)
       expect(`${command} → ${await ask(GROUP, command)}`).toBe(`${command} → card`);

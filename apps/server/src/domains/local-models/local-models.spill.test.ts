@@ -89,7 +89,7 @@ function service() {
       spawned.push(args);
       up = true;
       const pid = nextPid++;
-      return { pid, once: () => undefined, unref: () => undefined };
+      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: () => {
       up = false;

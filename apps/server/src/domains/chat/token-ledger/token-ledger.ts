@@ -3,6 +3,7 @@ import type {
   SplitTokenLedger,
   SplitTokenUsage,
 } from '../../../lib/app-store/app-store.types.ts';
+import { normalizeProjectPath } from '../../../lib/app-store/projects.ts';
 
 /**
  * Счёт токенов группы (E4) — постоянный датчик вместо разового скрипта.
@@ -160,7 +161,7 @@ export async function readSessionLedger(
 }
 
 const normalized = (content: string): string => content.replace(/\s+/g, ' ').trim();
-const pathKey = (path: string): string => path.replaceAll('\\', '/').toLowerCase();
+const pathKey = normalizeProjectPath;
 
 /**
  * Пути файлов инструкций с одинаковым содержимым под разными путями: модель

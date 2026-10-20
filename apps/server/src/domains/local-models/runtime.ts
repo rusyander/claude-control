@@ -7,7 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { HardwareGpu, RuntimeSource } from '@agentdeck/contracts/local-models';
 import { MIN_LLAMA_BUILD } from '@agentdeck/contracts/local-models';
 import { downloadResumable, extractArchive, verifySha256, type FetchLike } from './download.ts';
@@ -76,6 +76,15 @@ export function findPanelBinary(paths: LocalPaths, os: NodeJS.Platform): string 
 }
 
 /** Архивы кладут файл по-разному: Windows — в корень, Linux и macOS — в каталог `llama-<тег>/`. */
+/** Все файлы и ссылки дерева `from` — прямо в каталог `to`, без вложенных каталогов. */
+function moveFilesFlat(from: string, to: string): void {
+  for (const entry of readdirSync(from, { withFileTypes: true })) {
+    const path = join(from, entry.name);
+    if (entry.isDirectory()) moveFilesFlat(path, to);
+    else renameSync(path, join(to, entry.name));
+  }
+}
+
 export function locateBinary(dir: string, os: NodeJS.Platform): string {
   const name = binaryName(os);
   if (existsSync(join(dir, name))) return join(dir, name);
@@ -265,16 +274,27 @@ export async function installPanelRuntime(input: {
   const final = join(paths.runtime, `llama-${info.tag}`);
   const temp = `${final}.tmp`;
   rmSync(temp, { recursive: true, force: true });
-  for (const file of files)
+  // Linux: архивы — каждый со своим верхним каталогом, и библиотеки CUDA легли бы рядом,
+  // а не в каталог llama-server. ld.so ищет `libcublas.so` по RPATH `$ORIGIN` — только там,
+  // и без этого переноса сервер молча шёл на процессоре. Zip под Windows верхнего каталога не имеет.
+  const libs = join(temp, '.cudart');
+  for (const file of files) {
+    const cudart = input.os !== 'win32' && file.asset.name.startsWith('cudart-');
     await (input.extract ?? ((archive, dest) => extractArchive(archive, dest, input.os)))(
       file.path,
-      temp,
+      cudart ? libs : temp,
     );
-  if (!locateBinary(temp, input.os))
+  }
+  const unpacked = locateBinary(temp, input.os);
+  if (!unpacked)
     throw localError(
       'local-binary-missing',
       `в распакованном архиве нет исполняемого файла ${binaryName(input.os)}`,
     );
+  if (existsSync(libs)) {
+    moveFilesFlat(libs, dirname(unpacked));
+    rmSync(libs, { recursive: true, force: true });
+  }
   rmSync(final, { recursive: true, force: true });
   renameSync(temp, final);
   for (const file of files) rmSync(file.path, { force: true });

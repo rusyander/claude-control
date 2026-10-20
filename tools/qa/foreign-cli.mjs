@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
+import { killProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
 
 const IS_WIN = process.platform === 'win32';
 
@@ -24,15 +25,61 @@ export function findCli(name) {
   return dirs.find((dir) => dir && names.some((file) => existsSync(join(dir, file))));
 }
 
+/** Один вид разделителя; регистр складывается только на Windows — там он не различает пути. */
+const norm = (text) => {
+  const slashed = text.replace(/[\\/]+/g, '/').replace(/\/+$/, '');
+  return IS_WIN ? slashed.toLowerCase() : slashed;
+};
+
 /**
- * PID процессов, запущенных из каталога CLI. Стенд снимает панель жёстко, и её
- * `exit`, гасящий `opencode serve`, не успевает отработать: сервер CLI
- * пережил бы проверку. Снимаем ровно то, чего до прогона не было.
+ * Настоящий путь: `tmpdir()` на Windows отдаёт короткое имя (`RUSYAN~1`), а дети
+ * CLI пишут длинное; на macOS `/var/folders/…` — это `/private/var/folders/…`.
  */
-export function cliProcesses(dir) {
-  // Сравниваем без регистра и с одним видом разделителя: Windows пишет путь как придётся.
-  const norm = (text) => text.toLowerCase().replace(/[\\/]+/g, '/');
-  const needle = norm(dir).replace(/\/+$/, '');
+const long = (path) => {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return path;
+  }
+};
+
+/**
+ * Признаки CLI в командной строке процесса. `within` — подстрока, `path` — слово
+ * строки, равное пути или лежащее под ним.
+ *
+ * Windows: каталог CLI — `%APPDATA%\npm`, в нём одни обёртки, подстроки хватает.
+ * POSIX: каталог CLI — тот же, что у node (nvm, `/usr/bin`, Homebrew), и по
+ * подстроке под снятие попадали сервер стенда, панель и чужой `python3`, а сам
+ * CLI — нет: Codex запускает свой бинарь из `node_modules/@openai/codex/vendor/…`.
+ * Там признак — путь CLI (как вызвали и настоящий) и каталог его пакета npm.
+ */
+export function cliNeedles(dir, name, homes = []) {
+  const own = homes.flatMap((home) => [home, long(home)]).map((home) => ({ within: norm(home) }));
+  if (IS_WIN) return [{ within: norm(dir) }, ...own];
+  const entry = join(dir, name);
+  const real = norm(long(entry));
+  const pkg = /^(.*\/node_modules\/(?:@[^/]+\/)?[^/]+)\//.exec(real)?.[1];
+  return [{ path: norm(entry) }, { path: real }, ...(pkg ? [{ path: pkg }] : []), ...own];
+}
+
+/** Подходит ли командная строка под один из признаков. */
+export function matchesCli(args, needles) {
+  const text = norm(args);
+  const words = text.split(/\s+/);
+  return needles.some((needle) =>
+    needle.within === undefined
+      ? words.some((word) => word === needle.path || word.startsWith(`${needle.path}/`))
+      : text.includes(needle.within),
+  );
+}
+
+/**
+ * PID процессов CLI и тех, что запущены из временных домов прогона. Стенд снимает
+ * панель жёстко, и её `exit`, гасящий `opencode serve`, не успевает отработать:
+ * сервер CLI пережил бы проверку. Снимаем ровно то, чего до прогона не было.
+ */
+export function cliProcesses(dir, name, homes = []) {
+  const needles = cliNeedles(dir, name, homes);
   try {
     const rows = IS_WIN
       ? execFileSync(
@@ -49,7 +96,7 @@ export function cliProcesses(dir) {
       rows
         .split(/\r?\n/)
         .map((row) => row.trim().match(/^(\d+)\s+(.*)$/))
-        .filter((match) => match && norm(match[2]).includes(needle))
+        .filter((match) => match && matchesCli(match[2], needles))
         .map((match) => Number(match[1])),
     );
   } catch {
@@ -62,25 +109,17 @@ export function cliProcesses(dir) {
  * оттуда, — его остаток (Codex клонирует плагины `git` в свой дом, и клон
  * переживает стенд, держа каталог).
  */
-export function reap(before, dir, homes = []) {
-  // `tmpdir()` на Windows отдаёт короткое имя (`RUSYAN~1`), а дети CLI пишут длинное.
-  const long = (path) => {
-    try {
-      return realpathSync.native(path);
-    } catch {
-      return path;
-    }
-  };
-  const left = [...cliProcesses(dir), ...homes.flatMap((home) => [...cliProcesses(long(home))])];
-  for (const pid of new Set(left)) {
+export function reap(before, dir, name, homes = []) {
+  for (const pid of cliProcesses(dir, name, homes)) {
     if (before.has(pid) || pid === process.pid) continue;
-    try {
-      // Деревом: у `git fetch` ребёнок `git remote-https`, в строке которого пути дома нет.
-      if (IS_WIN) execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-      else process.kill(pid);
-    } catch {
-      // уже вышел
-    }
+    // Деревом: у `git fetch` ребёнок `git remote-https`, в строке которого пути дома нет.
+    if (IS_WIN) {
+      try {
+        execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+      } catch {
+        // уже вышел
+      }
+    } else killProcessTree(pid);
   }
 }
 

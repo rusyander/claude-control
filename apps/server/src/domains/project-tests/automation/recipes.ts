@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { isExecutableFile } from '../../../lib/path-lookup.mjs';
 import type {
   ProjectTestAutomationCommand,
   ProjectTestAutomationRecipe,
@@ -214,8 +215,11 @@ function wrapperOf(dir: string, root: string, posixName: string, windowsName: st
   const name = IS_WINDOWS ? windowsName : posixName;
   const at = findUp(dir, root, [name]);
   if (!at) return undefined;
-  // cmd находит `gradlew.bat` по `gradlew` в текущем каталоге, sh — только по `./gradlew`.
-  return { dir: at, path: join(at, name), command: IS_WINDOWS ? posixName : `./${posixName}` };
+  // cmd находит `gradlew.bat` по `gradlew` в текущем каталоге, sh — только по `./gradlew`;
+  // обёртка без права на исполнение (закоммичена с Windows как 100644) — через `sh`.
+  const path = join(at, name);
+  const command = IS_WINDOWS ? posixName : `${isExecutableFile(path) ? '' : 'sh '}./${posixName}`;
+  return { dir: at, path, command };
 }
 
 function gradleRecipe(dir: string, root: string): Draft | undefined {

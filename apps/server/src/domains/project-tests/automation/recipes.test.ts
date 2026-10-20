@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { automationRecipes } from './recipes.ts';
@@ -99,7 +99,8 @@ describe('project-tests/automation/recipes: готовые команды бэк
     put('svc/build.gradle', "plugins { id 'java' }\n");
     put('svc/src/test/java/com/shop/OrderTest.java', 'class OrderTest {}\n');
     const [recipe] = automationRecipes(root, all);
-    const wrapper = process.platform === 'win32' ? 'gradlew' : './gradlew';
+    // POSIX: обёртка без права на исполнение (как после коммита с Windows) — через sh.
+    const wrapper = process.platform === 'win32' ? 'gradlew' : 'sh ./gradlew';
     expect(recipe).toMatchObject({
       id: 'gradle:svc',
       dir: 'svc',
@@ -110,6 +111,15 @@ describe('project-tests/automation/recipes: готовые команды бэк
       },
     });
     expect(recipe?.automation.format).toBeUndefined();
+  });
+
+  it.skipIf(process.platform === 'win32')('обёртка с правом на исполнение — ./gradlew', () => {
+    put('gradlew', '');
+    chmodSync(join(root, 'gradlew'), 0o755);
+    put('build.gradle', "plugins { id 'java' }\n");
+    put('src/test/java/com/shop/OrderTest.java', 'class OrderTest {}\n');
+    const [recipe] = automationRecipes(root, all);
+    expect(recipe?.automation.command).toMatch(/^\.\/gradlew /);
   });
 
   it('Maven без обёртки и без mvn — рецепт есть, программа названа', () => {

@@ -74,6 +74,21 @@ describe('settings snapshot', () => {
     ]);
   });
 
+  // Ключи по проекту на Windows сложены в нижний регистр: на Linux/macOS они не находили проект.
+  it('настройки проекта с Windows находят свой проект на Linux и macOS', () => {
+    const state = stateWith({
+      projects: [{ id: 'a', name: 'a', path: 'C:\\Users\\alice\\MyProj' }],
+      runnerPrefs: { 'c:/users/alice/myproj': { x: 1 } },
+    } as unknown as Partial<AppState>);
+    const portable = portableOf(state, WIN) as Partial<AppState>;
+    for (const target of [LINUX, { home: '/Users/bob', platform: 'darwin' as const }]) {
+      const there = applyPortable(DEFAULT_STATE, portable, target);
+      const path = there.projects[0]?.path as string;
+      expect(path).toBe(`${target.home}/MyProj`);
+      expect(Object.keys(there.runnerPrefs)).toEqual([path]);
+    }
+  });
+
   it('путь Linux возвращается домом Windows с обратными чертами', () => {
     const state = stateWith({ projects: [{ id: 'a', name: 'a', path: '/home/bob/src/app' }] });
     const back = applyPortable(DEFAULT_STATE, portableOf(state, LINUX) as Partial<AppState>, WIN);

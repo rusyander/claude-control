@@ -62,6 +62,23 @@ describe('buildProjectLists', () => {
     expect(acme?.registered).toBe(true);
   });
 
+  // Сервер на Linux держит `App` и `app` двумя проектами; общий ключ сливал их в один.
+  it('пути Linux, различные регистром, — два проекта, у каждого свои разговоры', () => {
+    const { mine } = buildProjectLists(
+      [reg('App', '/home/u/App'), reg('app', '/home/u/app')],
+      [
+        hist('/home/u/app', '2026-10-15T10:00:00Z', [
+          { id: 'low', updatedAt: '2026-10-15T10:00:00Z' },
+        ]),
+      ],
+    );
+    expect(mine.map((entry) => entry.path).sort()).toEqual(['/home/u/App', '/home/u/app']);
+    expect(mine.find((entry) => entry.name === 'App')?.chats).toEqual([]);
+    expect(mine.find((entry) => entry.name === 'app')?.chats.map((chat) => chat.id)).toEqual([
+      'low',
+    ]);
+  });
+
   it('разговоры копии — у проекта, с именем копии, свежие первыми', () => {
     const { mine, others } = buildProjectLists(registry, [
       hist('c:\\work\\acme', '2026-10-14T10:00:00Z', [

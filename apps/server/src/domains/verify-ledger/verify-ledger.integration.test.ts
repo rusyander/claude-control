@@ -92,6 +92,10 @@ afterEach(() => {
 
 type Run = { code: number | null; out: string; err: string };
 
+// TZ и CI входят в ключ (T5): унаследованные от раннера (`CI=1` в контейнере) совпали
+// бы со значением теста, и «промах» стал бы повтором.
+const { TZ: _tz, CI: _ci, ...baseEnv } = process.env;
+
 function run(env: Record<string, string> = {}, args: string[] = []): Run {
   const r = spawnSync(process.execPath, ['.claude/tools/check.mjs', ...args], {
     cwd: repo,
@@ -100,7 +104,7 @@ function run(env: Record<string, string> = {}, args: string[] = []): Run {
     // и «записи нет» доказывало бы убийство, а не предел захвата журнала.
     maxBuffer: 64 * 1024 * 1024,
     env: {
-      ...process.env,
+      ...baseEnv,
       NODE_OPTIONS: `--require "${PRELOAD}"`,
       AGENTDECK_VERIFY_LEDGER_HOME: home,
       AGENTDECK_VERIFY_LEDGER: 'on',
@@ -195,6 +199,47 @@ describe('verify-ledger: ключ видит то, что видит прове�
     run();
     writeFileSync(join(repo, 'node_modules/.package-lock.json'), '{"v":2}');
     expect(reused(run())).toBe(false);
+  });
+
+  /**
+   * Linux и macOS (git сверяет секунды mtime): правка того же размера в ту же секунду,
+   * что и запись индекса, видна git только по «racy»-отсчёту — mtime самого индекса.
+   * Копия индекса с новым mtime его теряла: снимок хешировал старое содержимое, и
+   * зелёный прогон над D выдавался потом за прогон над C. На Windows (наносекунды)
+   * тест зелёный и без правки.
+   */
+  it('правка в ту же секунду, что и запись индекса, — снимок видит её', () => {
+    const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+    pause(1_000 - (Date.now() % 1_000) + 5);
+    writeFileSync(join(repo, 'src.txt'), 'C\n');
+    git('add', 'src.txt');
+    writeFileSync(join(repo, 'src.txt'), 'D\n');
+    pause(1_200);
+    expect(run().code).toBe(0);
+    writeFileSync(join(repo, 'src.txt'), 'C\n');
+    expect(reused(run())).toBe(false);
+  });
+
+  /**
+   * git старше 2.40 (Apple Git 2.39, Ubuntu 22.04 — 2.34) не знает `--attr-source` и
+   * отвечает 129: снимок падал, и журнал молчал на каждом прогоне. Старый git — обёртка
+   * в PATH; на Windows execFile не запускает скрипт без расширения, там тест молчит.
+   */
+  it.skipIf(process.platform === 'win32')('git без --attr-source — журнал работает', () => {
+    const real = spawnSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim();
+    const bin = join(root, 'old-git');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'git'),
+      `#!/bin/sh\nfor a in "$@"; do case "$a" in --attr-source=*) echo "unknown option: $a" >&2; exit 129;; esac; done\nexec "${real}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const old = { PATH: `${bin}:${process.env.PATH ?? ''}` };
+    expect(run(old).code).toBe(0);
+    expect(reused(run(old))).toBe(true);
+    writeFileSync(join(repo, 'src.txt'), 'B\n');
+    expect(reused(run(old))).toBe(false);
+    expect(events().some((e) => e.reason?.includes('snapshot'))).toBe(false);
   });
 
   it('T5: TZ и CI — промах; слоты очереди и id сессии — повтор', () => {
@@ -362,7 +407,7 @@ if (process.env.FAKE_EAGAIN) {
       cwd: repo,
       encoding: 'utf8',
       env: {
-        ...process.env,
+        ...baseEnv,
         ...both,
         AGENTDECK_VERIFY_LEDGER_HOME: home,
         AGENTDECK_VERIFY_LEDGER: 'on',

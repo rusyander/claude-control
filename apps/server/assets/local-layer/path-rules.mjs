@@ -27,7 +27,12 @@ function main() {
   if (typeof target !== 'string' || !target) return;
   const file = isAbsolute(target) ? target : resolve(event.cwd ?? process.cwd(), target);
   const { caseless, rules } = JSON.parse(readFileSync(index, 'utf8'));
-  const stateDir = join(tmpdir(), 'agentdeck-local-layer');
+  // Per user, closed to others: /tmp is shared on Linux, and the first user's dir would deny the
+  // second one's write — rules then silently never arrive.
+  const stateDir = join(
+    tmpdir(),
+    `agentdeck-local-layer${process.getuid ? `-${process.getuid()}` : ''}`,
+  );
   const session = String(event.session_id ?? 'no-session').replace(/[^\w.-]/g, '_');
   const stateFile = join(stateDir, `${session}.json`);
   const seen = new Set(existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : []);
@@ -55,7 +60,7 @@ function main() {
     }
     seen.add(rule.id);
   }
-  mkdirSync(stateDir, { recursive: true });
+  mkdirSync(stateDir, { recursive: true, mode: 0o700 });
   writeFileSync(stateFile, JSON.stringify([...seen]), 'utf8');
   process.stdout.write(
     JSON.stringify({

@@ -387,6 +387,7 @@ export function readPosixProcessTable(run = spawnSync) {
  *
  * POSIX: как и прежде — группа, если запуск был `detached` и группа своя
  * (`group`), иначе сам процесс. `kill(-pid)` без своей группы снёс бы сервер.
+ * Проверка `spawnedAt` — по снимку `ps`; снимка нет — так же ничего не снимаем.
  *
  * `impl` — подмена платформы, снимка и сигнала для тестов.
  */
@@ -437,6 +438,9 @@ export function killProcessTree(pid, options = {}, impl = {}) {
   const readTable =
     impl.readTable ?? (process.platform === 'win32' ? () => undefined : readPosixProcessTable);
   const table = readTable();
+  // Снимка нет (busybox `ps` без `-A -o etime`) — проверить время нечем; голый
+  // номер из журнала мог занять чужой процесс, его не трогаем, как и на Windows.
+  if (!table && options.spawnedAt !== undefined) return [];
   const plan = table ? planTreeKill(table, pid, options) : undefined;
   if (plan?.skipped === 'root-reused') return [];
   const descendants = plan ? plan.pids.filter((target) => target !== pid) : [];

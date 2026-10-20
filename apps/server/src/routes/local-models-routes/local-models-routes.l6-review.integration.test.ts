@@ -113,6 +113,7 @@ beforeEach(async () => {
           once: (event: string, callback: (code: number) => void) => {
             if (event === 'exit') callback(1);
           },
+          on: () => undefined,
           unref: () => undefined,
         };
       }
@@ -122,7 +123,7 @@ beforeEach(async () => {
           up = alive.size > 0;
         }, startDelayMs);
       else up = true;
-      return { pid, once: () => undefined, unref: () => undefined };
+      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: (pid) => {
       alive.delete(pid);

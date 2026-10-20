@@ -31,6 +31,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
@@ -38,6 +39,7 @@ import { homedir, tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brandEnvName, legacyEnvName } from '../../apps/server/src/lib/brand.mjs';
+import { killProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
 
 // Префиксы переменных панели — нынешний и прежний. Прежний собирает brand.mjs
 // из частей: литерал старого имени в дереве запрещён (`pnpm brand`).
@@ -234,13 +236,19 @@ async function waitFor(url, seconds, gone = () => false) {
 }
 
 /**
- * PATH без каталогов, где лежит `claude`: одноразовая панель не должна запускать
- * настоящий CLI (он пошёл бы в сеть и в учётную запись человека). Git и node
- * остаются — без git не работают проекты. Исключение — каталоги, поставленные
- * самой проверкой (`checkAddedPathDirs`); если в таком лежит `claude`,
- * `keptClaude` велит стенду заслонить его заглушкой (`BLOCKED_CLAUDE`).
+ * PATH без `claude`: одноразовая панель не должна запускать настоящий CLI (он
+ * пошёл бы в сеть и в учётную запись человека). Git и node остаются — без git не
+ * работают проекты. Исключение — каталоги, поставленные самой проверкой
+ * (`checkAddedPathDirs`); если в таком лежит `claude`, `keptClaude` велит стенду
+ * заслонить его заглушкой (`BLOCKED_CLAUDE`).
+ *
+ * Windows: каталог с `claude` (или с CLI из `hideCli`) вырезается целиком —
+ * `%APPDATA%\npm` держит одни обёртки npm. POSIX: `npm i -g` кладёт `claude`
+ * рядом с node, npx и pnpm (nvm, `/usr/local/bin`), Homebrew — рядом с git и go;
+ * вырезанный каталог оставлял панель без них. Там каталог заменяется копией из
+ * ссылок на всё, кроме скрытых имён (`mirrorRoot/<n>`).
  */
-function pathWithoutClaude(hideCli = []) {
+export function pathWithoutClaude(hideCli = [], mirrorRoot) {
   const raw = process.env.PATH ?? process.env.Path ?? '';
   const filesOf = (cli) =>
     IS_WIN ? ['cmd', 'exe', 'ps1', ''].map((ext) => (ext ? `${cli}.${ext}` : cli)) : [cli];
@@ -248,14 +256,51 @@ function pathWithoutClaude(hideCli = []) {
   const hidden = hideCli.flatMap(filesOf);
   const added = new Set(checkAddedPathDirs(raw));
   let keptClaude = false;
-  const dirs = raw.split(delimiter).filter((dir) => {
-    if (!dir) return false;
-    if (hidden.some((name) => existsSync(join(dir, name)))) return false;
-    const hasClaude = names.some((name) => existsSync(join(dir, name)));
-    if (hasClaude && added.has(dir)) keptClaude = true;
-    return !hasClaude || added.has(dir);
+  let mirrors = 0;
+  const dirs = raw.split(delimiter).flatMap((dir) => {
+    if (!dir) return [];
+    const present = (list) => list.filter((name) => existsSync(join(dir, name)));
+    const hiddenHere = present(hidden);
+    const claudeHere = present(names);
+    const keep = claudeHere.length > 0 && added.has(dir);
+    if (IS_WIN) {
+      if (hiddenHere.length > 0) return [];
+      if (keep) keptClaude = true;
+      return claudeHere.length === 0 || keep ? [dir] : [];
+    }
+    if (keep) keptClaude = true;
+    const skip = keep ? hiddenHere : [...hiddenHere, ...claudeHere];
+    if (skip.length === 0) return [dir];
+    mirrors += 1;
+    const mirror = mirrorDir(dir, skip, join(mirrorRoot, String(mirrors)));
+    return mirror ? [mirror] : [];
   });
   return { path: dirs.join(delimiter), keptClaude };
+}
+
+/**
+ * Каталог `target` из ссылок на каждую запись `dir`, кроме `skip`. Ссылка — на
+ * путь записи, не на её настоящий путь: относительные ссылки npm и Homebrew
+ * (`../lib/node_modules/…`, `../Cellar/…`) разрешаются от своего каталога.
+ * Каталог не читается — `undefined`, вызывающий его вырезает.
+ */
+export function mirrorDir(dir, skip, target) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  mkdirSync(target, { recursive: true });
+  for (const entry of entries) {
+    if (skip.includes(entry)) continue;
+    try {
+      symlinkSync(join(dir, entry), join(target, entry));
+    } catch {
+      // Запись исчезла между чтением и ссылкой — без неё каталог всё равно годен.
+    }
+  }
+  return target;
 }
 
 /**
@@ -322,7 +367,7 @@ function killTree(child) {
  * дом (EPERM при удалении). Pid берётся из журнала прогонов панели и снимается,
  * только если это всё ещё посредник: освободившийся pid мог достаться чужому.
  */
-function reapStandRelays(stateDir) {
+export function reapStandRelays(stateDir) {
   let entries;
   try {
     entries = JSON.parse(readFileSync(join(stateDir, 'runs.json'), 'utf8'));
@@ -338,12 +383,10 @@ function reapStandRelays(stateDir) {
   ];
   for (const pid of pids) {
     if (!IS_WIN) {
-      try {
-        const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
-        if (cmd.includes('live-relay.mjs')) process.kill(pid, 'SIGTERM');
-      } catch {
-        // Процесса уже нет или /proc нет (macOS) — посредник догаснет сам.
-      }
+      // `ps`, не `/proc`: на macOS его нет, и посредник с CLI под ним жил после
+      // стенда до получаса. Деревом — CLI под посредником уходит вместе с ним.
+      const probe = spawnSync('ps', ['-o', 'args=', '-p', String(pid)], { encoding: 'utf8' });
+      if (probe.stdout?.includes('live-relay.mjs')) killProcessTree(pid);
       continue;
     }
     const probe = spawnSync(
@@ -432,7 +475,7 @@ export async function startStand({
   // панели: скрипт запускается этим же node через обёртку под именем CLI. Так
   // проверка видит, что ДОШЛО до процесса (argv, stdin), не трогая настоящий.
   const bin = join(root, 'bin');
-  const shellPath = pathWithoutClaude(hideCli);
+  const shellPath = pathWithoutClaude(hideCli, join(root, 'path'));
   const fakes =
     shellPath.keptClaude && !fakeCli.claude ? { ...fakeCli, claude: BLOCKED_CLAUDE } : fakeCli;
   const fakeNames = Object.keys(fakes);
@@ -508,6 +551,12 @@ export async function startStand({
   process.once('SIGINT', () => {
     reap();
     process.exit(130);
+  });
+  // `junit-run` снимает проверку по таймауту SIGTERM-ом: node умирает от него
+  // без `exit`, и сервер с Vite стенда жили бы дальше во временном доме.
+  process.once('SIGTERM', () => {
+    reap();
+    process.exit(143);
   });
 
   let log = '';

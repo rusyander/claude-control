@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DockerExec } from '../../compose/docker.ts';
@@ -132,6 +140,26 @@ describe('закрытие группы ревью', () => {
       .filter((line) => line.startsWith('worktree '));
     expect(left).toHaveLength(5);
   });
+
+  // git перечисляет копии настоящим путём, панель помнит путь через ссылку.
+  it.skipIf(process.platform === 'win32')(
+    'своя копия, известная по пути через ссылку, не снимается как временная',
+    async () => {
+      const via = join(root, 'via');
+      symlinkSync(root, via);
+      const startedAt = new Date(Date.now() - 1000).toISOString();
+      const own = join(root, 'repo-worktrees', 'own');
+      run(main, 'worktree', 'add', '--detach', own, 'HEAD');
+
+      const close = await closeReviewGroup(
+        { mainDir: main, copy, startedAt, knownCopies: [copy, join(via, 'repo-worktrees', 'own')] },
+        { docker },
+      );
+
+      expect(close?.scratchRemoved ?? []).toEqual([]);
+      expect(existsSync(own)).toBe(true);
+    },
+  );
 
   it('копия с коммитами без ветки остаётся: их больше нигде нет', async () => {
     await sleep(80);

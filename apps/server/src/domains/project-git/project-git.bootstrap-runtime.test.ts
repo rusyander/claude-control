@@ -211,8 +211,9 @@ describe('мягкие цепочки: среда языка не провали
   it('мягкая цепочка не освобождает ждущего соседа того же каталога', async () => {
     // Хотя бы по логу порядка: сосед `after: ['lib']` ждёт НЕ мягкую цепочку каталога lib.
     const marker = join(work, 'order.txt');
+    // Без обратных кавычек: `/bin/sh` внутри "…" исполняет их как подстановку команды.
     const append = (text: string): string =>
-      `${NODE} -e "require('fs').appendFileSync(String.raw\`${marker}\`, '${text}\\n')"`;
+      `${NODE} -e "require('fs').appendFileSync('${marker.replace(/\\/g, '/')}', '${text}\\n')"`;
     const plan: BootstrapPlan = {
       summary: 'order',
       chains: [

@@ -1,7 +1,8 @@
-import { statSync } from 'node:fs';
+import { realpathSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { WorktreeMirrorSettings } from '@agentdeck/contracts';
 import type { SplitGroupReviewClose } from '@agentdeck/contracts/chat-handoff';
+import { normalizeProjectPath } from '../../../lib/app-store/projects.ts';
 import type { DockerExec } from '../../compose/docker.ts';
 import { git } from '../../project-git/exec/exec.ts';
 import { effectiveSettings, LINK_DIRS, wanted } from '../../project-git/mirror-local.ts';
@@ -70,7 +71,19 @@ export async function copyDirt(
   return { total: paths.length, files: paths.slice(0, DIRT_FILES_MAX) };
 }
 
-const norm = (path: string): string => resolve(path).replace(/\\/g, '/').toLowerCase();
+/**
+ * Ключ копии по НАСТОЯЩЕМУ пути: `git worktree list` раскрывает ссылки, а панель
+ * помнит копию по пути через ссылку (корень за symlink, `/tmp` на macOS) — своя
+ * копия группы читалась бы чужой. Каталога уже нет — путь как есть.
+ */
+const norm = (path: string): string => {
+  const full = resolve(path);
+  try {
+    return normalizeProjectPath(realpathSync.native(full));
+  } catch {
+    return normalizeProjectPath(full);
+  }
+};
 
 /** Когда копию завели: время указателя `.git` в её корне — он пишется один раз. */
 function createdAt(path: string): number | undefined {

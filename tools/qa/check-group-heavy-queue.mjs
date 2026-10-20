@@ -64,7 +64,8 @@ function workBase() {
     if (existsSync(join(dir, '.claude'))) break;
     if (dir === parse(dir).root) return tmpdir();
   }
-  const pub = process.env.PUBLIC;
+  // PUBLIC есть только на Windows; на Linux с TMPDIR под домом — `/tmp`.
+  const pub = process.platform === 'win32' ? process.env.PUBLIC : '/tmp';
   if (pub && existsSync(pub)) return pub;
   throw new Error('нет каталога вне домашней папки: задайте PUBLIC');
 }

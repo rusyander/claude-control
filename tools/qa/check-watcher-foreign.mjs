@@ -36,6 +36,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { mirrorDir } from './throwaway-stand.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PORT = Number(process.env.WATCH_FOREIGN_PORT ?? 5281);
@@ -168,14 +169,24 @@ function makeEnv(root, extra) {
   return { ...base, ...homeEnv, ...extra };
 }
 
-/** PATH без настоящих CLI: системный каталог и (по желанию) подмена. */
-function isolatedPath(bin) {
-  const system = IS_WIN
-    ? [
-        join(process.env.SystemRoot ?? 'C:\\Windows', 'System32'),
-        process.env.SystemRoot ?? 'C:\\Windows',
-      ]
-    : ['/usr/bin', '/bin'];
+/**
+ * Системные каталоги PATH. POSIX: node из пакетов дистрибутива ставит CLI npm в
+ * `/usr/bin`, и «Qwen не на PATH» находил настоящий — там каталоги заменены
+ * ссылками на всё, кроме `qwen` и `claude`.
+ */
+function systemDirs(root) {
+  if (IS_WIN) {
+    const windows = process.env.SystemRoot ?? 'C:\\Windows';
+    return [join(windows, 'System32'), windows];
+  }
+  return ['/usr/bin', '/bin'].flatMap((dir, index) => {
+    const mirror = mirrorDir(dir, ['qwen', 'claude'], join(root, 'system', String(index)));
+    return mirror ? [mirror] : [];
+  });
+}
+
+/** PATH без настоящих CLI: системные каталоги и (по желанию) подмена. */
+function isolatedPath(system, bin) {
   return [...(bin ? [bin] : []), ...system].join(IS_WIN ? ';' : ':');
 }
 
@@ -211,6 +222,7 @@ async function main() {
   mkdirSync(bin, { recursive: true });
   mkdirSync(dump, { recursive: true });
   writeFakeQwen(bin);
+  const system = systemDirs(root);
   const report = join(root, 'report', 'WATCH-REPORT.md');
   const children = [];
   try {
@@ -228,11 +240,11 @@ async function main() {
       children.push(child);
       return child;
     };
-    panel(PORTS[0], 'main', isolatedPath(bin), { AGENTDECK_WATCH_REPORT: report });
-    panel(PORTS[1], 'cursor', isolatedPath(bin), {
+    panel(PORTS[0], 'main', isolatedPath(system, bin), { AGENTDECK_WATCH_REPORT: report });
+    panel(PORTS[1], 'cursor', isolatedPath(system, bin), {
       AGENTDECK_WATCH_REPORT: join(root, 'cursor', 'R.md'),
     });
-    panel(PORTS[2], 'nocli', isolatedPath(), {
+    panel(PORTS[2], 'nocli', isolatedPath(system), {
       AGENTDECK_WATCH_REPORT: join(root, 'nocli', 'R.md'),
     });
     for (const port of PORTS) {

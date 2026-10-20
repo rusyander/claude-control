@@ -63,7 +63,9 @@ const CHAT_WITH_PROJECT = {
   name: 'Чат — проект открыт',
   prepare: async (page) => {
     await page.evaluate((path) => {
-      const id = path.toLowerCase().replace(/\\/g, '/');
+      // Ключ вкладки, как `normalizeProjectPath` фронта: регистр — только у путей Windows.
+      const flat = path.replace(/\\/g, '/').replace(/\/+$/, '');
+      const id = /^[A-Za-z]:([\\/]|$)|^\\\\/.test(path) ? flat.toLowerCase() : flat;
       localStorage.setItem(
         'agentdeck:workspace',
         JSON.stringify({ projectTabs: [{ id, path, name: 'qa' }], activeTabId: id, views: {} }),

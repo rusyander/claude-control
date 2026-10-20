@@ -14,9 +14,17 @@ const STORAGE_KEY = 'agentdeck:workspace';
 
 const EMPTY: WorkspaceState = { projectTabs: [], activeTabId: HOME_TAB_ID, views: {} };
 
-/** Один каталог пишется по-разному (регистр, слэши) — приводим к общему виду. */
+/** Путь Windows — с буквой диска или UNC: только там регистр не различает папки. */
+const WINDOWS_PATH = /^[A-Za-z]:([\\/]|$)|^\\\\/;
+
+/**
+ * Один каталог пишется по-разному (слэши, черта в конце) — приводим к общему виду.
+ * Регистр складываем только у путей Windows: на Linux `App` и `app` — две папки,
+ * сервер держит их двумя проектами, и сложенный ключ слил бы их в одну вкладку.
+ */
 export function normalizeProjectPath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const flat = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return WINDOWS_PATH.test(path) ? flat.toLowerCase() : flat;
 }
 
 /** Короткое имя проекта из пути — для табов и уведомлений о фоновом агенте. */
@@ -164,29 +172,37 @@ export function sanitizeState(raw: unknown): WorkspaceState {
   const source = (raw ?? {}) as Partial<WorkspaceState>;
   const seen = new Set<string>();
   const projectTabs: ProjectTab[] = [];
+  // id выводится из пути заново: раньше регистр складывался и на Linux, и
+  // сохранённый `/home/u/app` не совпал бы с `/home/u/App` — вкладка открылась бы второй.
+  const renamed = new Map<string, string>();
 
   for (const tab of Array.isArray(source.projectTabs) ? source.projectTabs : []) {
     if (!tab || typeof tab.id !== 'string' || typeof tab.path !== 'string') continue;
-    if (seen.has(tab.id)) continue;
-    seen.add(tab.id);
+    const id = normalizeProjectPath(tab.path);
+    renamed.set(tab.id, id);
+    if (seen.has(id)) continue;
+    seen.add(id);
     projectTabs.push({
-      id: tab.id,
+      id,
       path: tab.path,
       name: typeof tab.name === 'string' && tab.name ? tab.name : tab.path,
     });
   }
 
+  const wanted =
+    typeof source.activeTabId === 'string'
+      ? (renamed.get(source.activeTabId) ?? source.activeTabId)
+      : undefined;
   const activeTabId =
-    source.activeTabId === HOME_TAB_ID || projectTabs.some((tab) => tab.id === source.activeTabId)
-      ? source.activeTabId
-      : HOME_TAB_ID;
+    wanted === HOME_TAB_ID || projectTabs.some((tab) => tab.id === wanted) ? wanted : HOME_TAB_ID;
 
   // Открытые разговоры оставляем только у живых вкладок: запись про давно
   // закрытый проект восстановила бы чужой чат при следующем его открытии.
   const views: Record<string, string> = {};
   const known = new Set([HOME_TAB_ID, ...projectTabs.map((tab) => tab.id)]);
   const rawViews = (source.views ?? {}) as Record<string, unknown>;
-  for (const [tabId, chatId] of Object.entries(rawViews)) {
+  for (const [rawId, chatId] of Object.entries(rawViews)) {
+    const tabId = renamed.get(rawId) ?? rawId;
     if (typeof chatId === 'string' && chatId && known.has(tabId)) views[tabId] = chatId;
   }
 

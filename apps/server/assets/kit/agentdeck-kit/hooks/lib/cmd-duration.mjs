@@ -30,6 +30,10 @@ import {
   wasJustRefused,
 } from './transcript.mjs';
 
+// Case is folded only where the disk ignores it: on Linux `App` and `app` are two repos.
+const foldCase = (text) =>
+  process.platform === 'win32' || process.platform === 'darwin' ? text.toLowerCase() : text;
+
 const FILE = join(stateDir('durations'), 'cmd-durations.json');
 const CAP_S = 600;
 const KEEP_KEYS = 400;
@@ -43,7 +47,7 @@ export function legacyKey(cwd, command) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 300);
-  return `${String(cwd ?? '').toLowerCase()}|${cmd}`;
+  return `${foldCase(String(cwd ?? ''))}|${cmd}`;
 }
 
 // Top-level split of a shell line, quotes and $( ) respected. kind 'list' = ; && || newline; 'pipe' = |.
@@ -140,7 +144,7 @@ export function repoRoot(dir) {
   } catch {
     /* keep as is */
   }
-  return root.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
+  return foldCase(root.replace(/\\/g, '/').replace(/\/$/, ''));
 }
 
 export function commandKey(cwd, command) {

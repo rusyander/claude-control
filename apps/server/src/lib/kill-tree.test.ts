@@ -204,6 +204,17 @@ describe('killProcessTree — сигналы', () => {
     expect(kill).not.toHaveBeenCalled();
   });
 
+  // Linux 20.10 (alpine): busybox `ps` не знает `-A -o etime`, снимка нет — и номер
+  // из журнала, занятый чужим процессом, снимался без проверки времени.
+  it('POSIX без снимка: со spawnedAt не трогаем; без него — сам процесс', () => {
+    const kill = vi.fn();
+    const impl = { platform: 'linux', readTable: () => undefined, kill };
+    expect(killProcessTree(900, { selfPid: -1, spawnedAt: T0 }, impl)).toEqual([]);
+    expect(kill).not.toHaveBeenCalled();
+    expect(killProcessTree(900, { selfPid: -1 }, impl)).toEqual([900]);
+    expect(kill.mock.calls).toEqual([[900, 'SIGTERM']]);
+  });
+
   it('разбор `ps -o etime`: дни, часы, минуты → время создания', () => {
     const now = T0 + 90_061_000;
     const rows = parsePosixProcessTable('  1     0 1-01:01:01\n 42     1    00:05\nмусор\n', now);

@@ -203,6 +203,30 @@ describe('преамбула окружения: монорепозиторий 
     }
   });
 
+  // Linux/macOS: путь машины начинается с `/`, как и `/api` модели, — читался модулем `home/u/…`.
+  it('зона путём машины на Linux/macOS: внутри копии — свой модуль, вне её — вся копия', () => {
+    const zoned = (scope: string[], root?: string) =>
+      environmentPreamble({
+        bootstrap: { ...ok, runtimes } as never,
+        scope,
+        ...(root ? { root } : {}),
+      });
+    for (const root of ['/home/u/shop-worktrees/g1', '/Users/u/shop-worktrees/g1/']) {
+      const text = zoned([`${root.replace(/\/$/, '')}/shared-ui/src`], root);
+      expect(text, root).toContain('Node in shared-ui/: the project asks for');
+      expect(text, root).toContain("Outside this group's zone");
+    }
+    expect(zoned(['C:\\Work\\Repo\\shared-ui'], 'c:/work/repo')).toContain(
+      'Node in shared-ui/: the project asks for',
+    );
+    for (const machine of ['/home/u/other/api', '/private/var/folders/x/T/api']) {
+      const text = zoned([machine], '/home/u/shop-worktrees/g1');
+      expect(text, machine).not.toContain("Outside this group's zone");
+      expect(text, machine).toContain('Use 22.23.2 for installs and runs (put it first in PATH)');
+    }
+    expect(zoned(['/home/u/app/api'])).not.toContain("Outside this group's zone");
+  });
+
   it('потолок: двадцать восемь модулей вне зоны стоят меньше 1,5 тыс. знаков, а не 9', () => {
     const flat = before({ ...ok, runtimes });
     const scoped = environmentPreamble({

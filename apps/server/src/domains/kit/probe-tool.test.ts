@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -26,16 +27,34 @@ function probe(name: string, body: string): string {
   return file;
 }
 
-function run(...args: string[]): Promise<{ code: number; out: string; err: string }> {
+type Ran = { code: number; out: string; err: string };
+
+function runWith(extra: NodeJS.ProcessEnv, args: string[]): Promise<Ran> {
   return new Promise((done) => {
     execFile(
       process.execPath,
       [TOOL, ...args],
-      { cwd: process.cwd(), env, encoding: 'utf8', timeout: 90_000 },
+      { cwd: process.cwd(), env: { ...env, ...extra }, encoding: 'utf8', timeout: 90_000 },
       (error, out, err) => done({ code: error ? Number(error.code ?? 1) : 0, out, err }),
     );
   });
 }
+
+const run = (...args: string[]): Promise<Ran> => runWith({}, args);
+
+/** Браузер Playwright проекта запускается — иначе (свежий Linux, CI без `playwright install`) пробе нечего доказывать. */
+async function browserStarts(): Promise<boolean> {
+  try {
+    const { chromium } = createRequire(join(process.cwd(), 'x.js'))('playwright') as {
+      chromium: { launch: () => Promise<{ close: () => Promise<void> }> };
+    };
+    await (await chromium.launch()).close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+const hasBrowser = await browserStarts();
 
 beforeAll(async () => {
   server = createServer((_, res) => {
@@ -53,7 +72,27 @@ afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('kit probe — постоянный браузер', { timeout: 120_000 }, () => {
+// Linux 20.10: без скачанного браузера проба ждала 30 с и говорила только «did not start».
+describe('kit probe — браузер не скачан', () => {
+  it('причина приходит сразу, а не через 30 с ожидания', async () => {
+    const empty = mkdtempSync(join(tmpdir(), 'kit-probe-nobrowser-'));
+    try {
+      const file = probe('none', `return 1;`);
+      const started = Date.now();
+      const ran = await runWith({ PLAYWRIGHT_BROWSERS_PATH: empty, PROBE_DIR: join(empty, 'st') }, [
+        'run',
+        file,
+      ]);
+      expect(ran.code).toBe(1);
+      expect(ran.err).toMatch(/the browser did not start: .*Executable doesn't exist/);
+      expect(Date.now() - started).toBeLessThan(20_000);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
+describe.skipIf(!hasBrowser)('kit probe — постоянный браузер', { timeout: 120_000 }, () => {
   it('первая проба поднимает браузер, следующие — тёплые; печатается только возврат пробы', async () => {
     const read = probe(
       'read',

@@ -386,7 +386,9 @@ export const localModelsEn: typeof localModelsRu = {
       'panel, and an update is a deliberate edit together with a check of the launch flags. For an NVIDIA card ' +
       'it takes the CUDA build matching the driver and a separate archive with the CUDA libraries; for other cards Vulkan, on a Mac Metal, ' +
       'without a card the CPU build. The checksum is compared with the one GitHub computed when the file was uploaded; ' +
-      'a mismatch deletes the file and it is downloaded again. Your own llama-server can be set with the LLAMA_SERVER_BINARY variable.',
+      'a mismatch deletes the file and it is downloaded again. On Linux the CUDA libraries land beside llama-server: that is the only place ' +
+      'the server looks for them, otherwise it would silently run on the CPU. A server that cannot start (no execute bit, a noexec volume) ' +
+      'ends the launch with that error. Your own llama-server can be set with the LLAMA_SERVER_BINARY variable.',
     importTitle: 'Models already downloaded in Ollama',
     importLead:
       'The weights layer in the Ollama store is a plain GGUF. The panel attaches it with a hard link and tries to open ' +

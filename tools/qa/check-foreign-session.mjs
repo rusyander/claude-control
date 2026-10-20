@@ -80,7 +80,7 @@ async function checkCli(name, spec) {
   const root = mkdtempSync(join(tmpdir(), `cc-session-${name}-`));
   const restoreEnv = applyCliEnv(spec.env(root, `http://127.0.0.1:${stub.port}`), dir);
 
-  const before = cliProcesses(dir);
+  const before = cliProcesses(dir, name);
   let stand;
   try {
     stand = await startStand({
@@ -182,7 +182,7 @@ async function checkCli(name, spec) {
     } else check('сценарий дошёл до конца', false, error?.stack ?? String(error));
   } finally {
     if (stand) await stand.stop();
-    reap(before, dir, stand ? [root, stand.root] : [root]);
+    reap(before, dir, name, stand ? [root, stand.root] : [root]);
     await wait(500);
     // Сервер CLI писал в дом стенда до самого снятия — стенд не смог его стереть.
     if (stand) rmSync(stand.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });

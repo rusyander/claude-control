@@ -13,9 +13,12 @@ const WORKTREES_SUFFIX = '-worktrees';
  * Ключ сравнения путей. Реестр и история пишут один каталог по-разному: `c:\work\x`
  * и `C:\work\x`, с косой в конце и без, — а на Windows это одна папка. Без
  * нормализации проект из реестра показывался бы «без разговоров», хотя их десятки.
+ * Регистр складывается только у путей Windows (буква диска или UNC): на Linux `App`
+ * и `app` — две папки, сервер держит их двумя проектами, и общий ключ слил бы их в один.
  */
 export function pathKey(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const flat = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return /^[A-Za-z]:([\\/]|$)|^\\\\/.test(path) ? flat.toLowerCase() : flat;
 }
 
 /** Последний сегмент пути — имя папки для подписи. */

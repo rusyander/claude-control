@@ -143,6 +143,27 @@ describe('где стоит Node: менеджеры версий', () => {
     ]);
   });
 
+  // Панель от launchd/systemd не видит FNM_DIR из `fnm env`: искать во всех местах fnm.
+  it('fnm без FNM_DIR на POSIX: ~/.fnm, XDG и Application Support на macOS', () => {
+    fakeNode(home, '.fnm/node-versions/v20.17.0/installation/bin', 'darwin');
+    fakeNode(home, '.local/share/fnm/node-versions/v22.22.2/installation/bin', 'darwin');
+    fakeNode(
+      home,
+      'Library/Application Support/fnm/node-versions/v18.20.4/installation/bin',
+      'darwin',
+    );
+    const list = (platform: NodeJS.Platform) =>
+      installedNodes(deps(platform))
+        .map((item) => `${item.manager} ${item.text}`)
+        .sort();
+    expect(list('darwin')).toEqual(['fnm 18.20.4', 'fnm 20.17.0', 'fnm 22.22.2']);
+    expect(list('linux')).toEqual(['fnm 20.17.0', 'fnm 22.22.2']);
+    // FNM_DIR задан — только он.
+    expect(
+      installedNodes(deps('linux', { FNM_DIR: join(home, '.fnm') })).map((item) => item.text),
+    ).toEqual(['20.17.0']);
+  });
+
   it('nvm, asdf и nodenv на POSIX — исполняемый файл в bin', () => {
     fakeNode(home, '.nvm/versions/node/v22.22.2/bin', 'linux');
     fakeNode(home, '.asdf/installs/nodejs/20.17.0/bin', 'linux');

@@ -33,9 +33,12 @@ import { openProjectChat } from './chat-walk.mjs';
 
 const git = (dir, ...args) =>
   execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true });
-const same = (a, b) =>
-  a.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() ===
-  b.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+/** Ключ вкладки, как `normalizeProjectPath` фронта: регистр складывается только у путей Windows. */
+const tabKey = (path) => {
+  const flat = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return /^[A-Za-z]:([\\/]|$)|^\\\\/.test(path) ? flat.toLowerCase() : flat;
+};
+const same = (a, b) => tabKey(a) === tabKey(b);
 
 let repo = '';
 
@@ -110,7 +113,7 @@ await runOnStand(
       );
       // Ф-6: копия из карточки открывается своей вкладкой — как из окна
       // «Параллельные ветки», — и разговор, переехавший в неё, виден уже там.
-      const copyId = copy.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      const copyId = tabKey(copy);
       const activeTab = () =>
         page.evaluate(
           () => JSON.parse(localStorage.getItem('agentdeck:workspace') ?? '{}').activeTabId ?? '',

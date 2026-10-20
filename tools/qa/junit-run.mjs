@@ -458,8 +458,10 @@ function spawnVitest(root, targets, report) {
   });
 }
 
+/** cmd — двойные кавычки; sh — одинарные: в двойных он раскрывает `$` и обратные кавычки. */
 function quoteArg(value) {
-  return /[\s"&|<>^]/.test(value) ? `"${value}"` : value;
+  if (process.platform === 'win32') return /[\s"&|<>^]/.test(value) ? `"${value}"` : value;
+  return /^[\w./:@%+,=-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 function vitestRoot(start) {

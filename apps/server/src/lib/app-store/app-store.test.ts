@@ -253,20 +253,23 @@ describe('AppStore', () => {
     it('оверрайд из старой карты runnerCommands не теряется при обновлении панели', () => {
       const dir = join(dirA, 'agentdeck');
       mkdirSync(dir, { recursive: true });
-      // Старая карта хранила ключ нормализованным: на Windows — в нижнем
-      // регистре, в других ОС регистр пути значим и остаётся как есть.
-      const legacyKey = process.platform === 'win32' ? 'c:/work/mono' : 'C:/work/mono';
+      // Старая карта хранила ключ нормализованным: путь Windows — в нижнем
+      // регистре, путь Linux и macOS — как есть (там регистр значим). Путь — той
+      // системы, где идёт тест: другой на этой машине не встречается.
+      const windows = process.platform === 'win32';
+      const project = windows ? 'C:/work/Mono' : '/work/Mono';
+      const legacyKey = windows ? 'c:/work/mono' : '/work/Mono';
       writeFileSync(
         join(dir, 'state.json'),
         JSON.stringify({ runnerCommands: { [legacyKey]: 'pnpm start' } }),
       );
 
       const a = new AppStore(dir);
-      expect(a.getRunnerCommand('C:/work/mono')).toBe('pnpm start');
+      expect(a.getRunnerCommand(project)).toBe('pnpm start');
 
       // Переписали — значение переезжает в runnerPrefs, старая запись уходит.
-      a.setRunnerCommand('C:/work/mono', 'pnpm dev');
-      expect(new AppStore(dir).getRunnerCommand('C:/work/mono')).toBe('pnpm dev');
+      a.setRunnerCommand(project, 'pnpm dev');
+      expect(new AppStore(dir).getRunnerCommand(project)).toBe('pnpm dev');
     });
   });
 });

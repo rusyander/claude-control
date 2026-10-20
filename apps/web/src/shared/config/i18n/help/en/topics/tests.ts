@@ -1350,7 +1350,8 @@ export const testsEn: typeof testsRu = {
         'names the command itself in .agent/tests/automation.json ({"version":1,"command":"…"}) — ' +
         'by hand or with the “Run command” block (see “Backend tests” below): ' +
         '{files} becomes the files of the selected cases (of every automated case when none is selected), {paths} the same files but empty when none is selected (the runner collects the suite itself), {report} and the AGENTDECK_JUNIT_REPORT ' +
-        'variable become the junit report path. A list longer than the command line (cmd.exe ' +
+        'variable become the junit report path; a report path with a space or a shell character goes in quotes ' +
+        '(single ones on Linux and macOS: $ and backticks in it are not expanded). A list longer than the command line (cmd.exe ' +
         'cuts it at 8191 characters) goes as a file: its path is in AGENTDECK_TEST_FILES, and ' +
         'the line is built as a run without a selection. The command is named under the button and ' +
         'pnpm tests run without --cmd takes it too; a folder with tests wins over it. “Only ' +
@@ -1484,7 +1485,7 @@ export const testsEn: typeof testsRu = {
         'two folders deep: go.mod — Go, pytest.ini or [tool.pytest] in pyproject.toml, conftest.py ' +
         '— pytest, build.gradle(.kts) — Gradle, pom.xml — Maven, Cargo.toml — Cargo. Each recipe ' +
         'shows which file it was found by, how many test files there are and a ready command. ' +
-        'Gradle and Maven use the project’s wrapper (gradlew, mvnw), pytest uses uv, poetry or the ' +
+        'Gradle and Maven use the project’s wrapper (gradlew, mvnw; without the execute bit through sh), pytest uses uv, poetry or the ' +
         'project’s .venv. When the program is not on the machine, the recipe says so before the ' +
         'run and names how to install it. A module in a subfolder runs via “cd folder && …” and ' +
         'always as a whole. Several Go modules and no go.work — the “all modules” recipe comes ' +

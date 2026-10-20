@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,6 +24,14 @@ import { builtinKitDir } from './service.ts';
 const DISPATCH = join(builtinKitDir(), 'hooks', 'lib', 'run.mjs');
 const dir = mkdtempSync(join(tmpdir(), 'kit-economy-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+/**
+ * Каталог в ключе выученной длительности — как у кита (`cmd-duration.mjs`): регистр складывается
+ * только там, где диск его не различает. Модуль кита сюда не импортируется: при загрузке он
+ * заводит каталог состояния в настоящем доме.
+ */
+const foldCase = (path: string): string =>
+  process.platform === 'win32' || process.platform === 'darwin' ? path.toLowerCase() : path;
 
 let n = 0;
 const prompt = (text: string) => ({ type: 'user', message: { role: 'user', content: text } });
@@ -116,7 +132,7 @@ describe('check-cost: проверка всего проекта посреди 
       writeFileSync(
         file,
         JSON.stringify({
-          keys: { [`${repo.toLowerCase()}|${command}`]: { runs, kills: 0, last: Date.now() } },
+          keys: { [`${foldCase(repo)}|${command}`]: { runs, kills: 0, last: Date.now() } },
           pending: {},
         }),
       );
@@ -311,6 +327,39 @@ describe('диспетчер: модули pre импортируются тол
       expect(items.PRE_TOOLS[name]?.source, name).toBe(mod.hooks.pre.tools?.source);
       expect(items.PRE_TOOLS[name]?.flags, name).toBe(mod.hooks.pre.tools?.flags);
     }
+  });
+});
+
+describe('runIfMain: файл кита — точка входа процесса', () => {
+  // Node разрешает ссылки в import.meta.url, но не в argv[1]: кит, подключённый через ссылку
+  // (stow, репозиторий dotfiles), сравнивал разные пути и молча ничего не делал.
+  it('запуск через ссылку на каталог узнаётся; регистр складывается только на Windows', async () => {
+    const itemsUrl = pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'items.mjs')).href;
+    const real = join(dir, 'entry-real');
+    mkdirSync(real);
+    const file = join(real, 'item.mjs');
+    writeFileSync(
+      file,
+      `import { isEntry } from ${JSON.stringify(itemsUrl)};\n` +
+        `console.log(isEntry(import.meta.url) ? 'MAIN' : 'NOT');\n`,
+      'utf8',
+    );
+    const link = join(dir, 'entry-link');
+    symlinkSync(real, link, 'junction');
+    const out = spawnSync(process.execPath, [join(link, 'item.mjs')], { encoding: 'utf8' });
+    expect(out.stderr).toBe('');
+    expect(out.stdout.trim()).toBe('MAIN');
+    expect(spawnSync(process.execPath, [file], { encoding: 'utf8' }).stdout.trim()).toBe('MAIN');
+
+    const { isEntry } = (await import(itemsUrl)) as {
+      isEntry: (url: string, argv1?: string, platform?: string) => boolean;
+    };
+    const url = pathToFileURL(file).href;
+    const upper = file.toUpperCase();
+    expect(isEntry(url, join(real, 'other.mjs'), 'win32')).toBe(false);
+    expect(isEntry(url, upper, 'win32')).toBe(true);
+    // Различать регистр есть чем только на файловой системе, где `ITEM.MJS` — другой файл (Linux).
+    if (!existsSync(upper)) expect(isEntry(url, upper, 'linux')).toBe(false);
   });
 });
 
@@ -538,7 +587,7 @@ describe('Qwen и Codex: охранники говорят на языке св�
     const command = 'node slow-foreign.mjs';
     const file = join(dir, 'state', 'durations', 'cmd-durations.json');
     mkdirSync(dirname(file), { recursive: true });
-    const key = `${PROJECT.toLowerCase()}|${command}`;
+    const key = `${foldCase(PROJECT)}|${command}`;
     writeFileSync(
       file,
       JSON.stringify({

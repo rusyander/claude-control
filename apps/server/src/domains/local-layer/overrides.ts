@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gitSyncOutcome } from '../project-git/exec/exec.ts';
@@ -44,6 +44,17 @@ const eol = (text: string): string => text.replace(/\r\n/g, '\n');
 function show(root: string, rev: string, path: string): string | undefined {
   const outcome = gitSyncOutcome(root, ['show', `${rev}:${path}`], 10_000);
   return outcome.ok ? outcome.stdout : undefined;
+}
+
+/** Командный файл исполняемый: бит на диске или режим 100755 в коммите замены. */
+function executable(root: string, rev: string, rel: string): boolean {
+  try {
+    if (statSync(join(root, rel)).mode & 0o111) return true;
+  } catch {
+    // Командного файла нет — решает коммит.
+  }
+  const outcome = gitSyncOutcome(root, ['ls-tree', rev, '--', rel], 10_000);
+  return outcome.ok && outcome.stdout.startsWith('100755');
 }
 
 function revParse(root: string, args: string[]): string | undefined {
@@ -174,6 +185,9 @@ export function materializeOverride(
     const target = join(outDir, rel);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, text, 'utf8');
+    // Хук, вызванный прямо (`"$CLAUDE_PROJECT_DIR"/.claude/hooks/check.sh`), без бита
+    // исполнения падал бы с кодом 126, а панель показывала бы замену действующей.
+    if (process.platform !== 'win32' && executable(root, commit, rel)) chmodSync(target, 0o755);
     mapped.set(rel, target);
   }
   return { status: { ...base, state: 'active', improved }, closure, mapped };

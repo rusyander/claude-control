@@ -61,7 +61,9 @@ export function wholeProjectCheck(command: string): boolean {
 const dataHeredocsOnly = (command: string): boolean =>
   command.includes('<<') && !ruleInjector.dropDataHeredocs(command).includes('<<');
 
-const SCRATCH = /[\\/](?:Temp|tmp|scratchpad)[\\/]|[\\/]\.agent[\\/]/i;
+// `/var/folders/<xx>/<id>/T/` — временный каталог macOS (`os.tmpdir()`), в нём нет `tmp`.
+const SCRATCH =
+  /[\\/](?:Temp|tmp|scratchpad)[\\/]|[\\/]\.agent[\\/]|\/var\/folders\/[^/]+\/[^/]+\/T\//i;
 
 /** Секунды всех `sleep N` команды (`sleep 2m` — минуты). */
 function sleepSeconds(command: string): number {

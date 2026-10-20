@@ -505,7 +505,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "b1ff18e0b26d73a6"
+          "sha": "e82eac05195fdf7f"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
@@ -700,7 +700,7 @@
         {
           "path": "apps/server/src/domains/project-git/seed-node-modules.ts",
           "why": "node_modules копии ссылкой: когда подключается и когда нет (недостающий пакет, версия по lock-файлу npm)",
-          "sha": "b034e3010f237edf"
+          "sha": "119314ad3e18623f"
         },
         {
           "path": "apps/server/src/domains/chat/split-stall/split-stall.ts",
@@ -715,7 +715,7 @@
         {
           "path": "tools/verify-ledger/checks.cjs",
           "why": "Журнал проверок: какие запуски — проверка (vitest, tsc, eslint, prettier, сборка vite) и когда сборка не повторяется",
-          "sha": "c54f00863c4cd2a9"
+          "sha": "1da900759d1220ad"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/recheck-session.ts",
@@ -728,7 +728,7 @@
           "sha": "0360f22c1d409f51"
         }
       ],
-      "confirmedAt": "2026-10-20T14:52:09.593Z"
+      "confirmedAt": "2026-10-20T17:57:32.956Z"
     },
     {
       "topic": "tests",
@@ -832,12 +832,12 @@
         {
           "path": "apps/server/src/domains/project-tests/automation/recipes.ts",
           "why": "«Тесты бэкенда»: какие модули узнаются и по каким файлам, обёртки и окружения, нехватка программы, cd в подкаталог",
-          "sha": "5b30d2511068916b"
+          "sha": "e133cce7c7b4278e"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/automation.ts",
           "why": "«Тесты бэкенда»: запись и снятие команды, {files}/{packages}/{report}, виды отчёта",
-          "sha": "38662e10c9029654"
+          "sha": "5dddc4d017643b1d"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/report.ts",
@@ -935,7 +935,7 @@
           "sha": "b87cc7baba498557"
         }
       ],
-      "confirmedAt": "2026-10-20T13:46:22.715Z"
+      "confirmedAt": "2026-10-20T17:57:33.044Z"
     },
     {
       "topic": "rules",
@@ -2974,7 +2974,7 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-17T14:42:20.112Z",
+      "confirmedAt": "2026-10-20T17:57:33.130Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
@@ -2984,7 +2984,7 @@
         {
           "path": "apps/server/src/domains/local-models/server.ts",
           "why": "«Контекст — на весь сервер», «Видеопамять занята, пока работает сервер»: аргументы запуска llama-server (контекст, кеш, слои на карте, MTP, порт); «Где считать»: процессор — скрытые видеокарты в окружении сервера",
-          "sha": "e0d74425c385fb25"
+          "sha": "2fe503b69420d379"
         },
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -3019,7 +3019,7 @@
         {
           "path": "apps/server/src/domains/local-models/runtime.ts",
           "why": "«Откуда берётся сервер моделей»: закреплённая сборка llama.cpp, выбор архива по карте, проверка суммы",
-          "sha": "2c9b4c5e2956034a"
+          "sha": "93f5f9b0850e9549"
         },
         {
           "path": "apps/server/src/domains/local-models/hardware.ts",

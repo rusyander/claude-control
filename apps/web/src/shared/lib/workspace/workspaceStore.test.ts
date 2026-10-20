@@ -30,6 +30,14 @@ describe('normalizeProjectPath', () => {
   it('приводит слэши, регистр и хвостовой разделитель к общему виду', () => {
     expect(normalizeProjectPath('C:\\Work\\App\\')).toBe('c:/work/app');
     expect(normalizeProjectPath('C:/Work/App')).toBe('c:/work/app');
+    expect(normalizeProjectPath('\\\\Srv\\Share\\App')).toBe('//srv/share/app');
+  });
+
+  // На Linux `App` и `app` — две папки: сложенный ключ сливал два проекта в одну вкладку.
+  it('путь Linux и macOS сохраняет регистр', () => {
+    expect(normalizeProjectPath('/home/u/App/')).toBe('/home/u/App');
+    const state = withTabs('/home/u/App', '/home/u/app');
+    expect(state.projectTabs.map((tab) => tab.id)).toEqual(['/home/u/App', '/home/u/app']);
   });
 });
 
@@ -233,5 +241,17 @@ describe('sanitizeState', () => {
       views: { 'c:/a': 'chat-1', home: 'chat-home', 'c:/закрытая': 'chat-2', 'c:/битая': 42 },
     });
     expect(state.views).toEqual({ 'c:/a': 'chat-1', home: 'chat-home' });
+  });
+
+  it('вкладка Linux, сохранённая со сложенным регистром, получает id своего пути', () => {
+    const state = sanitizeState({
+      projectTabs: [{ id: '/home/u/app', path: '/home/u/App', name: 'App' }],
+      activeTabId: '/home/u/app',
+      views: { '/home/u/app': 'chat-1' },
+    });
+    expect(state.projectTabs.map((tab) => tab.id)).toEqual(['/home/u/App']);
+    expect(state.activeTabId).toBe('/home/u/App');
+    expect(state.views).toEqual({ '/home/u/App': 'chat-1' });
+    expect(tabContaining(state, '/home/u/App/sub')?.id).toBe('/home/u/App');
   });
 });

@@ -73,7 +73,7 @@ function service() {
     spawnServer: ((_binary: string, args: string[]) => {
       spawned.push(args);
       up = true;
-      return { pid: 4242, once: () => undefined, unref: () => undefined };
+      return { pid: 4242, once: () => undefined, on: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: (pid) => {
       killed.push(pid);

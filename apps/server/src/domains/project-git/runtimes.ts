@@ -266,17 +266,22 @@ export function installedNodes(deps: RuntimeDeps): InstalledRuntime[] {
   // nvm-windows кладёт версии рядом с самим nvm, без bin.
   scan(env.NVM_HOME ?? (win ? join(appData, 'nvm') : undefined), 'nvm-windows', (dir) => dir);
   scan(join(env.NVM_DIR ?? join(home, '.nvm'), 'versions', 'node'), 'nvm', bin);
-  const fnmRoot =
-    env.FNM_DIR ??
-    (win
-      ? join(localData, 'fnm')
-      : platform === 'darwin'
-        ? join(home, 'Library', 'Application Support', 'fnm')
-        : join(env.XDG_DATA_HOME ?? join(home, '.local', 'share'), 'fnm'));
-  scan(join(fnmRoot, 'node-versions'), 'fnm', (dir) => {
-    const installation = join(dir, 'installation');
-    return win ? installation : join(installation, 'bin');
-  });
+  // FNM_DIR задаёт только `fnm env` в интерактивной оболочке — панель от keepalive,
+  // launchd или systemd его не видит. Тогда все места, которые fnm выбирал в разных
+  // версиях: старый `~/.fnm` (он и сейчас первый, если есть), XDG и, на macOS, Application Support.
+  const fnmRoots = win
+    ? [join(localData, 'fnm')]
+    : [
+        join(home, '.fnm'),
+        join(env.XDG_DATA_HOME ?? join(home, '.local', 'share'), 'fnm'),
+        ...(platform === 'darwin' ? [join(home, 'Library', 'Application Support', 'fnm')] : []),
+      ];
+  for (const fnmRoot of new Set(env.FNM_DIR ? [env.FNM_DIR] : fnmRoots)) {
+    scan(join(fnmRoot, 'node-versions'), 'fnm', (dir) => {
+      const installation = join(dir, 'installation');
+      return win ? installation : join(installation, 'bin');
+    });
+  }
   const volta = env.VOLTA_HOME ?? (win ? join(localData, 'Volta') : join(home, '.volta'));
   scan(join(volta, 'tools', 'image', 'node'), 'volta', bin);
   scan(join(env.ASDF_DATA_DIR ?? join(home, '.asdf'), 'installs', 'nodejs'), 'asdf', bin);

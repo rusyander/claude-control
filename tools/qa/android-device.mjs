@@ -28,6 +28,8 @@ export function adbPath() {
     process.env.ANDROID_SDK_ROOT,
     process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Android', 'Sdk'),
     process.env.HOME && join(process.env.HOME, 'Android', 'Sdk'),
+    // Android Studio на macOS.
+    process.env.HOME && join(process.env.HOME, 'Library', 'Android', 'sdk'),
   ].filter(Boolean);
   for (const root of roots) {
     const candidate = join(root, 'platform-tools', exe);

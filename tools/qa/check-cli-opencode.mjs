@@ -47,6 +47,7 @@ import {
   startStand,
   wait,
 } from './throwaway-stand.mjs';
+import { cliProcesses, reap } from './foreign-cli.mjs';
 import { startStubModel } from './stub-steer-model.mjs';
 
 const IS_WIN = process.platform === 'win32';
@@ -77,58 +78,6 @@ function realBinary(dir) {
       ]
     : [join(dir, 'opencode')];
   return candidates.find((file) => existsSync(file));
-}
-
-/**
- * PID процессов, в командной строке которых есть один из каталогов. Стенд снимает
- * панель жёстко, и `opencode serve` её переживает. Снимаем ровно то, чего до
- * прогона не было.
- */
-function processesUnder(dirs) {
-  const norm = (text) => text.toLowerCase().replace(/[\\/]+/g, '/');
-  const long = (dir) => {
-    try {
-      return realpathSync.native(dir);
-    } catch {
-      return dir;
-    }
-  };
-  const needles = dirs
-    .flatMap((dir) => [dir, long(dir)])
-    .map((dir) => norm(dir).replace(/\/+$/, ''));
-  try {
-    const rows = IS_WIN
-      ? execFileSync(
-          'powershell',
-          [
-            '-NoProfile',
-            '-Command',
-            'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }',
-          ],
-          { encoding: 'utf8' },
-        )
-      : execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
-    return new Set(
-      rows
-        .split(/\r?\n/)
-        .map((row) => row.trim().match(/^(\d+)\s+(.*)$/))
-        .filter((match) => match && needles.some((needle) => norm(match[2]).includes(needle)))
-        .map((match) => Number(match[1])),
-    );
-  } catch {
-    return new Set();
-  }
-}
-
-function reap(before, dirs) {
-  for (const pid of processesUnder(dirs)) {
-    if (before.has(pid) || pid === process.pid) continue;
-    try {
-      process.kill(pid);
-    } catch {
-      // уже вышел
-    }
-  }
 }
 
 async function until(probe, seconds) {
@@ -162,7 +111,7 @@ const stub = await startStubModel({
   toolLine: `echo edited > ${PROBE}`,
 });
 const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-cli-opencode-')));
-const before = processesUnder([cliDir, root]);
+const before = cliProcesses(cliDir, 'opencode', [root]);
 
 // Конфигурация OpenCode — только модель-заглушка, прав в ней НЕТ: умолчание самого
 // OpenCode («можно всё») и есть то, против чего держится переключатель.
@@ -328,7 +277,7 @@ try {
 
   await stand.stop();
   stand = undefined;
-  reap(before, [cliDir, root]);
+  reap(before, cliDir, 'opencode', [root]);
 
   // --- Одиночный запуск `opencode run` ----------------------------------------
   // Обёртка под именем CLI: `serve` отказывает (панель уходит в one-shot), всё
@@ -442,7 +391,7 @@ child.on('exit', (code) => process.exit(code ?? 1));
 
   await stand.stop();
   stand = undefined;
-  reap(before, [cliDir, root]);
+  reap(before, cliDir, 'opencode', [root]);
 
   // --- Ключ без CLI ------------------------------------------------------------
   console.log('\nБез CLI в PATH, ключ сохранён');
@@ -501,7 +450,7 @@ child.on('exit', (code) => process.exit(code ?? 1));
   } else check('сценарий дошёл до конца', false, error?.stack ?? String(error));
 } finally {
   if (stand) await stand.stop();
-  reap(before, [cliDir, root]);
+  reap(before, cliDir, 'opencode', [root]);
   await stub.close();
   await wait(500);
   const touched = diffRealProviderDirs(realBefore, snapshotRealProviderDirs());

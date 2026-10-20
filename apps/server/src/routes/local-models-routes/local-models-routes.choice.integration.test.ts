@@ -227,7 +227,12 @@ beforeAll(async () => {
         .then((started) => {
           server = started;
         });
-      return { pid: 888_000 + spawned.length, once: () => undefined, unref: () => undefined };
+      return {
+        pid: 888_000 + spawned.length,
+        once: () => undefined,
+        on: () => undefined,
+        unref: () => undefined,
+      };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: () => {
       void server?.close();

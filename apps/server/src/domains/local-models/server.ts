@@ -372,6 +372,9 @@ async function launch(
     cwd: dirname(input.binary),
   });
   closeSync(log);
+  // Файл не запускается (нет файла, нет права на исполнение, noexec-том): ENOENT/EACCES
+  // приходит событием 'error', и без слушателя он ронял бы сервер панели.
+  child.on('error', () => {});
   if (!child.pid) return fail();
   child.unref();
   let code: number | null = null;
@@ -536,6 +539,11 @@ export async function testLoadModel(input: {
   let code: number | null = null;
   child.once('exit', (exitCode) => {
     code = exitCode ?? -1;
+  });
+  // Процесс не запустился: 'exit' не придёт, причина — текст ошибки запуска.
+  child.once('error', (error) => {
+    tail += `\n${error.message}`;
+    code ??= -1;
   });
   const client = llamaClient(baseUrlOf(port), fetchImpl);
   const deadline = Date.now() + (input.timeoutMs ?? TEST_LOAD_TIMEOUT_MS);

@@ -32,7 +32,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SELF = fileURLToPath(import.meta.url);
-const DIR = process.env.PROBE_DIR || join(tmpdir(), 'agentdeck-probe');
+// Per user: /tmp is shared on Linux, and a state file names the browser's ws endpoint.
+const DIR =
+  process.env.PROBE_DIR ||
+  join(tmpdir(), `agentdeck-probe${process.getuid ? `-${process.getuid()}` : ''}`);
 const IDLE_MS = Number(process.env.PROBE_IDLE_MIN ?? 15) * 60_000;
 
 const argv = process.argv.slice(2);
@@ -86,8 +89,19 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 /** Detached server: launches the browser, publishes the endpoint, exits after the idle limit. */
 async function serve(path, headed) {
   const file = stateFile(path, headed);
-  const { chromium } = await loadPlaywright(path);
-  const server = await chromium.launchServer({ headless: !headed });
+  let server;
+  try {
+    const { chromium } = await loadPlaywright(path);
+    server = await chromium.launchServer({ headless: !headed });
+  } catch (error) {
+    // stdio is ignored: the waiting `run` learns the cause only from the state file (a browser not
+    // installed — fresh Linux, CI — was a silent 30 s wait ending in «did not start»).
+    writeFileSync(
+      file,
+      JSON.stringify({ pid: process.pid, error: String(error?.message ?? error) }),
+    );
+    process.exit(1);
+  }
   writeFileSync(touchFile(file), '');
   writeFileSync(
     file,
@@ -117,10 +131,10 @@ async function serve(path, headed) {
 
 /** The running browser's endpoint, starting one when there is none. Cold start → `cold: true`. */
 async function endpoint(path, headed) {
-  mkdirSync(DIR, { recursive: true });
+  mkdirSync(DIR, { recursive: true, mode: 0o700 });
   const file = stateFile(path, headed);
   const known = readState(file);
-  if (known && alive(known.pid)) return { ws: known.ws, cold: false, file };
+  if (known?.ws && alive(known.pid)) return { ws: known.ws, cold: false, file };
   rmSync(file, { force: true });
   const child = spawn(process.execPath, [SELF, 'serve', ...(headed ? ['--headed'] : [])], {
     cwd: process.cwd(),
@@ -132,6 +146,10 @@ async function endpoint(path, headed) {
   for (let waited = 0; waited < 30_000; waited += 100) {
     await sleep(100);
     const state = readState(file);
+    if (state?.pid === child.pid && state.error) {
+      rmSync(file, { force: true });
+      throw new Error(`probe: the browser did not start: ${state.error.split('\n')[0]}`);
+    }
     if (state?.pid === child.pid) return { ws: state.ws, cold: true, file };
   }
   throw new Error('probe: the browser server did not start within 30 s');

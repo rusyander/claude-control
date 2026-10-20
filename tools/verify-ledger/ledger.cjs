@@ -185,12 +185,22 @@ function statDigest(out) {
  * `write-tree`. Обычный `add` при `* text=auto eol=lf` хеширует правку
  * LF→CRLF в то же дерево, а prettier и `check-lf.mjs` читают сырые байты.
  */
+/** git этого процесса понимает `--attr-source`; первый отказ 129 выключает его до конца процесса. */
+let attrSource = true;
+
 function snapshot(repo) {
   const tmpDir = path.join(repo.store, 'tmp');
   fs.mkdirSync(tmpDir, { recursive: true });
   const idx = path.join(tmpDir, `idx-${process.pid}-${nodeCrypto.randomBytes(4).toString('hex')}`);
   try {
-    if (fs.existsSync(repo.index)) fs.copyFileSync(repo.index, idx);
+    if (fs.existsSync(repo.index)) {
+      fs.copyFileSync(repo.index, idx);
+      // mtime индекса — отсчёт «racy git»: запись того же размера в ту же секунду, что и
+      // запись индекса, git перехеширует, только пока mtime индекса прежний. Linux и macOS
+      // копируют с новым mtime, а git там сверяет секунды — правка сходила за чистую.
+      const st = fs.statSync(repo.index);
+      fs.utimesSync(idx, st.atime, st.mtime);
+    }
     const others = git(repo.top, [
       'ls-files',
       '-o',
@@ -207,22 +217,35 @@ function snapshot(repo) {
       if (st && st.size > UNTRACKED_CAP) return { off: 'untracked-large', file: rel };
     }
     const env = { GIT_INDEX_FILE: idx };
-    git(
-      repo.top,
-      [
-        '-c',
-        'core.autocrlf=false',
-        '-c',
-        'core.safecrlf=false',
-        `--attr-source=${EMPTY_TREE}`,
-        'add',
-        '-A',
-        '--',
-        '.',
-        ...EXCLUDES,
-      ],
-      env,
-    );
+    const add = (attr) =>
+      git(
+        repo.top,
+        [
+          '-c',
+          'core.autocrlf=false',
+          '-c',
+          'core.safecrlf=false',
+          ...attr,
+          'add',
+          '-A',
+          '--',
+          '.',
+          ...EXCLUDES,
+        ],
+        env,
+      );
+    if (attrSource) {
+      try {
+        add([`--attr-source=${EMPTY_TREE}`]);
+      } catch (error) {
+        // `--attr-source` — git 2.40+; старее (Apple Git 2.39, Ubuntu 22.04 — 2.34) отвечает
+        // 129 «unknown option», и журнал молчал бы на каждом прогоне. Без него `.gitattributes`
+        // нормализует концы строк: правка только CRLF↔LF ключ не сдвинет — на POSIX-копиях редкость.
+        if (error?.status !== 129) throw error;
+        attrSource = false;
+        add([]);
+      }
+    } else add([]);
     const tree = git(repo.top, ['write-tree'], env).trim();
     const stat = statDigest(git(repo.top, ['ls-files', '--debug'], env));
     return { tree, stat };
@@ -340,10 +363,14 @@ function envPart(env, extra) {
 
 /** Аргументы без машинных путей: абсолютный путь внутри репозитория — относительный. */
 function normalizeArgs(args, top) {
-  const topSlash = `${slash(top)}/`.toLowerCase();
+  // Регистр складывается только там, где его не различает диск: на Linux соседний `Proj`
+  // рядом с `proj` — другой каталог, и срезанный префикс дал бы двум аргументам один ключ.
+  const caseless = process.platform === 'win32' || process.platform === 'darwin';
+  const fold = (text) => (caseless ? text.toLowerCase() : text);
+  const topSlash = fold(`${slash(top)}/`);
   return args.map((a) => {
     const s = slash(a);
-    return s.toLowerCase().startsWith(topSlash) ? s.slice(topSlash.length) : s;
+    return fold(s).startsWith(topSlash) ? s.slice(topSlash.length) : s;
   });
 }
 

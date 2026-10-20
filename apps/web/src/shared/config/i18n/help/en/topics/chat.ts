@@ -1328,7 +1328,8 @@ export const chatEn: typeof chatRu = {
       'configs, setup files or snapshots, an edit to code outside every package (a script a ' +
       'test launches as a separate process), a deleted file, a junit report, a rerun after a ' +
       'red narrowed run, and ten narrowed runs in a row or a day without a whole run bring ' +
-      'the whole run back. The ledger is shared by the main folder and all its copies: a ' +
+      'the whole run back. A tool launched through a node_modules/.bin link (as npm, yarn and bun install it on Linux and macOS) ' +
+      'is recognised by the package’s real file. The ledger is shared by the main folder and all its copies: a ' +
       'green run in one copy counts for any other with the same tree. The last green run ' +
       'for narrowing is each copy’s own, and a new copy’s first run narrows from a ' +
       'neighbour’s. Settings → Groups → Verify ledger shows ' +

@@ -6,7 +6,12 @@
 // → a test file of this run. Env in: MUSTFAIL_TARGETS (JSON array of absolute paths), MUSTFAIL_GRAPH_OUT.
 import { realpathSync, writeFileSync } from 'node:fs';
 
-const norm = (p) => String(p).replace(/\\/g, '/').toLowerCase();
+// Case folds only where the disk ignores it: on Linux `App.ts` and `app.ts` are two modules.
+const caseless = process.platform === 'win32' || process.platform === 'darwin';
+const norm = (p) => {
+  const slashed = String(p).replace(/\\/g, '/');
+  return caseless ? slashed.toLowerCase() : slashed;
+};
 // git names the target by its long path, vite the module by the cwd's spelling — an 8.3 short name
 // (`C:/Users/RUSYAN~1/…`) survives lower-casing, so only the OS can say both are one file.
 const canon = (p) => {

@@ -43,6 +43,7 @@ import {
   startStand,
   wait,
 } from './throwaway-stand.mjs';
+import { cliProcesses, reap } from './foreign-cli.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const CANNED_PARTS = ['GOOSE_STUB_CANNED_5d2a ', 'вторая часть\n', '    строка с отступом'];
@@ -60,34 +61,6 @@ function findCliDir() {
     ...(process.env.PATH ?? process.env.Path ?? '').split(delimiter),
   ];
   return dirs.find((dir) => dir && names.some((file) => existsSync(join(dir, file))));
-}
-
-/** PID процессов из каталога CLI — снимаем после прогона только появившиеся. */
-function cliProcesses(dir) {
-  const norm = (text) => text.toLowerCase().replace(/[\\/]+/g, '/');
-  const needle = norm(dir).replace(/\/+$/, '');
-  try {
-    const rows = IS_WIN
-      ? execFileSync(
-          'powershell',
-          [
-            '-NoProfile',
-            '-Command',
-            'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }',
-          ],
-          { encoding: 'utf8' },
-        )
-      : execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
-    return new Set(
-      rows
-        .split(/\r?\n/)
-        .map((row) => row.trim().match(/^(\d+)\s+(.*)$/))
-        .filter((match) => match && norm(match[2]).includes(needle))
-        .map((match) => Number(match[1])),
-    );
-  } catch {
-    return new Set();
-  }
 }
 
 /**
@@ -209,7 +182,7 @@ const realDirs = [
   join(REAL_HOME, '.claude', 'skills'),
 ];
 const realBefore = snapshotRealProviderDirs({ dirs: realDirs });
-const pidsBefore = cliProcesses(cliDir);
+const pidsBefore = cliProcesses(cliDir, 'goose');
 let notChecked;
 
 const until = async (probe, seconds) => {
@@ -463,14 +436,7 @@ try {
   check('сценарий дошёл до конца', false, error?.stack ?? String(error));
 } finally {
   await stub.close();
-  for (const pid of cliProcesses(cliDir)) {
-    if (pidsBefore.has(pid) || pid === process.pid) continue;
-    try {
-      process.kill(pid);
-    } catch {
-      // уже вышел
-    }
-  }
+  reap(pidsBefore, cliDir, 'goose');
 }
 
 if (notChecked && failed() === 0) {

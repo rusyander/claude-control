@@ -53,9 +53,11 @@ describe('Привязка группы к проекту', () => {
       expect(matchesProject('', 'c:/work/company')).toBe(false);
     });
 
+    // Регистр решает форма пути, а не система сервера: путь Windows складывается везде,
+    // путь POSIX — нигде (на Linux `Company` и `company` — разные каталоги).
     it('слэши и регистр не мешают (Windows)', () => {
-      const same = matchesProject('c:\\work\\company\\', 'c:/work/Company/apps');
-      expect(same).toBe(process.platform === 'win32');
+      expect(matchesProject('c:\\work\\company\\', 'c:/work/Company/apps')).toBe(true);
+      expect(matchesProject('/work/company/', '/work/Company/apps')).toBe(false);
     });
   });
 

@@ -799,7 +799,7 @@ function commandPlan(command, files, project) {
   const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
   const report = join(temp, 'junit.xml');
   return {
-    line: line.replaceAll('{report}', /[\s"'&|<>^]/.test(report) ? `"${report}"` : report),
+    line: line.replaceAll('{report}', shellQuote(report)),
     cwd: project,
     env: { AGENTDECK_JUNIT_REPORT: report },
     results: ['junit', report],
@@ -1017,7 +1017,14 @@ function rootTestScript(project) {
   }
 }
 
-const shellQuote = (value) => (/[\s"'&|<>^()]/.test(value) ? `"${value}"` : value);
+/**
+ * Аргумент строки для `shell: true`: cmd — двойные кавычки при пробеле или знаке cmd; sh —
+ * одинарные, в двойных он раскрывает `$` и обратные кавычки (близнец `apps/server/src/lib/shell-quote.ts`).
+ */
+function shellQuote(value) {
+  if (process.platform === 'win32') return /[\s"'&|<>^()]/.test(value) ? `"${value}"` : value;
+  return /^[\w./:@%+,=-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`;
+}
 
 /** Файл или каталог (Allure) изменён не раньше старта прогона. */
 function freshSince(path, started) {

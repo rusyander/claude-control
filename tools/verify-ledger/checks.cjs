@@ -233,10 +233,21 @@ function readRegistry(found) {
  * Ответ: `null` — не проверка; иначе `{ id, script, args, noSkip, entry }`, где
  * `entry` — запись реестра проекта (для общих инструментов её нет).
  */
+function realOf(file) {
+  try {
+    return slash(fs.realpathSync(file));
+  } catch {
+    return file;
+  }
+}
+
 function recognize(argv, cwd) {
   const script = argv[1];
   if (!script) return null;
-  const file = slash(path.resolve(cwd, script));
+  const asGiven = slash(path.resolve(cwd, script));
+  // npm, yarn и bun на Linux/macOS ставят `.bin/vitest` символьной ссылкой, и argv[1] остаётся
+  // путём ссылки: инструмент узнаётся (и хешируется его каталог) по настоящему файлу пакета.
+  const file = /\/node_modules\/\.bin\/[^/]+$/.test(asGiven) ? realOf(asGiven) : asGiven;
   const args = argv.slice(2);
   for (const tool of TOOLS) {
     if (!tool.re.test(file)) continue;

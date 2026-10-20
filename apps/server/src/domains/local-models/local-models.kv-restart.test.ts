@@ -80,7 +80,7 @@ function service(fetchImpl: FetchLike = fakeServerNet, extra: { cuda?: boolean }
     spawnServer: ((_binary: string, args: string[], options: { env: NodeJS.ProcessEnv }) => {
       spawned.push({ args, env: options.env });
       up = true;
-      return { pid: 4242, once: () => undefined, unref: () => undefined };
+      return { pid: 4242, once: () => undefined, on: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: (pid) => {
       killed.push(pid);
@@ -223,6 +223,7 @@ describe('сервер, не ответивший вовремя', () => {
     const silent = (() => ({
       pid: 5151,
       once: () => undefined,
+      on: () => undefined,
       unref: () => undefined,
     })) as unknown as Parameters<typeof startServer>[0]['spawnImpl'];
     await expect(
@@ -250,6 +251,7 @@ describe('сервер, не ответивший вовремя', () => {
     const dead = (() => ({
       pid: 5252,
       once: (_event: string, handler: (code: number) => void) => handler(3),
+      on: () => undefined,
       unref: () => undefined,
     })) as unknown as Parameters<typeof startServer>[0]['spawnImpl'];
     await expect(

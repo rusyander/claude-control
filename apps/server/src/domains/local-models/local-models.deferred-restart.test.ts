@@ -71,7 +71,7 @@ function service() {
       const pid = nextPid++;
       up = true;
       alive.add(pid);
-      return { pid, once: () => undefined, unref: () => undefined };
+      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: (pid) => {
       alive.delete(pid);

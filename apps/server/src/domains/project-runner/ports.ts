@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync, readlinkSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import type { PortHoldersInfo } from '@agentdeck/contracts';
 import { isWindows, PROBE_HOSTS } from './project-runner.constants.ts';
@@ -86,12 +87,75 @@ function processNames(pids: number[]): Map<number, string> {
   return names;
 }
 
+interface ProcFs {
+  readFileSync: (file: string, encoding: 'utf8') => string;
+  readdirSync: (dir: string) => string[];
+  readlinkSync: (link: string) => string;
+}
+
+const realProc: ProcFs = { readFileSync, readdirSync, readlinkSync };
+
+/**
+ * Linux без `lsof` (alpine, минимальные образы — там его нет из коробки):
+ * слушающие сокеты из `/proc/net/tcp{,6}` (состояние `0A`) → их inode →
+ * процессы, у которых `fd` ведёт на `socket:[inode]`. Чужие процессы без прав
+ * не видны — как и у `lsof` не от root.
+ */
+export function procPortHolders(port: number, proc = '/proc', io: ProcFs = realProc): number[] {
+  const inodes = new Set<string>();
+  for (const table of ['tcp', 'tcp6']) {
+    let text: string;
+    try {
+      text = io.readFileSync(`${proc}/net/${table}`, 'utf8');
+    } catch {
+      continue;
+    }
+    for (const line of text.split('\n').slice(1)) {
+      // sl local_address rem_address st … uid timeout inode
+      const cols = line.trim().split(/\s+/);
+      const local = cols[1]?.split(':')[1];
+      if (cols[3] === '0A' && local && parseInt(local, 16) === port && cols[9] !== '0') {
+        inodes.add(cols[9] ?? '');
+      }
+    }
+  }
+  inodes.delete('');
+  if (inodes.size === 0) return [];
+  const pids: number[] = [];
+  let entries: string[];
+  try {
+    entries = io.readdirSync(proc);
+  } catch {
+    return [];
+  }
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry)) continue;
+    let fds: string[];
+    try {
+      fds = io.readdirSync(`${proc}/${entry}/fd`);
+    } catch {
+      continue;
+    }
+    const holds = fds.some((fd) => {
+      try {
+        const target = /^socket:\[(\d+)\]$/.exec(io.readlinkSync(`${proc}/${entry}/fd/${fd}`));
+        return target !== null && inodes.has(target[1] ?? '');
+      } catch {
+        return false;
+      }
+    });
+    if (holds) pids.push(Number(entry));
+  }
+  return pids;
+}
+
 /**
  * Кто слушает порт — по данным ОС.
  *
  * Windows: `netstat -ano` (единственный способ без сторонних утилит), POSIX:
- * `lsof`. Ни одна из команд не обязана существовать — пустой список значит
- * «не выяснили», а не «порт свободен»; занятость определяет TCP-проба.
+ * `lsof`, на Linux без него — `/proc` (`procPortHolders`). Ни одна из команд не
+ * обязана существовать — пустой список значит «не выяснили», а не «порт
+ * свободен»; занятость определяет TCP-проба.
  */
 export function findPortHolders(port: number): number[] {
   const pids = new Set<number>();
@@ -111,6 +175,9 @@ export function findPortHolders(port: number): number[] {
     for (const line of runLines('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'])) {
       const pid = Number(line.trim());
       if (Number.isInteger(pid) && pid > 1) pids.add(pid);
+    }
+    if (pids.size === 0 && process.platform === 'linux') {
+      for (const pid of procPortHolders(port)) pids.add(pid);
     }
   }
   // Себя не показываем и тем более не убиваем: сервер панели тоже слушает порт.

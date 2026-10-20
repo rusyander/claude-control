@@ -1,10 +1,17 @@
 import type { Project } from '@agentdeck/contracts';
 import type { AppState } from './app-store.types.ts';
 
-/** Нормализация пути для сравнения: Windows нечувствителен к регистру и слэшам. */
+/** Путь Windows — с буквой диска или UNC: только там регистр не различает папки. */
+const WINDOWS_PATH = /^[A-Za-z]:([\\/]|$)|^\\\\/;
+
+/**
+ * Нормализация пути для сравнения: слэши и черта в конце не различаются, регистр — только у путей
+ * Windows. Решает форма пути, а не платформа сервера: так же складывает веб, и записанный на Windows
+ * путь сравнивается одинаково на любой машине.
+ */
 export function normalizeProjectPath(path: string): string {
   const unified = path.replace(/\\/g, '/').replace(/\/+$/, '');
-  return process.platform === 'win32' ? unified.toLowerCase() : unified;
+  return WINDOWS_PATH.test(path) ? unified.toLowerCase() : unified;
 }
 
 export function listProjects(state: AppState): Project[] {

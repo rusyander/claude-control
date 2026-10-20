@@ -15,7 +15,7 @@ import process from 'node:process';
  */
 
 /** Обычный файл (по ссылке — её цель) с правом на исполнение. */
-function isExecutableFile(path) {
+export function isExecutableFile(path) {
   try {
     if (!statSync(path).isFile()) return false;
     accessSync(path, constants.X_OK);

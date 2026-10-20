@@ -19,6 +19,7 @@ import {
   writeTextFile,
 } from '../../lib/safe-io/safe-io.ts';
 import type { AppStore } from '../../lib/app-store/app-store.ts';
+import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 import { classifyCall, GUARD_VERSION, type GuardConfig, type GuardHit } from './guard-script.mjs';
 
 /**
@@ -131,11 +132,11 @@ function settingsOf(config: GuardConfig): BackendGuardSettings {
 }
 
 function findGroup(groups: readonly Group[], root: string): Group | undefined {
-  const target = resolve(root).toLowerCase();
+  const target = normalizeProjectPath(resolve(root));
   return groups.find(
     (group) =>
       group.scope?.kind === 'project' &&
-      resolve(group.scope.path).toLowerCase() === target &&
+      normalizeProjectPath(resolve(group.scope.path)) === target &&
       group.members.some((member) => member.kind === 'hook' && member.id === GUARD_HOOK_ID),
   );
 }

@@ -123,7 +123,11 @@ export async function seedSourceFor(
   const mainDir = dirname(common);
   // git отдаёт длинный путь, а копия может прийти короткой формой (`RUSYAN~1`).
   const real = await Promise.all([realpath(mainDir), realpath(copyDir)]).catch(() => []);
-  if (real.length === 0 || real[0]?.toLowerCase() === real[1]?.toLowerCase()) return undefined;
+  // Регистр не в счёт только там, где его не различает диск: на Linux `App` и `app` — две папки.
+  const caseless = process.platform === 'win32' || process.platform === 'darwin';
+  const key = (path: string | undefined): string | undefined =>
+    caseless ? path?.toLowerCase() : path;
+  if (real.length === 0 || key(real[0]) === key(real[1])) return undefined;
   const source = join(mainDir, cwd);
   if (!(await exists(join(source, 'node_modules')))) return undefined;
   const same = await Promise.all(

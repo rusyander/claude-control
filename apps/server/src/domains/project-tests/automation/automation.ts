@@ -6,6 +6,7 @@ import type {
   ProjectTestAutomationFormat,
 } from '@agentdeck/contracts';
 import { codedIf } from '../../../lib/server-text/server-text.ts';
+import { shellQuote } from '../../../lib/shell-quote.ts';
 import { ProjectTestsError, readJson, testsPath, writeJson } from '../files.ts';
 import { shellArg } from '../e2e-command/e2e-command.ts';
 import { isReportDir } from './report.ts';
@@ -162,7 +163,7 @@ export const COMMAND_LINE_LIMIT = 8000;
 /** Путь к файлу со списком прогона (по строке на путь), когда он не влез в строку. */
 export const RUN_FILES_ENV = 'AGENTDECK_TEST_FILES';
 
-const quote = (value: string): string => (/[\s"'&|<>^()]/.test(value) ? `"${value}"` : value);
+const quote = (value: string): string => shellQuote(value);
 
 /**
  * Каталоги пакетов Go для выбранных файлов: `./internal/orders`. Пусто — весь

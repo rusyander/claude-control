@@ -52,5 +52,8 @@ export function openBrowser(url: string): void {
             windowsHide: true,
           })
         : spawn('xdg-open', [url], { stdio: 'ignore', detached: true });
+  // Linux без xdg-open (сервер, контейнер, WSL): ENOENT приходит событием
+  // 'error', и без слушателя он ронял бы весь сервер панели.
+  child.on('error', () => {});
   child.unref();
 }

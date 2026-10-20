@@ -1,4 +1,5 @@
 import type { Project } from '@agentdeck/contracts';
+import { normalizeProjectPath } from '@shared/lib/workspace';
 
 /**
  * Реестр плюс открытые вкладки проектов.
@@ -9,6 +10,6 @@ import type { Project } from '@agentdeck/contracts';
  * после реестра и только те, которых в нём ещё нет.
  */
 export function mergeProjects(registry: Project[], tabs: Project[]): Project[] {
-  const known = new Set(registry.map((project) => project.path.toLowerCase()));
-  return [...registry, ...tabs.filter((tab) => !known.has(tab.path.toLowerCase()))];
+  const known = new Set(registry.map((project) => normalizeProjectPath(project.path)));
+  return [...registry, ...tabs.filter((tab) => !known.has(normalizeProjectPath(tab.path)))];
 }

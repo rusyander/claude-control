@@ -91,12 +91,13 @@ function service(extra: Partial<Parameters<typeof createLocalModels>[0]> = {}) {
           once: (event: string, callback: (code: number) => void) => {
             if (event === 'exit') callback(1);
           },
+          on: () => undefined,
           unref: () => undefined,
         };
       }
       up = true;
       alive.add(pid);
-      return { pid, once: () => undefined, unref: () => undefined };
+      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: (pid) => {
       up = false;

@@ -116,12 +116,23 @@ function homeToToken(value: string, { home, platform }: PathContext): string {
   return token + value.slice(home.length);
 }
 
-function tokenToHome(value: string, { home, platform }: PathContext): string {
+/**
+ * `<home>` — путь, сложенный Windows в нижний регистр (ключи записей по проекту). На
+ * Linux/macOS он получает регистр проекта с тем же путём из `known`: иначе ключ
+ * `/home/bob/myproj` не находил проект `/home/bob/MyProj`, и настройки терялись молча.
+ */
+function tokenToHome(
+  value: string,
+  { home, platform }: PathContext,
+  known?: ReadonlyMap<string, string>,
+): string {
   const token = value.startsWith(HOME) ? HOME : value.startsWith(HOME_NORMAL) ? HOME_NORMAL : '';
   if (!token) return value;
   const base = token === HOME_NORMAL && platform === 'win32' ? normalized(home) : home;
   const rest = value.slice(token.length);
-  return base + (platform === 'win32' ? rest : rest.replace(/\\/g, '/'));
+  const path = base + (platform === 'win32' ? rest : rest.replace(/\\/g, '/'));
+  if (token !== HOME_NORMAL || platform === 'win32') return path;
+  return known?.get(normalized(path).replace(/\/+$/, '')) ?? path;
 }
 
 /** Обход значения: строки и ключи записей — через `map`, секретные ключи — прочь. */
@@ -169,9 +180,20 @@ export function applyPortable(
   portable: Partial<AppState>,
   context: PathContext,
 ): AppState {
+  const projects = mapDeep(
+    portable.projects ?? [],
+    (text) => tokenToHome(text, context),
+    false,
+  ) as Partial<AppState['projects'][number]>[];
+  const known = new Map(
+    projects
+      .map((project) => project?.path)
+      .filter((path): path is string => typeof path === 'string')
+      .map((path) => [normalized(path).replace(/\/+$/, ''), path] as const),
+  );
   const restored = mapDeep(
     portable,
-    (text) => tokenToHome(text, context),
+    (text) => tokenToHome(text, context, known),
     false,
   ) as Partial<AppState>;
   const next = { ...local } as unknown as Record<string, unknown>;

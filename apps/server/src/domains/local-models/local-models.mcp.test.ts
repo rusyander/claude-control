@@ -439,7 +439,7 @@ function service(source: LocalMcpSource) {
           stub = started;
         }),
       );
-      return { pid: 4343, once: () => undefined, unref: () => undefined };
+      return { pid: 4343, once: () => undefined, on: () => undefined, unref: () => undefined };
     }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
     kill: () => {
       const old = stub;

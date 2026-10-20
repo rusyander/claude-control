@@ -11,6 +11,7 @@ import {
   type RuntimeDeps,
 } from './runtimes.ts';
 import { formatVersion, satisfiesRange } from '../../lib/runtime-range/runtime-range.ts';
+import { shellQuote } from '../../lib/shell-quote.ts';
 
 /**
  * Среда языков, кроме Node: Python и Go (T15, живое ревью MR 13.10.2026).
@@ -154,10 +155,6 @@ export interface LanguageStepResult {
   log?: string;
 }
 
-function quote(path: string): string {
-  return /[\s"&|<>^()]/.test(path) ? `"${path}"` : path;
-}
-
 /**
  * Собрать настоящую команду шага языка на этой машине. Не бросает: нет
  * интерпретатора, утилиты или нужной версии — это пропуск с названной причиной.
@@ -171,6 +168,7 @@ export async function resolveLanguageStep(
   const abs = resolve(root, where);
   const venvDir = join(abs, '.venv');
   const python = venvPython(venvDir, deps.platform);
+  const quote = (path: string) => shellQuote(path, deps.platform);
   const runVenv = `${deps.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python'} -m pytest`;
   switch (step.lang) {
     case 'python-venv': {

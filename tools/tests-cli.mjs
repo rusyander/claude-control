@@ -924,8 +924,12 @@ async function vitestPlan(project, files) {
       );
     }
     const report = join(temp, `vitest-${index}.xml`);
+    // Из каталога пакета, а не корня проекта: `--root` не меняет process.cwd, а Babel
+    // (react-compiler в vite-плагине) ищет свои плагины от cwd — из корня монорепо без
+    // node_modules каждый набор падал на трансформе, «no tests» (widget-app, 20.10.2026).
+    const enter = `${process.platform === 'win32' ? 'cd /d' : 'cd'} ${shellQuote(cwd)} && `;
     return (
-      `${shellQuote(process.execPath)} ${shellQuote(bin)} run --root ${shellQuote(cwd)} ` +
+      `${enter}${shellQuote(process.execPath)} ${shellQuote(bin)} run --root ${shellQuote(cwd)} ` +
       `--reporter=default --reporter=junit ` +
       `--outputFile.junit=${shellQuote(report)} ${inside.filter(Boolean).map(shellArg).join(' ')}`
     );

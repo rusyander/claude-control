@@ -664,8 +664,20 @@ describe('tests-cli run: кейсы vitest мимо своей команды Go
 
   beforeEach(() => {
     project = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-tests-cli-vitest-')));
+    // Набор admin заодно сверяет каталог ГЛАВНОГО процесса vitest (его отдаёт конфиг
+    // пакета): vitest идёт из каталога пакета, а не из корня проекта — `--root` cwd не
+    // меняет, а Babel трансформа ищет плагины от cwd. Рабочие процессы vitest и так
+    // стартуют в `--root`, поэтому `process.cwd()` внутри теста этого не различает.
+    const adminDir = JSON.stringify(join(project, 'admin').toLowerCase());
     for (const [pkg, body] of [
-      ['admin', `describe('a', () => { it('считает', () => expect(1 + 1).toBe(2)); });`],
+      [
+        'admin',
+        `import { realpathSync } from 'node:fs';\n` +
+          `describe('a', () => { it('считает', () => {\n` +
+          `  expect(1 + 1).toBe(2);\n` +
+          `  expect(realpathSync.native(process.env.PKG_MAIN_CWD).toLowerCase()).toBe(${adminDir});\n` +
+          `}); });`,
+      ],
       ['chat', `describe('b', () => { it('падает', () => expect(1).toBe(2)); });`],
     ] as const) {
       mkdirSync(join(project, pkg, 'src'), { recursive: true });
@@ -676,6 +688,10 @@ describe('tests-cli run: кейсы vitest мимо своей команды Go
       );
       symlinkSync(MODULES, join(project, pkg, 'node_modules'), 'junction');
     }
+    writeFileSync(
+      join(project, 'admin', 'vitest.config.mjs'),
+      'export default { test: { env: { PKG_MAIN_CWD: process.cwd() } } };\n',
+    );
     writeGroup(project, {
       ...createGroup(project, 'web', 'web'),
       cases: [

@@ -44,6 +44,23 @@ const WIDE = [
 /** Что граф импортов vitest видит как модуль. Остальное (md, html, картинки) — через fs, целиком. */
 const MODULE_EXT = /\.([cm]?[jt]sx?|vue|svelte|css|scss|sass|less)$/;
 
+/** Исполняемый код JS/TS: тест может запустить его дочерним процессом по пути из своего кода. */
+const EXEC_EXT = /\.[cm]?[jt]sx?$/;
+
+/**
+ * Файл лежит в каком-то пакете (каталог с `package.json` ниже корня репозитория).
+ * Код вне всех пакетов (`tools/*.mjs`, `scripts/*.mjs`) — общий: тест пакета зовёт
+ * его по относительному пути, и ни граф импортов, ни конфиги этого не видят
+ * (20.10: тест `apps/server` гонял `tools/tests-cli.mjs`, правка скрипта давала
+ * старый зелёный). Код чужого пакета тест достаёт только импортом через
+ * node_modules — это `linkedDirs`.
+ */
+function insidePackage(top, rel) {
+  for (let dir = path.posix.dirname(rel); dir && dir !== '.'; dir = path.posix.dirname(dir))
+    if (fs.existsSync(path.join(top, dir, 'package.json'))) return true;
+  return false;
+}
+
 const sha = (data) => nodeCrypto.createHash('sha256').update(data).digest('hex');
 
 function git(cwd, args) {
@@ -220,7 +237,13 @@ function plan({ repo, parts, match, cwd, tree, now = Date.now(), env = process.e
       return { why: `widen setup ${p}`, family, shape };
     if (linked.some((d) => p.startsWith(`${d}/`)))
       return { why: `widen linked ${p}`, family, shape };
-    if (!inPkg(p)) continue;
+    if (!inPkg(p)) {
+      // Данные вне пакетов (md, json), читаемые тестом через fs, сюда не попадают:
+      // правка документации гнала бы всё целиком, а такие чтения редки.
+      if (EXEC_EXT.test(p) && !insidePackage(repo.top, p))
+        return { why: `widen outside ${p}`, family, shape };
+      continue;
+    }
     const rel = pkgRel ? p.slice(pkgRel.length + 1) : p;
     const moduleLike = MODULE_EXT.test(p) || (/\.json$/.test(p) && /^src\//.test(rel));
     if (!moduleLike) return { why: `widen non-module ${p}`, family, shape };

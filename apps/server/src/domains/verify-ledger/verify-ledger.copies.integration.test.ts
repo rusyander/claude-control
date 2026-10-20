@@ -161,6 +161,21 @@ describe('verify-ledger: копии и пакеты монорепо', () => {
     expect(third.report).not.toBe(first.report);
   });
 
+  it('vitest: правка вне пакета — прогон, даже если её нет ни в одном конфиге', () => {
+    // Тест пакета может звать скрипт вне пакета дочерним процессом (`tools/*.mjs`):
+    // путь к нему живёт в коде теста, не в конфиге, и узкий ключ его не видел.
+    put(main, 'pkg-a/node_modules/vitest/vitest.mjs', FAKE_VITEST);
+    put(main, 'tools/run.mjs', 'console.log(1);\n');
+    expect(vitest(main, 'pkg-a', join(root, 'r1', 'report.xml')).reused).toBe(false);
+    expect(vitest(main, 'pkg-a', join(root, 'r2', 'report.xml')).reused).toBe(true);
+    put(main, 'tools/run.mjs', 'console.log(2);\n');
+    expect(vitest(main, 'pkg-a', join(root, 'r3', 'report.xml')).reused).toBe(false);
+    // tsc того же пакета по-прежнему узок: его входы — пакет и пути конфигов.
+    expect(tsc(main, 'pkg-a')).toBe(false);
+    put(main, 'tools/run.mjs', 'console.log(3);\n');
+    expect(tsc(main, 'pkg-a')).toBe(true);
+  });
+
   it('правка соседа из пути конфига, файла корня или своего пакета — прогон', () => {
     expect(tsc(main, 'pkg-a')).toBe(false);
     put(main, 'shared/src/s.ts', 'export const s = 2;\n');

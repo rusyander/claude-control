@@ -158,15 +158,23 @@ describe('verify-ledger: сужение от последнего зелёног
     expect(vitest(['run']).args).toEqual(['run']);
   });
 
-  it('правка вне пакета и вне его связей — повтор зелёного без прогона', () => {
+  it('код вне всех пакетов — целиком: тест может исполнить его дочерним процессом', () => {
     vitest(['run']);
     put('other/x.ts', 'export const x = 2;\n');
     const r = vitest(['run']);
     expect(r.args).toEqual(['run']);
     expect(r.code).toBe(0);
-    // Ключ пакета теперь — его дерево, а не всё: правка вне пакета даёт прямой повтор
-    // ещё до сужения (verify-ledger.copies.integration.test.ts).
-    expect(r.err).toContain('[verify-ledger] reused green');
+    expect(r.err).not.toContain('reused');
+  });
+
+  it('правка чужого пакета и документации вне пакета — повтор зелёного без прогона', () => {
+    put('other/package.json', '{"name":"other"}\n');
+    vitest(['run']);
+    put('other/x.ts', 'export const x = 2;\n');
+    put('docs/page.md', '# B\n');
+    const r = vitest(['run']);
+    expect(r.code).toBe(0);
+    expect(r.err).toContain('[verify-ledger] nothing the tests can see changed');
   });
 
   it('AGENTDECK_VERIFY_LEDGER_DELTA=off — целиком', () => {

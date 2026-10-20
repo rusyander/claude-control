@@ -183,8 +183,8 @@
     {
       "kind": "added",
       "text": {
-        "ru": "pnpm tests run прогоняет кейсы vitest и там, где своя команда проекта их не берёт (она пишет отчёт Go или Cargo, или её нет): каждый пакет — своим vitest из ближайшего package.json, итоги ложатся на кейсы. Раньше файлы *.test.ts уходили в go test, и отчёт для блока «Тесты» приходилось собирать вручную.",
-        "en": "pnpm tests run now runs vitest cases where the project's own command does not take them (it writes a Go or Cargo report, or there is none): each package with the vitest of its nearest package.json, and the results land on the cases. Before, *.test.ts files went to go test and the report for the Tests block had to be put together by hand."
+        "ru": "pnpm tests run прогоняет кейсы vitest и там, где своя команда проекта их не берёт (она пишет отчёт Go или Cargo, или её нет): каждый пакет — своим vitest из ближайшего package.json, запущенным из каталога пакета, итоги ложатся на кейсы. Раньше файлы *.test.ts уходили в go test, и отчёт для блока «Тесты» приходилось собирать вручную.",
+        "en": "pnpm tests run now runs vitest cases where the project's own command does not take them (it writes a Go or Cargo report, or there is none): each package with the vitest of its nearest package.json, started from the package directory, and the results land on the cases. Before, *.test.ts files went to go test and the report for the Tests block had to be put together by hand."
       },
       "area": {
         "ru": "Тесты",

@@ -434,9 +434,15 @@ const SCOPE_CONFIG =
  * пакеты рабочей области, каталоги из `../`-путей его конфигов и файлы корня.
  * Правка в чужом пакете ключ не меняет (19.10: правка mdx в inst-docs-ui гнала
  * tsc/eslint/prettier всех пакетов). Чего не разобрать — всё дерево целиком.
+ *
+ * vitest — всегда всё дерево: тест исполняет что угодно по пути из своего кода
+ * (скрипт `tools/*.mjs` дочерним процессом, фикстуру соседнего каталога), а
+ * таких путей нет ни в одном конфиге. С узким ключом правка такого скрипта
+ * отдавала старый зелёный вместо прогона (20.10: тест `tests-cli` в
+ * `apps/server` повторялся после правки `tools/tests-cli.mjs`).
  */
 function scopeTree(repo, tree, cwd, match) {
-  if (match.entry || !tree) return tree;
+  if (match.entry || !tree || match.id === 'vitest') return tree;
   const top = realDir(repo.top);
   const pkgAbs = realDir(cwd);
   const pkgRel = slash(path.relative(top, pkgAbs));

@@ -710,7 +710,7 @@
         {
           "path": "tools/verify-ledger/delta.cjs",
           "why": "Журнал проверок: сужение vitest от последнего зелёного и когда прогон снова целиком",
-          "sha": "7cd88358eb7d0d29"
+          "sha": "13ac0a804bb94360"
         },
         {
           "path": "tools/verify-ledger/checks.cjs",
@@ -728,7 +728,7 @@
           "sha": "0360f22c1d409f51"
         }
       ],
-      "confirmedAt": "2026-10-20T10:37:15.012Z"
+      "confirmedAt": "2026-10-20T14:52:09.593Z"
     },
     {
       "topic": "tests",

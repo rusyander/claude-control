@@ -33,12 +33,13 @@ import { pauseResumePrompt } from '../../domains/chat/split-conveyor/split-conve
 import { wireGroupActivation } from '../../bootstrap/group-activation-wiring/group-activation-wiring.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import {
+  buildGroupPrompt,
   GROUP_QUESTIONS_HUMAN_LINE,
   SPLIT_BLOCK_LANG,
   scanSplitBlocks,
 } from '@agentdeck/contracts/task-split';
 import { SPLIT_DEFAULTS_BUILTIN } from '@agentdeck/contracts/split-groups';
-import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
+import { ESCALATE_LINE, planAssignment } from '@agentdeck/contracts/model-cascade';
 import { OWNER_PRECEDENCE_LINE } from '@agentdeck/contracts/quality-floor';
 import {
   childAppendPrompt,
@@ -712,6 +713,38 @@ describe('POST /api/chat/split', () => {
 
       const body = response.json() as { chats: { model?: string; kind?: string }[] };
       expect(body.chats[0]).toMatchObject({ model: 'sonnet', kind: 'mechanical' });
+    });
+
+    it('модель группы — та, что обещала карточка: служебные абзацы задания её не поднимают', async () => {
+      // Карточка считает подбор по заданию группы (`buildGroupPrompt`). Задание
+      // прогона длиннее на служебные абзацы (развилки, доставка, копия), и
+      // группа у порога «большой» уезжала на ступень выше обещанного.
+      store.setSplitDefaults({
+        ...structuredClone(SPLIT_DEFAULTS_BUILTIN),
+        groupQuestions: 'human',
+      });
+      const group = { title: 'Раз', branch: 'feature/one', tasks: [''], kind: 'mechanical' };
+      const pad = 3_990 - buildGroupPrompt(group, kinds.shared).length;
+      const near = { ...kinds, groups: [{ ...group, tasks: ['я'.repeat(pad)] }, kinds.groups[1]!] };
+      const card = planAssignment(
+        {
+          kind: 'mechanical',
+          tasks: 1,
+          length: buildGroupPrompt(near.groups[0]!, near.shared).length,
+        },
+        ceiling,
+      );
+      expect(card.model).toBe('sonnet');
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: { projectPath: project, proposal: near, startRuns: true, ...ceiling },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(started[0]?.prompt.length).toBeGreaterThan(4_000);
+      expect(started[0]).toMatchObject({ model: card.model, effort: card.effort });
     });
 
     it('замена человека сильнее подбора и действует ВНИЗ', async () => {

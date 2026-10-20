@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration } from '@shared/lib/format-duration';
+import { MascotCameo } from '@shared/ui/mascot';
 import type { RunTimerProps } from './RunTimer.types';
 
 /**
@@ -19,9 +20,13 @@ export function RunTimer({ since, className }: RunTimerProps) {
     return () => window.clearInterval(timer);
   }, [since]);
 
+  const elapsed = Math.max(0, now - since);
+
   return (
     <span className={className} role="timer" aria-live="off">
-      {t('chat.usage.live', { time: formatDuration(Math.max(0, now - since), t) })}
+      {/* Дека выходит на долгом ходу — время берёт отсюда, своего тика нет. */}
+      <MascotCameo elapsed={elapsed} />
+      {t('chat.usage.live', { time: formatDuration(elapsed, t) })}
     </span>
   );
 }

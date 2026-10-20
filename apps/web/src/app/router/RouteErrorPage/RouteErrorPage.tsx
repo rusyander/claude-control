@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { PageHeader } from '@shared/ui/page-header';
 import { CrashCard } from '@shared/ui/error-boundary';
+import { MascotNote } from '@shared/ui/mascot';
 import { logRenderCrash } from '@shared/lib/watch-capture';
 
 /**
@@ -29,6 +30,7 @@ export function RouteErrorPage({ error, reset }: ErrorComponentProps) {
   return (
     <Stack gap="var(--spacing-lg)">
       <PageHeader title={t('common.crashTitle')} />
+      <MascotNote mood="dizzy" text={t('mascot.crash')} />
       <CrashCard error={error} onRetry={retry} />
     </Stack>
   );

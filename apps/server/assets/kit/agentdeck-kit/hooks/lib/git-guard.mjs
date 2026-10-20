@@ -11,7 +11,7 @@
 // \S+ is greedy and backtracks to end on a word character, so quoted names still match.
 // Bare `git tag` and `git tag -l/--list` are reads and stay free.
 //
-// Door C — the ticket grant. Handing a ticket to the `agentdeck-kit:ticket-delivery` conveyor
+// Door C — the ticket grant. Handing a ticket to the `agentdeck-kit:ticket-delivery-2` conveyor
 // authorises the git ops it runs by itself: branch, commit, push, and the rebase that clears a
 // conflict. Without it the flow the user asked to be autonomous stops for a permission question at
 // every stage, which is the one thing it exists to avoid.

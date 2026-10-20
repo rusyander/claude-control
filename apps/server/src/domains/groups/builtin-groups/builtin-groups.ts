@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { Group } from '@agentdeck/contracts';
 import { isBuiltinGroupId, type BuiltinGroupsStatus } from '@agentdeck/contracts/groups';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
+import { sortedJson } from '../../../lib/sorted-json.ts';
 import { BUILTIN_GROUPS } from './builtin-groups.constants.ts';
 import type { BuiltinGroupEntry, BuiltinSeedReport } from './builtin-groups.types.ts';
 
@@ -49,11 +50,29 @@ function contentOf(group: Group): unknown {
   };
 }
 
+function digest(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+}
+
+/**
+ * Отпечаток по смыслу: ключи сортируются. Сохранение шагов через схему
+ * переставляет ключи шага в её порядок — по тексту группа «менялась» без
+ * единой правки.
+ */
 export function builtinContentHash(group: Group): string {
-  return createHash('sha256')
-    .update(JSON.stringify(contentOf(group)))
-    .digest('hex')
-    .slice(0, 16);
+  return digest(sortedJson(contentOf(group)));
+}
+
+/**
+ * Записанный отпечаток описывает эту группу. Запись прежнего формата (текст в
+ * порядке обхода) тоже принимается: иначе каждая нетронутая встроенная на
+ * установке до смены формата считалась бы изменённой и больше не обновлялась.
+ */
+function matchesRecord(recorded: string | undefined, group: Group): boolean {
+  if (recorded === undefined) return false;
+  return (
+    recorded === builtinContentHash(group) || recorded === digest(JSON.stringify(contentOf(group)))
+  );
 }
 
 function render(
@@ -118,12 +137,13 @@ export function seedBuiltinGroups(deps: BuiltinSeedDeps): BuiltinSeedReport {
       continue;
     }
     const current = builtinContentHash(existing);
-    const recorded = seeded[entry.id];
-    if (recorded === undefined) {
-      if (current === freshHash) seeded[entry.id] = current;
+    // Совпала с каталогом — снова «не тронута», даже если человек менял её
+    // раньше: иначе следующая версия каталога её не обновит.
+    if (current === freshHash) {
+      seeded[entry.id] = current;
       continue;
     }
-    if (recorded !== current || current === freshHash) continue;
+    if (!matchesRecord(seeded[entry.id], existing)) continue;
     // Не тронута человеком, а каталог (версия, язык, скилл) ушёл вперёд.
     const steps = fresh.path?.steps.map((step) => ({
       ...step,
@@ -137,7 +157,8 @@ export function seedBuiltinGroups(deps: BuiltinSeedDeps): BuiltinSeedReport {
   const changed =
     report.added.length > 0 ||
     report.updated.length > 0 ||
-    Object.keys(seeded).length !== Object.keys(record.seeded).length;
+    Object.keys(seeded).length !== Object.keys(record.seeded).length ||
+    Object.entries(seeded).some(([id, hash]) => record.seeded[id] !== hash);
   // Пустой проход state.json не переписывает: он идёт на каждом старте.
   if (changed) store.setBuiltinGroups({ seeded, removed: [...removed] });
   return report;
@@ -167,10 +188,7 @@ export function builtinGroupsStatus(store: AppStore): BuiltinGroupsStatus {
   const edited = store
     .getGroups()
     .filter((group) => isBuiltinGroupId(group.id))
-    .filter((group) => {
-      const recorded = record.seeded[group.id];
-      return recorded === undefined || recorded !== builtinContentHash(group);
-    })
+    .filter((group) => !matchesRecord(record.seeded[group.id], group))
     .map((group) => group.id);
   return {
     removed: record.removed.filter((id) => BUILTIN_GROUPS.some((e) => e.id === id)),

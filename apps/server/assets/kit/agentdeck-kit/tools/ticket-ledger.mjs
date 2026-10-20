@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ticket-ledger — stage journal of a delivery run (skill `agentdeck-kit:ticket-delivery`).
+ * ticket-ledger — stage journal of a delivery run (skill `agentdeck-kit:ticket-delivery-2`).
  *
  * Why a file. The MR description and the QA comment are built from the FACTS of the run, not from
  * the agent's memory: memory survives a compaction badly and a `/clear` not at all. This is the one
@@ -138,7 +138,7 @@ function header(key, title) {
   return [
     `# ${key}${title ? ` — ${title}` : ''}`,
     '',
-    'Ledger of the delivery conveyor (skill `agentdeck-kit:ticket-delivery`), written by',
+    'Ledger of the delivery conveyor (skill `agentdeck-kit:ticket-delivery-2`), written by',
     '`<kit>/tools/ticket-ledger.mjs`. One line per gate, appended as the run goes.',
     '',
     'The MR description and the QA comment are built FROM this file: what is not written here did',

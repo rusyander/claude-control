@@ -134,7 +134,7 @@ describe('перезапуск панели при живой сессии', { t
 
     // Фон кончился уже при сервере B: CLI начал ход сам, реестр завёл прогон.
     const sessionId = entry?.sessionId ?? '';
-    await waitFor(() => registry?.describe(sessionId)?.options.wake === true);
+    await waitFor(() => registry?.describe(sessionId)?.woken === true);
     await waitFor(() => !registry?.isRunning(sessionId));
     const key = registry.describe(sessionId)?.key ?? '';
     expect(textOf(registry, key)).toBe(`woke pid ${cliPid}`);

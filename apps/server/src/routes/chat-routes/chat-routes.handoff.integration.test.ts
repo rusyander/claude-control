@@ -780,14 +780,25 @@ function groupPaths(root: string) {
 describe('планировщик конвейера подбора модели', () => {
   const CWD = 'C:/work/проект-worktrees/rename';
 
-  /** `tools` — вызовы инструментов, которые ход сделал до текста ответа. */
-  function fakeRun(text: string, tools: readonly string[] = [], onStart?: () => void): RunLike {
+  /**
+   * `tools` — вызовы инструментов, которые ход сделал до текста ответа;
+   * `context` — окно последнего шага (расход), по нему группа выбирает сессию (E1).
+   */
+  function fakeRun(
+    text: string,
+    tools: readonly string[] = [],
+    onStart?: () => void,
+    context?: number,
+  ): RunLike {
     return {
       start: async (_options, onEvent) => {
         onStart?.();
         tools.forEach((name, index) =>
           onEvent({ kind: 'tool', name, input: {}, id: `toolu_${index}` }),
         );
+        if (context) {
+          onEvent({ kind: 'usage', input: context, output: 0, cacheRead: 0, cacheCreation: 0 });
+        }
         onEvent({ kind: 'text', text });
         onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: 'sess-работа' });
       },
@@ -803,6 +814,7 @@ describe('планировщик конвейера подбора модели'
       store?: AppStore;
       dir?: string;
       stat?: () => number | undefined;
+      context?: number;
     } = {},
   ) {
     const chains = new HandoffChains();
@@ -810,16 +822,21 @@ describe('планировщик конвейера подбора модели'
     /** Включённые группы в момент, когда прогон реально стартовал, — по порядку стартов. */
     const enabledAtStart: string[][] = [];
     const registry = new ChatRunRegistry(() =>
-      fakeRun(text, options.tools, () => {
-        if (store) {
-          enabledAtStart.push(
-            store
-              .getGroups()
-              .filter((group) => group.isEnabled)
-              .map((group) => group.id),
-          );
-        }
-      }),
+      fakeRun(
+        text,
+        options.tools,
+        () => {
+          if (store) {
+            enabledAtStart.push(
+              store
+                .getGroups()
+                .filter((group) => group.isEnabled)
+                .map((group) => group.id),
+            );
+          }
+        },
+        options.context,
+      ),
     );
     const links = new Map<string, ChatLink>();
     // Со store связи живут там же, где в runtime: включение группы читает дерево из него.
@@ -905,8 +922,10 @@ describe('планировщик конвейера подбора модели'
   }
 
   it('продолжение группы с чистого листа несёт задание группы, а не реплику закрытого хода (F6)', async () => {
+    // Окно у сжатия (150k из 200k): только тогда группе положен чистый лист (E1).
     const { chains, registry, links } = build(`Этап закрыт.\n\n${block(PROPOSAL)}`, {
       stat: () => Date.now() + 10_000,
+      context: 150_000,
     });
     const task = 'ЗАДАНИЕ ГРУППЫ ЦЕЛИКОМ: переименовать foo в bar, тесты зелёные, MR.';
     links.set('чат-группа', { ...WORK_LINK, task });

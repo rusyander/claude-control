@@ -150,6 +150,23 @@ describe('planForeignHandoff', () => {
     expect(runs[0]?.prompt).toContain('.agent/PROGRESS.md');
   });
 
+  // Чужой CLI той же сессией не продолжить (в отличие от Claude, E1): проза у
+  // группы — по-прежнему продолжение, иначе недоделанное ушло бы в ревью.
+  it('проза у группы разделения — продолжение, как и блок', () => {
+    const { deps } = setup();
+    const link: ChatLink = {
+      parentChatId: 'codex:parent',
+      stage: 'work',
+      createdAt: '2026-09-09T10:00:00.000Z',
+    };
+
+    const prose = planForeignHandoff(
+      input({ text: 'Готово. Перезапустите сессию и продолжайте по .agent/PROGRESS.md.', link }),
+      deps,
+    );
+    expect(prose?.chatId).toBe('c1');
+  });
+
   it('автомат выключен — молчит: карточка блока в ленте и так есть', () => {
     const { deps, runs } = setup({ chains: new HandoffChains(() => false) });
 

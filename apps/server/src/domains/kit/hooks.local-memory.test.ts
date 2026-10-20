@@ -137,6 +137,30 @@ describe('context-watch: пороги по окну', () => {
       }),
     ).toMatchObject({ floor: 150_000 });
   });
+
+  // E1: продолжение и следующую стадию группы ведёт панель — совет «/clear»
+  // заставлял группу просить чистую сессию, которая перечитывала всё заново.
+  it('группа разделения: просьба обновить PROGRESS.md остаётся, совета «/clear» нет', () => {
+    delete process.env.AGENTDECK_KIT_VARIANT;
+    expect(run(160_000)).toContain('/clear');
+    process.env.AGENTDECK_SPLIT_CHILD = '1';
+    const message = run(160_000) ?? '';
+    expect(message).toContain('.agent/PROGRESS.md');
+    expect(message).not.toContain('/clear');
+  });
+});
+
+describe('clear-advisor: группа разделения', () => {
+  it('со второго сжатия обычной сессии советует «/clear», группе — молчит', async () => {
+    const advisor = (await import(
+      pathToFileURL(join(LIB, 'postcompact-clear-advisor.mjs')).href
+    )) as { default: (input: unknown) => { systemMessage: string } | null };
+    const input = { session_id: `advisor-${Date.now()}` };
+    expect(advisor.default(input)).toBeNull();
+    expect(advisor.default(input)?.systemMessage).toContain('/clear');
+    process.env.AGENTDECK_SPLIT_CHILD = '1';
+    expect(advisor.default(input)).toBeNull();
+  });
 });
 
 describe('precompact-checkpoint: контрольная точка локального прогона', () => {

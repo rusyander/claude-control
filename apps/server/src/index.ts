@@ -19,6 +19,7 @@ import { createRuntime, installShutdownHandlers } from './bootstrap/runtime/runt
 import { buildRouteTable } from './bootstrap/route-table.ts';
 import { startupBanner } from './bootstrap/banner.ts';
 import { createWatchCapture } from './bootstrap/watcher-capture/watcher-capture.ts';
+import { forgetInheritedChildMarks } from './domains/chat/ChatRunner/ChatRunner.ts';
 
 /**
  * Сборка сервера: гейт доступа, долгоживущие объекты, таблица маршрутов,
@@ -32,6 +33,10 @@ const HOST = '127.0.0.1'; // только локально: приложение
 
 /** Свой интерфейс и никто больше — правила и их обоснование в origin-guard.ts. */
 const ALLOWED_ORIGINS = allowedOrigins(WEB_PORT);
+
+// До первого запуска чего-либо: панель, перезапущенная агентом группы, не
+// передаёт его метки ребёнка ни одному своему прогону.
+forgetInheritedChildMarks(process.env);
 
 const ctx = new ServerContext();
 // Журнал идёт через перехват фонового наблюдателя: в stdout всё как раньше, а

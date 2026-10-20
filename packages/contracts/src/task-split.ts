@@ -1138,7 +1138,7 @@ export function reviewPackLine(command: string): string {
 /**
  * Доставка группы до готового MR (настройка проекта `SplitSettings.deliver`).
  *
- * Конвейер доставки панель не повторяет: он уже есть навыком (`ticket-delivery`
+ * Конвейер доставки панель не повторяет: он уже есть навыком (`ticket-delivery-2`
  * и проектные варианты — взять задачу, ветка, проверки, коммит, пуш, черновик
  * MR, ревью, живая проверка, описание) и отлажен на живых задачах. Панель
  * велит группе пройти его и держит то, чего навык не знает: копия и ветка уже
@@ -1172,7 +1172,7 @@ export function deliveryPreamble(input: {
     // проектный навык доставки только источник фактов, стадии ведёт общий: иначе
     // группа шла по устаревшему проектному конвейеру мимо уровней риска и экономии проверок.
     "Take the group's tasks through the delivery skill the panel group names, else the global " +
-      '`ticket-delivery` (none — the same stages yourself; a project delivery skill only supplies ' +
+      '`ticket-delivery-2` (none — the same stages yourself; a project delivery skill only supplies ' +
       'facts): tracker tasks into work on yourself, the ' +
       "change, the project's checks, commit, push, draft MR, review, live check, design comparison " +
       'if a mockup is attached to the task, fixing what was found, the MR description — and take the ' +
@@ -1274,10 +1274,10 @@ export function splitTicketPreamble(input: { readOnly?: boolean } = {}): string 
 export function chatDeliveryPrompt(input: { skill?: string; foreign?: boolean }): string {
   // Найденный проектный навык не ведёт стадии (владелец 20.10) — только факты проекта.
   const skill = input.skill
-    ? 'with the global task delivery skill `ticket-delivery` (a global or panel skill outranks a ' +
+    ? 'with the global task delivery skill `ticket-delivery-2` (a global or panel skill outranks a ' +
       `project one: the project skill \`${input.skill}\` does not drive the stages — open it only ` +
       'for the project facts it holds: gate commands, tracker statuses, the stand)'
-    : 'with the global task delivery skill `ticket-delivery` (no skill — go through the same stages ' +
+    : 'with the global task delivery skill `ticket-delivery-2` (no skill — go through the same stages ' +
       'yourself)';
   const ask = input.foreign
     ? 'a question to the human'

@@ -418,6 +418,8 @@ export type ChatEvent =
        *   начинается не с начала (L4b).
        * 'backgroundAsk' — фоновому субагенту после конца хода нужно решение человека: панель
        *   завела под ждущую сессию видимый прогон с карточкой (L6, живой прогон 14.10).
+       * 'groupSameSession' — группа попросила продолжения, окно далеко от сжатия: ход идёт
+       *   той же сессией, а не чистой (E1, 20.10).
        */
       code:
         | 'adopted'
@@ -445,7 +447,8 @@ export type ChatEvent =
         | 'autoContinue'
         | 'autoContinueSpent'
         | 'eventsTrimmed'
-        | 'backgroundAsk';
+        | 'backgroundAsk'
+        | 'groupSameSession';
       text: string;
       /**
        * Код самой строки — отдельно от `code`, который называет повод. Есть не

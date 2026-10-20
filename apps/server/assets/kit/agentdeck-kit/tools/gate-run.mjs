@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * gate-run — run the project's OWN verdict commands as one gate (skill `agentdeck-kit:ticket-delivery` §6).
+ * gate-run — run the project's OWN verdict commands as one gate (skill `agentdeck-kit:ticket-delivery-2` §6).
  *
  * Why. Four commands in a row are four chances to forget one and then honestly believe everything
  * was green. One command runs the whole discovered list, keeps one line per green gate, shows only

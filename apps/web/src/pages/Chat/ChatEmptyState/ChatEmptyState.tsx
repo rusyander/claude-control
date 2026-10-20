@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
+import { MascotGreeting } from '@shared/ui/mascot';
 import { PROJECT_ACTIONS, SUGGESTIONS } from '../ChatPage/ChatPage.constants';
 import type { ChatEmptyStateProps } from './ChatEmptyState.types';
 import styles from './ChatEmptyState.module.scss';
@@ -29,7 +30,11 @@ export function ChatEmptyState({
       className={styles.empty}
     >
       <Stack gap="var(--spacing-sm)" align="center" className={styles.emptyBox}>
-        <Icon name={isProjectContext ? 'folder' : 'chat'} size={40} />
+        {/* Дека встречает в пустом чате и даёт совет; выключен — прежний значок. */}
+        <MascotGreeting
+          scope="chat"
+          fallback={<Icon name={isProjectContext ? 'folder' : 'chat'} size={40} />}
+        />
         <Typography variant="heading-sm">
           {isProjectContext ? (projectName ?? t('chat.newChat')) : t('chat.emptyTitle')}
         </Typography>

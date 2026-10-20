@@ -36,7 +36,11 @@ import { CHILD_DENIED_TOOLS, childAppend } from '../initiative/initiative.ts';
 import { SyntheticGate } from '../synthetic-gate.ts';
 import { autoPickResults, picksFor } from '../auto-pick/auto-pick.ts';
 import { withChatNode } from '../../project-git/chat-node.ts';
-import { AUTONOMOUS_ENV, BRIEF_OUTPUT_ENV } from '@agentdeck/contracts/chat-group-settings';
+import {
+  AUTONOMOUS_ENV,
+  BRIEF_OUTPUT_ENV,
+  SPLIT_CHILD_ENV,
+} from '@agentdeck/contracts/chat-group-settings';
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
@@ -136,17 +140,31 @@ export function heavySlots(base: NodeJS.ProcessEnv): number {
 }
 
 /**
- * Окружение ребёнка разделения: места очереди тяжёлых шагов и короткий вывод
- * `tests-cli run` (2.2 плана экономии — журнал в файл, в контекст итог). Одно
- * на Claude и на чужие CLI (6.1): ребёнок Codex или Qwen гоняет те же проверки
- * той же копии. Заданное человеком в окружении панели число мест не трогаем;
- * `options.env` прогона, идущий позже, сильнее.
+ * Окружение ребёнка разделения: места очереди тяжёлых шагов, короткий вывод
+ * `tests-cli run` (2.2 плана экономии — журнал в файл, в контекст итог) и метка
+ * группы, по которой хуки советов «/clear» молчат (E1). Одно на Claude и на
+ * чужие CLI (6.1): ребёнок Codex или Qwen гоняет те же проверки той же копии.
+ * Заданное человеком в окружении панели число мест не трогаем; `options.env`
+ * прогона, идущий позже, сильнее.
  */
 export function childRunEnv(base: NodeJS.ProcessEnv): Record<string, string> {
   return {
     ...(base[HEAVY_SLOTS_ENV] ? {} : { [HEAVY_SLOTS_ENV]: CHILD_HEAVY_SLOTS }),
     [BRIEF_OUTPUT_ENV]: '1',
+    [SPLIT_CHILD_ENV]: '1',
   };
+}
+
+/**
+ * Снять с окружения панели метки ребёнка, унаследованные от запустившего её
+ * процесса. Панель, перезапущенная агентом группы, иначе метила бы ребёнком
+ * каждый свой запуск — чаты человека (хуки молчали бы ему о «/clear»), чужие
+ * CLI, прогоны проверок с коротким выводом. Число мест очереди остаётся: его
+ * человек задаёт в окружении панели сам. Вызывается один раз, при старте.
+ */
+export function forgetInheritedChildMarks(env: NodeJS.ProcessEnv): void {
+  delete env[SPLIT_CHILD_ENV];
+  delete env[BRIEF_OUTPUT_ENV];
 }
 
 export type { ChatEvent, RawEvent, RawUsage } from '../chat-events.ts';
@@ -537,7 +555,8 @@ export class ChatRun {
 
     // Метка автономии — только от реестра этого прогона (`options.env`): панель,
     // сама запущенная из автономного прогона, не должна передать её каждому
-    // чату, где человек автономию выключил.
+    // чату, где человек автономию выключил. Метки ребёнка разделения панель
+    // снимает с себя при старте (`forgetInheritedChildMarks`).
     const { [AUTONOMOUS_ENV]: _inherited, ...parentEnv } = process.env;
     const env = {
       ...parentEnv,

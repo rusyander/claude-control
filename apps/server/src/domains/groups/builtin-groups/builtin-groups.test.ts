@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { triageStagePrompt } from '@agentdeck/contracts/split-plan';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { pickableGroups } from '../../chat/group-auto-pick/group-auto-pick.ts';
+import { builtinKitDir } from '../../kit/service.ts';
+import { normalizePathSteps, withPathSteps } from '../path-edit.ts';
 import { BUILTIN_GROUPS } from './builtin-groups.constants.ts';
 import {
   builtinGroupsStatus,
@@ -97,16 +100,105 @@ describe('встроенные группы доставки', () => {
     expect(after?.projectPaths).toEqual(['/p']);
   });
 
+  it('изменённую человеком раньше каталога, когда каталог догнал, принимает и дальше обновляет', () => {
+    seedBuiltinGroups(deps());
+    const own = store.getGroups().find((group) => group.id === 'builtin-delivery')!;
+    const [step] = own.path!.steps;
+    // Человек переключил шаг на глобальный скилл раньше, чем тот появился.
+    store.saveGroup({
+      ...own,
+      path: { steps: [{ ...step!, within: { ...step!.within!, skillId: 'ticket-delivery-2' } }] },
+    });
+    seedBuiltinGroups(deps());
+    expect(builtinGroupsStatus(store).edited).toEqual(['builtin-delivery']);
+
+    mkdirSync(join(skillsDir, 'ticket-delivery-2'), { recursive: true });
+    writeFileSync(join(skillsDir, 'ticket-delivery-2', 'SKILL.md'), '---\nname: x\n---\n');
+    seedBuiltinGroups(deps());
+    expect(builtinGroupsStatus(store).edited).toEqual([]);
+
+    store.updateSettings({ language: 'en' });
+    expect(seedBuiltinGroups(deps()).updated).toContain('builtin-delivery');
+  });
+
+  it('принятие совпавшей записывается, даже когда это единственная перемена прохода', () => {
+    seedBuiltinGroups(deps());
+    const record = store.getBuiltinGroups();
+    // Запись от прежней версии каталога, а содержимое уже равно нынешнему.
+    store.setBuiltinGroups({ ...record, seeded: { ...record.seeded, 'builtin-delivery': 'old' } });
+    expect(builtinGroupsStatus(store).edited).toEqual(['builtin-delivery']);
+
+    const report = seedBuiltinGroups(deps());
+    expect(report).toEqual({ added: [], updated: [] });
+    expect(store.getBuiltinGroups().seeded['builtin-delivery']).not.toBe('old');
+    expect(builtinGroupsStatus(store).edited).toEqual([]);
+  });
+
+  it('сохранение шагов через схему без правки не делает группу изменённой', () => {
+    seedBuiltinGroups(deps());
+    const own = store.getGroups().find((group) => group.id === 'builtin-delivery')!;
+    // Тот же путь, что PUT /api/groups/:id/path/steps: схема переставляет ключи шага.
+    store.saveGroup(withPathSteps(own, normalizePathSteps({ steps: own.path!.steps })));
+    expect(builtinGroupsStatus(store).edited).toEqual([]);
+
+    store.updateSettings({ language: 'en' });
+    expect(seedBuiltinGroups(deps()).updated).toContain('builtin-delivery');
+  });
+
+  it('запись отпечатка прежнего формата: нетронутая обновляется, а не считается изменённой', () => {
+    seedBuiltinGroups(deps());
+    const own = store.getGroups().find((group) => group.id === 'builtin-delivery-backend')!;
+    // Прежний формат — текст группы в порядке обхода ключей.
+    const legacy = createHash('sha256')
+      .update(
+        JSON.stringify({
+          name: own.name,
+          description: own.description,
+          color: own.color,
+          icon: own.icon,
+          members: own.members,
+          env: own.env,
+          flow: own.flow ?? 'conveyor',
+          when: own.when ?? '',
+          steps: (own.path?.steps ?? []).map(({ createdAt: _createdAt, ...step }) => step),
+        }),
+      )
+      .digest('hex')
+      .slice(0, 16);
+    const record = store.getBuiltinGroups();
+    store.setBuiltinGroups({ ...record, seeded: { ...record.seeded, [own.id]: legacy } });
+    expect(builtinGroupsStatus(store).edited).toEqual([]);
+
+    store.updateSettings({ language: 'en' });
+    expect(seedBuiltinGroups(deps()).updated).toContain('builtin-delivery-backend');
+  });
+
+  it('каждый скилл каталога есть в наборе панели: свежая установка без своих скиллов не ссылается в пустоту', () => {
+    for (const entry of BUILTIN_GROUPS) {
+      const file = join(builtinKitDir(), 'skills', entry.skill, 'SKILL.md');
+      expect(existsSync(file), entry.skill).toBe(true);
+      expect(readFileSync(file, 'utf8'), entry.skill).toMatch(
+        new RegExp(`^---\\r?\\nname: ${entry.skill}\\r?\\n`),
+      );
+    }
+    expect(BUILTIN_GROUPS.filter((entry) => entry.id.startsWith('builtin-delivery'))).not.toEqual(
+      [],
+    );
+    for (const entry of BUILTIN_GROUPS.filter((e) => e.id !== 'builtin-mr-review')) {
+      expect(entry.skill, entry.id).toBe('ticket-delivery-2');
+    }
+  });
+
   it('шаг профиля называет свой скилл, если он есть, иначе скилл набора панели', () => {
     seedBuiltinGroups(deps());
     const stepSkill = (id: string): string | undefined =>
       store.getGroups().find((group) => group.id === id)?.path?.steps[0]?.within?.skillId;
-    expect(stepSkill('builtin-delivery')).toBe('agentdeck-kit:ticket-delivery');
+    expect(stepSkill('builtin-delivery')).toBe('agentdeck-kit:ticket-delivery-2');
 
-    mkdirSync(join(skillsDir, 'ticket-delivery'), { recursive: true });
-    writeFileSync(join(skillsDir, 'ticket-delivery', 'SKILL.md'), '---\nname: x\n---\n');
+    mkdirSync(join(skillsDir, 'ticket-delivery-2'), { recursive: true });
+    writeFileSync(join(skillsDir, 'ticket-delivery-2', 'SKILL.md'), '---\nname: x\n---\n');
     seedBuiltinGroups(deps());
-    expect(stepSkill('builtin-delivery')).toBe('ticket-delivery');
+    expect(stepSkill('builtin-delivery')).toBe('ticket-delivery-2');
     expect(stepSkill('builtin-mr-review')).toBe('agentdeck-kit:deep-review');
   });
 

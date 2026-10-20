@@ -61,7 +61,7 @@ export const OWNER_PRECEDENCE_LINE = `Precedence: the global and project rules (
  * проектного (владелец 20.10), нет навыка — те же шаги руками, и это сказано вслух.
  */
 export const SKILL_ROUTE_LINE =
-  'Skills: before acting, load the skill this kind of work calls for — the one the task names, else the one the skill router (skill-map) points to: a review → deep-review; merge conflicts → resolving-merge-conflicts; a ticket or delivery to an MR → the delivery skill of the panel group, else the global `ticket-delivery` (a project one only supplies facts); tests → unit-integration-tests; a bug of unknown cause → log-forensics; a visible UI fix → before/after screenshots as the rules say. A skill not installed here — go through the same steps yourself and say so.';
+  'Skills: before acting, load the skill this kind of work calls for — the one the task names, else the one the skill router (skill-map) points to: a review → deep-review; merge conflicts → resolving-merge-conflicts; a ticket or delivery to an MR → the delivery skill of the panel group, else the global `ticket-delivery-2` (a project one only supplies facts); tests → unit-integration-tests; a bug of unknown cause → log-forensics; a visible UI fix → before/after screenshots as the rules say. A skill not installed here — go through the same steps yourself and say so.';
 
 /**
  * Текст без строки старшинства. Задание группы её уже несёт (`buildGroupPrompt`),

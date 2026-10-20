@@ -66,7 +66,7 @@ vi.mock('../../project-git/chat-node.ts', () => ({
     command === 'node-wired-cli' ? { ...env, CHAT_NODE_CWD: cwd } : env,
 }));
 
-const { ChatRun, RUN_STDERR_MAX } = await import('./ChatRunner.ts');
+const { ChatRun, RUN_STDERR_MAX, forgetInheritedChildMarks } = await import('./ChatRunner.ts');
 
 beforeEach(() => {
   child = new FakeChild();
@@ -299,6 +299,33 @@ describe('ChatRun.start: места очереди тяжёлых шагов', (
 
   it('обычному чату метки короткого вывода нет', async () => {
     expect((await spawnedEnv()).AGENTDECK_BRIEF_OUTPUT).toBeUndefined();
+  });
+
+  // E1: по метке глобальные хуки не советуют группе «/clear».
+  it('ребёнку — метка группы разделения', async () => {
+    expect((await spawnedEnv({ child: true })).AGENTDECK_SPLIT_CHILD).toBe('1');
+  });
+
+  it('обычному чату метки группы нет', async () => {
+    expect((await spawnedEnv()).AGENTDECK_SPLIT_CHILD).toBeUndefined();
+  });
+
+  // Ревью 20.10: панель, перезапущенная агентом группы, наследовала его метки и
+  // метила ребёнком каждый чат человека — хуки молчали ему о «/clear».
+  it('панель, запущенная из группы, снимает с себя метки ребёнка; места очереди оставляет', async () => {
+    process.env.AGENTDECK_SPLIT_CHILD = '1';
+    process.env.AGENTDECK_BRIEF_OUTPUT = '1';
+    process.env.AGENTDECK_HEAVY_SLOTS = '5';
+    try {
+      forgetInheritedChildMarks(process.env);
+      const env = await spawnedEnv();
+      expect(env.AGENTDECK_SPLIT_CHILD).toBeUndefined();
+      expect(env.AGENTDECK_BRIEF_OUTPUT).toBeUndefined();
+      expect(env.AGENTDECK_HEAVY_SLOTS).toBe('5');
+    } finally {
+      delete process.env.AGENTDECK_SPLIT_CHILD;
+      delete process.env.AGENTDECK_BRIEF_OUTPUT;
+    }
   });
 
   it('число мест из окружения панели сильнее нашего', async () => {

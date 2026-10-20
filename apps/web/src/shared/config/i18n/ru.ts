@@ -10,6 +10,7 @@ import { changelogRu } from './changelog/ru.ts';
 import { panelUpdateRu } from './panel-update/ru.ts';
 import { chatProjectsRu } from './chat-projects/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
+import { mascotRu } from './mascot/ru.ts';
 import { usageLimitsRu } from './usage-limits/ru.ts';
 import { devRestartRu } from './dev-restart/ru.ts';
 import { environmentRu } from './environment/ru.ts';
@@ -49,6 +50,8 @@ export const ru = {
   chatProjects: chatProjectsRu,
   /** Фоновый наблюдатель: его страница и строка в боковой панели — `watcher/ru.ts`. */
   watcher: watcherRu,
+  /** Маскот Дека: боковая панель, реплики, чат, «не найдено» — `mascot/ru.ts`. */
+  mascot: mascotRu,
   /** Лимиты подписки Claude в боковой панели — `usage-limits/ru.ts`. */
   usageLimits: usageLimitsRu,
   /** Плашка «правки сервера ждут перезапуска» — `dev-restart/ru.ts`. */
@@ -829,8 +832,9 @@ export const ru = {
       noRemote:
         'У репозитория нет удалённого (git remote) — MR создать негде, доставка не действует',
       skill:
-        'Доставка идёт по общему `ticket-delivery`; навык проекта `{{name}}` — источник фактов о проекте',
-      skillNone: 'Доставка идёт по общему `ticket-delivery`; своего навыка доставки у проекта нет',
+        'Доставка идёт по общему `ticket-delivery-2`; навык проекта `{{name}}` — источник фактов о проекте',
+      skillNone:
+        'Доставка идёт по общему `ticket-delivery-2`; своего навыка доставки у проекта нет',
       parallel: 'Групп разделения разом',
       parallelHint: 'Задано вручную. Остальные ждут в очереди: от 1 до {{max}}',
       parallelAuto:
@@ -5349,10 +5353,10 @@ export const ru = {
       '«Права» в меню чата сильнее этой настройки в обе стороны.',
     chatLeanTools: 'Облегчённый набор инструментов в чатах',
     chatLeanToolsHint:
-      'Включено из коробки: чаты Claude из панели запускаются без инструментов Artifact и Workflow. ' +
-      'Их описания занимают около 10 тыс. токенов в начале каждого запроса, а пользуются ими редко. ' +
-      'Выключите, если агенту нужно публиковать страницы или запускать сценарии из нескольких ' +
-      'агентов, — со следующего хода он получит полный набор.',
+      'Включено из коробки: чаты Claude из панели запускаются без инструментов Artifact, Workflow ' +
+      'и ScheduleWakeup. Их описания занимают около 12 тыс. токенов в начале каждого запроса, а ' +
+      'пользуются ими редко. Выключите, если агенту нужно публиковать страницы, запускать сценарии ' +
+      'из нескольких агентов или будить себя по таймеру, — со следующего хода он получит полный набор.',
     chatEffortAuto: 'По умолчанию CLI',
     pricingTitle: 'Тарифы для оценки стоимости',
     pricingHint:

@@ -2,7 +2,7 @@
 /**
  * ticket-preflight — can a delivery run start RIGHT NOW. Read-only, creates nothing.
  *
- * Why. The conveyor (skill `agentdeck-kit:ticket-delivery`) claims the ticket first, at stage 1, and only
+ * Why. The conveyor (skill `agentdeck-kit:ticket-delivery-2`) claims the ticket first, at stage 1, and only
  * discovers the conditions it cannot work without later: a dirty tree at stage 2, the wrong runtime
  * major at the first gate, a missing server at the first write. An autonomous run then stops with a
  * ticket already assigned and moved to in-progress. This checks the same things BEFORE any write.

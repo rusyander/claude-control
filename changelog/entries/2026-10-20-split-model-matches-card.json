@@ -1,0 +1,16 @@
+{
+  "title": {
+    "ru": "Группа разделения стартует на модели, которую обещала карточка",
+    "en": "A split group starts on the model its card promised"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Карточка разделения обещала группе, например, sonnet на средней глубине, а её чат стартовал на opus. Карточка считала размер группы по её заданию, а запуск — по заданию вместе со служебными абзацами (подготовка копии, доставка, развилки), и группа у порога «большой» поднималась на ступень выше. Теперь запуск меряет то же задание, что и карточка. Этап плана у группы ниже потолка по-прежнему идёт на потолке, работа — на обещанной модели.",
+        "en": "The split card promised a group, say, sonnet at medium depth, yet its chat started on opus. The card sized the group by its task, while the launch measured the task together with the panel's service paragraphs (copy setup, delivery, questions), so a group near the «large» threshold was raised a step. The launch now measures the same task as the card. The plan stage of a group below the ceiling still runs at the ceiling; the work runs on the promised model."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    }
+  ]
+}

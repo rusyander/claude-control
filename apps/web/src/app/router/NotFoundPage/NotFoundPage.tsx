@@ -5,6 +5,7 @@ import { PageHeader } from '@shared/ui/page-header';
 import { Card } from '@shared/ui/card';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
+import { MascotNote } from '@shared/ui/mascot';
 
 /**
  * Неизвестный адрес. Без своего компонента роутер рисовал голое английское
@@ -18,6 +19,7 @@ export function NotFoundPage() {
       <PageHeader title={t('common.notFoundTitle')} />
       <Card padding="md">
         <Stack gap="var(--spacing-sm)" align="start">
+          <MascotNote mood="lost" text={t('mascot.notFound')} />
           <Typography variant="body-sm" color="subtle">
             {t('common.notFoundText')}
           </Typography>

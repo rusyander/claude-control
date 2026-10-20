@@ -1,0 +1,91 @@
+// Сцены Деки вне боковой панели: у таймера прогона и на пустом экране.
+
+.cameo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  margin-right: var(--spacing-xs);
+  vertical-align: middle;
+  animation: scene-in var(--duration-normal, 200ms) ease-out;
+}
+
+// Реплика — облачко справа от Деки, мелким кеглем: таймер рядом важнее.
+.cameoLine {
+  position: relative;
+  max-width: 340px;
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  line-height: 1.35;
+  animation: scene-in var(--duration-normal, 200ms) ease-out;
+}
+
+.greeting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.tip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+  max-width: 520px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+  text-wrap: pretty;
+}
+
+.tipLabel {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.tipNext {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.noteText {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+  text-wrap: pretty;
+}
+
+@keyframes scene-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

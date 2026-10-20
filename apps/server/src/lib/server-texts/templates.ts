@@ -1266,6 +1266,10 @@ export const serverTextTemplates = {
     ru: 'Шаг пути «{{step}}» не прошёл проверку: {{note}}. Цепочка ждёт ответа в этом чате.',
     en: 'Path step “{{step}}” did not pass its check: {{note}}. The chain waits for an answer in this chat.',
   },
+  'group-same-session-notice': {
+    ru: 'Группа продолжает ту же сессию: окно {{tokens}}k из {{window}}k до сжатия — чистая сессия перечитала бы всё, что уже в нём.',
+    en: 'The group continues in the same session: context {{tokens}}k of the {{window}}k compaction window — a fresh session would re-read everything already in it.',
+  },
   'split-limit-wait-notice': {
     ru: 'Группы разделения упёрлись в лимит подписки и ждут его сброса до {{until}}: продолжатся сами, очередь до сброса не стартует.',
     en: 'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',

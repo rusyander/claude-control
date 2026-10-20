@@ -260,6 +260,8 @@ interface RegisteredRun {
   meta: RunMeta;
   /** С чем прогон стартовал: продолжение в чистой сессии идёт теми же. */
   options: RunOptions;
+  /** Старт был пробуждением — ход начал сам CLI. Отметка этого старта, в `options` её нет. */
+  woken?: true;
   /** Момент старта (мс) — по нему видно, обновлён ли файл-опора этим прогоном. */
   startedAt: number;
   /** Хвост ответа агента: в нём ищется блок предложения продолжить. */
@@ -358,6 +360,8 @@ export interface RunSnapshot {
   options: RunOptions;
   meta: RunMeta;
   sessionId?: string;
+  /** Прогон заведён под ход, начатый самим CLI (`wake`); сам флаг из `options` снят. */
+  woken?: true;
 }
 
 export interface RunLedgerSink {
@@ -1168,6 +1172,7 @@ export class ChatRunRegistry {
       options: { ...run.options },
       meta: { ...run.meta },
       ...(run.sessionId ? { sessionId: run.sessionId } : {}),
+      ...(run.woken ? { woken: true as const } : {}),
     };
   }
 
@@ -1425,11 +1430,17 @@ export class ChatRunRegistry {
     const routedMeta: RunMeta = this.localOf?.(routed, freshMeta)
       ? { ...withLowered, local: true }
       : withLowered;
+    // `wake`/`hold` — про ЭТОТ старт (ход, начатый самим CLI), не про разговор.
+    // Из параметров прогона их заводит всё следующее: продолжение той же сессией,
+    // звено, тёплая доставка, журнал для подхвата. С ними такой старт забирал бы
+    // несуществующий ход CLI и молча не шёл — недоделанное уезжало в ревью.
+    const { wake: _wake, hold: _hold, ...kept } = routed;
     const registered: RegisteredRun = {
       chatId,
       run,
       meta: routedMeta,
-      options: routed,
+      options: kept,
+      ...(routed.wake ? { woken: true as const } : {}),
       startedAt: Date.now(),
       text: '',
       events: [],

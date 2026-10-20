@@ -21,6 +21,9 @@ import { stateDir, sessionKey } from './kit-paths.mjs';
 export default function clearAdvisor(input) {
   if (process.env.AGENTDECK_KIT_CLEAR_ADVISOR === '0' || process.env.CLAUDE_CLEAR_ADVISOR === '0')
     return null;
+  // Split-group run (the panel sets AGENTDECK_SPLIT_CHILD): nobody reads a /clear line there, and
+  // the model obeying it asked for fresh sessions that re-read everything.
+  if (process.env.AGENTDECK_SPLIT_CHILD === '1') return null;
   const session = sessionKey(input).slice(0, 12) || 'x';
   const dir = stateDir('stamps');
   if (!dir) return null;

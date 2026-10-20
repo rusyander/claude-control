@@ -1,0 +1,89 @@
+// Облачко реплики. Ниже сводки и любых окон: реплика — фон, не диалог.
+.bubble {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+  max-width: 300px;
+  padding: var(--spacing-xs) var(--spacing-xs) var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 14px 14px 14px 4px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md, 0 6px 20px rgb(0 0 0 / 14%));
+  animation: bubble-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: 0% 100%;
+
+  // Хвостик к Деке: повёрнутый квадрат у левого нижнего угла.
+  &::before {
+    position: absolute;
+    bottom: 14px;
+    left: -6px;
+    width: 10px;
+    height: 10px;
+    border-bottom: 1px solid var(--color-border);
+    border-left: 1px solid var(--color-border);
+    background: var(--color-surface);
+    transform: rotate(45deg);
+    content: '';
+  }
+}
+
+.text {
+  margin: 0;
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-3xs);
+}
+
+.open {
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border: none;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dismiss {
+  order: -1;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--color-fg-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.85);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -5,6 +5,7 @@ import { HelpSection, FieldTable, Callout, OptionCards } from '../../ui';
 import { SettingsGuideSections } from '../SettingsGuideSections/SettingsGuideSections';
 import { SettingsLimitsSections } from '../SettingsLimitsSections/SettingsLimitsSections';
 import { SettingsGlobalLayerSection } from '../SettingsGlobalLayerSection/SettingsGlobalLayerSection';
+import { SettingsMascotSection } from '../SettingsMascotSection/SettingsMascotSection';
 
 /**
  * Документ раздела «Настройки».
@@ -42,6 +43,8 @@ export function SettingsTopic() {
       <SettingsGuideSections tr={tr} />
 
       <SettingsGlobalLayerSection tr={tr} />
+
+      <SettingsMascotSection tr={tr} />
 
       <SettingsLimitsSections
         tr={tr}

@@ -22,7 +22,7 @@ export const BUILTIN_GROUPS: readonly BuiltinGroupEntry[] = [
       en: 'Any tracker ticket to a ready MR: every check once, one deep review, one check run before the push — locally only the touched parts of the project, CI runs everything. The profile is picked from the code.',
     },
     when: 'a tracker ticket or task to deliver end to end into an MR when its side (frontend, backend, design) is not yet known',
-    skill: 'ticket-delivery',
+    skill: 'ticket-delivery-2',
     step: {
       title: { ru: 'Быстрый путь, профиль по §3', en: 'Fast flow, profile by §3' },
       prompt: {
@@ -43,7 +43,7 @@ export const BUILTIN_GROUPS: readonly BuiltinGroupEntry[] = [
       en: 'The same path with every check at full depth: tier never below T2, a live run of every entry with variations and a red run before the fix, mustfail per fixed bug, review with a cold re-check of every finding. Slower and costlier than fast — for risky tickets.',
     },
     when: 'a risky ticket delivered into an MR: access, money, data, contracts, migrations, or the human asks for the strict path',
-    skill: 'ticket-delivery',
+    skill: 'ticket-delivery-2',
     step: {
       title: {
         ru: 'Строгий путь: T2 и полная живая проверка',
@@ -67,7 +67,7 @@ export const BUILTIN_GROUPS: readonly BuiltinGroupEntry[] = [
       en: 'Front-only changes: before and after shots, a browser walk, a deep review with the frontend lens. Backend steps are cut.',
     },
     when: 'tickets whose every change is frontend: components, pages, styles, i18n, front tests',
-    skill: 'ticket-delivery',
+    skill: 'ticket-delivery-2',
     step: {
       title: { ru: 'Профиль: фронт', en: 'Profile: frontend' },
       prompt: {
@@ -88,7 +88,7 @@ export const BUILTIN_GROUPS: readonly BuiltinGroupEntry[] = [
       en: 'No visible change: the endpoint is checked by requests, a deep review with the backend lens, the database read-only. No shots, no browser.',
     },
     when: 'tickets with no user-visible file: handlers, services, queries, workers, jobs',
-    skill: 'ticket-delivery',
+    skill: 'ticket-delivery-2',
     step: {
       title: { ru: 'Профиль: бэкенд', en: 'Profile: backend' },
       prompt: {
@@ -109,7 +109,7 @@ export const BUILTIN_GROUPS: readonly BuiltinGroupEntry[] = [
       en: 'Page by page from the mock: one checker compares the numbers, an MR with before and after pairs and QA steps.',
     },
     when: 'build or match screens from a Figma mock one to one; the task carries a Figma link or node',
-    skill: 'ticket-delivery',
+    skill: 'ticket-delivery-2',
     step: {
       title: { ru: 'Профиль: дизайн', en: 'Profile: design' },
       prompt: {
@@ -130,7 +130,7 @@ export const BUILTIN_GROUPS: readonly BuiltinGroupEntry[] = [
       en: 'Both sides or a shared contract: contract first, then server, then the client against the real backend; a deep review with both lenses.',
     },
     when: 'tickets changing both server and client, or an API contract or shared type both sides read',
-    skill: 'ticket-delivery',
+    skill: 'ticket-delivery-2',
     step: {
       title: { ru: 'Профиль: фронт и бэкенд', en: 'Profile: fullstack' },
       prompt: {
@@ -151,7 +151,7 @@ export const BUILTIN_GROUPS: readonly BuiltinGroupEntry[] = [
       en: 'Reviewer threads on an open MR: a fix or a reasoned reply to each; replies are posted after your yes.',
     },
     when: 'reviewer threads on an existing MR: fix the review comments, answer the threads',
-    skill: 'ticket-delivery',
+    skill: 'ticket-delivery-2',
     step: {
       title: { ru: 'Режим: замечания к MR', en: 'Mode: MR follow-up' },
       prompt: {

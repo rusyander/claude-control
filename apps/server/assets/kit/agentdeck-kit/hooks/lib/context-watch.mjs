@@ -105,11 +105,17 @@ export default function contextWatch(input) {
       `Then continue the task.`
     );
   }
+  // A split-group run (AGENTDECK_SPLIT_CHILD, set by the panel) gets no /clear advice: the panel
+  // drives its next stage and picks same-session vs fresh by window size — the advice made groups
+  // ask for fresh sessions that re-read everything.
+  const clearTail =
+    process.env.AGENTDECK_SPLIT_CHILD === '1'
+      ? ''
+      : ` Task closed → tell the user plainly, in their language: continuing is cheaper after /clear.`;
   return (
     `[context-watch] ctx ${k}k, re-billed whole on every request. Refresh .agent/PROGRESS.md ` +
     `(done / in progress / left / decisions / paths), briefly, files by path, then carry on at full ` +
-    `depth — this counter is not a deadline. Task closed → tell the user plainly, in their language: ` +
-    `continuing is cheaper after /clear.`
+    `depth — this counter is not a deadline.${clearTail}`
   );
 }
 

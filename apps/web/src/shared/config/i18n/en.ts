@@ -11,6 +11,7 @@ import { changelogEn } from './changelog/en.ts';
 import { panelUpdateEn } from './panel-update/en.ts';
 import { chatProjectsEn } from './chat-projects/en.ts';
 import { watcherEn } from './watcher/en.ts';
+import { mascotEn } from './mascot/en.ts';
 import { usageLimitsEn } from './usage-limits/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
@@ -41,6 +42,7 @@ export const en: TranslationSchema = {
   /** Проекты чата и страница «Проекты» — `chat-projects/en.ts`. */
   chatProjects: chatProjectsEn,
   watcher: watcherEn,
+  mascot: mascotEn,
   usageLimits: usageLimitsEn,
   devRestart: devRestartEn,
   environment: environmentEn,
@@ -818,9 +820,9 @@ export const en: TranslationSchema = {
       noRemote:
         'The repository has no remote (git remote) — there is nowhere to open an MR, delivery is off',
       skill:
-        'Delivery follows the general `ticket-delivery`; the project skill `{{name}}` is a source of project facts',
+        'Delivery follows the general `ticket-delivery-2`; the project skill `{{name}}` is a source of project facts',
       skillNone:
-        'Delivery follows the general `ticket-delivery`; the project has no delivery skill of its own',
+        'Delivery follows the general `ticket-delivery-2`; the project has no delivery skill of its own',
       parallel: 'Split groups at once',
       parallelHint: 'Set by hand. The rest wait in a queue: 1 to {{max}}',
       parallelAuto:
@@ -5084,10 +5086,10 @@ export const en: TranslationSchema = {
       'does the same. The permissions toggle in the chat menu beats this setting either way.',
     chatLeanTools: 'Lean tool set in chats',
     chatLeanToolsHint:
-      'On out of the box: Claude chats started from the panel run without the Artifact and Workflow ' +
-      'tools. Their descriptions take about 10k tokens at the start of every request and are rarely ' +
-      'used. Turn this off when the agent needs to publish pages or run multi-agent workflows — it ' +
-      'gets the full set from its next turn.',
+      'On out of the box: Claude chats started from the panel run without the Artifact, Workflow ' +
+      'and ScheduleWakeup tools. Their descriptions take about 12k tokens at the start of every ' +
+      'request and are rarely used. Turn this off when the agent needs to publish pages, run ' +
+      'multi-agent workflows or wake itself on a timer — it gets the full set from its next turn.',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:

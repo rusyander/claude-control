@@ -314,6 +314,22 @@ describe('цепочки', () => {
     expect(chains.lastCheckpointHash(['new-4'])).toBe('h2');
   });
 
+  // E1: группа продолжает той же сессией — шаг обязан считаться, иначе потолок
+  // цепочки и «ходит по кругу» не видели бы такие продолжения вовсе.
+  it('шаг той же сессией двигает номер и отпечаток на тех же ключах', () => {
+    const chains = new HandoffChains();
+    chains.setAuto(['sess-1'], true);
+    expect(chains.step(['new-1', 'sess-1'], 'h1')).toBe(1);
+    expect(chains.depth(['sess-1'])).toBe(1);
+    expect(chains.lastCheckpointHash(['new-1'])).toBe('h1');
+    // Без отпечатка прежний не теряется; тумблер остаётся.
+    expect(chains.step(['sess-1'])).toBe(2);
+    expect(chains.lastCheckpointHash(['sess-1'])).toBe('h1');
+    expect(chains.isAuto(['sess-1'])).toBe(true);
+    // Продолжение в новой сессии после шагов — следующий номер, а не первый.
+    expect(chains.link(['sess-1'], 'new-2')).toBe(3);
+  });
+
   it('исходное задание ставится первым продолжением и дальше не перебивается', () => {
     const chains = new HandoffChains();
     chains.link(['sess-1'], 'new-2', { rootTask: 'первое' });

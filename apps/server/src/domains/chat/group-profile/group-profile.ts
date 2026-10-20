@@ -139,7 +139,7 @@ export function foreignGroupMcp(input: GroupProfileInput): { off: string[]; note
  */
 export const GROUP_SKILLS = [
   'skill-map',
-  'ticket-delivery',
+  'ticket-delivery-2',
   'prepare-mr',
   'changelog-builder',
   'mr-visual-report',
@@ -168,7 +168,7 @@ export const STAGE_SKILLS: Partial<Record<CascadeStage, readonly GroupSkill[]>> 
   ],
   fix: [
     'skill-map',
-    'ticket-delivery',
+    'ticket-delivery-2',
     'unit-integration-tests',
     'bug-regression-test',
     'playwright-e2e-tests',
@@ -177,7 +177,7 @@ export const STAGE_SKILLS: Partial<Record<CascadeStage, readonly GroupSkill[]>> 
   ],
   deliver: [
     'skill-map',
-    'ticket-delivery',
+    'ticket-delivery-2',
     'prepare-mr',
     'changelog-builder',
     'mr-visual-report',

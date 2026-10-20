@@ -505,7 +505,9 @@ export const groupsEn: typeof groupsRu = {
       'or both: it reads the side from the code itself; «Ticket → MR (strict)» for ' +
       'risky tickets; three narrow ones — frontend, backend, frontend and backend — ' +
       '«Screens from a Figma mock», «MR review comments» and «Review someone’s MR». ' +
-      'Each is one step inside the delivery skill, and the «Path» tab shows it among ' +
+      'Each is one step inside the delivery skill `ticket-delivery-2` — the panel ' +
+      'kit’s, or yours when your global skills hold one by that name. The «Path» tab ' +
+      'shows the step among ' +
       'the skill’s own steps: plan, fix, review, live run, check run, MR. In both ' +
       'general ones the live run always happens, once, on the final code: backend by ' +
       'requests to the real endpoint, frontend by a browser walk, both sides by the UI ' +
@@ -534,7 +536,8 @@ export const groupsEn: typeof groupsRu = {
       'While a built-in group is untouched, the panel updates it with the version and ' +
       'the interface language, keeping your switch, order and projects. Change its ' +
       'name, «When» or step and the card says «edited by you» — updates no longer ' +
-      'touch it.',
+      'touch it. Once it matches the panel’s version again (you made the same edit ' +
+      'before the panel did), the mark goes and updates return.',
 
     toggleTitle: 'Who overrides whom: a group and a single toggle',
     toggleCaption:

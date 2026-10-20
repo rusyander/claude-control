@@ -12,6 +12,7 @@ import {
   restartRequestPrompt,
   scanHandoffBlocks,
   scanHandoffProse,
+  type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
 import type { ServerContext } from '../../context.ts';
 import type { ChatEvent } from '../../domains/chat/ChatRunner/ChatRunner.ts';
@@ -22,6 +23,15 @@ import type {
 import type { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
 import { planContextRotation } from '../../domains/chat/context-rotation/context-rotation.ts';
+import {
+  continueHerePrompt,
+  DEFAULT_COMPACT_WINDOW,
+  groupContinuation,
+  WARM_DELIVER_LINE,
+  WARM_SESSION_MAX_AGE_MS,
+  warmDeliverSession,
+  type WarmGroupSession,
+} from '../../domains/chat/group-continuation/group-continuation.ts';
 import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace/ChatWorkspace.ts';
 import {
   activateGroupsQuietly,
@@ -171,6 +181,11 @@ export interface HandoffPlannerDeps {
    * выбор группы читается через родителя. Нет поля — чисел в дописке нет.
    */
   groupKnobs?: (keys: readonly string[], cwd: string) => string | undefined;
+  /**
+   * Окно сжатия закрывшегося прогона (E1): по нему группа решает, продолжать ли
+   * той же сессией. Нет поля — окно по умолчанию (`DEFAULT_COMPACT_WINDOW`).
+   */
+  compactWindow?: (finished: RunFinished) => number;
   /** Время правки файла; подменяется в тестах. */
   stat?: StatFile;
   /** Отпечаток файла; подменяется в тестах вместе с `stat`. */
@@ -265,9 +280,34 @@ export function createHandoffPlanner({
   review,
   pathSteps,
   groupKnobs,
+  compactWindow,
   stat,
   hash,
 }: HandoffPlannerDeps): (finished: RunFinished) => ChatEvent | undefined {
+  /**
+   * Тёплые сессии групп (E2): последний ход работы или правок каждой группы.
+   * В памяти, а не в связи: кэш живёт час, и после перезапуска панели доставка
+   * всё равно пошла бы с чистого листа.
+   */
+  const warmSessions = new Map<string, WarmGroupSession>();
+  const groupKey = (link: ChatLink) => `${link.parentChatId}#${link.groupIndex ?? ''}`;
+
+  function rememberWarm(finished: RunFinished, link: ChatLink | undefined): void {
+    if (!link?.parentChatId || !finished.ok || !finished.sessionId) return;
+    const stage = stageOf(link);
+    if (stage !== 'work' && stage !== 'fix') return;
+    const now = Date.now();
+    for (const [key, warm] of warmSessions) {
+      if (now - warm.at >= WARM_SESSION_MAX_AGE_MS) warmSessions.delete(key);
+    }
+    warmSessions.set(groupKey(link), {
+      sessionId: finished.sessionId,
+      options: finished.options,
+      at: now,
+      contextTokens: finished.contextTokens,
+    });
+  }
+
   /**
    * Звено конвейера подбора модели: проверка работы на потолке и правки по её
    * замечаниям. Считается ПОСЛЕ продолжения в чистой сессии и только когда то не
@@ -346,13 +386,38 @@ export function createHandoffPlanner({
     // ключа задачи в словах пользователя сторож git не пускает правку истории
     // своей же ветки, и звено вставало с вопросом (журнал 98).
     const identity = link?.parentChatId ? split?.identityOf?.(link) : undefined;
-    const prompt = identity ? `${identity}\n\n${plan.prompt}` : plan.prompt;
-    const options = { ...finished.options, prompt };
-    delete options.sessionId;
-    delete options.fork;
+    // Доставка продолжает тёплую сессию работы или правок (E2) — ответвлением
+    // (`--fork-session`): у звена свой разговор и своя связь, как раньше, а
+    // переписка и кэш — той сессии, что ветку, задачи и проверки уже знает.
+    // Ревью сюда не попадает никогда: его ценность — свежий взгляд. Дерево на
+    // паузе — тоже с чистого листа: звено ляжет в очередь до «Продолжить всё»,
+    // часто на часы, и ответвление тогда переписывало бы в кэш всё окно заново.
+    // Через контур тёплой доставки не бывает: в параметрах прогона модель
+    // контура, а не та, что просили, и сравнение с моделью доставки не сходится —
+    // доставка идёт с чистого листа, как до E2.
+    const warm =
+      plan.stage === 'deliver' && link?.parentChatId && !gate?.paused?.(chatId)
+        ? warmDeliverSession({
+            warm: warmSessions.get(groupKey(link)),
+            now: Date.now(),
+            model: plan.model,
+            effort: plan.effort,
+            compactWindow: compactWindow?.(finished) ?? DEFAULT_COMPACT_WINDOW,
+          })
+        : undefined;
+    if (warm && link) warmSessions.delete(groupKey(link));
+    const task = warm ? `${WARM_DELIVER_LINE}\n\n${plan.prompt}` : plan.prompt;
+    const prompt = identity ? `${identity}\n\n${task}` : task;
+    const options = warm
+      ? { ...warm.options, prompt, sessionId: warm.sessionId, fork: true }
+      : { ...finished.options, prompt };
+    if (!warm) {
+      delete options.sessionId;
+      delete options.fork;
+      options.model = plan.model;
+      options.effort = plan.effort;
+    }
     delete options.name;
-    options.model = plan.model;
-    options.effort = plan.effort;
     options.permissionPrompt = { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() };
     // Группа разделения идёт в авторежиме (split-launch.ts), и звено обязано его
     // держать. Прогон, усыновлённый после перезапуска журналом без режима, отдал
@@ -364,12 +429,15 @@ export function createHandoffPlanner({
     }
     // Дописка собирается заново по стадии: у работы в ней лежит планка сдачи
     // «тебя ведёт модель ниже потолка», и в ревью она сказала бы проверяющему
-    // ровно обратное тому, зачем его завели.
-    const append = stageAppendPrompt(
-      plan,
-      cascade.settings(),
-      childStageExtra(plan.stage, groupKnobs?.([chatId], cwd)),
-    );
+    // ровно обратное тому, зачем его завели. У тёплой доставки — дописка той
+    // сессии байт в байт: другой системный промпт переписал бы кэш целиком.
+    const append = warm
+      ? warm.options.appendSystemPrompt
+      : stageAppendPrompt(
+          plan,
+          cascade.settings(),
+          childStageExtra(plan.stage, groupKnobs?.([chatId], cwd)),
+        );
     if (append) options.appendSystemPrompt = append;
     else delete options.appendSystemPrompt;
 
@@ -546,6 +614,9 @@ export function createHandoffPlanner({
     // ещё висящий на ней, не получил бы конца никогда (как слово родителя, Д7).
     // Ключ — настоящий, не временный `new-…`: под ним CLI разговор не хранит.
     const key = aliases.find((alias) => !alias.startsWith('new-')) ?? finished.sessionId;
+    // Брокер прав ищет ход по ключу запуска, а не по временному ключу первого хода.
+    if (options.permissionPrompt)
+      options.permissionPrompt = { ...options.permissionPrompt, runId: key };
     (pathSteps.defer ?? ((next: () => void) => setTimeout(next, 0)))(() => {
       if (gate?.defer('stage', key, options, meta)) return;
       if (runs.start(key, options, meta)) return;
@@ -566,6 +637,56 @@ export function createHandoffPlanner({
         textCode,
         textParams: params,
       },
+    };
+  }
+
+  /**
+   * Продолжение группы ТОЙ ЖЕ сессией (E1) — тем же путём, что шаг «Пути»: те же
+   * параметры прогона, ключ настоящий (под временным `new-…` CLI разговор не
+   * хранит), старт — после того, как закончившийся прогон закроет слушателей.
+   * Шаг цепочки засчитывается до старта: потолок и «ходит по кругу» видят его.
+   */
+  function resumeGroupSession(
+    finished: RunFinished,
+    aliases: string[],
+    proposal: HandoffProposal,
+    checkpointHash: string | undefined,
+    window: number,
+  ): ChatEvent {
+    const sessionId = finished.sessionId as string;
+    const options = { ...finished.options, prompt: continueHerePrompt(proposal), sessionId };
+    delete options.fork;
+    delete options.name;
+    // Тот же авторежим, что у продолжения чистой сессией (журнал 44): прогон,
+    // усыновлённый после перезапуска без режима, встал бы на невидимой карточке прав.
+    if (options.permissionMode !== 'default') options.permissionMode = AUTONOMOUS_PERMISSION_MODE;
+    const meta = {
+      ...(finished.projectPath ? { projectPath: finished.projectPath } : {}),
+      sessionId,
+      ...(finished.origin ? { origin: finished.origin } : {}),
+    };
+    chains.step(aliases, checkpointHash);
+    const key = aliases.find((alias) => !alias.startsWith('new-')) ?? sessionId;
+    // Брокер прав ищет ход по ключу, под которым тот запущен. Старый временный
+    // `new-…` из параметров первого хода прогоном уже не числится — и каждый
+    // вопрос человеку получал бы отказ «прогон неизвестен».
+    if (options.permissionPrompt)
+      options.permissionPrompt = { ...options.permissionPrompt, runId: key };
+    (pathSteps?.defer ?? ((next: () => void) => setTimeout(next, 0)))(() => {
+      if (gate?.defer('handoff', key, options, meta)) return;
+      if (!runs.start(key, options, meta))
+        console.warn('group same-session turn did not start', key);
+    });
+    const params = {
+      tokens: finished.contextTokens > 0 ? String(Math.round(finished.contextTokens / 1000)) : '?',
+      window: String(Math.round(window / 1000)),
+    };
+    return {
+      kind: 'notice',
+      code: 'groupSameSession',
+      text: serverText('group-same-session-notice', params),
+      textCode: 'group-same-session-notice',
+      textParams: params,
     };
   }
 
@@ -604,13 +725,23 @@ export function createHandoffPlanner({
     if (pathed.stop) return pathed.event;
     const { finished } = pathed;
     if (split && link?.stage === 'triage') return split.onTriageFinished(finished, aliases);
+    // До звена: правки, за которыми идёт доставка, — самая тёплая сессия группы.
+    rememberWarm(finished, link);
 
     // Блок сильнее прозы: он называет, что закрыто и чем продолжить. Проза —
     // «перезапустите сессию», «/clear», «продолжай по .agent/PROGRESS.md» —
     // раньше была концом работы до утра; теперь это то же предложение с
     // файлом-опорой из текста, и дальше его ждут те же предохранители.
-    const own =
-      scanHandoffBlocks(finished.text).proposals.at(-1) ?? scanHandoffProse(finished.text);
+    // У группы разделения (E1) проза чистую сессию не заводит никогда: «/clear»
+    // там — привычка глобального правила, и новая сессия перечитывала бы всё
+    // заново. Но и молчать о ней нельзя — недоделанная работа ушла бы прямо в
+    // ревью. Поэтому проза группы — продолжение ТОЙ ЖЕ сессией, и только когда
+    // сессия известна; без неё фраза не значит ничего.
+    const groupChild = splitOwnsHandoff(link);
+    const block = scanHandoffBlocks(finished.text).proposals.at(-1);
+    const prose =
+      block || (groupChild && !finished.sessionId) ? undefined : scanHandoffProse(finished.text);
+    const own = block ?? prose;
 
     // Второй повод продолжить — размер окна. Предложение агента его перебивает:
     // оно знает, ЧТО закрыто, а порог знает только «сколько накопилось».
@@ -631,9 +762,9 @@ export function createHandoffPlanner({
       ok: finished.ok,
       startedAt: finished.startedAt,
       // Свой блок группы разделения исполняется без тумблера (журнал 42c).
-      auto: chains.isAuto(aliases) || splitOwnsHandoff(link),
+      auto: chains.isAuto(aliases) || groupChild,
       depth: chains.depth(aliases),
-      ...(splitOwnsHandoff(link) ? { maxDepth: HANDOFF_GROUP_MAX_CHAIN } : {}),
+      ...(groupChild ? { maxDepth: HANDOFF_GROUP_MAX_CHAIN } : {}),
       ...(chains.lastCheckpointHash(aliases) !== undefined
         ? { previousHash: chains.lastCheckpointHash(aliases) as string }
         : {}),
@@ -717,6 +848,25 @@ export function createHandoffPlanner({
     const cwd = finished.projectPath as string;
     const target = checkpointInside(cwd, verdict.proposal.checkpoint);
     const checkpointHash = target ? (hash ?? hashFile)(target) : undefined;
+    // Группа с окном далеко от сжатия продолжает ТОЙ ЖЕ сессией (E1): чистая
+    // перечитывала бы то, что уже лежит в окне. Проза группы — всегда той же:
+    // сжатие на большом окне CLI сделает сам. Повод по порогу окна (настройка
+    // человека, не предложение агента) — всегда чистой: той же сессией окно не
+    // уменьшится, и порог срабатывал бы снова на каждом ходу до потолка цепочки.
+    const window = groupChild ? (compactWindow?.(finished) ?? DEFAULT_COMPACT_WINDOW) : 0;
+    const proseOnly = Boolean(prose) && verdict.proposal === prose;
+    if (
+      groupChild &&
+      own &&
+      (proseOnly ||
+        groupContinuation({
+          contextTokens: finished.contextTokens,
+          compactWindow: window,
+          ...(finished.sessionId ? { sessionId: finished.sessionId } : {}),
+        }) === 'resume')
+    ) {
+      return resumeGroupSession(finished, aliases, verdict.proposal, checkpointHash, window);
+    }
     let deferred = false;
     const started = startHandoff({
       proposal: verdict.proposal,

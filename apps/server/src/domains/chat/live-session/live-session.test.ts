@@ -159,7 +159,7 @@ describe('живая сессия разговора', { timeout: 30_000 }, () =
   it('ход, начатый самим CLI, становится прогоном того же разговора', async () => {
     fresh();
     const first = await turn('new-3', 'WAKE');
-    await waitFor(() => registry.describe('new-3')?.options.wake === true);
+    await waitFor(() => registry.describe('new-3')?.woken === true);
     await waitFor(() => !registry.isRunning('new-3'));
     expect(textOf('new-3')).toBe(`woke pid ${pidIn(first)}`);
     // И после него процесс ждёт следующего сообщения, а не уходит.
@@ -183,7 +183,7 @@ describe('живая сессия разговора', { timeout: 30_000 }, () =
     expect(finished).toEqual([{ text, ok: true }]);
     // Настоящий ход достался прогону человека — пробуждения под него не заводили.
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(registry.describe('new-ghost')?.options.wake).toBeUndefined();
+    expect(registry.describe('new-ghost')?.woken).toBeUndefined();
     expect(finished).toHaveLength(1);
   });
 

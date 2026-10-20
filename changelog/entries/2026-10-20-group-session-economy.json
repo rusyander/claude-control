@@ -1,0 +1,52 @@
+{
+  "title": {
+    "ru": "Группы разделения не начинают с чистого листа без нужды: продолжение и доставка в тёплой сессии",
+    "en": "Split groups stop starting from scratch for nothing: continuation and delivery in a warm session"
+  },
+  "items": [
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа разделения продолжает работу в той же сессии, пока окно её последнего хода меньше 60 % окна сжатия (из коробки 120 из 200 тысяч токенов). «/clear» и «перезапустите сессию» словами у группы всегда продолжают ту же сессию, а блок продолжения ведёт в чистую сессию только на большом окне; строка в ленте называет, что сессия сохранена. Порог окна из настроек, заданный человеком, по-прежнему ведёт группу в чистую сессию: в той же окно не уменьшилось бы, и порог срабатывал бы на каждом ходу. Новая сессия заново перечитывала ветку, задачи и файлы, которые прошлая уже держала.",
+        "en": "A split group keeps working in the same session while its last turn’s window stays under 60 % of the compact window (120k of 200k tokens out of the box). “/clear” and “restart the session” in words always continue the same session for a group, and a continuation block leads to a clean session only on a large window; a line in the feed says the session was kept. The window threshold a human set in the settings still leads a group to a clean session: in the same one the window would not shrink, and the threshold would fire on every turn. A new session used to re-read the branch, the tasks and the files the previous one already held."
+      },
+      "how": {
+        "ru": "Окно сжатия берётся из окружения прогона (в нём и окно локальной модели), затем из окна групп, затем из autoCompactWindow каталога конфигурации. Ход той же сессией идёт под ключом сессии — с ним брокер прав находит ход — и не наследует флагов хода, разбуженного фоновой задачей. В детском прогоне группы подсказки хуков экономии о «/clear» молчат: человека, который его наберёт, у группы нет; панель, перезапущенная агентом группы, эту метку с себя снимает и чаты человека ею не метит.",
+        "en": "The compact window comes from the run’s environment (the local model’s window included), then the group window, then autoCompactWindow of the config directory. A same-session turn runs under the session’s key — the permission broker finds the turn by it — and inherits no flags of a turn woken by a background task. In a group’s child run the economy hooks no longer suggest “/clear”: a group has no human to type it; a panel restarted by a group’s agent drops that mark and does not put it on the human’s chats."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Доставка группы продолжает ответвлением последнюю сессию работы или правок, если та закончилась меньше 55 минут назад, её окно меньше 200 тысяч и 60 % окна сжатия, а модель и глубина те же. Доставка с чистого листа тратила почти четверть расхода группы на то, чтобы узнать сделанное заново. Ревью по-прежнему всегда идёт в новой сессии, а доставке прямо сказано, что строки о модели ниже потолка и о предстоящем ревью относятся к прошедшей стадии.",
+        "en": "A group’s delivery continues the last work or fix session as a fork when that session ended less than 55 minutes ago, its window is under 200k and under 60 % of the compact window, and the model and effort match. Delivery from scratch spent almost a quarter of a group’s usage learning again what had been done. Review still always runs in a new session, and the delivery is told plainly that the lines about a model below the ceiling and a review to come belong to the stage that is over."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Облегчённый набор инструментов в чатах убирает и ScheduleWakeup: его описание — около 1,2 тыс. токенов в каждом запросе, а за три недели на 10 тысяч запросов чатов и групп его не вызвал никто. Всего набор снимает около 12 тыс. токенов с каждого запроса; агенту, который должен будить себя по таймеру (`/loop` без интервала), набор выключается в настройках.",
+        "en": "The lean tool set in chats drops ScheduleWakeup too: its description costs about 1.2k tokens in every request, and in three weeks of 10 thousand chat and group requests nobody called it. In total the set takes about 12k tokens off every request; for an agent that has to wake itself on a timer (`/loop` without an interval) the set is turned off in the settings."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "В детском прогоне группы охранник фоновых команд запрещает цикл sleep над выводом собственной фоновой команды — её задачи или лога, в который она пишет, — без обхода повтором и просит закончить ход: панель сама будит агента, когда фоновая задача заканчивается. Ожидание чужого файла снимается повтором, как в обычной сессии, а цикл готовности сервера по логу вроде latest.log или healthcheck.log больше не принимается за опрос проверки.",
+        "en": "In a group’s child run the background-command guard denies a sleep loop over the output of the run’s own background command — its task or the log it writes — with no repeat escape and asks to end the turn: the panel wakes the agent itself when the background task finishes. A wait on someone else’s file is lifted by a repeat, as in an ordinary session, and a server readiness loop over a log such as latest.log or healthcheck.log is no longer taken for a check poll."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Чат» описывает продолжение группы в той же сессии и тёплую доставку, «Настройки» — новый состав облегчённого набора.",
+        "en": "The Chat help covers a group continuing in the same session and the warm delivery; Settings covers the new contents of the lean tool set."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

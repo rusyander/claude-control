@@ -4,6 +4,8 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
 import { ACCENT_OPTIONS, accentLabelKey } from '@shared/lib/accent';
+import { setMascotPrefs, useMascotPrefs } from '@shared/lib/mascot';
+import { Mascot } from '@shared/ui/mascot';
 import { EditorCard } from '../EditorCard/EditorCard';
 import { InstallAppCard } from '../InstallAppCard/InstallAppCard';
 import { SettingToggleRow } from '../SettingToggleRow/SettingToggleRow';
@@ -12,6 +14,7 @@ import type { SettingsTabProps } from '../SettingsTabs.types';
 /** Раздел «Общие»: как панель выглядит, читается и чем открывает файлы. */
 export function GeneralTab({ settings, patch }: SettingsTabProps) {
   const { t } = useTranslation();
+  const mascot = useMascotPrefs();
 
   return (
     <Stack gap="var(--spacing-lg)">
@@ -99,6 +102,30 @@ export function GeneralTab({ settings, patch }: SettingsTabProps) {
             hint={t('settings.highContrastHint')}
             checked={settings.highContrast}
             onChange={(highContrast) => patch({ highContrast })}
+          />
+        </Stack>
+      </Card>
+
+      {/* Маскот — настройка этого браузера (localStorage), не файлов CLI. */}
+      <Card padding="md">
+        <Stack gap="var(--spacing-sm)">
+          <Stack direction="row" align="center" gap="var(--spacing-sm)">
+            <Mascot mood={mascot.enabled ? 'waving' : 'sleeping'} size={36} />
+            <Typography variant="body" weight="medium">
+              {t('mascot.settings.title')}
+            </Typography>
+          </Stack>
+          <SettingToggleRow
+            label={t('mascot.settings.show')}
+            hint={t('mascot.settings.showHint')}
+            checked={mascot.enabled}
+            onChange={(enabled) => setMascotPrefs({ enabled })}
+          />
+          <SettingToggleRow
+            label={t('mascot.settings.chatty')}
+            hint={t('mascot.settings.chattyHint')}
+            checked={mascot.chatty}
+            onChange={(chatty) => setMascotPrefs({ chatty })}
           />
         </Stack>
       </Card>

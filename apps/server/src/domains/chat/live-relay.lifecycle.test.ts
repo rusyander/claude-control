@@ -156,7 +156,7 @@ describe('посредник и выход сервера', { timeout: 60_000 },
 
     const target = serverB(appData);
     const sessionId = entry.sessionId ?? '';
-    await waitFor(() => target.describe(sessionId)?.options.wake === true);
+    await waitFor(() => target.describe(sessionId)?.woken === true);
     await waitFor(() => !target.isRunning(sessionId));
     const key = target.describe(sessionId)?.key ?? '';
     expect(textOf(target, key)).toBe(`woke pid ${cliPid}`);

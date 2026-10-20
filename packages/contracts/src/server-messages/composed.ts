@@ -104,6 +104,7 @@ export const composedMessageParams = {
   'path-step-started-notice': ['step'],
   'path-gate-nudge-notice': ['step'],
   'path-gate-failed-notice': ['step', 'note'],
+  'group-same-session-notice': ['tokens', 'window'],
   'split-limit-wait-notice': ['until'],
   'split-limit-warning-notice': ['until'],
   'split-delivery-description-unchecked-notice': ['group', 'mr'],

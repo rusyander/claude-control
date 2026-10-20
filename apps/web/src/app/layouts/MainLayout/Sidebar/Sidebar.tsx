@@ -10,6 +10,7 @@ import { NotificationCenter } from '@shared/ui/notification-center';
 import { Badge } from '@shared/ui/badge';
 import { PanelAgentLauncher } from '@features/PanelAgentWindow';
 import { WatcherIndicator } from '@features/WatcherIndicator';
+import { MascotCompanion } from '@features/MascotCompanion';
 import { useOverview } from '@entities/AppConfig';
 import { usePanelUpdate } from '@entities/Changelog';
 import { UsageLimitsMeter } from '@entities/UsageLimits';
@@ -194,6 +195,9 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
           </Stack>
         ))}
       </div>
+
+      {/* Маскот — вне прокрутки разделов: его состояние видно всегда. */}
+      <MascotCompanion isCollapsed={isCollapsed} />
     </motion.nav>
   );
 }

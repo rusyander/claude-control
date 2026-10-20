@@ -18,7 +18,7 @@
 - GitHub/GitLab CLI/API writes (MR/PR, pipelines, issues): say what you are about to do, get a yes,
   each time.
 - **Door C, the ticket grant**: while a ticket run is live (its ledger written by this session through
-  `agentdeck-kit:ticket-delivery`) and the user's words in this window carry its tracker key
+  `agentdeck-kit:ticket-delivery-2`) and the user's words in this window carry its tracker key
   (`PROJ-123`) or issue link, `commit`, `push` (never to the default branch), `checkout -b`, `rebase`,
   `cherry-pick` pass unasked; MR/tracker writes of that ticket too. **C′**: in a split worktree
   (`<repo>-worktrees/<dir>`) on a branch named after a tracker key, `commit`, `cherry-pick`, `rebase`

@@ -1233,7 +1233,7 @@ export const chatEn: typeof chatRu = {
       'The “To MR” button in a project chat header shows how a task will end: “on”, ' +
       '“off” or “nowhere” (the repository has no remote). Delivery is on out of the ' +
       'box; to turn it off everywhere — “Settings” → “Models” → “Take tasks to a ready ' +
-      'MR”. Delivery follows the general `ticket-delivery` skill (a project delivery ' +
+      'MR”. Delivery follows the general `ticket-delivery-2` skill (a project delivery ' +
       'skill, if any, is only a source of project facts; its name shows in the button panel):in a plain chat the agent takes a ' +
       'code-change task to an MR — branch, checks, commit, push, MR, review, ' +
       'description — while questions and reviews without edits open no MR; in a split ' +
@@ -1659,7 +1659,12 @@ export const chatEn: typeof chatRu = {
     cascadeDeliveryText:
       'With delivery on, the work (and the review with its fixes) is followed by a ' +
       '“delivery” link on the work model: commit, fresh main branch, push of its own ' +
-      'branch, MR. The panel does not take the agent’s word for it: when the link ends ' +
+      'branch, MR. Delivery continues the last work or fix session as a fork when ' +
+      'that session ended less than 55 minutes ago, its window is under 200k and ' +
+      'under 60 % of the compact window, and the model and effort are the same: the ' +
+      'branch, the tasks and the check results are already in it, so nothing has to ' +
+      'be learned again. Otherwise delivery runs in a new session, and review always ' +
+      'does. The panel does not take the agent’s word for it: when the link ends ' +
       'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
       'MR whose head is the group’s copy, and which branch that MR comes from: while ' +
       'the group has no commits of its own and shares its predecessor’s head, the MR ' +
@@ -1930,7 +1935,8 @@ export const chatEn: typeof chatRu = {
       'turn of a foreign CLI does not keep its session, so continuing means asking the same thing again rather than ' +
       'returning to the same place. Clean-session continuation follows from that: ' +
       'with a foreign CLI the panel reads “restart the session” in the tail of an ' +
-      'answer just as it reads the block, and opens a NEW conversation in the same ' +
+      'answer just as it reads the block (for a group too), and opens a ' +
+      'NEW conversation in the same ' +
       'directory — with the checkpoint file and the original task of the whole run. ' +
       'The limits are Claude’s: eight continuations in a row, a stop when the ' +
       'checkpoint file has not changed, no continuation after a failed run; the ' +
@@ -2026,6 +2032,19 @@ export const chatEn: typeof chatRu = {
       'without the toggle — a group has no human — its cap is three continuations, and ' +
       'the task in the continuation prompt is a boundary for it rather than a guide. ' +
       'Past the cap the turn ends, and the pipeline takes the group from there. ' +
+      'A group does not always get a new session either: a proposal in words (“/clear”, ' +
+      '“restart the session”) always continues THE SAME session for a group, and a ' +
+      'block leads to a clean session only once the last turn’s window has reached ' +
+      '60 % of the compact window (120k of 200k out of the box). Below that it is the ' +
+      'same session too, with a “continue here, the CLI compacts the context itself” ' +
+      'task, and a line in the feed says so: a new session would re-read everything ' +
+      'this one already holds. ' +
+      'The window threshold from the settings — the human’s reason, not the agent’s — ' +
+      'always leads a group to a clean session: in the same one the window would not ' +
+      'shrink, and the threshold would fire on every turn up to the chain cap. ' +
+      'For a group on a foreign CLI both a block and words still lead to a new ' +
+      'conversation: that CLI gives the panel neither the window size nor a session ' +
+      'to continue. ' +
       'Work the agent itself marked closed and verified (“nothing to continue”) is not ' +
       'continued by the panel at all — neither in a chat nor in a group: a new session ' +
       'would only read the checkpoint file and say everything is done. The card stays, ' +

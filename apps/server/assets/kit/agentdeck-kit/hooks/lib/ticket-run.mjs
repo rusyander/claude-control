@@ -1,6 +1,6 @@
 // A ticket delivery run that outlives the context window.
 //
-// Door C in `git-guard` and the two review spawns of `agentdeck-kit:ticket-delivery` hang on one fact: the
+// Door C in `git-guard` and the two review spawns of `agentdeck-kit:ticket-delivery-2` hang on one fact: the
 // user handed a ticket over and asked for the conveyor to run by itself. Both used to read that
 // fact out of the user's own words in the window — and a compaction or a `/clear` erases exactly
 // those words, in the longest runs, which is where the grant matters most. Measured on two real

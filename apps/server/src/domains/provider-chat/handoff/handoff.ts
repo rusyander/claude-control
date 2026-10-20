@@ -153,7 +153,10 @@ export function planForeignHandoff(
   const aliases = [foreignChatKey(input.providerId, input.chatId)];
   // Блок сильнее прозы: он называет, что закрыто и чем продолжить. Проза —
   // «перезапустите сессию», «/clear», «продолжай по .agent/PROGRESS.md» — то же
-  // предложение словами, и дальше его ждут ровно те же предохранители.
+  // предложение словами, и дальше его ждут ровно те же предохранители. Группа
+  // разделения здесь — не исключение, в отличие от Claude (E1): продолжить ТОЙ
+  // ЖЕ сессией чужой CLI панель не умеет, и без прозы недоделанная работа ушла
+  // бы прямо в ревью.
   const proposal = scanHandoffBlocks(input.text).proposals.at(-1) ?? scanHandoffProse(input.text);
   const previousHash = deps.chains.lastCheckpointHash(aliases);
   const verdict = evaluateHandoff({

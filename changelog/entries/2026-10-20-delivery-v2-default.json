@@ -1,0 +1,32 @@
+{
+  "title": {
+    "ru": "Доставка задачи до MR по новому конвейеру — из коробки",
+    "en": "Ticket delivery into an MR on the new conveyor — out of the box"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В наборе панели появился навык `ticket-delivery-2` — конвейер доставки задачи трекера до готового MR: уровень риска T0–T3 задаёт глубину каждой проверки, каждая проверка идёт один раз на дерево, прогон проверок — инструментом проекта или по затронутым частям, навык доставки проекта служит только источником фактов. Навык едет с самой панелью, поэтому есть и на свежей установке без своих правил, и после переноса панели на другую машину.",
+        "en": "The panel kit gains the `ticket-delivery-2` skill — a conveyor delivering a tracker ticket into a ready MR: the T0–T3 risk tier sizes every check, each check runs once per tree, the check run uses the project's own tool or covers the touched parts, and the project's own delivery skill only supplies facts. The skill ships with the panel itself, so it is there on a fresh install with no rules of your own and after the panel moves to another machine."
+      },
+      "area": { "ru": "Набор панели", "en": "Panel kit" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Встроенные группы доставки, включённая доставка в чате и группы разделения ведут задачу по `ticket-delivery-2`. Прежний `ticket-delivery` остаётся в наборе и запускается, только когда его назвали: группа с его шагом или прямая просьба.",
+        "en": "The built-in delivery groups, delivery switched on in a chat and the split groups run a ticket by `ticket-delivery-2`. The previous `ticket-delivery` stays in the kit and runs only when named: a group with its step or a direct request."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Встроенная группа больше не получает пометку «изменена вами» после сохранения её шагов без единой правки, а группа, которую поменяли так же, как потом поменялся каталог панели, снова обновляется вместе с ним.",
+        "en": "A built-in group no longer gets the «edited by you» mark after its steps are saved without a single change, and a group changed the same way the panel catalogue later changed is updated along with it again."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    }
+  ]
+}

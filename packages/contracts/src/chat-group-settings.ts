@@ -56,6 +56,14 @@ export const AUTONOMOUS_ENV = 'AGENTDECK_AUTONOMOUS';
  */
 export const BRIEF_OUTPUT_ENV = 'AGENTDECK_BRIEF_OUTPUT';
 
+/**
+ * Метка «прогон — группа разделения» (E1 плана экономии). По ней глобальные хуки
+ * советов «/clear» молчат: продолжение и следующую стадию группы ведёт панель,
+ * а совет заставлял агента просить чистую сессию, которая перечитывала всё
+ * заново. Имя повторено в хуках строкой — они не импортируют контракты.
+ */
+export const SPLIT_CHILD_ENV = 'AGENTDECK_SPLIT_CHILD';
+
 /** Действующие значения из своего и родительского — чистая функция для сервера и тестов. */
 export function resolveChatGroupSettings(
   own: StoredChatGroupSettings | undefined,

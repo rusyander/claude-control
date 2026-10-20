@@ -17,6 +17,10 @@ import {
 } from '../../domains/chat/group-profile/group-profile.ts';
 import { stageOf } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
 import {
+  runCompactWindow,
+  settingsCompactWindow,
+} from '../../domains/chat/group-continuation/group-continuation.ts';
+import {
   releaseSessionLeases,
   writeHeavyQueueConfig,
 } from '../../domains/chat/heavy-queue-leases/heavy-queue-leases.ts';
@@ -497,7 +501,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   chatRuns.setFirstEditListener((keys, at) => ctx.store.markChatFirstEdit(keys, at));
   // Локальный слой проекта (`.agent/local-layer/`): сломанный слой не мешает
   // чату — прогон идёт на командном слое, как без него.
-  // Тяжёлые неиспользуемые схемы (Artifact, Workflow) — флагом каждому прогону Claude.
+  // Тяжёлые неиспользуемые схемы (Artifact, Workflow, ScheduleWakeup) — флагом каждому прогону Claude.
   chatRuns.setDeniedToolsResolver(() =>
     ctx.store.getSettings().chatLeanTools ? UNUSED_HEAVY_TOOLS : [],
   );
@@ -1228,6 +1232,14 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     session: chatSession,
     selfBaseUrl,
     contextLimit: () => ctx.store.getSettings().handoffContextLimit,
+    // Окно сжатия закрывшегося прогона (E1): окружение прогона с `platformEnv`
+    // (локальная модель, профиль группы), рычаг окна групп, `autoCompactWindow`.
+    compactWindow: (finished) =>
+      runCompactWindow(
+        finished.options,
+        compactWindowOf(process.env.AGENTDECK_GROUP_COMPACT_WINDOW),
+        settingsCompactWindow(finished.options.configDir ?? ctx.location.paths.root),
+      ),
     // Продолжение наследует связь закрытого разговора: и родителя в дереве, и
     // подобранную под задачу модель. Иначе следующее сообщение человека —
     // первое, что придёт в новый чат без модели, — уехало бы на дефолте.

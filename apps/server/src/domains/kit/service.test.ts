@@ -73,7 +73,7 @@ afterEach(() => {
 describe('режимы по провайдерам', () => {
   it('по умолчанию «глобальные»; что кто умеет — честно', () => {
     const view = service().describe();
-    expect(view.version).toBe('1.2.0');
+    expect(view.version).toBe('1.3.0');
     expect(view.builtinDir).toBe(builtinKitDir());
     expect(view.mineDir).toBe(join(appData, 'kit', 'mine'));
     expect(view.providers).toEqual([

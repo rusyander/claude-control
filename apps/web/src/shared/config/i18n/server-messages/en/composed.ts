@@ -135,6 +135,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Path step “{{step}}” ended its turn without a check result — the panel asked it once to report. Without a result after that, the chain waits for an answer in this chat.',
   'path-gate-failed-notice':
     'Path step “{{step}}” did not pass its check: {{note}}. The chain waits for an answer in this chat.',
+  'group-same-session-notice':
+    'The group continues in the same session: context {{tokens}}k of the {{window}}k compaction window — a fresh session would re-read everything already in it.',
   'split-limit-wait-notice':
     'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
   'split-limit-warning-notice':

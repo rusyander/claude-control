@@ -507,7 +507,7 @@ describe('statusRunProfile (5.1)', () => {
       enabledPlugins: Record<string, boolean>;
       permissions: { deny: string[] };
     };
-    for (const name of ['my-skill', 'deep-review', 'kit-skill', 'ticket-delivery', 'dataviz']) {
+    for (const name of ['my-skill', 'deep-review', 'kit-skill', 'ticket-delivery-2', 'dataviz']) {
       expect(settings.skillOverrides[name]).toBe('name-only');
     }
     expect(settings.enabledPlugins).toEqual({ 'figma@market': false, 'notes@market': false });

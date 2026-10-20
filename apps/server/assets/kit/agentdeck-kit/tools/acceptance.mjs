@@ -1,5 +1,5 @@
 /**
- * acceptance — the acceptance table of a live run (skill `agentdeck-kit:ticket-delivery` §10).
+ * acceptance — the acceptance table of a live run (skill `agentdeck-kit:ticket-delivery-2` §10).
  *
  * Why. «Verified» without a table rests on the agent's word. Here every statement from the plan
  * becomes a row, a row carries an expectation and a fact taken off the running system, and the

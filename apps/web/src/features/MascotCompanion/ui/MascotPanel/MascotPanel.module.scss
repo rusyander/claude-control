@@ -1,0 +1,172 @@
+// Сводка Деки: облачко-окно у края боковой панели. z-index ниже модалок
+// страницы (100) и окна агента панели (90) — сводка не должна их перекрывать.
+.panel {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 320px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg, 0 12px 32px rgb(0 0 0 / 18%));
+  animation: panel-in var(--duration-normal, 200ms) ease-out;
+  transform-origin: 0% 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+
+  &[data-tone='waiting'] {
+    color: var(--color-warning);
+  }
+
+  &[data-tone='error'] {
+    color: var(--color-danger);
+  }
+
+  &[data-tone='working'] {
+    color: var(--color-success);
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: none;
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-accent-subtle);
+  }
+}
+
+.rowName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowAction {
+  flex: none;
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+}
+
+.more,
+.quiet {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.tip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  font-size: var(--font-size-body-sm);
+  text-wrap: pretty;
+}
+
+.tipLabel {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.tipNext {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+.toggleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

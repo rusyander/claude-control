@@ -99,8 +99,8 @@ export const settingsEn: typeof settingsRu = {
     tabModels: 'Models',
     tabModelsText:
       'Default model and effort, auto permission mode and the lean tool set in chats (no ' +
-      'Artifact or Workflow — about 10k tokens at the start of every request), the model ' +
-      'catalog, a custom endpoint and MCP server checks.',
+      'Artifact, Workflow or ScheduleWakeup — about 12k tokens at the start of every request), ' +
+      'the model catalog, a custom endpoint and MCP server checks.',
     tabPrompts: 'Prompts',
     tabPromptsText:
       'The texts the panel speaks to the model with, not on your behalf: the tool protocol, ' +
@@ -672,9 +672,57 @@ export const settingsEn: typeof settingsRu = {
         'It reads, to compare. It writes only a confirmed proposal, with a backup. A transfer ' +
         'into the panel edits the working copy of the repository and does not commit.',
     },
+    mascot: {
+      title: 'Decky — the panel mascot',
+      caption:
+        'Decky is the panel mark come alive. It sits at the bottom of the sidebar, its look ' +
+        'tells what the agents are doing, and a click opens a short summary: who is waiting ' +
+        'for an answer, who failed, who is working.',
+      where: 'At the bottom of the sidebar — always in sight',
+      whereText:
+        'Next to it is a status line: “1 chat waits for you”, an error count, “1 agent ' +
+        'working” or “all quiet”. A conversation waiting for your answer gets a remark with an “Open the chat” ' +
+        'button that leads straight into that chat. Decky speaks up the same way about an ' +
+        'error and a finished turn. After five minutes with nobody around Decky falls ' +
+        'asleep; the first mouse move wakes it. At rest it follows the cursor with its eye and ' +
+        'now and then blinks, looks around or hops, standing still in between — with nothing ' +
+        'moving the panel spends no frames on it. Only the scale around the eye spins ' +
+        'non-stop, while agents are working.',
+      panel: 'Click — a summary of the agents',
+      panelText:
+        'Three lists: waiting for you, errors, working. Clicking a row opens the ' +
+        'conversation — in its project, if it has one. Below is a tip about the panel and a ' +
+        '“Another tip” button. Escape closes the summary and returns focus to Decky.',
+      chat: 'In the chat — a greeting and long turns',
+      chatText:
+        'In an empty chat Decky says hello and gives a chat tip. If an agent turn runs ' +
+        'longer than 20 seconds, Decky appears next to the timer and once a minute makes a ' +
+        'remark: working, long, very long.',
+      settings: 'Settings → General → “Mascot”',
+      settingsText:
+        '“Show Decky” removes it everywhere: the sidebar, the chat and the error pages. ' +
+        '“Remarks and tips” turns off only the tips and the comments on long turns — ' +
+        'messages about questions, errors and finished turns stay. Both settings live in ' +
+        'this browser, not in the Claude Code files. “Hide Decky” in the summary does the ' +
+        'same as the first toggle.',
+      quietTitle: 'When Decky stays quiet',
+      quietText:
+        'An unprompted tip comes no sooner than three minutes after the panel opens and no ' +
+        'more often than once every nine minutes. And never while someone waits for an ' +
+        'answer or something has failed, the summary is open, you are typing or the tab is ' +
+        'hidden. “Reduce motion” stops its animation.',
+    },
   },
 
   shots: {
+    mascot: {
+      '01-ask':
+        'Decky at the bottom of the sidebar: a conversation is waiting, a remark with an “Open the chat” button',
+      '02-panel':
+        'The summary on click: the waiting conversation in the list, a tip and “Another tip” below',
+      '03-chat': 'An empty chat: Decky says hello and gives a chat tip',
+      '04-settings': 'The “Mascot” card in General: “Show Decky” and “Remarks and tips”',
+    },
     'global-layer': {
       '01-verdict':
         'Comparing the real copies: the global layer is better on secrets and debug leftovers, the other sieves are equal',

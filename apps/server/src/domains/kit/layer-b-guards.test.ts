@@ -237,6 +237,64 @@ describe('bg-wait-guard: сон и ls отчёта агента, пока он �
   });
 });
 
+describe('bg-wait-guard: группа разделения не снимает отказ повтором (E6)', () => {
+  // Замер 29.09–20.10: 2.3 ч таких циклов в деревьях разделения — лог своего фонового гейта,
+  // отказ снимался повтором той же команды. Панель сама будит прогон результатом команды.
+  const poll =
+    'for i in $(seq 1 115); do grep -q "^EXIT" .agent/tmp/gate2.log && break; sleep 5; done; tail -40 .agent/tmp/gate2.log';
+  const gate = [
+    say('доведи до конца'),
+    use(
+      'Bash',
+      { command: 'pnpm gate > .agent/tmp/gate2.log 2>&1', run_in_background: true },
+      'g1',
+    ),
+    result('g1', 'Command running in background with ID: bgate1. Output is being written to: …'),
+  ];
+  const refusedAfter = (launch: object[], command = poll) => [
+    ...launch,
+    use('Bash', { command }, 'p1'),
+    result('p1', '[ctx-guard] bg-wait-guard: …', true),
+  ];
+  const inSplit = <T>(fn: () => T): T => {
+    process.env.AGENTDECK_SPLIT_CHILD = '1';
+    try {
+      return fn();
+    } finally {
+      delete process.env.AGENTDECK_SPLIT_CHILD;
+    }
+  };
+
+  it('лог своего фонового гейта: вне группы повтор проходит, в группе — снова отказ', () => {
+    expect(pre('Bash', { command: poll }, refusedAfter(gate))).toBe('');
+    expect(inSplit(() => pre('Bash', { command: poll }, refusedAfter(gate)))).toMatch(
+      /split-group run[\s\S]*End the turn/,
+    );
+  });
+
+  // Ревью 20.10: отказ без выхода ловил любое ожидание — и файл чужого процесса, и готовность
+  // сервера. Их не разбудит ничто, а закончивший ход ребёнок считается закончившим группу.
+  it('в группе ожидание не своей фоновой команды снимается повтором', () => {
+    const foreign = refusedAfter([say('доведи до конца')]);
+    expect(inSplit(() => pre('Bash', { command: poll }, foreign))).toBe('');
+    const presence = 'for i in {1..40}; do [ -f out/build.log ] && break; sleep 3; done';
+    expect(inSplit(() => pre('Bash', { command: presence }, [say('собери')]))).toMatch(
+      /Repeat this exact call/,
+    );
+  });
+
+  it('в группе ожидание сервера опросом и по логу готовности остаётся разрешённым', () => {
+    const start = [say('подними стенд')];
+    for (const command of [
+      'until curl -s localhost:3000; do sleep 2; done; tail -5 server.log',
+      'until grep -q "Local:" .agent/tmp/latest.log; do sleep 1; done',
+      'for i in $(seq 1 30); do grep -q healthy .agent/tmp/healthcheck.log && break; sleep 2; done',
+    ]) {
+      expect(inSplit(() => pre('Bash', { command }, start))).toBe('');
+    }
+  });
+});
+
 describe('review-report: один отказ — полный список', () => {
   const load = async () =>
     (await import(

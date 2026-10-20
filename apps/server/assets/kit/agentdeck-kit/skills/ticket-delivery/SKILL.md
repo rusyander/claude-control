@@ -1,6 +1,6 @@
 ---
 name: ticket-delivery
-description: "Use when a ticket or task is handed over to deliver end to end — claim, fix, one deep review, live run, one gate, MR: 'take this ticket', 'do PROJ-123'."
+description: 'v1 delivery conveyor, superseded by ticket-delivery-2 — only when a panel group or the user names ticket-delivery v1.'
 ---
 
 # Ticket → an MR that is ready to merge

@@ -139,7 +139,7 @@ describe('строка инициатив для прогона', () => {
     expect(line).toContain('enabled delivery up to an MR on this project');
     expect(line).toContain('`acme-ticket-delivery`');
     // Старшинство (владелец 20.10): стадии ведёт общий навык, проектный — только факты.
-    expect(line).toContain('with the global task delivery skill `ticket-delivery`');
+    expect(line).toContain('with the global task delivery skill `ticket-delivery-2`');
     expect(line).toContain('`acme-ticket-delivery` does not drive the stages');
     expect(line).not.toContain('with the project skill');
     expect(line).toContain('code-change task');
@@ -150,7 +150,7 @@ describe('строка инициатив для прогона', () => {
     // Чужому CLI — без AskUserQuestion, но строка доезжает.
     const foreign = chatDeliveryPrompt({ foreign: true });
     expect(foreign).not.toContain('AskUserQuestion');
-    expect(foreign).toContain('`ticket-delivery`');
+    expect(foreign).toContain('`ticket-delivery-2`');
     expect(initiativePrompt(settings, { foreign: true, delivery: foreign })).toContain(foreign);
   });
 

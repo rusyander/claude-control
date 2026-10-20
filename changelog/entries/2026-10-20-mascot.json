@@ -1,0 +1,44 @@
+{
+  "title": {
+    "ru": "Дека — маскот панели: сводка по агентам и реплики о вопросах и готовых ходах",
+    "en": "Decky, the panel mascot: an agent summary and remarks about questions and finished turns"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Внизу боковой панели появился Дека — ожившая эмблема панели. По его виду и строке под ним понятно, что делают агенты: работают, ждут ответа, упали или всё спокойно. Разговор, который ждёт ответа, ошибка или закончившийся ход — повод для короткой реплики с кнопкой «Открыть чат». После пяти минут без действий Дека засыпает.",
+        "en": "Decky, the panel mark come alive, now sits at the bottom of the sidebar. Its look and the line next to it show what the agents are doing: working, waiting for an answer, failed or all quiet. A conversation waiting for an answer, an error or a finished turn gets a short remark with an «Open the chat» button. After five idle minutes Decky falls asleep."
+      },
+      "how": {
+        "ru": "Дека на виду всё время, поэтому в покое он неподвижен: время от времени моргает, оглядывается или подпрыгивает и снова замирает. Каждая подвижная часть — отдельный слой, браузер двигает её без перерисовки страницы; между движениями панель не тратит на Деку ни кадра.",
+        "en": "Decky is always on screen, so at rest it stands still: now and then it blinks, looks around or hops, then freezes again. Every moving part is its own layer that the browser moves without repainting the page; between moves the panel spends no frames on Decky."
+      },
+      "area": { "ru": "Панель", "en": "Panel" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Клик по Деке открывает сводку: кто ждёт ответа, у кого ошибка, кто работает — строка ведёт в разговор. Там же совет о возможностях панели. Советы по своей инициативе приходят редко и никогда, пока кто-то ждёт ответа или вы печатаете.",
+        "en": "Clicking Decky opens a summary: who is waiting for an answer, who failed, who is working — each row leads to the conversation. A tip about panel features sits there too. Unprompted tips are rare and never come while someone waits for an answer or you are typing."
+      },
+      "area": { "ru": "Панель", "en": "Panel" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Дека здоровается в пустом чате, появляется рядом с таймером на ходу дольше 20 секунд и встречает на страницах «не найдено» и «сбой раздела».",
+        "en": "Decky greets you in an empty chat, appears next to the timer on turns longer than 20 seconds and shows up on the «not found» and «section crashed» pages."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "«Настройки → Общие → Маскот»: «Показывать Деку» и «Реплики и советы». Настройки хранятся в браузере; «Меньше движения» останавливает анимацию. Справка — раздел «Дека» в документе «Настройки».",
+        "en": "«Settings → General → Mascot»: «Show Decky» and «Remarks and tips». Both live in the browser; «Reduce motion» stops the animation. Help covers it in the «Decky» section of the Settings document."
+      },
+      "area": { "ru": "Настройки", "en": "Settings" }
+    }
+  ]
+}

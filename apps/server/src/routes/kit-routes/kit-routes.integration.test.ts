@@ -92,7 +92,7 @@ describe('набор панели по настоящему сокету', () =>
   it('GET /api/kit — элементы, режимы и конфликт с навыком человека', async () => {
     const { status, body } = await api<KitResponse>('GET', '/api/kit');
     expect(status).toBe(200);
-    expect(body.version).toBe('1.2.0');
+    expect(body.version).toBe('1.3.0');
     expect(body.items.map((item) => item.id)).toEqual(
       kitFiles(builtinKitDir()).map((file) => file.id),
     );

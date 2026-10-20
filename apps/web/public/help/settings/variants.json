@@ -265,6 +265,94 @@
         "height": 639
       }
     },
+    "mascot/01-ask": {
+      "light-ru": {
+        "file": "01-ask.png",
+        "width": 1180,
+        "height": 720
+      },
+      "light-en": {
+        "file": "01-ask.en.png",
+        "width": 1180,
+        "height": 720
+      },
+      "dark-ru": {
+        "file": "01-ask.dark.png",
+        "width": 1180,
+        "height": 720
+      },
+      "dark-en": {
+        "file": "01-ask.dark.en.png",
+        "width": 1180,
+        "height": 720
+      }
+    },
+    "mascot/02-panel": {
+      "light-ru": {
+        "file": "02-panel.png",
+        "width": 1180,
+        "height": 720
+      },
+      "light-en": {
+        "file": "02-panel.en.png",
+        "width": 1180,
+        "height": 720
+      },
+      "dark-ru": {
+        "file": "02-panel.dark.png",
+        "width": 1180,
+        "height": 720
+      },
+      "dark-en": {
+        "file": "02-panel.dark.en.png",
+        "width": 1180,
+        "height": 720
+      }
+    },
+    "mascot/03-chat": {
+      "light-ru": {
+        "file": "03-chat.png",
+        "width": 584,
+        "height": 207
+      },
+      "light-en": {
+        "file": "03-chat.en.png",
+        "width": 584,
+        "height": 248
+      },
+      "dark-ru": {
+        "file": "03-chat.dark.png",
+        "width": 584,
+        "height": 248
+      },
+      "dark-en": {
+        "file": "03-chat.dark.en.png",
+        "width": 584,
+        "height": 248
+      }
+    },
+    "mascot/04-settings": {
+      "light-ru": {
+        "file": "04-settings.png",
+        "width": 896,
+        "height": 249
+      },
+      "light-en": {
+        "file": "04-settings.en.png",
+        "width": 896,
+        "height": 249
+      },
+      "dark-ru": {
+        "file": "04-settings.dark.png",
+        "width": 896,
+        "height": 249
+      },
+      "dark-en": {
+        "file": "04-settings.dark.en.png",
+        "width": 896,
+        "height": 249
+      }
+    },
     "safety/01-safety": {
       "light-ru": {
         "file": "01-safety.png",

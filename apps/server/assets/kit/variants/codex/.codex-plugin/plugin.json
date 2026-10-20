@@ -1,6 +1,6 @@
 {
   "name": "agentdeck-kit",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "agentdeck built-in kit: rules, skills, pipeline commands and safety hooks for coding agents",
   "hooks": "./hooks/hooks.codex.json"
 }

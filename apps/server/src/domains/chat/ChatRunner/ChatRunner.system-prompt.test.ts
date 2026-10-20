@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { UNUSED_HEAVY_TOOLS } from '../initiative/initiative.ts';
 
 /**
  * Дописка к системному промпту не имеет права ехать через командную строку
@@ -333,7 +334,7 @@ describe('ChatRun: прогон ребёнка разделения', () => {
 });
 
 describe('ChatRun: облегчённый набор инструментов (chatLeanTools)', () => {
-  const lean = () => ['Artifact', 'Workflow'] as const;
+  const lean = () => UNUSED_HEAVY_TOOLS;
 
   it('обычный разговор запускается без тяжёлых схем', async () => {
     const call = await viaRegistry(['other'], 'new-1', undefined, undefined, 'задача', lean);
@@ -341,6 +342,7 @@ describe('ChatRun: облегчённый набор инструментов (c
     expect(call.args[call.args.indexOf('--disallowedTools') + 1]?.split(',')).toEqual([
       'Artifact',
       'Workflow',
+      'ScheduleWakeup',
     ]);
   });
 
@@ -354,6 +356,7 @@ describe('ChatRun: облегчённый набор инструментов (c
       'ListAgents',
       'Artifact',
       'Workflow',
+      'ScheduleWakeup',
     ]);
   });
 

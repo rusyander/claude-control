@@ -2,6 +2,8 @@ import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { AppSettings, Overview, ProviderDetectResponse } from '@agentdeck/contracts';
+import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
+import { GROUP_WATCH_DEFAULTS } from '@agentdeck/contracts/group-watch';
 import {
   settingsPatchSchema,
   importStateSchema,
@@ -40,6 +42,7 @@ import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { migrateLegacyIntegrations } from '@agentdeck/contracts/integrations-legacy';
 import type { CredentialsLookup } from '../../lib/credentials/credentials.ts';
 import { machineId, machineName } from '../../lib/machine-identity/machine-identity.ts';
+import { compactWindowOf } from '../../domains/chat/group-profile/group-profile.ts';
 
 /** Источник доступа и причина с кодом — без самого токена. */
 function credentialsReply(found: CredentialsLookup) {
@@ -158,6 +161,9 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     // узнаёт её по номеру, даже когда адрес сменился.
     machineName: machineName(),
     machineId: machineId(),
+    // Переменная панели сильнее рычага порога сжатия групп (F-19 ревью П1): без
+    // этого поля карточка показывала выбранный порог, а группы шли с другим.
+    groupCompactWindowEnv: compactWindowOf(process.env.AGENTDECK_GROUP_COMPACT_WINDOW) ?? null,
   }));
 
   app.patch<{ Body: unknown }>('/api/settings', (request, reply) => {
@@ -192,7 +198,8 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       });
     }
 
-    const { claudeDirOverride, ...patch }: Partial<AppSettings> = parsed.data;
+    const { claudeDirOverride, groupEconomy, groupWatch, ...rest } = parsed.data;
+    const patch: Partial<AppSettings> = { ...rest };
     // Контур, приехавший с панели ДО Т3, поля потребителей не знает, а схема
     // подставила ему пустой список — то есть «никуда не подключён». Возвращаем
     // прежнее поведение по сырому телу, пока ещё видно, было поле или нет.
@@ -222,6 +229,15 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
       }
       ctx.rememberDirOverride(claudeDirOverride);
       if (result.isValid) afterRelocate(app, ctx);
+    }
+    // Блоки экономии и сторожа групп приходят изменёнными ключами — сливаем с
+    // сохранённым. После переезда: сохранённое — в хранилище нового каталога.
+    const saved = ctx.store.getSettings();
+    if (groupEconomy) {
+      patch.groupEconomy = { ...GROUP_ECONOMY_DEFAULTS, ...saved.groupEconomy, ...groupEconomy };
+    }
+    if (groupWatch) {
+      patch.groupWatch = { ...GROUP_WATCH_DEFAULTS, ...saved.groupWatch, ...groupWatch };
     }
     const settings = ctx.store.updateSettings(patch);
     // Глубина ротации копий действует сразу для следующих записей.

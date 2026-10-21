@@ -96,11 +96,15 @@ function groupRow(
   const ordered = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const last = ordered.at(-1);
   if (!last) return undefined;
-  const isRunning = ordered.some((chat) =>
-    runs.some(
-      (run) => (run.id === chat.id || run.sessionId === chat.id) && run.status === 'running',
-    ),
+  const running = runs.filter(
+    (run) =>
+      run.status === 'running' &&
+      ordered.some((chat) => run.id === chat.id || run.sessionId === chat.id),
   );
+  const isRunning = running.length > 0;
+  // Свежий из идущих: «работает» считается с хода, а не с заведения цепочки.
+  const starts = running.flatMap((run) => (run.startedAt === undefined ? [] : [run.startedAt]));
+  const runStart = starts.length > 0 ? Math.max(...starts) : Number.NaN;
   // Прогон на запросе прав числится не «running», а «waiting» — без этого флага
   // индикатор группы прочёл бы его как «стоит» (19.10.2026).
   const awaitingPermission = ordered.some((chat) =>
@@ -130,6 +134,7 @@ function groupRow(
     // Ключ прогона сверяется дважды: разговор, заведённый панелью, живёт под
     // временным `new-…`, пока CLI не назовёт настоящий `sessionId`.
     isRunning,
+    ...(Number.isFinite(runStart) ? { runStartedAt: new Date(runStart).toISOString() } : {}),
     ...(awaitingPermission ? { awaitingPermission } : {}),
     // Звено спросило человека инструментом и стоит (Д16): из транскрипта, а не
     // из конвейера — вопрос бывает и у разговора, продолженного руками.

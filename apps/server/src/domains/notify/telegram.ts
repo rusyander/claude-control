@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import type { TelegramEvent, TelegramSettings } from '@agentdeck/contracts';
+import type { GroupSignalSeverity, GroupWatchRule } from '@agentdeck/contracts/group-watch';
 import type { RunNotice } from '../chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { describeFailure, failureCode, parseJson, sendRequest } from '../integrations/http/http.ts';
 import { unreachable } from '../integrations/errors.ts';
@@ -21,7 +22,12 @@ import type { CodedText } from '../../lib/server-text/server-text.ts';
  * единственное, чем сеть может помешать, — задержать ответ следующему запросу.
  */
 
-const API = 'https://api.telegram.org';
+/**
+ * Адрес Bot API. Переменная — шов проверок (`tools/qa/check-group-watch.mjs`
+ * поднимает свой приёмник на loopback): настоящий сервер Telegram проверка
+ * трогать не должна. Читается при каждой отправке.
+ */
+const apiBase = (): string => process.env.AGENTDECK_TELEGRAM_API || 'https://api.telegram.org';
 const SYSTEM = 'Telegram';
 
 /** Провал теста — повод, которого у push-уведомлений нет. */
@@ -123,10 +129,10 @@ export async function sendTelegramMessage(
   text: string,
 ): Promise<void> {
   const response = await sendRequest({
-    url: `${API}/bot${token}/sendMessage`,
+    url: `${apiBase()}/bot${token}/sendMessage`,
     // Токен бота — ЧАСТЬ АДРЕСА. Без этой подписи он уехал бы в подробность
     // отказа, а оттуда в ответ API и в журнал панели.
-    label: `${API}/bot<токен>/sendMessage`,
+    label: `${apiBase()}/bot<токен>/sendMessage`,
     method: 'POST',
     system: SYSTEM,
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -146,8 +152,8 @@ export async function sendTelegramMessage(
  */
 export async function telegramMe(token: string): Promise<string> {
   const response = await sendRequest({
-    url: `${API}/bot${token}/getMe`,
-    label: `${API}/bot<токен>/getMe`,
+    url: `${apiBase()}/bot${token}/getMe`,
+    label: `${apiBase()}/bot<токен>/getMe`,
     system: SYSTEM,
     headers: { Accept: 'application/json' },
   });
@@ -204,4 +210,83 @@ function safeCode(code: CodedText): CodedText {
 
 function safeDetail(text: string): string {
   return text.replace(/bot\d+:[\w-]+/g, 'bot<токен>').slice(0, 300);
+}
+
+/**
+ * Сигнал сторожа групп (фаза 2, W.5): «внимание» и «тревога» — правило, числа
+ * и имя папки проекта. Названия группы и текста вопроса здесь нет: это уже
+ * содержимое разговора, а наружу уходит только заголовок.
+ *
+ * Подписка у него своя (`groupWatch.telegram`), не список событий: сигнал —
+ * не событие прогона, и вебхук его не получает.
+ */
+export interface GroupSignalNotice {
+  rule: GroupWatchRule;
+  severity: GroupSignalSeverity;
+  numbers: Record<string, number>;
+  projectPath?: string;
+  stage?: string;
+}
+
+/** Короткое имя правила для строки в Telegram — только правила, что туда уходят. */
+const GROUP_SIGNAL_TITLES: Partial<Record<GroupWatchRule, string>> = {
+  R1: 'группа молчит',
+  R1b: 'вопрос ждёт ответа',
+  R2: 'кэш остыл, окно переписано',
+  R3: 'сжатия подряд',
+  R4: 'одна проверка по кругу',
+  R5: 'ревью на стадии работы',
+  R6: 'пуш или MR раньше звена доставки',
+  R9: 'пятичасовое окно к сбросу кончится',
+  R11: 'цикл опроса со сном',
+};
+
+/** Числа сигнала словами: человек читает строку, а не ключи кода. Неизвестный ключ — как есть. */
+const GROUP_SIGNAL_NUMBERS: Record<string, (value: number) => string> = {
+  idleMin: (value) => `без событий ${value} мин`,
+  waitMin: (value) => `ждёт ${value} мин`,
+  writeK: (value) => `переписано ${value}k токенов`,
+  gapMin: (value) => `перерыв ${value} мин`,
+  lostW: (value) => `потеря ≈${value} W`,
+  count: (value) => `сжатий за час: ${value}`,
+  runs: (value) => `запусков без правки: ${value}`,
+  spawns: (value) => `спавнов: ${value}`,
+  ops: (value) => `публикаций: ${value}`,
+  nowPct: (value) => `сейчас ${value} %`,
+  projectedPct: (value) => `к сбросу ≈${value} %`,
+  resetMin: (value) => `сброс через ${value} мин`,
+  polls: (value) => `циклов: ${value}`,
+};
+
+const STAGE_TITLES: Record<string, string> = {
+  work: 'работа',
+  review: 'ревью',
+  deliver: 'доставка',
+};
+
+export function composeGroupSignal(notice: GroupSignalNotice): string {
+  const project = notice.projectPath ? basename(notice.projectPath) : '';
+  const icon = notice.severity === 'alert' ? '⛔' : notice.severity === 'warn' ? '⚠️' : 'ℹ️';
+  const title = GROUP_SIGNAL_TITLES[notice.rule];
+  const numbers = Object.entries(notice.numbers)
+    .map(([key, value]) => GROUP_SIGNAL_NUMBERS[key]?.(value) ?? `${key} ${value}`)
+    .join(', ');
+  const stage = notice.stage ? `стадия «${STAGE_TITLES[notice.stage] ?? notice.stage}»` : '';
+  const details = [numbers, stage].filter(Boolean).join('; ');
+  return `${icon} ${notice.rule}${title ? ` ${title}` : ''}${details ? ` (${details})` : ''}${
+    project ? ` — ${project}` : ''
+  }`;
+}
+
+/** Отправитель сигналов сторожа: та же тишина без настройки, токена или чата. */
+export function createGroupSignalTelegram(deps: TelegramDeps): (notice: GroupSignalNotice) => void {
+  return (notice) => {
+    const settings = deps.settings();
+    if (!settings.enabled || !settings.chatId) return;
+    const token = deps.token();
+    if (!token) return;
+    void sendTelegramMessage(token, settings.chatId, composeGroupSignal(notice)).catch(
+      (error: unknown) => deps.onError?.(error),
+    );
+  };
 }

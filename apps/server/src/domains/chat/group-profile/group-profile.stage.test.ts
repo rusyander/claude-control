@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   GROUP_SKILLS,
   groupRunProfile,
+  mergeDeny,
   readOnlyMcpDeny,
   STAGE_SKILLS,
   stageSkills,
@@ -80,10 +81,14 @@ describe('MCP наружу только на чтение — звеньям п�
     const review = groupRunProfile({ ...input, stage: 'review' });
     const permissions = review.settings.permissions as { ask: string[]; deny?: string[] };
     expect(permissions.ask).toContain('mcp__gitlab-work');
-    expect(permissions.deny).toEqual(readOnlyMcpDeny(review.mcp.ids.map(byId), 'review'));
+    const kept = review.mcp.ids.map(byId);
+    expect(permissions.deny).toEqual([...readOnlyMcpDeny(kept, 'review'), ...mergeDeny(kept)]);
     expect(review.note).toContain('write tools are not in this run');
     const work = groupRunProfile({ ...input, stage: 'work' });
-    expect(work.settings.permissions).not.toHaveProperty('deny');
+    // У работы под запретом только слияние MR (F-13) — запись открыта.
+    expect((work.settings.permissions as { deny?: string[] }).deny).toEqual(
+      mergeDeny(work.mcp.ids.map(byId)),
+    );
     expect(work.note).not.toContain('write tools are not in this run');
   });
 });

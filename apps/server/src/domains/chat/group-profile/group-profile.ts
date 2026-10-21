@@ -59,10 +59,16 @@ export function mcpRole(entry: ProfileMcpEntry): McpRole {
  * Есть ли в задачах работа с макетом. Ссылка — наверняка; слова «макет»,
  * «дизайн», «вёрстка» — тоже: задача из трекера часто приходит ключом, а ссылка
  * на макет живёт в теле тикета, которого здесь нет. Лишний сервер макетов стоит
- * десяток имён, потерянный макет — переделку.
+ * десяток имён, потерянный макет — переделку. Английские слова ищутся только
+ * в прозе: путь `app/layouts/MainLayout` в задаче включал макеты группе без
+ * макета (живой прогон 20.10 — +16 описаний навыков плагина в каждом вызове).
+ * Путь — слово со слэшем или с точкой ПЕРЕД буквой (`design.tokens`); точка в
+ * конце фразы — пунктуация: «Fix the layout.» — дизайн-задача, не путь.
  */
 export function needsDesign(text: string): boolean {
-  return /figma\.com\/|макет|дизайн|в[её]рстк|mockup|design|layout|pixel/i.test(text);
+  if (/figma\.com\/|макет|дизайн|в[её]рстк/i.test(text)) return true;
+  const prose = text.replace(/\S*[/\\]\S*|\S*\.\w\S*|\b\w*[a-z][A-Z]\w*\b/g, ' ');
+  return /\b(?:mock-?ups?|designs?|layouts?|pixel)\b/i.test(prose);
 }
 
 /**
@@ -286,12 +292,19 @@ const IDLE_BUNDLED = [
   'init',
 ];
 
+/** Звенья, которым макет не нужен и при макете в задачах: коммит, пуш, MR. */
+const DESIGN_IDLE: ReadonlySet<CascadeStage | undefined> = new Set(['deliver', 'push']);
+
 /**
  * Перечень навыков группы. Навыку вне группы остаётся ИМЯ (`name-only`), а не
  * выключение: агент по-прежнему может его вызвать — описание есть у
  * маршрутизатора `skill-map`, — а платит каждый вызов только за имя. Навыки
  * проекта не трогаются вовсе: их поставил сам репозиторий. Плагин макетов без
- * макета в задачах и плагин-мессенджер выключаются на этот прогон.
+ * макета в задачах и плагин-мессенджер выключаются на этот прогон. Плагин
+ * макетов выключается и в доставке: коммиту и MR макет не нужен, а `name-only`
+ * навыкам плагина CLI не применяет ни по голому, ни по полному имени
+ * (замерено 2.1.x: свой навык теряет описание, навык плагина — нет), так что
+ * его описания (~6 тыс. знаков) уходят только вместе с плагином.
  */
 export function skillSettings(
   skills: SkillScopeInput,
@@ -306,7 +319,7 @@ export function skillSettings(
   );
   const offPlugins = skills.plugins.filter((plugin) => {
     const role = mcpRole({ id: plugin, config: {} });
-    return role === 'messenger' || (role === 'design' && !design);
+    return role === 'messenger' || (role === 'design' && (!design || DESIGN_IDLE.has(stage)));
   });
   return {
     skillOverrides: overrides,
@@ -324,6 +337,134 @@ function wantsConnectors(extra: readonly string[]): boolean {
 /** Переменная CLI (2.1.286): окно автосжатия, сильнее настройки `autoCompactWindow`. */
 const COMPACT_WINDOW_ENV = 'CLAUDE_CODE_AUTO_COMPACT_WINDOW';
 /**
+ * Рычаги экономии (CLI 2.1.286, имена из самого CLI). Потолок чтения и срок кэша —
+ * в `--settings`: так они сильнее того же ключа в личном settings.json, как потолок
+ * Bash. Отвязка от IDE — окружением процесса: CLI смотрит её первой, до настроек.
+ */
+const READ_MAX_TOKENS_ENV = 'CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS';
+const CACHE_TTL_ENV = 'CLAUDE_CODE_PROMPT_CACHE_TTL';
+const AUTO_CONNECT_IDE_ENV = 'CLAUDE_CODE_AUTO_CONNECT_IDE';
+/**
+ * Напоминание «человек давно тебя не слышал» (CLI 2.1.286): после пяти ходов без
+ * текста CLI дописывает его в каждый запрос, и модель тратит ход на отчёт, которого
+ * в стадии никто не читает. Значение переменной сильнее способности модели (замер
+ * 21.10: со способностью включено, `0` убирает) — поэтому окружением процесса.
+ */
+const SILENT_TURN_REMINDER_ENV = 'CLAUDE_CODE_SILENT_TURN_REMINDER';
+
+/**
+ * Привычки, которые удешевляют каждый следующий вызов (замер 20.10): окно
+ * перечитывается целиком на каждом шаге, поэтому цепочка одиночных чтений и
+ * чужой код, прочитанный ради поиска, оплачиваются десятки раз. Подагентов
+ * строка не советует (F-10): их запуск — по согласию человека (директива L9),
+ * а промпт подагента без меток хука `agent-prompt-guard` отклоняется — каждый
+ * первый вызов оплачивался бы отказом и повтором.
+ */
+const WORK_HABITS_NOTE =
+  'Economy (the human enabled it in the panel; every call re-sends this whole conversation): ' +
+  'put independent reads and commands into one step — parallel tool calls or one `a; b; c` ' +
+  'command — instead of a chain of single calls; read only what you will edit or judge. Keep ' +
+  'output narrow: grep, line ranges, `git diff --stat` before a full diff. Work from the copy ' +
+  'root with relative paths; do not `cd` — every directory change adds an environment note to ' +
+  'the conversation.';
+
+/**
+ * Навыки ревью, которые звено работы или правок звало у себя (директива L3):
+ * за ним конвейер всё равно заведёт ревью на потолке — проход внутри звена
+ * оплачивался второй раз, на модели слабее той, что его повторит.
+ */
+export const REVIEW_SKILLS: readonly string[] = ['deep-review', 'style-conformance-review'];
+
+/** Инструмент подагентов CLI: правило без скобок снимает его из запроса целиком. */
+export const REVIEW_AGENT_DENY = 'Agent';
+
+/**
+ * Публикация, которую делает звено доставки (L3). Коммит не запрещён: дельту
+ * ревью и доставку считают по коммитам ветки. Правило `deny` старше `ask`
+ * брокера — пуш до доставки не доходит до карточки вовсе.
+ */
+export const DELIVERY_BASH_DENY: readonly string[] = [
+  'Bash(git push*)',
+  'Bash(git -C * push*)',
+  'Bash(gh pr create*)',
+  'Bash(glab mr create*)',
+];
+
+/** Инструменты MCP хранилища кода, которыми открывают MR / PR. */
+const FORGE_OPEN_TOOLS = ['create_merge_request', 'create_pull_request'];
+
+/** Инструменты MCP хранилища кода, которыми сливают MR / PR. */
+const FORGE_MERGE_TOOLS = ['merge_merge_request', 'merge_pull_request'];
+
+/** MCP-инструменты серверов наружу с этими именами — в форме правила CLI. */
+function outwardTools(kept: readonly ProfileMcpEntry[], tools: readonly string[]): string[] {
+  return kept
+    .filter((entry) => OUTWARD_ROLES.has(mcpRole(entry)))
+    .flatMap((entry) => tools.map((tool) => `mcp__${cliServerName(entry.id)}__${tool}`));
+}
+
+/**
+ * Слияние MR — в каждом звене группы под `deny` (F-13): слияние запрещено
+ * политикой владельца всегда, а держалось только на `ask` брокера, то есть на
+ * одной карточке, которую человек мог подтвердить по ошибке.
+ */
+export function mergeDeny(kept: readonly ProfileMcpEntry[]): string[] {
+  return outwardTools(kept, FORGE_MERGE_TOOLS);
+}
+
+/**
+ * Чего звену не делать: за ним идут ревью и/или доставка; иначе пусто. Перед
+ * ревью закрыт и `Agent` (F-09): ревью-полоса подагентом — тот же второй проход,
+ * что и навык ревью, а без человека подагентов звену звать не с чьего согласия
+ * (директива L9).
+ */
+export function aheadDeny(
+  kept: readonly ProfileMcpEntry[],
+  ahead: GroupProfileInput['ahead'],
+): string[] {
+  const review = ahead?.review
+    ? [...REVIEW_SKILLS.map((name) => `Skill(${name})`), REVIEW_AGENT_DENY]
+    : [];
+  // Все серверы наружу, не только опознанные хранилищем кода: имя открытия MR
+  // бывает только у форджа, а сервер «трекер + форж» опознаётся трекером.
+  const deliver = ahead?.deliver
+    ? [...DELIVERY_BASH_DENY, ...outwardTools(kept, FORGE_OPEN_TOOLS)]
+    : [];
+  return [...review, ...deliver];
+}
+
+/**
+ * Перечень навыков звена (1.3) с навыками ревью, выключенными перед ревью (L3):
+ * `deny` на `Skill(…)` в 2.1.286 лишь отказывает вызову, а описание остаётся в
+ * каждом запросе — `off` снимает его из перечня (замер `check-run-layers.mjs`).
+ */
+function skillsWithAhead(input: GroupProfileInput): Record<string, unknown> {
+  const base = input.skills
+    ? skillSettings(input.skills, needsDesign(input.tasksText), input.stage)
+    : {};
+  if (!input.ahead?.review) return base;
+  const overrides = (base.skillOverrides ?? {}) as Record<string, string>;
+  return {
+    ...base,
+    skillOverrides: {
+      ...overrides,
+      ...Object.fromEntries(REVIEW_SKILLS.map((name) => [name, 'off'])),
+    },
+  };
+}
+
+function aheadNote(ahead: GroupProfileInput['ahead']): string | undefined {
+  const parts = [
+    ...(ahead?.review
+      ? ['a review stage on the ceiling model reads this work — do not run a review pass here']
+      : []),
+    ...(ahead?.deliver
+      ? ['a delivery stage pushes the branch and opens the MR — commit, but do not push or open it']
+      : []),
+  ];
+  return parts.length > 0 ? `Later stages of this chain: ${parts.join('; ')}.` : undefined;
+}
+/**
  * Метка для хука конца хода блока «Тесты» (`tools/tests-hook.mjs`): автоматические
  * кейсы группа прогоняет один раз перед «доставлено» (`chat/tests-gate`), не в
  * конце каждого хода (решение владельца 19.10, пункт A).
@@ -331,6 +472,17 @@ const COMPACT_WINDOW_ENV = 'CLAUDE_CODE_AUTO_COMPACT_WINDOW';
 export const TESTS_RUNS_AT_DELIVERY_ENV = 'AGENTDECK_TESTS_RUNS_AT_DELIVERY';
 const COMPACT_WINDOW_MIN = 100_000;
 const COMPACT_WINDOW_MAX = 1_000_000;
+
+/**
+ * Окно сжатия групп: переменная панели `AGENTDECK_GROUP_COMPACT_WINDOW` (замер A/B
+ * на одном запуске) сильнее рычага на странице настроек; ноль там — окно человека.
+ */
+export function groupCompactWindow(
+  envRaw: string | undefined,
+  setting: number | undefined,
+): number | undefined {
+  return compactWindowOf(envRaw) ?? (setting ? compactWindowOf(String(setting)) : undefined);
+}
 
 /**
  * Окно автосжатия группы из настройки панели (2.1, рычаг A/B, по умолчанию выключен):
@@ -421,19 +573,41 @@ export const GROUP_DANGER_ASK: readonly string[] = [
   'Bash(curl *DELETE*)',
 ];
 
+/**
+ * Личные секции (память копии, каталог, git) — из системного промпта в первое
+ * сообщение (X1, CLI 2.1.286). Замер 22.10.2026 настоящим API, Opus 5.5, две
+ * копии одной группы подряд: второй старт читал из кэша 9 468 токенов без флага
+ * и 12 544 с ним при строке о тестах без путей (запись 18 110 → 14 860); один
+ * флаг без той строки не давал ничего. Дата и сведения о среде и без флага
+ * идут сообщением — системный промпт полночь не меняет. С `--system-prompt`
+ * (контур) CLI флаг не применяет.
+ */
+const SHARED_PREFIX_ARG = '--exclude-dynamic-system-prompt-sections';
+
 /** Профиль в виде, в каком его кладёт в запуск реестр прогонов. */
 export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
   const profile = groupMcpProfile(input);
   const connectors = wantsConnectors(input.extra);
   const outward = outwardAsk(profile.kept);
   const readOnly = readOnlyMcpDeny(profile.kept, input.stage);
+  const economy = input.economy;
+  const deny = [...readOnly, ...aheadDeny(profile.kept, input.ahead), ...mergeDeny(profile.kept)];
+  const ahead = aheadNote(input.ahead);
+  const notes = [
+    groupProfileNote(profile, connectors),
+    ...(readOnly.length > 0 ? [READ_ONLY_NOTE] : []),
+    ...(ahead ? [ahead] : []),
+    ...(economy?.workHabits ? [WORK_HABITS_NOTE] : []),
+  ];
   return {
-    args: ['--strict-mcp-config'],
+    args: ['--strict-mcp-config', SHARED_PREFIX_ARG],
     env: {
       ...(connectors ? {} : { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' }),
       [TESTS_RUNS_AT_DELIVERY_ENV]: '1',
       ...(input.compactWindow ? { [COMPACT_WINDOW_ENV]: String(input.compactWindow) } : {}),
       ...(input.heavyQueue ? { [HEAVY_QUEUE_ENV]: input.heavyQueue.dir } : {}),
+      ...(economy?.detachIde ? { [AUTO_CONNECT_IDE_ENV]: 'false' } : {}),
+      ...(economy?.workHabits ? { [SILENT_TURN_REMINDER_ENV]: '0' } : {}),
     },
     mcp: {
       ids: profile.kept.map((entry) => entry.id),
@@ -441,19 +615,23 @@ export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
         mcpServers: Object.fromEntries(profile.kept.map((entry) => [entry.id, entry.config])),
       },
     },
-    note:
-      readOnly.length > 0
-        ? `${groupProfileNote(profile, connectors)}\n${READ_ONLY_NOTE}`
-        : groupProfileNote(profile, connectors),
+    note: notes.join('\n'),
     settings: {
-      env: { [BASH_MAX_TIMEOUT_ENV]: String(bashCeilingMs(input.bashCeilings)) },
-      ...(input.skills
-        ? skillSettings(input.skills, needsDesign(input.tasksText), input.stage)
-        : {}),
+      env: {
+        [BASH_MAX_TIMEOUT_ENV]: String(bashCeilingMs(input.bashCeilings)),
+        ...(economy?.readOutputTokens
+          ? { [READ_MAX_TOKENS_ENV]: String(economy.readOutputTokens) }
+          : {}),
+        ...(economy?.cacheTtl ? { [CACHE_TTL_ENV]: economy.cacheTtl } : {}),
+      },
+      // Ключ настроек, а не `BASH_MAX_OUTPUT_LENGTH`: переменная в 2.1.286 задаёт
+      // лишь окно дочитывания, сколько ответа попадает в разговор — этот ключ.
+      ...(economy?.bashOutputChars ? { bashOutputMaxChars: economy.bashOutputChars } : {}),
+      ...skillsWithAhead(input),
       ...groupHooks(input),
       permissions: {
         ...outward.permissions,
-        ...(readOnly.length > 0 ? { deny: readOnly } : {}),
+        ...(deny.length > 0 ? { deny } : {}),
       },
     },
   };

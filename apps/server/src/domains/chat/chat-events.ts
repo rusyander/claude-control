@@ -33,7 +33,14 @@ export type ChatEvent =
    */
   | { kind: 'steer'; text: string; at: string }
   | { kind: 'thinking'; text: string }
-  | { kind: 'tool'; name: string; input: unknown; id: string }
+  | {
+      kind: 'tool';
+      name: string;
+      input: unknown;
+      id: string;
+      /** Вызов субагента (`parent_tool_use_id` строки): сторож не считает его ходом сессии. */
+      parent?: string;
+    }
   /**
    * Событие лимита подписки. `sample` — загрузка окон в момент события
    * (`unifiedWindows`); у CLI старше этого поля его нет, и прогон замеров не ставит.
@@ -96,7 +103,17 @@ export type ChatEvent =
    * карточку ничего не запустит. Живой ответ до результата не доживает —
    * брокер снимает запрос в момент клика, раньше, чем CLI исполнит вызов.
    */
-  | { kind: 'toolResult'; toolUseId: string }
+  | {
+      kind: 'toolResult';
+      toolUseId: string;
+      /** Знаков в ответе вызова — сторожу групп (размер подмеса в окно). */
+      chars?: number;
+    }
+  /**
+   * CLI сжал окно (`system/compact_boundary`) — ВНУТРЕННЕЕ событие сторожа групп
+   * (R3 «шторм сжатий»), в ленту не уходит. `preTokens` — окно до сжатия.
+   */
+  | { kind: 'compact'; trigger?: string; preTokens?: number }
   /**
    * Вопрос `AskUserQuestion` закрыт автономией чата: за человека взят вариант с
    * «(Recommended)». Узнаётся по результату вызова (`auto-pick.ts`), лента
@@ -170,6 +187,8 @@ export type ChatEvent =
        *   завела под ждущую сессию видимый прогон с карточкой (L6, живой прогон 14.10).
        * 'groupSameSession' — группа попросила продолжения, окно далеко от сжатия: ход идёт
        *   той же сессией, а не чистой (E1, 20.10).
+       * 'coldResume' — продолжение группы после паузы дольше срока кэша с окном от 85k: ход
+       *   пошёл новым разговором, а не перезаписью остывшего кэша (рычаг экономии, 21.10).
        */
       code:
         | 'adopted'
@@ -198,7 +217,8 @@ export type ChatEvent =
         | 'autoContinueSpent'
         | 'eventsTrimmed'
         | 'backgroundAsk'
-        | 'groupSameSession';
+        | 'groupSameSession'
+        | 'coldResume';
       text: string;
       /**
        * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод
@@ -358,4 +378,6 @@ export interface RawEvent {
   usage?: RawUsage;
   modelUsage?: Record<string, unknown>;
   hook_name?: string;
+  /** `system/compact_boundary`: чем вызвано сжатие и окно до него. */
+  compact_metadata?: { trigger?: string; pre_tokens?: number };
 }

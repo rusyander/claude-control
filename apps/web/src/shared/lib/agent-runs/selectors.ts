@@ -19,6 +19,12 @@ export interface ActiveRunView {
    */
   model?: string;
   /**
+   * Когда сервер завёл этот ход (мс). Хаб считает по нему «работает · 3 мин»:
+   * группа, продолженная через сутки, иначе «работала» с заведения цепочки
+   * (живой прогон 20.10: «работает · 21ч 09м» при часе работы).
+   */
+  startedAt?: number;
+  /**
    * Вызовы прогона. Нужны не только его собственной ленте: вопрос дочернего
    * чата (`AskUserQuestion`) показывается и в РОДИТЕЛЬСКОМ разговоре, чтобы
    * человек отвечал всем из одного места, а не обходил шесть чатов по кругу.
@@ -55,6 +61,7 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
       costUsd: run.costUsd,
       tokens: run.tokens,
       ...(run.model ? { model: run.model } : {}),
+      ...(run.startedAt !== undefined ? { startedAt: run.startedAt } : {}),
       // Вопросы носим только у тех, кто спрашивал: у остальных это лишний
       // массив на каждый пересчёт пульта агентов.
       ...(run.tools?.some(isOpenAsk) ? { tools: run.tools } : {}),

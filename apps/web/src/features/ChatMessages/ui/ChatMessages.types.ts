@@ -10,6 +10,7 @@ import type { ChildStageGroup } from './ChildStages.types';
 import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
 import type { BranchGateCardProps, PendingBranchGate } from './BranchGateCard.types';
 import type { ChildBranch } from './TaskSplitCard.types';
+import type { ChildQuestion } from './ChildQuestion.types';
 
 /**
  * Всё, что карточке продолжения нужно от страницы, одним объектом. Плоскими
@@ -40,26 +41,12 @@ export interface HandoffControls {
 export interface SplitDecision {
   startRuns: boolean;
   assignments?: Record<number, CascadeAssignment>;
+  /** «Доставка на Sonnet», тронутая человеком у группы: номер → да/нет. */
+  sonnetDeliver?: Record<number, boolean>;
 }
 
 /** Вопрос, заданный агентом дочернего разговора, и подпись, чей он. */
-export interface ChildQuestion {
-  /** Ключ прогона ребёнка — по нему уходит ответ. */
-  chatId: string;
-  /** Как назван этот чат в списке: человеку нужно понимать, кому он отвечает. */
-  title: string;
-  /** Тело вызова `AskUserQuestion` как есть — разбирает его карточка. */
-  input: string;
-  /** Идентификатор вызова: нужен только как ключ списка. */
-  toolUseId?: string;
-  /** Ребёнок ещё работает — ответ ему встанет в очередь, о чём карточка и скажет. */
-  isRunning?: boolean;
-  /**
-   * Вопрос задан ТЕКСТОМ, без `AskUserQuestion` (журнал 97 g7): хвост ответа
-   * ребёнка. Вариантов нет — карточка с полем ответа, `input` пустой.
-   */
-  text?: string;
-}
+export type { ChildQuestion };
 
 /** Запросы прав дочернего разговора и подпись, чей он. */
 export interface ChildPermission {

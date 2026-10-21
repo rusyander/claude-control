@@ -18,10 +18,14 @@ export interface TaskSplitCardProps {
    * подбора и действует в обе стороны, поэтому уезжает ОТДЕЛЬНО от предложения
    * агента, а не подмешивается в него (иначе просьбу модели и решение человека
    * на сервере было бы не различить).
+   *
+   * `sonnetDeliver` — «Доставка на Sonnet», тронутая человеком у группы: номер →
+   * да/нет. Нетронутые не едут — их доставку решит общий рычаг на момент доставки.
    */
   onSplit?: (options: {
     startRuns: boolean;
     assignments?: Record<number, CascadeAssignment>;
+    sonnetDeliver?: Record<number, boolean>;
   }) => void;
   /** Отказаться от разделения и продолжить в этом же разговоре. */
   onKeepHere?: () => void;

@@ -933,6 +933,20 @@ function runtimeLine(note: WorktreeRuntimeNote, modules: string[]): string {
 }
 
 /**
+ * Готовая установка — командой, только если та короткая. У монорепозитория команда
+ * склеена из цепочки на модуль (`[api] go mod download · [web] npm ci …`): у живой
+ * группы 20.10 — 2,4 тыс. знаков в каждом её вызове (замер B.1), а готовую
+ * установку группа не повторяет. Провал называет команду целиком — его решают повторить.
+ */
+const INSTALL_COMMAND_SHOWN = 200;
+
+function installedLine(command: string): string {
+  if (command.length <= INSTALL_COMMAND_SHOWN) return `dependencies installed with "${command}"`;
+  const steps = command.split(' · ').length;
+  return `dependencies installed by the project's copy preparation (${steps} steps)`;
+}
+
+/**
  * Преамбула задания для агента в копии: что панель уже сделала, чтобы первый
  * ход был по задаче, а не по «обживанию» копии.
  *
@@ -951,9 +965,7 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
   const done: string[] = [];
   if (input.mirror) done.push(input.mirror);
   const boot = input.bootstrap;
-  if (boot?.status === 'ok') {
-    done.push(`dependencies installed with "${boot.command}"`);
-  }
+  if (boot?.status === 'ok') done.push(installedLine(boot.command));
   if (boot?.reverted && boot.reverted.length > 0) {
     done.push(`lock files rewritten by the install were reverted: ${boot.reverted.join(', ')}`);
   }
@@ -1153,6 +1165,18 @@ export function reviewPackLine(command: string): string {
 }
 
 /**
+ * Кто ведёт стадии доставки группы. Старшинство (владелец 20.10): общий навык и
+ * навык панели главнее проектного — проектный навык доставки только источник
+ * фактов, иначе группа шла по устаревшему проектному конвейеру мимо уровней
+ * риска и экономии проверок. Отдельно — им же старые задания переводятся на
+ * новую схему (`stage-scheme.ts`).
+ */
+export const GROUP_DELIVERY_SKILL_CLAUSE =
+  "Take the group's tasks through the delivery skill the panel group names, else the global " +
+  '`ticket-delivery-2` (none — the same stages yourself; a project delivery skill only supplies ' +
+  'facts):';
+
+/**
  * Доставка группы до готового MR (настройка проекта `SplitSettings.deliver`).
  *
  * Конвейер доставки панель не повторяет: он уже есть навыком (`ticket-delivery-2`
@@ -1185,12 +1209,7 @@ export function deliveryPreamble(input: {
       'their permission to commit, push, create and update the MR and to move the tracker tasks of ' +
       'this group. Merging and deleting branches stay forbidden; so does force-push, except for the ' +
       'one case below about your own branch.',
-    // Старшинство (владелец 20.10): общий навык и навык панели главнее проектного —
-    // проектный навык доставки только источник фактов, стадии ведёт общий: иначе
-    // группа шла по устаревшему проектному конвейеру мимо уровней риска и экономии проверок.
-    "Take the group's tasks through the delivery skill the panel group names, else the global " +
-      '`ticket-delivery-2` (none — the same stages yourself; a project delivery skill only supplies ' +
-      'facts): tracker tasks into work on yourself, the ' +
+    `${GROUP_DELIVERY_SKILL_CLAUSE} tracker tasks into work on yourself, the ` +
       "change, the project's checks, commit, push, draft MR, review, live check, design comparison " +
       'if a mockup is attached to the task, fixing what was found, the MR description — and take the ' +
       'draft off when all is clean.',

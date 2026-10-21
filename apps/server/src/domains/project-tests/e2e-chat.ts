@@ -1,4 +1,5 @@
 import type { ProjectTestAutomationCommand, ProjectTestE2eFolder } from '@agentdeck/contracts';
+import { TESTS_PROJECT_ENV } from '@agentdeck/contracts/chat-group-settings';
 import { AUTOMATION_FILE } from './automation/automation.ts';
 import { CASE_STANDARD } from './case-standard.ts';
 import { TESTS_DIR } from './files.ts';
@@ -56,14 +57,19 @@ export function e2eChatLine(input: {
    * умеет всегда. Строка — без вопроса и без оговорки «не можешь — скажи».
    */
   group?: boolean;
+  /**
+   * Проект — из окружения прогона (`TESTS_PROJECT_ENV`, X1): строка без путей,
+   * одна на все копии группы, иначе путь копии делал системный промпт каждой
+   * копии своим и кэш начала запроса между ними не делился.
+   */
+  projectFromEnv?: boolean;
 }): string {
   const { root, folder, cliPath, automation } = input;
   const cli = `node "${cliPath}"`;
-  const folderReady =
-    folder.state !== 'missing' && folder.framework !== 'unknown' && folder.specs > 0;
-  if (automation && !folderReady) {
-    return ownCommandLine({ ...input, root: input.commandRoot ?? root }, automation, cli);
+  if (automation && !e2eFolderReady(folder)) {
+    return ownCommandLine({ ...input, root: e2eChatProjectRoot(input) }, automation, cli);
   }
+  const project = projectArg(root, input.projectFromEnv);
   const where =
     folder.dir && folder.state !== 'missing'
       ? `e2e folder "${folder.dir}" (${folder.framework}, ${folder.specs} spec files` +
@@ -75,6 +81,7 @@ export function e2eChatLine(input: {
           ' ("e2e/" with a Playwright config) or only in the checks the project already has';
   return [
     `QA workspace of this project (AgentDeck Tests section): ${where};`,
+    envProjectLine(input.projectFromEnv),
     `test cases live in ${TESTS_DIR}/<group>.tests.json and the panel shows them as groups.`,
     'When the task involves testing, write REAL e2e tests into that folder in its existing style:',
     // У pytest имя кейса — первая строка docstring: без этой подсказки тест
@@ -91,15 +98,50 @@ export function e2eChatLine(input: {
     'cover equivalence classes, boundaries, negative',
     'paths and state transitions, not only the happy path; keep lower-level checks in unit or',
     'integration tests.',
-    `Register them: ${cli} sync --project "${root}"; run them:`,
-    `${cli} run --project "${root}" --group <group>`,
+    `Register them: ${cli} sync${project}; run them:`,
+    `${cli} run${project} --group <group>`,
     "(it starts the folder's own runner from the right directory and imports only the report of",
     'THIS run, so results land on the cases; a runner is never installed on the fly — if it is',
     'missing, pass on the install command it prints). A red test is a finding to report, never a',
     'reason to weaken it.',
-    ownWorkLine(root, cli, input.group),
+    ownWorkLine(project, cli, input.group),
     askLine(input),
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** Папка e2e годится для прогона: есть, раннер узнан, спеки есть. */
+function e2eFolderReady(folder: ProjectTestE2eFolder): boolean {
+  return folder.state !== 'missing' && folder.framework !== 'unknown' && folder.specs > 0;
+}
+
+/**
+ * Проект, который называют команды строки: своя команда проекта гоняет код
+ * `commandRoot` (копии ветки), папка e2e — `root`. Им же панель заполняет
+ * `TESTS_PROJECT_ENV`, когда строка идёт без путей, — одно место решения.
+ */
+export function e2eChatProjectRoot(input: {
+  root: string;
+  commandRoot?: string;
+  folder: ProjectTestE2eFolder;
+  automation?: ProjectTestAutomationCommand;
+}): string {
+  return input.automation && !e2eFolderReady(input.folder)
+    ? (input.commandRoot ?? input.root)
+    : input.root;
+}
+
+/** ` --project "<root>"`, а при проекте из окружения — ничего. */
+function projectArg(root: string, fromEnv = false): string {
+  return fromEnv ? '' : ` --project "${root}"`;
+}
+
+function envProjectLine(fromEnv = false): string {
+  return fromEnv
+    ? `every tests-cli command below finds this project through ${TESTS_PROJECT_ENV}, set for this` +
+        ' run — run it from any directory and never add --project;'
+    : '';
 }
 
 /** Вопрос человеку в начале задачи; группе — откуда взять то же без вопроса. */
@@ -117,16 +159,16 @@ function askLine(input: {
  * Кейсы и записи на любой задаче, меняющей поведение продукта: агент ведёт блок
  * сам, а кейс человека правит только предложением (черновиком на приёмку).
  */
-function ownWorkLine(root: string, cli: string, group = false): string {
+function ownWorkLine(project: string, cli: string, group = false): string {
   return [
     'Beyond test tasks: whenever you change how the product behaves, keep this Tests section in',
     'step on your own — add or update the case that covers the change',
-    `(${cli} case --project "${root}" --group <group> --json`,
+    `(${cli} case${project} --group <group> --json`,
     '\'{"title":"…","steps":["…"],"expected":"…","codePaths":["<changed path>"]}\';',
     'pass "id" to update; a case a human wrote becomes a draft they accept).',
     CASE_STANDARD,
     'A manual case: record',
-    `what you actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
+    `what you actually verified (${cli} record${project} <group>:<case>=passed|failed|blocked`,
     '--note "<how you checked>"; it shows as checked by hand). An automated case is never recorded —',
     'record refuses it — run it as above. Never call the work tested without a recorded run.',
     group
@@ -152,27 +194,30 @@ function askOf(input: { hasStandUrl: boolean; folder?: ProjectTestE2eFolder }): 
 
 /** Строка для проекта со своей командой прогона и без папки с тестами. */
 function ownCommandLine(
-  input: { root: string; hasStandUrl: boolean; group?: boolean },
+  input: { root: string; hasStandUrl: boolean; group?: boolean; projectFromEnv?: boolean },
   automation: ProjectTestAutomationCommand,
   cli: string,
 ): string {
-  const { root } = input;
+  const project = projectArg(input.root, input.projectFromEnv);
   return [
     'QA workspace of this project (AgentDeck Tests section): the project runs its checks with',
     `its own command from ${TESTS_DIR}/${AUTOMATION_FILE}: "${automation.command}"`,
     '({files} = the files of the selected cases, or of every automated case; {paths} = the selected files, empty on a',
     'full run; {packages} = their Go packages, ./... on a full run; {report} and AGENTDECK_JUNIT_REPORT = the junit',
     `report path); test cases live in ${TESTS_DIR}/<group>.tests.json.`,
+    envProjectLine(input.projectFromEnv),
     'When the task involves testing, write checks the way this project already writes them —',
     'do NOT add a Playwright/Cypress folder of your own. Link every new or existing check to a',
     'case in the SAME pass: the case gets "automation": {"status": "automated", "file": "<path',
-    'from the project root>"} (plus "testName": the exact test name, for unit or integration',
-    'tests), and the test or its junit testcase is named "[<group>-NNN] <what it proves>" so',
+    'from the project root>"} (plus, for unit or integration tests, "testName": the full path',
+    '"outer describe > … > it"; a describe path covers every test under it), and the test or its junit testcase is named "[<group>-NNN] <what it proves>" so',
     'the report lands on that case; cover negative paths and boundaries, not only the happy path.',
-    `Run them: ${cli} run --project "${root}" [--group <group>]`,
+    `Run them: ${cli} run${project} [--group <group> | --case <group>:<id>,…]`,
     '(no --cmd: it runs the command above with the files of those cases and imports only the',
     'report of THIS run). A red check is a finding to report, never a reason to weaken it.',
-    ownWorkLine(root, cli, input.group),
+    ownWorkLine(project, cli, input.group),
     askLine(input),
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }

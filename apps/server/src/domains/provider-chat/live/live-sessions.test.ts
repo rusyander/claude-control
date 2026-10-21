@@ -287,3 +287,81 @@ describe('goose: агент без loadSession', () => {
     }
   });
 });
+
+describe('qwen: режим одобрения сессии', () => {
+  // Qwen 0.25 без `approvalMode` открывает сессию в режиме `auto`: правка файла идёт
+  // без `permission_request` (живой прогон 21.10 на локальной модели). Панель обещает
+  // «спрашивать перед правками» — режим `default` обязан уходить и в новую, и в
+  // продолженную сессию, иначе вопрос человеку не придёт ни разу.
+  it('новая и продолженная сессии открываются в default — вопрос доходит до человека', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-live-session-qwen-mode-'));
+    const store = join(dir, 'store.json');
+    const asked: string[] = [];
+    try {
+      const run = (session: LiveTurnOptions['session']) =>
+        new QwenServeTurn({ mcpWaitMs: 0 }).run(
+          {
+            command: process.execPath,
+            prompt: FULL,
+            timeoutMs: 15_000,
+            workdir: dir,
+            env: { FAKE_MODE: 'permission', HOLD_MS: '5000', MCP_MS: '0', FAKE_STORE: store },
+            spawnImpl: spawnInto('fake-qwen-serve.mjs'),
+            permission: {
+              allowEdits: false,
+              ask: async (request) => (asked.push(request.requestId), 'allow'),
+            },
+            session,
+          },
+          () => {},
+        );
+      const first = await run({});
+      const second = await run({ resume: { id: 'ses-1', prompt: DELTA } });
+      const state = JSON.parse(readFileSync(store, 'utf8')) as Disk;
+
+      expect(first.kind === 'done' && first.reply).toContain('разрешение: proceed_once');
+      expect(second).toMatchObject({ kind: 'done', session: 'ses-1', resumed: true });
+      expect(second.kind === 'done' && second.reply).toContain('разрешение: proceed_once');
+      expect(asked).toEqual(['req-1', 'req-1']);
+      expect(state.log).toContain(`resume ses-1 cwd=${dir} mode=default`);
+    } finally {
+      await removeDir(dir);
+    }
+  });
+
+  // Живой прогон 21.10: на «нет» человека qwen 0.25 кончает ход без единого слова
+  // модели. Панель писала «CLI закончил ход без ответа» — свой же отказ человек
+  // читал как сбой CLI, а сессия оставалась на диске Qwen, хотя панель её бросала.
+  it('отказ человека при пустом ходе — ошибка с причиной, сессия удалена; «да» — обычный ответ', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-live-session-qwen-refuse-'));
+    const store = join(dir, 'store.json');
+    try {
+      const run = (decision: 'allow' | 'deny') =>
+        new QwenServeTurn({ mcpWaitMs: 0 }).run(
+          {
+            command: process.execPath,
+            prompt: FULL,
+            timeoutMs: 15_000,
+            workdir: dir,
+            env: { FAKE_MODE: 'refuse-silent', HOLD_MS: '5000', MCP_MS: '0', FAKE_STORE: store },
+            spawnImpl: spawnInto('fake-qwen-serve.mjs'),
+            permission: { allowEdits: false, ask: async () => decision },
+            session: {},
+          },
+          () => {},
+        );
+      const refused = await run('deny');
+      const disk = JSON.parse(readFileSync(store, 'utf8')) as Disk;
+      expect(refused).toEqual({
+        kind: 'error',
+        error: 'Qwen остановил ход после отказа в разрешении: edit notes.txt',
+      });
+      expect(disk.deleted).toEqual(['ses-1']);
+
+      const allowed = await run('allow');
+      expect(allowed).toMatchObject({ kind: 'done', reply: 'правка сделана', session: 'ses-2' });
+    } finally {
+      await removeDir(dir);
+    }
+  });
+});

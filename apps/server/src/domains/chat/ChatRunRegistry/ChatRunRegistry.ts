@@ -27,7 +27,7 @@ import {
 import type { BranchGateContext } from '../ChatBranchGate/ChatBranchGate.ts';
 import type { ClosingTurn } from '../ChatHistory/ChatHistory.ts';
 import { looksLikeCheck } from '../lowered-journal/lowered-journal.ts';
-import type { LimitRunRecord } from '../limit-journal/limit-journal.ts';
+import { withLimitSample, type LimitRunRecord } from '../limit-journal/limit-journal.ts';
 import { normalizePath } from '../../project-runner/targets.ts';
 import {
   adoptableEntries,
@@ -38,7 +38,7 @@ import {
   type LedgerRelay,
   type RunLedgerEntry,
 } from '../run-ledger/run-ledger.ts';
-import type { RunMeta } from './ChatRunRegistry.types.ts';
+import type { RunMeta, RunWatchFeed, RunWatchListener } from './ChatRunRegistry.types.ts';
 import {
   endRelayInput,
   ledgerRunMeta,
@@ -204,6 +204,16 @@ export interface RunSubscriber {
 export type { RunMeta };
 
 /**
+ * Решение о продолжении (`setContinuationPolicy`): нет ответа — старт как
+ * просили; есть — с этими параметрами и, если надо, заметкой человеку.
+ */
+export type ContinuationPolicy = (
+  keys: readonly string[],
+  options: RunOptions,
+  meta: RunMeta,
+) => { options: RunOptions; meta: RunMeta; notice?: ChatEvent } | undefined;
+
+/**
  * Минимум, что реестру нужно от прогона: запуститься с колбэком событий и уметь
  * остановиться. `ChatRun` этому соответствует; интерфейс нужен, чтобы в тестах
  * подставлять управляемый фейк вместо запуска настоящего CLI.
@@ -284,8 +294,10 @@ interface RegisteredRun {
   /** Текст последней ошибки и последний лимит хода — надзору повторов (Д10). */
   lastError?: string;
   limit?: { resetsAt: number; status: string };
-  /** Первый и последний замер загрузки окон подписки — журналу доли лимита. */
+  /** Различные замеры загрузки окон подписки (`withLimitSample`) — журналу доли лимита. */
   limitSamples?: LimitSample[];
+  /** Когда запись прогона в журнале лимита последний раз обновлялась посреди него. */
+  limitJournalAt?: number;
   /** Ход звал `AskUserQuestion` — см. `RunFinished.asked`. */
   asked?: boolean;
   /** Тела вызовов `AskUserQuestion` по id: по ним автовыбор узнаёт `critical`. */
@@ -391,6 +403,11 @@ export interface StepTokens {
 
 /** Сколько держать завершённый прогон в буфере — на догон при переподключении. */
 const GRACE_MS = 60_000;
+/**
+ * Как часто запись прогона в журнале лимита обновляется посреди него: файл
+ * читается и переписывается целиком, а событие лимита приходит на каждом ходе.
+ */
+const LIMIT_JOURNAL_EVERY_MS = 5 * 60_000;
 
 /**
  * Сколько последних символов ответа держим ради разбора блока продолжения.
@@ -571,6 +588,30 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Записать прогон в журнал лимита — посреди него (новый замер) и на конце.
+   * Ключ записи один на прогон, журнал заменяет прежнюю: конец не плодит вторую.
+   */
+  private writeLimitJournal(run: RegisteredRun, endedAt: number): void {
+    const samples = run.limitSamples ?? [];
+    if (!this.limitJournal || run.detached || (run.spentTokens <= 0 && samples.length === 0)) {
+      return;
+    }
+    try {
+      this.limitJournal({
+        id: `${run.chatId}:${run.startedAt}`,
+        chatId: run.chatId,
+        ...(run.sessionId ? { sessionId: run.sessionId } : {}),
+        startedAt: run.startedAt,
+        endedAt,
+        tokens: run.spentTokens,
+        samples,
+      });
+    } catch {
+      // Молча, как журнал понижений: наблюдение не держит прогон.
+    }
+  }
+
+  /**
    * «Что получил агент» (U8): вход каждого стартовавшего прогона — после
    * маршрута контура, сводки детей и всех дописок, то есть ровно то, что уедет
    * CLI. Куда писать, знает bootstrap, как и для журнала понижений.
@@ -637,6 +678,21 @@ export class ChatRunRegistry {
     this.onRunStart = listener;
   }
 
+  /** Сторож групп (`RunWatchFeed`): только наблюдает, его сбой прогон не трогает. */
+  private watch?: RunWatchListener;
+
+  setWatchListener(listener: RunWatchListener): void {
+    this.watch = listener;
+  }
+
+  private feedWatch(chatId: string, feed: RunWatchFeed): void {
+    try {
+      this.watch?.(chatId, feed);
+    } catch {
+      // Слушатель чужой: поток прогона обязан идти дальше.
+    }
+  }
+
   /**
    * Человек нажал «Стоп» в чате (журнал 89c). Слушатель — конвейер разделения:
    * остановленная группа встаёт на паузу, а не «сбоем», и место в очереди
@@ -694,6 +750,47 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Продолжать ли сессию на этом старте (F-05 ревью П1, директива §L4). Одна
+   * точка на ВСЕ продолжения — повтор после лимита, «Продолжить всё», ответ
+   * человека, отложенный старт, звенья: прежде правило знал только запуск
+   * стадий, и остальные пути продолжали остывший разговор, записывая всё окно в
+   * кэш заново. Решение — на момент запуска, а не на момент, когда старт отложили.
+   */
+  private continuationOf?: ContinuationPolicy;
+
+  setContinuationPolicy(policy: ContinuationPolicy): void {
+    this.continuationOf = policy;
+  }
+
+  /**
+   * Параметры этого старта после решения о продолжении. Ход, начатый самим CLI
+   * (`wake`/`hold`), — продолжение уже идущей сессии, его не переигрывают.
+   * Отметка `afterLimit` в запись прогона не попадает ни при каком ответе.
+   */
+  private continuation(
+    keys: readonly string[],
+    options: RunOptions,
+    askedMeta: RunMeta,
+  ): { options: RunOptions; meta: RunMeta; notice?: ChatEvent } {
+    const { afterLimit, ...meta } = askedMeta;
+    if (!options.sessionId || options.wake || options.hold || !this.continuationOf) {
+      return { options, meta };
+    }
+    try {
+      const decided = this.continuationOf(keys, options, {
+        ...meta,
+        ...(afterLimit ? { afterLimit } : {}),
+      });
+      if (!decided) return { options, meta };
+      const { afterLimit: _limit, ...decidedMeta } = decided.meta;
+      return { ...decided, meta: decidedMeta };
+    } catch {
+      // Решение не главнее хода: осечка чтения транскрипта оставляет продолжение.
+      return { options, meta };
+    }
+  }
+
+  /**
    * Автономен ли разговор (своё или от родителя, `chat-autonomy.ts`) —
    * спрашивается на КАЖДОМ старте (метка в окружении CLI) и на каждом вопросе
    * агента: выбор человека в меню действует со следующего же события.
@@ -728,6 +825,26 @@ export class ChatRunRegistry {
   /** `group` — прогон группы разделения: ей строка о тестах в своей редакции (1.4). */
   setWorkspaceNote(resolve: (cwd: string, run: { group: boolean }) => string | undefined): void {
     this.workspaceNoteOf = resolve;
+  }
+
+  /**
+   * Окружение группы к её строке о тестах без путей (X1): проект блока «Тесты»
+   * едет здесь, а не путём в системном промпте. Только ребёнку разделения.
+   */
+  private workspaceEnvOf?: (cwd: string) => Record<string, string> | undefined;
+
+  setWorkspaceEnv(resolve: (cwd: string) => Record<string, string> | undefined): void {
+    this.workspaceEnvOf = resolve;
+  }
+
+  /** Осечка решателя старт не срывает: без окружения tests-cli берёт текущий каталог. */
+  private workspaceEnv(cwd: string, child: boolean): Record<string, string> {
+    if (!child) return {};
+    try {
+      return this.workspaceEnvOf?.(cwd) ?? {};
+    } catch {
+      return {};
+    }
   }
 
   /** Строки о тестах по сессиям: системная — одна на сессию (E6). */
@@ -956,6 +1073,15 @@ export class ChatRunRegistry {
       ...(entry.relay?.background ? { ledgerBackground: entry.relay.background } : {}),
     };
     this.runs.set(entry.key, registered);
+    // Потока у такого прогона нет: сторож групп читает сессию из её транскрипта.
+    if (!live) {
+      this.feedWatch(entry.key, {
+        kind: 'start',
+        cwd: options.cwd,
+        detached: true,
+        ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
+      });
+    }
     if (entry.sessionId) {
       this.emit(registered, {
         kind: 'session',
@@ -1296,10 +1422,10 @@ export class ChatRunRegistry {
    * до транскрипта. Поэтому возвращаем признак: false — прогон уже идёт, промпт
    * НЕ принят, вызывающий обязан сказать об этом человеку.
    */
-  start(chatId: string, options: RunOptions, meta: RunMeta): boolean {
+  start(chatId: string, asked: RunOptions, askedMeta: RunMeta): boolean {
     // Ищем прогон по ОБОИМ написаниям ключа (см. resolveKey): иначе вторая
     // вкладка того же разговора заводила второй процесс мимо этой проверки.
-    const existingKey = this.resolveKey(chatId, meta.sessionId);
+    const existingKey = this.resolveKey(chatId, askedMeta.sessionId);
     const existing = this.runs.get(existingKey);
     if (existing && existing.status === 'running') return false;
     // Перезапуск поверх завершённого (повтор упавшего) — чистим старый буфер.
@@ -1315,10 +1441,19 @@ export class ChatRunRegistry {
       this.remove(existingKey);
     }
 
+    // Связи ищутся под ключами ПРОСИМОГО разговора: новая сессия вместо
+    // остывшей своего ключа ещё не имеет, а звено — то же.
+    const keys = askedMeta.sessionId ? [chatId, askedMeta.sessionId] : [chatId];
     // Сводка детей снимается до всего остального: под ней мог остаться блок
-    // перемены прошлой попытки, и снять его можно, только пока он стоит первым.
-    const said = withChildrenBrief(options.prompt, undefined);
-    const keys = meta.sessionId ? [chatId, meta.sessionId] : [chatId];
+    // перемены прошлой попытки, и снять его можно, только пока он стоит первым —
+    // то есть и до вводной нового разговора, которую решение ставит в начало.
+    const turn = this.continuation(
+      keys,
+      { ...asked, prompt: withChildrenBrief(asked.prompt, undefined) },
+      askedMeta,
+    );
+    const { options, meta } = turn;
+    const said = options.prompt;
     const child = this.childOf?.(keys) ?? false;
     const workspace = this.workspaceTurn(
       options.cwd,
@@ -1377,7 +1512,12 @@ export class ChatRunRegistry {
         ? { permissionMode: 'acceptEdits' }
         : {}),
       // Набор панели (В2) едет своим полем: и мимо контура, и поверх него.
-      platformEnv: { ...route.env, ...route.kit?.env, ...profile?.env },
+      platformEnv: {
+        ...route.env,
+        ...route.kit?.env,
+        ...profile?.env,
+        ...this.workspaceEnv(options.cwd, child),
+      },
       // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
       // после выключенной галочки, обязан вернуться к промпту CLI.
       platformSystemPrompt: route.systemPrompt ?? '',
@@ -1466,6 +1606,7 @@ export class ChatRunRegistry {
       workspace: workspace.state,
     };
     this.runs.set(chatId, registered);
+    this.feedWatch(chatId, { kind: 'start', sessionId: meta.sessionId, cwd: kept.cwd });
     try {
       this.onRunStart?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]);
     } catch {
@@ -1484,6 +1625,8 @@ export class ChatRunRegistry {
     } catch {
       // Группа не главнее разговора: осечка включения старт не срывает.
     }
+    // Человек видит, что остывший разговор не продолжен и почему (F-05).
+    if (turn.notice) this.emit(registered, turn.notice);
 
     // Отказанный контуром прогон не получил ничего — и записывать нечего.
     if (!route.refusal) {
@@ -1578,6 +1721,12 @@ export class ChatRunRegistry {
 
   /** Записать событие в буфер и разослать живым слушателям. */
   private emit(run: RegisteredRun, event: ChatEvent): void {
+    if (!run.detached) {
+      const sessionId = event.kind === 'session' ? event.sessionId : run.sessionId;
+      this.feedWatch(run.chatId, { kind: 'event', event, sessionId });
+    }
+    // Сжатие окна — только сторожу групп (R3), в ленту оно не идёт.
+    if (event.kind === 'compact') return;
     // Внутреннее событие: вкладкам и буферу его знать незачем.
     if (event.kind === 'toolResult') {
       run.toolResults = (run.toolResults ?? 0) + 1;
@@ -1617,11 +1766,15 @@ export class ChatRunRegistry {
       run.lastError = event.message;
     }
     if (event.kind === 'limit') run.limit = { resetsAt: event.resetsAt, status: event.status };
-    // Держим первый и последний замер: прирост между ними и есть трата прогона
-    // вместе с соседями; промежуточные деление не уточняют настолько, чтобы их копить.
+    // Различные замеры, и запись в журнале обновляется по ходу: доля на
+    // карточке не ждёт конца многочасового звена.
     if (event.kind === 'limit' && event.sample) {
-      const first = run.limitSamples?.[0];
-      run.limitSamples = first ? [first, event.sample] : [event.sample];
+      run.limitSamples = withLimitSample(run.limitSamples ?? [], event.sample);
+      const now = Date.now();
+      if (run.limitJournalAt === undefined || now - run.limitJournalAt >= LIMIT_JOURNAL_EVERY_MS) {
+        run.limitJournalAt = now;
+        this.writeLimitJournal(run, now);
+      }
     }
     // Вопрос, который автономия закроет сама (есть рекомендация на каждый), —
     // не ожидание человека: ни точки, ни пуша, ни записи для хаба. Но только
@@ -1942,22 +2095,8 @@ export class ChatRunRegistry {
       }
     }
 
-    const samples = run.limitSamples ?? [];
-    if (this.limitJournal && !run.detached && (run.spentTokens > 0 || samples.length > 0)) {
-      try {
-        this.limitJournal({
-          id: `${run.chatId}:${run.startedAt}`,
-          chatId: run.chatId,
-          ...(run.sessionId ? { sessionId: run.sessionId } : {}),
-          startedAt: run.startedAt,
-          endedAt: run.finishedAt ?? Date.now(),
-          tokens: run.spentTokens,
-          samples,
-        });
-      } catch {
-        // Молча, как журнал понижений: наблюдение не держит завершение прогона.
-      }
-    }
+    this.writeLimitJournal(run, run.finishedAt ?? Date.now());
+    this.feedWatch(run.chatId, { kind: 'finish', sessionId: run.sessionId });
 
     this.notify?.({
       kind: run.errored ? 'error' : 'done',
@@ -2047,7 +2186,11 @@ export class ChatRunRegistry {
       // прогон «идущим» навсегда, кнопка «Остановить» больше ничего бы не
       // делала, а `stopAll` при выходе панели споткнулся бы на первом же таком.
     }
-    if (run.status === 'running') run.status = 'stopped';
+    if (run.status === 'running') {
+      run.status = 'stopped';
+      // Конец хода сторожу: `finish` остановленного прогона уже ничего не скажет.
+      this.feedWatch(run.chatId, { kind: 'finish', sessionId: run.sessionId });
+    }
     for (const subscriber of run.subscribers) subscriber.close('stopped');
     this.remove(key);
     return 'stopped';

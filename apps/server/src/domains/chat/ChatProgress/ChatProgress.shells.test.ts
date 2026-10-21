@@ -507,6 +507,63 @@ describe('buildProgress — фон и текущий вызов', () => {
     });
   });
 
+  /**
+   * Живой прогон 20.10: у транскрипта в 6.8 МБ чтение взяло начало и хвост, и
+   * результат `jira_assign_issue` остался за границей начала. Вызов без ответа
+   * сутки числился текущим, пока группа гоняла Bash и правки.
+   */
+  describe('вызов прежнего ответа модели не текущий', () => {
+    const turn = (minute: number, id: string, blocks: unknown[]): TranscriptRecord =>
+      ({
+        type: 'assistant',
+        timestamp: at(minute),
+        message: { id, content: blocks },
+      }) as TranscriptRecord;
+    const jira = (id: string) => ({
+      type: 'tool_use',
+      name: 'mcp__tracker__jira_assign_issue',
+      id,
+      input: { issue_key: 'PROJ-1' },
+    });
+
+    it('результат пропал в середине файла — между вызовами текущего нет', () => {
+      const progress = buildProgress([
+        turn(1, 'msg_1', [jira('j1')]),
+        // …середина файла, где лежал результат j1, не прочитана…
+        turn(30, 'msg_9', [bash('b', 'node check-ticket.mjs')]),
+        user(31, [result('b', 'ok')]),
+        turn(32, 'msg_10', [{ type: 'text', text: 'Проверка прошла.' }]),
+      ]);
+
+      expect(progress.activeTool).toBeUndefined();
+    });
+
+    it('длинный Bash нового ответа — текущий, а не старый вызов', () => {
+      const progress = buildProgress([
+        turn(1, 'msg_1', [jira('j1')]),
+        turn(30, 'msg_9', [bash('b', 'node check-ticket.mjs', { description: 'Check ticket' })]),
+      ]);
+
+      expect(progress.activeTool).toEqual({
+        name: 'Bash',
+        summary: 'Check ticket',
+        startedAt: at(30),
+      });
+    });
+
+    it('параллельные вызовы одного ответа: результат одного не гасит другой', () => {
+      const progress = buildProgress([
+        turn(1, 'msg_1', [bash('a', 'pnpm test', { description: 'Run tests' })]),
+        turn(1, 'msg_1', [jira('j1')]),
+        user(2, [result('j1', 'ok')]),
+        turn(2, 'msg_1', [jira('j2')]),
+        user(3, [result('j2', 'ok')]),
+      ]);
+
+      expect(progress.activeTool).toMatchObject({ name: 'Bash', summary: 'Run tests' });
+    });
+  });
+
   it('все вызовы вернулись — текущего нет', () => {
     const progress = buildProgress([
       assistant(1, [bash('a', 'pnpm install')]),

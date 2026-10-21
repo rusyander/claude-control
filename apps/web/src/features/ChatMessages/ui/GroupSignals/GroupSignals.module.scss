@@ -1,0 +1,107 @@
+// Остров сторожа: цвет по самому важному активному сигналу. Без активных —
+// нейтральный, остаются только свёрнутые закрытые.
+.island {
+  margin-top: var(--spacing-2xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+.island-info {
+  border-color: color-mix(in srgb, var(--color-info) 40%, var(--color-border));
+  background: var(--color-info-subtle);
+}
+
+.island-warn {
+  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+  background: var(--color-warning-subtle);
+}
+
+.island-alert {
+  border-color: color-mix(in srgb, var(--color-danger) 50%, var(--color-border));
+  background: var(--color-danger-subtle);
+}
+
+.title {
+  display: block;
+  margin-bottom: var(--spacing-3xs);
+  font-weight: 600;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row + .row {
+  margin-top: var(--spacing-3xs);
+}
+
+.rowCleared {
+  opacity: 0.75;
+}
+
+.rowMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-2xs);
+}
+
+.badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-weight: 600;
+}
+
+.info {
+  color: var(--color-info);
+}
+
+.warn {
+  color: var(--color-warning);
+}
+
+.alert {
+  color: var(--color-danger);
+}
+
+.text {
+  flex: 1 1 16rem;
+  min-width: 0;
+  color: var(--color-fg);
+}
+
+.time {
+  flex: none;
+}
+
+.open {
+  flex: none;
+}
+
+.param {
+  overflow-wrap: anywhere;
+  padding-left: var(--spacing-xs);
+}
+
+.toggle {
+  margin-top: var(--spacing-3xs);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: underline dotted;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}

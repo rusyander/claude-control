@@ -445,13 +445,15 @@ describe('хаб разделения — индикатор группы', () =
     );
   }
 
-  it('идёт: полоса 7 из 14 — 50 %, «работает» со временем, вызов и его длительность', () => {
+  it('идёт: полоса 7 из 14 — 50 %, «работает» с начала хода, вызов и его длительность', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
-    const html = renderWith({ tasks: [], agents: [], steps, activeTool: bash }, [running('g0')]);
+    // Группа заведена в 10:00, идущий ход начался в 11:00 — время считается с хода.
+    const turn = { ...running('g0'), startedAt: Date.parse('2026-09-24T11:00:00.000Z') };
+    const html = renderWith({ tasks: [], agents: [], steps, activeTool: bash }, [turn]);
     expect(html).toContain('data-group-progress="working"');
     expect(html).toMatch(/role="progressbar"[^>]*aria-valuenow="50"/);
-    expect(textOf(html)).toContain('работает · 2ч 00м');
+    expect(textOf(html)).toContain('работает · 1ч 00м');
     expect(textOf(html)).toContain('7 из 14 · 50 %');
     expect(textOf(html)).toContain('Bash: pnpm test · 3м 00с');
   });

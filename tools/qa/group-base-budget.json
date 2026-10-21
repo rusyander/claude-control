@@ -1,0 +1,38 @@
+{
+  "cli": "2.1.282 (Claude Code)",
+  "slack": 2000,
+  "stages": {
+    "work": {
+      "total": 67907,
+      "system": 10926,
+      "tools": 24292,
+      "builtinTools": 24279,
+      "mcpTools": 0,
+      "messages": 31463
+    },
+    "review": {
+      "total": 67613,
+      "system": 11109,
+      "tools": 24292,
+      "builtinTools": 24279,
+      "mcpTools": 0,
+      "messages": 30992
+    },
+    "fix": {
+      "total": 67759,
+      "system": 10926,
+      "tools": 24292,
+      "builtinTools": 24279,
+      "mcpTools": 0,
+      "messages": 31315
+    },
+    "deliver": {
+      "total": 67779,
+      "system": 10926,
+      "tools": 24292,
+      "builtinTools": 24279,
+      "mcpTools": 0,
+      "messages": 31335
+    }
+  }
+}

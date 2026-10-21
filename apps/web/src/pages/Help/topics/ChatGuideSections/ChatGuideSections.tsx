@@ -82,6 +82,9 @@ export function ChatGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('sAsk')} text={g('sAskText')}>
             <HelpShot topic="chat" scenario="split" frame="04-child-ask" side="panel" />
           </GuideStep>
+          <GuideStep title={g('sCardAsk')} text={g('sCardAskText')}>
+            <HelpShot topic="chat" scenario="split" frame="04b-card-ask" side="panel" />
+          </GuideStep>
           <GuideStep title={g('sOverlap')} text={g('sOverlapText')}>
             <HelpShot topic="chat" scenario="split" frame="05-overlap" side="panel" />
           </GuideStep>

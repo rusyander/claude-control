@@ -383,6 +383,33 @@ describe('ChatRunRegistry — происхождение прогона и ма�
   });
 
   /**
+   * X1: строка группы идёт без путей, проект блока «Тесты» — окружением прогона.
+   * Только ребёнку разделения: чат человека зовёт tests-cli с `--project` сам, а
+   * осечка решателя старт не срывает.
+   */
+  it('проект строки о тестах — в окружении группы, чату его нет, осечка — без окружения', () => {
+    const asked: string[] = [];
+    registry.setChildResolver((keys) => keys.includes('g1') || keys.includes('g2'));
+    registry.setWorkspaceEnv((cwd) => {
+      asked.push(cwd);
+      return { AGENTDECK_TESTS_PROJECT: `${cwd}/project` };
+    });
+    registry.start('g1', { ...OPTIONS }, {});
+    registry.start('c1', { ...OPTIONS }, {});
+    expect(registry.describe('g1')?.options.platformEnv).toEqual({
+      AGENTDECK_TESTS_PROJECT: '/tmp/x/project',
+    });
+    expect(registry.describe('c1')?.options.platformEnv).toEqual({});
+    expect(asked).toEqual(['/tmp/x']);
+
+    registry.setWorkspaceEnv(() => {
+      throw new Error('битый automation.json');
+    });
+    registry.start('g2', { ...OPTIONS }, {});
+    expect(registry.describe('g2')?.options.platformEnv).toEqual({});
+  });
+
+  /**
    * E6. Системный промпт сессии обязан совпадать байт в байт от хода к ходу —
    * иначе CLI пишет кэш всего разговора заново (замер 12.10.2026: путь папки
    * e2e сменился посреди сессии копии). Строка о тестах замораживается на

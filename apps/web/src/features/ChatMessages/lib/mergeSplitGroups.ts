@@ -132,6 +132,8 @@ export function mergeSplitGroups(
           : {}),
         ...(group.mrClosed ? { mrClosed: group.mrClosed } : {}),
         ...(queued ? { mergeOrder: queued } : {}),
+        // Сигналы сторожа — и у идущего звена: ради него они и заведены.
+        ...(group.watchSignals?.length ? { watchSignals: group.watchSignals } : {}),
         // Разрешённое по строке «с отметкой» — и у идущего звена: это то, что
         // прошло без человека прямо сейчас.
         ...(group.autoNotices?.length

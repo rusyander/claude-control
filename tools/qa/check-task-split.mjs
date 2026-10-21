@@ -34,8 +34,9 @@ const PROPOSAL = {
       branch: 'feature/login',
       tasks: ['починить валидацию', 'убрать двойную отправку'],
       // Класс называет агент, модель под класс подставляет таблица в коде:
-      // понятная правка едет ниже потолка, необратимое — на потолке.
-      kind: 'implementation',
+      // механика едет ниже потолка, необратимое — на потолке. «Реализация» с
+      // 12.10 держит пол opus high (`KIND_PLAN`) — понижение видно только у механики.
+      kind: 'mechanical',
     },
     {
       title: 'Шапка',
@@ -90,6 +91,14 @@ const errors = [];
 page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text().slice(0, 200));
 });
+// «Failed to load resource» в консоли без адреса — отказ сервера называем сами.
+page.on('response', (response) => {
+  if (response.status() >= 400) {
+    errors.push(
+      `${response.status()} ${response.request().method()} ${response.url().slice(0, 160)}`,
+    );
+  }
+});
 
 /** Что ушло на сервер: по этому и судим, а не по виду кнопок. */
 let sent;
@@ -132,6 +141,26 @@ await page.route('**/api/platform-run-plan/**', (route) =>
 await page.route('**/api/project-git*', (route) =>
   route.fulfill({
     json: { isRepo: false, detached: false, unborn: false, branches: [], changes: [] },
+  }),
+);
+// `*` в шаблоне выше не ловит `/split-settings`: настоящий сервер на несуществующий
+// каталог отвечал 400, и карточка жила без настроек доставки проекта.
+await page.route('**/api/project-git/split-settings*', (route) =>
+  route.fulfill({
+    json: {
+      deliver: true,
+      parallel: 8,
+      parallelAuto: true,
+      profile: {
+        enabled: false,
+        repo: false,
+        remote: false,
+        bootstrapConfigured: false,
+        heavy: false,
+      },
+      permissions: {},
+      permissionsOwn: [],
+    },
   }),
 );
 
@@ -249,12 +278,12 @@ check(body.includes('Общий контекст'), 'общий контекст
 // названо прямо, и цена в прогонах видна ДО кнопки.
 const groupModel = (title) => page.getByLabel(`Модель группы «${title}»`);
 check(
-  body.includes('реализация') && body.includes('проектирование'),
+  body.includes('механика') && body.includes('проектирование'),
   'классы работы у групп подписаны',
 );
 check(
   (await groupModel('Форма входа').first().inputValue()) === 'sonnet',
-  'понятная правка едет ниже потолка',
+  'механика едет ниже потолка',
 );
 check(
   (await groupModel('Шапка').first().inputValue()) === 'opus',
@@ -282,7 +311,9 @@ check(
 // спрашивая. (Т1 переписал эту строку: без уровней плана она читалась «до 4
 // прогонов с проверками», и прогон отстал от панели.)
 check(
-  body.includes('до 7 прогонов: разбор, планы, работа и проверки'),
+  // U6: ревью после КАЖДОЙ работы — до 4 прогонов на группу + план, + разбор:
+  // (4 + 1) × 2 + 1 = 11 (`plannedRunCount`).
+  body.includes('до 11 прогонов: разбор, планы, работа и проверки'),
   'конвейер назван до кнопки, вместе с ценой',
 );
 
@@ -396,6 +427,9 @@ await page.route('**/api/chats', (route) =>
         parentId: CHAT_ID,
         branch: group.branch,
         preview: group.tasks[0],
+        // Отработку карточка считает только по детям, заведённым ПОСЛЕ предложения
+        // (10:05): ребёнок со временем родителя читался бы остатком прошлого плана.
+        createdAt: '2026-09-01T10:06:00.000Z',
       })),
     ],
   }),
@@ -414,6 +448,55 @@ check(
     .getByRole('switch', { name: 'Только завести чаты, не запускать агентов' })
     .count()) === 0,
   'переключателя запуска у отработанной карточки тоже нет',
+);
+
+// «Доставка на Sonnet» своя у каждой группы (F-12). Через контур модель решает
+// маршрут — переключателя нет, поэтому вторая фаза идёт без контура, на свежей
+// карточке (детей у разговора нет). Запуск подменён: агенты не стартуют.
+await page.route('**/api/chats', (route) => route.fulfill({ json: [CHAT] }));
+await page.route('**/api/platform-run-plan/**', (route) =>
+  route.fulfill({
+    json: {
+      routed: false,
+      title: '',
+      rules: { model: '', source: 'none', map: {}, catalog: [] },
+      effort: true,
+    },
+  }),
+);
+splitBody = undefined;
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('nav');
+await page.waitForTimeout(1800);
+const deliver = (title) =>
+  page.getByRole('switch', { name: `Доставка группы «${title}» на Sonnet` });
+// `.last()`: ранняя карточка истории погашена, живая — последняя.
+check(
+  await waitEnabled(deliver('Форма входа').last()),
+  'без контура у группы есть «Доставка на Sonnet»',
+);
+const deliverBefore = await Promise.all(
+  ['Форма входа', 'Шапка'].map(async (title) => deliver(title).last().getAttribute('aria-checked')),
+);
+check(
+  deliverBefore[0] === deliverBefore[1] && ['true', 'false'].includes(deliverBefore[0]),
+  `обе группы стоят как в настройках: ${deliverBefore.join(', ')}`,
+);
+await deliver('Форма входа').last().click();
+await page.waitForTimeout(200);
+const flipped = deliverBefore[0] === 'true' ? 'false' : 'true';
+check(
+  (await deliver('Форма входа').last().getAttribute('aria-checked')) === flipped &&
+    (await deliver('Шапка').last().getAttribute('aria-checked')) === deliverBefore[1],
+  'щелчок переключил только свою группу',
+);
+await waitEnabled(apply);
+await apply.click();
+await page.waitForTimeout(1500);
+check(
+  splitBody?.startRuns === true &&
+    JSON.stringify(splitBody?.sonnetDeliver) === JSON.stringify({ 0: flipped === 'true' }),
+  `выбор уехал только для тронутой группы: ${JSON.stringify(splitBody?.sonnetDeliver)}`,
 );
 
 check(errors.length === 0, errors.length === 0 ? 'ошибок консоли нет' : errors.join(' | '));

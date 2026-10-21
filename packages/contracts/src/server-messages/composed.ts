@@ -112,6 +112,7 @@ export const composedMessageParams = {
   'split-mr-watch-infra-retry-notice': ['group', 'mr', 'jobs'],
   'split-mr-watch-infra-again-notice': ['group', 'mr', 'jobs'],
   'chat-conversation-lost-notice': ['lost'],
+  'chat-cold-resume-notice': ['tokens', 'previous'],
   'split-default-drift-notice': ['group', 'target', 'files', 'count'],
   'chat-autonomy-deferred-notice': ['count'],
   'chat-auto-continue-notice': ['attempt', 'max', 'seconds', 'reason'],

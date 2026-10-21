@@ -157,9 +157,64 @@ describe('translate — разбор потока CLI', () => {
         }),
       ),
     ).toEqual([
-      { kind: 'toolResult', toolUseId: 'toolu_a' },
-      { kind: 'toolResult', toolUseId: 'toolu_b' },
+      { kind: 'toolResult', toolUseId: 'toolu_a', chars: 2 },
+      { kind: 'toolResult', toolUseId: 'toolu_b', chars: 3 },
     ]);
+  });
+
+  it('размер ответа вызова — знаки текста блоков; system/compact_boundary → compact (сторожу групп)', () => {
+    expect(
+      translate(
+        raw({
+          type: 'user',
+          message: {
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: 'toolu_c',
+                content: [
+                  { type: 'text', text: 'abc' },
+                  { type: 'image', source: {} },
+                  { type: 'text', text: 'de' },
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual([{ kind: 'toolResult', toolUseId: 'toolu_c', chars: 5 }]);
+    expect(
+      translate(
+        raw({
+          type: 'system',
+          subtype: 'compact_boundary',
+          compact_metadata: { trigger: 'auto', pre_tokens: 167_000 },
+        }),
+      ),
+    ).toEqual([{ kind: 'compact', trigger: 'auto', preTokens: 167_000 }]);
+    // Сжатие окна субагента — не окно сессии.
+    expect(
+      translate(
+        raw({
+          type: 'system',
+          subtype: 'compact_boundary',
+          parent_tool_use_id: 'toolu_task',
+          compact_metadata: { trigger: 'auto', pre_tokens: 90_000 },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('вызов субагента (parent_tool_use_id) помечен родителем', () => {
+    expect(
+      translate(
+        raw({
+          type: 'assistant',
+          parent_tool_use_id: 'toolu_task',
+          message: { content: [{ type: 'tool_use', name: 'Read', input: {}, id: 'toolu_r' }] },
+        }),
+      ),
+    ).toEqual([{ kind: 'tool', name: 'Read', input: {}, id: 'toolu_r', parent: 'toolu_task' }]);
   });
 
   it('незнакомый тип события → пусто (шум CLI отбрасывается)', () => {

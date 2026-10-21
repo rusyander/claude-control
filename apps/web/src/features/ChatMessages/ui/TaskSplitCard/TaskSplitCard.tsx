@@ -12,7 +12,9 @@ import {
   type CascadeAssignment,
   type CascadePlan,
 } from '@agentdeck/contracts/model-cascade';
+import { groupEconomyWithDefaults } from '@agentdeck/contracts/group-economy';
 import { usePlatformRunPlan } from '@entities/Platform';
+import { useSettings } from '@entities/AppConfig';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -65,6 +67,12 @@ export function TaskSplitCard({
   // отдельным полем запроса: подмешать их в предложение агента нельзя — его
   // просьба действует только вверх, а выбор человека в обе стороны.
   const [assignments, setAssignments] = useState<Record<number, CascadeAssignment>>({});
+  // «Доставка на Sonnet» по группам (F-12 ревью П1): одна дорогая группа рядом с
+  // механическими. Едут только тронутые — нетронутые сервер доставит по общему
+  // рычагу, каким он будет к доставке, а не каким был при нажатии.
+  const [sonnetDeliver, setSonnetDeliver] = useState<Record<number, boolean>>({});
+  const { data: settings } = useSettings();
+  const deliverDefault = groupEconomyWithDefaults(settings?.groupEconomy).sonnetDeliver;
 
   const count = proposal.groups.length;
   const isLocked = Boolean(isPending || disabled);
@@ -275,6 +283,28 @@ export function TaskSplitCard({
                       {t(contourCaption.key, contourCaption.params)}
                     </Typography>
                   )}
+                  {/* Доставку заводит только конвейер — у «только завести чаты» её
+                      нет; через контур модель решает маршрут, и рычаг не действует. */}
+                  {!createOnly && !routed && (
+                    <span
+                      className={styles.deliver}
+                      title={t('chat.split.cascade.sonnetDeliverHint')}
+                      data-sonnet-deliver={index}
+                    >
+                      <Toggle
+                        size="sm"
+                        checked={sonnetDeliver[index] ?? deliverDefault}
+                        onCheckedChange={(checked) =>
+                          setSonnetDeliver((prev) => ({ ...prev, [index]: checked }))
+                        }
+                        disabled={isLocked || !onSplit || isDone}
+                        aria-label={t('chat.split.cascade.sonnetDeliverLabel', {
+                          title: group.title,
+                        })}
+                      />
+                      {t('chat.split.cascade.sonnetDeliver')}
+                    </span>
+                  )}
                 </Stack>
               )}
             </div>
@@ -365,6 +395,7 @@ export function TaskSplitCard({
               onSplit({
                 startRuns: !createOnly,
                 ...(Object.keys(assignments).length > 0 ? { assignments } : {}),
+                ...(Object.keys(sonnetDeliver).length > 0 ? { sonnetDeliver } : {}),
               })
             }
             isLoading={isPending}

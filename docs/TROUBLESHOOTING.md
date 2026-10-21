@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Symptom → cause → what to do. Start with `pnpm doctor`: it explains every finding; come here when its verdict was not enough.
+Symptom → cause → what to do. Start with `pnpm run doctor`: it explains every finding; come here when its verdict was not enough.
 
 🇷🇺 [Русская версия](TROUBLESHOOTING.ru.md) · 🔧 [Setup](SETUP.md) · 📱 [Access from a phone](REMOTE.md) · 🚫 [What the panel does not do](LIMITATIONS.md)
 
@@ -282,13 +282,13 @@ git worktree prune          # in a repository whose copies already broke
 ```
 
 The system-wide Windows setting (the "Enable Win32 long paths" policy, or `LongPathsEnabled = 1` in
-the registry) lifts the limit more broadly — not only for git. `pnpm doctor` shows whether either of
+the registry) lifts the limit more broadly — not only for git. `pnpm run doctor` shows whether either of
 the two is on.
 
 ### A sandbox says "Not logged in"
 
 Ordinary chat works, so this is not about your account: the token did not make it into the temp
-directory. Start with `pnpm doctor` — the credentials line says whether they were found and where.
+directory. Start with `pnpm run doctor` — the credentials line says whether they were found and where.
 
 On **macOS** this is the most common cause; the breakdown and three fixes are in
 [Platform differences → macOS](SETUP.md#macos-sandboxes-and-the-keychain). On **Windows and Linux** check
@@ -340,7 +340,7 @@ output paths are resolved from the working directory.
 ## Collecting diagnostics
 
 ```bash
-pnpm doctor                                # covers almost everything asked first
+pnpm run doctor                            # covers almost everything asked first
 node --version && pnpm --version && claude --version
 
 curl http://127.0.0.1:5178/api/location    # the directory found, validity, what is missing

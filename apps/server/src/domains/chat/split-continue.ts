@@ -49,6 +49,28 @@ export function lostConversationBrief(
   ].join('\n');
 }
 
+/** Первая строка вводной нового разговора вместо остывшего — общая для всех стадий. */
+export const COLD_RESUME_INTRO =
+  'The panel started a new conversation instead of continuing the previous one: it stood idle ' +
+  'past its prompt cache lifetime, and continuing would have written the whole window again at ' +
+  'full price. The panel collected the facts below from your copy — start from them.';
+
+/**
+ * Вводная группе, чей разговор панель НЕ продолжает намеренно (`coldResume`):
+ * кэш остыл, и продолжение заново записало бы всё окно. Факты (заметки, git,
+ * последний ответ, путь к транскрипту) дописывает запуск — он знает копию и файл.
+ */
+export function coldResumeBrief(
+  group: Pick<SplitPlanGroupRecord, 'branch' | 'mr'>,
+  tasks: readonly string[],
+): string {
+  return [
+    COLD_RESUME_INTRO,
+    `Branch ${group.branch}` + (group.mr ? `, MR ${group.mr}.` : '.'),
+    ...(tasks.length > 0 ? ["The group's tasks:", ...tasks.map((task) => `- ${task}`)] : []),
+  ].join('\n');
+}
+
 /** Группа, которой «Продолжить» по делу: остановилась недоделанной и есть где продолжать. */
 export function continuable(record: SplitPlanRecord, group: SplitPlanGroupRecord): boolean {
   if (record.cancelledAt || !group.chatId || !group.path || group.cleaned) return false;

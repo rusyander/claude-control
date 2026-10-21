@@ -1,3 +1,5 @@
+import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
+import { GROUP_WATCH_DEFAULTS } from '@agentdeck/contracts/group-watch';
 import type { AppState } from './app-store.types.ts';
 
 export const DEFAULT_STATE: AppState = {
@@ -69,6 +71,11 @@ export const DEFAULT_STATE: AppState = {
     chatAutoMode: true,
     // Облегчённый набор инструментов в чатах — из коробки включён (владелец, 18.10.2026).
     chatLeanTools: true,
+    // Рычаги экономии групп — из коробки включены (владелец, 21.10.2026), срок
+    // кэша решает CLI: пять минут дороже при долгих паузах групп (замер 20.10).
+    groupEconomy: { ...GROUP_ECONOMY_DEFAULTS },
+    // Сторож групп — из коробки включён (владелец, 21.10.2026).
+    groupWatch: { ...GROUP_WATCH_DEFAULTS },
     modelPricing: {},
     encryptSecretBackups: false,
     taskSplitInitiative: true,

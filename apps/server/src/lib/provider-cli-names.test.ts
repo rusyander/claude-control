@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { listProviders } from '../providers/registry.ts';
 import { PROVIDER_CLI_NAMES } from './provider-cli-names.mjs';
 
-/** Таблица для `pnpm doctor` не расходится с каталогом провайдеров. */
+/** Таблица для `pnpm run doctor` не расходится с каталогом провайдеров. */
 describe('PROVIDER_CLI_NAMES', () => {
   it('совпадает с каталогом: id, имя и команды CLI каждого провайдера', () => {
     expect(PROVIDER_CLI_NAMES).toEqual(

@@ -150,8 +150,18 @@ const split = () => ({
     status: group.status,
     ...(group.mr ? { mr: mrOf(group.mr) } : {}),
     ...(group.status === 'done' ? { result: { kind: 'pushed', commits: 1 } } : {}),
+    // Отметки «с отметкой» стоящей группы: повторы и вызовы MCP (карточка 28, 20.10).
+    ...(group.title === 'Импорт'
+      ? {
+          autoNotices: [
+            ...[1, 2, 3].map(() => notice('mcp__tracker__jira_assign_issue')),
+            notice('pnpm build'),
+          ],
+        }
+      : {}),
   })),
 });
+const notice = (summary) => ({ at: ago(5 * MIN), summary });
 
 const browser = await chromium.launch();
 const page = await browser.newPage({
@@ -338,12 +348,14 @@ const expectations = [
     'Вход',
     'working',
     '50',
-    [/работает · \d+м \d\dс/, /7 из 14 · 50 %/, /Bash: pnpm test · 3м \d\dс/],
+    // С начала хода (10 мин), а не с заведения чата (42 мин) — карточка 29, 20.10.
+    [/работает · 10м \d\dс/, /7 из 14 · 50 %/, /Bash: pnpm test · 3м \d\dс/],
   ],
   ['Отчёты', 'queued', '20', [/ждёт очередь · 1м \d\dс · впереди 2/, /2 из 10 · 20 %/]],
   ['Схема', 'permission', '79', [/ждёт разрешения · 4м \d\dс/, /Bash: git push origin main/]],
   ['Импорт', 'stalled', '50', [/стоит · 2м \d\dс/, /3 из 6 · 50 %/]],
-  ['Доки', 'finished', '100', [/закончила · 2м \d\dс/, /14 из 14 · 100 %/]],
+  // Закончившей — «2 мин назад», без тикающих секунд (владелец 20.10).
+  ['Доки', 'finished', '100', [/закончила · 2 мин назад/, /14 из 14 · 100 %/]],
 ];
 for (const [title, state, bar, texts] of expectations) {
   const seen = await stateOf(title);
@@ -357,6 +369,10 @@ for (const [title, state, bar, texts] of expectations) {
 }
 const imports = await textIn('Импорт');
 check(!imports.includes('sleep 600'), 'у стоящей группы незакрытый вызов не показан');
+check(
+  imports.includes('Разрешено автоматически: tracker: jira_assign_issue ×3; pnpm build'),
+  `«Импорт»: отметки сведены в «×N» под сервером MCP — «${imports.slice(0, 240)}»`,
+);
 
 check(errors.length === 0, errors.length === 0 ? 'ошибок консоли нет' : errors.join(' | '));
 await browser.close();

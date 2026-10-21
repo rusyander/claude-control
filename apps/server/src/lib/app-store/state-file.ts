@@ -1,5 +1,7 @@
 import { renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { groupEconomyChanges, groupEconomyWithDefaults } from '@agentdeck/contracts/group-economy';
+import { groupWatchChanges, groupWatchWithDefaults } from '@agentdeck/contracts/group-watch';
 import { migrateLegacyPlatforms } from '@agentdeck/contracts/platform-legacy';
 import {
   migrateLegacyIntegrations,
@@ -67,6 +69,26 @@ export function mergeState(input: Partial<AppState>): AppState {
         ...base.settings.integrations,
         ...loaded.settings?.integrations,
       },
+      // На диске лежат только отличия от умолчаний (`stateOnDisk`) — недостающие
+      // рычаги берутся из умолчаний ТЕКУЩЕГО кода, а не пропадают.
+      groupEconomy: groupEconomyWithDefaults(loaded.settings?.groupEconomy),
+      groupWatch: groupWatchWithDefaults(loaded.settings?.groupWatch),
+    },
+  };
+}
+
+/**
+ * Состояние в том виде, в каком оно пишется в файл: рычаги экономии групп —
+ * только отличные от умолчаний, иначе первое же сохранение заморозило бы все
+ * умолчания блока и их смена в коде до пользователя не дошла бы.
+ */
+export function stateOnDisk(state: AppState): unknown {
+  return {
+    ...state,
+    settings: {
+      ...state.settings,
+      groupEconomy: groupEconomyChanges(state.settings.groupEconomy),
+      groupWatch: groupWatchChanges(state.settings.groupWatch),
     },
   };
 }

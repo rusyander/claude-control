@@ -94,7 +94,7 @@ const HELP = `Тест-кейсы проекта без панели.
             record <группа>:<кейс>=passed|failed|blocked|skipped …; автокейс — только run
 
 Опции:
-  --project <dir>   каталог проекта (по умолчанию текущий)
+  --project <dir>   каталог проекта (по умолчанию AGENTDECK_TESTS_PROJECT, иначе текущий)
   --group <id>      только эта группа
   --case <g:id,…>   для run: только эти кейсы (группа:кейс через запятую; id без группы —
                     если он один такой в проекте)
@@ -138,7 +138,7 @@ async function main() {
     return;
   }
 
-  const project = resolve(options.project ?? process.cwd());
+  const project = resolve(options.project ?? (await projectFromEnv()) ?? process.cwd());
   if (!existsSync(project)) throw new Error(`Каталог проекта не найден: ${project}`);
 
   if (command === 'list') return await listCases(project, options);
@@ -555,6 +555,18 @@ async function syncFolder(project, options) {
  * Метку ставит панель ребёнку разделения (`ChatRunner`, `BRIEF_OUTPUT_ENV`); имя
  * берётся из контрактов — литерал здесь разошёлся бы с панелью молча (ревью A2-F18).
  */
+/**
+ * Проект группы Claude без `--project` (X1): панель кладёт его в окружение прогона,
+ * а строка о тестах в системном промпте группы идёт без путей — так копии одной
+ * группы делят кэш начала запроса. Имя — из контрактов, как у метки выше.
+ */
+async function projectFromEnv() {
+  const { TESTS_PROJECT_ENV } = await import(
+    pathToFileURL(join(REPO, 'packages', 'contracts', 'src', 'chat-group-settings.ts')).href
+  );
+  return process.env[TESTS_PROJECT_ENV]?.trim() || undefined;
+}
+
 async function briefMarked() {
   const { BRIEF_OUTPUT_ENV } = await import(
     pathToFileURL(join(REPO, 'packages', 'contracts', 'src', 'chat-group-settings.ts')).href
@@ -915,7 +927,7 @@ async function vitestPlan(project, files) {
   const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
   const runs = [...byPackage].sort(([a], [b]) => a.localeCompare(b));
   const parts = runs.map(([dir, inside], index) => {
-    const cwd = join(project, dir);
+    const cwd = upperDrive(join(project, dir));
     const bin = vitestEntry(cwd);
     if (!bin) {
       dropTemp(temp);
@@ -968,6 +980,19 @@ async function vitestPlan(project, files) {
       };
     },
   };
+}
+
+/**
+ * Буква диска — заглавная. НЕ УБИРАТЬ: `--project "d:\…"` (так путь отдаёт VS Code) давал
+ * vitest каталог и входной файл с `d:`, а Vite на Windows считает `d:/…` и `D:/…` разными
+ * модулями — тест получал второй экземпляр `vitest` без раннера, каждый файл падал с
+ * «Vitest failed to find the runner», «no tests» (widget-app, 22.10.2026). Держит тест
+ * «путь проекта со строчной буквой диска» в tests-cli.integration.test.ts.
+ */
+function upperDrive(path) {
+  return process.platform === 'win32'
+    ? path.replace(/^[a-z]:/, (drive) => drive.toUpperCase())
+    : path;
 }
 
 /** classname и имя набора vitest — от корня пакета; кейсы знают путь от корня проекта. */

@@ -39,6 +39,8 @@ export interface QueuedMessage {
   model?: string;
   effort?: string;
   files?: Upload[];
+  /** Метка уже уходившего на ходу слова: досылку сервер узнает как повтор (карточка 33). */
+  clientId?: string;
 }
 
 export type RunStatus = 'idle' | 'running' | 'waiting' | 'done' | 'error' | 'stopped';
@@ -102,6 +104,10 @@ export interface StartInput {
   model?: string;
   effort?: string;
   files?: Upload[];
+  /** Метка сообщения — повтор уже переданного сервер узнаёт по ней. */
+  clientId?: string;
+  /** Отправляет само приложение (очередь): группу на паузе это не будит — 409 `group_paused`. */
+  automatic?: boolean;
 }
 
 /**

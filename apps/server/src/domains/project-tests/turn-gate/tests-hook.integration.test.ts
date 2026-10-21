@@ -155,6 +155,23 @@ describe('tests-hook: проверка конца хода', () => {
     );
     expect(group.code, group.err).toBe(0);
     expect(group.out).toBe('');
+    // Карточка 22: ход держит непокрытый файл — группе тут же точная команда её
+    // автокейсов и формат testName, без похода в исходники панели.
+    turn([
+      { name: 'Edit', input: { file_path: join(project, 'src', 'login.ts') } },
+      { name: 'Edit', input: { file_path: join(project, 'src', 'pay.ts') } },
+    ]);
+    const held = hook(
+      'stop',
+      { transcript_path: transcript, cwd: project },
+      { AGENTDECK_TESTS_RUNS_AT_DELIVERY: '1' },
+    );
+    const verdict = JSON.parse(held.out) as { decision: string; reason: string };
+    expect(verdict.decision).toBe('block');
+    expect(verdict.reason).toContain('no case covers src/pay.ts');
+    expect(verdict.reason).toContain('"testName":"<outer describe > … > it');
+    expect(verdict.reason).toContain(`run --project "${project}" --case auth:auth-001`);
+    expect(verdict.reason).not.toContain('not run after the last edit');
   });
 
   it('начало сессии: строка о блоке; в чате панели (строка уже в промпте) — тишина', () => {

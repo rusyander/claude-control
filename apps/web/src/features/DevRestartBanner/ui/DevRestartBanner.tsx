@@ -11,10 +11,12 @@ import { NAMED_FILES, WAITING_KEY } from './DevRestartBanner.constants';
 import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
- * «Правки сервера ждут перезапуска» (решение 30.09). Dev-сторож не рвёт живые
- * ходы и подготовку копий ради перезапуска и ждёт их без предела; плашка
- * говорит, что правка ещё не действует и чего она ждёт, а кнопка даёт
- * перезапустить сейчас — с подтверждением, потому что ходы оборвутся.
+ * «Правки сервера ждут перезапуска» (решение 30.09). Dev-сторож не рвёт
+ * подготовку копий ради перезапуска и ждёт её без предела, а ходы — до
+ * предела (D1, 21.10: 30 мин), и плашка заранее называет время и ходы, которых
+ * он не дождётся. Она говорит, что правка ещё не действует и чего она ждёт, а
+ * кнопка даёт перезапустить сейчас — с подтверждением, потому что подготовка
+ * копий и проверки оборвутся.
  * Вне dev-сторожа сервер всегда отвечает «не ждут», и плашки нет.
  */
 export function DevRestartBanner() {
@@ -51,6 +53,14 @@ export function DevRestartBanner() {
             ? ` ${t('devRestart.since', { time: formatClock(status.since, i18n.language) })}.`
             : ''}
         </Typography>
+        {status.capAt && (
+          <Typography variant="caption" color="subtle" data-dev-restart-cap>
+            {t(status.runs?.length ? 'devRestart.capAt' : 'devRestart.capAtUnnamed', {
+              time: formatClock(status.capAt, i18n.language),
+              names: status.runs?.join(', ') ?? '',
+            })}
+          </Typography>
+        )}
         {files.length > 0 && (
           <Typography variant="caption" color="subtle" title={files.join('\n')}>
             {t('devRestart.files', {

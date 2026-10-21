@@ -1,11 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import { appSettingsSchema, type AppSettings } from '@agentdeck/contracts';
+import { appSettingsSchema, type AppSettings, type AppSettingsPatch } from '@agentdeck/contracts';
 import { queryKeys } from '@shared/api/query-keys';
 import { apiClient } from '@shared/api/client';
 import { applySettingsUpdate } from '../lib/applySettingsUpdate';
 import { changedSettings } from '../lib/changedSettings';
 import { refreshSettingsFromServer } from '../lib/refreshSettingsFromServer';
+import { sendSettingsPatch } from '../lib/sendSettingsPatch';
 
 const settings = (patch: Partial<AppSettings>): AppSettings => appSettingsSchema.parse(patch);
 
@@ -134,6 +135,69 @@ describe('applySettingsUpdate', () => {
     applySettingsUpdate(client, next, { theme: 'dark' });
 
     expect(client.getQueryData(queryKeys.settings)).toBe(next);
+  });
+});
+
+/** Ответ сервера, который тест отпускает сам — в нужном ему порядке. */
+function deferred(): { promise: Promise<AppSettings>; resolve: (value: AppSettings) => void } {
+  let resolve: (value: AppSettings) => void = () => {};
+  const promise = new Promise<AppSettings>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+describe('sendSettingsPatch — ответы двух быстрых правок (F-28)', () => {
+  it('ответ первой правки, пришедший последним, не затирает вторую', async () => {
+    const client = seed();
+    const first = deferred();
+    const second = deferred();
+    const replies = [first.promise, second.promise];
+    const send = vi.fn(() => replies.shift() as Promise<AppSettings>);
+    const both = settings({ theme: 'dark', language: 'en' });
+
+    const a = sendSettingsPatch(client, { theme: 'dark' }, send);
+    const b = sendSettingsPatch(client, { language: 'en' }, send);
+    second.resolve(both);
+    await b;
+    first.resolve(settings({ theme: 'dark' }));
+    await a;
+
+    expect(client.getQueryData(queryKeys.settings)).toBe(both);
+  });
+
+  it('устаревший ответ всё равно сбрасывает разделы прошлого провайдера', async () => {
+    const client = seed();
+    const first = deferred();
+    const second = deferred();
+    const replies = [first.promise, second.promise];
+    const send = vi.fn(() => replies.shift() as Promise<AppSettings>);
+
+    const a = sendSettingsPatch(client, { provider: 'codex' }, send);
+    const b = sendSettingsPatch(client, { theme: 'dark' }, send);
+    second.resolve(settings({ provider: 'codex', theme: 'dark' }));
+    await b;
+    client.setQueryData(queryKeys.providerRules, ['cursor rule']);
+    first.resolve(settings({ provider: 'codex' }));
+    await a;
+
+    expect(client.getQueryData(queryKeys.providerRules)).toBeUndefined();
+  });
+
+  it('после правок внахлёст настройки перечитываются, одиночная правка — нет', async () => {
+    const client = seed();
+    client.setQueryData(queryKeys.settings, settings({}));
+    const send = vi.fn(async (patch: AppSettingsPatch) => settings({ theme: patch.theme }));
+
+    await sendSettingsPatch(client, { theme: 'dark' }, send);
+    expect(client.getQueryState(queryKeys.settings)?.isInvalidated).toBe(false);
+
+    await Promise.all([
+      sendSettingsPatch(client, { theme: 'light' }, send),
+      sendSettingsPatch(client, { language: 'en' }, send),
+    ]);
+    // Сервер мог применить их не в том порядке, в каком они ушли, — правду знает он.
+    expect(client.getQueryState(queryKeys.settings)?.isInvalidated).toBe(true);
   });
 });
 

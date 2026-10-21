@@ -11,10 +11,12 @@ import type {
   SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
 import type { CodedFields, CodedList } from '@agentdeck/contracts/server-messages';
+import type { GroupSignal } from '@agentdeck/contracts/group-watch';
 import type { GroupControlState } from './GroupControl.types';
 import type { GroupAcceptanceState } from './GroupAcceptance.types';
 import type { GroupRecheckState } from './GroupRecheck.types';
 import type { GroupAutoNoticesState } from './GroupAutoNotices.types';
+import type { ChildQuestion } from './ChildQuestion.types';
 
 /**
  * Группа разделения глазами родителя: где она сейчас и чем ведётся.
@@ -55,6 +57,8 @@ export interface ChildStageGroup {
    */
   startedAt?: string;
   lastAt?: string;
+  /** Старт идущего хода группы (ISO) — с него индикатор считает «работает». */
+  runStartedAt?: string;
   isRunning: boolean;
   /** Прогон группы стоит на запросе прав — ждёт решения человека. */
   awaitingPermission?: boolean;
@@ -161,6 +165,8 @@ export interface ChildStageGroup {
   control?: GroupControlState;
   /** Что группа разрешила себе по строке «с отметкой» — до «Убрать» (аудит 25.09, L51). */
   autoNotices?: GroupAutoNoticesState;
+  /** Сигналы сторожа группы (фаза 2, W): новые первыми, закрытые — с `clearedAt`. */
+  watchSignals?: GroupSignal[];
   /**
    * Ручная приёмка доставленной группы (TK-accepted): есть у группы, которую
    * конвейер закрыл «готово», или у уже принятой. `acceptedAt` — когда приняли.
@@ -251,4 +257,8 @@ export interface ChildStagesProps {
   onResumeInterrupted?: (index?: number) => void;
   /** Запрос в пути — кнопка крутится, второй клик не уходит. */
   resumeInterruptedBusy?: boolean;
+  /** Вопросы агентов по ключу чата карточки (карточка 27) — каждый в своей карточке. */
+  questions?: ReadonlyMap<string, ChildQuestion[]>;
+  /** Ответ на вопрос группы — уходит в её чат. */
+  onAnswer?: (chatId: string, answer: string) => void;
 }

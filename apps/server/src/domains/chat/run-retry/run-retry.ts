@@ -127,8 +127,11 @@ export class RunRetry {
     return this.settle(
       key,
       finished,
-      () => {
-        if (!this.deps.start(finished.chatId, options, meta)) {
+      (kind) => {
+        // После сброса лимита кэш остыл при любом простое (§L8): решение о
+        // продолжении в реестре знает об этом по отметке.
+        const asked: RunMeta = kind === 'limit' ? { ...meta, afterLimit: true } : meta;
+        if (!this.deps.start(finished.chatId, options, asked)) {
           this.deps.log('run retry: start refused', finished.chatId);
         }
       },
@@ -144,7 +147,7 @@ export class RunRetry {
   settle(
     key: string,
     finished: Pick<RunFinished, 'ok' | 'error' | 'limit'>,
-    fire: () => void,
+    fire: (kind: FailureKind) => void,
     aliases: readonly string[] = [],
   ): RetryDecision | undefined {
     if (finished.ok) {
@@ -171,7 +174,7 @@ export class RunRetry {
     }
     const run = (): void => {
       this.timers.delete(key);
-      fire();
+      fire(failure.kind);
     };
     this.cancel(key);
     this.timers.set(key, (this.deps.schedule ?? setTimeout)(run, Math.max(0, at - now)));

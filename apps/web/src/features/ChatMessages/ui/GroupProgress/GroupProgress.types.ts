@@ -4,6 +4,12 @@ export interface GroupProgressProps {
   chatId: string;
   group: Pick<
     ChildStageGroup,
-    'isRunning' | 'awaitingPermission' | 'status' | 'mrClosed' | 'startedAt' | 'lastAt'
+    | 'isRunning'
+    | 'awaitingPermission'
+    | 'status'
+    | 'mrClosed'
+    | 'startedAt'
+    | 'lastAt'
+    | 'runStartedAt'
   >;
 }

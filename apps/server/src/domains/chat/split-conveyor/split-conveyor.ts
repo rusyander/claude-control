@@ -300,6 +300,18 @@ export function copyRootOf(record: Pick<SplitPlanRecord, 'projectPath' | 'copyRo
 }
 
 /**
+ * Звено доставки группы ещё впереди: группа доводит до MR и не ждёт доставки
+ * по фактам git (тогда цепочка кончилась, и доставляет её же чат). Общее для
+ * конвейера (L3) и сторожа групп (R6).
+ */
+export function groupDeliverAhead(
+  group: Pick<SplitPlanGroupRecord, 'deliver' | 'status' | 'waitingFor'> | undefined,
+): boolean {
+  if (group?.deliver !== true) return false;
+  return !(group.status === 'awaiting' && group.waitingFor === 'delivery');
+}
+
+/**
  * Ветки, которые группе `index` своими не считать: ветки остальных групп плана
  * и основания всех копий, плюс ветки групп прежнего плана. Предшественник с
  * тем же ключом задачи (`fix/PROJ-1` у `fix/PROJ-1-tests`) иначе отдал бы
@@ -1476,11 +1488,36 @@ export class SplitConveyor {
    * доставки (журнал 59a). Нет плана или группы — нет и доставки.
    */
   delivers(link: ChatLink): boolean {
+    return this.groupOfLink(link)?.deliver === true;
+  }
+
+  /**
+   * «Доставка на Sonnet» группы связи, выбранная человеком на карточке (F-12).
+   * Нет выбора — `undefined`: доставку решает общий рычаг экономии.
+   */
+  sonnetDeliverOf(link: ChatLink): boolean | undefined {
+    const group = this.groupOfLink(link);
+    if (!group || !link.parentChatId) return undefined;
+    return this.deps.store.get(link.parentChatId)?.request.sonnetDeliver?.[String(group.index)];
+  }
+
+  /**
+   * Звено доставки ещё впереди — его заведёт планировщик (L3: работу доставки
+   * звену не делать). Группа уже ждёт доставки по фактам git — цепочка кончилась,
+   * звена не будет, и любой следующий ход в её чат (напоминание «отправь ветку,
+   * открой MR», ответ человека) доставляет сам (F-04 ревью П1: запрет пуша висел
+   * и на ходе напоминания, и напоминания сгорали впустую).
+   */
+  deliverAhead(link: ChatLink): boolean {
+    return groupDeliverAhead(this.groupOfLink(link));
+  }
+
+  private groupOfLink(link: ChatLink): SplitPlanGroupRecord | undefined {
     const record = link.parentChatId ? this.deps.store.get(link.parentChatId) : undefined;
-    const group =
+    return (
       record?.groups.find((item) => item.index === link.groupIndex) ??
-      record?.groups.find((item) => link.branch && item.branch === link.branch);
-    return group?.deliver === true;
+      record?.groups.find((item) => link.branch && item.branch === link.branch)
+    );
   }
 
   /** Строка «ветка + задачи» группы (журнал 98); пусто — сказать нечего. */
@@ -2053,6 +2090,7 @@ export class SplitConveyor {
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
         ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
         ...(group.tokenLedger ? this.tokenView(record, group.tokenLedger) : {}),
+        ...(group.watch?.signals.length ? { watchSignals: group.watch.signals } : {}),
         ...(group.reviewClose ? { reviewClose: group.reviewClose } : {}),
         ...(group.deliver !== undefined ? { deliver: group.deliver } : {}),
         ...(group.interruptedAt ? { interruptedAt: group.interruptedAt } : {}),

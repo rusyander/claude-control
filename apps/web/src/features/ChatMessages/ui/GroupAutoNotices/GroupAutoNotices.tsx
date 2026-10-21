@@ -4,6 +4,7 @@ import { chatTreeKeys, useDismissAutoNotices } from '@entities/ChatTree';
 import { toast } from '@shared/lib/toast';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
+import { autoNoticeList } from '../../lib/autoNoticeList';
 import type { GroupAutoNoticesProps } from '../GroupAutoNotices.types';
 import styles from './GroupAutoNotices.module.scss';
 import { toErrorMessage } from '../../../../shared/api/toErrorMessage';
@@ -17,7 +18,10 @@ export function GroupAutoNotices({ autoNotices }: GroupAutoNoticesProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const dismiss = useDismissAutoNotices();
-  const list = autoNotices.notices.map((notice) => notice.summary).join('; ');
+  const summaries = autoNotices.notices.map((notice) => notice.summary);
+  const list = autoNoticeList(summaries);
+  // Сведённое «×6» прячет, какие именно файлы и задачи прошли, — они в подсказке.
+  const full = list === summaries.join('; ') ? undefined : summaries.join('\n');
 
   const onDismiss = (): void => {
     if (dismiss.isPending) return;
@@ -32,7 +36,7 @@ export function GroupAutoNotices({ autoNotices }: GroupAutoNoticesProps) {
 
   return (
     <div className={styles.holdActions} data-auto-notices={autoNotices.notices.length}>
-      <Typography variant="caption" color="subtle" as="span">
+      <Typography variant="caption" color="subtle" as="span" title={full}>
         {t('chat.cascade.hub.autoNotices', { list })}
       </Typography>
       <Button size="sm" variant="ghost" isLoading={dismiss.isPending} onClick={onDismiss}>

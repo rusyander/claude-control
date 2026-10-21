@@ -3,6 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  COLD_CACHE_MS,
+  COLD_CACHE_SHORT_MS,
+  COLD_RESUME_MARGIN_TOKENS,
+  coldResume,
+  FRESH_BASE_TOKENS,
   continueHerePrompt,
   DEFAULT_COMPACT_WINDOW,
   effectiveCompactWindow,
@@ -171,5 +176,44 @@ describe('доставка тёплой сессией (E2)', () => {
 
   it('тёплой сессии нет — с чистого листа', () => {
     expect(ask({ warm: undefined })).toBeUndefined();
+  });
+});
+
+describe('новый разговор после остывшего кэша (рычаг экономии групп)', () => {
+  const edge = FRESH_BASE_TOKENS + COLD_RESUME_MARGIN_TOKENS;
+
+  it('порог — 55 минут и 85k в абсолютных числах, не доля окна сжатия', () => {
+    expect(COLD_CACHE_MS).toBe(55 * 60_000);
+    expect(edge).toBe(85_000);
+    expect(coldResume({ idleMs: COLD_CACHE_MS, contextTokens: edge })).toBe(true);
+    // 100k — ниже 60 % окна 250k, но холодное продолжение переписало бы его целиком.
+    expect(coldResume({ idleMs: COLD_CACHE_MS, contextTokens: 100_000 })).toBe(true);
+  });
+
+  it('кэш ещё тёплый или окно у базы — та же сессия', () => {
+    expect(coldResume({ idleMs: COLD_CACHE_MS - 1, contextTokens: 200_000 })).toBe(false);
+    expect(coldResume({ idleMs: COLD_CACHE_MS * 5, contextTokens: edge - 1 })).toBe(false);
+  });
+
+  it('база сессии из её первого вызова сдвигает порог', () => {
+    expect(coldResume({ idleMs: COLD_CACHE_MS, contextTokens: 60_000, freshBase: 35_000 })).toBe(
+      true,
+    );
+    expect(coldResume({ idleMs: COLD_CACHE_MS, contextTokens: 59_999, freshBase: 35_000 })).toBe(
+      false,
+    );
+  });
+
+  it('пятиминутный кэш остывает через четыре минуты', () => {
+    expect(coldResume({ idleMs: COLD_CACHE_SHORT_MS, contextTokens: edge, cacheTtl: '5m' })).toBe(
+      true,
+    );
+    expect(coldResume({ idleMs: COLD_CACHE_SHORT_MS, contextTokens: edge, cacheTtl: '' })).toBe(
+      false,
+    );
+  });
+
+  it('окно неизвестно — продолжаем, как раньше', () => {
+    expect(coldResume({ idleMs: COLD_CACHE_MS * 5, contextTokens: 0 })).toBe(false);
   });
 });

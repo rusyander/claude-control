@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { acquire, slotsOf } from '../../../../../../tools/heavy-queue-hook.mjs';
 import { heavySlots } from '../ChatRunner/ChatRunner.ts';
-import { releaseSessionLeases, writeHeavyQueueConfig } from './heavy-queue-leases.ts';
+import {
+  releaseSessionLeases,
+  sessionHoldsLease,
+  writeHeavyQueueConfig,
+} from './heavy-queue-leases.ts';
 
 const dirs: string[] = [];
 const queueDir = () => {
@@ -90,5 +94,33 @@ describe('releaseSessionLeases', () => {
     expect(releaseSessionLeases(dir, 'x')).toBe(0);
     expect(releaseSessionLeases(dir, '')).toBe(0);
     expect(readdirSync(join(dir, 'leases'))).toEqual(['x.broken.json']);
+  });
+});
+
+/** Сторож групп глушит R1, пока сессия держит аренду; истёкшая аренда убитого CLI глушить не должна. */
+describe('sessionHoldsLease', () => {
+  it('живая аренда держит, истёкшая — нет, чужая — нет', async () => {
+    const dir = queueDir();
+    process.env.AGENTDECK_HEAVY_SLOTS = '2';
+    try {
+      expect(
+        await acquire(dir, {
+          session_id: 'run',
+          tool_use_id: 'toolu_a',
+          tool_name: 'Bash',
+          tool_input: { command: 'node scripts/check_frontend_tests.mjs', timeout: 600_000 },
+        }),
+      ).not.toBeNull();
+    } finally {
+      delete process.env.AGENTDECK_HEAVY_SLOTS;
+    }
+    const [name] = readdirSync(join(dir, 'leases'));
+    const lease = JSON.parse(readFileSync(join(dir, 'leases', name ?? ''), 'utf8')) as {
+      until: number;
+    };
+    expect(sessionHoldsLease(dir, 'run', lease.until - 1)).toBe(true);
+    expect(sessionHoldsLease(dir, 'run', lease.until + 1)).toBe(false);
+    expect(sessionHoldsLease(dir, 'other', lease.until - 1)).toBe(false);
+    expect(sessionHoldsLease(dir, '', lease.until - 1)).toBe(false);
   });
 });

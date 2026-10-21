@@ -87,6 +87,8 @@ export interface SessionAudit {
   lastTimestamp?: string;
   calls: number;
   totals: CallTokens;
+  /** Вес вызовов сессии в окне подписки, W (`window-weight.ts`); у чужих CLI нет. */
+  weight?: number;
   models: Record<string, number>;
   constant?: ConstantPart;
   averageContext: number;

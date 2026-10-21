@@ -31,6 +31,11 @@ export interface SplitTasksBody {
    * сервере они бы не различались.
    */
   assignments?: Record<number, CascadeAssignment>;
+  /**
+   * «Доставка на Sonnet» по группам: только тронутые человеком. Остальные
+   * сервер доставит по общему рычагу экономии.
+   */
+  sonnetDeliver?: Record<number, boolean>;
 }
 
 /**

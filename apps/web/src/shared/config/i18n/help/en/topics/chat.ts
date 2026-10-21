@@ -459,6 +459,15 @@ export const chatEn: typeof chatRu = {
         "A child's permission request arrives in the parent conversation signed " +
         'with the group it came from. The decision goes back where it is awaited — ' +
         'there is no need to open the group chat.',
+      sCardAsk: 'The agent’s question sits in its group’s card',
+      sCardAskText:
+        'A question the group’s agent asks mid-turn stands in the group’s card as a ' +
+        'separate yellow island: “The agent asks”, the stage of the link and the start ' +
+        'of the chat key (the full key is in the tooltip). The group may still be ' +
+        '“running”: the question shows at once, not after the turn ends. Answer right ' +
+        'in the card; the answer goes to the group’s chat. A question from a chat ' +
+        'with no card of its own in the hub stands in the strip above the hub, like ' +
+        'permission requests.',
       sOverlap: 'Compare the branches once the work is done',
       sOverlapText:
         'Compare branches counts the overlaps: two here. ' +
@@ -1063,7 +1072,8 @@ export const chatEn: typeof chatRu = {
     parallelPreamble: 'The agent’s first move in a copy is the task',
     parallelPreambleText:
       'The task of every split group running in a copy opens with a panel preamble: what ' +
-      'was mirrored, which command installed the dependencies, which lockfiles were ' +
+      'was mirrored, which command installed the dependencies (a long monorepo command as a ' +
+      'step count: the agent does not repeat a finished install), which lockfiles were ' +
       'reverted, and — if the preparation failed — the tail of its log. It ends with a ' +
       'direct “the environment is ready — do not check or set it up, start with the task”. ' +
       'Later sessions of the same group get it compacted: identical version lines are merged ' +
@@ -1089,10 +1099,12 @@ export const chatEn: typeof chatRu = {
       'number when the project skill writes .agent/steps.json in the copy — { "current": 8, ' +
       '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. Next to the ' +
       'step every group carries an indicator: its state and how long it has lasted («working · ' +
-      '42m 10s», «waiting in queue · 1m 30s · 2 ahead» — a heavy command waits in the heavy-step ' +
+      '42m 10s» — since the current turn started, not since the group was created, ' +
+      '«waiting in queue · 1m 30s · 2 ahead» — a heavy command waits in the heavy-step ' +
       'queue, «waiting for permission» — a permission card waits for you, «stopped», ' +
       '«finished»), a bar «7 of 14 · 50 %» and the call the group is busy with right now, with ' +
-      'its time — «Bash: pnpm test · 3m 00s». Done is counted from the steps file (the running ' +
+      'its time — «Bash: pnpm test · 3m 00s»; between calls, while the model is thinking, this ' +
+      'line is absent. Done is counted from the steps file (the running ' +
       'step is not done yet) or from the closed plan items; with neither there is no bar — the ' +
       'panel does not invent percentages. A group working ' +
       'in the shared directory gets no preamble: that environment is yours. A group also gets ' +
@@ -1660,13 +1672,23 @@ export const chatEn: typeof chatRu = {
     cascadeDelivery: 'Delivery is checked by git, “accepted” is yours to set',
     cascadeDeliveryText:
       'With delivery on, the work (and the review with its fixes) is followed by a ' +
-      '“delivery” link on the work model: commit, fresh main branch, push of its own ' +
-      'branch, MR. Delivery continues the last work or fix session as a fork when ' +
+      '“delivery” link: commit, fresh main branch, push of its own branch, MR. Out of ' +
+      'the box it runs on Sonnet (effort no higher than “high”): it is mechanics, and a ' +
+      'call costs almost half. Turn off “Delivery on Sonnet” in “Settings” → “Groups” ' +
+      'and delivery runs on the work model; through a contour it always does. For a ' +
+      'single group it is decided on the split card: the group’s “Delivery on Sonnet” ' +
+      'switch starts as set in Settings, cleared it keeps that group’s delivery on the ' +
+      'work model, and on it sends the delivery to Sonnet even with the setting off. On the ' +
+      'work model delivery continues the last work or fix session as a fork when ' +
       'that session ended less than 55 minutes ago, its window is under 200k and ' +
       'under 60 % of the compact window, and the model and effort are the same: the ' +
       'branch, the tasks and the check results are already in it, so nothing has to ' +
       'be learned again. Otherwise delivery runs in a new session, and review always ' +
-      'does. The panel does not take the agent’s word for it: when the link ends ' +
+      'does. A link does not do another link’s work: while delivery is ahead, the work ' +
+      'and fix links commit but neither push the branch nor open an MR — by command or ' +
+      'through MCP; while review is ahead, review skills and subagents are closed to ' +
+      'them — the review at the ceiling would repeat that pass anyway. A link with no ' +
+      'delivery after it may push. The panel does not take the agent’s word for it: when the link ends ' +
       'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
       'MR whose head is the group’s copy, and which branch that MR comes from: while ' +
       'the group has no commits of its own and shares its predecessor’s head, the MR ' +
@@ -1749,7 +1771,12 @@ export const chatEn: typeof chatRu = {
       'the agent one by one, so it restarts the ones it needs instead of guessing from ' +
       'a cut-off call. A queued group can be paused too — it does not start until you ' +
       '“Resume” it back into the queue. A message from the main chat to a paused group ' +
-      'does not wake it: it waits and goes out after the turn you start. While the panel prepares a copy (branch and ' +
+      'does not wake it: it waits and goes out after the turn you start. The group tab’s ' +
+      'own queue works the same way: a message written while a turn ran does not go out ' +
+      'by itself after a pause — the tab says “The group is paused”, the message stays ' +
+      'queued, and “Retry” sends it as yours. Words the agent already got mid-turn are ' +
+      'not sent a second time, even if the panel’s reply never reached the tab. ' +
+      'While the panel prepares a copy (branch and ' +
       'dependency install — minutes) the row says “preparing the copy”; a pause holds ' +
       'during it, and “Resume” later starts the group in the ready copy. A paused ' +
       'group holds its slot, so next to “Resume” it has “Remove” — close a group you ' +
@@ -1782,10 +1809,13 @@ export const chatEn: typeof chatRu = {
       'A group has no human by construction, so its permissions are decided by the ' +
       'tab’s rows, each in one of three positions: “Itself”, “With a note” (also on ' +
       'its own, but the parent’s summary keeps an “Allowed automatically” line you can ' +
-      '“Dismiss”) and “Human” — a card and a wait. A card asks you only about what ' +
+      '“Dismiss”; repeats in it are collapsed to “×N”, MCP calls are grouped under the ' +
+      'server name (“atlassian: jira_assign_issue ×6”), the full list is in the hover hint) ' +
+      'and “Human” — a card and a wait. A card asks you only about what ' +
       'cannot be undone: deletion (branches locally and on the remote, tags, copies, ' +
       'real files and directories, tables and databases), merging (git merge, an MR ' +
-      'merge through the hosting API, CLI or MCP), a push to a main or protected ' +
+      'merge through the hosting API or CLI; the MCP merge tool is closed to every group ' +
+      'stage outright), a push to a main or protected ' +
       'branch and a force push. Everything else a group does by itself. Out of the ' +
       'box it does by itself ordinary work, writes to git and temp cleanup; “With a ' +
       'note” covers outward writes (replies in MR threads and edits of them, edits of ' +
@@ -1836,6 +1866,67 @@ export const chatEn: typeof chatRu = {
       'shared”. A group stopped on a question or a permission is marked “waits for ' +
       'you” in the chat list and the summary, and the panel calls you with a toast, a ' +
       'sound and — on a hidden tab — a system notification.',
+    cascadeEconomy: 'Group economy — “Settings” → “Groups”',
+    cascadeEconomyText:
+      'A group is a long conversation, and every call sends the model the whole ' +
+      'accumulated window again: in a measured run of ten groups three quarters of the ' +
+      'spend was reading that window. So the “Split group economy” card keeps the ' +
+      'window smaller and the mechanics cheaper. The compaction threshold is when the ' +
+      'CLI compacts the conversation into a summary; out of the box it is the Claude ' +
+      'Code one: a lower threshold makes calls cheaper but loses detail, so it is worth ' +
+      'switching on after a comparison run. Command ' +
+      'output has a ceiling (8000 characters out of the box): longer output the CLI saves ' +
+      'to a file and shows the group a preview of the start (about 2000 characters) and ' +
+      'the path to the full output. For a failed command the CLI gives the exit code and ' +
+      'the start of the output up to the ceiling, with no file: the agent sees an error at ' +
+      'the end of long output only by narrowing the output. One file read has ' +
+      'a ceiling (10k tokens): the CLI returns the start, the rest is read in parts. The cache lifetime is ' +
+      'left to the CLI out of the box: five minutes is cheaper to write, but a longer ' +
+      'pause writes the whole window again, and groups pause like that often. Delivery ' +
+      'on Sonnet runs commit, push, MR and sieves on the cheaper model. New ' +
+      'conversation after a long pause: the group stood idle for 55 minutes or more (4 with ' +
+      'the five-minute cache lifetime; after a limit reset, any pause) and its window is 25k above the conversation base (about ' +
+      '85k) — any continuation (a panel message, a retry of a failed turn, “Resume all”, a ' +
+      'human answer) goes on as a new conversation with a brief the panel built from ' +
+      'files: the group’s tasks and its stage task, the group’s notebook and tickets, its ' +
+      'notes, commits and changes since the branch its copy was cut from, ' +
+      'the last answer. A feed ' +
+      'line names the size of the previous window, and the previous conversation stays ' +
+      'on disk. Keeping ' +
+      'groups off the editor stops diagnostics of the folder the panel was started ' +
+      'from. Economical habits is a line in the task: independent reads in one step, ' +
+      'no folder changes, narrow output; it does not suggest subagents. With it the CLI ' +
+      'also stops telling the agent the human has not heard from it in a while: otherwise, ' +
+      'after five turns without text, the agent spends a turn on a report nobody reads ' +
+      'inside a stage. Each lever switches off on its own. The compaction threshold and ' +
+      'a new conversation after a pause apply from the group’s next turn, Sonnet ' +
+      'delivery from the next delivery. The rest apply from the group’s next new ' +
+      'conversation: one already started keeps its levers, or its whole cache would be ' +
+      'rewritten. A chat without a group is not affected.',
+    cascadeWatch: 'Group watch — signals on the group card',
+    cascadeWatchText:
+      'While groups run, the panel itself watches their live stream and transcripts ' +
+      'against a set of rules — no observer agent and not a single model call. A rule ' +
+      'names the trouble in numbers: a group silent for over 20 minutes, a question ' +
+      'or a permission request waiting for an answer over 15, a cache gone cold after a pause and the window ' +
+      'rewritten, two compactions closer than 15 minutes, the same check three times ' +
+      'with no edit between, a review during the work stage, a push or MR before the ' +
+      'delivery stage, a copy reading the panel’s own sources, a group’s spend or the ' +
+      'five-hour window projection over the threshold, the subscription limit hit, a ' +
+      'sleep-poll loop, the same file or chunk of it read three times with no edit. A ' +
+      'signal lands as the “Group watch” island on the group’s card in the ' +
+      'parent’s hub, and the number of active ones as a chip in the hub summary; ' +
+      '“Open chat” leads to the conversation where the rule fired. When the condition ' +
+      'ends, the signal closes by itself and stays as a folded row; a signal nobody ' +
+      'watches after a panel restart closes when the group ends or its conversation ' +
+      'stays silent long enough. The watch stops ' +
+      'nothing: the decision is yours. “Attention” and “alarm” signals go to Telegram ' +
+      'when it is set up in integrations — the rule, the numbers, the stage and the project ' +
+      'folder name, the same signal at most once per 30 minutes. Thresholds, the watch ' +
+      'switch and the Telegram switch are on the “Split-group watch” card under ' +
+      '“Settings” → “Groups”; a threshold change applies at once, without restarting ' +
+      'groups. A watch switched off closes the active signals; the history stays on ' +
+      'the cards.',
     cascadeOverlap: 'Branch overlap after the work',
     cascadeOverlapText:
       'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +
@@ -2037,7 +2128,8 @@ export const chatEn: typeof chatRu = {
       'A group does not always get a new session either: a proposal in words (“/clear”, ' +
       '“restart the session”) always continues THE SAME session for a group, and a ' +
       'block leads to a clean session only once the last turn’s window has reached ' +
-      '60 % of the compact window (120k of 200k out of the box). Below that it is the ' +
+      '60 % of the compact window (the window comes from the Claude Code settings or ' +
+      'the group threshold in “Settings” → “Groups”). Below that it is the ' +
       'same session too, with a “continue here, the CLI compacts the context itself” ' +
       'task, and a line in the feed says so: a new session would re-read everything ' +
       'this one already holds. ' +
@@ -2730,6 +2822,7 @@ export const chatEn: typeof chatRu = {
       '02-tree': 'After the split: links in the list on the left and the hub in the parent feed',
       '03-hub': 'The hub: chain stages, model, time at work and the branch comparison button',
       '04-child-ask': "A child's permission request lands in the parent with the group name",
+      '04b-card-ask': 'The group agent’s question as a yellow island in its card: stage and chat',
       '05-overlap': 'Branch overlap: a shared file and a file taken outside the group it owns',
       '06-paused': 'The tree on pause: a mark on every group and the resume button',
       '07-worktrees': 'Parallel copies of the repository: path, install trace and removal',

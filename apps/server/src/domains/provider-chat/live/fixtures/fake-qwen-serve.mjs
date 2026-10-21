@@ -5,7 +5,13 @@
 // (инструмент просит разрешения), `no-server` (подкоманды нет), `mcp` (сервер MCP
 // поднимается MCP_MS, как у настоящего 0.25, фоном после ответа на POST /session:
 // промпт, пришедший раньше, его инструментов не видит; ход дописывает, видел ли),
-// `fail` (ход кончается `turn_error`).
+// `fail` (ход кончается `turn_error`), `refuse-silent` (как настоящий 0.25 на
+// отказ: модель ни слова не пишет, ход кончается пустым `turn_complete`; на «да» —
+// одна строка «правка сделана»).
+// Режим одобрения сессии — как у настоящего 0.25: `approvalMode` из тела `POST
+// /session` или `/resume`, без него — `auto` (живой прогон 21.10: правка файла
+// прошла без `permission_request`). В `auto`, `auto-edit` и `yolo` правка в режиме
+// `permission` идёт без вопроса — так подделка краснеет на сессии без режима.
 // С FAKE_STORE сессии живут на «диске» (`fake-session-store.mjs`): `POST
 // /session/:id/resume` поднимает записанную, и поток событий такой сессии сперва
 // проигрывает события её прежних ходов (с их promptId) — ответом хода они не
@@ -32,6 +38,8 @@ let busy = false;
 let release;
 let current = 'ses-1';
 let resumed = false;
+let approvalMode = 'auto';
+const SILENT_MODES = ['auto', 'auto-edit', 'yolo'];
 
 const emit = (type, promptId, data = {}) =>
   stream?.write(`data: ${JSON.stringify({ type, promptId, data })}\n\n`);
@@ -55,6 +63,7 @@ createServer(async (req, res) => {
   const url = req.url ?? '';
   if (url === '/health') return reply(res, 200, { status: 'ok' });
   if (req.method === 'POST' && url === '/session') {
+    approvalMode = (await body(req)).approvalMode ?? 'auto';
     void wait(mcpMs).then(() => (mcpReady = true));
     if (persistent) {
       current = nextId('ses');
@@ -67,12 +76,15 @@ createServer(async (req, res) => {
   }
   const resuming = /^\/session\/([^/]+)\/resume$/.exec(url);
   if (req.method === 'POST' && resuming) {
-    const { cwd } = await body(req);
+    const resumeBody = await body(req);
     if (!load().sessions[resuming[1]]) return reply(res, 404, { code: 'session_not_found' });
     current = resuming[1];
     resumed = true;
     mcpReady = true;
-    change((state) => state.log.push(`resume ${current} cwd=${cwd}`));
+    approvalMode = resumeBody.approvalMode ?? 'auto';
+    change((state) =>
+      state.log.push(`resume ${current} cwd=${resumeBody.cwd} mode=${approvalMode}`),
+    );
     return reply(res, 200, { sessionId: current });
   }
   const closing = /^\/session\/([^/]+)$/.exec(url);
@@ -131,6 +143,25 @@ createServer(async (req, res) => {
 }).listen(port, '127.0.0.1');
 
 async function runTurn(prompt) {
+  if (mode === 'refuse-silent') {
+    emit('permission_request', 'p1', {
+      requestId: 'req-1',
+      toolCall: { kind: 'edit', title: 'notes.txt' },
+      options: [
+        { optionId: 'proceed_once', kind: 'allow_once' },
+        { optionId: 'cancel', kind: 'reject_once' },
+      ],
+    });
+    const got = await new Promise((resolve) => {
+      release = resolve;
+      setTimeout(() => resolve(undefined), holdMs);
+    });
+    release = undefined;
+    if (got === 'proceed_once') chunk('p1', 'правка сделана');
+    emit('turn_complete', 'p1', { promptId: 'p1' });
+    busy = false;
+    return;
+  }
   chunk('p1', `ответ на ${prompt.slice(-12)}`);
   if (mode === 'fail') {
     emit('turn_error', 'p1', { message: 'model refused' });
@@ -138,6 +169,12 @@ async function runTurn(prompt) {
     return;
   }
   if (mode === 'mcp') chunk('p1', mcpReady ? ' / mcp: есть' : ' / mcp: нет');
+  if (mode === 'permission' && SILENT_MODES.includes(approvalMode)) {
+    chunk('p1', ` / разрешение: без вопроса (${approvalMode})`);
+    emit('turn_complete', 'p1', { promptId: 'p1' });
+    busy = false;
+    return;
+  }
   if (mode === 'permission') {
     emit('permission_request', 'p1', {
       requestId: 'req-1',

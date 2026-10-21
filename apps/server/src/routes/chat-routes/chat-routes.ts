@@ -51,6 +51,8 @@ export function registerChatRoutes(
   awaitsYou?: (chatId: string) => boolean,
   /** Модель, назначенная лёгкому чату вопросов о ходе групп (5.1). */
   assignedOf?: (chatId: string) => { model: string; effort: string } | undefined,
+  /** Разговор группы на паузе — досылку без человека не принимает. */
+  heldOf?: (chatId: string) => boolean,
 ): void {
   registerChatTranscriptRoutes(
     app,
@@ -60,7 +62,7 @@ export function registerChatRoutes(
     assignedOf,
   );
   registerChatBrowseRoutes(app, ctx);
-  registerChatRunRoutes(app, ctx, registry, session, assignedOf);
+  registerChatRunRoutes(app, ctx, registry, session, assignedOf, heldOf);
   registerChatArtifactRoutes(app, ctx);
   registerChatCliRoutes(app, undefined, () => ctx.store);
   // Вопросы сессий из терминала и VS Code: сводка помечает те, что ждут

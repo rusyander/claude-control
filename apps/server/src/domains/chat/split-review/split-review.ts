@@ -22,6 +22,8 @@ import {
 } from '../../../lib/app-store/chat-links.ts';
 import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
 import { ownerTraceUnparsed } from '../owner-coverage/owner-coverage.ts';
+import { COLD_RESUME_INTRO } from '../split-continue.ts';
+import { withStageTask } from '../cold-continuation/cold-continuation.ts';
 
 /**
  * Ревью запроса на слияние по ссылке (Т7): замечания в связь, решение — человеку.
@@ -112,6 +114,8 @@ export interface SplitReviewDeps {
     resume?: { sessionId: string };
     /** Вводная на случай, когда разговор продолжить нельзя и ход идёт новым (G3). */
     fresh?: string;
+    /** Вводная на случай, когда разговор остыл и запуск начинает новый (`coldResume`). */
+    cold?: string;
   }) => { started: boolean; chatId?: string; busy?: boolean };
   /** Заметка в ленту родителя; `false` — родителя никто не слушает. */
   emit?: (parentChatId: string, event: ChatEvent) => boolean;
@@ -228,8 +232,20 @@ const REVIEW_LOST_LINE =
   'follows; the request after it continues that task — redo from the code and the merge request ' +
   'whatever it needs.';
 
-function lostFrame(link: ChatLink): { fresh?: string } {
-  return link.task ? { fresh: `${REVIEW_LOST_LINE}\n\n${link.task}` } : {};
+/**
+ * Вводные звена: `fresh` — файла сессии нет, `cold` — разговор не потерян, а
+ * остыл (`coldResume`, F-01 ревью П1): запуск начинает новый намеренно, и без
+ * задания новая сессия публикации или повтора итога не знала ни MR, ни что в нём
+ * проверять. «Транскрипт удалён» там было бы неправдой — он на месте, путь к нему
+ * запуск дописывает в факты.
+ */
+function lostFrame(link: ChatLink): { fresh?: string; cold?: string } {
+  return link.task
+    ? {
+        fresh: `${REVIEW_LOST_LINE}\n\n${link.task}`,
+        cold: withStageTask(COLD_RESUME_INTRO, link.task),
+      }
+    : {};
 }
 
 export class SplitReview {

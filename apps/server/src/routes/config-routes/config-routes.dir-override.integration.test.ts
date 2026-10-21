@@ -18,6 +18,7 @@ describe('config-routes: каталог через настройки и руч�
   let root: string;
   let app: FastifyInstance;
   let store: AppStore;
+  let other: AppStore;
   let relocated: string[];
   let remembered: string[];
 
@@ -28,6 +29,8 @@ describe('config-routes: каталог через настройки и руч�
     root = mkdtempSync(join(tmpdir(), 'cc-config-dir-'));
     mkdirSync(join(root, 'agentdeck'), { recursive: true });
     store = new AppStore(join(root, 'agentdeck'));
+    mkdirSync(join(root, 'other'), { recursive: true });
+    other = new AppStore(join(root, 'other'));
     relocated = [];
     remembered = [];
 
@@ -51,6 +54,8 @@ describe('config-routes: каталог через настройки и руч�
       // Настоящий relocate не нужен: важно, что маршрут смотрит на его вердикт.
       relocate: (path: string) => {
         relocated.push(path);
+        // Переезд меняет хранилище контекста, как настоящий `relocate`.
+        if (path.includes('swap')) ctx.store = other;
         return path.includes('missing')
           ? { isValid: false, problem: 'Каталог не существует: ' + path }
           : { isValid: true };
@@ -99,6 +104,20 @@ describe('config-routes: каталог через настройки и руч�
     // Память о пути — забота контекста (хранилище каталога старта), в текущий
     // store маршрут её не пишет.
     expect(store.getSettings().claudeDirOverride).toBe('');
+  });
+
+  it('переезд вместе с порогом сторожа сливает порог с настройками нового каталога', async () => {
+    store.updateSettings({ groupWatch: { ...store.getSettings().groupWatch, askMinutes: 40 } });
+    other.updateSettings({ groupWatch: { ...other.getSettings().groupWatch, stallMinutes: 60 } });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings',
+      payload: { claudeDirOverride: 'C:/swap/.claude', groupWatch: { burnPerHour: 9 } },
+    });
+    expect(res.statusCode).toBe(200);
+    const watch = other.getSettings().groupWatch;
+    // Своё нового каталога осталось, старое сюда не переехало.
+    expect([watch.stallMinutes, watch.askMinutes, watch.burnPerHour]).toEqual([60, 15, 9]);
   });
 
   it('пустая строка — возврат к автоопределению, всегда принимается', async () => {

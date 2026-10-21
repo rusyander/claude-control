@@ -4,7 +4,7 @@ Everything needed to get AgentDeck running. Not running — [Troubleshooting](TR
 
 > [!TIP]
 > If you would rather not dig into it by hand, open Claude Code in this folder and say "it won't
-> start, figure it out". The agent reads [AGENTS.md](../AGENTS.md), runs `pnpm doctor` and fixes it.
+> start, figure it out". The agent reads [AGENTS.md](../AGENTS.md), runs `pnpm run doctor` and fixes it.
 
 🇷🇺 [Русская версия](SETUP.ru.md) · 📖 [What this project is](../README.md) · 🛠 [Troubleshooting](TROUBLESHOOTING.md) ·
 📱 [Access from a phone](REMOTE.md) · 🚫 [What the panel does not do](LIMITATIONS.md)
@@ -51,7 +51,7 @@ git config --global core.longpaths true
 Better still, enable long paths in Windows itself (needs administrator rights): Local Group Policy
 Editor → Computer Configuration → Administrative Templates → System → Filesystem → **"Enable Win32
 long paths"**, or `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1`.
-`pnpm doctor` checks both and stays quiet if either one is on. Symptoms and details —
+`pnpm run doctor` checks both and stays quiet if either one is on. Symptoms and details —
 [Parallel copies show files as deleted](TROUBLESHOOTING.md#parallel-copies-show-files-as-deleted).
 
 Claude Code must be **logged in**, not merely installed: run `claude` once in a terminal and
@@ -107,7 +107,7 @@ The panel behaves the same everywhere; only a few things need attention by hand.
 environment in one command (it changes nothing and explains every finding):
 
 ```bash
-pnpm doctor
+pnpm run doctor
 ```
 
 | What            | Windows                      | macOS                             | Linux               |
@@ -131,7 +131,7 @@ lives in the Keychain and there is no file. The sandbox runs Claude with a subst
 (`security find-generic-password`). The first access raises a permission prompt — click **Always
 Allow**. When Claude Code runs with a non-default config directory (`CLAUDE_CONFIG_DIR`), the
 Keychain entry has a different name — `Claude Code-credentials-<8 characters of the directory
-hash>`; the panel looks for it too, and `pnpm doctor` checks the same names.
+hash>`; the panel looks for it too, and `pnpm run doctor` checks the same names.
 
 **If that did not help** (the Keychain entry was renamed, say) — find the name and pass it in:
 
@@ -254,7 +254,7 @@ Configuration directory: C:\Users\you\.claude (source: home)
 **A machine without Claude Code.** The panel does not need a `.claude` directory: it keeps its own
 state in `~/.agentdeck/data`, and `source: not-found` is not an error here. First-run onboarding
 asks which CLI to use; with another CLI it has three steps — the Claude access step is gone. The
-directory card on Overview is grey, "Claude Code not in use", not red. `pnpm doctor` passes once the
+directory card on Overview is grey, "Claude Code not in use", not red. `pnpm run doctor` passes once the
 chosen CLI is found.
 
 ## A second computer with the same settings
@@ -297,7 +297,7 @@ the file with its own.
 
 ## Verifying it works
 
-Start with `pnpm doctor`, then walk through:
+Start with `pnpm run doctor`, then walk through:
 
 1. **Overview** shows non-zero counts of rules, skills and hooks. Zeroes everywhere mean the wrong
    directory — check the `source` line.

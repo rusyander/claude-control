@@ -120,6 +120,9 @@ describe('heavy-queue-hook: что считается тяжёлым', () => {
       './gradlew check',
       'make test',
       'node "C:/x/tools/tests-cli.mjs" run --project .',
+      // X1: группа Claude зовёт прогон без --project — проект в её окружении.
+      'node "C:/x/tools/tests-cli.mjs" run --group gui',
+      'node "C:/x/tools/tests-cli.mjs" run --case gui:gui-001',
       'cd apps/web && tsc --noEmit',
       // Ревью A2-F4/B2-F9: подробный вывод, каталог ключом, Rust/.NET, полный шаг в цепочке.
       'go test -v ./...',

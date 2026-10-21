@@ -1,5 +1,7 @@
 import type { AppSettings } from '@agentdeck/contracts';
 import {
+  ceilingEffortRank,
+  ceilingModelRank,
   deliverStagePrompt,
   fixStagePrompt,
   loweredWorkPrompt,
@@ -139,9 +141,19 @@ export interface CascadeStageInput {
    * чтения каталогов и нужен только звеньям после работы.
    */
   artifacts?: () => readonly string[];
+  /**
+   * Доставка на Sonnet (рычаг `groupEconomy.sonnetDeliver`). Нет — доставка на
+   * модели работы, как раньше. Маршрут контура сюда не попадает: алиаса `sonnet`
+   * у контура может не быть.
+   */
+  cheapDeliver?: boolean;
   /** Часы — в тесте фиксируются. */
   now?: () => Date;
 }
+
+/** Модель и потолок глубины дешёвой доставки: механика, но не небрежность. */
+const CHEAP_DELIVER_MODEL = 'sonnet';
+const CHEAP_DELIVER_EFFORT = 'high';
 
 /**
  * Системная дописка звена: инициативы панели плюс планка сдачи там, где звено
@@ -205,6 +217,24 @@ export function stageOf(link: ChatLink): CascadeStage {
     default:
       return 'work';
   }
+}
+
+/**
+ * Звенья, которые конвейер заведёт после звена связи (директива L3): их работу
+ * звену не делать. Считается по полям, записанным при заведении связи, а не по
+ * отметке «ревью было»: запреты едут в настройки прогона, и смена посреди
+ * разговора переписала бы начало запроса (§4).
+ */
+export function stagesAhead(
+  link: ChatLink,
+  delivers: boolean,
+): { review: boolean; deliver: boolean } {
+  const stage = stageOf(link);
+  const review =
+    stage === 'work'
+      ? Boolean(link.ceilingModel ?? (link.lowered ? undefined : link.model))
+      : stage === 'fix' && verifiesFixes(link);
+  return { review, deliver: delivers && stage !== 'deliver' };
 }
 
 /**
@@ -449,11 +479,41 @@ function deliverPlan(
 }
 
 /**
+ * Доставка на Sonnet (замер 20.10: доставка — четверть расхода групп, коммит, пуш,
+ * MR и сита). Только вниз: группа уже на Sonnet или ниже, модель не из лестницы
+ * Claude — план как есть. Глубина не выше `high` и не выше той, что была.
+ *
+ * Тёплое продолжение сессии работы (E2) у другой модели невозможно — кэш у каждой
+ * модели свой, — и доставка пойдёт с чистого листа. В прогоне 20.10 все девять
+ * доставок и так шли с чистого листа, так что теряется лишь редкий тёплый случай.
+ */
+function withCheapDeliver(plan: CascadeStagePlan): CascadeStagePlan {
+  const rank = ceilingModelRank(plan.model);
+  const floor = ceilingModelRank(CHEAP_DELIVER_MODEL);
+  if (rank === undefined || floor === undefined || rank <= floor) return plan;
+  const effort =
+    plan.effort && ceilingEffortRank(plan.effort) < ceilingEffortRank(CHEAP_DELIVER_EFFORT)
+      ? plan.effort
+      : CHEAP_DELIVER_EFFORT;
+  return {
+    ...plan,
+    model: CHEAP_DELIVER_MODEL,
+    effort,
+    link: { ...plan.link, model: CHEAP_DELIVER_MODEL, effort },
+  };
+}
+
+/**
  * Что запускать после этого прогона. `undefined` — цепочка закрыта (или её и не
  * было), и это самый частый ответ: конвейер существует ради понижённых детей
  * разделения, а прогонов в панели идут сотни.
  */
 export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | undefined {
+  const plan = planStage(input);
+  return plan?.stage === 'deliver' && input.cheapDeliver ? withCheapDeliver(plan) : plan;
+}
+
+function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
   const { link, ok, text, task, hasWork, now = () => new Date() } = input;
   if (!link) return undefined;
 

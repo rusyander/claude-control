@@ -53,6 +53,9 @@ export type TellStart = (input: {
   resume: { sessionId: string };
   /** Вводная на случай, когда разговор продолжить нельзя и ход идёт новым. */
   fresh?: string;
+  /** Вводная нового разговора вместо остывшего (рычаг экономии групп). */
+  cold?: string;
+  base?: string;
 }) => { started: boolean; busy?: boolean };
 
 export interface ChildTellDeps {
@@ -86,6 +89,9 @@ interface Pending {
   cwd: string;
   title: string;
   fresh?: string;
+  cold?: string;
+  /** Ветка, от которой отведена копия группы (вводная считает коммиты от неё). */
+  base?: string;
 }
 
 type Delivery = 'sent' | 'queued' | 'refused';
@@ -190,6 +196,8 @@ export class ChildTells {
       fromAliases: aliases,
       resume: { sessionId: session },
       ...(pending.fresh ? { fresh: pending.fresh } : {}),
+      ...(pending.cold ? { cold: pending.cold } : {}),
+      ...(pending.base ? { base: pending.base } : {}),
     });
     if (outcome.started) return 'sent';
     if (outcome.busy) {

@@ -61,6 +61,9 @@ async function keepStreaming(
 ): Promise<void> {
   let attempts = 0;
   let currentMode = mode;
+  // Сервер отказал в самой отправке: хода не было, и очереди досылать нечего —
+  // иначе вернувшееся в неё сообщение уходило бы снова и снова по кругу отказов.
+  let refusedSend = false;
   // Отказ «занят» на первой отправке не отдаётся вызывающему: прогон ниже
   // подхватывается, а сообщение встаёт в очередь — ответ принят (F-67).
   let busyHeld: ((outcome: SendOutcome) => void) | undefined;
@@ -135,6 +138,7 @@ async function keepStreaming(
       }
       // Подхватить не вышло (остановлено) — отказ отдаём, как он есть.
       busyHeld?.({ ok: false, code: 'run_busy', message: refused.error ?? '' });
+      refusedSend = true;
       break;
     }
     if (outcome === 'gone') {
@@ -155,11 +159,11 @@ async function keepStreaming(
   }
 
   if (discarded.has(controller)) return;
-  finish(id);
+  finish(id, !refusedSend);
 }
 
 /** Прогон закончился: статус, чистка контроллера и отправка очереди. */
-function finish(id: string): void {
+function finish(id: string, flush = true): void {
   const run = getRun(id);
   const status = stoppedByUser.has(id) ? 'stopped' : run.error ? 'error' : 'done';
   const wasStopped = stoppedByUser.has(id);
@@ -190,11 +194,16 @@ function finish(id: string): void {
     ).catch(() => undefined);
   }
 
-  void flushQueue(id);
+  if (flush) void flushQueue(id);
 }
 
-/** Слово агенту посреди хода; `false` — сервер не принял на ходу (дальше очередь). */
-async function steer(run: AgentRun, input: StartInput): Promise<boolean> {
+/**
+ * Слово агенту посреди хода; `false` — сервер не принял на ходу (дальше очередь).
+ * `clientId` — на случай, когда сервер слово отдал, а ответ до телефона не дошёл
+ * (сон приложения, сеть): с ней же оно встанет в очередь, и досылку сервер
+ * узнает как повтор, а не отдаст агенту второй раз (карточка 33).
+ */
+async function steer(run: AgentRun, input: StartInput, clientId: string): Promise<boolean> {
   try {
     const reply = await api.post<{ steered?: boolean }>('/chat/send', {
       chatId: run.serverRunId ?? run.id,
@@ -202,6 +211,7 @@ async function steer(run: AgentRun, input: StartInput): Promise<boolean> {
       ...(run.projectPath ? { projectPath: run.projectPath } : {}),
       prompt: input.prompt,
       steer: true,
+      clientId,
     });
     if (!reply?.steered) return false;
     const current = runs.get(run.id);
@@ -226,7 +236,10 @@ export async function send(input: StartInput): Promise<SendOutcome> {
     // Агент занят — слово уходит ему сразу, как в самом Claude Code: он учтёт
     // его на ближайшем шаге, не дожидаясь конца всей работы. Вложения и прогон
     // без живой сессии — в очередь: не теряется и не плодит второй процесс.
-    if ((input.files?.length ?? 0) === 0 && (await steer(existing, input))) return { ok: true };
+    const clientId = `steer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    if ((input.files?.length ?? 0) === 0 && (await steer(existing, input, clientId))) {
+      return { ok: true };
+    }
     enqueue(id, {
       prompt: input.prompt,
       allowEdits: input.allowEdits,
@@ -234,6 +247,7 @@ export async function send(input: StartInput): Promise<SendOutcome> {
       model: input.model,
       effort: input.effort,
       files: input.files,
+      clientId,
     });
     // Ход кончился, пока шёл запрос «на ходу»: конец хода очередь уже не снимет.
     if (getRun(id).status !== 'running') void flushQueue(id);
@@ -438,8 +452,9 @@ export async function restoreQueue(id: string): Promise<void> {
 
 /**
  * Агент освободился — отправляем первое из дописанного тем же разговором.
- * Не принятое сервером возвращается в голову очереди: отказ («занят», сеть)
- * не повод потерять написанное.
+ * Не принятое сервером возвращается в голову очереди: отказ («занят», сеть,
+ * группа на паузе) не повод потерять написанное. Досылка помечена `automatic`:
+ * группу, которую человек поставил на паузу, она не будит (карточка 33).
  */
 async function flushQueue(id: string): Promise<void> {
   const run = getRun(id);
@@ -458,6 +473,8 @@ async function flushQueue(id: string): Promise<void> {
     model: next.model,
     effort: next.effort,
     files: next.files,
+    ...(next.clientId ? { clientId: next.clientId } : {}),
+    automatic: true,
   });
   if (outcome.ok) return;
   const after = getRun(id);

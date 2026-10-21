@@ -38,8 +38,11 @@ export function panelRelayCommand(): string {
  * Хуки пересылки — по переключателю: включено — стоят, выключено — сняты.
  * Зовётся на старте панели и при каждом переключении. Сбой записи не валит
  * ни старт, ни запрос: настройки покажут «хука нет» и команду для «Хуков».
+ * Каталога Claude нет (или ручной путь негоден) — не трогаем ничего: запись
+ * хуков молча создала бы `~/.claude` у того, кто работает с другим CLI.
  */
 export function syncRelayHooks(ctx: ServerContext): void {
+  if (!ctx.location.isValid) return;
   const settings = ctx.location.paths.settings;
   try {
     if (ctx.store.getOutsideRelay()) {

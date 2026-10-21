@@ -1,6 +1,7 @@
 import { economyOf } from './economy.ts';
 import { stepClass, type ToolUseLike } from './step-class.ts';
 import { sessionTime } from './time.ts';
+import { windowWeight } from './window-weight.ts';
 import type { AuditCall, ConstantPart, SessionAudit, SpikeInfo } from './token-audit.types.ts';
 
 /**
@@ -229,6 +230,7 @@ export function auditClaudeRows(id: string, rows: Row[]): SessionAudit {
     ...(title ? { title } : {}),
     calls: calls.length,
     totals: { input: 0, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 0 },
+    weight: 0,
     models: {},
     averageContext: 0,
     maxContext: 0,
@@ -260,6 +262,7 @@ export function auditClaudeRows(id: string, rows: Row[]): SessionAudit {
     t.cacheWrite += call.cacheWrite;
     t.cacheWrite1h += call.cacheWrite1h;
     t.output += call.output;
+    audit.weight = (audit.weight ?? 0) + windowWeight(call, call.model);
     contextSum += call.context;
     audit.maxContext = Math.max(audit.maxContext, call.context);
     const model = call.model ?? '?';

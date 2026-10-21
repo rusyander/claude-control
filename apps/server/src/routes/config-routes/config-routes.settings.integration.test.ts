@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from 'nod
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AppSettings } from '@agentdeck/contracts';
+import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
+import { GROUP_WATCH_DEFAULTS } from '@agentdeck/contracts/group-watch';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import { getStoredKey, setStoredKey } from '../../lib/provider-keys/provider-keys.ts';
 import type { ServerContext } from '../../context.ts';
@@ -78,6 +80,26 @@ describe('config-routes: валидация настроек и импорта',
   const importState = (payload: unknown) =>
     app.inject({ method: 'POST', url: '/api/settings/import', payload: payload as object });
 
+  // F-19 ревью П1: переменная сильнее рычага, и карточка обязана это знать.
+  it('/api/system называет порог сжатия групп из переменной панели, без неё — null', async () => {
+    const saved = process.env.AGENTDECK_GROUP_COMPACT_WINDOW;
+    const windowEnv = async () =>
+      (await app.inject({ url: '/api/system' })).json<{ groupCompactWindowEnv: number | null }>()
+        .groupCompactWindowEnv;
+    try {
+      process.env.AGENTDECK_GROUP_COMPACT_WINDOW = '160k';
+      expect(await windowEnv()).toBe(160_000);
+      // Вне границ CLI переменная не действует — и карточка её не называет.
+      process.env.AGENTDECK_GROUP_COMPACT_WINDOW = '50k';
+      expect(await windowEnv()).toBeNull();
+      delete process.env.AGENTDECK_GROUP_COMPACT_WINDOW;
+      expect(await windowEnv()).toBeNull();
+    } finally {
+      if (saved === undefined) delete process.env.AGENTDECK_GROUP_COMPACT_WINDOW;
+      else process.env.AGENTDECK_GROUP_COMPACT_WINDOW = saved;
+    }
+  });
+
   describe('PATCH /api/settings', () => {
     it('валидный частичный патч сохраняется', async () => {
       const res = await patch({ theme: 'dark', backupKeep: 5 });
@@ -85,6 +107,67 @@ describe('config-routes: валидация настроек и импорта',
       expect(res.json<AppSettings>().theme).toBe('dark');
       expect(res.json<AppSettings>().backupKeep).toBe(5);
       expect((await getSettings()).theme).toBe('dark');
+    });
+
+    // F-03: блок целиком в state.json замораживал все умолчания — их будущая
+    // смена в коде до этого пользователя не доходила.
+    it('рычаг экономии групп: на диске только отличия от умолчаний, в ответе — слитый блок', async () => {
+      const res = await patch({ groupEconomy: { bashOutputChars: 4000 } });
+      expect(res.statusCode).toBe(200);
+      expect((await getSettings()).groupEconomy).toEqual({
+        ...GROUP_ECONOMY_DEFAULTS,
+        bashOutputChars: 4000,
+      });
+      const disk = JSON.parse(readFileSync(join(root, 'agentdeck', 'state.json'), 'utf8'));
+      expect(disk.settings.groupEconomy).toEqual({ bashOutputChars: 4000 });
+      const snapshot = JSON.parse(
+        readFileSync(join(root, 'agentdeck', 'settings-snapshot.json'), 'utf8'),
+      );
+      expect(snapshot.state.settings.groupEconomy).toEqual({ bashOutputChars: 4000 });
+      // Значение, равное умолчанию, снова следует за ним.
+      await patch({ groupEconomy: { bashOutputChars: GROUP_ECONOMY_DEFAULTS.bashOutputChars } });
+      const after = JSON.parse(readFileSync(join(root, 'agentdeck', 'state.json'), 'utf8'));
+      expect(after.settings.groupEconomy).toEqual({});
+    });
+
+    it('частичный блок экономии с диска дополняется умолчаниями текущего кода', async () => {
+      writeFileSync(
+        join(root, 'agentdeck', 'state.json'),
+        JSON.stringify({ settings: { groupEconomy: { compactWindow: 160_000 } } }),
+      );
+      expect(new AppStore(join(root, 'agentdeck')).getSettings().groupEconomy).toEqual({
+        ...GROUP_ECONOMY_DEFAULTS,
+        compactWindow: 160_000,
+      });
+    });
+
+    it('сторож групп: правка порога сливается с сохранённым, на диске только отличия', async () => {
+      expect((await getSettings()).groupWatch).toEqual(GROUP_WATCH_DEFAULTS);
+      expect((await patch({ groupWatch: { stallMinutes: 30 } })).statusCode).toBe(200);
+      // Второй ключ не возвращает первый к заводскому.
+      expect((await patch({ groupWatch: { telegram: false } })).statusCode).toBe(200);
+      expect((await getSettings()).groupWatch).toEqual({
+        ...GROUP_WATCH_DEFAULTS,
+        stallMinutes: 30,
+        telegram: false,
+      });
+      const disk = JSON.parse(readFileSync(join(root, 'agentdeck', 'state.json'), 'utf8'));
+      expect(disk.settings.groupWatch).toEqual({ stallMinutes: 30, telegram: false });
+      expect((await patch({ groupWatch: { stallMinutes: 0 } })).statusCode).toBe(400);
+    });
+
+    it('снимок с одними отличиями рычагов импортируется и дополняется умолчаниями', async () => {
+      // Снимок настроек для git пишется так же, как state.json, — отличиями.
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/settings/import',
+        payload: { settings: { groupEconomy: { sonnetDeliver: false } } },
+      });
+      expect(res.statusCode).toBe(200);
+      expect((await getSettings()).groupEconomy).toEqual({
+        ...GROUP_ECONOMY_DEFAULTS,
+        sonnetDeliver: false,
+      });
     });
 
     it('смена языка сразу пересобирает свой гейт на промпте на новом языке', async () => {

@@ -51,7 +51,7 @@ Needs **Node 22.6+** (server runs with `--experimental-strip-types`), pnpm 10, `
 ## Triage in 60 seconds
 
 ```bash
-pnpm doctor                                # node, claude in PATH, config dir, account access
+pnpm run doctor                            # node, claude in PATH, config dir, account access
                                            # (incl. macOS keychain), ports, deps — exit 1 = blocking
 curl http://127.0.0.1:5178/api/location    # which dir, which rule chose it, what's missing
 curl http://127.0.0.1:5178/api/system      # platform, home, shell

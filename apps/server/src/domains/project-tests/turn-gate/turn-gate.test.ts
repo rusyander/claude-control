@@ -235,6 +235,40 @@ describe('пробелы хода агента', () => {
     expect(deferred([cases[0]!], [red], ['src/auth/a.ts']).join('\n')).toContain('red this turn');
   });
 
+  it('ход группы: держат другие пробелы — точная команда её автокейсов; одни автокейсы ход не держат', () => {
+    // Карточка 22: группа искала синтаксис прогона и формат testName в исходниках панели.
+    const deferred = (cases: ProjectTestCase[], paths: string[]) =>
+      judgeTurn({
+        groups: groups(cases),
+        runs: [],
+        paths,
+        since: SINCE,
+        changedAt: EDIT,
+        cli: CLI,
+        root: '/p',
+        deferRuns: true,
+      });
+    const automated = auto('auth-001', ['src/auth']);
+    const held = deferred(
+      [automated, testCase('auth-002', { codePaths: ['src/auth'] })],
+      ['src/auth/login.ts'],
+    ).join('\n');
+    expect(held).toContain(
+      'run once at delivery; to check them now: node "tests-cli.mjs" run --project "/p" --case auth:auth-001',
+    );
+    expect(held).not.toMatch(/--case \S*auth-002/);
+    expect(deferred([automated], ['src/auth/login.ts'])).toEqual([]);
+  });
+
+  it('просьба завести кейс называет формат testName: полный путь describe > … > it', () => {
+    const format =
+      '"testName":"<outer describe > … > it; a describe path covers every test under it>"';
+    expect(judge([], [], ['src/auth/login.ts']).join('\n')).toContain(format);
+    expect(
+      judge([auto('auth-001', ['src/auth'])], [], ['src/billing/pay.ts']).join('\n'),
+    ).toContain(format);
+  });
+
   it('запись словом (attested) автокейс не закрывает', () => {
     const cases = [auto('auth-001', ['src/auth'])];
     const word = run('2026-10-15T10:06:00.000Z', [['auth-001', 'passed']], {

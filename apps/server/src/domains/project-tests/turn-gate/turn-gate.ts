@@ -65,6 +65,13 @@ const NAMED = 4;
 /** Сколько кейсов конец хода требует прогнать или записать — остальное ждёт конца задачи. */
 const DEMAND = 5;
 
+/**
+ * Привязка готового теста к кейсу — с форматом `testName` (карточка 22): без
+ * него группа читала исходники панели, чтобы узнать, как назвать тест vitest.
+ */
+const LINK_TEST =
+  'An existing test → add "automation":{"status":"automated","file":"<test path>","testName":"<outer describe > … > it; a describe path covers every test under it>"}';
+
 function named(items: readonly string[]): string {
   const head = items.slice(0, NAMED).join(', ');
   return items.length > NAMED ? `${head} (+${items.length - NAMED})` : head;
@@ -137,7 +144,7 @@ export function judgeTurn(input: TurnGateInput): string[] {
   const hasCases = live.some((group) => group.cases.some((item) => !item.archived));
   if (!hasCases) {
     return [
-      `Tests block: code changed (${named(code)}) but the project has no test case yet — add one for the change: ${caseCmd(code[0] ?? '')}. An existing test file → add "automation":{"status":"automated","file":"<path>"} and run it: ${input.cli} run ${project} --case <group>:<id>.`,
+      `Tests block: code changed (${named(code)}) but the project has no test case yet — add one for the change: ${caseCmd(code[0] ?? '')}. ${LINK_TEST} and run it: ${input.cli} run ${project} --case <group>:<id>.`,
     ];
   }
 
@@ -181,7 +188,7 @@ export function judgeTurn(input: TurnGateInput): string[] {
   if (touched.length === 0 || (uncovered.length > 0 && covered.size > 0)) {
     const files = touched.length === 0 ? code : uncovered;
     gaps.push(
-      `Tests block: no case covers ${named(files)} — add or extend one (codePaths = the changed files): ${caseCmd(files[0] ?? '')}`,
+      `Tests block: no case covers ${named(files)} — add or extend one (codePaths = the changed files): ${caseCmd(files[0] ?? '')}. ${LINK_TEST}.`,
     );
   }
 
@@ -208,13 +215,17 @@ export function judgeTurn(input: TurnGateInput): string[] {
   const unrunKeys: string[] = [];
   const unrun: string[] = [];
   const unrecorded: string[] = [];
+  const deferred: string[] = [];
   for (const item of direct) {
     if (unrunKeys.length + unrecorded.length >= DEMAND) break;
     const key = `${item.groupId}:${item.caseId}`;
     const testCase = byKey.get(key);
     if (!testCase || testCase.muted) continue;
     if (testCase.automation?.status === 'automated') {
-      if (input.deferRuns) continue;
+      if (input.deferRuns) {
+        if (deferred.length < DEMAND) deferred.push(key);
+        continue;
+      }
       const status = executed.get(key);
       if (!status || status === 'skipped' || status === 'unknown') {
         unrun.push(item.caseId);
@@ -249,6 +260,14 @@ export function judgeTurn(input: TurnGateInput): string[] {
   if (red.length > 0) {
     gaps.push(
       `Tests block: red this turn (${named(red)}) — fix and run again; a red test is never weakened to pass.`,
+    );
+  }
+  // Группе прогон не требуется (он у доставки), но ход и так держат — точная
+  // команда её кейсов тут же: иначе группа искала синтаксис в исходниках панели
+  // (карточка 22). Без других пробелов строки нет — сама она ход не держит.
+  if (deferred.length > 0 && weak.length + gaps.length > 0) {
+    gaps.push(
+      `Tests block: automated cases for the changed code run once at delivery; to check them now: ${input.cli} run ${project} --case ${deferred.join(',')}`,
     );
   }
   return [...weak, ...gaps];

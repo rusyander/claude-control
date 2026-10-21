@@ -53,4 +53,4 @@ inside the library itself, in `node_modules/<package>/android/build` and `.cxx`:
 about 10 GB, and none of it reaches the APK. So `pnpm mobile:apk` wipes them the moment the APK lands
 in the repository root; building several times in a row, use `pnpm mobile:apk --keep-build` for a
 faster rebuild. Left over from an interrupted build — `pnpm mobile:clean` (`--dry` measures without
-deleting), and `pnpm doctor` warns on its own once more than 2 GB has piled up.
+deleting), and `pnpm run doctor` warns on its own once more than 2 GB has piled up.

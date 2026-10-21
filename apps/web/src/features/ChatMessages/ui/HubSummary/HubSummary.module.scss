@@ -24,3 +24,9 @@
   background: var(--color-warning-subtle);
   color: var(--color-fg);
 }
+
+// Сигнал сторожа «тревога» хоть у одной группы — фишка красная: группа молчит.
+.chipAlarm {
+  background: var(--color-danger-subtle);
+  color: var(--color-fg);
+}

@@ -21,6 +21,9 @@ import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } 
  * Права — по переключателю чата (`permission`): правки разрешены — просьба
  * `permission_request` получает «да»; нет — вопрос человеку, его ответ уходит
  * в `POST /session/:id/permission/:rid`. Без политики — отказ, как у `qwen -p`.
+ * Сессия открывается и поднимается с `approvalMode: 'default'`: без него 0.25
+ * берёт `auto`, и правка файла идёт вовсе без `permission_request` — переключатель
+ * чата тогда ничего не решает (живой прогон 21.10 на локальной модели).
  *
  * С `session` (E2b) сессия переживает процесс: следующий ход поднимает её
  * `POST /session/:id/resume` в новом `qwen serve`; события её прежних ходов, если
@@ -31,6 +34,20 @@ import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } 
 
 /** Сколько ждать удаления сессии, прежде чем снять процесс. */
 const DELETE_MS = 3_000;
+
+/**
+ * Режим одобрения сессии qwen. Только `default` шлёт `permission_request` на каждую
+ * правку и команду — решает тогда одна панель (`decidePermission`): правки
+ * разрешены — «да» без вопроса, нет — вопрос человеку. `auto` (умолчание 0.25)
+ * правит файлы молча, мимо переключателя.
+ */
+const APPROVAL_MODE = 'default';
+
+/** Ошибка хода, оборванного отказом в разрешении; `what` — инструмент и цель, если CLI их назвал. */
+function refusedText(what: string): string {
+  const base = 'Qwen остановил ход после отказа в разрешении';
+  return what ? `${base}: ${what}` : base;
+}
 
 const HEALTH_MS = 20_000;
 /** Сколько ждать подхвата принятого сообщения после конца хода (на деле — доли секунды). */
@@ -73,6 +90,12 @@ export class QwenServeTurn implements LiveTurn {
   private readonly graceMs: number;
   private readonly mcpWaitMs: number;
   private permission?: LivePermissionPolicy;
+  /**
+   * Что ход получил отказом («edit notes.txt»). Qwen 0.25 после отказа модели слова
+   * не даёт — ход кончается пустым, и без этой отметки человек прочёл бы свой же
+   * отказ как сбой CLI «без ответа».
+   */
+  private refused?: string;
   private resumed = false;
   /** Сессию оставить по концу хода: её продолжит следующий ход разговора (E2b). */
   private keep = false;
@@ -135,7 +158,10 @@ export class QwenServeTurn implements LiveTurn {
         sessionId = request.resume.id;
         this.resumed = true;
       } else {
-        const created = await this.json('POST', '/session', { cwd: workspace });
+        const created = await this.json('POST', '/session', {
+          cwd: workspace,
+          approvalMode: APPROVAL_MODE,
+        });
         sessionId = typeof created?.sessionId === 'string' ? created.sessionId : undefined;
         if (!sessionId)
           return this.close({ kind: 'unavailable', why: 'POST /session без sessionId' });
@@ -295,6 +321,12 @@ export class QwenServeTurn implements LiveTurn {
               }
               if (open.size === 0 && this.awaitingSteers === 0) {
                 this.active = false;
+                // Пустой ход после отказа — отказ человека, а не молчание CLI. Ошибкой,
+                // а не ответом: слов модели не было, и сессия уходит в удаление, а не
+                // остаётся на диске Qwen сиротой, которую панель уже не продолжит.
+                if (!this.reply.trim() && this.refused !== undefined) {
+                  return { kind: 'error', error: refusedText(this.refused) };
+                }
                 return { kind: 'done', reply: this.reply.trim() };
               }
               break;
@@ -338,6 +370,9 @@ export class QwenServeTurn implements LiveTurn {
     const optionId = pickOption(options, decision);
     // Нет варианта под решение — `cancelled`: для CLI это отказ, «да» не выдумываем.
     const outcome = optionId ? { outcome: 'selected', optionId } : { outcome: 'cancelled' };
+    if (decision === 'deny' || !optionId) {
+      this.refused = [toolCall?.kind, toolCall?.title].filter(Boolean).join(' ');
+    }
     try {
       await this.json('POST', `/session/${this.sessionId}/permission/${requestId}`, {
         outcome,
@@ -412,7 +447,7 @@ export class QwenServeTurn implements LiveTurn {
       const res = await this.fetchImpl(`${this.base}/session/${id}/resume`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: workspace }),
+        body: JSON.stringify({ cwd: workspace, approvalMode: APPROVAL_MODE }),
         signal: this.abort.signal,
       });
       await res.body?.cancel().catch(() => undefined);

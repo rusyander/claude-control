@@ -167,10 +167,16 @@ const TOOL_LINE = {
   qwen: `echo edited>${PROBE}`,
   codex: IS_WIN ? `Set-Content ${PROBE} edited` : `echo edited > ${PROBE}`,
 };
+// Каталог текущего сценария: qwen пишет файл своим `write_file` по абсолютному пути.
+// Оболочкой нельзя — режим `auto` (умолчание qwen 0.25) спрашивает про команду и
+// тогда, когда правки файлов идут молча; проверка была зелёной при правках без вопроса.
+let scenarioDir = '';
 const stub = await startStubModel({
   marker: 'never-steered',
   holdMs: 300,
   toolLine: TOOL_LINE[CLI],
+  // Длинное имя: короткое `RUSYAN~1` из `tmpdir()` qwen serve не пишет (-32603).
+  ...(CLI === 'qwen' ? { fileWrite: () => join(realpathSync.native(scenarioDir), PROBE) } : {}),
 });
 const root = mkdtempSync(join(tmpdir(), 'cc-fperm-'));
 const before = processesUnder([cliDir, root]);
@@ -197,6 +203,7 @@ try {
   const project = (name) => {
     const dir = join(root, name);
     mkdirSync(dir, { recursive: true });
+    scenarioDir = dir;
     return dir;
   };
   const newChat = async (dir) => {
@@ -231,6 +238,13 @@ try {
     JSON.stringify(await status(allowId)),
   );
   check('файла до решения нет', !existsSync(join(dirAllow, PROBE)));
+  if (CLI === 'qwen') {
+    check(
+      'qwen просит о правке файла (write_file), не об оболочке',
+      stub.requests.some((r) => r.tools.includes('write_file')) && asked?.tool === 'edit',
+      JSON.stringify(asked),
+    );
+  }
   await openChat('Запиши файл');
   const shown = await card()
     .waitFor({ timeout: 30_000 })

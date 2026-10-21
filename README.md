@@ -11,7 +11,7 @@ By default the panel configures Claude Code, where everything is available; it a
 🇷🇺 [Русская версия](README.ru.md) · 🔧 [Setup](docs/SETUP.md) · 🛠 [Troubleshooting](docs/TROUBLESHOOTING.md) · 🏗 [How it works](docs/ARCHITECTURE.md) · 🔒 [Security](docs/SECURITY.md) · 📱 [Access from a phone](docs/REMOTE.md) · 💬 [Chat and parallel agents](docs/CHAT.md) · 👥 [Groups](docs/GROUPS.md) · 📡 [Contour](docs/PLATFORM.md) · 🧑‍💻 [Development](docs/DEVELOPMENT.md) · 🚫 [What the panel does not do](docs/LIMITATIONS.md)
 
 > [!TIP]
-> **Won't start?** `pnpm doctor` explains every finding. Still stuck — open Claude Code in this
+> **Won't start?** `pnpm run doctor` explains every finding. Still stuck — open Claude Code in this
 > folder and say "it won't start, figure it out": it reads [AGENTS.md](AGENTS.md), the map of this
 > project written for the agent, and starts with diagnostics rather than with the code.
 
@@ -122,7 +122,7 @@ Keys you do enter are stored encrypted (AES-256-GCM) in `agentdeck/provider-keys
 
 **Requirements:** Node.js 22.6+ (for TypeScript type stripping), pnpm 10+, and an agent CLI on your `PATH` — by default `claude`, installed and logged in. A machine without Claude Code only needs the CLI you chose, Qwen Code for example: see [first run](docs/SETUP.md#first-run).
 
-**On Windows, one more line, once per machine:** `git config --global core.longpaths true`. Parallel working copies live at a path longer than the original, and without permission for long paths git reports real files as deleted — `git add -A` inside such a copy would record those deletions. `pnpm doctor` checks this and tells you if it is off; the full story is in [TROUBLESHOOTING.md → Parallel copies show files as deleted](docs/TROUBLESHOOTING.md#parallel-copies-show-files-as-deleted).
+**On Windows, one more line, once per machine:** `git config --global core.longpaths true`. Parallel working copies live at a path longer than the original, and without permission for long paths git reports real files as deleted — `git add -A` inside such a copy would record those deletions. `pnpm run doctor` checks this and tells you if it is off; the full story is in [TROUBLESHOOTING.md → Parallel copies show files as deleted](docs/TROUBLESHOOTING.md#parallel-copies-show-files-as-deleted).
 
 ```bash
 pnpm install

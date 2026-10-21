@@ -1,4 +1,5 @@
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
+import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
 
 /** Запись MCP-сервера, как её видит профиль: имя и настройка из файла. */
 export interface ProfileMcpEntry {
@@ -50,7 +51,23 @@ export interface GroupProfileInput {
    * проектные настройки. Профиль потолок только поднимает — больший из них остаётся.
    */
   bashCeilings?: readonly (string | undefined)[];
+  /**
+   * Рычаги экономии из настроек панели (`groupEconomy`): длина ответов Bash и
+   * чтения, срок кэша, отвязка от IDE, строка о привычках. Нет — прогон как до них.
+   */
+  economy?: GroupEconomyInput;
+  /**
+   * Звенья, которые конвейер заведёт после этого (директива L3): за ним ревью —
+   * навыки ревью запрещены; доставка — пуш и открытие MR. Нет — без запретов.
+   */
+  ahead?: { review?: boolean; deliver?: boolean };
 }
+
+/** Рычаги экономии, которые едут в запуск группы; окно сжатия — своим полем выше. */
+export type GroupEconomyInput = Pick<
+  GroupEconomy,
+  'bashOutputChars' | 'readOutputTokens' | 'cacheTtl' | 'detachIde' | 'workHabits'
+>;
 
 /** Что профилю известно о навыках: личные, навыки групп панели прогона, плагины. */
 export interface SkillScopeInput {

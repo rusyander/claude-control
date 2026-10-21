@@ -11,6 +11,8 @@ import { GroupRecheck } from '../GroupRecheck/GroupRecheck';
 import { SplitTasksMove } from '../SplitTasksMove/SplitTasksMove';
 import { GroupAutoNotices } from '../GroupAutoNotices/GroupAutoNotices';
 import { GroupText } from '../GroupText/GroupText';
+import { GroupAsk } from '../GroupAsk/GroupAsk';
+import { GroupSignals } from '../GroupSignals/GroupSignals';
 import { MergeOrderChip } from '../MergeOrderChip/MergeOrderChip';
 import type { GroupCardProps } from './GroupCard.types';
 import styles from './GroupCard.module.scss';
@@ -40,9 +42,12 @@ export function GroupCard({
   releaseBusy,
   onResumeInterrupted,
   resumeInterruptedBusy,
+  questions,
+  onAnswer,
 }: GroupCardProps) {
   const { t } = useTranslation();
   const chatId = group.chatId;
+  const asks = chatId && onAnswer && questions?.length ? questions : undefined;
   const openable = Boolean(chatId && onOpen);
   const mrId = group.mr?.match(/(\d+)$/)?.[1] ?? '';
   // PR GitHub — «PR #12», MR GitLab — «MR !12»: слово и знак своего форджа.
@@ -171,8 +176,17 @@ export function GroupCard({
 
       {/* Что под карточкой — во всю её ширину и над растянутой кнопкой:
           форма ответа, отметка уборки копии, предупреждения панели. */}
-      {(cleanup?.cleaned || group.hold || group.autoNotices) && (
+      {(asks || cleanup?.cleaned || group.hold || group.autoNotices || group.watchSignals) && (
         <div className={styles.groupFoot}>
+          {asks && onAnswer && (
+            <GroupAsk questions={asks} stage={group.stages.at(-1)} onAnswer={onAnswer} />
+          )}
+          {group.watchSignals && (
+            <GroupSignals
+              signals={group.watchSignals}
+              {...(onOpen ? { onOpen: (target: string) => onOpen(target) } : {})}
+            />
+          )}
           {cleanup?.cleaned && parentChatId && (
             <GroupCopyCleanup
               parentChatId={parentChatId}

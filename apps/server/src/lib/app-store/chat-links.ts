@@ -1,3 +1,4 @@
+import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
 import type { AppState, ChatLink } from './app-store.types.ts';
 
 /**
@@ -91,6 +92,8 @@ export function linkChatSession(state: AppState, chatId: string, sessionId: stri
   // одним из них (`saveLink`, `markReviewed`), а после перезапуска это и вовсе
   // два разных объекта.
   link.conversation ??= chatId;
+  // Разговор родился — задание звена знает его сессия; копия в состоянии не нужна.
+  delete link.stagePrompt;
   setChatLink(state, sessionId, link);
   return true;
 }
@@ -102,8 +105,33 @@ export function linkChatSession(state: AppState, chatId: string, sessionId: stri
  * старым в один узел (Д11).
  */
 export function carriedLink(link: ChatLink): ChatLink {
-  const { conversation: _closed, ...rest } = link;
+  // Рычаги экономии — свои у каждого разговора: новый берёт текущие настройки.
+  // Задание непорождённого звена — его, а не разговора, на который связь едет.
+  const { conversation: _closed, economy: _pinned, stagePrompt: _stage, ...rest } = link;
   return { ...rest, createdAt: new Date().toISOString() };
+}
+
+/**
+ * Рычаги экономии разговора: закреплённые на его первом старте, а нет — текущие,
+ * которые тут же закрепляются под всеми ключами разговора. Связи нет — текущие.
+ */
+export function pinLinkEconomy(
+  state: AppState,
+  keys: readonly string[],
+  current: GroupEconomy,
+): { economy: GroupEconomy; pinned: boolean } {
+  const links = state.chatLinks ?? {};
+  const key = keys.find((candidate) => links[candidate]);
+  const link = key ? links[key] : undefined;
+  if (!key || !link) return { economy: current, pinned: false };
+  if (link.economy) return { economy: link.economy, pinned: false };
+  // Все ключи сразу: у старых связей без канонического ключа разговор узнаётся
+  // по одинаковому содержимому, и поле под одним ключом раздвоило бы дерево.
+  for (const same of conversationKeys(links, key)) {
+    const other = links[same];
+    if (other) other.economy = current;
+  }
+  return { economy: current, pinned: true };
 }
 
 /**
@@ -127,6 +155,45 @@ export function conversationKeys(links: Record<string, ChatLink>, chatId: string
   }
   const identity = JSON.stringify(link);
   return Object.keys(links).filter((key) => JSON.stringify(links[key]) === identity);
+}
+
+/** Стадии, чья сессия пишет код группы: продолжать работу можно только в них. */
+const WRITING_STAGES: readonly (string | undefined)[] = ['work', 'fix', 'deliver', undefined];
+
+/**
+ * Чем продолжить группу, чей чат стадии так и не родился (живой прогон 20.10,
+ * группа 1): звено заведено под `new-…`, пауза пришла до первого хода, и
+ * настоящего ключа у разговора нет — CLI под временным ключом его не хранит.
+ * Раньше «Продолжить» тут отказывало навсегда, и у группы не было ни одной
+ * кнопки, хотя работа лежала в копии и в прошлой сессии.
+ *
+ * Продолжается последняя родившаяся сессия той же группы, писавшая код. Если
+ * нерождённым было ревью, отметка `reviewedAt` у неё снимается: ревью не было,
+ * и конец хода должен завести его заново — свежей сессией, как всегда.
+ */
+export function unbornResumeTarget(
+  links: Record<string, ChatLink>,
+  chatId: string,
+): { chatId: string; clearReviewed: boolean } | undefined {
+  const link = links[chatId];
+  if (!link || link.groupIndex === undefined) return undefined;
+  if (conversationKeys(links, chatId).some((key) => !key.startsWith('new-'))) return undefined;
+  const born = Object.entries(links)
+    .filter(
+      ([key, other]) =>
+        !key.startsWith('new-') &&
+        other.parentChatId === link.parentChatId &&
+        other.groupIndex === link.groupIndex &&
+        WRITING_STAGES.includes(other.stage) &&
+        (other.createdAt ?? '') <= (link.createdAt ?? ''),
+    )
+    .sort(([, a], [, b]) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  const target = born[0];
+  if (!target) return undefined;
+  return {
+    chatId: target[0],
+    clearReviewed: link.stage === 'review' && Boolean(target[1].reviewedAt),
+  };
 }
 
 /** Самые старые связи вытесняются: файл состояния не должен расти без края. */

@@ -1,0 +1,137 @@
+import { object, number, boolean, enum as zodEnum, type infer as Infer } from 'zod';
+
+/** Границы числовых рычагов экономии групп: ноль — «не трогать, решает CLI». */
+export const GROUP_ECONOMY_LIMITS = {
+  // Окно CLI принимает только от 100k до 1M — меньшее он отверг бы молча.
+  compactWindow: { min: 100_000, max: 1_000_000 },
+  // Зажим самого CLI: меньше 4000 и больше 128 000 он всё равно не возьмёт.
+  bashOutputChars: { min: 4_000, max: 128_000 },
+  readOutputTokens: { min: 2_000, max: 100_000 },
+} as const;
+
+/**
+ * Рычаги экономии групп разделения (владелец, 21.10.2026, замер прогона 20.10).
+ *
+ * Группа — долгий разговор, и каждый вызов перевыставляет всё накопленное окно:
+ * три четверти расхода — чтение кэша. Поэтому рычаги бьют в средний размер окна
+ * (порог сжатия, длина ответов инструментов), в цену записи (срок кэша, чистая
+ * сессия после остывшего кэша) и в цену модели там, где работа механическая
+ * (доставка). Каждый выключается здесь же — по одному, без перезапуска панели.
+ * Порог сжатия, доставка на Sonnet и новый разговор после паузы читаются на ходу;
+ * остальные закрепляются на первом старте разговора (`pinLinkEconomy`): строка в
+ * системном промпте и переменные запуска посреди тёплой сессии переписали бы кэш.
+ */
+export const groupEconomySchema = object({
+  /**
+   * Окно автосжатия групп, токены (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`). Средний
+   * контекст вызова — половина пути от базы после сжатия до порога, поэтому
+   * порог ниже — каждый вызов дешевле, сжатий больше, но и подробностей
+   * теряется больше. Ноль — окно человека — по умолчанию: знак влияния на
+   * качество неизвестен, пока сравнительный прогон (группа на 160k против
+   * контрольной) не покажет, что расход на правку падает без потерь.
+   * Переменная панели `AGENTDECK_GROUP_COMPACT_WINDOW` сильнее — для этого прогона.
+   */
+  compactWindow: number().int().nonnegative().default(0),
+  /**
+   * Потолок ответа Bash в окне группы (`bashOutputMaxChars` CLI). Замер 21.10
+   * (CLI 2.1.286, `check-group-economy.mjs`): вывод длиннее CLI кладёт в файл и
+   * отдаёт превью начала ~2k знаков и путь; у упавшей команды — «Exit code N» и
+   * начало до потолка, без файла, хвост с ошибкой не виден. Ноль — 30 000 CLI.
+   */
+  bashOutputChars: number().int().nonnegative().default(8_000),
+  /**
+   * Потолок одного чтения файла, токены (`CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS`).
+   * Файл больше — CLI 2.1.286 отдаёт начало (замер 21.10: 70 069 → 35 540 знаков),
+   * и модель дочитывает кусками. Ноль — потолок CLI.
+   */
+  readOutputTokens: number().int().nonnegative().default(10_000),
+  /**
+   * Срок кэша подсказки (`CLAUDE_CODE_PROMPT_CACHE_TTL`). Пусто — решает CLI
+   * (на подписке час). Пять минут дешевле на записи, но любая пауза длиннее —
+   * долгая команда, вопрос человеку — переписывает всё окно заново: в прогоне
+   * 20.10 таких пауз у работы группы было до двадцати, и это дороже экономии.
+   */
+  cacheTtl: zodEnum(['', '5m', '1h']).default(''),
+  /**
+   * Не подключать группу к IDE, из которой запущена панель
+   * (`CLAUDE_CODE_AUTO_CONNECT_IDE=false`): диагностика редактора о ЧУЖОЙ папке
+   * приходила группе вставками в каждый ход и шла ложными ошибками.
+   */
+  detachIde: boolean().default(true),
+  /**
+   * Доставка (коммит, пуш, MR, сита) — на Sonnet. Работа, ревью и правки
+   * остаются на своей модели. Доставка в прогоне 20.10 — четверть расхода
+   * групп и шла с чистой сессии, так что тёплый кэш работы она не теряет.
+   */
+  sonnetDeliver: boolean().default(true),
+  /**
+   * Продолжение группы после паузы от 55 минут (кэш остыл; при кэше 5m — от
+   * четырёх) при окне от базы сессии + 25k (≈85k) — новым разговором с вводной,
+   * которую панель собрала из файлов, а не перезаписью всего старого окна в кэш.
+   */
+  freshOnColdResume: boolean().default(true),
+  /**
+   * Строка о привычках к прогону группы: независимые чтения и команды — одним
+   * шагом, узкий вывод, без смены папки. Подагентов не советует: их запуск — по
+   * согласию человека (директива L9).
+   */
+  workHabits: boolean().default(true),
+});
+
+export type GroupEconomy = Infer<typeof groupEconomySchema>;
+
+/** Значения по умолчанию — те, что панель помечает «рекомендуется». */
+export const GROUP_ECONOMY_DEFAULTS: GroupEconomy = groupEconomySchema.parse({});
+
+/**
+ * Что хранить на диске: только рычаги, отличные от умолчаний. Блок целиком
+ * замораживал бы умолчания — их смена в коде до этого пользователя не дошла бы
+ * (стенд жил на прежнем окне сжатия 160k после переворота умолчания в ноль).
+ */
+export function groupEconomyChanges(
+  value: Partial<GroupEconomy> | undefined,
+): Partial<GroupEconomy> {
+  const changes: Record<string, unknown> = {};
+  for (const [key, setting] of Object.entries(value ?? {})) {
+    if (setting !== undefined && setting !== GROUP_ECONOMY_DEFAULTS[key as keyof GroupEconomy]) {
+      changes[key] = setting;
+    }
+  }
+  return changes as Partial<GroupEconomy>;
+}
+
+/** Блок для чтения: сохранённые отличия поверх умолчаний текущего кода. */
+export function groupEconomyWithDefaults(value: Partial<GroupEconomy> | undefined): GroupEconomy {
+  return { ...GROUP_ECONOMY_DEFAULTS, ...value };
+}
+
+/** Номеров групп у разделения не больше, чем ключей ручных замен модели. */
+const MAX_GROUP_KEYS = 30;
+
+/**
+ * Выбор «Доставка на Sonnet» с карточки разделения: номер группы → да/нет.
+ * Тело пишет клиент, поэтому берутся только номера в пределах и настоящие
+ * да/нет. Пусто — человек ни одной группы не трогал, решает общий рычаг.
+ */
+export function parseGroupSonnetDeliver(raw: unknown): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const index = Number(key);
+    if (!Number.isInteger(index) || index < 0 || index >= MAX_GROUP_KEYS) continue;
+    if (typeof value === 'boolean') out[String(index)] = value;
+  }
+  return out;
+}
+
+/**
+ * Идёт ли доставка группы на Sonnet: выбор человека для этой группы сильнее
+ * общего рычага в обе стороны (F-12 ревью П1 — одна дорогая группа рядом с
+ * механическими). Выбора нет — общий рычаг; нет и его — доставка на модели работы.
+ */
+export function resolveSonnetDeliver(
+  groupChoice: boolean | undefined,
+  global: boolean | undefined,
+): boolean {
+  return groupChoice ?? global === true;
+}

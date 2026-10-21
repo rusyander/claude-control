@@ -12,6 +12,7 @@ import { panelUpdateEn } from './panel-update/en.ts';
 import { chatProjectsEn } from './chat-projects/en.ts';
 import { watcherEn } from './watcher/en.ts';
 import { mascotEn } from './mascot/en.ts';
+import { groupWatchEn } from './group-watch/en.ts';
 import { usageLimitsEn } from './usage-limits/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
@@ -43,6 +44,7 @@ export const en: TranslationSchema = {
   chatProjects: chatProjectsEn,
   watcher: watcherEn,
   mascot: mascotEn,
+  groupWatch: groupWatchEn,
   usageLimits: usageLimitsEn,
   devRestart: devRestartEn,
   environment: environmentEn,
@@ -1019,6 +1021,12 @@ export const en: TranslationSchema = {
         loweredCount: 'below the ceiling: {{count}}',
         pipeline: 'up to {{total}} runs with reviews',
         pipelinePlanned: 'up to {{total}} runs: triage, plans, work and reviews',
+        sonnetDeliver: 'Delivery on Sonnet',
+        sonnetDeliverLabel: 'Deliver the “{{title}}” group on Sonnet',
+        sonnetDeliverHint:
+          'This group’s commit, push, MR and sieves run on Sonnet. Work, review and fixes ' +
+          'stay on the group’s own model. Clear it for a group whose delivery its own model ' +
+          'should do; the default follows Settings → Split group economy.',
       },
       triageStarted: 'Split triage started — the groups start on its verdict',
       triageDeferred: 'Tree paused — the triage is created, it starts on “Resume all”',
@@ -1181,6 +1189,8 @@ export const en: TranslationSchema = {
         mergeOrderFree: 'Depends on no other MR: its place follows the plan order',
         mergeOrderName: '“{{name}}”',
         openHint: 'Open the group’s chat',
+        askFrom: 'The agent asks · {{stage}} · chat {{chat}}',
+        askFromNoStage: 'The agent asks · chat {{chat}}',
         waiting: 'waiting for: {{names}}',
         held: 'waiting for your answer',
         holdAnswered: 'answered',
@@ -5090,6 +5100,73 @@ export const en: TranslationSchema = {
       'and ScheduleWakeup tools. Their descriptions take about 12k tokens at the start of every ' +
       'request and are rarely used. Turn this off when the agent needs to publish pages, run ' +
       'multi-agent workflows or wake itself on a timer — it gets the full set from its next turn.',
+    groupEconomyTitle: 'Split group economy',
+    groupEconomyHint:
+      'A group is a long conversation, and every call sends the model the whole window again. ' +
+      'These levers keep the window smaller and the mechanical steps cheaper. Each one switches ' +
+      'off on its own, no panel restart needed. The compaction threshold and a new conversation ' +
+      "after a pause apply from the group's next turn, Sonnet delivery from the next delivery. " +
+      "The rest apply from the group's next new conversation: one already started keeps the " +
+      'levers it started with — changing them midway would rewrite its whole cache.',
+    groupCompactWindow: 'Group context compaction threshold',
+    groupCompactWindowHint:
+      "When a group's window reaches the threshold, the CLI compacts it into a summary. A lower " +
+      'threshold makes every call cheaper but compacts more often and loses more detail. Until a ' +
+      'comparison run shows quality holds, the default is the Claude Code threshold. The ' +
+      'AGENTDECK_GROUP_COMPACT_WINDOW variable at panel start wins.',
+    groupCompactWindowEnv:
+      'Groups now run with a {{tokens}} thousand token threshold from the ' +
+      'AGENTDECK_GROUP_COMPACT_WINDOW variable: the choice above does not apply while the panel ' +
+      'runs with it.',
+    groupCompactWindowOff: 'As in Claude Code settings (recommended)',
+    groupCompactWindowValue: '{{tokens}} thousand tokens',
+    groupCompactWindowDefault: '{{tokens}} thousand tokens (recommended)',
+    groupBashOutput: 'Command output in the conversation',
+    groupBashOutputHint:
+      'Ceiling for command output. Longer output the CLI saves to a file and shows the group a ' +
+      'preview of the start (about 2000 characters) and the path; for a failed command, the exit ' +
+      'code and the start of the output up to the ceiling, with no file. Long output is not paid ' +
+      'for by every later call.',
+    groupBashOutputOff: 'CLI default (30,000 characters)',
+    groupBashOutputValue: '{{chars}} characters',
+    groupBashOutputDefault: '{{chars}} characters (recommended)',
+    groupReadOutput: 'One file read',
+    groupReadOutputHint:
+      'The ceiling of one file read. For a bigger file the CLI returns its start and the agent reads ' +
+      'the rest in parts, so only the needed part enters the conversation.',
+    groupReadOutputOff: 'CLI default',
+    groupReadOutputValue: '{{tokens}} thousand tokens',
+    groupReadOutputDefault: '{{tokens}} thousand tokens (recommended)',
+    groupCacheTtl: 'Conversation cache lifetime',
+    groupCacheTtlHint:
+      'Five minutes is cheaper to write, but any longer pause — a long check, a question to you — ' +
+      'writes the whole window again. Groups pause like that often, so by default the CLI decides ' +
+      '(one hour on a subscription).',
+    groupCacheTtlAuto: 'CLI decides (recommended)',
+    groupCacheTtl5m: '5 minutes (not recommended: a pause rewrites the window)',
+    groupCacheTtl1h: '1 hour',
+    groupSonnetDeliver: 'Delivery on Sonnet',
+    groupSonnetDeliverHint:
+      'The group commits, pushes, opens the MR and runs the sieves on Sonnet: it is mechanics, and a ' +
+      'call costs almost half. Work, review and fixes keep their model. Not applied through a contour.',
+    groupFreshOnColdResume: 'New conversation after a long pause',
+    groupFreshOnColdResumeHint:
+      'The group stood idle for 55 minutes or more (the cache went cold) and its window is 25k ' +
+      'above the conversation base (about 85k): any continuation — «Continue», a panel message, ' +
+      'review, push — goes on as a new conversation. The panel builds the brief itself: the ' +
+      "group's notes, commits and changes since the main branch, the last answer. Continuing the " +
+      'cold conversation would write the whole window again. The previous conversation stays on ' +
+      'disk, and the group can search it.',
+    groupDetachIde: 'Keep groups off the editor',
+    groupDetachIdeHint:
+      'A panel started from a VS Code terminal handed its groups the editor connection, and every ' +
+      "turn received diagnostics of someone else's folder — extra tokens and false errors.",
+    groupWorkHabits: 'Economical agent habits',
+    groupWorkHabitsHint:
+      'A line in the group task: independent reads and commands in one step, work from the copy root ' +
+      'without changing folders, narrow command output. The agent reads only what it edits or ' +
+      'judges; the line does not suggest subagents. The CLI also stops reminding the agent about a ' +
+      'long silence: nobody reads an interim report inside a stage.',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:

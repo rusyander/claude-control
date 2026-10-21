@@ -115,6 +115,17 @@
   white-space: nowrap;
 }
 
+// Своя доставка на Sonnet у группы: переключатель с подписью одной строкой,
+// подсказка — по наведению, чтобы строка группы не росла вдвое.
+.deliver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
 .cost {
   margin-bottom: var(--spacing-xs);
 }

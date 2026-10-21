@@ -36,6 +36,25 @@ export function groupIdentityLine(branch: string, tickets: readonly string[]): s
 }
 
 /**
+ * Сообщение панели без первой строки `groupIdentityLine`, когда вводная нового
+ * разговора уже называет ту же ветку и каждый ключ задач (R3 ревью F-05): ключи
+ * сторож git найдёт в ней же, повтор — лишние токены в начале окна. Вводная без
+ * ветки (звено ревью) строку сохраняет — иначе разговор не знал бы, где он.
+ */
+export function withoutGroupIdentity(prompt: string, brief: string): string {
+  const cut = prompt.indexOf('\n\n');
+  if (cut < 0) return prompt;
+  const line = /^(?:Group branch: (\S+)\.)? ?(?:Group tasks: ([^\n]+)\.)?$/.exec(
+    prompt.slice(0, cut),
+  );
+  const [, branch, tickets] = line ?? [];
+  if (!branch && !tickets) return prompt;
+  if (branch && !brief.includes(`Branch ${branch}`)) return prompt;
+  const named = tickets ? tickets.split(', ') : [];
+  return named.every((ticket) => brief.includes(ticket)) ? prompt.slice(cut + 2) : prompt;
+}
+
+/**
  * Что в первой реплике чата написала ПАНЕЛЬ, а не человек, — чтобы название
  * чата не бралось из неё (живой стенд 24–25.09.2026: группы назывались
  * «Панель подготовила эту копию: Локальный слой: перенесено 235,…», звенья —

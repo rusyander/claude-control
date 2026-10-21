@@ -1,4 +1,5 @@
 import type { BuiltinGroupsRecord } from '@agentdeck/contracts/groups';
+import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -64,6 +65,7 @@ import {
   getRetiredChatLinks as readRetiredChatLinks,
   linkChatSession as moveChatLink,
   markChatFirstEdit as stampFirstEdit,
+  pinLinkEconomy,
   retireChatLink as stampChatLinkRetired,
   setChatLink as writeChatLink,
 } from './chat-links.ts';
@@ -147,6 +149,7 @@ import {
   moveLegacyIntegrationTokens,
   readStateFile,
   stateFilePath,
+  stateOnDisk,
   withCurrentIntegrations,
   withCurrentPlatformDrivers,
 } from './state-file.ts';
@@ -280,7 +283,7 @@ export class AppStore {
 
   private persist(): void {
     if (this.isDetached) return;
-    writeJsonFile(this.stateFile, this.state);
+    writeJsonFile(this.stateFile, stateOnDisk(this.state));
     this.writeSettingsSnapshot();
   }
 
@@ -736,6 +739,13 @@ export class AppStore {
   setChatLink(chatId: string, link: ChatLink): void {
     writeChatLink(this.state, chatId, link);
     this.persist();
+  }
+
+  /** Рычаги экономии разговора — закреплённые на его первом старте (`pinLinkEconomy`). */
+  linkEconomy(keys: readonly string[], current: GroupEconomy): GroupEconomy {
+    const { economy, pinned } = pinLinkEconomy(this.state, keys, current);
+    if (pinned) this.persist();
+    return economy;
   }
 
   /**

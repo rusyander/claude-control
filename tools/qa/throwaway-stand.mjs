@@ -526,6 +526,11 @@ export async function startStand({
     // Веб-цель «Dev-сервера» открыла бы браузер ОС на рабочем столе человека, с
     // домом стенда в профиле: окно висит, каталог стенда не удаляется.
     AGENTDECK_OPEN_BROWSER: '0',
+    // Каталог локальных моделей по умолчанию — `.local-models` репозитория, общий с
+    // панелью человека: поставленный там qwen вставал в PATH стенда раньше подставного
+    // («No auth type is selected», прогон 21.10), а стенд мог подхватить его сервер
+    // моделей. Свой пустой каталог; проверка с настоящими моделями задаёт свой в `env`.
+    AGENTDECK_LOCAL_MODELS_DIR: join(root, 'local-models'),
     ...extraEnv,
     ...homeEnv,
     PATH: [...(fakeNames.length > 0 ? [bin] : []), shellPath.path, ...extraPath].join(delimiter),

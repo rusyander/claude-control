@@ -7,8 +7,11 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
+import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
+import { COLD_RESUME_INTRO } from '../../domains/chat/split-continue.ts';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -68,6 +71,8 @@ describe('POST /api/chat/split', () => {
     prompt: string;
     cwd: string;
     appendSystemPrompt?: string;
+    /** Продолженный разговор; нет — новый. */
+    sessionId?: string;
     /** Чем прогон реально стартовал: подбор модели проверяется только здесь. */
     model?: string;
     effort?: string;
@@ -96,6 +101,7 @@ describe('POST /api/chat/split', () => {
           prompt: options.prompt,
           cwd: options.cwd,
           ...(options.appendSystemPrompt ? { appendSystemPrompt: options.appendSystemPrompt } : {}),
+          ...(options.sessionId ? { sessionId: options.sessionId } : {}),
           ...(options.model ? { model: options.model } : {}),
           ...(options.effort ? { effort: options.effort } : {}),
           ...(options.permissionMode ? { permissionMode: options.permissionMode } : {}),
@@ -651,6 +657,88 @@ describe('POST /api/chat/split', () => {
   });
 
   /**
+   * Остывший разговор группы (рычаг `freshOnColdResume`, директива L4): ЛЮБОЕ
+   * продолжение стадии — здесь публикация ревью, у которой своей вводной нет, —
+   * идёт новым разговором, а вводную собирает панель из файлов копии и хвоста
+   * транскрипта. Порог — база сессии (первый вызов) + 25k и пауза от 55 минут.
+   */
+  it('остывшее продолжение любой стадии — новым разговором с вводной панели', () => {
+    const dir = join(root, 'projects', 'C--copy');
+    mkdirSync(dir, { recursive: true });
+    const call = (context: number, text: string) =>
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [{ type: 'text', text }],
+          usage: {
+            input_tokens: 0,
+            output_tokens: 10,
+            cache_read_input_tokens: context,
+            cache_creation_input_tokens: 0,
+          },
+        },
+      });
+    const transcript = (id: string, last: number, idleMs: number): string => {
+      const file = join(dir, `${id}.jsonl`);
+      const lines = [
+        call(40_000, 'Начал ревью.'),
+        call(last, 'Ревью: два замечания, готово к публикации.'),
+      ];
+      writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
+      const at = (Date.now() - idleMs) / 1000;
+      utimesSync(file, at, at);
+      return file;
+    };
+    const copy = join(project, 'copy');
+    mkdirSync(join(copy, '.agent'), { recursive: true });
+    writeFileSync(join(copy, '.agent', 'PROGRESS.md'), 'notebook-marker: замечание 2 открыто\n');
+    const start = createReviewStarter(ctx, {
+      runs: registry,
+      providerChats: new ProviderChatService(),
+      session,
+      log: { warn: () => undefined },
+    });
+    const publish = (id: string) =>
+      start({
+        chatId: id,
+        prompt: 'Publish the review.',
+        cwd: copy,
+        stage: 'review',
+        fromAliases: [id],
+        resume: { sessionId: id },
+      });
+
+    // База 40k + 25k = 65k; 70k после 56 минут — новый разговор.
+    const coldFile = transcript('sess-cold', 70_000, 56 * 60_000);
+    expect(publish('sess-cold').started).toBe(true);
+    const cold = started.at(-1)!;
+    expect(cold.sessionId).toBeUndefined();
+    expect(cold.prompt.startsWith(COLD_RESUME_INTRO)).toBe(true);
+    expect(cold.prompt).toContain('notebook-marker: замечание 2 открыто');
+    expect(cold.prompt).toContain('Ревью: два замечания, готово к публикации.');
+    expect(cold.prompt).toContain(`Previous transcript: ${coldFile}`);
+    expect(cold.prompt.endsWith('Publish the review.')).toBe(true);
+    // Самопересказа не просим: вводная — факты, а не задание пересказать.
+    expect(cold.prompt).not.toMatch(/summari[sz]e/i);
+
+    // Окно у базы (64 999 < 65k) — продолжаем ту же сессию.
+    transcript('sess-small', 64_999, 56 * 60_000);
+    publish('sess-small');
+    expect(started.at(-1)?.sessionId).toBe('sess-small');
+    // Пауза 54 минуты — кэш тёплый, та же сессия при любом окне.
+    transcript('sess-warm', 200_000, 54 * 60_000);
+    publish('sess-warm');
+    expect(started.at(-1)?.sessionId).toBe('sess-warm');
+    expect(started.at(-1)?.prompt).toBe('Publish the review.');
+
+    // Рычаг выключен — остывший тоже продолжается.
+    store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, freshOnColdResume: false } });
+    transcript('sess-off', 150_000, 3 * 60 * 60_000);
+    publish('sess-off');
+    expect(started.at(-1)?.sessionId).toBe('sess-off');
+  });
+
+  /**
    * Отказ «работаем здесь» гасит инициативу и в РОДИТЕЛЬСКОМ разговоре: реплика
    * отказа живёт один ход, а инструкция дописывается к каждому прогону.
    */
@@ -959,6 +1047,61 @@ describe('POST /api/chat/split', () => {
         'pending',
         'pending',
       ]);
+    });
+
+    // F-12 ревью П1: «Доставка на Sonnet» с карточки — своя у каждой группы.
+    const groupLink = (parentChatId: string, groupIndex: number): ChatLink => ({
+      parentChatId,
+      groupIndex,
+      createdAt: new Date().toISOString(),
+    });
+
+    it('выбор доставки на Sonnet по группам — в записи плана, конвейер отдаёт его по связи', async () => {
+      const conveyor = withConveyor();
+      const instance = await withRoutes(conveyor);
+
+      const response = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+          // Мусор и номер за пределом не доезжают: тело пишет клиент.
+          sonnetDeliver: { 0: false, 1: true, 2: 'да', 99: true },
+        },
+      });
+      await instance.close();
+
+      expect(response.statusCode).toBe(200);
+      expect(store.getSplitPlan('parent-1')?.request.sonnetDeliver).toEqual({ 0: false, 1: true });
+      expect(conveyor.sonnetDeliverOf(groupLink('parent-1', 0))).toBe(false);
+      expect(conveyor.sonnetDeliverOf(groupLink('parent-1', 1))).toBe(true);
+      // Связь чужого плана — выбора нет, решает общий рычаг.
+      expect(conveyor.sonnetDeliverOf(groupLink('чужой', 0))).toBeUndefined();
+    });
+
+    it('без выбора на карточке поля в записи нет — доставку решает общий рычаг', async () => {
+      const conveyor = withConveyor();
+      const instance = await withRoutes(conveyor);
+
+      await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      await instance.close();
+
+      expect(store.getSplitPlan('parent-1')?.request).not.toHaveProperty('sonnetDeliver');
+      expect(conveyor.sonnetDeliverOf(groupLink('parent-1', 0))).toBeUndefined();
     });
 
     it('по итогу разбора группы стартуют со звена плана на потолке, границы — в связи', async () => {

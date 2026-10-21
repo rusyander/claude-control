@@ -14,11 +14,12 @@ const plan = (done: number, total: number): ChatProgress => ({
 });
 const STARTED = '2026-10-19T10:00:00.000Z';
 const LAST = '2026-10-19T11:30:00.000Z';
-const running = { isRunning: true, startedAt: STARTED, lastAt: LAST };
+const RUN = '2026-10-19T11:20:00.000Z';
+const running = { isRunning: true, startedAt: STARTED, lastAt: LAST, runStartedAt: RUN };
 const bash = { name: 'Bash', summary: 'pnpm test', startedAt: '2026-10-19T11:28:00.000Z' };
 
 describe('groupProgress', () => {
-  it('идёт по плану: сделано 7 из 14 — 50 %, работает с заведения, вызов виден', () => {
+  it('идёт по плану: сделано 7 из 14 — 50 %, работает со старта хода, вызов виден', () => {
     const view = groupProgress({
       progress: { ...plan(7, 14), activeTool: bash },
       group: running,
@@ -26,7 +27,7 @@ describe('groupProgress', () => {
     });
     expect(view).toMatchObject({
       state: 'working',
-      since: STARTED,
+      since: RUN,
       done: 7,
       total: 14,
       percent: 50,
@@ -101,6 +102,17 @@ describe('groupProgress', () => {
       permission: false,
     });
     expect(view).toEqual({ state: 'finished', since: LAST });
+  });
+
+  /** Живой прогон 20.10: продолженная через сутки группа «работала 21ч 09м» при часе работы. */
+  it('старт хода неизвестен — «работает» без времени, а не с заведения цепочки', () => {
+    const view = groupProgress({
+      progress: { tasks: [], agents: [] },
+      group: { isRunning: true, startedAt: STARTED, lastAt: LAST },
+      permission: false,
+    });
+    expect(view.state).toBe('working');
+    expect(view.since).toBeUndefined();
   });
 
   it('ни плана, ни файла шагов — полосы нет, процентов не выдумывает', () => {

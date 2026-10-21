@@ -108,7 +108,8 @@ export const settingsEn: typeof settingsRu = {
     tabGroups: 'Groups',
     tabGroupsText:
       'What a split group decides by itself, how many groups run at once, which project is ' +
-      'heavy, and the sieves a group passes before an MR.',
+      'heavy, group economy, the group-watch thresholds and the sieves a group passes ' +
+      'before an MR.',
     tabGlobalLayer: 'Global layer',
     tabGlobalLayerText:
       'Mechanics living both in the panel and in the config directory hooks: which copy is ' +

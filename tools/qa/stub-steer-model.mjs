@@ -11,12 +11,16 @@ import { createServer } from 'node:http';
 const IS_WIN = process.platform === 'win32';
 
 // `toolLine` — своя строка для инструмента-оболочки (проверка прав пишет ею файл).
+// `fileWrite` — абсолютный путь файла: при инструменте `write_file` модель пишет файл
+// им, а не оболочкой. Режим одобрения `auto` у qwen 0.25 спрашивает про оболочку, а
+// правку файла пропускает молча — проверка прав без этого его не видела.
 export function startStubModel({
   marker,
   holdMs = 9000,
   port = 0,
   slowTool = false,
   toolLine,
+  fileWrite,
 } = {}) {
   const requests = [];
   let holding = false;
@@ -248,7 +252,11 @@ export function startStubModel({
       requests.push(entry);
       let plan;
       if (seen) plan = { text: 'STEER_SEEN' };
-      else if (!entry.toolResult) {
+      else if (!entry.toolResult && fileWrite && entry.tools.includes('write_file')) {
+        plan = {
+          tool: { name: 'write_file', args: { file_path: fileWrite(), content: 'edited' } },
+        };
+      } else if (!entry.toolResult) {
         const tool = pickTool(tools);
         plan = tool ? { tool: { name: tool.name, args: argsFor(tool.schema) } } : { hold: true };
       } else plan = { hold: true };

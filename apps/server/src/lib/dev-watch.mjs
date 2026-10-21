@@ -33,13 +33,15 @@
 import { spawn } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, watch } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { appDataDirOf } from './brand.mjs';
 import {
   appendDevLog,
   clearRestartState,
   deferReason,
+  RUNS_WAIT_CAP_MS,
+  runsWaitCapped,
   takeRestartRequest,
   writeRestartState,
 } from './dev-restart.mjs';
@@ -49,6 +51,10 @@ const SKIP_DIRS = new Set(['node_modules', '__fixtures__', 'coverage', 'dist']);
 const TEST_FILE = /\.(test|spec)\.[cm]?[jt]s$/;
 const DEBOUNCE_MS = 300;
 const DEFER_POLL_MS = Number(process.env.AGENTDECK_DEV_DEFER_POLL_MS) || 5_000;
+/** Предел ожидания ходов; `0` выключает его (ждать, как до 21.10, без предела). */
+const RUNS_CAP_MS = process.env.AGENTDECK_DEV_RUNS_CAP_MS
+  ? Math.max(0, Number(process.env.AGENTDECK_DEV_RUNS_CAP_MS) || 0)
+  : RUNS_WAIT_CAP_MS;
 /**
  * Журналы процессов проверок проекта в каталоге данных: имена — те же, что у
  * `project-tests/runs.ts` и `mutation.ts` (сторож исполняется голым Node и
@@ -164,9 +170,23 @@ export class SourceWatcher {
 
 /** Идёт ли ход: запись журнала не ждущая, и её процесс жив. */
 export function busyRun(entries, isAlive) {
-  return entries.some(
-    (entry) => entry && !entry.idle && typeof entry.pid === 'number' && isAlive(entry.pid),
-  );
+  return entries.some((entry) => runGoing(entry, isAlive));
+}
+
+function runGoing(entry, isAlive) {
+  return Boolean(entry && !entry.idle && typeof entry.pid === 'number' && isAlive(entry.pid));
+}
+
+/**
+ * Идущие ходы по именам — папка прогона (у копии группы в ней ветка), без неё
+ * ключ разговора: их называет панель, когда перезапуск по пределу их не дождётся.
+ */
+export function busyRunNames(entries, isAlive) {
+  const names = entries
+    .filter((entry) => runGoing(entry, isAlive))
+    .map((entry) => (typeof entry.cwd === 'string' && entry.cwd ? basename(entry.cwd) : entry.key))
+    .filter((name) => typeof name === 'string' && name);
+  return [...new Set(names)];
 }
 
 /** Подготовка копии старше этого — след процесса, умершего без перезапуска. */
@@ -217,6 +237,11 @@ export function readJsonSteady(file, read = readFileSync, attempts = READ_ATTEMP
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, READ_PAUSE_MS);
     }
   }
+}
+
+/** Предел для журнала: минуты, а короче минуты (тесты) — секунды. */
+function capLabel(ms) {
+  return ms >= 60_000 ? `${Math.round(ms / 60_000)} мин` : `${Math.round(ms / 1000)} с`;
 }
 
 /** Идёт ли ход по журналу процессов; нечитаемый журнал — занято. */
@@ -380,31 +405,50 @@ function main() {
     // успел перезапустить сам) иначе сорвал бы следующую, и живые ходы
     // оборвались бы без клика (ревью 30.09).
     const forced = takeRestartRequest(appData) && deferredSince !== undefined;
+    // Ходы ждём до предела (D1), подготовку копий и проверки — без него.
+    const ledger = readJsonSteady(ledgerFile);
+    const entries = Array.isArray(ledger.value) ? ledger.value : [];
+    const runsBusy = ledger.unreadable === true || busyRun(entries, pidAlive);
+    const capped = runsWaitCapped(deferredSince, now, RUNS_CAP_MS);
     const waitingFor =
       defer && !forced
         ? deferReason(
-            ledgerBusy(ledgerFile, pidAlive),
+            runsBusy && !capped,
             setupBusy(stateFile, now),
             checkLedgers.some((file) => ledgerBusy(file, pidAlive)),
           )
         : undefined;
+    const runs = runsBusy ? busyRunNames(entries, pidAlive).slice(0, 5) : [];
     if (waitingFor) {
       if (deferredSince === undefined) {
         deferredSince = now;
         log(
-          'правки ждут конца идущих ходов, подготовки копий и проверок — перезапуск без предела отложен',
+          RUNS_CAP_MS > 0
+            ? `правки ждут конца идущих ходов (предел ${capLabel(RUNS_CAP_MS)}), подготовки копий и проверок (без предела) — перезапуск отложен`
+            : 'правки ждут конца идущих ходов, подготовки копий и проверок — перезапуск без предела отложен',
         );
       }
+      const capAt =
+        RUNS_CAP_MS > 0 && runsBusy && !capped
+          ? new Date(deferredSince + RUNS_CAP_MS).toISOString()
+          : undefined;
       writeRestartState(appData, {
         pid: process.pid,
         since: new Date(deferredSince).toISOString(),
         files: [...pending].map((file) => relative(repoRoot, file).replace(/\\/g, '/')),
         waitingFor,
+        ...(capAt ? { capAt } : {}),
+        ...(runs.length > 0 ? { runs } : {}),
       });
       timer = setTimeout(restart, DEFER_POLL_MS);
       return;
     }
     if (forced && deferredSince !== undefined) log('перезапуск по просьбе из панели');
+    else if (defer && capped && runsBusy) {
+      log(
+        `предел ожидания ходов (${capLabel(RUNS_CAP_MS)}): перезапуск, не дождавшись ${runs.length > 0 ? runs.join(', ') : 'идущих ходов'}`,
+      );
+    }
     deferredSince = undefined;
     clearRestartState(appData);
     const files = [...pending];

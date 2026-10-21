@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { AppSettings } from '@agentdeck/contracts';
+import type { AppSettings, AppSettingsPatch } from '@agentdeck/contracts';
 import { queryKeys, isProviderScopedKey } from '@shared/api/query-keys';
 
 /**
@@ -12,12 +12,16 @@ import { queryKeys, isProviderScopedKey } from '@shared/api/query-keys';
 export function applySettingsUpdate(
   queryClient: QueryClient,
   settings: AppSettings,
-  patch: Partial<AppSettings>,
+  patch: AppSettingsPatch,
 ): void {
   // Настройки кладём в кеш напрямую: тема и язык должны примениться
   // мгновенно, без ожидания повторного запроса.
   queryClient.setQueryData(queryKeys.settings, settings);
+  applyPatchEffects(queryClient, patch);
+}
 
+/** Сбросы чужих запросов, которые тянет за собой правка, — без записи самих настроек. */
+export function applyPatchEffects(queryClient: QueryClient, patch: AppSettingsPatch): void {
   // Источник каталога — настройка, от которой зависит ЧУЖОЙ запрос. Ключ
   // каталога источника не содержит, а `staleTime` у него десять минут: без
   // сброса переключение «models.dev ↔ контур» десять минут не меняло на экране

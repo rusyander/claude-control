@@ -38,6 +38,8 @@ import type {
   StoredChatGroupSettings,
 } from '@agentdeck/contracts/chat-group-settings';
 import type { StoredSplitDefaults } from '@agentdeck/contracts/split-groups';
+import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
+import type { GroupWatchRecord } from '@agentdeck/contracts/group-watch';
 import type { SplitHumanStepView, SplitTicketView } from '@agentdeck/contracts/split-tickets';
 import type { SieveReportRow } from '@agentdeck/contracts/sieves';
 import type { ReviewDepthGap, ReviewTier } from '@agentdeck/contracts/model-cascade';
@@ -116,6 +118,13 @@ export interface ChatLink {
    * под ключами одного прогона). Нет — связь старше поля, узнаём по содержимому.
    */
   conversation?: string;
+  /**
+   * Рычаги экономии, с которыми разговор стартовал. Часть их — строка в
+   * системном промпте, отвязка от редактора — меняет начало запроса, и правка
+   * настроек посреди тёплой сессии переписала бы весь её кэш. Поэтому
+   * продолжение берёт эти, а новые настройки достаются новым разговорам.
+   */
+  economy?: GroupEconomy;
   /** Когда связь записана — по ней вытесняются самые старые. */
   createdAt: string;
   /**
@@ -193,6 +202,14 @@ export interface ChatLink {
    * `review`, и по этому полю она отличается от ревью работы.
    */
   fixFindings?: string[];
+  /**
+   * Задание звена правок или доставки целиком — пока звено не родилось (F-07
+   * ревью П1). Собранный планировщиком промпт жил только в памяти: оборвался
+   * процесс до первого хода — «Продолжить» продолжало прошлую сессию работы
+   * общим словом, и замечания или задание доставки терялись. Рождение разговора
+   * (`linkChatSession`) и копия связи (`carriedLink`) поле снимают.
+   */
+  stagePrompt?: string;
   /**
    * Свои шаги «Пути» группы (`domains/chat/path-steps/path-steps.ts`), идущие ходами в ЭТОМ
    * чате после его стадии. Без записи шаг заводился бы на каждом ходу человека,
@@ -493,6 +510,8 @@ export interface SplitPlanGroupRecord {
   stand?: { name: string; image: string; startedAt: string };
   /** Итог закрытия группы ревью по её копии (T13, T6/T11). */
   reviewClose?: SplitGroupReviewClose;
+  /** Сигналы сторожа групп (`token-ledger/watch`), новые первыми, не больше 20. */
+  watch?: GroupWatchRecord;
 }
 
 export type SplitReviewClose = SplitGroupReviewClose;
@@ -606,6 +625,11 @@ export interface SplitPlanRecord {
     model?: string;
     effort?: string;
     assignments?: Record<string, { model?: string; effort?: string }>;
+    /**
+     * «Доставка на Sonnet» с карточки: номер группы → выбор человека. Нет номера —
+     * доставку группы решает общий рычаг `groupEconomy.sonnetDeliver` (F-12).
+     */
+    sonnetDeliver?: Record<string, boolean>;
   };
   /** Предложение агента после применения разбора (задачи, границы, заметки). */
   proposal: {

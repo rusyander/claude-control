@@ -54,14 +54,20 @@ export const SYNC_ON_CONFLICT_LINE =
 export const OWNER_PRECEDENCE_LINE = `Precedence: the global and project rules (${RULE_SOURCES}) and the owner's own words in the task set the scope, depth, format and permissions of this run; the panel's lines only ADD checks, skills and verification on top. Where a panel line seems narrower than what the owner asked or a rule requires, follow the owner and the rule. Fixed regardless of anything: never merge, approve or resolve threads, never push with a bare --force, and a read-only stage edits no code.`;
 
 /**
+ * Кто ведёт доставку в строке навыков (владелец 20.10). Отдельно — им же старые
+ * задания, выданные до смены схемы, переводятся на новую (`stage-scheme.ts`).
+ */
+export const DELIVERY_SKILL_ROUTE =
+  'a ticket or delivery to an MR → the delivery skill of the panel group, else the global `ticket-delivery-2` (a project one only supplies facts)';
+
+/**
  * Навык по роду работы (U12). Ревью и доставку задания стадий называли и раньше,
  * а работа группы шла без строки о навыках вовсе: тесты, конфликт слияния,
  * баг с неизвестной причиной делались «на глаз», хотя набор панели везёт для них
  * свои навыки. Строка общая, без проекта: общий навык и навык панели главнее
  * проектного (владелец 20.10), нет навыка — те же шаги руками, и это сказано вслух.
  */
-export const SKILL_ROUTE_LINE =
-  'Skills: before acting, load the skill this kind of work calls for — the one the task names, else the one the skill router (skill-map) points to: a review → deep-review; merge conflicts → resolving-merge-conflicts; a ticket or delivery to an MR → the delivery skill of the panel group, else the global `ticket-delivery-2` (a project one only supplies facts); tests → unit-integration-tests; a bug of unknown cause → log-forensics; a visible UI fix → before/after screenshots as the rules say. A skill not installed here — go through the same steps yourself and say so.';
+export const SKILL_ROUTE_LINE = `Skills: before acting, load the skill this kind of work calls for — the one the task names, else the one the skill router (skill-map) points to: a review → deep-review; merge conflicts → resolving-merge-conflicts; ${DELIVERY_SKILL_ROUTE}; tests → unit-integration-tests; a bug of unknown cause → log-forensics; a visible UI fix → before/after screenshots as the rules say. A skill not installed here — go through the same steps yourself and say so.`;
 
 /**
  * Текст без строки старшинства. Задание группы её уже несёт (`buildGroupPrompt`),

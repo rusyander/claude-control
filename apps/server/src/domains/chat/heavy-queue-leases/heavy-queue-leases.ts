@@ -52,3 +52,32 @@ export function releaseSessionLeases(dir: string, sessionId: string): number {
   }
   return released;
 }
+
+/**
+ * Держит ли сессия аренду очереди тяжёлых шагов — идёт долгая проверка, и
+ * молчание звена законно (сторож групп, R1). Аренда с истёкшим `until` — не
+ * держит: её оставил убитый CLI, и хук уберёт её на следующем опросе, а до того
+ * она глушила бы R1 до получаса. Только чтение; сбой — «не держит».
+ */
+export function sessionHoldsLease(dir: string, sessionId: string, now = Date.now()): boolean {
+  if (!sessionId) return false;
+  const root = join(dir, 'leases');
+  let names: string[];
+  try {
+    names = readdirSync(root);
+  } catch {
+    return false;
+  }
+  return names.some((name) => {
+    if (!name.endsWith('.json')) return false;
+    try {
+      const lease = JSON.parse(readFileSync(join(root, name), 'utf8')) as {
+        session?: unknown;
+        until?: unknown;
+      };
+      return lease.session === sessionId && typeof lease.until === 'number' && lease.until > now;
+    } catch {
+      return false;
+    }
+  });
+}

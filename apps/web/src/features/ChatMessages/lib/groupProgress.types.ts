@@ -15,6 +15,8 @@ export interface GroupProgressInput {
     startedAt?: string;
     /** Последняя запись в цепочке (ISO). */
     lastAt?: string;
+    /** Старт идущего хода (ISO): с него считается «работает». */
+    runStartedAt?: string;
   };
   /** Прогон группы стоит на запросе прав — карточка ждёт человека. */
   permission: boolean;

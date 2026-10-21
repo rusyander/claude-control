@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { HANDOFF_BLOCK_LANG, HANDOFF_GROUP_MAX_CHAIN } from '@agentdeck/contracts/chat-handoff';
+import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
 import { WARM_DELIVER_LINE } from '../../domains/chat/group-continuation/group-continuation.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
@@ -104,6 +105,10 @@ function build(
     paused?: boolean;
     /** Ответ по параметрам прогона; пусто — правило `every`/`FIRST_PROMPT`. */
     answer?: (runOptions: { prompt: string; model?: string }) => string | undefined;
+    /** Рычаг экономии «Доставка на Sonnet»; пусто — настроек экономии нет (как раньше). */
+    sonnetDeliver?: boolean;
+    /** Выбор группы с карточки разделения; пусто — выбора не было. */
+    groupSonnetDeliver?: boolean;
   } = {},
 ) {
   const chains = new HandoffChains();
@@ -187,7 +192,13 @@ function build(
       },
       markReviewed: () => undefined,
       hasWork: () => true,
-      settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
+      settings: () => ({
+        taskSplitInitiative: true,
+        handoffInitiative: false,
+        ...(options.sonnetDeliver === undefined
+          ? {}
+          : { groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, sonnetDeliver: options.sonnetDeliver } }),
+      }),
       ...(options.sieves
         ? { sieves: (_cwd: string, _link: ChatLink, stage: string) => options.sieves!(stage) }
         : {}),
@@ -198,6 +209,7 @@ function build(
         void ended.push({ ...(link.stage ? { stage: link.stage } : {}), status: outcome.status }),
       identityOf: () => 'Group branch: split/rename. Group tasks: PROJ-7.',
       delivers: () => options.delivers ?? false,
+      sonnetDeliverOf: () => options.groupSonnetDeliver,
     },
   });
   registry.setHandoffPlanner(planner);
@@ -284,6 +296,8 @@ describe('звено доставки группы разделения', () => 
     const deliver = stageRuns(runs)[0];
     expect(deliver?.prompt).toContain('SIEVES-PARAGRAPH');
     expect(deliver?.prompt).not.toContain('agentdeck:sieve-slot');
+    // F-07: сохранённое задание доставки — с тем же абзацем сит, без метки.
+    expect(links.get(deliver?.chatId ?? '')?.stagePrompt).toBe(deliver?.prompt);
   });
 
   it('пустой абзац сит уносит метку: задание без следа места под него', async () => {
@@ -391,6 +405,12 @@ describe('звено доставки группы разделения', () => 
       expect(deliver?.prompt).toContain(WARM_DELIVER_LINE);
       expect(deliver?.prompt).toContain('git fetch');
       expect(ended).toEqual([{ stage: 'deliver', status: 'done' }]);
+      // F-07: звено, стартующее заново, идёт с чистого листа — строки «ты продолжаешь
+      // свою сессию» в сохранённом задании нет, ветка и шаги доставки на месте.
+      const kept = links.get(deliver?.chatId ?? '')?.stagePrompt ?? '';
+      expect(kept.startsWith('Group branch: split/rename.')).toBe(true);
+      expect(kept).toContain('git fetch');
+      expect(kept).not.toContain(WARM_DELIVER_LINE);
     });
 
     it('работа → чистое ревью → доставка: ревью свежее, доставка — из сессии работы', async () => {
@@ -503,6 +523,101 @@ describe('звено доставки группы разделения', () => 
       });
       expect(deliver?.prompt).toContain(WARM_DELIVER_LINE);
     });
+
+    // Рычаг экономии групп: доставка — механика, Opus на ней не нужен (замер 20.10).
+    const OPUS_FIX: ChatLink = { ...FIX_LINK, model: 'claude-opus-5', effort: 'xhigh' };
+    const OPUS_FIX_LINK: ChatLink = {
+      ...OPUS_FIX,
+      workModel: 'claude-opus-5',
+      workEffort: 'xhigh',
+    };
+
+    it('доставка на Sonnet: Opus-группа доставляет на Sonnet с high, с чистого листа', async () => {
+      const { registry, links, runs } = build('Поправил.', {
+        delivers: true,
+        context: 30_000,
+        sonnetDeliver: true,
+      });
+      links.set('чат-правки', OPUS_FIX_LINK);
+
+      await start(registry, 'чат-правки', { model: 'claude-opus-5', effort: 'xhigh' });
+
+      const deliver = stageRuns(runs)[0];
+      expect(links.get(deliver?.chatId ?? '')).toMatchObject({ stage: 'deliver', model: 'sonnet' });
+      expect(deliver).toMatchObject({ model: 'sonnet', effort: 'high' });
+      // Кэш у каждой модели свой: ответвлять сессию Opus для Sonnet нечего.
+      expect(deliver?.fork).toBeUndefined();
+      expect(deliver?.prompt).not.toContain(WARM_DELIVER_LINE);
+    });
+
+    it('рычаг выключен — доставка на модели работы и тёплым ответвлением, как раньше', async () => {
+      const { registry, links, runs } = build('Поправил.', {
+        delivers: true,
+        context: 30_000,
+        sonnetDeliver: false,
+      });
+      links.set('чат-правки', OPUS_FIX_LINK);
+
+      await start(registry, 'чат-правки', { model: 'claude-opus-5', effort: 'xhigh' });
+
+      expect(stageRuns(runs)[0]).toMatchObject({
+        model: 'claude-opus-5',
+        effort: 'xhigh',
+        fork: true,
+      });
+    });
+
+    // F-12 ревью П1: выбор человека для группы сильнее общего рычага в обе стороны.
+    it('группа, снятая с Sonnet на карточке, доставляет на своей модели при включённом рычаге', async () => {
+      const { registry, links, runs } = build('Поправил.', {
+        delivers: true,
+        context: 30_000,
+        sonnetDeliver: true,
+        groupSonnetDeliver: false,
+      });
+      links.set('чат-правки', OPUS_FIX_LINK);
+
+      await start(registry, 'чат-правки', { model: 'claude-opus-5', effort: 'xhigh' });
+
+      expect(stageRuns(runs)[0]).toMatchObject({
+        model: 'claude-opus-5',
+        effort: 'xhigh',
+        fork: true,
+      });
+    });
+
+    it('группа, отправленная на Sonnet с карточки, доставляет на Sonnet при выключенном рычаге', async () => {
+      const { registry, links, runs } = build('Поправил.', {
+        delivers: true,
+        context: 30_000,
+        sonnetDeliver: false,
+        groupSonnetDeliver: true,
+      });
+      links.set('чат-правки', OPUS_FIX_LINK);
+
+      await start(registry, 'чат-правки', { model: 'claude-opus-5', effort: 'xhigh' });
+
+      expect(stageRuns(runs)[0]).toMatchObject({ model: 'sonnet', effort: 'high' });
+      expect(stageRuns(runs)[0]?.fork).toBeUndefined();
+    });
+
+    it('через контур рычаг не действует: модель там решает маршрут', async () => {
+      const { registry, links, runs } = build('Поправил.', {
+        delivers: true,
+        context: 30_000,
+        sonnetDeliver: true,
+      });
+      registry.setPlatformRouting((_origin, asked) => ({
+        env: {},
+        model: { model: 'contour-model', asked, source: 'mapped', replaced: true },
+        effort: false,
+      }));
+      links.set('чат-правки', OPUS_FIX_LINK);
+
+      await start(registry, 'чат-правки', { model: 'claude-opus-5', effort: 'xhigh' });
+
+      expect(stageRuns(runs)[0]).toMatchObject({ model: 'claude-opus-5', fork: true });
+    });
   });
 
   it('правки группы с доставкой знают, что доставка идёт следом (журнал 59d)', async () => {
@@ -515,6 +630,19 @@ describe('звено доставки группы разделения', () => 
     const fix = stageRuns(runs)[0];
     expect(saved[0]?.stage).toBe('fix');
     expect(fix?.prompt).toContain('commit, push and MR are not forbidden by it');
+    // F-07: задание правок — в связи до рождения звена, слово в слово как у запуска.
+    expect(saved[0]?.stagePrompt).toBe(fix?.prompt);
+    expect(saved[0]?.stagePrompt).toContain('поправь a.ts:1');
+  });
+
+  it('связь работы и ревью задания звена не хранит — им продолжать нечего (F-07)', async () => {
+    const { registry, links, saved } = build('Сделал.', { delivers: true });
+    links.set('чат-работы', { ...WORK_LINK, lowered: false });
+
+    await run(registry, 'чат-работы');
+
+    expect(saved[0]?.stage).toBe('review');
+    expect(saved[0]?.stagePrompt).toBeUndefined();
   });
 
   it('конец доставки — конец цепочки: итог уходит конвейеру, звеньев больше нет', async () => {

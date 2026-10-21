@@ -120,4 +120,22 @@ describe('settings snapshot', () => {
       'New:b',
     ]);
   });
+
+  it('сторож групп уезжает только правками: без умолчаний, чужих ключей и битых значений', () => {
+    // Блок прочитан с диска без схемы; полный блок заморозил бы умолчания на
+    // другой машине, а чужой ключ — отказ всего снимка там.
+    const state = stateWith({
+      settings: {
+        ...DEFAULT_STATE.settings,
+        groupWatch: {
+          ...DEFAULT_STATE.settings.groupWatch,
+          askMinutes: 40,
+          checkRepeats: 'x',
+          legacy: 7,
+        } as unknown as AppState['settings']['groupWatch'],
+      },
+    });
+    const settings = portableOf(state, WIN).settings as Record<string, unknown>;
+    expect(settings.groupWatch).toEqual({ askMinutes: 40 });
+  });
 });

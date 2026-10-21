@@ -1,8 +1,9 @@
 /**
  * Живое доказательство 6.1 плана экономии: ребёнок разделения в чужом CLI
  * получает то же окружение, что ребёнок Claude, — короткий вывод
- * `tests-cli run` (`AGENTDECK_BRIEF_OUTPUT=1`, пункт 2.2) и два места очереди
- * тяжёлых шагов (`AGENTDECK_HEAVY_SLOTS=2`) без потолка vitest, а обычный
+ * `tests-cli run` (`AGENTDECK_BRIEF_OUTPUT=1`, пункт 2.2) и места очереди
+ * тяжёлых шагов (`AGENTDECK_HEAVY_SLOTS` = max(2, ядра/4), как в `ChatRunner.ts`)
+ * без потолка vitest, а обычный
  * разговор того же CLI — ничего из этого. Группа ещё и
  * без лишних серверов MCP (1.2): мессенджер и макеты без макета в задачах
  * выключены, трекер остался, а строка о снятых доехала до модели. Выключатель
@@ -24,12 +25,15 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-
+import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runOnStand, wait } from './throwaway-stand.mjs';
 
 const CLI = process.argv[2];
+// Мест очереди у ребёнка — по ядрам машины (`ChatRunner.ts CHILD_HEAVY_SLOTS`, 20.10):
+// прежнее «ровно 2» краснело на любой машине больше чем с 11 ядрами.
+const SLOTS = String(Math.max(2, Math.floor(availableParallelism() / 4)));
 if (CLI === undefined) {
   const self = fileURLToPath(import.meta.url);
   const codes = ['codex', 'qwen'].map(
@@ -245,8 +249,8 @@ await runOnStand(
       brief(kids),
     );
     check(
-      'каждый запуск звена: два места очереди, потолка vitest нет',
-      kids.length > 0 && kids.every((call) => call.slots === '2' && call.workers === null),
+      `каждый запуск звена: мест очереди ${SLOTS}, потолка vitest нет`,
+      kids.length > 0 && kids.every((call) => call.slots === SLOTS && call.workers === null),
       brief(kids),
     );
 

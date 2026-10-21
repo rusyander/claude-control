@@ -1,14 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { Typography } from '@shared/ui/typography';
-import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
-import { parseQuestions } from '../../lib/parseQuestions';
-import { QuestionCard } from '../QuestionCard/QuestionCard';
-import { ChildTextQuestion } from '../ChildTextQuestion/ChildTextQuestion';
+import { cardQuestions } from '../../lib/cardQuestions';
+import { ChildQuestionBody } from '../ChildQuestionBody/ChildQuestionBody';
 import { PermissionCard } from '../PermissionCard/PermissionCard';
 import { ChildStages } from '../ChildStages/ChildStages';
 import type { ChildBlocksProps } from './ChildBlocks.types';
 import styles from './ChildBlocks.module.scss';
-import { liveQuestionKey } from '../../lib/liveQuestionKey';
 
 /**
  * Всё о ДЕТЯХ разговора в одном месте ленты: где группы стоят, кого из них
@@ -43,10 +40,12 @@ export function ChildBlocks({
   onAnswer,
 }: ChildBlocksProps) {
   const { t } = useTranslation();
-  const answered = useAnsweredQuestions();
+  // Вопрос группы с карточкой в хабе — в самой карточке (карточка 27); полоса
+  // держит запросы прав и вопросы чатов, у которых своей карточки нет.
+  const { inCards, strip } = cardQuestions(onOpenChild ? (stages ?? []) : [], questions ?? []);
   const hasAsks =
     (Boolean(onPermissionDecide) && (permissions ?? []).length > 0) ||
-    (Boolean(onAnswer) && (questions ?? []).length > 0);
+    (Boolean(onAnswer) && strip.length > 0);
 
   return (
     <>
@@ -85,54 +84,17 @@ export function ChildBlocks({
           вслепую.
         */}
           {onAnswer &&
-            (questions ?? []).map((child) => {
-              // Вопрос ТЕКСТОМ (журнал 97 g7): вариантов нет — поле ответа.
-              if (child.text) {
-                const textKey = liveQuestionKey(child.chatId, undefined, child.text);
-                return (
-                  <div key={`${child.chatId}-text`} className={styles.childAsk}>
-                    <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
-                      {t('chat.questionFromChild', { title: child.title })}
-                    </Typography>
-                    <ChildTextQuestion
-                      text={child.text}
-                      target={child.title}
-                      busy={child.isRunning}
-                      isAnswered={answered.has(textKey)}
-                      onAnswer={(answer) => {
-                        markQuestionAnswered(textKey);
-                        onAnswer(child.chatId, answer);
-                      }}
-                    />
-                  </div>
-                );
-              }
-              const parsed = parseQuestions(child.input);
-              if (!parsed) return null;
-              const key = liveQuestionKey(child.chatId, child.toolUseId, child.input);
-              return (
-                <div
-                  key={`${child.chatId}-${child.toolUseId ?? 'ask'}`}
-                  className={styles.childAsk}
-                >
-                  <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
-                    {t('chat.questionFromChild', { title: child.title })}
-                  </Typography>
-                  <QuestionCard
-                    questions={parsed}
-                    onPick={(answer) => {
-                      markQuestionAnswered(key);
-                      onAnswer(child.chatId, answer);
-                    }}
-                    busy={child.isRunning}
-                    isAnswered={answered.has(key)}
-                    // Подпись сохраняется и ПОСЛЕ ответа: «отправлено» без имени
-                    // разговора не говорит, кому именно из шестерых человек ответил.
-                    target={child.title}
-                  />
-                </div>
-              );
-            })}
+            strip.map((child) => (
+              <div
+                key={`${child.chatId}-${child.text ? 'text' : (child.toolUseId ?? 'ask')}`}
+                className={styles.childAsk}
+              >
+                <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
+                  {t('chat.questionFromChild', { title: child.title })}
+                </Typography>
+                <ChildQuestionBody question={child} onAnswer={onAnswer} />
+              </div>
+            ))}
         </div>
       )}
 
@@ -156,6 +118,7 @@ export function ChildBlocks({
           resumeInterruptedBusy={resumeInterruptedBusy}
           onCheckOverlap={onCheckOverlap}
           overlapBusy={overlapBusy}
+          {...(onAnswer && inCards.size > 0 ? { questions: inCards, onAnswer } : {})}
         />
       )}
     </>

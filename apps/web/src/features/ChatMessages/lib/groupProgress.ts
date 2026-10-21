@@ -75,8 +75,10 @@ const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max);
 
 /**
  * С каких пор группа в этом состоянии: запрос прав висит со своего вызова,
- * очередь — с билета, работа — с заведения цепочки, остановка — с последней
- * записи. Чего не знаем — того не показываем.
+ * очередь — с билета, работа — со старта идущего хода, остановка — с последней
+ * записи. Чего не знаем — того не показываем: заведение цепочки работой не
+ * считается (живой прогон 20.10: группа, продолженная через сутки, «работала
+ * 21ч 09м» при часе работы).
  */
 function sinceOf(
   state: GroupProgressView['state'],
@@ -85,6 +87,6 @@ function sinceOf(
 ): string | undefined {
   if (state === 'permission') return progress?.activeTool?.startedAt;
   if (state === 'queued') return progress?.heavyQueue?.since;
-  if (state === 'working') return group.startedAt;
+  if (state === 'working') return group.runStartedAt;
   return group.lastAt;
 }

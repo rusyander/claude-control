@@ -272,7 +272,11 @@ function isRecord(value: unknown): value is PendingAskRecord {
  */
 export function lastAskedInput(projectsDir: string, chatId: string): unknown {
   const path = findTranscript(projectsDir, chatId);
-  if (!path) return undefined;
+  return path ? lastAskedInputIn(path) : undefined;
+}
+
+/** То же по известному пути транскрипта; `undefined` — вопрос уже отвечен или его не было. */
+export function lastAskedInputIn(path: string): unknown {
   let input: unknown;
   for (const record of readTailRecords(path, 256 * 1024)) {
     const content = record.message?.content;

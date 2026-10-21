@@ -208,4 +208,43 @@ describe('GET /api/chats — доля окна лимита у звена гру
     });
     expect((await list()).get('g-2')?.limitShare).toBeUndefined();
   });
+
+  it('замеры ложатся в журнал посреди прогона, а не только на его конце (W.1)', async () => {
+    let run: FakeRun | undefined;
+    const registry = new ChatRunRegistry(() => {
+      run = new FakeRun();
+      return run;
+    });
+    registry.setLimitJournal((record) => appendLimitRun(appData, record));
+    registry.start('g-3', OPTIONS, {});
+    run?.emit({ kind: 'session', sessionId: 'g-3', model: 'm', tools: 0 });
+
+    clock = 1_001_000;
+    run?.emitRaw(limitRaw(0.1));
+    run?.emit(usage(3000));
+    clock = 1_041_000;
+    run?.emitRaw(limitRaw(0.15));
+    // Звено ещё работает — запись уже в файле, с обоими замерами и токенами.
+    const midRun = readLimitRuns(appData);
+    expect(midRun).toHaveLength(1);
+    expect(midRun[0]?.samples.map((sample) => sample.fiveHour?.utilization)).toEqual([0.1, 0.15]);
+    expect(midRun[0]?.tokens).toBe(3000);
+    expect(midRun[0]?.endedAt).toBe(1_041_000);
+
+    // Чаще раза в полминуты файл не переписывается; замер не теряется — он в памяти.
+    clock = 1_046_000;
+    run?.emitRaw(limitRaw(0.2));
+    expect(readLimitRuns(appData)[0]?.samples).toHaveLength(2);
+
+    clock = 1_050_000;
+    run?.finish();
+    await flush();
+    // Конец прогона заменяет ту же запись, а не дописывает вторую.
+    const final = readLimitRuns(appData);
+    expect(final).toHaveLength(1);
+    expect(final[0]?.id).toBe(midRun[0]?.id);
+    expect(final[0]?.samples.map((sample) => sample.fiveHour?.utilization)).toEqual([
+      0.1, 0.15, 0.2,
+    ]);
+  });
 });

@@ -35,6 +35,43 @@ describe('преамбула окружения: провал подготовк
   });
 });
 
+/**
+ * Команда установки монорепозитория склеена из цепочки на модуль — у живой группы
+ * 20.10 это 2,4 тыс. знаков в каждом её вызове (замер B.1), а готовую установку
+ * группа не повторяет. Провал называет команду целиком: её решают повторить.
+ */
+describe('преамбула окружения: команда установки', () => {
+  const chains = Array.from(
+    { length: 40 },
+    (_, i) => `[svc-${String(i).padStart(2, '0')}] npm ci --prefer-offline --no-audit --no-fund`,
+  ).join(' · ');
+
+  it('длинная готовая установка — числом шагов, без самой команды', () => {
+    const text = environmentPreamble({
+      bootstrap: { status: 'ok', command: chains, logTail: '' } as never,
+    });
+    const first = text.split('\n')[0] ?? '';
+    expect(first).toBe(
+      "The panel prepared this copy: dependencies installed by the project's copy preparation (40 steps).",
+    );
+    expect(text).not.toContain('[svc-00]');
+  });
+
+  it('короткая готовая установка — командой, как раньше', () => {
+    const text = environmentPreamble({
+      bootstrap: { status: 'ok', command: 'pnpm install --frozen-lockfile', logTail: '' } as never,
+    });
+    expect(text).toContain('dependencies installed with "pnpm install --frozen-lockfile"');
+  });
+
+  it('провал длинной установки называет команду целиком', () => {
+    const text = environmentPreamble({
+      bootstrap: { ...(FAILED as object), command: chains } as never,
+    });
+    expect(text).toContain(`the command "${chains}" exited with code 2`);
+  });
+});
+
 describe('преамбула окружения: версии рантайма', () => {
   const ok = { status: 'ok', command: 'npm ci', logTail: '' };
 

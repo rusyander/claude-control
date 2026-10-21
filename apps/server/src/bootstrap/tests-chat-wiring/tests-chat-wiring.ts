@@ -2,10 +2,11 @@ import { existsSync, statSync } from 'node:fs';
 import { relative, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProjectTestE2eSync } from '@agentdeck/contracts';
+import { TESTS_PROJECT_ENV } from '@agentdeck/contracts/chat-group-settings';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import type { ProviderChatService } from '../../domains/provider-chat/ProviderChatService/ProviderChatService.ts';
 import { e2eFolderView, e2eLinkedRoot } from '../../domains/project-tests/e2e-folder/e2e-folder.ts';
-import { e2eChatLine } from '../../domains/project-tests/e2e-chat.ts';
+import { e2eChatLine, e2eChatProjectRoot } from '../../domains/project-tests/e2e-chat.ts';
 import { syncE2eIfChanged } from '../../domains/project-tests/e2e-sync/e2e-sync.ts';
 import { readEnvironments } from '../../domains/project-tests/library/library.ts';
 import { readAutomation } from '../../domains/project-tests/automation/automation.ts';
@@ -39,7 +40,8 @@ import { getProvider } from '../../providers/registry.ts';
  */
 export interface TestsChatWiringDeps {
   appData: string;
-  chatRuns: Pick<ChatRunRegistry, 'setWorkspaceNote'>;
+  chatRuns: Pick<ChatRunRegistry, 'setWorkspaceNote'> &
+    Partial<Pick<ChatRunRegistry, 'setWorkspaceEnv'>>;
   providerChats?: Pick<
     ProviderChatService,
     'setWorkspaceNote' | 'setSystemNote' | 'setLocalLimits'
@@ -124,12 +126,37 @@ function projectOf(cwd: string): string | undefined {
   return e2eLinkedRoot(cwd) ?? cwd;
 }
 
-/** Строка для каталога прогона; `undefined` — каталог не проект (песочница панели). */
+/**
+ * Строка для каталога прогона; `undefined` — каталог не проект (песочница панели).
+ * `projectFromEnv` — группа Claude (X1): строка без путей, проект едет в
+ * окружении (`testsChatEnv`), и системный промпт у копий одной группы общий.
+ */
 export function testsChatNote(
   deps: TestsChatWiringDeps,
   at: string,
   group = false,
+  projectFromEnv = false,
 ): string | undefined {
+  const input = testsChatInput(deps, at, group);
+  return input
+    ? e2eChatLine({ ...input, ...(projectFromEnv ? { projectFromEnv } : {}) })
+    : undefined;
+}
+
+/** Окружение группы Claude к строке без путей: проект, который назвала бы строка. */
+export function testsChatEnv(
+  deps: TestsChatWiringDeps,
+  at: string,
+): Record<string, string> | undefined {
+  const input = testsChatInput(deps, at, true);
+  return input ? { [TESTS_PROJECT_ENV]: e2eChatProjectRoot(input) } : undefined;
+}
+
+function testsChatInput(
+  deps: TestsChatWiringDeps,
+  at: string,
+  group: boolean,
+): Parameters<typeof e2eChatLine>[0] | undefined {
   const cwd = projectOf(at);
   if (!cwd) return undefined;
   const folder = e2eFolderView(cwd, deps.appData);
@@ -145,7 +172,7 @@ export function testsChatNote(
   // `.agent/tests` переезжает зеркалом) — и прогон от имени копии.
   const copyAutomation = cwd !== at ? readAutomation(at).automation : undefined;
   const automation = copyAutomation ?? readAutomation(cwd).automation;
-  return e2eChatLine({
+  return {
     root: cwd,
     commandRoot: copyAutomation ? at : cwd,
     folder,
@@ -153,7 +180,7 @@ export function testsChatNote(
     hasStandUrl,
     automation,
     ...(group ? { group } : {}),
-  });
+  };
 }
 
 /**
@@ -180,9 +207,12 @@ export function testsChatFinished(
 export function wireTestsChatNote(deps: TestsChatWiringDeps): {
   finished: (cwd: string | undefined, startedAt: number) => ProjectTestE2eSync | undefined;
 } {
+  // Группа Claude — строкой без путей и проектом в окружении (X1): путь копии в
+  // системном промпте не давал копиям одной группы делить кэш начала запроса.
   deps.chatRuns.setWorkspaceNote((cwd, run?: { group: boolean }) =>
-    testsChatNote(deps, cwd, run?.group),
+    testsChatNote(deps, cwd, run?.group, run?.group),
   );
+  deps.chatRuns.setWorkspaceEnv?.((cwd) => testsChatEnv(deps, cwd));
   // Группа чужого CLI — той же строкой, что группа Claude (ревью A2-F10): обычная
   // зовёт спросить человека, а группа идёт без человека и встала бы на вопросе.
   deps.providerChats?.setWorkspaceNote((cwd, run) => testsChatNote(deps, cwd, run?.group));

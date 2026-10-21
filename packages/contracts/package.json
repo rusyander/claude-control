@@ -29,6 +29,8 @@
     "./group-delivery": "./src/group-delivery.ts",
     "./group-describe": "./src/group-describe.ts",
     "./group-knobs": "./src/group-knobs.ts",
+    "./group-economy": "./src/group-economy.ts",
+    "./group-watch": "./src/group-watch.ts",
     "./group-path": "./src/group-path.ts",
     "./group-sources": "./src/group-sources.ts",
     "./groups": "./src/groups.ts",

@@ -34,4 +34,22 @@ describe('плашка отложенного перезапуска', () => {
       i18n.t('devRestart.waitingBoth'),
     );
   });
+
+  // D1 (21.10): ходы ждут до предела, плашка заранее называет время и ходы.
+  it('предел ожидания ходов — время и ходы, которых перезапуск не дождётся', () => {
+    const html = render({
+      pending: true,
+      waitingFor: 'runs',
+      since: '2026-10-21T10:00:00.000Z',
+      capAt: '2026-10-21T10:30:00.000Z',
+      runs: ['feat-export-1a2b3c', 'fix-login-9f8e7d'],
+    });
+    expect(html).toContain('data-dev-restart-cap');
+    expect(html).toContain('feat-export-1a2b3c, fix-login-9f8e7d');
+    expect(html).toMatch(/\d{1,2}:30/);
+  });
+
+  it('без предела строки о нём нет', () => {
+    expect(render({ pending: true, waitingFor: 'setup' })).not.toContain('data-dev-restart-cap');
+  });
 });

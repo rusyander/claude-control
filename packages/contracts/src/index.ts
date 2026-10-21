@@ -50,6 +50,8 @@ export * from './groups';
 export * from './group-delivery';
 export * from './group-describe';
 export * from './group-knobs';
+export * from './group-economy';
+export * from './group-watch';
 export * from './group-path';
 export * from './group-sources';
 export * from './chat-group-settings';

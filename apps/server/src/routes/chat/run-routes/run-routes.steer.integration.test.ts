@@ -138,6 +138,29 @@ describe('маршрут отправки: сообщение агенту по�
     expect(prompts).toEqual([]);
   });
 
+  // Карточка 33: слово на ходу дошло, а ответ на запрос вкладка потеряла (обрыв,
+  // сон телефона) — она ставит слово в очередь и досылает его по концу хода
+  // новым запуском. Метка вкладки та же: второй раз агенту его не отдаём.
+  it('досылка уже переданного слова — 202 duplicate, нового прогона нет', async () => {
+    void send('первое');
+    await until(() => prompts.length === 1 && registry.isRunning(CHAT));
+    expect((await send('ответ', { steer: true, clientId: 'm-1' })).statusCode).toBe(202);
+    finishFirst();
+    await until(() => !registry.isRunning(CHAT));
+
+    const again = await send('ответ', { clientId: 'm-1', automatic: true });
+    expect(again.statusCode).toBe(202);
+    expect(again.json()).toMatchObject({ steered: true, duplicate: true });
+    expect(prompts).toEqual(['первое']);
+
+    // Своя метка у нового сообщения — обычный ход; его повтор тоже не уходит.
+    expect((await send('другое', { clientId: 'm-2' })).statusCode).toBe(200);
+    expect((await send('другое', { clientId: 'm-2', automatic: true })).json()).toMatchObject({
+      duplicate: true,
+    });
+    expect(prompts).toEqual(['первое', 'другое']);
+  });
+
   it('с вложением — не на ходу: картинка идёт своим ходом', async () => {
     void send('первое');
     await until(() => prompts.length === 1 && registry.isRunning(CHAT));

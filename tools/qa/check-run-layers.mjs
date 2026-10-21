@@ -365,6 +365,97 @@ function factsOf(body) {
   };
 }
 
+/**
+ * Группа, собранная нынешними строителями панели (B.6) в том порядке, что и
+ * старт копии с доставкой в `ChatSplit`: преамбула окружения, доставка, задание
+ * группы, блок тикета. Дописка — та же, что у чата; ребёнка из неё делает реестр.
+ */
+async function syntheticGroupInput(pad) {
+  const split = await import('../../packages/contracts/src/task-split.ts');
+  const { initiativePrompt } =
+    await import('../../apps/server/src/domains/chat/initiative/initiative.ts');
+  const { e2eChatLine } = await import('../../apps/server/src/domains/project-tests/e2e-chat.ts');
+  const group = {
+    title: 'Форма входа',
+    branch: 'feat/proj-1-login',
+    tasks: [
+      'PROJ-1 Форма входа: ошибка под полем пароля вместо всплывающего окна',
+      'PROJ-2 Вход: кнопка «Войти» недоступна, пока поля пусты',
+    ],
+    owns: ['apps/web'],
+  };
+  const task = [
+    split.environmentPreamble({
+      bootstrap: {
+        command: 'pnpm install --frozen-lockfile',
+        status: 'ok',
+        startedAt: '2026-10-22T00:00:00.000Z',
+        logTail: '',
+      },
+      scope: group.owns,
+      root: '/copy',
+    }),
+    split.deliveryPreamble({
+      branch: group.branch,
+      questions: 'plan',
+      reviewPack: 'node "/panel/tools/review-pack.mjs"',
+    }),
+    split.buildGroupPrompt(group, 'Общее: макет экрана входа в задаче PROJ-1.'),
+    split.splitTicketPreamble(),
+  ].join('\n\n');
+  return {
+    prompt: pad > 0 ? `${task}\n\n${'x'.repeat(pad)}` : task,
+    append: initiativePrompt(
+      { taskSplitInitiative: true, handoffInitiative: true },
+      { splitMuted: true },
+    ),
+    child: true,
+    note: (cwd, run) =>
+      e2eChatLine({
+        root: cwd,
+        folder: { state: 'missing', framework: 'unknown', specs: 0, excluded: false, git: false },
+        cliPath: '/panel/tools/tests-cli.mjs',
+        hasStandUrl: false,
+        automation: { command: 'npm test' },
+        group: run.group,
+        // Группа Claude — строкой без путей, как в панели (X1).
+        projectFromEnv: run.group,
+      }),
+  };
+}
+
+/**
+ * Инварианты первого запроса синтетической группы — в обе стороны: нужное
+ * доехало (дописка ребёнка, строка «Тесты», задание, описание навыка звена),
+ * снятое не доехало (инструменты, закрытые ребёнку и всем прогонам, дописка
+ * обычного чата). Без них бюджет зеленел бы и у запроса, потерявшего главное.
+ */
+async function checkGroupInvariants(stage, body, stageDesc) {
+  const { CHILD_DENIED_TOOLS, UNUSED_HEAVY_TOOLS } =
+    await import('../../apps/server/src/domains/chat/initiative/initiative.ts');
+  const text = JSON.stringify(body.system ?? '') + JSON.stringify(body.messages ?? []);
+  const tools = (body.tools ?? []).map((tool) => tool.name);
+  const present = {
+    'дописка ребёнка разделения': 'as a split group',
+    'строка блока «Тесты» группы': 'QA workspace of this project',
+    'задание группы': 'Форма входа',
+    'описание навыка звена skill-map': `${stageDesc}-skill-map`,
+  };
+  for (const [what, needle] of Object.entries(present)) {
+    check(text.includes(needle), `инвариант «${stage}»: ${what} в запросе`);
+  }
+  for (const needle of ['cards with buttons', 'Ask the user once']) {
+    check(!text.includes(needle), `инвариант «${stage}»: дописки обычного чата нет («${needle}»)`);
+  }
+  const leaked = [...CHILD_DENIED_TOOLS, ...UNUSED_HEAVY_TOOLS].filter((name) =>
+    tools.includes(name),
+  );
+  check(
+    leaked.length === 0,
+    `инвариант «${stage}»: закрытых инструментов в перечне нет${leaked.length ? ` — ${leaked.join(', ')}` : ''}`,
+  );
+}
+
 async function main() {
   const exe = resolveClaude();
   if (!exe) throw new NotChecked('не нашёлся настоящий `claude` — задайте путь через CLAUDE_CLI.');
@@ -700,15 +791,18 @@ ${MARK.ancestor}
       'jira_create_issue',
       'update_merge_request',
       'merge_merge_request',
+      'create_merge_request',
       'create_merge_request_note',
       'jira_transition_issue',
       'execute_graphql',
     ],
   };
-  const runStage = async (stage) => {
+  /** `input` — первое сообщение и дописка настоящей группы (`--group-base --input`). */
+  const runStage = async (stage, ahead, input = {}) => {
     const { groupRunProfile, GROUP_SKILLS } =
       await import('../../apps/server/src/domains/chat/group-profile/group-profile.ts');
     const work = buildProjectDir();
+    input.prepare?.(work);
     const home = buildConfigDir(work);
     for (const name of GROUP_SKILLS) {
       mkdirSync(join(home, 'skills', name), { recursive: true });
@@ -732,15 +826,34 @@ ${MARK.ancestor}
       extra: [],
       skills: { user: [...GROUP_SKILLS], group: [], plugins: [] },
       stage,
+      ...(ahead ? { ahead } : {}),
     });
     const runs = new ChatRunRegistry();
-    runs.setPlatformRouting(() => ({ env: { ...stubEnv } }));
-    runs.setGroupProfileResolver(() => profile);
+    runs.setPlatformRouting(() => ({ env: { ...stubEnv, ...input.env } }));
+    // `dropArgs` — красный контроль общего префикса (X1): тот же профиль без флага.
+    runs.setGroupProfileResolver(() =>
+      input.args || input.dropArgs
+        ? {
+            ...profile,
+            args: [...(profile.args ?? []), ...(input.args ?? [])].filter(
+              (arg) => !input.dropArgs?.includes(arg),
+            ),
+          }
+        : profile,
+    );
+    if (input.denied) runs.setDeniedToolsResolver(() => input.denied);
+    // Синтетическая группа (B.6): ребёнок разделения и строка блока «Тесты» —
+    // склеивает их сам реестр, как на старте настоящей группы.
+    if (input.child) runs.setChildResolver(() => true);
+    if (input.note) runs.setWorkspaceNote(input.note);
+    // Проводка панели целиком (`wireTestsChatNote`), а не готовая строка (X1).
+    input.wire?.(runs);
     const from = stub.seen.length;
     runs.start(
       `layers-stage-${stage}`,
       {
-        prompt: 'скажи ок',
+        prompt: input.prompt ?? 'скажи ок',
+        ...(input.append ? { appendSystemPrompt: input.append } : {}),
         cwd: work,
         configDir: home,
         ...(process.env.CLAUDE_CLI ? { command: process.env.CLAUDE_CLI } : {}),
@@ -757,15 +870,225 @@ ${MARK.ancestor}
     removeDir(home);
     if (!body) return undefined;
     const all = JSON.stringify(body);
-    const tool = (name) => all.includes(`mcp__t8-gitlab__${name}`);
+    // Имя целиком: `create_merge_request` — начало `create_merge_request_note`.
+    const tool = (name) => new RegExp(`mcp__t8-gitlab__${name}(?![A-Za-z0-9_])`).test(all);
     return {
+      body,
       chars: all.length,
       read: STAGE_TOOLS.read.filter(tool),
       write: STAGE_TOOLS.write.filter(tool),
       described: GROUP_SKILLS.filter((name) => all.includes(`${STAGE_DESC}-${name}`)),
       named: GROUP_SKILLS.filter((name) => all.includes(name)),
+      // Инструмент подагентов в перечне запроса (F-09: перед ревью он под запретом).
+      agent: (body.tools ?? []).some((entry) => entry?.name === 'Agent'),
     };
   };
+
+  // `--group-base` — замер первого запроса каждого звена по блокам (B.1), без
+  // проверок слоёв. `--input <run-input.json>` — первое сообщение и дописка
+  // настоящей группы из записи панели (`agentdeck/run-inputs/<сессия>.json`,
+  // запись 0), иначе «скажи ок» без дописки; `--out <каталог>` — куда писать.
+  //
+  // `--synthetic` — вместо записи панели группа, собранная нынешними строителями
+  // задания и дописки (B.6): запись заморожена на дне своего прогона и роста
+  // текстов панели не видит. `--pin <файл>` записывает числа замера как пин;
+  // `--budget <файл>` сверяет с пином: блок вырос больше BUDGET_SLACK — красное,
+  // плюс инварианты в обе стороны (нужное в запросе есть, снятое — нет).
+  // `--pad <n>` дописывает n знаков в задание — мутант для проверки самой сверки.
+  if (process.argv.includes('--group-base')) {
+    const { blocksOf, budgetOf, overBudget, writeGroupBase, BUDGET_SLACK } =
+      await import('./group-base-blocks.mjs');
+    const arg = (name) => {
+      const at = process.argv.indexOf(name);
+      return at > 0 ? process.argv[at + 1] : undefined;
+    };
+    const inputFile = arg('--input');
+    const record = inputFile ? JSON.parse(readFileSync(inputFile, 'utf8'))['0'] : undefined;
+    const synthetic = process.argv.includes('--synthetic')
+      ? await syntheticGroupInput(Number(arg('--pad') ?? 0))
+      : undefined;
+    const pinFile = arg('--pin');
+    const budgetFile = arg('--budget');
+    const pinned = budgetFile ? JSON.parse(readFileSync(budgetFile, 'utf8')) : undefined;
+    const cli = spawnSync(exe, ['--version'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    }).stdout?.trim();
+    const pin = { cli, slack: BUDGET_SLACK, stages: {} };
+    // Стаб — не адрес Anthropic, и CLI без подсказки шлёт каждый свой инструмент
+    // со схемой целиком; настоящая группа идёт к Anthropic с поиском инструментов,
+    // где редкие из них — одной строкой имени. Замер базы — как у неё.
+    const env = {
+      ENABLE_TOOL_SEARCH: 'true',
+      ...(record?.model ? { ANTHROPIC_MODEL: record.model } : {}),
+    };
+    // Тяжёлые неиспользуемые схемы снимает runtime каждому прогону (`chatLeanTools`,
+    // по умолчанию включено) — тем же списком.
+    const { UNUSED_HEAVY_TOOLS } =
+      await import('../../apps/server/src/domains/chat/initiative/initiative.ts');
+    const base = { env, denied: UNUSED_HEAVY_TOOLS };
+    const input = synthetic
+      ? { ...base, ...synthetic }
+      : record
+        ? { ...base, prompt: record.prompt, append: record.appendSystemPrompt }
+        : base;
+    const out =
+      arg('--out') ?? join(fileURLToPath(new URL('../../', import.meta.url)), '.agent', 'tmp');
+    for (const stage of ['work', 'review', 'fix', 'deliver']) {
+      const measured = await runStage(stage, undefined, input);
+      check(Boolean(measured), `замер звена «${stage}»: запрос записан`);
+      if (!measured) continue;
+      const file = writeGroupBase(out, stage, measured.body, { input: inputFile ?? null });
+      const blocks = blocksOf(measured.body);
+      console.log(
+        `     ${stage}: всего ${blocks.total}, системный ${blocks.system.chars}, инструменты ${blocks.tools.chars} ` +
+          `(свои ${blocks.tools.builtin.count}/${blocks.tools.builtin.chars}, MCP ${blocks.tools.mcp.count}/${blocks.tools.mcp.chars}), ` +
+          `сообщения ${blocks.messages.chars} → ${file}`,
+      );
+      pin.stages[stage] = budgetOf(blocks);
+      if (synthetic) await checkGroupInvariants(stage, measured.body, STAGE_DESC);
+      if (pinned) {
+        const was = pinned.stages?.[stage];
+        check(Boolean(was), `бюджет «${stage}»: звено есть в пине`);
+        const grown = was ? overBudget(was, pin.stages[stage], pinned.slack ?? BUDGET_SLACK) : [];
+        check(
+          was !== undefined && grown.length === 0,
+          `бюджет «${stage}»: ни один блок не вырос больше ${pinned.slack ?? BUDGET_SLACK} знаков` +
+            (grown.length > 0
+              ? ` — ${grown.map((item) => `${item.block} ${item.pinned ?? '—'} → ${item.now}`).join(', ')}` +
+                ` (пин снят на CLI ${pinned.cli ?? '?'}, сейчас ${cli ?? '?'})`
+              : ''),
+        );
+      }
+    }
+    if (pinFile) {
+      writeFileSync(pinFile, `${JSON.stringify(pin, null, 2)}\n`, 'utf8');
+      console.log(`     пин бюджета записан → ${pinFile}`);
+    }
+    stub.close();
+    removeDir(kitData);
+    finish();
+  }
+
+  // `--shared-prefix` (X1) — две копии одной группы подряд, проводка панели
+  // целиком (`wireTestsChatNote` на настоящем реестре, профиль группы с флагом
+  // выноса личных секций): системный промпт обязан совпасть байт в байт — кэш
+  // между копиями ловится только на границе блока с меткой кэша. Два красных
+  // контроля доказывают, что сравнение видит разницу: строка о тестах с путём
+  // копии (проводка до X1) и профиль без флага (память копии в системном).
+  if (process.argv.includes('--shared-prefix')) {
+    const { UNUSED_HEAVY_TOOLS } =
+      await import('../../apps/server/src/domains/chat/initiative/initiative.ts');
+    const { wireTestsChatNote, testsChatNote } =
+      await import('../../apps/server/src/bootstrap/tests-chat-wiring/tests-chat-wiring.ts');
+    const { TESTS_PROJECT_ENV } =
+      await import('../../packages/contracts/src/chat-group-settings.ts');
+    const appData = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-appdata-')));
+    const deps = { appData, chatRuns: undefined };
+    // Строку о тестах ставит проводка панели, а не готовая строка синтетики.
+    const synthetic = { ...(await syntheticGroupInput(0)), note: undefined };
+    const base = {
+      env: { ENABLE_TOOL_SEARCH: 'true' },
+      denied: UNUSED_HEAVY_TOOLS,
+      ...synthetic,
+      // Своя команда проекта, как у этого репозитория: строка о тестах — её редакции.
+      prepare: (work) => {
+        mkdirSync(join(work, '.agent', 'tests'), { recursive: true });
+        writeFileSync(
+          join(work, '.agent', 'tests', 'automation.json'),
+          JSON.stringify({ command: 'npm test' }),
+          'utf8',
+        );
+      },
+      wire: (runs) => wireTestsChatNote({ ...deps, chatRuns: runs }),
+    };
+    const variants = [
+      { name: 'как в панели', input: base, same: true },
+      {
+        name: 'контроль: строка с путём копии',
+        input: {
+          ...base,
+          wire: (runs) => {
+            wireTestsChatNote({ ...deps, chatRuns: runs });
+            runs.setWorkspaceNote((cwd, run) => testsChatNote(deps, cwd, run?.group));
+          },
+        },
+        same: false,
+      },
+      {
+        name: 'контроль: без флага',
+        input: { ...base, dropArgs: ['--exclude-dynamic-system-prompt-sections'] },
+        same: false,
+      },
+    ];
+    const blocksOfSystem = (body) =>
+      (Array.isArray(body.system) ? body.system : [{ text: String(body.system ?? '') }]).map(
+        (block) => ({ text: block.text ?? '', mark: block.cache_control ?? null }),
+      );
+    const firstDiff = (left, right) => {
+      let at = 0;
+      while (at < left.length && at < right.length && left[at] === right[at]) at += 1;
+      return at;
+    };
+    const dump = process.argv.includes('--dump')
+      ? process.argv[process.argv.indexOf('--dump') + 1]
+      : undefined;
+    for (const [index, variant] of variants.entries()) {
+      const one = await runStage('work', undefined, variant.input);
+      const two = await runStage('work', undefined, variant.input);
+      check(Boolean(one && two), `общий префикс, ${variant.name}: оба запроса записаны`);
+      if (!one || !two) continue;
+      if (dump) {
+        mkdirSync(dump, { recursive: true });
+        writeFileSync(join(dump, `x1-${index}-1.json`), JSON.stringify(one.body, null, 1));
+        writeFileSync(join(dump, `x1-${index}-2.json`), JSON.stringify(two.body, null, 1));
+      }
+      const left = blocksOfSystem(one.body);
+      const right = blocksOfSystem(two.body);
+      const differ = left
+        .map((block, at) => ({ at, block, other: right[at] }))
+        .filter(
+          ({ block, other }) =>
+            block.text !== other?.text ||
+            JSON.stringify(block.mark) !== JSON.stringify(other?.mark),
+        );
+      const where = differ
+        .map(({ at, block, other }) => {
+          const from = firstDiff(block.text, other?.text ?? '');
+          const cut = (text) => text.slice(Math.max(0, from - 40), from + 60).replace(/\s+/g, ' ');
+          return `[${at}] с ${from}: «${cut(block.text)}» ⇄ «${cut(other?.text ?? '')}»`;
+        })
+        .join('; ');
+      const system = left.map((block) => block.text).join('\n');
+      if (variant.same) {
+        // Совпадение ничего не стоит, если строка о тестах не доехала вовсе.
+        check(
+          system.includes('QA workspace of this project') && system.includes(TESTS_PROJECT_ENV),
+          `общий префикс, ${variant.name}: строка о тестах в системном, проект — через ${TESTS_PROJECT_ENV}`,
+        );
+        check(
+          left.length === right.length && differ.length === 0,
+          `общий префикс, ${variant.name}: системный промпт копий совпадает байт в байт ` +
+            `(${left.length} блоков, ${left.map((block) => block.text.length).join('/')} знаков)` +
+            (where ? ` — ${where}` : ''),
+        );
+        check(
+          JSON.stringify(one.body.tools ?? []) === JSON.stringify(two.body.tools ?? []),
+          `общий префикс, ${variant.name}: инструменты копий совпадают`,
+        );
+      } else {
+        check(
+          left.length !== right.length || differ.length > 0,
+          `общий префикс, ${variant.name}: копии расходятся — сравнение видит разницу` +
+            (where ? ` (${where})` : ''),
+        );
+      }
+    }
+    stub.close();
+    removeDir(kitData);
+    removeDir(appData);
+    finish();
+  }
 
   try {
     // ── 0. Звено группы: MCP наружу на чтение и свои навыки (L1.2, L1.3) ─────
@@ -774,14 +1097,42 @@ ${MARK.ancestor}
     const stageWork = await runStage('work');
     const stageReview = await runStage('review');
     const stageDeliver = await runStage('deliver');
+    // Работа, за которой ревью и доставка (L3): запрет навыков ревью и открытия MR.
+    const stageAhead = await runStage('work', { review: true, deliver: true });
     check(
-      Boolean(stageWork && stageReview && stageDeliver),
-      'звено группы: запросы работы, ревью и доставки записаны',
+      Boolean(stageWork && stageReview && stageDeliver && stageAhead),
+      'звено группы: запросы работы, ревью, доставки и работы перед ними записаны',
     );
+    if (stageWork && stageAhead) {
+      check(
+        stageWork.described.includes('deep-review') &&
+          !stageAhead.described.includes('deep-review') &&
+          !stageAhead.described.includes('style-conformance-review'),
+        `звено группы, работа перед ревью: навыков ревью нет в перечне: ${stageAhead.described.join(', ')}`,
+      );
+      check(
+        stageWork.agent && !stageAhead.agent,
+        `звено группы, работа перед ревью: инструмента Agent нет (работа без ревью: ${stageWork.agent}, перед ревью: ${stageAhead.agent})`,
+      );
+      check(
+        stageWork.write.includes('create_merge_request') &&
+          !stageAhead.write.includes('create_merge_request') &&
+          stageAhead.write.includes('update_merge_request'),
+        `звено группы, работа перед доставкой: открытия MR нет, прочая запись есть: ${stageAhead.write.join(', ')}`,
+      );
+    }
     if (stageWork && stageReview && stageDeliver) {
       const all = (list, of) => list.length === of.length;
+      // Слияние MR закрыто в каждом звене (F-13): прочая запись — на месте.
+      const open = STAGE_TOOLS.write.filter((name) => name !== 'merge_merge_request');
       check(
-        all(stageWork.read, STAGE_TOOLS.read) && all(stageWork.write, STAGE_TOOLS.write),
+        ![stageWork, stageReview, stageDeliver, stageAhead].some((stage) =>
+          stage?.write.includes('merge_merge_request'),
+        ),
+        'звено группы: слияния MR нет ни в одном звене (работа, ревью, доставка, работа перед ними)',
+      );
+      check(
+        all(stageWork.read, STAGE_TOOLS.read) && all(stageWork.write, open),
         `звено группы, работа: все инструменты сервера в запросе: ${[...stageWork.read, ...stageWork.write].join(', ')}`,
       );
       check(
@@ -803,7 +1154,7 @@ ${MARK.ancestor}
         `звено группы, ревью: описания только своих навыков, прочим — имя: ${stageReview.described.join(', ')}`,
       );
       check(
-        all(stageDeliver.write, STAGE_TOOLS.write),
+        all(stageDeliver.write, open),
         `звено группы, доставка: инструменты записи на месте: ${stageDeliver.write.join(', ')}`,
       );
       check(

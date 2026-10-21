@@ -102,6 +102,21 @@ describe('ChildTells (Д7)', () => {
     });
   });
 
+  it('слово панели доносит до запуска вводную и ветку, от которой отведена копия', () => {
+    const { tells, starts } = setup();
+
+    tells.send({
+      chatId: 'sess-1',
+      prompt: 'Продолжай.',
+      cwd: '/c/h',
+      title: 'Шапка',
+      cold: 'Branch split/next.',
+      base: 'split/pred',
+    });
+
+    expect(starts[0]).toMatchObject({ cold: 'Branch split/next.', base: 'split/pred' });
+  });
+
   it('занятой группе — в очередь, и доставка после конца её хода', () => {
     const { tells, starts, notices, deferred, busy } = setup(new Set(['sess-2']));
 

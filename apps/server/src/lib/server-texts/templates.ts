@@ -1298,6 +1298,10 @@ export const serverTextTemplates = {
     ru: 'Прежний разговор группы продолжить нельзя: его файла ({{lost}}) на диске нет. Ход пошёл новым разговором в той же копии — ветка, MR и задачи переданы ему вводной.',
     en: "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
   },
+  'chat-cold-resume-notice': {
+    ru: 'Группа простояла дольше срока кэша, её разговор остыл, а окно уже {{tokens}} тыс. токенов: продолжать его — заново записать всё окно. Ход пошёл новым разговором в той же копии; вводную панель собрала из файлов — заметки группы, git, последний ответ. Прежний разговор ({{previous}}) остаётся на диске. Выключается в настройках: «Группы», экономия групп.',
+    en: "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk. Switch off in settings: Groups, group economy.",
+  },
   'split-default-drift-notice': {
     ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — перенесёт её rebase при доставке.',
     en: 'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',

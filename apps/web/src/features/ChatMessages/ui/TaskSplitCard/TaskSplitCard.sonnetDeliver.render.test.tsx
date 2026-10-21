@@ -1,0 +1,70 @@
+import { beforeAll, describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
+import { queryKeys } from '@shared/api/query-keys';
+import { i18n } from '@shared/config/i18n';
+import { TaskSplitCard } from './TaskSplitCard';
+
+const proposal = {
+  reason: 'две независимые задачи',
+  groups: [
+    { title: 'Формат цены', branch: 'fix/format-price', tasks: ['formatPrice'] },
+    { title: 'Сумма', branch: 'fix/math-sum', tasks: ['sum'] },
+  ],
+} as TaskSplitProposal;
+
+const CEILING = { model: 'claude-opus-5', effort: 'high' };
+
+function render(options: { ceiling?: typeof CEILING; sonnetDeliver?: boolean } = {}): string {
+  const client = new QueryClient();
+  if (options.sonnetDeliver !== undefined) {
+    client.setQueryData(queryKeys.settings, {
+      groupEconomy: { sonnetDeliver: options.sonnetDeliver },
+    });
+  }
+  return renderToStaticMarkup(
+    <QueryClientProvider client={client}>
+      <TaskSplitCard
+        proposal={proposal}
+        onSplit={() => {}}
+        {...(options.ceiling ? { ceiling: options.ceiling } : {})}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+/** Состояния переключателей «Доставка на Sonnet» по порядку групп. */
+function deliverStates(html: string): string[] {
+  return [
+    ...html.matchAll(/data-sonnet-deliver="\d+"[^>]*>\s*<button[^>]*aria-checked="(true|false)"/g),
+  ].map((match) => match[1] ?? '');
+}
+
+beforeAll(async () => {
+  await i18n.changeLanguage('ru');
+});
+
+/**
+ * F-12 ревью П1: рычаг «Доставка на Sonnet» был только общим, и одну дорогую
+ * группу среди механических нельзя было оставить доставлять на своей модели.
+ */
+describe('TaskSplitCard: своя доставка на Sonnet у группы', () => {
+  it('при подборе модели у каждой группы переключатель, по умолчанию включён', () => {
+    const html = render({ ceiling: CEILING });
+
+    expect(deliverStates(html)).toEqual(['true', 'true']);
+    expect(html).toContain('Доставка группы «Формат цены» на Sonnet');
+  });
+
+  it('общий рычаг выключен в настройках — переключатели групп стоят выключенными', () => {
+    expect(deliverStates(render({ ceiling: CEILING, sonnetDeliver: false }))).toEqual([
+      'false',
+      'false',
+    ]);
+  });
+
+  it('без подбора модели доставки конвейера нет — и переключателя нет', () => {
+    expect(render()).not.toContain('data-sonnet-deliver');
+  });
+});

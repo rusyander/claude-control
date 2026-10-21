@@ -79,7 +79,7 @@ describe('автовыбор по результату вызова', () => {
         picks: [{ question: 'Какой путь?', label: 'Надёжный (Recommended)', critical: false }],
       },
       // Тот же результат — и реестру: запрос прав по нему, если висит, мёртв.
-      { kind: 'toolResult', toolUseId: 'q1' },
+      { kind: 'toolResult', toolUseId: 'q1', chars: MESSAGE.length },
     ]);
   });
 

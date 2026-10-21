@@ -163,6 +163,63 @@ export interface WarmGroupSession {
  */
 export const WARM_SESSION_MAX_AGE_MS = 55 * 60_000;
 
+/**
+ * С какой паузы кэш считается остывшим. Срок кэша CLI на подписке — час с
+ * последнего попадания, но продолжение на 58–60-й минуте может прийти уже в
+ * холодный кэш, поэтому запас тот же, что у тёплой доставки.
+ */
+export const COLD_CACHE_MS = WARM_SESSION_MAX_AGE_MS;
+
+/** То же для пятиминутного кэша (`groupEconomy.cacheTtl = '5m'`). */
+export const COLD_CACHE_SHORT_MS = 4 * 60_000;
+
+/**
+ * Окно первого вызова свежей сессии группы, когда транскрипт его не называет:
+ * медиана замера 20.10 — 62k, округлено вниз, чтобы не продолжать лишнего.
+ */
+export const FRESH_BASE_TOKENS = 60_000;
+
+/**
+ * Насколько окно должно превысить базу свежей сессии, чтобы переписать его было
+ * дороже, чем начать заново: свежий разговор платит запись базы и десяток
+ * вызовов на то, чтобы прочесть вводную и заметки.
+ */
+export const COLD_RESUME_MARGIN_TOKENS = 25_000;
+
+export interface ColdResumeInput {
+  /** Сколько сессия стоит с последней записи в транскрипт. */
+  idleMs: number;
+  /** Окно последнего вызова модели в этой сессии; 0 — неизвестно. */
+  contextTokens: number;
+  /** Окно ПЕРВОГО вызова этой сессии — её база; 0 или нет — `FRESH_BASE_TOKENS`. */
+  freshBase?: number;
+  /** Срок кэша групп из настроек: '' и '1h' — час, '5m' — пять минут. */
+  cacheTtl?: string;
+}
+
+/**
+ * Продолжить группу новым разговором, а не остывшей сессией (рычаг
+ * `groupEconomy.freshOnColdResume`, замечания 8 и 12 прогона 20.10).
+ *
+ * Продолжение остывшей сессии пишет в кэш всё окно заново — по цене записи, а
+ * не чтения, — и тянет его дальше до сжатия. Новый разговор начинает с базы и
+ * вводной, собранной панелью из файлов. Порог по окну абсолютный (база + 25k,
+ * ≈85k сегодня), а не доля окна сжатия: при окне 250k доля 0,6 — это 150k, и
+ * холодное продолжение 85–150k платило бы переписывание целиком. Окно
+ * неизвестно (0) — продолжаем, как раньше.
+ */
+export function coldResume({
+  idleMs,
+  contextTokens,
+  freshBase,
+  cacheTtl,
+}: ColdResumeInput): boolean {
+  if (contextTokens <= 0) return false;
+  const coldAfter = cacheTtl === '5m' ? COLD_CACHE_SHORT_MS : COLD_CACHE_MS;
+  const base = freshBase && freshBase > 0 ? freshBase : FRESH_BASE_TOKENS;
+  return idleMs >= coldAfter && contextTokens >= base + COLD_RESUME_MARGIN_TOKENS;
+}
+
 /** Окно, выше которого доставка идёт с чистого листа даже при тёплом кэше. */
 export const WARM_DELIVER_MAX_CONTEXT = 200_000;
 

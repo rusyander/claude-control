@@ -102,4 +102,24 @@ describe('хаб родителя: порядок и отметки', () => {
     expect(html).toContain('Убрать');
     expect(html.split('data-auto-notices').length - 1).toBe(1);
   });
+
+  /** Живой прогон 20.10, карточка 28: шесть одинаковых вызовов MCP занимали пол-карточки. */
+  it('повторы сведены в «×N» под меткой сервера MCP, полный список — в подсказке', () => {
+    const notice = (summary: string) => ({ at: '2026-10-20T19:00:00.000Z', summary });
+    const html = render(
+      [
+        group(0, {
+          chatId: 'c0',
+          autoNotices: [
+            ...Array.from({ length: 3 }, () => notice('mcp__tracker__jira_assign_issue')),
+            notice('pnpm build'),
+          ],
+        }),
+      ],
+      false,
+    );
+    expect(html).toContain('data-auto-notices="4"');
+    expect(html).toContain('Разрешено автоматически: tracker: jira_assign_issue ×3; pnpm build');
+    expect(html).toContain('title="mcp__tracker__jira_assign_issue');
+  });
 });

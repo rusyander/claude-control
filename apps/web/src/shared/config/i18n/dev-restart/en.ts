@@ -10,6 +10,10 @@ export const devRestartEn: typeof devRestartRu = {
   waitingBoth:
     'The server restarts on its own once everything running finishes: chat turns, group copy preparation, autotests and checks.',
   since: 'Waiting since {{time}}',
+  capAt:
+    'Turns are waited for until {{time}}, then the server restarts on its own without them: {{names}}.',
+  capAtUnnamed:
+    'Turns are waited for until {{time}}, then the server restarts on its own without them.',
   files_one: '{{count}} file edited: {{names}}',
   files_few: '{{count}} files edited: {{names}}',
   files_many: '{{count}} files edited: {{names}}',

@@ -385,6 +385,28 @@ describe('collectChildStages', () => {
     expect(rows[0]).toMatchObject({ chatId: 'push', isRunning: true });
   });
 
+  /** Живой прогон 20.10: продолженная через сутки группа «работала 21ч 09м» при часе работы. */
+  it('старт хода группы — у свежего из её идущих прогонов, а не заведение цепочки', () => {
+    const chats = [
+      chat({ id: 'work', parentId: 'parent', groupIndex: 0, groupTitle: 'Форма' }),
+      chat({ id: 'other', parentId: 'parent', groupIndex: 1, groupTitle: 'Список' }),
+    ];
+    const resumed = Date.parse('2026-09-08T18:59:00.000Z');
+
+    const rows = collectChildStages(chats, 'parent', [
+      run({ id: 'new-1', sessionId: 'work', startedAt: resumed - 60_000, status: 'quiet' }),
+      run({ id: 'work', startedAt: resumed }),
+      run({ id: 'other' }),
+    ]);
+
+    expect(rows.find((row) => row.chatId === 'work')).toMatchObject({
+      startedAt: '2026-09-07T10:00:00.000Z',
+      runStartedAt: '2026-09-08T18:59:00.000Z',
+    });
+    // Старта прогон не назвал — поля нет, хаб покажет «работает» без времени.
+    expect(rows.find((row) => row.chatId === 'other')).not.toHaveProperty('runStartedAt');
+  });
+
   it('группа, чьё звено спросило человека, — «ждёт ответа», а не «стоит» (Д16)', () => {
     const chats = [
       chat({ id: 'work', parentId: 'parent', groupIndex: 0, awaitingReply: true }),

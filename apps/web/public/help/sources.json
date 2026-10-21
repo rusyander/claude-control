@@ -485,7 +485,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "6eb858aa6fc4f1cd"
+          "sha": "7d67a0115848db11"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions/ChatPermissions.ts",
@@ -510,7 +510,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "a50bc672c10f2e69"
+          "sha": "337b8a75cb2bb1be"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -541,6 +541,41 @@
           "path": "apps/server/src/domains/chat/split-overlap/split-overlap.ts",
           "why": "«Пересечения веток»: когда считаются и что красное",
           "sha": "510cf05fb8b60d06"
+        },
+        {
+          "path": "apps/server/src/domains/chat/token-ledger/watch/rules.ts",
+          "why": "«Сторож групп»: какие правила и на каком условии срабатывают",
+          "sha": "5995cdcb0fea70bd"
+        },
+        {
+          "path": "apps/server/src/domains/chat/token-ledger/watch/reduce.ts",
+          "why": "«Сторож групп»: что считается правкой, проверкой, чтением целиком и публикацией",
+          "sha": "a9a72055a74ddeee"
+        },
+        {
+          "path": "apps/server/src/domains/notify/telegram.ts",
+          "why": "«Сторож групп»: что именно уходит в Telegram о сигнале",
+          "sha": "c3195621beb47ee8"
+        },
+        {
+          "path": "apps/web/src/pages/Settings/GroupWatchCard/GroupWatchCard.tsx",
+          "why": "«Сторож групп»: карточка порогов в настройках",
+          "sha": "e288da0a2ea02ee4"
+        },
+        {
+          "path": "apps/server/src/domains/chat/token-ledger/watch/signals.ts",
+          "why": "«Сторож групп»: сигнал закрывается сам, что и как часто уходит в Telegram",
+          "sha": "5d3957143d25581f"
+        },
+        {
+          "path": "packages/contracts/src/group-watch.ts",
+          "why": "«Сторож групп»: пороги из коробки и важность правил",
+          "sha": "f4345bb818e030f4"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/ui/GroupSignals/GroupSignals.tsx",
+          "why": "«Сторож групп»: остров в карточке группы, «Открыть чат», свёрнутые закрытые",
+          "sha": "4a49b7067d79b16f"
         },
         {
           "path": "apps/server/src/domains/chat/tree-pause/tree-pause.ts",
@@ -689,13 +724,38 @@
         },
         {
           "path": "apps/server/src/domains/chat/group-profile/group-profile.ts",
-          "why": "Лёгкий профиль группы: набор MCP, навыки по имени, дописка с правилом расхода, хуки трекера и очереди",
-          "sha": "9cf78bc348eb846b"
+          "why": "Лёгкий профиль группы: набор MCP, навыки по имени, дописка с правилом расхода, хуки трекера и очереди; запреты звена, пока впереди доставка или ревью; слияние закрыто каждому звену",
+          "sha": "85cd4459acb13eb5"
         },
         {
           "path": "apps/server/src/domains/chat/group-profile/bash-ceiling.ts",
           "why": "Потолок таймаута команды группы: 30 минут, больший из ваших настроек остаётся",
           "sha": "0cc50725d6942b1f"
+        },
+        {
+          "path": "packages/contracts/src/group-economy.ts",
+          "why": "«Экономия групп»: рычаги, их значения из коробки и границы",
+          "sha": "60a4a4048ba1bee3"
+        },
+        {
+          "path": "apps/server/src/domains/chat/ChatCascadeStages/ChatCascadeStages.ts",
+          "why": "«Доставка»: когда звено доставки идёт на Sonnet и с какой глубиной",
+          "sha": "2bb5d7b4726dfdc0"
+        },
+        {
+          "path": "apps/server/src/domains/chat/group-continuation/group-continuation.ts",
+          "why": "«Новый разговор после долгой паузы»: 55 / 4 минуты простоя и база + 25 тысяч; тёплая доставка до 200 тысяч и 60 %; «/clear» группы по 60 %",
+          "sha": "4ffdf793cb6a76ac"
+        },
+        {
+          "path": "apps/server/src/domains/chat/cold-continuation/cold-continuation.ts",
+          "why": "«Новый разговор после долгой паузы»: одно решение на каждом пути продолжения группы (слово панели, повтор, «Продолжить всё», ответ человека)",
+          "sha": "4e7a002a582fff4f"
+        },
+        {
+          "path": "apps/server/src/domains/chat/cold-brief/cold-brief.ts",
+          "why": "Вводная нового разговора группы: что панель собирает из файлов (задачи, задание стадии, блокнот, тикеты, заметки, коммиты, последний ответ)",
+          "sha": "076fc1044f8a6b0e"
         },
         {
           "path": "apps/server/src/domains/project-git/seed-node-modules.ts",
@@ -725,10 +785,20 @@
         {
           "path": "apps/web/src/features/ChatMessages/lib/groupProgress.ts",
           "why": "Строка хода группы в хабе: состояния, время, полоса «сделано из скольких», текущий вызов",
-          "sha": "0360f22c1d409f51"
+          "sha": "332ba8d1a5b44963"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/lib/autoNoticeList.ts",
+          "why": "Строка «Разрешено автоматически»: повторы в «×N», вызовы MCP под именем сервера",
+          "sha": "d6e43fc8b9e4c1bd"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/lib/cardQuestions.ts",
+          "why": "Чей вопрос — островком в карточке группы, а чей — в полосе над сводкой",
+          "sha": "fca5d825581e4b20"
         }
       ],
-      "confirmedAt": "2026-10-20T17:57:32.956Z"
+      "confirmedAt": "2026-10-21T21:53:51.406Z"
     },
     {
       "topic": "tests",
@@ -797,7 +867,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-chat.ts",
           "why": "«Агент чата знает о папке»: что агент чата узнаёт и о чём спрашивает",
-          "sha": "2fd07c1414c426f2"
+          "sha": "c8b030e0a8b3f6e9"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eCard/TestE2eCard.tsx",
@@ -822,7 +892,7 @@
         {
           "path": "apps/server/src/bootstrap/tests-chat-wiring/tests-chat-wiring.ts",
           "why": "«Кейс появился сам»: сверка папки по концу хода, пропуск при прогоне агента, копия сверяется в исходном проекте",
-          "sha": "9c9fa905fffe7d3a"
+          "sha": "3547fe8928cc4eac"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eRun/TestE2eRun.tsx",
@@ -912,7 +982,7 @@
         {
           "path": "apps/server/src/lib/dev-watch.mjs",
           "why": "«Проверка набора поломкой»: перезапуск dev-сервера панели ждёт конца идущих проверок",
-          "sha": "7f8498e63a07754e"
+          "sha": "004fd5148321e5c7"
         },
         {
           "path": "apps/server/src/domains/project-tests/suites/suites.ts",
@@ -927,7 +997,7 @@
         {
           "path": "apps/server/src/domains/project-tests/turn-gate/turn-gate.ts",
           "why": "какие пробелы проверка конца хода называет агенту",
-          "sha": "014838581a04cfdc"
+          "sha": "3c67d6372e46c91a"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/native-reports.ts",
@@ -935,7 +1005,7 @@
           "sha": "b87cc7baba498557"
         }
       ],
-      "confirmedAt": "2026-10-20T17:57:33.044Z"
+      "confirmedAt": "2026-10-21T20:15:36.100Z"
     },
     {
       "topic": "rules",
@@ -3086,7 +3156,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-20T11:25:28.933Z",
+      "confirmedAt": "2026-10-21T21:53:51.484Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -3106,7 +3176,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "fc88020d53b217b9"
+          "sha": "23f77583ea26891a"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

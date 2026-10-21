@@ -4,6 +4,7 @@
 import { continuationEnvironment, type TaskSplitReviewDecision } from './task-split.ts';
 import type { CodedFields, CodedList } from './server-messages';
 import type { SplitHumanStepView, SplitTicketView } from './split-tickets';
+import type { GroupSignal } from './group-watch';
 import { blockLang, blockLangPattern } from './brand.ts';
 import { ANSWER_LANGUAGE_LINE } from './model-cascade.ts';
 import type { ReviewDepthGap, ReviewTier } from './model-cascade.ts';
@@ -981,6 +982,11 @@ export interface SplitPlanView {
       tokenFlags?: SplitGroupTokenFlag[];
       /** Медиана холодного старта по группам проекта; мало групп — нет. */
       tokenMedian?: number;
+      /**
+       * Сигналы сторожа групп (фаза 2, W): новые первыми, не больше 20;
+       * закрытые (`clearedAt`) остаются свёрнутыми строками.
+       */
+      watchSignals?: GroupSignal[];
       /**
        * Группа доводит работу до MR — решение, принятое при разделении. Шапка
        * чата группы показывает его, а не настройку проекта по пути копии: они

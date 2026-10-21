@@ -17,7 +17,16 @@ export function HubSummary({ groups, now }: HubSummaryProps) {
   const { t } = useTranslation();
   const { counts, elapsedMs } = summarizeHub(groups, now);
   const buckets = HUB_BUCKETS.filter((bucket) => counts[bucket] > 0);
-  if (buckets.length === 0 && elapsedMs === undefined) return null;
+  // Активные сигналы сторожа всех групп (фаза 2, W.4): тревога красит фишку,
+  // «внимание» выделяет, одни сведения — спокойная фишка.
+  const signals = groups.flatMap((group) =>
+    (group.watchSignals ?? []).filter((signal) => !signal.clearedAt),
+  );
+  const severities = new Set(signals.map((signal) => signal.severity));
+  let tone: 'alarm' | 'warn' | 'info' = 'info';
+  if (severities.has('alert')) tone = 'alarm';
+  else if (severities.has('warn')) tone = 'warn';
+  if (buckets.length === 0 && elapsedMs === undefined && signals.length === 0) return null;
 
   return (
     <div className={styles.summary} data-hub-summary>
@@ -34,6 +43,23 @@ export function HubSummary({ groups, now }: HubSummaryProps) {
           {t(`chat.cascade.hub.summary.${bucket}`, { count: counts[bucket] })}
         </Typography>
       ))}
+      {signals.length > 0 && (
+        <Typography
+          variant="caption"
+          color={tone === 'info' ? 'subtle' : 'default'}
+          as="span"
+          className={cn(
+            styles.chip,
+            tone === 'alarm' && styles.chipAlarm,
+            tone === 'warn' && styles.chipAsk,
+          )}
+          data-hub-count="signals"
+          data-hub-tone={tone}
+          title={t('groupWatch.summaryHint')}
+        >
+          {t('groupWatch.summary', { count: signals.length })}
+        </Typography>
+      )}
       {elapsedMs !== undefined && (
         <Typography variant="caption" color="subtle" as="span" data-hub-elapsed>
           {t('chat.cascade.hub.summary.elapsed', { time: formatDuration(elapsedMs, t) })}

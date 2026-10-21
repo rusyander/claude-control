@@ -235,11 +235,16 @@ await runOnStand(
       await wait(500);
       sieve = await learned();
     }
-    const relay = of(SESSIONS[0])[0];
+    // Перепроверка — НОВЫМ разговором группы (`recheck-session.ts`): тред ищется
+    // в вызове, чья вводная называет группу A, а не в продолжении её сессии.
+    const relay =
+      of(SESSIONS[0])[0] ?? calls().find((call) => call.text?.includes(`«${GROUPS[0].title}»`));
     check(
       'тред ушёл группе A ссылкой и файлом',
       Boolean(relay?.text?.includes(THREAD) && relay.text.includes(THREAD_FILE)),
-      (relay?.text ?? '').slice(0, 900),
+      relay
+        ? (relay.text ?? '').slice(0, 900)
+        : `нет вызова с сессией A; вызовы: ${JSON.stringify(calls().map((call) => ({ session: call.session, text: (call.text ?? '').slice(0, 120) }))).slice(0, 900)}`,
     );
     check(
       'сито записано предложенным, с областью файла треда',

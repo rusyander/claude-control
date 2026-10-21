@@ -39,6 +39,8 @@ export interface SplitDecision {
   startRuns: boolean;
   /** Номер группы → выбранные человеком модель и глубина. */
   assignments?: Record<number, CascadeAssignment>;
+  /** Номер группы → «Доставка на Sonnet», если человек её тронул. */
+  sonnetDeliver?: Record<number, boolean>;
 }
 
 export interface TaskSplitApi {
@@ -127,6 +129,7 @@ export function useTaskSplit({
         // Замены человека — отдельным полем от предложения агента: одно
         // действует в обе стороны, другое только вверх.
         ...(options.assignments ? { assignments: options.assignments } : {}),
+        ...(options.sonnetDeliver ? { sonnetDeliver: options.sonnetDeliver } : {}),
       },
       {
         onSuccess: (result) => {

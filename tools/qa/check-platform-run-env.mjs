@@ -307,7 +307,13 @@ async function main() {
    * Один разбор наблюдателя: зависимости — сборкой сервера, свои только рабочая
    * папка и отчёт (фальшивый `claude` пишет выгрузку в рабочую папку).
    */
+  // Свой текст сбоя на каждый разбор: тот же текст, уже разобранный, наблюдатель
+  // повторно не разбирает (32adf7fc, 20.10; цифры и id отпечаток отбрасывает — нужны
+  // слова). Подстрока «qa failure» остаётся: по ней `helperRun` узнаёт свою выгрузку.
+  const WATCH_WORDS = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel'];
+  let watchCount = 0;
   const watchRun = async (store, appData, dir, gatewayPort, runRoute) => {
+    const word = WATCH_WORDS[watchCount++ % WATCH_WORDS.length];
     const ctx = {
       store,
       location: { paths: { appData } },
@@ -327,7 +333,7 @@ async function main() {
         method: 'GET',
         path: '/api/qa',
         status: 500,
-        message: 'qa failure',
+        message: `qa failure ${word}`,
       });
       await watcher.settled();
       return { dump: await waitForDump(dir, 5), problem: watcher.status().problem };

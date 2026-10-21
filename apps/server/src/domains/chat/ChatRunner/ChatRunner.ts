@@ -40,6 +40,7 @@ import {
   AUTONOMOUS_ENV,
   BRIEF_OUTPUT_ENV,
   SPLIT_CHILD_ENV,
+  TESTS_PROJECT_ENV,
 } from '@agentdeck/contracts/chat-group-settings';
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 
@@ -165,6 +166,9 @@ export function childRunEnv(base: NodeJS.ProcessEnv): Record<string, string> {
 export function forgetInheritedChildMarks(env: NodeJS.ProcessEnv): void {
   delete env[SPLIT_CHILD_ENV];
   delete env[BRIEF_OUTPUT_ENV];
+  // Проект группы (X1): унаследованный, он увёл бы tests-cli без `--project`
+  // в любом чате панели к копии, из которой её перезапустили.
+  delete env[TESTS_PROJECT_ENV];
 }
 
 export type { ChatEvent, RawEvent, RawUsage } from '../chat-events.ts';
@@ -1052,6 +1056,7 @@ export function translate(raw: RawEvent): ChatEvent[] {
   // взять только первый (как было), остальные потеряются — а среди них может
   // оказаться AskUserQuestion, без которого не зажжётся точка «агент ждёт ответа».
   if (raw.type === 'assistant') {
+    const parent = raw.parent_tool_use_id;
     return (raw.message?.content ?? [])
       .filter((block) => block.type === 'tool_use')
       .map((block) => ({
@@ -1059,7 +1064,22 @@ export function translate(raw: RawEvent): ChatEvent[] {
         name: block.name ?? '',
         input: block.input,
         id: block.id ?? '',
+        ...(parent ? { parent } : {}),
       }));
+  }
+
+  // Сжатие окна — сторожу групп (R3); в ленту не идёт (`compact` в `chat-events.ts`).
+  // Сжатие окна субагента — не окно сессии: такое не передаётся.
+  if (raw.type === 'system' && raw.subtype === 'compact_boundary') {
+    if (raw.parent_tool_use_id) return [];
+    const meta = raw.compact_metadata;
+    return [
+      {
+        kind: 'compact',
+        ...(meta?.trigger ? { trigger: meta.trigger } : {}),
+        ...(typeof meta?.pre_tokens === 'number' ? { preTokens: meta.pre_tokens } : {}),
+      },
+    ];
   }
 
   // Результат вызова, закрытого автовыбором (хук или брокер под автономией):
@@ -1076,7 +1096,11 @@ export function translate(raw: RawEvent): ChatEvent[] {
     const content = raw.message?.content;
     const results: ChatEvent[] = (Array.isArray(content) ? content : [])
       .filter((block) => block.type === 'tool_result' && block.tool_use_id)
-      .map((block) => ({ kind: 'toolResult', toolUseId: block.tool_use_id ?? '' }));
+      .map((block) => ({
+        kind: 'toolResult',
+        toolUseId: block.tool_use_id ?? '',
+        chars: resultChars(block.content),
+      }));
     return [...picks, ...results];
   }
 
@@ -1107,6 +1131,18 @@ export function translate(raw: RawEvent): ChatEvent[] {
   }
 
   return [];
+}
+
+/** Знаков в ответе вызова: строка целиком или текстовые блоки (картинки не в счёт). */
+function resultChars(content: unknown): number {
+  if (typeof content === 'string') return content.length;
+  if (!Array.isArray(content)) return 0;
+  let chars = 0;
+  for (const part of content) {
+    const text = (part as { text?: unknown } | null)?.text;
+    if (typeof text === 'string') chars += text.length;
+  }
+  return chars;
 }
 
 /**

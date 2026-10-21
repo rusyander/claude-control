@@ -1,0 +1,336 @@
+{
+  "title": {
+    "ru": "Группа после паузы начинает новый разговор с вводной панели и заданием своей стадии",
+    "en": "After a pause a group starts a new conversation with the panel's brief and its stage task"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Остывший разговор группы больше не продолжается ни на одном пути — «Продолжить» в хабе, «Продолжить прерванные», повтор после лимита, «Продолжить всё», ответ человека, отложенный старт: ход идёт новым разговором с вводной панели и заданием стадии; после сброса лимита — при любой паузе.",
+        "en": "A group's cooled conversation is no longer resumed on any path — hub «Continue», «Continue interrupted», a retry after a limit, «Continue all», a human answer, a deferred start: the turn runs as a new conversation with the panel's brief and the stage task; after a limit reset, whatever the pause."
+      },
+      "how": {
+        "ru": "Продолжение остывшего разговора заново оплачивает чтение всего окна без скидки кэша. Вводная собирается панелью из файлов копии и хвоста прежнего разговора и стоит один раз.",
+        "en": "Resuming a cooled conversation pays for reading the whole window again without the cache discount. The brief is built by the panel from the copy's files and the tail of the previous conversation and costs once."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вводная после паузы включает блокнот и тикеты группы, а если прежний разговор кончился вопросом с вариантами — и сам вопрос: ответ «Слить» больше не приходит в новый разговор без контекста.",
+        "en": "The brief after a pause includes the group's notebook and tickets and, when the previous conversation ended with a multiple-choice question, the question itself: an answer like «Merge» no longer reaches the new conversation without context."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ревью группы, продолженное после остывшего кэша, получает задание своего звена, а не пустую реплику.",
+        "en": "A group review resumed after the cache cooled gets its stage task instead of an empty message."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Звено правок или доставки, оборванное до первого хода, по «Продолжить» стартует со своим заданием.",
+        "en": "A fix or delivery stage cut off before its first turn starts with its own task on «Continue»."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Дерево, заведённое до смены схемы стадий, при продолжении работает по нынешней: задание группы переводится, и стадии ведёт общий навык доставки, а собственный навык проекта остаётся источником фактов. Тёплый разговор получает об этом строку первым сообщением, новый — уже переведённое задание.",
+        "en": "A tree created before the stage scheme changed follows the current scheme when continued: the group's task is converted, the stages are driven by the global delivery skill, and the project's own skill stays a source of facts. A warm conversation gets a line about it in the first message, a new one gets the converted task."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Напоминание «отправь ветку, открой MR» больше не уходит в ход, где пуш запрещён.",
+        "en": "The «push the branch, open the MR» reminder is no longer sent into a turn where pushing is forbidden."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Задача про макет распознаётся и тогда, когда слово стоит в конце предложения.",
+        "en": "A design-mockup task is recognised even when the word ends the sentence."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "На карточке разделения у каждой группы свой переключатель «Доставка на Sonnet»; по умолчанию — как в настройках.",
+        "en": "Each group on the split card has its own «Delivery on Sonnet» toggle; by default it follows the settings."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Настройки экономии групп хранятся только отличиями от умолчаний — новые умолчания доходят без сброса.",
+        "en": "Group economy settings are stored only as differences from the defaults, so new defaults arrive without a reset."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "До ревью группа не запускает подагентов; строка о привычках не советует их.",
+        "en": "Before the review a group does not launch subagents; the habits line no longer suggests them."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Слияние MR через сервер трекера закрыто во всех звеньях группы.",
+        "en": "Merging an MR through the tracker server is closed in every stage of a group."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "С рабочими привычками ходы группы идут без служебного напоминания CLI о тихом ходе — в каждом запросе на один блок текста меньше.",
+        "en": "With work habits on, group turns run without the CLI's silent-turn reminder — one block of text less in every request."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа на паузе больше не просыпается от очереди своей вкладки или телефона: сообщение остаётся в очереди с пометкой «Группа на паузе», а «Повторить» отправляет его от человека. Слово, которое агент уже получил на ходу, не уходит второй раз, даже если ответ панели до вкладки не дошёл.",
+        "en": "A paused group no longer wakes up from its tab’s or the phone’s queue: the message stays queued marked «The group is paused», and «Retry» sends it as the person’s own. Words the agent already got mid-turn are not sent a second time, even if the panel’s reply never reached the tab."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вопрос агента группы стоит прямо в её карточке хаба — жёлтым островком со стадией и чатом, даже пока группа ещё работает; ответить можно там же. Раньше он стоял полосой над всей сводкой и в карточке не был виден.",
+        "en": "A group agent’s question stands right in its hub card — a yellow island with the stage and chat, even while the group is still running; it can be answered right there. It used to sit in a strip above the whole hub and was not visible in the card."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Строка «Разрешено автоматически» в карточке группы сводит повторы в «×N», а вызовы MCP — под именем сервера: «tracker: jira_assign_issue ×6, jira_transition_issue ×7». Полный список — в подсказке при наведении.",
+        "en": "The «Allowed automatically» line in a group card collapses repeats to «×N» and groups MCP calls under the server name: «tracker: jira_assign_issue ×6, jira_transition_issue ×7». The full list is in the hover hint."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Работает · …» в карточке группы считается с начала идущего хода: группа, продолженная через сутки, больше не «работает 21ч» после часа работы.",
+        "en": "«Working · …» in a group card counts from the start of the current turn: a group resumed a day later no longer shows «working 21h» after an hour of work."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Строка текущего вызова группы больше не застревает на давнем вызове: у длинного разговора панель читает начало и хвост файла, и вызов, чей ответ попал в непрочитанную середину, сутки числился идущим. Между вызовами строки теперь нет.",
+        "en": "A group's current-call line no longer sticks to a long-past call: for a long conversation the panel reads the start and the tail of the file, and a call whose result fell into the unread middle stayed «running» for a day. Between calls the line is now absent."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Qwen снова спрашивает разрешение на правки и команды: панель не передавала ему режим подтверждений, и он правил файлы без вопроса даже при выключенных правках.",
+        "en": "Qwen asks for permission on edits and commands again: the panel did not pass it the approval mode, so it edited files without asking even with edits turned off."
+      },
+      "area": { "ru": "Чужие CLI", "en": "Foreign CLIs" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отказ в разрешении у Qwen завершает ход ошибкой с названием отказанного действия вместо «CLI закончил ход без ответа», и его сессия не остаётся висеть.",
+        "en": "A denied permission in Qwen ends the turn with an error naming the denied action instead of «CLI ended the turn without an answer», and its session is no longer left hanging."
+      },
+      "area": { "ru": "Чужие CLI", "en": "Foreign CLIs" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Правка сервера в разработке ждёт идущие ходы чатов не дольше 30 минут, потом сервер перезапускается сам. Плашка заранее называет время и ходы, которых он не дождётся; подготовку копий групп и проверки проектов сторож по-прежнему ждёт до конца.",
+        "en": "A server edit in development waits for running chat turns no longer than 30 minutes, then the server restarts on its own. The banner names the time and the turns it will not wait for in advance; group copy preparation and project checks are still waited for to the end."
+      },
+      "how": {
+        "ru": "Без предела две группы с ходами по 10–30 минут держали правку больше часа. Процесс агента перезапуск переживает, а группа с оборванным ходом продолжает сама.",
+        "en": "Without a limit two groups with 10–30 minute turns held an edit for over an hour. The agent process survives the restart, and a group whose turn was cut continues on its own."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Два быстрых переключения в настройках больше не возвращают на экран состояние без второго: ответ, пришедший позже более новой правки, кэш не затирает, а после правок внахлёст настройки перечитываются.",
+        "en": "Two quick toggles in settings no longer bring back a state without the second one: a reply arriving after a newer edit does not overwrite the cache, and overlapping edits re-read the settings."
+      },
+      "area": { "ru": "Настройки", "en": "Settings" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Карточка экономии групп говорит, когда порог сжатия задан переменной AGENTDECK_GROUP_COMPACT_WINDOW и выбор на карточке не действует; срок кэша «5 минут» помечен как нерекомендуемый; подсказка точно называет, какие рычаги действуют со следующего хода, а какие — с нового разговора группы.",
+        "en": "The group economy card says when the compaction threshold comes from the AGENTDECK_GROUP_COMPACT_WINDOW variable and the card's choice does not apply; the 5-minute cache lifetime is marked as not recommended; the hint names exactly which levers apply from the next turn and which from the group's next conversation."
+      },
+      "area": { "ru": "Настройки", "en": "Settings" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Новый разговор группы после паузы считает её коммиты от ветки предшественника, если копия отведена от неё, и не повторяет строку ветки, которую вводная уже назвала.",
+        "en": "A group's new conversation after a pause counts its commits from the predecessor's branch when the copy was made from it, and does not repeat the branch line the brief already names."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Длинная команда установки зависимостей в задании группы заменена строкой с числом шагов подготовки копии — около 2,4 тыс. знаков меньше в каждом вызове; провал установки по-прежнему называет команду целиком.",
+        "en": "A long dependency install command in a group's task is replaced by a line with the number of copy preparation steps — about 2.4k characters less in every call; a failed install still names the full command."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Звенья доставки и пуша работают без плагина макетов и при макете в задачах: коммиту и MR он не нужен, а его описания навыков — около 6 тыс. знаков в каждом вызове. Убрать их можно только вместе с плагином: оставить навыку плагина одно имя CLI не позволяет.",
+        "en": "The deliver and push stages run without the design plugin even when the tasks carry a design: a commit and an MR do not need it, and its skill descriptions cost about 6k characters per call. They can only go together with the plugin: the CLI does not let a plugin skill keep just its name."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Проверка конца хода называет формат привязки готового теста (testName — полный путь describe > … > it), а группе, чей ход и так остановлен, — точную команду прогона её автокейсов: группы больше не ищут синтаксис в исходниках панели.",
+        "en": "The end-of-turn check names how to link an existing test (testName is the full describe > … > it path), and a group whose turn is held anyway gets the exact run command for its automated cases: groups no longer search the panel's sources for the syntax."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "internal",
+      "text": {
+        "ru": "Бюджет первого запроса звена группы: настоящий CLI получает группу из нынешних строителей задания, и рост любого блока запроса больше 2 тыс. знаков против пина краснеет; заодно проверяется, что нужное в запросе есть, а снятое не вернулось.",
+        "en": "A budget for a group stage's first request: the real CLI receives a group built by the current task builders, and any request block growing more than 2k characters over the pin goes red; it also checks that what is needed is present and what was removed did not come back."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Панель, запущенная без каталога настроек Claude, больше не создаёт в нём файл настроек при старте.",
+        "en": "A panel started without a Claude settings directory no longer creates a settings file in it at startup."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Справка о потолке вывода Bash описывает то, что CLI делает на самом деле: превью и путь к полному выводу, у упавшей команды — начало.",
+        "en": "Help on the Bash output ceiling describes what the CLI actually does: a preview and the path to the full output, the start of it for a failed command."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка чата объясняет, почему до ревью звену закрыты навыки ревью и подагенты, и что при кэше на 5 минут разговор группы считается остывшим уже через 4 минуты.",
+        "en": "Chat help explains why review skills and subagents are closed to a stage before the review, and that with a 5-minute cache a group's conversation counts as cooled after 4 minutes."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Проверка окружения запускается как «pnpm run doctor»: короткое «pnpm doctor» вызывало встроенную команду pnpm и ничего не проверяло.",
+        "en": "The environment check runs as «pnpm run doctor»: the short «pnpm doctor» called pnpm's built-in command and checked nothing."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Копии одной группы начинают запрос одинаково: строка о тестах в системном промпте больше не несёт путь копии, а личные сведения копии (память, каталог) идут первым сообщением. Второй старт группы читает из кэша 12,5 тыс. токенов вместо 9,5 тыс. и записывает в кэш на 17 % меньше.",
+        "en": "Copies of one group start their request identically: the tests line in the system prompt no longer carries the copy's path, and the copy's own details (memory, directory) go in the first message. A group's second start reads 12.5k tokens from the cache instead of 9.5k and writes 17 % less to it."
+      },
+      "how": {
+        "ru": "Кэш начала запроса делится между разговорами только при совпадении байт в байт до метки кэша — путь копии делал системный промпт каждой копии своим.",
+        "en": "The request-prefix cache is shared between conversations only when it matches byte for byte up to the cache mark — the copy's path made every copy's system prompt unique."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "tests-cli без --project берёт проект из переменной AGENTDECK_TESTS_PROJECT, которую панель ставит прогону группы, а без неё — текущий каталог; явный --project главнее.",
+        "en": "tests-cli without --project takes the project from AGENTDECK_TESTS_PROJECT, set by the panel for a group run, and otherwise the current directory; an explicit --project wins."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож групп разделения: панель сама следит за идущими группами — молчание, вопрос без ответа, остывший кэш, сжатия подряд, одна проверка по кругу, ревью или пуш не на своей стадии, чтение исходников панели из копии, расход и прогноз окна, исчерпанный лимит, цикл опроса со сном, перечитывание файла. Модель для этого не вызывается.",
+        "en": "Split-group watch: the panel itself watches running groups — silence, an unanswered question, a cooled cache, compactions in a row, one check run in a loop, a review or push outside its stage, the panel's sources read from a copy, window burn and projection, an exhausted limit, a sleep-polling loop, a file read again. No model is called for this."
+      },
+      "how": {
+        "ru": "Правила идут по живому потоку прогона и хвостам транскриптов — своего и субагентов; прогон, подхваченный после перезапуска панели, читается из его транскрипта. Сигнал закрывается сам, когда условие кончилось, а сигнал, за которым никто не следит, — когда группа закончилась или разговор долго молчит.",
+        "en": "The rules follow the run's live stream and the tails of transcripts — its own and its subagents'; a run picked up after a panel restart is read from its transcript. A signal closes itself when its condition ends, and a signal nobody watches closes when the group ends or the conversation stays silent long enough."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Островок «Сторож группы» в карточке группы хаба: правило, числа, время (с датой, если не сегодня) и ссылка в чат, где оно сработало; фишка сводки хаба считает активные сигналы, одни сведения её не красят.",
+        "en": "A «Group watch» island in the group's hub card: the rule, its numbers, the time (with the date when not today) and a link to the chat where it fired; the hub summary chip counts active signals, information alone does not colour it."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сигналы «внимание» и «тревога» уходят в Telegram строкой по-русски — правило, числа, стадия и папка проекта; повтор не чаще срока тишины, сбой отправки пишется в журнал сервера.",
+        "en": "«Attention» and «alarm» signals go to Telegram as a readable line — the rule, its numbers, the stage and the project folder; a repeat no more often than the quiet period, a failed send is written to the server log."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка «Сторож групп разделения» в «Настройки» → «Группы»: пороги правил, выключатели сторожа и Telegram. Правка действует сразу, выключение закрывает активные сигналы, в снимок настроек уезжают только изменённые допустимые пороги.",
+        "en": "A «Split-group watch» card in «Settings» → «Groups»: rule thresholds, the watch and Telegram switches. A change applies at once, switching off closes active signals, and the settings snapshot carries only changed valid thresholds."
+      },
+      "area": { "ru": "Настройки", "en": "Settings" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Журнал лимита пишется и посреди прогона — не чаще раза в 5 минут, до 24 замеров на прогон, — так что доля окна у прогона видна до его конца.",
+        "en": "The limit journal is also written mid-run — at most every 5 minutes, up to 24 samples per run — so a run's share of the window is visible before it ends."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка чата — раздел «Сторож групп»: какие правила есть, когда сигнал закрывается сам и где меняются пороги.",
+        "en": "Chat help — a «Group watch» section: which rules exist, when a signal closes itself and where the thresholds are changed."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

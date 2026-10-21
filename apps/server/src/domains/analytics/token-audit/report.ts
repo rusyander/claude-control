@@ -1,5 +1,6 @@
 import type { SessionAudit } from './token-audit.types.ts';
 import { unionMs } from './time.ts';
+import { roundWeight } from './window-weight.ts';
 
 /**
  * Отчёт измерителя: заголовочные числа сессии, сумма по разделению, текст для
@@ -14,6 +15,8 @@ export interface Headline {
   cacheWrite: number;
   cacheWrite1h: number;
   output: number;
+  /** Вес в окне подписки, W (`window-weight.ts`), вложенные агенты включены. */
+  weight: number;
   /** Постоянная часть: контекст первого вызова (у суммы — средний по сессиям). */
   firstContext: number;
   averageContext: number;
@@ -132,6 +135,7 @@ export function headline(audit: SessionAudit): Headline {
     cacheWrite: audit.totals.cacheWrite,
     cacheWrite1h: audit.totals.cacheWrite1h,
     output: audit.totals.output,
+    weight: roundWeight((audit.weight ?? 0) + sum(subs.map((s) => s.weight))),
     firstContext: audit.constant?.firstContext ?? 0,
     averageContext: audit.averageContext,
     maxContext: audit.maxContext,
@@ -170,6 +174,7 @@ export function totalHeadline(audits: SessionAudit[]): Headline {
     cacheWrite: add('cacheWrite'),
     cacheWrite1h: add('cacheWrite1h'),
     output: add('output'),
+    weight: roundWeight(add('weight')),
     firstContext: heads.length ? Math.round(add('firstContext') / heads.length) : 0,
     averageContext: calls
       ? Math.round(sum(audits.map((a) => a.averageContext * a.calls)) / calls)
@@ -215,7 +220,7 @@ export function formatSession(audit: SessionAudit): string[] {
   const h = headline(audit);
   const lines = [
     `■ ${audit.id.slice(0, 8)} [${audit.kind}]${audit.title ? ` ${audit.title}` : ''} ${audit.firstTimestamp?.slice(0, 16) ?? ''}`,
-    `  вызовы ${h.calls} · чтение кеша ${k(h.cacheRead)} · запись ${k(h.cacheWrite)} (часовая ${pct(h.cacheWrite1h, h.cacheWrite)}) · вывод ${k(h.output)} · вход ${k(h.input)}`,
+    `  вызовы ${h.calls} · чтение кеша ${k(h.cacheRead)} · запись ${k(h.cacheWrite)} (часовая ${pct(h.cacheWrite1h, h.cacheWrite)}) · вывод ${k(h.output)} · вход ${k(h.input)} · вес окна ${h.weight} W`,
     `  контекст: первый ${k(h.firstContext)} · средний ${k(h.averageContext)} · наибольший ${k(h.maxContext)} · сжатий ${h.compactions}`,
     ...(h.wallMs ? [timeLine(h)] : []),
     ...(audit.economy ? [economyLine(h)] : []),
@@ -283,7 +288,7 @@ export function formatSession(audit: SessionAudit): string[] {
 /** Строка суммы — то же, что у сессии, по всем сразу. */
 export function formatTotal(h: Headline, sessions: number): string[] {
   return [
-    `═ ИТОГО ${sessions} сесс.: вызовы ${h.calls} · чтение кеша ${k(h.cacheRead)} · запись ${k(h.cacheWrite)} (часовая ${pct(h.cacheWrite1h, h.cacheWrite)}) · вывод ${k(h.output)}`,
+    `═ ИТОГО ${sessions} сесс.: вызовы ${h.calls} · чтение кеша ${k(h.cacheRead)} · запись ${k(h.cacheWrite)} (часовая ${pct(h.cacheWrite1h, h.cacheWrite)}) · вывод ${k(h.output)} · вес окна ${h.weight} W`,
     `  первый контекст в среднем ${k(h.firstContext)} · средний ${k(h.averageContext)} · наибольший ${k(h.maxContext)} · сжатий ${h.compactions}`,
     ...(h.wallMs ? [timeLine(h)] : []),
     economyLine(h),

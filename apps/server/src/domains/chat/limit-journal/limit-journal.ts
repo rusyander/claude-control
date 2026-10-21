@@ -13,10 +13,10 @@ import type { RawEvent, RawLimitWindow } from '../chat-events.ts';
 
 /**
  * Журнал прогонов для доли лимита подписки: интервал, токены и замеры загрузки
- * окон (первый и последний за прогон).
+ * окон (все различные за прогон; запись обновляется посреди него).
  *
  * Своим файлом в каталоге данных, как журнал понижений (`lowered-journal.ts`), и
- * по тем же причинам: дописывается на каждом завершении прогона, а битый файл
+ * по тем же причинам: дописывается по ходу и на завершении прогона, а битый файл
  * должен означать пустой журнал, а не панель без настроек. Замеров нет в
  * транскрипте — CLI шлёт их только в поток, — поэтому после перезапуска панели
  * их неоткуда взять, кроме этого файла.
@@ -74,10 +74,52 @@ export function readLimitRuns(appDataDir: string): LimitRunRecord[] {
   }
 }
 
-/** Дописать прогон; записи старше недели и сверх потолка уходят. */
+/**
+ * Дописать прогон или заменить его прежнюю запись (тот же `id`): прогон пишется
+ * и посреди работы, на новых замерах, — иначе доля на карточке ждала бы конца
+ * многочасового звена. Записи старше недели и сверх потолка уходят.
+ */
 export function appendLimitRun(appDataDir: string, record: LimitRunRecord, now = Date.now()): void {
-  const fresh = readLimitRuns(appDataDir).filter((entry) => now - entry.endedAt <= KEEP_MS);
+  const fresh = readLimitRuns(appDataDir).filter(
+    (entry) => entry.id !== record.id && now - entry.endedAt <= KEEP_MS,
+  );
   writeJsonFile(limitJournalPath(appDataDir), [...fresh, record].slice(-LIMIT));
+}
+
+/**
+ * Потолок замеров одного прогона: журнал читается и переписывается целиком на
+ * каждой записи, а прогонов в нём до сотни — сотня замеров на каждый раздувала
+ * файл. Середины ровных участков и так схлопываются.
+ */
+export const MAX_RUN_SAMPLES = 24;
+
+/**
+ * Добавить замер к замерам прогона. Хранятся различные: прирост между соседними
+ * делится точнее. Середина ровного участка (три одинаковых подряд) схлопывается
+ * в его конец — концы участка держат границы прироста. Сверх потолка уходит
+ * второй по старшинству: первый замер — опора всего прогона.
+ */
+export function withLimitSample(
+  samples: readonly LimitSample[],
+  sample: LimitSample,
+): LimitSample[] {
+  const last = samples.at(-1);
+  const beforeLast = samples.at(-2);
+  if (last && beforeLast && sameLoad(last, sample) && sameLoad(beforeLast, last)) {
+    return [...samples.slice(0, -1), sample];
+  }
+  const next = [...samples, sample];
+  const [first, , ...rest] = next;
+  return next.length > MAX_RUN_SAMPLES && first ? [first, ...rest] : next;
+}
+
+function sameLoad(left: LimitSample, right: LimitSample): boolean {
+  return sameWindow(left.fiveHour, right.fiveHour) && sameWindow(left.sevenDay, right.sevenDay);
+}
+
+function sameWindow(left?: LimitWindowSample, right?: LimitWindowSample): boolean {
+  if (!left || !right) return left === right;
+  return left.utilization === right.utilization && left.resetsAt === right.resetsAt;
 }
 
 /**

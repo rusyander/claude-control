@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppSettings } from '@agentdeck/contracts';
+import { groupEconomyChanges } from '@agentdeck/contracts/group-economy';
+import { groupWatchChanges } from '@agentdeck/contracts/group-watch';
 import type { AppState } from './app-store.types.ts';
 
 /**
@@ -159,7 +161,13 @@ export function portableOf(state: AppState, context: PathContext): Record<string
     if (state[key] !== undefined) picked[key] = state[key];
   }
   if (state.settings) {
-    const settings: Record<string, unknown> = { ...state.settings };
+    // Рычаги экономии — только отличия от умолчаний, как и в state.json: иначе
+    // снимок, применённый на другой машине, заморозил бы там все умолчания.
+    const settings: Record<string, unknown> = {
+      ...state.settings,
+      groupEconomy: groupEconomyChanges(state.settings.groupEconomy),
+      groupWatch: groupWatchChanges(state.settings.groupWatch),
+    };
     for (const key of LOCAL_SETTINGS) delete settings[key];
     picked.settings = settings;
   }

@@ -11,7 +11,7 @@
  *   у другого CLI нет), «Готово» закрывает мастер;
  * - обзор считает конфиг Qwen и подписан «Qwen Code»;
  * - строка CLI в «Провайдерах» — про qwen и его версию;
- * - `pnpm doctor` в том же окружении выходит 0; контроль: без qwen в PATH — 1.
+ * - `pnpm run doctor` в том же окружении выходит 0; контроль: без qwen в PATH — 1.
  *
  * Запуск: `QWEN_BIN_DIR=<каталог с qwen(.cmd)> node tools/qa/check-no-claude-boot.mjs`.
  * Без `QWEN_BIN_DIR` — «не проверено» (код 2): CLI в систему проверка не ставит.
@@ -38,7 +38,7 @@ function pathWithoutClaude() {
     .join(delimiter);
 }
 
-/** `pnpm doctor` под временным домом; `withQwen` — с CLI qwen в PATH или без. */
+/** `pnpm run doctor` под временным домом; `withQwen` — с CLI qwen в PATH или без. */
 function runDoctor(home, withQwen) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(

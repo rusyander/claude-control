@@ -6,6 +6,7 @@ import {
   type TaskSplitResult,
 } from '@agentdeck/contracts/task-split';
 import { cascadeSystemPrompt, parseAssignments } from '@agentdeck/contracts/model-cascade';
+import { parseGroupSonnetDeliver } from '@agentdeck/contracts/group-economy';
 import { cascadeCeilingFor } from '../../domains/model-cascade/model-cascade.ts';
 import type { ServerContext } from '../../context.ts';
 import type { SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
@@ -126,6 +127,8 @@ export function registerChatSplitRoutes(
        * человека в обе стороны, и внутри одного объекта их не различить.
        */
       assignments?: unknown;
+      /** «Доставка на Sonnet» по группам с карточки: номер → да/нет (F-12). */
+      sonnetDeliver?: unknown;
     };
   }>('/api/chat/split', async (request, reply) => {
     // Тумблера автоподтверждения в теле запроса нет намеренно: он живёт на
@@ -222,6 +225,8 @@ export function registerChatSplitRoutes(
     // получает: человек просил заготовки, а не работу.
     if (deps.conveyor && launcher.planned && wantRuns && launcher.parentKey) {
       const manual = parseAssignments(request.body?.assignments);
+      // Доставка есть только у групп конвейера — выбор живёт в его записи.
+      const sonnetDeliver = parseGroupSonnetDeliver(request.body?.sonnetDeliver);
       const { result } = await deps.conveyor.begin({
         // Запись конвейера ключуется ТЕМ ЖЕ ключом, что и связи: у чужого CLI
         // именованным. Иначе конец цепочки группы (`onChainEnded` смотрит в
@@ -239,6 +244,7 @@ export function registerChatSplitRoutes(
           ...(manual.size > 0
             ? { assignments: Object.fromEntries([...manual].map(([i, a]) => [String(i), a])) }
             : {}),
+          ...(Object.keys(sonnetDeliver).length > 0 ? { sonnetDeliver } : {}),
         },
       });
       return result;

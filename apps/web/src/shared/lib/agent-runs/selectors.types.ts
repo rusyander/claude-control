@@ -21,4 +21,6 @@ export interface RunLike {
   permissions?: PendingPermission[];
   /** Вызовы этого хода: среди них и вопрос человеку. */
   tools?: StreamedTool[];
+  /** Когда сервер завёл прогон, по его часам (мс). */
+  startedAt?: number;
 }

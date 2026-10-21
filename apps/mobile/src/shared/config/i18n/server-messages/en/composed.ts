@@ -151,6 +151,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Group «{{group}}»: after the retry the MR {{mr}} pipeline failed on CI infrastructure again — {{jobs}}. The panel retries no more and does not wake the group: check the runner.',
   'chat-conversation-lost-notice':
     "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
+  'chat-cold-resume-notice':
+    "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk. Switch off in settings: Groups, group economy.",
   'split-default-drift-notice':
     'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
   'chat-autonomy-deferred-notice':

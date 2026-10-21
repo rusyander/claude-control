@@ -40,7 +40,9 @@ const A_PLAN = 'help-split-a-plan';
 const A_WORK = 'help-split-a-work';
 const A_REVIEW = 'help-split-a-review';
 const B_PLAN = 'help-split-b-plan';
-const B_WORK = 'help-split-b-work';
+// Ключ как у настоящей сессии: островок вопроса в карточке группы называет
+// начало ключа чата, и `help-spl` там читался бы обрывком.
+const B_WORK = '3f9a1c2e-7b44-4d0e-9a51-0c6d2b1e8f10';
 
 const A = { title: 'Выгрузка заказов', branch: 'feature/orders-export' };
 const B = { title: 'Фильтры списка', branch: 'feature/orders-filters' };
@@ -155,6 +157,30 @@ const CHILD_QUESTION = {
       ],
     },
   ],
+};
+
+/**
+ * Вопрос, записанный СЕРВЕРОМ на узле группы посреди хода (карточки 4 и 27
+ * прогона 20.10): у узла с карточкой хаба он стоит в самой карточке.
+ */
+const CARD_ASK = {
+  kind: 'question',
+  runId: B_WORK,
+  toolUseId: 'split-ask-2',
+  input: {
+    questions: [
+      {
+        question: 'Хранить выбранные фильтры между заходами?',
+        header: 'Фильтры',
+        multiSelect: false,
+        options: [
+          { label: 'Да, в адресе страницы', description: 'Ссылкой можно поделиться.' },
+          { label: 'Нет, сбрасывать', description: 'Каждый заход — с полного списка.' },
+        ],
+      },
+    ],
+  },
+  askedAt: at('2026-09-10T11:28:00.000Z'),
 };
 
 const PERMISSION = frame(
@@ -356,6 +382,7 @@ export async function shootSplit(browser, web, scenario) {
             parentChatId: PARENT,
             title: item.title,
             running: !paused && !delivered && (item.id === A_WORK || item.id === B_WORK),
+            ...(item.id === B_WORK && !paused && !delivered ? { asks: [CARD_ASK] } : {}),
           })),
         },
       }),
@@ -411,6 +438,13 @@ export async function shootSplit(browser, web, scenario) {
     await scenario.shot(page, '02-tree');
 
     // ── 03. Сводка групп у родителя ──────────────────────────────────────────
+    // Сводка — к верху окна: полоса вопросов над ней растёт с каждым вопросом
+    // группы и уводила её ниже окна, а кадр за окном не снять.
+    await page
+      .locator('[data-child-hub]')
+      .first()
+      .evaluate((node) => node.scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(600);
     await scenario.shot(page, '03-hub', { clip: '[data-child-hub]' });
 
     // ── 04. Ребёнок спрашивает — отвечают в родителе ─────────────────────────
@@ -424,6 +458,15 @@ export async function shootSplit(browser, web, scenario) {
       .evaluate((node) => node.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(600);
     await scenario.shot(page, '04-child-ask', { clip: '[class*="_childAsk_"]' });
+
+    // ── 04b. Вопрос группы — в её карточке ───────────────────────────────────
+    const cardB = `[data-hub-row="chat"]:has-text("${B.title}")`;
+    await page
+      .locator(cardB)
+      .first()
+      .evaluate((node) => node.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(600);
+    await scenario.shot(page, '04b-card-ask', { clip: cardB });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.waitForTimeout(800);
 

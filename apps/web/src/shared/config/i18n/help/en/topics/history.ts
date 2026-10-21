@@ -88,8 +88,9 @@ export const historyEn: typeof historyRu = {
         'never touched. With uncommitted edits the button is closed and the card names the files; ' +
         'a branch that has diverged from the server gets an explanation of how to pull by hand. ' +
         'A new pnpm-lock.yaml makes the panel run pnpm install itself. The interface refreshes ' +
-        'at once, and the dev watcher restarts the server once the running chat turns finish: ' +
-        'conversations continue where they were. A server run without the watcher makes the ' +
+        'at once, and the dev watcher restarts the server once the running chat turns finish, ' +
+        'waiting for them no longer than 30 minutes — the banner names the time and the turns ' +
+        'in advance: conversations continue where they were. A server run without the watcher makes the ' +
         'card ask you to restart the panel yourself.',
       cardTitle: 'How to read a feed entry',
       cardCaption: 'What each mark and number in a release header means.',

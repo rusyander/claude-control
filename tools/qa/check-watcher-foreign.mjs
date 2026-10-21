@@ -166,7 +166,14 @@ function makeEnv(root, extra) {
       ([key]) => !['PATH', ...Object.keys(homeEnv)].includes(key.toUpperCase()),
     ),
   );
-  return { ...base, ...homeEnv, ...extra };
+  // Свой каталог локальных моделей: qwen, поставленный панелью человека в
+  // `.local-models` репозитория, иначе встаёт в PATH раньше подставного (прогон 21.10).
+  return {
+    ...base,
+    ...homeEnv,
+    AGENTDECK_LOCAL_MODELS_DIR: join(root, 'local-models'),
+    ...extra,
+  };
 }
 
 /**

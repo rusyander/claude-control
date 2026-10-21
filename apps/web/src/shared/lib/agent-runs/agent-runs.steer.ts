@@ -44,6 +44,9 @@ export async function steer(
     return 'queued';
   }
   const sendingId = markSending(key, message.prompt);
+  // Метка на случай, когда сервер слово отдал, а ответ до вкладки не дошёл: с
+  // ней же оно встанет в очередь, и досылку сервер узнает как повтор.
+  const clientId = `steer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   try {
     const { data } = await apiClient.post<{ steered?: boolean }>('/chat/send', {
       chatId: run.serverRunId ?? (run.id || key),
@@ -51,6 +54,7 @@ export async function steer(
       ...(run.projectPath ? { projectPath: run.projectPath } : {}),
       prompt: message.prompt,
       steer: true,
+      clientId,
       ...(message.allowEdits !== undefined ? { allowEdits: message.allowEdits } : {}),
       ...(message.autoApprove !== undefined ? { autoApprove: message.autoApprove } : {}),
       ...(message.model ? { model: message.model } : {}),
@@ -65,7 +69,7 @@ export async function steer(
   }
   // Снять пузырь «Передаётся…» и поставить в очередь — одним показом, без мигания.
   unmarkSending(key, sendingId);
-  enqueue(id, message);
+  enqueue(id, { ...message, clientId });
   // Ход кончился, пока шёл запрос: конец хода очередь уже не снимет — дослать сейчас.
   if (runs.get(key)?.status !== 'running') drainQueue(key);
   return 'queued';

@@ -90,6 +90,7 @@ import {
   queueAfterRun,
   type QueuedSend,
 } from '../../../domains/chat/busy-send-queue.ts';
+import { SentOnce } from '../../../domains/chat/sent-once.ts';
 import { parseBody } from '../../../lib/request-body.ts';
 import { allowedPermissionRules } from '@agentdeck/contracts/permission-rules';
 import { cachedMainOf, guardHitFor } from '../../../domains/backend-guard/backend-guard.ts';
@@ -222,8 +223,14 @@ export function registerChatRunRoutes(
    * Его ходы идут без дописки панели, как первый ход из хаба, и на его модели.
    */
   statusOf?: (chatId: string) => { model: string; effort: string } | undefined,
+  /**
+   * Разговор принадлежит группе на паузе (`pausedGroupOf`). Досылку без человека
+   * (`automatic`) такой разговор не принимает: паузу снимает только человек.
+   */
+  heldOf?: (chatId: string) => boolean,
 ): void {
   const guardMainOf = cachedMainOf(mainCheckoutOf);
+  const sentOnce = new SentOnce();
   // Реестр считает расход, но тарифов не знает: прайс и свои цены пользователя
   // доступны только здесь. Отдаём ему саму функцию, а не таблицу, — тогда правка
   // цен в настройках подхватывается со следующего же шага.
@@ -341,6 +348,22 @@ export function registerChatRunRoutes(
       // читают его, а не настройку заново (переключение посреди запроса не
       // должно дать бинарь одного CLI с аргументами другого).
       const provider = getActiveProvider(ctx.store);
+      const queuedByServer = Boolean(request.headers[QUEUED_SEND_HEADER]);
+
+      // Это сообщение агент уже получил, а клиент ответа не узнал и досылает его
+      // (см. `SentOnce`). Очередь сервера несёт метку принятого ею же сообщения —
+      // её доставка не повтор.
+      if (body.clientId && !queuedByServer && sentOnce.has(body.clientId)) {
+        const running = registry.isRunning(chatId, sessionId);
+        return reply.code(202).send({
+          steered: true,
+          duplicate: true,
+          ...(running ? { runId: registry.resolveKey(chatId, sessionId) } : {}),
+        });
+      }
+      const delivered = (): void => {
+        if (body.clientId) sentOnce.remember(body.clientId);
+      };
 
       // Прошлый ответ ещё генерируется — второй промпт принять некуда. Раньше
       // маршрут в этом случае молча подключался к идущему прогону с seq 0:
@@ -359,6 +382,7 @@ export function registerChatRunRoutes(
         // его на ближайшем шаге и учтёт, не дожидаясь конца всей работы.
         // Вложения так не едут — они идут своим ходом, через очередь.
         if (body.steer && (files ?? []).length === 0 && registry.steer(chatId, sessionId, prompt)) {
+          delivered();
           return reply.code(202).send({ steered: true, runId });
         }
         // Слово идущему ходу выше — не новый запуск, его чужой CLI не касается.
@@ -376,6 +400,7 @@ export function registerChatRunRoutes(
           };
           queuedSends.add(entry);
           sendAfterRun(entry, runId, request.headers.authorization);
+          delivered();
           return reply.code(202).send({ queued: true, runId });
         }
         return refuse(reply, 409, 'run_busy', RUN_BUSY_MESSAGE, {
@@ -385,6 +410,20 @@ export function registerChatRunRoutes(
       }
 
       if (provider.id !== 'claude') return refuseForeignProvider(reply, provider);
+
+      // Досылка без человека — очередь вкладки по концу хода, автоповтор — группу
+      // на паузе не будит: через 3 с после «Паузы» из хаба вкладка дослала ответ
+      // из своей очереди, и группа пошла дальше (карточка 33 прогона 20.10).
+      // Паузу снимает «Продолжить» или сообщение, которое человек пишет сейчас.
+      if (body.automatic && (heldOf?.(chatId) || (sessionId ? heldOf?.(sessionId) : false))) {
+        return refuse(
+          reply,
+          409,
+          'group_paused',
+          'Группа на паузе — сообщение из очереди не отправлено, чтобы не будить её. Оно осталось в очереди.',
+          { messageCode: 'run-group-paused' },
+        );
+      }
 
       // Слово «на ходу», а ход уже кончился (между проверкой вкладки и этой):
       // новый прогон здесь же, а вкладка поставила бы то же слово в очередь —
@@ -761,6 +800,7 @@ export function registerChatRunRoutes(
           messageCode: 'run-busy',
         });
       }
+      delivered();
 
       // Про включившийся набор говорим ПОСЛЕ старта: до него прогона в реестре
       // нет, и заметке некуда лечь. Буфер реестра держит её наравне с событиями
@@ -770,7 +810,7 @@ export function registerChatRunRoutes(
 
       // Доставка из очереди сервера (`queueIfBusy`): поток читать некому —
       // идущий прогон вкладки подхватят опросом.
-      if (request.headers[QUEUED_SEND_HEADER]) {
+      if (queuedByServer) {
         return reply.code(202).send({ started: true, runId: chatId });
       }
       await streamRun(registry, reply, chatId, 0);

@@ -8,9 +8,12 @@ import {
   limitJournalPath,
   limitSampleOf,
   limitSharesByChat,
+  MAX_RUN_SAMPLES,
   readLimitRuns,
+  withLimitSample,
   type LimitRunRecord,
 } from './limit-journal.ts';
+import type { LimitSample } from '@agentdeck/contracts/limit-share';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -59,6 +62,38 @@ describe('limitSampleOf — замер из rate_limit_event', () => {
   });
 });
 
+describe('withLimitSample — замеры прогона', () => {
+  const at = (time: number, utilization: number, resetsAt = 99): LimitSample => ({
+    at: time,
+    fiveHour: { utilization, resetsAt },
+  });
+  const fold = (samples: LimitSample[]): LimitSample[] =>
+    samples.reduce<LimitSample[]>((kept, sample) => withLimitSample(kept, sample), []);
+
+  it('держит все различные замеры, а не только первый и последний', () => {
+    expect(fold([at(1, 0.1), at(2, 0.2), at(3, 0.3)]).map((sample) => sample.at)).toEqual([
+      1, 2, 3,
+    ]);
+  });
+
+  it('середина ровного участка схлопывается, концы участка остаются', () => {
+    const kept = fold([at(1, 0.1), at(2, 0.2), at(3, 0.2), at(4, 0.2), at(5, 0.3)]);
+    expect(kept.map((sample) => sample.at)).toEqual([1, 2, 4, 5]);
+  });
+
+  it('новое окно (другой сброс) при той же загрузке — различный замер', () => {
+    expect(fold([at(1, 0.2), at(2, 0.2), at(3, 0.2, 100)])).toHaveLength(3);
+  });
+
+  it('сверх потолка уходит второй замер, первый — опора прогона', () => {
+    const many = Array.from({ length: MAX_RUN_SAMPLES + 5 }, (_, index) => at(index, index / 1000));
+    const kept = fold(many);
+    expect(kept).toHaveLength(MAX_RUN_SAMPLES);
+    expect(kept[0]?.at).toBe(0);
+    expect(kept.at(-1)?.at).toBe(MAX_RUN_SAMPLES + 4);
+  });
+});
+
 describe('журнал доли лимита на диске', () => {
   let dir: string;
   beforeEach(() => {
@@ -74,6 +109,15 @@ describe('журнал доли лимита на диске', () => {
     appendLimitRun(dir, record({ id: 'fresh', endedAt: now - DAY }), now);
     appendLimitRun(dir, record({ id: 'new', endedAt: now }), now);
     expect(readLimitRuns(dir).map((entry) => entry.id)).toEqual(['fresh', 'new']);
+  });
+
+  it('запись с тем же id заменяет прежнюю — прогон пишется посреди работы и на конце', () => {
+    appendLimitRun(dir, record({ id: 'run', endedAt: 500, tokens: 10 }), 1000);
+    appendLimitRun(dir, record({ id: 'other' }), 1000);
+    appendLimitRun(dir, record({ id: 'run', endedAt: 900, tokens: 40 }), 1000);
+    const entries = readLimitRuns(dir);
+    expect(entries.map((entry) => entry.id)).toEqual(['other', 'run']);
+    expect(entries.find((entry) => entry.id === 'run')?.tokens).toBe(40);
   });
 
   it('битый файл и чужие строки — пустой журнал без исключения', () => {

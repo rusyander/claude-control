@@ -1,4 +1,5 @@
 import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumers';
+import type { ChatEvent } from '../chat-events.ts';
 
 /** Сведения о прогоне для группировки и переподключения (в т.ч. после F5). */
 export interface RunMeta {
@@ -21,6 +22,13 @@ export interface RunMeta {
   /** Идентификатор сессии на старте (для продолжения разговора). */
   sessionId?: string;
   /**
+   * Старт — повтор после сброса лимита (директива §L8): ждали до `resetsAt`, и
+   * кэш остыл при любом простое. Нужна только решению о продолжении на этом
+   * старте (`setContinuationPolicy`); в запись прогона не попадает, иначе
+   * следующий повтор того же прогона считался бы «после лимита» тоже.
+   */
+  afterLimit?: true;
+  /**
    * Прогон уехал ступенью НИЖЕ потолка разговора (веер параллельного запуска).
    * Само присутствие поля и означает понижение; внутри — чем именно ведут, уже
    * развёрнутым именем. По этой отметке прогон попадает в журнал сдачи: без неё
@@ -38,3 +46,16 @@ export interface RunMeta {
     kind?: string;
   };
 }
+
+/**
+ * Что реестр отдаёт сторожу групп (`token-ledger/watch`): старт прогона, КАЖДОЕ
+ * событие потока, внутренние (`toolResult`, `compact`) тоже, и конец. Отдельный
+ * слушатель, а не подписка вкладки: внутренние события в буфер не попадают.
+ */
+export type RunWatchFeed =
+  /** `detached` — прогон подхвачен после перезапуска без потока: событий не будет, только конец. */
+  | { kind: 'start'; sessionId?: string; cwd: string; detached?: true }
+  | { kind: 'event'; event: ChatEvent; sessionId?: string }
+  | { kind: 'finish'; sessionId?: string };
+
+export type RunWatchListener = (chatId: string, feed: RunWatchFeed) => void;

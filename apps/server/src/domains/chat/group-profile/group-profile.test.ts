@@ -5,6 +5,8 @@ import {
   chatRunProfile,
   foreignGroupMcp,
   compactWindowOf,
+  DELIVERY_BASH_DENY,
+  groupCompactWindow,
   GROUP_DANGER_ASK,
   GROUP_SKILLS,
   groupMcpProfile,
@@ -59,6 +61,25 @@ describe('needsDesign', () => {
     expect(needsDesign('PROJ-1 https://www.figma.com/design/abc?node-id=1-2')).toBe(true);
     expect(needsDesign('Сверстать карточку по макету')).toBe(true);
     expect(needsDesign('PROJ-2 ручка экспорта в CSV, тесты')).toBe(false);
+  });
+
+  it('пути и имена из кода о макете не говорят; слово в прозе — говорит', () => {
+    // Задача группы 0 живого прогона 20.10.
+    expect(needsDesign('Не трогать app/layouts/MainLayout/useAppSocket, shared/api')).toBe(false);
+    expect(needsDesign('вынести designTokens.ts и useLayoutEffect')).toBe(false);
+    expect(needsDesign('Fix the card layout on mobile')).toBe(true);
+    expect(needsDesign('сверить с mockup из тикета')).toBe(true);
+  });
+
+  // F-02: точка в конце фразы — пунктуация, не часть пути; фильтр путей съедал слово.
+  it('слово в конце фразы с точкой — проза; точка или слэш внутри — путь', () => {
+    expect(needsDesign('Fix the layout.')).toBe(true);
+    expect(needsDesign('Match the mockup.')).toBe(true);
+    expect(needsDesign('Implement the new design. Then ship')).toBe(true);
+    expect(needsDesign('See the layout, please')).toBe(true);
+    expect(needsDesign('Rename src/layout.ts')).toBe(false);
+    expect(needsDesign('Bump design.tokens version')).toBe(false);
+    expect(needsDesign('Update layouts\\Main')).toBe(false);
   });
 });
 
@@ -137,16 +158,24 @@ describe('foreignGroupMcp (6.1)', () => {
 /** Потолок Bash группы (3.1) — в каждых настройках флага её прогона. */
 const CEILING = { env: { BASH_MAX_TIMEOUT_MS: '1800000' } };
 /** Трекер и хранилище кода из `ENTRIES` — правилом `ask` (журнал 19.10). */
+/** Запрет слияния MR — во всех звеньях группы (F-13): слияние запрещено всегда. */
+const MERGE_RULES = ['atlassian-work', 'gitlab-work'].flatMap((server) => [
+  `mcp__${server}__merge_merge_request`,
+  `mcp__${server}__merge_pull_request`,
+]);
+
 const OUTWARD = {
   permissions: {
     ask: ['mcp__atlassian-work', 'mcp__gitlab-work', ...GROUP_DANGER_ASK, ...MAIN_SYNC_ASK],
+    deny: MERGE_RULES,
   },
 };
 
 describe('groupRunProfile', () => {
   it('флаг строгого набора, подключения claude.ai сняты, оставленные — своим файлом', () => {
     const run = groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [] });
-    expect(run.args).toEqual(['--strict-mcp-config']);
+    // X1: личные секции — из системного промпта в сообщение, копии делят его кэш.
+    expect(run.args).toEqual(['--strict-mcp-config', '--exclude-dynamic-system-prompt-sections']);
     // Метка хука блока «Тесты»: автокейсы группа прогоняет перед «доставлено» (пункт A 19.10).
     expect(run.env).toEqual({
       ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
@@ -176,6 +205,7 @@ describe('groupRunProfile', () => {
     });
     expect(odd.settings.permissions).toEqual({
       ask: ['mcp__gitlab_work', ...GROUP_DANGER_ASK, ...MAIN_SYNC_ASK],
+      deny: ['mcp__gitlab_work__merge_merge_request', 'mcp__gitlab_work__merge_pull_request'],
     });
     // Без хранилища кода и трекера остаются правила опасных команд оболочки и догона main.
     const none = groupRunProfile({ entries: [ENTRIES[6]!], tasksText: '', extra: [] });
@@ -445,6 +475,15 @@ describe('skillSettings', () => {
     expect(skillSettings({ ...SKILLS, plugins: [] }, false)).not.toHaveProperty('enabledPlugins');
   });
 
+  it('с макетом плагин макетов выключен в доставке и пуше, в работе, ревью и правках — нет', () => {
+    const off = { 'figma@claude-plugins-official': false, 'discord@x': false };
+    expect(skillSettings(SKILLS, true, 'deliver').enabledPlugins).toEqual(off);
+    expect(skillSettings(SKILLS, true, 'push').enabledPlugins).toEqual(off);
+    for (const stage of ['plan', 'work', 'review', 'fix'] as const) {
+      expect(skillSettings(SKILLS, true, stage).enabledPlugins).toEqual({ 'discord@x': false });
+    }
+  });
+
   it('профиль без сведений о навыках настроек навыков не несёт — только потолок Bash', () => {
     expect(groupRunProfile({ entries: ENTRIES, tasksText: '', extra: [] }).settings).toEqual({
       ...CEILING,
@@ -524,5 +563,154 @@ describe('statusRunProfile (5.1)', () => {
   it('без плагинов поля плагинов нет — личные настройки не трогаются', () => {
     const bare = statusRunProfile({ user: [], group: [], plugins: [] });
     expect(bare.settings).not.toHaveProperty('enabledPlugins');
+  });
+});
+
+describe('groupRunProfile — рычаги экономии групп', () => {
+  const ON = {
+    bashOutputChars: 8000,
+    readOutputTokens: 10000,
+    cacheTtl: '1h',
+    detachIde: true,
+    workHabits: true,
+  } as const;
+
+  it('включённые рычаги едут в запуск: env процесса, env настроек, ключ Bash, строка привычек', () => {
+    const run = groupRunProfile({ entries: [], tasksText: '', extra: [], economy: ON });
+    // IDE — env процесса: CLI читает его раньше настроек, а связь с редактором
+    // приходит от процесса панели, запущенной из терминала VS Code.
+    expect(run.env).toMatchObject({ CLAUDE_CODE_AUTO_CONNECT_IDE: 'false' });
+    // Привычки работы гасят и напоминание о молчании: в стадии отчёта посреди
+    // работы никто не читает, а ход на него оплачивается.
+    expect(run.env).toMatchObject({ CLAUDE_CODE_SILENT_TURN_REMINDER: '0' });
+    // Часовой кэш группе задаёт `cacheTtl`; общий тумблер CLI лишь переписал бы
+    // выбор человека для всего прогона.
+    expect(run.env).not.toHaveProperty('ENABLE_PROMPT_CACHING_1H');
+    expect(run.settings.env).toEqual({
+      BASH_MAX_TIMEOUT_MS: '1800000',
+      CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS: '10000',
+      CLAUDE_CODE_PROMPT_CACHE_TTL: '1h',
+    });
+    // Ключ настроек, а не BASH_MAX_OUTPUT_LENGTH: в 2.1.286 переменная лишь окно дочитывания.
+    expect(run.settings).toMatchObject({ bashOutputMaxChars: 8000 });
+    expect(run.settings).not.toHaveProperty('env.BASH_MAX_OUTPUT_LENGTH');
+    // F-10: подагентов строка не советует — их запуск по согласию человека
+    // (директива L9), а промпт без меток хука отклоняется и оплачивается дважды.
+    expect(run.note).toContain('one `a; b; c`');
+    expect(run.note).not.toMatch(/\bAgent\b|Explore|subagent|\bsonnet\b/i);
+    expect(run.note).toContain('do not `cd`');
+  });
+
+  it('ноль, пусто и выключено — ничего: решает CLI и настройки человека', () => {
+    const run = groupRunProfile({
+      entries: [],
+      tasksText: '',
+      extra: [],
+      economy: {
+        bashOutputChars: 0,
+        readOutputTokens: 0,
+        cacheTtl: '',
+        detachIde: false,
+        workHabits: false,
+      },
+    });
+    expect(run.env).not.toHaveProperty('CLAUDE_CODE_AUTO_CONNECT_IDE');
+    expect(run.env).not.toHaveProperty('CLAUDE_CODE_SILENT_TURN_REMINDER');
+    expect(run.settings.env).toEqual(CEILING.env);
+    expect(run.settings).not.toHaveProperty('bashOutputMaxChars');
+    expect(run.note).not.toContain('Explore');
+    // Без блока экономии вовсе (старый вызов) — то же самое.
+    const bare = groupRunProfile({ entries: [], tasksText: '', extra: [] });
+    expect(bare.settings.env).toEqual(CEILING.env);
+    expect(bare.note).toBe(run.note);
+  });
+
+  it('окно сжатия — env процесса: переменная панели сильнее настройки, ноль — окно человека', () => {
+    expect(groupCompactWindow(undefined, 160_000)).toBe(160_000);
+    expect(groupCompactWindow('250k', 160_000)).toBe(250_000);
+    expect(groupCompactWindow(undefined, 0)).toBeUndefined();
+    // Вне границ CLI (100k–1M) — выключено, а не зажато молча.
+    expect(groupCompactWindow(undefined, 50_000)).toBeUndefined();
+    expect(groupCompactWindow('junk', 120_000)).toBe(120_000);
+    const run = groupRunProfile({ entries: [], tasksText: '', extra: [], compactWindow: 160_000 });
+    expect(run.env).toMatchObject({ CLAUDE_CODE_AUTO_COMPACT_WINDOW: '160000' });
+  });
+});
+
+/**
+ * Директива L3: звено не делает работу следующих — за ним ревью на потолке, и
+ * свой проход ревью оплачивался бы второй раз; за ним доставка, и пуш или MR
+ * раньше неё ломают её дельту.
+ */
+describe('groupRunProfile — слияние MR закрыто в каждом звене (F-13)', () => {
+  it('работа, правки, ревью, доставка и звено без стадии: запрет на слияние у серверов наружу', () => {
+    for (const stage of ['work', 'fix', 'review', 'deliver', undefined] as const) {
+      const { settings } = groupRunProfile({
+        entries: ENTRIES,
+        tasksText: '',
+        extra: [],
+        ...(stage ? { stage } : {}),
+      });
+      const deny = (settings.permissions as { deny?: string[] }).deny ?? [];
+      expect(deny, `звено ${stage ?? '—'}`).toEqual(expect.arrayContaining(MERGE_RULES));
+    }
+  });
+});
+
+describe('groupRunProfile — работа следующих звеньев запрещена (L3)', () => {
+  // Запрет слияния есть всегда (F-13) — здесь проверяются запреты «на будущее».
+  const deny = (ahead: { review?: boolean; deliver?: boolean } | undefined): string[] => {
+    const { settings } = groupRunProfile({
+      entries: ENTRIES,
+      tasksText: '',
+      extra: [],
+      stage: 'work',
+      ...(ahead ? { ahead } : {}),
+    });
+    const rules = (settings.permissions as { deny?: string[] }).deny ?? [];
+    return rules.filter((rule) => !MERGE_RULES.includes(rule));
+  };
+
+  it('за звеном ревью — навыки ревью выключены из перечня и под запретом, строка называет, кто прочитает', () => {
+    // F-09: ревью-полоса через Agent — тот же второй проход, что и навык ревью.
+    expect(deny({ review: true })).toEqual([
+      'Skill(deep-review)',
+      'Skill(style-conformance-review)',
+      'Agent',
+    ]);
+    const run = groupRunProfile({
+      entries: [],
+      tasksText: '',
+      extra: [],
+      skills: { user: ['deep-review', 'prepare-mr'], group: [], plugins: [] },
+      stage: 'work',
+      ahead: { review: true },
+    });
+    // `deny` на Skill(…) в 2.1.286 не снимает описание — снимает `off`.
+    expect(run.settings).toMatchObject({
+      skillOverrides: { 'deep-review': 'off', 'style-conformance-review': 'off' },
+    });
+    expect(run.note).toContain('a review stage on the ceiling model reads this work');
+  });
+
+  it('за звеном доставка — пуш, MR через CLI форджа и через MCP наружу; коммит и прочая запись открыты', () => {
+    const rules = deny({ deliver: true });
+    expect(rules).toEqual([
+      ...DELIVERY_BASH_DENY,
+      'mcp__atlassian-work__create_merge_request',
+      'mcp__atlassian-work__create_pull_request',
+      'mcp__gitlab-work__create_merge_request',
+      'mcp__gitlab-work__create_pull_request',
+    ]);
+    expect(rules.some((rule) => rule.includes('commit'))).toBe(false);
+    // Запись в трекер звену работы остаётся: снято только открытие MR.
+    expect(rules.some((rule) => /create_issue|update_/.test(rule))).toBe(false);
+  });
+
+  it('ничего не следует — запретов и строки нет', () => {
+    expect(deny(undefined)).toEqual([]);
+    expect(deny({ review: false, deliver: false })).toEqual([]);
+    const run = groupRunProfile({ entries: [], tasksText: '', extra: [] });
+    expect(run.note).not.toContain('Later stages');
   });
 });

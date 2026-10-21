@@ -13,6 +13,7 @@ import { registerProviderPermissionsRoutes } from '../routes/provider-permission
 import { registerProviderKeysRoutes } from '../routes/provider-keys-routes/provider-keys-routes.ts';
 import { registerGroupRoutes } from '../routes/group-routes/group-routes.ts';
 import { groupAsk } from '../routes/group-ask.ts';
+import { pausedGroupOf } from '../routes/chat/split-control-routes.ts';
 import type { GroupAsk } from '../domains/groups/model.ts';
 import type { ServerContext } from '../context.ts';
 import { registerGroupSourcesRoutes } from '../routes/group-sources-routes/group-sources-routes.ts';
@@ -222,6 +223,9 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         chatSession,
         (chatId) => treePause.awaitsHuman(chatId),
         (chatId) => statusChats.assignedOf(chatId),
+        // Пауза группы или всего дерева — решение человека: досылка вкладки её не снимает.
+        (chatId) =>
+          pausedGroupOf(context.store, splitConveyor)(chatId) || treePause.isPaused(chatId),
       ),
     // Правило «подбирать модель под задачу»: одно положение на проект, без
     // зависимостей — ни реестр прогонов, ни сессия ему не нужны.

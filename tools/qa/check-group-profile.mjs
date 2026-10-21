@@ -461,6 +461,12 @@ async function main() {
       'группа со ссылкой на макет получила сервер макетов',
     );
     check(listed(design, MARK.pluginSkill), 'с макетом плагин макетов на месте');
+    const deliver = await runCase('design-deliver', {
+      tasksText: 'https://www.figma.com/design/abc',
+      extra: [],
+      stage: 'deliver',
+    });
+    check(!listed(deliver, MARK.pluginSkill), 'с макетом в доставке плагин макетов выключен');
 
     const asked = await runCase('asked', { tasksText: 'PROJ-2', extra: ['telegram-inbox'] });
     check(

@@ -631,8 +631,11 @@ export const testsEn: typeof testsRu = {
       'A turn demands at most five cases tied to the changed file by path, the narrowest ' +
       'first; the rest are checked at the end of the task. A split group does not run its ' +
       'automated cases at the end of each turn: it runs them once before "delivered", while ' +
-      'a case for the change, a recorded manual check and a red result still hold its turn. ' +
-      'A shot or ' +
+      'a case for the change, a recorded manual check and a red result still hold its turn; ' +
+      'when the turn is held anyway, the gaps add the exact run --case command for its ' +
+      'automated cases — checking earlier needs no hunt for the syntax. A request to add a ' +
+      'case also names how to link an existing test: testName is the full path "outer ' +
+      'describe > … > it", and a describe path covers every test under it. A shot or ' +
       'probe script (shots, screenshot, snapshot, probe, repro in its name) in the root or ' +
       'a scripts folder (e2e, qa, scripts, tools, tmp) that git does not track is not code: ' +
       'it is turn scaffolding, like the agent’s notes. The same file under src/ or lib/ is ' +
@@ -1429,7 +1432,10 @@ export const testsEn: typeof testsRu = {
         'silently either: with none and a task that needs tests, it asks in that same single ' +
         'question whether to keep them in the Tests section. A split group does not ask at ' +
         'all: it takes the stand, credentials and flows from its task and the project notes, ' +
-        'and with no folder keeps tests in the checks the project already has. Changing how ' +
+        'and with no folder keeps tests in the checks the project already has. A Claude group ' +
+        'gets the line without paths: the project arrives as AGENTDECK_TESTS_PROJECT, and ' +
+        'tests-cli commands without --project take it from there — so copies of one group ' +
+        'start their request identically and share the cache. Changing how ' +
         'the product behaves, ' +
         'it adds or updates the case for the change on its own (tests-cli case) — a step per ' +
         'behaviour, each expected naming what is seen, never “all pass” — and records ' +
@@ -1446,7 +1452,8 @@ export const testsEn: typeof testsRu = {
         'A failure here never cancels the add — the notification suggests creating the folder with the button.',
       cliTitle: 'Without the panel',
       cliText:
-        'pnpm tests sync --project <dir> does the same (--dir picks the folder); pnpm tests run ' +
+        'pnpm tests sync --project <dir> does the same (--dir picks the folder; without --project — ' +
+        'AGENTDECK_TESTS_PROJECT, otherwise the current directory); pnpm tests run ' +
         '--project <dir> [--group <group>] [--case <group:case,…>] runs them (--case runs only ' +
         'the named cases; a bare case id works when it is unique in the project): without --cmd it starts the folder runner ' +
         'from the right directory with the same command as the button, takes the report of ' +

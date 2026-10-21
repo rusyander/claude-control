@@ -1,5 +1,5 @@
 import { isOpenAsk } from '@shared/lib/chat-stream';
-import { MAX_AUTO_RETRIES, MAX_RECONNECT } from './agent-runs.constants';
+import { GROUP_PAUSED, MAX_AUTO_RETRIES, MAX_RECONNECT } from './agent-runs.constants';
 import { autoRetries, autoRetryTimers, stoppedByUser } from './agent-runs.retry';
 import { loadSpend } from './agent-runs.spend';
 import { sleep } from './agent-runs.sse';
@@ -120,7 +120,8 @@ export function finalize(id: string): void {
 
   // Ход закончился — самое время отдать то, что человек дописал, пока агент был
   // занят. Остановленному человеком прогону очередь не досылаем: он остановил.
-  if (!stoppedByUser.has(id)) drainQueue(id);
+  // Группе на паузе — тоже: досылку сервер уже отклонил, и она ждёт человека.
+  if (!stoppedByUser.has(id) && finalized.errorCode !== GROUP_PAUSED) drainQueue(id);
 }
 
 /**
@@ -134,8 +135,14 @@ export function finalize(id: string): void {
  * покидает реестр, — замерено живым прогоном 2 сентября). Молча съеденное здесь
  * дописанное исчезло бы совсем: из очереди оно уже вынуто, а в ленту не попало.
  * Возвращаем его в НАЧАЛО очереди — досылка повторится по концу того хода.
+ *
+ * Отказ «группа на паузе» (`group_paused`) — так же: сообщение остаётся первым
+ * в очереди и ждёт, пока человек сам напишет группе или нажмёт «Продолжить»;
+ * будить группу, остановленную человеком, досылка не вправе (карточка 33).
+ * `byHuman` — отправку попросил сам человек («Повторить» у такого отказа): это
+ * уже его решение, и паузу оно снимает.
  */
-export function drainQueue(id: string): void {
+export function drainQueue(id: string, options?: { byHuman?: boolean }): void {
   const run = runs.get(id);
   if (!run || run.queued.length === 0) return;
 
@@ -157,8 +164,10 @@ export function drainQueue(id: string): void {
     autoApprove: next.autoApprove,
     model: next.model,
     effort: next.effort,
+    ...(next.clientId ? { clientId: next.clientId } : {}),
+    ...(options?.byHuman ? {} : { automatic: true }),
   }).then((outcome) => {
-    if (outcome.ok || outcome.code !== 'run_busy') return;
+    if (outcome.ok || (outcome.code !== 'run_busy' && outcome.code !== GROUP_PAUSED)) return;
     const current = runs.get(id);
     if (!current) return;
     // Не ушло — значит, и не «ушедшее»: метку снимаем вместе с возвратом.
@@ -454,8 +463,15 @@ export async function retryRun(
   options?: { fullAccess?: boolean; auto?: boolean },
 ): Promise<void> {
   const run = getRun(id);
-  if (!run.lastPrompt) return;
   const key = run.id || id;
+  // Досылку очереди отклонила пауза группы, и «Повторить» — решение человека
+  // отправить её сейчас. Уходит первое из очереди, а не прошлая реплика: та и
+  // есть это сообщение, и повтор её рядом с очередью отдал бы его дважды.
+  if (!options?.auto && run.errorCode === GROUP_PAUSED && run.queued.length > 0) {
+    drainQueue(runs.has(key) ? key : id, { byHuman: true });
+    return;
+  }
+  if (!run.lastPrompt) return;
   if (!options?.auto) autoRetries.delete(key);
   // Авто-повтор не переотправляет задачу вслепую: если реплика уже в
   // транскрипте, просим продолжить с места обрыва (см. pickRetryPrompt).
@@ -473,5 +489,7 @@ export async function retryRun(
     model: run.model,
     effort: run.effort,
     fullAccess: options?.fullAccess,
+    // Автоповтор — не решение человека: группу на паузе он не будит.
+    ...(options?.auto ? { automatic: true } : {}),
   });
 }

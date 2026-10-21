@@ -148,6 +148,7 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
       continue;
     }
     if (!Array.isArray(content)) continue;
+    if (record.type === 'assistant' && !record.isSidechain) shells.step(record.message?.id);
 
     for (const block of content) {
       if (block.type === 'tool_use') {
@@ -223,11 +224,31 @@ class Shells {
    * с пустым ответом): погашенным он станет, только если после этого упадёт.
    */
   private readonly suspects = new Map<string, number>();
+  /** Ответ модели (`message.id`), которым сделан ещё не вернувшийся вызов. */
+  private readonly stepOf = new Map<string, string | undefined>();
+  private current: string | undefined;
+
+  /**
+   * Новый ответ модели. CLI зовёт её снова, только когда вернулись все вызовы
+   * прежнего ответа, — вызов прежнего ответа без результата уже не идёт: его
+   * результат лежит в середине большого файла, которую чтение пропускает, или
+   * прогон оборвали на нём. Живой прогон 20.10: результат `jira_assign_issue`
+   * попал за границу начала файла, и хаб сутки звал этот вызов текущим —
+   * «· 20ч 59м», — пока группа гоняла Bash и правки.
+   */
+  step(messageId: string | undefined): void {
+    if (!messageId || messageId === this.current) return;
+    this.current = messageId;
+    for (const id of this.pending.keys()) {
+      if (this.stepOf.get(id) !== messageId) this.pending.delete(id);
+    }
+  }
 
   use(block: TranscriptBlock, at: string | undefined): void {
     if (!block.id || !block.name) return;
     const input = (block.input ?? {}) as Record<string, unknown>;
     const summary = toolSummary(input);
+    this.stepOf.set(block.id, this.current);
     this.pending.set(block.id, {
       name: block.name,
       summary,

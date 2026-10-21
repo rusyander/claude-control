@@ -16,6 +16,8 @@ import { NOTIFY_EVENTS } from './integrations';
 import { platformGatewaySettingsSchema, platformSchema } from './platform';
 import { promptGateSettingsSchema } from './prompt-gate';
 import { remoteAccessSettingsSchema } from './remote';
+import { groupEconomySchema, type GroupEconomy } from './group-economy';
+import { groupWatchSchema, type GroupWatch } from './group-watch';
 
 /**
  * Тариф за миллион токенов. Панель считает по нему справочную стоимость —
@@ -318,6 +320,10 @@ export const appSettingsSchema = object({
    * запроса, а вызовов за неделю — ноль. Выключено — CLI получает полный набор.
    */
   chatLeanTools: boolean().default(true),
+  /** Рычаги экономии групп разделения (владелец, 21.10.2026): см. `groupEconomySchema`. */
+  groupEconomy: groupEconomySchema.default(() => groupEconomySchema.parse({})),
+  /** Сторож групп разделения (владелец, 21.10.2026): пороги правил, см. `groupWatchSchema`. */
+  groupWatch: groupWatchSchema.default(() => groupWatchSchema.parse({})),
   /**
    * Свои тарифы: фрагмент имени модели → цена за миллион токенов. Пустой
    * объект — считать по встроенным. Заведено потому, что тарифы меняются, а
@@ -448,3 +454,13 @@ export const appSettingsSchema = object({
 });
 
 export type AppSettings = Infer<typeof appSettingsSchema>;
+
+/**
+ * Тело `PATCH /settings`. Блок экономии групп едет ТОЛЬКО изменёнными ключами, а
+ * сервер сливает его с сохранённым: целый блок по снимку страницы терял правку,
+ * сделанную за миг до этого, — вторая правка уходила раньше ответа на первую.
+ */
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'groupEconomy' | 'groupWatch'> & {
+  groupEconomy?: Partial<GroupEconomy>;
+  groupWatch?: Partial<GroupWatch>;
+};

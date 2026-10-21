@@ -1,6 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import type { AppSettings } from '@agentdeck/contracts';
+import type { AppSettingsPatch } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
@@ -65,7 +65,7 @@ export function SettingsPage() {
 
   if (!settings) return <SkeletonList rows={4} withActions={false} />;
 
-  const patch = (change: Partial<AppSettings>): void => {
+  const patch = (change: AppSettingsPatch): void => {
     updateSettings.mutate(change);
   };
 
@@ -97,7 +97,7 @@ export function SettingsPage() {
           {activeTab === 'providers' && <ProvidersTab />}
           {activeTab === 'models' && <ModelsTab settings={settings} patch={patch} />}
           {activeTab === 'prompts' && <PromptsTab />}
-          {activeTab === 'groups' && <GroupsTab />}
+          {activeTab === 'groups' && <GroupsTab settings={settings} patch={patch} />}
           {activeTab === 'globalLayer' && <GlobalLayerTab />}
           {activeTab === 'integrations' && <IntegrationsTab />}
           {activeTab === 'spend' && <SpendTab settings={settings} patch={patch} />}

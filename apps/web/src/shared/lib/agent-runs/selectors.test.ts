@@ -54,6 +54,19 @@ describe('selectActiveRuns', () => {
     expect(active.find((view) => view.id === 'named')?.model).toBe('claude-sonnet-5');
     expect(active.find((view) => view.id === 'unnamed')).not.toHaveProperty('model');
   });
+
+  // По старту хода хаб считает «работает · 3 мин» — не с заведения цепочки группы.
+  it('несёт старт прогона по часам сервера; не названный — без поля', () => {
+    const active = selectActiveRuns(
+      [
+        run({ id: 'started', status: 'running', startedAt: NOW - 60_000 }),
+        run({ id: 'unknown', status: 'running' }),
+      ],
+      NOW,
+    );
+    expect(active.find((view) => view.id === 'started')?.startedAt).toBe(NOW - 60_000);
+    expect(active.find((view) => view.id === 'unknown')).not.toHaveProperty('startedAt');
+  });
 });
 
 describe('countRunning', () => {

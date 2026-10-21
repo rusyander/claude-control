@@ -1,4 +1,5 @@
 import type { ChildStageGroup } from '../ChildStages.types';
+import type { ChildQuestion } from '../ChildQuestion.types';
 
 export interface GroupCardProps {
   group: ChildStageGroup;
@@ -14,4 +15,8 @@ export interface GroupCardProps {
   releaseBusy?: boolean;
   onResumeInterrupted?: (index?: number) => void;
   resumeInterruptedBusy?: boolean;
+  /** Вопросы последнего звена группы (карточка 27) — островком в карточке. */
+  questions?: ChildQuestion[];
+  /** Ответ на них уходит в чат группы. Без обработчика островка нет. */
+  onAnswer?: (chatId: string, answer: string) => void;
 }

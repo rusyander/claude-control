@@ -449,3 +449,57 @@ describe('чем ведут прогон', () => {
     expect(getRun('new-1').model).toBe('claude-sonnet-5');
   });
 });
+
+/**
+ * Карточка 33 прогона 20.10: ответ человека дошёл до агента на ходу, а через
+ * полчаса, сразу после «Паузы» из хаба, ушёл ещё раз новым запуском и разбудил
+ * группу. Досылка из очереди помечена и несёт метку слова.
+ */
+describe('слово на ходу, очередь и пауза группы (карточка 33)', () => {
+  it('ответ на слово на ходу потерян — в очереди с той же меткой', async () => {
+    setRun('g1', { status: 'running', sessionId: 'g1' });
+    controllers.set('g1', new AbortController());
+    apiPost.mockRejectedValueOnce(new Error('timeout'));
+
+    await send({ chatId: 'g1', prompt: '«Сбой провайдера» (Рекомендую)' });
+
+    const steerBody = apiPost.mock.calls[0]?.[1] as { steer?: boolean; clientId?: string };
+    expect(steerBody.steer).toBe(true);
+    expect(steerBody.clientId).toMatch(/^steer-/);
+    expect(getRun('g1').queued[0]?.clientId).toBe(steerBody.clientId);
+    controllers.get('g1')?.abort();
+  });
+
+  it('группа на паузе: досылка — один запрос с automatic и меткой, 409 оставляет её в очереди', async () => {
+    storage.set(
+      'agentdeck:chat-queue:s1',
+      JSON.stringify({
+        savedAt: Date.now(),
+        items: [{ id: 'q-1', prompt: 'ответ', clientId: 'steer-x' }],
+      }),
+    );
+    apiGet.mockResolvedValue([]);
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      // Без `messageCode`: словарь в подмене текстов сервера не знает.
+      json: async () => ({ code: 'group_paused', message: 'Группа на паузе' }),
+    } as unknown as Response);
+
+    await restoreQueue('s1');
+    await flush();
+    await new Promise((done) => setTimeout(done, 20));
+
+    // Без метки `automatic` сервер считал бы досылку решением человека; без
+    // остановки после отказа она возвращалась бы в очередь и уходила по кругу.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const init = fetchMock.mock.calls[0]?.[1] as { body: string };
+    expect(JSON.parse(init.body)).toMatchObject({
+      prompt: 'ответ',
+      clientId: 'steer-x',
+      automatic: true,
+    });
+    expect(getRun('s1').queued.map((item) => item.prompt)).toEqual(['ответ']);
+    expect(getRun('s1').errorCode).toBe('group_paused');
+  });
+});

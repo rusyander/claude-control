@@ -11,6 +11,7 @@ import { recheckDeliveredMr } from '../../domains/chat/split-recheck/split-reche
 import { registerChatRunRoutes } from '../chat/run-routes/run-routes.ts';
 import { pausedGroupOf, pauseOnHumanStop } from '../chat/split-control-routes.ts';
 import { ChildTells } from '../../domains/chat/child-tell/child-tell.ts';
+import { sandboxRoot } from '../../domains/chat/ChatArtifacts/ChatArtifacts.ts';
 import { conversationKeys } from '../../lib/app-store/chat-links.ts';
 import {
   ChatRunRegistry,
@@ -134,7 +135,8 @@ describe('разделение: пауза, продолжение, запуск
           index,
         ),
     });
-    registerChatRunRoutes(app, ctx, registry, session);
+    // Пауза держит досылку без человека — тем же вопросом, что в runtime.
+    registerChatRunRoutes(app, ctx, registry, session, undefined, pausedGroupOf(store, conveyor));
     await app.ready();
 
     await conveyor.begin({
@@ -157,6 +159,8 @@ describe('разделение: пауза, продолжение, запуск
     registry.stopAll();
     await app.close();
     rmSync(root, { recursive: true, force: true });
+    // Отправка в чат заводит его папку в песочнице панели — убираем за собой.
+    rmSync(join(sandboxRoot(), 'chat-0'), { recursive: true, force: true });
   });
 
   const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
@@ -278,6 +282,46 @@ describe('разделение: пауза, продолжение, запуск
     expect(group(0)?.status).toBe('started');
     tells.childFinished(['chat-0']);
     expect(starts).toEqual(['chat-0']);
+  });
+
+  // Карточка 33 (прогон 20.10): через 3 с после «Паузы» из хаба вкладка дослала
+  // ответ человека из своей очереди новым запуском — и разбудила группу.
+  it('пауза держит досылку без человека: 409 group_paused; своё сообщение человека паузу снимает', async () => {
+    registry.setStartListener((keys) => {
+      for (const key of keys) {
+        const link = store.getChatLink(key);
+        if (link) return conveyor.onChainResumed(link, key);
+      }
+    });
+    await post('pause', { index: 0 });
+    await settle();
+    expect(group(0)?.status).toBe('paused');
+
+    const send = (extra: object) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/chat/send',
+        payload: {
+          chatId: 'chat-0',
+          prompt: '«Сбой провайдера» (Рекомендую)',
+          projectPath: root,
+          ...extra,
+        },
+      });
+    const automatic = await send({ automatic: true });
+    expect(automatic.statusCode).toBe(409);
+    expect(automatic.json()).toMatchObject({
+      code: 'group_paused',
+      messageCode: 'run-group-paused',
+    });
+    expect(registry.isRunning('chat-0')).toBe(false);
+    expect(group(0)?.status).toBe('paused');
+
+    // Человек пишет группе сам — решение его: ход идёт, группа снова работает.
+    void send({});
+    for (let i = 0; i < 50 && !registry.isRunning('chat-0'); i += 1) await settle();
+    expect(registry.isRunning('chat-0')).toBe(true);
+    expect(group(0)?.status).toBe('started');
   });
 
   it('«Продолжить» сдавшуюся группу: место отдано — 409 с числами, с согласием — слово группе', async () => {

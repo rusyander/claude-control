@@ -53,6 +53,8 @@ export function ChildStages({
   resumeInterruptedBusy,
   foreign,
   providerId,
+  questions,
+  onAnswer,
 }: ChildStagesProps) {
   const { t } = useTranslation();
   // Время разбора и всего разделения тикает, только пока что-то идёт.
@@ -164,6 +166,9 @@ export function ChildStages({
             {...(releaseBusy !== undefined ? { releaseBusy } : {})}
             {...(onResumeInterrupted ? { onResumeInterrupted } : {})}
             {...(resumeInterruptedBusy !== undefined ? { resumeInterruptedBusy } : {})}
+            {...(onAnswer && group.chatId && questions?.has(group.chatId)
+              ? { questions: questions.get(group.chatId), onAnswer }
+              : {})}
           />
         ))}
       </div>

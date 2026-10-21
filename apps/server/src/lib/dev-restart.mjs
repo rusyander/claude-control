@@ -57,7 +57,9 @@ function pidAlive(pid) {
 
 /**
  * Правки ждут: `since` — с какого времени, `files` — какие, `waitingFor` —
- * чего ждут (`runs` — идущих ходов, `setup` — подготовки копий, `both`).
+ * чего ждут (`runs` — идущих ходов, `setup` — подготовки копий, `both`);
+ * `capAt` — когда сторож перезапустит, не дождавшись ходов, `runs` — какие
+ * ходы он тогда не дождётся (папки их прогонов).
  */
 export function writeRestartState(appData, state) {
   try {
@@ -91,11 +93,16 @@ export function readRestartState(appData, isAlive = pidAlive) {
   const waitingFor = ['runs', 'setup', 'checks', 'both'].includes(parsed.waitingFor)
     ? parsed.waitingFor
     : 'runs';
+  const runs = Array.isArray(parsed.runs)
+    ? parsed.runs.filter((run) => typeof run === 'string').slice(0, 5)
+    : [];
   return {
     pending: true,
     ...(typeof parsed.since === 'string' ? { since: parsed.since } : {}),
     files,
     waitingFor,
+    ...(typeof parsed.capAt === 'string' ? { capAt: parsed.capAt } : {}),
+    ...(runs.length > 0 ? { runs } : {}),
     requested: existsSync(join(appData, DEV_RESTART_REQUEST)),
   };
 }
@@ -113,10 +120,26 @@ export function takeRestartRequest(appData) {
 }
 
 /**
+ * Предел ожидания ХОДОВ (владелец 21.10, D1). Без предела две группы с ходами по
+ * 10–30 мин держали правку сервера больше часа (прогон 20.10). Процесс агента
+ * перезапуск переживает, а группа, чей ход он всё же оборвал, продолжает сама
+ * (E3); кэш за полчаса не остывает.
+ * Подготовка копий и проверки предела не имеют: оборванные, они оставляют
+ * полузаведённую копию (Ф11).
+ */
+export const RUNS_WAIT_CAP_MS = 30 * 60_000;
+
+/** Ожидание ходов, начатое в `sinceMs`, упёрлось в предел; `capMs` 0 — предела нет. */
+export function runsWaitCapped(sinceMs, now, capMs) {
+  return capMs > 0 && sinceMs !== undefined && now - sinceMs >= capMs;
+}
+
+/**
  * Чего ждёт перезапуск: идущих ходов, подготовки копий, автотестов и проверок
  * поломкой проектов (`checks`, Ф11), нескольких из них сразу (`both`) — или
- * ничего (`undefined`). Предела у ожидания нет: оборванный ход, `npm ci` копии
- * или прогон тестов дороже правки, которая подождёт; нетерпеливому — кнопка в панели.
+ * ничего (`undefined`). Ходы ждут до предела (`RUNS_WAIT_CAP_MS`) — его
+ * сторож проверяет сам, сюда приходит уже «занято с учётом предела»; нетерпеливому —
+ * кнопка в панели.
  */
 export function deferReason(runsBusy, setupBusy, checksBusy = false) {
   const busy = [runsBusy && 'runs', setupBusy && 'setup', checksBusy && 'checks'].filter(Boolean);

@@ -1,6 +1,7 @@
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { applySettingsUpdate } from '../lib/applySettingsUpdate';
+import type { AppSettingsPatch } from '@agentdeck/contracts';
 import { patchSettings } from '../lib/patchSettings';
+import { sendSettingsPatch } from '../lib/sendSettingsPatch';
 
 export function useUpdateSettings({
   silentError = false,
@@ -11,9 +12,7 @@ export function useUpdateSettings({
   const queryClient = useQueryClient();
   return useMutation({
     meta: { silentError },
-    mutationFn: patchSettings,
-    onSuccess: (settings, variables) => {
-      applySettingsUpdate(queryClient, settings, variables);
-    },
+    // Ответ раскладывается внутри: порядок ответов сверяется с порядком отправки.
+    mutationFn: (patch: AppSettingsPatch) => sendSettingsPatch(queryClient, patch, patchSettings),
   });
 }

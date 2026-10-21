@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planCascadeStage, stageAppendPrompt } from './ChatCascadeStages.ts';
+import { planCascadeStage, stageAppendPrompt, stagesAhead } from './ChatCascadeStages.ts';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 
 /**
@@ -671,5 +671,90 @@ describe('planCascadeStage: сита перед MR', () => {
 
   it('без поставщика сит задание звена прежнее', () => {
     expect(plan()?.prompt).not.toContain('SIEVES-');
+  });
+});
+
+describe('planCascadeStage: доставка на Sonnet (рычаг экономии групп)', () => {
+  /** Группа без потолка с доставкой — сразу в доставку (как выше). */
+  function deliverLink(patch: Partial<ChatLink>): ChatLink {
+    const link = workLink(patch);
+    delete link.ceilingModel;
+    return link;
+  }
+
+  it('Opus с глубиной xhigh — доставка на Sonnet с high, модель работы в связи остаётся', () => {
+    const link = deliverLink({ model: 'claude-opus-5', effort: 'xhigh' });
+    const staged = plan({ link, deliver: true, cheapDeliver: true });
+
+    expect(staged?.stage).toBe('deliver');
+    expect(staged?.model).toBe('sonnet');
+    expect(staged?.effort).toBe('high');
+    expect(staged?.link).toMatchObject({ model: 'sonnet', effort: 'high' });
+  });
+
+  it('глубина ниже high не поднимается', () => {
+    const link = deliverLink({ model: 'opus', effort: 'medium' });
+    const staged = plan({ link, deliver: true, cheapDeliver: true });
+
+    expect(staged?.model).toBe('sonnet');
+    expect(staged?.effort).toBe('medium');
+  });
+
+  it('только вниз: Sonnet и Haiku — как были', () => {
+    const sonnet = plan({
+      link: deliverLink({ effort: 'max' }),
+      deliver: true,
+      cheapDeliver: true,
+    });
+    expect(sonnet?.model).toBe('sonnet');
+    expect(sonnet?.effort).toBe('max');
+    const haiku = plan({
+      link: deliverLink({ model: 'haiku' }),
+      deliver: true,
+      cheapDeliver: true,
+    });
+    expect(haiku?.model).toBe('haiku');
+  });
+
+  it('рычаг выключен — доставка на модели работы', () => {
+    const link = deliverLink({ model: 'claude-opus-5', effort: 'xhigh' });
+    const staged = plan({ link, deliver: true });
+
+    expect(staged?.model).toBe('claude-opus-5');
+    expect(staged?.effort).toBe('xhigh');
+  });
+
+  it('ревью рычаг не трогает: оно на потолке', () => {
+    const staged = plan({ deliver: true, cheapDeliver: true });
+
+    expect(staged?.stage).toBe('review');
+    expect(staged?.model).toBe('claude-opus-5');
+  });
+});
+
+describe('stagesAhead (L3)', () => {
+  it('работа с потолком — ревью; группа с доставкой — доставка', () => {
+    expect(stagesAhead(workLink(), true)).toEqual({ review: true, deliver: true });
+    expect(stagesAhead(workLink(), false)).toEqual({ review: true, deliver: false });
+  });
+
+  it('понижённая работа без потолка — ревью не будет; на потолке своей моделью — будет', () => {
+    expect(stagesAhead(workLink({ ceilingModel: undefined }), false).review).toBe(false);
+    expect(stagesAhead(workLink({ ceilingModel: undefined, lowered: false }), false).review).toBe(
+      true,
+    );
+  });
+
+  it('само ревью и доставка свои навыки не теряют; правки — ревью только с проверкой правок', () => {
+    expect(stagesAhead(workLink({ stage: 'review' }), true)).toEqual({
+      review: false,
+      deliver: true,
+    });
+    expect(stagesAhead(workLink({ stage: 'deliver' }), true)).toEqual({
+      review: false,
+      deliver: false,
+    });
+    expect(stagesAhead(workLink({ stage: 'fix' }), false).review).toBe(false);
+    expect(stagesAhead(workLink({ stage: 'fix', fixFindings: ['F1'] }), false).review).toBe(true);
   });
 });

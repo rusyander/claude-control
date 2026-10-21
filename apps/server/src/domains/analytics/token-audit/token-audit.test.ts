@@ -175,6 +175,12 @@ describe('token-audit — транскрипт Claude', () => {
       cacheWrite1h: 78_000,
       output: 1_180,
     });
+    // Вес окна — та же формула, что у сторожа групп: Opus ×5.
+    expect(audit.weight).toBeCloseTo(
+      (5 * (35 + 1.25 * 20_000 + 2 * 78_000 + 0.1 * 313_500 + 5 * 1_180)) / 1e6,
+      9,
+    );
+    expect(headline(audit).weight).toBe(1.09);
     expect(audit.maxContext).toBe(77_505 + 500);
     expect(audit.averageContext).toBe(
       Math.round((74_010 + 75_005 + 77_005 + 77_505 + 78_005 + 30_005) / 6),

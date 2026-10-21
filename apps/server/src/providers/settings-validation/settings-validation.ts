@@ -38,6 +38,8 @@ import {
 import { modelSources } from '@agentdeck/contracts/models';
 import { SPLIT_MAX_GROUPS } from '@agentdeck/contracts/task-split';
 import { SPLIT_HEAVY_RULE_MAX } from '@agentdeck/contracts/split-groups';
+import { GROUP_ECONOMY_LIMITS } from '@agentdeck/contracts/group-economy';
+import { groupWatchPatchSchema } from '@agentdeck/contracts/group-watch';
 import { isKnownProviderId } from '../registry.ts';
 
 /**
@@ -227,6 +229,30 @@ const platformGatewaySettingsSchema = object({
   forceStream: boolean(),
 });
 
+/** Ноль («решает CLI») или число в границах рычага — опечатка не доходит до прогона. */
+function economyNumber(limits: { min: number; max: number }) {
+  return number()
+    .int()
+    .refine((value) => value === 0 || (value >= limits.min && value <= limits.max), {
+      message: `0 или от ${limits.min} до ${limits.max}`,
+    });
+}
+
+/**
+ * Рычаги экономии групп: блок целиком, как у шлюза, — без ключа в схеме PATCH
+ * отвечал бы 200 со старым значением, и тумблер на странице отскакивал бы назад.
+ */
+const groupEconomyPatchSchema = object({
+  compactWindow: economyNumber(GROUP_ECONOMY_LIMITS.compactWindow),
+  bashOutputChars: economyNumber(GROUP_ECONOMY_LIMITS.bashOutputChars),
+  readOutputTokens: economyNumber(GROUP_ECONOMY_LIMITS.readOutputTokens),
+  cacheTtl: zodEnum(['', '5m', '1h']),
+  detachIde: boolean(),
+  sonnetDeliver: boolean(),
+  freshOnColdResume: boolean(),
+  workHabits: boolean(),
+});
+
 /**
  * Настройки прокси защиты данных. Правил здесь нет намеренно — они в отдельном
  * файле, и через общий PATCH настроек не правятся: в словарях правил лежат сами
@@ -389,6 +415,10 @@ export const settingsPatchSchema = object({
   autoApproveRules: record(string(), boolean()),
   chatAutoMode: boolean(),
   chatLeanTools: boolean(),
+  // Изменёнными ключами: маршрут сливает их с сохранённым блоком.
+  groupEconomy: groupEconomyPatchSchema.partial(),
+  // Пороги сторожа групп — тоже изменёнными ключами, слияние в маршруте.
+  groupWatch: groupWatchPatchSchema,
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),
@@ -420,6 +450,10 @@ export const settingsPatchSchema = object({
  */
 const importSettingsSchema = settingsPatchSchema.extend({
   remoteAccess: remoteAccessSettingsSchema.optional(),
+  // Снимок и state.json хранят только отличия от умолчаний (`groupEconomyChanges`);
+  // недостающие ключи дополняет `mergeState` умолчаниями текущего кода.
+  groupEconomy: groupEconomyPatchSchema.partial().optional(),
+  groupWatch: groupWatchPatchSchema.optional(),
   /**
    * Активный контур. В PATCH его нет намеренно (он переключается транзакцией
    * активации), а в снимке обязан быть: без ключа zod вырезал его, тумблеры

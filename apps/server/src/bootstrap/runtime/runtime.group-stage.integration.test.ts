@@ -158,17 +158,57 @@ describe('звено группы получает свой профиль за�
     expect(settings.skillOverrides?.['deep-review']).toBeUndefined();
   });
 
+  const MERGE_ONLY = [
+    'mcp__gitlab-work__merge_merge_request',
+    'mcp__gitlab-work__merge_pull_request',
+  ];
+
   it('доставка: запись на месте, описание — у навыка доставки, ревью — имя', async () => {
     const settings = await settingsOf('deliver');
-    expect(settings.permissions?.deny).toBeUndefined();
+    // Под запретом только слияние MR — оно закрыто в каждом звене (F-13).
+    expect(settings.permissions?.deny).toEqual(MERGE_ONLY);
     expect(settings.skillOverrides?.['deep-review']).toBe('name-only');
     expect(settings.skillOverrides?.['prepare-mr']).toBeUndefined();
   });
 
   it('работа (связь без звена): весь набор группы, запрета записи нет', async () => {
     const settings = await settingsOf(undefined);
-    expect(settings.permissions?.deny).toBeUndefined();
+    expect(settings.permissions?.deny).toEqual(MERGE_ONLY);
     expect(settings.skillOverrides?.['deep-review']).toBeUndefined();
     expect(settings.skillOverrides?.['prepare-mr']).toBeUndefined();
+  });
+
+  /**
+   * F-04 ревью П1: цепочка кончилась, доставку взял конвейер (группа ждёт
+   * доставки по фактам git) — звена доставки впереди уже не будет, и ход в чат
+   * группы (напоминание «отправь ветку, открой MR», ответ человека) идёт С
+   * правом пуша. Раньше запрет «следующих звеньев» висел и здесь: просьба
+   * пушить уходила в сессию, которой пуш запрещён, напоминания сгорали.
+   */
+  describe('доставка впереди — только пока её заведёт конвейер (F-04)', () => {
+    const delivering = (group: Partial<SplitPlanRecord['groups'][number]>): void => {
+      store.setSplitPlan({
+        ...SPLIT,
+        projectPath: project,
+        groups: [{ ...SPLIT.groups[0]!, deliver: true, ...group }],
+      });
+    };
+
+    it('группа работает — пуш и MR этой сессии запрещены: их сделает звено доставки', async () => {
+      delivering({ status: 'started' });
+      const settings = await settingsOf('work');
+      expect(settings.permissions?.deny).toEqual(
+        expect.arrayContaining(['Bash(git push*)', 'mcp__gitlab-work__create_merge_request']),
+      );
+    });
+
+    it('группа ждёт доставки — ход напоминания пушит: запрета пуша и MR нет', async () => {
+      delivering({ status: 'awaiting', waitingFor: 'delivery' });
+      const settings = await settingsOf('work');
+      const deny = settings.permissions?.deny ?? [];
+      expect(deny).not.toContain('Bash(git push*)');
+      expect(deny).not.toContain('Bash(gh pr create*)');
+      expect(deny).not.toContain('mcp__gitlab-work__create_merge_request');
+    });
   });
 });

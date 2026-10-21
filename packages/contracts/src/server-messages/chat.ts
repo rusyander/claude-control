@@ -2,6 +2,7 @@
 export const chatMessageParams = {
   'run-busy': [],
   'run-steer-ended': [],
+  'run-group-paused': [],
   'chat-send-foreign-provider': ['provider'],
   'run-empty-prompt': [],
   'run-unsupported-upload': ['names', 'supported'],

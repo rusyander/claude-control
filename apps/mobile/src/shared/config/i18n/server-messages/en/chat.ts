@@ -5,6 +5,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The previous answer in this conversation is still being generated. Wait for it to finish or press “Stop” — the message was not sent.',
   'run-steer-ended':
     'The turn has already ended — the mid-turn message was not sent; the panel will send it the usual way.',
+  'run-group-paused':
+    'The group is paused — the queued message was not sent so as not to wake it. It stays in the queue.',
   'chat-send-foreign-provider':
     '{{provider}} is the active CLI: this route runs only the Claude chat. The message was not sent — write in the {{provider}} chat on the computer or switch the active CLI to Claude.',
   'run-empty-prompt': 'The message is empty — nothing to send.',

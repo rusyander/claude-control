@@ -28,7 +28,14 @@ import { activeCliCommand } from '../../providers/cli/cli.ts';
 import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace/ChatWorkspace.ts';
 import { apiTokenPath } from '../../lib/api-token/api-token.ts';
 import { findTranscript } from '../../domains/chat/ChatTranscriptFile/ChatTranscriptFile.ts';
+import {
+  coldResumeNotice,
+  decideContinuation,
+  sessionWarmth,
+} from '../../domains/chat/cold-continuation/cold-continuation.ts';
 import type { ChatEvent } from '../../domains/chat/chat-events.ts';
+import { upgradeStageScheme } from '../../domains/chat/stage-scheme/stage-scheme.ts';
+import { withoutGroupIdentity } from '../../domains/chat/panel-preamble.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { projectsDir } from './paths.ts';
 
@@ -46,7 +53,19 @@ export interface ReviewStageStart {
   resume?: { sessionId: string };
   /** Вводная на случай, когда продолжить разговор нельзя: его файла на диске нет. */
   fresh?: string;
+  /**
+   * Вводная нового разговора вместо остывшего (`coldResume`, рычаг экономии
+   * групп): первые строки — задачи группы. Нет — общая первая строка; факты
+   * из копии запуск дописывает в обоих случаях.
+   */
+  cold?: string;
+  /** Ветка, от которой отведена копия группы: от неё вводная считает коммиты. */
+  base?: string;
 }
+
+// Правило живёт в домене (одно на все продолжения групп, F-05); отсюда — для
+// прежних потребителей.
+export { sessionWarmth };
 
 /**
  * Какую сессию продолжать: ту, чей файл ещё на диске, — из просимой и всех
@@ -224,6 +243,27 @@ export function createReviewStarter(
     // Файла сессии нет — новый разговор под тем же ключом: настоящий ключ он
     // получит своим первым ходом, и связь с группой переедет на него сама.
     const lost = wanted && !sessionId ? wanted : undefined;
+    // Остывший разговор группы с большим окном — новым разговором (рычаг
+    // экономии): продолжение заново записало бы в кэш всё окно по цене записи.
+    // Любое продолжение стадии — слово панели, «Продолжить», ревью, пуш, —
+    // а не только то, что принесло свою вводную.
+    // Реестр решает то же на старте, но вводную стадии знает только запуск:
+    // поэтому решение здесь, а реестр видит уже новый разговор без сессии.
+    const decided = sessionId
+      ? decideContinuation({
+          dir: projectsDir(ctx),
+          sessionId,
+          cwd: input.cwd,
+          economy: settings.groupEconomy,
+          // Вводную собрал вызвавший из задания связи — у дерева до смены схемы
+          // стадий старого; новый разговор получает его переведённым (§10).
+          ...(input.cold ? { intro: upgradeStageScheme(input.cold) } : {}),
+          ...(input.base ? { base: input.base } : {}),
+          now: Date.now(),
+        })
+      : undefined;
+    const cold = decided?.kind === 'fresh' ? decided : undefined;
+    const resumed = cold ? undefined : sessionId;
     // Продолжение того же разговора (Д8, Д4): второй прогон поверх идущего —
     // это два агента в одной копии, поэтому отказ с причиной.
     if (wanted && deps.runs.isRunning(input.chatId, sessionId ?? wanted)) {
@@ -245,13 +285,15 @@ export function createReviewStarter(
     const initiative =
       linkedChildAppend(ctx.store, ctx.location.paths.appData, settings, keys, input.cwd) ??
       initiativePrompt(settings, { splitMuted: true });
+    const brief = cold
+      ? cold.brief
+      : lost
+        ? upgradeStageScheme(input.fresh ?? LOST_FALLBACK)
+        : undefined;
     const options = {
-      prompt: lost
-        ? `${input.fresh ?? LOST_FALLBACK}
-
-${input.prompt}`
-        : input.prompt,
-      ...(sessionId ? { sessionId } : {}),
+      // Вводная, назвавшая ветку и задачи, делает строку ветки панели повтором.
+      prompt: brief ? `${brief}\n\n${withoutGroupIdentity(input.prompt, brief)}` : input.prompt,
+      ...(resumed ? { sessionId: resumed } : {}),
       cwd: input.cwd,
       command: activeCliCommand(ctx.store),
       model: input.model || settings.chatModel,
@@ -263,7 +305,7 @@ ${input.prompt}`
     const meta = {
       origin: 'groups' as const,
       projectPath: input.cwd,
-      ...(sessionId ? { sessionId } : {}),
+      ...(resumed ? { sessionId: resumed } : {}),
     };
     // Дерево на паузе — прогон заведён, но ждёт «Продолжить всё»: решение
     // человека при этом не теряется, оно уже записано в связь.
@@ -273,6 +315,9 @@ ${input.prompt}`
     const notice = started ? groupsActivatedNotice(activated) : undefined;
     if (notice) deps.runs.emitExternal(input.chatId, notice);
     if (started && lost) deps.runs.emitExternal(input.chatId, conversationLostNotice(lost));
+    if (started && cold) {
+      deps.runs.emitExternal(input.chatId, coldResumeNotice(cold.previous, cold.contextTokens));
+    }
     return started ? { started } : { started, ...(wanted ? { busy: true } : {}) };
   };
 }

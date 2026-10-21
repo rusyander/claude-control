@@ -7,6 +7,8 @@ export interface DevRestartFileState {
   since: string;
   files: string[];
   waitingFor: DevRestartWait;
+  capAt?: string;
+  runs?: string[];
 }
 
 export interface DevRestartView {
@@ -14,8 +16,17 @@ export interface DevRestartView {
   since?: string;
   files?: string[];
   waitingFor?: DevRestartWait;
+  capAt?: string;
+  runs?: string[];
   requested?: boolean;
 }
+
+export declare const RUNS_WAIT_CAP_MS: number;
+export declare function runsWaitCapped(
+  sinceMs: number | undefined,
+  now: number,
+  capMs: number,
+): boolean;
 
 export declare const DEV_RESTART_STATE: string;
 export declare const DEV_RESTART_REQUEST: string;

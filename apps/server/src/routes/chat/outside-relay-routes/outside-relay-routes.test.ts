@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -51,7 +51,7 @@ describe('Хуки пересылки следуют переключателю'
       }),
     );
     ctx = {
-      location: { paths: { settings } },
+      location: { paths: { settings }, source: 'home', isValid: true },
       store,
       backupDir: undefined,
     } as unknown as ServerContext;
@@ -93,6 +93,21 @@ describe('Хуки пересылки следуют переключателю'
     expect(() => syncRelayHooks(ctx)).not.toThrow();
     const on = await toggle(true);
     expect(on.statusCode).toBe(200);
+    expect(on.json()).toMatchObject({ enabled: true, installed: false });
+  });
+
+  it('каталога Claude нет — ни старт, ни переключатель не создают ~/.claude', async () => {
+    // Первый запуск без Claude Code (выбран другой CLI): `detectClaudeLocation`
+    // отдаёт `not-found` с путями в несуществующий `~/.claude`.
+    const absent = join(dir, 'no-claude');
+    ctx.location = {
+      paths: { settings: join(absent, 'settings.json') },
+      source: 'not-found',
+      isValid: false,
+    } as unknown as ServerContext['location'];
+    syncRelayHooks(ctx);
+    const on = await toggle(true);
+    expect(existsSync(absent)).toBe(false);
     expect(on.json()).toMatchObject({ enabled: true, installed: false });
   });
 });

@@ -66,6 +66,7 @@ import { childStageExtra } from '../../domains/chat/group-run-lines/group-run-li
 import { planPathTurn } from '../../domains/chat/path-steps/path-steps.ts';
 import type { CascadeStage, ReviewDelta } from '@agentdeck/contracts/model-cascade';
 import type { PathStep } from '@agentdeck/contracts/group-path';
+import { resolveSonnetDeliver } from '@agentdeck/contracts/group-economy';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
@@ -229,6 +230,8 @@ export interface SplitStageDeps {
   identityOf?: (link: ChatLink) => string | undefined;
   /** Группа связи доводит работу до MR — за правками идёт звено доставки (журнал 59a). */
   delivers?: (link: ChatLink) => boolean;
+  /** «Доставка на Sonnet» группы с карточки; `undefined` — решает общий рычаг (F-12). */
+  sonnetDeliverOf?: (link: ChatLink) => boolean | undefined;
 }
 
 /** Что планировщику нужно снаружи, чтобы завести звено конвейера. */
@@ -249,7 +252,8 @@ export interface CascadeStageDeps {
    */
   reviewDelta?: (cwd: string, since?: string) => ReviewDelta;
   /** Настройки — из них собирается системная дописка звена. */
-  settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>;
+  settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'> &
+    Partial<Pick<AppSettings, 'groupEconomy'>>;
   /** Абзац сит перед MR для звена ревью или доставки (`sievePromptBlock`). */
   sieves?: (
     cwd: string,
@@ -364,17 +368,36 @@ export function createHandoffPlanner({
       ...(link?.deliveredAt && asksDelivery(finished.options.prompt ?? '')
         ? { redeliver: true }
         : {}),
+      // Доставка на Sonnet (рычаг экономии) — мимо контура: там модель решает маршрут.
+      // Выбор человека для группы на карточке сильнее общего рычага (F-12).
+      ...(link?.parentChatId &&
+      !finished.routed &&
+      resolveSonnetDeliver(
+        split?.sonnetDeliverOf?.(link),
+        cascade.settings().groupEconomy?.sonnetDeliver,
+      )
+        ? { cheapDeliver: true }
+        : {}),
     });
     if (!plan) return undefined;
 
     // Ключ — общим счётчиком с переносом: работа и её подъём на потолок могут
     // стартовать в одну миллисекунду, и второй затёр бы связь первого.
     const chatId = uniqueNewChatId(Date.now());
+    // Звено группы разделения знает свою ветку и задачи с первой строки: без
+    // ключа задачи в словах пользователя сторож git не пускает правку истории
+    // своей же ветки, и звено вставало с вопросом (журнал 98).
+    const identity = link?.parentChatId ? split?.identityOf?.(link) : undefined;
+    // Задание правок и доставки — в связь, пока звено не родилось (F-07): процесс,
+    // оборванный до первого хода, иначе уносил замечания и задание доставки с
+    // собой, и «Продолжить» нечем было продолжить само звено.
+    const keepsTask = plan.stage === 'fix' || plan.stage === 'deliver';
+    const stageTask = identity ? `${identity}\n\n${plan.prompt}` : plan.prompt;
     // Связь и отметка «проверено» пишутся ДО запуска. Связь — потому что перенос
     // на настоящий `sessionId` ищет запись по временному ключу и, не найдя, молча
     // ничего не делает; отметка — потому что упавший запуск не повод завести
     // вторую проверку той же работы на следующем же сообщении человека.
-    cascade.saveLink(chatId, plan.link);
+    cascade.saveLink(chatId, keepsTask ? { ...plan.link, stagePrompt: stageTask } : plan.link);
     if (plan.stage === 'review') cascade.markReviewed(aliases, new Date().toISOString());
     // План отработан ровно один раз: второе сообщение человека в чат плана без
     // отметки заводило бы вторую работу той же группы (Т1).
@@ -389,10 +412,6 @@ export function createHandoffPlanner({
       }
     }
 
-    // Звено группы разделения знает свою ветку и задачи с первой строки: без
-    // ключа задачи в словах пользователя сторож git не пускает правку истории
-    // своей же ветки, и звено вставало с вопросом (журнал 98).
-    const identity = link?.parentChatId ? split?.identityOf?.(link) : undefined;
     // Доставка продолжает тёплую сессию работы или правок (E2) — ответвлением
     // (`--fork-session`): у звена свой разговор и своя связь, как раньше, а
     // переписка и кэш — той сессии, что ветку, задачи и проверки уже знает.
@@ -488,6 +507,14 @@ export function createHandoffPlanner({
         .catch(() => '')
         .then((paragraph) => {
           options.prompt = fillSieveSlot(options.prompt ?? '', paragraph);
+          // Сохранённое задание звена — с тем же абзацем сит, а не с меткой.
+          const kept = cascade.linkOf([chatId]);
+          if (kept?.stagePrompt) {
+            cascade.saveLink(chatId, {
+              ...kept,
+              stagePrompt: fillSieveSlot(kept.stagePrompt, paragraph),
+            });
+          }
           if (gate?.defer('stage', chatId, options, meta)) return;
           if (!runs.start(chatId, options, meta)) console.warn('stage did not start', chatId);
         });

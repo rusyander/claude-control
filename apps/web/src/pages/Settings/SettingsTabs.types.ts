@@ -1,4 +1,4 @@
-import type { AppSettings } from '@agentdeck/contracts';
+import type { AppSettings, AppSettingsPatch } from '@agentdeck/contracts';
 import type { SettingsTabId } from './model/tabs.types';
 
 export interface SettingsTabsProps {
@@ -9,5 +9,5 @@ export interface SettingsTabsProps {
 /** Общий вход раздела: сохранённые настройки и способ их изменить. */
 export interface SettingsTabProps {
   settings: AppSettings;
-  patch: (change: Partial<AppSettings>) => void;
+  patch: (change: AppSettingsPatch) => void;
 }

@@ -653,10 +653,10 @@ describe('tests-cli run: кейсы vitest мимо своей команды Go
     readGroups(project)
       .flatMap((g) => g.cases)
       .find((c) => c.id === id)?.status;
-  const run = (group: string) => {
+  const run = (group: string, projectArg = project) => {
     const result = spawnSync(
       process.execPath,
-      [CLI, 'run', '--group', group, '--project', project],
+      [CLI, 'run', '--group', group, '--project', projectArg],
       { encoding: 'utf8', timeout: 120_000 },
     );
     return { code: result.status, out: `${result.stdout}${result.stderr}` };
@@ -756,6 +756,26 @@ describe('tests-cli run: кейсы vitest мимо своей команды Go
     expect(status('web-002')).toBe('failed');
     expect(readRuns(project)[0]).toMatchObject({ exitCode: 1, summary: { passed: 1, failed: 1 } });
   }, 150_000);
+
+  // `--project "d:\…"` — так путь отдаёт VS Code. Vite на Windows считает `d:/…` и `D:/…`
+  // разными модулями: без заглавной буквы диска тест получал второй `vitest` без раннера,
+  // и каждый файл падал «Vitest failed to find the runner» (widget-app, 22.10.2026). Сам
+  // провал здесь не воспроизвести: он нужен vitest настоящими файлами в дереве проекта
+  // (hoisted node_modules), а у фикстуры ссылка — realpath сам чинит регистр. Поэтому
+  // держится инвариант команды: ни одного пути со строчной буквой диска.
+  it.runIf(process.platform === 'win32')(
+    'путь проекта со строчной буквой диска — в команду vitest он идёт с заглавной',
+    () => {
+      const lowerDrive = project.replace(/^[A-Z]:/, (drive) => drive.toLowerCase());
+      expect(lowerDrive).not.toBe(project);
+      const result = run('web', lowerDrive);
+      const command = result.out.split('\n').find((line) => line.startsWith('Команда:')) ?? '';
+      expect(command).toMatch(/--root /);
+      expect(command).not.toMatch(/(^|[\s"'])[a-z]:\\/);
+      expect(status('web-001')).toBe('passed');
+    },
+    150_000,
+  );
 
   it('наборы-каталоги пакетов с одним ключом src — итог каждому своему', () => {
     const result = run('suites');

@@ -915,7 +915,7 @@ async function vitestPlan(project, files) {
   const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
   const runs = [...byPackage].sort(([a], [b]) => a.localeCompare(b));
   const parts = runs.map(([dir, inside], index) => {
-    const cwd = join(project, dir);
+    const cwd = upperDrive(join(project, dir));
     const bin = vitestEntry(cwd);
     if (!bin) {
       dropTemp(temp);
@@ -968,6 +968,17 @@ async function vitestPlan(project, files) {
       };
     },
   };
+}
+
+/**
+ * Буква диска — заглавная. НЕ УБИРАТЬ: `--project "d:\…"` (так путь отдаёт VS Code) давал
+ * vitest каталог и входной файл с `d:`, а Vite на Windows считает `d:/…` и `D:/…` разными
+ * модулями — тест получал второй экземпляр `vitest` без раннера, каждый файл падал с
+ * «Vitest failed to find the runner», «no tests» (widget-app, 22.10.2026). Держит тест
+ * «путь проекта со строчной буквой диска» в tests-cli.integration.test.ts.
+ */
+function upperDrive(path) {
+  return process.platform === 'win32' ? path.replace(/^[a-z]:/, (drive) => drive.toUpperCase()) : path;
 }
 
 /** classname и имя набора vitest — от корня пакета; кейсы знают путь от корня проекта. */

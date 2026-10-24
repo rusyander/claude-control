@@ -41,7 +41,11 @@ describe('POST /api/chat/permission-request: вопрос человеку', () 
       stop: () => undefined,
     }));
     const store = new AppStore(join(root, 'agentdeck'));
-    const ctx = { location: { paths: { root } }, store } as unknown as ServerContext;
+    // appData — хранилище D-n: запрос прав сверяется с ним до карточки.
+    const ctx = {
+      location: { paths: { root, appData: join(root, 'agentdeck') } },
+      store,
+    } as unknown as ServerContext;
 
     app = Fastify();
     registerChatRoutes(app, ctx, registry, new ChatSession(registry));

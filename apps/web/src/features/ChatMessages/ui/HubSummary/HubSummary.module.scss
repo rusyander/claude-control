@@ -30,3 +30,26 @@
   background: var(--color-danger-subtle);
   color: var(--color-fg);
 }
+
+// Итог подогрева кэша по разделению: сберегли — зелёным, переплатили — жёлтым,
+// как фишка итога на карточке группы.
+.chipSaved {
+  background: var(--color-success-subtle);
+  color: var(--color-fg);
+}
+
+.chipLost {
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
+}
+
+// В тёмной теме `*-subtle` почти сливается с фоном: тон — от самого цвета.
+:global(:root[data-theme='dark']) .chipSaved {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+
+:global(:root[data-theme='dark']) .chipLost {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}

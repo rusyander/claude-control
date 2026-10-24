@@ -42,11 +42,19 @@ describe('пересечения веток — сворачивание', () =>
     expect(html).toContain('data-overlap-fold="closed"');
   });
 
-  it('свёрнутый список не прячет файлы вне владения — их число видно', () => {
+  it('свёрнутый список прячет и число файлов вне владения, и порядок слияния', () => {
     const html = render(overlapOf(215, 4));
 
     expect(rowsIn(html)).toBe(0);
+    expect(html).not.toContain('chat.cascade.overlap.outsideCount');
+    expect(html).not.toContain('chat.cascade.overlap.mergeOrder');
+  });
+
+  it('раскрытый список показывает число вне владения и порядок слияния', () => {
+    const html = render(overlapOf(215, 4), true);
+
     expect(html).toContain('chat.cascade.overlap.outsideCount');
+    expect(html).toContain('chat.cascade.overlap.mergeOrder');
   });
 
   it('раскрытый показывает все строки', () => {
@@ -56,7 +64,14 @@ describe('пересечения веток — сворачивание', () =>
     expect(html).toContain('aria-expanded="true"');
   });
 
-  it('короткий список открыт и без переключателя', () => {
+  it('даже один файл свёрнут до заголовка (владелец 22.10.2026)', () => {
+    const html = render(overlapOf(1));
+
+    expect(rowsIn(html)).toBe(0);
+    expect(html).toContain('data-overlap-fold="closed"');
+  });
+
+  it('пустой список без переключателя', () => {
     const html = render(overlapOf(OVERLAP_OPEN_LIMIT));
 
     expect(rowsIn(html)).toBe(OVERLAP_OPEN_LIMIT);
@@ -65,7 +80,7 @@ describe('пересечения веток — сворачивание', () =>
   });
 
   it('порядок слияния и «не прочитано» — отдельными блоками, а не одной строкой', () => {
-    const html = render(overlapOf(1));
+    const html = render(overlapOf(1), true);
 
     expect(html).toMatch(/<div[^>]*>chat\.cascade\.overlap\.mergeOrder<\/div>/);
     expect(html).toMatch(/<div[^>]*data-overlap-unread[^>]*>/);

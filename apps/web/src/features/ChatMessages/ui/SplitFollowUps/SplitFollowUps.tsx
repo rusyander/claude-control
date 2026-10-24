@@ -7,14 +7,22 @@ import type { SplitFollowUpsProps } from './SplitFollowUps.types';
  * могут (находка 112), — первыми: без них доставка не закончена. Дефекты вне
  * задач групп (95b) — следом: это уже новая работа.
  */
-export function SplitFollowUps({ split }: SplitFollowUpsProps) {
+export function SplitFollowUps({
+  split,
+  defaultExpanded = false,
+  onOpen,
+  foreign,
+}: SplitFollowUpsProps) {
   return (
     <>
-      <SplitHumanSteps groups={split.groups} />
+      <SplitHumanSteps groups={split.groups} defaultExpanded={defaultExpanded} />
       <SplitTickets
         groups={split.groups}
         parentChatId={split.parentChatId}
+        defaultExpanded={defaultExpanded}
         {...(split.ticketTracker ? { tracker: split.ticketTracker } : {})}
+        {...(onOpen ? { onOpen } : {})}
+        {...(foreign !== undefined ? { foreign } : {})}
       />
     </>
   );

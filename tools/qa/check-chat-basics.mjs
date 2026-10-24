@@ -313,13 +313,18 @@ await runOnStand(
         await toggle.waitFor({ timeout: 10_000 });
         return toggle;
       };
+      // Переключатель меняется после ответа сервера: под нагрузкой стенда ответ
+      // дольше 800 мс, поэтому ждём состояния (до 10 с), а не времени.
+      const switched = async (toggle, want) => {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          if ((await toggle.getAttribute('aria-checked')) === want) return true;
+          await wait(500);
+        }
+        return false;
+      };
       const toggleOn = await rule();
       await toggleOn.click();
-      await wait(800);
-      check(
-        'правило «Удаление файлов» включено',
-        (await toggleOn.getAttribute('aria-checked')) === 'true',
-      );
+      check('правило «Удаление файлов» включено', await switched(toggleOn, 'true'));
       await page.keyboard.press('Escape');
       await wait(400);
       await input.fill('УДАЛИ: ещё раз удали tmp-delete-me.txt');
@@ -341,13 +346,9 @@ await runOnStand(
       await dismissAccess(page);
       await wait(1500);
       const afterReload = await rule();
-      check(
-        'после F5 правило по-прежнему включено',
-        (await afterReload.getAttribute('aria-checked')) === 'true',
-      );
+      check('после F5 правило по-прежнему включено', await switched(afterReload, 'true'));
       await afterReload.click();
-      await wait(800);
-      check('выключено обратно', (await afterReload.getAttribute('aria-checked')) === 'false');
+      check('выключено обратно', await switched(afterReload, 'false'));
       await page.keyboard.press('Escape');
 
       // ---------------------------------------------------------------- chat-009

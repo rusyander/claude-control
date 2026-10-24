@@ -48,6 +48,28 @@ await runOnStand({ label: 'help-english', settings: { language: 'en' } }, async 
     for (const topic of TOPICS) {
       await page.goto(`${stand.webUrl}/help?topic=${topic}`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 30_000 });
+      // Английский словарь — отдельный чанк, и пока он едет, `t()` по замыслу отдаёт
+      // русский (`i18n/instance.ts`): под нагрузкой стенда 400 мс не хватало, и
+      // документ читался наполовину русским. Признак, что словарь применён, —
+      // боковая панель без кириллицы; не дождались — это отдельный провал, а не
+      // повод читать документ.
+      const applied = await page
+        .waitForFunction(
+          () => !/[А-Яа-яЁё]/.test(document.querySelector('nav')?.innerText ?? 'н'),
+          null,
+          { timeout: 30_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        );
+      check(
+        `${topic}: английский словарь применился`,
+        applied,
+        'боковая панель осталась русской 30 с',
+      );
+      // Язык не применился — дальше каждая тема ждала бы те же 30 с впустую.
+      if (!applied) break;
       await wait(400);
       const text = await page.locator('main').innerText();
       const raw = [...new Set(text.match(/\bhelp\.[a-zA-Z_][\w.]*/g) ?? [])];

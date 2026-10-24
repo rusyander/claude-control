@@ -99,6 +99,24 @@ export function runningAgents(transcriptText) {
   return [...new Set(ids)].filter((id) => !transcriptText.includes(`<task-id>${id}</task-id>`));
 }
 
+// Phase G.4 (E6 gap): a split group held its turn up to 28 min on its own two review lanes —
+// `D=.agent/tmp/review-…; for i in $(seq 1 170); do [ -f $D/lane-A.md ] && [ -f $D/lane-B.md ] &&
+// break; sleep 10; done`. A 10 s sleep is under the 60 s branch below, the path sits in a variable,
+// and a file test is neither a task output nor a check log, so nothing saw it. A presence loop (≥ 20 s
+// in total) over agent files — `.agent/tmp/`, `subagents/`, `tasks/` — while an agent this session
+// launched in the background still runs is refused in a split child with no repeat escape: the
+// agent's completion notification wakes the run. No running agent → not judged here.
+const FILE_TEST = /\[\[?\s+(?:!\s+)?-[efs]\s|\btest\s+(?:!\s+)?-[efs]\s/;
+const AGENT_FILES = /\.agent[\\/]tmp[\\/]|[\\/]subagents[\\/]|[\\/]tasks[\\/]/;
+
+/** Seconds a loop testing for a file can sleep in total; 0 when the command is no such loop. */
+export function fileWaitTotal(command) {
+  const bare = bareCommand(command);
+  const m = SLEEP.exec(bare);
+  if (!m || !LOOP.test(bare) || !FILE_TEST.test(bare) || PROBE.test(bare)) return 0;
+  return Number(m[1]) * Math.max(1, loopRounds(bare));
+}
+
 const ownTaskReason = (wait) =>
   `bg-wait-guard: sleeping ${wait} on the output of a background command THIS session started is blind ` +
   'polling, and repeating the call does not lift it: the CLI wakes the session with a completion ' +
@@ -122,6 +140,29 @@ export default function bgWaitGuard(input) {
         );
     } catch {
       /* no transcript → nothing known of agents */
+    }
+  }
+  if (
+    process.env.AGENTDECK_SPLIT_CHILD === '1' &&
+    !inSubagent(input) &&
+    AGENT_FILES.test(command)
+  ) {
+    const fileWait = fileWaitTotal(command);
+    if (fileWait >= 20) {
+      try {
+        if (runningAgents(readTailText(ownTranscript(input), OWN_TASK_BYTES)).length) {
+          const span = Number.isFinite(fileWait)
+            ? `${Math.round(fileWait)} s`
+            : 'an unbounded loop';
+          return deny(
+            `bg-wait-guard: a ${span} sleep loop waiting for files of an agent this split-group run launched is ` +
+              'blind polling, and repeating the call does not lift it. End the turn saying what is running: the ' +
+              "agent's completion notification wakes this session with its result.",
+          );
+        }
+      } catch {
+        /* no transcript → nothing known of agents */
+      }
     }
   }
   const total = sleepTotal(command);

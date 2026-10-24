@@ -24,6 +24,7 @@ import {
   anthropicRequestToOpenAi,
   chooseToolRoute,
   errorBody,
+  forwardsCacheMarks,
   openAiModelsToAnthropic,
   openAiRequestWithShim,
   openAiResponseToAnthropic,
@@ -779,7 +780,13 @@ async function chat(
   // compromise: dialect-bridge — клиент говорит по-Anthropic, а родной ручки у платформы нет; что не переносится, названо таблицей
   const translated =
     dialect === 'anthropic'
-      ? anthropicRequestToOpenAi(clientBody, driver.requestFields, route)
+      ? // Пометки кэша — только моделям, которым драйвер их объявил (n4): у остальных путь прежний.
+        anthropicRequestToOpenAi(
+          clientBody,
+          driver.requestFields,
+          route,
+          forwardsCacheMarks(driver, clientBody.model),
+        )
       : // Перевода тут нет, а потери есть: контур принимает схемой половину
         // полей диалекта OpenAI и до модели их не доносит (справочник §5).
         // Без этой строки codex и cursor читали бы в следе «перенеслось всё»
@@ -1252,7 +1259,15 @@ function countUsage(
   deps: PipelineDeps,
   platformId: string,
   model: string,
-  facts: { promptTokens: number; completionTokens: number; totalTokens: number },
+  facts: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    /** Из входа — прочитано из кэша, записано и из записанного на час (n4, ревью K 🟡2). */
+    cachedTokens?: number;
+    cacheWriteTokens?: number;
+    cacheWrite1hTokens?: number;
+  },
   /** Ответ дошёл, а счёта за него контур не прислал — см. `usageUnreported`. */
   unreported = false,
 ): void {
@@ -1263,10 +1278,22 @@ function countUsage(
     totalTokens: facts.totalTokens,
   };
   deps.journal.addUsage(platformId, tokens, at);
+  // Кэш — только деньгам: чтение дешевле входа вдесятеро, часовая запись дороже
+  // вдвое, и без них Claude через контур выглядел бы дороже, чем стоит. Нулей не
+  // кладём — расход модели без кэша остаётся прежним до байта.
+  const cache = {
+    ...(facts.cachedTokens ? { cacheReadTokens: facts.cachedTokens } : {}),
+    ...(facts.cacheWriteTokens ? { cacheWriteTokens: facts.cacheWriteTokens } : {}),
+    ...(facts.cacheWrite1hTokens ? { cacheWrite1hTokens: facts.cacheWrite1hTokens } : {}),
+  };
   // Постоянный учёт — ПОСЛЕ ответа клиенту и пачкой (см. `spend-flush.ts`):
   // ответ модели не имеет права ждать нашу бухгалтерию. Модель называем ту, что
   // ушла наверх: по ней ищется цена, и без неё расход виден только в токенах.
-  deps.spend?.add(platformId, { model, ...tokens, ...(unreported ? { unreported } : {}) }, at);
+  deps.spend?.add(
+    platformId,
+    { model, ...tokens, ...cache, ...(unreported ? { unreported } : {}) },
+    at,
+  );
 }
 
 /** Запасной счётчик на процесс, когда слушатель своего не передал. */
@@ -2154,7 +2181,7 @@ async function collectForClient(
       answer.promptTokens,
       answer.completionTokens,
       answer.totalTokens,
-      answer.cachedTokens,
+      answer.cache,
     ),
   };
 

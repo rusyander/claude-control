@@ -6,6 +6,7 @@ export const HUB_BUCKETS: readonly HubBucket[] = [
   'done',
   'running',
   'ask',
+  'deferred',
   'queued',
   'failed',
   'cancelled',

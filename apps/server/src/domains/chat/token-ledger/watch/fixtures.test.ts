@@ -133,13 +133,14 @@ describe('сторож на вырезках прогона 20.10', () => {
   it('R6: группа 3 пушит в стадии работы при звене доставки впереди (карточка 24); коммит — своя работа', () => {
     const fixture = load('commit-in-work');
     const ahead = { node: { deliverAhead: true } };
-    // Коммит в 19:27:17 — не повод: копия звена его и ждёт. Повод — пуш в 19:27:40.
+    // Коммит в 19:27:17 — не повод: копия звена его и ждёт. Повод — пуш в 19:27:40, а
+    // сигнал — с его ответом в 19:27:44: отбитый пуш не исполнен и поводом не был бы (C17).
     expect(first(replay(fixture, ahead), 'R6')).toMatchObject({
-      at: '19:27:40',
+      at: '19:27:44',
       numbers: { ops: 1 },
       params: { op: 'push', stage: 'work' },
     });
-    expect(first(replay(fixture, { ...ahead, stage: 'review' }), 'R6')?.at).toBe('19:27:40');
+    expect(first(replay(fixture, { ...ahead, stage: 'review' }), 'R6')?.at).toBe('19:27:44');
     expect(first(replay(fixture, { ...ahead, stage: 'deliver' }), 'R6')).toBeUndefined();
     // Звена доставки впереди нет — пуш и есть работа этого звена.
     expect(first(replay(fixture), 'R6')).toBeUndefined();
@@ -148,8 +149,11 @@ describe('сторож на вырезках прогона 20.10', () => {
   it('R7: копия группы 3 читает исходники панели (карточка 22); сама панель — своё', () => {
     const fixture = load('panel-sources');
     const fired = replay(fixture);
-    expect(first(fired, 'R7')).toMatchObject({ at: '19:11:48' });
+    // С 19:11:48 копия только запускает CLI тестов панели — так велит подсказка
+    // блока «Тесты», это не чтение. Чтение — `grep` по самому tests-cli.mjs в 19:13:37.
+    expect(first(fired, 'R7')).toMatchObject({ at: '19:13:37' });
     expect(first(fired, 'R7')?.params?.path).toContain('/work/panel');
+    expect(first(fired, 'R7')?.params?.path).toContain('tests-cli.mjs');
     expect(first(replay(fixture, { cwd: PANEL }), 'R7')).toBeUndefined();
     // Наблюдатель работает в самой панели: его чтения её файлов — не сигнал.
     expect(first(replay(load('compact-storm')), 'R7')).toBeUndefined();
@@ -201,5 +205,35 @@ describe('сторож на вырезках прогона 20.10', () => {
 
   it('R12 молчит: три куска одного файла подряд — не перечитывание (карточка 17)', () => {
     expect(rulesOf(replay(load('chunked-reads')))).toEqual([]);
+  });
+
+  // F-73: проверка «правило сработало» не видит лишнего срабатывания на той же
+  // вырезке. Полный список включений по порядку — шум на настоящем транскрипте
+  // краснеет здесь, а не в карточке человека.
+  it('каждая вырезка включает ровно свои правила, без лишних', () => {
+    const askSince =
+      load('ask-pending').events.find(
+        (event) => event.kind === 'tool' && event.name === 'AskUserQuestion',
+      )?.t ?? 0;
+    const table: Array<[string, Replay, GroupWatchRule[]]> = [
+      ['cold-resume', {}, ['R2']],
+      ['compact-storm', {}, ['R3']],
+      ['compact-calm', {}, []],
+      ['commit-in-work', { node: { deliverAhead: true } }, ['R6']],
+      ['panel-sources', {}, ['R7']],
+      ['review-in-work', {}, ['R5', 'R11']],
+      // Здесь копия только запускает CLI тестов панели (`node "$T" list`): R7 нет.
+      [
+        'ask-pending',
+        { node: { running: true, ask: { since: askSince } }, until: '19:25:00' },
+        ['R1b'],
+      ],
+      // Главный чат сжимался в 18:59:37 и 19:06:24 — 7 мин, это и есть шторм R3. R14 — чтение
+      // PROGRESS.md в 250 строк принесло в окно 29.4k знаков разом (порог 20k).
+      ['reread', {}, ['R14', 'R3', 'R12']],
+      ['chunked-reads', {}, []],
+    ];
+    const actual = table.map(([name, options]) => [name, rulesOf(replay(load(name), options))]);
+    expect(actual).toEqual(table.map(([name, , expected]) => [name, expected]));
   });
 });

@@ -25,6 +25,7 @@ export async function removeGroupCopy(input: {
   release?: (path: string) => Promise<void>;
 }): Promise<SplitGroupCleaned['branch']> {
   const { projectPath, path, branch } = input;
+  // Записи журнала проверок копии убирает сам `removeWorktree`.
   await removeWorktree(projectPath, path, false, input.claudeJsonPath, input.mirror, input.release);
   if (input.keepBranch) return 'mr';
   const ref = `refs/heads/${branch}`;

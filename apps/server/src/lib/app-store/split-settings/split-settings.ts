@@ -7,6 +7,7 @@ import {
   pickGroupPermissions,
   resolveSplitDefaults,
   SPLIT_DEFAULTS_BUILTIN,
+  SPLIT_DEFAULTS_REVISION,
   type GroupPermissionLevel,
   type SplitDefaults,
   type StoredSplitDefaults,
@@ -76,9 +77,23 @@ export function setSplitSettings(
   return structuredClone(next);
 }
 
-/** Общие правила групп — действующие, хранимое поверх коробки. */
+/**
+ * Общие правила групп — действующие, хранимое поверх коробки. Запись без
+ * ревизии писалась при коробке «история git: человек», и выбранное тогда
+ * «человек» совпадало с коробкой и не сохранялось (F-33): такой записи строка
+ * читается как `human`, а не как новая коробка `auto` — смена коробки не
+ * снимает с человека выбор, сделанный ради безопасности. Записи нет вовсе —
+ * отличить «выбрал человека» от «не трогал» нечем, действует коробка.
+ */
 export function getSplitDefaults(state: AppState): SplitDefaults {
-  return resolveSplitDefaults(state.splitDefaults);
+  const stored = state.splitDefaults;
+  const legacy =
+    stored !== undefined &&
+    stored.revision === undefined &&
+    stored.permissions?.gitHistory === undefined;
+  return resolveSplitDefaults(
+    legacy ? { ...stored, permissions: { ...stored.permissions, gitHistory: 'human' } } : stored,
+  );
 }
 
 /**
@@ -103,7 +118,9 @@ export function setSplitDefaults(state: AppState, input: StoredSplitDefaults): S
   if (value.heavy.chains !== base.heavy.chains) heavy.chains = value.heavy.chains;
   if (value.heavy.steps !== base.heavy.steps) heavy.steps = value.heavy.steps;
   if (Object.keys(heavy).length > 0) stored.heavy = heavy;
-  if (Object.keys(stored).length > 0) state.splitDefaults = stored;
-  else delete state.splitDefaults;
+  // Ревизия — с отклонениями: по ней чтение знает, от какой коробки они считаны.
+  if (Object.keys(stored).length > 0) {
+    state.splitDefaults = { revision: SPLIT_DEFAULTS_REVISION, ...stored };
+  } else delete state.splitDefaults;
   return value;
 }

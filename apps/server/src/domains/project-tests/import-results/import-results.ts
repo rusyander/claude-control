@@ -11,6 +11,7 @@ import type {
 import { pointId, summarize, toStatus } from '@agentdeck/contracts/test-format';
 import { ProjectFileError, resolveProjectPath } from '../../project-files/paths.ts';
 import { ProjectTestsError } from '../files.ts';
+import { stampsOf } from '../content-stamp/content-stamp.ts';
 import { gitContext } from '../impact/impact.ts';
 import { findElements, textContent } from '../import-xml/import-xml.ts';
 import { writeRun } from '../runs-store/runs-store.ts';
@@ -96,6 +97,12 @@ export interface ImportResultsInput {
    * (19.10.2026). Внутри группы одного пакета тот же ключ однозначен.
    */
   groups?: string[];
+  /**
+   * Отпечатки содержимого кейсов, снятые на СТАРТЕ прогона (`content-stamp`):
+   * в запись ложатся отпечатки кейсов с результатом. Снятые после прогона
+   * закрыли бы правку, которой прогон не видел.
+   */
+  stamps?: ReadonlyMap<string, string>;
 }
 
 /** Насколько результат «хуже»: при двух результатах на кейс побеждает худший. */
@@ -459,6 +466,7 @@ export function importResults(root: string, input: ImportResultsInput): ProjectT
     status: 'done',
     startedAt: now,
     finishedAt: now,
+    ...stampsOf(input.stamps, points),
     results: points,
     summary: summarize(points),
   };

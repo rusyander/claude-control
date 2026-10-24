@@ -66,6 +66,10 @@ describe('ключи разделов агента панели', () => {
     expect(sectionQueryKeys('endpoints')).toContainEqual(queryKeys.env);
   });
 
+  it('действие агента над чатами перечитывает и сигналы сторожа одиночных чатов', () => {
+    expect(sectionQueryKeys('chat')).toContainEqual(queryKeys.chatWatchSignals);
+  });
+
   it('смена провайдера перечитывает всё (пустой ключ совпадает с любым)', () => {
     expect(sectionQueryKeys('provider')).toEqual([[]]);
   });

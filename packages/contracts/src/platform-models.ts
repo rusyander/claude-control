@@ -231,16 +231,31 @@ export function chooseRunModel(rules: PlatformModelRules, asked: string): Platfo
  *
  * `unset` — контуру нечем заменять (пробы не было, каталог пуст): подмена,
  * объявленная на экране, была бы ложью о пустоте. `replaced` — уедет не то, что
- * человек выбрал. `named` — просто имя.
+ * человек выбрал. `mapped` — имя переведено строкой карты контура: это слово
+ * самого человека, и «имени там нет» жёлтым было бы неправдой. `named` — просто имя.
  *
  * В контрактах, а не в каждом экране, потому что экранов уже три (шапка чата,
  * шапка чужого CLI, поле ввода телефона), и четвёртое состояние, добавленное в
  * панели, оставило бы телефон молча на трёх (ревью Т13). Слова остаются за
  * экраном — здесь только выбор состояния.
  */
-export type PlatformModelCaptionState = 'named' | 'replaced' | 'unset';
+/**
+ * Модель, на которой пойдёт «Доставка на Sonnet» через контур, — перевод
+ * строкой карты «sonnet» (n6). Сервер пускает доставку через контур только при
+ * такой строке (`routedMap` в `handoff-routes.ts`, ключи там так же обрезаны и в
+ * нижнем регистре); нет строки — рычаг через контур не действует, и экран не
+ * обещает Sonnet.
+ */
+export function routedDeliverModel(rules: PlatformModelRules): string | undefined {
+  return Object.entries(rules.map)
+    .find(([from, to]) => lower(from.trim()) === 'sonnet' && to.trim())?.[1]
+    .trim();
+}
+
+export type PlatformModelCaptionState = 'named' | 'mapped' | 'replaced' | 'unset';
 
 export function modelCaptionState(choice: PlatformModelChoice): PlatformModelCaptionState {
   if (choice.source === 'none') return 'unset';
-  return choice.replaced ? 'replaced' : 'named';
+  if (!choice.replaced) return 'named';
+  return choice.source === 'mapped' ? 'mapped' : 'replaced';
 }

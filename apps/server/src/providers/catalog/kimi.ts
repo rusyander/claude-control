@@ -109,6 +109,26 @@ export const kimiProvider: ConfigProvider = {
     skills: { format: 'skill-md-dir', relativeDir: '.kimi-code/skills' },
   },
   configLocations: () => [kimiCodeHome()],
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026; Kimi Code 2.1.1 — по
+  // строкам его сборки, без живой пробы: CLI на машине проверки не было). Канала нет.
+  groupEconomy: {
+    support: {
+      // `[loop_control] compaction_trigger_ratio` и `[read] default_max_chars` — только в
+      // config.toml; свой `KIMI_CODE_HOME` на прогон перенёс бы весь каталог человека.
+      compactWindow: { support: 'disproportionate', note: 'economy-note-config-only' },
+      readOutputTokens: { support: 'disproportionate', note: 'economy-note-config-only' },
+      // Ответ инструмента режется в самом CLI на 50 000 знаках, ключа нет.
+      bashOutputChars: { support: 'impossible', note: 'economy-note-hardcoded-limit' },
+      cacheTtl: { support: 'impossible', note: 'economy-note-cache-implicit' },
+      detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
+      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
+      // Провайдер и цена кэша — в config.toml человека (Moonshot лишь по умолчанию):
+      // ни паузу «кэш остыл», ни окупаемость пинга панель не посчитает — одна причина обоим.
+      freshOnColdResume: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
+      keepWarm: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
+      workHabits: { support: 'emulated' },
+    },
+  },
   // Ассистент: модельное API Kimi — OpenAI-совместимое API Moonshot, ключ в
   // `KIMI_API_KEY`/`MOONSHOT_API_KEY`. One-shot: `kimi -p <промпт>`. Живой ход
   // (сообщение посреди ответа) — через `kimi web`: занятая сессия ставит

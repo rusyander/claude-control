@@ -1,16 +1,19 @@
-// Фишка «на паузе» — та же форма, что у звена конвейера в списке чатов: одно
-// слово в капсуле на утопленной поверхности, читается в обеих темах.
+// Фишка состояния — та же форма, что у звена конвейера в списке чатов: одно
+// слово в капсуле на утопленной поверхности, читается в обеих темах. Карточка
+// сама на утопленном фоне — поэтому капсула на обычной поверхности с рамкой.
 .chip {
   flex: none;
   padding: 0 6px;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: var(--color-surface-sunken);
+  background: var(--color-surface);
   white-space: nowrap;
 }
 
 // Ждут человека — вопрос или решение по ревью: это единственные фишки, после
 // которых работа не пойдёт сама, и они не должны сливаться с «ждёт фон».
 .chipAsk {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
   background: var(--color-warning-subtle);
   color: var(--color-fg);
 }
@@ -22,17 +25,93 @@
   color: var(--color-fg-muted);
 }
 
-// Хвост ответа — цитата, а не состояние: курсивом, чтобы не сливался со строкой
-// ветки и звеньев над ним. Две строки, а не одна (живой прогон 29.09): одной
-// строкой вопрос группы обрывался раньше, чем становилось понятно, о чём он.
-.tail {
-  display: -webkit-box;
-  overflow: hidden;
-  font-style: italic;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+// Шапка: название с фишками и под ним путь звеньев — левая часть ряда кнопок.
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+// Название и фишки — одним рядом; название ужимается многоточием, фишки — нет.
+.titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-2xs);
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.3;
+}
+
+// Тело карточки — блоками с ровным шагом: глаз ловит границы блоков, а не
+// ищет их в сплошном тексте.
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+  flex: 1;
+}
+
+// Путь группы: пройденные звенья тихим текстом, текущее — капсулой (владелец
+// 22.10.2026): в строке «план › работа › работа…» оно терялось в конце.
+.stages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-2xs);
+}
+
+.stageNow {
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  white-space: nowrap;
+}
+
+// Звено идёт прямо сейчас — акцентной рамкой, без заливки: заливка спорила бы
+// с фишками «ждёт вашего ответа».
+.stageRunning {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+
+// Беда — плашкой с красной чертой слева: упавшая или оборванная группа не
+// должна читаться как идущая. Каждая причина — своей строкой.
+.problem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border-left: 3px solid var(--color-danger);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
   overflow-wrap: anywhere;
-  line-clamp: 2;
+}
+
+// Факты — пунктами через «·»; перенос рвёт ряд между пунктами, а не внутри.
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--spacing-2xs);
+}
+
+.fact {
+  max-width: none;
+  overflow-wrap: anywhere;
+
+  & + &::before {
+    margin-right: var(--spacing-2xs);
+    color: var(--color-fg-subtle);
+    content: '·';
+  }
 }
 
 // Строки состояния переносятся, а не режутся многоточием. Это данные, не проза:
@@ -42,22 +121,90 @@
   overflow-wrap: anywhere;
 }
 
+// Пометка о правках ревью — плашкой, а не капсулой: текст длинный и переносится.
+.notice {
+  padding: 2px var(--spacing-xs);
+  border-radius: 6px;
+}
+
 // Ветка — одной строкой, целиком по наведению.
 .branch {
   display: block;
   max-width: 100%;
+  margin-top: calc(-1 * var(--spacing-3xs));
 }
 
-.titleLine {
+// Счёт токенов — своим разделом под чертой: заголовок с итогом подогрева и
+// флагами одним рядом фишек, под ним числа рядами «Сессии» и «Подогрев».
+.tokens {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--spacing-2xs);
   min-width: 0;
+  padding-top: var(--spacing-2xs);
+  border-top: 1px dashed var(--color-border);
 }
 
-// Длинное имя ветки не должно распирать карточку: текст ужимается, а не
-// растягивает ленту вбок.
-.text {
-  min-width: 0;
-  flex: 1;
+.tokensHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-2xs);
+}
+
+.tokensTitle {
+  color: var(--color-fg);
+}
+
+// Подпись ряда — слева от чисел, по строке их подписей; узкая карточка
+// переносит числа, подпись остаётся слева.
+.tokenRows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--spacing-xs) var(--spacing-sm);
+  align-items: start;
+}
+
+.rowTitle {
+  min-width: 64px;
+}
+
+// Итог подогрева кэша: сберёг — зелёным, переплатил — жёлтым.
+.chipSaved {
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+  background: var(--color-success-subtle);
+  color: var(--color-fg);
+}
+
+.chipLost {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
+}
+
+// В тёмной теме `*-subtle` почти сливался с фоном карточки: тон — от самого
+// цвета, текст — им же, чтобы «сберёг» и «переплатил» различались с первого взгляда.
+:global(:root[data-theme='dark']) .chipSaved {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+
+:global(:root[data-theme='dark']) .chipLost {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
+
+// Хвост ответа — цитата, а не состояние: курсивом и с чертой слева, чтобы не
+// сливался с фактами над ним. Две строки, а не одна (живой прогон 29.09): одной
+// строкой вопрос группы обрывался раньше, чем становилось понятно, о чём он.
+.tail {
+  display: -webkit-box;
+  padding-left: var(--spacing-xs);
+  border-left: 2px solid var(--color-border-strong);
+  overflow: hidden;
+  font-style: italic;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  line-clamp: 2;
 }

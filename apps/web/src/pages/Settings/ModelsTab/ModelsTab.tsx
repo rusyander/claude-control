@@ -142,6 +142,28 @@ export function ModelsTab({ settings, patch }: SettingsTabProps) {
             checked={settings.chatLeanTools}
             onChange={(chatLeanTools) => patch({ chatLeanTools })}
           />
+          {/* Неотвеченная карточка прав сама становится вопросом D-n в списке
+              «Ждёт решения»: человек ушёл — агент не стоит на ней часами. */}
+          <NumberSettingRow
+            label={t('settings.deferAfterMinutes')}
+            hint={t('settings.deferAfterMinutesHint')}
+            value={settings.deferAfterMinutes}
+            min={0}
+            max={1440}
+            inputClassName={styles.numberInput}
+            hintClassName={styles.hint}
+            onChange={(deferAfterMinutes) => patch({ deferAfterMinutes })}
+          />
+          <NumberSettingRow
+            label={t('settings.deferredTtlDays')}
+            hint={t('settings.deferredTtlDaysHint')}
+            value={settings.deferredTtlDays}
+            min={1}
+            max={90}
+            inputClassName={styles.numberInput}
+            hintClassName={styles.hint}
+            onChange={(deferredTtlDays) => patch({ deferredTtlDays })}
+          />
         </Stack>
       </Card>
 

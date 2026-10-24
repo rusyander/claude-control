@@ -15,6 +15,8 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/storybook-static/**',
+      // Отчёт покрытия — сгенерированный JS, vitest переписывает его посреди прохода ESLint.
+      '**/coverage/**',
       '.qa-screenshots/**',
       '.agent/**',
       // Личные черновики в корне (`.vsc-tmp.mjs` и т. п.) — не код проекта.

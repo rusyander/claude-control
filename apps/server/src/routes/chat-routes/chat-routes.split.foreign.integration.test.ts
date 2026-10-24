@@ -8,8 +8,9 @@ import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
 import { SPLIT_DEFAULTS_BUILTIN } from '@agentdeck/contracts/split-groups';
 import {
   FOREIGN_CHILD_PROMPT,
-  GROUP_ECONOMY_PROMPT,
+  FOREIGN_GROUP_ECONOMY_PROMPT,
 } from '../../domains/chat/initiative/initiative.ts';
+import { WORK_HABITS_SHARED_NOTE } from '../../domains/chat/group-profile/group-profile.ts';
 import { writePanelJson } from '../../lib/app-store/group-sources.ts';
 import { foreignChildExtra } from '../../domains/chat/group-run-lines/group-run-lines.ts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
@@ -274,8 +275,12 @@ describe('POST /api/chat/split — чужой провайдер', () => {
     expect(runs).toHaveLength(2);
     for (const run of runs) {
       expect(run.systemPrefix).toContain(FOREIGN_CHILD_PROMPT);
-      // Правило расхода (этап 2–4 плана экономии) — и чужому CLI, той же строкой.
-      expect(run.systemPrefix).toContain(GROUP_ECONOMY_PROMPT);
+      // Правило расхода (этап 2–4 плана экономии) — и чужому CLI, своим вариантом
+      // строки: без имени инструмента `Edit`, которого у него нет.
+      expect(run.systemPrefix).toContain(FOREIGN_GROUP_ECONOMY_PROMPT);
+      // Привычки (рычаг `workHabits`, включён по умолчанию) — общая часть строки Claude.
+      expect(run.systemPrefix).toContain(WORK_HABITS_SHARED_NOTE);
+      expect(run.systemPrefix).not.toContain('do not `cd`');
       const said = [run.systemPrefix ?? '', ...run.history.map((message) => message.content)];
       expect(said.join('\n')).not.toContain('AskUserQuestion');
       expect(said.join('\n')).toContain('last line of your answer');

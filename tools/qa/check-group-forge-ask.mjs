@@ -20,7 +20,8 @@
  * в основную ветку и принудительный пуш):
  * - запись в тред MR и правка описания доходят до панели запросом прав, панель
  *   решает «с отметкой» — запись исполнена, хаб её покажет;
- * - слияние MR инструментом форджа — «человеку», до сервера не доходит;
+ * - слияние MR инструментом форджа — снято профилем (`mergeDeny`), модели не
+ *   дано; дано — «человеку»; до сервера не доходит в обоих случаях;
  * - чтение MR исполняется без карточки;
  * - принудительный пуш оболочкой (`--force`, `--force-with-lease`, `-f`,
  *   `+refspec`, `git -C`, внутри составной команды) — тоже запрос прав панели
@@ -81,9 +82,28 @@ const DANGER = [
   ['git push origin --delete del1', 'del1'],
   ['git push origin :del2', 'del2'],
   ['git branch -D keepme', 'keepme'],
+  // Глобальный ключ перед подкомандой и другое имя git (F-28): правило `ask`
+  // `Bash(* git *)` / `Bash(git *)` обязано задеть и их.
+  ['git --no-pager branch -D keep2', 'keep2'],
+  ['command git push origin --delete del3', 'del3'],
   ['git merge side', 'merge'],
+  // `src` не отслеживается: удалить его — безвозвратно, карточка и по 23.10.
   ['rm -rf src', 'src'],
 ];
+/**
+ * Опасное инструментом PowerShell (повторная проверка 24.10): правило `Bash(…)` его
+ * не задевает, и в авторежиме такие вызовы шли мимо брокера к классификатору. У
+ * каждого своя цель — по ней видно, исполнилась ли команда.
+ */
+const PS_DANGER = [
+  ['git push origin HEAD:main', 'main'],
+  ['git push origin --delete del4', 'del4'],
+  ['git branch -D keep3', 'keep3'],
+  ['Remove-Item -Recurse -Force src', 'src'],
+  ["Invoke-Expression 'git branch -D keep4'", 'keep4'],
+];
+/** Рутина PowerShell: доходит до панели, решается сама и исполнена. */
+const PS_PLAIN_PUSH = 'git push origin HEAD:psplain';
 /** Рутина: доходит до панели правилом `ask`, решается сама и исполнена. */
 const PLAIN_PUSH = 'git push origin HEAD:plain';
 const TEMP_CLEANUP = 'rm -rf dist';
@@ -95,15 +115,36 @@ const BASH_CALLS = [
   'git status --short',
 ];
 
-/** Вызов модели-стаба по счёту: сначала хранилище кода, потом оболочка. */
+/**
+ * Порядок вызовов модели-стаба — из инструментов, которые CLI ДЕЙСТВИТЕЛЬНО дал
+ * модели: сначала хранилище кода, потом оболочка. Слияние MR профиль группы
+ * снимает запретом (`mergeDeny`), и инструмента в списке нет: прежде номер вызова
+ * считался по полному `CALLS`, на слиянии стаб не находил инструмента и кончал
+ * разговор — ни одна команда оболочки не звалась (ревью 23.10, L9).
+ */
+function planFor(tools) {
+  const forge = CALLS.flatMap(([verb, input]) => {
+    const name = tools.find((tool) => tool.endsWith(`__${verb}`));
+    return name ? [{ name, input }] : [];
+  });
+  const powershell = tools.includes('PowerShell')
+    ? [...PS_DANGER.map(([command]) => command), PS_PLAIN_PUSH].map((command) => ({
+        name: 'PowerShell',
+        input: { command },
+      }))
+    : [];
+  const shell = tools.includes('Bash')
+    ? BASH_CALLS.map((command) => ({ name: 'Bash', input: { command } }))
+    : [];
+  // `git status` оболочки — последним: по номеру его итог ищут в потоке CLI.
+  return [...forge, ...powershell, ...shell];
+}
+
+/** Инструменты главного разговора по словам CLI — из последнего запроса к стабу. */
+let offeredTools = [];
+
 function callAt(index, tools) {
-  const forge = CALLS[index];
-  if (forge) {
-    const name = tools.find((tool) => tool.endsWith(`__${forge[0]}`));
-    return name ? { name, input: forge[1] } : undefined;
-  }
-  const command = BASH_CALLS[index - CALLS.length];
-  return command && tools.includes('Bash') ? { name: 'Bash', input: { command } } : undefined;
+  return planFor(tools)[index];
 }
 
 /** Итоги вызовов из потока CLI (`stream-json`): номер вызова → текст итога. */
@@ -251,7 +292,7 @@ function startStub() {
       if (DEBUG) {
         const system = JSON.stringify(body.system ?? '').slice(0, 160);
         console.log(
-          `[stub] main=${main} tools=${tools.length} results=${resultCount(body)} ${system}`,
+          `[stub] main=${main} tools=${tools.length} results=${resultCount(body)} [${tools.join(',')}] ${system}`,
         );
       }
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
@@ -259,6 +300,7 @@ function startStub() {
         res.end(textReply('no'));
         return;
       }
+      offeredTools = tools;
       const done = resultCount(body);
       const next = callAt(done, tools);
       res.end(
@@ -367,8 +409,21 @@ async function main() {
   git(project, 'commit', '-qm', 'zero');
   const zero = git(project, 'rev-parse', 'HEAD');
   git(project, 'remote', 'add', 'origin', remote);
-  git(project, 'push', '-q', 'origin', 'HEAD:main', 'HEAD:del1', 'HEAD:del2');
+  git(
+    project,
+    'push',
+    '-q',
+    'origin',
+    'HEAD:main',
+    'HEAD:del1',
+    'HEAD:del2',
+    'HEAD:del3',
+    'HEAD:del4',
+  );
   git(project, 'branch', 'keepme');
+  git(project, 'branch', 'keep2');
+  git(project, 'branch', 'keep3');
+  git(project, 'branch', 'keep4');
   // `side` — ветка со своим коммитом: исполненный `git merge side` сдвинул бы HEAD.
   git(project, 'checkout', '-q', '-b', 'side');
   writeFileSync(join(project, 'b.txt'), 'side\n');
@@ -434,6 +489,13 @@ async function main() {
     ANTHROPIC_API_KEY: 'fa-stub',
     ANTHROPIC_MODEL: process.env.FORGE_ASK_MODEL || 'claude-sonnet-4-6',
     DISABLE_AUTOUPDATER: '1',
+    // CLI 2.1.310 откладывает инструменты MCP за ToolSearch, и стаб не находил главный
+    // разговор по имени инструмента форджа — ни одного вызова (24.10). Загрузка
+    // инструментов здесь не под проверкой: путь прав тот же.
+    ENABLE_TOOL_SEARCH: 'false',
+    // PowerShell без Git Bash CLI включает сам, под Git Bash — по учётной записи;
+    // проверка о том, куда идут его вызовы, когда он есть.
+    CLAUDE_CODE_USE_POWERSHELL_TOOL: '1',
   };
   const args = [
     '-p',
@@ -500,27 +562,72 @@ async function main() {
     check(executed.includes(write), `${write}: исполнено сервером`);
   }
   {
+    // Слияние снято профилем (`mergeDeny`) — модели инструмент не дан вовсе; дан —
+    // обязан встать карточкой. Оба исхода — без слияния на сервере.
     const merge = 'merge_merge_request';
+    const offered = offeredTools.some((tool) => tool.endsWith(`__${merge}`));
     const ask = panel.asked.find((entry) => entry.tool.endsWith(`__${merge}`));
-    check(ask?.level === 'human', `${merge}: «человеку» (${ask?.level ?? 'нет запроса'})`);
+    check(
+      offered ? ask?.level === 'human' : !ask,
+      `${merge}: ${offered ? `«человеку» (${ask?.level ?? 'нет запроса'})` : 'снят профилем, модели не дан'}`,
+    );
     check(!executed.includes(merge), `${merge}: без ответа человека до сервера не дошло`);
   }
+  check(
+    offeredTools.includes('Bash') &&
+      offeredTools.some((tool) => tool.endsWith('__get_merge_request')),
+    'модели даны оболочка и чтение MR: план вызовов не пуст',
+  );
+  // Одна и та же строка бывает у обоих инструментов — запрос ищется по паре.
+  const askOf = (tool, command) =>
+    panel.asked.find((entry) => entry.tool === tool && entry.command === command);
   for (const [command] of DANGER) {
-    const ask = panel.asked.find((entry) => entry.command === command);
+    const ask = askOf('Bash', command);
     check(
       ask?.level === 'human',
       `${command}: запрос прав в панели, «человеку» (${ask?.level ?? 'нет запроса'})`,
     );
   }
+  // PowerShell под Git Bash CLI даёт по умолчанию; не дан — его случаи не проверены,
+  // и это провал, а не молчаливый пропуск.
+  check(
+    process.platform !== 'win32' || offeredTools.includes('PowerShell'),
+    'модели дан инструмент PowerShell (Windows)',
+  );
+  if (offeredTools.includes('PowerShell')) {
+    for (const [command] of PS_DANGER) {
+      const ask = askOf('PowerShell', command);
+      check(
+        ask?.level === 'human',
+        `PowerShell ${command}: запрос прав в панели, «человеку» (${ask?.level ?? 'нет запроса'})`,
+      );
+    }
+    const ask = askOf('PowerShell', PS_PLAIN_PUSH);
+    check(
+      ask?.level === 'auto',
+      `PowerShell ${PS_PLAIN_PUSH}: дошёл до панели и решён сам (${ask?.level ?? 'нет запроса'})`,
+    );
+  }
   const remoteHas = (branch) =>
     spawnSync('git', ['rev-parse', '--verify', '-q', branch], { cwd: remote }).status === 0;
   check(git(remote, 'rev-parse', 'main') === zero, 'main на удалённом не тронута');
-  check(remoteHas('del1') && remoteHas('del2'), 'del1 и del2 на удалённом не удалены');
-  check(git(project, 'rev-parse', '--verify', '-q', 'keepme') === zero, 'keepme не удалена');
+  check(
+    remoteHas('del1') && remoteHas('del2') && remoteHas('del3') && remoteHas('del4'),
+    'del1–del4 на удалённом не удалены',
+  );
+  for (const branch of ['keepme', 'keep2', 'keep3', 'keep4']) {
+    check(git(project, 'rev-parse', '--verify', '-q', branch) === zero, `${branch} не удалена`);
+  }
   check(git(project, 'rev-parse', 'HEAD') === head, 'git merge side не исполнен');
   check(existsSync(join(project, 'src', 'keep.ts')), 'src не удалён');
+  if (offeredTools.includes('PowerShell')) {
+    check(
+      remoteHas('psplain') && git(remote, 'rev-parse', 'psplain') === head,
+      `PowerShell ${PS_PLAIN_PUSH}: исполнен`,
+    );
+  }
   for (const command of [PLAIN_PUSH, TEMP_CLEANUP]) {
-    const ask = panel.asked.find((entry) => entry.command === command);
+    const ask = askOf('Bash', command);
     check(
       ask?.level === 'auto',
       `${command}: дошёл до панели и решён сам (${ask?.level ?? 'нет запроса'})`,
@@ -532,7 +639,7 @@ async function main() {
   );
   check(!existsSync(join(project, 'dist')), `${TEMP_CLEANUP}: исполнен`);
   for (const [branch, command] of FORCE_PUSHES) {
-    const ask = panel.asked.find((entry) => entry.command === command);
+    const ask = askOf('Bash', command);
     check(
       ask?.level === 'human',
       `${command}: запрос прав в панели, «человеку» (${ask?.level ?? 'нет запроса'})`,
@@ -540,10 +647,10 @@ async function main() {
     const head = git(remote, 'rev-parse', branch);
     check(head === before, `${command}: ветка ${branch} на удалённом не тронута`);
   }
-  const status = panel.asked.find((entry) => entry.command === 'git status --short');
+  const status = askOf('Bash', 'git status --short');
   check(!status || status.level === 'auto', 'git status: без карточки');
   // Итог вызова — из потока CLI: `tool_result` с номером вызова модели-стаба.
-  const statusId = `toolu_fa${CALLS.length + BASH_CALLS.length - 1}`;
+  const statusId = `toolu_fa${planFor(offeredTools).length - 1}`;
   const statusResult = toolResults(output).get(statusId) ?? '';
   check(
     statusResult.includes('untracked.txt'),

@@ -235,6 +235,7 @@ describe('всё, что панель шлёт модели, — по-англи
       chatDeliveryForeign: chatDeliveryPrompt({ foreign: true, skill: 'x-delivery' }),
       delivery: deliveryPreamble({ branch: 'feature/header' }),
       deliveryHuman: deliveryPreamble({ branch: 'b', mergeRequest: 'u', questions: 'human' }),
+      deliveryWork: deliveryPreamble({ branch: 'b', mergeRequest: 'u', deliverLater: true }),
       environment: environmentPreamble({}),
       environmentFailed: environmentPreamble({
         mirror: 'Local layer: 3 copied',

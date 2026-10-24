@@ -4,7 +4,12 @@ import type { MascotPrefs } from './prefs.types';
 /** Ключ в localStorage: настройка этого браузера, сервер о маскоте не знает. */
 export const MASCOT_PREFS_KEY = 'agentdeck.mascot';
 
-export const DEFAULT_MASCOT_PREFS: MascotPrefs = { enabled: true, chatty: true, greeted: false };
+export const DEFAULT_MASCOT_PREFS: MascotPrefs = {
+  enabled: true,
+  chatty: true,
+  greeted: false,
+  reactions: true,
+};
 
 /**
  * Разбор сохранённого значения. Битая строка или чужая форма — не повод
@@ -18,7 +23,12 @@ export function parseMascotPrefs(raw: string | null): MascotPrefs {
     const record = value as Record<string, unknown>;
     const flag = (key: keyof MascotPrefs): boolean =>
       typeof record[key] === 'boolean' ? (record[key] as boolean) : DEFAULT_MASCOT_PREFS[key];
-    return { enabled: flag('enabled'), chatty: flag('chatty'), greeted: flag('greeted') };
+    return {
+      enabled: flag('enabled'),
+      chatty: flag('chatty'),
+      greeted: flag('greeted'),
+      reactions: flag('reactions'),
+    };
   } catch {
     return DEFAULT_MASCOT_PREFS;
   }

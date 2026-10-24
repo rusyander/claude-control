@@ -70,3 +70,16 @@ describe('server-texts: шаблоны разбираются однозначн
     expect(result).not.toHaveProperty('params');
   });
 });
+
+describe('server-texts: число напоминаний в причине остановки — без неверного падежа', () => {
+  // F-115: «после 1 напоминаний» и «after 1 reminders». Шаблон один на любое число,
+  // поэтому число стоит в форме, которой не нужно склонение («напоминаний до него: N»).
+  it.each([1, 2, 5, 21])('разбор не сдвинул после %i напоминаний — ru и en читаются', (count) => {
+    const ru = serverText('split-delivery-escalation-stalled', { nudges: count });
+    const en = localizeText(ru, 'en');
+    expect(ru).not.toContain(` ${count} напоминан`);
+    expect(en).not.toContain(` ${count} reminder`);
+    expect(ru).toContain(String(count));
+    expect(matchText(ru)?.params).toEqual({ nudges: String(count) });
+  });
+});

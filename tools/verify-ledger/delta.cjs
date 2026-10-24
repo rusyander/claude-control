@@ -20,7 +20,8 @@ const { execFileSync } = require('node:child_process');
 const nodeCrypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { slash, gitTimeoutMs } = require('./checks.cjs');
+const { slash, gitTimeoutMs, panelLocked } = require('./checks.cjs');
+const { canonical } = require('./ledger.cjs');
 
 /** Цепочка сужений длиннее или старше — следующий прогон целиком: ошибки сужения не копятся. */
 const MAX_CHAIN = 10;
@@ -99,13 +100,18 @@ function vitestShape(args) {
   return null;
 }
 
-/** Семейство: тот же запуск, кроме дерева и списка файлов. Другое окружение — другое семейство. */
+/**
+ * Семейство: тот же запуск, кроме дерева и списка файлов. Другое окружение — другое семейство.
+ * `canonical`, а не `JSON.stringify(ctx, ключи)`: массив-заменитель — список имён на ВСЕХ
+ * уровнях, и вложенные `env`/`tool` сериализовались пустыми — мутант через окружение или
+ * ключ node получал «ничего не изменилось» от зелёного тождества (24.10).
+ */
 function familyOf(parts, shape) {
   const { tree: _t, args: _a, ...ctx } = parts;
   const flags = shape.flags.filter((f) => f !== '--run' && f !== '--passWithNoTests');
   return sha(
     JSON.stringify({
-      ctx: sha(JSON.stringify(ctx, Object.keys(ctx).sort())),
+      ctx: sha(canonical(ctx)),
       mode: shape.mode,
       flags,
     }),
@@ -205,7 +211,8 @@ function plan({ repo, parts, match, cwd, tree, now = Date.now(), env = process.e
   if (match.id !== 'vitest' || match.noSkip) return { why: 'not-vitest' };
   // Суженный прогон дал бы отчёт лишь о части тестов — потребитель счёл бы прочие пропавшими.
   if (match.wholeOnly) return { why: 'report' };
-  if (String(env.AGENTDECK_VERIFY_LEDGER_DELTA ?? '').toLowerCase() === 'off')
+  // Под замком панели (`ledger.cjs` locked) сужение не выключается из команды модели.
+  if (!panelLocked(env) && String(env.AGENTDECK_VERIFY_LEDGER_DELTA ?? '').toLowerCase() === 'off')
     return { why: 'delta-off' };
   const shape = vitestShape(match.args);
   if (!shape) return { why: 'shape' };

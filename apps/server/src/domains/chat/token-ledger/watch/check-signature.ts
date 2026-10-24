@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { stepClass } from '../../../analytics/token-audit/step-class.ts';
 
 /**
@@ -37,6 +38,28 @@ const queue = (await import(
   return undefined;
 })) as QueueModule | undefined;
 
+/**
+ * Полный гейт — тем же кодом, что страж «один гейт в конце» набора (`gate-at-end`):
+ * скрипт гейта проекта (`check-ticket`, `scripts/check_*.mjs`, `pnpm gate`) или
+ * несколько видов проверок целиком. Своей копии правил нет — та же причина, что у
+ * классификатора очереди. Не загрузился — сторож судит о тяжести только по длительности.
+ */
+const gateAtEnd = (await import(
+  new URL('../../../../../assets/kit/agentdeck-kit/hooks/lib/gate-at-end.mjs', import.meta.url).href
+).catch((error: unknown) => {
+  console.warn('[group-watch] full-gate classifier unavailable', error);
+  return undefined;
+})) as { isFullGate(command: string): boolean } | undefined;
+
+/** Команда — полный гейт (R21); без классификатора — нет. */
+export function isFullGate(command: string): boolean {
+  try {
+    return gateAtEnd?.isFullGate(command) === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Опыт длительностей из каталога очереди; нечитаемый — пустой. */
 export function loadLearnedDurations(queueDir: string): LearnedDurations {
   try {
@@ -60,6 +83,20 @@ export function maskCommand(command: string): string {
 export function commandSteps(command: string): string[] {
   const list = queue ? queue.steps(command) : command.split(/&&|\|\||[;|\n]/);
   return list.map((step) => step.trim().replace(/\s+/g, ' ')).filter(Boolean);
+}
+
+const CD_STEP = /^(?:cd|pushd)\s/;
+
+/**
+ * Отпечаток команды для сравнения между группами (R23, F-89): шаги без перехода в
+ * каталог (у каждой группы своя копия), целиком — без маски и обрезки строки сигнала,
+ * где две длинные команды с общим началом совпали бы. В сигнал идёт только sha256
+ * (12 знаков): сама команда и её секреты наружу не уходят.
+ */
+export function commandPrint(command: string): string | undefined {
+  const steps = commandSteps(command).filter((step) => !CD_STEP.test(step));
+  if (steps.length === 0) return undefined;
+  return createHash('sha256').update(steps.join(' && ')).digest('hex').slice(0, 12);
 }
 
 /** `git` с глобальными ключами (`-C путь`, `-c k=v`, `--no-pager`…) → подкоманда и остаток. */
@@ -106,6 +143,24 @@ function stepChangesTree(step: string): boolean {
 /** Шаги, которые меняют дерево: после них прежний прогон проверки ничего не говорит. */
 export function changesTree(command: string): boolean {
   return commandSteps(command).some(stepChangesTree);
+}
+
+/** Запас к опыту: прогон бывает и на четверть дольше прошлых (как срок фоновой аренды у хука). */
+const EXPECT_MARGIN = 1.25;
+
+/**
+ * Сколько команда должна идти по опыту очереди, мс: известные шаги цепочки
+ * подряд, с запасом. Ни один шаг не известен — `undefined` (опыта нет).
+ */
+export function expectedMs(command: string, learned?: LearnedDurations): number | undefined {
+  if (!queue || !learned || learned.size === 0) return undefined;
+  let total = 0;
+  for (const step of queue.steps(command)) {
+    const signature = queue.stepSignature(step);
+    const ms = signature ? learned.get(signature) : undefined;
+    if (ms !== undefined && Number.isFinite(ms)) total += ms;
+  }
+  return total > 0 ? Math.round(total * EXPECT_MARGIN) : undefined;
 }
 
 /** Перенаправления вывода (`2>&1`, `> out.log`, `&> log`) — не часть проверки. */

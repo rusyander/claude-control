@@ -17,6 +17,8 @@ import { DetachedRun, type DetachedRunDeps } from '../detached-run/detached-run.
 import { LiveSessionPool } from '../live-session/live-session.ts';
 import { withChildrenBrief } from '../children-brief/children-brief.ts';
 import { withoutMcp, type GroupRunProfile } from '../group-profile/group-profile.ts';
+import { capKitToRoute, capProfileToRoute } from './route-caps.ts';
+import { ViewerPresence } from './viewer-presence.ts';
 import {
   isCliCommand,
   SessionWorkspaceNotes,
@@ -38,9 +40,16 @@ import {
   type LedgerRelay,
   type RunLedgerEntry,
 } from '../run-ledger/run-ledger.ts';
-import type { RunMeta, RunWatchFeed, RunWatchListener } from './ChatRunRegistry.types.ts';
+import type {
+  LatestRun,
+  RunMeta,
+  RunWatchFeed,
+  RunWatchListener,
+} from './ChatRunRegistry.types.ts';
+import { runWarmPing, type WarmOutcome } from './warm-ping.ts';
 import {
   endRelayInput,
+  ledgerLaunchOf,
   ledgerRunMeta,
   ledgerRunOptions,
   reattachSession,
@@ -50,9 +59,11 @@ import {
   pickRecommended,
   type RecommendedPick,
 } from '@agentdeck/contracts/chat-group-settings';
-import { picksFor } from '../auto-pick/auto-pick.ts';
+import { confirmedPicks } from '../auto-pick/auto-pick.ts';
+import { planAnswers } from '../group-questions/group-questions.ts';
 import { withAutonomy } from '../chat-autonomy/chat-autonomy.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { withProcessSnapshot } from '../../../lib/process-tree/process-tree.ts';
 import {
   mergeFlagSettings,
   withoutMcpConfig,
@@ -127,6 +138,12 @@ export interface RunFinished {
    * пустая глубина, а не то, что просили.
    */
   routed?: true;
+  /**
+   * Имена, которые переводит карта соответствия контура этого прогона
+   * (`PlatformRunRoute.modelMapKeys`): звено доставки через контур идёт на
+   * «sonnet», только когда у контура есть такая строка (n6).
+   */
+  routedMap?: readonly string[];
   /** Прогон шёл на локальной модели (`RunMeta.local`). */
   local?: true;
   /** Сколько инструментов отработало за ход: у продолжения — «успело поработать». */
@@ -199,6 +216,8 @@ export interface RunSubscriber {
    * (кнопка, пауза, отмена плана), а не ход кончился сам.
    */
   close: (reason?: 'stopped') => void;
+  /** Поток клиента человека (`ChatStream`), а не служебная подписка панели. */
+  viewer?: true;
 }
 
 export type { RunMeta };
@@ -275,10 +294,17 @@ interface RegisteredRun {
   meta: RunMeta;
   /** С чем прогон стартовал: продолжение в чистой сессии идёт теми же. */
   options: RunOptions;
+  /**
+   * Старт, который правило остывшей сессии заменило новым разговором: с ним
+   * человек возвращает ход в старую сессию (`keepColdSession`, R5 ревью П1).
+   */
+  coldOrigin?: { options: RunOptions; meta: RunMeta };
   /** Старт был пробуждением — ход начал сам CLI. Отметка этого старта, в `options` её нет. */
   woken?: true;
   /** Модель старта подставил маршрут контура — см. `RunFinished.routed`. */
   routed?: true;
+  /** Карта соответствия контура этого старта — см. `RunFinished.routedMap`. */
+  routedMap?: readonly string[];
   /** Момент старта (мс) — по нему видно, обновлён ли файл-опора этим прогоном. */
   startedAt: number;
   /** Хвост ответа агента: в нём ищется блок предложения продолжить. */
@@ -443,6 +469,8 @@ const CHECK_TEXT_MAX = 200;
 
 export class ChatRunRegistry {
   private runs = new Map<string, RegisteredRun>();
+  /** Когда разговор в последний раз видел человек — для `isAttended`. */
+  readonly viewers = new ViewerPresence();
   private readonly createRun: RunFactory;
 
   /**
@@ -463,7 +491,17 @@ export class ChatRunRegistry {
    */
   private readonly wakeable = new Map<
     string,
-    { chatId: string; options: RunOptions; meta: RunMeta }
+    {
+      chatId: string;
+      options: RunOptions;
+      meta: RunMeta;
+      /**
+       * Параметры из журнала прогонов (`ledgerRunOptions`), а не со старта хода:
+       * в них нет вводной группы (`appendSystemPrompt`), слоёв настроек и команды.
+       * Будить ими можно, а собирать пинг тёплого кэша — нет: префикс другой.
+       */
+      adopted?: true;
+    }
   >();
 
   private localOf?: (options: RunOptions, meta: RunMeta) => boolean;
@@ -611,6 +649,15 @@ export class ChatRunRegistry {
     }
   }
 
+  /** Идущие прогоны с замерами, ещё не записанными в журнал лимита, — записать сейчас. */
+  flushLimitJournal(now = Date.now()): void {
+    for (const run of this.runs.values()) {
+      if (run.status !== 'running' || !run.limitSamples?.length) continue;
+      run.limitJournalAt = now;
+      this.writeLimitJournal(run, now);
+    }
+  }
+
   /**
    * «Что получил агент» (U8): вход каждого стартовавшего прогона — после
    * маршрута контура, сводки детей и всех дописок, то есть ровно то, что уедет
@@ -705,6 +752,26 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Отказать ходу, который CLI начал сам (`wake`), — по ключам разговора. Слушатель
+   * — конвейер разделения: группа на паузе не просыпается (N1a). Пауза — решение
+   * человека, и снимает её он сам, а не конец фоновой задачи.
+   */
+  private wakeGuard?: (keys: readonly string[]) => boolean;
+
+  setWakeGuard(guard: (keys: readonly string[]) => boolean): void {
+    this.wakeGuard = guard;
+  }
+
+  /** Сбой чужого слушателя — пробуждение как было: молча не терять ход. */
+  private refusesWake(keys: readonly string[]): boolean {
+    try {
+      return this.wakeGuard?.(keys) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Ждущий процесс живой сессии ушёл сам, держа фоновые задачи (решение W3-4c):
    * группа разделения стояла «ждёт фон», пробуждения не будет уже никогда, и
    * без этого сигнала она так и стояла бы. Слушатель — конвейер: это обрыв,
@@ -772,8 +839,9 @@ export class ChatRunRegistry {
     options: RunOptions,
     askedMeta: RunMeta,
   ): { options: RunOptions; meta: RunMeta; notice?: ChatEvent } {
-    const { afterLimit, ...meta } = askedMeta;
-    if (!options.sessionId || options.wake || options.hold || !this.continuationOf) {
+    const { afterLimit, keepSession, ...meta } = askedMeta;
+    // Человек сам вернул ход в старую сессию (R5): правило остывшей не спрашиваем.
+    if (keepSession || !options.sessionId || options.wake || options.hold || !this.continuationOf) {
       return { options, meta };
     }
     try {
@@ -875,6 +943,62 @@ export class ChatRunRegistry {
     const run = this.runs.get(this.resolveKey(chatId));
     const keys = run?.sessionId ? [run.chatId, run.sessionId] : [run?.chatId ?? chatId];
     return this.autonomousOf?.(keys) ?? false;
+  }
+
+  /**
+   * Смотрит ли на идущий разговор человек: открыт поток клиента (вкладка,
+   * телефон). Служебные подписки панели (очередь сообщений на занятый ход) — не
+   * человек. Брокер прав по этому решает, показать ли карточку автономного чата
+   * (решение владельца 23.10: человек может смотреть — карточка первой).
+   */
+  hasViewer(chatId: string): boolean {
+    const run = this.runs.get(this.resolveKey(chatId));
+    return run ? [...run.subscribers].some((subscriber) => subscriber.viewer === true) : false;
+  }
+
+  /**
+   * Смотрит ли человек на разговор с поправкой на переподключение: поток открыт
+   * сейчас, либо был открыт или закрыт в последние `windowMs`, либо панель
+   * моложе окна и потока у разговора ещё не было (`viewer-presence.ts`).
+   */
+  isAttended(chatId: string, windowMs: number): boolean {
+    if (this.hasViewer(chatId)) return true;
+    return this.viewers.recentlySeen(this.viewerKeys(chatId), windowMs);
+  }
+
+  /** Ключи разговора для отметок человека: спрошенный, ключ прогона и сессия. */
+  private viewerKeys(chatId: string): string[] {
+    const run = this.runs.get(this.resolveKey(chatId));
+    return [
+      ...new Set([chatId, run?.chatId, run?.sessionId].filter((key): key is string => !!key)),
+    ];
+  }
+
+  /**
+   * Отвечает ли панель на вопросы разговора сама, без человека: группа
+   * разделения под «Развилки группы: по плану» (`group-questions.ts`). Один
+   * ответ на оба места — брокер отвечает, реестр не зовёт человека заранее.
+   */
+  private questionPlanOf?: (keys: readonly string[]) => boolean;
+
+  setQuestionPlanResolver(resolver: (keys: readonly string[]) => boolean): void {
+    this.questionPlanOf = resolver;
+  }
+
+  /** Отвечает ли на вопросы идущего разговора план — брокеру прав. */
+  answersByPlan(chatId: string): boolean {
+    const run = this.runs.get(this.resolveKey(chatId));
+    const keys = run?.sessionId ? [run.chatId, run.sessionId] : [run?.chatId ?? chatId];
+    return this.answersByPlanFor(keys);
+  }
+
+  /** Осечка решателя — человеку, как было: ответ за него без уверенности хуже ожидания. */
+  private answersByPlanFor(keys: readonly string[]): boolean {
+    try {
+      return this.questionPlanOf?.(keys) ?? false;
+    } catch {
+      return false;
+    }
   }
 
   /** Вопрос закрыт автовыбором — главному чату дерева говорят о критичных. */
@@ -1016,6 +1140,8 @@ export class ChatRunRegistry {
       ...(run.meta.lowered ? { lowered: run.meta.lowered } : {}),
       ...(autoApprove ? { autoApprove } : {}),
       ...(run.options.permissionMode ? { permissionMode: run.options.permissionMode } : {}),
+      // Тот же CLI на продолжении усыновлённого прогона (EF-190), а не `claude` из PATH.
+      ...ledgerLaunchOf(run.options),
       ...(run.meta.origin ? { origin: run.meta.origin } : {}),
       ...(run.meta.local ? { local: true as const } : {}),
       ...(live ? { relay: live } : {}),
@@ -1043,7 +1169,7 @@ export class ChatRunRegistry {
     const options = ledgerRunOptions(entry);
     const meta = ledgerRunMeta(entry);
     if (live && entry.sessionId) {
-      this.wakeable.set(entry.sessionId, { chatId: entry.key, options, meta });
+      this.wakeable.set(entry.sessionId, { chatId: entry.key, options, meta, adopted: true });
     }
     // Ждущей сессии прогон не нужен: ход заведёт её пробуждение или человек.
     if (entry.idle) return Boolean(live);
@@ -1170,6 +1296,14 @@ export class ChatRunRegistry {
   wake(sessionId: string, hold = false): boolean {
     const last = this.wakeable.get(sessionId);
     if (!last) return false;
+    // Группа на паузе ходов не делает (N1a, 23.10): фоновая задача, пережившая
+    // паузу, разбудила CLI, и группа сделала коммит и завела копию уже после
+    // «Пауза». Ход не принимаем, а процесс гасим — иначе его ход без хозяина
+    // всё равно шёл бы, только молча.
+    if (this.refusesWake([last.chatId, sessionId])) {
+      this.killSession(sessionId);
+      return false;
+    }
     return this.start(
       last.chatId,
       { ...last.options, sessionId, prompt: '', wake: true, ...(hold ? { hold: true } : {}) },
@@ -1244,6 +1378,41 @@ export class ChatRunRegistry {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Самый поздний ход разговора по любому из ключей — его параметры пингу
+   * тёплого кэша (`warm`): после остывшего продолжения у разговора две сессии, и
+   * греть надо нынешнюю. Идущий ход (стоит на разрешении или в очереди тяжёлых
+   * шагов) — самый поздний: у первого хода группы законченного ещё нет. Иначе —
+   * память пробуждаемых, упорядоченная концом хода. `adopted` — параметры из
+   * журнала прогонов, пинг ими не собирают (см. `wakeable`).
+   */
+  latestRunOf(keys: readonly string[]): LatestRun | undefined {
+    for (const run of this.runs.values()) {
+      if (run.status !== 'running' || !run.sessionId || run.detached) continue;
+      if (!keys.includes(run.chatId) && !keys.includes(run.sessionId)) continue;
+      return {
+        chatId: run.chatId,
+        sessionId: run.sessionId,
+        options: run.options,
+        meta: run.meta,
+        ...(run.reattached ? { adopted: true as const } : {}),
+      };
+    }
+    let found: LatestRun | undefined;
+    for (const [sessionId, last] of this.wakeable) {
+      if (keys.includes(sessionId) || keys.includes(last.chatId)) {
+        found = {
+          chatId: last.chatId,
+          sessionId,
+          options: last.options,
+          meta: last.meta,
+          ...(last.adopted ? { adopted: true as const } : {}),
+        };
+      }
+    }
+    return found;
   }
 
   /** sessionId ждущей живой сессии разговора под этим ключом прогона. */
@@ -1336,18 +1505,94 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Корни процессов ВСЕХ прогонов и живых сессий панели. Решение человека
+   * (права, D-n, ворота ветки), пришедшее от потомка любого из них, — решение
+   * модели, а не человека: маршруты решений отказывают ему (`human-only.ts`).
+   */
+  allProcessRoots(): number[] {
+    const roots = new Set<number>(this.livePool.pids());
+    for (const key of this.runs.keys()) for (const pid of this.processRootsOf(key)) roots.add(pid);
+    return [...roots];
+  }
+
+  /**
    * Фоновые команды живого процесса разговора (описания, без вывода): что
    * умрёт, если процесс остановить. Пауза группы называет их продолжению (L7.6).
    */
   backgroundTasksOf(chatId: string): string[] {
-    const ids = new Set([this.runs.get(this.resolveKey(chatId, chatId))?.sessionId, chatId]);
-    for (const [session, last] of this.wakeable) if (last.chatId === chatId) ids.add(session);
-    for (const id of ids) {
+    for (const id of this.liveSessionIdsOf(chatId)) {
       const session = this.livePool.waking(id);
-      if (!session?.alive || session.backgroundList.length === 0) continue;
-      return session.backgroundList.map((task) => task.description || task.id).filter(Boolean);
+      // Число, не список: после перезапуска список пуст, а фон идёт (раунд 3, 24.10).
+      if (!session?.alive || !session.hasBackgroundWork) continue;
+      const named = session.backgroundList.map((task) => task.description || task.id);
+      if (named.length > 0) return named.filter(Boolean);
+      // Усыновлённая после перезапуска сессия знает из журнала только число
+      // задач: описания придут с первым `background_tasks_changed`. Продолжению
+      // всё равно надо знать, что фон был, — иначе оно решит, что терять нечего.
+      return Array.from(
+        { length: session.backgroundCount },
+        () => 'a background task started before the panel restarted (name unknown)',
+      );
     }
     return [];
+  }
+
+  /**
+   * Ждущий следующего хода процесс разговора с идущим фоном — снимком, которым
+   * его продолжить (пауза дерева, 23.10): хода нет, а конец фона разбудил бы CLI.
+   * Идёт ход или фона нет — `undefined`: первое снимает `stop`, второе само не
+   * проснётся.
+   */
+  idleWithBackground(chatId: string): RunSnapshot | undefined {
+    if (this.isRunning(chatId, chatId)) return undefined;
+    for (const id of this.liveSessionIdsOf(chatId)) {
+      const session = this.livePool.waking(id);
+      // Число, не список: после перезапуска список пуст, а фон идёт (раунд 3, 24.10).
+      if (!session?.alive || !session.hasBackgroundWork) continue;
+      const last = this.wakeable.get(id);
+      if (!last) continue;
+      return {
+        key: last.chatId,
+        status: 'done',
+        options: { ...last.options },
+        meta: { ...last.meta },
+        sessionId: id,
+      };
+    }
+    return undefined;
+  }
+
+  /** Все sessionId, под которыми у разговора может ждать живой процесс. */
+  private liveSessionIdsOf(chatId: string): string[] {
+    const ids = new Set([this.runs.get(this.resolveKey(chatId, chatId))?.sessionId, chatId]);
+    for (const [session, last] of this.wakeable) if (last.chatId === chatId) ids.add(session);
+    return [...ids].filter((id): id is string => Boolean(id));
+  }
+
+  /**
+   * Погасить живой процесс разговора, у которого хода нет (N1a, 23.10). Пауза
+   * группы останавливала только идущий прогон, а процесс, ждущий следующего
+   * хода, жил дальше вместе с фоновой задачей — её конец будил CLI, и группа на
+   * паузе коммитила и заводила копию. Гасится деревом, фон — с ним: пауза
+   * называет эти задачи продолжению (`pausedTasks`). `unconfirmed` — процесс
+   * жив, а номер не сверить (F-145): в пуле остаётся, повтор попробует снова.
+   */
+  closeLive(chatId: string): StopOutcome {
+    let outcome: StopOutcome = 'absent';
+    for (const id of this.liveSessionIdsOf(chatId)) {
+      const closed = this.killSession(id);
+      if (closed === 'unconfirmed') outcome = 'unconfirmed';
+      else if (closed === 'stopped' && outcome === 'absent') outcome = 'stopped';
+    }
+    return outcome;
+  }
+
+  private killSession(sessionId: string): StopOutcome {
+    const session = this.livePool.waking(sessionId);
+    if (!session?.alive) return 'absent';
+    if (session.kill() === 'unconfirmed') return 'unconfirmed';
+    this.livePool.forget(session);
+    return 'stopped';
   }
 
   /**
@@ -1447,136 +1692,14 @@ export class ChatRunRegistry {
     // Сводка детей снимается до всего остального: под ней мог остаться блок
     // перемены прошлой попытки, и снять его можно, только пока он стоит первым —
     // то есть и до вводной нового разговора, которую решение ставит в начало.
-    const turn = this.continuation(
-      keys,
-      { ...asked, prompt: withChildrenBrief(asked.prompt, undefined) },
-      askedMeta,
-    );
+    const plain = { ...asked, prompt: withChildrenBrief(asked.prompt, undefined) };
+    const turn = this.continuation(keys, plain, askedMeta);
     const { options, meta } = turn;
+    const { afterLimit: _limit, keepSession: _keep, ...originMeta } = askedMeta;
+    const cold = turn.notice?.kind === 'notice' && turn.notice.code === 'coldResume';
     const said = options.prompt;
-    const child = this.childOf?.(keys) ?? false;
-    const workspace = this.workspaceTurn(
-      options.cwd,
-      options.sessionId ?? meta.sessionId,
-      said,
-      child,
-    );
+    const { routed, routedMeta, route, workspace } = this.compose(keys, options, meta, said);
     const run = this.createRun();
-    // Маршрут решается ЗДЕСЬ, на каждом старте: продолжение остановленного
-    // прогона приходит со СТАРЫМИ параметрами (пауза дерева, продолжение в
-    // чистой сессии), и адрес контура, оставшийся в них с прошлой жизни,
-    // пережил бы снятую галочку. Пустой объект — законный ответ «не через
-    // контур», и он затирает прежний.
-    const route = this.platformRouting?.(meta.origin ?? 'chat', options.model ?? '') ?? { env: {} };
-    // У контура и локальной модели свой `--strict-mcp-config` и свой выбор
-    // серверов: от профиля группы там остаётся всё, кроме MCP, — запрет правок
-    // лёгкого чата, хуки, очередь тяжёлых шагов, перечень навыков. Прежде такой
-    // прогон терял профиль целиком (ревью A1-F4/B1-F2).
-    const strict = Boolean(route.layers?.args.includes('--strict-mcp-config'));
-    const fromRoute = route.localMcp?.(options.cwd);
-    const resolved = this.groupProfileOf?.(keys, options.cwd);
-    const profile = resolved && (strict || fromRoute) ? withoutMcp(resolved) : resolved;
-    const mcp = fromRoute ?? profile?.mcp;
-    const baseArgs = [
-      ...(route.layers?.args ?? []),
-      ...(route.kit?.args ?? []),
-      ...(profile?.args ?? []),
-    ];
-    // Локальный слой проекта: командный слой из `.agent/local-layer/` вместо
-    // самого командного (`--setting-sources` без `project`). Песочница со своим
-    // каталогом конфигурации и маршрут, уже снявший `project`, его не получают —
-    // и слой для них даже не собирается.
-    const layerSources =
-      options.configDir || options.settingSources ? undefined : withoutProjectSource(baseArgs);
-    const layered = layerSources ? this.localLayerOf?.(options.cwd) : undefined;
-    const layerArgs = layered
-      ? baseArgs.includes('--strict-mcp-config')
-        ? withoutMcpConfig(layered.args)
-        : layered.args
-      : [];
-    const routed: RunOptions = {
-      ...options,
-      // Модель и усилие принадлежат КОНТУРУ, пока прогон идёт через него (Т6):
-      // имя вендора контур не знает (403 «модель»), а усилия он не принимает
-      // вовсе — `--effort` уехал бы платной просьбой, которую никто не выполнит.
-      // Не через контур — поля отсутствуют, и выбор человека остаётся как был.
-      ...(route.model?.model ? { model: route.model.model } : {}),
-      ...(route.effort === false ? { effort: '' } : {}),
-      // Авторежим решён по модели, которую ПРОСИЛИ; контур мог подставить свою.
-      // Без авторежима у неё CLI молча опустил бы `auto` до `default`, и прогон
-      // спрашивал бы каждую правку, — такой идёт в `acceptEdits`, а рутину
-      // снимает автоподтверждение панели (`providers/claude-auto-mode.ts`).
-      ...(options.permissionMode === 'auto' &&
-      route.model?.model &&
-      !claudeModelHasAutoMode(route.model.model)
-        ? { permissionMode: 'acceptEdits' }
-        : {}),
-      // Набор панели (В2) едет своим полем: и мимо контура, и поверх него.
-      platformEnv: {
-        ...route.env,
-        ...route.kit?.env,
-        ...profile?.env,
-        ...this.workspaceEnv(options.cwd, child),
-      },
-      // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
-      // после выключенной галочки, обязан вернуться к промпту CLI.
-      platformSystemPrompt: route.systemPrompt ?? '',
-      // Наши слои (Т8): и флаги снятия, и судьба нашей дописки к системному
-      // промпту (инициативы, разделение, продолжение) решаются на КАЖДОМ старте
-      // и кладутся безусловно — прошлая жизнь прогона не переживает ни снятую
-      // галочку, ни возвращённую. Сам текст дописки при этом не трогается:
-      // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
-      platformArgs: layered && layerSources ? [...layerSources, ...layerArgs] : baseArgs,
-      platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
-      // Блок набора к системному промпту (дисциплина локальной модели при режиме «глобальные»): решается на каждом старте, как и остальной маршрут.
-      // Инструкции локального слоя едут сюда же: слой «системный промпт» их не снимает —
-      // это правила проекта, а не наша дописка.
-      platformAppend: [route.kit?.append ?? '', layered?.append ?? '']
-        .filter((part) => part.trim())
-        .join('\n\n'),
-      // Строка профиля группы: что подключено, что снято и как попросить снятое.
-      profileNote: profile?.note ?? '',
-      // Перечень навыков группы (1.3) — настройками поверх личных, тоже на каждом старте.
-      // Командные настройки слоя — снизу, профиль группы — сверху.
-      platformSettings: layered
-        ? mergeFlagSettings(layered.settings, profile?.settings ?? {})
-        : (profile?.settings ?? {}),
-      // MCP-серверы, взятые человеком в локальный прогон этого проекта: выбор меняется
-      // между ходами, поэтому читается на каждом старте и кладётся безусловно.
-      ...(mcp ? { platformMcp: mcp } : {}),
-      // Одна на сессию (E6): перемена между ходами уезжает в сообщении ниже.
-      workspaceNote: workspace.system,
-      child,
-      // Настройка панели читается на каждом старте и кладётся безусловно: снятая
-      // галочка возвращает инструменты следующему ходу, а не новому разговору.
-      deniedTools: this.deniedToolsOf?.() ?? [],
-      // Метка автономии решается на КАЖДОМ старте и кладётся или снимается
-      // безусловно: продолжение приходит со старыми параметрами, и метка прошлой
-      // жизни пережила бы снятую галочку.
-      env: withAutonomy(options.env, this.autonomousOf?.(keys) ?? false),
-      prompt: withChildrenBrief(withWorkspaceUpdate(said, workspace.update), this.briefOf?.(keys)),
-    };
-    // Выбор, снятый между ходами, не переживает продолжение: прежние параметры несли поле.
-    if (!mcp) delete routed.platformMcp;
-    // Журнал понижений отвечает на «окупается ли понижение», и отвечать он обязан
-    // моделью, которой прогон ШЁЛ. Через контур это модель маршрута, а не имя из
-    // шапки: иначе расход считался бы по модели, которой прогона не было (ревью
-    // Т6, m8). Глубина, которую контур не принимает, в журнал тоже не пишется.
-    const { local: _stale, ...freshMeta } = meta;
-    const withLowered: RunMeta = freshMeta.lowered
-      ? {
-          ...freshMeta,
-          lowered: {
-            ...freshMeta.lowered,
-            ...(route.model?.model ? { model: route.model.model } : {}),
-            ...(route.effort === false ? { effort: '' } : {}),
-          },
-        }
-      : freshMeta;
-    // Отметка решается на каждом старте, как и маршрут: продолжение приходит со старой.
-    const routedMeta: RunMeta = this.localOf?.(routed, freshMeta)
-      ? { ...withLowered, local: true }
-      : withLowered;
     // `wake`/`hold` — про ЭТОТ старт (ход, начатый самим CLI), не про разговор.
     // Из параметров прогона их заводит всё следующее: продолжение той же сессией,
     // звено, тёплая доставка, журнал для подхвата. С ними такой старт забирал бы
@@ -1587,8 +1710,10 @@ export class ChatRunRegistry {
       run,
       meta: routedMeta,
       options: kept,
+      ...(cold ? { coldOrigin: { options: plain, meta: originMeta } } : {}),
       ...(routed.wake ? { woken: true as const } : {}),
       ...(route.model?.model ? { routed: true as const } : {}),
+      ...(route.model?.model && route.modelMapKeys ? { routedMap: route.modelMapKeys } : {}),
       startedAt: Date.now(),
       text: '',
       events: [],
@@ -1606,7 +1731,13 @@ export class ChatRunRegistry {
       workspace: workspace.state,
     };
     this.runs.set(chatId, registered);
-    this.feedWatch(chatId, { kind: 'start', sessionId: meta.sessionId, cwd: kept.cwd });
+    this.feedWatch(chatId, {
+      kind: 'start',
+      sessionId: meta.sessionId,
+      cwd: kept.cwd,
+      // Ответвление тёплой сессии: сторожу R2 нужен конец её последнего вызова.
+      ...(options.fork && options.sessionId ? { forkOf: options.sessionId } : {}),
+    });
     try {
       this.onRunStart?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]);
     } catch {
@@ -1660,6 +1791,232 @@ export class ChatRunRegistry {
     if (this.ledger) void this.trackPids(registered).catch(() => {});
 
     return true;
+  }
+
+  /**
+   * Параметры старта поверх решения о продолжении: маршрут контура, профиль
+   * группы, наши слои, строка о тестах, снятые инструменты, метка автономии —
+   * всё, что решается на КАЖДОМ старте. Одна сборка у хода разговора и у пинга
+   * тёплого кэша (`warm`): иначе префикс пинга разошёлся бы с префиксом
+   * следующего хода группы, и пинг грел бы не тот кэш.
+   */
+  private compose(
+    keys: readonly string[],
+    options: RunOptions,
+    meta: RunMeta,
+    said: string,
+    ping = false,
+  ): { routed: RunOptions; routedMeta: RunMeta; route: PlatformRunRoute; workspace: NoteTurn } {
+    const child = this.childOf?.(keys) ?? false;
+    const workspace = this.workspaceTurn(
+      options.cwd,
+      options.sessionId ?? meta.sessionId,
+      said,
+      child,
+    );
+    // Маршрут решается ЗДЕСЬ, на каждом старте: продолжение остановленного
+    // прогона приходит со СТАРЫМИ параметрами (пауза дерева, продолжение в
+    // чистой сессии), и адрес контура, оставшийся в них с прошлой жизни,
+    // пережил бы снятую галочку. Пустой объект — законный ответ «не через
+    // контур», и он затирает прежний.
+    const route = this.platformRouting?.(meta.origin ?? 'chat', options.model ?? '') ?? { env: {} };
+    // У контура и локальной модели свой `--strict-mcp-config` и свой выбор
+    // серверов: от профиля группы там остаётся всё, кроме MCP, — запрет правок
+    // лёгкого чата, хуки, очередь тяжёлых шагов, перечень навыков. Прежде такой
+    // прогон терял профиль целиком (ревью A1-F4/B1-F2).
+    const strict = Boolean(route.layers?.args.includes('--strict-mcp-config'));
+    const fromRoute = route.localMcp?.(options.cwd);
+    const resolved = this.groupProfileOf?.(keys, options.cwd);
+    const stripped = resolved && (strict || fromRoute) ? withoutMcp(resolved) : resolved;
+    // Окно сжатия и потолок чтения группы не выше пределов маршрута (n2, n1): см. route-caps.
+    const profile = stripped && capProfileToRoute(stripped, route);
+    const mcp = fromRoute ?? profile?.mcp;
+    const baseArgs = [
+      ...(route.layers?.args ?? []),
+      ...(route.kit?.args ?? []),
+      ...(profile?.args ?? []),
+    ];
+    // Локальный слой проекта: командный слой из `.agent/local-layer/` вместо
+    // самого командного (`--setting-sources` без `project`). Песочница со своим
+    // каталогом конфигурации и маршрут, уже снявший `project`, его не получают —
+    // и слой для них даже не собирается.
+    const layerSources =
+      options.configDir || options.settingSources ? undefined : withoutProjectSource(baseArgs);
+    const layered = layerSources ? this.localLayerOf?.(options.cwd) : undefined;
+    const layerArgs = layered
+      ? baseArgs.includes('--strict-mcp-config')
+        ? withoutMcpConfig(layered.args)
+        : layered.args
+      : [];
+    const routed: RunOptions = {
+      ...options,
+      // Модель и усилие принадлежат КОНТУРУ, пока прогон идёт через него (Т6):
+      // имя вендора контур не знает (403 «модель»), а усилия он не принимает
+      // вовсе — `--effort` уехал бы платной просьбой, которую никто не выполнит.
+      // Не через контур — поля отсутствуют, и выбор человека остаётся как был.
+      ...(route.model?.model ? { model: route.model.model } : {}),
+      ...(route.effort === false ? { effort: '' } : {}),
+      // Авторежим решён по модели, которую ПРОСИЛИ; контур мог подставить свою.
+      // Без авторежима у неё CLI молча опустил бы `auto` до `default`, и прогон
+      // спрашивал бы каждую правку, — такой идёт в `acceptEdits`, а рутину
+      // снимает автоподтверждение панели (`providers/claude-auto-mode.ts`).
+      ...(options.permissionMode === 'auto' &&
+      route.model?.model &&
+      !claudeModelHasAutoMode(route.model.model)
+        ? { permissionMode: 'acceptEdits' }
+        : {}),
+      // Набор панели (В2) едет своим полем: и мимо контура, и поверх него —
+      // но его потолки не выше пределов маршрута (route-caps, ревью K 🟡1).
+      platformEnv: {
+        ...route.env,
+        ...capKitToRoute(route),
+        ...profile?.env,
+        ...this.workspaceEnv(options.cwd, child),
+      },
+      // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
+      // после выключенной галочки, обязан вернуться к промпту CLI.
+      platformSystemPrompt: route.systemPrompt ?? '',
+      // Наши слои (Т8): и флаги снятия, и судьба нашей дописки к системному
+      // промпту (инициативы, разделение, продолжение) решаются на КАЖДОМ старте
+      // и кладутся безусловно — прошлая жизнь прогона не переживает ни снятую
+      // галочку, ни возвращённую. Сам текст дописки при этом не трогается:
+      // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
+      platformArgs: layered && layerSources ? [...layerSources, ...layerArgs] : baseArgs,
+      platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
+      // Блок набора к системному промпту (дисциплина локальной модели при режиме «глобальные»): решается на каждом старте, как и остальной маршрут.
+      // Инструкции локального слоя едут сюда же: слой «системный промпт» их не снимает —
+      // это правила проекта, а не наша дописка.
+      platformAppend: [route.kit?.append ?? '', layered?.append ?? '']
+        .filter((part) => part.trim())
+        .join('\n\n'),
+      // Строка профиля группы: что подключено, что снято и как попросить снятое.
+      profileNote: profile?.note ?? '',
+      // Перечень навыков группы (1.3) — настройками поверх личных, тоже на каждом старте.
+      // Командные настройки слоя — снизу, профиль группы — сверху.
+      platformSettings: layered
+        ? mergeFlagSettings(layered.settings, profile?.settings ?? {})
+        : (profile?.settings ?? {}),
+      // MCP-серверы, взятые человеком в локальный прогон этого проекта: выбор меняется
+      // между ходами, поэтому читается на каждом старте и кладётся безусловно.
+      ...(mcp ? { platformMcp: mcp } : {}),
+      // Одна на сессию (E6): перемена между ходами уезжает в сообщении ниже.
+      workspaceNote: workspace.system,
+      child,
+      // Настройка панели читается на каждом старте и кладётся безусловно: снятая
+      // галочка возвращает инструменты следующему ходу, а не новому разговору.
+      deniedTools: this.deniedToolsOf?.() ?? [],
+      // Метка автономии решается на КАЖДОМ старте и кладётся или снимается
+      // безусловно: продолжение приходит со старыми параметрами, и метка прошлой
+      // жизни пережила бы снятую галочку.
+      env: withAutonomy(options.env, this.autonomousOf?.(keys) ?? false),
+      // Пинг тёплого кэша идёт своим словом: сводка детей и перемена строки о тестах
+      // принадлежат ходу человека, а не ему.
+      prompt: ping
+        ? said
+        : withChildrenBrief(withWorkspaceUpdate(said, workspace.update), this.briefOf?.(keys)),
+    };
+    // Выбор, снятый между ходами, не переживает продолжение: прежние параметры несли поле.
+    if (!mcp) delete routed.platformMcp;
+    // Журнал понижений отвечает на «окупается ли понижение», и отвечать он обязан
+    // моделью, которой прогон ШЁЛ. Через контур это модель маршрута, а не имя из
+    // шапки: иначе расход считался бы по модели, которой прогона не было (ревью
+    // Т6, m8). Глубина, которую контур не принимает, в журнал тоже не пишется.
+    const { local: _stale, ...freshMeta } = meta;
+    const withLowered: RunMeta = freshMeta.lowered
+      ? {
+          ...freshMeta,
+          lowered: {
+            ...freshMeta.lowered,
+            ...(route.model?.model ? { model: route.model.model } : {}),
+            ...(route.effort === false ? { effort: '' } : {}),
+          },
+        }
+      : freshMeta;
+    // Отметка решается на каждом старте, как и маршрут: продолжение приходит со старой.
+    const routedMeta: RunMeta = this.localOf?.(routed, freshMeta)
+      ? { ...withLowered, local: true }
+      : withLowered;
+    return { routed, routedMeta, route, workspace };
+  }
+
+  /** Идущие пинги тёплого кэша: выход сервера и «Остановить всё» гасят их вместе с прогонами. */
+  private readonly warming = new Set<RunLike>();
+
+  /**
+   * Пинг тёплого кэша (`keep-warm`): разовый ход ответвления сессии группы тем же
+   * путём сборки, что и её ход (`compose`), — префикс совпадает байт в байт, и
+   * чтение освежает часовой кэш. `--fork-session` + `--no-session-persistence`:
+   * транскрипт группы не трогается, нового не пишется, в списке чатов пинга нет
+   * (замер 22.10). Ни записи прогона, ни буфера, ни журнала, ни сторожа, ни
+   * решения о продолжении, ни включения группы — пинг не ход разговора.
+   */
+  warm(
+    keys: readonly string[],
+    sessionId: string,
+    template: RunOptions,
+    meta: RunMeta,
+    prompt: string,
+  ): Promise<WarmOutcome> {
+    const { name: _name, wake: _wake, hold: _hold, ...rest } = template;
+    const base: RunOptions = {
+      ...rest,
+      prompt,
+      sessionId,
+      fork: true,
+      ephemeral: true,
+      // Инструменты пинга отклоняет хук до исполнения: обрыв по событию `tool`
+      // запаздывает за инструментом без вопроса (acceptEdits, правила «разрешить»).
+      denyTools: true,
+      // Свой ключ у брокера прав: вопрос пинга не должен всплыть в чате группы.
+      ...(rest.permissionPrompt
+        ? { permissionPrompt: { ...rest.permissionPrompt, runId: `keep-warm-${sessionId}` } }
+        : {}),
+    };
+    const { routed, route } = this.compose(keys, base, { ...meta, sessionId }, prompt, true);
+    // Исчерпанный бюджет контура (402 записан, человек не сбросил): пинг был бы
+    // заведомым отказом, а кэш в таком контуре всё равно некому читать.
+    if (!sessionId || route.refusal || route.budgetExhausted) {
+      return Promise.resolve({
+        ok: false,
+        usage: { input: 0, cacheRead: 0, cacheWrite: 0, cacheWrite1h: 0, output: 0 },
+        error: route.refusal ?? (sessionId ? 'contour-budget-exhausted' : 'no-session'),
+        durationMs: 0,
+      });
+    }
+    const run = this.createRun();
+    this.warming.add(run);
+    return runWarmPing(run, routed)
+      .then((outcome) => {
+        this.journalWarm(keys[0] ?? sessionId, sessionId, outcome);
+        return outcome;
+      })
+      .finally(() => this.warming.delete(run));
+  }
+
+  /**
+   * Пинг — в журнал доли лимита, с меткой `keep-warm` и ключом чата группы: его
+   * токены — её трата окна подписки. Без записи прирост загрузки за пинг делили
+   * бы между собой прогоны, шедшие рядом, а группа в аналитике выглядела бы дешевле.
+   */
+  private journalWarm(chatId: string, sessionId: string, outcome: WarmOutcome): void {
+    const { usage } = outcome;
+    const tokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
+    const startedAt = outcome.startedAt ?? Date.now() - outcome.durationMs;
+    if (!this.limitJournal || (tokens <= 0 && !outcome.samples?.length)) return;
+    try {
+      this.limitJournal({
+        id: `keep-warm:${sessionId}:${startedAt}`,
+        chatId,
+        sessionId,
+        source: 'keep-warm',
+        startedAt,
+        endedAt: startedAt + outcome.durationMs,
+        tokens,
+        samples: outcome.samples ?? [],
+      });
+    } catch {
+      // Молча, как у прогонов: наблюдение не держит пинг.
+    }
   }
 
   /**
@@ -1725,15 +2082,18 @@ export class ChatRunRegistry {
       const sessionId = event.kind === 'session' ? event.sessionId : run.sessionId;
       this.feedWatch(run.chatId, { kind: 'event', event, sessionId });
     }
-    // Сжатие окна — только сторожу групп (R3), в ленту оно не идёт.
-    if (event.kind === 'compact') return;
+    // Сжатие окна (R3) и повтор запроса к модели (R30) — только сторожу, в ленту не идут.
+    if (event.kind === 'compact' || event.kind === 'apiRetry') return;
     // Внутреннее событие: вкладкам и буферу его знать незачем.
     if (event.kind === 'toolResult') {
       run.toolResults = (run.toolResults ?? 0) + 1;
       const deferred = run.expectedPicks?.get(event.toolUseId);
       if (deferred) {
         run.expectedPicks?.delete(event.toolUseId);
-        if (!run.autoPicked?.has(event.toolUseId)) this.raiseQuestion(run, deferred);
+        // Отказ панели (D-n или известный ответ) — не вопрос человеку: агенту
+        // уже сказано, что делать, и «ждёт вас» был бы ложным пушем.
+        const refused = event.denied === 'deferred' || event.denied === 'panel-refused';
+        if (!run.autoPicked?.has(event.toolUseId) && !refused) this.raiseQuestion(run, deferred);
       }
       try {
         this.onToolResult?.(run.chatId, event.toolUseId);
@@ -1783,12 +2143,15 @@ export class ChatRunRegistry {
     // сняли посреди хода, а метку в окружении процесса читает хук, — пуш,
     // ушедший раньше его автовыбора, назад не вернуть. Отложить же ничего не
     // стоит: результат без автовыбора поднимает сигнал сам.
+    // Группа «по плану» (`group-questions.ts`): брокер ответит на любой вопрос
+    // с вопросами внутри — человека не зовут ни точкой, ни пушем, ни записью.
+    const askKeys = run.sessionId ? [run.chatId, run.sessionId] : [run.chatId];
+    const isAsk = event.kind === 'tool' && event.name === 'AskUserQuestion';
     const expectedPick =
-      event.kind === 'tool' &&
-      event.name === 'AskUserQuestion' &&
-      (this.autonomousOf?.(run.sessionId ? [run.chatId, run.sessionId] : [run.chatId]) === true ||
-        run.options.env?.[AUTONOMOUS_ENV] === '1') &&
-      pickRecommended(event.input) !== null;
+      isAsk &&
+      (((this.autonomousOf?.(askKeys) === true || run.options.env?.[AUTONOMOUS_ENV] === '1') &&
+        pickRecommended(event.input) !== null) ||
+        (this.answersByPlanFor(askKeys) && planAnswers(event.input) !== null));
     if (event.kind === 'tool' && event.name === 'AskUserQuestion') {
       if (event.id) (run.askInputs ??= new Map()).set(event.id, event.input);
       if (!event.id) run.askedUnkeyed = true;
@@ -1804,7 +2167,13 @@ export class ChatRunRegistry {
       (run.autoPicked ??= new Set()).add(event.toolUseId);
       run.expectedPicks?.delete(event.toolUseId);
       const input = run.askInputs?.get(event.toolUseId);
-      picked = { ...event, picks: input === undefined ? event.picks : picksFor(input, '') };
+      // Выбор — из текста отказа (ответ «по плану» берёт не всегда
+      // рекомендованный), из тела — только `critical`; текст не разобрался —
+      // считаем по телу.
+      picked = {
+        ...event,
+        picks: input === undefined ? event.picks : confirmedPicks(input, event.picks),
+      };
       if (picked.picks.length === 0) picked = event;
       run.asked =
         run.askedUnkeyed === true ||
@@ -1989,6 +2358,8 @@ export class ChatRunRegistry {
         chatId: run.chatId,
         options: run.options,
         meta: run.meta,
+        // Подхваченный ход живёт параметрами из журнала — см. `adopt`.
+        ...(run.reattached ? { adopted: true as const } : {}),
       });
       for (const key of this.wakeable.keys()) {
         if (this.wakeable.size <= MAX_RETIRED) break;
@@ -2057,6 +2428,7 @@ export class ChatRunRegistry {
           ...(interrupted ? { interrupted: true as const } : {}),
           ...(run.meta.origin ? { origin: run.meta.origin } : {}),
           ...(run.routed ? { routed: true as const } : {}),
+          ...(run.routedMap ? { routedMap: run.routedMap } : {}),
           ...(run.meta.local ? { local: true as const } : {}),
           ...(run.toolResults ? { toolResults: run.toolResults } : {}),
           ...(run.lastError ? { error: run.lastError } : {}),
@@ -2115,12 +2487,27 @@ export class ChatRunRegistry {
    * Сначала догоняем буфер, затем — живые события. Возвращает отписку, либо
    * `undefined`, если прогон уже завершён (буфер отдан, живых событий не будет)
    * или его нет вовсе.
+   *
+   * `startedAt` — ход, к которому относится курсор клиента. Новый ход под тем же
+   * ключом нумерует события с нуля, и курсор прошлого хода (`from=40` у хода с
+   * десятью событиями) терял его начало и конец: поток закрывался пустым, а
+   * телефон переподключался по кругу до «связь потеряна». Ход другой — курсор
+   * не его, отдаём ход с начала.
    */
-  attach(chatId: string, fromSeq: number, subscriber: RunSubscriber): (() => void) | undefined {
+  attach(
+    chatId: string,
+    askedFromSeq: number,
+    subscriber: RunSubscriber,
+    startedAt?: number,
+  ): (() => void) | undefined {
     // По ключу-синониму тоже: вкладка, узнавшая о прогоне под sessionId, должна
     // суметь подключиться к нему, даже если он зарегистрирован под `new-…`.
+    // Человек открыл поток — отметка раньше проверки прогона: вкладка, открытая
+    // на уже кончившемся ходе, тоже значит, что человек на месте.
+    if (subscriber.viewer) this.viewers.mark(this.viewerKeys(chatId));
     const run = this.runs.get(this.resolveKey(chatId));
     if (!run) return undefined;
+    const fromSeq = startedAt !== undefined && startedAt !== run.startedAt ? 0 : askedFromSeq;
 
     // Клиент ждёт кадры, которых уже нет: говорим об этом, а не молчим о дыре в ленте.
     // Номер сообщения — последний сброшенный: он больше `fromSeq` и меньше любого оставшегося.
@@ -2145,7 +2532,11 @@ export class ChatRunRegistry {
     if (run.status !== 'running') return undefined;
 
     run.subscribers.add(subscriber);
-    return () => run.subscribers.delete(subscriber);
+    return () => {
+      run.subscribers.delete(subscriber);
+      // Закрытие — тоже «видел только что»: окно срока считается от него.
+      if (subscriber.viewer) this.viewers.mark(this.viewerKeys(run.chatId));
+    };
   }
 
   /**
@@ -2156,6 +2547,26 @@ export class ChatRunRegistry {
    */
   stop(chatId: string): StopOutcome {
     return this.halt(chatId);
+  }
+
+  /**
+   * Вернуть ход в остывшую сессию (R5 ревью П1): идущий новый разговор,
+   * начатый правилом остывшей сессии, снимается, и тот же старт идёт старой
+   * сессией — человеку полная память группы дороже перезаписи кэша. Только
+   * пока новый разговор идёт: законченный уже сделал работу, и повтор того же
+   * задания старой сессией сделал бы её дважды. Снимается тихо (`halt`, не
+   * «Стоп» человека) — группа не встаёт на паузу.
+   */
+  keepColdSession(chatId: string): 'started' | 'absent' | 'not_cold' | 'unconfirmed' {
+    const run = this.runs.get(this.resolveKey(chatId));
+    if (!run || run.status !== 'running') return 'absent';
+    const origin = run.coldOrigin;
+    if (!origin) return 'not_cold';
+    const halted = this.halt(chatId);
+    if (halted === 'unconfirmed') return 'unconfirmed';
+    return this.start(run.chatId, origin.options, { ...origin.meta, keepSession: true })
+      ? 'started'
+      : 'absent';
   }
 
   private halt(chatId: string): StopOutcome {
@@ -2215,8 +2626,12 @@ export class ChatRunRegistry {
 
   /** Остановить все прогоны разом. */
   stopAll(): void {
-    for (const chatId of [...this.runs.keys()]) this.stop(chatId);
-    this.livePool.closeAll();
+    // Один снимок процессов на всех: N сессий × ~0,8 с синхронного снимка Windows.
+    withProcessSnapshot(() => {
+      for (const chatId of [...this.runs.keys()]) this.stop(chatId);
+      for (const run of this.warming) run.stop();
+      this.livePool.closeAll();
+    });
   }
 
   /**
@@ -2229,11 +2644,16 @@ export class ChatRunRegistry {
    * Остановить всех — явное действие человека: «Остановить» по каждому прогону.
    */
   detachAll(): void {
+    // Журнал лимита пишется посреди прогона не чаще раза в пять минут: замеры
+    // последних минут на выходе — на диск, новый сервер (и прогноз R9) их видит.
+    this.flushLimitJournal();
     for (const [key, run] of [...this.runs]) {
       if (run.status !== 'running') continue;
       if (run.run.detach && (run.detached || run.run.live)) run.run.detach();
       else this.stop(key);
     }
+    // Пинг не переживает сервер: ход разовый, и отпускать его посредником незачем.
+    for (const run of this.warming) run.stop();
     this.livePool.detachAll();
   }
 

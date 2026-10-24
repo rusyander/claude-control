@@ -1,5 +1,6 @@
 import type { BuiltinGroupsRecord } from '@agentdeck/contracts/groups';
 import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
+import type { GroupWatchRecord } from '@agentdeck/contracts/group-watch';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -83,9 +84,24 @@ import {
   setSplitPlan as writeSplitPlan,
   moveSplitPlan as relocateSplitPlan,
 } from './split-plans.ts';
+import {
+  allGroupWatchSignals as readAllGroupWatchSignals,
+  getGroupWatchSignals as readGroupWatchSignals,
+  setGroupWatchSignals as writeGroupWatchSignals,
+} from './group-watch-signals.ts';
+import {
+  allChatWatchSignals as readAllChatWatchSignals,
+  getChatWatchSignals as readChatWatchSignals,
+  setChatWatchSignals as writeChatWatchSignals,
+} from './chat-watch-signals.ts';
+import {
+  getGroupWaitResume as readGroupWaitResume,
+  setGroupWaitResume as writeGroupWaitResume,
+} from './group-wait-resumes.ts';
 import type {
   AppState,
   DisabledRuleSnapshot,
+  GroupWaitResumeRecord,
   PermissionFilePlaces,
   ChatLink,
   TreePauseRecord,
@@ -881,6 +897,64 @@ export class AppStore {
     const moved = relocateSplitPlan(this.state, from, to);
     if (moved) this.persist();
     return moved;
+  }
+
+  // --- Сигналы сторожа групп: свой срез, пишет только сторож (F-42) ---
+
+  /** Блок сигналов группы как есть с диска — разбирает читатель (`groupSignalsOf`). */
+  getGroupWatchSignals(parentChatId: string, groupIndex: number): GroupWatchRecord | undefined {
+    return readGroupWatchSignals(this.state, parentChatId, groupIndex);
+  }
+
+  /** Все блоки: родитель → номер группы → блок. */
+  getAllGroupWatchSignals(): Record<string, Record<string, GroupWatchRecord>> {
+    return readAllGroupWatchSignals(this.state);
+  }
+
+  /**
+   * Записать блок группы в память, `undefined` — стереть. На диск — `saveGroupWatchSignals`:
+   * сторож пишет числа сигналов на каждом событии, а файл — только когда сменился состав или на тике.
+   */
+  putGroupWatchSignals(
+    parentChatId: string,
+    groupIndex: number,
+    record: GroupWatchRecord | undefined,
+  ): void {
+    writeGroupWatchSignals(this.state, parentChatId, groupIndex, record);
+  }
+
+  saveGroupWatchSignals(): void {
+    this.persist();
+  }
+
+  /** Блок сигналов одиночного чата как есть с диска (`groupSignalsOf` разбирает). */
+  getChatWatchSignals(chatId: string): GroupWatchRecord | undefined {
+    return readChatWatchSignals(this.state, chatId);
+  }
+
+  /** Все блоки одиночных чатов: ключ чата → блок. */
+  getAllChatWatchSignals(): Record<string, GroupWatchRecord> {
+    return readAllChatWatchSignals(this.state);
+  }
+
+  /** Записать блок чата в память, `undefined` — стереть; на диск — `saveGroupWatchSignals`. */
+  putChatWatchSignals(chatId: string, record: GroupWatchRecord | undefined): void {
+    writeChatWatchSignals(this.state, chatId, record);
+  }
+
+  // --- Продолжения группы «по плану» подряд: свой срез, переживает перезапуск (F-87) ---
+
+  getGroupWaitResume(conversation: string): GroupWaitResumeRecord | undefined {
+    return readGroupWaitResume(this.state, conversation);
+  }
+
+  /** Записать счёт сессии, `undefined` — стереть; счета кончившихся групп уходят заодно. */
+  setGroupWaitResume(conversation: string, record: GroupWaitResumeRecord | undefined): void {
+    // Стирать нечего — файла не трогаем: стирание зовут на каждом конце хода группы.
+    const known = this.state.groupWaitResumes;
+    if (!record && !(known && Object.hasOwn(known, conversation))) return;
+    writeGroupWaitResume(this.state, conversation, record);
+    this.persist();
   }
 
   // --- Внешние интеграции: итог проверки связи и привязки проектов ---

@@ -521,6 +521,8 @@ export interface StartHandoffInput {
   checkpointHash?: string;
   /** Продолжение группы разделения: задание в промпте — граница, а не ориентир. */
   group?: boolean;
+  /** За работой группы идёт звено доставки с полным прогоном проверок (RF-BGCD-06). */
+  deliver?: boolean;
 }
 
 /**
@@ -554,6 +556,7 @@ export function startHandoff({
   rootTask,
   checkpointHash,
   group = false,
+  deliver = false,
 }: StartHandoffInput): HandoffStarted {
   // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:
   // настоящим id он станет, когда CLI выдаст сессию.
@@ -563,7 +566,7 @@ export function startHandoff({
   const task =
     chains.rootTaskOf(fromAliases) ??
     (rootTask?.trim() ? labelledCut(rootTask.trim(), HANDOFF_ROOT_TASK_MAX) : undefined);
-  const prompt = buildHandoffPrompt(proposal, task, { group });
+  const prompt = buildHandoffPrompt(proposal, task, { group, deliver });
   const chainDepth = chains.link(fromAliases, chatId, {
     ...(task ? { rootTask: task } : {}),
     ...(checkpointHash ? { checkpointHash } : {}),

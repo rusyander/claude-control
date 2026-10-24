@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { spawnCliProcess } from './cli-spawn.ts';
+import { ledgerCliMarker, spawnCliProcess } from './cli-spawn.ts';
 
 /**
  * Окружение прогона — там, где его читает сам процесс.
@@ -101,5 +104,78 @@ describe('lib/cli-spawn: метка CLI для пульса журнала пр�
 
   it('агент панели (inheritEnv: false) метку не получает', async () => {
     expect(await ledgerMarker('/tmp/ledger-home', false)).toBe('');
+  });
+
+  it('журнал подмешан — CLI получает замок: off в команде модели повтор не выключает', () => {
+    const names = [
+      'AGENTDECK_VERIFY_LEDGER_HOME',
+      'AGENTDECK_VERIFY_LEDGER',
+      'AGENTDECK_VERIFY_LEDGER_DELTA',
+      'NODE_OPTIONS',
+    ] as const;
+    const before = names.map((name) => process.env[name]);
+    try {
+      process.env.AGENTDECK_VERIFY_LEDGER_HOME = '/tmp/ledger-home';
+      delete process.env.AGENTDECK_VERIFY_LEDGER;
+      delete process.env.AGENTDECK_VERIFY_LEDGER_DELTA;
+      delete process.env.NODE_OPTIONS;
+      expect(ledgerCliMarker('C:/bin/claude.exe')).toEqual({
+        AGENTDECK_VERIFY_LEDGER_LOCK: '1',
+        AGENTDECK_VERIFY_LEDGER_CLI: 'claude',
+      });
+      // Имя не разобрано — метки нет, замок есть.
+      expect(ledgerCliMarker('weird name!')).toEqual({ AGENTDECK_VERIFY_LEDGER_LOCK: '1' });
+      // Человек выключил повтор или сужение в окружении самой панели — его выбор, замка нет.
+      process.env.AGENTDECK_VERIFY_LEDGER = 'off';
+      expect(ledgerCliMarker('claude')).toEqual({ AGENTDECK_VERIFY_LEDGER_CLI: 'claude' });
+      process.env.AGENTDECK_VERIFY_LEDGER = 'on';
+      process.env.AGENTDECK_VERIFY_LEDGER_DELTA = 'off';
+      expect(ledgerCliMarker('claude')).toEqual({ AGENTDECK_VERIFY_LEDGER_CLI: 'claude' });
+      delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
+      expect(ledgerCliMarker('claude')).toEqual({});
+    } finally {
+      names.forEach((name, i) => {
+        const value = before[i];
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      });
+    }
+  });
+
+  it('замок во входе (F-30): NODE_OPTIONS ведёт на preload-locked.cjs, только если файл есть', () => {
+    const names = [
+      'AGENTDECK_VERIFY_LEDGER_HOME',
+      'AGENTDECK_VERIFY_LEDGER',
+      'AGENTDECK_VERIFY_LEDGER_DELTA',
+      'NODE_OPTIONS',
+    ] as const;
+    const before = names.map((name) => process.env[name]);
+    const home = mkdtempSync(join(tmpdir(), 'ledger-home-')).replace(/\\/g, '/');
+    const bin = `${home}/bin`;
+    mkdirSync(bin);
+    try {
+      process.env.AGENTDECK_VERIFY_LEDGER_HOME = '/tmp/ledger-home';
+      delete process.env.AGENTDECK_VERIFY_LEDGER;
+      delete process.env.AGENTDECK_VERIFY_LEDGER_DELTA;
+      process.env.NODE_OPTIONS = `--max-old-space-size=4096 --require "${bin}/preload.cjs"`;
+      // Входа с замком ещё нет (старая установка) — NODE_OPTIONS не трогается.
+      expect(ledgerCliMarker('claude').NODE_OPTIONS).toBeUndefined();
+      writeFileSync(`${bin}/preload-locked.cjs`, '');
+      expect(ledgerCliMarker('claude')).toEqual({
+        AGENTDECK_VERIFY_LEDGER_LOCK: '1',
+        NODE_OPTIONS: `--max-old-space-size=4096 --require "${bin}/preload-locked.cjs"`,
+        AGENTDECK_VERIFY_LEDGER_CLI: 'claude',
+      });
+      // Выбор человека (off в окружении панели) — обычный вход, без замка.
+      process.env.AGENTDECK_VERIFY_LEDGER = 'off';
+      expect(ledgerCliMarker('claude').NODE_OPTIONS).toBeUndefined();
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+      names.forEach((name, i) => {
+        const value = before[i];
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      });
+    }
   });
 });

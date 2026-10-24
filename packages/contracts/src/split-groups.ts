@@ -74,19 +74,25 @@ export const GROUP_QUESTIONS_MODES: readonly GroupQuestionsMode[] = ['plan', 'hu
  * 19.10, L6.2). Удаление и слияние на форже и в трекере — отдельная строка
  * `externalDestroy`, она у человека.
  *
- * Затирание истории git (`reset --hard`, `clean`, `restore`) тоже у человека
- * (аудит 25.09, L163): эти команды стирают работу без возврата. Пуш, слияние и
- * удаление веток эта строка не решает: их разбирает `group-command.ts` по
- * устройству команды — принудительный пуш, пуш в основную ветку, слияние и
- * удаление ветки уходят человеку при любых строках, а аренда СВОЕЙ ветки после
- * rebase (решение владельца, W3-3) и обычный пуш рабочей ветки — сами.
+ * Затирание правок git (`reset --hard`, `clean`, `restore`, `checkout -- пути`) в
+ * СВОЕЙ копии — само (решение владельца 23.10: эти карточки держали группы
+ * часами, а копия группы — её собственная), но на грязном дереве сперва снимок
+ * незакоммиченного в `refs/agentdeck/backup/…`; снимок не вышел — отказ агенту.
+ * Смена ветки на грязном дереве — отказ агенту: сперва закоммитить правки этой
+ * ветки. Вне копии, `clean -x` (игнорируемое) и перезапись чужой работы
+ * `group-command.ts` отдаёт человеку при любых строках. Пуш, слияние и удаление
+ * данных git эта строка не решает: их разбирает `group-command.ts` по устройству
+ * команды — пуш в основную ветку, принудительный пуш любой ветки, кроме своей,
+ * слияние не базы и удаление веток, меток, тайника и ссылок уходят человеку при
+ * любых строках, а перезапись СВОЕЙ ветки (арендой или `--force`, решение
+ * владельца 23.10) и обычный пуш рабочей ветки — сами.
  */
 export const GROUP_REQUEST_DEFAULTS: Readonly<Record<GroupRequestId, GroupPermissionLevel>> = {
   routine: 'auto',
   externalWrite: 'notify',
   gitWrite: 'auto',
   filesDelete: 'auto',
-  gitHistory: 'human',
+  gitHistory: 'auto',
   database: 'human',
   infrastructure: 'human',
   packagePublish: 'human',
@@ -137,8 +143,17 @@ export interface SplitDefaultsView {
   builtIn: SplitDefaults;
 }
 
+/**
+ * Ревизия коробки, от которой считаны отклонения записи. 2 — «история git» из
+ * коробки `auto` (23.10); запись без ревизии писалась при коробке `human`, и
+ * совпавшее с ней положение тогда не сохранялось (F-33).
+ */
+export const SPLIT_DEFAULTS_REVISION = 2;
+
 /** Хранимая запись: только отклонения от коробки, как и у записи проекта. */
 export interface StoredSplitDefaults {
+  /** `SPLIT_DEFAULTS_REVISION` на момент записи; нет — запись до 23.10. */
+  revision?: number;
   /** Прежние записи — булевы, новые — положения; читаются обе. */
   permissions?: Partial<Record<GroupRequestId, GroupPermissionLevel | boolean>>;
   groupQuestions?: GroupQuestionsMode;

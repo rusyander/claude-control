@@ -65,9 +65,16 @@ export default defineConfig({
         target: `http://127.0.0.1:${API_PORT}`,
         changeOrigin: true,
         configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             const token = apiToken();
             if (token) proxyReq.setHeader('authorization', `Bearer ${token}`);
+            // Порт клиента прокси: маршруты решений человека судят владельца ЭТОГО
+            // конца (`human-only.ts`), а не сам прокси, — иначе процесс модели
+            // ответил бы за человека через :8888. Заголовок ставится всегда и
+            // поверх присланного: клиент его не выбирает.
+            const port = req.socket.remotePort;
+            if (port) proxyReq.setHeader('x-agentdeck-client-port', String(port));
+            else proxyReq.removeHeader('x-agentdeck-client-port');
           });
         },
       },

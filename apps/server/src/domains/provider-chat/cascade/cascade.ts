@@ -1,4 +1,4 @@
-import type { AppSettings, ModelInfo } from '@agentdeck/contracts';
+import type { AppSettings, ModelInfo, ProviderChatDetail } from '@agentdeck/contracts';
 import {
   deliverStagePrompt,
   fixStagePrompt,
@@ -17,6 +17,7 @@ import {
   TASK_MAX_CHARS,
 } from '@agentdeck/contracts/split-plan';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import { resolveSonnetDeliver } from '@agentdeck/contracts/group-economy';
 import { labelledCut } from '@agentdeck/contracts/quality-floor';
 import {
   mergeSieveRows,
@@ -26,7 +27,7 @@ import {
   stampSieveRows,
 } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
-import { carriedLink } from '../../../lib/app-store/chat-links.ts';
+import { carriedStageLink } from '../../../lib/app-store/chat-links.ts';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
 import type { RunOptions } from '../../chat/ChatRunner/ChatRunner.ts';
 import type { RunMeta } from '../../chat/ChatRunRegistry/ChatRunRegistry.ts';
@@ -37,7 +38,7 @@ import { initiativePrompt } from '../../chat/initiative/initiative.ts';
 import { reviewNoticeText } from '../../chat/split-review/split-review.ts';
 import {
   chainOutcomeOf,
-  endsWithQuestion,
+  waitsForAnswer,
   type ChainOutcomeInput,
 } from '../../chat/chain-outcome/chain-outcome.ts';
 import { asksDelivery } from '../../chat/ChatCascadeStages/ChatCascadeStages.ts';
@@ -45,6 +46,11 @@ import type { ChainOutcome } from '../../chat/split-conveyor/split-conveyor.ts';
 import type { HandoffChains, HashFile, StatFile } from '../../chat/ChatHandoff/ChatHandoff.ts';
 import { planForeignHandoff, type ForeignHandoffDeps } from '../handoff/handoff.ts';
 import { foreignPathTurn, type ForeignPathTurnDeps } from '../path-turn/path-turn.ts';
+import {
+  withForeignCheapDeliver,
+  workDeliverAfterRefusal,
+  type DeliverContourRoute,
+} from './cheap-deliver.ts';
 import {
   appendMessage,
   createChat,
@@ -170,7 +176,9 @@ function stageTitle(cascade: ProviderChatCascade, stage: ForeignStagePlan['stage
 /**
  * Звено ДОСТАВКИ у чужого CLI (W3-3) — то же, что у Claude: на модели работы,
  * одно на круг. Задание без инструмента вопросов: у чужого CLI его нет, и
- * вопрос человеку — ход, кончившийся вопросом.
+ * вопрос человеку — ход, кончившийся вопросом. Младшую ступень лестницы при
+ * рычаге «Доставка на Sonnet» подставляет планировщик (`withForeignCheapDeliver`):
+ * здесь ни провайдера, ни каталога моделей нет.
  */
 function foreignDeliverPlan(
   cascade: ProviderChatCascade,
@@ -438,6 +446,8 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
     prompt: fixStagePrompt(findings, {
       ...(cascade.branch ? { branch: cascade.branch } : {}),
       reviewer: 'cli',
+      // Как у Claude (RC-D-01): шапка правок — новый разговор без `deliveredAt`,
+      // и за правками доставка придёт и после доставки круга — обещание верно.
       ...(input.deliver ? { deliver: true } : {}),
       verify: true,
       // Замечания уже в задании карточками — прозу ревью вокруг них правки не
@@ -544,6 +554,8 @@ export interface ForeignRunFinished {
   error?: string;
   /** Надзор назначил повтор или попытки кончились (Д10) — см. `chainOutcomeOf`. */
   retry?: ChainOutcomeInput['retry'];
+  /** Ход остановил человек (`ProviderChatFinished.stopped`): это не отказ модели. */
+  stopped?: boolean;
 }
 
 /** Что планировщику нужно снаружи, чтобы завести звено. */
@@ -554,8 +566,27 @@ export interface ForeignStagePlannerDeps {
   provider: (providerId: string) => ConfigProvider | undefined;
   /** Каталог моделей провайдера — им разворачиваются алиасы в самом прогоне. */
   models: (provider: ConfigProvider) => ModelInfo[];
-  /** Настройки: из них собирается системная дописка звена. */
-  settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>;
+  /**
+   * Настройки: из них собирается системная дописка звена; общий рычаг доставки
+   * на младшей ступени — `groupEconomy.sonnetDeliver`.
+   */
+  settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'> &
+    Partial<Pick<AppSettings, 'groupEconomy'>>;
+  /**
+   * Выбор человека «Доставка на Sonnet» для группы связи (карточка разделения,
+   * F-12) — тот же, что у Claude (`splitConveyor.sonnetDeliverOf`). Не задан —
+   * дешёвой доставки нет вовсе: без него выбор «нет» у группы потерялся бы молча.
+   */
+  sonnetDeliverOf?: (link: ChatLink) => boolean | undefined;
+  /**
+   * Маршрут контура следующего прогона этого CLI: идёт ли он через контур и
+   * какие имена переводит карта соответствия (`resolveRunRoute` для
+   * `foreign:<cli>`). Дешёвая доставка через контур — только когда в карте есть
+   * строка младшей ступени (то же правило, что у Claude, n6). Не задан — дешёвой
+   * доставки нет: узнать, уедет ли младшая ступень в модель контура по
+   * умолчанию, нечем, и доставка остаётся на модели работы.
+   */
+  contourRoute?: (providerId: string) => DeliverContourRoute;
   /**
    * Строки группы звена по ключу чата (`foreignChildExtra`) — те же, что у
    * ребёнка Claude. Не задан — звено идёт без них.
@@ -684,6 +715,89 @@ function foreignHandoffDeps(
 }
 
 /**
+ * Доставка на младшей ступени упала отказом в модели (`workDeliverAfterRefusal`)
+ * — та же доставка НОВЫМ разговором на модели работы. Новым, а не следующей
+ * репликой: у чужого CLI история едет вместе с ходом, и упавший ход с текстом
+ * отказа незачем показывать модели работы. Задание — первая реплика упавшего
+ * разговора (сита в нём уже подставлены), шапка и связь — его же, без модели и
+ * глубины младшей ступени. `true` — откат заведён, звеньев дальше не решаем.
+ */
+function redeliverOnWorkModel(
+  deps: ForeignStagePlannerDeps,
+  finished: ForeignRunFinished,
+  chat: ProviderChatDetail,
+  link: ChatLink,
+): boolean {
+  const { appDataDir, providerId, chatId } = finished;
+  const provider = deps.provider(providerId);
+  if (!provider) return false;
+  const models = deps.models(provider);
+  const cascade = readChatCascade(appDataDir, providerId, chatId);
+  const work = workDeliverAfterRefusal(
+    {
+      cascade,
+      chatModel: chat.model,
+      ok: finished.ok,
+      ...(finished.stopped ? { stopped: true } : {}),
+      ...(finished.error ? { error: finished.error } : {}),
+      ...(finished.retry ? { retry: finished.retry } : {}),
+    },
+    provider,
+    models,
+  );
+  const prompt = chat.messages.find((message) => message.role === 'user')?.content;
+  const cwd = chat.workdir;
+  if (!work || !cascade || !prompt || !cwd) return false;
+
+  const created = createChat(appDataDir, providerId, {
+    title: chat.title,
+    workdir: cwd,
+    cascade,
+    ...(work.model ? { model: work.model } : {}),
+    ...(work.effort ? { effort: work.effort } : {}),
+    ...(chat.allowEdits === undefined ? {} : { allowEdits: chat.allowEdits }),
+  });
+  if (!created) return false;
+
+  const stageKey = foreignChatKey(providerId, created.id);
+  const { model: _cheapModel, effort: _cheapEffort, ...carried } = link;
+  deps.saveLink?.(stageKey, {
+    ...carried,
+    createdAt: new Date().toISOString(),
+    ...(work.model ? { model: work.model } : {}),
+    ...(work.effort ? { effort: work.effort } : {}),
+  });
+  // Упавшая доставка остаётся в ленте с текстом отказа — человек должен видеть,
+  // куда она делась, а не гадать, откуда взялся второй разговор.
+  appendMessage(appDataDir, providerId, chatId, {
+    role: 'notice',
+    content: `Модель «${chat.model}» эту доставку не приняла: аккаунт или маршрут её не пускают. Доставка заново — новым разговором на модели работы${work.model ? ` «${work.model}»` : ''}.`,
+  });
+
+  if (
+    deps.gate?.defer(
+      'stage',
+      stageKey,
+      { prompt, cwd } as RunOptions,
+      {
+        projectPath: cwd,
+      } as RunMeta,
+    )
+  ) {
+    return true;
+  }
+  const prefix = foreignChatPrefix(cascade, deps.settings(), deps.childExtra?.(stageKey));
+  deps.chats.send(
+    appDataDir,
+    providerId,
+    created.id,
+    { text: prompt },
+    { provider, models, ...(prefix ? { systemPrefix: prefix } : {}) },
+  );
+  return true;
+}
+
+/**
  * Следующий ход ТОГО ЖЕ разговора (шаг «Пути») с дополнением звена — тем же,
  * что на старте звена (`foreignChatPrefix`). `false` — не запустился.
  */
@@ -737,7 +851,9 @@ export function createForeignStagePlanner(
       // отличить. Признак ревью один и живёт в связи.
       // Вопрос человеку текстом — пауза, а не итог (Д3). Фон чужого CLI панели
       // не виден: его ход кончается вместе с процессом.
-      const paused = finished.ok && endsWithQuestion(finished.text);
+      // Правило то же, что у итога группы (`waitsForAnswer`): иначе звено шло
+      // за ходом, который `chainOutcomeOf` уже счёл вопросом.
+      const paused = finished.ok && waitsForAnswer(finished.text);
       if (link?.review) {
         const reviewPath = link.review.path;
         const reviewWork = reviewPath ? () => deps.hasWork(reviewPath, link.createdAt) : undefined;
@@ -791,6 +907,16 @@ export function createForeignStagePlanner(
 
       const chat = readChat(appDataDir, providerId, chatId);
       if (!chat) return;
+
+      // Младшую ступень доставки отвергли аккаунт или маршрут (C2) — доставка
+      // заново на модели работы, а не провал группы без MR.
+      if (
+        link &&
+        cascade?.stage === 'deliver' &&
+        redeliverOnWorkModel(deps, finished, chat, link)
+      ) {
+        return;
+      }
 
       // Задание разговора — ПЕРВАЯ реплика человека. Разделение кладёт туда
       // задание группы, и именно с ним ревьюер сверяет сделанное; последняя
@@ -895,7 +1021,7 @@ export function createForeignStagePlanner(
       // Абзац сит план получает меткой (см. `SIEVE_SLOT`): пути копии читаются
       // асинхронно, и подставляются перед запуском звена.
       let sieveAsk = undefined as SieveAsk | undefined;
-      const plan = planForeignStage({
+      let plan = planForeignStage({
         cascade,
         ok: finished.ok,
         text,
@@ -937,6 +1063,24 @@ export function createForeignStagePlanner(
 
       const provider = deps.provider(providerId);
       if (!provider) return;
+      // Доставка на младшей ступени лестницы (C2): выбор группы сильнее общего рычага.
+      if (
+        plan.stage === 'deliver' &&
+        link &&
+        deps.sonnetDeliverOf &&
+        deps.contourRoute &&
+        resolveSonnetDeliver(
+          deps.sonnetDeliverOf(link),
+          deps.settings().groupEconomy?.sonnetDeliver,
+        )
+      ) {
+        plan = withForeignCheapDeliver(
+          plan,
+          provider,
+          deps.models(provider),
+          deps.contourRoute(providerId),
+        );
+      }
 
       // Отметка «проверено» / «спланировано» — ДО запуска: упавший запуск не
       // повод завести вторую проверку или вторую работу той же группы на
@@ -976,7 +1120,8 @@ export function createForeignStagePlanner(
       // разделения) — звено остаётся вне дерева, как и сам разговор.
       const stageKey = foreignChatKey(providerId, created.id);
       if (link) {
-        const carried = carriedLink(link);
+        // Новое звено — своё окно работы (F-110), как у звеньев Claude (`base`).
+        const carried = carriedStageLink(link);
         if (plan.raised) {
           delete carried.lowered;
           delete carried.model;

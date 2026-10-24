@@ -12,6 +12,7 @@ import { registerChatCliRoutes } from '../chat/cli-routes/cli-routes.ts';
 import { registerChatInboxRoutes } from '../chat/inbox-routes/inbox-routes.ts';
 import { registerOutsideRelayRoutes } from '../chat/outside-relay-routes/outside-relay-routes.ts';
 import { OutsideRelay } from '../../domains/chat/outside-relay/outside-relay.ts';
+import { registerDeferredRoutes } from '../chat/deferred-routes/deferred-routes.ts';
 
 /**
  * Классификация ошибок CLI живёт в домене; здесь она переэкспортирована, чтобы
@@ -75,4 +76,6 @@ export function registerChatRoutes(
   });
   registerChatInboxRoutes(app, ctx, registry, session, relay);
   registerOutsideRelayRoutes(app, ctx, relay);
+  // Отложенные вопросы D-n: список и решение человека (`deferred-routes.ts`).
+  registerDeferredRoutes(app, ctx, registry);
 }

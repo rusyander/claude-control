@@ -181,6 +181,19 @@ describe('подпись модели через контур', () => {
     expect(caption).toMatchObject({ key: 'chat.platformModelReplaced', warn: true });
   });
 
+  it('перевод строкой карты — не подмена: назван переводом, без тревоги', () => {
+    const mapped = choice({ model: 'qwen-mid', asked: 'sonnet', source: 'mapped', replaced: true });
+    expect(platformModelCaption('Company · dev', mapped)).toEqual({
+      key: 'chat.platformModelMapped',
+      params: { title: 'Company · dev', asked: 'sonnet', model: 'qwen-mid' },
+      warn: false,
+    });
+    expect(platformModelCaption('Локальная модель', mapped, true)).toMatchObject({
+      key: 'chat.localRoute.model',
+      warn: false,
+    });
+  });
+
   it('на локальной модели замена имени Claude — не предупреждение: подпись называет модель', () => {
     const caption = platformModelCaption(
       'Локальная модель',

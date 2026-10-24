@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ChatSummary } from '@agentdeck/contracts';
+import type { GroupSignal } from '@agentdeck/contracts/group-watch';
 import { i18n } from '@shared/config/i18n';
 import { ChatRow } from './ChatRow';
 
@@ -54,5 +55,56 @@ describe('строка списка чатов — метки дерева', () 
     expect(pending).not.toContain('data-row-mr');
     expect(plain).not.toContain('data-row-mr');
     expect(plain).not.toContain(i18n.t('chat.cascade.tree.noMr'));
+  });
+});
+
+const watchSignal = (id: string, severity: GroupSignal['severity']): GroupSignal => ({
+  id,
+  rule: 'R27',
+  severity,
+  groupIndex: -1,
+  chatId: 'solo',
+  at: '2026-10-23T10:00:00.000Z',
+  numbers: { waitMin: 12 },
+  textKey: 'groupWatch.rule.R27',
+});
+
+const renderWatch = (watchSignals: GroupSignal[] | undefined): string =>
+  renderToStaticMarkup(
+    <ChatRow
+      chat={chat({ id: 'solo', parentId: undefined })}
+      isActive={false}
+      language="ru"
+      onSelect={() => {}}
+      {...(watchSignals ? { watchSignals } : {})}
+    />,
+  );
+
+/** Тег фишки сторожа и её текст. */
+const watchChip = (html: string): { tag?: string; text?: string } => {
+  const match = /(<span[^>]*data-chat-watch-count[^>]*>)([^<]*)</.exec(html);
+  return { tag: match?.[1], text: match?.[2] };
+};
+
+describe('строка списка чатов — фишка сторожа одиночного чата', () => {
+  it('два активных сигнала: число, цвет по самому важному и подсказка', () => {
+    const html = renderWatch([watchSignal('a', 'warn'), watchSignal('b', 'alert')]);
+    const { tag, text } = watchChip(html);
+    expect(tag).toContain('data-chat-watch-count="2"');
+    expect(tag).toContain('data-chat-watch-severity="alert"');
+    expect(tag).toContain(`title="${i18n.t('groupWatch.chat.chipHint')}"`);
+    expect(text).toBe(i18n.t('groupWatch.chat.chip', { count: 2 }));
+    expect(text).not.toContain('groupWatch.');
+  });
+
+  it('одно «внимание» — жёлтым, не красным', () => {
+    const { tag } = watchChip(renderWatch([watchSignal('a', 'warn')]));
+    expect(tag).toContain('data-chat-watch-severity="warn"');
+    expect(tag).toContain('data-chat-watch-count="1"');
+  });
+
+  it('пустой список и без поля — фишки нет', () => {
+    expect(renderWatch([])).not.toContain('data-chat-watch-count');
+    expect(renderWatch(undefined)).not.toContain('data-chat-watch-count');
   });
 });

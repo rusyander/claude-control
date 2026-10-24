@@ -138,4 +138,21 @@ describe('settings snapshot', () => {
     const settings = portableOf(state, WIN).settings as Record<string, unknown>;
     expect(settings.groupWatch).toEqual({ askMinutes: 40 });
   });
+
+  // F-41 (решение владельца): пороги сторожа — переносимые предпочтения, как экономия групп.
+  it('снимок с блоком сторожа (даже пустым) принимается, без блока — пороги машины остаются', () => {
+    const local = stateWith({
+      settings: { ...DEFAULT_STATE.settings, groupWatch: { stallMinutes: 45 } as never },
+    });
+    const empty = applyPortable(local, { settings: { groupWatch: {} } } as never, WIN);
+    expect(empty.settings.groupWatch).toEqual({});
+    const brought = applyPortable(
+      local,
+      { settings: { groupWatch: { askMinutes: 40 } } } as never,
+      WIN,
+    );
+    expect(brought.settings.groupWatch).toEqual({ askMinutes: 40 });
+    const without = applyPortable(local, { settings: { backupKeep: 3 } } as never, WIN);
+    expect(without.settings.groupWatch).toEqual({ stallMinutes: 45 });
+  });
 });

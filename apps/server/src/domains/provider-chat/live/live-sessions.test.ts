@@ -357,6 +357,10 @@ describe('qwen: режим одобрения сессии', () => {
         error: 'Qwen остановил ход после отказа в разрешении: edit notes.txt',
       });
       expect(disk.deleted).toEqual(['ses-1']);
+      // Q1: брошенная сессия уходит в архив Qwen, а не стирается — её журнал
+      // остаётся аналитике (расход хода потрачен, даже если ответа нет).
+      expect(disk.log).toContain('archive ses-1');
+      expect(disk.log.filter((line) => line.startsWith('erase'))).toEqual([]);
 
       const allowed = await run('allow');
       expect(allowed).toMatchObject({ kind: 'done', reply: 'правка сделана', session: 'ses-2' });

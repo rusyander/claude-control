@@ -182,6 +182,15 @@ const sizeOf = (name) => {
     return 0;
   }
 };
+// Split group (the panel sets AGENTDECK_SPLIT_CHILD=1), phase G.3: a group compacts every ~15 min
+// and every compaction re-sent each rule whole — in measured worktree sessions the re-sends were
+// twice the first sends, and the group then Read the source file anyway. There a RE-delivery (the
+// rule already reached this session once) is a card ≤ CARD_MAX: title, the file path with a Read
+// window per section, the lead clipped to fit. The first delivery stays whole (quality on first
+// contact); a human session is untouched. The `.sent` mark outlives compaction on purpose.
+export const CARD_MAX = 1000;
+const splitChild = () => process.env.AGENTDECK_SPLIT_CHILD === '1';
+
 /** Ceiling the dispatcher must allow so the largest deliberate payload is not clipped on its way out. */
 export const MAX_RULE_CEILING = Math.max(MAX_RULE * 2, ...[...BIG_RULES].map(sizeOf)) + 512;
 
@@ -301,12 +310,16 @@ export default function ruleInjector(input) {
   if (!wanted.length) return null;
 
   const out = [];
+  const group = splitChild();
   for (const { rule, text } of wanted) {
     if (alreadySent(session, rule)) continue;
-    const body = text ? text() : read(rule);
+    let body = text ? text() : read(rule);
     if (body) {
+      if (group && existsSync(sentOf(session, rule)))
+        body = cardOf(body, join(RULES, `${rule}.md`), rule);
       out.push(body);
       logDelivery(session, rule, body.length);
+      if (group) markSent(session, rule);
     }
   }
   return out.length ? out.join('\n\n') : null;
@@ -328,16 +341,62 @@ export function clearRuleStamps(session) {
   if (key.length >= 4) logDelivery(key, '#compact', 0);
   try {
     for (const f of readdirSync(CACHE)) {
-      if (!f.startsWith('rule-') || !f.endsWith('.stamp')) continue;
+      if (!f.startsWith('rule-') || !(f.endsWith('.stamp') || f.endsWith('.sent'))) continue;
       const path = join(CACHE, f);
       // Own stamps go now; anyone else's go once they are a week stale — the cache had grown to
-      // 200 dead files from finished sessions.
+      // 200 dead files from finished sessions. A `.sent` mark is never "own": it must outlive compaction.
       const stale = !own(f) && Date.now() - statSync(path).mtimeMs > 7 * 24 * 3600e3;
       if (own(f) || stale) unlinkSync(path);
     }
   } catch {
     /* a stamp that cannot be cleared costs one missed re-delivery, never the compaction */
   }
+}
+
+// Split group only: "this rule reached the session once". Not a `.stamp`, so compaction keeps it.
+const sentOf = (session, name) => join(CACHE, `rule-${name}-${session}.sent`);
+function markSent(session, name) {
+  try {
+    stateDir('rules');
+    writeFileSync(sentOf(session, name), '1');
+  } catch {
+    /* a lost mark costs one whole re-delivery, never the rule */
+  }
+}
+
+/**
+ * Split-group re-delivery (see CARD_MAX): the header and the Read pointer go first so a clip never
+ * eats them; the lead (text before the first section) fills what is left. Binding as a whole.
+ */
+export function cardOf(body, file, name = 'rule') {
+  const title = /^# +(.+)$/m.exec(body)?.[1]?.trim() ?? name;
+  const path = file.split('\\').join('/');
+  let lines = [];
+  try {
+    lines = readFileSync(file, 'utf8').split('\n');
+  } catch {
+    /* no file to window — the path alone still says where the rule lives */
+  }
+  const starts = lines.flatMap((l, i) => (l.startsWith('## ') ? [i] : []));
+  const windows = starts
+    .map(
+      (s, k) =>
+        `${lines[s].slice(3).trim()} offset=${s + 1} limit=${(starts[k + 1] ?? lines.length) - s}`,
+    )
+    .join(' · ');
+  const head =
+    `# ${title} — card (split group, re-sent after compaction; the full text reached this session before)\n` +
+    `Still binding in full: Read ${path}${windows ? ` — the section covering your work, before acting: ${windows}` : ' before acting'}\n`;
+  const titleAt = body.search(/^# /m);
+  const afterTitle = titleAt < 0 ? body : body.slice(body.indexOf('\n', titleAt) + 1);
+  const cut = afterTitle.indexOf('\n## ');
+  const lead = (cut < 0 ? afterTitle : afterTitle.slice(0, cut))
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const room = CARD_MAX - head.length;
+  if (room < 40 || !lead) return head.slice(0, CARD_MAX).trimEnd();
+  return `${head}${lead.length > room ? `${lead.slice(0, room - 1).trimEnd()}…` : lead}`;
 }
 
 function read(name) {

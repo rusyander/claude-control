@@ -94,6 +94,15 @@ export class ModelCatalogStore {
     };
   }
 
+  /**
+   * Все модели кэша, без фильтра по вендору: окно модели нужно и для чужой модели
+   * под CLI (Qwen Code ходит в OpenAI-совместимые и в Claude), а список выбора
+   * провайдера — только его вендоры. Без обращения к сети.
+   */
+  allModels(): ModelInfo[] {
+    return this.cache?.models ?? [];
+  }
+
   isStale(maxAgeMs = MODELS_MAX_AGE_MS): boolean {
     if (!this.cache) return true;
 

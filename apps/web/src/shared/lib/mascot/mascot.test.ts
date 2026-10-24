@@ -22,7 +22,14 @@ describe('parseMascotPrefs', () => {
       enabled: false,
       chatty: true,
       greeted: true,
+      reactions: true,
     });
+  });
+
+  it('reactions: on by default (old stored prefs included), off only when saved off', () => {
+    expect(DEFAULT_MASCOT_PREFS.reactions).toBe(true);
+    expect(parseMascotPrefs('{"enabled":true,"chatty":true,"greeted":true}').reactions).toBe(true);
+    expect(parseMascotPrefs('{"reactions":false}').reactions).toBe(false);
   });
 });
 

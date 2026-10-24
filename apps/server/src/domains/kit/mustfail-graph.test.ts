@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -47,7 +48,8 @@ const mustfail = (...extra: string[]) => {
   const r = spawnSync(process.execPath, [MUSTFAIL, '--base', 'HEAD~1', ...extra, '--cmd', CMD], {
     cwd: repo,
     encoding: 'utf8',
-    env: { ...process.env, AGENTDECK_VERIFY_LEDGER: 'off' },
+    // Замок панели снимает сам mustfail в своих прогонах; здесь — и для своего запуска.
+    env: { ...process.env, AGENTDECK_VERIFY_LEDGER: 'off', AGENTDECK_VERIFY_LEDGER_LOCK: '' },
   });
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
 };
@@ -109,6 +111,46 @@ describe('mustfail набора: режим графа vitest и память в
       expect(changed.out).not.toContain('already proven');
     } finally {
       git('checkout', '-q', 'src/b.js');
+    }
+  }, 120_000);
+
+  it('вход с замком журнала (F-30): прогоны мутантов идут через обычный preload.cjs', () => {
+    // Панель кладёт в NODE_OPTIONS `bin/preload-locked.cjs` — замок, который окружение не снимает.
+    // Мутантам он вернул бы зелёный повтор с немутированного дерева, поэтому mustfail меняет вход.
+    const bin = join(repo, '..', `${repo.split(/[\\/]/).pop()}-ledger`, 'bin');
+    mkdirSync(bin, { recursive: true });
+    const log = join(bin, 'loads.log').replace(/\\/g, '/');
+    // Каждый node пишет, через какой вход стартовал и какой замок/режим журнала увидел (F-81).
+    const mark = (word: string) =>
+      `const e = process.env; require('node:fs').appendFileSync(${JSON.stringify(log)}, ` +
+      `'${word}:' + (e.AGENTDECK_VERIFY_LEDGER_LOCK ?? '') + ':' + (e.AGENTDECK_VERIFY_LEDGER ?? '') + '\\n');\n`;
+    writeFileSync(join(bin, 'preload-locked.cjs'), mark('locked'));
+    writeFileSync(join(bin, 'preload.cjs'), mark('plain'));
+    const entry = join(bin, 'preload-locked.cjs').replace(/\\/g, '/');
+    put('src/b.js', 'export const mul = (x, y) => (y * x);\n');
+    try {
+      const r = spawnSync(process.execPath, [MUSTFAIL, '--base', 'HEAD~1', '--cmd', CMD], {
+        cwd: repo,
+        encoding: 'utf8',
+        // Окружение панели: замок стоит, журнал включён — mustfail обязан снять оба сам.
+        env: {
+          ...process.env,
+          NODE_OPTIONS: `--require "${entry}"`,
+          AGENTDECK_VERIFY_LEDGER_LOCK: '1',
+          AGENTDECK_VERIFY_LEDGER: 'on',
+        },
+      });
+      const loads = readFileSync(log, 'utf8').trim().split('\n');
+      expect(`${r.stdout}${r.stderr}`).toContain('· baseline with graph: green');
+      // Только сам mustfail стартовал через вход с замком; каждый node прогона — через обычный,
+      // с пустым замком и выключенным журналом.
+      expect(loads.filter((w) => w.startsWith('locked:'))).toEqual(['locked:1:on']);
+      const plain = loads.filter((w) => w.startsWith('plain:'));
+      expect(plain.length).toBeGreaterThan(0);
+      expect(new Set(plain)).toEqual(new Set(['plain::off']));
+    } finally {
+      git('checkout', '-q', 'src/b.js');
+      rmSync(dirname(bin), { recursive: true, force: true });
     }
   }, 120_000);
 });

@@ -338,3 +338,62 @@ describe('продолжение — доводка после ревью L4b (L
     expect(timers).toHaveLength(1);
   });
 });
+
+// F-45: прогон, подхваченный после перезапуска панели, несёт мост прав с
+// пустым адресом (`run-reattach.ts`). Продолжение брало его как есть — каждый
+// вызов инструмента продолженного хода брокер отказывал.
+describe('продолжение подхваченного прогона: мост прав — к этой панели', () => {
+  it('пустой адрес моста заменяется своим, под ключом нового хода', () => {
+    const started: RunOptions[] = [];
+    const supervisor = new AutoContinue({
+      start: (_chatId, options) => {
+        started.push(options);
+        return true;
+      },
+      isLocal: () => true,
+      schedule: (run) => run(),
+      bridge: (runId) => ({ runId, baseUrl: 'http://127.0.0.1:5178', tokenFile: '/t/api-token' }),
+      log: () => undefined,
+    });
+    supervisor.finished({
+      chatId: 'c',
+      sessionId: 's',
+      text: '',
+      ok: false,
+      startedAt: 0,
+      options: { prompt: '', cwd: '/w', permissionPrompt: { runId: 'old', baseUrl: '' } },
+      contextTokens: 0,
+      error: 'fetch failed',
+    });
+    expect(started[0]?.permissionPrompt).toEqual({
+      runId: 'c',
+      baseUrl: 'http://127.0.0.1:5178',
+      tokenFile: '/t/api-token',
+    });
+  });
+
+  it('прогон без моста прав моста и не получает', () => {
+    const started: RunOptions[] = [];
+    const supervisor = new AutoContinue({
+      start: (_chatId, options) => {
+        started.push(options);
+        return true;
+      },
+      isLocal: () => true,
+      schedule: (run) => run(),
+      bridge: (runId) => ({ runId, baseUrl: 'http://127.0.0.1:5178' }),
+      log: () => undefined,
+    });
+    supervisor.finished({
+      chatId: 'c',
+      sessionId: 's',
+      text: '',
+      ok: false,
+      startedAt: 0,
+      options: { prompt: '', cwd: '/w' },
+      contextTokens: 0,
+      error: 'fetch failed',
+    });
+    expect(started[0]?.permissionPrompt).toBeUndefined();
+  });
+});

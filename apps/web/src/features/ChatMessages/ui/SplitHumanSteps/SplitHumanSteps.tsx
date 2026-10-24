@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
 import { toast } from '@shared/lib/toast';
+import { HubFold } from '../HubFold/HubFold';
 import type { SplitHumanStepsProps } from './SplitHumanSteps.types';
 import styles from './SplitHumanSteps.module.scss';
 import type { HubHumanStep } from '../../lib/collectHumanSteps';
@@ -16,7 +17,7 @@ import { collectHumanSteps } from '../../lib/collectHumanSteps';
  * Панель шаг не выполняет: запись во внешний сервис — согласие человека на
  * каждую операцию. «Копировать» отдаёт шаг с местом, где он делается.
  */
-export function SplitHumanSteps({ groups }: SplitHumanStepsProps) {
+export function SplitHumanSteps({ groups, defaultExpanded = false }: SplitHumanStepsProps) {
   const { t } = useTranslation();
   const steps = collectHumanSteps(groups);
   if (steps.length === 0) return null;
@@ -36,41 +37,39 @@ export function SplitHumanSteps({ groups }: SplitHumanStepsProps) {
 
   return (
     <div className={styles.section} data-split-human-steps={steps.length}>
-      <Typography
-        variant="caption"
-        color="subtle"
-        as="div"
-        title={t('chat.cascade.hub.humanSteps.hint')}
+      <HubFold
+        title={t('chat.cascade.hub.humanSteps.title', { count: steps.length })}
+        hint={t('chat.cascade.hub.humanSteps.hint')}
+        defaultExpanded={defaultExpanded}
       >
-        {t('chat.cascade.hub.humanSteps.title', { count: steps.length })}
-      </Typography>
-      {steps.map((step) => (
-        <div key={step.key} className={styles.item} data-split-human-step>
-          <div className={styles.body}>
-            <Typography variant="body-sm" as="div">
-              {step.action}
-            </Typography>
-            <Typography variant="caption" color="subtle" as="div" truncate>
-              {[
-                step.where,
-                t('chat.cascade.hub.humanSteps.askedBy', { groups: step.groups.join(', ') }),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </Typography>
-            {step.why && (
-              <Typography variant="caption" color="subtle" as="div" className={styles.why}>
-                {step.why}
+        {steps.map((step) => (
+          <div key={step.key} className={styles.item} data-split-human-step>
+            <div className={styles.body}>
+              <Typography variant="body-sm" as="div">
+                {step.action}
               </Typography>
-            )}
+              <Typography variant="caption" color="subtle" as="div" truncate>
+                {[
+                  step.where,
+                  t('chat.cascade.hub.humanSteps.askedBy', { groups: step.groups.join(', ') }),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Typography>
+              {step.why && (
+                <Typography variant="caption" color="subtle" as="div" className={styles.why}>
+                  {step.why}
+                </Typography>
+              )}
+            </div>
+            <div className={styles.holdActions}>
+              <Button size="sm" variant="ghost" onClick={() => copy(step)}>
+                {t('chat.cascade.hub.tickets.copy')}
+              </Button>
+            </div>
           </div>
-          <div className={styles.holdActions}>
-            <Button size="sm" variant="ghost" onClick={() => copy(step)}>
-              {t('chat.cascade.hub.tickets.copy')}
-            </Button>
-          </div>
-        </div>
-      ))}
+        ))}
+      </HubFold>
     </div>
   );
 }

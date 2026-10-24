@@ -9,13 +9,31 @@ import type {
 } from '@agentdeck/contracts/chat-handoff';
 import type { ServerContext } from '../../context.ts';
 import type { StopOutcome } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
+import {
+  copyRootOf,
+  type SplitConveyor,
+} from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import type { PendingAsks } from '../../domains/chat/pending-asks/pending-asks.ts';
 import { acceptSplitGroup } from '../../domains/chat/split-acceptance.ts';
-import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
+import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { conversationKeys } from '../../lib/app-store/chat-links.ts';
+import {
+  sweepPathProcesses,
+  sweepPathsProcesses,
+  type SweepImpl,
+} from '../../lib/process-tree/path-sweep.ts';
+import { TESTS_RUNS_AT_DELIVERY_ENV } from '../../domains/chat/group-profile/group-profile.ts';
+import type { TreePause } from '../../domains/chat/tree-pause/tree-pause.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
 import type { SplitLaunchDeps } from './split-launch.ts';
+import { deferredAsksOf } from './deferred-routes/deferred-store.ts';
+
+/**
+ * Метка процессов группы для добора по пути (RF-BGCD-09): профиль группы кладёт
+ * её в окружение CLI всегда, потомки наследуют. Где окружение читается (Linux),
+ * сирота с меткой — группы, даже подобранный субжнецом `systemd --user`.
+ */
+const GROUP_SWEEP: SweepImpl = { mark: TESTS_RUNS_AT_DELIVERY_ENV };
 
 /**
  * Управление одной группой разделения из хаба (журнал 81, 89): пауза,
@@ -37,8 +55,30 @@ export function registerSplitControlRoutes(
     asks?: Pick<PendingAsks, 'forget'>;
     /** «Перепроверить MR» доставленной группы (`split-recheck.ts`). */
     recheckMr?: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
+    /** Добор процессов копии по пути (`path-sweep.ts`); номера снятых. */
+    sweepCopy?: (path: string) => Promise<number[]>;
   },
 ): void {
+  const sweepCopy = deps.sweepCopy ?? ((path: string) => sweepPathProcesses(path, GROUP_SWEEP));
+  /**
+   * После паузы, «Убрать» и отмены — добор того, что группа завела в своей
+   * копии и что пережило её CLI (N1b/N1c, 23.10): dev-сервер, цепочка тестов,
+   * потерявшая родителя. Только своя копия группы: группа без копии работает в
+   * самом проекте, и там же — стенд человека.
+   */
+  const sweepAfter = (paths: readonly string[], why: string): void => {
+    for (const path of paths) {
+      void sweepCopy(path).then((killed) => {
+        if (killed.length > 0) app.log.info({ path, killed }, `${why}: copy processes swept`);
+      });
+    }
+  };
+  /** Своя копия группы по записи плана — до действия, которое меняет запись. */
+  const copyOf = (parentChatId: string, index: number): string[] => {
+    const record = ctx.store.getSplitPlan(parentChatId);
+    const path = record ? ownCopyOf(record, groupOf(record, index)) : undefined;
+    return path ? [path] : [];
+  };
   /** Номер группы из тела; нет конвейера или номера — ответ уже отправлен. */
   const target = (
     reply: FastifyReply,
@@ -89,8 +129,11 @@ export function registerSplitControlRoutes(
       const found = target(reply, request.body?.index);
       if (!found) return reply;
       try {
+        const copy = copyOf(request.params.parent, found.index);
         const { chatIds } = found.conveyor.pause(request.params.parent, found.index);
+        // Идущий ход и ждущий процесс с фоном — оба (N1a): `stopConversation`.
         const body: SplitGroupPaused = { index: found.index, ...stopEach(chatIds) };
+        sweepAfter(copy, 'split pause');
         return body;
       } catch (error) {
         return refuse(reply, error);
@@ -160,7 +203,24 @@ export function registerSplitControlRoutes(
       const found = target(reply, request.body?.index);
       if (!found) return reply;
       try {
+        const plan = ctx.store.getSplitPlan(request.params.parent);
+        const chatId = plan ? groupOf(plan, found.index)?.chatId : undefined;
+        const copy = copyOf(request.params.parent, found.index);
         found.conveyor.dropGroup(request.params.parent, found.index);
+        // Убранная группа больше не на паузе, и сторож пробуждений её не держит:
+        // процесс, переживший паузу (снятие не подтвердилось), гасится здесь.
+        if (chatId) stopEach([chatId]);
+        sweepAfter(copy, 'split drop');
+        // Убранная группа закрыта насовсем — её D-n отзываются, как при отмене
+        // плана: иначе позднее «Разрешить» будило бы группу, которую человек
+        // убрал, а сообщение в Telegram ждало бы ответа (RF-DL-10).
+        const parent = request.params.parent;
+        deferredAsksOf(ctx).withdraw(
+          (scope) =>
+            scope.kind === 'group' &&
+            scope.parentChatId === parent &&
+            scope.groupIndex === found.index,
+        );
         return { index: found.index };
       } catch (error) {
         return refuse(reply, error);
@@ -274,9 +334,11 @@ export function registerSplitControlRoutes(
       const { chatIds, cancelled, paths } = deps.conveyor.cancel(request.params.parent);
       const body: SplitPlanCancelled = { ...stopEach(chatIds), cancelled, chatIds };
       // Процессы CLI, ждущие следующего хода в копиях отменённого плана, держат
-      // копии своим cwd, и «Убрать копию» спотыкалась о них (F4c). Занятые ходом
-      // или фоном остаются: их прогон гасит остановка выше или человек.
+      // копии своим cwd, и «Убрать копию» спотыкалась о них (F4c). Процессы
+      // разговоров групп — и с фоном — гасит остановка выше (N1a); здесь —
+      // прочие простаивающие в копиях, потом добор по пути копии.
       for (const path of paths) void deps.runs.livePool.closeIdleIn(path);
+      sweepAfter(paths, 'split cancel');
       // Вопросы закрытых групп больше никто не ждёт — иначе вкладка звала бы
       // «агент ждёт ответа» по разговору отменённого плана.
       // И законченные прогоны их ходов уходят из буфера догона: хвост с вопросом
@@ -286,6 +348,12 @@ export function registerSplitControlRoutes(
         deps.asks?.forget(keys);
         for (const key of keys) deps.runs.discardFinished(key);
       }
+      // Отложенные вопросы D-n отменённого плана отзываются: продолжать нечего,
+      // а неиспользованное разрешение не должно дожить до нового плана.
+      const parent = request.params.parent;
+      deferredAsksOf(ctx).withdraw(
+        (scope) => scope.kind === 'group' && scope.parentChatId === parent,
+      );
       return body;
     } catch (error) {
       return refuse(reply, error);
@@ -303,7 +371,40 @@ export function stopChatKey(
 ): StopOutcome {
   const foreign = parseForeignChatKey(key);
   if (foreign) return deps.providerChats.stop(foreign.chatId) ? 'stopped' : 'absent';
-  return deps.runs.isRunning(key) ? deps.runs.stop(key) : 'absent';
+  if (deps.runs.isRunning(key)) return deps.runs.stop(key);
+  // Хода нет, а процесс ждёт следующего — с фоновой задачей, чей конец его
+  // разбудит (N1a, 23.10: группа на паузе закоммитила и завела копию). Гасим и его.
+  return deps.runs.closeLive(key);
+}
+
+/**
+ * Своя копия группы — путь, которого нет ни у проекта, ни у верха копий: только
+ * её можно мести по пути (то же правило, что у копий отменённого плана).
+ */
+/**
+ * Группа записи по её номеру `index`, не по позиции в массиве (F-83): так её ищут все остальные
+ * места; позиция совпадает с номером лишь пока группы не переставляют и не убирают из записи.
+ */
+export function groupOf<G extends { index: number }>(
+  record: { groups: readonly G[] },
+  index: number,
+): G | undefined {
+  return record.groups.find((group) => group.index === index);
+}
+
+export function ownCopyOf(
+  record: Pick<SplitPlanRecord, 'projectPath' | 'copyRoot'>,
+  group: { path?: string; cleaned?: unknown } | undefined,
+): string | undefined {
+  if (!group?.path || group.cleaned) return undefined;
+  const norm = (value: string): string =>
+    value.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const within = (path: string, dir: string): boolean =>
+    norm(path) === norm(dir) || norm(path).startsWith(`${norm(dir)}/`);
+  if (within(group.path, record.projectPath) || within(group.path, copyRootOf(record))) {
+    return undefined;
+  }
+  return group.path;
 }
 
 /**
@@ -342,6 +443,49 @@ export function pausedGroupOf(
       const link = store.getChatLink(key);
       return Boolean(link && conveyor.isPaused(link));
     });
+}
+
+/**
+ * Разговор группы разделения в стоящем дереве («Остановить всё», 23.10): сторож
+ * пробуждений держит его так же, как группу на паузе. Только группы: прочие
+ * разговоры дерева пробуждение не держит — их ход начат CLI, а не панелью.
+ */
+export function treePausedGroupOf(
+  store: {
+    getChatLink: (key: string) => ChatLink | undefined;
+    getChatLinks: () => Record<string, ChatLink>;
+  },
+  tree: Pick<TreePause, 'isPaused'>,
+): (chatId: string) => boolean {
+  return (chatId) => {
+    const keys = [chatId, ...conversationKeys(store.getChatLinks(), chatId)];
+    const group = keys.some((key) => store.getChatLink(key)?.groupIndex !== undefined);
+    return group && keys.some((key) => tree.isPaused(key));
+  };
+}
+
+/**
+ * Добор процессов своих копий групп по ключам снятых разговоров (пауза дерева):
+ * одним снимком на все копии. Номера снятых.
+ */
+export function sweepGroupCopies(
+  store: {
+    getChatLink: (key: string) => ChatLink | undefined;
+    getSplitPlan: (parentChatId: string) => SplitPlanRecord | undefined;
+  },
+  keys: readonly string[],
+  sweep: (dirs: readonly string[]) => Promise<number[]> = (dirs) =>
+    sweepPathsProcesses(dirs, GROUP_SWEEP),
+): Promise<number[]> {
+  const copies = new Set<string>();
+  for (const key of keys) {
+    const link = store.getChatLink(key);
+    if (!link?.parentChatId || link.groupIndex === undefined) continue;
+    const record = store.getSplitPlan(link.parentChatId);
+    const copy = record ? ownCopyOf(record, groupOf(record, link.groupIndex)) : undefined;
+    if (copy) copies.add(copy);
+  }
+  return copies.size > 0 ? sweep([...copies]) : Promise.resolve([]);
 }
 
 /**

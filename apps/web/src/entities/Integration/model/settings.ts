@@ -46,6 +46,8 @@ export const TELEGRAM_EVENTS: readonly TelegramEvent[] = [
   // бюджета»): подписываются на «сообщать ли про бюджет», а какой именно порог,
   // сказано в тексте.
   'budget',
+  // Сигнал сторожа групп: «внимание» и «тревога».
+  'groupSignal',
 ];
 
 const NO_SITE: AtlassianSiteSettings = { enabled: false, baseUrl: '', email: '', deployment: '' };

@@ -22,6 +22,9 @@ export function hubBucket(group: ChildStageGroup): HubBucket {
   ) {
     return 'ask';
   }
+  // Остались одни вызовы D-n — законное ожидание решения списком: не «ждёт
+  // вас» (вопроса нет, работа сделана) и не «готово» (ветка недоделана).
+  if (group.waitingFor === 'human-op') return 'deferred';
   // Принятая человеком — своя корзина (TK-accepted): «готово» говорит, что
   // панель довела группу, «принято» — что человек её посмотрел.
   if (group.status === 'done' && group.acceptance?.acceptedAt) return 'accepted';

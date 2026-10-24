@@ -205,6 +205,38 @@ describe('translate — разбор потока CLI', () => {
     ).toEqual([]);
   });
 
+  it('system/api_retry → apiRetry сторожу (R30): поля CLI под своими именами, битые — мимо', () => {
+    expect(
+      translate(
+        raw({
+          type: 'system',
+          subtype: 'api_retry',
+          attempt: 2,
+          max_retries: 10,
+          retry_delay_ms: 1_150,
+          error_status: 529,
+          error: 'overloaded',
+          session_id: 's1',
+        }),
+      ),
+    ).toEqual([
+      {
+        kind: 'apiRetry',
+        attempt: 2,
+        maxRetries: 10,
+        delayMs: 1_150,
+        status: 529,
+        error: 'overloaded',
+      },
+    ]);
+    // Сеть не ответила: статуса нет; строка вместо числа и пустая ошибка — не поля.
+    expect(
+      translate(
+        raw({ type: 'system', subtype: 'api_retry', attempt: '3', error_status: null, error: '' }),
+      ),
+    ).toEqual([{ kind: 'apiRetry' }]);
+  });
+
   it('вызов субагента (parent_tool_use_id) помечен родителем', () => {
     expect(
       translate(

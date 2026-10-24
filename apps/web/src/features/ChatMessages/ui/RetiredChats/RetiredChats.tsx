@@ -4,6 +4,7 @@ import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
 import { Stack } from '@shared/ui/stack';
 import { GroupCopyCleanup } from '../GroupCopyCleanup/GroupCopyCleanup';
+import { HubFold } from '../HubFold/HubFold';
 import type { RetiredChatsProps } from './RetiredChats.types';
 import styles from './RetiredChats.module.scss';
 
@@ -14,62 +15,63 @@ import styles from './RetiredChats.module.scss';
  * заменили, — но в счёт групп и в сводку они не идут. Копию, оставленную такой
  * группой, убирают отсюда же (F5.2): хаб её строкой группы уже не покажет.
  */
-export function RetiredChats({ chats, onOpen }: RetiredChatsProps) {
+export function RetiredChats({ chats, onOpen, defaultExpanded = false }: RetiredChatsProps) {
   const { t } = useTranslation();
   if (chats.length === 0) return null;
 
   return (
     <div className={styles.inactive} data-hub-inactive>
-      <Typography
-        variant="caption"
-        color="subtle"
-        as="span"
-        title={t('chat.cascade.hub.inactiveHint')}
+      <HubFold
+        title={t('chat.cascade.hub.inactive', { count: chats.length })}
+        hint={t('chat.cascade.hub.inactiveHint')}
+        defaultExpanded={defaultExpanded}
       >
-        {t('chat.cascade.hub.inactive', { count: chats.length })}
-      </Typography>
-      {chats.map((chat) => (
-        <Fragment key={chat.chatId}>
-          <button
-            type="button"
-            className={styles.row}
-            data-hub-row="retired"
-            onClick={() => onOpen(chat.chatId)}
-          >
-            <StatusDot
-              tone={chat.isRunning ? 'success' : 'neutral'}
-              pulse={chat.isRunning}
-              label={t(chat.isRunning ? 'chat.cascade.hub.running' : 'chat.cascade.hub.idle')}
-            />
-            <Stack gap="0" className={styles.text}>
-              <Typography variant="body-sm" color="subtle" as="span" truncate>
-                {chat.title}
-              </Typography>
-              {/* Приёмка человека переживает новое разделение (живая приёмка 09.10):
-                  без отметки принятая группа здесь не отличалась от брошенной. */}
-              {chat.retiredAccepted && (
-                <Typography
-                  variant="caption"
-                  color="subtle"
-                  as="span"
-                  className={styles.chip}
-                  data-hub-accepted
-                >
-                  {t('chat.cascade.hub.accept.marker')}
+        {chats.map((chat) => (
+          <Fragment key={chat.chatId}>
+            <button
+              type="button"
+              className={styles.row}
+              data-hub-row="retired"
+              onClick={() => onOpen(chat.chatId)}
+            >
+              <StatusDot
+                tone={chat.isRunning ? 'success' : 'neutral'}
+                pulse={chat.isRunning}
+                label={t(chat.isRunning ? 'chat.cascade.hub.running' : 'chat.cascade.hub.idle')}
+              />
+              <Stack gap="0" className={styles.text}>
+                <Typography variant="body-sm" color="subtle" as="span" truncate>
+                  {chat.title}
                 </Typography>
-              )}
-              <Typography variant="caption" color="subtle" as="span" truncate>
-                {[chat.branch, ...chat.stages.map((stage) => t(`chat.cascade.stageFull.${stage}`))]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Typography>
-            </Stack>
-          </button>
-          {chat.retiredCopy && (
-            <GroupCopyCleanup parentChatId={chat.retiredCopy.parentChatId} chatId={chat.chatId} />
-          )}
-        </Fragment>
-      ))}
+                {/* Приёмка человека переживает новое разделение (живая приёмка 09.10):
+                  без отметки принятая группа здесь не отличалась от брошенной. */}
+                {chat.retiredAccepted && (
+                  <Typography
+                    variant="caption"
+                    color="subtle"
+                    as="span"
+                    className={styles.chip}
+                    data-hub-accepted
+                  >
+                    {t('chat.cascade.hub.accept.marker')}
+                  </Typography>
+                )}
+                <Typography variant="caption" color="subtle" as="span" truncate>
+                  {[
+                    chat.branch,
+                    ...chat.stages.map((stage) => t(`chat.cascade.stageFull.${stage}`)),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Typography>
+              </Stack>
+            </button>
+            {chat.retiredCopy && (
+              <GroupCopyCleanup parentChatId={chat.retiredCopy.parentChatId} chatId={chat.chatId} />
+            )}
+          </Fragment>
+        ))}
+      </HubFold>
     </div>
   );
 }

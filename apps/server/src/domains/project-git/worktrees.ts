@@ -27,6 +27,7 @@ import { isGitRepo, requireRepo } from './read.ts';
 import { assertBranchName } from './write.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
 import { carryCopyRuns } from '../project-tests/runs-store/carry-runs.ts';
+import { pruneLedgerForRemovedCopy } from '../verify-ledger/verify-ledger.ts';
 
 /**
  * Параллельные рабочие копии (`git worktree`) — то, чем несколько агентов
@@ -192,7 +193,8 @@ export async function listWorktrees(projectDir: string): Promise<ProjectWorktree
  *   занята другой копией — двух рабочих деревьев на одной ветке не бывает);
  * - ветки нет локально, но есть на удалённом → заводим её от `<remote>/<имя>`
  *   с отслеживанием: так разбирают чужую ветку из merge request;
- * - нет нигде → новая ветка от HEAD того каталога, откуда позвали.
+ * - нет нигде → новая ветка от `base`, а без неё — от HEAD того каталога,
+ *   откуда позвали.
  *
  * Потолок ожидания сетевой: `worktree add` разворачивает всё дерево файлов, и
  * на большом репозитории это дольше обычной локальной команды.
@@ -228,9 +230,10 @@ export async function addWorktree(
   name: string,
   mirror?: WorktreeMirrorSettings,
   /**
-   * От какой ветки отвести НОВУЮ ветку копии. Нужно группе разделения, которая
-   * ждала предшественников (Т1): её копия начинается с их правок. Пусто — от
-   * HEAD основной копии, как и раньше; у уже существующей ветки база не в счёт.
+   * От какой ветки отвести НОВУЮ ветку копии. Группа разделения передаёт её
+   * всегда: ждавшая предшественников (Т1) — их ветку, остальные — основную ветку
+   * проекта (`defaultBaseOf`). Пусто — от HEAD основной копии (ручная копия из
+   * раздела копий); у уже существующей ветки база не в счёт.
    */
   base?: string,
   /**
@@ -302,7 +305,9 @@ export async function addWorktree(
       : info.remote && info.remoteBranches.includes(value)
         ? ['worktree', 'add', '--track', '-b', value, target, `${info.remote}/${value}`]
         : base?.trim()
-          ? ['worktree', 'add', '-b', value, target, base.trim()]
+          ? // `--no-track`: от `origin/main` git по умолчанию завёл бы ветке
+            // отслеживание main — и `git push` из копии целил бы в main.
+            ['worktree', 'add', '--no-track', '-b', value, target, base.trim()]
           : ['worktree', 'add', '-b', value, target];
 
   let out: string;
@@ -636,6 +641,7 @@ export async function removeWorktree(
 
   if (entry.prunable) {
     await git(projectDir, ['worktree', 'prune']);
+    pruneLedgerForRemovedCopy({ projectPath: projectDir, copyPath: entry.path });
     return {
       output: 'Каталога копии больше нет — запись убрана',
       outputCode: 'worktree-pruned',
@@ -680,6 +686,10 @@ export async function removeWorktree(
     throw error;
   }
   await sweepLinkShell(entry.path);
+  // Записи журнала проверок, которых касалась только эта копия, уходят вместе с
+  // ней, а не через срок, — каким бы путём копию ни убрали (группа, закрытое
+  // ревью, маршруты человека); сбой уборки журнала копию назад не возвращает.
+  pruneLedgerForRemovedCopy({ projectPath: projectDir, copyPath: entry.path });
   if (carried.runs > 0)
     return {
       output: `Копия ${entry.path} убрана, её прогоны блока «Тесты» (${carried.runs}) перенесены в историю проекта`,

@@ -278,3 +278,118 @@ describe('пауза дерева', () => {
     expect(view.nodes.some((node) => node.chatId === 'stranger')).toBe(false);
   });
 });
+
+describe('пауза дерева: добор процессов копий (F-106)', () => {
+  it('группа между ходами без фона — её копия тоже уходит в добор; не группа — нет', () => {
+    const links: Record<string, ChatLink> = {
+      ...LINKS,
+      'group-1': link('root', { title: 'Группа', groupIndex: 1 }),
+    };
+    const runs = fakeRuns({ 'new-a': { sessionId: 'sess-a' } });
+    const swept: string[][] = [];
+    const tree = new TreePause({
+      links: () => links,
+      runs,
+      store: memoryStore(),
+      idle: { snapshot: () => undefined, close: () => 'absent' },
+      afterPause: (keys) => swept.push([...keys]),
+    });
+    tree.pause('root');
+    expect(swept).toHaveLength(1);
+    expect(swept[0]).toContain('new-a');
+    expect(swept[0]).toContain('group-1');
+    expect(swept[0]).not.toContain('new-b');
+  });
+});
+
+// Round 2: мост продолженного разговора — к этой панели, а не той жизни,
+// в которой его сняли (подхваченная из журнала сессия несёт пустой адрес).
+describe('пауза дерева: мост прав при продолжении', () => {
+  const bridge = (runId: string) => ({ runId, baseUrl: 'http://127.0.0.1:5178', tokenFile: 't' });
+
+  it('остановленное и очередь продолжают с мостом этой панели; запуск без моста — без него', () => {
+    const runs = fakeRuns({
+      'new-a': {
+        sessionId: 'sess-a',
+        options: { permissionPrompt: { runId: 'new-a', baseUrl: '' } },
+      },
+      'new-b': {},
+    });
+    const tree = new TreePause({ links: () => LINKS, runs, store: memoryStore(), bridge });
+    tree.pause('root');
+    tree.defer(
+      'stage',
+      'new-a-review',
+      { prompt: 'ревью', cwd: 'C:/p', permissionPrompt: { runId: 'new-a-review', baseUrl: '' } },
+      {},
+    );
+
+    tree.resume('root');
+    const byId = Object.fromEntries(runs.started.map((s) => [s.chatId, s.options]));
+    expect(byId['new-a']?.permissionPrompt).toEqual(bridge('new-a'));
+    expect(byId['new-a-review']?.permissionPrompt).toEqual(bridge('new-a-review'));
+    expect(byId['new-b']?.permissionPrompt).toBeUndefined();
+  });
+});
+
+// RF-EF-05: отложивший старт оставляет обработчики — «Продолжить всё» зовёт их
+// вокруг запуска; после перезапуска панели их нет, и старт выходит как раньше.
+describe('пауза дерева: обработчики отложенного старта', () => {
+  it('до запуска — before, после — after с ответом реестра; в записи — только ключ', () => {
+    const runs = fakeRuns({ 'new-b': {} });
+    const store = memoryStore();
+    const tree = new TreePause({ links: () => LINKS, runs, store });
+    const seen: string[] = [];
+    tree.pause('root');
+    // Пока дерево стоит, «new-b» уже запустил человек — реестр второму старту откажет.
+    runs.start('new-b', { prompt: 'человек', cwd: 'C:/p' }, {});
+    const hooksFor = (name: string) => ({
+      before: () => seen.push(`${name}:before:${runs.started.length}`),
+      after: (started: boolean) => seen.push(`${name}:after:${started}:${runs.started.length}`),
+    });
+    tree.defer('handoff', 'new-a-cont', { prompt: 'дальше', cwd: 'C:/p' }, {}, hooksFor('cont'));
+    tree.defer('split', 'new-b', { prompt: 'сборка', cwd: 'C:/p' }, {}, hooksFor('b'));
+    expect(JSON.parse(JSON.stringify(store.records.root?.pendingStarts))).toEqual([
+      expect.objectContaining({ chatId: 'new-a-cont', hook: expect.any(String) }),
+      expect.objectContaining({ chatId: 'new-b', hook: expect.any(String) }),
+    ]);
+
+    expect(tree.resume('root')).toMatchObject({ flushed: 1 });
+    expect(seen).toEqual(['cont:before:1', 'cont:after:true:2', 'b:before:2', 'b:after:false:2']);
+  });
+
+  it('сбой обработчика не останавливает очередь; новая жизнь панели старых обработчиков не зовёт', () => {
+    const runs = fakeRuns({});
+    const store = memoryStore();
+    const first = new TreePause({ links: () => LINKS, runs, store });
+    const seen: string[] = [];
+    first.pause('root');
+    first.defer(
+      'handoff',
+      'new-a-cont',
+      { prompt: 'дальше', cwd: 'C:/p' },
+      {},
+      {
+        after: () => seen.push('first'),
+      },
+    );
+    // Перезапуск: запись та же, обработчики первой жизни остались в её памяти.
+    const second = new TreePause({ links: () => LINKS, runs, store });
+    second.defer(
+      'split',
+      'new-b',
+      { prompt: 'сборка', cwd: 'C:/p' },
+      {},
+      {
+        before: () => {
+          throw new Error('сбой');
+        },
+        after: () => seen.push('second'),
+      },
+    );
+
+    expect(second.resume('root')).toMatchObject({ flushed: 2 });
+    expect(seen).toEqual(['second']);
+    expect(runs.started.map((s) => s.chatId)).toEqual(['new-a-cont', 'new-b']);
+  });
+});

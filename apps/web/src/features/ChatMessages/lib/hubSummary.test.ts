@@ -24,6 +24,16 @@ describe('hubBucket: строки без чата — в свои корзины
     expect(hubBucket(row({ pending: 'queued' }))).toBe('queued');
   });
 
+  it('ждёт только записей D-n — своя корзина «ждёт решения», не «ждёт вас» и не «готово»', () => {
+    expect(hubBucket(row({ chatId: 'c', waitingFor: 'human-op', status: 'done' }))).toBe(
+      'deferred',
+    );
+    // Живой вопрос перевешивает: он держит группу, D-n — нет.
+    expect(hubBucket(row({ chatId: 'c', waitingFor: 'question' }))).toBe('ask');
+    const { counts } = summarizeHub([row({ chatId: 'c', waitingFor: 'human-op' })], 0);
+    expect(counts).toMatchObject({ deferred: 1, ask: 0, done: 0 });
+  });
+
   it('счётчики сводки — по тем же корзинам', () => {
     const { counts } = summarizeHub(
       [row({ pending: 'setup' }), row({ pending: 'interrupted' }), row({ pending: 'paused' })],

@@ -79,6 +79,7 @@ export const SECTION_QUERY_KEYS: Readonly<Record<string, Keys>> = {
     ['split'],
     ['chat-group-settings'],
     queryKeys.chatEscalations,
+    queryKeys.chatWatchSignals,
   ],
   // Стоп сессии вне панели: список идущих и сессий аналитики.
   analytics: [['analytics']],

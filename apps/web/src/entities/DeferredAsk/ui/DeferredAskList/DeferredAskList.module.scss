@@ -1,0 +1,122 @@
+// Список D-n: записи — строками с разделителем, как пункты карточки прав в
+// ленте; команда — моноширинным блоком, ответы — справа внизу строки.
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+}
+
+.filter {
+  padding: 2px var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+.filterOn {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-fg);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+
+  & + & {
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+.rowHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-2xs) var(--spacing-xs);
+  min-width: 0;
+}
+
+.id {
+  padding: 1px var(--spacing-2xs);
+  border-radius: 6px;
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
+  font-weight: 600;
+  font-size: var(--font-size-caption);
+}
+
+.tool {
+  padding: 1px var(--spacing-2xs);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.time {
+  margin-left: auto;
+}
+
+.summary {
+  margin: 0;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Что впишется в файл: много строк, поэтому с потолком высоты и прокруткой. */
+.detail {
+  margin: 0;
+  max-height: 160px;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--spacing-2xs);
+  margin-top: var(--spacing-2xs);
+}

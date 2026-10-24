@@ -2,6 +2,10 @@ import {
   childIsRunning,
   killOrphanGroup,
   killProcessTree,
+  readPosixProcessTable,
+  readProcessTable,
+  stopTreeWithGrace,
+  type ProcessRow,
   type TreeKillImpl,
 } from '../kill-tree.mjs';
 
@@ -48,6 +52,11 @@ export interface KillOptions {
    * `ChildProcess` не нужен: номер держит открытый дескриптор.
    */
   spawnedAt?: number;
+  /**
+   * Снять потомков одним снимком, а корень оставить (посредник живой сессии):
+   * пока дерево цело, его видно целиком. Снимка нет — не снимается ничего.
+   */
+  keepRoot?: boolean;
 }
 
 /**
@@ -74,12 +83,48 @@ function markStopped(pid: number): void {
 }
 
 /**
+ * Один снимок процессов на пачку снятий (23.10): «Остановить всё», пауза дерева
+ * и выход панели снимают N сессий подряд, а снимок Windows синхронный и стоит
+ * ~0,8 с — N раз подряд сервер стоял секундами. Внутри `withProcessSnapshot`
+ * первый `killPidTree` читает снимок, остальные берут его же. Снимок старее
+ * снятий — не беда: снятие сверяет время создания по дескриптору, а вышедший
+ * номер даёт «gone». Пропустить можно лишь процесс, родившийся за эти
+ * миллисекунды синхронного цикла.
+ */
+let shared: { table?: ProcessRow[] | undefined; read: boolean } | undefined;
+
+export function withProcessSnapshot<T>(fn: () => T): T {
+  // Вложенный вызов живёт в снимке внешнего: пачка одна.
+  if (shared) return fn();
+  shared = { read: false };
+  try {
+    return fn();
+  } finally {
+    shared = undefined;
+  }
+}
+
+function sharedImpl(): TreeKillImpl | undefined {
+  const scope = shared;
+  if (!scope) return undefined;
+  return {
+    readTable: () => {
+      if (!scope.read) {
+        scope.read = true;
+        scope.table = process.platform === 'win32' ? readProcessTable() : readPosixProcessTable();
+      }
+      return scope.table;
+    },
+  };
+}
+
+/**
  * Убить дерево по PID. Ошибки глушим: снятие процесса не должно ронять ответ.
  * Возвращает номера, по которым ушёл сигнал; `impl` — подмена для тестов.
  */
 export function killPidTree(pid: number, options: KillOptions = {}, impl?: TreeKillImpl): number[] {
   try {
-    return killProcessTree(pid, { ...options, onKill: markStopped }, impl);
+    return killProcessTree(pid, { ...options, onKill: markStopped }, impl ?? sharedImpl());
   } catch {
     // Снимок или сигнал отказали неожиданно — ответ пользователю важнее.
     return [];
@@ -106,4 +151,23 @@ export function killChildTree(
   } catch {
     // Процесс уже завершился — повторный сигнал не ошибка.
   }
+}
+
+/**
+ * `killChildTree` и через `graceMs` — SIGKILL корню, пропустившему мягкий сигнал
+ * (POSIX: `trap '' TERM`): иначе ждущий его выхода ждал бы вечно. Добивание —
+ * общее с CLI тестов (`stopTreeWithGrace`), а не своя копия у каждого вызывающего;
+ * таймер не держит выход панели. Возвращает отмену добивания.
+ */
+export function stopChildTree(
+  child: KillableChild,
+  options: KillOptions & { graceMs?: number } = {},
+  impl?: TreeKillImpl,
+): () => void {
+  const { graceMs, ...kill } = options;
+  return stopTreeWithGrace(
+    child,
+    { ...(graceMs !== undefined ? { graceMs } : {}), unref: true },
+    { killChild: (target) => killChildTree(target, kill, impl) },
+  );
 }

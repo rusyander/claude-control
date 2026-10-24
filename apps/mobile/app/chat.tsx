@@ -46,6 +46,7 @@ import { useInboxChats } from '../src/features/inbox/useInboxChats';
 import { chatMessagesQuery } from '../src/entities/chat/chatMessagesQuery';
 import { useChatMessages } from '../src/entities/chat/useChatMessages';
 import { OUTSIDE_POLL_MS, useOutsideTurn } from '../src/features/chat/useOutsideTurn';
+import { useTurnEndRefresh } from '../src/features/chat/useTurnEndRefresh';
 import { useChatProgress } from '../src/entities/chat/useChatProgress';
 import { inboxChatNamed } from '../src/entities/inbox/inboxChatNamed';
 import { visibleAsks } from '../src/entities/inbox/visibleAsks';
@@ -186,6 +187,9 @@ export default function ChatScreen() {
     run.projectPath,
     workspace.projectPath,
   ]);
+  // Конец хода, который мимо «работает» прошёл (подхвачен законченным, сменён
+  // новым ходом в переподключённом потоке), — лента дочитывается так же.
+  useTurnEndRefresh(runKey, run.endedAt, isRunning);
 
   // Лента перечиталась уже после конца хода и ответ в ней есть — значит поток
   // договорил своё и обязан замолчать: иначе один и тот же ответ стоит на

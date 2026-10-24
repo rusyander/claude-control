@@ -14,7 +14,7 @@
  * намеренно — набор целиком читается одним файлом, и правка в одном разделе
  * справки не двигает картинки в другом.
  *
- * Две страницы, и только две: схема здесь появляется там, где снимок бессилен.
+ * Три страницы, и только три: схема здесь появляется там, где снимок бессилен.
  *
  * Страница 1 — путь одного сообщения: где живёт разговор, кто запускает CLI,
  *              почему у панели нет своей базы и почему прогон переживает её
@@ -22,6 +22,9 @@
  * Страница 2 — конвейер разделения: разбор, план, работа, ревью и исправления
  *              по колонкам, и что из этого делает человек, а чего панель не
  *              делает никогда.
+ * Страница 3 — вызов, который решает только человек: запись D-n, отказ
+ *              агенту с номером, ответ из любого места и продолжение ровно с
+ *              этим вызовом. На экране видна только запись, а не её путь.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -716,6 +719,179 @@ legend(p2, 60, bottomOf(p2) + 60, [
   { caption: 'обратно в сводку родителя', edgeColour: FLOW.back, dashed: true },
 ]);
 
+// ─── Страница 3: вызов, который решает только человек ─────────────────────
+
+const p3 = newPage('3. Ждёт решения: D-n', 'p3');
+heading(
+  p3,
+  60,
+  30,
+  'Вызов, который решает только человек',
+  'Сверху вниз — что происходит с таким вызовом. Работа на нём не стоит: вызов уходит в список под номером D-n, агент делает остальное.',
+  1000,
+);
+
+const DX = 300;
+const DW = 360;
+const NX = 820;
+const NW = 340;
+
+const call = card(p3, 'p3:call', DX, 140, DW, {
+  pal: C.cli,
+  icon: 'shape=process',
+  iconText: 'CLI',
+  title: 'Агент делает вызов',
+  lines: [
+    'Команда, правка файла или инструмент MCP. Мини-сервер прав спрашивает панель, можно ли.',
+  ],
+});
+
+const judge = card(p3, 'p3:judge', DX, call.y + call.h + 100, DW, {
+  pal: C.panel,
+  icon: 'shape=hexagon',
+  iconText: 'API',
+  title: 'Панель судит вызов',
+  lines: [
+    'Покрыт правилами прав группы или автоподтверждения — выполняется без вопроса.',
+    'Не покрыт — его решает человек. Группа и автономный чат, у которого никто не сидит, ставят его в список сразу; открытый чат сначала показывает карточку.',
+  ],
+});
+
+const record = card(p3, 'p3:record', DX, judge.y + judge.h + 110, DW, {
+  pal: C.store,
+  icon: 'shape=cylinder3;backgroundOutline=1;size=7',
+  iconText: 'D-n',
+  title: 'Запись D-n',
+  lines: [
+    'Номер, чья запись, сама команда и причина. Тот же вызов ещё раз — та же запись и счётчик повторов, а не новая.',
+    'Живёт в каталоге данных панели, переживает её перезапуск, ждёт 7 суток.',
+  ],
+});
+
+const goOn = card(p3, 'p3:goon', DX, record.y + record.h + 110, DW, {
+  pal: C.cli,
+  icon: 'shape=process',
+  iconText: 'CLI',
+  title: 'Агент работает дальше',
+  lines: [
+    'Отказ называет номер и запрещает обходить вызов другой командой. Агент делает всё, что от него не зависит, и закрывает ход строкой «ждёт человека: D-n».',
+    'Пока у группы ждёт D-n, её MR остаётся черновиком.',
+  ],
+});
+
+const human = card(p3, 'p3:human', DX, goOn.y + goOn.h + 110, DW, {
+  pal: C.human,
+  icon: 'shape=card',
+  iconText: 'вы',
+  title: 'Человек отвечает',
+  lines: [
+    'Плашка «Ждёт решения» над любой страницей, раздел в сводке групп, «Вопросы» на телефоне, сообщение в Telegram.',
+    '«Разрешить» — разово ровно на этот вызов с теми же аргументами, на два часа. «Отклонить» — повтор получит тот же отказ.',
+  ],
+});
+
+const resume = card(p3, 'p3:resume', DX, human.y + human.h + 110, DW, {
+  pal: C.panel,
+  icon: 'shape=hexagon',
+  iconText: 'API',
+  title: 'Работа продолжается с этим вызовом',
+  lines: [
+    'Панель продолжает разговор сразу, после паузы дерева или когда закончится идущий ход. Продолжать нечего — агент увидит ответ при следующем вызове.',
+  ],
+});
+
+const chatCard = card(p3, 'p3:card', NX, judge.y, NW, {
+  pal: C.warn,
+  title: 'Карточка в открытом чате',
+  lines: [
+    '«Разрешить / Запретить» ждёт ответа 10 минут (настройка в «Модели», 0 — ждёт сколько нужно), потом становится строкой «Отложено как D-n».',
+  ],
+});
+
+const refusal = card(p3, 'p3:refusal', NX, call.y, NW, {
+  pal: C.warn,
+  title: 'Отказ с известным ответом — не вопрос',
+  lines: [
+    'Слияние MR, push в основную или защищённую ветку, push с недоказуемой целью: агент сразу получает отказ, записи D-n нет.',
+  ],
+});
+
+card(p3, 'p3:only', NX, human.y, NW, {
+  pal: C.note,
+  soft: true,
+  title: 'Отвечает только человек',
+  lines: [
+    'Маршрут решения процесс модели не пускает. Вызов, который тянется к маршрутам решений или ключу панели, отклоняется раньше всех правил: свой D-n агент не решит.',
+  ],
+});
+
+// Пояснение о сроке — у ряда «агент работает дальше», а не у записи: справа от
+// записи идёт стрелка «не ответили вовремя» от карточки чата.
+card(p3, 'p3:expire', NX, goOn.y, NW, {
+  pal: C.note,
+  soft: true,
+  title: 'Срок вышел',
+  lines: [
+    'Запись истекает, «Разрешить заново» выдаёт разрешение снова. Отмена плана или удаление чата отзывает ждущие записи.',
+  ],
+});
+
+link(p3, 'p3:call', 'p3:judge', 'запрос прав', { colour: FLOW.fwd });
+link(p3, 'p3:judge', 'p3:record', 'решает человек', { colour: FLOW.fwd });
+link(p3, 'p3:record', 'p3:goon', 'отказ с номером', { colour: FLOW.back, dashed: true });
+link(p3, 'p3:goon', 'p3:human', 'список ждёт ответа', { colour: FLOW.data });
+link(p3, 'p3:human', 'p3:resume', 'ответ', { colour: FLOW.human });
+// Боковая карточка ниже своей соседки слева: стрелка выходит на высоте её
+// середины, иначе ломается и упирается в угол.
+const levelWith = (from, to) => Math.min(0.9, Math.max(0.1, (to.cy - from.y) / from.h));
+link(p3, 'p3:judge', 'p3:card', 'чат открыт', {
+  colour: FLOW.fwd,
+  exit: [1, levelWith(judge, chatCard)],
+  entry: [0, 0.5],
+});
+link(p3, 'p3:card', 'p3:record', 'не ответили вовремя', {
+  colour: FLOW.fwd,
+  exit: [0.5, 1],
+  entry: [1, 0.5],
+  points: [{ x: chatCard.cx, y: record.cy }],
+  startDir: 'v',
+});
+link(p3, 'p3:call', 'p3:refusal', 'слияние или push в main', {
+  colour: FLOW.back,
+  dashed: true,
+  exit: [1, levelWith(call, refusal)],
+  entry: [0, 0.5],
+});
+link(p3, 'p3:resume', 'p3:call', 'тот же вызов, уже разрешённый', {
+  colour: FLOW.human,
+  exit: [0, 0.5],
+  entry: [0, 0.5],
+  points: [
+    { x: 150, y: resume.cy },
+    { x: 150, y: call.cy },
+  ],
+  startDir: 'h',
+});
+
+routeEdges(p3);
+legend(p3, 60, bottomOf(p3) + 60, [
+  { caption: 'человек и то, что он видит', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'сервер панели', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'процесс агентного CLI', fill: C.cli.tint, stroke: C.cli.line },
+  { caption: 'файл на диске', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'пояснение', fill: C.note.tint, stroke: C.note.line },
+  { caption: 'отказ или место, где ждут ответа', fill: C.warn.tint, stroke: C.warn.line },
+  {
+    caption: 'значок формы: карточка, сервер, процесс, файл',
+    fill: '#FFFFFF',
+    stroke: C.cli.line,
+  },
+  { caption: 'запрос вперёд', edgeColour: FLOW.fwd },
+  { caption: 'ответ агенту', edgeColour: FLOW.back, dashed: true },
+  { caption: 'запись в списке', edgeColour: FLOW.data },
+  { caption: 'решение человека', edgeColour: FLOW.human },
+]);
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -744,14 +920,15 @@ const bounds = (p) => {
 
 const b1 = bounds(p1);
 const b2 = bounds(p2);
+const b3 = bounds(p3);
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
-  `${pageXml(p1, b1.w, b1.h)}\n${pageXml(p2, b2.w, b2.h)}\n` +
+  `${pageXml(p1, b1.w, b1.h)}\n${pageXml(p2, b2.w, b2.h)}\n${pageXml(p3, b3.w, b3.h)}\n` +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
 console.log(
   `записано ${OUT}: страница 1 ${b1.w}×${b1.h}, страница 2 ${b2.w}×${b2.h}, ` +
-    `ячеек ${p1.cells.length + p2.cells.length}`,
+    `страница 3 ${b3.w}×${b3.h}, ячеек ${p1.cells.length + p2.cells.length + p3.cells.length}`,
 );

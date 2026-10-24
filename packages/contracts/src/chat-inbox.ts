@@ -33,6 +33,41 @@ export const inboxQuestionSchema = object({
 export type InboxQuestion = Infer<typeof inboxQuestionSchema>;
 
 /**
+ * Запуск агента (`Agent`/`Task`) — то, по чему человек решает «пускать ли»:
+ * что поручено, каким агентом, на какой модели и с каким усилием, в фоне ли.
+ * Модель и усилие — из вызова, а нет там — из описания агента (`agents/<тип>.md`).
+ */
+export const inboxLaunchSchema = object({
+  description: string().optional(),
+  subagentType: string().optional(),
+  model: string().optional(),
+  effort: string().optional(),
+  background: boolean().optional(),
+});
+export type InboxLaunch = Infer<typeof inboxLaunchSchema>;
+
+/**
+ * Откуда вопрос: приложение (панель или сессия вне панели — терминал, VS Code),
+ * CLI, группа разделения со стадией, фоновый ли это ход. По этой строке человек
+ * на телефоне и в Telegram узнаёт, чей вопрос, не открывая чата.
+ */
+export const inboxSourceSchema = object({
+  app: union([literal('agentdeck'), literal('outside')]),
+  /** Имя CLI, как в списке провайдеров (`Claude Code`). */
+  cli: string(),
+  /** Вопрос задан из фона: у разговора нет хода, панель завела его под вопрос. */
+  background: boolean().optional(),
+  group: object({
+    /** Номер группы с единицы — как в хабе. */
+    index: number().int().positive(),
+    title: string().optional(),
+    stage: string().optional(),
+    parentTitle: string().optional(),
+  }).optional(),
+});
+export type InboxSource = Infer<typeof inboxSourceSchema>;
+
+/**
  * Одно ожидание. `key` устойчив между опросами: по нему клиент держит уже
  * выбранный ответ, пока сервер отдаёт тот же вопрос, и снимает его, когда вопрос
  * исчез (ответили за компьютером, прогон остановлен).
@@ -50,6 +85,8 @@ export const inboxAskSchema = union([
      * маршрутом `/api/outside/asks`, а не `permission-decision` прогона.
      */
     relay: boolean().optional(),
+    /** Запрос на запуск агента — подробности запуска. */
+    launch: inboxLaunchSchema.optional(),
   }),
   object({
     /** Первая правка в основной копии: «писать здесь» или «не писать». */
@@ -112,6 +149,8 @@ export const inboxChatSchema = object({
    * ближайшего шага. Вопросы и права такой сессии помечены `relay`.
    */
   outside: boolean().optional(),
+  /** Чей это разговор: приложение, CLI, группа и стадия. */
+  source: inboxSourceSchema.optional(),
   /** Последнее движение: время транскрипта, начала прогона или вопроса. */
   updatedAt: string(),
   preview: string().optional(),
@@ -119,9 +158,47 @@ export const inboxChatSchema = object({
 });
 export type InboxChat = Infer<typeof inboxChatSchema>;
 
+/**
+ * Отложенный вопрос D-n (`deferred-asks.ts`): прогон уже пошёл дальше, а
+ * решение ждёт человека — сколько угодно долго. Отвечают маршрутом
+ * `/api/chat/deferred/:id/decision`, а не `permission-decision`: карточки,
+ * ждущей клика, у CLI больше нет.
+ */
+export const inboxDeferredSchema = object({
+  id: string(),
+  state: union([literal('waiting'), literal('allowed'), literal('expired')]),
+  kind: union([literal('permission'), literal('branchGate')]),
+  toolName: string(),
+  summary: string(),
+  /** Что впишется в файл (`Write`, `Edit`) — урезано и под маской (D-S03). */
+  detail: string().optional(),
+  /** Для агента, по-английски; человеку — `reasonCode` на языке клиента. */
+  reason: string(),
+  reasonCode: union([
+    literal('group-rows'),
+    literal('not-auto-approved'),
+    literal('backend-guard'),
+    literal('main-copy'),
+  ]).optional(),
+  reasonParams: object({ rule: string().optional(), match: string().optional() }).optional(),
+  askedAt: string(),
+  expiresAt: string(),
+  retries: number().int().nonnegative().optional(),
+  grantUntil: string().optional(),
+  chatId: string().optional(),
+  project: string().optional(),
+  chatTitle: string().optional(),
+  /** Номер группы с единицы — как в хабе. */
+  group: number().int().positive().optional(),
+  groupTitle: string().optional(),
+});
+export type InboxDeferred = Infer<typeof inboxDeferredSchema>;
+
 export const chatInboxSchema = object({
   generatedAt: string(),
   chats: array(inboxChatSchema),
+  /** Отложенные вопросы всех разговоров машины; нет поля — старый сервер. */
+  deferred: array(inboxDeferredSchema).optional(),
 });
 export type ChatInbox = Infer<typeof chatInboxSchema>;
 

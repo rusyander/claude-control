@@ -1,0 +1,9 @@
+{
+  "session": "7048c9b9-0000-4000-8000-000000000000",
+  "lane": "main",
+  "toolUseId": "toolu_x",
+  "foreground": true,
+  "since": 1792523829768,
+  "until": 1792524459768,
+  "command": "npm run type-check"
+}

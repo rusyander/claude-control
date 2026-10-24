@@ -92,9 +92,12 @@ describe('runPlanView', () => {
   });
 
   it('переводит имя картой и отдаёт идентификатор каталога в его регистре', () => {
-    expect(runPlanView(plan(), { model: 'Sonnet', effort: '' }, words).lines[0]?.text).toBe(
-      'Через контур «Company»: имени «Sonnet» там нет, запрос уйдёт с qwen3-coder.',
-    );
+    // Строка карты — слово самого человека: перевод назван переводом, без тревоги
+    // и без «имени там нет» (было до 23.10 — неправда при строке «sonnet» в карте).
+    expect(runPlanView(plan(), { model: 'Sonnet', effort: '' }, words).lines[0]).toEqual({
+      text: 'Через контур «Company»: «Sonnet» по карте контура — qwen3-coder.',
+      warn: false,
+    });
     const known = runPlanView(plan(), { model: 'llama-3', effort: '' }, words);
     expect(known.lines[0]).toEqual({ text: 'Через контур «Company»: Llama-3.', warn: false });
   });

@@ -43,6 +43,8 @@ import { migrateLegacyIntegrations } from '@agentdeck/contracts/integrations-leg
 import type { CredentialsLookup } from '../../lib/credentials/credentials.ts';
 import { machineId, machineName } from '../../lib/machine-identity/machine-identity.ts';
 import { compactWindowOf } from '../../domains/chat/group-profile/group-profile.ts';
+import { humanOnly } from '../chat/human-only/human-only.ts';
+import { humanOnlyDepsFor } from '../chat/human-only/human-only-deps.ts';
 
 /** Источник доступа и причина с кодом — без самого токена. */
 function credentialsReply(found: CredentialsLookup) {
@@ -166,135 +168,141 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     groupCompactWindowEnv: compactWindowOf(process.env.AGENTDECK_GROUP_COMPACT_WINDOW) ?? null,
   }));
 
-  app.patch<{ Body: unknown }>('/api/settings', (request, reply) => {
-    const raw = request.body;
+  // Настройки прав (авторежим, правила автоподтверждения, срок D-n) меняет
+  // только человек: процесс модели мог бы так разрешить себе всё (`human-only.ts`).
+  app.patch<{ Body: unknown }>(
+    '/api/settings',
+    { preHandler: humanOnly(humanOnlyDepsFor()) },
+    (request, reply) => {
+      const raw = request.body;
 
-    // Глубину ротации ужимаем к контрактному [1..100] ДО валидации: значение вне
-    // диапазона мы исторически клампим, а не отклоняем (иначе PATCH со 100000
-    // заставил бы панель хранить сто тысяч копий, в т.ч. секретов). После клампа
-    // число всегда проходит проверку схемы.
-    const hasNumericKeep =
-      typeof raw === 'object' &&
-      raw !== null &&
-      typeof (raw as { backupKeep?: unknown }).backupKeep === 'number' &&
-      Number.isFinite((raw as { backupKeep: number }).backupKeep);
-    const pre = hasNumericKeep
-      ? {
-          ...(raw as Record<string, unknown>),
-          backupKeep: clampBackupKeep((raw as { backupKeep: number }).backupKeep),
-        }
-      : raw;
+      // Глубину ротации ужимаем к контрактному [1..100] ДО валидации: значение вне
+      // диапазона мы исторически клампим, а не отклоняем (иначе PATCH со 100000
+      // заставил бы панель хранить сто тысяч копий, в т.ч. секретов). После клампа
+      // число всегда проходит проверку схемы.
+      const hasNumericKeep =
+        typeof raw === 'object' &&
+        raw !== null &&
+        typeof (raw as { backupKeep?: unknown }).backupKeep === 'number' &&
+        Number.isFinite((raw as { backupKeep: number }).backupKeep);
+      const pre = hasNumericKeep
+        ? {
+            ...(raw as Record<string, unknown>),
+            backupKeep: clampBackupKeep((raw as { backupKeep: number }).backupKeep),
+          }
+        : raw;
 
-    // Тело приходит от клиента — доверять ему нельзя: валидируем контрактной
-    // (частичной) схемой, кривое отклоняем, неизвестные поля отбрасываем, чтобы
-    // мусор не осел в state.json.
-    const parsed = settingsPatchSchema.safeParse(pre);
-    if (!parsed.success) {
-      return reply.code(400).send({
-        error: 'invalid_settings',
-        message: 'Настройки не прошли проверку и не сохранены.',
-        messageCode: 'settings-invalid',
-        issues: issuesOf(parsed.error),
-      });
-    }
-
-    const { claudeDirOverride, groupEconomy, groupWatch, ...rest } = parsed.data;
-    const patch: Partial<AppSettings> = { ...rest };
-    // Контур, приехавший с панели ДО Т3, поля потребителей не знает, а схема
-    // подставила ему пустой список — то есть «никуда не подключён». Возвращаем
-    // прежнее поведение по сырому телу, пока ещё видно, было поле или нет.
-    if (patch.platforms) {
-      patch.platforms = withLegacyConsumers(
-        (pre as { platforms?: unknown } | null)?.platforms,
-        patch.platforms,
-      );
-    }
-    // Смена каталога через настройки применяется сразу же, а не после перезапуска.
-    // Сначала переезд, потом память: отказанный путь не должен осесть в
-    // настройках (раньше PATCH с несуществующим каталогом отвечал 200, и
-    // настройки называли один каталог, а /api/location — другой). Пустая
-    // строка — возврат к автоопределению, ему отказа не бывает.
-    if (claudeDirOverride !== undefined) {
-      const result = ctx.relocate(claudeDirOverride);
-      if (claudeDirOverride && !result.isValid) {
+      // Тело приходит от клиента — доверять ему нельзя: валидируем контрактной
+      // (частичной) схемой, кривое отклоняем, неизвестные поля отбрасываем, чтобы
+      // мусор не осел в state.json.
+      const parsed = settingsPatchSchema.safeParse(pre);
+      if (!parsed.success) {
         return reply.code(400).send({
-          error: 'invalid_path',
-          message: result.problem ?? 'Каталог конфигурации не подходит.',
-          ...(result.problemCode
-            ? { messageCode: result.problemCode, params: result.problemParams }
-            : result.problem
-              ? {}
-              : { messageCode: 'config-dir-unsuitable' as const }),
+          error: 'invalid_settings',
+          message: 'Настройки не прошли проверку и не сохранены.',
+          messageCode: 'settings-invalid',
+          issues: issuesOf(parsed.error),
         });
       }
-      ctx.rememberDirOverride(claudeDirOverride);
-      if (result.isValid) afterRelocate(app, ctx);
-    }
-    // Блоки экономии и сторожа групп приходят изменёнными ключами — сливаем с
-    // сохранённым. После переезда: сохранённое — в хранилище нового каталога.
-    const saved = ctx.store.getSettings();
-    if (groupEconomy) {
-      patch.groupEconomy = { ...GROUP_ECONOMY_DEFAULTS, ...saved.groupEconomy, ...groupEconomy };
-    }
-    if (groupWatch) {
-      patch.groupWatch = { ...GROUP_WATCH_DEFAULTS, ...saved.groupWatch, ...groupWatch };
-    }
-    const settings = ctx.store.updateSettings(patch);
-    // Глубина ротации копий действует сразу для следующих записей.
-    if (patch.backupKeep !== undefined) setBackupKeep(settings.backupKeep);
-    // Режим шифрования копий секретов — тоже сразу. Парольную фразу этим не
-    // трогаем: включение без фразы просто перестаёт делать копии секретов до
-    // её ввода (см. backupEntry), а UI задаёт фразу отдельным запросом.
-    if (patch.encryptSecretBackups !== undefined) {
-      setEncryptSecretBackups(settings.encryptSecretBackups);
-    }
-    // Гейт на промпте говорит с человеком в CLI на языке, выбранном при сборке.
-    // Смена языка пересобирает СВОЙ скрипт сразу; правленный руками не трогается
-    // (это решает applyPromptGate). Отказ диска настройку не откатывает: язык
-    // интерфейса важнее, а карточка гейта покажет устаревший скрипт.
-    if (patch.language !== undefined && settings.promptGate.enabled) {
-      try {
-        applyPromptGate(
-          ctx.store,
-          {
-            hooksDir: ctx.location.paths.hooks,
-            settingsPath: ctx.location.paths.settings,
-            appDataDir: ctx.location.paths.appData,
-          },
-          settings.promptGate,
-          { backupDir: ctx.backupDir },
+
+      const { claudeDirOverride, groupEconomy, groupWatch, ...rest } = parsed.data;
+      const patch: Partial<AppSettings> = { ...rest };
+      // Контур, приехавший с панели ДО Т3, поля потребителей не знает, а схема
+      // подставила ему пустой список — то есть «никуда не подключён». Возвращаем
+      // прежнее поведение по сырому телу, пока ещё видно, было поле или нет.
+      if (patch.platforms) {
+        patch.platforms = withLegacyConsumers(
+          (pre as { platforms?: unknown } | null)?.platforms,
+          patch.platforms,
         );
-      } catch (error) {
-        request.log.warn({ err: error }, 'prompt gate rebuild after language change failed');
       }
-    }
-    // Контуры — единственный ключ настроек, за которым тянутся данные ВНЕ
-    // настроек: ключ в шифрохранилище и след пробы. Этот маршрут про них не
-    // знает, поэтому убирает за собой сразу: контур, исчезнувший из списка,
-    // не оставляет ни живого секрета, ни результата проверки.
-    if (patch.platforms !== undefined) {
-      // Контур, исчезнувший отсюда, уносит и своё применение: иначе конфиги CLI
-      // остались бы указывать на маршрут шлюза, которого больше нет, а снять
-      // применение было бы уже нечем — маршрут отката спрашивает контур.
-      for (const id of forgetOrphanPlatforms(ctx.store, ctx.location.paths.appData)) {
-        rollbackContour(rollbackDeps(), id);
+      // Смена каталога через настройки применяется сразу же, а не после перезапуска.
+      // Сначала переезд, потом память: отказанный путь не должен осесть в
+      // настройках (раньше PATCH с несуществующим каталогом отвечал 200, и
+      // настройки называли один каталог, а /api/location — другой). Пустая
+      // строка — возврат к автоопределению, ему отказа не бывает.
+      if (claudeDirOverride !== undefined) {
+        const result = ctx.relocate(claudeDirOverride);
+        if (claudeDirOverride && !result.isValid) {
+          return reply.code(400).send({
+            error: 'invalid_path',
+            message: result.problem ?? 'Каталог конфигурации не подходит.',
+            ...(result.problemCode
+              ? { messageCode: result.problemCode, params: result.problemParams }
+              : result.problem
+                ? {}
+                : { messageCode: 'config-dir-unsuitable' as const }),
+          });
+        }
+        ctx.rememberDirOverride(claudeDirOverride);
+        if (result.isValid) afterRelocate(app, ctx);
       }
-      // Тумблеры в пришедшем списке — не решение о том, через какой контур идёт
-      // работа: это решение принимает активация, и только она (инвариант 1).
-      // Общий патч настроек тумблер трогать вправе, но итог обязан сойтись к
-      // активному контуру — иначе шлюз обслуживал бы контур, который панель
-      // называет выключенным.
-      reconcileActivePlatform(ctx.store);
-    }
-    // Управляемые профили эндпоинтов — вторая такая же зависимость, и сверка
-    // нужна ещё и при смене НАСТРОЕК ШЛЮЗА: сменившийся порт оставил бы в
-    // списке профиль с устаревшим адресом, и ассистент панели молча ходил бы
-    // в никуда.
-    if (patch.platforms !== undefined || patch.platformGateway !== undefined) {
-      reconcileManagedProfiles(ctx.store);
-    }
-    return ctx.effectiveSettings();
-  });
+      // Блоки экономии и сторожа групп приходят изменёнными ключами — сливаем с
+      // сохранённым. После переезда: сохранённое — в хранилище нового каталога.
+      const saved = ctx.store.getSettings();
+      if (groupEconomy) {
+        patch.groupEconomy = { ...GROUP_ECONOMY_DEFAULTS, ...saved.groupEconomy, ...groupEconomy };
+      }
+      if (groupWatch) {
+        patch.groupWatch = { ...GROUP_WATCH_DEFAULTS, ...saved.groupWatch, ...groupWatch };
+      }
+      const settings = ctx.store.updateSettings(patch);
+      // Глубина ротации копий действует сразу для следующих записей.
+      if (patch.backupKeep !== undefined) setBackupKeep(settings.backupKeep);
+      // Режим шифрования копий секретов — тоже сразу. Парольную фразу этим не
+      // трогаем: включение без фразы просто перестаёт делать копии секретов до
+      // её ввода (см. backupEntry), а UI задаёт фразу отдельным запросом.
+      if (patch.encryptSecretBackups !== undefined) {
+        setEncryptSecretBackups(settings.encryptSecretBackups);
+      }
+      // Гейт на промпте говорит с человеком в CLI на языке, выбранном при сборке.
+      // Смена языка пересобирает СВОЙ скрипт сразу; правленный руками не трогается
+      // (это решает applyPromptGate). Отказ диска настройку не откатывает: язык
+      // интерфейса важнее, а карточка гейта покажет устаревший скрипт.
+      if (patch.language !== undefined && settings.promptGate.enabled) {
+        try {
+          applyPromptGate(
+            ctx.store,
+            {
+              hooksDir: ctx.location.paths.hooks,
+              settingsPath: ctx.location.paths.settings,
+              appDataDir: ctx.location.paths.appData,
+            },
+            settings.promptGate,
+            { backupDir: ctx.backupDir },
+          );
+        } catch (error) {
+          request.log.warn({ err: error }, 'prompt gate rebuild after language change failed');
+        }
+      }
+      // Контуры — единственный ключ настроек, за которым тянутся данные ВНЕ
+      // настроек: ключ в шифрохранилище и след пробы. Этот маршрут про них не
+      // знает, поэтому убирает за собой сразу: контур, исчезнувший из списка,
+      // не оставляет ни живого секрета, ни результата проверки.
+      if (patch.platforms !== undefined) {
+        // Контур, исчезнувший отсюда, уносит и своё применение: иначе конфиги CLI
+        // остались бы указывать на маршрут шлюза, которого больше нет, а снять
+        // применение было бы уже нечем — маршрут отката спрашивает контур.
+        for (const id of forgetOrphanPlatforms(ctx.store, ctx.location.paths.appData)) {
+          rollbackContour(rollbackDeps(), id);
+        }
+        // Тумблеры в пришедшем списке — не решение о том, через какой контур идёт
+        // работа: это решение принимает активация, и только она (инвариант 1).
+        // Общий патч настроек тумблер трогать вправе, но итог обязан сойтись к
+        // активному контуру — иначе шлюз обслуживал бы контур, который панель
+        // называет выключенным.
+        reconcileActivePlatform(ctx.store);
+      }
+      // Управляемые профили эндпоинтов — вторая такая же зависимость, и сверка
+      // нужна ещё и при смене НАСТРОЕК ШЛЮЗА: сменившийся порт оставил бы в
+      // списке профиль с устаревшим адресом, и ассистент панели молча ходил бы
+      // в никуда.
+      if (patch.platforms !== undefined || patch.platformGateway !== undefined) {
+        reconcileManagedProfiles(ctx.store);
+      }
+      return ctx.effectiveSettings();
+    },
+  );
 
   // Перенос настроек панели (группы, сценарии, отметки, настройки) — снимок
   // state.json, который раньше переносили только копированием файла руками.

@@ -10,14 +10,16 @@
 // So the rule: nothing fans out until the user has seen HOW MANY agents and ON WHICH MODEL.
 // `ask`, never `deny` — the user may well want the expensive version, they just get to say so.
 // Silence (= allow) when every spawn already names a non-top model explicitly, for the two review
-// agents of a live ticket run, and for tagged review lanes (review-spawn.mjs).
+// agents of a live ticket run, for tagged review lanes (review-spawn.mjs), and while the human's
+// time-boxed grant for this session runs (spawn-grant.mjs; single agents only, never a workflow).
 // Kill-switch: AGENTDECK_KIT_SPAWN_GUARD=0 (CLAUDE_SPAWN_GUARD=0 is honoured too).
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { liveTicketRuns } from './ticket-run.mjs';
 import { reviewSpawnAllows } from './review-spawn.mjs';
-import { stateDir, sessionKey } from './kit-paths.mjs';
+import { logSessionEvent, stateDir, sessionKey } from './kit-paths.mjs';
+import { activeSpawnGrant, GRANT_PHRASE } from './spawn-grant.mjs';
 
 /** The cap IS the grant: the ticket pipeline names exactly two review agents; a third asks again. */
 const TICKET_SPAWN_CAP = 2;
@@ -63,16 +65,27 @@ function oneAgent(arg, input) {
   // Tagged review lanes spawn unasked, up to a per-session cap.
   if (reviewSpawnAllows(input, arg)) return null;
   const what = String(arg.description ?? arg.subagent_type ?? 'subagent').slice(0, 60);
+  // The human's time-boxed grant for THIS session (spawn-grant.mjs) — the only door the user opens
+  // by typing; one line per spawn it lets through, so the session log shows what rode on it.
+  const grant = activeSpawnGrant(input);
+  if (grant) {
+    logSessionEvent(input, { kind: 'spawn-granted', what, model, until: grant.until });
+    return null;
+  }
   const on = model ? `on ${model}` : 'with no model named — it inherits the session model';
   return {
     decision: 'ask',
     reason:
       `Spawning subagent "${what}" ${on}. A subagent runs its own request loop, invisible in the main ` +
       'chat. For mechanical work (translation, fact extraction, repetitive edits) a smaller model ' +
-      'costs roughly 15x less. Allow as is?',
+      'costs roughly 15x less. Allow as is? To stop this question for up to 24 h, the user types in ' +
+      `chat: ${GRANT_PHRASE.en} / ${GRANT_PHRASE.ru}`,
   };
 }
 
+// The human's spawn grant does NOT cover a workflow: the grant answers "spawn an agent when you need
+// one", a workflow multiplies agents per item (the measured 181-agent hour was one), so its count and
+// models still get a look every time.
 function workflow(arg) {
   const src = String(arg.script ?? '');
   // scriptPath / saved name: the body is not in the tool input, so the count cannot be read.

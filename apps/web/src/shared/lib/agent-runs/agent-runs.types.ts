@@ -24,6 +24,11 @@ export interface PendingPermission {
   toolUseId: string;
   /** Защита бэкенда проекта узнала команду — карточка называет причину. */
   guard?: PermissionGuardReason;
+  /**
+   * Карточка, не дождавшаяся ответа, отложена как D-n: агент работает дальше,
+   * а кнопки карточки решают уже запись списка «Ждёт решения».
+   */
+  deferredId?: string;
 }
 
 /** Группа разделения, которой отдана работа разговора (Д15). */
@@ -128,6 +133,11 @@ export interface AgentRun {
    */
   textUsage?: MessageUsage;
   limitResetsAt?: number;
+  /**
+   * Лимит подписки отказал этому ходу (`rate_limit_event` со статусом
+   * `rejected`): маскот говорит «упёрлись в лимит», а не «что-то сломалось».
+   */
+  limitHit?: boolean;
   error?: string;
   /**
    * Структурный код отказа сервера (`run_busy`, `unsupported_upload`,
@@ -151,6 +161,12 @@ export interface AgentRun {
   askedQuestion: boolean;
   /** Запросы на права, ждущие ответа человека (интерактивный permission-prompt). */
   permissions: PendingPermission[];
+  /**
+   * Карточки этого разговора, отложенные как D-n: агента они не держат (статус
+   * не «ждёт вас»), но ответить на них можно прямо в ленте. Живут до старта
+   * следующего хода; дальше их держит список «Ждёт решения».
+   */
+  deferredPermissions?: PendingPermission[];
   /** Ворота ветки: первая правка в основной копии ждёт решения человека. */
   branchGates: PendingBranchGate[];
   /** Дописанное, пока агент занят: уйдёт по очереди, как только он освободится. */
@@ -373,7 +389,13 @@ export type ChatEvent =
       toolUseId: string;
       guard?: PermissionGuardReason;
     }
-  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  | {
+      kind: 'permissionResolved';
+      toolUseId: string;
+      behavior: 'allow' | 'deny';
+      /** Карточка не дождалась ответа и стала записью D-n (`deferAfterMinutes`). */
+      deferredId?: string;
+    }
   /** Вопрос закрыт автономией чата — выбор ложится на свой вызов по id. */
   | {
       kind: 'autoPick';

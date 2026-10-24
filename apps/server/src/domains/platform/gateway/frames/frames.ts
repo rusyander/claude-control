@@ -5,11 +5,12 @@ import { readViolations } from '../status/status.ts';
 import {
   anthropicMessageId,
   anthropicUsage,
-  cachedTokensOf,
+  cacheTokensOf,
   errorBody,
   openAiUsage,
   stopReasonOf,
   upstreamErrorCode,
+  type CacheTokens,
   type Dialect,
 } from '../dialect/dialect.ts';
 import { expandContourAliases, strayAliases, strayPlatformLabels } from '../tool-shim/aliases.ts';
@@ -173,6 +174,13 @@ export interface FrameFacts {
   totalTokens: number;
   /** Часть входа, прочитанная моделью из кэша (`prompt_tokens_details`). */
   cachedTokens: number;
+  /**
+   * Часть входа, ЗАПИСАННАЯ в кэш (поля LiteLLM, `cache-usage.ts`), и из неё — на
+   * час. Нужны транскрипту CLI: по разбивке поддержание кэша и сторож групп
+   * узнают срок кэша сессии.
+   */
+  cacheWriteTokens: number;
+  cacheWrite1hTokens: number;
   /** Сколько знаков размышления снято с текста ответа (L9, `think-tail.ts`). */
   reasoningChars: number;
   /**
@@ -199,7 +207,8 @@ export interface AssembledAnswer {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  cachedTokens: number;
+  /** Кэш входа: прочитано, записано, записано на час. */
+  cache: CacheTokens;
   model: string;
   id: string;
 }
@@ -509,6 +518,8 @@ export class StreamTranslator {
     completionTokens: 0,
     totalTokens: 0,
     cachedTokens: 0,
+    cacheWriteTokens: 0,
+    cacheWrite1hTokens: 0,
     reasoningChars: 0,
     bareThinkClose: false,
   };
@@ -624,7 +635,7 @@ export class StreamTranslator {
       promptTokens: this.facts.promptTokens,
       completionTokens: this.facts.completionTokens,
       totalTokens: this.facts.totalTokens,
-      cachedTokens: this.facts.cachedTokens,
+      cache: this.#cache(),
       model: this.#model,
       id: this.#id || `chatcmpl-${Date.now().toString(36)}`,
     };
@@ -1257,7 +1268,7 @@ export class StreamTranslator {
               this.facts.promptTokens,
               this.facts.completionTokens,
               this.facts.totalTokens,
-              this.facts.cachedTokens,
+              this.#cache(),
             ),
           }),
         );
@@ -1490,7 +1501,19 @@ export class StreamTranslator {
     this.facts.promptTokens = prompt;
     this.facts.completionTokens = completion;
     this.facts.totalTokens = total;
-    this.facts.cachedTokens = cachedTokensOf(payload.usage);
+    const cache = cacheTokensOf(payload.usage);
+    this.facts.cachedTokens = cache.read;
+    this.facts.cacheWriteTokens = cache.write;
+    this.facts.cacheWrite1hTokens = cache.write1h;
+  }
+
+  /** Кэш входа из последнего кадра расхода — одной формой для обоих диалектов. */
+  #cache(): CacheTokens {
+    return {
+      read: this.facts.cachedTokens,
+      write: this.facts.cacheWriteTokens,
+      write1h: this.facts.cacheWrite1hTokens,
+    };
   }
 
   #done(): string {
@@ -1648,7 +1671,7 @@ export class StreamTranslator {
       content: [],
       stop_reason: null,
       stop_sequence: null,
-      usage: anthropicUsage(this.facts.promptTokens, 0, this.facts.cachedTokens),
+      usage: anthropicUsage(this.facts.promptTokens, 0, this.#cache()),
     };
     const start = serializeFrame(
       'message_start',
@@ -1720,11 +1743,7 @@ export class StreamTranslator {
         // последним), а `message_start` ушёл на первой дельте с нулём. Anthropic
         // и сам отдаёт итоговый расход здесь — иначе строка таблицы
         // «usage.input_tokens ← usage.prompt_tokens» врала бы в потоке.
-        usage: anthropicUsage(
-          this.facts.promptTokens,
-          this.facts.completionTokens,
-          this.facts.cachedTokens,
-        ),
+        usage: anthropicUsage(this.facts.promptTokens, this.facts.completionTokens, this.#cache()),
       }),
     );
     out += serializeFrame('message_stop', JSON.stringify({ type: 'message_stop' }));

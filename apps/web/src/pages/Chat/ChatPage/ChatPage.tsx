@@ -14,6 +14,7 @@ import { useDraftBox } from '@shared/lib/draft';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ProjectGitControls } from '@features/ProjectGit';
+import { ChatWatchIsland } from '@features/ChatMessages';
 import { useRunModelName } from '@features/ChatModelPicker';
 import { useChats, useChatMessages, useChatAutoRefresh, useChatProgress } from '@entities/Chat';
 import { useProjects, useOpenInEditor } from '@entities/Project';
@@ -402,6 +403,9 @@ export function ChatPage() {
             onOpenChild={session.openChatById}
           />
 
+          {/* Сторож одиночного чата: беда этого разговора — над его лентой. */}
+          <ChatWatchIsland chatId={chatId} sessionId={run.sessionId} />
+
           <ChatThread
             messages={[...shownHistory, ...pending]}
             conversationId={activeChat?.id}
@@ -418,6 +422,9 @@ export function ChatPage() {
             localRun={localRun}
             chatId={chatId}
             permissions={run.permissions}
+            {...(run.deferredPermissions?.length
+              ? { deferredPermissions: run.deferredPermissions }
+              : {})}
             branchGates={run.branchGates}
             queued={pendingBubbles(run)}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}

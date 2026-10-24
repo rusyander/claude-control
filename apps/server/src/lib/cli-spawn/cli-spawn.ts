@@ -1,10 +1,17 @@
 import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { errorMonitor } from 'node:events';
+import { existsSync } from 'node:fs';
 import { StringDecoder } from 'node:string_decoder';
 import { shellArgs } from '../cli-args/cli-args.ts';
 import { wasStoppedOnPurpose } from '../process-tree/process-tree.ts';
 import { resolveWindowsExecutable, cmdWouldTruncate } from '../win-exec/win-exec.ts';
 import { resolveWindowsShim } from '../win-shim.ts';
+import { trackCliPid } from './live-cli-pids.ts';
+import { installSpawnRegistry } from './spawn-registry.ts';
+
+// Реестр запусков сервера (RF-BGCD-09) — до первого запуска: модуль запуска CLI
+// грузится на старте сервера, и с ним — подписка на каждый `ChildProcess`.
+installSpawnRegistry();
 
 /**
  * Запуск CLI провайдера без shell-интерполяции — общий для всех, кто запускает
@@ -175,6 +182,7 @@ export function watchCliChild(
   args: readonly string[],
   child: ChildProcessWithoutNullStreams,
 ): void {
+  trackCliPid(child);
   if (cliExitObserver) watchExit(command, args, child);
 }
 
@@ -207,14 +215,39 @@ function watchExit(
  * Метка CLI для пульса журнала проверок: preload, загрузившийся в проверке под
  * этим CLI, отмечает «журнал здесь работает». Без неё покрытие было бы
  * предположением. Только когда журнал подмешан в окружение панели — иначе
- * метка ничего не значит и лишь меняла бы окружение запуска.
+ * метка ничего не значит и лишь меняла бы окружение запуска. С меткой едет
+ * замок `AGENTDECK_VERIFY_LEDGER_LOCK` (`tools/verify-ledger/ledger.cjs` locked).
  */
 export function ledgerCliMarker(command: string): Record<string, string> {
   if (!process.env.AGENTDECK_VERIFY_LEDGER_HOME) return {};
   const cli = (command.split(/[\\/]/).pop() ?? '')
     .replace(/\.(exe|cmd|bat|ps1)$/i, '')
     .toLowerCase();
-  return /^[\w.-]+$/.test(cli) ? { AGENTDECK_VERIFY_LEDGER_CLI: cli } : {};
+  // Замок (владелец 23.10): `AGENTDECK_VERIFY_LEDGER=off` в команде модели больше не
+  // выключает повтор — группа обходила им журнал и гоняла тот же гейт на том же дереве.
+  // Выбор человека в окружении самой панели (off, shadow, _DELTA=off) замок не перекрывает.
+  const own = (name: string) => String(process.env[name] ?? '').toLowerCase();
+  const chosen =
+    !['', 'on'].includes(own('AGENTDECK_VERIFY_LEDGER')) ||
+    own('AGENTDECK_VERIFY_LEDGER_DELTA') === 'off';
+  const lock: Record<string, string> = chosen
+    ? {}
+    : { AGENTDECK_VERIFY_LEDGER_LOCK: '1', ...lockedEntry() };
+  return /^[\w.-]+$/.test(cli) ? { ...lock, AGENTDECK_VERIFY_LEDGER_CLI: cli } : lock;
+}
+
+/**
+ * Тот же NODE_OPTIONS, но вход `bin/preload-locked.cjs` вместо `bin/preload.cjs`: замок
+ * переменной снимается одной командой модели (`AGENTDECK_VERIFY_LEDGER_LOCK=`), замок во
+ * входе — нет. Только если файл входа есть: `--require` на несуществующий путь уронил бы
+ * каждый процесс node, включая хуки.
+ */
+function lockedEntry(): Record<string, string> {
+  const options = process.env.NODE_OPTIONS ?? '';
+  const match = /--require\s+"([^"]*\/bin\/)preload\.cjs"/.exec(options);
+  if (!match || !existsSync(`${match[1]}preload-locked.cjs`)) return {};
+  const swapped = options.replace(`${match[1]}preload.cjs"`, `${match[1]}preload-locked.cjs"`);
+  return { NODE_OPTIONS: swapped };
 }
 
 export function spawnCliProcess(
@@ -223,6 +256,8 @@ export function spawnCliProcess(
   options: CliSpawnOptions = {},
 ): CliSpawnOutcome {
   const outcome = spawnUnobserved(command, args, options);
+  // Номер — до любого выхода ниже: маршрут решения человека судит и по нему.
+  if (!outcome.error) trackCliPid(outcome.child);
   if (!spawnFailureObserver && !cliExitObserver) return outcome;
   if (outcome.error) notifySpawnFailure(command, outcome.error);
   else {

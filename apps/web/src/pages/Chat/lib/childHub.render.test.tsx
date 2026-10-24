@@ -53,7 +53,7 @@ function render(chats: ChatSummary[], runs: ActiveRunView[], split?: SplitPlanVi
   // под клиентом запросов.
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
-      <ChildStages groups={groups} onOpen={() => {}} {...(tree ? { tree } : {})} />
+      <ChildStages groups={groups} onOpen={() => {}} {...(tree ? { tree } : {})} sectionsOpen />
     </QueryClientProvider>,
   );
 }
@@ -360,7 +360,7 @@ describe('хаб разделения — колонки и шаг группы'
     id: 'g0',
     stage: 'work',
     groupTitle: 'CP-admin-UI',
-    branch: 'fix-GOR-1409-GOR-1334/cp-clients-instances-2',
+    branch: 'fix-PROJ-1409-PROJ-1334/cp-clients-instances-2',
     model: 'claude-opus-5-5',
     effort: 'high',
     firstEditAt: '2026-09-24T10:03:10.000Z',
@@ -382,7 +382,7 @@ describe('хаб разделения — колонки и шаг группы'
     expect(section(html, 'data-hub-meta-cell="model"')).toContain('claude-opus-5-5 · Высокая');
     expect(textOf(html)).toMatch(/До первой правки\|*3м 10с/);
     expect(html).toContain('data-hub-meta-cell="workTime"');
-    expect(textOf(html)).toContain('fix-GOR-1409-GOR-1334/cp-clients-instances-2');
+    expect(textOf(html)).toContain('fix-PROJ-1409-PROJ-1334/cp-clients-instances-2');
     // Многоточие обрезало строку на полуслове — у строк группы его больше нет.
     expect(section(html, 'data-hub-meta')).not.toContain('truncate');
   });

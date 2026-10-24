@@ -84,6 +84,13 @@ export interface NativeFacts {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /**
+   * Из входа — прочитано из кэша, записано и из записанного на час: учёт денег
+   * считает их по своим ставкам (ревью K, 🟡2), те же имена, что у моста (`frames.ts`).
+   */
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  cacheWrite1hTokens: number;
   /** Блоков `tool_use` в ответе. */
   toolCalls: number;
   upstreamError?: { code: string; message: string };
@@ -95,6 +102,8 @@ interface Tokens {
   input: number;
   cacheRead: number;
   cacheCreation: number;
+  /** Из записи — часовая (`usage.cache_creation.ephemeral_1h_input_tokens`). */
+  cacheCreation1h: number;
   output: number;
 }
 
@@ -128,6 +137,10 @@ function readUsage(tokens: Tokens, usage: unknown): void {
     const value = usage[theirs];
     if (typeof value === 'number' && Number.isFinite(value) && value > 0) tokens[ours] = value;
   }
+  const split = isRecord(usage.cache_creation) ? usage.cache_creation.ephemeral_1h_input_tokens : 0;
+  if (typeof split === 'number' && Number.isFinite(split) && split > 0) {
+    tokens.cacheCreation1h = split;
+  }
 }
 
 function errorOf(payload: Record<string, unknown>): { code: string; message: string } {
@@ -140,13 +153,24 @@ function errorOf(payload: Record<string, unknown>): { code: string; message: str
 
 function factsOf(
   tokens: Tokens,
-  rest: Omit<NativeFacts, keyof Tokens | 'promptTokens' | 'completionTokens' | 'totalTokens'>,
+  rest: Omit<
+    NativeFacts,
+    | 'promptTokens'
+    | 'completionTokens'
+    | 'totalTokens'
+    | 'cachedTokens'
+    | 'cacheWriteTokens'
+    | 'cacheWrite1hTokens'
+  >,
 ): NativeFacts {
   const promptTokens = tokens.input + tokens.cacheRead + tokens.cacheCreation;
   return {
     promptTokens,
     completionTokens: tokens.output,
     totalTokens: promptTokens + tokens.output,
+    cachedTokens: tokens.cacheRead,
+    cacheWriteTokens: tokens.cacheCreation,
+    cacheWrite1hTokens: Math.min(tokens.cacheCreation1h, tokens.cacheCreation),
     ...rest,
   };
 }
@@ -154,7 +178,13 @@ function factsOf(
 /** Поток читается сбоку: байты клиенту идут как пришли, здесь только факты. */
 export class AnthropicStreamMeter {
   #buffer = '';
-  readonly #tokens: Tokens = { input: 0, cacheRead: 0, cacheCreation: 0, output: 0 };
+  readonly #tokens: Tokens = {
+    input: 0,
+    cacheRead: 0,
+    cacheCreation: 0,
+    cacheCreation1h: 0,
+    output: 0,
+  };
   #toolCalls = 0;
   #error?: { code: string; message: string };
   #complete = false;
@@ -212,7 +242,13 @@ export class AnthropicStreamMeter {
 
 /** Цельное сообщение: те же факты из его `usage` и `content`. */
 export function messageFacts(payload: unknown): NativeFacts {
-  const tokens: Tokens = { input: 0, cacheRead: 0, cacheCreation: 0, output: 0 };
+  const tokens: Tokens = {
+    input: 0,
+    cacheRead: 0,
+    cacheCreation: 0,
+    cacheCreation1h: 0,
+    output: 0,
+  };
   if (!isRecord(payload)) return factsOf(tokens, { toolCalls: 0, complete: false });
   if (payload.type === 'error') {
     return factsOf(tokens, { toolCalls: 0, complete: false, upstreamError: errorOf(payload) });

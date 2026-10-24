@@ -38,6 +38,13 @@ import { upgradeStageScheme } from '../../domains/chat/stage-scheme/stage-scheme
 import { withoutGroupIdentity } from '../../domains/chat/panel-preamble.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { projectsDir } from './paths.ts';
+import { warmedAtOf } from '../../domains/chat/keep-warm/keep-warm.ts';
+
+/** Отметка пинга тёплого кэша сессии — полем решения о продолжении; нет — пусто. */
+function warmedAt(appDataDir: string, sessionId: string): { warmedAt?: number } {
+  const at = warmedAtOf(appDataDir, sessionId);
+  return at !== undefined ? { warmedAt: at } : {};
+}
 
 /** Что домен ревью просит запустить: правки по замечаниям или их отправку в MR. */
 export interface ReviewStageStart {
@@ -259,6 +266,7 @@ export function createReviewStarter(
           // стадий старого; новый разговор получает его переведённым (§10).
           ...(input.cold ? { intro: upgradeStageScheme(input.cold) } : {}),
           ...(input.base ? { base: input.base } : {}),
+          ...warmedAt(ctx.location.paths.appData, sessionId),
           now: Date.now(),
         })
       : undefined;

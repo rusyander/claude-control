@@ -21,6 +21,7 @@ import { markSent } from '../sent';
 import { answerSummary } from '../answerSummary';
 import { isRelayCard, relayDecisions } from '../relayAnswers';
 import { OutsideAsks } from './OutsideAsks/OutsideAsks';
+import { SourceLine } from './SourceLine/SourceLine';
 import { styles } from './AskCard.styles';
 
 /**
@@ -126,6 +127,7 @@ export function AskCard({
             {' · '}
             {t.home.age(ageMinutes(asks[0]?.askedAt ?? chat.updatedAt, now))}
           </Mono>
+          <SourceLine source={chat.source} />
         </View>
         {onOpen ? (
           <Pressable accessibilityRole="link" onPress={onOpen} hitSlop={8}>

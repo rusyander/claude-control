@@ -1,6 +1,7 @@
 import type { InboxAsk } from '@agentdeck/contracts/chat-inbox';
 import type { AskAnswer } from '../../queue.types';
-import { useT } from '../../../../shared/config/i18n';
+import { useLanguage, useT } from '../../../../shared/config/i18n';
+import { launchLines } from '../../../../entities/inbox/askSource';
 import { useState } from 'react';
 import { toolSummary } from '../../../../entities/inbox/toolSummary';
 import { View, Text, Pressable } from 'react-native';
@@ -19,14 +20,24 @@ export function ToolAsk({
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const lang = useLanguage();
   const summary = toolSummary(ask.input);
   const gate = ask.kind === 'branchGate';
+  // Запуск агента: решают по тому, что поручено и чем, а не по сырому вызову.
+  const launch = ask.kind === 'permission' ? launchLines(ask.launch, lang) : undefined;
   return (
     <View style={styles.body}>
       <Text style={styles.kind}>{gate ? t.home.branchGate : t.home.permission}</Text>
       {gate ? <Text style={styles.hint}>{t.home.branchGateHint}</Text> : null}
       <Mono style={styles.tool}>{ask.toolName}</Mono>
-      {summary ? (
+      {launch ? (
+        <View style={styles.body}>
+          <Text style={styles.hint}>{launch.title}</Text>
+          {launch.description ? <Text style={styles.question}>{launch.description}</Text> : null}
+          {launch.how ? <Mono style={styles.summary}>{launch.how}</Mono> : null}
+        </View>
+      ) : null}
+      {summary && !launch?.description ? (
         <Mono style={styles.summary} numberOfLines={open ? undefined : 3}>
           {summary}
         </Mono>

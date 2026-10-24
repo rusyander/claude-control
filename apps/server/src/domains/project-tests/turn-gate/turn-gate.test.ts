@@ -300,6 +300,33 @@ describe('пробелы хода агента', () => {
     expect(judge([muted], [red], ['src/auth/a.ts']).join('\n')).not.toContain('red this turn');
   });
 
+  // Как F-22 у шлюза доставки: запись словом после исполненного красного его не снимает.
+  it('исполненный красный не снимается поздней записью словом passed — и у хода группы', () => {
+    const cases = [auto('auth-001', ['src/auth'])];
+    const red = run('2026-10-15T10:06:00.000Z', [['auth-001', 'failed']]);
+    const word = run('2026-10-15T10:07:00.000Z', [['auth-001', 'passed']], {
+      id: 'r-word',
+      attested: true,
+    } as Partial<ProjectTestRunRecord>);
+    expect(judge(cases, [red, word], ['src/auth/a.ts']).join('\n')).toContain('red this turn');
+    const group = judgeTurn({
+      groups: groups(cases),
+      runs: [red, word],
+      paths: ['src/auth/a.ts'],
+      since: SINCE,
+      changedAt: EDIT,
+      deferRuns: true,
+      cli: CLI,
+      root: '/p',
+    });
+    expect(group.join('\n')).toContain('red this turn');
+    // Исполненный зелёный после красного — снимает, как раньше.
+    const green = run('2026-10-15T10:08:00.000Z', [['auth-001', 'passed']], { id: 'r-green' });
+    expect(judge(cases, [red, word, green], ['src/auth/a.ts']).join('\n')).not.toContain(
+      'red this turn',
+    );
+  });
+
   it('прогон прошлого хода не засчитывается', () => {
     const old = run('2026-10-15T09:00:00.000Z', [['auth-001', 'passed']]);
     expect(judge([auto('auth-001', ['src/auth'])], [old], ['src/auth/a.ts'])).toHaveLength(1);

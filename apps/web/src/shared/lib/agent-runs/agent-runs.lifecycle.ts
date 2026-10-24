@@ -410,6 +410,7 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
     serverRunId: undefined,
     askedQuestion: false,
     permissions: [],
+    deferredPermissions: undefined,
     // Замолчавшим считался прошлый ход — этот только начинается.
     stalled: undefined,
     dropped: undefined,

@@ -90,6 +90,12 @@ export interface AutoContinueDeps {
   start: (chatId: string, options: RunOptions, meta: RunMeta) => boolean;
   /** Прогон шёл на локальной модели: у облака обрыв чинит человек или лимит. */
   isLocal: (finished: RunFinished) => boolean;
+  /**
+   * Мост прав нового хода — к этой панели, под ключом запуска (F-45): прогон,
+   * подхваченный после перезапуска, несёт пустой адрес (`run-reattach.ts`), и
+   * брокер отказывал бы каждому вызову продолженного хода.
+   */
+  bridge?: (runId: string) => NonNullable<RunOptions['permissionPrompt']>;
   schedule?: (run: () => void, ms: number) => unknown;
   cancel?: (handle: unknown) => void;
   log: (message: string, error?: unknown) => void;
@@ -137,7 +143,7 @@ export class AutoContinue {
     this.spent.set(key, attempt);
     if (finished.sessionId) this.alias.set(finished.sessionId, key);
     // Сессии нет — ход умер до первого слова модели: продолжать нечем, уходит прежняя задача.
-    const options: RunOptions = finished.sessionId
+    const resumed: RunOptions = finished.sessionId
       ? {
           ...finished.options,
           prompt: continuePrompt(verdict.reason),
@@ -146,6 +152,10 @@ export class AutoContinue {
           fork: false,
         }
       : finished.options;
+    const options: RunOptions =
+      resumed.permissionPrompt && this.deps.bridge
+        ? { ...resumed, permissionPrompt: this.deps.bridge(key) }
+        : resumed;
     const meta: RunMeta = {
       ...(finished.origin ? { origin: finished.origin } : {}),
       ...(finished.projectPath ? { projectPath: finished.projectPath } : {}),

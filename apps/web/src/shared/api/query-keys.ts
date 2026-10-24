@@ -200,6 +200,10 @@ export const queryKeys = {
     ['chat-group-settings', chatId, sessionId] as const,
   /** Заметки главным чатам деревьев: один список на все, как его отдаёт сервер. */
   chatEscalations: ['chat-escalations'] as const,
+  /** Активные сигналы сторожа одиночных чатов: один список на все, по чату. */
+  chatWatchSignals: ['chat-watch-signals'] as const,
+  /** Отложенные вопросы D-n: один список на все чаты и группы, как его отдаёт сервер. */
+  chatDeferred: ['chat-deferred'] as const,
   /** Резервные копии: список обновляется после каждой записи в конфиг. */
   backups: ['backups'] as const,
   /** Лента изменений конфигурации: обновляется после каждой записи в конфиг. */
@@ -344,6 +348,11 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   overview: [queryKeys.overview],
   // Ребёнок разделения сказал критичное: сервер рассылает домен сам, файла нет.
   'chat-escalations': [queryKeys.chatEscalations],
+  // Сторож записал или закрыл сигнал одиночного чата: строка и остров перечитывают список.
+  'chat-signals': [queryKeys.chatWatchSignals],
+  // Запись D-n заведена, решена или истекла: сервер шлёт домен после каждой
+  // записи списка — плашка «Ждёт решения» и хаб групп перечитывают его сразу.
+  'chat-deferred': [queryKeys.chatDeferred],
   // Папку e2e проекта сверил наблюдатель сервера: тест, дописанный в редакторе,
   // стал кейсом — раздел «Тесты» перечитывает вид, историю и отчёт.
   'project-tests': [['project-tests']],
@@ -360,6 +369,10 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   // Окна подписки сдвинулись: сервер спросил Anthropic сам и рассылает домен
   // без файла (`domains/usage-limits`), вкладка перечитывает свой снимок.
   'usage-limits': [queryKeys.usageLimits],
+  // Сторож групп записал сигналы разделения: сервер шлёт домен сам после записи, и
+  // карточки групп показывают их сразу, а не на следующем опросе дерева. Ключ —
+  // корень `chatTreeKeys.all` (`entities/ChatTree`): shared не тянет сущность.
+  'chat-tree': [['chat-tree']],
   // Транскриптов здесь намеренно нет: разговоров сотни, и правка одного не
   // повод перечитывать открытый — обновление идёт адресно, по пути из события
   // (см. FileWatchProvider).

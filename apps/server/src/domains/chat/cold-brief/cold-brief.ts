@@ -33,9 +33,15 @@ const NOTEBOOK_FILES = [TASK_NOTEBOOK, TASK_TICKETS, '.agent/PROGRESS.md', '.age
 /** Ветки, от которых считаются изменения группы: первая найденная — база. */
 const BASE_REFS = ['origin/HEAD', 'origin/main', 'origin/master'];
 
-function clip(text: string, max: number): string {
+/**
+ * Обрез с указанием, где остаток. Без него «не собирай заново» в шапке читается
+ * как запрет дочитать: хвост PROGRESS.md с планом и «не трогать» терялся молча.
+ */
+function clip(text: string, max: number, rest: string): string {
   const trimmed = text.trim();
-  return trimmed.length > max ? `${trimmed.slice(0, max)}\n…(cut at ${max} chars)` : trimmed;
+  return trimmed.length > max
+    ? `${trimmed.slice(0, max)}\n…(cut at ${max} chars — ${rest})`
+    : trimmed;
 }
 
 // Только хвост: ведущий пробел у `git status --short` — смысл (« M» — правка
@@ -96,14 +102,27 @@ function mergeBase(cwd: string, own?: string): { ref: string; sha: string } | un
  * Блок фактов для вводной: заметки, git от базы, незакоммиченное, последний
  * ответ и путь к прежнему транскрипту. Пустой раздел не печатается. `base` —
  * ветка, от которой отведена копия группы; нет — основная ветка origin.
+ *
+ * `read` — у чужого CLI (Codex, Qwen Code): последний ответ и открытый вопрос
+ * его разговор приносит сам, транскрипт Claude не читается. Без `read` — как было.
  */
-export function coldBriefFacts(cwd: string, transcript: string, base?: string): string {
+export function coldBriefFacts(
+  cwd: string,
+  transcript: string,
+  base?: string,
+  read?: { lastAnswer?: string; openQuestion?: string },
+): string {
   const parts: string[] = ['Facts the panel collected for you — do not collect them again:'];
   for (const rel of NOTEBOOK_FILES) {
     const file = join(cwd, rel);
     if (!existsSync(file)) continue;
     const text = readFileSync(file, 'utf8');
-    if (text.trim()) parts.push(`## Notebook ${rel}`, clip(text, BRIEF_NOTEBOOK_CHARS));
+    if (text.trim()) {
+      parts.push(
+        `## Notebook ${rel}`,
+        clip(text, BRIEF_NOTEBOOK_CHARS, `read the rest of ${rel} yourself before acting`),
+      );
+    }
   }
   const branch = gitSync(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
   const fork = mergeBase(cwd, base);
@@ -122,18 +141,22 @@ export function coldBriefFacts(cwd: string, transcript: string, base?: string): 
   if (status !== undefined) {
     parts.push('## Uncommitted (git status --short)', status.trim() ? clipLines(status) : 'clean');
   }
-  const answer = lastAnswer(transcript);
+  const answer = read ? (read.lastAnswer ?? '') : lastAnswer(transcript);
   if (answer) {
     parts.push(
       '## Your last answer in the previous conversation',
-      clip(answer, BRIEF_LAST_ANSWER_CHARS),
+      clip(
+        answer,
+        BRIEF_LAST_ANSWER_CHARS,
+        'the rest is the last answer in the previous transcript',
+      ),
     );
   }
-  const asked = openQuestion(transcript);
+  const asked = read ? (read.openQuestion ?? '') : openQuestion(transcript);
   if (asked) {
     parts.push(
       '## Your question still open in the previous conversation (the message below may answer it)',
-      clip(asked, BRIEF_LAST_ANSWER_CHARS),
+      clip(asked, BRIEF_LAST_ANSWER_CHARS, 'the rest is in the previous transcript'),
     );
   }
   parts.push(

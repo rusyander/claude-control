@@ -1,13 +1,16 @@
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { GROUP_ECONOMY_DEFAULTS, type GroupEconomy } from '@agentdeck/contracts/group-economy';
+import type { GroupEconomyLever } from '@agentdeck/contracts/group-economy-support';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { SelectField } from '@shared/ui/select-field';
+import { useProviders } from '@entities/Provider';
 import { SettingToggleRow } from '../SettingToggleRow/SettingToggleRow';
+import { GroupEconomySupport } from '../GroupEconomySupport/GroupEconomySupport';
 import type { SettingsTabProps } from '../SettingsTabs.types';
 
 // Немного полезных значений вместо свободного числа: опечатка на порядок в поле
@@ -15,6 +18,7 @@ import type { SettingsTabProps } from '../SettingsTabs.types';
 const WINDOW_VALUES = [0, 120_000, 160_000, 200_000, 250_000];
 const BASH_VALUES = [0, 4_000, 8_000, 16_000, 30_000];
 const READ_VALUES = [0, 5_000, 10_000, 25_000];
+const PING_VALUES = [1, 2, 3, 5, 9];
 
 const NUMBER_LABELS = {
   compactWindow: ['groupCompactWindow', 'tokens', 1000],
@@ -27,7 +31,7 @@ type NumberLever = keyof typeof NUMBER_LABELS;
 /**
  * Рычаги экономии групп разделения (замер прогона 20.10.2026). Каждый
  * выключается отдельно, панель перезапускать не нужно. Порог сжатия, доставка на
- * Sonnet и новый разговор после паузы читаются на ходу; остальные закрепляются на
+ * Sonnet, новый разговор после паузы и тёплый кэш ожидания читаются на ходу; остальные закрепляются на
  * первом старте разговора (`pinLinkEconomy`) — смена посреди него переписала бы кэш.
  */
 export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
@@ -46,6 +50,11 @@ export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
     staleTime: Infinity,
   });
   const envWindow = system?.groupCompactWindowEnv;
+  // Где действует каждый рычаг — из каталогов CLI; списка ещё нет — строк отметок нет.
+  const providers = useProviders().data?.providers ?? [];
+  const support = (lever: GroupEconomyLever) => (
+    <GroupEconomySupport lever={lever} providers={providers} />
+  );
 
   // Значение по умолчанию помечено; чужое текущее (правка файла руками) не теряется.
   const numberOptions = (key: NumberLever, values: number[]) => {
@@ -60,6 +69,25 @@ export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
     const all = values.includes(economy[key]) ? values : [...values, economy[key]];
     return all.map((value) => ({ value: String(value), label: label(value) }));
   };
+
+  // Пинг — на 50-й минуте после прошлого, кэш живёт час: N пингов держат его
+  // тёплым N·50 + 60 минут ожидания. Подпись говорит часы, а не счёт.
+  const pingOptions = (
+    PING_VALUES.includes(economy.keepWarmPings)
+      ? PING_VALUES
+      : [...PING_VALUES, economy.keepWarmPings]
+  ).map((count) => {
+    const hours = ((count * 50 + 60) / 60).toLocaleString(i18n.language, {
+      maximumFractionDigits: 1,
+    });
+    return {
+      value: String(count),
+      label:
+        count === GROUP_ECONOMY_DEFAULTS.keepWarmPings
+          ? t('settings.groupKeepWarmPingsDefault', { count, hours })
+          : t('settings.groupKeepWarmPingsValue', { count, hours }),
+    };
+  });
 
   return (
     <Card padding="md">
@@ -78,6 +106,7 @@ export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
           options={numberOptions('compactWindow', WINDOW_VALUES)}
           hint={t('settings.groupCompactWindowHint')}
         />
+        {support('compactWindow')}
         {envWindow ? (
           <Typography variant="body-sm" color="warning" role="status">
             {t('settings.groupCompactWindowEnv', {
@@ -92,6 +121,7 @@ export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
           options={numberOptions('bashOutputChars', BASH_VALUES)}
           hint={t('settings.groupBashOutputHint')}
         />
+        {support('bashOutputChars')}
         <SelectField
           label={t('settings.groupReadOutput')}
           value={String(economy.readOutputTokens)}
@@ -99,6 +129,7 @@ export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
           options={numberOptions('readOutputTokens', READ_VALUES)}
           hint={t('settings.groupReadOutputHint')}
         />
+        {support('readOutputTokens')}
         <SelectField
           label={t('settings.groupCacheTtl')}
           value={economy.cacheTtl}
@@ -110,17 +141,35 @@ export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
           ]}
           hint={t('settings.groupCacheTtlHint')}
         />
+        {support('cacheTtl')}
         <SettingToggleRow
           label={t('settings.groupSonnetDeliver')}
           hint={t('settings.groupSonnetDeliverHint')}
           checked={economy.sonnetDeliver}
           onChange={(sonnetDeliver) => patchEconomy({ sonnetDeliver })}
         />
+        {support('sonnetDeliver')}
         <SettingToggleRow
           label={t('settings.groupFreshOnColdResume')}
           hint={t('settings.groupFreshOnColdResumeHint')}
           checked={economy.freshOnColdResume}
           onChange={(freshOnColdResume) => patchEconomy({ freshOnColdResume })}
+        />
+        {support('freshOnColdResume')}
+        <SettingToggleRow
+          label={t('settings.groupKeepWarm')}
+          hint={t('settings.groupKeepWarmHint')}
+          checked={economy.keepWarm}
+          onChange={(keepWarm) => patchEconomy({ keepWarm })}
+        />
+        {support('keepWarm')}
+        <SelectField
+          label={t('settings.groupKeepWarmPings')}
+          value={String(economy.keepWarmPings)}
+          onChange={(value) => patchEconomy({ keepWarmPings: Number(value) })}
+          options={pingOptions}
+          hint={t('settings.groupKeepWarmPingsHint')}
+          disabled={!economy.keepWarm}
         />
         <SettingToggleRow
           label={t('settings.groupDetachIde')}
@@ -128,12 +177,14 @@ export function GroupEconomyCard({ settings, patch }: SettingsTabProps) {
           checked={economy.detachIde}
           onChange={(detachIde) => patchEconomy({ detachIde })}
         />
+        {support('detachIde')}
         <SettingToggleRow
           label={t('settings.groupWorkHabits')}
           hint={t('settings.groupWorkHabitsHint')}
           checked={economy.workHabits}
           onChange={(workHabits) => patchEconomy({ workHabits })}
         />
+        {support('workHabits')}
       </Stack>
     </Card>
   );

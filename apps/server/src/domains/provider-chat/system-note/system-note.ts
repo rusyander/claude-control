@@ -81,8 +81,11 @@ export function writeQwenSystemNote(options: {
         loadFromIncludeDirectories: true,
       },
     });
-    // Каталог без файла настроек — недописанный прошлый (сбой посреди сборки).
-    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    // Каталог без файла настроек — недописанный прошлый (сбой посреди сборки). Файл
+    // есть — соседний прогон успел первым, пока писался черновик: его каталог не трогать.
+    if (existsSync(dir) && !existsSync(join(dir, SETTINGS_FILE))) {
+      rmSync(dir, { recursive: true, force: true });
+    }
     try {
       renameWithRetry(staging, dir);
     } catch {
@@ -256,7 +259,10 @@ function writeSettingsLayer(
     const staging = join(root, `.${digest}-${randomUUID().slice(0, 8)}`);
     mkdirSync(staging, { recursive: true });
     writeJsonFile(join(staging, SETTINGS_FILE), merged);
-    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    // Недописанный каталог — снести; готовый соседа (файл на месте) — не трогать.
+    if (existsSync(dir) && !existsSync(join(dir, SETTINGS_FILE))) {
+      rmSync(dir, { recursive: true, force: true });
+    }
     try {
       renameWithRetry(staging, dir);
     } catch {

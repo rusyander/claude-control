@@ -10,6 +10,7 @@ import type { IntegrationCardExtrasProps } from './IntegrationCardExtras.types';
 import styles from './IntegrationCardExtras.module.scss';
 import { toggleEvent } from '../../model/toggleEvent';
 import { MCP_NAME } from './IntegrationCardExtras.constants';
+import { TelegramAnswers } from '../TelegramAnswers/TelegramAnswers';
 
 /**
  * То, что есть только у части коннекторов: подписка на события (Telegram и
@@ -69,6 +70,7 @@ export function IntegrationCardExtras({
             {t('integrations.telegram.test')}
           </Button>
         </Stack>
+        <TelegramAnswers />
       </Stack>
     );
   }

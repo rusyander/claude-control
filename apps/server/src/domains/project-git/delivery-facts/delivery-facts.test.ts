@@ -141,7 +141,7 @@ describe('доставка по фактам git', () => {
   });
 
   /**
-   * Живой прогон 29.09: панель назвала ветку `fix-GOR-1485-…-2`, а группа по
+   * Живой прогон 29.09: панель назвала ветку `fix-PROJ-1485-…-2`, а группа по
    * правилу проекта (ключи через запятую) завела и отправила свою. Проверка
    * искала панельное имя на удалённом и не нашла бы никогда.
    */
@@ -225,6 +225,80 @@ describe('доставка по фактам git', () => {
       const facts = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-12' });
 
       expect(facts.branch).toBeUndefined();
+    });
+
+    /**
+     * L7 (ревью 23.10): `git branch -m` своей ветки группа делает сама, а запись
+     * разделения хранила прежнее имя — доставка искала ветку, которой больше
+     * нет. Ветка копии, переименованная ИЗ ветки панели (журнал ссылок git это
+     * помнит), — та же ветка группы под новым именем: принимается и без ключа
+     * задачи в имени, и неотправленной, и при отправленной прежней.
+     */
+    it('переименованная из ветки панели — принимается под новым именем', async () => {
+      gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1']);
+      gitIn(work, ['branch', '-m', 'feature/renamed']);
+
+      const unpushed = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+      expect(unpushed).toMatchObject({ branch: 'feature/renamed', pushed: false });
+      expect(missingDelivery(unpushed, unpushed.branch ?? '').join('\n')).toContain(
+        'feature/renamed',
+      );
+
+      gitIn(work, ['branch', '-m', 'feature/renamed-again']);
+      gitIn(work, ['push', '-q', 'origin', 'feature/renamed-again']);
+      mrRef(3, head());
+      const pushed = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+      expect(pushed).toMatchObject({
+        branch: 'feature/renamed-again',
+        pushed: true,
+        mr: `${WEB}/-/merge_requests/3`,
+      });
+    });
+
+    it('переименованная из ДРУГОЙ ветки или занятая другой группой — не принимается', async () => {
+      gitIn(work, ['switch', '-q', '-c', 'other']);
+      gitIn(work, ['branch', '-m', 'feature/x']);
+      const foreign = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+      expect(foreign.branch).toBeUndefined();
+
+      gitIn(work, ['switch', '-q', 'fix/PROJ-1']);
+      gitIn(work, ['branch', '-m', 'feature/y']);
+      const claimed = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1',
+        claimed: ['feature/y'],
+      });
+      expect(claimed.branch).toBeUndefined();
+    });
+
+    /**
+     * A-27 (аудит 23.10): переименованием считалась любая строка журнала с
+     * «renamed … to …» — и тема коммита, и давний перенос, после которого ветка
+     * панели заведена заново, и перенос поверх защищённой ветки.
+     */
+    it('тема коммита, давний перенос и защищённая ветка — не переименование', async () => {
+      gitIn(work, ['branch', '-m', 'feature/old']);
+      gitIn(work, ['switch', '-q', '-c', 'fix/PROJ-1']);
+      gitIn(work, ['switch', '-q', 'feature/old']);
+      const recreated = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+      expect(recreated.branch).toBeUndefined();
+
+      gitIn(work, ['switch', '-q', 'fix/PROJ-1']);
+      gitIn(work, ['branch', '-M', 'main']);
+      const protectedTarget = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+      expect(protectedTarget.branch).toBeUndefined();
+
+      // Ветки панели больше нет, а тема коммита похожа на запись переноса.
+      gitIn(work, ['switch', '-q', '-c', 'feature/q']);
+      gitIn(work, [
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'renamed refs/heads/fix/PROJ-1 to refs/heads/feature/q',
+      ]);
+      const forged = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+      expect(forged.branch).toBeUndefined();
     });
 
     it('копия стоит на основной ветке удалённого — это не доставка группы', async () => {

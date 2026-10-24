@@ -7,6 +7,7 @@ import {
 import { ChatRunRegistry, type RunLike, type RunFinished } from './ChatRunRegistry.ts';
 import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
 import { translate } from '../ChatRunner/ChatRunner.ts';
+import { deferralDenial, mergeRefusal } from '../deferred-asks/deferred-asks.ts';
 
 /**
  * Автономия в реестре прогонов: метка в окружении решается на каждом старте,
@@ -142,6 +143,34 @@ describe('ChatRunRegistry — автономия чата', () => {
     await flush();
     expect(finished[0]?.asked).toBe(true);
     expect(picked).toHaveLength(0);
+  });
+
+  it('отказ панели вопросу (D-n или известный ответ) — «ждёт вас» не поднимается', async () => {
+    // Результат — тем же путём, что строка потока CLI: `translate` → `toolResult`
+    // с родом отказа. Агенту уже сказано, что делать, человека звать не о чем.
+    const notices: string[] = [];
+    registry.setNotifier((notice) => notices.push(notice.kind));
+    registry.start('c1', OPTIONS, {});
+    const run = runs[0]!;
+    const refusals = [deferralDenial('D-4', 'a test reason'), mergeRefusal()];
+    for (const [index, message] of refusals.entries()) {
+      const id = `q${index + 1}`;
+      run.emit({ kind: 'tool', name: 'AskUserQuestion', input: QUESTION, id });
+      const lines = translate({
+        type: 'user',
+        message: {
+          content: [{ type: 'tool_result', tool_use_id: id, is_error: true, content: message }],
+        },
+      } as Parameters<typeof translate>[0]);
+      expect(lines.find((event) => event.kind === 'toolResult')).toMatchObject({
+        denied: index === 0 ? 'deferred' : 'panel-refused',
+      });
+      for (const event of lines) run.emit(event);
+    }
+    expect(notices).toEqual([]);
+    run.finish();
+    await flush();
+    expect(finished[0]?.asked).toBeFalsy();
   });
 
   it('ход кончился раньше результата ожидаемого автовыбора — вопрос висит', async () => {

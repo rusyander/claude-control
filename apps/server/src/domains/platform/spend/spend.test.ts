@@ -9,6 +9,7 @@ import {
   BUDGET_WARN_SHARE,
   clearExhausted,
   daysSince,
+  declaredPricing,
   emptySpend,
   gatewayPricing,
   spendDay,
@@ -152,6 +153,121 @@ describe('расход одного ответа', () => {
     const day = addToDay(emptyDay(), delta({ model: '' }), LOOKUP);
     expect(day.money.unpricedTokens).toBe(1_000_000);
     expect(day.money.unpricedModels).toEqual([]);
+  });
+});
+
+/**
+ * Ревью K, 🟡2: Claude через контур теперь кэширует (n4), и вход хода группы —
+ * это в основном прочитанное из кэша. По ставке входа оно завышало деньги в
+ * десять раз на своей доле, и полоса бюджета краснела раньше времени.
+ */
+describe('кэш в деньгах ответа', () => {
+  /** Haiku: вход 1, выход 5, чтение 0.1, запись 1.25, часовая 2 за миллион. */
+  const HAIKU: PricingLookup = {
+    entries: [
+      {
+        id: 'claude-haiku-5-5',
+        label: 'Claude Haiku 5.5',
+        price: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25, cacheWrite1h: 2 },
+      },
+    ],
+  };
+  const haiku = (patch: Partial<SpendDelta>): SpendDelta =>
+    delta({ model: 'claude-haiku-5-5', completionTokens: 400, ...patch });
+
+  it('прочитанное из кэша — по ставке чтения, а не входа', () => {
+    const day = addToDay(
+      emptyDay(),
+      haiku({ promptTokens: 50_000, totalTokens: 50_400, cacheReadTokens: 45_000 }),
+      HAIKU,
+    );
+    // 5000 свежих по 1 $ + 45000 чтения по 0.1 $ + 400 выхода по 5 $.
+    expect(day.money.usd).toBeCloseTo((5_000 * 1 + 45_000 * 0.1 + 400 * 5) / 1e6, 9);
+    // Токены дня — как прислал контур: вход вместе с кэшем.
+    expect(day.promptTokens).toBe(50_000);
+    expect(day.money.pricedTokens).toBe(50_400);
+  });
+
+  it('запись — по ставке записи, часовая — по часовой, и вход её не включает', () => {
+    const day = addToDay(
+      emptyDay(),
+      haiku({
+        promptTokens: 50_000,
+        totalTokens: 50_400,
+        cacheWriteTokens: 40_000,
+        cacheWrite1hTokens: 30_000,
+      }),
+      HAIKU,
+    );
+    // 10000 свежих + 10000 записи на 5 минут + 30000 часовой + выход.
+    expect(day.money.usd).toBeCloseTo((10_000 * 1 + 10_000 * 1.25 + 30_000 * 2 + 400 * 5) / 1e6, 9);
+  });
+
+  it('рассогласованные поля не дают отрицательного входа', () => {
+    const day = addToDay(
+      emptyDay(),
+      haiku({
+        promptTokens: 100,
+        totalTokens: 500,
+        cacheReadTokens: 80,
+        cacheWriteTokens: 50,
+        cacheWrite1hTokens: 70,
+      }),
+      HAIKU,
+    );
+    // Прочитано 80, запись урезана до 20 (и часовая — до неё), свежего входа нет.
+    expect(day.money.usd).toBeCloseTo((80 * 0.1 + 20 * 2 + 400 * 5) / 1e6, 12);
+  });
+
+  it('без полей кэша — те же деньги, что и до них', () => {
+    const plain = addToDay(emptyDay(), haiku({ promptTokens: 50_000, totalTokens: 50_400 }), HAIKU);
+    const zero = addToDay(
+      emptyDay(),
+      haiku({
+        promptTokens: 50_000,
+        totalTokens: 50_400,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        cacheWrite1hTokens: 0,
+      }),
+      HAIKU,
+    );
+    expect(plain.money.usd).toBe((50_000 * 1 + 400 * 5) / 1e6);
+    expect(zero).toEqual(plain);
+  });
+
+  it('шлюз не объявил цену кэша: часовая запись — по входу, как и прочая', () => {
+    const declared = declaredPricing([
+      { id: 'Vendor/Plain', price: { input: 2, output: 4 } },
+      { id: 'vendor/cached', price: { input: 2, output: 4, cacheRead: 0.2, cacheWrite: 2.5 } },
+    ]);
+    expect(declared['vendor/plain']).toEqual({
+      input: 2,
+      output: 4,
+      cacheRead: 2,
+      cacheWrite: 2,
+      cacheWrite1h: 2,
+    });
+    // Объявил запись — часовую считает множитель справочника, поля нет.
+    expect(declared['vendor/cached']).not.toHaveProperty('cacheWrite1h');
+  });
+
+  it('полоса бюджета считает по ставке чтения: десять ходов группы не «исчерпали» 0.2 $', () => {
+    let record = emptySpend('company-dev');
+    const at = new Date(2026, 9, 22, 12);
+    for (let turn = 0; turn < 10; turn += 1) {
+      record = addSpend(
+        record,
+        haiku({ promptTokens: 50_000, totalTokens: 50_400, cacheReadTokens: 45_000 }),
+        at,
+        HAIKU,
+      );
+    }
+    const verdict = budgetVerdict(platformOf({ budgetUsd: 0.2 }), record);
+    expect(verdict.spentUsd).toBeCloseTo(0.115, 9);
+    expect(verdict.overEstimate).toBe(false);
+    // 0.115 / 0.2 = 57.5 % — до порога внимания далеко; по ставке входа было бы 0.52 $.
+    expect(verdict.nearLimit).toBe(false);
   });
 });
 

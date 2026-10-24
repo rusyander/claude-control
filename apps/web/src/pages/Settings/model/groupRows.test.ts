@@ -60,9 +60,9 @@ describe('строки разрешений групп', () => {
     expect(defaultRows(next).every((row) => !row.own)).toBe(true);
   });
 
-  it('затирание истории из коробки у человека (аудит 25.09, L163)', () => {
+  it('затирание истории своей копии из коробки — само (решение владельца 23.10)', () => {
     const rows = defaultRows(defaults());
-    expect(rows.find((row) => row.id === 'gitHistory')?.level).toBe('human');
+    expect(rows.find((row) => row.id === 'gitHistory')?.level).toBe('auto');
     expect(defaults().groupQuestions).toBe('plan');
     expect(defaults().permissions.routine).toBe('auto');
   });

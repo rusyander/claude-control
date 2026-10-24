@@ -94,6 +94,30 @@ export const geminiProvider: ConfigProvider = {
   },
   // Детект «конфиг найден» (Ф7): каталог ~/.gemini. Только проверка существования.
   configLocations: () => [geminiHome()],
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026). Канала нет: оба родных
+  // ключа живут только в файлах настроек, а файл на прогон CLI не берёт — почему,
+  // см. `economy-run/gemini.ts` (живая проба gemini 0.65.0).
+  groupEconomy: {
+    support: {
+      // `model.compressionThreshold` и `tools.truncateToolOutputThreshold` — только в
+      // настройках; системный файл на прогон CLI пропускает, если он не администратора.
+      compactWindow: { support: 'disproportionate', note: 'economy-note-admin-settings' },
+      bashOutputChars: { support: 'disproportionate', note: 'economy-note-admin-settings' },
+      // `read_file` режет сам: 2000 строк по 2000 знаков, ключа нет.
+      readOutputTokens: { support: 'impossible', note: 'economy-note-hardcoded-limit' },
+      // Кэш Gemini неявный: срок не задаётся.
+      cacheTtl: { support: 'impossible', note: 'economy-note-cache-implicit' },
+      // `gemini -p` без редактора.
+      detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
+      // Доставка — на младшей модели лестницы (`modelLadder` ниже, `cheap-deliver.ts`).
+      sonnetDeliver: { support: 'emulated' },
+      // Каждый ответ — свой запуск с короткой историей: держать между ходами нечего.
+      freshOnColdResume: { support: 'meaningless', note: 'economy-note-one-shot' },
+      keepWarm: { support: 'meaningless', note: 'economy-note-one-shot' },
+      // Строка привычек — нейтральная часть той же строки, что у Claude.
+      workHabits: { support: 'emulated' },
+    },
+  },
   // Ассистент Gemini: API — Google (ключи GEMINI_API_KEY / GOOGLE_API_KEY), есть
   // рабочий CLI (`gemini`). Обе стандартные переменные подхватываются автоматически.
   // One-shot: `gemini -p <prompt>` — неинтерактивный print-режим (флаг задокументирован).

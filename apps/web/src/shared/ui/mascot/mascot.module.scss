@@ -11,7 +11,9 @@
 @use 'sass:math';
 
 $ink: #ffffff;
-$iris: #1e1b4b;
+// Зрачок и огонёк покоя — от акцента: смена акцента (тёмная тема ушла с индиго
+// 22.10.2026) не оставляет на Деке чужого фиолетового.
+$iris: color-mix(in srgb, var(--color-accent) 22%, #0b0d12);
 $dark: color-mix(in srgb, var(--color-accent) 72%, #000);
 
 // Доля холста 64×64 в процентах: опорные точки и сдвиги слоёв.
@@ -28,7 +30,7 @@ $dark: color-mix(in srgb, var(--color-accent) 72%, #000);
 $eye-origin: 50% at(31);
 
 .root {
-  --mascot-led: #a5b4fc;
+  --mascot-led: color-mix(in srgb, var(--color-accent) 55%, #ffffff);
   position: relative;
   display: inline-block;
   flex-shrink: 0;

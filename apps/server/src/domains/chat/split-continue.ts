@@ -26,9 +26,58 @@ export function continuePrompt(input: {
         ? ' Deliver as agreed: commit, push the branch, open the MR (or update the existing one) ' +
           'and give its link as the last line.'
         : ' Finish with a short summary of what was done.'),
-    'If what stopped the work is outside your reach (no access, not logged in, the decision is ' +
-      "the human's) — ask the human with a question, not a report.",
+    HUMAN_ONLY_LINE,
   ].join('\n');
+}
+
+/**
+ * Что группа отдаёт человеку, а что решает сама (решение владельца 23.10:
+ * остановка доставки «решение за вами» — не обычный путь). Вопрос человеку —
+ * только слияние, удаление (git или вне своей копии), force-push сверх аренды
+ * доставки, миграция/DDL/запись в БД и учётные данные, которых нет нигде в
+ * проекте — тот же список, что у навыков `prepare-mr` и `ticket-delivery-2`;
+ * остальное («системное» тоже) группа чинит или снимает заметкой в MR.
+ */
+export const HUMAN_ONLY_LINE =
+  'Ask the human (a question, not a report) ONLY for: merging into the target branch; a ' +
+  'deletion (any git deletion, or anything outside your copy); a force-push beyond the ' +
+  "delivery's lease; a DB migration, DDL or data write; credentials that exist nowhere in the " +
+  'project. Everything else — a live check that cannot run here, a red that predates the ' +
+  'branch, a missing MR, a stale stand session, a conflict — you resolve yourself, or waive ' +
+  'with the reason as a note in the MR description. When one of these does stop you, end the ' +
+  'answer with a paragraph of lines `HUMAN: <kind> — <what exactly is needed>`, <kind> being ' +
+  'merge, destructive (a deletion, a force-push or a DB write) or credentials: the panel does ' +
+  'not answer such a turn for the human, and when it ' +
+  'checks the delivery it stops the group on those lines instead of reminding it and shows the ' +
+  'human just them.';
+
+/** Что можно только человеку (решение владельца 23.10) — вид строки `HUMAN:`. */
+export type HumanAskKind = 'merge' | 'destructive' | 'credentials';
+
+/**
+ * Строки `HUMAN: <вид> — <что нужно>` из ПОЛНОГО текста ответа группы
+ * (`HUMAN_ONLY_LINE` просит так завершать ответ). Не из хвоста: хвост обрезан
+ * до 280 знаков спереди, и длинная строка теряла саму метку, а абзац меток,
+ * за которым агент ставил ссылку MR, хвостом не был вовсе. Блоки кода не в
+ * счёт (лог с меткой — не просьба). Пункт — до следующей метки или конца
+ * строки. Метка — заглавными и отдельным словом (F-41): «The human: merge it…»
+ * в прозе — не просьба; эхо шаблона (`merge|destructive|…`, `<что нужно>`) — тоже.
+ */
+export function humanAsksOf(text: string | undefined): { kind: HumanAskKind; what: string }[] {
+  if (!text) return [];
+  const asks: { kind: HumanAskKind; what: string }[] = [];
+  const marker =
+    /(?<![\p{L}\d_])HUMAN:\s*([Mm]erge|[Dd]estructive|[Cc]redentials)\b(?!\s*\|)[ \t]*[—–:-]?[ \t]*(.*?)`?(?=`?(?<![\p{L}\d_])HUMAN:|$)/gu;
+  const lines = text.replace(/```[\s\S]*?(```|$)/g, '').split(/\r?\n|\r/);
+  for (const match of lines.flatMap((line) => [...line.matchAll(marker)])) {
+    const kind = (match[1] ?? '').toLowerCase() as HumanAskKind;
+    const what = (match[2] ?? '')
+      .replace(/\s+/g, ' ')
+      .replace(/[`\s]+$/, '')
+      .trim();
+    if (what && !/^<[^>]*>/.test(what)) asks.push({ kind, what });
+  }
+  return asks;
 }
 
 /**
@@ -78,6 +127,11 @@ export function continuable(record: SplitPlanRecord, group: SplitPlanGroupRecord
   if (group.droppedAt) return false;
   return (
     group.status === 'failed' ||
-    (group.status === 'awaiting' && group.waitingFor === 'review-missing')
+    (group.status === 'awaiting' && group.waitingFor === 'review-missing') ||
+    // Ждёт повтора доставки панелью (до `DELIVERY_RETRY_MS`) — человек может
+    // не ждать срока; слово снимает и счёт повторов (`continueGroup`).
+    (group.status === 'awaiting' &&
+      group.waitingFor === 'delivery' &&
+      Boolean(group.deliveryRetry?.at))
   );
 }

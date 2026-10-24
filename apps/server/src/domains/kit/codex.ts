@@ -44,6 +44,18 @@ export const CODEX_MCP_OFF_ENV = 'AGENTDECK_CODEX_MCP_OFF';
  * (config reference: «Token threshold that triggers automatic history compaction»).
  */
 export const CODEX_COMPACT_LIMIT_ENV = 'AGENTDECK_CODEX_COMPACT_LIMIT';
+/**
+ * Потолок ответа инструмента группы в токенах (рычаги bashOutputChars и
+ * readOutputTokens, решение O2): уходит ключом `-c tool_output_token_limit=<число>`
+ * — у Codex он ОДИН на все инструменты (имя сверено с бинарником codex-cli 0.155.1).
+ */
+export const CODEX_TOOL_OUTPUT_LIMIT_ENV = 'AGENTDECK_CODEX_TOOL_OUTPUT_LIMIT';
+
+/** Числовые рычаги группы: переменная панели → ключ конфига Codex, в этом порядке в argv. */
+const CODEX_LIMIT_KEYS: readonly (readonly [string, string])[] = [
+  [CODEX_COMPACT_LIMIT_ENV, 'model_auto_compact_token_limit'],
+  [CODEX_TOOL_OUTPUT_LIMIT_ENV, 'tool_output_token_limit'],
+];
 
 /**
  * Предел длины аргумента. Командная строка Windows — 32 767 символов на ВСЁ;
@@ -304,7 +316,8 @@ function shellExcludeArgs(home: string | undefined, names: readonly string[]): s
  * Применить наложения к запуску Codex — набор панели и группы прогона — одним
  * `-c developer_instructions=…` сразу после подкоманды (`exec` / `app-server` —
  * опции идут до промпта): текст человека, набор, группы. MCP групп — своими
- * `-c mcp_servers.…`, порог сжатия группы — `-c model_auto_compact_token_limit`.
+ * `-c mcp_servers.…`, порог сжатия группы — `-c model_auto_compact_token_limit`,
+ * потолок ответа инструмента — `-c tool_output_token_limit`.
  * Переменные с путями убраны из окружения. Нет переменных —
  * запуск как был. Файл наложения пропал между сборкой и запуском — `missing`:
  * вызывающий отказывает, а не идёт молча без того, что человек включил. Всё
@@ -316,24 +329,27 @@ export function withCodexKit(
   surface: 'exec' | 'appServer',
 ): CodexKitRun {
   const off = env?.[CODEX_MCP_OFF_ENV];
-  const limit = env?.[CODEX_COMPACT_LIMIT_ENV];
-  if (!env || (off === undefined && limit === undefined)) {
+  const limits = CODEX_LIMIT_KEYS.filter(([name]) => env?.[name] !== undefined);
+  if (!env || (off === undefined && limits.length === 0)) {
     return withOverlays(args, env, surface);
   }
-  const { [CODEX_MCP_OFF_ENV]: _off, [CODEX_COMPACT_LIMIT_ENV]: _limit, ...rest } = env;
+  // Переменные панели до CLI не доходят никогда, даже с битым значением.
+  const rest = { ...env };
+  delete rest[CODEX_MCP_OFF_ENV];
+  for (const [name] of CODEX_LIMIT_KEYS) delete rest[name];
   const result = withOverlays(args, rest, surface);
   const groupArgs = [
     ...(off === undefined ? [] : mcpOffArgs(off)),
-    ...(limit === undefined ? [] : compactLimitArgs(limit)),
+    ...limits.flatMap(([name, key]) => limitArgs(key, env[name] ?? '')),
   ];
   if (groupArgs.length === 0 || result.missing || result.refusal) return result;
   const [head, ...tail] = result.args;
   return { ...result, args: head ? [head, ...groupArgs, ...tail] : result.args };
 }
 
-/** Порог сжатия — только целое положительное число; иное — ничего, CLI решает сам. */
-function compactLimitArgs(raw: string): string[] {
-  return /^[1-9]\d*$/.test(raw) ? ['-c', `model_auto_compact_token_limit=${raw}`] : [];
+/** Порог — только целое положительное число; иное — ничего, CLI решает сам. */
+function limitArgs(key: string, raw: string): string[] {
+  return /^[1-9]\d*$/.test(raw) ? ['-c', `${key}=${raw}`] : [];
 }
 
 interface CodexKitRun {

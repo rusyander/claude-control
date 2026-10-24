@@ -97,6 +97,13 @@ export interface SpendDelta {
   completionTokens: number;
   totalTokens: number;
   /**
+   * Из входа (`promptTokens` его включает) — прочитано из кэша, записано в кэш и
+   * из записанного — на час. Нет полей — ноль: так шлют модели без кэша.
+   */
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  cacheWrite1hTokens?: number;
+  /**
    * Ответ ДОШЁЛ до клиента, а счёта за него контур не прислал (MD-09). Токенов
    * у такого ответа нет и придумывать их нечем, но и молчать о нём нельзя:
    * считается отдельно, деньги и запросы не трогает.
@@ -125,17 +132,25 @@ function emptyDay(day: string): PlatformSpendDay {
 /**
  * Деньги одного ответа по нашему справочнику — либо признание, что цены нет.
  *
- * Кэш здесь нулевой намеренно: контур полей кэша не отдаёт вовсе, и выдумывать
- * их долю значило бы считать деньги по несуществующим кадрам.
+ * Кэш — по тем полям, что прислал контур: у моделей Claude платформа компании
+ * отдаёт и чтение, и запись с часовой долей (замер 22.10.2026, n4). Вход их
+ * включает, поэтому свежий вход = вход − прочитанное − записанное, как в
+ * аналитике транскриптов (`costOf`: часовая запись — часть записи, не сверх неё).
+ * Рассогласованные поля прижимаются к входу: отрицательных денег не бывает.
+ * Полей нет — вход целиком по ставке входа, ровно как раньше.
  */
 function moneyOf(delta: SpendDelta, lookup: PricingLookup): number | undefined {
   const price = delta.model ? findPricing(delta.model, lookup) : undefined;
   if (!price) return undefined;
+  const prompt = Math.max(delta.promptTokens, 0);
+  const read = Math.min(Math.max(delta.cacheReadTokens ?? 0, 0), prompt);
+  const write = Math.min(Math.max(delta.cacheWriteTokens ?? 0, 0), prompt - read);
   return costOf(price, {
-    input: delta.promptTokens,
+    input: prompt - read - write,
     output: delta.completionTokens,
-    cacheRead: 0,
-    cacheCreation: 0,
+    cacheRead: read,
+    cacheCreation: write,
+    cacheCreation1h: Math.min(Math.max(delta.cacheWrite1hTokens ?? 0, 0), write),
   });
 }
 
@@ -390,9 +405,10 @@ export function gatewayPricing(
 /**
  * Цены из каталога последней пробы — в форме справочника, по точному имени.
  *
- * Кэша в оценке расхода нет (см. `moneyOf`), но справочник требует его ставки;
- * не объявленная шлюзом ставка кэша берётся равной входу — так шлюз без
- * отдельной цены кэша и берёт деньги за эти токены.
+ * Кэш оценка расхода считает по его ставкам (`moneyOf`). Не объявленная шлюзом
+ * ставка кэша берётся равной входу — так шлюз без отдельной цены кэша и берёт
+ * деньги за эти токены; часовая запись тогда тоже по входу, а не по множителю
+ * Anthropic поверх него. Объявлена запись — часовая по множителю (`costOf`).
  */
 export function declaredPricing(
   models: readonly PlatformModelInfo[],
@@ -405,6 +421,7 @@ export function declaredPricing(
       output: price.output,
       cacheRead: price.cacheRead ?? price.input,
       cacheWrite: price.cacheWrite ?? price.input,
+      ...(price.cacheWrite === undefined ? { cacheWrite1h: price.input } : {}),
     };
   }
   return declared;

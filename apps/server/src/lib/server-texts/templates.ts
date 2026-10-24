@@ -1282,6 +1282,10 @@ export const serverTextTemplates = {
     ru: 'Группа «{{group}}»: описание MR {{mr}} панель не проверила — MR не читается (интеграция с форджем выключена или нет токена). Проверьте описание сами.',
     en: 'Group «{{group}}»: the panel did not check the description of MR {{mr}} — the MR cannot be read (the forge integration is off or there is no token). Check the description yourself.',
   },
+  'split-delivery-notes-notice': {
+    ru: 'Группа «{{group}}» доставлена с заметками — MR они не держат, но знать их стоит: {{notes}}',
+    en: 'Group «{{group}}» was delivered with notes — they do not hold the MR, but are worth knowing: {{notes}}',
+  },
   'split-mr-watch-limit-notice': {
     ru: 'Группа «{{group}}»: наблюдатель MR {{mr}} продолжал её уже {{resumes}} раз и больше сам не продолжает — новые ветки ревьюера и падения конвейера ждут вас.',
     en: 'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
@@ -1299,12 +1303,12 @@ export const serverTextTemplates = {
     en: "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
   },
   'chat-cold-resume-notice': {
-    ru: 'Группа простояла дольше срока кэша, её разговор остыл, а окно уже {{tokens}} тыс. токенов: продолжать его — заново записать всё окно. Ход пошёл новым разговором в той же копии; вводную панель собрала из файлов — заметки группы, git, последний ответ. Прежний разговор ({{previous}}) остаётся на диске. Выключается в настройках: «Группы», экономия групп.',
-    en: "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk. Switch off in settings: Groups, group economy.",
+    ru: 'Группа простояла дольше срока кэша, её разговор остыл, а окно уже {{tokens}} тыс. токенов: продолжать его — заново записать всё окно. Ход пошёл новым разговором в той же копии; вводную панель собрала из файлов — заметки группы, git, последний ответ. Прежний разговор ({{previous}}) остаётся на диске: вернуть ход в него — кнопкой «Продолжить старый разговор», пока новый идёт. Выключается в настройках: «Группы», экономия групп.',
+    en: "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk: to move the turn back into it, press «Continue the old conversation» while the new one runs. Switch off in settings: Groups, group economy.",
   },
   'split-default-drift-notice': {
-    ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — перенесёт её rebase при доставке.',
-    en: 'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
+    ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — при доставке группа сверит конфликт и сделает rebase, только если он настоящий.',
+    en: 'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — at delivery the group checks for a conflict and rebases only on a real one.',
   },
   'chat-autonomy-deferred-notice': {
     ru: 'Фоновые команды агента ещё идут ({{count}}): процесс чата перезапустится с новой настройкой автономии, когда они кончатся, — перезапуск сейчас оборвал бы их. До тех пор у самого процесса прежняя метка автономии.',
@@ -1367,6 +1371,46 @@ export const serverTextTemplates = {
     ru: 'доставка не доведена: {{first}}; {{second}}; {{third}}',
     en: 'delivery not completed: {{first}}; {{second}}; {{third}}',
   },
+  'split-delivery-stalled': {
+    ru: 'напоминание {{nudges}} ничего не изменило: та же голова ветки и те же пробелы — посмотрите, что держит группу, и продолжите её словом',
+    en: 'reminder {{nudges}} changed nothing: the same branch head and the same gaps — see what holds the group and continue it with a word',
+  },
+  'split-delivery-nudge-cap': {
+    ru: 'панель напомнила группе {{nudges}} раз — это потолок напоминаний; группа двигалась, но не дошла — продолжите её словом',
+    en: 'the panel reminded the group {{nudges}} times — the reminder cap; the group was moving but did not finish — continue it with a word',
+  },
+  'split-delivery-escalation-stalled': {
+    ru: 'разбор доставки на усиленной модели тоже ничего не изменил (напоминаний до него: {{nudges}}): та же голова ветки и те же пробелы — нужен человек',
+    en: 'the delivery diagnosis on a stronger model changed nothing either (reminders before it: {{nudges}}): the same branch head and the same gaps — a human is needed',
+  },
+  'delivery-human-merge': {
+    ru: 'нужен человек — слияние: {{what}}',
+    en: 'a human is needed — merge: {{what}}',
+  },
+  'delivery-human-destructive': {
+    ru: 'нужен человек — удаление данных git или вне своей копии, force-push сверх аренды, запись в БД или публикация пакета: {{what}}',
+    en: 'a human is needed — deleting git data or outside its own copy, a force-push beyond the lease, a DB write or a package publish: {{what}}',
+  },
+  'delivery-human-credentials': {
+    ru: 'нужен человек — доступа нет нигде в проекте: {{what}}',
+    en: 'a human is needed — credentials that exist nowhere in the project: {{what}}',
+  },
+  'delivery-human-corrupt-store': {
+    ru: 'нужен человек — хранилище объектов git копии {{path}} повреждено: выполните в ней git fsck --full, восстановите объекты или пересоздайте копию, затем продолжите группу ({{what}})',
+    en: 'a human is needed — the git object store of the copy {{path}} is corrupt: run git fsck --full in it, restore the objects or recreate the copy, then continue the group ({{what}})',
+  },
+  'split-delivery-retry': {
+    ru: 'панель повторит сама через {{minutes}} мин (повтор {{attempt}} из {{max}})',
+    en: 'the panel retries on its own in {{minutes}} min (retry {{attempt}} of {{max}})',
+  },
+  'split-delivery-retry-cap': {
+    ru: 'панель повторила доставку сама (повторов: {{retries}}) и не довела — продолжите группу словом',
+    en: 'the panel retried {{retries}} times and did not finish — continue the group with a word',
+  },
+  'split-delivery-busy': {
+    ru: 'новая доставка не ушла: разговор группы был занят {{checks}} сверок подряд',
+    en: 'the new delivery did not go out: the group conversation was busy for {{checks}} checks in a row',
+  },
   'split-delivery-remote-down': {
     ru: 'удалённый недоступен с {{since}}: панель проверяет его раз в {{minutes}} мин и продолжит группу, когда он ответит ({{reason}})',
     en: 'the remote is unreachable since {{since}}: the panel checks it every {{minutes}} min and resumes the group once it answers ({{reason}})',
@@ -1388,8 +1432,8 @@ export const serverTextTemplates = {
     en: 'branch {{branch}} is not pushed to the remote (or lags behind the copy HEAD)',
   },
   'delivery-gap-no-mr': {
-    ru: 'нет MR, чья голова — HEAD копии (ветка {{branch}})',
-    en: 'no MR whose head is the copy HEAD (branch {{branch}})',
+    ru: 'нет MR, чья голова — HEAD копии (ветка {{branch}}) — отправьте ветку и откройте MR или обновите свой',
+    en: 'no MR whose head is the copy HEAD (branch {{branch}}) — push the branch and open the MR, or update yours',
   },
   'delivery-gap-review-unfinished': {
     ru: 'ревью работы не закончено: вердикта ревьюера нет',
@@ -1412,8 +1456,12 @@ export const serverTextTemplates = {
     en: 'owner’s point {{point}} is marked without evidence: file:line, the command and a line of its output, or the reason, are needed',
   },
   'delivery-gap-mr-description': {
-    ru: 'у MR {{mr}} пустое описание',
-    en: 'MR {{mr}} has an empty description',
+    ru: 'у MR {{mr}} пустое описание — опишите в нём, что изменено, зачем и как проверено',
+    en: 'MR {{mr}} has an empty description — describe what changed, why, and how it was checked',
+  },
+  'delivery-gap-mr-notes': {
+    ru: 'описание MR {{mr}}: не названы заметки доставки ({{items}}) — впишите каждую в описание: что не проверено или красное не из-за ветки и почему',
+    en: 'MR {{mr}} description: the delivery notes ({{items}}) are not named — add each to the description: what was not checked or is red not because of the branch, and why',
   },
   'delivery-gap-mr-na-reason': {
     ru: 'в описании MR {{mr}} нет причины n/a живой проверки ({{sieves}}) — впишите в описание id сита и почему оно не применимо',
@@ -1425,8 +1473,8 @@ export const serverTextTemplates = {
     en: 'integration sieve: merging with fresh main conflicts in {{files}} — rebase the branch onto fresh main and resolve the conflict',
   },
   'sieve-gap-foreign-removals': {
-    ru: 'сито «чужие −»: ветка удаляет строки, пришедшие в основную после старта группы: {{files}} — верните их или назовите каждый файл в строке foreign-removals отчёта о ситах с причиной',
-    en: 'foreign-removals sieve: the branch deletes lines that landed in main after the group started: {{files}} — restore them or name every file in the foreign-removals row of the sieve report with the reason',
+    ru: 'сито «чужие −»: ветка удаляет строки, пришедшие в основную после старта группы: {{files}} — верните их или назовите каждый файл полным путём в строке foreign-removals отчёта о ситах с причиной',
+    en: 'foreign-removals sieve: the branch deletes lines that landed in main after the group started: {{files}} — restore them or name every file by its full path in the foreign-removals row of the sieve report with the reason',
   },
   'sieve-gap-consumers': {
     ru: 'сито «потребители вне диффа»: удалённое ({{tokens}}) ещё используется в {{files}} — поправьте потребителей или назовите каждый файл в строке consumers-repo-wide отчёта о ситах с причиной',
@@ -1441,8 +1489,8 @@ export const serverTextTemplates = {
     en: 'sieve {{sieve}} is marked without evidence: the command and a line of its output, or the reason, are needed',
   },
   'sieve-gap-failed': {
-    ru: 'сито {{sieve}} не пройдено: {{evidence}}',
-    en: 'sieve {{sieve}} failed: {{evidence}}',
+    ru: 'сито {{sieve}} не пройдено: {{evidence}} — исправьте и сдайте строку снова; живую проверку, которую здесь не запустить, сдайте «not checked: <причина>», красное не из-за ветки — «not caused by the branch: <почему>»',
+    en: 'sieve {{sieve}} failed: {{evidence}} — fix it and report the row again; a live check that cannot run here is reported «not checked: <reason>», red not caused by the branch — «not caused by the branch: <why>»',
   },
   'sieve-gap-lockfile': {
     ru: 'сито «lockfile»: манифест зависимостей изменён без своего лок-файла: {{files}} — пересоберите лок штатным менеджером пакетов проекта или назовите каждый манифест в строке lockfile-sync отчёта о ситах с причиной',
@@ -1527,6 +1575,26 @@ export const serverTextTemplates = {
   'tests-gap-uncovered': {
     ru: 'блок «Тесты» копии: изменённые файлы не покрыты ни одним кейсом ({{files}}) — заведите кейс с codePaths на них',
     en: 'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
+  },
+  'tests-note-red-baseline': {
+    ru: 'блок «Тесты» копии: красные и до старта группы, дифф их не задел: {{cases}} — не из-за ветки, группу не держат; назовите их в описании MR',
+    en: 'Tests block of the copy: red already before the group started and untouched by the diff: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
+  },
+  'tests-note-red-environment': {
+    ru: 'блок «Тесты» копии: не выполнились (blocked) или красные от окружения (таймаут, сеть, стенд, платформа) там, где дифф их не задел: {{cases}} — не из-за ветки, группу не держат; назовите их в описании MR',
+    en: 'Tests block of the copy: could not run (blocked), or red from the environment (timeout, network, stand, platform) where the diff does not touch them: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
+  },
+  'sieve-note-unchecked': {
+    ru: 'сито {{sieve}}: не проверено: {{reason}} — группу не держит; причина — в описании MR',
+    en: 'sieve {{sieve}}: not checked: {{reason}} — does not hold the group; the reason goes into the MR description',
+  },
+  'sieve-note-not-branch': {
+    ru: 'сито {{sieve}}: красное не из-за ветки: {{reason}} — группу не держит; назовите его в описании MR',
+    en: 'sieve {{sieve}}: red not caused by the branch: {{reason}} — does not hold the group; name it in the MR description',
+  },
+  'sieve-note-run-red': {
+    ru: 'прогон {{run}}: красные не из-за ветки (были красными до старта группы или упали от окружения, дифф их не задел): {{cases}} — группу не держат; назовите их в описании MR',
+    en: 'run {{run}}: red not caused by the branch (red before the group started or failed on the environment, untouched by the diff): {{cases}} — they do not hold the group; name them in the MR description',
   },
   'assistant-route-refused': {
     ru: 'Помощник не запущен: {{reason}}',

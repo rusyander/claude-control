@@ -60,6 +60,30 @@ export const aiderProvider: ConfigProvider = {
   // Детект «конфиг найден» (Ф7): у Aider каталога конфигурации нет — есть
   // задокументированные файлы в домашнем каталоге. Проверяем только их наличие.
   configLocations: () => [aiderConfigFile(), join(homedir(), '.aider.model.settings.yml')],
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, aider 0.86.2). Канала нет:
+  // `aider --message` — один запуск на ответ без своих инструментов (оболочку панель
+  // выключает, `--no-suggest-shell-commands`), поэтому ни одному рычагу менять нечего.
+  groupEconomy: {
+    support: {
+      compactWindow: { support: 'meaningless', note: 'economy-note-one-shot' },
+      bashOutputChars: { support: 'meaningless', note: 'economy-note-no-tool-loop' },
+      readOutputTokens: { support: 'meaningless', note: 'economy-note-no-tool-loop' },
+      // Срока кэша у aider нет ни флагом, ни ключом (`--cache-prompts` ставит кэш без
+      // срока, пинги `--cache-keepalive-pings` — только в интерактивном режиме).
+      cacheTtl: { support: 'impossible', note: 'economy-note-no-key' },
+      detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
+      // Доставка — коммит, пуш, MR: без оболочки aider её не сделает ни на какой модели.
+      sonnetDeliver: { support: 'meaningless', note: 'economy-note-no-tool-loop' },
+      freshOnColdResume: { support: 'meaningless', note: 'economy-note-one-shot' },
+      keepWarm: { support: 'meaningless', note: 'economy-note-one-shot' },
+      // Строка привычек — о чтении и правках инструментами, которых у aider нет; группе
+      // aider её и не дописывают (`foreignHabits` в `group-run-lines.ts` смотрит сюда).
+      workHabits: { support: 'meaningless', note: 'economy-note-no-tool-loop' },
+    },
+    // Строка экономии группы — о вызовах, чтениях, оболочке и сжатии; aider из неё
+    // исполнит только тетрадь задачи и файл задач трекера (`foreignChildExtra`).
+    noToolLoop: true,
+  },
   // Ассистент Aider. Прямой вызов модели (CLI не установлен, ключ есть) — ТОЛЬКО
   // ключом OpenAI и только в OpenAI (`openai` → api.openai.com, адрес задан
   // кодом, а не окружением): своего модельного API у Aider нет, и «совместимый»

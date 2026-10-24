@@ -270,7 +270,9 @@ export const providersEn: typeof providersRu = {
       'sections and do not depend on the provider. A group does not act the same ' +
       'everywhere, though: Claude reads it from its own directories, Codex and Qwen Code ' +
       'get the chosen groups as a layer on every run, and on the other CLIs a group does ' +
-      'not act — the panel says so on its card.',
+      'not act — the panel says so on its card. Split-group economy levers reach the CLIs ' +
+      'differently too: under each lever in “Settings” → “Groups” stands a “Where it works:” ' +
+      'row — a mark per CLI, and for a lever that does not work there, the reason in the hint.',
 
     gapTitle: 'Why a section exists for one CLI and not for another',
     gapCaption:

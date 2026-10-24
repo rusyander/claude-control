@@ -13,7 +13,13 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { KitMode } from '@agentdeck/contracts/local-models';
 import { CODEX_KIT_ENV } from './codex.ts';
-import { KIT_VARIANT_ENV, KitRefusal, KitService, builtinKitDir } from './service.ts';
+import {
+  KIT_VARIANT_ENV,
+  KitRefusal,
+  KitService,
+  OURS_CLAUDE_CAPS,
+  builtinKitDir,
+} from './service.ts';
 
 /**
  * Сервис набора на временных данных панели и временном каталоге Claude:
@@ -73,7 +79,7 @@ afterEach(() => {
 describe('режимы по провайдерам', () => {
   it('по умолчанию «глобальные»; что кто умеет — честно', () => {
     const view = service().describe();
-    expect(view.version).toBe('1.3.0');
+    expect(view.version).toBe('1.4.0');
     expect(view.builtinDir).toBe(builtinKitDir());
     expect(view.mineDir).toBe(join(appData, 'kit', 'mine'));
     expect(view.providers).toEqual([
@@ -402,8 +408,29 @@ describe('runExtras: что получает прогон', () => {
     service().setMode('claude', 'ours');
     expect(extras('claude', true, true)).toEqual({
       args: ['--plugin-dir', effective('ours')],
-      env: { [KIT_VARIANT_ENV]: 'local', CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1' },
+      env: {
+        [KIT_VARIANT_ENV]: 'local',
+        CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1',
+        ...OURS_CLAUDE_CAPS,
+      },
     });
+  });
+
+  // Фаза G.6: без личного слоя пропадают и личные потолки окна — «только наш» ставит свои.
+  it('потолки окна едут только в «только наш», не в «оба» и не в «глобальные»', () => {
+    expect(OURS_CLAUDE_CAPS).toEqual({
+      BASH_MAX_OUTPUT_LENGTH: '8000',
+      CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS: '10000',
+    });
+    service().setMode('claude', 'ours');
+    expect(extras('claude').env).toEqual({ [KIT_VARIANT_ENV]: 'standard', ...OURS_CLAUDE_CAPS });
+    service().setMode('claude', 'hybrid');
+    expect(extras('claude').env).not.toHaveProperty('BASH_MAX_OUTPUT_LENGTH');
+    expect(extras('claude', true).env).not.toHaveProperty(
+      'CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS',
+    );
+    service().setMode('claude', 'global');
+    expect(extras('claude').env).toEqual({});
   });
 
   it('гибрид: одноимённый навык человека побеждает — навыка набора в сборке нет; выбор «набор» возвращает его', () => {

@@ -8,6 +8,7 @@ import {
   type PermissionRequest,
   type ChatPermissionReply,
   type PermissionDecideOutcome,
+  type DeferOptions,
 } from '../ChatPermissions/ChatPermissions.ts';
 
 /**
@@ -348,11 +349,23 @@ export class ChatSession {
    * разговора. Ответ, остановка и сводка телефона ищут запрос по ключу прогона,
    * и запрос под синонимом не снимал бы никто.
    */
-  requestPermission(request: PermissionRequest): Promise<ChatPermissionReply> {
-    return this.permissions.request({
-      ...request,
-      runId: this.registry.resolveKey(request.runId),
-    });
+  requestPermission(
+    request: PermissionRequest,
+    defer?: DeferOptions,
+  ): Promise<ChatPermissionReply> {
+    return this.permissions.request(
+      {
+        ...request,
+        runId: this.registry.resolveKey(request.runId),
+      },
+      undefined,
+      defer,
+    );
+  }
+
+  /** Номер D-n, которым карточка этого вызова стала по сроку «отложить». */
+  deferredIdOf(runId: string, toolUseId: string): string | undefined {
+    return this.permissions.deferredIdOf(this.registry.resolveKey(runId), toolUseId);
   }
 
   /** Висящие запросы прав всех разговоров — для сводки ожиданий телефона. */
@@ -386,5 +399,10 @@ export class ChatSession {
   /** Умер ли запрос прав: CLI его оборвал или истёк срок брокера. */
   isPermissionExpired(runId: string, toolUseId: string): boolean {
     return this.permissions.isExpired(this.registry.resolveKey(runId), toolUseId);
+  }
+
+  /** Ответил ли на запрос прав человек — окном, телефоном или из Telegram. */
+  wasPermissionAnswered(runId: string, toolUseId: string): boolean {
+    return this.permissions.isAnswered(this.registry.resolveKey(runId), toolUseId);
   }
 }

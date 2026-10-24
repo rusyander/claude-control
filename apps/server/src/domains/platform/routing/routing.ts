@@ -27,7 +27,7 @@ import { promptText } from '../../prompts/prompts.ts';
 import { activeGatewaySettings, buildManagedProfile, PLACEHOLDER_KEY } from '../apply/profile.ts';
 import { pickApiKind, targetProfile } from '../apply/targets.ts';
 import { runLayers, type RunLayers } from '../layers/layers.ts';
-import { effortAccepted, modelRulesFor, toolRouteOf } from '../models/models.ts';
+import { chatModels, effortAccepted, modelRulesFor, toolRouteOf } from '../models/models.ts';
 import { consumersOf, readPlatforms, readToken } from '../store/store.ts';
 
 /**
@@ -229,6 +229,26 @@ export interface PlatformRunRoute {
    * на локальном контуре; Qwen Code получает их файлом настроек (`model.generationConfig`).
    */
   localLimits?: LocalRunLimits;
+  /**
+   * Имена, которые карта соответствия контура переводит (ключи с непустой целью,
+   * в нижнем регистре). По ним конвейер групп узнаёт, есть ли у контура своя
+   * модель на «sonnet» для дешёвой доставки (n6): нет строки — просьба ушла бы в
+   * модель контура по умолчанию, и экономии не было бы.
+   */
+  modelMapKeys?: string[];
+  /**
+   * Окно модели прогона по каталогу контура (`contextLimit` пробы). Есть, только
+   * когда контур его объявил: окно группы выше него — отказ контура до сжатия
+   * истории, и реестр прогонов прижимает окно группы к нему (n1).
+   */
+  modelContext?: number;
+  /**
+   * Контур уже отказал по бюджету (402 записан в учёте, `exhaustedAt`) и человек
+   * отметку не снял. Обычный ход это НЕ останавливает — решает контур, и его отказ
+   * доезжает до CLI сам. Останавливает только тёплый пинг: он не нужен никому, кроме
+   * кэша, и в исчерпанный контур был бы заведомым отказом (ревью K).
+   */
+  budgetExhausted?: boolean;
 }
 
 /** Окно и сроки локальной модели в числах: из них выходной слой собирает настройки чужого CLI. */
@@ -464,11 +484,20 @@ export function resolveRunRoute(
   // ничего не значат. Поверх адреса контура: по ключам они не пересекаются.
   if (provider.id === 'claude') Object.assign(env, deps.localRunEnv?.(platform.id, 'gateway'));
   const limits = provider.id === 'claude' ? undefined : limitsOf(deps.localRunEnv?.(platform.id));
+  const modelMapKeys = Object.entries(platform.modelMap)
+    .filter(([from, to]) => from.trim() && to.trim())
+    .map(([from]) => from.trim().toLowerCase());
+  const modelContext = chatModels(deps.store.getPlatformHealth()[platform.id]).find(
+    (item) => item.id === model.model,
+  )?.contextLimit;
   return {
     routed: true,
     platformId: platform.id,
     env,
     model,
+    ...(modelMapKeys.length > 0 ? { modelMapKeys } : {}),
+    ...(modelContext && modelContext > 0 ? { modelContext } : {}),
+    ...(deps.store.getPlatformSpend()[platform.id]?.exhaustedAt ? { budgetExhausted: true } : {}),
     // compromise: no-effort — драйвер не объявил приём усилия, и прогон уходит без `--effort`
     effort: effortAccepted(platform),
     ...(systemPrompt.trim() ? { systemPrompt } : {}),
@@ -519,6 +548,9 @@ export function runRouteOf(decision: PlatformRouteDecision): PlatformRunRoute {
     ...(decision.systemPrompt ? { systemPrompt: decision.systemPrompt } : {}),
     ...(decision.layers ? { layers: decision.layers } : {}),
     ...(decision.localLimits ? { localLimits: decision.localLimits } : {}),
+    ...(decision.modelMapKeys ? { modelMapKeys: decision.modelMapKeys } : {}),
+    ...(decision.modelContext ? { modelContext: decision.modelContext } : {}),
+    ...(decision.budgetExhausted ? { budgetExhausted: true } : {}),
   };
 }
 

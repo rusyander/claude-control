@@ -23,7 +23,7 @@ const assets = join(root, 'apps', 'mobile', 'assets', 'images');
 const webIcons = join(root, 'apps', 'web', 'public', 'icons');
 
 /** Плитка значка — тот же градиент, что в `favicon.svg`: светлее сверху слева. */
-const GRADIENT = ['#7c78ff', '#4338ca'];
+const GRADIENT = ['#3b82f6', '#1d4ed8'];
 
 /**
  * Пропорции знака — ровно те же, что в `apps/web/public/favicon.svg` (там
@@ -131,8 +131,10 @@ for (const file of FILES) {
   await tab.setViewportSize({ width: file.size, height: file.size });
   await tab.setContent(page(file));
   const shot = await tab.screenshot({
-    // Без фона снимок прозрачный — это и нужно слоям адаптивного значка.
-    omitBackground: !file.background,
+    // Снимок всегда без фона страницы: слоям адаптивного значка нужна
+    // прозрачность, а скруглённой плитке — прозрачные углы. С белым фоном
+    // страницы углы значка в панели задач выходили белыми квадратиками.
+    omitBackground: true,
     type: 'png',
   });
   writeFileSync(join(file.dir ?? assets, file.name), shot);

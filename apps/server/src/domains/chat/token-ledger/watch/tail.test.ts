@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TranscriptTail } from './tail.ts';
@@ -50,6 +50,85 @@ describe('transcript tail', () => {
     tail.read(dir, 0, 0);
     writeFileSync(file, line({ b: 1 }));
     expect(tail.read(dir, 1, 0).map((entry) => entry.row)).toEqual([{ b: 1 }]);
+  });
+
+  it('rereads a file rewritten LONGER from zero: the changed head resets the offset', () => {
+    const dir = temp();
+    const file = join(dir, 'agent-4.jsonl');
+    const tail = new TranscriptTail();
+    writeFileSync(file, line({ m: 1 }));
+    expect(tail.read(dir, 0, 0).map((entry) => entry.row)).toEqual([{ m: 1 }]);
+    writeFileSync(file, line({ m: 2 }) + line({ m: 3 }));
+    expect(tail.read(dir, 1, 0).map((entry) => entry.row)).toEqual([{ m: 2 }, { m: 3 }]);
+    // Дописанный файл с тем же началом — только новые строки.
+    appendFileSync(file, line({ m: 4 }));
+    expect(tail.read(dir, 2, 0).map((entry) => entry.row)).toEqual([{ m: 4 }]);
+  });
+
+  it('a replaced transcript sharing the first 64 bytes is still read from zero', () => {
+    const dir = temp();
+    const file = join(dir, 'agent-5.jsonl');
+    const tail = new TranscriptTail();
+    // Служебная строка с длинным общим началом: отличаются только id сессии.
+    const first = (session: string) => line({ type: 'summary', text: 'x'.repeat(80), session });
+    expect(first('A').slice(0, 64)).toBe(first('B').slice(0, 64));
+    writeFileSync(file, first('A'));
+    expect(tail.read(dir, 0, 0).map((entry) => entry.row)).toHaveLength(1);
+    writeFileSync(file, first('B') + line({ n: 2 }));
+    expect(tail.read(dir, 1, 0).map((entry) => entry.row)).toEqual([
+      { type: 'summary', text: 'x'.repeat(80), session: 'B' },
+      { n: 2 },
+    ]);
+  });
+
+  it('forget drops the cursors of a directory, not of a sibling with the same name prefix', () => {
+    const root = temp();
+    const dir = join(root, 's1');
+    const sibling = join(root, 's1-other');
+    mkdirSync(dir);
+    mkdirSync(sibling);
+    writeFileSync(join(dir, 'a.jsonl'), line({ a: 1 }));
+    writeFileSync(join(sibling, 'b.jsonl'), line({ b: 1 }));
+    const tail = new TranscriptTail();
+    tail.prime(dir, 0);
+    tail.prime(sibling, 0);
+    tail.forget(dir);
+    // Забытый каталог читается с начала, соседний помнит свой конец.
+    expect(tail.read(dir, 60_000).map((entry) => entry.row)).toEqual([{ a: 1 }]);
+    expect(tail.read(sibling, 60_000)).toEqual([]);
+  });
+
+  it('skips a line longer than the 1 MB chunk and keeps reading the next ones', () => {
+    const dir = temp();
+    const file = join(dir, 'agent-5.jsonl');
+    writeFileSync(
+      file,
+      `${JSON.stringify({ big: 'x'.repeat(1024 * 1024 + 10) })}\n${line({ n: 2 })}`,
+    );
+    const tail = new TranscriptTail();
+    // Первый кусок — без конца строки: пропущен целиком, отступ сдвинут на мегабайт.
+    expect(tail.read(dir, 0, 0)).toEqual([]);
+    // Хвост большой строки — не JSON, пропущен; следующая строка дочитана.
+    expect(tail.read(dir, 1, 0).map((entry) => entry.row)).toEqual([{ n: 2 }]);
+  });
+
+  it('an unreadable path yields nothing and does not throw', () => {
+    const dir = temp();
+    const tail = new TranscriptTail();
+    // Каталог с именем файла транскрипта: stat есть, читать как файл нельзя.
+    mkdirSync(join(dir, 'broken.jsonl'));
+    expect(tail.read(dir, 0, 0)).toEqual([]);
+    expect(tail.readFile(join(dir, 'missing.jsonl'), 0, 0)).toEqual([]);
+    expect(tail.head(join(dir, 'missing.jsonl'))).toEqual([]);
+  });
+
+  it('head returns the first complete rows without moving the tail cursor', () => {
+    const dir = temp();
+    const file = join(dir, 'main.jsonl');
+    writeFileSync(file, line({ h: 1 }) + line({ h: 2 }) + '{"h":3');
+    const tail = new TranscriptTail();
+    expect(tail.head(file)).toEqual([{ h: 1 }, { h: 2 }]);
+    expect(tail.readFile(file, 0, 0).map((entry) => entry.row)).toEqual([{ h: 1 }, { h: 2 }]);
   });
 
   it('turns subagent transcript rows into sidechain calls, one per message id', () => {

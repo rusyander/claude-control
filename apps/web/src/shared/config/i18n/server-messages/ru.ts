@@ -6,6 +6,7 @@ import { composedRu } from './ru/composed.ts';
 import { configRu } from './ru/config.ts';
 import { contourRu } from './ru/contour.ts';
 import { dlpRu } from './ru/dlp.ts';
+import { economyRu } from './ru/economy.ts';
 import { filesRu } from './ru/files.ts';
 import { gatewayRu } from './ru/gateway.ts';
 import { gitRu } from './ru/git.ts';
@@ -35,6 +36,7 @@ export const serverMessagesRu: Record<ServerMessageCode, string> = {
   ...configRu,
   ...contourRu,
   ...dlpRu,
+  ...economyRu,
   ...filesRu,
   ...gatewayRu,
   ...gitRu,

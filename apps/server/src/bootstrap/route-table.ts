@@ -1,4 +1,5 @@
 import type { RouteRegistrar } from '../routes/register.ts';
+import { gateHumanRoutesFor } from '../routes/chat/human-only/ledger-gate.ts';
 import { registerConfigRoutes } from '../routes/config-routes/config-routes.ts';
 import { registerEnvTransferRoutes } from '../routes/env-transfer-routes/env-transfer-routes.ts';
 import { registerEntityRoutes } from '../routes/entity-routes/entity-routes.ts';
@@ -43,6 +44,7 @@ import { registerChatCascadeRoutes } from '../routes/chat/cascade-routes.ts';
 import { registerChatHandoffRoutes } from '../routes/chat/handoff-routes.ts';
 import { registerChatTreeRoutes } from '../routes/chat/tree-routes/tree-routes.ts';
 import { registerChatGroupSettingsRoutes } from '../routes/chat/group-settings-routes/group-settings-routes.ts';
+import { registerChatWatchSignalsRoutes } from '../routes/chat/watch-signals-routes.ts';
 import { registerSandboxRoutes } from '../routes/sandbox-routes/sandbox-routes.ts';
 import { registerResourceRoutes } from '../routes/resource-routes/resource-routes.ts';
 import { registerBackupRoutes } from '../routes/backup-routes/backup-routes.ts';
@@ -65,6 +67,7 @@ import { registerProjectFilesRoutes } from '../routes/project-files-routes/proje
 import { registerProjectTestsRoutes } from '../routes/project-tests-routes/project-tests-routes.ts';
 import { registerProjectTestsPublishRoutes } from '../routes/project-tests/publish-routes.ts';
 import { registerIntegrationsRoutes } from '../routes/integrations-routes/integrations-routes.ts';
+import { registerTelegramAnswersRoutes } from '../routes/integrations/telegram-answers-routes.ts';
 import { registerProviderChatRoutes } from '../routes/provider-chat-routes/provider-chat-routes.ts';
 import { registerDlpRoutes } from '../routes/dlp-routes/dlp-routes.ts';
 import { registerCompromiseRoutes } from '../routes/compromise-routes.ts';
@@ -138,6 +141,9 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     groupAsk(context, runtime.claudeSwitchEnv);
 
   return [
+    // Первым: ворота «только человек» на каждый маршрут `human:*` журнала
+    // возможностей ставит хук `onRoute`, а он видит лишь маршруты после себя.
+    gateHumanRoutesFor,
     registerConfigRoutes,
     registerEnvTransferRoutes,
     registerEntityRoutes,
@@ -232,6 +238,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerChatCascadeRoutes,
     // Группа и автономность чата, заметки главному чату — только хранилище.
     registerChatGroupSettingsRoutes,
+    // Сигналы сторожа одиночных чатов — только хранилище: пишет их сторож.
+    registerChatWatchSignalsRoutes,
     // Разделение задач по чатам заводит копии репозитория и открывает разговоры —
     // у Claude через реестр прогонов, у чужого CLI через его собственный сервис.
     // Поэтому оба живут дольше запроса и приходят сюда параметром.
@@ -247,6 +255,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         review: splitReview,
         recheckMr,
         asks: pendingAsks,
+        // «Разобрать…» тикетов групп: тот же служебный вызов модели, что у групп.
+        ticketAsk: (prompt) => groupAskFor(context)([{ role: 'user', content: prompt }], 'default'),
       }),
     // Пауза дерева: «Остановить всё» / «Продолжить всё» у родителя и само
     // дерево для пульта. Объект переживает запрос — он же глушит автостарты.
@@ -290,6 +300,14 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Внешние интеграции. Адрес панели известен только здесь (порт задаётся
     // переменной окружения), а переходнику MCP он нужен, чтобы знать, куда идти.
     (instance, context) => registerIntegrationsRoutes(instance, context, selfBaseUrl),
+    // Ответы из Telegram: опрос бота живёт с сервером и отвечает маршрутами
+    // разговоров — ему нужны реестр прогонов, права сессии и чужие чаты.
+    (instance, context) =>
+      registerTelegramAnswersRoutes(instance, context, {
+        registry: chatRuns,
+        session: chatSession,
+        providerChats,
+      }),
     (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
     // Реестр подписанных компромиссов партии «контур». Своих зависимостей нет:
     // список статичен, а ведёт его сервер, чтобы снятая подпись гасла сама.

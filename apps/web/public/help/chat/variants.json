@@ -287,6 +287,94 @@
         "height": 900
       }
     },
+    "deferred/01-banner": {
+      "light-ru": {
+        "file": "01-banner.png",
+        "width": 1140,
+        "height": 543
+      },
+      "light-en": {
+        "file": "01-banner.en.png",
+        "width": 1140,
+        "height": 543
+      },
+      "dark-ru": {
+        "file": "01-banner.dark.png",
+        "width": 1140,
+        "height": 543
+      },
+      "dark-en": {
+        "file": "01-banner.dark.en.png",
+        "width": 1140,
+        "height": 543
+      }
+    },
+    "deferred/02-hub": {
+      "light-ru": {
+        "file": "02-hub.png",
+        "width": 782,
+        "height": 351
+      },
+      "light-en": {
+        "file": "02-hub.en.png",
+        "width": 782,
+        "height": 351
+      },
+      "dark-ru": {
+        "file": "02-hub.dark.png",
+        "width": 782,
+        "height": 351
+      },
+      "dark-en": {
+        "file": "02-hub.dark.en.png",
+        "width": 782,
+        "height": 351
+      }
+    },
+    "deferred/03-card": {
+      "light-ru": {
+        "file": "03-card.png",
+        "width": 832,
+        "height": 217
+      },
+      "light-en": {
+        "file": "03-card.en.png",
+        "width": 832,
+        "height": 217
+      },
+      "dark-ru": {
+        "file": "03-card.dark.png",
+        "width": 832,
+        "height": 217
+      },
+      "dark-en": {
+        "file": "03-card.dark.en.png",
+        "width": 832,
+        "height": 217
+      }
+    },
+    "economy/01-where": {
+      "light-ru": {
+        "file": "01-where.png",
+        "width": 846,
+        "height": 111
+      },
+      "light-en": {
+        "file": "01-where.en.png",
+        "width": 846,
+        "height": 111
+      },
+      "dark-ru": {
+        "file": "01-where.dark.png",
+        "width": 846,
+        "height": 111
+      },
+      "dark-en": {
+        "file": "01-where.dark.en.png",
+        "width": 846,
+        "height": 111
+      }
+    },
     "split/01-proposal": {
       "light-ru": {
         "file": "01-proposal.png",
@@ -411,12 +499,12 @@
       "dark-ru": {
         "file": "05-overlap.dark.png",
         "width": 782,
-        "height": 111
+        "height": 47
       },
       "dark-en": {
         "file": "05-overlap.dark.en.png",
         "width": 782,
-        "height": 111
+        "height": 47
       }
     },
     "split/06-paused": {
@@ -433,12 +521,12 @@
       "dark-ru": {
         "file": "06-paused.dark.png",
         "width": 832,
-        "height": 591
+        "height": 529
       },
       "dark-en": {
         "file": "06-paused.dark.en.png",
         "width": 832,
-        "height": 591
+        "height": 529
       }
     },
     "split/07-worktrees": {

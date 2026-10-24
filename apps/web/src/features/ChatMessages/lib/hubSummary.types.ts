@@ -12,4 +12,13 @@
  * отброшенные перезапуском чаты — не группы, они не считаются.
  */
 export type HubBucket =
-  'accepted' | 'done' | 'running' | 'ask' | 'queued' | 'failed' | 'cancelled' | 'idle';
+  | 'accepted'
+  | 'done'
+  | 'running'
+  | 'ask'
+  /** Остались одни вызовы D-n: группа сделала всё, что могла, и ждёт решения списком. */
+  | 'deferred'
+  | 'queued'
+  | 'failed'
+  | 'cancelled'
+  | 'idle';

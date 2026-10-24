@@ -118,6 +118,34 @@ describe('чужой CLI: звено доставки группы', () => {
     expect(ended).toEqual([]);
   });
 
+  // RC-D-01: шапка правок — новый разговор без `deliveredAt`, и за правками
+  // доставка придёт и после доставки круга: задание правок её обещает.
+  it('правки после доставки круга обещают доставку — она за ними и придёт', () => {
+    const fixPrompt = (id: string, deliveredAt?: string): string => {
+      send.mockClear();
+      chat(id, { ...REVIEW, ...(deliveredAt ? { deliveredAt } : {}) }, 'review');
+      planner()(finish(id, reviewBlock(['a.ts:1 — забыт await'])));
+      return (send.mock.calls[0]?.[3] as { text: string }).text;
+    };
+
+    expect(fixPrompt('ahead')).toContain('in the delivery stage after your turn');
+    const done = fixPrompt('done', '2026-09-07T11:00:00.000Z');
+    expect(done).toContain('1. a.ts:1 — забыт await');
+    expect(done).toContain('in the delivery stage after your turn');
+    expect(done).toContain('a rule asking for them is met by that run');
+
+    // Что придёт за этими правками: проход проверки, а за чистым — доставка.
+    const fixChat = send.mock.calls[0]?.[2] as string;
+    expect(readChatCascade(dir, 'codex', fixChat)?.stage).toBe('fix');
+    send.mockClear();
+    planner()(finish(fixChat, 'Исправил.'));
+    const verifyChat = send.mock.calls[0]?.[2] as string;
+    expect(readChatCascade(dir, 'codex', verifyChat)?.stage).toBe('review');
+    send.mockClear();
+    planner()(finish(verifyChat, reviewBlock([])));
+    expect(deliveries()).toHaveLength(1);
+  });
+
   it('чистое ревью группы с доставкой тоже заводит доставку', () => {
     chat('review', REVIEW, 'review');
 

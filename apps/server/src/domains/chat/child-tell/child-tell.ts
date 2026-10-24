@@ -92,6 +92,20 @@ interface Pending {
   cold?: string;
   /** Ветка, от которой отведена копия группы (вводная считает коммиты от неё). */
   base?: string;
+  /**
+   * Сообщение ДОШЛО до разговора (не «в очереди»). Нужно отложенным вопросам
+   * D-n: продолжение помечалось сделанным уже в момент «queued», а очередь живёт
+   * в памяти — перезапуск панели до конца хода терял его навсегда, и группа
+   * стояла с разрешением, которого не видела (D-L02, живой прогон R3).
+   */
+  onSent?: () => void;
+  /**
+   * Текст — в миг доставки, а не постановки в очередь: слово об исходах D-n,
+   * пролежавшее до конца хода, иначе говорило бы о прежнем исходе (разрешение
+   * уже использовано — «сделайте вызов» повторял бы его, RF-DL-01). `undefined`
+   * — сказать уже нечего: слово не уходит.
+   */
+  render?: () => string | undefined;
 }
 
 type Delivery = 'sent' | 'queued' | 'refused';
@@ -187,9 +201,12 @@ export class ChildTells {
       this.queue.push(pending);
       return 'queued';
     }
+    const prompt = pending.render ? pending.render() : pending.prompt;
+    // Всё, о чём было слово, уже сказано другим словом — доставлять нечего.
+    if (prompt === undefined) return 'sent';
     const outcome = this.deps.start({
       chatId: session,
-      prompt: pending.prompt,
+      prompt,
       cwd: pending.cwd,
       ...this.deps.settingsOf(pending.chatId),
       stage: 'tell',
@@ -199,7 +216,10 @@ export class ChildTells {
       ...(pending.cold ? { cold: pending.cold } : {}),
       ...(pending.base ? { base: pending.base } : {}),
     });
-    if (outcome.started) return 'sent';
+    if (outcome.started) {
+      pending.onSent?.();
+      return 'sent';
+    }
     if (outcome.busy) {
       this.queue.push(pending);
       return 'queued';

@@ -55,6 +55,12 @@ export function runPlanView(
           warn: true,
         });
         break;
+      case 'mapped':
+        lines.push({
+          text: words.platformModelMapped(routed.title, choice.asked, choice.model),
+          warn: false,
+        });
+        break;
       default:
         lines.push({ text: words.platformModel(routed.title, choice.model), warn: false });
     }

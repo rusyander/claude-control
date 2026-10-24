@@ -1,17 +1,23 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AppSettings } from '@agentdeck/contracts';
 import { groupEconomyChanges } from '@agentdeck/contracts/group-economy';
 import { groupWatchChanges } from '@agentdeck/contracts/group-watch';
 import type { AppState } from './app-store.types.ts';
+import {
+  dropSplitLevers,
+  keepLocalSplitLevers,
+  LOCAL_SETTINGS,
+} from './settings-snapshot-levers.ts';
 
 /**
  * Снимок НАСТРОЕК панели для git (решение владельца 19.10): `state.json` — это
  * и настройки, и рабочее состояние машины (ссылки чатов — 5 МБ, планы, кэши), и
  * целиком в git ему нельзя — две машины спорили бы о каждой строке. Сюда идёт
  * только то, что человек выбрал сам: группы, отметки, настройки, правила групп
- * разделения, проекты. Файл лежит рядом со `state.json`; если каталог
+ * разделения, проекты. Рычаги решений (авторежим, автоподтверждение, разрешения
+ * групп и подобное — `settings-snapshot-levers.ts`) не едут: снимок из git мог
+ * записать не человек (24.10). Файл лежит рядом со `state.json`; если каталог
  * конфигурации — git-репозиторий (у владельца — приватный `~/.claude`), его
  * белый список берёт этот файл, и на другой машине панель подхватывает его сама.
  *
@@ -45,12 +51,14 @@ const STATE_KEYS = {
   settings: 'portable',
   projectCodeLayout: 'portable',
   projectCascade: 'portable',
-  outsideRelay: 'portable',
+  // Рычаги решений (`settings-snapshot-levers.ts`): пересылка вопросов на телефон
+  // (`human:rights`) и приём черновиков тестов без просмотра — у каждой машины свои.
+  outsideRelay: 'local',
   integrationLinks: 'portable',
   worktreeMirror: 'portable',
   splitSettings: 'portable',
   splitDefaults: 'portable',
-  testsAutoAccept: 'portable',
+  testsAutoAccept: 'local',
   permissionPlaces: 'local',
   providerChecks: 'local',
   mcpHealth: 'local',
@@ -60,6 +68,10 @@ const STATE_KEYS = {
   chatPins: 'local',
   splitPlans: 'local',
   splitPlanMoves: 'local',
+  groupWatchSignals: 'local',
+  chatWatchSignals: 'local',
+  groupWaitResumes: 'local',
+  doneMigrations: 'local',
   pushDevices: 'local',
   secretBackupVerifier: 'local',
   integrationHealth: 'local',
@@ -81,15 +93,6 @@ const STATE_KEYS = {
 export const PORTABLE_KEYS = (Object.keys(STATE_KEYS) as (keyof AppState)[]).filter(
   (key) => STATE_KEYS[key] === 'portable',
 );
-
-/**
- * Настройки этой машины внутри `settings`: свой каталог конфигурации и свой адрес
- * удалённого доступа. Чужой адрес Tailscale на другой машине вёл бы в эту.
- */
-const LOCAL_SETTINGS = [
-  'claudeDirOverride',
-  'remoteAccess',
-] as const satisfies readonly (keyof AppSettings)[];
 
 /** Ключ, значение которого — секрет: в снимок не пишется, даже если когда-то попадёт в состояние. */
 const SECRET_KEY = /token|secret|password|passphrase|api[-_]?key|credential|bearer/i;
@@ -171,6 +174,7 @@ export function portableOf(state: AppState, context: PathContext): Record<string
     for (const key of LOCAL_SETTINGS) delete settings[key];
     picked.settings = settings;
   }
+  dropSplitLevers(picked, state);
   return mapDeep(picked, (text) => homeToToken(text, context), true) as Record<string, unknown>;
 }
 
@@ -217,6 +221,7 @@ export function applyPortable(
     }
     next.settings = settings;
   }
+  keepLocalSplitLevers(next, local, restored);
   const own = local.disabledRules ?? [];
   const taken = new Set(own.map((rule) => rule.title.trim().toLocaleLowerCase()));
   const brought = (restored.disabledRules ?? []).filter(

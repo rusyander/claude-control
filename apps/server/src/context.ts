@@ -16,7 +16,7 @@ import { PricingStore } from './domains/analytics/pricing-source.ts';
 import { ModelCatalogStore } from './domains/models/model-store.ts';
 import { FormatCheckStore } from './domains/format-check/format-check.ts';
 import { WorktreeBootstraps } from './domains/project-git/bootstrap.ts';
-import { revertLockfileChurn } from './domains/project-git/lockfiles.ts';
+import { PREP_TREE_HOOKS } from './domains/project-git/lockfiles.ts';
 
 /**
  * Общее состояние сервера: где лежит конфигурация Claude Code и хранилище
@@ -55,9 +55,10 @@ export class ServerContext {
     this.pricing = new PricingStore(this.location.paths.appData);
     this.models = new ModelCatalogStore(this.location.paths.appData);
     this.formatCheck = new FormatCheckStore(this.location.paths.appData);
-    this.worktreeBootstraps = new WorktreeBootstraps(worktreeLogsDir(this.location.paths.appData), {
-      afterRun: revertLockfileChurn,
-    });
+    this.worktreeBootstraps = new WorktreeBootstraps(
+      worktreeLogsDir(this.location.paths.appData),
+      PREP_TREE_HOOKS,
+    );
 
     const override = this.bootStore.getSettings().claudeDirOverride;
     if (override) this.relocate(override);
@@ -150,9 +151,10 @@ export class ServerContext {
     this.models = new ModelCatalogStore(this.location.paths.appData);
     this.formatCheck = new FormatCheckStore(this.location.paths.appData);
     // Идущие установки остаются в прежнем экземпляре — их процессы не переезжают.
-    this.worktreeBootstraps = new WorktreeBootstraps(worktreeLogsDir(this.location.paths.appData), {
-      afterRun: revertLockfileChurn,
-    });
+    this.worktreeBootstraps = new WorktreeBootstraps(
+      worktreeLogsDir(this.location.paths.appData),
+      PREP_TREE_HOOKS,
+    );
     this.applyIoSettings();
     // Парольная фраза относилась к секретам ПРЕЖНЕГО каталога — держать её в
     // памяти для чужого файла нельзя. Введут заново, когда понадобится.

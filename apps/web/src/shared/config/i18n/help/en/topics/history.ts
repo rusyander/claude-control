@@ -89,7 +89,8 @@ export const historyEn: typeof historyRu = {
         'a branch that has diverged from the server gets an explanation of how to pull by hand. ' +
         'A new pnpm-lock.yaml makes the panel run pnpm install itself. The interface refreshes ' +
         'at once, and the dev watcher restarts the server once the running chat turns finish, ' +
-        'waiting for them no longer than 30 minutes — the banner names the time and the turns ' +
+        'waiting for a live turn as long as it takes; the 30-minute limit stays only for when ' +
+        'the turns ledger cannot be read — the banner names the time and the turns ' +
         'in advance: conversations continue where they were. A server run without the watcher makes the ' +
         'card ask you to restart the panel yourself.',
       cardTitle: 'How to read a feed entry',

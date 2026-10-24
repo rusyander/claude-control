@@ -28,6 +28,11 @@ export interface TreeKillOptions {
   selfPid?: number;
   /** Зовётся перед сигналом каждому снимаемому номеру. */
   onKill?: (pid: number) => void;
+  /**
+   * Снять только потомков, корень оставить: посредник живой сессии сам скажет
+   * код выхода CLI, если жив. Снимка нет — не снимается ничего.
+   */
+  keepRoot?: boolean;
 }
 
 export interface TreeKillImpl {
@@ -83,6 +88,8 @@ export declare function terminateByHandle(
   targets: readonly KillTarget[],
   run?: SnapshotRun,
 ): Map<number, KillOutcome> | undefined;
+/** `etime` из `ps` (`[[дд-]чч:]мм:сс`) → секунды; не разобрать — `undefined`. */
+export declare function etimeSeconds(text: string): number | undefined;
 export declare function parsePosixProcessTable(
   text: string,
   nowMs: number,
@@ -103,6 +110,15 @@ export declare function killChildProcessTree(
   options?: TreeKillOptions,
   impl?: TreeKillImpl,
 ): number[];
+/**
+ * Снять дерево и через `graceMs` (5 с) добить живой корень SIGKILL; возвращает отмену добивания.
+ * `unref` — таймер не держит процесс; `impl.killChild` — своё снятие дерева вместо встроенного.
+ */
+export declare function stopTreeWithGrace<C extends KillableProcess>(
+  child: C,
+  options?: TreeKillOptions & { graceMs?: number; unref?: boolean },
+  impl?: TreeKillImpl & { killChild?: (child: C) => void },
+): () => void;
 
 export declare const WATCH_SLACK_MS: number;
 /** План добивания пережившего команду: `known` — `pid → created` замеченных потомков (Ф9). */

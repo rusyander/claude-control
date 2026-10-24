@@ -7,9 +7,19 @@
 // STEER / STEERLATE model a message written to stdin mid-turn (claude 2.1.285, measured
 // 30.09): STEER absorbs it into the open turn (one result, the text names it); STEERLATE
 // has no step left — the turn ends and the CLI starts the next turn with it by itself.
+// HANG <file> writes its pid to <file> and never answers nor exits (a hung CLI). TOOLHOOK runs
+// the first PreToolUse hook of the --settings file the way the CLI does (shell, call JSON on
+// stdin) and reports its exit code. FAKE_ARGV_DUMP=<file> appends argv at start-up — for
+// paths whose prompt the test does not choose. STARTONLY <file> / STARTTOOL: the turn starts
+// (message_start with tokens) and then hangs, bare or after a tool call — a cut keep-alive ping.
 /* global process, setTimeout, clearTimeout, setInterval, clearInterval */
-import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+
+if (process.env.FAKE_ARGV_DUMP) {
+  appendFileSync(process.env.FAKE_ARGV_DUMP, JSON.stringify(process.argv.slice(2)) + '\n');
+}
 
 const SESSION = 'live-session-0001';
 let turn = 0;
@@ -79,6 +89,64 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   }
   if (content.includes('ARGV')) {
     runTurn(`argv ${JSON.stringify(process.argv.slice(2))}`);
+    return;
+  }
+  if (content.includes('STARTONLY') || content.includes('STARTTOOL')) {
+    // The request reached the model (message_start carries its input and cache tokens), then
+    // either nothing more (STARTONLY <file>: pid to <file>, never answers) or a tool call
+    // that the panel has to cut (STARTTOOL) — neither ever sends message_delta nor result.
+    out({ type: 'system', subtype: 'init', session_id: SESSION, model: 'fake', tools: [] });
+    const usage = {
+      input_tokens: 3,
+      output_tokens: 1,
+      cache_read_input_tokens: 120000,
+      cache_creation_input_tokens: 300,
+      cache_creation: { ephemeral_1h_input_tokens: 300 },
+    };
+    const message = { id: 'msg-start', model: 'fake', role: 'assistant', content: [], usage };
+    out({ type: 'stream_event', event: { type: 'message_start', message } });
+    if (content.includes('STARTTOOL')) {
+      const call = { type: 'tool_use', id: 'tu-1', name: 'Bash', input: { command: 'ls' } };
+      out({ type: 'assistant', message: { ...message, content: [call] } });
+    } else {
+      writeFileSync(
+        content.slice(content.indexOf('STARTONLY') + 'STARTONLY'.length).trim(),
+        String(process.pid),
+      );
+    }
+    setInterval(() => undefined, 1_000);
+    return;
+  }
+  if (content.includes('HANG')) {
+    writeFileSync(
+      content.slice(content.indexOf('HANG') + 'HANG'.length).trim(),
+      String(process.pid),
+    );
+    out({ type: 'system', subtype: 'init', session_id: SESSION, model: 'fake', tools: [] });
+    // Neither a result nor an exit, even when stdin closes.
+    setInterval(() => undefined, 1_000);
+    return;
+  }
+  if (content.includes('TOOLHOOK')) {
+    const argv = process.argv.slice(2);
+    const at = argv.indexOf('--settings');
+    const settings = at >= 0 ? JSON.parse(readFileSync(argv[at + 1], 'utf8')) : {};
+    const command = settings.hooks?.PreToolUse?.[0]?.hooks?.[0]?.command;
+    if (!command) {
+      runTurn('hook none');
+      return;
+    }
+    const call = {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'ls' },
+    };
+    const result = spawnSync(command, {
+      shell: true,
+      input: JSON.stringify(call),
+      encoding: 'utf8',
+    });
+    runTurn(`hook exit ${result.status} stderr ${String(result.stderr).trim()}`);
     return;
   }
   if (content.includes('SLOW')) {

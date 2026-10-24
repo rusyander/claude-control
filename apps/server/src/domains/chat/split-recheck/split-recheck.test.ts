@@ -190,6 +190,13 @@ describe('«Перепроверить MR» доставленной групп�
     expect(prompt.split('\n')[0]).toContain('PROJ-100');
     expect(prompt).toContain('recheck its delivered MR');
     expect(prompt).toContain('The forge reports conflicts with the target branch.');
+    // Владелец 23.10: rebase и повторный гейт — только при настоящем конфликте.
+    expect(prompt).toContain(
+      'Only on a real conflict (`git merge-tree --write-tree` without `--quiet`',
+    );
+    expect(prompt).toContain(
+      'no conflict — leave the base as it is and do not re-run the full checks',
+    );
     expect(prompt).toContain(`${MR}#note_17928`);
     expect(prompt).toContain(`${MR}#note_18001`);
     expect(prompt).toContain('#7763');

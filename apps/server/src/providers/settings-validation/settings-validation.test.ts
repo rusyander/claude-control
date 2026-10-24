@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { settingsPatchSchema, importStateSchema } from './settings-validation.ts';
 import { NOTIFY_EVENTS } from '@agentdeck/contracts/integrations';
+import { importStateSchema as contractImportStateSchema } from '@agentdeck/contracts';
 
 /**
  * Серверная схема PATCH — своя копия контрактной, разъезжаться им нельзя.
@@ -244,7 +245,7 @@ describe('settingsPatchSchema — сторож групп', () => {
   it('границы порогов держатся', () => {
     const ok = (groupWatch: Record<string, unknown>) =>
       settingsPatchSchema.safeParse({ groupWatch }).success;
-    expect(ok({ enabled: false, telegram: false })).toBe(true);
+    expect(ok({ enabled: false })).toBe(true);
     expect(ok({ stallMinutes: 0 })).toBe(false);
     expect(ok({ checkRepeats: 1 })).toBe(false);
     expect(ok({ coldContextTokens: 9_999 })).toBe(false);
@@ -258,7 +259,33 @@ describe('settingsPatchSchema — сторож групп', () => {
   });
 
   it('снимок с отличиями сторожа импортируется', () => {
-    const parsed = importStateSchema.safeParse({ settings: { groupWatch: { telegram: false } } });
+    const parsed = importStateSchema.safeParse({ settings: { groupWatch: { askMinutes: 40 } } });
     expect(parsed.success).toBe(true);
+  });
+
+  // F-55: снимок другой версии с порогом вне нынешних границ не отвергается целиком.
+  it('битый порог и старый ключ сторожа в снимке отбрасываются поштучно, остальное принимается', () => {
+    const parsed = importStateSchema.safeParse({
+      settings: {
+        backupKeep: 3,
+        groupWatch: { stallMinutes: 0, askMinutes: 40, telegram: false, checkRepeats: 'x' },
+      },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.settings?.groupWatch).toEqual({ askMinutes: 40 });
+      expect(parsed.data.settings?.backupKeep).toBe(3);
+    }
+    // Не объект — структурный мусор: снимок отвергается, как с любым кривым блоком.
+    expect(importStateSchema.safeParse({ settings: { groupWatch: 'off' } }).success).toBe(false);
+  });
+
+  // F-57: контрактная схема импорта state.json проверяет блок сторожа тем же объявлением.
+  it('контрактный importStateSchema разбирает сторожа той же схемой снимка', () => {
+    const parsed = contractImportStateSchema.safeParse({
+      settings: { groupWatch: { stallMinutes: 0, askMinutes: 40 } },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.settings?.groupWatch).toEqual({ askMinutes: 40 });
   });
 });

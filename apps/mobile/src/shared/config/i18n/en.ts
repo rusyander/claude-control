@@ -153,6 +153,8 @@ export const en: Dictionary = {
     platformModel: (title: string, model: string) => `Through the contour “${title}”: ${model}.`,
     platformModelReplaced: (title: string, asked: string, model: string) =>
       `Through the contour “${title}”: it has no “${asked}”, the request goes with ${model}.`,
+    platformModelMapped: (title: string, asked: string, model: string) =>
+      `Through the contour “${title}”: “${asked}” by the contour map — ${model}.`,
     platformModelUnset: (title: string) =>
       `The contour “${title}” assigned no model (empty catalog or no probe yet) — the request goes as is.`,
     platformNoEffort: (title: string) =>
@@ -163,6 +165,8 @@ export const en: Dictionary = {
       platformModel: (_title: string, model: string) => `Local model · llama.cpp: ${model}.`,
       platformModelReplaced: (_title: string, asked: string, model: string) =>
         `Local model · llama.cpp: no "${asked}" there, the request goes with ${model}.`,
+      platformModelMapped: (_title: string, _asked: string, model: string) =>
+        `Local model · llama.cpp: ${model}.`,
       platformModelUnset: (_title: string) =>
         'Local model · llama.cpp: no model assigned — the request goes as it is.',
       platformNoEffort: (_title: string) =>

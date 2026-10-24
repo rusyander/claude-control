@@ -46,7 +46,10 @@ interface Pin {
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return entry.name === '__fixtures__' ? [] : sources(path);
+    // Каталог с точкой — рабочая папка соседнего теста (`.layer-b-<pid>`), она исчезает
+    // посреди обхода; исходников там нет.
+    if (entry.isDirectory())
+      return entry.name === '__fixtures__' || entry.name.startsWith('.') ? [] : sources(path);
     return entry.name.endsWith('.ts') &&
       !entry.name.endsWith('.test.ts') &&
       !entry.name.endsWith('.d.ts')

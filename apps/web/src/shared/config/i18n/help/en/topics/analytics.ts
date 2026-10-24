@@ -181,8 +181,13 @@ export const analyticsEn: typeof analyticsRu = {
     storageForeign: 'Codex and Qwen Code',
     storageForeignValue:
       'the report follows the active CLI. With Codex it reads ~/.codex/sessions/**/rollout-*.jsonl ' +
-      'and archived_sessions, with Qwen Code — ~/.qwen/projects/*/chats/*.jsonl and the panel kit ' +
-      'home. Both count input together with the cache, so the cache is subtracted, and an ' +
+      'and archived_sessions, with Qwen Code — ~/.qwen/projects/*/chats/*.jsonl, their ' +
+      'chats/archive/ (where the panel moves an abandoned session — of a turn that got no ' +
+      'answer, or a replaced one, a group’s previous conversation after a long pause included; ' +
+      'its spend is real and goes into the totals; a session lying both there and in work is ' +
+      'counted once, by the live ' +
+      'file) and the panel kit home. The same count feeds the «Tokens» section of a ' +
+      'Codex or Qwen Code split group’s card, so its numbers match this report. Both count input together with the cache, so the cache is subtracted, and an ' +
       'answer recorded twice is counted once. Skills are Claude Code only. The panel does not ' +
       'recognise those CLIs’ processes, so under Codex or Qwen Code the «Running right now» ' +
       'block on the «Agents and contour» tab is empty and says why — claude processes are not ' +

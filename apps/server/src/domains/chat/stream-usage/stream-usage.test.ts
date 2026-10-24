@@ -225,4 +225,42 @@ describe('TurnTracker — края', () => {
       expect.objectContaining({ remainder: true, cacheCreation1h: 700 }),
     ]);
   });
+
+  it('начало хода отдаётся отдельно только по просьбе (пинг): запрос до модели дошёл, даже если ответа не будет', () => {
+    const begin = raw({
+      type: 'stream_event',
+      event: {
+        type: 'message_start',
+        message: {
+          id: 'm1',
+          model: 'opus',
+          usage: {
+            input_tokens: 3,
+            output_tokens: 1,
+            cache_read_input_tokens: 120_000,
+            cache_creation_input_tokens: 300,
+            cache_creation: { ephemeral_1h_input_tokens: 300 },
+          },
+        },
+      },
+    });
+    const tracker = new TurnTracker(Date.now, { emitStart: true });
+    expect(tracker.track(begin)).toEqual([
+      {
+        kind: 'turnStart',
+        input: 3,
+        cacheRead: 120_000,
+        cacheCreation: 300,
+        cacheCreation1h: 300,
+        model: 'opus',
+      },
+    ]);
+    // Ход закрывает обычный расход, один.
+    expect(usages(tracker.track(delta(2)))).toEqual([
+      expect.objectContaining({ input: 5, output: 2, cacheRead: 120_000 }),
+    ]);
+    // Без просьбы начало хода молчит, как всегда.
+    expect(new TurnTracker().track(begin)).toEqual([]);
+    expect(new TurnTracker(Date.now, { emitStart: false }).track(begin)).toEqual([]);
+  });
 });

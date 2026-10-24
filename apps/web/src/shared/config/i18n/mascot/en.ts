@@ -32,6 +32,48 @@ export const mascotEn: typeof mascotRu = {
     wake: "Oh! I wasn't asleep, I was watching the agents with my eye closed.",
     dizzy: 'Whoa, my head is spinning…',
   },
+  react: {
+    linkLost: [
+      'Lost the connection to the panel server. Waiting for it to come back.',
+      'The panel server is not answering — what you see may be out of date.',
+      'I lost sight of the panel server. Trying to reach it again.',
+    ],
+    linkBack: [
+      'The server is back — the data is up to date again.',
+      'Connected again, everything on screen is fresh.',
+      'We are back! I pulled in everything that changed meanwhile.',
+    ],
+    runFailed: [
+      'Something went wrong in “{{name}}” — have a look at the chat.',
+      'The turn in “{{name}}” failed. The reason is in the chat.',
+      '“{{name}}” tripped over an error. See what happened.',
+    ],
+    groupFailed: [
+      'Group “{{name}}” failed — details on its hub card.',
+      'Group “{{name}}” broke down. The hub shows why.',
+      'Group “{{name}}” did not get to the end — check the hub.',
+    ],
+    groupStopped: [
+      'Group “{{name}}” has been stopped.',
+      'Group “{{name}}” is standing — you can resume it from the hub.',
+      '“{{name}}” is paused, its queue slot went to others.',
+    ],
+    limitHit: [
+      'We hit the subscription limit — the turn waits for the window to reset.',
+      'The subscription limit is used up. We carry on after the reset.',
+      'The subscription window ran out — we have to wait for the reset.',
+    ],
+    longDone: [
+      'The long turn in “{{name}}” is finished — ready to look at.',
+      '“{{name}}” is finally done. It took a while, but it is ready.',
+      'Done: “{{name}}” got to the end of a long turn.',
+    ],
+    groupDelivered: [
+      'Group “{{name}}” delivered!',
+      'Group “{{name}}” is finished — the result is in the hub.',
+      '“{{name}}” delivered. Ready to check and accept.',
+    ],
+  },
   panel: {
     title: 'Decky',
     subtitle: 'Agents at a glance',
@@ -92,5 +134,8 @@ export const mascotEn: typeof mascotRu = {
     chatty: 'Remarks and tips',
     chattyHint:
       'Every now and then Decky suggests panel features and comments on long turns in the chat. Messages about questions and finished turns stay.',
+    reactions: 'Reactions to events',
+    reactionsHint:
+      'The server connection lost or back, a turn or a group failed, a group stopped or delivered, the subscription limit hit, a long turn finished. One short line, at most once a minute per event; in the chat — above the input field. Off — Decky reports a failed turn with the old single line and stays silent about the rest.',
   },
 };

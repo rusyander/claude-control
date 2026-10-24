@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import type { TaskSplitResult } from '@agentdeck/contracts/task-split';
+import type { SplitGroupKeepWarm } from '@agentdeck/contracts/chat-handoff';
 import type {
   ChatLink,
   SplitPlanRecord,
@@ -76,6 +77,8 @@ function triageDone(): RunFinished {
 
 function build(projectsDir: string, links: Record<string, ChatLink>) {
   const records = new Map<string, SplitPlanRecord>();
+  /** Счёт пингов тёплого кэша — свой срез (учёт пингов), ключ `родитель#индекс`. */
+  const keepWarm = new Map<string, SplitGroupKeepWarm>();
   const logs: string[] = [];
   let tick = 0;
   let measure = groupTokenLedger({
@@ -90,6 +93,7 @@ function build(projectsDir: string, links: Record<string, ChatLink>) {
       findByTriage: (ids) =>
         [...records.values()].find((record) => ids.includes(record.triageChatId ?? '')),
       all: () => Object.fromEntries(records),
+      keepWarm: (parent, index) => keepWarm.get(`${parent}#${index}`),
     },
     launch: async (record, groups): Promise<TaskSplitResult> => ({
       chats: groups.map((index) => ({
@@ -124,7 +128,7 @@ function build(projectsDir: string, links: Record<string, ChatLink>) {
   const fail = (error: Error) => {
     measure = () => Promise.reject(error);
   };
-  return { conveyor, records, start, wait, link: LINK, view, logs, fail };
+  return { conveyor, records, keepWarm, start, wait, link: LINK, view, logs, fail };
 }
 
 /** Закрытые группы других планов проекта — норма холодного старта. */
@@ -226,6 +230,39 @@ describe('SplitConveyor: счёт токенов группы (E4)', () => {
     await wait();
 
     expect(view()?.tokenLedger).toBeUndefined();
+  });
+
+  it('пинги тёплого кэша видны и у ждущей группы, а закрытие дописывает счёт рядом', async () => {
+    const dir = transcripts({ 'work-1': [turn('a', 40_000)] });
+    const { start, conveyor, link, wait, view, records, keepWarm: ledger } = build(dir, {});
+    await start();
+    conveyor.onChainEnded(link, { status: 'awaiting', waitingFor: 'question' });
+    await wait();
+    const keepWarm = {
+      pings: 2,
+      hits: 1,
+      misses: 1,
+      input: 3,
+      cacheRead: 40_000,
+      cacheWrite: 300,
+      output: 2,
+      saved: 50_000,
+      lastAt: '2026-10-12T11:00:00.000Z',
+    };
+    // Запись плана со старым полем (писалось до учёта пингов) — запасной путь вида.
+    const legacy = { ...keepWarm, pings: 1, hits: undefined, misses: undefined };
+    records.get('родитель')!.groups[0]!.keepWarm = legacy;
+    expect(view()?.tokenLedger).toEqual({ at: legacy.lastAt, keepWarm: legacy });
+    // Так счёт ложится проводкой пинга (`keep-warm-wiring`): учёт пингов, не план.
+    const group = records.get('родитель')!.groups[0]!;
+    ledger.set(`родитель#${group.index}`, keepWarm);
+    expect(view()?.tokenLedger).toEqual({ at: keepWarm.lastAt, keepWarm });
+
+    conveyor.onChainEnded(link, { status: 'done' });
+    await vi.waitFor(() => expect(view()?.tokenLedger?.usage).toBeDefined());
+    expect(view()?.tokenLedger).toMatchObject({ keepWarm, usage: { turns: 1 } });
+    // В норму холодного старта проекта пинги не входят: хранимый счёт закрытия — без них.
+    expect(records.get('родитель')?.groups[0]?.tokenLedger?.keepWarm).toBeUndefined();
   });
 
   it('счёт упал — группа закрыта как была, сбой в журнале', async () => {

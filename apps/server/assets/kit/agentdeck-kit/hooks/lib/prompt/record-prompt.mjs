@@ -16,6 +16,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stateDir, sessionKey, logSessionEvent, sweepState } from '../kit-paths.mjs';
+import { recordSpawnGrant } from '../spawn-grant.mjs';
 
 export default function recordPrompt(input, prompt) {
   try {
@@ -33,9 +34,17 @@ export default function recordPrompt(input, prompt) {
 
     // The consent gate's door B on CLIs whose transcript the kit cannot read (kit-paths.mjs).
     logSessionEvent(input, { kind: 'prompt', text: prompt.slice(0, 600) });
+    // The spawn grant only the human gives (spawn-grant.mjs): read off what they TYPED — a synthetic
+    // turn arrives here as '' and returned above, so a notification can neither grant nor revoke.
+    try {
+      recordSpawnGrant(input, prompt);
+    } catch {
+      /* a grant that cannot be stored leaves the spawn guard asking — the safe side */
+    }
     // Keep the folders from growing forever — one pass, oldest-first, nothing fancy.
     sweepState('prompts');
     sweepState('sessions');
+    sweepState('grants');
   } catch {
     /* never block a user prompt */
   }

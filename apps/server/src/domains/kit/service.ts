@@ -56,6 +56,22 @@ export function qwenVariantDir(): string {
  */
 const LOCAL_CLAUDE_ENV = { CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1' };
 
+/**
+ * Потолки окна «только набора» (Фаза G.6): личный `settings.json` в этом режиме
+ * не читается, и потолки, что человек держит в нём (вывод Bash 8000 знаков,
+ * чтение файла 10 000 токенов), до прогона не доезжали. Переменными, а не ключом
+ * настроек: на 2.1.286 `BASH_MAX_OUTPUT_LENGTH` режет ответ в разговор так же,
+ * как `bashOutputMaxChars` (живой прогон 22.10: 20 000 знаков → превью 2 336 и
+ * путь, у упавшей команды — начало 8 012 знаков в обоих случаях), а ключ из
+ * `--settings` сильнее переменной — свой потолок профиля группы её перекрывает.
+ * На маршруте со своим пределом (локальная модель) и набор, и группа прижаты к
+ * нему: действует меньшее из трёх (`ChatRunRegistry/route-caps.ts`).
+ */
+export const OURS_CLAUDE_CAPS = {
+  BASH_MAX_OUTPUT_LENGTH: '8000',
+  CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS: '10000',
+};
+
 /** Кто и как получает набор. Остальные CLI слоя на прогон не дают — честный «нет». */
 const SUPPORT: Record<string, { modes: KitMode[]; localOnly?: boolean; carries?: KitItemKind[] }> =
   {
@@ -456,8 +472,9 @@ export class KitService {
       // «Только набор панели»: личный источник `user` снимается тем же флагом,
       // что и у слоёв контура; вход в аккаунт живёт не в настройках и остаётся.
       if (mode === 'ours' && !input.hasSources) args.push('--setting-sources', 'project,local');
-      if (!input.local) return { args, env: { [KIT_VARIANT_ENV]: 'standard' } };
-      return { args, env: { [KIT_VARIANT_ENV]: 'local', ...LOCAL_CLAUDE_ENV } };
+      const caps = mode === 'ours' ? OURS_CLAUDE_CAPS : {};
+      if (!input.local) return { args, env: { [KIT_VARIANT_ENV]: 'standard', ...caps } };
+      return { args, env: { [KIT_VARIANT_ENV]: 'local', ...LOCAL_CLAUDE_ENV, ...caps } };
     }
     if (input.provider === 'qwen' && mode === 'ours' && input.local) {
       const home = composeQwenHome(

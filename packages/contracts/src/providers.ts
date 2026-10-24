@@ -1,4 +1,5 @@
 import type { GroupsModel } from './group-delivery.ts';
+import type { GroupEconomySupport } from './group-economy-support.ts';
 
 /**
  * Абстракция провайдера конфигурации (мульти-провайдерность).
@@ -145,6 +146,12 @@ export interface ProviderInfo {
    * `claude-files`, у прочих `none`: обещать группу, которая не доедет, нельзя.
    */
   groupsModel?: GroupsModel;
+  /**
+   * Где действуют рычаги экономии групп у этого CLI (`group-economy-support.ts`):
+   * отметки «Где действует» на странице «Настройки → Группы». Нет поля — каталог
+   * ничего не объявил (или сервер старше поля), и отметок у CLI нет.
+   */
+  groupEconomy?: GroupEconomySupport;
 }
 
 /** Ответ `GET /api/providers`: id активного провайдера и список известных. */

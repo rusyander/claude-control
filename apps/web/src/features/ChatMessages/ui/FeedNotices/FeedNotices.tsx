@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { serverMessageText } from '@shared/config/i18n';
 import type { FeedNoticesProps } from './FeedNotices.types';
 import styles from './FeedNotices.module.scss';
+
+/** Код строки «остывший разговор не продолжен» — под ней кнопка возврата (R5). */
+const COLD_RESUME_CODE = 'chat-cold-resume-notice';
 
 /**
  * Строки состояния ленты: что с прогоном, если пузыря на экране нет.
@@ -17,8 +21,11 @@ import styles from './FeedNotices.module.scss';
  * Отдельным файлом — потому что `ChatMessages.tsx` перерос предел длины, а этот
  * кусок в нём цельный и ни от чего, кроме потока, не зависит.
  */
-export function FeedNotices({ stream, onRefresh }: FeedNoticesProps) {
+export function FeedNotices({ stream, onRefresh, onKeepSession }: FeedNoticesProps) {
   const { t } = useTranslation();
+  // Нажатие одно на заметку: второе пришло бы уже к ходу старой сессии и
+  // получило бы отказ. Помним саму заметку — у следующей другая сессия в тексте.
+  const [kept, setKept] = useState<string>();
   // Заметку, которую панель написала по коду, читаем своим словарём; ту, что
   // сервер собрал из счётчиков, показываем его русской строкой.
   const notice = serverMessageText(stream.noticeCode, stream.noticeParams) ?? stream.notice;
@@ -88,6 +95,24 @@ export function FeedNotices({ stream, onRefresh }: FeedNoticesProps) {
         <div className={styles.reconnecting} role="status" data-chat-notice>
           <Icon name="info" size={18} />
           {notice}
+          {/*
+            Новый разговор вместо остывшего начат правилом экономии. Кому память
+            именно этой группы дороже перезаписи кэша — возвращает ход в старую
+            сессию, пока новый идёт (R5): законченный уже сделал работу.
+          */}
+          {onKeepSession && stream.isRunning && stream.noticeCode === COLD_RESUME_CODE && (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={kept === notice}
+              onClick={() => {
+                setKept(notice);
+                onKeepSession();
+              }}
+            >
+              {t('chat.keepColdSession')}
+            </Button>
+          )}
         </div>
       )}
     </>

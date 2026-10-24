@@ -71,6 +71,9 @@ export const DEFAULT_STATE: AppState = {
     chatAutoMode: true,
     // Облегчённый набор инструментов в чатах — из коробки включён (владелец, 18.10.2026).
     chatLeanTools: true,
+    // Карточка одиночного чата становится D-n через 10 минут; запись ждёт неделю.
+    deferAfterMinutes: 10,
+    deferredTtlDays: 7,
     // Рычаги экономии групп — из коробки включены (владелец, 21.10.2026), срок
     // кэша решает CLI: пять минут дороже при долгих паузах групп (замер 20.10).
     groupEconomy: { ...GROUP_ECONOMY_DEFAULTS },
@@ -130,12 +133,20 @@ export const DEFAULT_STATE: AppState = {
       confluence: { enabled: false, baseUrl: '', email: '', deployment: '' },
       gitlab: { enabled: false, baseUrl: '', repo: '' },
       github: { enabled: false, baseUrl: '', repo: '' },
-      telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed', 'budget'] },
+      telegram: {
+        enabled: false,
+        chatId: '',
+        events: ['runError', 'testFailed', 'budget', 'groupSignal'],
+      },
       zephyr: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
       xray: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
       testit: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
       ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
-      webhook: { enabled: false, url: '', events: ['runError', 'testFailed', 'budget'] },
+      webhook: {
+        enabled: false,
+        url: '',
+        events: ['runError', 'testFailed', 'budget', 'groupSignal'],
+      },
     },
   },
 };

@@ -11,7 +11,7 @@
  * Android рисует `borderStyle: 'dashed'` на скруглённой рамке сплошной линией,
  * и знак переставал быть похож на себя.
  */
-export const SPLASH_BACKGROUND = '#4f46e5';
+export const SPLASH_BACKGROUND = '#2563eb';
 
 /**
  * Размеры — те же доли радиуса, что в `favicon.svg` и в

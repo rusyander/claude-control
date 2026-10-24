@@ -119,7 +119,8 @@ describe('скрытая вкладка — хвост законченного 
     await agentRuns.resumeActive();
     await settle();
 
-    expect(streamsOpened()).toEqual(['/api/chat/h1/stream?from=0']);
+    // Поток называет ход, хвост которого дотягивает (`startedAt` из `/chat/active`).
+    expect(streamsOpened()).toEqual(['/api/chat/h1/stream?from=0&startedAt=1']);
     expect(getRun('h1').status).toBe('error');
     expect(events.map((run) => [run.id, run.status])).toEqual([['h1', 'error']]);
   });

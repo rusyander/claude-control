@@ -16,7 +16,7 @@ import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { SplitReviewOutcome, SplitReviewView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink, ChatReviewState } from '../../../lib/app-store/app-store.types.ts';
 import {
-  carriedLink,
+  carriedStageLink,
   conversationKeys as keysOf,
   linkIdentity,
 } from '../../../lib/app-store/chat-links.ts';
@@ -824,8 +824,10 @@ export class SplitReview {
 
     if (!retry && (decision === 'fix' || decision === 'both')) {
       const fixChatId = `new-${Date.now()}-fix${index}`;
+      // Окно работы правок — своё (F-110): с окном ревью `hasWork` правок
+      // считал бы коммиты до ревью своими.
       this.deps.store.set(fixChatId, {
-        ...carriedLink(link),
+        ...carriedStageLink(link),
         createdAt: at,
         stage: 'fix',
         review: next,

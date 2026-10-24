@@ -10,7 +10,12 @@ import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { useChatBodySearch, useChats, usePinChat, MIN_CHAT_SEARCH_LENGTH } from '@entities/Chat';
-import { escalationsOf, useChatEscalations } from '@entities/ChatGroupSettings';
+import {
+  escalationsOf,
+  useChatEscalations,
+  useChatWatchSignals,
+  watchSignalsOf,
+} from '@entities/ChatGroupSettings';
 import { matchBodyHits } from '../../lib/rows';
 import { searchView } from '../../lib/searchView';
 import { useExpandedBranches } from '../../model/expandedBranches';
@@ -53,6 +58,8 @@ export function ChatList({
   const view = searchView({ mode, query, bodyQuery, minLength: MIN_CHAT_SEARCH_LENGTH });
   // Непрочитанное критичное от детей разделения — метка у главного чата дерева.
   const escalations = useChatEscalations();
+  // Беда одиночного чата по сторожу — метка у его строки.
+  const watchSignals = useChatWatchSignals();
   // Все разговоры на диске, а не только этой вкладки: по ним сирота отличает
   // «родитель удалён» от «родитель в другом проекте».
   const everything = useChats();
@@ -222,6 +229,7 @@ export function ChatList({
                   escalationsOf(escalations.data, [row.data.chat.id]).filter((entry) => !entry.read)
                     .length
                 }
+                watchSignals={watchSignalsOf(watchSignals.data, [row.data.chat.id])}
                 onSelect={() => onSelect(row.data.chat)}
                 {...(row.data.depth
                   ? {}

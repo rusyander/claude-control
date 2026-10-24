@@ -182,6 +182,12 @@ const COMMAND_RULES: RuleMatcher[] = [
     // Git — только то, что стирает работу или историю. Коммит, ветка, пуш,
     // перенос и перебазирование сюда не входят: они восстанавливаются из reflog
     // и с удалённого (см. `gitWrite` ниже).
+    //
+    // Включённое правило пускает само лишь затирание рабочих файлов (`reset
+    // --hard`, `restore`, `clean`) и принудительный пуш: удаление веток, тегов,
+    // ссылок, тайника и слияние маршрут прав отдаёт человеку раньше, чем дойдёт
+    // сюда (`gitDestroys`, решение владельца 23.10), — строки ниже нужны, чтобы
+    // при выключенном правиле они тоже не шли сами.
     id: 'gitHistory',
     segment: [
       /\bgit\s+(clean|filter-branch)\b/i,
@@ -197,7 +203,10 @@ const COMMAND_RULES: RuleMatcher[] = [
     // строки, `+ветка` в refspec и глобальные опции git перед `push`
     // (`git -C ../copy push`): этих двух форм правило не узнавало, и группа
     // переписала ветку MR на ревью без карточки (журнал 19.10, L7.12).
-    whole: [new RegExp(`${GIT}push\\b[^\\n]*(\\s--force\\b|\\s-f\\b|\\s\\+\\S)`, 'i')],
+    // `--force-with-lease` (и `--force-if-includes` при нём) — не затирание: git
+    // откажет, если на удалённом появилось чужое. По решению владельца 23.10 такой
+    // пуш — обычная запись (`gitWrite`), человеку — только сила сверх аренды.
+    whole: [new RegExp(`${GIT}push\\b[^\\n]*(\\s--force(?![-\\w])|\\s-f\\b|\\s\\+\\S)`, 'i')],
   },
   {
     // База данных: схема и данные.
@@ -249,7 +258,18 @@ const COMMAND_RULES: RuleMatcher[] = [
     // что подтверждают молча: что именно исполнится, до запуска не знает никто.
     id: 'networkExec',
     segment: [/\bcurl\b[^\n]*\s-X\s*['"]?DELETE/i],
-    whole: [/\b(curl|wget|iwr|Invoke-WebRequest)\b[^\n]*\|\s*(sudo\s+)?(ba|z|fi)?sh\b/i],
+    // Исполнитель входа: оболочка, `iex`, PowerShell и интерпретатор без
+    // программы — и за `sudo -E` (R-C01); `| python3 parse.py`, `| jq` — чтение.
+    whole: [
+      new RegExp(
+        String.raw`\b(curl|wget|iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^\n]*\|\s*` +
+          String.raw`((sudo|doas)(\s+-\S+)*\s+)?` +
+          String.raw`((ba|z|fi|da|k|a)?sh\b|iex\b|Invoke-Expression\b|` +
+          String.raw`(pwsh|powershell|python[\d.]*|node|perl|ruby|php|deno|bun)(\.exe)?` +
+          String.raw`((\s+-\w+)*\s+-)?\s*(?=$|[;&|)\n]))`,
+        'i',
+      ),
+    ],
   },
   {
     // Обычная работа с репозиторием. Правило существует не ради запрета, а ради
@@ -261,6 +281,14 @@ const COMMAND_RULES: RuleMatcher[] = [
     ],
   },
 ];
+
+/**
+ * Инструменты оболочки. PowerShell судится теми же правилами, что Bash (I-09):
+ * формы PowerShell в них есть (`Remove-Item`, `iex`, `Invoke-RestMethod`), а
+ * разбирался только Bash, и с включённым тумблером `Remove-Item -Recurse` из
+ * PowerShell подтверждался сам.
+ */
+const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 
 /** Команда оболочки из ввода инструмента Bash; undefined — форма незнакомая. */
 function bashCommand(input: unknown): string | undefined {
@@ -295,7 +323,7 @@ export function ruleFor(toolName: string, input: unknown): PermissionRuleId | un
     return MCP_READ.test(verb) || MCP_READ_NAMES.test(verb) ? undefined : 'externalWrite';
   }
 
-  if (toolName !== 'Bash') return undefined;
+  if (!SHELL_TOOLS.has(toolName)) return undefined;
   const command = bashCommand(input);
   if (command === undefined) return undefined;
 
@@ -315,8 +343,12 @@ function parsePattern(pattern: string): { tool: string; spec?: string } {
   return { tool: (match[1] ?? '').trim(), spec: (match[2] ?? '').trim() };
 }
 
-/** Спецификация правила `Bash(...)` против конкретной команды. */
-function specMatchesCommand(spec: string, command: string): boolean {
+/**
+ * Спецификация правила `Bash(...)` против конкретной команды. Правило
+ * `PowerShell(...)` CLI сверяет без учёта регистра — здесь так же.
+ */
+function specMatchesCommand(spec: string, command: string, anyCase = false): boolean {
+  if (anyCase) return specMatchesCommand(spec.toLowerCase(), command.toLowerCase());
   const targets = [command.trim(), ...segments(command)];
 
   // `git push:*` — префикс команды, так это записано в правах Claude Code.
@@ -353,11 +385,13 @@ function matchesRule(pattern: string, toolName: string, input: unknown): boolean
   if (!sameTool) return false;
 
   if (!spec) return true;
-  if (toolName !== 'Bash') return true;
+  if (!SHELL_TOOLS.has(toolName)) return true;
 
   const command = bashCommand(input);
   // Команду не разобрали — считаем, что правило сработало.
-  return command === undefined ? true : specMatchesCommand(spec, command);
+  return command === undefined
+    ? true
+    : specMatchesCommand(spec, command, toolName === 'PowerShell');
 }
 
 /**
@@ -383,7 +417,7 @@ export function shouldAutoApprove(request: AutoApproveInput): boolean {
   if (!allowEdits && EDIT_TOOLS.has(toolName)) return false;
 
   // Незнакомая форма Bash-вызова: что исполнится — неизвестно, спрашиваем.
-  if (toolName === 'Bash' && bashCommand(input) === undefined) return false;
+  if (SHELL_TOOLS.has(toolName) && bashCommand(input) === undefined) return false;
 
   const named = ruleFor(toolName, input);
   const rule = named === 'externalWrite' && allowedTools?.has(toolName) ? undefined : named;

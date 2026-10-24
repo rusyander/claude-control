@@ -1,0 +1,490 @@
+{
+  "title": {
+    "ru": "Экономия и сторож групп для всех CLI и контура, правила утечек и задержек, сообщения с телефона не теряются",
+    "en": "Group economy and watch for every CLI and the contour, leak and delay rules, phone messages are no longer lost"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Семь новых правил сторожа: веер субагентов, огромный ответ инструмента в окно, вызов, упёршийся в свой срок, вызов, открытый дольше обычного, долгое ожидание очереди тяжёлых шагов, серия отказов стражей и прав, тяжёлый первый запрос нового разговора. Их пороги — в карточке сторожа в настройках.",
+        "en": "Seven new watch rules: a subagent fan-out, a huge tool result in the window, a call that hit its own timeout, a call open longer than usual, a long wait in the heavy-step queue, a run of guard and permission refusals, a heavy first request of a new conversation. Their thresholds are on the watch card in settings."
+      },
+      "how": {
+        "ru": "Срок и отказ берутся из того, что сам CLI пишет о результате вызова, — одинаково из живого потока и из транскрипта. В Telegram уходят только веер, упор в срок и ожидание очереди; остальные остаются заметками в карточке.",
+        "en": "The timeout and the refusal come from what the CLI itself writes about the call result — the same from the live stream and from the transcript. Only the fan-out, the timeout and the queue wait go to Telegram; the rest stay as notes on the card."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Новый разговор группы после паузы больше не поднимает ложный сигнал об остывшем кэше: запись его первого окна — начало, а не переписанное продолжение.",
+        "en": "A group's new conversation after a pause no longer raises a false cold-cache signal: writing its first window is a start, not a rewritten resume."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Уборка копии закрытой группы больше не затирает разделение, начатое заново, пока копия убиралась, и не возвращает разделение, которого за это время не стало.",
+        "en": "Removing the copy of a closed group no longer overwrites a split started anew while the copy was being removed, and no longer brings back a split that ceased to exist meanwhile."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Сигнал сторожа групп стал обычным событием подписки «Сигнал сторожа групп»: Telegram и вебхук присылают его, только если оно отмечено в их списке событий. Отдельный выключатель доставки в карточке сторожа убран; кто получал сигналы в Telegram, получает их и дальше — галочка ставится в его списке событий сама, один раз. Вебхук сигналов раньше не слал, ему галочку ставят вручную.",
+        "en": "A group watch signal became a regular subscription event, «Group watch signal»: Telegram and the webhook deliver it only when it is ticked in their event list. The separate delivery switch on the watch card is gone; whoever got the signals in Telegram keeps getting them — the tick is set in that event list automatically, once. The webhook never sent the signals before, so it needs the tick by hand."
+      },
+      "how": {
+        "ru": "Одна точка решения на все каналы: что приходит, задаёт список событий, как у остальных уведомлений.",
+        "en": "One decision point for every channel: the event list decides what arrives, as for every other notification."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Быстрый расход считается по всей группе, а не по каждому чату, и даёт один сигнал на группу; прогноз лимита аккаунта поднимается один раз на аккаунт. Веер субагентов прячет этот сигнал, только когда субагенты и несут больше половины расхода: тяжёлая работа самого чата рядом с дешёвыми разведчиками остаётся видна.",
+        "en": "Fast spend is counted for the whole group rather than per chat and raises one signal per group; the account limit projection is raised once per account. A subagent fan-out hides this signal only when the subagents carry more than half of the spend: heavy work of the chat itself next to cheap scouts stays visible."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пуш, MR и чтение исходников панели, сделанные субагентом, тоже замечаются — со стадией своего звена.",
+        "en": "A push, an MR and reading the panel's sources done by a subagent are noticed too, with the stage of their link."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чтение исходников панели узнаётся по пути с «~», относительному от копии и по короткому имени Windows; запуск CLI тестов панели из копии больше не считается таким чтением.",
+        "en": "Reading the panel's sources is recognised by a path with «~», a path relative to the copy and a Windows short name; running the panel's tests CLI from a copy no longer counts as such a read."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "После перезапуска панели, ответвления разговора или перезаписи транскрипта сторож не поднимает ложных сигналов о кэше и не теряет хвост.",
+        "en": "After a panel restart, a conversation fork or a rewritten transcript the watch raises no false cache signals and does not lose the tail."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа, у которой ещё нет строки чата в списке, показывает свои сигналы; новый сигнал появляется в хабе сразу, без ожидания опроса; испорченная запись сторожа на диске не ломает дерево групп.",
+        "en": "A group that has no chat row in the list yet shows its signals; a new signal appears in the hub at once without waiting for the poll; a damaged watch record on disk no longer breaks the group tree."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "В острове сторожа стадия и действие переведены, кнопки «Открыть чат» называют стадию или правило, а экранный диктор читает остров как группу с заголовком и пояснением.",
+        "en": "The watch island translates the stage and the action, the «Open chat» buttons name the stage or the rule, and a screen reader reads the island as a group with a heading and a description."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Пока сторож выключен, его пороги в настройках заблокированы и рядом сказано почему. Окно остывшего кэша остаётся открытым, пока включён тёплый кэш: по нему решает пинг.",
+        "en": "While the watch is off its thresholds in settings are locked, with a note saying why. The cold-cache window stays open while the warm cache is on: the ping decides by it."
+      },
+      "area": {
+        "ru": "Настройки",
+        "en": "Settings"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Агент панели больше не меняет настройки сторожа и экономии групп — их меняет только человек; импорт настроек отбрасывает испорченные пороги по одному, не отвергая снимок целиком.",
+        "en": "The panel agent can no longer change the group watch and group economy settings — only a person changes them; a settings import drops damaged thresholds one by one instead of rejecting the whole snapshot."
+      },
+      "area": {
+        "ru": "Настройки",
+        "en": "Settings"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вес вызова в окне подписки учитывает версию модели: Opus 4 и 4.1 весят втрое больше, по своей цене, а не как Opus 4.5; Opus 3 тоже считается по своей цене.",
+        "en": "A call's weight in the subscription window follows the model version: Opus 4 and 4.1 weigh three times more, by their own price, not as Opus 4.5; Opus 3 is counted by its own price too."
+      },
+      "area": {
+        "ru": "Аналитика",
+        "en": "Analytics"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Тёплый кэш ожидания: пока группа ждёт ответа или разрешения, стоит на паузе или в очереди тяжёлых шагов, на 50-й минуте панель шлёт её разговору одно короткое слово, и часовой кэш продлевается. Продолжение потом читает окно из кэша, а не записывает его заново и не уходит в новый разговор. Рычаг и число пингов на одно ожидание (из коробки три) — в карточке экономии групп. Строка «тёплый кэш» на карточке группы показывает пинги, попадания и промахи и итог в токенах по цене входа — «сберёг» или «переплатил». Сбережение засчитывается, только когда группа продолжила позже часа после последнего вызова и прочла окно из кэша; ответ раньше часа, ожидание дольше потолка пингов и продолжение, переписавшее окно, делают пинги расходом, а пока исход неизвестен, строка называет расход пингов текущего ожидания; доля окна подписки, ушедшая на пинги, входит в долю лимита группы.",
+        "en": "Warm cache while waiting: while a group waits for an answer or a permission, is paused or queued for a heavy step, at minute 50 the panel sends its conversation one short word and the one-hour cache is extended. The continuation then reads the window from the cache instead of writing it again or starting a new conversation. The lever and the number of pings per wait (three out of the box) are on the group economy card. The «warm cache» line on the group card shows pings, hits and misses and the result in tokens at input price — «saved» or «overpaid». A saving counts only when the group resumed more than an hour after its last call and read the window from the cache; a reply within the hour, a wait past the ping cap and a resume that rewrote the window make the pings a cost, and while the outcome is unknown the line names the cost of the current wait's pings; the share of the subscription window the pings used counts in the group's limit share."
+      },
+      "how": {
+        "ru": "Пинг идёт ответвлением сессии группы без транскрипта, с теми же параметрами, что её следующий ход, поэтому греет именно её кэш, а разговор группы не меняется. В замере пинг прочёл из кэша всё окно и записал около трёхсот токенов — в шестнадцать раз дешевле записи окна после паузы. Пятиминутный или неподтверждённый часовой кэш, окно меньше порога сторожа и ожидание сброса лимита подписки пинга не получают. Инструменты пингу закрыты хуком до исполнения. Пинг, прочитавший из кэша меньше 90% окна или записавший больше 10%, считается промахом и прекращает пинги этого ожидания. После перезапуска панели пинг собирается по сохранённым параметрам хода группы, а не по урезанным из журнала прогонов: иначе он грел бы другой префикс.",
+        "en": "The ping runs as a fork of the group's session without a transcript, with the same parameters as its next turn, so it warms exactly that cache and the group's conversation is not changed. In the measurement the ping read the whole window from the cache and wrote about three hundred tokens — sixteen times cheaper than rewriting the window after a pause. A five-minute or unconfirmed one-hour cache, a window under the watch threshold and a wait for a subscription limit reset get no ping. A hook refuses the ping's tools before they run. A ping that read less than 90% of the window from the cache or wrote more than 10% counts as a miss and stops the pings of that wait. After a panel restart the ping is built from the saved parameters of the group's turn, not from the trimmed ones of the run journal: otherwise it would warm a different prefix."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Под заметкой «ход пошёл новым разговором» у группы, вернувшейся после долгой паузы, — кнопка «Продолжить старый разговор»: пока новый разговор идёт, она снимает его и запускает тот же ход в прежней сессии, без вводной. Пригодится, когда старый контекст дороже перезаписи окна.",
+        "en": "Under the «the turn started a new conversation» notice of a group back from a long pause there is a «Continue the old conversation» button: while the new conversation is running it stops it and runs the same turn in the previous session, without the brief. Useful when the old context is worth more than rewriting the window."
+      },
+      "how": {
+        "ru": "Возврат действует на один старт: следующее продолжение снова решает правило остывшей сессии. Законченный новый разговор не переигрывается — его работа уже сделана.",
+        "en": "The return applies to one start: the next continuation is decided by the cold-session rule again. A finished new conversation is not replayed — its work is already done."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Аналитика Qwen Code больше не теряет расход ходов, оставшихся без ответа: сессию такого хода панель убирает в архив Qwen, а не стирает, и архив читается вместе с остальными сессиями.",
+        "en": "Qwen Code analytics no longer lose the spend of turns that got no answer: the panel moves such a session to the Qwen archive instead of erasing it, and the archive is read with the other sessions."
+      },
+      "area": {
+        "ru": "Аналитика",
+        "en": "Analytics"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ответ Codex, Qwen и других CLI в чате панели больше не обрывается перезапуском сервера при правке кода в режиме разработки: перезапуск ждёт конца хода, как у чатов Claude.",
+        "en": "An answer of Codex, Qwen and other CLIs in the panel chat is no longer cut by a server restart after a code edit in development mode: the restart waits for the turn to end, as for Claude chats."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Звено группы получает короткую карточку правил вместо личного CLAUDE.md, если карточка лежит в каталоге конфигурации (hooks/cards/group-rules.md): первый запрос каждой стадии легче примерно на пятнадцать тысяч знаков. Полный файл звено открывает само, когда случай карточкой не покрыт; без карточки личные правила грузятся целиком, как раньше.",
+        "en": "A group stage gets a short rules card instead of the personal CLAUDE.md when the card lies in the configuration folder (hooks/cards/group-rules.md): the first request of every stage is about fifteen thousand characters lighter. The stage opens the full file itself when the card does not cover a case; without the card the personal rules load in full, as before."
+      },
+      "how": {
+        "ru": "Панель исключает личный файл настройкой claudeMdExcludes в --settings звена и ставит метку AGENTDECK_USER_MEMORY_OFF; по метке хук начала сессии кладёт карточку и повторяет её после сжатия. Чат человека не меняется.",
+        "en": "The panel excludes the personal file with claudeMdExcludes in the stage's --settings and sets the AGENTDECK_USER_MEMORY_OFF marker; on that marker the session start hook adds the card and repeats it after compaction. The human's chat does not change."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Карточка группы перестроена: в строке названия — путь стадий и статус, кнопки справа; ниже на всю ширину — шаг, проблема, факты и раздел «Токены». В нём итог подогрева кэша («сберёг» или «переплатил») стоит у заголовка, а числа сессий и подогрева идут подписанными колонками вместо сплошной строки через запятые.",
+        "en": "The group card is rebuilt: the title row holds the stage path and the status, the buttons sit on the right; below, across the whole card, come the step, the problem, the facts and a «Tokens» section. There the cache warming result («saved» or «overpaid») sits by the heading, and the session and warming numbers run in labelled columns instead of one comma-separated line."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      },
+      "images": ["hub-tokens-before.png", "hub-tokens-after.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Над карточками групп — общий итог подогрева кэша: сколько токенов по цене входа сберегли законченные ожидания всех групп разделения. Пока ни одно ожидание не закончилось, итога нет.",
+        "en": "Above the group cards — the total of cache warming: how many tokens at the input price the finished waits of all split groups saved. Until a wait has finished, no total is shown."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Тексты карточки группы и сторожа стали проще: расход и подогрев кэша описаны обычными словами, тысячи пишутся как «тыс.», внутренняя единица веса — как «ед. окна» с пояснением в подсказке острова. Остров сторожа — нейтральный фон с цветной полосой по степени важности вместо сплошной заливки.",
+        "en": "The group card and watch texts are plainer: spend and cache warming are told in ordinary words, thousands are written as “K”, the internal weight unit as “window units” with an explanation in the island hint. The watch island is a neutral surface with a stripe in the severity colour instead of a solid fill."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Дека реагирует на события: связь с сервером панели пропала и вернулась, группа упала, остановилась или доставила работу, упёрлись в лимит, ход шёл десять минут и дольше. В чате реплика встаёт одной строкой над полем ввода и не закрывает его; за раз — одна строка о самом важном, одна и та же реакция — не чаще раза в минуту и без повтора прошлой формулировки. Выключается в «Настройки → Общие → Маскот → Реакции на события».",
+        "en": "Decky reacts to events: the link to the panel server was lost and came back, a group failed, stopped or delivered its work, a limit was hit, a turn ran ten minutes or longer. In the chat the remark is one line above the input and never covers it; one line at a time about the most important thing, the same reaction at most once a minute and never with the previous wording. Turned off in “Settings → General → Mascot → Reactions to events”."
+      },
+      "how": {
+        "ru": "Пропажа связи объявляется только после пяти секунд без переподключения — короткий перезапуск сервера молчит. Строка читается экранным диктором один раз, а в режиме «Меньше движения» появляется без анимации.",
+        "en": "A lost link is announced only after five seconds without a reconnect — a short server restart stays silent. A screen reader reads the line once, and with “Reduce motion” it appears without animation."
+      },
+      "area": {
+        "ru": "Маскот",
+        "en": "Mascot"
+      },
+      "images": ["mascot-reaction.png"]
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Длинные разделы сводки разделения свёрнуты до заголовка с числом: «Сделать человеку: N», предложенные тикеты, «Неактивно: N» и пересечения веток — у последних под заголовком больше нет строки «Вне владения» и порядка слияния. Карточки групп остаются на виду, а списки открываются нажатием на заголовок.",
+        "en": "Long sections of the split summary are folded to a heading with their number: «For you to do: N», proposed tickets, «Inactive: N» and branch overlap — the latter no longer shows the «Outside ownership» line and the merge order under its heading. Group cards stay in view, and the lists open on a click on the heading."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Спокойная палитра без фиолетового: акцент — классический синий в обеих темах, подложки статусов в тёмной теме приглушены, карточка влитой или принятой группы — лёгкий оттенок с полосой слева вместо сплошной заливки. Заголовок окна установленной панели повторяет поверхность темы, а не горит фиолетовой полосой.",
+        "en": "A calm palette without violet: the accent is a classic blue in both themes, status backgrounds in the dark theme are muted, the card of a merged or accepted group is a light tint with a stripe on the left instead of a solid fill. The title bar of the installed panel follows the theme surface instead of a violet strip."
+      },
+      "area": {
+        "ru": "Интерфейс",
+        "en": "Interface"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Значок установленной панели в панели задач больше не стоит на белом квадрате: углы скруглённой плитки прозрачные. Знак перекрашен в тот же синий, что и акцент.",
+        "en": "The icon of the installed panel in the taskbar no longer sits on a white square: the corners of the rounded tile are transparent. The mark is recoloured to the same blue as the accent."
+      },
+      "area": {
+        "ru": "Интерфейс",
+        "en": "Interface"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Встроенный набор панели экономит на группах так же, как личная настройка: звено разделения получает короткую карточку правил набора вместо полного текста, после сжатия правило приходит урезанной карточкой, а ожидание файла чужого агента в цикле останавливается сразу.",
+        "en": "The panel's built-in kit saves on groups the same way the personal setup does: a split stage gets a short card of the kit rules instead of the full text, after compaction a rule arrives as a trimmed card, and a loop waiting for another agent's file is stopped at once."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Счёт подогрева кэша честнее: прерванный или оборванный по времени подогрев учитывает свои токены, сессия старого формата не показывает выдуманной экономии, а карточка пишет «сберёг» только при реальной экономии — иначе «переплатил», без «-0».",
+        "en": "The cache warming count is more honest: an interrupted or timed-out warming counts its tokens, an old-format session shows no invented saving, and the card says «saved» only on a real saving — otherwise «overpaid», never «-0»."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Кнопка MR и отметка «MR влит» появляются у группы, как только проверка доставки нашла её MR, а не после того, как группа досдала всё остальное. Раньше у групп, которым не хватало, например, раздела в описании, ссылка на MR жила только в хвосте ответа.",
+        "en": "The MR button and the «MR merged» mark appear on a group as soon as the delivery check finds its MR, not after the group has handed over everything else. Before, groups missing, say, a section of the description had the MR link only in the tail of the reply."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Рычаги экономии групп действуют не только у Claude Code. Qwen Code: порог сжатия истории от окна модели, потолки вывода оболочки и чтения файлов, часовой кэш при входе через Anthropic. Codex: лимит вывода инструментов — только когда он ниже собственных 2 500 токенов Codex. Goose и Continue: потолки вывода и порог сжатия. В «Настройки → Группы» у каждого рычага отметки «где действует»; где рычаг не действует или действует с условием, сказано почему.",
+        "en": "Group economy levers work beyond Claude Code. Qwen Code: a history compaction threshold from the model window, shell and file-read output caps, the one-hour cache when signed in through Anthropic. Codex: the tool output limit — only when it is below Codex's own 2,500 tokens. Goose and Continue: output caps and the compaction threshold. Settings → Groups marks where each lever works; where it does not, or works only under a condition, the reason is given."
+      },
+      "how": {
+        "ru": "Рычаги доходят до CLI его собственными настройками на один прогон — слоем поверх настроек человека, личные файлы CLI не меняются. Окно для порога сжатия берётся оттуда же, откуда его берёт сам CLI (его настройка, пределы локальной модели, окно модели контура, каталог моделей), и порог никогда не наступает позже собственного порога CLI.",
+        "en": "Levers reach the CLI through its own settings for one run — a layer over the human's settings; the CLI's personal files are not changed. The window for the compaction threshold comes from where the CLI itself takes it (its setting, a local model's limits, the contour model's window, the model catalog), and the threshold never comes later than the CLI's own."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Доставка группы у Codex и Gemini идёт на самой дешёвой модели лестницы, без подъёма глубины. Если аккаунт или маршрут эту модель не пускает, доставка повторяется новым разговором на модели работы, а в ленте упавшей доставки остаётся заметка об этом. Через контур дешёвая доставка идёт только по строке «sonnet» его карты моделей.",
+        "en": "A group's delivery on Codex and Gemini runs on the cheapest model of the ladder without raising the effort. If the account or the route refuses that model, delivery is repeated as a new conversation on the work model, and the failed delivery's feed keeps a note about it. Through a contour, cheap delivery goes only by the «sonnet» row of its model map."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Моделям Claude через контур доходит пометка кэша промпта: следующий ход читает контекст из кэша, а не оплачивает его заново. Расход контура и полоса бюджета считают чтение и запись кэша по их ценам; подогрев кэша не шлёт запросов в контур, чей бюджет исчерпан.",
+        "en": "Claude models through a contour receive the prompt cache marks: the next turn reads the context from the cache instead of paying for it again. The contour's spend and the budget bar count cache reads and writes at their own prices; cache warming sends no requests to a contour whose budget is exhausted."
+      },
+      "area": {
+        "ru": "Контур",
+        "en": "Contour"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Перевод модели строкой карты контура (например, sonnet → qwen-mid) показан переводом, а не жёлтым предупреждением «имени там нет» — на карточке разделения, в шапке чата и на телефоне. У групп через контур со строкой «sonnet» появился свой переключатель «Доставка на Sonnet» с моделью карты.",
+        "en": "A model translated by a contour map row (for example, sonnet → qwen-mid) is shown as a translation, not as a yellow «the name is not there» warning — on the split card, in the chat header and on the phone. Groups routed through a contour with a «sonnet» row get their own «Delivery on Sonnet» toggle naming the map model."
+      },
+      "area": {
+        "ru": "Контур",
+        "en": "Contour"
+      },
+      "images": ["routed-deliver-before.png", "routed-deliver-after.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож групп и «новый разговор после долгой паузы» работают и у групп Codex и Qwen Code: карточка видит их ходы, пауза у каждого своя (Qwen — 5 минут, Codex — 10), у локальной модели кэша, который мог бы остыть, нет — и через локальный контур панели, и когда сервер на этом компьютере задан в настройках самого CLI. Правило остывшего кэша у них срабатывает только по падению чтения из кэша, считает потерей только выпавшее из кэша и сбрасывается сжатием истории.",
+        "en": "The group watch and «a new conversation after a long pause» also cover Codex and Qwen Code groups: the card sees their turns, each has its own pause (Qwen 5 minutes, Codex 10), and a local model has no cache to go cold — through the panel's local contour and when a server on this computer is set in the CLI's own settings. Their cold-cache rule fires only on a drop in cache reads, counts as loss only what dropped out of the cache, and resets on history compaction."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Служебный файл расхода, который Qwen Code 0.24 пишет рядом с сессией, больше не принимается за отдельную сессию; сессия, лежащая и в чатах, и в архиве Qwen, считается один раз.",
+        "en": "The spend sidecar file Qwen Code 0.24 writes next to a session is no longer taken for a separate session; a session present both in the chats and in the Qwen archive counts once."
+      },
+      "area": {
+        "ru": "Аналитика",
+        "en": "Analytics"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа на Aider получает только те указания, которые может выполнить: тетрадь задачи и задачи трекера. Просьб прогнать проверки нет — команды в этом режиме не запускаются, и выдавать непрогнанные проверки за прогнанные запрещено.",
+        "en": "An Aider group gets only the instructions it can carry out: the task notebook and the tracker tasks. There is no request to run checks — commands do not run in this mode — and claiming checks that did not run is forbidden."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сообщение, набранное на телефоне, больше не теряется, а лента телефона и вкладки браузера догоняет разговор без перезапуска. Если за время обрыва связи началась новая реплика, при переподключении приходит она целиком, а не пустой поток старой. Сообщение, которое не ушло из-за сети, остаётся в чате с пометкой и повторной отправкой, без двойной доставки; очередь отправляется, когда реплика закончилась, даже если поток оборвался. Прерванный поток подхватывается снова при возвращении в приложение.",
+        "en": "A message typed on the phone is no longer lost, and the phone feed and a browser tab catch up with the conversation without a restart. If a new turn started while the connection was down, reconnecting delivers that turn in full rather than an empty stream of the old one. A message that did not leave because of the network stays in the chat with a mark and a resend, without double delivery; the queue is sent once the turn ends, even if the stream broke off. A broken stream is picked up again on returning to the app."
+      },
+      "how": {
+        "ru": "Переподключение называет не только номер последнего кадра, но и реплику, к которой он относится; другая реплика отдаётся с начала.",
+        "en": "A reconnect names not only the number of the last frame but also the turn it belongs to; a different turn is sent from its start."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Длинная заметка во вводной нового разговора группы (например, PROGRESS.md с планом и списком «не трогать» в конце) едет началом с пометкой, что остаток группа дочитывает из файла сама, прежде чем действовать. Раньше пометка была просто «обрезано», и под указанием «не собирай заново» хвост заметки мог потеряться.",
+        "en": "A long note in a group's new-conversation brief (for example, PROGRESS.md with the plan and the «do not touch» list at the end) travels as its beginning with a mark that the group reads the rest from the file itself before acting. Before, the mark only said «cut», and under «do not collect them again» the note's tail could be lost."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В разделе «Тестирование» кнопка «Новая группа» больше не мелькает на секунду, пока грузится список групп: окно, открытое с неё в этот момент, теряло кнопку, и после закрытия фокус падал в начало страницы.",
+        "en": "In «Testing» the «New group» button no longer flashes for a second while the group list loads: a dialog opened from it at that moment lost its button, and after closing focus fell to the top of the page."
+      },
+      "area": {
+        "ru": "Тестирование",
+        "en": "Testing"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ветка группы разделения отводится от основной ветки проекта (на которую указывает origin/HEAD, иначе main или master, перед этим подтянутой с удалённого), а не от ветки, выгруженной сейчас в папке проекта. Раньше, если папка стояла на ветке задачи человека, её коммиты уезжали в ветку группы и в её MR. Группа, ждавшая предшественника, по-прежнему начинает с его ветки.",
+        "en": "A split group branch starts from the project main branch (the one origin/HEAD points to, otherwise main or master, fetched from the remote first) rather than from whatever is checked out in the project folder. Before, when the folder sat on a human task branch, its commits travelled into the group branch and its MR. A group that waited for a predecessor still starts from its branch."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: стадия и действие сырыми ключами, у группы без строки чата сигнал не виден",
+        "en": "Before: the stage and the action as raw keys, a group without a chat row shows no signal"
+      }
+    },
+    {
+      "file": "after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: стадия и действие переведены, тревога группы без строки чата видна в её карточке",
+        "en": "After: the stage and the action are translated, the alarm of a group without a chat row shows on its card"
+      }
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { composedEn } from './en/composed.ts';
 import { configEn } from './en/config.ts';
 import { contourEn } from './en/contour.ts';
 import { dlpEn } from './en/dlp.ts';
+import { economyEn } from './en/economy.ts';
 import { filesEn } from './en/files.ts';
 import { gatewayEn } from './en/gateway.ts';
 import { gitEn } from './en/git.ts';
@@ -27,6 +28,7 @@ export const serverMessagesEn: Record<ServerMessageCode, string> = {
   ...configEn,
   ...contourEn,
   ...dlpEn,
+  ...economyEn,
   ...filesEn,
   ...gatewayEn,
   ...gitEn,

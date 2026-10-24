@@ -804,6 +804,7 @@ ${MARK.ancestor}
     const work = buildProjectDir();
     input.prepare?.(work);
     const home = buildConfigDir(work);
+    input.prepareHome?.(home);
     for (const name of GROUP_SKILLS) {
       mkdirSync(join(home, 'skills', name), { recursive: true });
       writeFileSync(
@@ -829,7 +830,18 @@ ${MARK.ancestor}
       ...(ahead ? { ahead } : {}),
     });
     const runs = new ChatRunRegistry();
-    runs.setPlatformRouting(() => ({ env: { ...stubEnv, ...input.env } }));
+    // `kitMode` — набор панели тем же `KitService.runExtras`, что зовёт `runRoute`
+    // (Фаза G, порт в набор): каталог Claude — одноразовый каталог этого звена.
+    let kitRoute;
+    if (input.kitMode) {
+      kitClaudeDir = home;
+      kit.setMode('claude', input.kitMode);
+      kitRoute = kit.runExtras({ provider: 'claude', local: false, hasSources: false });
+    }
+    runs.setPlatformRouting(() => ({
+      env: { ...stubEnv, ...input.env },
+      ...(kitRoute ? { kit: kitRoute } : {}),
+    }));
     // `dropArgs` — красный контроль общего префикса (X1): тот же профиль без флага.
     runs.setGroupProfileResolver(() =>
       input.args || input.dropArgs
@@ -965,6 +977,90 @@ ${MARK.ancestor}
       writeFileSync(pinFile, `${JSON.stringify(pin, null, 2)}\n`, 'utf8');
       console.log(`     пин бюджета записан → ${pinFile}`);
     }
+    stub.close();
+    removeDir(kitData);
+    finish();
+  }
+
+  // `--group-kit` (Фаза G, порт в набор) — звено группы на наборе «только наш»:
+  // личный слой снят флагом источников, правила человека заменяют правила набора
+  // из хука SessionStart плагина. У звена (метки ребёнка и снятой личной памяти
+  // ставит сама панель) вместо полного текста правил набора — карточка группы
+  // набора; у чата человека на том же наборе — полный текст, карточки нет.
+  // Печатает тело первого запроса каждого звена — числа до и после.
+  if (process.argv.includes('--group-kit')) {
+    const CARD = '# Group rules card';
+    const { UNUSED_HEAVY_TOOLS } =
+      await import('../../apps/server/src/domains/chat/initiative/initiative.ts');
+    const base = {
+      env: { ENABLE_TOOL_SEARCH: 'true' },
+      denied: UNUSED_HEAVY_TOOLS,
+      kitMode: 'ours',
+    };
+    const synthetic = await syntheticGroupInput(0);
+    for (const stage of ['work', 'review', 'fix', 'deliver']) {
+      const measured = await runStage(stage, undefined, { ...base, ...synthetic });
+      check(Boolean(measured), `набор «только наш», звено «${stage}»: запрос записан`);
+      if (!measured) continue;
+      const all = JSON.stringify(measured.body);
+      check(!all.includes(MARK.rule), `«${stage}»: личного CLAUDE.md в запросе нет`);
+      check(all.includes(CARD), `«${stage}»: карточка группы набора в запросе`);
+      check(
+        !all.includes(MARK.kitRule),
+        `«${stage}»: полного текста правил набора («${MARK.kitRule}») в запросе нет`,
+      );
+      console.log(`     ${stage}: тело первого запроса ${all.length} знаков`);
+    }
+    // Контроль: чат человека на том же наборе — полный текст правил, карточки нет.
+    const human = await runStage('work', undefined, { ...base, prompt: synthetic.prompt });
+    const text = human ? JSON.stringify(human.body) : '';
+    check(text.includes(MARK.kitRule), 'чат человека на наборе: полный текст правил набора');
+    check(!text.includes(CARD), 'чат человека на наборе: карточки группы нет');
+    console.log(`     контроль (не звено): ${text.length} знаков`);
+    stub.close();
+    removeDir(kitData);
+    finish();
+  }
+
+  // `--group-card` (Фаза G.2) — звено группы при карточке правил в каталоге
+  // конфигурации (`hooks/cards/group-rules.md`): личный CLAUDE.md в запрос не
+  // идёт, карточку кладёт хук начала сессии по метке панели
+  // AGENTDECK_USER_MEMORY_OFF. Контроль — то же звено без карточки: личные
+  // правила на месте, метки нет. Хук здесь — строка `node -e`, а не личный
+  // session-brief: проверяется проводка панели и CLI, текст карточки — тестом хука.
+  if (process.argv.includes('--group-card')) {
+    const CARD = 'T8GROUPCARDMARKER';
+    const withCard = (home) => {
+      mkdirSync(join(home, 'hooks', 'cards'), { recursive: true });
+      writeFileSync(join(home, 'hooks', 'cards', 'group-rules.md'), `# card\n${CARD}\n`, 'utf8');
+    };
+    const cardHook = (home) => {
+      const file = join(home, 'settings.json');
+      const settings = JSON.parse(readFileSync(file, 'utf8'));
+      settings.hooks.SessionStart[0].hooks.push({
+        type: 'command',
+        command: `node -e "if(process.env.AGENTDECK_USER_MEMORY_OFF==='1')console.log('${CARD}')"`,
+      });
+      writeFileSync(file, JSON.stringify(settings, null, 2), 'utf8');
+    };
+    const measure = async (card) => {
+      const measured = await runStage('work', undefined, {
+        child: true,
+        prepareHome: (home) => {
+          cardHook(home);
+          if (card) withCard(home);
+        },
+      });
+      return measured ? JSON.stringify(measured.body) : '';
+    };
+    const on = await measure(true);
+    const off = await measure(false);
+    check(on.length > 0 && off.length > 0, 'карточка группы: оба запроса записаны');
+    check(!on.includes(MARK.rule), 'карточка есть — личный CLAUDE.md в запрос не попал');
+    check(on.includes(CARD), 'карточка есть — хук по метке панели положил её в запрос');
+    check(off.includes(MARK.rule), 'контроль без карточки — личные правила доезжают');
+    check(!off.includes(CARD), 'контроль без карточки — метки нет, хук молчит');
+    console.log(`     тело запроса: с карточкой ${on.length} знаков, без неё ${off.length}`);
     stub.close();
     removeDir(kitData);
     finish();

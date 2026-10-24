@@ -1,20 +1,20 @@
 import { useTranslation } from 'react-i18next';
-import { Typography } from '@shared/ui/typography';
 import { formatDuration } from '@shared/lib/format-duration';
 import { limitShareText } from '../../lib/limitShareText';
 import type { ChildStageGroup } from '../ChildStages.types';
-import styles from './GroupMeta.module.scss';
+import { MetricList } from '../MetricList/MetricList';
+import type { MetricItem } from '../MetricList/MetricList.types';
 
 /**
  * Колонки группы: модель с глубиной, время до первой правки, время работы,
  * доля окон лимита подписки.
  * Одной строкой через «·» они резались многоточием (живой прогон 29.09), и
- * глубины не было вовсе — а по ней видно, на чём идёт группа. Колонки
- * переносятся целиком, а не по буквам: на узком экране встают друг под друга.
+ * глубины не было вовсе — а по ней видно, на чём идёт группа. Колонки — те же,
+ * что у чисел раздела «Токены» (`MetricList`): одна форма на всю карточку.
  */
 export function GroupMeta({ group }: { group: ChildStageGroup }) {
   const { t, i18n } = useTranslation();
-  const cells: { key: string; label: string; value: string }[] = [];
+  const cells: MetricItem[] = [];
   if (group.model) {
     const effort = group.effort
       ? t(`chat.effort_${group.effort}`, { defaultValue: group.effort })
@@ -46,19 +46,5 @@ export function GroupMeta({ group }: { group: ChildStageGroup }) {
   if (limit) {
     cells.push({ key: 'limitShare', label: t('chat.cascade.hub.meta.limitShare'), value: limit });
   }
-  if (cells.length === 0) return null;
-  return (
-    <dl className={styles.meta} data-hub-meta>
-      {cells.map((cell) => (
-        <div key={cell.key} className={styles.metaCell} data-hub-meta-cell={cell.key}>
-          <Typography variant="caption" color="subtle" as="dt">
-            {cell.label}
-          </Typography>
-          <Typography variant="caption" as="dd" className={styles.metaValue}>
-            {cell.value}
-          </Typography>
-        </div>
-      ))}
-    </dl>
-  );
+  return <MetricList items={cells} attr="data-hub-meta" />;
 }

@@ -236,6 +236,33 @@ describe('родной диалект Anthropic у платформы', () => {
     });
   });
 
+  it('деньги ответа: прочитанное и записанное — по ставкам кэша, а не входа (ревью K 🟡2)', async () => {
+    await gateway.start({
+      store,
+      appDataDir: appData,
+      port: 0,
+      fetchImpl: platformAnswers(sse(EVENTS)),
+      spendFlushMs: 0,
+      // Ставки крупные нарочно: деньги дня округляются до миллионной доллара.
+      pricing: () => ({
+        entries: [
+          {
+            id: 'claude-x',
+            label: 'Claude X',
+            price: { input: 1000, output: 5000, cacheRead: 100, cacheWrite: 1250 },
+          },
+        ],
+      }),
+    });
+    port = gateway.status().port;
+    await ask(ASK);
+
+    const day = store.getPlatformSpend()['enterprise-platform']!.days[0]!;
+    // Вход 10 по 1000, чтение 5 по 100, запись 3 по 1250, выход 7 по 5000 — за миллион.
+    expect(day.money.usd).toBeCloseTo((10 * 1000 + 5 * 100 + 3 * 1250 + 7 * 5000) / 1e6, 9);
+    expect(day.promptTokens).toBe(18);
+  });
+
   it('не поток: цельное сообщение как есть, расход из его usage', async () => {
     const message = {
       id: 'msg_2',

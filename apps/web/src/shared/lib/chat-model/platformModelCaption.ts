@@ -8,6 +8,7 @@ export interface PlatformModelCaption {
   key:
     | ReturnType<typeof routeKey<'chat.platformModel'>>
     | 'chat.platformModelReplaced'
+    | 'chat.platformModelMapped'
     | ReturnType<typeof routeKey<'chat.platformModelUnset'>>;
   params: { title: string; asked: string; model: string };
   /** Человеку стоит присмотреться: уедет не то, что он выбрал. */
@@ -46,6 +47,9 @@ export function platformModelCaption(
       // 15.10). Подпись просто называет модель, которая ответит.
       if (local) return { key: 'chat.localRoute.model', params, warn: false };
       return { key: 'chat.platformModelReplaced', params, warn: true };
+    case 'mapped':
+      if (local) return { key: 'chat.localRoute.model', params, warn: false };
+      return { key: 'chat.platformModelMapped', params, warn: false };
     default:
       return { key: routeKey('chat.platformModel', local), params, warn: false };
   }

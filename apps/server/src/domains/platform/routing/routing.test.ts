@@ -360,6 +360,27 @@ describe('прогон через контур', () => {
       expect(route).toEqual({ env: {} });
     });
 
+    it('исчерпанный бюджет контура доезжает признаком, снятый — нет (ревью K)', () => {
+      connect();
+      expect(runRouteOf(resolveRunRoute(deps, 'chat')).budgetExhausted).toBeUndefined();
+
+      // Отказ 402 записан и держится до ручного сброса: тёплый пинг в такой
+      // контур — заведомый отказ, и место спавна должно знать это заранее.
+      store.savePlatformSpend({
+        platformId: PLATFORM.id,
+        days: [],
+        exhaustedAt: '2026-10-22T10:00:00.000Z',
+      });
+      const route = runRouteOf(resolveRunRoute(deps, 'chat'));
+      expect(route.budgetExhausted).toBe(true);
+      // Обычный ход не отказывает: решает контур, и его 402 доезжает до CLI сам.
+      expect(route.refusal).toBeUndefined();
+      expect(route.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:5179/company-dev/_s/chat');
+
+      store.savePlatformSpend({ platformId: PLATFORM.id, days: [] });
+      expect(runRouteOf(resolveRunRoute(deps, 'chat')).budgetExhausted).toBeUndefined();
+    });
+
     it('обязательный контур без шлюза — отказ доезжает текстом, а не пустотой', () => {
       connect(PLATFORM, 0);
 

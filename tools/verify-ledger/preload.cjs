@@ -21,6 +21,32 @@ try {
   /* журнал экономит, но никогда не мешает проверке */
 }
 
+/**
+ * Подсказка «как прогнать заново» — только без замка панели: человеку вне панели (VS Code,
+ * терминал) переменная работает, и строка без неё оставила бы его без выхода (F-127); группе
+ * под замком она ничего не даёт, и совет ею воспользоваться был бы ложью.
+ */
+function forceHint(L, hint) {
+  return L.locked() ? '' : `; ${hint}`;
+}
+
+/**
+ * Событие сбоя снимка. `reason` — прежняя короткая строка (по ней считает плитка панели),
+ * причина — в `stderr`: 21 сбой 23–24.10 остался без неё, первая строка ошибки — сама команда.
+ */
+function snapshotFailed(L, error) {
+  const reason = `snapshot-failed: ${String(error?.message ?? error)
+    .split('\n')[0]
+    .slice(0, 160)}`;
+  const stderr = L.stderrTail?.(error);
+  return {
+    kind: 'off',
+    reason,
+    ...(stderr ? { stderr } : {}),
+    ...(error?.attempts ? { attempts: error.attempts } : {}),
+  };
+}
+
 function main() {
   if (!require('node:worker_threads').isMainThread) return;
   // Два пути подключения (окружение панели и `settings.json` CLI) не дают двойной записи.
@@ -35,16 +61,15 @@ function main() {
   L.heartbeat();
   const startedAt = Date.now();
   const repo = L.repoOf(cwd);
-  if (repo.off) return L.appendEvent({ kind: 'off', reason: repo.off, check: match.id });
+  // Каталог — в событии: вне git ключа нет (дерево не снять), и видно, чей это прогон
+  // (24.10: 165 таких за двое суток — временные каталоги тестов и черновики агентов).
+  if (repo.off) return L.appendEvent({ kind: 'off', reason: repo.off, check: match.id, cwd });
   let start;
   try {
     start = L.snapshot(repo);
   } catch (error) {
     // Молчаливый сбой снимка 19.10 спрятал от журнала все прогоны групп: причина — в ленту.
-    const reason = `snapshot-failed: ${String(error?.message ?? error)
-      .split('\n')[0]
-      .slice(0, 160)}`;
-    return L.appendEvent({ kind: 'off', reason, check: match.id, repo: repo.top });
+    return L.appendEvent({ ...snapshotFailed(L, error), check: match.id, repo: repo.top });
   }
   if (start.off)
     return L.appendEvent({ kind: 'off', reason: start.off, check: match.id, repo: repo.top });
@@ -69,6 +94,8 @@ function main() {
     pid: process.pid,
     by: 'preload',
     scope: 'whole',
+    // Чья работа писала или повторяла ключ: пока она жива, запись не стареет (`keyFresh`).
+    wt: L.workOf(repo),
   };
   const event = { check: match.id, repo: repo.top, key: key.slice(0, 12) };
 
@@ -80,7 +107,7 @@ function main() {
     writeAll(
       2,
       Buffer.from(
-        `[verify-ledger] reused green ${hit.runId} from ${at} (key ${key.slice(0, 8)}); AGENTDECK_VERIFY_LEDGER=off forces a run\n`,
+        `[verify-ledger] reused green ${hit.runId} from ${at} (key ${key.slice(0, 8)}): nothing it depends on changed since; this output and exit code are that run's${forceHint(L, 'AGENTDECK_VERIFY_LEDGER=off forces a run')}\n`,
       ),
     );
     const empty = Buffer.alloc(0);
@@ -98,7 +125,17 @@ function main() {
   }
   if (hit)
     L.appendEvent({ ...event, kind: 'would-skip', recordedExit: hit.exit, savedMs: hit.ms, mode });
-  else L.appendEvent({ ...event, kind: 'miss', reason: match.noSkip ?? decision.reason, mode });
+  else {
+    const reason = match.noSkip ?? decision.reason;
+    const drift = reason === 'no-record' ? L.envDrift(repo, checkId, parts) : null;
+    L.appendEvent({
+      ...event,
+      kind: 'miss',
+      reason,
+      mode,
+      ...(drift ? { envChanged: drift } : {}),
+    });
+  }
 
   const D = require('./delta.cjs');
   const delta =
@@ -110,12 +147,14 @@ function main() {
   const capture = startCapture();
   process.on('exit', (code) => {
     try {
-      const record = finish(L, { repo, match, start, base, event, hit, mode, capture, code });
+      const record = finish(L, { repo, match, cwd, start, base, event, hit, mode, capture, code });
       if (code === 0 && record)
         rememberGreen(D, { repo, match, parts, cwd, start, delta, base, runId: record.runId });
     } catch {
       /* сбой записи — прогона просто нет в журнале */
     }
+    // Уборка хранилища — после записи, раз в час на хранилище; её сбой — тишина.
+    L.maybePrune(repo);
   });
 }
 
@@ -136,7 +175,7 @@ function narrow(L, D, { repo, delta, base, event, startedAt }) {
     writeAll(
       2,
       Buffer.from(
-        `[verify-ledger] nothing the tests can see changed since green ${last.runId} from ${at}; reused. AGENTDECK_VERIFY_LEDGER_DELTA=off forces a run\n`,
+        `[verify-ledger] nothing the tests can see changed since green ${last.runId} from ${at}; reused${forceHint(L, 'AGENTDECK_VERIFY_LEDGER_DELTA=off forces a run')}\n`,
       ),
     );
     const empty = Buffer.alloc(0);
@@ -160,7 +199,7 @@ function narrow(L, D, { repo, delta, base, event, startedAt }) {
   writeAll(
     2,
     Buffer.from(
-      `[verify-ledger] delta since green ${last.runId} from ${at}: vitest related on ${delta.files.length} changed file(s) (${delta.files.slice(0, 5).join(', ')}${delta.files.length > 5 ? ', …' : ''}); AGENTDECK_VERIFY_LEDGER_DELTA=off runs the whole set\n`,
+      `[verify-ledger] delta since green ${last.runId} from ${at}: vitest related on ${delta.files.length} changed file(s) (${delta.files.slice(0, 5).join(', ')}${delta.files.length > 5 ? ', …' : ''})${forceHint(L, 'AGENTDECK_VERIFY_LEDGER_DELTA=off runs the whole set')}\n`,
     ),
   );
   L.appendEvent({ ...event, kind: 'delta', files: delta.files.length, chain: base.chain });
@@ -192,7 +231,7 @@ function rememberGreen(D, { repo, match, parts, cwd, start, delta, base, runId }
  * через нас. Убитый процесс (SIGKILL, TaskStop, таймаут Bash) сюда не доходит —
  * и записи нет: недоделанный прогон не вердикт.
  */
-function finish(L, { repo, match, start, base, event, hit, mode, capture, code }) {
+function finish(L, { repo, match, cwd, start, base, event, hit, mode, capture, code }) {
   const ms = Date.now() - base.startedAt;
   if (hit && mode !== 'on') {
     const same = code === hit.exit;
@@ -205,9 +244,20 @@ function finish(L, { repo, match, start, base, event, hit, mode, capture, code }
     });
   }
   if (capture.over) return L.appendEvent({ ...event, kind: 'off', reason: 'output-cap' });
-  const end = L.snapshot(repo);
+  let end;
+  try {
+    end = L.snapshot(repo);
+  } catch (error) {
+    // Сбой второго снимка прежде глотал `exit`-обработчик: прогон молча пропадал из журнала.
+    return L.appendEvent({ ...event, ...snapshotFailed(L, error) });
+  }
+  let kept = null;
   if (end.off || end.tree !== start.tree || end.stat !== start.stat) {
-    return L.appendEvent({ ...event, kind: 'off', reason: 'tree-changed' });
+    // Дерево сменилось вне того, что видит проверка (соседний агент правил другой пакет):
+    // прогон годен для своего ключа (`inputsSteady`). Иначе — не вердикт.
+    if (!L.inputsSteady({ repo, match, cwd, start, end, key: base.key }))
+      return L.appendEvent({ ...event, kind: 'off', reason: 'tree-changed' });
+    kept = 'outside-scope';
   }
   const record = L.writeRecord(
     repo,
@@ -219,7 +269,7 @@ function finish(L, { repo, match, start, base, event, hit, mode, capture, code }
     },
     [...(match.entry?.artifacts ?? []), ...L.reportArtifacts(match)],
   );
-  L.appendEvent({ ...event, kind: 'record', exit: code, ms });
+  L.appendEvent({ ...event, kind: 'record', exit: code, ms, ...(kept ? { kept } : {}) });
   return record;
 }
 

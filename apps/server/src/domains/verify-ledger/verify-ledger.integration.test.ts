@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { installLedger } from './verify-ledger.ts';
 
 /**
  * Журнал проверок (`tools/verify-ledger/`) живыми процессами node с настоящим
@@ -37,11 +38,16 @@ let root: string;
 let repo: string;
 let home: string;
 
-/** Поддельная проверка: печать, необязательная пауза и правка дерева посреди прогона. */
+/**
+ * Поддельная проверка: печать, необязательная пауза и правка дерева посреди прогона.
+ * Управление — окружением (оно в ключе) или файлом вне репозитория `FAKE_CTL` (вне ключа:
+ * тот же ключ, другой исход — так тест получает «код поменялся, а журнал не видит»).
+ */
 const CHECK = `
 import fs from 'node:fs';
 import { helper } from './helper.mjs';
-const e = process.env;
+const ctl = process.env.FAKE_CTL && fs.existsSync(process.env.FAKE_CTL) ? JSON.parse(fs.readFileSync(process.env.FAKE_CTL, 'utf8')) : {};
+const e = { ...process.env, ...ctl };
 console.log('Test Files  3 passed ' + helper());
 console.error('note on stderr');
 if (e.FAKE_INHERIT) (await import('node:child_process')).spawnSync(process.execPath, ['-e', 'console.log(1)'], { stdio: 'inherit' });
@@ -108,12 +114,18 @@ function run(env: Record<string, string> = {}, args: string[] = []): Run {
       NODE_OPTIONS: `--require "${PRELOAD}"`,
       AGENTDECK_VERIFY_LEDGER_HOME: home,
       AGENTDECK_VERIFY_LEDGER: 'on',
+      // Прогон под панелью приносит её замок — тест сам решает, есть ли он.
+      AGENTDECK_VERIFY_LEDGER_LOCK: '',
+      FAKE_CTL: join(root, 'ctl.json'),
       ...env,
     },
     timeout: 30_000,
   });
   return { code: r.status, out: r.stdout, err: r.stderr };
 }
+/** Исход следующих прогонов — мимо ключа (файл вне репозитория). */
+const outside = (vars: Record<string, string>) =>
+  writeFileSync(join(root, 'ctl.json'), JSON.stringify(vars));
 
 const reused = (r: Run) => r.err.includes('[verify-ledger] reused green');
 const events = () =>
@@ -163,8 +175,9 @@ describe('verify-ledger: повтор при том же содержимом', 
 
   it('T26: тень замечает расхождение кода прогона с записью', () => {
     run();
-    // Тот же ключ, другой исход: код берётся из окружения, которого нет в списке значимых.
-    run({ AGENTDECK_VERIFY_LEDGER: 'shadow', FAKE_EXIT: '1' });
+    // Тот же ключ, другой исход: код берётся из файла вне репозитория — журнал его не видит.
+    outside({ FAKE_EXIT: '1' });
+    run({ AGENTDECK_VERIFY_LEDGER: 'shadow' });
     expect(events().map((e) => e.kind)).toContain('mismatch');
   });
 
@@ -176,6 +189,51 @@ describe('verify-ledger: повтор при том же содержимом', 
     expect(recordCount()).toBe(before + 1);
     // Режим в ленте — «off», а не тень: иначе плитка выдала бы выключенный журнал за замер.
     expect(events().find((e) => e.kind === 'would-skip')?.mode).toBe('off');
+  });
+
+  it('замок панели: off и shadow из команды модели повтор не выключают, строка повтора их не советует', () => {
+    run();
+    const lock = { AGENTDECK_VERIFY_LEDGER_LOCK: '1' };
+    const off = run({ ...lock, AGENTDECK_VERIFY_LEDGER: 'off' });
+    expect(reused(off)).toBe(true);
+    expect(off.err).not.toContain('VERIFY_LEDGER=off');
+    // Без замка (человек вне панели) строка называет выход — иначе ему нечем прогнать заново (F-127).
+    expect(run().err).toContain('AGENTDECK_VERIFY_LEDGER=off forces a run');
+    expect(reused(run({ ...lock, AGENTDECK_VERIFY_LEDGER: 'shadow' }))).toBe(true);
+    // Пустой замок — свой инструмент снял его (mustfail): off снова действует.
+    expect(reused(run({ AGENTDECK_VERIFY_LEDGER_LOCK: '', AGENTDECK_VERIFY_LEDGER: 'off' }))).toBe(
+      false,
+    );
+  });
+
+  // F-30: замок в окружении снимается командой модели (`LOCK=`, `env -u`, скрипт). Замок панели —
+  // в пути входа preload, который ставит панель: окружение команды его не достаёт.
+  it('замок во входе preload: снятый из окружения замок, off, чужой дом и _DELTA=off повтор не выключают', () => {
+    const appData = join(root, 'appdata');
+    const install = installLedger({ appData, sourceDir: DIR });
+    expect(install.lockedPreload).toBeTruthy();
+    const locked = { NODE_OPTIONS: `--require "${install.lockedPreload}"` };
+    const ledgerHome = join(appData, 'verify-ledger');
+    expect(run({ ...locked, AGENTDECK_VERIFY_LEDGER_HOME: ledgerHome }).code).toBe(0);
+    const escape = run({
+      ...locked,
+      AGENTDECK_VERIFY_LEDGER_LOCK: '',
+      AGENTDECK_VERIFY_LEDGER: 'off',
+      AGENTDECK_VERIFY_LEDGER_DELTA: 'off',
+      AGENTDECK_VERIFY_LEDGER_HOME: join(root, 'fresh-home'),
+    });
+    expect(reused(escape)).toBe(true);
+    expect(existsSync(join(root, 'fresh-home'))).toBe(false);
+    // Обычный вход (выбор человека без замка): off снова действует.
+    expect(
+      reused(
+        run({
+          NODE_OPTIONS: `--require "${install.preload}"`,
+          AGENTDECK_VERIFY_LEDGER_HOME: ledgerHome,
+          AGENTDECK_VERIFY_LEDGER: 'off',
+        }),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -335,7 +393,10 @@ describe('verify-ledger: запись только честного прогон
   });
 
   it('T11: красный на ключе — повтора нет никогда, даже после зелёного', () => {
-    run({ FAKE_EXIT: '1' });
+    // Красный и зелёный на ОДНОМ ключе: исход — мимо ключа.
+    outside({ FAKE_EXIT: '1' });
+    run();
+    outside({});
     run({ AGENTDECK_VERIFY_LEDGER: 'off' });
     const r = run();
     expect(reused(r)).toBe(false);
@@ -385,8 +446,10 @@ describe('verify-ledger: запись только честного прогон
     const calls = join(root, 'eagain-calls.txt');
     writeFileSync(
       shim,
+      // Включается файлом, а не окружением: окружение в ключе, а повтор нужен тот же.
       `const fs = require('node:fs');
-if (process.env.FAKE_EAGAIN) {
+const calls = ${JSON.stringify(calls)};
+if (fs.existsSync(calls + '.on')) {
   const original = fs.writeSync;
   let n = 0;
   fs.writeSync = function (fd, ...rest) {
@@ -396,12 +459,13 @@ if (process.env.FAKE_EAGAIN) {
     e.code = 'EAGAIN';
     throw e;
   };
-  process.on('exit', () => fs.writeFileSync(process.env.FAKE_EAGAIN, String(n)));
+  process.on('exit', () => fs.writeFileSync(calls, String(n)));
 }
 `,
     );
     const both = { NODE_OPTIONS: `--require "${shim}" --require "${PRELOAD}"` };
     expect(run(both).code).toBe(0);
+    writeFileSync(`${calls}.on`, '');
     const startedAt = Date.now();
     const r = spawnSync(process.execPath, ['.claude/tools/check.mjs'], {
       cwd: repo,
@@ -411,8 +475,9 @@ if (process.env.FAKE_EAGAIN) {
         ...both,
         AGENTDECK_VERIFY_LEDGER_HOME: home,
         AGENTDECK_VERIFY_LEDGER: 'on',
+        AGENTDECK_VERIFY_LEDGER_LOCK: '',
         AGENTDECK_VERIFY_LEDGER_WRITE_MS: '300',
-        FAKE_EAGAIN: calls,
+        FAKE_CTL: join(root, 'ctl.json'),
       },
       timeout: 10_000,
     });

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { MessageUsage } from '@agentdeck/contracts';
-import { EMPTY_RUN, type AgentRun, type ChatEvent, type RunStatus } from './types';
+import { EMPTY_RUN, TURN_RESET, type AgentRun, type ChatEvent, type RunStatus } from './types';
 
 /**
  * Состояние идущих прогонов. Живёт вне React по той же причине, что и в панели:
@@ -158,9 +158,22 @@ export function applyEvent(id: string, event: ChatEvent): void {
   if (!run) return;
 
   const tailOnly = run.tailOnly === true;
-  const next: AgentRun = { ...run, lastEventAt: Date.now() };
+  let next: AgentRun = { ...run, lastEventAt: Date.now() };
   switch (event.kind) {
     case 'session':
+      // Поток привёл в ДРУГОЙ ход этого разговора: прошлый кончился, пока связи
+      // не было (сервер отдал новый ход с начала, см. `startedAt` в запросе
+      // потока). Его текст, вызовы и права к новому не относятся — пузырь
+      // начинается заново, а отметка конца заставит экран дочитать прошлый
+      // ответ из транскрипта.
+      if (
+        event.startedAt !== undefined &&
+        run.startedAt !== undefined &&
+        event.startedAt !== run.startedAt
+      ) {
+        next = { ...next, ...TURN_RESET, endedAt: Date.now() };
+        pendingUsage.delete(id);
+      }
       next.sessionId = event.sessionId;
       next.startedAt = event.startedAt ?? run.startedAt;
       // Модель — от самого CLI, а не из того, что телефон отправил. Отправляет

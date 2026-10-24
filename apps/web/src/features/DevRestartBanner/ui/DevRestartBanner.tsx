@@ -12,9 +12,9 @@ import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * «Правки сервера ждут перезапуска» (решение 30.09). Dev-сторож не рвёт
- * подготовку копий ради перезапуска и ждёт её без предела, а ходы — до
- * предела (D1, 21.10: 30 мин), и плашка заранее называет время и ходы, которых
- * он не дождётся. Она говорит, что правка ещё не действует и чего она ждёт, а
+ * подготовку копий и живые ходы ради перезапуска и ждёт их без предела (24.10);
+ * плашка называет ходы, которых ждёт, а время — только у недоказанного «занято»
+ * (журнал ходов не прочитался). Она говорит, что правка ещё не действует и чего она ждёт, а
  * кнопка даёт перезапустить сейчас — с подтверждением, потому что подготовка
  * копий и проверки оборвутся.
  * Вне dev-сторожа сервер всегда отвечает «не ждут», и плашки нет.
@@ -53,12 +53,14 @@ export function DevRestartBanner() {
             ? ` ${t('devRestart.since', { time: formatClock(status.since, i18n.language) })}.`
             : ''}
         </Typography>
+        {(status.runs?.length ?? 0) > 0 && (
+          <Typography variant="caption" color="subtle" data-dev-restart-runs>
+            {t('devRestart.runs', { names: status.runs?.join(', ') ?? '' })}
+          </Typography>
+        )}
         {status.capAt && (
           <Typography variant="caption" color="subtle" data-dev-restart-cap>
-            {t(status.runs?.length ? 'devRestart.capAt' : 'devRestart.capAtUnnamed', {
-              time: formatClock(status.capAt, i18n.language),
-              names: status.runs?.join(', ') ?? '',
-            })}
+            {t('devRestart.capAt', { time: formatClock(status.capAt, i18n.language) })}
           </Typography>
         )}
         {files.length > 0 && (

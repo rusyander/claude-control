@@ -9,31 +9,31 @@
       "masked": 1,
       "width": 1180,
       "height": 720,
-      "shotAt": "2026-10-20T10:07:50.004Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 20 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа «Починить вход в систему» ждёт вашего ответа Открыть чат ×",
+      "shotAt": "2026-10-22T16:58:54.105Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 22 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа «Починить вход в систему» ждёт вашего ответа Открыть чат ×",
       "en": {
         "file": "01-ask.en.png",
         "masked": 1,
         "width": 1180,
         "height": 720,
-        "shotAt": "2026-10-20T10:08:09.304Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 20, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply “Fix the sign-in flow” is waiting for your answer Open the chat ×"
+        "shotAt": "2026-10-22T16:59:23.865Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 22, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply “Fix the sign-in flow” is waiting for your answer Open the chat ×"
       },
       "dark": {
         "file": "01-ask.dark.png",
         "masked": 1,
         "width": 1180,
         "height": 720,
-        "shotAt": "2026-10-20T09:24:57.409Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 20 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа «Починить вход в систему» ждёт вашего ответа Открыть чат ×"
+        "shotAt": "2026-10-22T17:00:03.332Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 22 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа «Починить вход в систему» ждёт вашего ответа Открыть чат ×"
       },
       "darkEn": {
         "file": "01-ask.dark.en.png",
         "masked": 1,
         "width": 1180,
         "height": 720,
-        "shotAt": "2026-10-20T09:25:15.872Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 20, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply “Fix the sign-in flow” is waiting for your answer Open the chat ×"
+        "shotAt": "2026-10-22T17:00:33.502Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 22, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply “Fix the sign-in flow” is waiting for your answer Open the chat ×"
       }
     },
     {
@@ -43,31 +43,31 @@
       "masked": 0,
       "width": 1180,
       "height": 720,
-      "shotAt": "2026-10-20T10:07:50.839Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 20 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа Дека Сводка по агентам: 1 разговор ждёт ответа Ждут вашего ответа · 1 Починить вход в систему Открыть Совет Лимиты подписки видны вверху боковой панели и обновляются сами. Ещё совет Реплики и советы Спрятать Деку",
+      "shotAt": "2026-10-22T16:58:54.980Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 22 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа Дека Сводка по агентам: 1 разговор ждёт ответа Ждут вашего ответа · 1 Починить вход в систему Открыть Совет Агент панели меняет настройки по просьбе словами: сам откроет нужную страницу, а применить правку решаете вы. Ещё совет Реплики и советы Спрятать Деку",
       "en": {
         "file": "02-panel.en.png",
         "masked": 0,
         "width": 1180,
         "height": 720,
-        "shotAt": "2026-10-20T10:08:10.160Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 20, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply Decky Agents at a glance: 1 chat waits for you Waiting for your answer · 1 Fix the sign-in flow Open Tip Click me to see which agents are working, which wait for an answer and which failed. Another tip Remarks and tips Hide Decky"
+        "shotAt": "2026-10-22T16:59:24.717Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 22, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply Decky Agents at a glance: 1 chat waits for you Waiting for your answer · 1 Fix the sign-in flow Open Tip The bell in the sidebar keeps recent notifications — anything you missed is there. Another tip Remarks and tips Hide Decky"
       },
       "dark": {
         "file": "02-panel.dark.png",
         "masked": 0,
         "width": 1180,
         "height": 720,
-        "shotAt": "2026-10-20T09:24:58.259Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 20 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа Дека Сводка по агентам: 1 разговор ждёт ответа Ждут вашего ответа · 1 Починить вход в систему Открыть Совет Лимиты подписки видны вверху боковой панели и обновляются сами. Ещё совет Реплики и советы Спрятать Деку"
+        "shotAt": "2026-10-22T17:00:04.186Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека 1 разговор ждёт ответа Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения •••••••••••• Не найдены файлы: AGENTS.md, skills/, hooks/, .claude.json Изменения за 7 дн. 1 Открыть историю изменений Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 3 3 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 8 8 наборов настроек Резервные копии 1 последняя: 22 окт. 2026 г. Открыть историю Проект «shop-frontend»: агент ждёт ответа Дека Сводка по агентам: 1 разговор ждёт ответа Ждут вашего ответа · 1 Починить вход в систему Открыть Совет Ctrl+K (на Mac ⌘K) или «/» открывают палитру команд — оттуда можно попасть куда угодно. Ещё совет Реплики и советы Спрятать Деку"
       },
       "darkEn": {
         "file": "02-panel.dark.en.png",
         "masked": 0,
         "width": 1180,
         "height": 720,
-        "shotAt": "2026-10-20T09:25:16.724Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 20, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply Decky Agents at a glance: 1 chat waits for you Waiting for your answer · 1 Fix the sign-in flow Open Tip Ctrl+K (⌘K on a Mac) or “/” opens the command palette — it gets you anywhere. Another tip Remarks and tips Hide Decky"
+        "shotAt": "2026-10-22T17:00:34.361Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 chat waits for you Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable •••••••••••• Missing files: AGENTS.md, skills/, hooks/, .claude.json Changes in 7 days 1 Open change history Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 3 3 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 8 8 setting bundles Backups 1 latest: Oct 22, 2026 Open history Project \"shop-frontend\": agent is waiting for a reply Decky Agents at a glance: 1 chat waits for you Waiting for your answer · 1 Fix the sign-in flow Open Tip Ctrl+K (⌘K on a Mac) or “/” opens the command palette — it gets you anywhere. Another tip Remarks and tips Hide Decky"
       }
     },
     {
@@ -76,32 +76,32 @@
       "file": "03-chat.png",
       "masked": 0,
       "width": 584,
-      "height": 207,
-      "shotAt": "2026-10-20T10:07:56.639Z",
-      "text": "Совет от Деки Enter отправляет сообщение, Shift+Enter — новая строка. Следующий совет",
+      "height": 248,
+      "shotAt": "2026-10-22T16:59:00.784Z",
+      "text": "Совет от Деки Недописанное сообщение не потеряется: черновик хранится, даже если уйти в другой раздел. Следующий совет",
       "en": {
         "file": "03-chat.en.png",
         "masked": 0,
         "width": 584,
         "height": 248,
-        "shotAt": "2026-10-20T10:08:16.190Z",
-        "text": "A tip from Decky An unfinished message is not lost: the draft is kept even if you leave for another section. Next tip"
+        "shotAt": "2026-10-22T16:59:30.483Z",
+        "text": "A tip from Decky An agent in another project is done or waiting for you? A sound and a notification tell you — no need to watch the screen. Next tip"
       },
       "dark": {
         "file": "03-chat.dark.png",
         "masked": 0,
         "width": 584,
         "height": 248,
-        "shotAt": "2026-10-20T09:25:03.792Z",
-        "text": "Совет от Деки Пока агент работает, ему можно дописать: слово уйдёт ему на ближайшем шаге работы. Следующий совет"
+        "shotAt": "2026-10-22T17:00:10.097Z",
+        "text": "Совет от Деки Агент в другом проекте закончил или ждёт ответа? Об этом скажут звук и уведомление — смотреть в экран не обязательно. Следующий совет"
       },
       "darkEn": {
         "file": "03-chat.dark.en.png",
         "masked": 0,
-        "width": 584,
-        "height": 248,
-        "shotAt": "2026-10-20T09:25:22.225Z",
-        "text": "A tip from Decky An unfinished message is not lost: the draft is kept even if you leave for another section. Next tip"
+        "width": 563,
+        "height": 186,
+        "shotAt": "2026-10-22T17:00:40.045Z",
+        "text": "A tip from Decky Enter sends the message, Shift+Enter starts a new line. Next tip"
       }
     },
     {
@@ -110,32 +110,66 @@
       "file": "04-settings.png",
       "masked": 0,
       "width": 896,
-      "height": 249,
-      "shotAt": "2026-10-20T10:08:01.078Z",
-      "text": "Маскот Показывать Деку Внизу боковой панели: сводка по агентам, реплики о готовых ходах и вопросах, появления в чате. Реплики и советы Время от времени Дека сам подсказывает возможности панели и комментирует долгие ходы в чате. Сообщения о вопросах и готовых ходах остаются.",
+      "height": 355,
+      "shotAt": "2026-10-22T16:59:05.155Z",
+      "text": "Маскот Показывать Деку Внизу боковой панели: сводка по агентам, реплики о готовых ходах и вопросах, появления в чате. Реплики и советы Время от времени Дека сам подсказывает возможности панели и комментирует долгие ходы в чате. Сообщения о вопросах и готовых ходах остаются. Реакции на события Связь с сервером пропала или вернулась, ход или группа упали, группа остановлена или доставлена, упёрлись в лимит подписки, закончился долгий ход. Одна короткая фраза, не чаще раза в минуту на событие; в чате — над полем ввода. Выключено — о сбое хода Дека говорит прежней фразой, об остальном молчит.",
       "en": {
         "file": "04-settings.en.png",
         "masked": 0,
         "width": 896,
-        "height": 249,
-        "shotAt": "2026-10-20T10:08:20.341Z",
-        "text": "Mascot Show Decky At the bottom of the sidebar: an agent summary, remarks about finished turns and questions, cameos in the chat. Remarks and tips Every now and then Decky suggests panel features and comments on long turns in the chat. Messages about questions and finished turns stay."
+        "height": 355,
+        "shotAt": "2026-10-22T16:59:34.337Z",
+        "text": "Mascot Show Decky At the bottom of the sidebar: an agent summary, remarks about finished turns and questions, cameos in the chat. Remarks and tips Every now and then Decky suggests panel features and comments on long turns in the chat. Messages about questions and finished turns stay. Reactions to events The server connection lost or back, a turn or a group failed, a group stopped or delivered, the subscription limit hit, a long turn finished. One short line, at most once a minute per event; in the chat — above the input field. Off — Decky reports a failed turn with the old single line and stays silent about the rest."
       },
       "dark": {
         "file": "04-settings.dark.png",
         "masked": 0,
         "width": 896,
-        "height": 249,
-        "shotAt": "2026-10-20T09:25:07.959Z",
-        "text": "Маскот Показывать Деку Внизу боковой панели: сводка по агентам, реплики о готовых ходах и вопросах, появления в чате. Реплики и советы Время от времени Дека сам подсказывает возможности панели и комментирует долгие ходы в чате. Сообщения о вопросах и готовых ходах остаются."
+        "height": 355,
+        "shotAt": "2026-10-22T17:00:14.552Z",
+        "text": "Маскот Показывать Деку Внизу боковой панели: сводка по агентам, реплики о готовых ходах и вопросах, появления в чате. Реплики и советы Время от времени Дека сам подсказывает возможности панели и комментирует долгие ходы в чате. Сообщения о вопросах и готовых ходах остаются. Реакции на события Связь с сервером пропала или вернулась, ход или группа упали, группа остановлена или доставлена, упёрлись в лимит подписки, закончился долгий ход. Одна короткая фраза, не чаще раза в минуту на событие; в чате — над полем ввода. Выключено — о сбое хода Дека говорит прежней фразой, об остальном молчит."
       },
       "darkEn": {
         "file": "04-settings.dark.en.png",
         "masked": 0,
         "width": 896,
-        "height": 249,
-        "shotAt": "2026-10-20T09:25:25.859Z",
-        "text": "Mascot Show Decky At the bottom of the sidebar: an agent summary, remarks about finished turns and questions, cameos in the chat. Remarks and tips Every now and then Decky suggests panel features and comments on long turns in the chat. Messages about questions and finished turns stay."
+        "height": 355,
+        "shotAt": "2026-10-22T17:00:43.984Z",
+        "text": "Mascot Show Decky At the bottom of the sidebar: an agent summary, remarks about finished turns and questions, cameos in the chat. Remarks and tips Every now and then Decky suggests panel features and comments on long turns in the chat. Messages about questions and finished turns stay. Reactions to events The server connection lost or back, a turn or a group failed, a group stopped or delivered, the subscription limit hit, a long turn finished. One short line, at most once a minute per event; in the chat — above the input field. Off — Decky reports a failed turn with the old single line and stays silent about the rest."
+      }
+    },
+    {
+      "id": "05-react",
+      "side": "panel",
+      "file": "05-react.png",
+      "masked": 0,
+      "width": 596,
+      "height": 102,
+      "shotAt": "2026-10-22T16:59:15.865Z",
+      "text": "? Сервер панели не отвечает — данные на экране могут устареть. ×",
+      "en": {
+        "file": "05-react.en.png",
+        "masked": 0,
+        "width": 596,
+        "height": 102,
+        "shotAt": "2026-10-22T16:59:45.166Z",
+        "text": "? The panel server is not answering — what you see may be out of date. ×"
+      },
+      "dark": {
+        "file": "05-react.dark.png",
+        "masked": 0,
+        "width": 596,
+        "height": 102,
+        "shotAt": "2026-10-22T17:00:25.380Z",
+        "text": "? Потерял сервер панели из виду. Пробую достучаться снова. ×"
+      },
+      "darkEn": {
+        "file": "05-react.dark.en.png",
+        "masked": 0,
+        "width": 596,
+        "height": 102,
+        "shotAt": "2026-10-22T17:00:54.895Z",
+        "text": "? I lost sight of the panel server. Trying to reach it again. ×"
       }
     }
   ]

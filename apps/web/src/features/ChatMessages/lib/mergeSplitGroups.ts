@@ -255,6 +255,9 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
     ...(pending !== 'pending' && !group.markedDoneAt ? controlOf(group, split, false) : {}),
     // «Отметить готовой» — и у группы без чата: стоит она так же, как с чатом.
     ...acceptanceOf(group, split, false),
+    // Сигналы сторожа — и у группы без строки чата: её чат до списка ещё не
+    // доехал, а тревога «группа молчит» как раз про неё (F-69).
+    ...(group.watchSignals?.length ? { watchSignals: group.watchSignals } : {}),
   };
 }
 
@@ -309,9 +312,11 @@ function controlActions(
   // кончился, повторы исчерпаны, доставка не сошлась — или ход без итога ревью.
   // Строка сдавшейся группы была без единой кнопки. Продолжать можно, пока
   // есть разговор и копия, а план не отменён.
+  // Ждёт повтора доставки панелью (до часа) — человек может не ждать срока.
   const unfinished =
     group.status === 'failed' ||
-    (group.status === 'awaiting' && group.waitingFor === 'review-missing');
+    (group.status === 'awaiting' && group.waitingFor === 'review-missing') ||
+    (group.status === 'awaiting' && group.waitingFor === 'delivery' && !!group.deliveryRetryAt);
   // «Убрать» — без возврата: убранной группе «Продолжить» нет (ревью R3).
   const continuable =
     !cancelled && !group.droppedAt && (hasChat || group.chatId) && group.path && !group.cleaned;

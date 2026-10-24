@@ -38,7 +38,13 @@ const WEBHOOK = card('Вебхук');
 const SITE = { enabled: false, baseUrl: '', email: '', deployment: '' };
 const FORGE_SITE = { enabled: false, baseUrl: '', repo: '' };
 const TMS = { enabled: false, baseUrl: '', projectKey: '', groupId: '' };
+/** Подписка по умолчанию (`app-settings.ts`): снимок показывает те галочки, что увидит человек. */
+const DEFAULT_EVENTS = ['runError', 'testFailed', 'budget', 'groupSignal'];
 const TELEGRAM = card('Telegram');
+/** Блок «Ответы из Telegram» внутри карточки: своего атрибута у него нет, ищется по заголовку. */
+const TELEGRAM_ANSWERS =
+  `${TELEGRAM} >> xpath=.//span[normalize-space(text())="Ответы из Telegram" or ` +
+  `normalize-space(text())="Answers from Telegram"]/ancestor::div[contains(@class,"block")][1]`;
 
 export async function shootAtlassian(browser, web, scenario, { panel, upstream }) {
   const page = await browser.newPage({ viewport: { width: 1400, height: 1300 } });
@@ -160,6 +166,13 @@ export async function shootAtlassian(browser, web, scenario, { panel, upstream }
 
 export async function shootNotify(browser, web, scenario, { panel, upstream }) {
   const page = await browser.newPage({ viewport: { width: 1400, height: 1300 } });
+  // Знакомство с маскотом уже было: приветствие ложилось поверх карточки вебхука.
+  await page.addInitScript(() =>
+    window.localStorage.setItem(
+      'agentdeck.mascot',
+      JSON.stringify({ enabled: false, chatty: false, greeted: true }),
+    ),
+  );
 
   try {
     await resetIntegrations(panel);
@@ -222,10 +235,38 @@ export async function shootNotify(browser, web, scenario, { panel, upstream }) {
       .first()
       .fill('@qa_release_bot');
     await page.waitForTimeout(600);
-    await shotCard(scenario, page, '04-telegram', TELEGRAM);
+    await shotUnderTabs(scenario, page, '04-telegram', TELEGRAM);
+
+    // ── 05. Ответы из Telegram ───────────────────────────────────────────────
+    // Блок на той же карточке. Стенд наружу не ходит, поэтому блок выключен и
+    // честно говорит, чего не хватает; что он делает включённым — в тексте шага.
+    await shotUnderTabs(scenario, page, '05-telegram-answers', TELEGRAM_ANSWERS, 12);
   } finally {
     await page.close();
   }
+}
+
+/**
+ * Кадр по высокой карточке. Прокручивается колонка, а не окно, и полоса
+ * разделов липнет к её верху: `shotCard` подводит карточку к верху окна, и
+ * полоса накрывает её заголовок. Здесь верх карточки встаёт под полосу.
+ */
+async function shotUnderTabs(scenario, page, id, selector, padding = 20) {
+  const element = page.locator(selector).first();
+  await element.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await element.evaluate((node, gap) => {
+    const scrolls = (box) =>
+      box.scrollHeight > box.clientHeight && /(auto|scroll)/.test(getComputedStyle(box).overflowY);
+    let box = node.parentElement;
+    while (box && !scrolls(box)) box = box.parentElement;
+    const scroller = box ?? document.scrollingElement;
+    const tabs = document.querySelector('[role="tablist"]');
+    const limit = tabs ? tabs.getBoundingClientRect().bottom : 0;
+    scroller.scrollTop += node.getBoundingClientRect().top - limit - gap;
+  }, padding + 8);
+  await page.waitForTimeout(400);
+  await scenario.shot(page, id, { clip: selector, padding });
 }
 
 /**
@@ -296,12 +337,12 @@ async function resetIntegrations(panel) {
         confluence: SITE,
         gitlab: FORGE_SITE,
         github: FORGE_SITE,
-        telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed'] },
+        telegram: { enabled: false, chatId: '', events: DEFAULT_EVENTS },
         zephyr: TMS,
         xray: TMS,
         testit: TMS,
         ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
-        webhook: { enabled: false, url: '', events: ['runError', 'testFailed'] },
+        webhook: { enabled: false, url: '', events: DEFAULT_EVENTS },
       },
     }),
   });

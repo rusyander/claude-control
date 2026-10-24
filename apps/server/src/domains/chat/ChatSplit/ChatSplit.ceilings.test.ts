@@ -95,7 +95,10 @@ describe('потолок задания группы', () => {
       const prompt = await firstPrompt(options);
       expect(prompt).toContain('PROJ-1');
       expect(prompt).toContain('npm run qa:shot');
-      expect(prompt).toContain('review-pack.mjs');
+      // Владелец 23.10: доставку ведёт звено после работы — работе ни своего
+      // ревью с пакетом, ни полного гейта, ни пуша.
+      expect(prompt).not.toContain('review-pack.mjs');
+      expect(prompt).toContain('no full project gate, no push, no MR');
       expect(prompt).toContain('<agentdeck:ticket>');
       expect(panelText(prompt).length).toBeLessThanOrEqual(6400);
     });

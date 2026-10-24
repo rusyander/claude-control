@@ -421,7 +421,9 @@ describe('panel-agent actions: sandbox', () => {
   });
 
   it('sandbox_ask: потолок времени останавливает прогон маршрутом «Стоп»', async () => {
-    const restore = setSandboxAskBudgetForTests(1_500);
+    // Потолок — после того, как поддельный CLI записал свой запуск: под нагрузкой
+    // всего набора 1,5 с не хватало, и проверка видела ноль запусков.
+    const restore = setSandboxAskBudgetForTests(6_000);
     try {
       const { result } = await decided('sandbox_ask', { question: 'HANG please' }, 'approve');
       expect(result.outcome).toBe('done');

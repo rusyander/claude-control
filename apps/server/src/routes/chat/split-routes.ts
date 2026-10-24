@@ -24,6 +24,10 @@ import { projectsDir } from './paths.ts';
 import { createSplitLauncher, splitChatRefusal, type SplitLaunchDeps } from './split-launch.ts';
 import { registerSplitControlRoutes, stopChatKey } from './split-control-routes.ts';
 import { registerSplitStatusRoutes } from './split-status-routes.ts';
+import {
+  registerSplitTicketBatchRoutes,
+  type SplitTicketBatchDeps,
+} from './split-ticket-batch-routes.ts';
 import type { StatusChats } from '../../domains/chat/status-chats/status-chats.ts';
 import { codeOf, coded } from '../../lib/server-text/server-text.ts';
 import { removeGroupCopy } from '../../domains/chat/split-cleanup.ts';
@@ -42,6 +46,7 @@ import {
   type SplitTaskTracker,
 } from '../../domains/chat/split-tasks/split-tasks.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
+import { fileOneTicket } from '../../domains/chat/split-ticket-batch/file-one.ts';
 import { fail } from '../integrations/shared.ts';
 import type { PendingAsks } from '../../domains/chat/pending-asks/pending-asks.ts';
 
@@ -85,7 +90,7 @@ export function registerChatSplitRoutes(
     asks?: Pick<PendingAsks, 'forget'>;
     /** Лёгкие чаты вопросов о ходе групп (5.1); нет — ручка отвечает 404. */
     statusChats?: StatusChats;
-  },
+  } & Omit<SplitTicketBatchDeps, 'conveyor' | 'runs'>,
 ): void {
   const tracker =
     deps.tracker ??
@@ -563,28 +568,32 @@ export function registerChatSplitRoutes(
    * на эту операцию. Описание собирает панель на языке интерфейса; заголовок —
    * из записи группы, не из тела запроса.
    */
-  app.post<{ Params: { parent: string }; Body: { key?: unknown; description?: unknown } }>(
-    '/api/chat/split/:parent/tickets/file',
-    async (request, reply) => {
-      if (!deps.conveyor)
-        return reply
-          .code(404)
-          .send({ message: 'Конвейер уровней выключен', messageCode: 'split-conveyor-off' });
-      const key = typeof request.body?.key === 'string' ? request.body.key : '';
-      const description =
-        typeof request.body?.description === 'string'
-          ? request.body.description.slice(0, 8000)
-          : '';
-      try {
-        return await deps.conveyor.fileTicket(request.params.parent, key, (ticket, projectKey) =>
-          tracker.create(projectKey, ticket.title, description || ticket.why),
-        );
-      } catch (error) {
-        if (error instanceof IntegrationError) return fail(reply, error);
-        return reply.code(409).send({ message: (error as Error).message, ...codeOf(error) });
-      }
-    },
-  );
+  app.post<{
+    Params: { parent: string };
+    Body: { key?: unknown; description?: unknown; lang?: unknown };
+  }>('/api/chat/split/:parent/tickets/file', async (request, reply) => {
+    if (!deps.conveyor)
+      return reply
+        .code(404)
+        .send({ message: 'Конвейер уровней выключен', messageCode: 'split-conveyor-off' });
+    const key = typeof request.body?.key === 'string' ? request.body.key : '';
+    const description =
+      typeof request.body?.description === 'string' ? request.body.description.slice(0, 8000) : '';
+    const lang = request.body?.lang === 'en' ? 'en' : 'ru';
+    try {
+      // Сверка с открытыми задачами — та же, что у публикации разом (R3.6):
+      // про уже открытое уходит комментарий, а не копия.
+      return await deps.conveyor.fileTicket(
+        request.params.parent,
+        key,
+        (ticket, projectKey, groups) =>
+          fileOneTicket(tracker, { key, ticket, groups, projectKey, description, lang }),
+      );
+    } catch (error) {
+      if (error instanceof IntegrationError) return fail(reply, error);
+      return reply.code(409).send({ message: (error as Error).message, ...codeOf(error) });
+    }
+  });
 
   /**
    * «Перевести задачи» (G4): задачи групп, статусы, общие для всех, и «из статуса».
@@ -798,6 +807,8 @@ export function registerChatSplitRoutes(
   registerSplitControlRoutes(app, ctx, deps);
   // Вопрос о ходе групп — в лёгкий чат, а не в родителя (5.1).
   registerSplitStatusRoutes(app, ctx, deps);
+  // «Разобрать…» предложенные тикеты: публикация в Jira разом и «Решить здесь».
+  registerSplitTicketBatchRoutes(app, ctx, deps);
 }
 
 /** Отказ запуска — текстом и кодом: клиент переводит код, лог читает текст. */

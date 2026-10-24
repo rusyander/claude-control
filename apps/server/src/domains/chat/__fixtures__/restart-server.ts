@@ -54,8 +54,11 @@ for (;;) {
 }
 // Any stdin line = graceful exit, the way `runtime.shutdown` runs on Ctrl+C,
 // SIGTERM or a normal exit (W3-4a). With stdin ignored this never fires.
-process.stdin.on('data', () => {
-  registry.detachAll();
+// A `stop` line = "stop everything" and exit at once, the way a script or a
+// harness ends: every pooled CLI and its relay must be gone afterwards.
+process.stdin.on('data', (chunk: Buffer) => {
+  if (chunk.toString().startsWith('stop')) registry.stopAll();
+  else registry.detachAll();
   process.exit(0);
 });
 setInterval(() => undefined, 60_000);

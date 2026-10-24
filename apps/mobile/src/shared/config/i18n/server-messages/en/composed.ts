@@ -152,9 +152,9 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'chat-conversation-lost-notice':
     "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
   'chat-cold-resume-notice':
-    "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk. Switch off in settings: Groups, group economy.",
+    "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk: to move the turn back into it, press «Continue the old conversation» while the new one runs. Switch off in settings: Groups, group economy.",
   'split-default-drift-notice':
-    'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
+    'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — at delivery the group checks for a conflict and rebases only on a real one.',
   'chat-autonomy-deferred-notice':
     "The agent's background commands are still running ({{count}}): the chat process restarts with the new autonomy setting once they finish — restarting now would kill them. Until then the process itself keeps its previous autonomy marker.",
   'chat-auto-continue-notice':
@@ -186,7 +186,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'delivery-gap-dirty-more': 'uncommitted changes: {{files}} and {{more}} more',
   'delivery-gap-not-pushed':
     'branch {{branch}} is not pushed to the remote (or lags behind the copy HEAD)',
-  'delivery-gap-no-mr': 'no MR whose head is the copy HEAD (branch {{branch}})',
+  'delivery-gap-no-mr':
+    'no MR whose head is the copy HEAD (branch {{branch}}) — push the branch and open the MR, or update yours',
   'delivery-gap-review-unfinished': 'the work review is not finished: there is no reviewer verdict',
   'delivery-gap-fix-missing':
     'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
@@ -195,21 +196,23 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'delivery-gap-owner-failed': 'owner’s point {{point}} is not done: {{evidence}}',
   'delivery-gap-owner-no-evidence':
     'owner’s point {{point}} is marked without evidence: file:line, the command and a line of its output, or the reason, are needed',
-  'delivery-gap-mr-description': 'MR {{mr}} has an empty description',
+  'delivery-gap-mr-description':
+    'MR {{mr}} has an empty description — describe what changed, why, and how it was checked',
   'delivery-gap-mr-na-reason':
     'the description of MR {{mr}} does not give the n/a reason of the live check ({{sieves}}) — add the sieve id and why it does not apply',
   'delivery-gap-no-copy': 'the group has no copy',
   'sieve-gap-conflicts':
     'integration sieve: merging with fresh main conflicts in {{files}} — rebase the branch onto fresh main and resolve the conflict',
   'sieve-gap-foreign-removals':
-    'foreign-removals sieve: the branch deletes lines that landed in main after the group started: {{files}} — restore them or name every file in the foreign-removals row of the sieve report with the reason',
+    'foreign-removals sieve: the branch deletes lines that landed in main after the group started: {{files}} — restore them or name every file by its full path in the foreign-removals row of the sieve report with the reason',
   'sieve-gap-consumers':
     'consumers sieve: removed names ({{tokens}}) are still used in {{files}} — fix the consumers or name every file in the consumers-repo-wide row of the sieve report with the reason',
   'sieve-gap-unreported':
     'sieve {{sieve}} is not reported: a row is needed in a {{lang}} block — {"sieves":[{"id":"…","status":"pass|fail|n/a","evidence":"the command and a line of its output, or the reason"}]}',
   'sieve-gap-no-evidence':
     'sieve {{sieve}} is marked without evidence: the command and a line of its output, or the reason, are needed',
-  'sieve-gap-failed': 'sieve {{sieve}} failed: {{evidence}}',
+  'sieve-gap-failed':
+    'sieve {{sieve}} failed: {{evidence}} — fix it and report the row again; a live check that cannot run here is reported «not checked: <reason>», red not caused by the branch — «not caused by the branch: <why>»',
   'sieve-gap-lockfile':
     'lockfile sieve: a dependency manifest changed without its lockfile: {{files}} — regenerate the lock with the project package manager or name every manifest in the lockfile-sync row of the sieve report with the reason',
   'sieve-gap-secrets':
@@ -252,4 +255,37 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again',
   'tests-gap-uncovered':
     'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
+  'tests-note-red-baseline':
+    'Tests block of the copy: red already before the group started and untouched by the diff: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
+  'tests-note-red-environment':
+    'Tests block of the copy: could not run (blocked), or red from the environment (timeout, network, stand, platform) where the diff does not touch them: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
+  'sieve-note-unchecked':
+    'sieve {{sieve}}: not checked: {{reason}} — does not hold the group; the reason goes into the MR description',
+  'sieve-note-not-branch':
+    'sieve {{sieve}}: red not caused by the branch: {{reason}} — does not hold the group; name it in the MR description',
+  'sieve-note-run-red':
+    'run {{run}}: red not caused by the branch (red before the group started or failed on the environment, untouched by the diff): {{cases}} — they do not hold the group; name them in the MR description',
+  'delivery-gap-mr-notes':
+    'MR {{mr}} description: the delivery notes ({{items}}) are not named — add each to the description: what was not checked or is red not because of the branch, and why',
+  'split-delivery-stalled':
+    'reminder {{nudges}} changed nothing: the same branch head and the same gaps — see what holds the group and continue it with a word',
+  'split-delivery-nudge-cap':
+    'the panel reminded the group {{nudges}} times — the reminder cap; the group was moving but did not finish — continue it with a word',
+  'split-delivery-escalation-stalled':
+    'the delivery diagnosis on a stronger model changed nothing either (reminders before it: {{nudges}}): the same branch head and the same gaps — a human is needed',
+  'delivery-human-merge': 'a human is needed — merge: {{what}}',
+  'delivery-human-destructive':
+    'a human is needed — deleting git data or outside its own copy, a force-push beyond the lease, a DB write or a package publish: {{what}}',
+  'delivery-human-credentials':
+    'a human is needed — credentials that exist nowhere in the project: {{what}}',
+  'delivery-human-corrupt-store':
+    'a human is needed — the git object store of the copy {{path}} is corrupt: run git fsck --full in it, restore the objects or recreate the copy, then continue the group ({{what}})',
+  'split-delivery-retry':
+    'the panel retries on its own in {{minutes}} min (retry {{attempt}} of {{max}})',
+  'split-delivery-retry-cap':
+    'the panel retried {{retries}} times and did not finish — continue the group with a word',
+  'split-delivery-busy':
+    'the new delivery did not go out: the group conversation was busy for {{checks}} checks in a row',
+  'split-delivery-notes-notice':
+    'Group «{{group}}» was delivered with notes — they do not hold the MR, but are worth knowing: {{notes}}',
 };

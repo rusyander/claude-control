@@ -51,3 +51,19 @@
     min-height: 0;
   }
 }
+
+// Плашки над страницей. Страница-заливка (чат) тянется вверх отрицательным полем
+// на `pad-top − 8px` (рамка 8px, `ChatPage.module.scss`) — блок отдаёт ей ровно
+// столько же снизу, иначе она наезжала на нижний край последней плашки.
+.banners {
+  flex-shrink: 0;
+  min-width: 0;
+
+  &:empty {
+    display: none;
+  }
+
+  &[data-page-fill] {
+    padding-bottom: calc(var(--layout-page-pad-top) - 8px);
+  }
+}

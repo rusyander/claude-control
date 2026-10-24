@@ -24,6 +24,8 @@ export interface SieveMechanics {
   conflicts?: string[];
   /** Файлы, где ветка удалила строки, пришедшие в основную после старта группы. */
   foreignRemovals?: string[];
+  /** Путь из `foreignRemovals` → коммит основной и строки: «sha «тема», lines 40-46». */
+  foreignBlame?: Record<string, string>;
   /** Удалённое имя/тест-id и файлы вне диффа, где оно ещё встречается. */
   consumers?: { token: string; files: string[] }[];
   /** Манифесты зависимостей, изменённые без своего lockfile. */
@@ -166,12 +168,16 @@ const FLAGS: readonly {
   code: SieveGap['code'];
   items: (mechanics: SieveMechanics) => readonly string[];
   param: 'files' | 'names';
+  /** Как файл показан в пробеле; снимается строка всё равно по пути. */
+  shown?: (mechanics: SieveMechanics, path: string) => string;
 }[] = [
   {
     id: 'foreign-removals',
     code: 'sieve-gap-foreign-removals',
     items: (m) => m.foreignRemovals ?? [],
     param: 'files',
+    // Чей коммит и какие строки — иначе агенту нечем проверить «чужое» (23.10).
+    shown: (m, path) => (m.foreignBlame?.[path] ? `${path} (${m.foreignBlame[path]})` : path),
   },
   {
     id: 'lockfile-sync',
@@ -403,7 +409,8 @@ export function judgeSieves(input: {
     const items = flag.items(mechanics);
     if (items.length === 0) continue;
     if (!cleared(flag.id, items, flag.id !== 'tests-alongside')) {
-      gaps.push({ code: flag.code, params: { [flag.param]: named(items) } });
+      const shown = flag.shown ? items.map((item) => flag.shown?.(mechanics, item) ?? item) : items;
+      gaps.push({ code: flag.code, params: { [flag.param]: named(shown) } });
       continue;
     }
     const moved = movedSinceRow(flag, items, input.proof);

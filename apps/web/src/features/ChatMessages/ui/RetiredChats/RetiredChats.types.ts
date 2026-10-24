@@ -5,4 +5,6 @@ export interface RetiredChatsProps {
   chats: ChildStageGroup[];
   /** Открыть чат в этом же окне — как строку группы. */
   onOpen: (chatId: string) => void;
+  /** Открыт ли список при первом показе; по умолчанию свёрнут. */
+  defaultExpanded?: boolean;
 }

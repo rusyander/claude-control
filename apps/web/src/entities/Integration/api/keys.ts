@@ -17,6 +17,7 @@ export const integrationKeys = {
   // «уже подключено» у них считается от сохранённого.
   discover: [ROOT, 'discover'],
   links: (path: string | undefined) => [ROOT, 'links', path ?? ''],
+  telegramAnswers: [ROOT, 'telegram', 'answers'],
   jiraProjects: [ROOT, 'jira', 'projects'],
   jiraSearch: (query: string) => [ROOT, 'jira', 'search', query],
   confluenceSearch: (query: string) => [ROOT, 'confluence', 'search', query],

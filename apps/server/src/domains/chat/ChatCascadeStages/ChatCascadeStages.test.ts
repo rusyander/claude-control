@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { planCascadeStage, stageAppendPrompt, stagesAhead } from './ChatCascadeStages.ts';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
@@ -56,6 +57,20 @@ describe('planCascadeStage: после работы', () => {
     // Ветвь дерева та же: три разговора одной группы висят под одним родителем.
     expect(staged?.link.parentChatId).toBe('parent');
     expect(staged?.link.branch).toBe('split/rename');
+  });
+
+  // 5.3 плана экономии + владелец 23.10: пакет ревью едет ревьюерам звена ревью
+  // доставляющей группы — настоящий скрипт панели по абсолютному пути.
+  it('ревью доставляющей группы несёт пакет ревью; обычный каскад — нет', () => {
+    const staged = plan({ deliver: true });
+    const command = /`node "([^"]+review-pack\.mjs)" --plan /.exec(staged?.prompt ?? '');
+
+    expect(staged?.stage).toBe('review');
+    expect(command?.[1] && existsSync(command[1])).toBe(true);
+    expect(staged?.prompt).toContain('instead of running git diff or git show');
+    expect(plan()?.prompt).not.toContain('review-pack.mjs');
+    // Полный гейт ревью не гонит: он один, в доставке.
+    expect(staged?.prompt).toContain('the full project checks belong to a later stage');
   });
 
   it('работа на потолке тоже получает ревью (U6): свежая сессия на той же модели', () => {
@@ -211,6 +226,35 @@ describe('planCascadeStage: после ревью', () => {
     expect(staged?.effort).toBe('medium');
     expect(staged?.findings).toEqual(['ChatSplit.ts:88 — потеряна ошибка']);
     expect(staged?.prompt).toContain('1. ChatSplit.ts:88 — потеряна ошибка');
+  });
+
+  // Сосед RF-BGCD-06: доставка круга уже заведена и человек не просил снова —
+  // второй не будет, обещание «полный прогон сделает доставка» врало бы.
+  // RC-D-01: связь правок — новое звено без `deliveredAt` (F-110), и за ними
+  // доставка приходит и после доставки круга. Обещание в задании правок должно
+  // совпадать с тем, что конвейер заведёт: проверка → доставка.
+  it('правки после доставки круга обещают доставку — она за ними и придёт', () => {
+    const text = REVIEW_BLOCK('{"findings":["ChatSplit.ts:88 — потеряна ошибка"]}');
+    const deliveredAt = '2026-09-07T11:00:00.000Z';
+    const ahead = plan({ link: reviewLink(), text, deliver: true });
+    expect(ahead?.prompt).toContain('in the delivery stage after your turn');
+    expect(ahead?.prompt).toContain('a rule asking for them is met by that run');
+
+    const done = plan({ link: reviewLink({ deliveredAt }), text, deliver: true });
+    expect(done?.stage).toBe('fix');
+    expect(done?.link.deliveredAt).toBeUndefined();
+    expect(done?.prompt).toContain('in the delivery stage after your turn');
+    expect(done?.prompt).toContain('a rule asking for them is met by that run');
+
+    // Что придёт за этими правками на самом деле.
+    const verify = plan({ link: done!.link, text: 'Исправил.', deliver: true });
+    expect(verify?.stage).toBe('review');
+    const after = plan({
+      link: verify!.link,
+      text: REVIEW_BLOCK('{"findings":[]}'),
+      deliver: true,
+    });
+    expect(after?.stage).toBe('deliver');
   });
 
   it('пустой список закрывает цепочку', () => {

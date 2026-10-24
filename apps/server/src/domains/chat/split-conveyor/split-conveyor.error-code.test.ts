@@ -7,6 +7,7 @@ import { localizeText } from '../../../lib/server-texts/server-texts.ts';
 import {
   DELIVERY_BLOCKED_PROBES,
   DELIVERY_RECHECK_MS,
+  DELIVERY_RETRY_MAX,
   SplitConveyor,
   type DeliveryVerdict,
   type SplitDeliveryDeps,
@@ -159,7 +160,7 @@ describe('SplitConveyor: причина сбоя группы — с кодом'
     expect(group?.error).toBe(
       'доставка не доведена: незакоммиченные правки: a.ts; ' +
         'ветка feature/login не отправлена на удалённый (или отстаёт от HEAD копии); ' +
-        'нет MR, чья голова — HEAD копии (ветка feature/login)',
+        'нет MR, чья голова — HEAD копии (ветка feature/login) — отправьте ветку и откройте MR или обновите свой',
     );
     expect(group?.errorCode).toBe('split-delivery-incomplete-3');
     expect(group?.errorParams).toEqual({
@@ -185,7 +186,8 @@ describe('SplitConveyor: причина сбоя группы — с кодом'
 
   it('удалённый лежит — строка блокировки и итоговая причина с кодом', async () => {
     const down = { missing: [], unreachable: 'Could not resolve host' };
-    const total = DELIVERY_RECHECK_MS.length + DELIVERY_BLOCKED_PROBES + 1;
+    const ladder = DELIVERY_RECHECK_MS.length + DELIVERY_BLOCKED_PROBES + 1;
+    const total = ladder + DELIVERY_RETRY_MAX;
     const h = deliveryHarness(Array.from({ length: total }, () => down));
     const { start, conveyor, link, wait, view } = build({ delivery: h.delivery });
     await start();
@@ -199,12 +201,35 @@ describe('SplitConveyor: причина сбоя группы — с кодом'
     for (const _ms of DELIVERY_RECHECK_MS) await h.fire();
     expect(view()?.deliveryMissingCodes?.[0]?.messageCode).toBe('split-delivery-remote-down');
 
+    for (let probe = 0; probe < DELIVERY_BLOCKED_PROBES; probe += 1) await h.fire();
+    // Повтор панели — пунктом с кодом первым, за ним причина, тоже с кодом.
+    expect(view()?.status).toBe('awaiting');
+    expect(view()?.deliveryMissingCodes?.map((entry) => entry?.messageCode)).toEqual([
+      'split-delivery-retry',
+      'split-delivery-unverifiable',
+    ]);
+    expect(view()?.deliveryMissingCodes?.[0]?.params).toEqual({
+      minutes: '30',
+      attempt: '1',
+      max: String(DELIVERY_RETRY_MAX),
+    });
+
     while (h.timers.length > 0) await h.fire();
     expect(view()).toMatchObject({
       status: 'failed',
-      errorCode: 'split-delivery-unverifiable',
-      errorParams: { checks: String(total), reason: 'Could not resolve host' },
+      errorCode: 'split-delivery-incomplete-2',
+      errorParams: {
+        first: {
+          messageCode: 'split-delivery-retry-cap',
+          params: { retries: String(DELIVERY_RETRY_MAX) },
+        },
+        second: {
+          messageCode: 'split-delivery-unverifiable',
+          params: { checks: String(ladder), reason: 'Could not resolve host' },
+        },
+      },
     });
+    expect(localizeText(view()?.error ?? '', 'en')).not.toMatch(/[А-Яа-яЁё]/);
   });
 
   it('запись с прошлого запуска, без кодов, получает код из своей строки', async () => {

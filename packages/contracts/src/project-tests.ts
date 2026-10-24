@@ -656,6 +656,14 @@ export interface ProjectTestRunRecord {
    * автоматическому кейсу такая запись прогон не заменяет (ревью 30.09).
    */
   attested?: boolean;
+  /**
+   * Отпечаток содержимого, которое видел прогон, по кейсам: `groupId:caseId` →
+   * хеш блобов его `codePaths` и файла автотеста на старте прогона. Свежесть
+   * прогона для ворот — по нему, а не по времени: коммит, rebase или amend, не
+   * тронувшие эти файлы, прогон не старят. Нет ключа (старая запись, кейс без
+   * `codePaths`) — прежнее правило по времени.
+   */
+  stamps?: Record<string, string>;
   results: ProjectTestPointResult[];
   summary: ProjectTestRunSummary;
   /**

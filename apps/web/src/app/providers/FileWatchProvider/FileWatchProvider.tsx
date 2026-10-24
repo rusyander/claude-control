@@ -3,8 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DOMAIN_KEYS } from '@shared/api/query-keys';
 import { publishPanelAgentEvent } from '@entities/PanelAgent';
 import { refreshSettingsFromServer } from '@entities/AppConfig';
+import { reportLinkError, reportLinkUp } from '@shared/lib/server-link';
 import type { FileWatchProviderProps } from './FileWatchProvider.types';
 import { shouldReconnectOnWake } from './shouldReconnectOnWake';
+
+/** Через сколько пробовать снова поток, который браузер закрыл окончательно, мс. */
+const RETRY_CLOSED_MS = 5_000;
 
 export function FileWatchProvider({ children }: FileWatchProviderProps) {
   const queryClient = useQueryClient();
@@ -15,6 +19,8 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
     let first = true;
     /** Когда вкладку свернули; пусто — она на виду. */
     let hiddenAt: number | undefined;
+    /** Отложенная попытка подключиться заново после окончательного обрыва. */
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
     const onMessage = (event: MessageEvent<string>): void => {
       const raw: unknown = JSON.parse(event.data);
@@ -48,13 +54,26 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
     };
 
     const connect = (): void => {
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+      retryTimer = undefined;
       source?.close();
       source = new EventSource('/api/events');
       source.onmessage = onMessage;
       // Браузер переподключает EventSource сам, поэтому ошибку достаточно
       // проглотить: иначе консоль засоряется при каждом перезапуске сервера.
-      source.onerror = () => undefined;
+      // Отмечаем её только для состояния связи (маскот говорит о пропаже) —
+      // «пропала» объявляется, если поток не открылся за срок ожидания.
+      // Ответ не 200 (сервер лежит, прокси Vite отдаёт 502) браузер считает
+      // окончательным и больше не пробует: поток закрыт, и вернувшийся сервер
+      // остался бы незамеченным до F5. Такой обрыв пробуем сами, раз в срок.
+      source.onerror = () => {
+        reportLinkError();
+        if (source?.readyState === EventSource.CLOSED && retryTimer === undefined) {
+          retryTimer = setTimeout(connect, RETRY_CLOSED_MS);
+        }
+      };
       source.onopen = () => {
+        reportLinkUp();
         // Это переподключение, а не первый вход: пока связи не было, файлы
         // менялись без нас — на экране может стоять что угодно.
         if (!first) void queryClient.invalidateQueries();
@@ -85,6 +104,7 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
     return () => {
       document.removeEventListener('visibilitychange', wake);
       window.removeEventListener('online', reconnect);
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
       source?.close();
     };
   }, [queryClient]);

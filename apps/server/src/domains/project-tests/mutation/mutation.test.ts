@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, normalize } from 'node:path';
 import { MutationChecks, breakFile, mutationCandidates, sweepMutationCopies } from './mutation.ts';
 
 /**
@@ -456,5 +456,64 @@ describe('проверка набора поломкой', () => {
     expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1);
     // Ссылка снята, оригинал её цели цел.
     expect(readFileSync(join(dir, 'node_modules', 'pkg', 'index.js'), 'utf8')).toBe('keep');
+  });
+});
+
+// Стоп проверки: мягкий сигнал дереву, через 5 с — SIGKILL корню, пропустившему
+// его (POSIX `trap '' TERM`). Добивание общее (`stopChildTree` → `stopTreeWithGrace`),
+// здесь — что вызов из стопа ведёт себя как прежняя своя копия.
+describe('стоп проверки поломкой: добивание глухой команды', () => {
+  afterEach(() => vi.useRealTimers());
+
+  /** Команда в полёте: номера нет (дерево не трогаем), сигналы записываются. */
+  function running(): {
+    checks: MutationChecks;
+    root: string;
+    child: { exitCode: number | null; signalCode: null; signals: string[] };
+  } {
+    const signals: string[] = [];
+    const child = {
+      exitCode: null as number | null,
+      signalCode: null,
+      signals,
+      kill: (signal?: string) => signals.push(signal ?? 'SIGTERM') > 0,
+    };
+    const checks = new MutationChecks();
+    const root = normalize(join(tmpdir(), 'mutation-stop'));
+    (checks as unknown as { checks: Map<string, unknown> }).checks.set(root, {
+      view: { status: 'running' },
+      child,
+    });
+    return { checks, root, child };
+  }
+
+  it('корень пропустил мягкий сигнал — через 5 с SIGKILL, не раньше', () => {
+    vi.useFakeTimers();
+    const { checks, root, child } = running();
+    expect(checks.stop(root)).toMatchObject({ status: 'stopped' });
+    expect(child.signals).toEqual(['SIGTERM']);
+    vi.advanceTimersByTime(4_999);
+    expect(child.signals).toEqual(['SIGTERM']);
+    vi.advanceTimersByTime(1);
+    expect(child.signals).toEqual(['SIGTERM', 'SIGKILL']);
+  });
+
+  it('вышла за отсрочку — SIGKILL не шлётся: номер мог достаться чужому', () => {
+    vi.useFakeTimers();
+    const { checks, root, child } = running();
+    checks.stop(root);
+    child.exitCode = 0;
+    vi.advanceTimersByTime(5_000);
+    expect(child.signals).toEqual(['SIGTERM']);
+  });
+
+  it('таймер добивания не держит выход панели', () => {
+    const spy = vi.spyOn(globalThis, 'setTimeout');
+    const { checks, root } = running();
+    checks.stop(root);
+    const timer = spy.mock.results.at(-1)?.value as NodeJS.Timeout;
+    spy.mockRestore();
+    clearTimeout(timer);
+    expect(timer.hasRef()).toBe(false);
   });
 });

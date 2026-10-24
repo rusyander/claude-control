@@ -72,6 +72,14 @@ export const TESTS_PROJECT_ENV = 'AGENTDECK_TESTS_PROJECT';
  */
 export const SPLIT_CHILD_ENV = 'AGENTDECK_SPLIT_CHILD';
 
+/**
+ * Метка звена группы, у которого личный `CLAUDE.md` снят из запроса. По ней хук
+ * начала сессии (личный `session-brief` или его порт в наборе панели) кладёт
+ * короткую карточку правил группы вместо снятого файла и повторяет её после
+ * сжатия. Имя повторено в хуках строкой — они не импортируют контракты.
+ */
+export const USER_MEMORY_OFF_ENV = 'AGENTDECK_USER_MEMORY_OFF';
+
 /** Действующие значения из своего и родительского — чистая функция для сервера и тестов. */
 export function resolveChatGroupSettings(
   own: StoredChatGroupSettings | undefined,

@@ -84,6 +84,14 @@ await runOnStand(
     try {
       const page = await stand.newPage(browser, { height: 1000 });
       const card = () => page.getByRole('main');
+      // Настройки и гейт — маршруты человека: ворота читают таблицы процессов ОС
+      // (на Windows ~2 с). Пауза отсчитывается от ответа сервера, а не от клика.
+      const saved = (path, method) =>
+        page.waitForResponse(
+          (response) =>
+            new URL(response.url()).pathname === path && response.request().method() === method,
+          { timeout: 20_000 },
+        );
       const openGate = async () => {
         await page.goto(`${stand.webUrl}/dlp?tab=gate`, { waitUntil: 'domcontentloaded' });
         await page
@@ -96,7 +104,9 @@ await runOnStand(
       };
       const switchLanguage = async (label) => {
         await page.goto(`${stand.webUrl}/settings`, { waitUntil: 'domcontentloaded' });
-        await page.getByRole('button', { name: label, exact: true }).click({ timeout: 30_000 });
+        const button = page.getByRole('button', { name: label, exact: true });
+        await button.waitFor({ timeout: 30_000 });
+        await Promise.all([saved('/api/settings', 'PATCH'), button.click()]);
         await wait(1500);
       };
 
@@ -145,7 +155,10 @@ await runOnStand(
         text.includes(OUTDATED_EN),
         text.slice(0, 400),
       );
-      await page.getByRole('button', { name: 'Rebuild the script' }).click();
+      await Promise.all([
+        saved('/api/prompt-gate', 'PUT'),
+        page.getByRole('button', { name: 'Rebuild the script' }).click(),
+      ]);
       await wait(1500);
       check('«Rebuild the script»: скрипт английский', configOf(script()).language === 'en');
       text = (await card().innerText()).replace(/\s+/g, ' ');

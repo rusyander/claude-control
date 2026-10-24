@@ -75,7 +75,20 @@ export const EARLY_ANSWER_MS = 10 * 60_000;
 interface Pending {
   resolve: (decision: ChatPermissionReply) => void;
   timer: LongTimer;
+  /** Срок «отложить» карточки одиночного чата (решение 1, D-n). */
+  deferTimer?: ReturnType<typeof setTimeout>;
   info: PendingPermissionInfo;
+}
+
+/**
+ * Карточка одиночного чата, на которую не ответили за `afterMs`, сама
+ * становится отложенным вопросом D-n (`deferred-asks.ts`): человек мог уйти, а
+ * прогон стоял бы сутки. `reply` заводит запись в момент срока и отдаёт отказ
+ * агенту; кнопки той же карточки потом отвечают записи `id`.
+ */
+export interface DeferOptions {
+  afterMs: number;
+  reply: () => { reply: ChatPermissionReply; id?: string } | undefined;
 }
 
 /**
@@ -143,6 +156,12 @@ function clearLongTimer(timer: LongTimer): void {
   if (timer.handle) clearTimeout(timer.handle);
 }
 
+/** Оба срока запроса: брокера и «отложить» — снятый запрос не должен сработать ни одним. */
+function clearPendingTimers(pending: Pending): void {
+  clearLongTimer(pending.timer);
+  if (pending.deferTimer) clearTimeout(pending.deferTimer);
+}
+
 export class PermissionBroker {
   private pending = new Map<string, Pending>();
 
@@ -154,6 +173,9 @@ export class PermissionBroker {
 
   /** Ответы, пришедшие раньше вопроса (ключ → решение и когда): их ждёт повтор моста. */
   private early = new Map<string, { decision: ChatPermissionReply; at: number }>();
+
+  /** Карточки, ставшие D-n по сроку (ключ → номер): их кнопки отвечают записи. */
+  private deferredIds = new Map<string, string>();
 
   private key(runId: string, toolUseId: string): string {
     return `${runId}::${toolUseId}`;
@@ -167,6 +189,7 @@ export class PermissionBroker {
   request(
     request: PermissionRequest,
     timeoutMs = permissionWaitMs(),
+    defer?: DeferOptions,
   ): Promise<ChatPermissionReply> {
     return new Promise((resolve) => {
       const key = this.key(request.runId, request.toolUseId);
@@ -177,6 +200,7 @@ export class PermissionBroker {
       const replaced = this.pending.get(key);
       if (replaced) {
         clearLongTimer(replaced.timer);
+        if (replaced.deferTimer) clearTimeout(replaced.deferTimer);
         replaced.resolve({ behavior: 'deny', message: 'Replaced by a newer request.' });
       }
       this.expired.delete(key);
@@ -192,17 +216,51 @@ export class PermissionBroker {
       }
 
       const timer = startLongTimer(timeoutMs, () => {
+        const entry = this.pending.get(key);
+        if (entry?.deferTimer) clearTimeout(entry.deferTimer);
         this.pending.delete(key);
         this.markExpired(key);
         resolve({ behavior: 'deny', message: EXPIRED_WAIT, expired: true });
       });
 
-      this.pending.set(key, {
+      const entry: Pending = {
         resolve,
         timer,
         info: { ...request, askedAt: new Date().toISOString() },
-      });
+      };
+      if (defer && Number.isFinite(defer.afterMs) && defer.afterMs > 0) {
+        entry.deferTimer = setTimeout(() => this.deferNow(key, defer), defer.afterMs);
+        entry.deferTimer.unref?.();
+      }
+      this.pending.set(key, entry);
     });
+  }
+
+  /** Срок карточки вышел: запрос становится D-n, агент получает отказ «поставлено человеку». */
+  private deferNow(key: string, defer: DeferOptions): void {
+    const pending = this.pending.get(key);
+    if (!pending) return;
+    let outcome: ReturnType<DeferOptions['reply']>;
+    try {
+      outcome = defer.reply();
+    } catch {
+      outcome = undefined;
+    }
+    // Записать не вышло — карточка остаётся ждать человека, как без срока.
+    if (!outcome) return;
+    clearPendingTimers(pending);
+    this.pending.delete(key);
+    this.remember(this.answered, key);
+    if (outcome.id) {
+      this.deferredIds.set(key, outcome.id);
+      this.trim(this.deferredIds);
+    }
+    pending.resolve(outcome.reply);
+  }
+
+  /** Номер D-n, которым стала карточка этого вызова по сроку. */
+  deferredIdOf(runId: string, toolUseId: string): string | undefined {
+    return this.deferredIds.get(this.key(runId, toolUseId));
   }
 
   /** Ответить на запрос (клик пользователя). false — если запрос уже снят. */
@@ -232,7 +290,7 @@ export class PermissionBroker {
       this.trim(this.early);
       return 'held';
     }
-    clearLongTimer(pending.timer);
+    clearPendingTimers(pending);
     this.pending.delete(key);
     this.remember(this.answered, key);
     pending.resolve(decision);
@@ -267,7 +325,7 @@ export class PermissionBroker {
     for (const key of this.early.keys()) if (key.endsWith(suffix)) this.early.delete(key);
     for (const [key, pending] of this.pending) {
       if (!key.endsWith(suffix)) continue;
-      clearLongTimer(pending.timer);
+      clearPendingTimers(pending);
       this.pending.delete(key);
       this.markExpired(key);
       pending.resolve({
@@ -283,6 +341,15 @@ export class PermissionBroker {
   /** Умер ли запрос (истёк срок или CLI его оборвал). */
   isExpired(runId: string, toolUseId: string): boolean {
     return this.expired.has(this.key(runId, toolUseId));
+  }
+
+  /**
+   * Ответил ли на запрос человек (любым входом). Нужен ответам из Telegram:
+   * пропавший запрос — «отвечено в панели», только если ответ был, а не
+   * прогон кончился.
+   */
+  isAnswered(runId: string, toolUseId: string): boolean {
+    return this.answered.has(this.key(runId, toolUseId));
   }
 
   private markExpired(key: string): void {
@@ -311,7 +378,7 @@ export class PermissionBroker {
     for (const key of this.early.keys()) if (key.startsWith(prefix)) this.early.delete(key);
     for (const [key, pending] of this.pending) {
       if (!key.startsWith(prefix)) continue;
-      clearLongTimer(pending.timer);
+      clearPendingTimers(pending);
       this.pending.delete(key);
       pending.resolve({ behavior: 'deny', message: 'The conversation was stopped.' });
     }

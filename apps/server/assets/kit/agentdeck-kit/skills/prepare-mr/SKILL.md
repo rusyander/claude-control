@@ -79,11 +79,23 @@ reviewer blocker of a class the table above lacks (MR link + the blocker in one 
 blocker → its row lands there with the fix; those rows run beside the table, same gate.
 
 Gate: a row per sieve, `pass` / `fail` / `n-a`, each with evidence — `n-a` names the absent kind or
-the reason. Live checks (contract-by-request, browser-focus, branch-backend-stand, boundary-negative)
-take `n-a` only on a diff with no behaviour file (product code, UI or backend), and that row's id and
-reason go into the MR description. Evidence from an older HEAD than the last edit → re-run that sieve. `fail` → fix, re-run
-step 1 for the touched subproject, then every sieve whose evidence predates the fix. A sieve left
-unchecked (no stand, no browser, no network) → **the MR is not ready**: name the sieve and why.
+the reason. Live sieves (contract-by-request, browser-focus, boundary-negative, migration-safety,
+branch-backend-stand) take `n-a` only on a diff with no behaviour file (product code, UI or backend),
+and that row's id and reason go into the MR description. Evidence from an older HEAD than the last
+edit → re-run that sieve. `fail` → fix, re-run step 1 for the touched subproject, then every sieve
+whose evidence predates the fix. A LIVE sieve that cannot run here (no stand, no browser, no
+network) is a NOTE, not a blocker: row `fail`, evidence starting `not checked: <reason>`. Any other
+sieve runs locally — `not checked:` does not waive it (the split-group gate keeps it open until it
+runs). A red not caused by the branch (red on the target branch too,
+platform-only, a timeout in code the diff does not touch) is a note too: evidence starting
+`not caused by the branch: <why>`. A Tests-block case that cannot run → recorded `blocked` with the
+reason, never left unrun. Every note goes into the MR description; the MR is ready with them.
+
+In a split group, ask the human ONLY for: a merge; a deletion (any git deletion, or anything
+outside its copy); a force-push beyond the delivery's lease; a DB migration, DDL or data write; credentials that exist nowhere in the project.
+Everything else (a live check that cannot run, a red that predates the branch, a missing MR, a stale
+stand session, a conflict) the group resolves itself or waives with the reason as a note in the MR
+description. Outside a split group the session's own rules stand (git writes per-op approved).
 
 ## 4. Readiness checklist
 
@@ -110,7 +122,7 @@ limitation.
 
 Invoke `agentdeck-kit:changelog-builder` → ready MR description (+ a title in the project's commit convention) —
 its header-id, quoted-fact and ticket-number gates included.
-Hand the user: readiness verdict first (ready / not ready + the unchecked sieves), description,
+Hand the user: readiness verdict first (ready / not ready + the live sieves noted `not checked:`), description,
 sieve table, checklist result, what is left on their side (checks I could not run live, named with
 the reason; the merge itself — git operations are the user's).
 
@@ -119,5 +131,5 @@ the reason; the merge itself — git operations are the user's).
 - Moving to step N with step N-1 red.
 - Checklist "ticked" without walking the diff.
 - A sieve row whose evidence is a conclusion ("checked, fine") instead of a command and its output.
-- "Ready" with any applicable sieve unchecked.
+- "Ready" with any applicable sieve unchecked — only a LIVE sieve's `not checked:` note waives one.
 - Summary written before the final style or sieve fixes (it will be stale).

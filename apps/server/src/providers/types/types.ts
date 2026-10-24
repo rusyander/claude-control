@@ -53,3 +53,5 @@ export type {
   ProviderNativeMechanisms,
   ProviderProjectConfigLocation,
 } from './provider.ts';
+
+export type { EconomyChannel, ProviderGroupEconomy } from './economy.ts';

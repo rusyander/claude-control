@@ -47,6 +47,8 @@ export const streamRun = (
   reply: FastifyReply,
   chatId: string,
   fromSeq: number,
+  /** Ход, к которому относится курсор (`ChatRunRegistry.attach`). */
+  startedAt?: number,
 ): Promise<void> =>
   new Promise((resolve) => {
     reply.raw.writeHead(200, SSE_HEADERS);
@@ -93,9 +95,11 @@ export const streamRun = (
         }
       },
       close: finish,
+      // Открытый поток — человек может смотреть: брокер прав покажет ему карточку.
+      viewer: true,
     };
 
-    const unsubscribe = registry.attach(chatId, fromSeq, subscriber);
+    const unsubscribe = registry.attach(chatId, fromSeq, subscriber, startedAt);
 
     // Клиент закрыл соединение — отцепляем слушателя, но прогон НЕ трогаем.
     reply.raw.on('close', () => {

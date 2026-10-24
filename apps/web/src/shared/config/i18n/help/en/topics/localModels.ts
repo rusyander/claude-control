@@ -373,7 +373,10 @@ export const localModelsEn: typeof localModelsRu = {
     kitOurs: 'Panel kit only',
     kitOursText:
       'The panel’s rules and skills; your personal settings are not loaded. Project files (.claude ' +
-      'in the repository) stay — without them the agent does not know the project.',
+      'in the repository) stay — without them the agent does not know the project. The caps a ' +
+      'personal settings.json usually holds reach Claude Code as launch variables: command output up ' +
+      'to 8000 characters, a file read up to 10,000 tokens; a cap of its own in the group profile ' +
+      'overrides them.',
     kitHybrid: 'Yours plus the panel kit',
     kitHybridText:
       'Your kit with the panel’s on top. For Claude Code and Codex (Codex gets the rules and ' +

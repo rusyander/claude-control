@@ -93,15 +93,52 @@ describe('хаб разделения — причина сбоя группы �
     );
     const text = textOf(html);
 
-    expect(text).toContain(
-      'stopped: delivery not completed: uncommitted changes: a.ts; branch agent/g1',
-    );
+    // Остановка на доставке — заголовком со счётом и пунктами (владелец
+    // 23.10.2026), а не строкой «stopped: delivery not completed: …; …».
+    expect(text).toContain('Delivery stopped — 2 items');
+    expect(text).not.toContain('stopped: delivery not completed');
+    expect(text).toContain('uncommitted changes|: a.ts');
+    expect(text).toContain('branch agent/g1');
     // Группа работала — «не завелась» ей не пишется (живой прогон 25.09, D5).
     expect(text).not.toContain('did not start');
-    expect(text).toContain('missing for the MR: uncommitted changes: a.ts; branch agent/g1');
-    // Подсказка по наведению — тот же список, тоже на языке интерфейса.
-    expect(html).toContain('title="uncommitted changes: a.ts\nbranch agent/g1');
+    // Свёрнутый раздел «Missing for the MR» список в теле не повторяет.
+    expect(html).not.toContain('data-hub-delivery-missing');
     expect(CYRILLIC.test(text.replace(/Группа \d/g, ''))).toBe(false);
+  });
+
+  it('развёрнутый список пробелов — пунктами, каждый на языке интерфейса', () => {
+    const key = splitGroupKey({ groupIndex: 1, id: '' });
+    const rows = new Map<string, ChildStageGroup>([
+      [key, { chatId: 'c1', title: 'Группа 1', stages: ['work'], isRunning: false }],
+    ]);
+    const merged = mergeSplitGroups(rows, {
+      parentChatId: 'parent',
+      triage: { at: '2026-09-25T10:00:00.000Z', received: true, repairs: [], conflicts: [] },
+      order: [1],
+      groups: [
+        group(1, {
+          status: 'awaiting',
+          chatId: 'c1',
+          deliveryMissing: [DIRTY, NOT_PUSHED],
+          deliveryMissingCodes: [
+            { messageCode: 'delivery-gap-dirty', params: { files: 'a.ts' } },
+            { messageCode: 'delivery-gap-not-pushed', params: { branch: 'agent/g1' } },
+          ],
+        }),
+      ],
+    });
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <ChildStages groups={merged} onOpen={() => {}} sectionsOpen />
+      </QueryClientProvider>,
+    );
+    const items = [...html.matchAll(/<li>(.*?)<\/li>/g)].map((match) => textOf(match[1] ?? ''));
+
+    expect(items).toEqual([
+      '|uncommitted changes: a.ts|',
+      expect.stringContaining('|branch agent/g1'),
+    ]);
+    expect(html).not.toContain(DIRTY);
   });
 
   it('причина без кода (чужая или от сервера постарше) — как есть', () => {

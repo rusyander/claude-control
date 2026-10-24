@@ -28,11 +28,13 @@ import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } 
  * С `session` (E2b) сессия переживает процесс: следующий ход поднимает её
  * `POST /session/:id/resume` в новом `qwen serve`; события её прежних ходов, если
  * поток их отдаст, в ответ не идут — ход слушает только свои запросы. Ход,
- * кончившийся не ответом, сессию удаляет (`POST /sessions/delete`), как и
- * сменённую (`discard`, не поднявшийся `resume`).
+ * кончившийся не ответом, сессию закрывает и убирает в архив Qwen (`POST
+ * /sessions/archive`, файл переезжает в `chats/archive/`), как и сменённую
+ * (`discard`, не поднявшийся `resume`). Не стирает: журнал сессии — единственный
+ * источник расхода Qwen для аналитики, стёртый уносил потраченные токены.
  */
 
-/** Сколько ждать удаления сессии, прежде чем снять процесс. */
+/** Сколько ждать архивации сессии, прежде чем снять процесс. */
 const DELETE_MS = 3_000;
 
 /**
@@ -457,7 +459,7 @@ export class QwenServeTurn implements LiveTurn {
     }
   }
 
-  /** Закрыть сессию в процессе и стереть её с диска Qwen; ошибки — не повод держать ход. */
+  /** Закрыть сессию в процессе и убрать в архив Qwen; ошибки — не повод держать ход. */
   private async remove(id: string): Promise<void> {
     const signal = AbortSignal.timeout(DELETE_MS);
     const send = (method: string, path: string, body?: unknown) =>
@@ -471,7 +473,7 @@ export class QwenServeTurn implements LiveTurn {
         .then((res) => res.body?.cancel())
         .catch(() => undefined);
     await send('DELETE', `/session/${id}`);
-    await send('POST', '/sessions/delete', { sessionIds: [id] });
+    await send('POST', '/sessions/archive', { sessionIds: [id] });
   }
 
   /**

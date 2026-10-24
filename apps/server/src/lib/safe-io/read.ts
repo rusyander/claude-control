@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { detectTextForm, stripBom, type TextForm } from '../text-form/text-form.ts';
+import { stripJsonComments } from '../json-comments/json-comments.ts';
 
 /** Выше этого размера форму файла не определяем — запись идёт как есть. */
 const MAX_FORM_PROBE_BYTES = 4 * 1024 * 1024;
@@ -12,6 +13,18 @@ export function readJsonFile<T>(path: string, fallback: T): T {
   // (Блокнот/PowerShell пишут settings.json именно так) — это уводило бы раздел
   // в fail-closed на здоровом конфиге. Сам BOM при записи вернётся (см. writeTextFile).
   return JSON.parse(stripBom(raw)) as T;
+}
+
+/**
+ * То же для файла, который его CLI читает с комментариями (`stripJsonComments`):
+ * строгий `JSON.parse` превращал бы рабочий файл с одной строкой `//` в «не
+ * разбирается» и терял бы всё, что в нём задано.
+ */
+export function readJsoncFile<T>(path: string, fallback: T): T {
+  if (!existsSync(path)) return fallback;
+  const raw = stripJsonComments(stripBom(readFileSync(path, 'utf8')));
+  if (!raw.trim()) return fallback;
+  return JSON.parse(raw) as T;
 }
 
 export function readTextFile(path: string, fallback = ''): string {

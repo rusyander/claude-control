@@ -1,11 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import { HelpSection, Callout, OptionCards, GuideSteps, GuideStep, HelpShot } from '../../ui';
+import {
+  HelpSection,
+  Callout,
+  OptionCards,
+  GuideSteps,
+  GuideStep,
+  HelpShot,
+  HelpDiagram,
+} from '../../ui';
 
 /**
  * Соседние разделы документа «Чат» об одном и том же: как работа одного проекта
  * расходится по нескольким разговорам — копии репозитория руками, разделение
  * задач, которое предлагает сам агент, подбор модели под каждую группу, группа
- * и автономность чата и продолжение закрытого этапа в чистой сессии. Вынесены из `ChatTopic` целиком:
+ * и автономность чата, отложенные вызовы D-n и продолжение закрытого этапа в чистой сессии. Вынесены из `ChatTopic` целиком:
  * вместе они переваливали документ за предел длины файла.
  */
 export function ChatParallelSections() {
@@ -83,6 +91,9 @@ export function ChatParallelSections() {
             { title: tr('cascadeOff'), text: tr('cascadeOffText') },
           ]}
         />
+        {/* Отметки «Где действует:» из карточки «Экономия групп» — словами их
+            описывает карточка cascadeEconomy, кадр показывает, как они выглядят. */}
+        <HelpShot topic="chat" scenario="economy" frame="01-where" side="panel" />
         <Callout tone="warning" title={tr('cascadeNote')} />
       </HelpSection>
 
@@ -102,6 +113,24 @@ export function ChatParallelSections() {
           <GuideStep title={tr('autonomyWhere')} text={tr('autonomyWhereText')} />
         </GuideSteps>
         <Callout tone="warning" title={tr('autonomyNote')} />
+      </HelpSection>
+
+      {/* Отложенные вызовы D-n — то, что автономия за человека не решает: вызов
+          встаёт в список, работа идёт дальше, ответ продолжает её с этим вызовом. */}
+      <HelpSection title={tr('deferredTitle')} caption={tr('deferredCaption')}>
+        <HelpDiagram topic="chat" name="deferred-asks" />
+        <GuideSteps>
+          <GuideStep title={tr('deferredWhen')} text={tr('deferredWhenText')}>
+            <HelpShot topic="chat" scenario="deferred" frame="03-card" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('deferredList')} text={tr('deferredListText')}>
+            <HelpShot topic="chat" scenario="deferred" frame="01-banner" side="panel" />
+            <HelpShot topic="chat" scenario="deferred" frame="02-hub" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('deferredDecide')} text={tr('deferredDecideText')} />
+          <GuideStep title={tr('deferredLimits')} text={tr('deferredLimitsText')} />
+        </GuideSteps>
+        <Callout tone="warning" title={tr('deferredNote')} />
       </HelpSection>
 
       {/* Продолжение в чистой сессии: там работа расходится вширь, здесь —

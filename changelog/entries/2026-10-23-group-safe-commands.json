@@ -1,0 +1,580 @@
+{
+  "title": {
+    "ru": "Группы сами доходят до MR, вызовы для человека ждут списком D-n, сторож ловит новые беды",
+    "en": "Groups reach the MR by themselves, calls for a human wait in a D-n list, the watcher catches new failures"
+  },
+  "items": [
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Команда группы судится по тому, что она исполнит: переменные, обёртки (bash -c, xargs, find -exec), код интерпретатора и черновики через heredoc раскрываются, а правило чата видит только звенья, которые разбор не узнал. Слово «drop» в grep или «merge» в merge-base больше не поднимает карточку.",
+        "en": "A group command is judged by what it will run: variables, wrappers (bash -c, xargs, find -exec), interpreter code and heredoc drafts are unfolded, and the chat rule sees only the links the parser did not recognise. The word “drop” in grep or “merge” in merge-base no longer raises a card."
+      },
+      "how": {
+        "ru": "Перед решением об удалении панель читает у git копии список игнорируемого: что git вернёт, то восстановимо.",
+        "en": "Before deciding on a deletion the panel reads the copy’s ignored list from git: what git brings back is restorable."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Удаление и откат файлов в копии группы (rm, git checkout -- файл, git restore, git rm) проходят сами, если это временное или git вернёт потерянное. Карточку поднимает то, чего git не вернёт: корень копии, .git, локальный слой (.agent/, .claude/, .env), игнорируемое и всё вне копии.",
+        "en": "Deleting and reverting files in a group copy (rm, git checkout -- file, git restore, git rm) go by themselves when the target is temporary or git brings back what is lost. A card is raised by what git cannot bring back: the copy root, .git, the local layer (.agent/, .claude/, .env), ignored files and everything outside the copy."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Затирание правок git в своей копии группы — git reset --hard, git clean, git restore и git checkout -- пути — по умолчанию проходит само: строка «Затирание истории git» в общих правилах групп теперь «само», а не «человек». На грязном дереве панель сперва снимает незакоммиченное в отдельную ссылку git, а не вышел снимок — агенту отказ. git clean -x (игнорируемое), то же вне копии, filter-branch и чистка reflog по-прежнему ждут человека. Общие правила групп, сохранённые раньше без этой строки, оставляют её у человека.",
+        "en": "Wiping git changes in the own group copy — git reset --hard, git clean, git restore and git checkout -- paths — goes by itself by default: the “Wiping git history” row of the shared group rules is now “auto”, not “human”. On a dirty tree the panel first snapshots the uncommitted work into a separate git ref, and when the snapshot fails the agent is refused. git clean -x (ignored files), the same outside the copy, filter-branch and reflog expiry still wait for a human. Shared group rules saved earlier without this row keep it with the human."
+      },
+      "how": {
+        "ru": "Решение владельца: эти карточки держали группы часами, а копия группы — её собственная.",
+        "en": "These cards held groups for hours, and a group copy is its own."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Сами проходят черновая рабочая копия для сверки (git worktree add — внутри своей копии или во временном каталоге), её снос внутри своей копии (git worktree remove), git worktree prune и сверка с основной веткой через merge-base и merge-tree. Удаление любой ветки (git branch -d и -D), метки и тайника (git stash drop), снос копии в другом месте по-прежнему решает человек — у группы такой вызов сразу становится вопросом D-n.",
+        "en": "A scratch working copy for comparison (git worktree add — inside the own copy or in a temporary directory), its removal inside the own copy (git worktree remove), git worktree prune and the comparison with the main branch through merge-base and merge-tree go by themselves. Deleting any branch (git branch -d and -D), a tag or a stash (git stash drop) and removing a copy anywhere else are still decided by a human — in a group such a call becomes a D-n question at once."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Вызов, который решает только человек, больше не держит агента: он становится вопросом D-n в списке «Ждёт решения», а агент получает «поставлено человеку как D-n» и работает дальше. Группа и автономный чат, который никто не открыл, откладывают такой вызов сразу; карточка прав в открытом чате — через 10 минут без ответа (меняется в настройках «Модели», 0 — ждёт сколько нужно). Список виден полосой над чатом, разделом хаба группы и на телефоне; «Разрешить» выдаёт разовое разрешение ровно на этот вызов, действующее два часа, и продолжает разговор. D-n без ответа истекает через 7 суток (меняется там же), истёкший можно разрешить заново, а группа, у которой больше ничего не ждёт, продолжает работу без истёкшего вызова и называет пробел в описании MR.",
+        "en": "A call that only a human decides no longer holds the agent: it becomes a D-n question in the “Awaiting decision” list, and the agent gets “queued for a human as D-n” and works on. A group and an autonomous chat nobody opened defer such a call at once; a permission card in an open chat after 10 minutes without an answer (set in the “Models” settings, 0 waits as long as needed). The list shows as a strip above the chat, a section of the group hub and on the phone; “Allow” gives a one-time grant for exactly that call, valid for two hours, and continues the conversation. An unanswered D-n expires after 7 days (set in the same place), an expired one can be allowed again, and a group with nothing else waiting carries on without the expired call and names the gap in the MR description."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["deferred-banner.png", "deferred-hub.png", "deferred-card.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Решить D-n может только человек: запрос к списку от процесса модели получает отказ, а вызов агента, который тянется к маршрутам решений или ключу панели, отклоняется раньше всех правил. Пока у группы открыт D-n, она не снимает черновик с MR и не пишет в коммит или MR свой номер D-n, а пуш, цель которого панель не может доказать, отклоняется сразу, без вопроса.",
+        "en": "Only a human can decide a D-n: a request to the list from a model process is refused, and an agent call that reaches for the decision endpoints or the panel key is refused before any rule. While a group has an open D-n it does not take its MR out of draft and does not write its D-n number into a commit or the MR, and a push whose target the panel cannot prove is refused at once, without a question."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Ответы из Telegram: вопрос агента, на который не ответили в панели за заданные минуты, приходит в личный чат с кнопками «Разрешить» / «Запретить» или вариантами ответа; вопрос группы и D-n — сразу. Нажатие проходит тем же путём, что кнопка в панели, и сообщение правится итогом; вопрос, решённый тем временем в панели, закрывается строкой «Отвечено в панели». Ответ принимается только от заданного id в личном чате, кнопка подписана и срабатывает один раз. Если бота уже слушает агент, блок просит отдельного бота.",
+        "en": "Answers from Telegram: an agent question left unanswered in the panel for the set minutes arrives in a private chat with “Allow” / “Deny” buttons or answer options; a group question and a D-n at once. A press takes the same path as the panel button and the message is edited to the outcome; a question decided in the panel meanwhile closes as answered in the panel. An answer is taken only from the set id in the private chat, a button is signed and works once. If an agent already listens to the bot, the block asks for a separate bot."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      },
+      "images": ["telegram-answers.png"]
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вопрос во «Входящих» на телефоне называет, откуда он: CLI, запущен ли чат панелью или вне её, фоновый ли это ход, группа, этап и родитель; запрос на запуск агента показывает, что запускается, каким агентом, модель, глубину и фон. Сверху — блок «Ждёт решения» со списком D-n, «Запретить» / «Разрешить» и «Разрешить заново» для истёкших; счётчик на вкладке учитывает и D-n.",
+        "en": "A question in the phone Inbox says where it comes from: the CLI, whether the panel started the chat, whether it is a background turn, the group, stage and parent; an agent launch request shows what is launched, by which agent, the model, effort and background. On top — an “Awaiting decision” block with the D-n list, “Deny” / “Allow” and “Allow again” for expired ones; the tab badge counts D-n too."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сторож больше не считает отказом первое откладывание вызова в D-n: сигнал «много отказов подряд» поднимает только повтор того же вызова.",
+        "en": "The watcher no longer counts the first deferral of a call into D-n as a refusal: the “many refusals in a row” signal is raised only by a repeat of the same call."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "После перезапуска панели следующий ход группы (шаг пути или продолжение сессии) снова спрашивает права у панели. Раньше мост прав подхваченного прогона оставался без адреса и отказывал в каждом вызове, и группа стояла часами.",
+        "en": "After a panel restart the group’s next turn (a path step or a session continuation) asks the panel for permissions again. Before, the permission bridge of a reattached run had no address and refused every call, and the group stood still for hours."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Во «Входящих» на телефоне больше не висят вопросы сессии группы, которую сменил новый разговор той же группы: ответить на них было уже некому.",
+        "en": "The phone inbox no longer keeps the questions of a group session replaced by a new conversation of the same group: nobody was left to answer them."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ревью группы, ответившее вердиктом и предложением продолжить, ведёт дальше по конвейеру: к правкам по замечаниям или, если замечаний нет, к доставке. Раньше продолжение оставалось ревью — без записи в MR и с запретом пуша, — и группа кончалась сбоем без MR.",
+        "en": "A group review that answers with a verdict and a continuation proposal moves on down the conveyor: to fixes for its findings or, with no findings, to delivery. Before, the continuation stayed a review — no MR writes, push denied — and the group ended failed without an MR."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вердикт ревью и отчёт о ситах из хода, после которого работа ушла в продолжение, доходят до итога группы. Раньше итог читал только последний ход, и группа получала «вердикта ревьюера нет» при вердиктах в цепочке.",
+        "en": "A review verdict and a sieve report from a turn that handed the work to a continuation reach the group outcome. Before, the outcome read only the last turn, and the group got “no reviewer verdict” although the chain had verdicts."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Продолжение этапа в новой сессии видит коммиты прошлой сессии того же этапа. Раньше работа считалась пустой, ревью не заводилось, а напоминание о MR уходило этапу, которому пуш запрещён.",
+        "en": "A stage continued in a new session sees the commits of the stage’s previous session. Before, the work counted as empty, no review started, and the MR reminder went to a stage that may not push."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "git -c ключ=значение push запрещён этапам до доставки так же, как git push, а слияние, ветки, метки и снос копии в этой форме идут на проверку панели. Раньше такая форма проходила мимо обоих правил.",
+        "en": "git -c key=value push is denied to stages before delivery just like git push, and merge, branch, tag and worktree removal in this form go to the panel’s check. Before, this form slipped past both rules."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группы разделения доводят доставку сами: стадия, где MR не открыть, получает новый разговор доставки, вставшие напоминания — разбор на усиленной модели; «не проверено», красное не из-за ветки и невыполнимый кейс стали заметками в MR. Человека зовут только на слияние, разрушительную операцию или отсутствующий доступ. Подготовка копии больше не оставляет правленый go.mod, а «чужие −» называют коммит и строки.",
+        "en": "Split groups finish delivery on their own: a stage that cannot open an MR gets a new delivery conversation, stalled reminders get a diagnosis on a stronger model; “not checked”, a red not caused by the branch and a case that cannot run became MR notes. A human is called only for a merge, a destructive operation or missing credentials. Copy preparation no longer leaves go.mod modified, and foreign removals name the commit and lines."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа, остановленная на доставке, показывает заголовок «Доставка остановлена — N пунктов» (или «Доставка ждёт вас», когда остались только шаги человека) и пункты списком; человека карточка зовёт только для мержа MR, подтверждения удаления или доступа — строкой с точным действием. Раньше — одна серая строка через «;».",
+        "en": "A group stopped on delivery shows a “Delivery stopped — N items” heading (or “Delivery is waiting for you” when only a person’s steps are left) with the items as a list; the card calls a person only for an MR merge, a deletion confirmation or access, as a line naming the action. Previously — one grey line joined with “;”."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      },
+      "images": ["delivery-stop-before.png", "delivery-stop-after.png"]
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вопрос группы разделения под «Развилки группы: по плану» больше не ждёт человека: панель сразу берёт рекомендованный вариант (или первый), не выбирает вариант, который зовёт человека или утверждает сделанное им, а в сводке родителя показывает «ответ дан автоматически».",
+        "en": "A split group’s question under “Group decision points: by the plan” no longer waits for a human: the panel takes the recommended (or first) option at once, never an option that calls the human or claims they already acted, and the parent summary shows “answered automatically”."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа под «Развилки группы: по плану», закончившая ход вопросами текстом («начну после ответа»), больше не стоит до ответа человека: панель сразу продолжает ту же сессию с её же рекомендациями и пишет в сводку родителя «ответ дан автоматически».",
+        "en": "A group under “Group decision points: by the plan” that ends a turn with questions in text (“I will start after your answer”) no longer waits for a human: the panel resumes the same session at once with the group’s own recommendations and shows “answered automatically” in the parent summary."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Полные проверки проекта группа гоняет один раз — на стадии доставки, на итоговом дереве. Стадии работы, ревью и правок, за которыми следует доставка, проверяют только затронутое, а повтор полной проверки на том же дереве в другой стадии получает отказ со ссылкой на уже готовый итог. Раньше каждая стадия начинала новую сессию и гоняла полный набор заново: за один день так набралось больше ста лишних прогонов по 13–20 минут.",
+        "en": "A group runs the full project checks once, in its delivery stage, on the final tree. Work, review and fix stages followed by delivery check only what they touched, and a repeat of the full checks on the same tree in another stage is refused with a pointer to the result already there. Before, every stage started a new session and ran the full set again: one day added up over a hundred extra runs of 13–20 minutes."
+      },
+      "how": {
+        "ru": "Дерево копии считает сам git (add -A в копию индекса и write-tree), запись прогона лежит в git-каталоге копии, итог читается из разговора стадии, которая его запускала.",
+        "en": "git itself computes the copy’s tree (add -A into a copy of the index, then write-tree), the run’s record lives in the copy’s git directory, and the result is read from the conversation of the stage that ran it."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Догон основной ветки и перезапись ветки группы — только при настоящем конфликте, и группа разрешает его сама, без человека. Без конфликта база остаётся как есть, а полные проверки не повторяются; то же в «Перепроверить MR».",
+        "en": "Catching up with the main branch and rewriting the group’s branch happen only on a real conflict, and the group resolves it itself, without a human. Without a conflict the base stays as it is and the full checks are not repeated; the same applies to “Recheck MR”."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Модель под панелью больше не выключает журнал проверок своей командой (AGENTDECK_VERIFY_LEDGER=off, shadow, _DELTA=off): запущенные CLI получают замок, строка повтора не подсказывает обход, а группе разделения такая команда отклоняется. Выбор, сделанный в окружении самой панели, действует как раньше.",
+        "en": "A model under the panel no longer switches the verify ledger off in its own command (AGENTDECK_VERIFY_LEDGER=off, shadow, _DELTA=off): the CLIs the panel starts get a lock, the replay line no longer suggests a way around it, and a split group’s command doing so is refused. A choice made in the panel’s own environment works as before."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Временный репозиторий группы в каталоге из mktemp (git init, commit, reset, checkout в нём) проходит сам: всё это живёт и умирает во временном каталоге и не трогает копию.",
+        "en": "A group’s scratch repository in a mktemp directory (git init, commit, reset, checkout inside it) goes through by itself: it all lives and dies in the temporary directory and does not touch the copy."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пауза группы разделения гасит и агента, который ждёт конца фоновой задачи: группа на паузе больше сама не просыпается и не коммитит. Вместе с паузой, «Убрать» и отменой плана снимаются процессы, запущенные из копии группы (dev-сервер, цепочка тестов), — стенд в самом проекте не трогается.",
+        "en": "Pausing a split group now also stops an agent that is waiting for a background task, so a paused group no longer wakes up and commits on its own. Pause, Drop and plan cancel also stop processes started from the group’s copy (dev server, test chain); a stand in the project itself is left alone."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож групп поднимает тревогу, когда группа на паузе всё равно действует: сколько вызовов и через сколько минут после паузы; на паузе прочие сигналы группы закрываются и после снятия паузы не возвращаются.",
+        "en": "The group watchdog raises an alert when a paused group still acts: how many calls and how many minutes after the pause; a pause closes the group's other signals and they do not come back after it is lifted."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож групп замечает тяжёлые проверки по кругу: полный гейт, прогнанный дважды и больше за группу — в работе, ревью и доставке вместе, даже с правками между; пороги — в настройках сторожа.",
+        "en": "The group watchdog spots heavy checks in a loop: a full gate run twice or more across the group — work, review and delivery together, edits in between included; thresholds are in the watchdog settings."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сигнал о расходе группы больше не мигает у порога: поднятый гаснет, только когда расход упал заметно ниже (на 15 %).",
+        "en": "The group burn signal no longer flickers at the threshold: once raised it clears only after the burn drops noticeably below it (by 15 %)."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа разделения судит команду из каталога, где стоит её оболочка: `..` из подпроекта копии — своя копия, и уборка своего больше не ждёт человека; оболочка вне копии — относительное удаление идёт человеку.",
+        "en": "A split group judges a command from the directory its shell is in: `..` from a sub-project of the copy is the copy itself, so cleaning up its own files no longer waits for a human; with the shell outside the copy, a relative delete goes to a human."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа сама гасит только свои процессы — потомков своего CLI; `taskkill`, `kill`, `Stop-Process`, `kill-port` по чужому номеру или порту, `pkill`/`killall` и погашение без названной цели — карточкой человеку.",
+        "en": "A group stops only its own processes — descendants of its CLI — by itself; `taskkill`, `kill`, `Stop-Process` and `kill-port` on another process or port, `pkill`/`killall`, and kills with no named target go to a human card."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "`tests-cli run` ждёт не дольше предела на кейс (10 мин, `--case-timeout <мин>` или `AGENTDECK_TESTS_CASE_TIMEOUT`): повисший прогон снимается вместе с деревом процессов, кейсы ложатся в историю проваленными с причиной «Предел времени», код выхода 124.",
+        "en": "`tests-cli run` waits no longer than a per-case cap (10 min, `--case-timeout <min>` or `AGENTDECK_TESTS_CASE_TIMEOUT`): a hung run is stopped with its whole process tree, and its cases are recorded in history as failed with the reason \"Time limit\", exit code 124."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ворота доставки группы и конца хода судят свежесть прогона по содержимому покрытых кейсом файлов, а не по времени: коммит, amend или rebase после прогона, не тронувшие эти файлы, больше не требуют прогнать те же кейсы заново; любая правка в них по-прежнему требует.",
+        "en": "The group delivery gate and the end-of-turn check judge a run’s freshness by the content of the files a case covers, not by time: a commit, amend or rebase after the run that leaves those files alone no longer demands running the same cases again; any edit in them still does."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Остановить всё» гасит и группы между ходами, у которых идёт фоновая задача, вместе с процессами их копий: такая группа больше не просыпается сама в стоящем дереве, а «Продолжить всё» продолжает её той же сессией.",
+        "en": "Stop all also stops groups idle between turns that have a background task running, together with the processes of their copies: such a group no longer wakes by itself in a paused tree, and Resume all continues it in the same session."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож следит и за одиночными чатами: беда видна фишкой в строке чата и островом «Сторож чата» над лентой; наружу уходит только тревога.",
+        "en": "The watch now follows single chats too: trouble shows as a chip on the chat row and a “Chat watch” island above the feed; only an alarm goes out."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Двенадцать новых сигналов сторожа: группа встала, одна беда в нескольких группах, повтор той же ошибки, обход отказа, остановка чужих процессов, вопрос текстом без ответа, напоминания впустую, несуществующий инструмент, недоступный сервис, правки вне копии, крупные служебные вставки, вердикт ревью без блока.",
+        "en": "Twelve new watch signals: a stalled group, one trouble in several groups, the same error repeated, a refusal bypassed, foreign processes stopped, an unanswered question in text, reminders with no effect, a missing tool, a service down, edits outside the copy, large service inserts, a review verdict without its block."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "В настройках сторожа — пороги новых правил, порог, после которого вопрос без ответа становится тревогой, и переключатель одиночных чатов.",
+        "en": "The watch settings card has the thresholds of the new rules, the delay after which an unanswered question becomes an alarm, and the single-chat switch."
+      },
+      "area": {
+        "ru": "Настройки",
+        "en": "Settings"
+      },
+      "images": ["watch-settings-before.png", "watch-settings-after.png"]
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Чат» описывает новые правила сторожа, рост сигнала до тревоги, сторож одиночных чатов и вопросы D-n — со снимками и схемой; справка «Интеграции» — ответы из Telegram, а «Права», «Телефон», «Тесты», «Агент панели» и «Настройки» — что теперь проходит само, что уходит в D-n и где его решить.",
+        "en": "The “Chat” help describes the new watcher rules, the signal growing into an alarm, the single-chat watcher and D-n questions — with shots and a diagram; the “Integrations” help covers answers from Telegram, and “Permissions”, “Phone”, “Tests”, “Panel agent” and “Settings” what now goes by itself, what goes to D-n and where to decide it."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Одна и та же команда падает или застревает в нескольких группах плана — одна тревога на план вместо сообщения от каждой группы.",
+        "en": "The same command failing or stuck in several groups of a plan raises one plan-level alert instead of one message per group."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Повторы запроса к модели после сбоя сервиса доходят до сторожа и не засоряют ленту чата.",
+        "en": "Model request retries after a service failure reach the watcher and stay out of the chat feed."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сторож стенда поднимается сразу после входа в Windows: его запускает задача планировщика текущего пользователя, без прав администратора. Раньше он стоял в «Автозагрузке», которую Windows запускает последней, — панель отвечала только через несколько минут после входа.",
+        "en": "The stand watchdog starts right after Windows sign-in: a Task Scheduler task of the current user launches it, no administrator rights needed. Before, it sat in the Startup folder, which Windows runs last, so the panel answered only minutes after sign-in."
+      },
+      "how": {
+        "ru": "Задача входа заводится из XML с триггером на своего пользователя: обычный `schtasks /sc ONLOGON` означает вход любого пользователя и требует прав администратора. Ярлык в «Автозагрузке» остаётся запасным путём.",
+        "en": "The sign-in task is created from XML with a trigger scoped to the user: plain `schtasks /sc ONLOGON` means any user's sign-in and needs administrator rights. The Startup shortcut stays as a fallback."
+      },
+      "area": {
+        "ru": "Запуск",
+        "en": "Startup"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Доставка, которую агенты могут довести сами, больше не останавливается с первой осечки: занятый разговор группы панель сверяет заново раз в 2 минуты, до часа; вставший разбор и копия, которую не удалось прочитать, повторяются панелью через 30 минут, не больше двух раз; после перезапуска панели и когда удалённый сервис снова отвечает, сверка идёт сразу. Повреждённое хранилище git копии сразу становится пунктом для человека — с путём копии и командой `git fsck --full`.",
+        "en": "A delivery the agents can finish themselves no longer stops at the first hiccup: the panel re-checks a busy group conversation every 2 minutes for up to an hour; a stalled review and a copy that could not be read are retried by the panel after 30 minutes, at most twice; after a panel restart and once the remote service answers again the check runs at once. A corrupt git object store of the copy becomes an item for a human right away — with the copy path and the `git fsck --full` command."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Новое звено группы — доставка, правки после ревью, продолжение на другом CLI — начинает со своего окна и не наследует отметки прошлого звена; у других CLI доставка идёт новым разговором своего CLI.",
+        "en": "A new link of a group — delivery, fixes after review, continuing on another CLI — starts with its own window and inherits none of the previous link's marks; on other CLIs the delivery runs as a new conversation of that CLI."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Пока группа ждёт повтора доставки, «Продолжить» доступна сразу. Плашка остановки называет повреждённое хранилище и потолок повторов: «Панель сама повторила доставку до своего потолка и не довела».",
+        "en": "While a group waits for a delivery retry, “Continue” is available at once. The stop plate names a corrupt store and the retry ceiling: “The panel retried delivery on its own up to its cap and did not finish”."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      },
+      "images": ["corrupt-store-before.png", "corrupt-store-after.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож групп замечает ещё три беды: новый разговор, начатый поверх ещё тёплого кэша, переделку уже закоммиченного на той же стадии и сервер звена, переживший паузу группы; пороги первых двух — в карточке сторожа в настройках. Остановка чужого процесса через конвейер (`… | Stop-Process`, `$(…)` в `taskkill`) тоже видна как остановка чужих процессов.",
+        "en": "The group watcher catches three more failures: a new conversation started over a still-warm cache, redoing what was already committed at the same stage, and a link's server that outlived the group's pause; the thresholds of the first two are on the watcher card in settings. Stopping a foreign process through a pipeline (`… | Stop-Process`, `$(…)` into `taskkill`) also shows as stopping foreign processes."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Карточку человеку получают и обходные формы команд: `env -S` и `env -C`, `xargs git` с подкомандой из ввода, push по шаблону или в `heads/<основная>`, принудительный fetch в локальные ветки, закодированные команды PowerShell, `pwsh -wd` вне копии, пути вида `C:имя`, ssh, `docker exec`, `kubectl exec` и `sudo -D`, исполняющие git или удаление. Push, которым управляют `-c push.default`, `-c remote.*.push`, `GIT_DIR` или `GIT_CONFIG_*`, отклоняется агенту с просьбой назвать ветку явно. Своё проходит само: `env -C` с каталогом копии судится на месте, `--force-with-lease=heads/<своя ветка>` принимается. Догон основной ветки узнаётся и в обёртке (`bash -c`, `sh -c`, `eval`), в составной команде с перенаправлением, с `exec >` и `>&`, с целью из `$(git rev-parse …)` или переменной и при выгрузке правок по хэшу; цель, которую до исполнения не назвать, решает человек. Псевдоним оболочки судится по развёртке вместе со словами вызова, функция из `.bashrc` — по телу; строка git в PowerShell с типографскими кавычками, неразрывным пробелом или одиночным возвратом каретки и `make` с каталогом в пачке ключей (`-sC`, `--dir=`) вне копии идут человеку.",
+        "en": "Bypass forms of commands also get a card for a human: `env -S` and `env -C`, `xargs git` with the subcommand from input, a push by pattern or to `heads/<main>`, a forced fetch into local branches, encoded PowerShell commands, `pwsh -wd` outside the copy, `C:name` paths, ssh, `docker exec`, `kubectl exec` and `sudo -D` running git or a deletion. A push steered by `-c push.default`, `-c remote.*.push`, `GIT_DIR` or `GIT_CONFIG_*` is refused to the agent with a request to name the branch explicitly. The group's own work goes through by itself: `env -C` with a copy directory is judged in place, `--force-with-lease=heads/<own branch>` is accepted. A catch-up with the main branch is recognised inside a wrapper (`bash -c`, `sh -c`, `eval`), inside a compound command with a redirect, with `exec >` and `>&`, with the target taken from `$(git rev-parse …)` or a variable, and as a patch export by hash; a target that cannot be named before it runs is decided by a human. A shell alias is judged by its expansion together with the call's words, a `.bashrc` function by its body; a git line in PowerShell with typographic quotes, a non-breaking space or a lone carriage return, and `make` with a directory in a switch bundle (`-sC`, `--dir=`) outside the copy go to a human."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Решения человека — D-n, права, решения по веткам, ответы на вопросы, правку настроек и другие маршруты, которые отдают ответ человеку, — панель принимает только из окна человека: из панели в установленном браузере, с телефона через Tailscale Serve с токеном и из кнопок Telegram. Запрос из терминала, скрипта или браузера под автоматизацией получает отказ 403, так что ответить за человека модель не может и через свою оболочку.",
+        "en": "Human decisions — D-n, permissions, branch decisions, answers to questions, settings edits and other routes that hand the answer to a human — are accepted only from the human's window: the panel in an installed browser, the phone through Tailscale Serve with the token, and Telegram buttons. A request from a terminal, a script or a browser under automation gets a 403, so the model cannot answer for the human even through its own shell."
+      },
+      "how": {
+        "ru": "Панель смотрит, какой процесс держит соединение, по таблицам ОС и пускает только браузер, запущенный обычным образом; подделанный X-Forwarded-For не помогает. На Windows такая проверка занимает 1–2 секунды; если таблицы ОС не прочитались — ответ 503 «повторите через несколько секунд».",
+        "en": "The panel looks up which process holds the connection in the OS tables and admits only a browser started the normal way; a forged X-Forwarded-For does not help. On Windows the check takes 1–2 seconds; if the OS tables could not be read the answer is 503 “retry in a few seconds”."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Решение по D-n не теряется и не повторяется после паузы, перезапуска панели или нескольких исходов сразу; переоткрытый D-n снова приходит в Telegram, а повреждённый файл ответов больше не останавливает панель.",
+        "en": "A decision on a D-n is no longer lost or repeated after a pause, a panel restart or several outcomes at once; a reopened D-n reaches Telegram again, and a corrupt answers file no longer stops the panel."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Добор процессов копии после паузы снимает только то, что запустила панель: процесс, поднятый человеком в копии группы, остаётся. Оставшийся процесс группы опознаётся по реестру запусков сервера, а где родительская оболочка не оставила следа — по метке группы в окружении (Windows, Linux, macOS). Продолжение прогона после перезапуска панели вызывает тот же CLI, которым прогон был запущен.",
+        "en": "Sweeping a copy's processes after a pause removes only what the panel started: a process a human launched in the group's copy stays. A leftover group process is recognised by the server's launch registry, and where the parent shell left no trace — by the group mark in its environment (Windows, Linux, macOS). Resuming a run after a panel restart calls the same CLI that started it."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Журнал проверок учитывает окружение запуска: прогон с другими переменными окружения, другой версией node или другим preload идёт заново, а не повторяет записанный зелёный. Сборка vite с каталогом вывода из конфига тоже повторяется. Запись живёт 72 часа от последнего использования, запись живой ветки не стареет; хранилище раз в час чистится до 1 ГБ, а записи копии группы удаляются вместе с копией.",
+        "en": "The verify ledger takes the launch environment into account: a run with other environment variables, another node version or another preload runs again instead of replaying the recorded green. A vite build with the output directory from the config is replayed too. A record lives 72 hours from its last use, a record of live branch work does not expire; the store is trimmed hourly to 1 GB, and a group copy's records go away with the copy."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правка сервера панели больше не обрывает живой ход группы или чата: перезапуск ждёт конца хода без предела по времени, а плашка перезапуска называет, сколько ходов он ждёт. Предел в 30 минут остался только на случай, когда журнал ходов не прочитать.",
+        "en": "An edit of the panel server no longer cuts off a live turn of a group or a chat: the restart waits for the turn to end with no time limit, and the restart plate names how many turns it waits for. The 30-minute limit remains only for when the turn ledger cannot be read."
+      },
+      "area": {
+        "ru": "Запуск",
+        "en": "Startup"
+      },
+      "images": ["dev-restart-before.png", "dev-restart-after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Команды инструмента PowerShell проходят те же проверки, что и команды Bash. В авторежиме CLI пуш в основную ветку, удаление веток и файлов и слияние из PowerShell больше не проходят мимо панели: в группе и в одиночном чате их решает человек, а запрет пуша до звена доставки действует и для PowerShell. Тумблер «Права автоматом» тоже судит команды PowerShell по правилам безвозвратности.",
+        "en": "PowerShell tool commands get the same checks as Bash commands. In the CLI auto mode a push to the main branch, branch and file deletion and merges from PowerShell no longer bypass the panel: in a group and in a single chat a human decides them, and the push ban before the delivery stage covers PowerShell too. The «Permissions auto» toggle also judges PowerShell commands by the irreversibility rules."
+      }
+    }
+  ]
+}

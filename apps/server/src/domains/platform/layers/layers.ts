@@ -161,7 +161,16 @@ export function userMemoryExcludes(
   if (at < 0) return undefined;
   const sources = (args[at + 1] ?? '').split(',');
   if (sources.includes('user') || !sources.includes('project')) return undefined;
+  return personalMemoryExcludes(place);
+}
 
+/**
+ * Шаблоны `claudeMdExcludes` для личного `CLAUDE.md` (и `AGENTS.md`) — без
+ * условия на источники: и тот, что CLI читает как личный, и тот, что находит
+ * поиском вверх как проектный. Звено группы получает их, когда личные правила
+ * заменяет карточка (`groupRulesCardSwap`).
+ */
+export function personalMemoryExcludes(place: UserMemoryPlace): string[] {
   const win = place.platform === 'win32';
   const p = win ? win32 : posix;
   const home = homeOf(place);

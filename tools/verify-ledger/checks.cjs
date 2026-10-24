@@ -193,8 +193,38 @@ function viteMatch(args, cwd) {
     return { noSkip: 'vite config unreadable', outputs: [] };
   }
   if (/\broot\s*:/.test(text)) return { noSkip: 'vite root from config', outputs: [] };
-  if (!outDir && /\boutDir\b/.test(text)) return { noSkip: 'vite outDir from config', outputs: [] };
-  return { noSkip: null, outputs: [path.resolve(root, outDir ?? 'dist')] };
+  const fromConfig = outDir ? null : configOutDir(text);
+  if (fromConfig === false) return { noSkip: 'vite outDir from config', outputs: [] };
+  return { noSkip: null, outputs: [path.resolve(root, outDir ?? fromConfig ?? 'dist')] };
+}
+
+/**
+ * `outDir` конфига: `null` — его нет (каталог по умолчанию), строка — единственное
+ * `outDir: '<литерал>'` прямо внутри `build: { … }`, `false` — что-то иное (выражение,
+ * несколько вхождений, ключ плагина): каталог не угадываем, прогон не повторяется.
+ * 24.10: все сборки проектов с `build: { outDir: 'dist' }` шли промахом — 35 зелёных
+ * сборок на уже зелёном ключе (31 мин) за двое суток. Ошибку в другую сторону ловит
+ * запись: каталог, в который прогон ничего не написал, хранится как негодный (`packDir`),
+ * и повтора нет.
+ */
+function configOutDir(text) {
+  const all = [...text.matchAll(/\boutDir\b/g)];
+  if (all.length === 0) return null;
+  if (all.length > 1) return false;
+  const at = all[0].index;
+  const literal = /^outDir\s*:\s*(['"`])([^'"`$\\\n]+)\1\s*[,}\n]/.exec(text.slice(at));
+  if (!literal) return false;
+  // Ближайшая открытая скобка над `outDir` — от `build:`; иначе это ключ чужого объекта.
+  let depth = 0;
+  for (let i = at - 1; i >= 0; i -= 1) {
+    const c = text[i];
+    if (c === '}') depth += 1;
+    else if (c === '{') {
+      if (depth > 0) depth -= 1;
+      else return /\bbuild\s*:\s*$/.test(text.slice(Math.max(0, i - 40), i)) ? literal[2] : false;
+    }
+  }
+  return false;
 }
 
 const MATCHERS = {
@@ -301,4 +331,32 @@ function gitTimeoutMs(env = process.env) {
   return knob > 0 ? knob : 60_000;
 }
 
-module.exports = { recognize, findRegistry, slash, gitTimeoutMs, TOOLS };
+/**
+ * Замок панели во входе preload (F-30): `bin/preload-locked.cjs`, которым панель грузит журнал
+ * в CLI под замком, кладёт сюда дом журнала до загрузки preload. Окружение команды модели
+ * (`_LOCK=`, `env -u`, скрипт) этого не достаёт — сменить вход можно только сменой
+ * NODE_OPTIONS, а её видит и отбивает страж группы `gate-at-end`.
+ */
+const ENTRY_LOCK = Symbol.for('agentdeck.verify-ledger.locked');
+
+/** `{ home }` замка входа или `null`. */
+function entryLock() {
+  const lock = globalThis[ENTRY_LOCK];
+  return lock && typeof lock.home === 'string' && lock.home ? lock : null;
+}
+
+/** Под замком панели: вход под замком или `AGENTDECK_VERIFY_LEDGER_LOCK=1` в окружении. */
+function panelLocked(env = process.env) {
+  return entryLock() !== null || String(env.AGENTDECK_VERIFY_LEDGER_LOCK ?? '') === '1';
+}
+
+module.exports = {
+  recognize,
+  findRegistry,
+  slash,
+  gitTimeoutMs,
+  entryLock,
+  panelLocked,
+  ENTRY_LOCK,
+  TOOLS,
+};

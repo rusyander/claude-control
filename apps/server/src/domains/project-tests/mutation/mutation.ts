@@ -24,7 +24,7 @@ import type {
   ServerMessageCode,
 } from '@agentdeck/contracts';
 import { coded } from '../../../lib/server-text/server-text.ts';
-import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
+import { killChildTree, stopChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { watchDescendants, type DescendantWatch } from '../../../lib/process-watch.ts';
 import { git } from '../../project-git/exec/exec.ts';
 import { automationCommand, readAutomation } from '../automation/automation.ts';
@@ -578,18 +578,9 @@ export class MutationChecks {
     // проверка занята: новая пошла бы поверх, а папку под ним не удалить (ревью PR #1).
     live.cleaning = true;
     const child = live.child;
+    // Команда, пропустившая мягкий сигнал, держала бы проверку и копию вечно.
     if (child) {
-      killChildTree(child, { group: process.platform !== 'win32' });
-      // Команда, пропустившая мягкий сигнал, держала бы проверку и копию вечно.
-      setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) {
-          try {
-            child.kill('SIGKILL');
-          } catch {
-            // Уже вышла.
-          }
-        }
-      }, KILL_GRACE_MS).unref?.();
+      stopChildTree(child, { group: process.platform !== 'win32', graceMs: KILL_GRACE_MS });
     }
     return live.view;
   }

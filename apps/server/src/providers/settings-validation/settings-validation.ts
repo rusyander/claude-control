@@ -39,7 +39,7 @@ import { modelSources } from '@agentdeck/contracts/models';
 import { SPLIT_MAX_GROUPS } from '@agentdeck/contracts/task-split';
 import { SPLIT_HEAVY_RULE_MAX } from '@agentdeck/contracts/split-groups';
 import { GROUP_ECONOMY_LIMITS } from '@agentdeck/contracts/group-economy';
-import { groupWatchPatchSchema } from '@agentdeck/contracts/group-watch';
+import { groupWatchPatchSchema, groupWatchSnapshotSchema } from '@agentdeck/contracts/group-watch';
 import { isKnownProviderId } from '../registry.ts';
 
 /**
@@ -251,6 +251,11 @@ const groupEconomyPatchSchema = object({
   sonnetDeliver: boolean(),
   freshOnColdResume: boolean(),
   workHabits: boolean(),
+  keepWarm: boolean(),
+  keepWarmPings: number()
+    .int()
+    .min(GROUP_ECONOMY_LIMITS.keepWarmPings.min)
+    .max(GROUP_ECONOMY_LIMITS.keepWarmPings.max),
 });
 
 /**
@@ -415,6 +420,8 @@ export const settingsPatchSchema = object({
   autoApproveRules: record(string(), boolean()),
   chatAutoMode: boolean(),
   chatLeanTools: boolean(),
+  deferAfterMinutes: number().int().min(0).max(1440),
+  deferredTtlDays: number().int().min(1).max(90),
   // Изменёнными ключами: маршрут сливает их с сохранённым блоком.
   groupEconomy: groupEconomyPatchSchema.partial(),
   // Пороги сторожа групп — тоже изменёнными ключами, слияние в маршруте.
@@ -453,7 +460,8 @@ const importSettingsSchema = settingsPatchSchema.extend({
   // Снимок и state.json хранят только отличия от умолчаний (`groupEconomyChanges`);
   // недостающие ключи дополняет `mergeState` умолчаниями текущего кода.
   groupEconomy: groupEconomyPatchSchema.partial().optional(),
-  groupWatch: groupWatchPatchSchema.optional(),
+  // Одно объявление с `importStateSchema` контрактов (F-67): битый порог отбрасывается поштучно.
+  groupWatch: groupWatchSnapshotSchema.optional(),
   /**
    * Активный контур. В PATCH его нет намеренно (он переключается транзакцией
    * активации), а в снимке обязан быть: без ключа zod вырезал его, тумблеры

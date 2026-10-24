@@ -8,6 +8,8 @@ import {
   DELIVERY_BLOCKED_PROBE_MS,
   DELIVERY_BLOCKED_PROBES,
   DELIVERY_RECHECK_MS,
+  DELIVERY_RETRY_MAX,
+  DELIVERY_RETRY_MS,
   MAX_DELIVERY_NUDGES,
   MAX_INTERRUPT_RESUMES,
   SplitConveyor,
@@ -73,6 +75,8 @@ function build(
     resume?: SplitConveyorDeps['resume'];
     /** Факты копии группы: были ли правки с её старта. */
     hasWork?: SplitConveyorDeps['hasWork'];
+    /** Заметки в ленту родителя. */
+    notify?: SplitConveyorDeps['notify'];
     /** Что запуск делает ВНУТРИ себя, до возврата: настоящее имя ветки, конец цепочки. */
     during?: (
       groups: number[],
@@ -121,6 +125,7 @@ function build(
     ...(options.delivery ? { delivery: options.delivery } : {}),
     ...(options.resume ? { resume: options.resume } : {}),
     ...(options.hasWork ? { hasWork: options.hasWork } : {}),
+    ...(options.notify ? { notify: options.notify } : {}),
     log: () => undefined,
     now: () => new Date(2026, 8, 9, 12, 0, (tick += 1)),
   });
@@ -748,6 +753,29 @@ describe('SplitConveyor: доставка по фактам git', () => {
     });
   });
 
+  // Живое разделение 22.10: MR создан, но в описании не хватало пунктов — кнопка
+  // MR была только у группы без пробелов, у прочих ссылка жила лишь в хвосте.
+  it('MR найден, а для сдачи чего-то не хватает — MR на группе сразу, и при напоминании, и при сбое', async () => {
+    const missing = ['в описании MR нет раздела «Проверка»'];
+    const h = deliveryHarness(
+      [
+        { missing, mr: MR },
+        { missing, mr: MR },
+      ],
+      'refused',
+    );
+    const { conveyor, records, link, wait } = await started(h.delivery);
+    const group = () => records.get('родитель')?.groups[0];
+
+    conveyor.onChainEnded(link(0), { status: 'done' });
+    await wait();
+    expect(group()).toMatchObject({ status: 'awaiting', waitingFor: 'delivery', mr: MR });
+    expect(conveyor.view(['родитель'])?.groups[0]?.mr).toBe(MR);
+
+    await h.fire();
+    expect(group()).toMatchObject({ status: 'failed', mr: MR });
+  });
+
   it('не хватает — одна повторная сверка, затем напоминание группе со списком; ответ — снова «работает»', async () => {
     const missing = ['ветка feature/login не отправлена на удалённый'];
     const h = deliveryHarness([{ missing }, { missing }]);
@@ -780,9 +808,16 @@ describe('SplitConveyor: доставка по фактам git', () => {
     expect(records.get('родитель')?.groups[0]?.status).toBe('started');
   });
 
-  it(`после ${MAX_DELIVERY_NUDGES} напоминаний — failed с причиной, ждавших отпускает`, async () => {
+  // Решение владельца 23.10: живая группа (MR уже открыт) встала после двух
+  // напоминаний, хотя каждое что-то двигало. Сдаётся только напоминание,
+  // которое ничего не изменило, или потолок.
+  it(`группа движется — напоминания идут до потолка ${MAX_DELIVERY_NUDGES}, затем failed с причиной «потолок»`, async () => {
     const missing = ['нет MR, чья голова — HEAD копии'];
-    const answers = Array.from({ length: 2 * (MAX_DELIVERY_NUDGES + 1) }, () => ({ missing }));
+    // Каждый круг — новая голова ветки: группа что-то сделала (rebase, коммит).
+    const answers = Array.from({ length: MAX_DELIVERY_NUDGES + 1 }, (_, round) => [
+      { missing, head: `h${round}` },
+      { missing, head: `h${round}` },
+    ]).flat();
     const h = deliveryHarness(answers);
     const { conveyor, records, link, wait } = await started(h.delivery);
 
@@ -793,11 +828,86 @@ describe('SplitConveyor: доставка по фактам git', () => {
       if (round < MAX_DELIVERY_NUDGES) conveyor.onChainResumed(link(0), 'new-0');
     }
 
+    expect(MAX_DELIVERY_NUDGES).toBeGreaterThan(2);
     expect(h.nudges).toHaveLength(MAX_DELIVERY_NUDGES);
     const group = records.get('родитель')?.groups[0];
     expect(group?.status).toBe('failed');
     expect(group?.error).toContain('доставка не доведена');
+    expect(group?.error).toContain(`напомнила группе ${MAX_DELIVERY_NUDGES} раз`);
     expect(group?.error).toContain(missing[0]);
+    // Причина — первым пунктом (F-23: `error` карточка не показывает), за ней пробелы списком.
+    expect(group?.deliveryMissing?.[0]).toContain(`напомнила группе ${MAX_DELIVERY_NUDGES} раз`);
+    expect(group?.deliveryMissing?.slice(1)).toEqual(missing);
+  });
+
+  it('пробелы сменились при той же голове (сдан отчёт) — это движение, напоминание идёт', async () => {
+    const first = ['сито project-checks не отчитано'];
+    const second = ['сито boundary-negative не отчитано'];
+    const h = deliveryHarness([
+      { missing: first, head: 'h1' },
+      { missing: first, head: 'h1' },
+      { missing: second, head: 'h1' },
+      { missing: second, head: 'h1' },
+    ]);
+    const { conveyor, records, link, wait } = await started(h.delivery);
+
+    for (let round = 0; round < 2; round += 1) {
+      conveyor.onChainEnded(link(0), { status: 'done' });
+      await wait();
+      await h.fire();
+      conveyor.onChainResumed(link(0), 'new-0');
+    }
+
+    expect(h.nudges).toHaveLength(2);
+    expect(records.get('родитель')?.groups[0]?.status).not.toBe('failed');
+  });
+
+  it('напоминание ничего не изменило (та же голова, те же пробелы) — failed сразу, с причиной', async () => {
+    const missing = ['сито «интеграция»: конфликт в a.ts'];
+    const h = deliveryHarness([
+      { missing, head: 'h1' },
+      { missing, head: 'h1' },
+      { missing, head: 'h1' },
+      { missing, head: 'h1' },
+    ]);
+    const { conveyor, records, link, wait } = await started(h.delivery);
+
+    conveyor.onChainEnded(link(0), { status: 'done' });
+    await wait();
+    await h.fire();
+    expect(h.nudges).toHaveLength(1);
+    conveyor.onChainResumed(link(0), 'new-0');
+
+    conveyor.onChainEnded(link(0), { status: 'done' });
+    await wait();
+    await h.fire();
+
+    expect(h.nudges).toHaveLength(1);
+    const group = records.get('родитель')?.groups[0];
+    expect(group?.status).toBe('failed');
+    expect(group?.error).toContain('напоминание 1 ничего не изменило');
+    expect(group?.deliveryMissing?.[0]).toContain('напоминание 1 ничего не изменило');
+    expect(group?.deliveryMissing?.slice(1)).toEqual(missing);
+  });
+
+  it('заметки доставки группу не держат: done, заметки на записи и в ленте родителя', async () => {
+    const notes = ['сито browser-focus: не проверено: нет браузера'];
+    const h = deliveryHarness([{ missing: [], mr: MR, notes }]);
+    const notices: unknown[] = [];
+    const built = build({
+      delivery: h.delivery,
+      notify: (_parent, event) => void notices.push(event),
+    });
+    await built.begin();
+    built.conveyor.onTriageFinished(finished('Ничего не нашёл.'), ['new-1-triage']);
+    await built.wait();
+
+    built.conveyor.onChainEnded(built.link(0), { status: 'done' });
+    await new Promise((done) => setTimeout(done, 5));
+
+    const group = built.records.get('родитель')?.groups[0];
+    expect(group).toMatchObject({ status: 'done', mr: MR, deliveryNotes: notes });
+    expect(notices).toEqual([expect.objectContaining({ textCode: 'split-delivery-notes-notice' })]);
   });
 
   it('напоминание не ушло (чат не продолжить) — сразу failed, а не вечное ожидание', async () => {
@@ -812,9 +922,9 @@ describe('SplitConveyor: доставка по фактам git', () => {
     expect(records.get('родитель')?.groups[0]?.status).toBe('failed');
   });
 
-  it('удалённый не отвечает — проверки с паузами, потом «заблокирована сервисом», потом failed', async () => {
+  it('удалённый не отвечает — проверки с паузами, «заблокирована сервисом», повторы панели, потом failed', async () => {
     const down = { missing: [], unreachable: 'Could not resolve host' };
-    const total = DELIVERY_RECHECK_MS.length + DELIVERY_BLOCKED_PROBES + 1;
+    const total = DELIVERY_RECHECK_MS.length + DELIVERY_BLOCKED_PROBES + 1 + DELIVERY_RETRY_MAX;
     const h = deliveryHarness(Array.from({ length: total }, () => down));
     const { conveyor, records, link, wait } = await started(h.delivery);
 
@@ -835,13 +945,28 @@ describe('SplitConveyor: доставка по фактам git', () => {
       expect(h.timers[0]?.ms).toBe(DELIVERY_BLOCKED_PROBE_MS);
       await h.fire();
     }
+    // Запас кончился — не failed сразу (трасса автономии 24.10, §2): панель
+    // повторяет сверку сама, по одной попытке за раз, до потолка повторов.
+    for (let attempt = 1; attempt <= DELIVERY_RETRY_MAX; attempt += 1) {
+      const waiting = records.get('родитель')?.groups[0];
+      expect(waiting).toMatchObject({ status: 'awaiting', waitingFor: 'delivery' });
+      expect(waiting?.deliveryRetry).toMatchObject({ count: attempt, kind: 'verify' });
+      expect(waiting?.deliveryMissing?.[0]).toContain(`повтор ${attempt} из ${DELIVERY_RETRY_MAX}`);
+      expect(waiting?.deliveryMissing?.[1]).toContain('Could not resolve host');
+      expect(h.timers.map((timer) => timer.ms)).toEqual([DELIVERY_RETRY_MS]);
+      await h.fire();
+    }
 
     const group = records.get('родитель')?.groups[0];
     expect(group?.status).toBe('failed');
     expect(group?.error).toContain('Could not resolve host');
+    expect(group?.deliveryMissing?.[0]).toContain(
+      `панель повторила доставку сама (повторов: ${DELIVERY_RETRY_MAX})`,
+    );
     expect(group?.blockedSince).toBeUndefined();
     expect(h.timers).toEqual([]);
     expect(h.nudges).toEqual([]);
+    expect(h.asked).toHaveLength(total);
   });
 
   // T7: агент назвал чужой MR («зависит от !789») — в запись группы попадает

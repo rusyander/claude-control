@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic/PlatformTopic.tsx",
-      "confirmedAt": "2026-10-15T15:27:44.509Z",
+      "confirmedAt": "2026-10-22T20:42:01.939Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -34,7 +34,7 @@
         {
           "path": "apps/server/src/domains/platform/gateway/pipeline/pipeline.ts",
           "why": "«Путь одного запроса»: что панель делает с запросом между CLI и контуром",
-          "sha": "7d369a3d39fe4e2b"
+          "sha": "a1a3d5e384981a09"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/status/status.ts",
@@ -64,7 +64,7 @@
         {
           "path": "packages/contracts/src/platform-models.ts",
           "why": "«Модель и глубина продумывания»: порядок выбора модели прогона и подмена незнакомого имени",
-          "sha": "dd863eda1bda0c03"
+          "sha": "804fbee55b882761"
         },
         {
           "path": "apps/web/src/pages/Platform/ModelCard/ModelCard.tsx",
@@ -114,7 +114,7 @@
         {
           "path": "apps/server/src/domains/platform/routing/routing.ts",
           "why": "«Модель и глубина продумывания»: чем пойдёт прогон и что отвечает шапке чата",
-          "sha": "5ae934814aa0ab75"
+          "sha": "06dbd1f26fd016b8"
         },
         {
           "path": "packages/contracts/src/platform-consumers.ts",
@@ -219,12 +219,12 @@
         {
           "path": "apps/server/src/domains/platform/layers/layers.ts",
           "why": "«Наши слои»: какой флаг снимает какой слой и почему личные правила, хуки и права уходят вместе",
-          "sha": "9a358d3a0dc93de1"
+          "sha": "1cc5a55d9527fb38"
         },
         {
           "path": "apps/server/src/domains/platform/spend/spend.ts",
           "why": "«Бюджет и расход»: две цифры, период, исчерпанный ключ (402)",
-          "sha": "a5336266ad913194"
+          "sha": "9680e4d3b6183a2d"
         },
         {
           "path": "apps/server/src/domains/platform/apply/targets.ts",
@@ -483,59 +483,99 @@
       "document": "apps/web/src/pages/Help/topics/ChatTopic/ChatTopic.tsx",
       "sources": [
         {
+          "path": "apps/server/src/domains/chat/tests-gate/tests-gate.ts",
+          "why": "Доставка группы: какие кейсы держат «доставлено», красное не из-за ветки — заметка в MR, а не остановка",
+          "sha": "6c37dae7eb97c5aa"
+        },
+        {
+          "path": "apps/server/src/domains/chat/keep-warm/keep-warm.ts",
+          "why": "«Тёплый кэш ожидания»: когда пинг, попадание и промах, итог ожидания — сбережено или расход",
+          "sha": "9778ab63e244ce79"
+        },
+        {
+          "path": "apps/server/src/bootstrap/keep-warm-wiring/keep-warm-wiring.ts",
+          "why": "«Тёплый кэш ожидания»: какие ожидания получают пинг, отказы лимита, когда подводится итог",
+          "sha": "d4b6da939cee6731"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/lib/tokenLedgerText.ts",
+          "why": "«Тёплый кэш ожидания»: что показывает строка «тёплый кэш» на карточке группы",
+          "sha": "54a59b2a9d842a01"
+        },
+        {
           "path": "apps/server/src/domains/chat/ChatRunner/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "7d67a0115848db11"
+          "sha": "260e5c2b1b2a0062"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions/ChatPermissions.ts",
           "why": "«Карточка разрешения»: как вопрос агента доходит до человека и что значит ответ",
-          "sha": "da82c8f55fc692d9"
+          "sha": "442f1c02281b143e"
         },
         {
           "path": "apps/server/src/domains/chat/auto-approve/auto-approve.ts",
           "why": "«Меню разговора»: тумблеры прав и правила, разрешающие без вопроса",
-          "sha": "ce54e8b87ed626e1"
+          "sha": "3b637bfb026c717e"
+        },
+        {
+          "path": "apps/server/src/domains/chat/group-questions/group-questions.ts",
+          "why": "«Развилки группы: по плану»: какой вариант берётся, что считается зовом человека, свободный ответ",
+          "sha": "676e534d1a481743"
+        },
+        {
+          "path": "apps/server/src/domains/chat/group-questions/group-wait.ts",
+          "why": "«Развилки группы: по плану»: какое ожидание текстом продолжается, повтор с решениями, предел подряд",
+          "sha": "26c4ff2a38bc9608"
         },
         {
           "path": "apps/server/src/domains/chat/ChatHandoff/ChatHandoff.ts",
           "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
-          "sha": "4f3f56a14af57fa5"
+          "sha": "d291bc1ff17b31ef"
         },
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "e82eac05195fdf7f"
+          "sha": "02b6bad3a9f50b45"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "337b8a75cb2bb1be"
+          "sha": "abfe4b7e0d916542"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
           "why": "«Перепроверить MR»: что панель читает из MR и когда отказывает",
-          "sha": "2271e5cd36ee8095"
+          "sha": "f5a6b3c83bbb3e01"
         },
         {
           "path": "apps/server/src/domains/chat/main-sync/main-sync.ts",
           "why": "«Права группы»: догон целевой ветки — отказ без конфликта, голый догон при конфликте сам",
-          "sha": "ca45e1b04f4c30b6"
+          "sha": "a5ab6eb68c6b2a8a"
         },
         {
           "path": "apps/server/src/domains/chat/group-command/group-command.ts",
           "why": "«Права группы»: рутина без карточки и что всегда карточка",
-          "sha": "18898a26a09ccae9"
+          "sha": "e654b1e57f6d788c"
+        },
+        {
+          "path": "apps/server/src/domains/chat/group-command/targets.ts",
+          "why": "«Права группы»: что удаление теряет — временное, восстановимое git, защищённое",
+          "sha": "28668d851f1ebe55"
+        },
+        {
+          "path": "apps/server/src/domains/chat/group-command/git-verdict.ts",
+          "why": "«Права группы»: git — branch -d, worktree remove, stash drop, откат файлов, push",
+          "sha": "c34de0d78df744f1"
         },
         {
           "path": "apps/server/src/domains/verify-ledger/verify-ledger.ts",
           "why": "«Журнал проверок»: установка, самопроверка, кому подмешивается, сводка плитки",
-          "sha": "4a2b20256fddcb72"
+          "sha": "83f9d693c59f193b"
         },
         {
           "path": "tools/verify-ledger/preload.cjs",
           "why": "«Журнал проверок»: режимы shadow/on/off, когда прогон записывается и когда повторяется",
-          "sha": "68d971611e92ae8b"
+          "sha": "abb36d675f58cc45"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap/split-overlap.ts",
@@ -545,42 +585,62 @@
         {
           "path": "apps/server/src/domains/chat/token-ledger/watch/rules.ts",
           "why": "«Сторож групп»: какие правила и на каком условии срабатывают",
-          "sha": "5995cdcb0fea70bd"
+          "sha": "292579496b1382ef"
         },
         {
           "path": "apps/server/src/domains/chat/token-ledger/watch/reduce.ts",
           "why": "«Сторож групп»: что считается правкой, проверкой, чтением целиком и публикацией",
-          "sha": "a9a72055a74ddeee"
+          "sha": "b3218fb96ad483ad"
         },
         {
           "path": "apps/server/src/domains/notify/telegram.ts",
           "why": "«Сторож групп»: что именно уходит в Telegram о сигнале",
-          "sha": "c3195621beb47ee8"
+          "sha": "c66311411c345fb0"
         },
         {
           "path": "apps/web/src/pages/Settings/GroupWatchCard/GroupWatchCard.tsx",
           "why": "«Сторож групп»: карточка порогов в настройках",
-          "sha": "e288da0a2ea02ee4"
+          "sha": "096c1d2ab711252b"
         },
         {
           "path": "apps/server/src/domains/chat/token-ledger/watch/signals.ts",
           "why": "«Сторож групп»: сигнал закрывается сам, что и как часто уходит в Telegram",
-          "sha": "5d3957143d25581f"
+          "sha": "2eafe9cfc4aa4a82"
         },
         {
           "path": "packages/contracts/src/group-watch.ts",
           "why": "«Сторож групп»: пороги из коробки и важность правил",
-          "sha": "f4345bb818e030f4"
+          "sha": "ed578a8f86a12273"
         },
         {
           "path": "apps/web/src/features/ChatMessages/ui/GroupSignals/GroupSignals.tsx",
           "why": "«Сторож групп»: остров в карточке группы, «Открыть чат», свёрнутые закрытые",
-          "sha": "4a49b7067d79b16f"
+          "sha": "ebe39dc01cd5f7f3"
+        },
+        {
+          "path": "apps/server/src/domains/chat/token-ledger/watch/rules-incidents.ts",
+          "why": "«Сторож групп»: правила R24–R33 и их условия",
+          "sha": "087603bcf04c1399"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/ui/ChatWatchIsland/ChatWatchIsland.tsx",
+          "why": "«Сторож групп»: остров «Сторож чата» над лентой одиночного чата",
+          "sha": "9ee6b6be8c036e5c"
+        },
+        {
+          "path": "apps/server/src/domains/chat/token-ledger/watch/group-watcher/group-sweep.ts",
+          "why": "«Сторож групп»: R22 группа стоит без хода (порог, втрое — тревога, причина), R28 напоминания впустую",
+          "sha": "0825e26636c5f901"
+        },
+        {
+          "path": "apps/server/src/domains/chat/token-ledger/watch/group-watcher/correlate.ts",
+          "why": "«Сторож групп»: R23 одна беда в нескольких группах плана — одна тревога на план",
+          "sha": "b590508c2363434c"
         },
         {
           "path": "apps/server/src/domains/chat/tree-pause/tree-pause.ts",
           "why": "«Пауза дерева»: ответ всегда от корня, продолжение всего дерева",
-          "sha": "abc772d2360eefff"
+          "sha": "0c182a7e4bb83281"
         },
         {
           "path": "apps/server/src/domains/media/images.ts",
@@ -625,12 +685,12 @@
         {
           "path": "packages/contracts/src/sieves/judge.ts",
           "why": "«Сита перед MR»: что держит «готово» — механика панели, названные файлы и команды, свежесть строки, прогон блока «Тесты»",
-          "sha": "09a384bb002bbfcf"
+          "sha": "1a82d7f521eb1a95"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-gate/sieve-gate.ts",
           "why": "«Сита перед MR»: абзац сит только группе с доставкой, пробелы становятся напоминанием доставки",
-          "sha": "2de528fc07771bb6"
+          "sha": "fca2e0682df37729"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-store/sieve-store.ts",
@@ -725,7 +785,7 @@
         {
           "path": "apps/server/src/domains/chat/group-profile/group-profile.ts",
           "why": "Лёгкий профиль группы: набор MCP, навыки по имени, дописка с правилом расхода, хуки трекера и очереди; запреты звена, пока впереди доставка или ревью; слияние закрыто каждому звену",
-          "sha": "85cd4459acb13eb5"
+          "sha": "1259dc03b613c072"
         },
         {
           "path": "apps/server/src/domains/chat/group-profile/bash-ceiling.ts",
@@ -735,27 +795,27 @@
         {
           "path": "packages/contracts/src/group-economy.ts",
           "why": "«Экономия групп»: рычаги, их значения из коробки и границы",
-          "sha": "60a4a4048ba1bee3"
+          "sha": "fafbc6edbb7b009e"
         },
         {
           "path": "apps/server/src/domains/chat/ChatCascadeStages/ChatCascadeStages.ts",
           "why": "«Доставка»: когда звено доставки идёт на Sonnet и с какой глубиной",
-          "sha": "2bb5d7b4726dfdc0"
+          "sha": "029082dc9e7852b3"
         },
         {
           "path": "apps/server/src/domains/chat/group-continuation/group-continuation.ts",
           "why": "«Новый разговор после долгой паузы»: 55 / 4 минуты простоя и база + 25 тысяч; тёплая доставка до 200 тысяч и 60 %; «/clear» группы по 60 %",
-          "sha": "4ffdf793cb6a76ac"
+          "sha": "50e2156a4e8cf651"
         },
         {
           "path": "apps/server/src/domains/chat/cold-continuation/cold-continuation.ts",
           "why": "«Новый разговор после долгой паузы»: одно решение на каждом пути продолжения группы (слово панели, повтор, «Продолжить всё», ответ человека)",
-          "sha": "4e7a002a582fff4f"
+          "sha": "a2aab8a4bed4456e"
         },
         {
           "path": "apps/server/src/domains/chat/cold-brief/cold-brief.ts",
           "why": "Вводная нового разговора группы: что панель собирает из файлов (задачи, задание стадии, блокнот, тикеты, заметки, коммиты, последний ответ)",
-          "sha": "076fc1044f8a6b0e"
+          "sha": "1d16ef2bedc76598"
         },
         {
           "path": "apps/server/src/domains/project-git/seed-node-modules.ts",
@@ -770,12 +830,12 @@
         {
           "path": "tools/verify-ledger/delta.cjs",
           "why": "Журнал проверок: сужение vitest от последнего зелёного и когда прогон снова целиком",
-          "sha": "13ac0a804bb94360"
+          "sha": "c39f8bf747e58abb"
         },
         {
           "path": "tools/verify-ledger/checks.cjs",
           "why": "Журнал проверок: какие запуски — проверка (vitest, tsc, eslint, prettier, сборка vite) и когда сборка не повторяется",
-          "sha": "1da900759d1220ad"
+          "sha": "4e300d5efd33ad3b"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/recheck-session.ts",
@@ -796,9 +856,59 @@
           "path": "apps/web/src/features/ChatMessages/lib/cardQuestions.ts",
           "why": "Чей вопрос — островком в карточке группы, а чей — в полосе над сводкой",
           "sha": "fca5d825581e4b20"
+        },
+        {
+          "path": "apps/server/src/domains/chat/deferred-asks/store.ts",
+          "why": "«Отложенные вопросы D-n»: срок жизни D-n, срок выданного разрешения, переходы состояний",
+          "sha": "876960617e4c4bb7"
+        },
+        {
+          "path": "apps/server/src/domains/chat/deferred-asks/texts.ts",
+          "why": "«Отложенные вопросы D-n»: что агент получает вместо ответа и что видит после решения",
+          "sha": "68be0443fb87e3ac"
+        },
+        {
+          "path": "apps/server/src/routes/chat/run-routes/deferred-bridge.ts",
+          "why": "«Отложенные вопросы D-n»: когда карточка становится D-n, что отказывается сразу, запреты доставки при открытом D-n",
+          "sha": "506e3b46cce1e8e0"
+        },
+        {
+          "path": "apps/web/src/features/DeferredAsksBanner/ui/DeferredAsksBanner.tsx",
+          "why": "«Отложенные вопросы D-n»: полоса «Ждёт решения» над чатом и её кнопки",
+          "sha": "f8c7bdb8daf1a513"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/ui/HubDeferred/HubDeferred.tsx",
+          "why": "«Отложенные вопросы D-n»: раздел хаба группы со списком D-n",
+          "sha": "1f47808fb2e16923"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/ui/SplitTicketResolve/SplitTicketResolveBody.tsx",
+          "why": "«Разобрать…»: что окно показывает до публикации и после — повторы, связки по файлу, «уже была открыта»",
+          "sha": "a506a561d4f41b06"
+        },
+        {
+          "path": "apps/server/src/domains/chat/split-ticket-batch/publish.ts",
+          "why": "«Опубликовать в Jira»: сначала поиск открытых задач, комментарий вместо копии, при сбое поиска не заводится ничего",
+          "sha": "c803809d55717db1"
+        },
+        {
+          "path": "apps/server/src/domains/chat/split-ticket-batch/file-one.ts",
+          "why": "«Завести» у строки: та же сверка с открытыми задачами, комментарий вместо копии",
+          "sha": "094253a399979db0"
+        },
+        {
+          "path": "packages/contracts/src/split-ticket-batch.ts",
+          "why": "Что считается повтором и какие дефекты собираются в одну задачу",
+          "sha": "af20309bd8e44367"
+        },
+        {
+          "path": "apps/web/src/features/ChatMessages/ui/SplitTicketFile/SplitTicketFile.tsx",
+          "why": "Строка предложения: «Завести», подпись «уже была открыта — добавлено комментарием»",
+          "sha": "363a1b61bd18425d"
         }
       ],
-      "confirmedAt": "2026-10-21T21:53:51.406Z"
+      "confirmedAt": "2026-10-24T14:28:52.786Z"
     },
     {
       "topic": "tests",
@@ -807,7 +917,7 @@
         {
           "path": "apps/server/src/domains/project-tests/runs/runs.ts",
           "why": "«Запись прогона»: собирается из файлов кейсов, штамп lastRunId, пустая запись; «Сгенерировать кейсы пишет и код тестов»: черновик применяется сам, сверка папки и статусы из свежего отчёта junit",
-          "sha": "4520756d812a5655"
+          "sha": "ff553289db79b9f4"
         },
         {
           "path": "apps/server/src/domains/project-tests/impact/impact.ts",
@@ -837,7 +947,7 @@
         {
           "path": "apps/server/src/domains/project-tests/import-results/import-results.ts",
           "why": "«Импорт из CI»: отчёт junit становится записью прогона",
-          "sha": "b27a308d82f650c7"
+          "sha": "956aeadd4fffbbf5"
         },
         {
           "path": "apps/server/src/domains/project-tests/coverage-matrix/coverage-matrix.ts",
@@ -882,7 +992,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-run/e2e-run.ts",
           "why": "«Прогнать автотесты», «Прогон лёг в историю»: команда фреймворка, junit в каталоге панели, одна запись истории, отказ при прогоне агента",
-          "sha": "3bf199015bf09967"
+          "sha": "eb464ab9d0cf791e"
         },
         {
           "path": "apps/server/src/domains/project-tests/e2e-parse-pytest.ts",
@@ -967,7 +1077,7 @@
         {
           "path": "apps/server/src/domains/project-tests/mutation/mutation.ts",
           "why": "«Проверка набора поломкой»: копия, виды поломки, поймал / не заметил / нет результата, уборка копии",
-          "sha": "d3c27824bc564978"
+          "sha": "09e3aac690f4335a"
         },
         {
           "path": "apps/server/src/domains/project-tests/mutation-stand/mutation-stand.ts",
@@ -982,7 +1092,7 @@
         {
           "path": "apps/server/src/lib/dev-watch.mjs",
           "why": "«Проверка набора поломкой»: перезапуск dev-сервера панели ждёт конца идущих проверок",
-          "sha": "004fd5148321e5c7"
+          "sha": "ed4ad2fa417615a1"
         },
         {
           "path": "apps/server/src/domains/project-tests/suites/suites.ts",
@@ -997,15 +1107,25 @@
         {
           "path": "apps/server/src/domains/project-tests/turn-gate/turn-gate.ts",
           "why": "какие пробелы проверка конца хода называет агенту",
-          "sha": "3c67d6372e46c91a"
+          "sha": "60cbcd8eee6cc5c0"
         },
         {
           "path": "apps/server/src/domains/project-tests/automation/native-reports.ts",
           "why": "ошибка сборки пакета — только его строки",
           "sha": "b87cc7baba498557"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/content-stamp/content-stamp.ts",
+          "why": "Проверка конца хода: когда прогон кейса считается свежим — отпечаток содержимого покрытых файлов, иначе время",
+          "sha": "b320ebf79fec6603"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/red-verdict/red-verdict.ts",
+          "why": "Проверка конца хода: исполненный красный не снимается записью «прошёл» словом",
+          "sha": "8c3dbfdb5307309b"
         }
       ],
-      "confirmedAt": "2026-10-21T20:15:36.100Z"
+      "confirmedAt": "2026-10-24T09:52:17.846Z"
     },
     {
       "topic": "rules",
@@ -1054,7 +1174,7 @@
         {
           "path": "apps/server/src/context.ts",
           "why": "«Границы и числа»: копия зависит от тумблера «Резервная копия перед записью»",
-          "sha": "88b37eb9cb7d0425"
+          "sha": "c47cf63b8746be85"
         },
         {
           "path": "apps/server/src/lib/app-store/disabled-rules.ts",
@@ -1067,7 +1187,7 @@
           "sha": "6aaba2a020955a76"
         }
       ],
-      "confirmedAt": "2026-10-19T21:07:03.650Z"
+      "confirmedAt": "2026-10-23T18:26:29.003Z"
     },
     {
       "topic": "claudeMd",
@@ -1116,7 +1236,7 @@
         {
           "path": "apps/server/src/providers/registry.ts",
           "why": "«Три модели инструкций»: какие CLI показывает раздел и какой у каждого файл",
-          "sha": "de2157055121c89b"
+          "sha": "689e5262b629a4e0"
         },
         {
           "path": "apps/server/src/lib/qwen-rule-md/qwen-rule-md.ts",
@@ -1126,10 +1246,10 @@
         {
           "path": "apps/server/src/context.ts",
           "why": "«Границы и числа»: копия зависит от тумблера «Резервная копия перед записью»",
-          "sha": "88b37eb9cb7d0425"
+          "sha": "c47cf63b8746be85"
         }
       ],
-      "confirmedAt": "2026-10-19T21:07:03.743Z"
+      "confirmedAt": "2026-10-23T18:26:29.117Z"
     },
     {
       "topic": "permissions",
@@ -1188,10 +1308,10 @@
         {
           "path": "apps/server/src/domains/chat/auto-approve/auto-approve.ts",
           "why": "«Разрешения в разговоре»: что автоодобрение пропускает молча и что всё равно останавливает прогон",
-          "sha": "ce54e8b87ed626e1"
+          "sha": "3b637bfb026c717e"
         }
       ],
-      "confirmedAt": "2026-10-19T18:36:08.243Z"
+      "confirmedAt": "2026-10-24T12:29:38.811Z"
     },
     {
       "topic": "mcp",
@@ -1314,25 +1434,25 @@
         {
           "path": "apps/server/src/providers/catalog/qwen.ts",
           "why": "Проектный уровень Qwen Code: хуки и скиллы проекта, которые называет документ",
-          "sha": "5a8dca9b7d9584a3"
+          "sha": "4336e944d21f3411"
         },
         {
           "path": "apps/server/src/providers/catalog/opencode.ts",
           "why": "Проектный уровень OpenCode: права, хуки только на чтение, плагины",
-          "sha": "6c532aad8d4f430d"
+          "sha": "a087c40a2e0a94e1"
         },
         {
           "path": "apps/server/src/providers/catalog/kimi.ts",
           "why": "Проектный уровень Kimi Code: скиллы и MCP есть, проектных прав нет",
-          "sha": "a823ed75a94c7a46"
+          "sha": "46785828367da3cd"
         },
         {
           "path": "apps/server/src/providers/catalog/cursor.ts",
           "why": "Проектный уровень Cursor: каталог правил вместо файла инструкций",
-          "sha": "1798a3598e80040b"
+          "sha": "63a38bc6338e0bd3"
         }
       ],
-      "confirmedAt": "2026-10-18T11:02:15.057Z"
+      "confirmedAt": "2026-10-22T20:55:39.904Z"
     },
     {
       "topic": "skills",
@@ -1586,7 +1706,7 @@
     {
       "topic": "analytics",
       "document": "apps/web/src/pages/Help/topics/AnalyticsTopic/AnalyticsTopic.tsx",
-      "confirmedAt": "2026-10-19T18:36:08.435Z",
+      "confirmedAt": "2026-10-22T21:03:13.561Z",
       "sources": [
         {
           "path": "apps/server/src/domains/usage-limits/usage-limits.ts",
@@ -1621,7 +1741,7 @@
         {
           "path": "apps/server/src/domains/analytics/pricing.ts",
           "why": "«В эквиваленте API»: откуда тарифы и что перебивает прайс",
-          "sha": "f13310ff31a3a1f1"
+          "sha": "28b1a808c618465c"
         },
         {
           "path": "apps/server/src/domains/analytics/runtime.ts",
@@ -1676,7 +1796,7 @@
         {
           "path": "apps/server/src/domains/analytics/scanner/foreign.ts",
           "why": "«Codex и Qwen Code»: какие файлы сессий читаются, вычет кэша, один след на ответ",
-          "sha": "1f2f8a55d5c4bb33"
+          "sha": "2f88b5d98b147ea5"
         },
         {
           "path": "apps/mobile/src/entities/analytics/api.ts",
@@ -1708,7 +1828,7 @@
     {
       "topic": "history",
       "document": "apps/web/src/pages/Help/topics/HistoryTopic/HistoryTopic.tsx",
-      "confirmedAt": "2026-10-13T10:58:05.851Z",
+      "confirmedAt": "2026-10-24T09:34:27.103Z",
       "sources": [
         {
           "path": "apps/server/src/domains/history/feed.ts",
@@ -1792,12 +1912,12 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic/SettingsTopic.tsx",
-      "confirmedAt": "2026-10-11T13:17:28.790Z",
+      "confirmedAt": "2026-10-23T18:26:29.859Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io/safe-io.ts",
           "why": "«Копии перед записью»: копия снимается перед каждой записью, и сколько их хранится",
-          "sha": "0997b4a3b97636af"
+          "sha": "48a82902614077b8"
         },
         {
           "path": "apps/server/src/domains/backups/backups.ts",
@@ -1848,6 +1968,16 @@
           "path": "apps/web/src/pages/Settings/model/settingsPanelDomId.ts",
           "why": "«Разделы страницы»: список и порядок вкладок, описанных в документе",
           "sha": "882865413be055f2"
+        },
+        {
+          "path": "apps/web/src/pages/Settings/GroupsTab/GroupsTab.tsx",
+          "why": "«Разделы страницы»: что лежит во вкладке «Группы» — экономия групп, сторож групп, сита",
+          "sha": "5a054f8450a2bb5d"
+        },
+        {
+          "path": "apps/web/src/pages/Settings/ModelsTab/ModelsTab.tsx",
+          "why": "Вкладка «Модели»: какие строки на ней есть, включая сроки D-n",
+          "sha": "6b189712147e38eb"
         }
       ]
     },
@@ -1941,12 +2071,12 @@
     {
       "topic": "providers",
       "document": "apps/web/src/pages/Help/topics/ProvidersTopic/ProvidersTopic.tsx",
-      "confirmedAt": "2026-10-10T11:13:53.571Z",
+      "confirmedAt": "2026-10-22T20:42:03.560Z",
       "sources": [
         {
           "path": "apps/server/src/providers/registry.ts",
           "why": "«Какие CLI есть»: состав списка и какие разделы есть у каждого",
-          "sha": "de2157055121c89b"
+          "sha": "689e5262b629a4e0"
         },
         {
           "path": "apps/server/src/providers/detect/detect.ts",
@@ -1995,7 +2125,7 @@
     {
       "topic": "integrations",
       "document": "apps/web/src/pages/Help/topics/IntegrationsTopic/IntegrationsTopic.tsx",
-      "confirmedAt": "2026-10-10T15:12:05.385Z",
+      "confirmedAt": "2026-10-23T21:03:36.189Z",
       "sources": [
         {
           "path": "apps/server/src/domains/integrations/store/store.ts",
@@ -2026,6 +2156,16 @@
           "path": "apps/server/src/domains/notify/webhook.ts",
           "why": "«Уведомления»: что именно уезжает в вебхук",
           "sha": "56e9d6e63961d4dc"
+        },
+        {
+          "path": "apps/web/src/features/IntegrationsEditor/ui/TelegramAnswers/TelegramAnswers.tsx",
+          "why": "«Ответы из Telegram»: поля блока, состояния опроса, отдельный бот",
+          "sha": "b99a86a608d9105a"
+        },
+        {
+          "path": "apps/server/src/domains/notify/telegram-answers/service.ts",
+          "why": "«Ответы из Telegram»: кто может ответить, однократные кнопки, когда вопрос уходит",
+          "sha": "ae2fbb0b1d58bfd8"
         }
       ]
     },
@@ -2330,7 +2470,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-app/actions-app.ts",
           "why": "«Что агент умеет» и «Настройки только для вас»: настройки, провайдер, эндпоинты, интеграции, DLP",
-          "sha": "13f81ee1bfaa3c96"
+          "sha": "87e658d8d16d6ea8"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-panel/actions-panel.ts",
@@ -2468,7 +2608,7 @@
           "sha": "1113e7ac61b649c5"
         }
       ],
-      "confirmedAt": "2026-10-19T21:07:03.873Z"
+      "confirmedAt": "2026-10-23T18:26:29.350Z"
     },
     {
       "topic": "portability",
@@ -2869,12 +3009,12 @@
         {
           "path": "apps/server/src/domains/groups/qwen-layer/qwen-layer.ts",
           "why": "«Группа в чате Qwen Code»: что едет слоем на прогон (MCP, хуки, правила, перечень скиллов), что нет (разрешения), системные настройки машины сохраняются",
-          "sha": "d3c1e0ea903a25bb"
+          "sha": "0c7e24055d476607"
         },
         {
           "path": "apps/server/src/domains/groups/qwen-run-layer/qwen-run-layer.ts",
           "why": "«Группа в чате Qwen Code»: слой из нескольких групп — MCP и хуки (таймаут) системными настройками, скиллы нативным каталогом, правила текстом, повтор участника — из первой группы, разрешения не передаются",
-          "sha": "3294d8d7f92ffdfd"
+          "sha": "b156ee0521efa159"
         },
         {
           "path": "apps/server/src/domains/chat/group-auto-pick/group-auto-pick.ts",
@@ -2912,12 +3052,12 @@
           "sha": "b280d6dc187cf339"
         }
       ],
-      "confirmedAt": "2026-10-20T12:01:39.513Z"
+      "confirmedAt": "2026-10-22T21:40:00.017Z"
     },
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic/PhoneTopic.tsx",
-      "confirmedAt": "2026-10-19T21:45:15.939Z",
+      "confirmedAt": "2026-10-23T18:26:29.458Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate/access-gate.ts",
@@ -2947,12 +3087,12 @@
         {
           "path": "apps/server/src/domains/chat/chat-inbox/chat-inbox.ts",
           "why": "«Главная»: работает / ждёт вас / молчит и число ожидающих ответа",
-          "sha": "c999423725c1c391"
+          "sha": "7472d13845ae715e"
         },
         {
           "path": "apps/server/src/routes/chat/inbox-routes/inbox-routes.ts",
           "why": "«Главная» и «Вопросы»: что телефон спрашивает раз в 5 секунд",
-          "sha": "ffcea7e211cceee6"
+          "sha": "1b152b52fac15af8"
         },
         {
           "path": "apps/web/src/pages/Settings/RemoteAccessCard/RemoteAccessCard.tsx",
@@ -3002,7 +3142,7 @@
         {
           "path": "apps/mobile/app/(tabs)/index.tsx",
           "why": "Кадр «Главная, панель молчит»: крутилка только от жеста, не от фонового опроса",
-          "sha": "d25ea8553bec95ca"
+          "sha": "dec0756592cd40f8"
         },
         {
           "path": "apps/mobile/app/(tabs)/settings.tsx",
@@ -3038,13 +3178,28 @@
           "path": "apps/mobile/src/shared/lib/panel-switch.ts",
           "why": "«Несколько компьютеров»: смена не останавливает работу, своё место у каждого, уведомление выбирает компьютер",
           "sha": "8dbb1594636e478f"
+        },
+        {
+          "path": "apps/mobile/src/shared/lib/runs/lifecycle.ts",
+          "why": "«Когда панель не отвечает», идущий ход и очередь: переподключение, «Связь с панелью потеряна» и повторный подхват, «Сообщение не отправлено», досылка очереди, повтор без двойной доставки",
+          "sha": "7c2ecc29f903ac5b"
+        },
+        {
+          "path": "apps/mobile/src/shared/lib/runs/stream.ts",
+          "why": "«Когда панель не отвечает», идущий ход: курсор потока со startedAt — ход, начатый без телефона, с начала; тишина потока — обрыв",
+          "sha": "cc503775ef0b60e1"
+        },
+        {
+          "path": "apps/mobile/src/shared/lib/runs/constants.ts",
+          "why": "«Когда панель не отвечает»: числа документа — 30 секунд тишины потока до обрыва, 2 часа жизни очереди",
+          "sha": "54f53ddc91c3b9ec"
         }
       ]
     },
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-20T17:57:33.130Z",
+      "confirmedAt": "2026-10-23T18:26:29.573Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
@@ -3059,7 +3214,7 @@
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Чей набор у агента»: что каждый режим добавляет или снимает у Claude Code и Qwen Code (runExtras)",
-          "sha": "58231c792c3eb35c"
+          "sha": "c831d7a6ebaecc1e"
         },
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
@@ -3114,7 +3269,7 @@
         {
           "path": "apps/server/src/domains/chat/auto-continue/auto-continue.ts",
           "why": "«Ночной прогон»: продолжение после сбоя — паузы и число попыток",
-          "sha": "cbb0a66588597fa0"
+          "sha": "90abbd09d373e306"
         },
         {
           "path": "apps/server/src/domains/local-models/remove.ts",
@@ -3156,12 +3311,12 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-21T21:53:51.484Z",
+      "confirmedAt": "2026-10-24T12:29:38.936Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Как набор доезжает до прогона», «Режимы», «Какой CLI что умеет»: runExtras, отказы, сброс в архив",
-          "sha": "58231c792c3eb35c"
+          "sha": "c831d7a6ebaecc1e"
         },
         {
           "path": "apps/server/src/domains/kit/compose.ts",
@@ -3176,7 +3331,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "23f77583ea26891a"
+          "sha": "9398f34eed1825e4"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",
@@ -3201,7 +3356,7 @@
         {
           "path": "apps/server/src/domains/kit/codex.ts",
           "why": "«Какой CLI что умеет», строка Codex: что доезжает (правила ключом после собственных инструкций, навыки каталогом), что нет",
-          "sha": "5a08c4544a6a3211"
+          "sha": "fe67763df53be588"
         },
         {
           "path": "apps/server/assets/kit/agentdeck-kit/hooks/lib/local-discipline.mjs",

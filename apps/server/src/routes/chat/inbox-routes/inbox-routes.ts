@@ -10,7 +10,11 @@ import {
   type InboxRun,
 } from '../../../domains/chat/chat-inbox/chat-inbox.ts';
 import type { OutsideRelay } from '../../../domains/chat/outside-relay/outside-relay.ts';
+import { withSources } from '../../../domains/chat/chat-inbox/ask-source.ts';
+import { readAgentDefinition } from '../../../domains/chat/chat-inbox/agent-definition.ts';
+import { getProvider } from '../../../providers/registry.ts';
 import { projectsDir } from '../paths.ts';
+import { inboxDeferredOf } from '../deferred-routes/deferred-routes.ts';
 
 /**
  * Сводка ожиданий и активности по всем разговорам (главный экран телефона).
@@ -66,10 +70,28 @@ export function registerChatInboxRoutes(
           askedAt: new Date(ask.askedAt).toISOString(),
         })),
       lastAsked: (chatId) => readTail(chatId)?.asked,
+      // Синоним пишет прогон, назвавший под ключом разговора другую сессию
+      // (`linkChatSession`): так панель продолжает остывшую группу новым
+      // разговором. Ветка правки синонима не пишет — её исходник остаётся своим.
+      replaced: (sessionId) => ctx.store.canonicalChatKey(sessionId) !== sessionId,
       liveOutside: (chatId) => !ownSessions.has(chatId) && liveByTail(readTail(chatId), now),
       groupTitle: (chatId) => links[chatId]?.title,
       now,
     });
+    // Чей вопрос — строкой над ним на телефоне и в Telegram: группа и стадия,
+    // фоновый ли ход, CLI; у запуска агента — что, каким агентом и на чём.
+    withSources(inbox, {
+      link: (key) => links[key],
+      parentTitle: (parent) => links[parent]?.title,
+      cliName: getProvider('claude').name,
+      background: (runKey) => registry.describe(runKey)?.options.hold === true,
+      agentDefinition: (type, projectPath) =>
+        readAgentDefinition(ctx.location.paths.root, type, projectPath),
+    });
+    // Отложенные вопросы D-n — отдельным разделом: прогон ушёл дальше, а
+    // решение ждёт человека (главный экран телефона, кнопки — маршрут D-n).
+    const deferred = inboxDeferredOf(ctx);
+    if (deferred.length > 0) inbox.deferred = deferred;
     if (!relay) return inbox;
     // Вопрос, который держит хук панели, отвечается с телефона — карточке надо
     // это знать, иначе она показала бы его только для чтения.

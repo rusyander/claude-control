@@ -3,7 +3,7 @@ import { platform } from 'node:os';
 import { join } from 'node:path';
 import type { Group } from '@agentdeck/contracts';
 import { scopeProvider } from '@agentdeck/contracts/group-sources';
-import { readJsonFile } from '../../../lib/safe-io/safe-io.ts';
+import { readJsoncFile } from '../../../lib/safe-io/safe-io.ts';
 
 /**
  * Общие части слоя Qwen: файл системных настроек, куда кладутся слои, перевод
@@ -65,7 +65,8 @@ export function qwenMcpEntry(raw: unknown): Record<string, unknown> | undefined 
  */
 export function baseSystemSettings(env: NodeJS.ProcessEnv): Record<string, unknown> {
   const path = env[QWEN_SYSTEM_SETTINGS_ENV] || defaultQwenSystemSettingsPath();
-  const base = existsSync(path) ? readJsonFile<unknown>(path, {}) : {};
+  // С комментариями, как читает сам Qwen: строгий разбор ронял бы прогон на рабочем файле.
+  const base = existsSync(path) ? readJsoncFile<unknown>(path, {}) : {};
   return base && typeof base === 'object' && !Array.isArray(base)
     ? (base as Record<string, unknown>)
     : {};

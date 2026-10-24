@@ -1,6 +1,14 @@
 export { chatTreeKeys, useChatTree } from './api/ChatTreeApi';
 export { useFileSplitTicket } from './api/useFileSplitTicket';
 export { fileSplitTicketMutation } from './api/useFileSplitTicket';
+export {
+  publishSplitTicketsMutation,
+  splitTicketBatchKeys,
+  takeSplitTicketsMutation,
+  usePublishSplitTickets,
+  useSplitTicketTarget,
+  useTakeSplitTickets,
+} from './api/SplitTicketBatchApi';
 export { useCleanupGroup } from './api/useCleanupGroup';
 export { useDismissAutoNotices } from './api/useDismissAutoNotices';
 export { useAcceptGroup } from './api/useAcceptGroup';

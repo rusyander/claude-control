@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import { openStream } from './stream';
 import {
   EMPTY_RUN,
+  TURN_RESET,
   type ActiveRunInfo,
   type AgentRun,
   type QueuedMessage,
@@ -22,7 +23,6 @@ import {
   findRunKey,
   lastSeqs,
   controllers,
-  forgetRun,
   forgetAllRuns,
   discarded,
 } from './store';
@@ -38,9 +38,20 @@ import {
 
 const RECONNECT_DELAY_MS = 1_500;
 const RECONNECT_LIMIT = 20;
+/** Переподключения кончились: связи с прогоном нет, а сам он, может, и жив. */
+const CONNECTION_LOST = 'connection_lost';
+/** Отправка не дошла до панели по сети: досылка из очереди повторится, когда та ответит. */
+const UNREACHABLE = 'unreachable';
 
 /** Прогоны, остановленные человеком: им переподключаться не надо. */
 const stoppedByUser = new Set<string>();
+/** Очереди, досылка которых уже идёт: опрос и конец хода не шлют одно и то же дважды. */
+const flushing = new Set<string>();
+
+/** Метка сообщения: повтор уже принятого сервер узнаёт по ней (`SentOnce`). */
+function newClientId(kind: string): string {
+  return `${kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 /** Ключ, под которым прогон известен серверу. */
 function serverKey(id: string): string {
@@ -78,14 +89,27 @@ async function keepStreaming(
     let outcome: Awaited<ReturnType<typeof openStream>>;
     try {
       outcome = await openStream(id, input, controller, currentMode, settle && firstSettle);
-    } catch (error) {
+    } catch {
       if (controller.signal.aborted) return;
       outcome = 'dirty';
       if (attempts === 0 && currentMode === 'send') {
         // Первая же попытка отправки не дошла до сервера — это отказ, а не
-        // обрыв: сообщение не принято, и человеку надо сказать прямо.
-        const message = error instanceof Error ? error.message : dict().run.serverUnreachable;
-        setRun(id, { status: 'error', error: message });
+        // обрыв: сообщение не принято, и человеку надо сказать прямо. Текст
+        // ошибки транспорта («Network request failed») человеку ничего не
+        // говорит — говорим своими словами. Контроллер снимаем: оставленный, он
+        // запирал разговор от опроса, и ход, который запрос всё-таки успел
+        // начать, телефон не подхватывал до перезапуска.
+        const t = dict().run;
+        const message = t.notSent.other(t.serverUnreachable);
+        setRun(id, {
+          status: 'error',
+          error: message,
+          errorCode: UNREACHABLE,
+          ...(input.prompt && input.clientId
+            ? { unsent: { prompt: input.prompt, clientId: input.clientId } }
+            : {}),
+        });
+        if (controllers.get(id) === controller) controllers.delete(id);
         settle?.({ ok: false, message });
         emit();
         return;
@@ -128,6 +152,8 @@ async function keepStreaming(
             model: input.model,
             effort: input.effort,
             files: input.files,
+            // Отказ «занят» метку не запомнил — с ней же сообщение и дошлётся.
+            ...(input.clientId ? { clientId: input.clientId } : {}),
           });
           busyHeld({ ok: true });
           busyHeld = undefined;
@@ -142,33 +168,57 @@ async function keepStreaming(
       break;
     }
     if (outcome === 'gone') {
-      forgetRun(id);
+      // Прогона на сервере больше нет — ход кончился, пока связи не было. Раньше
+      // запись разговора стиралась целиком: вместе с ней — очередь дописанного
+      // (до следующего открытия чата) и сессия, по которой черновик `new-…`
+      // становится настоящим разговором. Ход закрываем как законченный: экран
+      // перечитает транскрипт, очередь уйдёт. В шторку не сообщаем — чем он
+      // кончился, телефон не видел.
+      if (discarded.has(controller)) return;
+      finish(id, true, true);
       return;
     }
     if (stoppedByUser.has(id) || controller.signal.aborted) break;
+    // Поток жил и оборвался (сон телефона, смена сети) — связь была. Счёт
+    // попыток с нуля: иначе долгий ход, переживший двадцать таких обрывов,
+    // объявлялся бы потерянным при живой связи.
+    if (outcome === 'broken') attempts = 0;
     if (++attempts > RECONNECT_LIMIT) {
       // Переподключения исчерпаны: прогон, может, и жив, но связи с ним нет.
       // Ошибка со словами «связь потеряна» честнее вечного «работает», а конец
-      // хода заставит экран перечитать историю — ответ, если он есть, там.
-      setRun(id, { status: 'error', error: dict().run.connectionLost, stalled: undefined });
+      // хода заставит экран перечитать историю — ответ, если он есть, там. Код
+      // ошибки нужен опросу: такой прогон он подхватывает заново, тот же это
+      // ход или новый, а законченный — закрывает и отдаёт очередь.
+      setRun(id, {
+        status: 'error',
+        error: dict().run.connectionLost,
+        errorCode: CONNECTION_LOST,
+        stalled: undefined,
+      });
       controllers.delete(id);
       emit();
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
+    if (controller.signal.aborted) break;
   }
 
   if (discarded.has(controller)) return;
   finish(id, !refusedSend);
 }
 
-/** Прогон закончился: статус, чистка контроллера и отправка очереди. */
-function finish(id: string, flush = true): void {
+/**
+ * Прогон закончился: статус, чистка контроллера и отправка очереди. `quiet` —
+ * конец, которого телефон не видел (прогона на сервере уже нет): в шторку о нём
+ * не сообщаем.
+ */
+function finish(id: string, flush = true, quiet = false): void {
   const run = getRun(id);
   const status = stoppedByUser.has(id) ? 'stopped' : run.error ? 'error' : 'done';
   const wasStopped = stoppedByUser.has(id);
   // Переданное на ходу теперь в транскрипте — строкой в ленте, не дублем.
-  setRun(id, { status, stalled: undefined, steered: undefined });
+  // Отметка конца — экрану: перечитать транскрипт, даже если «работает» он не видел.
+  setRun(id, { status, stalled: undefined, steered: undefined, endedAt: Date.now() });
   controllers.delete(id);
   stoppedByUser.delete(id);
   emit();
@@ -181,6 +231,7 @@ function finish(id: string, flush = true): void {
   // законченным, не событие: он кончился до того, как приложение посмотрело.
   if (
     !wasStopped &&
+    !quiet &&
     !run.tailOnly &&
     AppState.currentState !== 'active' &&
     run.queued.length === 0
@@ -198,12 +249,19 @@ function finish(id: string, flush = true): void {
 }
 
 /**
- * Слово агенту посреди хода; `false` — сервер не принял на ходу (дальше очередь).
+ * Слово агенту посреди хода. `steered` — агент его получил; `ended` — сервер
+ * ответил, что хода уже нет (409 `run_steer_ended`): «идущий» прогон на телефоне
+ * — устаревший; `failed` — не принято по другой причине (сеть, прогон без живой
+ * сессии) — дальше очередь.
  * `clientId` — на случай, когда сервер слово отдал, а ответ до телефона не дошёл
  * (сон приложения, сеть): с ней же оно встанет в очередь, и досылку сервер
  * узнает как повтор, а не отдаст агенту второй раз (карточка 33).
  */
-async function steer(run: AgentRun, input: StartInput, clientId: string): Promise<boolean> {
+async function steer(
+  run: AgentRun,
+  input: StartInput,
+  clientId: string,
+): Promise<'steered' | 'ended' | 'failed'> {
   try {
     const reply = await api.post<{ steered?: boolean }>('/chat/send', {
       chatId: run.serverRunId ?? run.id,
@@ -213,16 +271,32 @@ async function steer(run: AgentRun, input: StartInput, clientId: string): Promis
       steer: true,
       clientId,
     });
-    if (!reply?.steered) return false;
+    if (!reply?.steered) return 'failed';
     const current = runs.get(run.id);
     if (current && !(current.steered ?? []).includes(input.prompt)) {
       setRun(run.id, { steered: [...(current.steered ?? []), input.prompt] });
       emit();
     }
-    return true;
-  } catch {
-    return false;
+    return 'steered';
+  } catch (error) {
+    return (error as { code?: unknown } | null)?.code === 'run_steer_ended' ? 'ended' : 'failed';
   }
+}
+
+/**
+ * Сервер сказал прямо: хода нет. Поток, за которым телефон его вёл, — старый
+ * (оборван и переподключается, а то и вовсе замолчал): ждать его конца, чтобы
+ * отдать очередь, значило бы держать написанное, пока поток не сдастся — или
+ * вечно. Поток отпускаем, ход закрываем — очередь уходит сейчас.
+ */
+function closeStale(id: string): void {
+  const stale = controllers.get(id);
+  if (stale) {
+    discarded.add(stale);
+    stale.abort();
+  }
+  if (getRun(id).status === 'running') finish(id, true, true);
+  else void flushQueue(id);
 }
 
 /**
@@ -236,10 +310,10 @@ export async function send(input: StartInput): Promise<SendOutcome> {
     // Агент занят — слово уходит ему сразу, как в самом Claude Code: он учтёт
     // его на ближайшем шаге, не дожидаясь конца всей работы. Вложения и прогон
     // без живой сессии — в очередь: не теряется и не плодит второй процесс.
-    const clientId = `steer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    if ((input.files?.length ?? 0) === 0 && (await steer(existing, input, clientId))) {
-      return { ok: true };
-    }
+    const clientId = newClientId('steer');
+    const steered =
+      (input.files?.length ?? 0) === 0 ? await steer(existing, input, clientId) : 'failed';
+    if (steered === 'steered') return { ok: true };
     enqueue(id, {
       prompt: input.prompt,
       allowEdits: input.allowEdits,
@@ -249,17 +323,35 @@ export async function send(input: StartInput): Promise<SendOutcome> {
       files: input.files,
       clientId,
     });
+    if (steered === 'ended') closeStale(id);
     // Ход кончился, пока шёл запрос «на ходу»: конец хода очередь уже не снимет.
-    if (getRun(id).status !== 'running') void flushQueue(id);
+    else if (getRun(id).status !== 'running') void flushQueue(id);
     return { ok: true };
   }
 
+  // Метка отправки. Тот же текст после сетевого отказа — с той же меткой: если
+  // первый запрос всё же дошёл, сервер узнает повтор и второй раз агенту не отдаст.
+  const clientId =
+    input.clientId ??
+    (existing?.unsent?.prompt === input.prompt ? existing.unsent.clientId : newClientId('send'));
+  // Поток под этим ключом ещё мог дочитывать хвост законченного хода: его
+  // конец и расход не должны лечь на ход, начатый сейчас.
+  const prior = controllers.get(id);
+  if (prior) {
+    discarded.add(prior);
+    prior.abort();
+  }
   const controller = new AbortController();
   controllers.set(id, controller);
   stoppedByUser.delete(id);
   lastSeqs.set(id, 0);
   setRun(id, {
     ...EMPTY_RUN,
+    ...TURN_RESET,
+    // Новый ход заводит свой `startedAt` событием сессии; прежний не должен
+    // выдавать курсор нового за курсор старого хода.
+    startedAt: undefined,
+    unsent: undefined,
     id,
     sessionId: input.sessionId,
     projectPath: input.projectPath,
@@ -281,7 +373,9 @@ export async function send(input: StartInput): Promise<SendOutcome> {
       settled = true;
       resolve(outcome);
     };
-    void keepStreaming(id, input, controller, 'send', settle).then(() => settle({ ok: true }));
+    void keepStreaming(id, { ...input, clientId }, controller, 'send', settle).then(() =>
+      settle({ ok: true }),
+    );
   });
 }
 
@@ -300,6 +394,11 @@ export async function send(input: StartInput): Promise<SendOutcome> {
  * Прогон, который сервер называет законченным (`status: 'done'`), заводим сразу
  * законченным: ни одного мгновения «работает», текст в пузырь не набирается —
  * ответ давно в истории; поток дотягивает лишь хвост (расход, вопрос).
+ *
+ * Исключение из «уже известного» — прогон, связь с которым телефон потерял
+ * (переподключения кончились) или который числится идущим без потока: такой
+ * подхватываем заново, даже с тем же `startedAt`. Раньше он отсеивался как
+ * «тот же ход» навсегда, и ход показывался только после перезапуска приложения.
  */
 export function attach(
   id: string,
@@ -308,8 +407,8 @@ export function attach(
   const key = findRunKey(id, meta.sessionId) ?? id;
   if (controllers.has(key)) return;
   const known = runs.get(key);
-  if (known?.status === 'running') return;
-  if (known && meta.startedAt !== undefined && known.startedAt === meta.startedAt) return;
+  const lost = known?.status === 'running' || known?.errorCode === CONNECTION_LOST;
+  if (!lost && known && meta.startedAt !== undefined && known.startedAt === meta.startedAt) return;
 
   const finished = meta.status === 'done';
   const controller = new AbortController();
@@ -317,6 +416,7 @@ export function attach(
   lastSeqs.set(key, 0);
   setRun(key, {
     ...EMPTY_RUN,
+    ...TURN_RESET,
     id: key,
     sessionId: meta.sessionId ?? known?.sessionId,
     projectPath: meta.projectPath ?? known?.projectPath,
@@ -326,6 +426,8 @@ export function attach(
     status: finished ? 'done' : 'running',
     tailOnly: finished || undefined,
     queued: known?.queued ?? [],
+    // Не дошедшая отправка могла как раз и начать этот ход: её метка нужна повтору.
+    unsent: known?.unsent,
     lastEventAt: Date.now(),
   });
   emit();
@@ -345,7 +447,33 @@ export async function resumeActive(): Promise<void> {
   } catch {
     return;
   }
-  for (const info of active) attach(info.chatId, info);
+  const named = new Set<string>();
+  for (const info of active) {
+    attach(info.chatId, info);
+    const key = findRunKey(info.chatId, info.sessionId);
+    if (key) named.add(key);
+  }
+  settleOrphans(named);
+}
+
+/**
+ * Панель ответила — значит, связь есть, и то, что телефон держит без потока,
+ * можно свести с правдой сервера. Прогон, с которым связь была потеряна (или
+ * «идущий» без потока), которого сервер больше не называет, кончился, пока
+ * связи не было: закрываем его, ошибку «связь потеряна» снимаем, очередь
+ * уходит. Досылка, не дошедшая по сети, повторяется сейчас; отказ сервера
+ * («группа на паузе», «занят») — нет: тот снимает человек или конец хода.
+ */
+function settleOrphans(named: Set<string>): void {
+  for (const [key, run] of [...runs]) {
+    if (named.has(key) || controllers.has(key)) continue;
+    if (run.status === 'running' || run.errorCode === CONNECTION_LOST) {
+      setRun(key, { error: undefined, errorCode: undefined, errorRetriable: undefined });
+      finish(key, true, true);
+    } else if (run.errorCode === UNREACHABLE && run.queued.length > 0) {
+      void flushQueue(key);
+    }
+  }
 }
 
 /**
@@ -412,7 +540,10 @@ export async function setAutoApprove(id: string, enabled: boolean): Promise<void
 export function enqueue(id: string, message: Omit<QueuedMessage, 'id'>): string {
   const run = getRun(id);
   const queuedId = `q-${Date.now()}-${run.queued.length}`;
-  setRun(id, { queued: [...run.queued, { ...message, id: queuedId }] });
+  // Метка у каждого: досылка, ответ на которую потерялся в сети, повторяется —
+  // и сервер узнаёт повтор уже принятого, а не отдаёт его агенту дважды.
+  const clientId = message.clientId ?? newClientId('queued');
+  setRun(id, { queued: [...run.queued, { ...message, clientId, id: queuedId }] });
   emit();
   void persistQueue(id);
   return queuedId;
@@ -457,9 +588,25 @@ export async function restoreQueue(id: string): Promise<void> {
  * группу, которую человек поставил на паузу, она не будит (карточка 33).
  */
 async function flushQueue(id: string): Promise<void> {
+  if (flushing.has(id)) return;
   const run = getRun(id);
   const [next, ...rest] = run.queued;
   if (!next) return;
+  flushing.add(id);
+  try {
+    await sendQueued(id, run, next, rest);
+  } finally {
+    flushing.delete(id);
+  }
+}
+
+/** Отправить голову очереди; не принятое возвращается в её начало. */
+async function sendQueued(
+  id: string,
+  run: AgentRun,
+  next: QueuedMessage,
+  rest: QueuedMessage[],
+): Promise<void> {
   setRun(id, { queued: rest });
   emit();
   await persistQueue(id);

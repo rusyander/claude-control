@@ -1,0 +1,40 @@
+{
+  "topic": "chat",
+  "scenario": "economy",
+  "frames": [
+    {
+      "id": "01-where",
+      "side": "panel",
+      "file": "01-where.png",
+      "masked": 0,
+      "width": 846,
+      "height": 111,
+      "shotAt": "2026-10-22T20:59:00.168Z",
+      "text": "Где действует: Claude Code · ключом CLI : Ключом самого CLI Codex (OpenAI) · силами панели : Ключа у CLI нет — панель делает это сама: строкой в задании или своим выбором модели Gemini CLI · не нужен : Каждый ответ — отдельный запуск с короткой историей: между ходами держать нечего. Qwen Code · силами панели · с условием : Действует только у облачной модели: у локальной нет кэша провайдера, остывать нечему — разговор всегда продолжается. Continue · не нужен : Каждый ответ — отдельный запуск с короткой историей: между ходами держать нечего. Goose · не окупается : Модель этому CLI даёт провайдер, выбранный в самом CLI: панель не знает ни цены его кэша, ни срока жизни и не может решить, когда кэш остыл и окупится ли пинг. Kimi Code · не окупается : Модель этому CLI даёт провайдер, выбранный в самом CLI: панель не знает ни цены его кэша, ни срока жизни и не может решить, когда кэш остыл и окупится ли пинг. Cursor · не нужен : Панель не запускает этот CLI в чате — рычагам нечего менять. OpenCode · не окупается : Модель этому CLI даёт провайдер, выбранный в самом CLI: панель не знает ни цены его кэша, ни срока жизни и не может решить, когда кэш остыл и окупится ли пинг. Aider · не нужен : Каждый ответ — отдельный запуск с короткой историей: между ходами держать нечего.",
+      "en": {
+        "file": "01-where.en.png",
+        "masked": 0,
+        "width": 846,
+        "height": 111,
+        "shotAt": "2026-10-22T20:59:03.685Z",
+        "text": "Where it works: Claude Code · own setting : The CLI's own setting Codex (OpenAI) · by the panel : The CLI has no setting — the panel does it itself: a line in the task or its own model choice Gemini CLI · not needed : Each answer is a separate run with a short history, so nothing is kept between turns. Qwen Code · by the panel · with a condition : Works only with a cloud model: a local model has no provider cache to go cold, so the conversation always continues. Continue · not needed : Each answer is a separate run with a short history, so nothing is kept between turns. Goose · not worth it : The model comes from a provider chosen inside the CLI: the panel knows neither its cache price nor its lifetime, so it cannot tell when the cache went cold or whether a ping pays off. Kimi Code · not worth it : The model comes from a provider chosen inside the CLI: the panel knows neither its cache price nor its lifetime, so it cannot tell when the cache went cold or whether a ping pays off. Cursor · not needed : The panel does not run this CLI in chat, so the levers have nothing to change. OpenCode · not worth it : The model comes from a provider chosen inside the CLI: the panel knows neither its cache price nor its lifetime, so it cannot tell when the cache went cold or whether a ping pays off. Aider · not needed : Each answer is a separate run with a short history, so nothing is kept between turns."
+      },
+      "dark": {
+        "file": "01-where.dark.png",
+        "masked": 0,
+        "width": 846,
+        "height": 111,
+        "shotAt": "2026-10-22T20:59:25.388Z",
+        "text": "Где действует: Claude Code · ключом CLI : Ключом самого CLI Codex (OpenAI) · силами панели : Ключа у CLI нет — панель делает это сама: строкой в задании или своим выбором модели Gemini CLI · не нужен : Каждый ответ — отдельный запуск с короткой историей: между ходами держать нечего. Qwen Code · силами панели · с условием : Действует только у облачной модели: у локальной нет кэша провайдера, остывать нечему — разговор всегда продолжается. Continue · не нужен : Каждый ответ — отдельный запуск с короткой историей: между ходами держать нечего. Goose · не окупается : Модель этому CLI даёт провайдер, выбранный в самом CLI: панель не знает ни цены его кэша, ни срока жизни и не может решить, когда кэш остыл и окупится ли пинг. Kimi Code · не окупается : Модель этому CLI даёт провайдер, выбранный в самом CLI: панель не знает ни цены его кэша, ни срока жизни и не может решить, когда кэш остыл и окупится ли пинг. Cursor · не нужен : Панель не запускает этот CLI в чате — рычагам нечего менять. OpenCode · не окупается : Модель этому CLI даёт провайдер, выбранный в самом CLI: панель не знает ни цены его кэша, ни срока жизни и не может решить, когда кэш остыл и окупится ли пинг. Aider · не нужен : Каждый ответ — отдельный запуск с короткой историей: между ходами держать нечего."
+      },
+      "darkEn": {
+        "file": "01-where.dark.en.png",
+        "masked": 0,
+        "width": 846,
+        "height": 111,
+        "shotAt": "2026-10-22T20:59:29.402Z",
+        "text": "Where it works: Claude Code · own setting : The CLI's own setting Codex (OpenAI) · by the panel : The CLI has no setting — the panel does it itself: a line in the task or its own model choice Gemini CLI · not needed : Each answer is a separate run with a short history, so nothing is kept between turns. Qwen Code · by the panel · with a condition : Works only with a cloud model: a local model has no provider cache to go cold, so the conversation always continues. Continue · not needed : Each answer is a separate run with a short history, so nothing is kept between turns. Goose · not worth it : The model comes from a provider chosen inside the CLI: the panel knows neither its cache price nor its lifetime, so it cannot tell when the cache went cold or whether a ping pays off. Kimi Code · not worth it : The model comes from a provider chosen inside the CLI: the panel knows neither its cache price nor its lifetime, so it cannot tell when the cache went cold or whether a ping pays off. Cursor · not needed : The panel does not run this CLI in chat, so the levers have nothing to change. OpenCode · not worth it : The model comes from a provider chosen inside the CLI: the panel knows neither its cache price nor its lifetime, so it cannot tell when the cache went cold or whether a ping pays off. Aider · not needed : Each answer is a separate run with a short history, so nothing is kept between turns."
+      }
+    }
+  ]
+}

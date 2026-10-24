@@ -58,7 +58,13 @@ describe('шаги пути группы — после стадии, в её ч
   let app: FastifyInstance;
   let store: AppStore;
   let registry: ChatRunRegistry;
-  let runs: { prompt: string; sessionId?: string; model?: string; append?: string }[];
+  let runs: {
+    prompt: string;
+    sessionId?: string;
+    model?: string;
+    append?: string;
+    bridge?: { runId: string; baseUrl: string; tokenFile?: string };
+  }[];
   let ended: { stage?: string; status: string; waitingFor?: string }[];
   /** Строки ленты, которые планировщик вернул на концы ходов (`textCode`). */
   let notices: string[];
@@ -88,6 +94,7 @@ describe('шаги пути группы — после стадии, в её ч
           ...(options.sessionId ? { sessionId: options.sessionId } : {}),
           ...(options.model ? { model: options.model } : {}),
           ...(options.appendSystemPrompt ? { append: options.appendSystemPrompt } : {}),
+          ...(options.permissionPrompt ? { bridge: options.permissionPrompt } : {}),
         });
         const nudged = options.prompt.includes(NUDGE_MARK);
         if (options.prompt.includes(STEP_EN) && stepEnds.startsWith('forgot')) {
@@ -239,6 +246,26 @@ describe('шаги пути группы — после стадии, в её ч
     expect(runs[2]?.prompt).toContain('Правки готовы.');
     expect(runs[2]?.prompt).not.toContain('Tests: 12 passed');
     expect(store.getChatLink(CHAT)?.pathRun).toEqual({ done: ['suite'] });
+  });
+
+  it('шаг после прогона, подхваченного перезапуском, спрашивает права у этой панели', async () => {
+    store.setChatGroupSettings(CHAT, { groupChoice: 'global:tests-first' });
+    // Подхваченный прогон несёт мост без адреса (`run-reattach.ts`): с ним мост
+    // отказывал бы каждому вызову нового хода.
+    registry.start(
+      CHAT,
+      {
+        prompt: 'Поправь по замечаниям ревью',
+        cwd: work,
+        permissionPrompt: { runId: CHAT, baseUrl: '' },
+      },
+      { projectPath: work },
+    );
+    await new Promise((done) => setTimeout(done, 80));
+
+    expect(runs[1]?.prompt).toContain(STEP_EN);
+    expect(runs[1]?.bridge).toMatchObject({ runId: CHAT, baseUrl: 'http://127.0.0.1:5178' });
+    expect(runs[1]?.bridge?.tokenFile).toMatch(/api-token$/);
   });
 
   it('проваленная проверка держит цепочку: доставки нет, группа ждёт ответа', async () => {

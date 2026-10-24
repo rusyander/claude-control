@@ -47,6 +47,20 @@ export type ChatEvent =
    */
   | { kind: 'limit'; resetsAt: number; type: string; status: string; sample?: LimitSample }
   /**
+   * Начало хода модели (`message_start`): вход и кэш хода уже прочитаны и
+   * оплачены. Только у пинга тёплого кэша (`TurnTracker` с `emitStart`): его ход
+   * обрывают до `message_delta` (вызов инструмента, потолок времени), и без этого
+   * события расход оборванного пинга терялся. В ленту не идёт.
+   */
+  | {
+      kind: 'turnStart';
+      input: number;
+      cacheRead: number;
+      cacheCreation: number;
+      cacheCreation1h?: number;
+      model?: string;
+    }
+  /**
    * Расход одного шага модели. `toolIds` — вызовы, рождённые ЭТИМ шагом: по ним
    * интерфейс ставит цифру у конкретного действия. Вызовов бывает несколько
    * (модель зовёт инструменты параллельно одним сообщением) — тогда расход у них
@@ -95,7 +109,14 @@ export type ChatEvent =
    * (или истёк срок брокера), и карточка обязана сказать «истекло», а не
    * «запрещено».
    */
-  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny'; expired?: true }
+  | {
+      kind: 'permissionResolved';
+      toolUseId: string;
+      behavior: 'allow' | 'deny';
+      expired?: true;
+      /** Карточку решил срок: она стала отложенным вопросом D-n, кнопки отвечают ему. */
+      deferredId?: string;
+    }
   /**
    * CLI вернул результат вызова `toolUseId` — ВНУТРЕННЕЕ событие реестра, в
    * поток вкладок не уходит. Висящий по этому вызову запрос прав после него
@@ -108,6 +129,29 @@ export type ChatEvent =
       toolUseId: string;
       /** Знаков в ответе вызова — сторожу групп (размер подмеса в окно). */
       chars?: number;
+      /** Вызов не уложился в свой срок, мс — сторожу групп (R15). */
+      timedOutMs?: number;
+      /** Вызов отбит стражем или правом: чей отказ — сторожу групп (R18). */
+      denied?: string;
+      /** Вызов кончился ошибкой — сторожу (R24, R29, R30). */
+      isError?: true;
+      /** Род ошибки (`tool-outcome.ts`): выход, нет инструмента, сеть, размер, прочее. */
+      errorKind?: 'exit' | 'no-tool' | 'network' | 'size' | 'other';
+      /** Голова ошибки под маской — повтор той же ошибки (R24). */
+      errorHead?: string;
+    }
+  /**
+   * CLI повторяет запрос к модели после сбоя (`system/api_retry`, CLI 2.1.309):
+   * ВНУТРЕННЕЕ событие сторожа (R30 «сервис не отвечает»), в ленту не идёт.
+   * `error` — род сбоя CLI (`overloaded`, `server_error`, `rate_limit`…), `status` — HTTP.
+   */
+  | {
+      kind: 'apiRetry';
+      attempt?: number;
+      maxRetries?: number;
+      delayMs?: number;
+      status?: number;
+      error?: string;
     }
   /**
    * CLI сжал окно (`system/compact_boundary`) — ВНУТРЕННЕЕ событие сторожа групп
@@ -303,6 +347,15 @@ export type ChatEvent =
       incomplete?: ReviewDepthGap[];
     };
 
+/**
+ * Внутреннее событие прогона (`compact`, `toolResult`, `apiRetry`): нужно реестру и
+ * сторожу групп, а клиенту — нет. Всякий, кто шлёт поток `ChatRun` наружу мимо реестра
+ * (песочница), отсекает их этим же признаком, чтобы список не разъезжался.
+ */
+export function isInternalChatEvent(event: ChatEvent): boolean {
+  return event.kind === 'compact' || event.kind === 'toolResult' || event.kind === 'apiRetry';
+}
+
 /** Счётчики расхода в том виде, в каком их пишет CLI (и модель). */
 export interface RawUsage {
   input_tokens?: number;
@@ -345,6 +398,8 @@ export interface RawEvent {
       /** `tool_result` в строке `user`: к какому вызову и что вернулось. */
       tool_use_id?: string;
       content?: unknown;
+      /** `tool_result`: вызов кончился ошибкой (в том числе отказом стража). */
+      is_error?: boolean;
     }[];
     /** В `assistant` это заглушка из `message_start` — полный расход в `message_delta`. */
     usage?: RawUsage;
@@ -361,6 +416,14 @@ export interface RawEvent {
   };
   /** Заполнен у строк субагента: ход принадлежит вложенному прогону, не этому. */
   parent_tool_use_id?: string | null;
+  /**
+   * `user` с результатом вызова (CLI 2.1.286): итог вызова — объект при успехе
+   * (`stdout`, `interrupted`, у старого увода в фон `timedOutAfterMs`), строка
+   * «Error: …» при ошибке.
+   */
+  tool_use_result?: unknown;
+  /** `user`: вызовы, которые не исполнялись (`non_execution_kind: 'permission-rule'` — отказ стража). */
+  tool_result_meta?: unknown;
   rate_limit_info?: {
     resetsAt?: number;
     rateLimitType?: string;
@@ -380,4 +443,12 @@ export interface RawEvent {
   hook_name?: string;
   /** `system/compact_boundary`: чем вызвано сжатие и окно до него. */
   compact_metadata?: { trigger?: string; pre_tokens?: number };
+  /** `system/api_retry` (CLI 2.1.309): номер попытки, предел, пауза до повтора. */
+  attempt?: number;
+  max_retries?: number;
+  retry_delay_ms?: number;
+  /** `system/api_retry`: HTTP-статус сбоя (`null` — ответа не было). */
+  error_status?: number | null;
+  /** `system/api_retry`: род сбоя (`overloaded`, `rate_limit`, `server_error`…). */
+  error?: string;
 }

@@ -8,6 +8,8 @@ import type { GroupSignalsProps } from './GroupSignals.types';
 import styles from './GroupSignals.module.scss';
 
 const RANK: Record<GroupSignalSeverity, number> = { info: 0, warn: 1, alert: 2 };
+/** Служебные подстановки сервера, человеку не строка: `sig` — отпечаток команды для R23. */
+const HIDDEN_PARAMS: ReadonlySet<string> = new Set(['sig']);
 
 /**
  * Остров «Сторож группы» в карточке хаба (фаза 2, W.4): сигналы правил по
@@ -15,11 +17,15 @@ const RANK: Record<GroupSignalSeverity, number> = { info: 0, warn: 1, alert: 2 }
  * строка — правило с числами, время и «Открыть чат» того звена. Закрытые
  * сигналы свёрнуты в одну строку и раскрываются по клику. Сторож только
  * наблюдает: кнопок, которые что-то останавливают, здесь нет намеренно.
+ * `scope="chat"` — тот же остров над лентой одиночного чата: своё название и
+ * без «Открыть чат», человек и так в этом разговоре.
  */
-export function GroupSignals({ signals, onOpen }: GroupSignalsProps) {
+export function GroupSignals({ signals, onOpen, scope = 'group' }: GroupSignalsProps) {
   const { t, i18n } = useTranslation();
   const [showCleared, setShowCleared] = useState(false);
   const clearedListId = useId();
+  const titleId = useId();
+  const hintId = useId();
   const active = signals.filter((signal) => !signal.clearedAt);
   const cleared = signals.filter((signal) => signal.clearedAt);
   if (signals.length === 0) return null;
@@ -38,6 +44,31 @@ export function GroupSignals({ signals, onOpen }: GroupSignalsProps) {
       minute: '2-digit',
     });
   };
+
+  // Сервер кладёт в подстановки коды (`push`, `work`): человеку — словами его языка.
+  const paramValue = (key: string, value: string): string => {
+    if (key === 'stage') return t(`chat.cascade.stageFull.${value}`, { defaultValue: value });
+    if (key === 'op') return t(`groupWatch.opValue.${value}`, { defaultValue: value });
+    if (key === 'service') return t(`groupWatch.serviceValue.${value}`, { defaultValue: value });
+    if (key === 'type') return t(`groupWatch.insertType.${value}`, { defaultValue: value });
+    if (key === 'why') return t(`groupWatch.why.${value}`, { defaultValue: value });
+    if (key === 'cause') return t(`groupWatch.cause.${value}`, { defaultValue: value });
+    return value;
+  };
+  // Кнопок «Открыть чат» в острове несколько: имя для скринридера называет,
+  // чей это чат, — правило и стадию звена.
+  const openLabel = (signal: GroupSignal): string =>
+    signal.stage
+      ? t('groupWatch.openChatStage', {
+          rule: signal.rule,
+          stage: paramValue('stage', signal.stage),
+        })
+      : t('groupWatch.openChatRule', { rule: signal.rule });
+
+  // Одиночный чат открыт на этой же странице: ссылка «Открыть чат» вела бы сюда же.
+  const canOpen = scope === 'group' ? onOpen : undefined;
+  const islandTitle = t(scope === 'chat' ? 'groupWatch.chat.island' : 'groupWatch.island');
+  const islandHint = t(scope === 'chat' ? 'groupWatch.chat.islandHint' : 'groupWatch.islandHint');
 
   const row = (signal: GroupSignal) => (
     <li
@@ -63,24 +94,27 @@ export function GroupSignals({ signals, onOpen }: GroupSignalsProps) {
             ? t('groupWatch.clearedAt', { time: time(signal.clearedAt) })
             : time(signal.at)}
         </Typography>
-        {onOpen && !signal.clearedAt && (
+        {canOpen && !signal.clearedAt && (
           <Button
             size="sm"
             variant="ghost"
             className={styles.open}
             data-watch-open
-            onClick={() => onOpen(signal.chatId)}
+            aria-label={openLabel(signal)}
+            onClick={() => canOpen(signal.chatId)}
           >
             {t('groupWatch.openChat')}
           </Button>
         )}
       </div>
       {signal.params &&
-        Object.entries(signal.params).map(([key, value]) => (
-          <Typography key={key} variant="mono" color="subtle" as="div" className={styles.param}>
-            {t(`groupWatch.param.${key}`, { value })}
-          </Typography>
-        ))}
+        Object.entries(signal.params)
+          .filter(([key]) => !HIDDEN_PARAMS.has(key))
+          .map(([key, value]) => (
+            <Typography key={key} variant="mono" color="subtle" as="div" className={styles.param}>
+              {t(`groupWatch.param.${key}`, { value: paramValue(key, value) })}
+            </Typography>
+          ))}
     </li>
   );
 
@@ -88,11 +122,18 @@ export function GroupSignals({ signals, onOpen }: GroupSignalsProps) {
     <div
       className={cn(styles.island, top && styles[`island-${top}`])}
       data-group-watch={active.length}
-      title={t('groupWatch.islandHint')}
+      role="group"
+      aria-labelledby={titleId}
+      aria-describedby={hintId}
+      data-watch-scope={scope}
+      title={islandHint}
     >
-      <Typography variant="caption" as="div" className={styles.title}>
-        {t('groupWatch.island')}
+      <Typography variant="caption" as="div" id={titleId} className={styles.title}>
+        {islandTitle}
       </Typography>
+      <span id={hintId} className={styles.srOnly}>
+        {islandHint}
+      </span>
       {active.length > 0 && <ul className={styles.list}>{active.map(row)}</ul>}
       {cleared.length > 0 && (
         <>

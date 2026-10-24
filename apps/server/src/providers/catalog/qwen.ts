@@ -111,6 +111,35 @@ export const qwenProvider: ConfigProvider = {
   // Группа Claude едет на прогон файлом системных настроек
   // (`QWEN_CODE_SYSTEM_SETTINGS_PATH`, живьём на 0.25 — provider-formats).
   groupLayer: 'qwen-system-settings',
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, таблица §1; бандл 0.24.3
+  // и живая проба): слой системных настроек на прогон (`economy-run/qwen.ts`), личный
+  // `settings.json` цел. Отметка одна на CLI, а дорог две — облако и локальная модель
+  // (llama-server): где локальной рычагу нечего менять, причина называет и её.
+  groupEconomy: {
+    channel: 'qwen',
+    support: {
+      // `context.autoCompactThreshold` — доля окна: окно из настроек CLI (у локальной
+      // его пишет слой окна), каталога контура или каталога моделей. Окна не знаем —
+      // ключа нет, и подсказка говорит это вслух.
+      compactWindow: { support: 'native', note: 'economy-note-window-known-only' },
+      // `tools.truncateToolOutputThreshold`, знаки — один предел на все инструменты.
+      bashOutputChars: { support: 'native' },
+      // Проба: `read_file` режется тем же пределом, своего ключа у чтения нет (O2).
+      readOutputTokens: { support: 'impossible', note: 'economy-note-shared-tool-limit' },
+      // `model.generationConfig.cacheRetention` читает только генератор Anthropic;
+      // у DashScope и локальной модели срока кэша нет — условие в подсказке.
+      cacheTtl: { support: 'native', note: 'economy-note-anthropic-only' },
+      // `ide.enabled: false`: дочерние `--acp` у `serve` подключают редактор на старте.
+      detachIde: { support: 'native' },
+      // Лестницы дешевле у Qwen нет (O5); у локальной модели доставка и так бесплатна.
+      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
+      // Пауза — 5 минут у облака (O4); у локальной кэш ничего не стоит — никогда.
+      freshOnColdResume: { support: 'emulated', note: 'economy-note-cloud-only' },
+      keepWarm: { support: 'disproportionate', note: 'economy-note-keep-warm-short-ttl' },
+      // Строка привычек — нейтральная часть той же строки, что у Claude.
+      workHabits: { support: 'emulated' },
+    },
+  },
   // Ассистент Qwen: модельное API — OpenAI-совместимое (OPENAI_API_KEY +
   // OPENAI_BASE_URL/OPENAI_MODEL), у ModelStudio/DashScope — DASHSCOPE_API_KEY.
   // One-shot: `qwen -p <промпт>` — задокументированный headless-режим.

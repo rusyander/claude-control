@@ -27,6 +27,9 @@ export function SettingsMascotSection({ tr }: SectionProps) {
           <GuideStep title={g('chat')} text={g('chatText')}>
             <HelpShot topic="settings" scenario="mascot" frame="03-chat" side="panel" />
           </GuideStep>
+          <GuideStep title={g('react')} text={g('reactText')}>
+            <HelpShot topic="settings" scenario="mascot" frame="05-react" side="panel" />
+          </GuideStep>
           <GuideStep title={g('settings')} text={g('settingsText')}>
             <HelpShot topic="settings" scenario="mascot" frame="04-settings" side="panel" />
           </GuideStep>

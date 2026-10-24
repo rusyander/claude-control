@@ -128,6 +128,8 @@ export function describeProviders(store: SettingsSource): ProvidersResponse {
       // получает группу на каждый прогон, у остальных она не действует.
       groupsModel:
         provider.id === 'claude' ? 'claude-files' : provider.groupLayer ? 'run-layer' : 'none',
+      // Рычаги экономии групп — только отметки: канал прогона клиенту не нужен.
+      ...(provider.groupEconomy ? { groupEconomy: { ...provider.groupEconomy.support } } : {}),
     })),
   };
 }

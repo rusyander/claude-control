@@ -174,8 +174,13 @@ describe('посредник и выход сервера', { timeout: 60_000 },
     expect(isPidAlive(cliPid)).toBe(true);
 
     const target = serverB(appData);
+    // Подхваченный ход живёт параметрами журнала (без вводной группы): пинг
+    // тёплого кэша их не берёт — и пока ход идёт, и когда он стал пробуждаемым.
+    expect(target.isRunning('new-r')).toBe(true);
+    expect(target.latestRunOf(['new-r'])).toMatchObject({ chatId: 'new-r', adopted: true });
     await waitFor(() => !target.isRunning('new-r'));
     expect(textOf(target, 'new-r')).toBe(`midturn pid ${cliPid}`);
+    expect(target.latestRunOf(['new-r'])).toMatchObject({ chatId: 'new-r', adopted: true });
   });
 
   it.runIf(WIN)('b: снятие дерева сервера не достаёт посредника и CLI', async () => {
@@ -202,6 +207,27 @@ describe('посредник и выход сервера', { timeout: 60_000 },
     await waitFor(() => !target.isRunning('new-r'));
     expect(textOf(target, 'new-r')).toBe(`turn 2 pid ${cliPid}`);
   });
+
+  it('d: «остановить всех» и сразу выход — CLI снят сразу, посредник уходит после своей паузы', async () => {
+    const { appData, cwd } = dataDirs();
+    const { entry, cliPid } = await runServerA(appData, cwd, 'просто ход');
+    const relayPid = entry.relay?.pid ?? 0;
+    expect(relayPid).toBeGreaterThan(0);
+    expect(isPidAlive(relayPid)).toBe(true);
+
+    // Строка `stop` — `stopAll()` и выход сразу за ним, как кончается скрипт или
+    // обвязка. Просьба `relay_kill` успевает уйти в канал до выхода: потерянная,
+    // она оставила бы простаивающий CLI жить полчаса (IDLE_MS посредника).
+    const child = serverA as ChildProcess;
+    child.stdin?.write('stop\n');
+    await exited(child);
+    serverA = undefined;
+    await waitFor(() => !isPidAlive(cliPid), 10_000);
+    // Посредник уходит сам. С 23.10 (N1b) CLI снимает сервер ещё при живом
+    // канале — посредник отдаёт код выхода в канал и уходит сразу; без клиента
+    // он ждал бы сервер EXIT_GRACE_MS (60 с, замер 22.10: посредник 60,6 с).
+    await waitFor(() => !isPidAlive(relayPid), 75_000);
+  }, 120_000);
 
   it('c: усыновлённая группа, чей процесс умер с фоном, — прервана и продолжается', async () => {
     const { appData, cwd } = dataDirs();

@@ -71,7 +71,11 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/backups/secret-passphrase': 'human:secret',
   'POST /api/chat/:chatId/auto-approve': 'human:rights',
   'POST /api/chat/:chatId/branch-decision': 'human:rights',
+  // Возврат хода в остывшую сессию перезаписывает всё её окно в кэш — деньги человека (R5).
+  'POST /api/chat/:chatId/keep-session': 'human:paid',
   'POST /api/chat/:chatId/permission-decision': 'human:rights',
+  // Решение владельца 23.10: отложенный вопрос D-n решает только человек.
+  'POST /api/chat/deferred/:id/decision': 'human:rights',
   'POST /api/chat/split': 'human:split-apply',
   'POST /api/chat/split/:parent/cancel': 'human:split-apply',
   'POST /api/chat/split/:parent/cleanup': 'human:split-apply',
@@ -79,6 +83,10 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/chat/split/:parent/review-push': 'human:outward',
   'POST /api/chat/split/:parent/review-retry': 'human:outward',
   'POST /api/chat/split/:parent/tickets/file': 'human:outward',
+  // «Разобрать…» (владелец 24.10): публикация в Jira разом и чат «Решить здесь» — клик человека.
+  'GET /api/chat/split/:parent/tickets/target': 'human:outward',
+  'POST /api/chat/split/:parent/tickets/publish': 'human:outward',
+  'POST /api/chat/split/:parent/tickets/take': 'human:split-apply',
   // G4 (владелец 05.10): перевод задач групп в Jira — запись в чужой сервис по кнопке.
   'GET /api/chat/split/:parent/tasks': 'human:outward',
   'POST /api/chat/split/:parent/tasks/move': 'human:outward',
@@ -112,6 +120,9 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/integrations/jira/issue/:key/transition': 'human:outward',
   'POST /api/integrations/mcp/connect': 'human:consent',
   'POST /api/integrations/telegram/test': 'human:outward',
+  'GET /api/integrations/telegram/answers': 'human:secret',
+  'PUT /api/integrations/telegram/answers': 'human:secret',
+  'POST /api/integrations/telegram/answers/restart': 'human:secret',
   'POST /api/integrations/tms/pull': 'human:outward',
   'POST /api/integrations/tms/push': 'human:outward',
   'POST /api/integrations/webhook/test': 'human:outward',

@@ -17,6 +17,18 @@ describe('window-weight — вес вызова в окне подписки', (
     expect(modelFactor(undefined)).toBe(5);
   });
 
+  it('множитель по версии: Opus 4/4.1 — 15, Opus 4.5+ — 5, Haiku 3.5 — 0,8', () => {
+    expect(modelFactor('claude-opus-4-20250514')).toBe(15);
+    expect(modelFactor('claude-opus-4-1-20250805')).toBe(15);
+    expect(modelFactor('claude-opus-4-1')).toBe(15);
+    expect(modelFactor('claude-opus-4-5-20251101')).toBe(5);
+    expect(modelFactor('claude-opus-4-8')).toBe(5);
+    expect(modelFactor('claude-haiku-3-5-20241022')).toBe(0.8);
+    // Имя до Claude 4: версия перед семейством — по своей цене, а не как Opus 4.8.
+    expect(modelFactor('claude-3-opus-20240229')).toBe(15);
+    expect(modelFactor('gpt-5')).toBe(5);
+  });
+
   it('запись 5 мин = вся запись минус часовая; чтение кеша — десятая часть', () => {
     // 1000 + 1,25·20000 + 2·10000 + 0,1·100000 + 5·2000 = 66 000 → ×3 / 1e6
     expect(windowWeight(tokens, 'claude-sonnet-5')).toBeCloseTo(0.198, 9);

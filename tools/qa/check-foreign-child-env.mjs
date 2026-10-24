@@ -79,6 +79,8 @@ appendFileSync(
     brief: pick('AGENTDECK_BRIEF_OUTPUT'),
     slots: pick('AGENTDECK_HEAVY_SLOTS'),
     workers: pick('VITEST_MAX_WORKERS'),
+    compactEnv: pick('AGENTDECK_CODEX_COMPACT_LIMIT'),
+    toolOutputEnv: pick('AGENTDECK_CODEX_TOOL_OUTPUT_LIMIT'),
     excluded: settings.mcp?.excluded ?? [],
     threshold: settings.context?.autoCompactThreshold ?? null,
     queueDir: pick('AGENTDECK_HEAVY_QUEUE_DIR'),
@@ -89,6 +91,11 @@ appendFileSync(
     ),
     prompt: stdin.length,
     noted: [argv.join(' '), stdin, ...contextFiles].some((text) => text.includes(NOTE)),
+    // Ревью A3: чей это запуск — группа «Форма входа», её второй ход, новая группа.
+    login: [argv.join(' '), stdin].some((text) => text.includes('починить валидацию')),
+    turn2: [argv.join(' '), stdin].some((text) => text.includes('A3-TURN-2')),
+    fresh: [argv.join(' '), stdin].some((text) => text.includes('A3-NEW-GROUP')),
+    truncate: settings.tools?.truncateToolOutputThreshold ?? null,
   }) + '\n',
 );
 // Живую сессию (app-server, serve) фальшивка не ведёт: отказ, и панель идёт одиночным запуском.
@@ -154,7 +161,12 @@ await runOnStand(
   {
     label: `foreign-child-env-${CLI}`,
     web: false,
-    settings: { provider: CLI },
+    // Чтение 2000 токенов (пакет C): потолок инструментов Codex ниже его собственного
+    // предела 2500 — только так ключ `tool_output_token_limit` вообще появляется.
+    settings: {
+      provider: CLI,
+      ...(CLI === 'codex' ? { groupEconomy: { readOutputTokens: 2000 } } : {}),
+    },
     env: { AGENTDECK_GROUP_COMPACT_WINDOW: '160k' },
     fakeCli: { [CLI]: FAKE_CLI },
     // Настоящий CLI человека панель нашла бы раньше обёртки `.cmd`.
@@ -310,6 +322,62 @@ await runOnStand(
         : kids.length > 0 && [...plain, ...kids].every((call) => !limited(call) && !call.threshold),
       JSON.stringify([...plain, ...kids].map((call) => call.argv.filter((a) => a.includes('=')))),
     );
+    if (CLI === 'codex') {
+      // План экономии чужих CLI (22.10): порог переехал из `runtime.ts` в канал рычагов
+      // (`economy-run/codex.ts`) — argv обязан остаться прежним: ключ ровно один, пара
+      // `-c` в блоке ключей группы сразу за подкомандой (за снятыми серверами), а
+      // служебная переменная до CLI не доходит.
+      const LIMIT = 'model_auto_compact_token_limit=160000';
+      const placed = (call) => {
+        const at = call.argv.indexOf(LIMIT);
+        const block = call.argv.slice(1, at + 1);
+        return (
+          call.argv.filter((arg) => arg.includes('model_auto_compact_token_limit')).length === 1 &&
+          block.length % 2 === 0 &&
+          block.every((arg, index) =>
+            index % 2 === 0 ? arg === '-c' : arg === LIMIT || arg.startsWith('mcp_servers.'),
+          )
+        );
+      };
+      check(
+        'порог Codex: та же пара `-c` в блоке группы за подкомандой, ровно один раз',
+        groups.length > 0 && groups.every(placed),
+        JSON.stringify(groups.map((call) => call.argv.slice(0, 9))),
+      );
+      check(
+        'служебная AGENTDECK_CODEX_COMPACT_LIMIT до CLI не доходит',
+        [...plain, ...kids].every((call) => call.compactEnv === null),
+        JSON.stringify([...plain, ...kids].map((call) => call.compactEnv)),
+      );
+      // Пакет C (решение O2): потолок ответа инструмента — один ключ на все инструменты,
+      // max(ceil(8000 / 4), 2000) = 2000 при чтении 2000 на стенде (ниже предела Codex
+      // 2500 — иначе ключа нет); пара `-c` сразу за порогом сжатия, у разбора и обычного
+      // разговора её нет.
+      const TOOL = 'tool_output_token_limit=2000';
+      const toolPlaced = (call) => {
+        const at = call.argv.indexOf(TOOL);
+        return (
+          call.argv.filter((arg) => arg.includes('tool_output_token_limit')).length === 1 &&
+          call.argv[at - 1] === '-c' &&
+          call.argv[at - 2] === LIMIT
+        );
+      };
+      check(
+        'потолок инструментов Codex 2000 — у групп за порогом сжатия, ровно один раз',
+        groups.length > 0 && groups.every(toolPlaced),
+        JSON.stringify(groups.map((call) => call.argv.slice(0, 11))),
+      );
+      check(
+        'потолка инструментов нет у разбора и обычного разговора',
+        rest.every((call) => !call.argv.some((arg) => arg.includes('tool_output_token_limit'))),
+        JSON.stringify(rest.map((call) => call.argv.filter((a) => a.includes('=')))),
+      );
+      check(
+        'служебная AGENTDECK_CODEX_TOOL_OUTPUT_LIMIT до CLI не доходит',
+        [...plain, ...kids].every((call) => call.toolOutputEnv === null),
+        JSON.stringify([...plain, ...kids].map((call) => call.toolOutputEnv)),
+      );
+    }
     check(
       'разбор и обычный разговор — с полным набором',
       kids.length - groups.length >= 1 && plain.every((call) => off(call).length === 0),
@@ -319,6 +387,118 @@ await runOnStand(
       'строка о снятых серверах доехала до групп и только до них',
       groups.length > 0 && groups.every((call) => call.noted) && rest.every((call) => !call.noted),
       offOf([...plain, ...kids]),
+    );
+
+    // Ревью A3: рычаги закрепляются на первом старте разговора группы. Правка
+    // настройки между ходами не меняет второй ход той же группы, а новая группа
+    // (второе разделение) берёт новое значение. Codex: потолок инструментов
+    // max(ceil(9600 / 4), 2000) = 2400 — ниже предела 2500, ключ есть; Qwen Code —
+    // `tools.truncateToolOutputThreshold` слоя настроек в знаках.
+    const economyOf = (call) => ({
+      tool: call.argv.filter((arg) => arg.includes('tool_output_token_limit')),
+      truncate: call.truncate,
+      brief: call.brief,
+      slots: call.slots,
+      off: off(call),
+      compact: call.argv.filter((arg) => arg.includes('model_auto_compact_token_limit')),
+    });
+    const turn1 = groups.find((call) => call.login);
+    check(
+      CLI === 'codex'
+        ? 'первый ход «Формы входа»: потолок инструментов 2000'
+        : 'первый ход «Формы входа»: предел вывода 8000 знаков',
+      CLI === 'codex'
+        ? turn1?.argv.includes('tool_output_token_limit=2000') === true
+        : turn1?.truncate === 8000,
+      JSON.stringify(turn1 ? economyOf(turn1) : groups.map(economyOf)),
+    );
+    const patched = await stand.api('/settings', {
+      method: 'PATCH',
+      body: {
+        groupEconomy: {
+          bashOutputChars: 9600,
+          ...(CLI === 'codex' ? { readOutputTokens: 2000 } : {}),
+        },
+      },
+    });
+    check(
+      'настройка рычагов изменена между ходами',
+      patched.status === 200,
+      patched.text.slice(0, 300),
+    );
+    const login = (await chats()).find((chat) => chat.title === 'Форма входа');
+    check('разговор группы «Форма входа» найден', Boolean(login), JSON.stringify(await chats()));
+    const beforeTurn2 = runs().length;
+    if (login) {
+      await stand.api(`/provider-chat/chats/${login.id}/send`, {
+        method: 'POST',
+        body: { text: 'A3-TURN-2: продолжай' },
+      });
+      for (let t = 0; t < 30_000 && !runs().some((call) => call.turn2); t += 250) await wait(250);
+    }
+    const turn2 = runs()
+      .slice(beforeTurn2)
+      .find((call) => call.turn2);
+    check(
+      'второй ход той же группы — с рычагами первого хода',
+      Boolean(turn1 && turn2) &&
+        JSON.stringify(economyOf(turn2)) === JSON.stringify(economyOf(turn1)),
+      JSON.stringify({
+        turn1: turn1 && economyOf(turn1),
+        turn2: turn2 && economyOf(turn2),
+      }),
+    );
+
+    // Новая группа — второе разделение от второго обычного разговора.
+    const second = await stand.api('/provider-chat/chats', {
+      method: 'POST',
+      body: { title: 'второй', workdir: stand.root },
+    });
+    const secondId = JSON.parse(second.text || '{}').id;
+    await stand.api(`/provider-chat/chats/${secondId}/send`, {
+      method: 'POST',
+      body: { text: 'привет' },
+    });
+    for (let t = 0; t < 30_000; t += 250) {
+      if ((await chats()).find((chat) => chat.id === secondId)?.messageCount >= 2) break;
+      await wait(250);
+    }
+    const beforeFresh = runs().length;
+    const split2 = await stand.api('/chat/split', {
+      method: 'POST',
+      body: {
+        projectPath: stand.root,
+        startRuns: true,
+        parentChatId: `${CLI}:${secondId}`,
+        proposal: {
+          groups: [
+            {
+              title: 'Подвал',
+              branch: 'feature/footer',
+              tasks: ['A3-NEW-GROUP: поправить подвал'],
+            },
+            // Разделение — минимум две группы с задачами.
+            { title: 'Меню', branch: 'feature/menu', tasks: ['A3-NEW-GROUP: сузить меню'] },
+          ],
+        },
+      },
+    });
+    check('второе разделение принято', split2.status === 200, split2.text.slice(0, 400));
+    const freshGroup = () =>
+      runs()
+        .slice(beforeFresh)
+        .find((call) => call.fresh && off(call).length > 0);
+    for (let t = 0; t < 30_000 && !freshGroup(); t += 250) await wait(250);
+    const fresh = freshGroup();
+    check(
+      CLI === 'codex'
+        ? 'новая группа — с новым потолком инструментов 2400, ровно один раз'
+        : 'новая группа — с новым пределом вывода 9600 знаков',
+      CLI === 'codex'
+        ? fresh?.argv.filter((arg) => arg.includes('tool_output_token_limit')).join() ===
+            'tool_output_token_limit=2400'
+        : fresh?.truncate === 9600,
+      JSON.stringify(fresh ? economyOf(fresh) : runs().slice(beforeFresh).map(economyOf)),
     );
   },
 );

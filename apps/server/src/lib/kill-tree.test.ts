@@ -11,6 +11,7 @@ import {
   readPosixProcessTable,
   readProcessTable,
   REUSE_SLACK_MS,
+  stopTreeWithGrace,
   terminateByHandle,
   type ProcessRow,
 } from './kill-tree.mjs';
@@ -281,6 +282,31 @@ describe('killProcessTree — сигналы', () => {
     expect(killProcessTree(0, {}, { platform: 'win32', readTable: () => SCENE, kill })).toEqual([]);
     expect(kill).not.toHaveBeenCalled();
   });
+
+  // Пауза группы 23.10 (N1b): сервер снимает всё под посредником одним снимком,
+  // пока дерево цело, а посредник остаётся — он сам скажет код выхода CLI.
+  it('keepRoot: только потомки, корень жив — Windows, POSIX и группа POSIX', () => {
+    for (const platform of ['win32', 'linux']) {
+      const kill = vi.fn();
+      const killed = killProcessTree(
+        900,
+        { selfPid: -1, keepRoot: true, group: platform === 'linux' },
+        { platform, readTable: () => SCENE, kill },
+      );
+      expect([...killed].sort()).toEqual([901, 902, 903, 904]);
+      expect(kill.mock.calls.map(([pid]) => pid)).not.toContain(900);
+      expect(kill.mock.calls.map(([pid]) => pid)).not.toContain(-900);
+    }
+  });
+
+  it('keepRoot без снимка: не снимается ничего, и корень тоже', () => {
+    for (const platform of ['win32', 'linux']) {
+      const kill = vi.fn();
+      const impl = { platform, readTable: () => undefined, kill };
+      expect(killProcessTree(900, { selfPid: -1, keepRoot: true }, impl)).toEqual([]);
+      expect(kill).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('killChildProcessTree — корень-дочерний', () => {
@@ -388,6 +414,71 @@ describe('killChildProcessTree — корень-дочерний', () => {
       );
       expect(kill).not.toHaveBeenCalled();
     });
+  });
+});
+
+// F-66 (POSIX): корень, глухой к SIGTERM (`trap '' TERM`), держал `tests-cli run`
+// без конца после предела. Платформа и сигналы подменены — хоста Linux/macOS тут
+// нет; путь тот же, что у `runPlan` в tools/tests-cli.mjs.
+describe('stopTreeWithGrace — добивание глухого корня (POSIX)', () => {
+  const posix = () => {
+    const kill = vi.fn();
+    const child = {
+      pid: 900,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn(() => true),
+    };
+    const impl = {
+      platform: 'linux',
+      readTable: () => [row(900, 7, at(100)), row(901, 900, at(101))],
+      kill,
+    };
+    return { child, kill, impl };
+  };
+
+  it('корень пропустил SIGTERM — через запас SIGKILL по своему дескриптору, не раньше', () => {
+    vi.useFakeTimers();
+    try {
+      const { child, kill, impl } = posix();
+      stopTreeWithGrace(child as never, { graceMs: 5_000 }, impl);
+      expect(kill).toHaveBeenCalledWith(901, 'SIGTERM');
+      expect(kill).toHaveBeenCalledWith(900, 'SIGTERM');
+      expect(child.kill).not.toHaveBeenCalledWith('SIGKILL');
+      vi.advanceTimersByTime(4_999);
+      expect(child.kill).not.toHaveBeenCalledWith('SIGKILL');
+      vi.advanceTimersByTime(1);
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+      expect(kill).not.toHaveBeenCalledWith(900, 'SIGKILL');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('корень вышел в запасе — SIGKILL не уходит: номер мог достаться чужому', () => {
+    vi.useFakeTimers();
+    try {
+      const { child, impl } = posix();
+      stopTreeWithGrace(child as never, { graceMs: 5_000 }, impl);
+      child.signalCode = 'SIGTERM';
+      vi.advanceTimersByTime(10_000);
+      expect(child.kill).not.toHaveBeenCalledWith('SIGKILL');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('выход дождались и добивание отменено — SIGKILL не уходит и живому', () => {
+    vi.useFakeTimers();
+    try {
+      const { child, impl } = posix();
+      const cancel = stopTreeWithGrace(child as never, { graceMs: 5_000 }, impl);
+      cancel();
+      vi.advanceTimersByTime(10_000);
+      expect(child.kill).not.toHaveBeenCalledWith('SIGKILL');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

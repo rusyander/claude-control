@@ -8,7 +8,7 @@
       "id": "t1",
       "name": "Bash",
       "input": {
-        "command": "cd ../../.. && grep -n \"VerdictFailed\\|\\\"failed\\\"\" svc-agentgw/internal/*/proxy.go | head -20; sed -n 449p svc-docs-ui/content/ru/agentic-proxy/journal.mdx | cut -c600-1400"
+        "command": "cd ../../.. && grep -n \"VerdictFailed\\|\\\"failed\\\"\" svc-agentgw/internal/*/proxy.go | head -20; sed -n 449p svc-docs-ui/content/ru/billing-proxy/journal.mdx | cut -c600-1400"
       }
     },
     { "kind": "toolResult", "t": 1792523011714, "id": "t1", "chars": 350 },
@@ -104,7 +104,7 @@
       "id": "t6",
       "name": "Bash",
       "input": {
-        "command": "cd svc-docs-ui/content; grep -n \"metadata\" ru/guardrails/rules.mdx ru/platform/integration.mdx | cut -c1-250; grep -n \"Exception types\\|Block kind\\|Any block\\|Collection check\\|Show in journal\\|sanitized\\|Sanitized\" en/guardrails/collections.mdx en/agentic-proxy/clients.mdx en/guardrails/testing.mdx | cut -c1-200"
+        "command": "cd svc-docs-ui/content; grep -n \"metadata\" ru/dashboards/rules.mdx ru/platform/integration.mdx | cut -c1-250; grep -n \"Exception types\\|Block kind\\|Any block\\|Collection check\\|Show in journal\\|sanitized\\|Sanitized\" en/dashboards/collections.mdx en/billing-proxy/clients.mdx en/dashboards/testing.mdx | cut -c1-200"
       }
     },
     { "kind": "toolResult", "t": 1792523049603, "id": "t6", "chars": 1796 },
@@ -124,7 +124,7 @@
       "id": "t7",
       "name": "Bash",
       "input": {
-        "command": "sed -n 805,830p ru/guardrails/rules.mdx | cut -c1-300; sed -n 755,768p en/guardrails/collections.mdx; sed -n 268,273p en/guardrails/collections.mdx; sed -n 222,226p en/agentic-proxy/clients.mdx; grep -n \"Tekshirish\\|Har qanday blok\\|Jurnalda ko'rsatish\" uz/guardrails/collections.mdx uz/agentic-proxy/clients.mdx | cut -c1-160 | head"
+        "command": "sed -n 805,830p ru/dashboards/rules.mdx | cut -c1-300; sed -n 755,768p en/dashboards/collections.mdx; sed -n 268,273p en/dashboards/collections.mdx; sed -n 222,226p en/billing-proxy/clients.mdx; grep -n \"Tekshirish\\|Har qanday blok\\|Jurnalda ko'rsatish\" uz/dashboards/collections.mdx uz/billing-proxy/clients.mdx | cut -c1-160 | head"
       }
     },
     { "kind": "toolResult", "t": 1792523053434, "id": "t7", "chars": 3450 },
@@ -144,7 +144,7 @@
       "id": "t8",
       "name": "Bash",
       "input": {
-        "command": "sed -n 762,766p uz/guardrails/collections.mdx; grep -n \"^\\*\\*.*\\*\\*\\. «Tekshiruv\\|Kolleksiyani tekshirish\\|kolleksiya orqali\" uz/guardrails/collections.mdx | head -3; grep -n \"event page\\|hodisa sahifasi\" uz/agentic-proxy/clients.mdx | cut -c1-300; sed -n 270,272p ru/guardrails/collections.mdx"
+        "command": "sed -n 762,766p uz/dashboards/collections.mdx; grep -n \"^\\*\\*.*\\*\\*\\. «Tekshiruv\\|Kolleksiyani tekshirish\\|kolleksiya orqali\" uz/dashboards/collections.mdx | head -3; grep -n \"event page\\|hodisa sahifasi\" uz/billing-proxy/clients.mdx | cut -c1-300; sed -n 270,272p ru/dashboards/collections.mdx"
       }
     },
     { "kind": "toolResult", "t": 1792523057783, "id": "t8", "chars": 921 },
@@ -164,7 +164,7 @@
       "id": "t9",
       "name": "Bash",
       "input": {
-        "command": "sed -n 212,216p uz/agentic-proxy/clients.mdx; grep -n \"Collection check\\|«Check»\\|(Tekshiruv)\" uz/guardrails/collections.mdx | head -3; sed -n 263,268p uz/guardrails/collections.mdx"
+        "command": "sed -n 212,216p uz/billing-proxy/clients.mdx; grep -n \"Collection check\\|«Check»\\|(Tekshiruv)\" uz/dashboards/collections.mdx | head -3; sed -n 263,268p uz/dashboards/collections.mdx"
       }
     },
     { "kind": "toolResult", "t": 1792523060763, "id": "t9", "chars": 1185 },
@@ -184,7 +184,7 @@
       "id": "t10",
       "name": "Bash",
       "input": {
-        "command": "cd ../../svc-admin-ui/src/shared/i18n/locales; ls; grep -n \"dictionaryError\\|dictionaryRetry\" */guardrails.json; sed -n 277,281p ../../../../../svc-docs-ui/content/uz/guardrails/collections.mdx"
+        "command": "cd ../../svc-admin-ui/src/shared/i18n/locales; ls; grep -n \"dictionaryError\\|dictionaryRetry\" */dashboards.json; sed -n 277,281p ../../../../../svc-docs-ui/content/de/dashboards/collections.mdx"
       }
     },
     { "kind": "toolResult", "t": 1792523069145, "id": "t10", "chars": 1081 },

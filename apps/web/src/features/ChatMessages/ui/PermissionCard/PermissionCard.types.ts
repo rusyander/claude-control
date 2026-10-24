@@ -5,6 +5,14 @@ export interface PendingPermission {
   input: unknown;
   toolUseId: string;
   guard?: PermissionGuardReason;
+  /** Карточка отложена как D-n: агент работает дальше, кнопки решают запись. */
+  deferredId?: string;
+}
+
+export interface DeferredPermissionCardProps {
+  /** Отложенные карточки разговора — у каждой свой `deferredId`. */
+  permissions: PendingPermission[];
+  onDecide: (toolUseId: string, behavior: 'allow' | 'deny') => void;
 }
 
 export interface PermissionCardProps {

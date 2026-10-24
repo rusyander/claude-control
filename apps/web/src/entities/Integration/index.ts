@@ -7,6 +7,11 @@ export { useForgetIntegration } from './api/useForgetIntegration';
 export { useConnectAtlassianMcp } from './api/useConnectAtlassianMcp';
 export { useTestWebhook } from './api/useTestWebhook';
 export { useTestTelegram } from './api/useTestTelegram';
+export {
+  useTelegramAnswers,
+  useSaveTelegramAnswers,
+  useRestartTelegramAnswers,
+} from './api/TelegramAnswersApi';
 export { useIntegrationDiscovery } from './api/useIntegrationDiscovery';
 export { useApplyDiscovered } from './api/useApplyDiscovered';
 export type { SaveIntegrationPayload } from './api/useSaveIntegration';

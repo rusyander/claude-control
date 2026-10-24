@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useAwaitingChats, useChats } from '@entities/Chat';
 import { useActiveRuns } from '@shared/lib/agent-runs';
+import { useServerLink } from '@shared/lib/server-link';
 import { workspace, projectShortName } from '@shared/lib/workspace';
 import { pickTip, setMascotPrefs, tipScope, useMascotPrefs } from '@shared/lib/mascot';
 import type { MascotMood } from '@shared/ui/mascot';
@@ -10,10 +11,13 @@ import { companionLists, runTarget } from '../model/chatTargets';
 import { diffRuns, snapshotRuns } from '../model/runEvents';
 import { resolveMood, statusLine } from '../model/mood';
 import { shouldTip } from '../model/shouldTip';
+import { EMPTY_MEMORY, pickReaction } from '../model/reactions';
+import type { ReactionKind, ReactionMemory } from '../model/reactions.types';
+import { useGroupEvents } from './useGroupEvents';
 import type { ChatTarget } from '../model/chatTargets.types';
 import type { RunSnapshot } from '../model/runEvents.types';
 import { useActivity } from './useActivity';
-import type { Speech } from './useMascotCompanion.types';
+import type { Speech, SpeechLine } from './useMascotCompanion.types';
 
 /** Сколько висит реплика каждого рода, мс. Вопрос — дольше: работа стоит. */
 const SPEECH_MS = {
@@ -24,10 +28,36 @@ const SPEECH_MS = {
   tip: 10_000,
   wake: 4_000,
   dizzy: 3_000,
+  react: 9_000,
 };
 
+/**
+ * «Связь пропала» висит дольше прочих реакций: пока связи нет, это главное, что
+ * стоит знать о панели. Вернулась связь — фразу сменит «вернулась».
+ */
+const LINK_LOST_MS = 20_000;
+
+/** Мимика реакции: беда — огорчение, остановка — раздумье, удача — радость. */
+const REACTION_MOOD: Record<ReactionKind, MascotMood> = {
+  linkLost: 'lost',
+  linkBack: 'happy',
+  runFailed: 'error',
+  groupFailed: 'error',
+  groupStopped: 'thinking',
+  limitHit: 'waiting',
+  longDone: 'happy',
+  groupDelivered: 'happy',
+};
+
+/** Повод реакции: род, кого назвать и куда вести кнопкой. */
+interface ReactionCause {
+  kind: ReactionKind;
+  name?: string;
+  target?: ChatTarget;
+}
+
 /** Важность реплики: новая не перебивает более важную, что уже на экране. */
-const PRIORITY = { ask: 5, error: 4, done: 3, greet: 2, wake: 1, dizzy: 1, tip: 0 };
+const PRIORITY = { ask: 5, error: 4, react: 4, done: 3, greet: 2, wake: 1, dizzy: 1, tip: 0 };
 
 /** Радость от готового хода и головокружение — вспышки на столько, мс. */
 const FLASH_MS = 3_200;
@@ -69,15 +99,22 @@ export function useMascotCompanion(isPanelOpen: boolean) {
   const lastSpokeAt = useRef<number | undefined>(undefined);
   const mountedAt = useRef(Date.now());
   const snapshot = useRef<RunSnapshot | undefined>(undefined);
+  const reactionMemory = useRef<ReactionMemory>(EMPTY_MEMORY);
+
+  const render = useCallback(
+    (line: SpeechLine): string => t(line.key, { name: line.name || t('mascot.panel.untitled') }),
+    [t],
+  );
 
   const say = useCallback(
-    (kind: keyof typeof PRIORITY, text: string, extra: Partial<Speech> = {}): void => {
+    (kind: keyof typeof PRIORITY, line: SpeechLine, extra: Partial<Speech> = {}): void => {
       const current = speechRef.current;
       if (current && current.until > Date.now() && PRIORITY[current.kind] > PRIORITY[kind]) return;
       const next: Speech = {
         id: Date.now(),
         kind,
-        text,
+        text: render(line),
+        line,
         until: Date.now() + SPEECH_MS[kind],
         ...extra,
       };
@@ -85,13 +122,42 @@ export function useMascotCompanion(isPanelOpen: boolean) {
       lastSpokeAt.current = Date.now();
       setSpeech(next);
     },
-    [],
+    [render],
   );
 
   const dismissSpeech = useCallback((): void => {
     speechRef.current = null;
     setSpeech(null);
   }, []);
+
+  /**
+   * Реакция на пачку событий: одна строка самого важного, без повтора прошлой
+   * формулировки и не чаще срока (`pickReaction`). Сказала — `true`.
+   */
+  const react = useCallback(
+    (causes: ReactionCause[]): boolean => {
+      const pick = pickReaction(
+        causes.map((cause) => cause.kind),
+        reactionMemory.current,
+        Date.now(),
+      );
+      if (!pick) return false;
+      reactionMemory.current = pick.memory;
+      const cause = causes.find((item) => item.kind === pick.kind);
+      say(
+        'react',
+        { key: `mascot.react.${pick.kind}.${pick.variant}`, name: cause?.name },
+        {
+          reaction: pick.kind,
+          mood: REACTION_MOOD[pick.kind],
+          ...(cause?.target ? { target: cause.target } : {}),
+          ...(pick.kind === 'linkLost' ? { until: Date.now() + LINK_LOST_MS } : {}),
+        },
+      );
+      return true;
+    },
+    [say],
+  );
 
   const flashMood = useCallback((mood: MascotMood): void => {
     const until = Date.now() + FLASH_MS;
@@ -100,7 +166,8 @@ export function useMascotCompanion(isPanelOpen: boolean) {
   }, []);
 
   const { isAsleep, lastInputAt } = useActivity(counts.running === 0 && attention === 0, () => {
-    if (prefs.enabled && prefs.chatty) say('wake', t('mascot.speech.wake'), { mood: 'waving' });
+    if (prefs.enabled && prefs.chatty)
+      say('wake', { key: 'mascot.speech.wake' }, { mood: 'waving' });
   });
 
   // Реплика сама уходит со сцены, вспышка гаснет — по своим часам.
@@ -125,38 +192,79 @@ export function useMascotCompanion(isPanelOpen: boolean) {
     const events = diffRuns(snapshot.current, runs);
     snapshot.current = snapshotRuns(runs);
     if (!prefs.enabled) return;
+    const causes: ReactionCause[] = [];
     for (const event of events) {
       const target = runTarget(event, chatList);
       const named = Boolean(target.name);
+      // Реакции включены — сбой, лимит и конец долгого хода идут одной пачкой
+      // через `react`: одна строка на пачку, без повтора формулировки.
+      if (prefs.reactions && event.kind === 'error') {
+        causes.push({ kind: 'runFailed', name: target.name, target });
+        continue;
+      }
+      if (event.kind === 'limit') {
+        if (prefs.reactions) causes.push({ kind: 'limitHit', name: target.name, target });
+        continue;
+      }
+      if (prefs.reactions && event.kind === 'done' && event.long) {
+        flashMood('happy');
+        causes.push({ kind: 'longDone', name: target.name, target });
+        continue;
+      }
       if (event.kind === 'ask') {
-        say('ask', t('mascot.speech.ask', { name: target.name || t('mascot.panel.untitled') }), {
-          target,
-        });
+        say('ask', { key: 'mascot.speech.ask', name: target.name }, { target });
       } else if (event.kind === 'error') {
         say(
           'error',
           named
-            ? t('mascot.speech.error', { name: target.name })
-            : t('mascot.speech.errorAnonymous'),
-          {
-            target,
-          },
+            ? { key: 'mascot.speech.error', name: target.name }
+            : { key: 'mascot.speech.errorAnonymous' },
+          { target },
         );
       } else {
         flashMood('happy');
         say(
           'done',
-          named ? t('mascot.speech.done', { name: target.name }) : t('mascot.speech.doneAnonymous'),
-          {
-            target,
-          },
+          named
+            ? { key: 'mascot.speech.done', name: target.name }
+            : { key: 'mascot.speech.doneAnonymous' },
+          { target },
         );
       }
     }
+    if (causes.length > 0) react(causes);
     // Реплики собираются из `t` и списка разговоров на момент события, а
     // пересчитывать их на каждое обновление списка не нужно.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runs, prefs.enabled]);
+
+  // Связь с сервером: пропала (поток не открылся за срок ожидания) и вернулась.
+  // Вернулась — устаревшее «пропала» уходит со сцены, даже если «вернулась»
+  // промолчит по сроку.
+  const link = useServerLink();
+  const previousLink = useRef(link);
+  useEffect(() => {
+    const before = previousLink.current;
+    previousLink.current = link;
+    if (before === link) return;
+    if (link === 'up' && speechRef.current?.reaction === 'linkLost') dismissSpeech();
+    if (!prefs.enabled || !prefs.reactions) return;
+    if (link === 'down') react([{ kind: 'linkLost' }]);
+    else if (link === 'up' && before === 'down') react([{ kind: 'linkBack' }]);
+  }, [link, prefs.enabled, prefs.reactions, react, dismissSpeech]);
+
+  // Группы разделения: упала, остановлена, доставлена. Кнопка ведёт в хаб —
+  // разговор-корень дерева.
+  useGroupEvents((events) => {
+    if (!prefs.enabled || !prefs.reactions) return;
+    react(
+      events.map((event) => ({
+        kind: event.kind,
+        name: event.title,
+        target: runTarget({ id: event.root }, chatList),
+      })),
+    );
+  });
 
   // Разговор, ждущий вне прогонов панели (терминал, соседнее окно, вопрос
   // дерева), — тот же повод «ждёт ответа». Как у звонка: первый снимок только
@@ -170,10 +278,8 @@ export function useMascotCompanion(isPanelOpen: boolean) {
     const fresh = awaiting.find((chat) => !seen.has(chat.id));
     if (!fresh) return;
     const target = runTarget({ id: fresh.id, projectPath: fresh.projectPath }, chatList);
-    say('ask', t('mascot.speech.ask', { name: target.name || t('mascot.panel.untitled') }), {
-      target,
-    });
-    // См. эффект прогонов выше: текст — на момент события.
+    say('ask', { key: 'mascot.speech.ask', name: target.name }, { target });
+    // См. эффект прогонов выше: имя — на момент события.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [awaiting, chats, prefs.enabled]);
 
@@ -182,10 +288,10 @@ export function useMascotCompanion(isPanelOpen: boolean) {
     if (!prefs.enabled || prefs.greeted) return undefined;
     const timer = window.setTimeout(() => {
       setMascotPrefs({ greeted: true });
-      say('greet', t('mascot.speech.greet'), { mood: 'waving' });
+      say('greet', { key: 'mascot.speech.greet' }, { mood: 'waving' });
     }, GREET_AFTER_MS);
     return () => window.clearTimeout(timer);
-  }, [prefs.enabled, prefs.greeted, say, t]);
+  }, [prefs.enabled, prefs.greeted, say]);
 
   // Совет по своей инициативе — редко и только когда не мешает (`shouldTip`).
   const gateRef = useRef({ attention, isAsleep, isPanelOpen, chatty: prefs.chatty, pathname });
@@ -208,10 +314,10 @@ export function useMascotCompanion(isPanelOpen: boolean) {
       });
       if (!ready) return;
       const key = pickTip(tipScope(gate.pathname));
-      say('tip', t(`mascot.tips.${key}`), { mood: 'thinking' });
+      say('tip', { key: `mascot.tips.${key}` }, { mood: 'thinking' });
     }, TIP_CHECK_MS);
     return () => window.clearInterval(timer);
-  }, [prefs.enabled, lastInputAt, say, t]);
+  }, [prefs.enabled, lastInputAt, say]);
 
   const openChat = useCallback(
     (target: ChatTarget): void => {
@@ -225,8 +331,8 @@ export function useMascotCompanion(isPanelOpen: boolean) {
 
   const poke = useCallback((): void => {
     flashMood('dizzy');
-    say('dizzy', t('mascot.speech.dizzy'));
-  }, [flashMood, say, t]);
+    say('dizzy', { key: 'mascot.speech.dizzy' });
+  }, [flashMood, say]);
 
   const nextTip = useCallback(
     () => setTip((current) => pickTip(tipScope(pathname), current)),
@@ -246,7 +352,9 @@ export function useMascotCompanion(isPanelOpen: boolean) {
     mood,
     status: statusLine({ ...counts, asleep: isAsleep }),
     lists,
-    speech,
+    // Текст — на языке этого рендера: `useTranslation` перерисовывает хук при
+    // смене языка, и висящая реплика переходит на новый вместе со всей панелью.
+    speech: speech?.line ? { ...speech, text: render(speech.line) } : speech,
     dismissSpeech,
     openChat,
     poke,

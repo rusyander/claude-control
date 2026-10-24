@@ -7,10 +7,12 @@ import {
   type SplitHumanStepProposal,
 } from '@agentdeck/contracts/split-tickets';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
+import { withoutDeferredWaitLines } from '@agentdeck/contracts/deferred-asks';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { scanSieveBlocks, stampSieveRows, withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 import type { ChainOutcome } from '../split-conveyor/split-conveyor.ts';
+import { humanAsksOf } from '../split-continue.ts';
 
 /**
  * Что конец хода значит для группы разделения (Д3, инцидент 23.09.2026).
@@ -89,6 +91,53 @@ export function endsWithQuestion(text: string): boolean {
   return before !== undefined && isOptionList(last) && hasQuestionLine(before);
 }
 
+/** Строгое «жду ответа» — где угодно в ответе: это всегда ожидание. */
+const WAITS_ANYWHERE = [
+  /(?<!\p{L})(жду|ожидаю|дождусь|подожду)\s+(ваш\p{L}*\s+|тво\p{L}*\s+)?(ответ|решени|выбор|подтверждени|указани|отмашк)/iu,
+  /\b(waiting|wait)\s+(for|on)\s+(your|you)\b/i,
+  /\bawaiting\s+your\b/i,
+];
+
+/** Ожидание без «жду» — только в последнем абзаце: там агент говорит, чем кончает ход. */
+const WAITS_AT_END = [
+  /(?<!\p{L})после\s+(ваш\p{L}*\s+|тво\p{L}*\s+)?(ответ|решени|подтверждени|выбор|отмашк)/iu,
+  /(?<!\p{L})(нужн\p{L}*|требуется|необходим\p{L}*)\s+(ваш\p{L}*|тво\p{L}*)\s+(решени|ответ|выбор|подтверждени)/iu,
+  /(?<!\p{L})вопрос\p{L}*(\s+и\s+рекомендаци\p{L}*)?\s+(записан|собран|перечислен|изложен|оставлен)/iu,
+  /\b(after|once)\s+(you|your)\s+(answer|reply|respond|decide|decision|confirm)/i,
+  /\b(need|needs|require|requires)\s+your\s+(decision|answer|input|confirmation|choice)\b/i,
+  /\bquestions\s+(and\s+recommendations\s+)?(are\s+)?(listed|written|recorded|collected|left)\b/i,
+  /\blet\s+me\s+know\s+(which|what|how)\b/i,
+];
+
+/**
+ * Ответ ждёт человека: вопрос в конце (`endsWithQuestion`), «после ответа»,
+ * «нужно ваше решение»… (живой случай RBAC 23.10: «Этапы D и E начну после
+ * ответа. Вопросы и рекомендации записаны в PROGRESS.md» — без «?»).
+ */
+export function awaitsAnswer(full: string): boolean {
+  // Строки «Waiting for the human: D-n — …» — законное ожидание решения по
+  // списку (решение 6): «решай сам» на них не тратится, R27 о них молчит.
+  const text = withoutDeferredWaitLines(full);
+  const body = prose(text);
+  if (!body) return false;
+  if (endsWithQuestion(text)) return true;
+  if (WAITS_ANYWHERE.some((pattern) => pattern.test(body))) return true;
+  const last = body.split(/\n\s*\n/).at(-1) ?? '';
+  return WAITS_AT_END.some((pattern) => pattern.test(last));
+}
+
+/**
+ * Ход кончился вопросом человеку — паузой, а не итогом: для планировщика
+ * цепочки (`pausedTurn`), итога группы и вопросов дерева одно правило. Вопрос
+ * в конце — всегда; ожидание словами («начну после ответа») — если в ответе нет
+ * меток `HUMAN:`: у них свой стоп доставки с пунктами «нужен человек», и
+ * «once you confirm» рядом с меткой его не подменяет.
+ */
+export function waitsForAnswer(text: string): boolean {
+  if (endsWithQuestion(withoutDeferredWaitLines(text))) return true;
+  return awaitsAnswer(text) && humanAsksOf(text).length === 0;
+}
+
 /** Строка абзаца кончается вопросительным знаком (с кавычкой, скобкой или выделением после). */
 function hasQuestionLine(paragraph: string): boolean {
   return paragraph
@@ -143,6 +192,12 @@ export interface ChainOutcomeInput {
   retry?: { attempt: number; at: number; limit?: true } | { exhausted: number };
   /** Последнее событие лимита подписки хода (`RunFinished.limit`). */
   limit?: { resetsAt: number; status: string };
+  /**
+   * Номера D-n, которые ждут решения человека по этой группе. Ход, кончившийся
+   * только ими, — законное ожидание (`human-op`), а не вопрос и не «готово»:
+   * зависимые не стартуют, сторож и «решай сам» на нём не тратятся.
+   */
+  deferred?: readonly string[];
 }
 
 /**
@@ -169,6 +224,8 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
   // выученного сита ссылка треда — тоже `merge_requests/N`).
   const text = withoutSieveBlocks(withoutSplitTickets(input.text));
   const tail = replyTail(text);
+  // Метки `HUMAN:` — из полного текста, не из хвоста ≤280 знаков (тот обрезан спереди).
+  const humanAsks = humanAsksOf(text);
   const mr = lastMergeRequestUrl(text);
   // Дефекты вне задач группы (95b) едут с любым итогом хода: находка не
   // пропадает оттого, что ход кончился вопросом или сбоем.
@@ -184,7 +241,12 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
       ? input.limit.resetsAt
       : undefined;
   // Ревью своей работы кончило цепочку: сколько замечаний в вердикте (L110).
-  const findings = link.stage === 'review' ? scanReviewBlocks(input.text).findings : undefined;
+  // Последний ход без блока — вердикт хода, передавшего работу продолжению
+  // (журнал 23.10): иначе «вердикта ревьюера нет» при вердиктах в цепочке.
+  const findings =
+    link.stage === 'review'
+      ? (scanReviewBlocks(input.text).findings ?? link.reviewVerdict)
+      : undefined;
   // Отчёт о ситах и выученные сита (решение владельца 28.09) едут с любым
   // итогом: строка сита, сданная ходом, кончившимся вопросом, не пропадает.
   const sieves = scanSieveBlocks(input.text);
@@ -192,6 +254,7 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
     ...(warningAt ? { limitWarningUntil: new Date(warningAt * 1000).toISOString() } : {}),
     ...(findings ? { reviewFindings: findings.length } : {}),
     ...(tail ? { tail } : {}),
+    ...(humanAsks.length > 0 ? { humanAsks } : {}),
     ...(mr ? { mr } : {}),
     ...(tickets.length > 0 ? { tickets } : {}),
     ...(humanSteps.length > 0 ? { humanSteps } : {}),
@@ -251,8 +314,15 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
   }
 
   // Вопрос инструментом — главный путь (Д16), вопрос текстом — запасной.
-  if (input.asked || endsWithQuestion(text)) {
+  // Строки «Waiting for the human: D-7 — …» вопросом не считаются: их просит
+  // сам отказ панели, а ответ на D-n даёт человек списком, не панель за него.
+  // Ожидание словами без «?» — тоже вопрос (`waitsForAnswer`): иначе группа в
+  // режиме «вопросы — человеку» получала «готово» и сверку доставки.
+  if (input.asked || waitsForAnswer(text)) {
     return { status: 'awaiting', waitingFor: 'question', ...withTail };
+  }
+  if (input.deferred && input.deferred.length > 0) {
+    return { status: 'awaiting', waitingFor: 'human-op', ...withTail };
   }
 
   // Итог словами фактов: ревью без правок — «проверено», а не «сделано».

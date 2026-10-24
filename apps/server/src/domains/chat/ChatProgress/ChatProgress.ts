@@ -14,6 +14,7 @@ import {
   type TranscriptBlock,
 } from '../ChatHistory/ChatHistory.ts';
 import { isHumanPrompt } from '../chat-inbox/chat-inbox.ts';
+import { killsProcess } from '../group-command/kill.ts';
 
 /**
  * Прогресс агента по его собственному следу в транскрипте.
@@ -399,41 +400,14 @@ class Shells {
 /** Инструменты, которыми агент сам останавливает фоновую задачу. */
 const STOP_TOOLS = new Set(['TaskStop', 'KillShell', 'KillBash']);
 
-/**
- * Команда, которая гасит процесс, — словом команды, а не словом в тексте: в
- * начале строки, после `;`/`&`/`|`/`(`/`{`, внутри `$(`, после `do`/`xargs`
- * (и его ключей: `xargs -r kill`, `xargs -0 kill`).
- * Кавычки перед проверкой вырезаются: `echo "kill"` и `grep "kill"` — не kill.
- */
-const KILL_COMMAND =
-  /(?:^|[;&|(`\n{]|\$\(|\bdo\b|\bxargs(?:\s+-\S+)*)\s*(?:sudo\s+)?(?:taskkill|kill|pkill|killall|Stop-Process|fuser|(?:npx\s+)?kill-port)\b/i;
-
 /** Чем агент находит процесс по порту: без поиска порт в команде — просто адрес. */
 const PORT_LOOKUP = /\b(?:netstat|lsof|fuser|Get-NetTCPConnection|kill-port|ss)\b|-LocalPort\b/i;
 
 /**
- * Гасит ли команда процесс. Кавычки вырезаются (`echo "kill"` — не kill), но
- * тело `powershell -Command "…"` и `bash -c "…"` — сама команда, и в Windows
- * это обычный вид погашения (холодная проверка 29.09, N5).
+ * Гасит ли команда процесс — один распознаватель с разбором команд группы
+ * (`group-command/kill.ts`): ход чата и маршрут прав узнают погашение одинаково.
  */
-function kills(command: string): boolean {
-  // Кавычки заменяются номерами: снаружи их текст не команда, а тело оболочки
-  // потом достаётся по номеру.
-  const quoted: string[] = [];
-  const outer = command.replace(/"([^"]*)"|'([^']*)'/g, (_m, dq?: string, sq?: string) => {
-    quoted.push(dq ?? sq ?? '');
-    return `"${quoted.length - 1}"`;
-  });
-  if (KILL_COMMAND.test(outer)) return true;
-  // Только тело оболочки, стоящей словом команды: `grep -c "kill"` — счёт
-  // строк, `./check.sh` — файл, `echo "bash -c '…'"` — текст (ревью r2, R2).
-  const bodies =
-    /(?:^|[;&|(\n])\s*(?:sudo\s+)?(?:pwsh|powershell|bash|sh|zsh|cmd)(?:\.exe)?(?=\s)[^"\n;&|]*?\s(?:-Command|-c|\/c)\s+"(\d+)"/gi;
-  for (const match of outer.matchAll(bodies)) {
-    if (kills(quoted[Number(match[1])] ?? '')) return true;
-  }
-  return false;
-}
+const kills = killsProcess;
 
 /** Команда — только поиск по порту: каждая её часть что-то ищет. */
 function onlyLookups(command: string): boolean {

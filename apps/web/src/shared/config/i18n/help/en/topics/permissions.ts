@@ -332,11 +332,20 @@ export const permissionsEn: typeof permissionsRu = {
     noteChatText:
       'The “ask” decision works here too: the agent’s request appears as an “the agent ' +
       'asks for permission” card with Allow and Deny buttons, and the run waits until you ' +
-      'press one; with no answer for half an hour the request is denied by itself — the ' +
-      'safe side. Auto-approve silently lets through only what is reversible: reading ' +
-      'always passes, even with the toggle off, while anything irreversible (deleting, ' +
-      'wiping history, publishing outward) asks whatever the toggle says. Your own “ask” ' +
-      'and “deny” rules outrank auto-approve — a matching call brings the card back. Your ' +
+      'press one; with no answer for 10 minutes («Settings» → «Models») the card becomes a ' +
+      'D-n item in «Awaiting decision» and the agent goes on with the rest (the «Chat» ' +
+      'document); at 0 the card waits as long as it takes. Auto-approve silently lets ' +
+      'through only what is reversible: reading always passes, even with the toggle off, ' +
+      'while anything irreversible (deleting, wiping history, publishing outward, a ' +
+      'download executed on the spot — curl … | sh, | python, | iex) asks whatever the ' +
+      'toggle says. Push --force-with-lease is an ordinary write: git itself refuses if ' +
+      'someone else’s work appeared on the remote; only force beyond the lease (--force, ' +
+      '-f, +branch) asks. Deleting branches, tags and the stash and any git merge always ' +
+      'ask, regardless of the rules. PowerShell tool commands are judged by the same rules ' +
+      'as Bash: Remove-Item -Recurse is a deletion, git push --force from PowerShell wipes ' +
+      'history. Your own “ask” ' +
+      'and “deny” rules outrank auto-approve — a matching call brings the card back; a ' +
+      'PowerShell(…) rule matches regardless of case, as PowerShell itself does. Your ' +
       '“allow” on an MCP tool by name (mcp__server__tool) the panel applies even where the ' +
       'whole server is handed to it to decide — in split groups: such a tool runs without ' +
       'a card, except deleting and merging. An allow on the whole server does not count ' +

@@ -29,6 +29,8 @@ import {
 } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 import { initiativePrompt } from '../initiative/initiative.ts';
+import { reviewPackLine } from '@agentdeck/contracts/task-split';
+import { reviewPackCommand } from '../review-pack/review-pack.ts';
 
 /**
  * Конвейер «работа → ревью → фикс → проверка» — решение о СЛЕДУЮЩЕМ звене.
@@ -143,8 +145,9 @@ export interface CascadeStageInput {
   artifacts?: () => readonly string[];
   /**
    * Доставка на Sonnet (рычаг `groupEconomy.sonnetDeliver`). Нет — доставка на
-   * модели работы, как раньше. Маршрут контура сюда не попадает: алиаса `sonnet`
-   * у контура может не быть.
+   * модели работы, как раньше. Маршрут контура попадает сюда, только когда в его
+   * карте соответствия есть строка `sonnet` (n6, `RunFinished.routedMap`): без неё
+   * просьба ушла бы в модель контура по умолчанию — ни экономии, ни смысла.
    */
   cheapDeliver?: boolean;
   /** Часы — в тесте фиксируются. */
@@ -152,7 +155,7 @@ export interface CascadeStageInput {
 }
 
 /** Модель и потолок глубины дешёвой доставки: механика, но не небрежность. */
-const CHEAP_DELIVER_MODEL = 'sonnet';
+export const CHEAP_DELIVER_MODEL = 'sonnet';
 const CHEAP_DELIVER_EFFORT = 'high';
 
 /**
@@ -634,6 +637,9 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
           ...(text.trim() ? { previous: { stage, text } } : {}),
         },
         ...(reviewSieves ? { sieves: reviewSieves } : {}),
+        // Пакет ревью (5.3) — ревьюерам звена ревью доставляющей группы: работа
+        // своего ревью больше не ведёт (владелец 23.10).
+        ...(input.deliver ? { reviewPack: reviewPackLine(reviewPackCommand()) } : {}),
       }),
       link: {
         ...base,
@@ -694,6 +700,10 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     effort: effort ?? '',
     prompt: fixStagePrompt(findings, {
       ...(link.branch ? { branch: link.branch } : {}),
+      // Доставка за правками будет и после доставки круга: связь правок — новое
+      // звено без чужой `deliveredAt` (F-110, `carriedStageLink`), и проход
+      // проверки или сами правки заведут её снова — правки иначе не уехали бы в MR.
+      // Снять обещание здесь значило бы соврать о звене, которое придёт (RC-D-01).
       ...(input.deliver ? { deliver: true } : {}),
       // Проход проверки будет, если есть кем проверять — ревьюер этой связи.
       ...(link.ceilingModel ? { verify: true } : {}),

@@ -119,8 +119,13 @@ describe('coldBriefFacts', () => {
     const transcript = join(dir, 's.jsonl');
     writeFileSync(transcript, answer('y'.repeat(BRIEF_LAST_ANSWER_CHARS + 50)));
     const facts = coldBriefFacts(dir, transcript);
-    expect(facts).toContain(`…(cut at ${BRIEF_NOTEBOOK_CHARS} chars)`);
-    expect(facts).toContain(`…(cut at ${BRIEF_LAST_ANSWER_CHARS} chars)`);
+    // Обрез называет, где остаток: «не собирай заново» в шапке не значит «не дочитывай».
+    expect(facts).toContain(
+      `…(cut at ${BRIEF_NOTEBOOK_CHARS} chars — read the rest of .agent/PROGRESS.md yourself before acting)`,
+    );
+    expect(facts).toContain(
+      `…(cut at ${BRIEF_LAST_ANSWER_CHARS} chars — the rest is the last answer in the previous transcript)`,
+    );
     expect(facts).not.toContain('## Commits');
     expect(facts).not.toContain('## Uncommitted');
     expect(facts).not.toContain('notes.md');

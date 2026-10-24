@@ -83,7 +83,9 @@ describe('доставка отставшей отправленной ветк�
     expect(check).toBeDefined();
     // Код 0 — execFileSync не бросает: конфликта нет, и задание велит стоять.
     runFromPrompt(copy, check ?? '', 'main');
-    expect(prompt).toContain('exit 0 = no conflict: stay on the current base, never rebase');
+    expect(prompt).toContain(
+      'exit 0 and no CONFLICT line = no conflict: stay on the current base, never rebase',
+    );
 
     expect(git(origin, 'rev-parse', BRANCH).trim()).toBe(branchBefore);
     expect(git(origin, 'rev-parse', 'main').trim()).toBe(mainBefore);
@@ -137,10 +139,16 @@ describe('задание доставки отставшей отправлен�
     expect(prompt).toContain("never the main, a protected or another group's branch");
   });
 
-  it('конфликт такого rebase — вопрос человеку, а не решение звена', () => {
+  // Владелец 23.10: rebase и перезапись MR — только при конфликте и сами; конфликт
+  // отправленной ветки, отданный человеку, держал MR до утра.
+  it('конфликт rebase — до пуша и после — снимает сама группа, не человек', () => {
     const prompt = deliverStagePrompt({ branch: BRANCH, after: 'fix' });
 
-    expect(prompt).toMatch(/conflict of that rebase: [^\n]*AskUserQuestion/);
+    expect(prompt).toContain(
+      'A rebase conflict within the tasks of the group — before or after the first push — is ' +
+        'resolved by the group itself, never handed to the human',
+    );
+    expect(prompt).not.toMatch(/conflict of that rebase: [^\n]*AskUserQuestion/);
     expect(prompt).toContain('git rebase --abort');
   });
 
@@ -149,7 +157,9 @@ describe('задание доставки отставшей отправлен�
 
     expect(preamble).toContain('git push --force-with-lease origin <group branch>');
     expect(preamble).toContain("never the main, a protected branch or another group's branch");
-    expect(preamble).toMatch(/a conflict in such a rebase is a question to the human/);
+    expect(preamble).toMatch(
+      /a conflict in such a rebase is resolved by the group itself, never handed to the human/,
+    );
     expect(preamble).not.toContain('Merging, deleting branches and force-push are still forbidden');
   });
 

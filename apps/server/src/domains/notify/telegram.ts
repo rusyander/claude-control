@@ -26,8 +26,28 @@ import type { CodedText } from '../../lib/server-text/server-text.ts';
  * Адрес Bot API. Переменная — шов проверок (`tools/qa/check-group-watch.mjs`
  * поднимает свой приёмник на loopback): настоящий сервер Telegram проверка
  * трогать не должна. Читается при каждой отправке.
+ *
+ * Принимается только https или http на loopback: токен бота — часть адреса, и
+ * открытый http на чужой машине отдал бы его любому на пути. Иное значение —
+ * настоящий сервер, как без переменной.
  */
-const apiBase = (): string => process.env.AGENTDECK_TELEGRAM_API || 'https://api.telegram.org';
+const TELEGRAM_API = 'https://api.telegram.org';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+export function telegramApiBase(
+  raw: string | undefined = process.env.AGENTDECK_TELEGRAM_API,
+): string {
+  if (!raw) return TELEGRAM_API;
+  try {
+    const url = new URL(raw);
+    const safe =
+      url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname));
+    return safe ? raw.replace(/\/+$/, '') : TELEGRAM_API;
+  } catch {
+    return TELEGRAM_API;
+  }
+}
+const apiBase = (): string => telegramApiBase();
 const SYSTEM = 'Telegram';
 
 /** Провал теста — повод, которого у push-уведомлений нет. */
@@ -56,13 +76,17 @@ export interface BudgetNotice {
   projectPath?: undefined;
 }
 
-export type TelegramNotice = RunNotice | TestFailedNotice | BudgetNotice;
+export type TelegramNotice = RunNotice | TestFailedNotice | BudgetNotice | GroupSignalNotice;
 
 export interface TelegramDeps {
   settings: () => TelegramSettings;
   /** Токен бота из зашифрованного хранилища; нет — молчим. */
   token: () => string | undefined;
-  /** Куда сообщить о неудачной отправке. Не задан — тишина. */
+  /**
+   * Куда сообщить о неудачной отправке. Не задан — предупреждение в журнал
+   * сервера: молчаливый отказ прятал бы пропавший сигнал сторожа, а тихий период
+   * после него уже начался и повтора не будет.
+   */
   onError?: (error: unknown) => void;
 }
 
@@ -87,6 +111,8 @@ export function noticeEvent(notice: TelegramNotice): TelegramEvent {
       // Одно событие подписки на оба порога: подписка отвечает на вопрос
       // «сообщать ли про бюджет», а какой именно порог — сказано в тексте.
       return 'budget';
+    case 'groupSignal':
+      return 'groupSignal';
     default:
       return 'testFailed';
   }
@@ -112,6 +138,8 @@ export function compose(notice: TelegramNotice): string {
       )} %`;
     case 'budgetOver':
       return `⛔ Оценка расхода контура «${notice.platformTitle}» дошла до введённого бюджета`;
+    case 'groupSignal':
+      return composeGroupSignal(notice);
     default:
       return `🔴 Тесты провалены (${notice.failed}${
         notice.total ? ` из ${notice.total}` : ''
@@ -188,9 +216,15 @@ export function createTelegramNotifier(deps: TelegramDeps): (notice: TelegramNot
     void sendTelegramMessage(token, settings.chatId, compose(notice)).catch((error: unknown) => {
       // Нет сети, лёг сервис, бот выкинут из чата — уведомление просто не дошло.
       // Состояние панели от этого не меняется, и падать тут не с чего.
-      deps.onError?.(error);
+      (deps.onError ?? warnSendFailed)(error);
     });
   };
+}
+
+/** Отказ отправки в журнал: текст ошибки уже без токена (`label` запроса, `safeDetail`). */
+function warnSendFailed(error: unknown): void {
+  const text = error instanceof Error ? error.message : String(error);
+  console.warn('[notify] telegram send failed:', safeDetail(text));
 }
 
 /**
@@ -208,7 +242,7 @@ function safeCode(code: CodedText): CodedText {
   return { ...code, params };
 }
 
-function safeDetail(text: string): string {
+export function safeDetail(text: string): string {
   return text.replace(/bot\d+:[\w-]+/g, 'bot<токен>').slice(0, 300);
 }
 
@@ -217,10 +251,12 @@ function safeDetail(text: string): string {
  * и имя папки проекта. Названия группы и текста вопроса здесь нет: это уже
  * содержимое разговора, а наружу уходит только заголовок.
  *
- * Подписка у него своя (`groupWatch.telegram`), не список событий: сигнал —
- * не событие прогона, и вебхук его не получает.
+ * Подписка — тем же списком событий (`groupSignal`), что у всех адресатов:
+ * отдельный выключатель у сторожа давал два источника одной подписки, и вебхук
+ * сигналов не получал вовсе.
  */
 export interface GroupSignalNotice {
+  kind: 'groupSignal';
   rule: GroupWatchRule;
   severity: GroupSignalSeverity;
   numbers: Record<string, number>;
@@ -239,6 +275,25 @@ const GROUP_SIGNAL_TITLES: Partial<Record<GroupWatchRule, string>> = {
   R6: 'пуш или MR раньше звена доставки',
   R9: 'пятичасовое окно к сбросу кончится',
   R11: 'цикл опроса со сном',
+  R13: 'веер субагентов',
+  R15: 'вызов упёрся в свой срок',
+  R17: 'долгое ожидание очереди тяжёлых шагов',
+  R20: 'группа действует на паузе',
+  R21: 'тяжёлые проверки по кругу',
+  R22: 'группа стоит без хода',
+  R23: 'одна беда в нескольких группах',
+  R24: 'тот же вызов падает той же ошибкой',
+  R25: 'отбитое действие сделано другим путём',
+  R26: 'останавливает чужие процессы',
+  R27: 'вопрос текстом ждёт ответа',
+  R28: 'напоминания о доставке впустую',
+  R29: 'инструмента нет в сессии',
+  R30: 'внешний сервис не отвечает',
+  R31: 'правки вне своей копии',
+  R33: 'вердикт ревью без блока',
+  R34: 'новый разговор поверх тёплого',
+  R35: 'переделка закоммиченного',
+  R36: 'сервер звена пережил паузу',
 };
 
 /** Числа сигнала словами: человек читает строку, а не ключи кода. Неизвестный ключ — как есть. */
@@ -256,6 +311,33 @@ const GROUP_SIGNAL_NUMBERS: Record<string, (value: number) => string> = {
   projectedPct: (value) => `к сбросу ≈${value} %`,
   resetMin: (value) => `сброс через ${value} мин`,
   polls: (value) => `циклов: ${value}`,
+  subW: (value) => `расход субагентов ${value} W`,
+  timeoutMin: (value) => `срок ${value} мин`,
+  timeouts: (value) => `упоров в срок: ${value}`,
+  ahead: (value) => `впереди в очереди: ${value}`,
+  tools: (value) => `вызовов: ${value}`,
+  afterMin: (value) => `через ${value} мин после паузы`,
+  gates: (value) => `прогонов: ${value}`,
+  totalMin: (value) => `всего ${value} мин`,
+  fails: (value) => `падений: ${value}`,
+  kills: (value) => `остановок: ${value}`,
+  calls: (value) => `вызовов: ${value}`,
+  failures: (value) => `сбоев: ${value}`,
+  spanMin: (value) => `за ${value} мин`,
+  writes: (value) => `действий вне копии: ${value}`,
+  nudges: (value) => `напоминаний: ${value}`,
+  groups: (value) => `групп: ${value}`,
+  insertK: (value) => `вставок ${value} тыс. знаков`,
+  prevK: (value) => `окно было ${value}k`,
+  files: (value) => `файлов: ${value}`,
+  ports: (value) => `портов: ${value}`,
+};
+
+/** Тот же ключ числа у правила значит другое: `afterMin` R25 — после отказа, не после паузы. */
+const GROUP_SIGNAL_NUMBERS_BY_RULE: Partial<
+  Record<GroupWatchRule, Record<string, (value: number) => string>>
+> = {
+  R25: { afterMin: (value) => `через ${value} мин после отказа` },
 };
 
 const STAGE_TITLES: Record<string, string> = {
@@ -268,25 +350,13 @@ export function composeGroupSignal(notice: GroupSignalNotice): string {
   const project = notice.projectPath ? basename(notice.projectPath) : '';
   const icon = notice.severity === 'alert' ? '⛔' : notice.severity === 'warn' ? '⚠️' : 'ℹ️';
   const title = GROUP_SIGNAL_TITLES[notice.rule];
+  const own = GROUP_SIGNAL_NUMBERS_BY_RULE[notice.rule];
   const numbers = Object.entries(notice.numbers)
-    .map(([key, value]) => GROUP_SIGNAL_NUMBERS[key]?.(value) ?? `${key} ${value}`)
+    .map(([key, value]) => (own?.[key] ?? GROUP_SIGNAL_NUMBERS[key])?.(value) ?? `${key} ${value}`)
     .join(', ');
   const stage = notice.stage ? `стадия «${STAGE_TITLES[notice.stage] ?? notice.stage}»` : '';
   const details = [numbers, stage].filter(Boolean).join('; ');
   return `${icon} ${notice.rule}${title ? ` ${title}` : ''}${details ? ` (${details})` : ''}${
     project ? ` — ${project}` : ''
   }`;
-}
-
-/** Отправитель сигналов сторожа: та же тишина без настройки, токена или чата. */
-export function createGroupSignalTelegram(deps: TelegramDeps): (notice: GroupSignalNotice) => void {
-  return (notice) => {
-    const settings = deps.settings();
-    if (!settings.enabled || !settings.chatId) return;
-    const token = deps.token();
-    if (!token) return;
-    void sendTelegramMessage(token, settings.chatId, composeGroupSignal(notice)).catch(
-      (error: unknown) => deps.onError?.(error),
-    );
-  };
 }

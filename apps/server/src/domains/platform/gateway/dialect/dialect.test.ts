@@ -87,6 +87,22 @@ describe('таблица соответствий диалектов', () => {
     },
   );
 
+  it.each(DIALECT_TABLE.filter((row) => row.withMarks))(
+    'с пометками кэша судьба строки $anthropic — та, что названа в withMarks',
+    (row) => {
+      const { body, lost } = anthropicRequestToOpenAi(
+        fullRequest(),
+        enterprisePlatformDriver.requestFields,
+        undefined,
+        true,
+      );
+      // Таблица не врёт ни в одном состоянии: «переносится» — не потеря и доехало.
+      expect(row.withMarks?.fate).toBe('mapped');
+      expect(lost.map((item) => item.field)).not.toContain(row.anthropic);
+      expect(JSON.stringify(body)).toContain(`"${row.anthropic}"`);
+    },
+  );
+
   it('каждая перенесённая строка доезжает под своим именем', () => {
     const { body } = anthropicRequestToOpenAi(
       fullRequest(),

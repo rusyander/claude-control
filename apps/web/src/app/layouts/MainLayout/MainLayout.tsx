@@ -10,6 +10,7 @@ import { useAwaitingAlarm } from '@entities/Chat';
 import { OnboardingWizard } from '@app/onboarding/OnboardingWizard';
 import { ProviderTrustBadge } from '@features/ProviderTrust';
 import { DevRestartBanner } from '@features/DevRestartBanner';
+import { DeferredAsksBanner } from '@features/DeferredAsksBanner';
 import { Sidebar } from './Sidebar/Sidebar';
 import { AppShortcuts } from './AppShortcuts/AppShortcuts';
 import styles from './MainLayout.module.scss';
@@ -67,9 +68,15 @@ export function MainLayout() {
             панель пишет и проверялся ли он на этой машине, нужно именно здесь.
             Для Claude компонент возвращает null — постоянная плашка у дефолтного
             провайдера была бы шумом. */}
-        <ProviderTrustBadge />
-        {/* Правки сервера ждут конца живых ходов (dev-сторож): видно в любом разделе. */}
-        <DevRestartBanner />
+        {/* Плашки — одним блоком: страница-заливка (чат) тянется вверх отрицательным
+            полем и без отступа блока наезжала на нижний край плашки (живой прогон 23.10). */}
+        <div className={styles.banners} data-page-fill={isFill || undefined}>
+          <ProviderTrustBadge />
+          {/* Правки сервера ждут конца живых ходов (dev-сторож): видно в любом разделе. */}
+          <DevRestartBanner />
+          {/* Вызовы D-n ждут решения человека, агенты работают дальше: видно в любом разделе. */}
+          <DeferredAsksBanner />
+        </div>
 
         <motion.div
           key={path}

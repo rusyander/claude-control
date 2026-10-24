@@ -105,6 +105,145 @@ function readEntryValues(
   }
 }
 
+/** Что собственный файл CLI говорит о шлюзе: уводит ли туда и какой контур называет. */
+export type EndpointFileRoute = { routed: false } | { routed: true; platformId?: string };
+
+/** Выбранный в файле провайдер или модель: имя и адрес, если он записан. */
+export interface ActiveEntry {
+  name: string;
+  baseUrl?: string;
+}
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * Провайдеры, которые Codex возьмёт ПРЯМО СЕЙЧАС: корневой `model_provider` и
+ * выбор активного профиля (`profile` → `[profiles.<имя>].model_provider`).
+ * Берутся оба: какой из них перекроет другой, решает запуск, а лишнее «уводит»
+ * здесь только закрывает младшую ступень, не ломая прогон.
+ */
+export function activeCodexEntries(parsed: Record<string, unknown>): ActiveEntry[] {
+  const names = new Set<string>();
+  if (typeof parsed.model_provider === 'string') names.add(parsed.model_provider);
+  const profileName = parsed.profile;
+  const profile =
+    typeof profileName === 'string'
+      ? recordOf(recordOf(parsed.profiles)?.[profileName])
+      : undefined;
+  if (typeof profile?.model_provider === 'string') names.add(profile.model_provider);
+
+  const table = recordOf(parsed.model_providers);
+  return [...names].map((name) => {
+    const baseUrl = recordOf(table?.[name])?.base_url;
+    return typeof baseUrl === 'string' ? { name, baseUrl } : { name };
+  });
+}
+
+/**
+ * Модели Continue — все: какую из них выберет запуск, файл не говорит, а
+ * ошибка здесь допустима только в сторону «уводит».
+ */
+function continueEntries(text: string): ActiveEntry[] {
+  return readContinueModels(text).map((model) => {
+    const name = typeof model.name === 'string' ? model.name : '';
+    return typeof model.apiBase === 'string' ? { name, baseUrl: model.apiBase } : { name };
+  });
+}
+
+/**
+ * Адрес шлюза панели — тот, что строит `gatewayUrlFor`:
+ * `http://127.0.0.1:<порт>/<контур>/…`. Шлюзом считается петлевой адрес на
+ * живом порту шлюза или с известным контуром первым сегментом пути (порт мог
+ * смениться с тех пор, как адрес записали). Петлевой адрес на чужом порту без
+ * контура — локальный сервер моделей человека, не контур.
+ */
+function gatewayPlatformOf(
+  baseUrl: string,
+  platformIds: readonly string[],
+  gatewayPort: number,
+): { platformId?: string } | undefined {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    return undefined;
+  }
+  if (!LOOPBACK_HOSTS.has(url.hostname)) return undefined;
+  const first = url.pathname.split('/').find(Boolean) ?? '';
+  const known = platformIds.find((id) => id === first);
+  if (known) return { platformId: known };
+  const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
+  return gatewayPort > 0 && port === gatewayPort ? {} : undefined;
+}
+
+function entryRoute(
+  entry: ActiveEntry,
+  platformIds: readonly string[],
+  gatewayPort: number,
+): EndpointFileRoute {
+  const named = platformIds.find((id) => contourEntryName(id) === entry.name);
+  if (named) return { routed: true, platformId: named };
+  const viaGateway = entry.baseUrl
+    ? gatewayPlatformOf(entry.baseUrl, platformIds, gatewayPort)
+    : undefined;
+  if (viaGateway) return { routed: true, ...viaGateway };
+  // Запись контура, которого в настройках уже нет: карта неизвестна, но уводит.
+  if (entry.name.startsWith(contourEntryName(''))) return { routed: true };
+  return { routed: false };
+}
+
+/**
+ * Запись провайдера в настройках CLI уводит в шлюз панели: имя записи контура
+ * (`contour-<id>`) или адрес шлюза — та же сверка, что у `endpointFileRoute`.
+ * Нужна тому, кто ищет у CLI свой локальный сервер моделей: шлюз тоже петлевой,
+ * но за ним облако.
+ */
+export function entryRoutesToGateway(
+  entry: ActiveEntry,
+  platformIds: readonly string[],
+  gatewayPort: number,
+): boolean {
+  return entryRoute(entry, platformIds, gatewayPort).routed;
+}
+
+/**
+ * Уводит ли СОБСТВЕННЫЙ файл CLI (`endpointFile`: Codex `config.toml`, Continue
+ * `config.yaml`) его прогоны в шлюз панели — по тому, что в файле лежит сейчас,
+ * без следа применения. След врёт в обе стороны: откат оставляет правленный
+ * рукой файл как есть (`kept`) и всё равно вычёркивает цель, а запись шлюза,
+ * вписанную человеком, след не знает вовсе. Ошибка только в сторону «уводит»:
+ * файл есть, но не читается или не разбирается — уводит, контур неизвестен.
+ */
+export function endpointFileRoute(
+  file: ProviderEndpointFile,
+  platformIds: readonly string[],
+  gatewayPort: number,
+): EndpointFileRoute {
+  const filePath = file.path();
+  if (!existsSync(filePath)) return { routed: false };
+  let entries: ActiveEntry[];
+  try {
+    const text = readFileSync(filePath, 'utf8');
+    entries =
+      file.format === 'codex-toml'
+        ? activeCodexEntries(parseCodexToml(text))
+        : continueEntries(text);
+  } catch {
+    return { routed: true };
+  }
+  for (const entry of entries) {
+    const route = entryRoute(entry, platformIds, gatewayPort);
+    if (route.routed) return route;
+  }
+  return { routed: false };
+}
+
 type OwnedTrace = Pick<PlatformAppliedTarget, 'targetId' | 'filePath' | 'previous'>;
 
 /**

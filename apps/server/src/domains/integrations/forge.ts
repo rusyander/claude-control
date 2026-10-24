@@ -405,6 +405,13 @@ export interface ForgeMergeRequest {
    * MR, снятого с черновика, принудительный пуш группы без человека не трогает.
    */
   draft: boolean;
+  /**
+   * Конфликт с целевой веткой глазами форджа: GitLab `has_conflicts`, GitHub
+   * `mergeable_state === 'dirty'` (`mergeable: true` — конфликта нет). Без поля
+   * форж ещё не посчитал — неизвестно. Права группы: перезапись ветки MR на
+   * ревью — только когда конфликт есть.
+   */
+  conflicts?: boolean;
 }
 
 /**
@@ -441,6 +448,9 @@ export async function readMergeRequest(
     target_branch?: string;
     head?: { ref?: string };
     base?: { ref?: string };
+    has_conflicts?: boolean;
+    mergeable?: boolean | null;
+    mergeable_state?: string;
   }>(systemName(access), response);
 
   const branch = mr.source_branch ?? mr.head?.ref ?? '';
@@ -450,6 +460,7 @@ export async function readMergeRequest(
     );
   }
   const target = mr.target_branch ?? mr.base?.ref;
+  const conflicts = mergeRequestConflicts(mr);
   return {
     branch,
     ...(target ? { targetBranch: target } : {}),
@@ -463,7 +474,20 @@ export async function readMergeRequest(
     state: mr.state === 'opened' || mr.state === 'open' ? 'open' : 'closed',
     draft:
       mr.draft ?? mr.work_in_progress ?? /^\s*(\[?draft\]?:?|\[?wip\]?:?)\s/i.test(mr.title ?? ''),
+    ...(conflicts === undefined ? {} : { conflicts }),
   };
+}
+
+/** Конфликт по ответу форджа; `undefined` — форж не сказал (GitHub считает лениво). */
+function mergeRequestConflicts(mr: {
+  has_conflicts?: boolean;
+  mergeable?: boolean | null;
+  mergeable_state?: string;
+}): boolean | undefined {
+  if (typeof mr.has_conflicts === 'boolean') return mr.has_conflicts;
+  if (mr.mergeable_state === 'dirty') return true;
+  if (mr.mergeable === true) return false;
+  return undefined;
 }
 
 /**

@@ -225,7 +225,7 @@
       "id": "t12",
       "name": "Bash",
       "input": {
-        "command": "cd svc-llm && grep -rn \"app_guardrails\\|app_tool_guard\" src --include=*.py | head -20; grep -n \"class.*Result\\|violations\\|def blocked\\|blocked:\" src/llm/guardrails/client.py | head -30"
+        "command": "cd svc-llm && grep -rn \"app_dashboards\\|app_tool_guard\" src --include=*.py | head -20; grep -n \"class.*Result\\|violations\\|def blocked\\|blocked:\" src/llm/dashboards/client.py | head -30"
       }
     },
     { "kind": "toolResult", "t": 1792522812242, "id": "t12", "chars": 1704 },
@@ -244,7 +244,7 @@
       "t": 1792522814861,
       "id": "t13",
       "name": "Bash",
-      "input": { "command": "sed -n 1,200p src/llm/guardrails/helpers.py" }
+      "input": { "command": "sed -n 1,200p src/llm/dashboards/helpers.py" }
     },
     { "kind": "toolResult", "t": 1792522815647, "id": "t13", "chars": 8479 },
     {
@@ -283,7 +283,7 @@
       "id": "t15",
       "name": "Bash",
       "input": {
-        "command": "cd ../svc-api && grep -n \"app_status\\|app_guardrails\\|ToolCallCapture\\|tool_error\\|\\\"guardrail\\\"\\|EventGuardrail\\|func (e \\*Engine) \\|case \\\"\" internal/completion/engine.go | head -60; grep -rn \"type ToolCallCapture\" -A25 internal | head -40"
+        "command": "cd ../svc-api && grep -n \"app_status\\|app_dashboards\\|ToolCallCapture\\|tool_error\\|\\\"dashboard\\\"\\|EventDashboard\\|func (e \\*Engine) \\|case \\\"\" internal/completion/engine.go | head -60; grep -rn \"type ToolCallCapture\" -A25 internal | head -40"
       }
     },
     { "kind": "toolResult", "t": 1792522844961, "id": "t15", "chars": 3957 },
@@ -325,7 +325,7 @@
       "id": "t17",
       "name": "Bash",
       "input": {
-        "command": "cd ../svc-chat-ui && ls src/features/chat/hooks/useStreamEvents/; cat src/features/chat/hooks/useStreamEvents/useGuardrailEvents/index.ts 2>/dev/null || grep -rln \"useGuardrailEvents\" src | head"
+        "command": "cd ../svc-chat-ui && ls src/features/chat/hooks/useStreamEvents/; cat src/features/chat/hooks/useStreamEvents/useDashboardEvents/index.ts 2>/dev/null || grep -rln \"useDashboardEvents\" src | head"
       }
     },
     { "kind": "toolResult", "t": 1792522856582, "id": "t17", "chars": 2700 }

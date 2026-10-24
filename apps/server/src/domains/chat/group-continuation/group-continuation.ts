@@ -195,6 +195,11 @@ export interface ColdResumeInput {
   freshBase?: number;
   /** Срок кэша групп из настроек: '' и '1h' — час, '5m' — пять минут. */
   cacheTtl?: string;
+  /**
+   * Свой срок остывания, мс, — сильнее `cacheTtl`: у чужого CLI кэш провайдера
+   * живёт по своим правилам (`foreign-cold.ts`), а не по настройке Claude.
+   */
+  coldAfterMs?: number;
 }
 
 /**
@@ -213,9 +218,11 @@ export function coldResume({
   contextTokens,
   freshBase,
   cacheTtl,
+  coldAfterMs,
 }: ColdResumeInput): boolean {
   if (contextTokens <= 0) return false;
-  const coldAfter = cacheTtl === '5m' ? COLD_CACHE_SHORT_MS : COLD_CACHE_MS;
+  const ttl = cacheTtl === '5m' ? COLD_CACHE_SHORT_MS : COLD_CACHE_MS;
+  const coldAfter = coldAfterMs ?? ttl;
   const base = freshBase && freshBase > 0 ? freshBase : FRESH_BASE_TOKENS;
   return idleMs >= coldAfter && contextTokens >= base + COLD_RESUME_MARGIN_TOKENS;
 }

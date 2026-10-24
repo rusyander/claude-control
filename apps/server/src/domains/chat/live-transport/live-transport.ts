@@ -321,6 +321,13 @@ export function connectRelay(
     end: () => send(`${JSON.stringify({ type: 'relay_end' })}\n`),
     kill: () => {
       if (socket && !socket.destroyed) {
+        // Сперва всё под посредником — одним снимком, пока дерево цело (N1b,
+        // 23.10): после паузы группы цепочка `timeout` → tests-cli → vitest
+        // жила ещё 40 минут — её родитель-оболочка умер раньше, и обход от CLI
+        // её уже не видел. Снимает сервер, а не только посредник: посредник,
+        // переживший обновление панели, исполняет код со своего старта. Сам
+        // посредник остаётся — он скажет код выхода CLI своей строкой.
+        if (address.pid) killTree(address.pid, { spawnedAt: aliveAt || ownedAt, keepRoot: true });
         socket.write(`${JSON.stringify({ type: 'relay_kill' })}\n`);
         return;
       }

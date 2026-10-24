@@ -35,13 +35,18 @@ export const RUN_STDERR_MAX = 16_384;
 import { CHILD_DENIED_TOOLS, childAppend } from '../initiative/initiative.ts';
 import { SyntheticGate } from '../synthetic-gate.ts';
 import { autoPickResults, picksFor } from '../auto-pick/auto-pick.ts';
+import { resultText, toolOutcome } from '../token-ledger/watch/tool-outcome.ts';
 import { withChatNode } from '../../project-git/chat-node.ts';
+import { withDenyToolsHook } from './deny-tools.ts';
+import { withChatGitAsk } from '../auto-approve/git-ask.ts';
 import {
   AUTONOMOUS_ENV,
   BRIEF_OUTPUT_ENV,
   SPLIT_CHILD_ENV,
   TESTS_PROJECT_ENV,
+  USER_MEMORY_OFF_ENV,
 } from '@agentdeck/contracts/chat-group-settings';
+import { groupRulesCardSwap } from './group-rules-card.ts';
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
@@ -166,6 +171,7 @@ export function childRunEnv(base: NodeJS.ProcessEnv): Record<string, string> {
 export function forgetInheritedChildMarks(env: NodeJS.ProcessEnv): void {
   delete env[SPLIT_CHILD_ENV];
   delete env[BRIEF_OUTPUT_ENV];
+  delete env[USER_MEMORY_OFF_ENV];
   // Проект группы (X1): унаследованный, он увёл бы tests-cli без `--project`
   // в любом чате панели к копии, из которой её перезапустили.
   delete env[TESTS_PROJECT_ENV];
@@ -190,6 +196,21 @@ export interface RunOptions {
    * сообщение — исходная ветка диалога при этом остаётся нетронутой.
    */
   fork?: boolean;
+  /**
+   * Разовый ход без следа (`--no-session-persistence`): CLI не пишет транскрипт,
+   * и процесс после хода закрывается, а не ждёт следующего в пуле. Так ходит
+   * пинг тёплого кэша (`keep-warm`): с `fork` он читает префикс сессии группы,
+   * а её транскрипт и список чатов остаются нетронутыми (замер 22.10).
+   */
+  ephemeral?: boolean;
+  /**
+   * Каждый вызов инструмента отклоняется хуком `PreToolUse` ДО исполнения
+   * (`deny-tools-hook.mjs` в том же файле `--settings`). Пинг тёплого кэша —
+   * ответвление сессии группы с её правами: правка без вопроса (acceptEdits,
+   * правило «разрешить») успела бы исполниться раньше, чем обрыв по событию
+   * `tool` снимет процесс. Хуки в системный промпт не попадают — префикс тот же.
+   */
+  denyTools?: boolean;
   /**
    * Каталог конфигурации Claude Code. Обычный чат работает с настоящим, а
    * песочница подсовывает временный — так тестируемое правило или хук
@@ -479,6 +500,7 @@ export class ChatRun {
 
     if (sessionId) args.push('--resume', sessionId);
     if (options.fork) args.push('--fork-session');
+    if (options.ephemeral) args.push('--no-session-persistence');
     if (name) args.push('--name', name);
     if (model) args.push('--model', model);
     // Имя, не прошедшее грамматику, до CLI не доедет — и до этой строки уезжало
@@ -562,7 +584,7 @@ export class ChatRun {
     // чату, где человек автономию выключил. Метки ребёнка разделения панель
     // снимает с себя при старте (`forgetInheritedChildMarks`).
     const { [AUTONOMOUS_ENV]: _inherited, ...parentEnv } = process.env;
-    const env = {
+    const env: Record<string, string | undefined> = {
       ...parentEnv,
       // Метка пульса журнала — по CLI, а не по пути: команда здесь бывает node
       // с JS-входом Claude.
@@ -588,13 +610,28 @@ export class ChatRun {
     // (`copyParityExcludes`, E1): копия грузит ровно то, что источник. Файл один —
     // массив из `--settings` сливается с личным, а не заменяет его.
     const place = { cwd: options.cwd, env, platform: process.platform, fallbackHome: homedir() };
+    const layerExcludes = userMemoryExcludes(options.platformArgs ?? [], place);
+    // Звено группы: личный `CLAUDE.md` заменяет карточка правил (Фаза G.2).
+    const card = groupRulesCardSwap(place, {
+      child: options.child === true,
+      alreadyExcluded: layerExcludes !== undefined,
+    });
+    if (card.marker) env[USER_MEMORY_OFF_ENV] = '1';
     const excludes = [
-      ...(userMemoryExcludes(options.platformArgs ?? [], place) ?? []),
+      ...(layerExcludes ?? []),
+      ...card.excludes,
       ...copyParityExcludes(options.platformArgs ?? [], place),
     ];
+    // Авторежим с брокером: удаление данных git и слияние обязаны дойти до
+    // маршрута прав, а CLI шлёт туда только задетое правилом `ask` (L2, 23.10).
+    const asked = withChatGitAsk(options.platformSettings, {
+      permissionMode: options.permissionMode ?? 'acceptEdits',
+      broker: Boolean(options.permissionPrompt),
+    });
     const flagSettings = {
-      ...options.platformSettings,
+      ...asked,
       ...(excludes.length > 0 ? { claudeMdExcludes: excludes } : {}),
+      ...(options.denyTools ? { hooks: withDenyToolsHook(options.platformSettings?.hooks) } : {}),
     };
     if (Object.keys(flagSettings).length > 0) {
       const file = join(this.ensureTempDir(), 'layers-settings.json');
@@ -686,7 +723,8 @@ export class ChatRun {
   ): Promise<void> {
     const sessionId = safeSessionId(options.sessionId);
     const runId = options.permissionPrompt?.runId;
-    const tracker = new TurnTracker();
+    // Разовый ход без транскрипта — только пинг тёплого кэша: ему нужно начало хода (`turnStart`).
+    const tracker = new TurnTracker(Date.now, { emitStart: options.ephemeral === true });
     const synthetic = new SyntheticGate();
     let streamError = false;
     const onRaw = (raw: RawEvent): void => {
@@ -707,7 +745,15 @@ export class ChatRun {
       if (!session || !claimed) return;
       this.session = session;
       const outcome = await claimed;
-      this.settleLive(outcome, pool, session, onEvent, streamError, options.command);
+      this.settleLive(
+        outcome,
+        pool,
+        session,
+        onEvent,
+        streamError,
+        options.command,
+        options.ephemeral === true,
+      );
       return;
     }
 
@@ -751,7 +797,15 @@ export class ChatRun {
     }
     this.session = session;
     const outcome = await session.turn(options.prompt, runId, onRaw);
-    this.settleLive(outcome, pool, session, onEvent, streamError, options.command);
+    this.settleLive(
+      outcome,
+      pool,
+      session,
+      onEvent,
+      streamError,
+      options.command,
+      options.ephemeral === true,
+    );
   }
 
   /** Имя модели, не прошедшее грамматику, до CLI не доезжает — и молчать об этом нельзя. */
@@ -790,13 +844,19 @@ export class ChatRun {
     onEvent: (event: ChatEvent) => void,
     streamError: boolean,
     command: string | undefined,
+    ephemeral: boolean,
   ): void {
     if (this.isStopped) return;
-    if (!outcome.closed) {
+    if (!outcome.closed && !ephemeral) {
       pool.keep(session);
       return;
     }
     pool.forget(session);
+    if (!outcome.closed) {
+      // Разовый ход: процесс своё отработал, ждать в пуле ему нечего.
+      session.close();
+      return;
+    }
     const failure = exitFailure(command ?? defaultCliCommand(), outcome, streamError);
     if (failure) onEvent(failure);
   }
@@ -897,7 +957,8 @@ export class ChatRun {
     // правда размазана по нескольким (см. stream-usage.ts). С потоковыми
     // событиями расход хода приходит ПОСЛЕ его вызовов (message_delta замыкает
     // ход), без них — до; интерфейсу порядок не важен, он сводит их по id.
-    const tracker = new TurnTracker();
+    // Разовый ход без транскрипта — только пинг тёплого кэша: ему нужно начало хода (`turnStart`).
+    const tracker = new TurnTracker(Date.now, { emitStart: options.ephemeral === true });
     const synthetic = new SyntheticGate();
     const lines = createInterface({ input: child.stdout });
     // Причину провала CLI уже назвал потоком (`result` с `is_error`): «API Error:
@@ -1057,8 +1118,10 @@ export function translate(raw: RawEvent): ChatEvent[] {
   // оказаться AskUserQuestion, без которого не зажжётся точка «агент ждёт ответа».
   if (raw.type === 'assistant') {
     const parent = raw.parent_tool_use_id;
-    return (raw.message?.content ?? [])
-      .filter((block) => block.type === 'tool_use')
+    const content = raw.message?.content;
+    // Блок `null` или не массив (кривая строка потока) пропускаем: живой путь исключений не ловит.
+    return (Array.isArray(content) ? content : [])
+      .filter((block) => block?.type === 'tool_use')
       .map((block) => ({
         kind: 'tool',
         name: block.name ?? '',
@@ -1082,6 +1145,23 @@ export function translate(raw: RawEvent): ChatEvent[] {
     ];
   }
 
+  // Повтор запроса к модели после сбоя — сторожу (R30 «сервис не отвечает»); в ленту
+  // не идёт (`apiRetry` в `chat-events.ts`). Повтор субагента — тот же сервис, тоже сюда.
+  if (raw.type === 'system' && raw.subtype === 'api_retry') {
+    const num = (value: unknown): value is number =>
+      typeof value === 'number' && Number.isFinite(value);
+    return [
+      {
+        kind: 'apiRetry',
+        ...(num(raw.attempt) ? { attempt: raw.attempt } : {}),
+        ...(num(raw.max_retries) ? { maxRetries: raw.max_retries } : {}),
+        ...(num(raw.retry_delay_ms) ? { delayMs: raw.retry_delay_ms } : {}),
+        ...(num(raw.error_status) ? { status: raw.error_status } : {}),
+        ...(typeof raw.error === 'string' && raw.error ? { error: raw.error } : {}),
+      },
+    ];
+  }
+
   // Результат вызова, закрытого автовыбором (хук или брокер под автономией):
   // лента рисует его строкой, реестр снимает «агент ждёт ответа» (`auto-pick.ts`).
   if (raw.type === 'user') {
@@ -1094,13 +1174,23 @@ export function translate(raw: RawEvent): ChatEvent[] {
     // CLI уже не ждёт (`toolResult` в `chat-events.ts`). Содержимое бывает строкой
     // (уведомление между ходами), а живой путь исключений не ловит — процесс падал.
     const content = raw.message?.content;
-    const results: ChatEvent[] = (Array.isArray(content) ? content : [])
-      .filter((block) => block.type === 'tool_result' && block.tool_use_id)
-      .map((block) => ({
-        kind: 'toolResult',
-        toolUseId: block.tool_use_id ?? '',
-        chars: resultChars(block.content),
-      }));
+    const blocks = (Array.isArray(content) ? content : []).filter(
+      (block) => block?.type === 'tool_result' && block.tool_use_id,
+    );
+    // Итог вызова (`tool_use_result`) у строки один — к единственному результату, не к нескольким.
+    const summary = blocks.length === 1 ? raw.tool_use_result : undefined;
+    const timedOutAfterMs =
+      summary && typeof summary === 'object'
+        ? (summary as { timedOutAfterMs?: unknown }).timedOutAfterMs
+        : undefined;
+    const results: ChatEvent[] = blocks.map((block) => {
+      const id = block.tool_use_id ?? '';
+      const outcome = toolOutcome(block, {
+        timedOutAfterMs,
+        denialKind: nonExecutionKind(raw.tool_result_meta, id),
+      });
+      return { kind: 'toolResult', toolUseId: id, chars: resultChars(block.content), ...outcome };
+    });
     return [...picks, ...results];
   }
 
@@ -1135,14 +1225,19 @@ export function translate(raw: RawEvent): ChatEvent[] {
 
 /** Знаков в ответе вызова: строка целиком или текстовые блоки (картинки не в счёт). */
 function resultChars(content: unknown): number {
-  if (typeof content === 'string') return content.length;
-  if (!Array.isArray(content)) return 0;
-  let chars = 0;
-  for (const part of content) {
-    const text = (part as { text?: unknown } | null)?.text;
-    if (typeof text === 'string') chars += text.length;
+  return resultText(content).length;
+}
+
+/** Род неисполнения вызова `id` из `tool_result_meta` строки потока (отказ стража). */
+function nonExecutionKind(meta: unknown, id: string): string | undefined {
+  if (!Array.isArray(meta)) return undefined;
+  for (const entry of meta) {
+    const item = entry as { id?: unknown; non_execution_kind?: unknown } | null;
+    if (item?.id === id && typeof item.non_execution_kind === 'string') {
+      return item.non_execution_kind;
+    }
   }
-  return chars;
+  return undefined;
 }
 
 /**

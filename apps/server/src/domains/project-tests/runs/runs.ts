@@ -33,6 +33,7 @@ import { defaultEnvironment, readEnvironments, readSharedSteps } from '../librar
 import { planCases, readPlan } from '../plans/plans.ts';
 import { gitContext, impactOf, releaseTag } from '../impact/impact.ts';
 import { writeRun } from '../runs-store/runs-store.ts';
+import { contentStamps, stampInputs, stampsOf } from '../content-stamp/content-stamp.ts';
 import {
   runScope,
   startPermissionGate,
@@ -133,6 +134,12 @@ export class ProjectTestRunRegistry {
       redact?: (text: string) => string;
       /** Отпечатки кейсов отбора на старте — по ним видно, что агент тронул. */
       snapshot?: Map<string, string>;
+      /**
+       * Отпечатки содержимого кейсов отбора на старте (`groupId:caseId` → хеш) —
+       * в запись прогона, как у `tests-cli run`: ворота судят свежесть по ним, а
+       * не по времени. Кейса нет — нет `codePaths` или предел: правило времени.
+       */
+      stamps?: Map<string, string>;
       /** Папка e2e генерации с кодом тестов: после конца — сверка и отчёт junit. */
       e2e?: { dir: string; junit: string };
       /** Журнал процесса CLI — есть, когда маршрут назвал каталог данных панели. */
@@ -400,6 +407,9 @@ export class ProjectTestRunRegistry {
       ...(e2e ? { e2e: { dir: e2e.dir, junit: e2e.junit } } : {}),
       redact: redactor(secrets.values),
       snapshot: fingerprintCases(groups, view),
+      ...(recordsResults(request.mode)
+        ? { stamps: startStamps(root, groups, request.groupId, caseIds) }
+        : {}),
       ...(options.appData
         ? {
             processes: new PanelAgentProcesses(
@@ -423,7 +433,7 @@ export class ProjectTestRunRegistry {
     if (request.e2e && !e2e) {
       this.note(root, 'e2e', 'папки e2e в проекте нет — генерация напишет только кейсы');
     }
-    this.persist(root, view);
+    this.persist(root, view, this.runs.get(root)?.stamps);
 
     // Автоматизации — папка e2e проекта (своя или заведённая панелью): первый
     // спек кейса без `automation.file` иначе писать было бы некуда (живая проверка 08.10).
@@ -769,7 +779,7 @@ export class ProjectTestRunRegistry {
       this.settleDraft(projectPath, entry.view, entry.autoAccept === true);
     }
     if (entry.e2e && status === 'done') this.settleE2e(projectPath, entry.view, entry.e2e);
-    this.persist(projectPath, entry.view);
+    this.persist(projectPath, entry.view, entry.stamps);
     // Об остановке рукой сообщать незачем: её сделал тот же человек, который
     // сейчас смотрит на панель.
     if (status !== 'stopped') {
@@ -892,7 +902,11 @@ export class ProjectTestRunRegistry {
   }
 
   /** Прогон в историю — той же формой, что и ручной. */
-  private persist(projectPath: string, view: ProjectTestRun): void {
+  private persist(
+    projectPath: string,
+    view: ProjectTestRun,
+    stamps?: ReadonlyMap<string, string>,
+  ): void {
     const record: ProjectTestRunRecord = {
       id: view.id,
       mode: view.mode,
@@ -918,6 +932,7 @@ export class ProjectTestRunRegistry {
       summary: view.summary ?? summarizeResults(view.results ?? []),
       draft: view.draft,
       generate: view.generate,
+      ...stampsOf(stamps, view.results ?? []),
     };
     try {
       writeRun(projectPath, record);
@@ -1050,6 +1065,29 @@ export function stampRunResults(
  * Исследование сюда входит: его находки — новые кейсы с `failed`/`passed`, и
  * без штампа запись сессии показывала «0 из 0» при найденных багах.
  */
+/**
+ * Отпечатки содержимого кейсов отбора — снимаются ДО того, как агент тронет
+ * дерево: прогон проверял код, каким он был на старте. Отбор по id сужает
+ * набор; в запись попадут только кейсы с результатом (`stampsOf`).
+ */
+function startStamps(
+  root: string,
+  groups: readonly ProjectTestGroup[],
+  groupId: string | undefined,
+  caseIds: readonly string[] | undefined,
+): Map<string, string> {
+  const scoped = groupId ? groups.filter((group) => group.id === groupId) : groups;
+  const picked = caseIds ? new Set(caseIds) : undefined;
+  const keys = picked
+    ? new Set(
+        scoped.flatMap((group) =>
+          group.cases.filter((item) => picked.has(item.id)).map((item) => `${group.id}:${item.id}`),
+        ),
+      )
+    : undefined;
+  return contentStamps(root, stampInputs(scoped, keys));
+}
+
 export function recordsResults(mode: ProjectTestRun['mode']): boolean {
   return mode === 'run' || mode === 'automate' || mode === 'explore';
 }

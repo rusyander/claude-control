@@ -23,6 +23,7 @@ import { registerEndpointRoutes } from '../../endpoint-routes.ts';
 import { registerDlpRoutes } from '../../dlp-routes/dlp-routes.ts';
 import { registerIntegrationsRoutes } from '../../integrations-routes/integrations-routes.ts';
 import { registerPanelAgentRoutes } from '../panel-agent-routes/panel-agent-routes.ts';
+import { APP_STATE_ACTIONS } from './actions-app.ts';
 
 /**
  * Действия по состоянию панели (группы, настройки, провайдер, эндпоинты, DLP,
@@ -222,6 +223,20 @@ describe('panel-agent actions: panel state', () => {
     ).json<PanelActionResult>();
     expect(human.outcome).toBe('invalid');
     expect(await listPending()).toEqual([]);
+  });
+
+  // F-60/F-66: сторож и экономия групп — рычаги человека; агент панели их не правит и знает почему.
+  it('сторож и экономия групп — только человеку: вход отклоняет, описание называет', async () => {
+    for (const patch of [
+      { groupWatch: { enabled: false } },
+      { groupEconomy: { warmOnly: false } },
+    ]) {
+      const result = (await call('update_settings', patch)).json<PanelActionResult>();
+      expect(result.outcome).toBe('invalid');
+    }
+    expect(await listPending()).toEqual([]);
+    const update = APP_STATE_ACTIONS.find((action) => action.name === 'update_settings');
+    expect(update?.description).toMatch(/Human-only[^]*groupWatch[^]*groupEconomy/);
   });
 
   it('switch_provider: неизвестный — отказ; известный — после «да» активен', async () => {

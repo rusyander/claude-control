@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMotion';
 import { Mascot } from '@shared/ui/mascot';
+import { useMascotSpeechSlot } from '@shared/lib/mascot';
 import { useMascotCompanion } from '../../lib/useMascotCompanion';
 import { useCursorLook } from '../../lib/useCursorLook';
 import { useBubblePlace } from '../../lib/useBubblePlace';
@@ -33,7 +34,13 @@ export function MascotCompanion({ isCollapsed = false }: MascotCompanionProps) {
   const isReduced = useReducedMotion();
   const enabled = companion.prefs.enabled;
   useCursorLook(triggerRef, enabled && companion.mood === 'idle' && !isReduced);
-  const place = useBubblePlace(triggerRef, enabled && (isOpen || companion.speech !== null));
+  // Страница дала место для реплики (чат — над полем ввода) — реплика там, в
+  // потоке, и ничего не накрывает; нет места — облачко у боковой панели.
+  const speechSlot = useMascotSpeechSlot();
+  const place = useBubblePlace(
+    triggerRef,
+    enabled && (isOpen || (companion.speech !== null && !speechSlot)),
+  );
 
   // Выключили маскота в настройках при открытой сводке — закрываем и её.
   useEffect(() => {
@@ -121,14 +128,14 @@ export function MascotCompanion({ isCollapsed = false }: MascotCompanionProps) {
         createPortal(
           <SpeechBubble
             speech={companion.speech}
-            style={place}
+            {...(speechSlot ? { inline: true } : { style: place })}
             onOpen={(target) => {
               companion.dismissSpeech();
               companion.openChat(target);
             }}
             onDismiss={companion.dismissSpeech}
           />,
-          document.body,
+          speechSlot ?? document.body,
         )}
     </div>
   );

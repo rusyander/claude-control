@@ -5,4 +5,9 @@ export interface GroupSignalsProps {
   signals: GroupSignal[];
   /** Открыть чат звена, где правило сработало. Нет — строка без ссылки. */
   onOpen?: (chatId: string) => void;
+  /**
+   * Где стоит остров: `group` — карточка группы в хабе (по умолчанию), `chat` —
+   * над лентой одиночного чата, без ссылки на тот же самый чат.
+   */
+  scope?: 'group' | 'chat';
 }

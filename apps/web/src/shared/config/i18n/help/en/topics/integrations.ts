@@ -239,14 +239,33 @@ export const integrationsEn: typeof integrationsRu = {
         'retells the answer in words and adds whether the body was signed.',
       notifyEvents: '3. What to write about is picked with checkboxes',
       notifyEventsText:
-        'Five events: run finished, run failed, case failed, agent asks for permission, ' +
-        'agent asked a question. The list is shared by the webhook and Telegram, but each ' +
-        'card ticks its own — an on-call bot usually wants failures only.',
+        'Seven events: run finished, run failed, case failed, agent asks for permission, ' +
+        'agent asked a question, contour budget running out and a group watch signal ' +
+        '(“attention” and “alarm”). The list is shared by the webhook and Telegram, but each ' +
+        'card ticks its own — an on-call bot usually wants failures only. The group watch ' +
+        'signal is ticked by default in new settings. A Telegram card that got the signals ' +
+        'before keeps getting them: the tick is set in its list automatically, once. A ' +
+        'webhook saved earlier needs it ticked by hand.',
       notifyTelegram: '4. Telegram: the bot must be in the chat',
       notifyTelegramText:
         'The chat is set by numeric id or @channel name, the token comes from @BotFather. ' +
         'The commonest cause of silence is a bot that was never added to the chat: the ' +
         'panel sends, Telegram refuses, and the refusal shows on the card.',
+      notifyAnswers: '5. Answers from Telegram: buttons instead of the panel',
+      notifyAnswersText:
+        'The “Answers from Telegram” block on the same card makes the link two-way. An agent ' +
+        'question left unanswered in the panel for the set minutes arrives in a private chat ' +
+        'with “Allow” / “Deny” buttons or answer options; a group question and a deferred D-n go ' +
+        'at once. A press takes the same path as the panel button, and the message is edited ' +
+        'to the outcome. An answer is taken only from your id and only in the private chat with ' +
+        'the bot; a button is signed and works once — a second press is told it was already answered. ' +
+        'If an agent already listens to the card’s bot (an MCP server or a Telegram channel), a ' +
+        'separate bot is needed: one bot can have only one listener, and the block says so ' +
+        'itself. The separate bot’s token is stored encrypted and shown only ' +
+        'as a mask. A D-n opened again under its old number (the same call after it expired) ' +
+        'arrives again as a new message. If the panel’s file of Telegram answers is damaged, ' +
+        'the panel still starts: the damaged file is set aside next to it and the loss goes to ' +
+        'the panel log; the answers setting starts from scratch and is turned on again by hand.',
     },
 
     notTitle: 'What this tab is not',
@@ -361,6 +380,8 @@ export const integrationsEn: typeof integrationsRu = {
         'Picking events: a permission request added to the failures — each card ticks its own list',
       '04-telegram':
         'The Telegram card: chat by @name, a token from @BotFather, a reminder to add the bot to the chat',
+      '05-telegram-answers':
+        'The “Answers from Telegram” block on the card: minutes before sending, your id, a separate bot token and the polling state',
     },
   },
 

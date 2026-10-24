@@ -159,88 +159,110 @@
       "light-ru": {
         "file": "01-webhook.png",
         "width": 1116,
-        "height": 514
+        "height": 545
       },
       "light-en": {
         "file": "01-webhook.en.png",
         "width": 1116,
-        "height": 514
+        "height": 545
       },
       "dark-ru": {
         "file": "01-webhook.dark.png",
         "width": 1116,
-        "height": 514
+        "height": 545
       },
       "dark-en": {
         "file": "01-webhook.dark.en.png",
         "width": 1116,
-        "height": 514
+        "height": 545
       }
     },
     "notify/02-webhook-checked": {
       "light-ru": {
         "file": "02-webhook-checked.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       },
       "light-en": {
         "file": "02-webhook-checked.en.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       },
       "dark-ru": {
         "file": "02-webhook-checked.dark.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       },
       "dark-en": {
         "file": "02-webhook-checked.dark.en.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       }
     },
     "notify/03-events": {
       "light-ru": {
         "file": "03-events.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       },
       "light-en": {
         "file": "03-events.en.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       },
       "dark-ru": {
         "file": "03-events.dark.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       },
       "dark-en": {
         "file": "03-events.dark.en.png",
         "width": 1116,
-        "height": 574
+        "height": 605
       }
     },
     "notify/04-telegram": {
       "light-ru": {
         "file": "04-telegram.png",
         "width": 1116,
-        "height": 436
+        "height": 861
       },
       "light-en": {
         "file": "04-telegram.en.png",
         "width": 1116,
-        "height": 436
+        "height": 861
       },
       "dark-ru": {
         "file": "04-telegram.dark.png",
         "width": 1116,
-        "height": 436
+        "height": 861
       },
       "dark-en": {
         "file": "04-telegram.dark.en.png",
         "width": 1116,
-        "height": 436
+        "height": 861
+      }
+    },
+    "notify/05-telegram-answers": {
+      "light-ru": {
+        "file": "05-telegram-answers.png",
+        "width": 1066,
+        "height": 405
+      },
+      "light-en": {
+        "file": "05-telegram-answers.en.png",
+        "width": 1066,
+        "height": 405
+      },
+      "dark-ru": {
+        "file": "05-telegram-answers.dark.png",
+        "width": 1066,
+        "height": 405
+      },
+      "dark-en": {
+        "file": "05-telegram-answers.dark.en.png",
+        "width": 1066,
+        "height": 405
       }
     }
   }

@@ -1,0 +1,7 @@
+{"type":"system","timestamp":"2026-10-19T06:23:35.645Z","subtype":"api_error","error":{"message":"Connection error.","formatted":"Connection dropped (ECONNRESET)"}}
+{"type":"system","timestamp":"2026-10-19T06:26:55.159Z","subtype":"api_error","error":{"message":"Connection error.","formatted":"No response from API"}}
+{"type":"system","timestamp":"2026-10-19T06:39:22.117Z","subtype":"api_error","error":{"message":"Connection error.","formatted":"Connection dropped (ECONNRESET)"}}
+{"type":"system","timestamp":"2026-10-19T06:39:41.795Z","subtype":"api_error","error":{"message":"Connection error.","formatted":"Connection dropped (ECONNRESET)"}}
+{"type":"system","timestamp":"2026-10-19T06:39:57.534Z","subtype":"api_error","error":{"message":"Connection error.","formatted":"Connection dropped (ECONNRESET)"}}
+{"type":"system","timestamp":"2026-10-19T06:40:57.990Z","subtype":"api_error","error":{"message":"Connection error.","formatted":"Connection dropped (ECONNRESET)"}}
+{"type":"system","timestamp":"2026-10-19T06:41:28.223Z","subtype":"api_error","error":{"message":"Connection error.","formatted":"Connection dropped (ECONNRESET)"}}

@@ -107,6 +107,29 @@ export const continueProvider: ConfigProvider = {
   },
   // Детект «конфиг найден» (Ф7): каталог ~/.continue. Только проверка существования.
   configLocations: () => [continueHome()],
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, живая проба `cn` 1.5.47).
+  // Переменные окружения запуска (`economy-run/continue.ts`); каждый ответ — свой `cn -p`.
+  groupEconomy: {
+    channel: 'continue',
+    support: {
+      // Каждый ответ — новый запуск с историей не длиннее предела промпта: копить
+      // окно между ходами `cn` нечему, а порог внутри хода есть лишь в config.yaml.
+      compactWindow: { support: 'meaningless', note: 'economy-note-one-shot' },
+      // `CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS` — вывод оболочки, знаки.
+      bashOutputChars: { support: 'native' },
+      // `CONTINUE_CLI_READ_FILE_MAX_OUTPUT_CHARS` — знаки (токены × 4); файл больше — отказ
+      // с советом читать частями, как у Claude.
+      readOutputTokens: { support: 'native' },
+      // Срока кэша у `cn` нет ни ключом, ни переменной.
+      cacheTtl: { support: 'impossible', note: 'economy-note-no-key' },
+      detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
+      // Модель — из config.yaml человека, лестницы моделей у панели нет.
+      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
+      freshOnColdResume: { support: 'meaningless', note: 'economy-note-one-shot' },
+      keepWarm: { support: 'meaningless', note: 'economy-note-one-shot' },
+      workHabits: { support: 'emulated' },
+    },
+  },
   // Ассистент Continue — только через `cn`: модель, адрес и ключ у Continue свои
   // в `config.yaml` (или в аккаунте Continue Hub), а СВОЕГО модельного API у
   // Continue нет вовсе. Поэтому `apiKind: 'none'` и ни одной переменной ключа:

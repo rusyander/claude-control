@@ -2,6 +2,7 @@ import {
   GROUP_SIGNALS_CAP,
   type GroupSignal,
   type GroupSignalSeverity,
+  type GroupWatchRule,
 } from '@agentdeck/contracts/group-watch';
 import type { RuleHit } from './watch.types.ts';
 
@@ -9,7 +10,7 @@ import type { RuleHit } from './watch.types.ts';
  * Попадания правил → сигналы на записи группы. Активный сигнал по паре
  * (правило, чат) один: повтор обновляет его числа, а не плодит строки. Условие
  * кончилось — сигнал закрыт (`clearedAt`) и остаётся свёрнутой строкой. Новые
- * первыми, потолок 20: уходят старые закрытые, потом старые вообще.
+ * первыми, потолок 20: уходят старые закрытые, активный — никогда.
  */
 
 export interface SignalScope {
@@ -34,23 +35,36 @@ const sameValues = <T>(left: Record<string, T>, right: Record<string, T>): boole
 };
 const sameNumbers = sameValues<number>;
 
+/**
+ * Чем ведает слияние. `rules` — правила, чьи сигналы оно поднимает и закрывает
+ * (нет — все); `group` — сигнал один на группу, а не на чат (R8, R9): активный
+ * ищется по правилу, `chatId` — лишь ссылка «открыть чат» на звено-источник.
+ */
+export interface MergeScope {
+  rules?: ReadonlySet<GroupWatchRule>;
+  group?: boolean;
+}
+
 export function mergeSignals(
   existing: readonly GroupSignal[],
   scope: SignalScope,
   hits: readonly RuleHit[],
   now: number,
   makeId: () => string,
+  merge: MergeScope = {},
 ): MergedSignals {
   const iso = new Date(now).toISOString();
   const signals = existing.map((signal) => ({ ...signal }));
   const raised: GroupSignal[] = [];
   let structural = false;
   let numbers = false;
+  const mine = (signal: GroupSignal): boolean =>
+    !signal.clearedAt &&
+    (merge.rules?.has(signal.rule) ?? true) &&
+    (merge.group === true || signal.chatId === scope.chatId);
 
   for (const hit of hits) {
-    const active = signals.find(
-      (signal) => !signal.clearedAt && signal.rule === hit.rule && signal.chatId === scope.chatId,
-    );
+    const active = signals.find((signal) => mine(signal) && signal.rule === hit.rule);
     if (active) {
       // Сменилась только подстановка (другая команда, другой файл) — тоже правка строки на записи.
       if (
@@ -60,8 +74,12 @@ export function mergeSignals(
         numbers = true;
       active.numbers = hit.numbers;
       if (hit.params) active.params = hit.params;
-      if (active.severity !== hit.severity) {
+      // Важность выросла (вопрос висит дольше `askAlertMinutes`) — тот же сигнал, но снова
+      // кандидат наружу: «внимание» ушло один раз, а ночь у карточки — уже тревога (C02).
+      // Вниз не идёт: тревога держится, пока условие не кончится.
+      if (RANK[hit.severity] > RANK[active.severity]) {
         active.severity = hit.severity;
+        raised.push(active);
         structural = true;
       }
       continue;
@@ -86,7 +104,7 @@ export function mergeSignals(
 
   const live = new Set(hits.map((hit) => hit.rule));
   for (const signal of signals) {
-    if (signal.clearedAt || signal.chatId !== scope.chatId || live.has(signal.rule)) continue;
+    if (!mine(signal) || live.has(signal.rule)) continue;
     signal.clearedAt = iso;
     structural = true;
   }
@@ -94,26 +112,36 @@ export function mergeSignals(
   return { signals: capSignals(signals), raised, structural, numbers };
 }
 
-/** Новые первыми; сверх потолка уходят сначала старые закрытые. */
+/**
+ * Новые первыми; сверх потолка уходят закрытые, старые первыми. Активный не
+ * вытесняется никогда: следующая оценка не нашла бы его и подняла заново под
+ * новым id — с записью на каждом событии. Активных и так немного: правило на чат.
+ */
 export function capSignals(signals: readonly GroupSignal[]): GroupSignal[] {
   const sorted = [...signals].sort((left, right) => right.at.localeCompare(left.at));
   while (sorted.length > GROUP_SIGNALS_CAP) {
     const cleared = sorted.findLastIndex((signal) => Boolean(signal.clearedAt));
-    sorted.splice(cleared === -1 ? sorted.length - 1 : cleared, 1);
+    if (cleared === -1) break;
+    sorted.splice(cleared, 1);
   }
   return sorted;
 }
 
-/** Закрыть активные сигналы чата — звено закончилось, следить больше не за чем. */
+/**
+ * Закрыть активные сигналы чата — звено закончилось, следить больше не за чем.
+ * `rules` — только эти правила (сигналы группы R8/R9 закрывает её же оценка).
+ */
 export function clearChatSignals(
   existing: readonly GroupSignal[],
   chatId: string,
   now: number,
+  rules?: ReadonlySet<GroupWatchRule>,
 ): { signals: GroupSignal[]; changed: boolean } {
   const iso = new Date(now).toISOString();
   let changed = false;
   const signals = existing.map((signal) => {
-    if (signal.clearedAt || signal.chatId !== chatId) return signal;
+    if (signal.clearedAt || signal.chatId !== chatId || !(rules?.has(signal.rule) ?? true))
+      return signal;
     changed = true;
     return { ...signal, clearedAt: iso };
   });
@@ -123,9 +151,10 @@ export function clearChatSignals(
 const RANK: Record<GroupSignalSeverity, number> = { info: 0, warn: 1, alert: 2 };
 
 /**
- * Кому из поднятых сигналов идти в Telegram: только «внимание» и «тревога»;
- * повтор того же ключа — когда важность выросла или прошёл срок тишины.
- * `sent` — память отправленного (ключ → когда и с какой важностью), правится здесь.
+ * Кому из поднятых сигналов идти наружу (Telegram, вебхук): только «внимание»
+ * и «тревога»; повтор того же ключа — когда прошёл срок тишины или важность
+ * выросла с прошлой отправки (внимание → тревога идёт сразу). `sent` — память
+ * отправленного (ключ → когда и с какой важностью), правится здесь.
  */
 export function signalsToNotify(
   raised: readonly GroupSignal[],
@@ -139,8 +168,8 @@ export function signalsToNotify(
     if (RANK[signal.severity] < RANK.warn) continue;
     const key = keyOf(signal);
     const previous = sent.get(key);
-    const rose = previous && RANK[signal.severity] > RANK[previous.severity];
-    if (previous && !rose && now - previous.at < cooldownMs) continue;
+    const escalated = previous !== undefined && RANK[signal.severity] > RANK[previous.severity];
+    if (previous && !escalated && now - previous.at < cooldownMs) continue;
     sent.set(key, { at: now, severity: signal.severity });
     out.push(signal);
   }

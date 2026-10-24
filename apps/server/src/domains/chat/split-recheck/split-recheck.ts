@@ -102,7 +102,11 @@ export function recheckPrompt(input: {
     '1. Conflicts. Fetch the target branch and check that the branch merges into it cleanly ' +
       '(git merge-tree or a trial merge on a scratch branch).' +
       (review?.conflicts ? ' The forge reports conflicts with the target branch.' : '') +
-      ' Resolve them the way the project does (merge or rebase) and run the checks again.',
+      // Владелец 23.10: догон основной и перезапись ветки — только при настоящем
+      // конфликте; без него брокер откажет, а повторный гейт стоит 13–20 мин.
+      ' Only on a real conflict (`git merge-tree --write-tree` without `--quiet`: exit 1 or a ' +
+      'CONFLICT line) resolve it the way the project does (merge or rebase) and run the checks ' +
+      'again; no conflict — leave the base as it is and do not re-run the full checks.',
     '2. Reviewer comments. Re-read ALL MR discussions in full. For each unresolved one waiting ' +
       'for an answer — fix it in the branch and reply in the same thread with what was done, or ' +
       'reply why you do not change it. The reviewer resolves the thread, not you. Write the ' +

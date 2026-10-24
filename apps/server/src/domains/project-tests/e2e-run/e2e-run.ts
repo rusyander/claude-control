@@ -25,6 +25,7 @@ import {
 import { BUILD_FAILURE } from '../automation/native-reports.ts';
 import type { ImportedTestResult } from '../import-results/import-results.ts';
 import { readGroups } from '../store/store.ts';
+import { contentStamps, stampInputs, stampsOf } from '../content-stamp/content-stamp.ts';
 import { gitContext } from '../impact/impact.ts';
 import { prepareResultsForRun } from '../import-results/import-results.ts';
 import { readEnvironments } from '../library/library.ts';
@@ -131,6 +132,22 @@ interface Live {
   timedOut?: boolean;
   /** Тесты прогона без кейса — целиком: из них «Завести кейсы» делает кейсы. */
   unmatched?: ImportedTestResult[];
+  /** Отпечатки содержимого кейсов на старте (`content-stamp`) — в запись истории. */
+  stamps?: Map<string, string>;
+}
+
+/** Отпечатки кейсов, которые прогон может прогнать: выбранных, иначе всех с автотестом. */
+function startStamps(root: string, groupId?: string, caseIds?: string[]): Map<string, string> {
+  const wanted = new Set(caseIds ?? []);
+  const groups = readGroups(root).filter((group) => !groupId || group.id === groupId);
+  const keys = new Set(
+    groups.flatMap((group) =>
+      group.cases
+        .filter((item) => item.automation?.file && (wanted.size === 0 || wanted.has(item.id)))
+        .map((item) => `${group.id}:${item.id}`),
+    ),
+  );
+  return contentStamps(root, stampInputs(groups, keys));
 }
 
 /** Чем гонять: командой папки e2e или своей командой проекта (automation.json). */
@@ -242,7 +259,8 @@ export class E2eRunRegistry {
       startedAt: now(),
       log: '',
     };
-    const live: Live = { view };
+    // До запуска раннера: отпечаток — то, что прогон увидит, а не то, что лежит после.
+    const live: Live = { view, stamps: startStamps(root, input.groupId, input.caseIds) };
     forgetOtherSpellings(this.runs, root);
     this.runs.set(root, live);
 
@@ -468,6 +486,7 @@ export class E2eRunRegistry {
       writeRun(root, {
         ...base,
         status: stopped ? 'stopped' : 'done',
+        ...stampsOf(live.stamps, points),
         results: points,
         summary,
       });

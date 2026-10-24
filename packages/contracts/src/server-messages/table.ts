@@ -10,6 +10,7 @@ import { composedMessageParams } from './composed.ts';
 import { configMessageParams } from './config.ts';
 import { contourMessageParams } from './contour.ts';
 import { dlpMessageParams } from './dlp.ts';
+import { economyMessageParams } from './economy.ts';
 import { filesMessageParams } from './files.ts';
 import { gatewayMessageParams } from './gateway.ts';
 import { gitMessageParams } from './git.ts';
@@ -30,6 +31,7 @@ export const serverMessageAreas = {
   config: configMessageParams,
   contour: contourMessageParams,
   dlp: dlpMessageParams,
+  economy: economyMessageParams,
   files: filesMessageParams,
   gateway: gatewayMessageParams,
   git: gitMessageParams,
@@ -51,6 +53,7 @@ export const serverMessageParams = {
   ...configMessageParams,
   ...contourMessageParams,
   ...dlpMessageParams,
+  ...economyMessageParams,
   ...filesMessageParams,
   ...gatewayMessageParams,
   ...gitMessageParams,
@@ -71,6 +74,7 @@ export type ComposedMessageCode = keyof typeof composedMessageParams;
 export type ConfigMessageCode = keyof typeof configMessageParams;
 export type ContourMessageCode = keyof typeof contourMessageParams;
 export type DlpMessageCode = keyof typeof dlpMessageParams;
+export type EconomyMessageCode = keyof typeof economyMessageParams;
 export type FilesMessageCode = keyof typeof filesMessageParams;
 export type GatewayMessageCode = keyof typeof gatewayMessageParams;
 export type GitMessageCode = keyof typeof gitMessageParams;

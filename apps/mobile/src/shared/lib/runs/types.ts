@@ -92,6 +92,19 @@ export interface AgentRun {
    * запуска приложения ответ печатался бы с нуля поверх прочитанного.
    */
   tailOnly?: boolean;
+  /**
+   * Когда телефон узнал, что ход кончился, — по своим часам. Ставится и там, где
+   * экран конца не видел: ход подхвачен уже законченным, поток привёл в новый ход
+   * того же разговора. По смене отметки экран перечитывает транскрипт — иначе
+   * ответ, который агент уже дал, показывался только после перезапуска.
+   */
+  endedAt?: number;
+  /**
+   * Отправка, не дошедшая по сети: её текст и метка. Повтор того же текста идёт с
+   * той же меткой — если первый запрос всё же дошёл до сервера, он узнает повтор
+   * и не отдаст агенту сообщение дважды.
+   */
+  unsent?: { prompt: string; clientId: string };
 }
 
 export interface StartInput {
@@ -180,4 +193,31 @@ export const EMPTY_RUN: AgentRun = {
   permissions: [],
   queued: [],
   lastEventAt: 0,
+};
+
+/**
+ * Что принадлежит ходу, а не разговору: с новым ходом начинается заново.
+ * `EMPTY_RUN` этого не делает — необязательных полей в нём нет, и слияние с
+ * прежней записью их оставляло: ошибка прошлого хода висела под новым (и
+ * объявляла его упавшим по концу), а `tailOnly` подхваченного хвоста глушил
+ * текст хода, начатого после него с телефона.
+ */
+export const TURN_RESET: Partial<AgentRun> = {
+  status: 'running',
+  text: '',
+  thinking: '',
+  tools: [],
+  permissions: [],
+  askedQuestion: false,
+  tokens: 0,
+  textUsage: undefined,
+  costUsd: undefined,
+  error: undefined,
+  errorCode: undefined,
+  errorRetriable: undefined,
+  tailOnly: undefined,
+  lastPrompt: undefined,
+  steered: undefined,
+  handoffTo: undefined,
+  stalled: undefined,
 };

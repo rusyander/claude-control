@@ -1,0 +1,13 @@
+// Раздел хаба «Ждёт решения у групп»: под сводкой, своей рамкой — его ищут
+// глазами раньше карточек групп, после него работа групп пойдёт дальше.
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-warning);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--color-surface);
+}

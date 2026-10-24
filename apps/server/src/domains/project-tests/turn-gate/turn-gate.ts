@@ -1,7 +1,9 @@
 import type { ProjectTestGroup, ProjectTestRunRecord } from '@agentdeck/contracts';
+import { freshResult } from '../content-stamp/content-stamp.ts';
 import { casesTouching } from '../impact/impact.ts';
 import { CASE_STANDARD } from '../case-standard.ts';
 import { isVagueCase } from '../lint/lint.ts';
+import { redOf } from '../red-verdict/red-verdict.ts';
 
 /**
  * Проверка конца хода любого агента над проектом (решение владельца 15.10): правил
@@ -24,6 +26,12 @@ export interface TurnGateInput {
   since: string;
   /** Последняя правка хода: прогон до неё не видел того, что сдаётся. */
   changedAt?: string;
+  /**
+   * Отпечатки содержимого кейсов сейчас (`content-stamp`): у результата с
+   * отпечатком свежесть решает он, а не `changedAt` — правка непокрытого файла
+   * после прогона кейс не старит. Нет поля или ключа — правило по времени.
+   */
+  stamps?: ReadonlyMap<string, string>;
   /**
    * Файлы хода, которых git не отслеживает (3.4): скрипт снимков или пробы среди
    * них — подсобка хода, не код. Нет поля — исключения нет.
@@ -152,21 +160,26 @@ export function judgeTurn(input: TurnGateInput): string[] {
   const changed = input.changedAt ? Date.parse(input.changedAt) : since;
   const done = input.runs.filter((run) => run.status !== 'running');
   const inTurn = done.filter((run) => Date.parse(run.startedAt) >= since);
-  const executedFresh = inTurn.filter(
-    (run) => !run.attested && Date.parse(run.startedAt) >= changed,
-  );
-  const latest = (runs: readonly ProjectTestRunRecord[]) => {
+  const latest = (
+    runs: readonly ProjectTestRunRecord[],
+    counts: (run: ProjectTestRunRecord, key: string) => boolean = () => true,
+  ) => {
     const map = new Map<string, string>();
     for (const run of [...runs].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))) {
       for (const result of run.results) {
         const key = `${result.groupId}:${result.caseId}`;
-        if (!map.has(key)) map.set(key, result.status);
+        if (!map.has(key) && counts(run, key)) map.set(key, result.status);
       }
     }
     return map;
   };
   const anyResult = latest(inTurn);
-  const executed = latest(executedFresh);
+  // Исполненный и свежий для ЭТОГО кейса: по отпечатку содержимого, без него — по
+  // времени последней правки хода (`freshResult`).
+  const executed = latest(
+    inTurn.filter((run) => !run.attested),
+    (run, key) => freshResult(run, key, changed, input.stamps),
+  );
 
   const touched = casesTouching(code, live).cases;
   const byKey = new Map<string, ProjectTestGroup['cases'][number]>(
@@ -252,11 +265,20 @@ export function judgeTurn(input: TurnGateInput): string[] {
         .join(' ')} --note "<how you checked>"`,
     );
   }
-  const red = [...anyResult]
-    .filter(
-      ([key, status]) => (status === 'failed' || status === 'blocked') && !byKey.get(key)?.muted,
-    )
-    .map(([key]) => key);
+  // Красное — по последней записи хода И по последнему ИСПОЛНЕННОМУ прогону: запись
+  // словом (`attested`) после исполненного красного его не снимает (как F-22 у
+  // доставки) — снимает только исполненный зелёный. Правило общее с доставкой
+  // группы (`redOf`, RF-EF-03): на одном входе ворота не расходятся.
+  const executedInTurn = latest(inTurn.filter((run) => !run.attested));
+  const statusOf = (map: Map<string, string>, key: string) => {
+    const status = map.get(key);
+    return status === undefined ? undefined : { status };
+  };
+  const red = [...new Set([...anyResult.keys(), ...executedInTurn.keys()])].filter(
+    (key) =>
+      redOf(statusOf(anyResult, key), statusOf(executedInTurn, key)) !== undefined &&
+      !byKey.get(key)?.muted,
+  );
   if (red.length > 0) {
     gaps.push(
       `Tests block: red this turn (${named(red)}) — fix and run again; a red test is never weakened to pass.`,

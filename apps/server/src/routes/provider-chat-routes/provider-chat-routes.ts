@@ -41,6 +41,8 @@ import { checkProjectDir } from '../../domains/projects/projects.ts';
 import { chatDeliveryFor } from '../../domains/project-git/project-git.ts';
 import { registerProviderChatProjectsRoute } from '../provider-chat-projects-route/provider-chat-projects-route.ts';
 import { refuseUnlessReady } from '../provider-guard/provider-guard.ts';
+import { humanOnly } from '../chat/human-only/human-only.ts';
+import { humanOnlyDepsFor } from '../chat/human-only/human-only-deps.ts';
 
 /**
  * Чат чужого провайдера: список разговоров, переписка, вопрос, поток ответа и
@@ -496,6 +498,7 @@ export function registerProviderChatRoutes(
    */
   app.post<{ Params: { id: string; askId: string }; Body: ProviderChatPermissionAnswer }>(
     '/api/provider-chat/chats/:id/permissions/:askId',
+    { preHandler: humanOnly(humanOnlyDepsFor()) },
     (request, reply) => {
       const providerId = requireProvider(reply);
       if (!providerId) return reply;

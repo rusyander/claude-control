@@ -1,6 +1,8 @@
 import type { WorktreeMirrorSettings } from '@agentdeck/contracts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { isProtectedBranch } from '../../chat/group-command/branch.ts';
 import { git } from '../exec/exec.ts';
+import { prepLeftovers } from '../lockfiles.ts';
 import { effectiveSettings, listed } from '../mirror-local.ts';
 import { mergeRequestRef, parseLsRemote } from '../merge-request.ts';
 import { pickRemote } from '../parse.ts';
@@ -22,12 +24,63 @@ import { parseDirtyPaths } from '../read.ts';
  *   другой головой или другой веткой не засчитывается.
  */
 
-/** Ключ задачи трекера в имени ветки: `GOR-1485`, `PROJ-1`. */
+/** Ключ задачи трекера в имени ветки: `PROJ-1485`, `ABC-12`. */
 const TICKET_KEY = /[A-Z][A-Z0-9]+-\d+/g;
 
 /** Ключ стоит в имени отдельно: не хвост другого ключа и не начало большего номера. */
 function hasKey(name: string, key: string): boolean {
   return new RegExp(`(?<![A-Z0-9])${key}(?!\\d)`).test(name);
+}
+
+/** Запись журнала о переименовании ветки — вся строка, как её пишет `git branch -m`. */
+const RENAME_ENTRY = /^Branch: renamed refs\/heads\/(\S+) to refs\/heads\/(\S+)$/;
+
+/**
+ * Ветка копии переименована (`git branch -m`) из ветки панели — прямо или
+ * цепочкой. Журнал ссылок переезжает вместе с веткой и хранит каждое
+ * «Branch: renamed refs/heads/<старое> to refs/heads/<новое>»; журнала нет
+ * (выключен `core.logAllRefUpdates`) — не знаем, `false`.
+ *
+ * Ревью 23.10 (A-27): совпадение раньше искалось в любом месте строки любой
+ * записи — тему коммита `renamed refs/heads/feat/x to refs/heads/release`
+ * принимало за переименование, как и давнее переименование, после которого
+ * ветку панели завели заново. Теперь — только записи переименования целиком,
+ * цепочкой от новейшей: последняя ведёт в текущую ветку, каждая предыдущая — в
+ * старое имя следующей, и ветки панели в копии больше нет. Основную и
+ * защищённую (и ветку по умолчанию удалённого) не принимает никогда.
+ */
+async function renamedFrom(
+  cwd: string,
+  current: string,
+  panel: string,
+  defaultBranch: string | undefined,
+): Promise<boolean> {
+  if (isProtectedBranch(current, defaultBranch)) return false;
+  const panelExists = await git(cwd, ['rev-parse', '--verify', '-q', `refs/heads/${panel}`])
+    .then((out) => out.trim() !== '')
+    .catch(() => false);
+  if (panelExists) return false;
+  const log = await git(cwd, ['reflog', 'show', '--format=%gs', `refs/heads/${current}`]).catch(
+    () => '',
+  );
+  let target = current;
+  for (const line of log.split('\n')) {
+    const entry = RENAME_ENTRY.exec(line.trim());
+    if (!entry) continue;
+    if (entry[2] !== target) return false;
+    if (entry[1] === panel) return true;
+    target = entry[1] as string;
+  }
+  return false;
+}
+
+/** Ветка по умолчанию удалённого по локальной `refs/remotes/<удалённый>/HEAD`. */
+async function remoteDefault(cwd: string, remote: string): Promise<string | undefined> {
+  const ref = await git(cwd, ['symbolic-ref', '--quiet', `refs/remotes/${remote}/HEAD`]).catch(
+    () => '',
+  );
+  const prefix = `refs/remotes/${remote}/`;
+  return ref.trim().startsWith(prefix) ? ref.trim().slice(prefix.length) : undefined;
 }
 
 /** Сетевой потолок одного `ls-remote`: чуть меньше, чем ждёт человек у хаба. */
@@ -192,7 +245,11 @@ export async function readDeliveryFacts(input: {
   const { cwd, branch } = input;
   const include = effectiveSettings(input.mirror).include;
   const status = await git(cwd, ['status', '--porcelain=v1', '-z', '-uall']);
-  const dirty = parseDirtyPaths(status).filter((path) => !listed(path, include));
+  // Правка подготовки копии (go.mod после `go mod download`, своя команда
+  // человека) — не работа группы: в «не закоммичено» её не ставим, пока агент
+  // сам не тронул файл (разбор остановок 23.10, D5).
+  const prep = await prepLeftovers(cwd).catch(() => new Set<string>());
+  const dirty = parseDirtyPaths(status).filter((path) => !listed(path, include) && !prep.has(path));
   const head = (await git(cwd, ['rev-parse', 'HEAD'])).trim();
   // На какой ветке стоит копия: группа могла завести свою по правилу проекта
   // (живой прогон 29.09 — ключи через запятую вместо имени панели).
@@ -238,13 +295,20 @@ export async function readDeliveryFacts(input: {
   // предшественника с тем же ключом, увела бы группу на чужую ветку и чужой MR
   // (ревью 29.09). Ключа в имени панели нет — сверять не с чем, не берём.
   const keys = branch.match(TICKET_KEY) ?? [];
+  const free = Boolean(own) && !(input.claimed ?? []).includes(own as string);
+  // Переименованная из ветки панели (L7, ревью 23.10: `git branch -m` своей ветки
+  // группа делает сама) — та же ветка под новым именем, и прежней в копии нет:
+  // принимается и неотправленной, иначе доставка звала бы отправить пропавшую.
+  const renamed =
+    free && (await renamedFrom(cwd, own as string, branch, await remoteDefault(cwd, remote)));
   const adopted =
     own &&
-    keys.some((key) => hasKey(own, key)) &&
-    !(input.claimed ?? []).includes(own) &&
-    !refs.has(`refs/heads/${branch}`) &&
-    refs.get(`refs/heads/${own}`) === head &&
-    refs.get('HEAD') !== head
+    free &&
+    (renamed ||
+      (keys.some((key) => hasKey(own, key)) &&
+        !refs.has(`refs/heads/${branch}`) &&
+        refs.get(`refs/heads/${own}`) === head &&
+        refs.get('HEAD') !== head))
       ? own
       : undefined;
   const pushed = refs.get(`refs/heads/${adopted ?? branch}`) === head;
@@ -290,18 +354,29 @@ async function sharesBaseHead(
  *
  * `liveNa` — живые проверки, сданные `n/a` (решение владельца 10.10): причина
  * идёт в описание MR, и описание должно назвать каждое такое сито по id.
+ *
+ * `noted` — заметки доставки (решение владельца 23.10): сито «не проверено» и
+ * красное не из-за ветки группу не держат, но ревьюер должен их увидеть —
+ * описание называет каждое по id сита или кейса.
  */
 export async function mrDescriptionGap(
   mr: string,
   read: (url: string) => Promise<{ description?: string } | undefined>,
   liveNa: readonly string[] = [],
+  noted: readonly string[] = [],
 ): Promise<{ missing?: string; unchecked?: true }> {
   const review = await read(mr).catch(() => undefined);
   if (!review || review.description === undefined) return { unchecked: true };
   const text = review.description.trim();
   if (!text) return { missing: serverText('delivery-gap-mr-description', { mr }) };
-  const unnamed = liveNa.filter((id) => !new RegExp(`(^|[^\\w-])${id}([^\\w-]|$)`).test(text));
-  return unnamed.length > 0
-    ? { missing: serverText('delivery-gap-mr-na-reason', { mr, sieves: unnamed.join(', ') }) }
+  const named = (id: string): boolean =>
+    new RegExp(`(^|[^\\w-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\w-]|$)`).test(text);
+  const unnamed = liveNa.filter((id) => !named(id));
+  if (unnamed.length > 0) {
+    return { missing: serverText('delivery-gap-mr-na-reason', { mr, sieves: unnamed.join(', ') }) };
+  }
+  const silent = [...new Set(noted)].filter((id) => !named(id));
+  return silent.length > 0
+    ? { missing: serverText('delivery-gap-mr-notes', { mr, items: silent.join(', ') }) }
     : {};
 }

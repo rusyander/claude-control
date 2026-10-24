@@ -86,6 +86,7 @@ export {
   requireRepo,
   splitRootOf,
 } from './read.ts';
+export { defaultBaseOf } from './default-base.ts';
 export {
   addWorktree,
   listWorktrees,

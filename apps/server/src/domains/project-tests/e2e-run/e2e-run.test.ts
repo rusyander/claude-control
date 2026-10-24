@@ -18,6 +18,7 @@ import { syncE2eFolder } from '../e2e-sync/e2e-sync.ts';
 import { createGroup, parseCase, readGroups, writeGroup } from '../store/store.ts';
 import { saveEnvironment } from '../library/library.ts';
 import { readRuns } from '../runs-store/runs-store.ts';
+import { contentStamps, stampInputs } from '../content-stamp/content-stamp.ts';
 import { installFakeRunners, markRunnerInstalled } from '../__fixtures__/fake-runners.ts';
 
 /**
@@ -483,6 +484,44 @@ writeFileSync(process.env.AGENTDECK_JUNIT_REPORT, '<testsuites><testsuite name="
         expect.objectContaining({ messageCode: 'e2e-run-nothing-selected' }),
       );
       expect(readFileSync(ownArgv, 'utf8')).toBe('untouched');
+    });
+
+    // RC-D-04: отпечаток содержимого (`content-stamp`) — на миг СТАРТА раннера:
+    // правка покрытого файла во время прогона старит его, а не прячется в нём.
+    // Кейс без codePaths отпечатка не получает — его судит время.
+    it('запись прогона несёт отпечаток кейса со старта; правка во время прогона его не меняет', async () => {
+      ownProject({ command: 'node tools/run.mjs {files}' });
+      mkdirSync(join(root, 'src', 'qa'), { recursive: true });
+      writeFileSync(join(root, 'src', 'qa', 'open.ts'), 'export const open = 1;\n');
+      writeGroup(root, {
+        ...createGroup(root, 'qa', 'Проверки'),
+        cases: [
+          {
+            id: 'qa-001',
+            title: 'панель открывается',
+            automation: { status: 'automated', file: 'tools/qa/open.mjs' },
+            codePaths: ['src/qa'],
+          },
+          {
+            id: 'qa-002',
+            title: 'поиск находит',
+            automation: { status: 'automated', file: 'tools/qa/search.mjs' },
+          },
+        ].flatMap((raw, index) => parseCase(raw, index) ?? []),
+      });
+      const atStart = contentStamps(root, stampInputs(readGroups(root))).get('qa:qa-001');
+      expect(atStart).toMatch(/^[0-9a-f]{32}$/);
+      setEnv('OWN_SLEEP', '1500');
+
+      const registry = new E2eRunRegistry();
+      registry.start({ root, appData, groupId: 'qa' });
+      writeFileSync(join(root, 'src', 'qa', 'open.ts'), 'export const open = 2;\n');
+      await vi.waitFor(() => expect(registry.get(root)?.status).toBe('done'), { timeout: 20_000 });
+
+      const [record] = readRuns(root);
+      expect(record?.stamps).toEqual({ 'qa:qa-001': atStart });
+      const now = contentStamps(root, stampInputs(readGroups(root))).get('qa:qa-001');
+      expect(now).not.toBe(atStart);
     });
 
     it('{paths}: без выбора пуст — раннер собирает весь набор сам, с группой — её файлы', async () => {

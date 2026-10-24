@@ -80,7 +80,7 @@
       "id": "t5",
       "name": "Bash",
       "input": {
-        "command": "git ls-files e2e/bl | head -3; git check-ignore -v e2e/bl/proj-3-shots.mjs e2e/screenshots/before-after/proj-3-guardrails-agentgw/README.md; git status --short | grep -vE \"^ M\" "
+        "command": "git ls-files e2e/bl | head -3; git check-ignore -v e2e/bl/proj-3-shots.mjs e2e/screenshots/before-after/proj-3-dashboards-agentgw/README.md; git status --short | grep -vE \"^ M\" "
       }
     },
     { "kind": "toolResult", "t": 1792524420276, "id": "t5", "chars": 736 },
@@ -120,7 +120,7 @@
       "id": "t7",
       "name": "Bash",
       "input": {
-        "command": "git commit -q -F - <<'EOF'\nfeat(svc-admin-api,svc-config,svc-admin-ui,contracts): справочники исключений из metadata, переносы в «Проверке», отбор журнала в адресе, «Сбой провайдера» (PROJ-4, PROJ-3, PROJ-5, PROJ-6)\n\nPROJ-4: GET /api/v1/guardrails/metadata отдаёт exception_rule_types и block_kinds, в том числе при недоступном svc-config. Форма исключения и подстановка из адреса берут типы правил и"
+        "command": "git commit -q -F - <<'EOF'\nfeat(svc-admin-api,svc-config,svc-admin-ui,contracts): справочники исключений из metadata, переносы в «Проверке», отбор журнала в адресе, «Сбой провайдера» (PROJ-4, PROJ-3, PROJ-5, PROJ-6)\n\nPROJ-4: GET /api/v1/dashboards/metadata отдаёт exception_rule_types и block_kinds, в том числе при недоступном svc-config. Форма исключения и подстановка из адреса берут типы правил и"
       }
     },
     { "kind": "toolResult", "t": 1792524439740, "id": "t7", "chars": 97 },

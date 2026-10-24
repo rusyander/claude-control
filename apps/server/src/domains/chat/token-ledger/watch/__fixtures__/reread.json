@@ -437,7 +437,7 @@
       "id": "t27",
       "name": "Bash",
       "input": {
-        "command": "cat content/ru/chat/_section.json content/ru/platform/_section.json; ls content/en/chat content/uz/chat 2>&1 | head; ls content/"
+        "command": "cat content/ru/chat/_section.json content/ru/platform/_section.json; ls content/en/chat content/de/chat 2>&1 | head; ls content/"
       }
     },
     { "kind": "toolResult", "t": 1792522834221, "id": "t27", "chars": 563 },

@@ -51,19 +51,52 @@ export function autoPickResults(content: unknown): { toolUseId: string; text: st
 }
 
 /**
- * Что выбрано. Тело вызова известно — считаем тем же `pickRecommended`, что
- * хук и брокер: только оно знает заголовок `critical`. Не известно (вызов
- * пришёл раньше, чем панель его увидела) — разбираем текст отказа, и
- * критичность тогда неизвестна: такой выбор в главный чат не сообщается.
+ * Что выбрано. Выбор — тот, что записан в тексте отказа: ответ группы «по
+ * плану» (`group-questions.ts`) берёт не всегда рекомендованный вариант, и
+ * пересчёт по `pickRecommended` подменял бы его. Тело вызова известно — из него
+ * только заголовок `critical`; не известно (вызов пришёл раньше, чем панель его
+ * увидела) — критичность неизвестна, и такой выбор в главный чат не сообщается.
+ * Текст не разобрался — выбор считается по телу, как его считают хук и брокер.
  */
 export function picksFor(input: unknown, text: string): RecommendedPick[] {
+  const parsed = parseAutonomousPickMessage(text) ?? [];
+  if (parsed.length > 0) return withCritical(input, parsed);
   const fromInput = input === undefined ? null : pickRecommended(input);
-  if (fromInput) return fromInput;
-  return (parseAutonomousPickMessage(text) ?? []).map((pick) => ({
-    question: pick.question,
-    label: pick.label,
-    critical: false,
-  }));
+  return fromInput ?? [];
+}
+
+/**
+ * Выбор события `autoPick` при известном теле вызова: подписи — из события
+ * (разобранный текст отказа), критичность — из тела; событие без выбора
+ * (текст не разобрался) — по телу.
+ */
+export function confirmedPicks(
+  input: unknown,
+  picks: readonly { question: string; label: string }[],
+): RecommendedPick[] {
+  if (picks.length > 0) return withCritical(input, picks);
+  return pickRecommended(input) ?? [];
+}
+
+const CRITICAL_HEADER = /^\s*\[?critical\]?\s*$/i;
+
+/** Критичность выбора — по заголовку его вопроса в теле вызова. */
+export function withCritical(
+  input: unknown,
+  picks: readonly { question: string; label: string }[],
+): RecommendedPick[] {
+  const questions = (input as { questions?: unknown } | null | undefined)?.questions;
+  const list = Array.isArray(questions)
+    ? (questions as { question?: unknown; header?: unknown }[])
+    : [];
+  return picks.map(({ question, label }) => {
+    const header = list.find((item) => item?.question === question)?.header;
+    return {
+      question,
+      label,
+      critical: typeof header === 'string' && CRITICAL_HEADER.test(header),
+    };
+  });
 }
 
 // --- Лента из транскрипта: выбор ложится на блок вопроса ---

@@ -1,4 +1,8 @@
 import { CLAUDE_HOOK_EVENTS } from '@agentdeck/contracts/vocabulary';
+import {
+  GROUP_ECONOMY_LEVERS,
+  type GroupEconomySupport,
+} from '@agentdeck/contracts/group-economy-support';
 import { detectClaudeLocation } from '../lib/claude-paths/claude-paths.ts';
 import { uniformCapabilities, type ConfigProvider } from './types/types.ts';
 
@@ -15,6 +19,13 @@ export const claudeProvider: ConfigProvider = {
   paths: (override) => detectClaudeLocation(override).paths,
   cli: { command: 'claude', windowsCommand: 'claude.cmd' },
   capabilities: uniformCapabilities('ready'),
+  // Рычаги экономии групп придуманы на Claude и все доходят его собственными
+  // ключами (`group-profile.ts`): канала диспетчера ему не нужно.
+  groupEconomy: {
+    support: Object.fromEntries(
+      GROUP_ECONOMY_LEVERS.map((lever) => [lever, { support: 'native' }]),
+    ) as GroupEconomySupport,
+  },
   // Все разделы Claude — СОБСТВЕННАЯ модель панели на своих маршрутах, поэтому
   // ни одного универсального `*Config` у него нет. Матрица верности (П1.1)
   // считает по каталогу, и без этого блока она решила бы, что в Claude не

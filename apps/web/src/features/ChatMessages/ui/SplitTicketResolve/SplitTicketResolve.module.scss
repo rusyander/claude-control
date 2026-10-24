@@ -1,0 +1,94 @@
+// Окно «Разобрать…»: что открыто (список только для чтения), куда уйдёт
+// публикация, итог по задачам. Разделы — столбиком, список прокручивает тело окна.
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Склейка явных повторов — одна строка: первая находка и под ней «то же: …».
+.item {
+  min-width: 0;
+  padding-left: var(--spacing-2xs);
+  border-left: 2px solid var(--color-border);
+}
+
+.target {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+}
+
+// Итог: ключ · название · сколько предложений задача собрала — сеткой, чтобы
+// колонки ключей стояли ровно и при длинных названиях.
+.rows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: var(--spacing-3xs) var(--spacing-sm);
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: contents;
+}
+
+.key {
+  font-family: var(--font-mono);
+  color: var(--color-accent);
+}
+
+.wide {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Причина отказа строки упавших — на обе оставшиеся колонки.
+.reason {
+  grid-column: span 2;
+  overflow-wrap: anywhere;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  justify-content: flex-end;
+}
+
+.blocked {
+  flex: 1;
+  min-width: 0;
+}
+
+// Связка — одна будущая задача: дефекты одного файла столбиком под общей подписью.
+.bundle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+// Что задача собрала — дефекты и сведённые в них повторы — под её названием.
+.defects {
+  grid-column: 2 / span 2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

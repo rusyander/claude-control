@@ -66,6 +66,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   // chat/group-settings-routes.ts
   'GET /api/chat/:chatId/group-settings': 'action:set_chat_group',
   'GET /api/chat/escalations': 'action:list_waiting',
+  'GET /api/chat/watch-signals': 'gap:P3',
   'POST /api/chat/:chatId/escalations/read': 'internal:ui-state',
   'PUT /api/chat/:chatId/group-settings': 'action:set_chat_group',
   // chat/handoff-routes.ts
@@ -76,6 +77,10 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/handoff/auto': 'action:restart_chat_session',
   // chat/inbox-routes.ts
   'GET /api/chat/inbox': 'action:list_waiting',
+  // chat/deferred-routes.ts — список D-n агенту панели пока не нужен (он видит его в
+  // сводке `GET /api/chat/inbox`), решает только человек.
+  'GET /api/chat/deferred': 'gap:P3',
+  'POST /api/chat/deferred/:id/decision': 'human:rights',
   // chat/run-routes.ts
   'GET /api/chat/:chatId/auto-mode': 'action:read_chat_modes',
   'GET /api/chat/:chatId/stream': 'internal:stream',
@@ -85,6 +90,9 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/:chatId/branch-decision': 'human:rights',
   'POST /api/chat/:chatId/permission-decision': 'human:rights',
   'POST /api/chat/:chatId/stop': 'action:stop_chat_run',
+  // Возврат хода в остывшую сессию перезаписывает всё её окно в кэш — решение
+  // о деньгах человека, агенту панели закрыт (R5).
+  'POST /api/chat/:chatId/keep-session': 'human:paid',
   'POST /api/chat/permission-request': 'internal:callback',
   'POST /api/chat/send':
     'action:start_chat,send_chat_message,request_split,restart_chat_session,request_chat_handoff',
@@ -113,6 +121,10 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/split/:parent/review-push': 'human:outward',
   'POST /api/chat/split/:parent/review-retry': 'human:outward',
   'POST /api/chat/split/:parent/tickets/file': 'human:outward',
+  // chat/split-ticket-batch-routes.ts: «Разобрать…» — публикация в Jira разом и «Решить здесь»
+  'GET /api/chat/split/:parent/tickets/target': 'human:outward',
+  'POST /api/chat/split/:parent/tickets/publish': 'human:outward',
+  'POST /api/chat/split/:parent/tickets/take': 'human:split-apply',
   'GET /api/chat/split/:parent/tasks': 'human:outward',
   'POST /api/chat/split/:parent/tasks/move': 'human:outward',
   // chat/split-status-routes.ts: вопрос человека о ходе групп из хаба — лёгкий чат-помощник
@@ -325,6 +337,10 @@ export const ROUTE_LEDGER: RouteLedger = {
   // integrations/exchange-routes.ts
   'POST /api/integrations/ci/import': 'human:upload',
   'POST /api/integrations/telegram/test': 'human:outward',
+  // Ответы из Telegram: токен отдельного бота и id владельца — решает человек.
+  'GET /api/integrations/telegram/answers': 'human:secret',
+  'PUT /api/integrations/telegram/answers': 'human:secret',
+  'POST /api/integrations/telegram/answers/restart': 'human:secret',
   'POST /api/integrations/tms/pull': 'human:outward',
   'POST /api/integrations/tms/push': 'human:outward',
   'POST /api/integrations/webhook/test': 'human:outward',

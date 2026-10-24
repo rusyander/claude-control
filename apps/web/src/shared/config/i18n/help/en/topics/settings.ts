@@ -100,7 +100,9 @@ export const settingsEn: typeof settingsRu = {
     tabModelsText:
       'Default model and effort, auto permission mode and the lean tool set in chats (no ' +
       'Artifact, Workflow or ScheduleWakeup — about 12k tokens at the start of every request), ' +
-      'the model catalog, a custom endpoint and MCP server checks.',
+      'how many minutes an unanswered permission card waits before it becomes a D-n question ' +
+      'under “Awaiting decision” (10 by default, 0 waits as long as needed), how many days a D-n ' +
+      'waits for an answer (7), the model catalog, a custom endpoint and MCP server checks.',
     tabPrompts: 'Prompts',
     tabPromptsText:
       'The texts the panel speaks to the model with, not on your behalf: the tool protocol, ' +
@@ -108,8 +110,9 @@ export const settingsEn: typeof settingsRu = {
     tabGroups: 'Groups',
     tabGroupsText:
       'What a split group decides by itself, how many groups run at once, which project is ' +
-      'heavy, group economy, the group-watch thresholds and the sieves a group passes ' +
-      'before an MR.',
+      'heavy, group economy (under each lever — where it works for each CLI, details in the ' +
+      '“Chat” help), the group-watch thresholds, the sieves a group passes ' +
+      'before an MR, and the verify ledger — how many repeat runs it would have saved.',
     tabGlobalLayer: 'Global layer',
     tabGlobalLayerText:
       'Mechanics living both in the panel and in the config directory hooks: which copy is ' +
@@ -699,19 +702,34 @@ export const settingsEn: typeof settingsRu = {
         'In an empty chat Decky says hello and gives a chat tip. If an agent turn runs ' +
         'longer than 20 seconds, Decky appears next to the timer and once a minute makes a ' +
         'remark: working, long, very long.',
+      react: 'Reactions to events — in the chat above the input',
+      reactText:
+        'Decky answers with one short line when the connection to the panel server is lost or ' +
+        'back, a turn or a split group fails, a group is stopped or delivered, a turn hits the ' +
+        'subscription limit or a turn longer than ten minutes ends. In the chat the line sits ' +
+        'above the input field and covers nothing; on other pages it is a bubble by the ' +
+        'sidebar. With a conversation, “Open the chat” leads into it, for a group — into the ' +
+        'hub. × removes the line early. “Lost” is said only if the connection is not back ' +
+        'within five seconds: a server restart is not announced. Decky learns about groups ' +
+        'while the panel reads their tree — the hub or a group chat is open.',
       settings: 'Settings → General → “Mascot”',
       settingsText:
         '“Show Decky” removes it everywhere: the sidebar, the chat and the error pages. ' +
         '“Remarks and tips” turns off only the tips and the comments on long turns — ' +
-        'messages about questions, errors and finished turns stay. Both settings live in ' +
-        'this browser, not in the Claude Code files. “Hide Decky” in the summary does the ' +
-        'same as the first toggle.',
+        'messages about questions, errors and finished turns stay. “Reactions to events” ' +
+        'turns off the lines about the connection, groups, the limit and long turns; a ' +
+        'failed turn then gets the old single line. All three settings live in this ' +
+        'browser, not in the Claude Code files. “Hide Decky” in the summary does the same ' +
+        'as the first toggle.',
       quietTitle: 'When Decky stays quiet',
       quietText:
         'An unprompted tip comes no sooner than three minutes after the panel opens and no ' +
         'more often than once every nine minutes. And never while someone waits for an ' +
         'answer or something has failed, the summary is open, you are typing or the tab is ' +
-        'hidden. “Reduce motion” stops its animation.',
+        'hidden. Reactions to events — one line per burst of events, no more often than ' +
+        'every six seconds and once a minute for the same event, never the same wording ' +
+        'twice in a row. “Reduce motion” stops its animation, the lines appear without ' +
+        'movement.',
     },
   },
 
@@ -722,7 +740,9 @@ export const settingsEn: typeof settingsRu = {
       '02-panel':
         'The summary on click: the waiting conversation in the list, a tip and “Another tip” below',
       '03-chat': 'An empty chat: Decky says hello and gives a chat tip',
-      '04-settings': 'The “Mascot” card in General: “Show Decky” and “Remarks and tips”',
+      '04-settings':
+        'The “Mascot” card in General: “Show Decky”, “Remarks and tips” and “Reactions to events”',
+      '05-react': 'The chat: the server connection is lost — Decky’s line above the input field',
     },
     'global-layer': {
       '01-verdict':

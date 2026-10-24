@@ -73,6 +73,21 @@ export const cursorProvider: ConfigProvider = {
   },
   // Детект «конфиг найден» (Ф7): каталог ~/.cursor. Только проверка существования.
   configLocations: () => [cursorHome()],
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026): Cursor панель в чате
+  // не запускает (`cliRunnable: false`) — групп на нём нет, и рычагам менять нечего.
+  groupEconomy: {
+    support: {
+      compactWindow: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      bashOutputChars: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      readOutputTokens: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      cacheTtl: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      detachIde: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      sonnetDeliver: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      freshOnColdResume: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      keepWarm: { support: 'meaningless', note: 'economy-note-not-runnable' },
+      workHabits: { support: 'meaningless', note: 'economy-note-not-runnable' },
+    },
+  },
   // У Cursor нет собственного модельного API и запуск ассистента через CLI не
   // поддерживаем → ассистент unsupported (раннер всегда `none`).
   assistant: { apiKind: 'none', apiKeyEnvVars: [], cliRunnable: false },

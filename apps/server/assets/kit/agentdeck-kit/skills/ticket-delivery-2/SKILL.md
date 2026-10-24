@@ -172,7 +172,24 @@ In the user's language, short, per artifacts.md §Final report, the tier named. 
 and everything NOT verified is named with its reason. Self-check first: stages.md §Red flags. After
 it only a reviewer thread or a target conflict reopens the task.
 
+## Notes, not blockers
+
+A LIVE sieve that cannot run here (contract-by-request, browser-focus, boundary-negative,
+migration-safety, branch-backend-stand — no stand, no browser, no network) and a red not caused by
+the branch (red on the target branch too, platform-only, a timeout in code the diff does not touch)
+do not stop the ticket: report them as `not checked: <reason>` / `not caused by the branch: <why>`,
+record a Tests-block case that cannot run as `blocked` with the reason, and name each in the MR
+description. The MR is ready with them. Any other sieve runs locally: `not checked:` does not waive
+it. A split group asks the human ONLY for: a merge; a deletion (any git deletion, or anything
+outside its copy); a force-push beyond the §11 lease; a DB migration, DDL or data write; credentials
+that exist nowhere in the project. The other items below a group resolves itself: a dirty tree →
+finish and commit its own edits first; a result still ambiguous → decide by the plan and name the
+decision in the MR description; the same gate red a third time → the panel's escalation, then stop
+with the reason; a dependency/CI/build change no finding needs → do not make it.
+
 ## Stop and ask — do not improvise
+
+Binding as is outside a split group (solo delivery); a split group follows the paragraph above.
 
 - The ticket is assigned to someone else, or already in progress elsewhere.
 - The working tree is dirty at §2.

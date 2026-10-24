@@ -35,18 +35,30 @@ describe('плашка отложенного перезапуска', () => {
     );
   });
 
-  // D1 (21.10): ходы ждут до предела, плашка заранее называет время и ходы.
-  it('предел ожидания ходов — время и ходы, которых перезапуск не дождётся', () => {
+  // 24.10: живые ходы ждут без предела — плашка называет их, а времени не обещает.
+  it('живые ходы — их имена и никакого времени перезапуска', () => {
+    const html = render({
+      pending: true,
+      waitingFor: 'runs',
+      since: '2026-10-21T10:00:00.000Z',
+      runs: ['feat-export-1a2b3c', 'fix-login-9f8e7d'],
+    });
+    expect(html).toContain('data-dev-restart-runs');
+    expect(html).toContain('feat-export-1a2b3c, fix-login-9f8e7d');
+    expect(html).not.toContain('data-dev-restart-cap');
+  });
+
+  it('нечитаемый журнал ходов — время, когда сервер перезапустится сам', () => {
     const html = render({
       pending: true,
       waitingFor: 'runs',
       since: '2026-10-21T10:00:00.000Z',
       capAt: '2026-10-21T10:30:00.000Z',
-      runs: ['feat-export-1a2b3c', 'fix-login-9f8e7d'],
     });
     expect(html).toContain('data-dev-restart-cap');
-    expect(html).toContain('feat-export-1a2b3c, fix-login-9f8e7d');
+    expect(html).toContain(i18n.t('devRestart.capAt', { time: '' }).split('—')[0]?.trim() ?? '');
     expect(html).toMatch(/\d{1,2}:30/);
+    expect(html).not.toContain('data-dev-restart-runs');
   });
 
   it('без предела строки о нём нет', () => {

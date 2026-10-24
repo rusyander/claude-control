@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   buildTreeResumePrompt,
   type ChatAwaitingView,
@@ -16,7 +17,13 @@ import type {
   TreePauseRecord,
 } from '../../../lib/app-store/app-store.types.ts';
 import { linkIdentity } from '../../../lib/app-store/chat-links.ts';
-import type { ChatRunRegistry, RunMeta } from '../ChatRunRegistry/ChatRunRegistry.ts';
+import type {
+  ChatRunRegistry,
+  RunMeta,
+  RunSnapshot,
+  StopOutcome,
+} from '../ChatRunRegistry/ChatRunRegistry.ts';
+import { withProcessSnapshot } from '../../../lib/process-tree/process-tree.ts';
 import type { RunOptions } from '../ChatRunner/ChatRunner.ts';
 import type { AutoApproveState } from '../ChatSession/ChatSession.ts';
 
@@ -42,9 +49,38 @@ import type { AutoApproveState } from '../ChatSession/ChatSession.ts';
 
 export type TreeStartKind = PendingTreeStart['kind'];
 
+/** Обработчик отложившего — его забота: сбой в нём не останавливает выпуск очереди. */
+function quietly(run: () => void): void {
+  try {
+    run();
+  } catch {
+    // Остальные старты дерева от чужого сбоя не зависят.
+  }
+}
+
+/**
+ * Что отложивший старт хочет сделать, когда «Продолжить всё» его выпустит.
+ * Без этого продолжение группы «по плану» (`group-wait.ts`) выходило из очереди
+ * чужим: слушатель стартов принимал его за слово человека и обнулял счёт
+ * продолжений, а отказ реестра в старте никто не проводил — вопрос группы не
+ * доходил до человека.
+ */
+export interface TreeStartHooks {
+  /** Перед запуском из очереди. */
+  before?(): void;
+  /** После запуска: `started` — реестр принял ход. */
+  after?(started: boolean): void;
+}
+
 /** Воротца перед автостартом: `true` — дерево стоит, старт отложен в очередь. */
 export interface TreeStartGate {
-  defer(kind: TreeStartKind, chatId: string, options: RunOptions, meta: RunMeta): boolean;
+  defer(
+    kind: TreeStartKind,
+    chatId: string,
+    options: RunOptions,
+    meta: RunMeta,
+    hooks?: TreeStartHooks,
+  ): boolean;
   /** Стоит ли дерево чата — старт, отложенный до готового задания, ляжет в очередь. */
   paused?(chatId: string): boolean;
 }
@@ -80,6 +116,26 @@ export interface TreePauseDeps {
    * вопросов и запросов прав. Нет — узлы без них, как раньше.
    */
   asksOf?: (keys: readonly string[]) => ChatTreeAsk[];
+  /**
+   * Группа разделения между ходами с идущим фоном (23.10, N1a): хода нет, и
+   * остановка прогонов её не видит, а конец фона будил CLI в стоящем дереве.
+   * `snapshot` — чем её продолжить, `close` — погасить процесс. Нет — как раньше.
+   */
+  idle?: {
+    snapshot(chatId: string): RunSnapshot | undefined;
+    close(chatId: string): StopOutcome;
+  };
+  /** После паузы — по ключам снятых разговоров (добор процессов копий групп). */
+  afterPause?: (keys: readonly string[]) => void;
+  /**
+   * Мост прав к ЭТОЙ панели для разговора `runId`. Сохранённые параметры
+   * несут мост той жизни, в которой их сняли: у сессии, подхваченной из
+   * журнала после перезапуска, адрес пуст (ключ ход берёт из файла), и
+   * продолжение с ним отказывало каждому запросу прав «no connection to the
+   * AgentDeck panel». Поэтому мост собирается заново при каждом запуске из
+   * записи — как у продолжения в чистой сессии. Нет — параметры как сохранены.
+   */
+  bridge?: (runId: string) => NonNullable<RunOptions['permissionPrompt']>;
   now?: () => Date;
 }
 
@@ -146,6 +202,12 @@ export function pausedChatIds(
 
 export class TreePause implements TreeStartGate {
   private readonly deps: TreePauseDeps;
+  /**
+   * Обработчики отложенных стартов — только в памяти: это замыкания. Ключ —
+   * случайный, а не счётчик: очередь в хранилище переживает перезапуск, и
+   * номер старой жизни совпал бы с номером новой — сработал бы чужой обработчик.
+   */
+  private readonly hooks = new Map<string, TreeStartHooks>();
 
   constructor(deps: TreePauseDeps) {
     this.deps = deps;
@@ -153,6 +215,19 @@ export class TreePause implements TreeStartGate {
 
   private now(): string {
     return (this.deps.now?.() ?? new Date()).toISOString();
+  }
+
+  /** Всё, чем перезапустить разговор: параметры, сессия, права. */
+  private snapshotOf(run: RunSnapshot): PausedTreeChat {
+    const autoApprove = this.deps.autoApprove?.snapshot(run.key);
+    return {
+      cwd: run.options.cwd,
+      ...(run.sessionId ? { sessionId: run.sessionId } : {}),
+      options: withoutRoute(run.options) as unknown as Record<string, unknown>,
+      meta: run.meta as unknown as Record<string, unknown>,
+      ...(autoApprove ? { autoApprove: { ...autoApprove } } : {}),
+      pausedAt: this.now(),
+    };
   }
 
   /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке чатов. */
@@ -210,33 +285,60 @@ export class TreePause implements TreeStartGate {
     let stopped = 0;
     let unconfirmed = 0;
     const seen = new Set<string>();
-    for (const key of [root, ...collectTree(links, root)]) {
-      const run = this.deps.runs.describe(key);
-      if (!run || seen.has(run.key) || run.status !== 'running') continue;
-      seen.add(run.key);
-      const autoApprove = this.deps.autoApprove?.snapshot(run.key);
-      const snapshot: PausedTreeChat = {
-        cwd: run.options.cwd,
-        ...(run.sessionId ? { sessionId: run.sessionId } : {}),
-        options: withoutRoute(run.options) as unknown as Record<string, unknown>,
-        meta: run.meta as unknown as Record<string, unknown>,
-        ...(autoApprove ? { autoApprove: { ...autoApprove } } : {}),
-        pausedAt: this.now(),
-      };
-      // Остановка — ПОСЛЕ снимка: реестр забывает прогон сразу.
-      if (this.deps.runs.stop(run.key) === 'unconfirmed') {
-        // Процесс жив и не снят — номер нечем проверить (F-145). В запись паузы
-        // его не кладём: «Продолжить» подняло бы по нему вторую копию той же
-        // сессии рядом с живой. Прогон доходит свой ход; следующие старты дерева
-        // пауза всё равно откладывает, а человек узнаёт число из ответа.
+    const halted: string[] = [];
+    const keys = [root, ...collectTree(links, root)];
+    /**
+     * Снимок — до остановки: реестр забывает прогон сразу. Процесс жив и не снят
+     * — номер нечем проверить (F-145). В запись паузы его не кладём: «Продолжить»
+     * подняло бы по нему вторую копию той же сессии рядом с живой. Прогон доходит
+     * свой ход; следующие старты дерева пауза всё равно откладывает, а человек
+     * узнаёт число из ответа.
+     */
+    const hold = (run: RunSnapshot, stop: () => StopOutcome): void => {
+      const snapshot = this.snapshotOf(run);
+      if (stop() === 'unconfirmed') {
         unconfirmed += 1;
-        continue;
+        return;
       }
       record.chats[run.key] = snapshot;
+      halted.push(run.key);
       stopped += 1;
-    }
+    };
+    // Один снимок процессов на всё дерево: N сессий × ~0,8 с снимка Windows.
+    withProcessSnapshot(() => {
+      for (const key of keys) {
+        const run = this.deps.runs.describe(key);
+        if (!run || seen.has(run.key) || run.status !== 'running') continue;
+        seen.add(run.key);
+        hold(run, () => this.deps.runs.stop(run.key));
+      }
+      // Группы разделения между ходами — как пауза одной группы (N1a, 23.10):
+      // процесс с фоном гасится сразу, а «Продолжить всё» продолжает его той же
+      // сессией. Прочие разговоры дерева без хода сами не просыпаются.
+      const idle = this.deps.idle;
+      if (!idle) return;
+      for (const key of keys) {
+        if (links[key]?.groupIndex === undefined) continue;
+        const run = idle.snapshot(key);
+        if (!run || seen.has(run.key) || record.chats[run.key]) continue;
+        seen.add(run.key);
+        hold(run, () => idle.close(key));
+      }
+    });
 
     this.deps.store.set(record);
+    // Добор — по снятым И по всем группам дерева (F-106): группа между ходами без фона
+    // процесса не держит, но её копия может держать оставленный сервер или наблюдатель.
+    const sweep = [
+      ...new Set([...halted, ...keys.filter((key) => links[key]?.groupIndex !== undefined)]),
+    ];
+    if (sweep.length > 0) {
+      try {
+        this.deps.afterPause?.(sweep);
+      } catch {
+        // Добор после паузы — страховка: ответ человеку от него не зависит.
+      }
+    }
     return {
       root,
       stopped,
@@ -268,6 +370,7 @@ export class TreePause implements TreeStartGate {
         ? { ...saved, sessionId, prompt: buildTreeResumePrompt() }
         : { ...saved };
       delete options.fork;
+      this.liveBridge(options, key);
       const meta: RunMeta = {
         ...(chat.meta as unknown as RunMeta),
         ...(sessionId ? { sessionId } : {}),
@@ -278,33 +381,53 @@ export class TreePause implements TreeStartGate {
 
     let flushed = 0;
     for (const pending of record.pendingStarts) {
-      if (
-        this.deps.runs.start(
-          pending.chatId,
-          pending.options as unknown as RunOptions,
-          pending.meta as unknown as RunMeta,
-        )
-      ) {
-        flushed += 1;
+      const options = { ...(pending.options as unknown as RunOptions) };
+      // Очередь переживает перезапуск в хранилище — мост в ней той жизни.
+      this.liveBridge(options, options.permissionPrompt?.runId ?? pending.chatId);
+      const hooks = pending.hook ? this.hooks.get(pending.hook) : undefined;
+      if (pending.hook) this.hooks.delete(pending.hook);
+      quietly(() => hooks?.before?.());
+      let started = false;
+      try {
+        started = this.deps.runs.start(pending.chatId, options, pending.meta as unknown as RunMeta);
+      } finally {
+        quietly(() => hooks?.after?.(started));
       }
+      if (started) flushed += 1;
     }
     return { root, wasPaused: true, resumed, flushed };
+  }
+
+  /** Мост прав — к этой панели; запуск без моста (CLI без панели) остаётся без него. */
+  private liveBridge(options: RunOptions, runId: string): void {
+    if (options.permissionPrompt && this.deps.bridge) {
+      options.permissionPrompt = this.deps.bridge(runId);
+    }
   }
 
   paused(chatId: string): boolean {
     return Boolean(this.deps.store.get(rootOf(this.deps.links(), chatId)));
   }
 
-  defer(kind: TreeStartKind, chatId: string, options: RunOptions, meta: RunMeta): boolean {
+  defer(
+    kind: TreeStartKind,
+    chatId: string,
+    options: RunOptions,
+    meta: RunMeta,
+    hooks?: TreeStartHooks,
+  ): boolean {
     const root = rootOf(this.deps.links(), chatId);
     const record = this.deps.store.get(root);
     if (!record) return false;
+    const hook = hooks ? randomUUID() : undefined;
+    if (hook && hooks) this.hooks.set(hook, hooks);
     record.pendingStarts.push({
       kind,
       chatId,
       options: withoutRoute(options) as unknown as Record<string, unknown>,
       meta: meta as unknown as Record<string, unknown>,
       at: this.now(),
+      ...(hook ? { hook } : {}),
     });
     this.deps.store.set(record);
     return true;

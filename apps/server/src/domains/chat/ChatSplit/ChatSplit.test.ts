@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@agentdeck/contracts/task-split';
 import {
   OWNER_PRECEDENCE_LINE,
+  OWNER_PRECEDENCE_PLAIN_LINE,
   OWNER_TEXT_MAX,
   SKILL_ROUTE_LINE,
 } from '@agentdeck/contracts/quality-floor';
@@ -112,14 +113,46 @@ describe('блок предложения в ответе агента', () => {
     );
 
     expect(prompt).toBe(
-      `Общее\n\n1. убрать лишний отступ\n2. выровнять\n\n${SKILL_ROUTE_LINE}\n\n${OWNER_PRECEDENCE_LINE}`,
+      `Общее\n\n1. убрать лишний отступ\n2. выровнять\n\n${SKILL_ROUTE_LINE}\n\n${OWNER_PRECEDENCE_PLAIN_LINE}`,
     );
   });
 
   it('единственную задачу не нумерует: это готовое задание, а не список', () => {
     const prompt = buildGroupPrompt({ title: 'Раз', branch: 'a', tasks: ['Сделай папку A'] });
 
-    expect(prompt).toBe(`Сделай папку A\n\n${SKILL_ROUTE_LINE}\n\n${OWNER_PRECEDENCE_LINE}`);
+    expect(prompt).toBe(`Сделай папку A\n\n${SKILL_ROUTE_LINE}\n\n${OWNER_PRECEDENCE_PLAIN_LINE}`);
+  });
+
+  /**
+   * RF-BGCD-06: группа, запущенная без доставки, получала обещание «правило о
+   * полном прогоне выполнит доставка» — звена доставки за ней нет, и полный
+   * прогон не делал никто. С доставкой обещание остаётся: звено его и выполняет.
+   */
+  it('строка старшинства группы — по наличию звена доставки за ней', async () => {
+    const SCHEDULE = 'a rule asking for them is met by that run';
+    const run = async (options: { deliver?: boolean }) => {
+      const prompts: string[] = [];
+      await splitTasks({
+        projectPath: '/repo',
+        proposal: PROPOSAL,
+        startRuns: true,
+        git: fakeGit(),
+        ...options,
+        start: ({ prompt }) => {
+          prompts.push(prompt);
+          return true;
+        },
+      });
+      return prompts;
+    };
+    const plain = await run({});
+    expect(plain.length).toBeGreaterThan(0);
+    for (const prompt of plain) {
+      expect(prompt).toContain(OWNER_PRECEDENCE_PLAIN_LINE);
+      expect(prompt).not.toContain(SCHEDULE);
+    }
+    const delivered = await run({ deliver: true });
+    for (const prompt of delivered) expect(prompt).toContain(OWNER_PRECEDENCE_LINE);
   });
 });
 
@@ -504,7 +537,7 @@ describe('разделение задач по чатам', () => {
    * знаков на шестерых). Доставляющая группа получает команду пакета ревью —
    * настоящий скрипт панели по абсолютному пути — и правила чтения для ревьюеров.
    */
-  it('пакет ревью и правила чтения ревьюеров — в задании доставляющей группы', async () => {
+  it('пакет ревью — не в задании работы доставляющей группы: ревью ведёт своё звено', async () => {
     const run = async (options: { deliver?: boolean }) => {
       const prompts: string[] = [];
       await splitTasks({
@@ -520,11 +553,11 @@ describe('разделение задач по чатам', () => {
       });
       return prompts[0] ?? '';
     };
+    // Владелец 23.10: работа доставляющей группы своего ревью не ведёт — пакет
+    // едет ревьюерам звена ревью (`reviewStagePrompt`, ChatCascadeStages).
     const delivered = await run({ deliver: true });
-    const command = /`node "([^"]+review-pack\.mjs)" --plan /.exec(delivered);
-    expect(command?.[1] && existsSync(command[1])).toBe(true);
-    expect(delivered).toContain('instead of running git diff or git show');
-    expect(delivered).toContain('with its count and depth unchanged');
+    expect(delivered).not.toContain('review-pack.mjs');
+    expect(delivered).toContain('no full project gate, no push, no MR and no review pass');
     expect(await run({})).not.toContain('review-pack.mjs');
   });
 
@@ -952,6 +985,70 @@ describe('порция групп для конвейера уровней', () 
     expect(result.chats.map((chat) => [chat.index, chat.chatId])).toEqual([[1, 'new-1000-1']]);
     expect(linked).toEqual([{ stage: 'plan', index: 1, base: 'feature/login' }]);
     expect(started).toEqual([{ stage: 'plan', index: 1, predecessors: 1 }]);
+  });
+
+  it('группа без предшественников отводится от основной ветки проекта, а не от HEAD папки', async () => {
+    const bases: (string | undefined)[] = [];
+    let asked = 0;
+    const git = fakeGit({
+      defaultBase: async () => {
+        asked += 1;
+        return 'origin/main';
+      },
+      addWorktree: async (_dir, branch, base) => {
+        bases.push(base);
+        return { path: `/copies/${branch.replace(/\//g, '-')}` };
+      },
+    });
+
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: false,
+      git,
+      start: () => true,
+    });
+
+    expect(result.chats.length).toBeGreaterThan(1);
+    expect(bases).toEqual(result.chats.map(() => 'origin/main'));
+    // Основа узнаётся один раз на запуск — там `fetch`, а не по разу на группу.
+    expect(asked).toBe(1);
+  });
+
+  it('ветка предшественника важнее основной; сбой основы — копия всё равно от HEAD', async () => {
+    const bases: (string | undefined)[] = [];
+    const record = async (_dir: string, branch: string, base?: string) => {
+      bases.push(base);
+      return { path: `/copies/${branch.replace(/\//g, '-')}` };
+    };
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: false,
+      git: fakeGit({ defaultBase: async () => 'origin/main', addWorktree: record }),
+      groups: [1],
+      context: { base: 'feature/login' },
+      start: () => true,
+    });
+    expect(bases).toEqual(['feature/login']);
+
+    bases.length = 0;
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      git: fakeGit({
+        defaultBase: async () => {
+          throw new Error('fetch упал');
+        },
+        addWorktree: record,
+      }),
+      startRuns: false,
+      groups: [1],
+      start: () => true,
+    });
+    expect(bases).toEqual([undefined]);
+    expect(result.failures).toEqual([]);
   });
 
   it('сбой копии в порции называет позицию группы', async () => {

@@ -4,8 +4,10 @@
  * скриптом с `GUIDE_THEME=dark`.
  *
  * СТЕНД ОДНОРАЗОВЫЙ (`tools/qa/throwaway-stand.mjs`): разговор засеян
- * транскриптом. Подменён ОДИН ответ — `GET /api/chat/awaiting`: без живого
- * агента иначе не сделать разговор ждущим (так же, как `tools/qa/check-mascot.mjs`).
+ * транскриптом. Подменены два ответа — `GET /api/chat/awaiting`: без живого
+ * агента иначе не сделать разговор ждущим (так же, как `tools/qa/check-mascot.mjs`);
+ * и поток `/api/events` в кадре 05 — ответ 502, как от прокси при лежащем
+ * сервере: иначе пропажу связи не показать, не роняя сам стенд.
  *
  * Запуск: node tools/help-shots/settings-mascot.mjs
  *         GUIDE_THEME=dark node tools/help-shots/settings-mascot.mjs
@@ -67,6 +69,10 @@ async function shoot(browser, scenario, lang) {
   });
   const page = await context.newPage();
   let asking = false;
+  let eventsDown = false;
+  await page.route('**/api/events', (route) =>
+    eventsDown ? route.fulfill({ status: 502, body: 'Bad Gateway' }) : route.continue(),
+  );
   await page.route('**/api/chat/awaiting', (route) =>
     route.fulfill({
       json: {
@@ -113,6 +119,24 @@ async function shoot(browser, scenario, lang) {
     await page.waitForSelector(CARD);
     await wait(1_000);
     await shotCard(scenario, page, '04-settings', CARD);
+
+    // ── 05. Реакция в чате: связь с сервером пропала — строка над полем ввода ─
+    await page.goto(`${stand.webUrl}/chat`, { waitUntil: 'domcontentloaded' });
+    // Пустое место высоты не занимает — ждём, что оно есть, а не что видно.
+    await page.waitForSelector('[data-mascot-speech-slot]', { state: 'attached', timeout: 15_000 });
+    await wait(1_500);
+    if ((await page.getByRole('dialog').count()) > 0) {
+      await page.keyboard.press('Escape');
+      await page.getByRole('dialog').first().waitFor({ state: 'detached', timeout: 3_000 });
+    }
+    eventsDown = true;
+    // Переподключение потока — уже в 502; «пропала» звучит через срок ожидания.
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForSelector('[data-mascot-reaction="linkLost"]', { timeout: 15_000 });
+    await page.mouse.move(700, 300);
+    await wait(700);
+    await shotCard(scenario, page, '05-react', '[data-mascot-speech-slot]', 28);
+    eventsDown = false;
   } finally {
     await context.close();
   }

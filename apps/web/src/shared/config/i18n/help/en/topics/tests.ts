@@ -623,7 +623,8 @@ export const testsEn: typeof testsRu = {
     agentGateText:
       'A line is not enough: the agent can forget it. So at the end of every turn the panel ' +
       'checks it against the set — code changed but a changed file has no case or its case ' +
-      'was not run after the change; a case written whose expected names nothing — and hands ' +
+      'was not run after a change to the files it covers (a commit that leaves them alone ' +
+      'keeps the run fresh); a case written whose expected names nothing — and hands ' +
       'the agent a short list of gaps ' +
       'with exact commands; no gaps — not a word and not a single extra token. Unrun cases ' +
       'are named one by one (run --case), not as their whole group: a group may hold long ' +
@@ -633,7 +634,9 @@ export const testsEn: typeof testsRu = {
       'automated cases at the end of each turn: it runs them once before "delivered", while ' +
       'a case for the change, a recorded manual check and a red result still hold its turn; ' +
       'when the turn is held anyway, the gaps add the exact run --case command for its ' +
-      'automated cases — checking earlier needs no hunt for the syntax. A request to add a ' +
+      'automated cases — checking earlier needs no hunt for the syntax. A red run of the ' +
+      'turn is cleared only by an executed green one: a “passed” recorded by word after it ' +
+      'does not turn the case green. A request to add a ' +
       'case also names how to link an existing test: testName is the full path "outer ' +
       'describe > … > it", and a describe path covers every test under it. A shot or ' +
       'probe script (shots, screenshot, snapshot, probe, repro in its name) in the root or ' +
@@ -1470,7 +1473,12 @@ export const testsEn: typeof testsRu = {
         '--memo answers a green run of the same command on an unchanged tree from memory ' +
         '(a panel group gets this by default), --fresh runs anyway. An answer from memory ' +
         'goes into the history as its own "from memory" record pointing at the real run; ' +
-        'files git ignores are invisible to the memory.',
+        'files git ignores are invisible to the memory. run waits no longer than a cap: 10 ' +
+        'minutes per case (per case file), times the number of files. Change it with ' +
+        '--case-timeout <min> or the AGENTDECK_TESTS_CASE_TIMEOUT variable; the command’s own ' +
+        'timeoutMinutes wins when it is shorter. Past the cap, the run is stopped together with ' +
+        'every process under it, and its cases are recorded in history as failed with the ' +
+        'reason "Time limit", exit code 124.',
       limitsTitle: 'What the sync cannot do',
       limitsText:
         'Parsing is textual, not a run: a test whose name is built from variables (a template ' +

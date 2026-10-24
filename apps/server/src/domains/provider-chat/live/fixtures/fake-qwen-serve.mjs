@@ -15,7 +15,8 @@
 // С FAKE_STORE сессии живут на «диске» (`fake-session-store.mjs`): `POST
 // /session/:id/resume` поднимает записанную, и поток событий такой сессии сперва
 // проигрывает события её прежних ходов (с их promptId) — ответом хода они не
-// являются. `DELETE /session/:id` закрывает, `POST /sessions/delete` стирает.
+// являются. `DELETE /session/:id` закрывает, `POST /sessions/archive` убирает из
+// живых (журнал `archive <id>`), `POST /sessions/delete` стирает (`erase <id>`).
 import { createServer } from 'node:http';
 import { change, load, nextId, persistent, remove } from './fake-session-store.mjs';
 import process from 'node:process';
@@ -93,10 +94,16 @@ createServer(async (req, res) => {
     res.writeHead(204);
     return res.end();
   }
-  if (req.method === 'POST' && url === '/sessions/delete') {
+  if (req.method === 'POST' && (url === '/sessions/delete' || url === '/sessions/archive')) {
     const { sessionIds } = await body(req);
-    for (const id of sessionIds) remove(id);
-    return reply(res, 200, { removed: sessionIds, errors: [] });
+    const verb = url === '/sessions/archive' ? 'archive' : 'erase';
+    for (const id of sessionIds) {
+      change((state) => state.log.push(`${verb} ${id}`));
+      remove(id);
+    }
+    return verb === 'archive'
+      ? reply(res, 200, { archived: sessionIds, notFound: [], errors: [] })
+      : reply(res, 200, { removed: sessionIds, errors: [] });
   }
   if (url === '/workspace/mcp') {
     return reply(res, 200, { discoveryState: mcpReady ? 'completed' : 'in_progress' });

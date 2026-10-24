@@ -87,3 +87,67 @@
     transform: none;
   }
 }
+
+// Реплика в потоке страницы (чат — над полем ввода): на всю ширину колонки,
+// без тени и хвостика — она часть ленты, а не всплывающее облачко. Лицо Деки
+// слева говорит, чья это фраза.
+.inline {
+  position: static;
+  z-index: auto;
+  align-items: center;
+  width: 100%;
+  max-width: none;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  box-shadow: none;
+  animation-name: bubble-rise;
+  transform-origin: 50% 100%;
+
+  &::before {
+    display: none;
+  }
+
+  .text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .dismiss {
+    order: 0;
+  }
+}
+
+.face {
+  display: inline-flex;
+  flex: none;
+}
+
+@keyframes bubble-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// Меньше движения — реплика просто появляется: и по системной настройке, и по
+// переключателю панели (`data-reduce-motion` на <html>).
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+  }
+}
+
+:global(:root[data-reduce-motion='true']) .bubble {
+  animation: none;
+}

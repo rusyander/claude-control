@@ -10,7 +10,7 @@ import type { AttentionTone } from './attention.types';
 
 const BASE_ART =
   '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
-  '<stop offset="0" stop-color="#7c78ff"/><stop offset="1" stop-color="#4338ca"/>' +
+  '<stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/>' +
   '</linearGradient></defs>' +
   '<rect width="32" height="32" rx="8" fill="url(#g)"/>' +
   '<circle cx="16" cy="16" r="8.6" fill="none" stroke="#ffffff" stroke-width="2.8" ' +

@@ -13,6 +13,7 @@ import {
   type CascadePlan,
 } from '@agentdeck/contracts/model-cascade';
 import { groupEconomyWithDefaults } from '@agentdeck/contracts/group-economy';
+import { routedDeliverModel } from '@agentdeck/contracts/platform-models';
 import { usePlatformRunPlan } from '@entities/Platform';
 import { useSettings } from '@entities/AppConfig';
 import { Stack } from '@shared/ui/stack';
@@ -94,6 +95,9 @@ export function TaskSplitCard({
   // сервер. Без подбора модели выбора нет — и спрашивать план незачем.
   const runPlan = usePlatformRunPlan(hasCascade ? 'groups' : '');
   const routed = runPlan.data?.routed === true ? runPlan.data : undefined;
+  // Через контур «Доставка на Sonnet» идёт строкой карты «sonnet» (n6): есть
+  // строка — переключатель есть и называет модель, на которую уедет доставка.
+  const routedDeliver = routed ? routedDeliverModel(routed.rules) : undefined;
 
   // Чем пойдёт каждая группа. Класс распознаётся подбором один раз и переживает
   // ручную замену: по нему группа подписана, и менять модель — не значит менять
@@ -284,11 +288,19 @@ export function TaskSplitCard({
                     </Typography>
                   )}
                   {/* Доставку заводит только конвейер — у «только завести чаты» её
-                      нет; через контур модель решает маршрут, и рычаг не действует. */}
-                  {!createOnly && !routed && (
+                      нет; через контур без строки карты «sonnet» модель решает
+                      маршрут, и рычаг не действует. */}
+                  {!createOnly && (!routed || routedDeliver) && (
                     <span
                       className={styles.deliver}
-                      title={t('chat.split.cascade.sonnetDeliverHint')}
+                      title={
+                        routed && routedDeliver
+                          ? t('chat.split.cascade.sonnetDeliverHintRouted', {
+                              title: routed.title,
+                              model: routedDeliver,
+                            })
+                          : t('chat.split.cascade.sonnetDeliverHint')
+                      }
                       data-sonnet-deliver={index}
                     >
                       <Toggle
@@ -302,7 +314,9 @@ export function TaskSplitCard({
                           title: group.title,
                         })}
                       />
-                      {t('chat.split.cascade.sonnetDeliver')}
+                      {routedDeliver
+                        ? t('chat.split.cascade.sonnetDeliverRouted', { model: routedDeliver })
+                        : t('chat.split.cascade.sonnetDeliver')}
                     </span>
                   )}
                 </Stack>

@@ -68,7 +68,10 @@ export const kitEn: typeof kitRu = {
       'and MR delivery rely on.',
     modeOurs: 'Panel kit only',
     modeOursText:
-      'Only the kit: personal settings, rules and hooks are not loaded. The account login stays — it does not live in settings.',
+      'Only the kit: personal settings, rules and hooks are not loaded. The account login stays — it does not live in settings. ' +
+      'The kit sets the window caps itself: a command answer in the conversation is up to 8000 characters (longer — the ' +
+      'head and a path to the file with the full output), one file read is up to 10,000 tokens. A split-group stage ' +
+      'gets the kit rules as a short card with the path to the full text — after every compaction too.',
 
     cliTitle: 'Which CLI supports what',
     cliCaption:

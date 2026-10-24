@@ -1,7 +1,12 @@
 import { renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { groupEconomyChanges, groupEconomyWithDefaults } from '@agentdeck/contracts/group-economy';
-import { groupWatchChanges, groupWatchWithDefaults } from '@agentdeck/contracts/group-watch';
+import {
+  groupSignalsOf,
+  groupWatchChanges,
+  groupWatchWithDefaults,
+  type GroupWatchRecord,
+} from '@agentdeck/contracts/group-watch';
 import { migrateLegacyPlatforms } from '@agentdeck/contracts/platform-legacy';
 import {
   migrateLegacyIntegrations,
@@ -29,7 +34,11 @@ export function stateFilePath(appDataDir: string): string {
  * (песочницы, смена целевого каталога через claudeDirOverride).
  */
 export function mergeState(input: Partial<AppState>): AppState {
-  const loaded = withCurrentIntegrations(withCurrentPlatformDrivers(input).state).state;
+  const loaded = withWatchSlice(
+    withGroupSignalSubscription(
+      withCurrentIntegrations(withCurrentPlatformDrivers(input).state).state,
+    ),
+  );
   const base = structuredClone(DEFAULT_STATE);
   return {
     ...base,
@@ -75,6 +84,76 @@ export function mergeState(input: Partial<AppState>): AppState {
       groupWatch: groupWatchWithDefaults(loaded.settings?.groupWatch),
     },
   };
+}
+
+/** Отметка разовой переделки подписки Telegram на сигналы сторожа групп. */
+export const GROUP_SIGNAL_TELEGRAM_MIGRATION = 'group-signal-telegram';
+
+/**
+ * Сигналы сторожа групп в Telegram прежде включал свой выключатель
+ * `groupWatch.telegram` (по умолчанию включён); теперь — событие `groupSignal`
+ * в списке событий Telegram (F-37). Сохранённый список событий перекрывает
+ * умолчания, а выключатель загрузка отбрасывает — без переноса тот, кто получал
+ * сигналы, молча перестал бы их получать. Переносим согласие один раз: блок
+ * сторожа на диске есть и выключатель не выключен — `groupSignal` в список
+ * Telegram. Вебхук не трогаем: сигналов он прежде не получал, согласия не было.
+ * Отметка ставится и когда переносить нечего: иначе снятая потом галочка
+ * возвращалась бы на каждом старте — блок без выключателя выглядит так же.
+ */
+export function withGroupSignalSubscription(loaded: Partial<AppState>): Partial<AppState> {
+  const done = Array.isArray(loaded.doneMigrations) ? loaded.doneMigrations : [];
+  if (done.includes(GROUP_SIGNAL_TELEGRAM_MIGRATION)) return loaded;
+  const marked = { ...loaded, doneMigrations: [...done, GROUP_SIGNAL_TELEGRAM_MIGRATION] };
+  const settings = loaded.settings;
+  const watch: unknown = settings?.groupWatch;
+  if (!settings || typeof watch !== 'object' || watch === null) return marked;
+  if ((watch as { telegram?: unknown }).telegram === false) return marked;
+  const telegram = settings.integrations?.telegram;
+  if (!telegram || !Array.isArray(telegram.events)) return marked;
+  if (telegram.events.includes('groupSignal')) return marked;
+  return {
+    ...marked,
+    settings: {
+      ...settings,
+      integrations: {
+        ...settings.integrations,
+        telegram: { ...telegram, events: [...telegram.events, 'groupSignal'] },
+      },
+    },
+  };
+}
+
+/**
+ * Сигналы сторожа из записей разделения (прежнее место, поле `watch` группы) —
+ * в свой срез `groupWatchSignals` (F-42). Срез уже знает группу — его и держим:
+ * он пишется только сторожем. Повторная загрузка ничего не находит.
+ */
+export function withWatchSlice(loaded: Partial<AppState>): Partial<AppState> {
+  const plans = loaded.splitPlans;
+  if (!plans || typeof plans !== 'object') return loaded;
+  const legacy = Object.entries(plans).filter(
+    ([, record]) =>
+      Array.isArray(record?.groups) && record.groups.some((group) => group?.watch !== undefined),
+  );
+  if (legacy.length === 0) return loaded;
+  const slice: Record<string, Record<string, GroupWatchRecord>> = {};
+  for (const [parent, groups] of Object.entries(loaded.groupWatchSignals ?? {})) {
+    slice[parent] = { ...groups };
+  }
+  const splitPlans = { ...plans };
+  for (const [parent, record] of legacy) {
+    const own = { ...slice[parent] };
+    const groups = record.groups.map((group) => {
+      if (group?.watch === undefined) return group;
+      const { watch, ...rest } = group;
+      const signals = groupSignalsOf(watch);
+      if (signals.length > 0 && !own[String(group.index)]) own[String(group.index)] = { signals };
+      return rest;
+    });
+    if (Object.keys(own).length > 0) slice[parent] = own;
+    splitPlans[parent] = { ...record, groups };
+  }
+  return { ...loaded, splitPlans, groupWatchSignals: slice };
 }
 
 /**

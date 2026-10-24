@@ -201,6 +201,33 @@ describe('ворота ветки: основная копия и копия', (
       expect(intoMain('Bash', { command: `cat ${join(main, 'a.txt')}` })).toBeUndefined();
     });
 
+    // R-C05 (ревью корпуса 23.10): запись кодом интерпретатора и скачиванием в
+    // основную копию проходила сама — `SHELL_WRITE` таких записей не видит.
+    it('оболочка: запись кодом и скачиванием в основную копию поймана', () => {
+      const real = slashed(realpathSync.native(main));
+      for (const command of [
+        `cd ${real} && node -e "require('fs').writeFileSync('e2e/bl/x.mjs','y')"`,
+        `node -e "require('fs').appendFileSync('${real}/notes.md','y')"`,
+        `cd ${real} && python -c "open('x.txt', 'w').write('y')"`,
+        `cd ${real} && curl -sS -o e2e/x.json https://example.com/x`,
+        `wget -q -O ${real}/x.json https://example.com/x`,
+      ]) {
+        expect(`${command} → ${intoMain('Bash', { command }) !== undefined}`).toBe(
+          `${command} → true`,
+        );
+      }
+      for (const command of [
+        `cd ${real} && node -e "console.log(require('fs').readFileSync('a.txt','utf8'))"`,
+        `cd ${real} && curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/`,
+        `node -e "require('fs').writeFileSync('${slashed(copy)}/x.txt','y')"`,
+        `curl -sS -o x.json https://example.com/x`,
+      ]) {
+        expect(`${command} → ${intoMain('Bash', { command }) !== undefined}`).toBe(
+          `${command} → false`,
+        );
+      }
+    });
+
     it('прогон в основной копии — решают прежние ворота, не эта проверка', () => {
       expect(intoMain('Write', { file_path: join(main, 'a.txt') }, main)).toBeUndefined();
     });

@@ -14,6 +14,9 @@ import { createTreeRuns } from '../tree-runs/tree-runs.ts';
 import { ChatRunRegistry, type RunLike } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
 import { chainOutcomeOf } from '../chain-outcome/chain-outcome.ts';
+import type { RunFinished } from '../ChatRunRegistry/ChatRunRegistry.ts';
+import type { RunLedgerEntry } from '../run-ledger/run-ledger.ts';
+import { ledgerRunOptions } from '../run-reattach.ts';
 import {
   MAX_ATTEMPTS,
   RETRY_DELAYS_MS,
@@ -300,5 +303,66 @@ describe('надзор повторов у чужого CLI (Д10)', () => {
     plan.runs[0]!.emit!({ type: 'error', error: 'fetch failed', reason: 'cli_error' });
     await flush();
     expect(plan.timers).toEqual([]);
+  });
+});
+
+describe('повтор подхваченного прогона: мост прав — к этой панели (как F-45)', () => {
+  // После перезапуска панели параметры прогона собраны из журнала (`ledgerRunOptions`):
+  // адреса моста там нет (`baseUrl: ''`) — повтор с ними отказывал бы каждому вызову.
+  const reattached = (): RunFinished => ({
+    chatId: 'child',
+    sessionId: 'sess-1',
+    text: '',
+    ok: false,
+    error: 'fetch failed',
+    startedAt: NOW,
+    contextTokens: 0,
+    options: ledgerRunOptions({
+      key: 'child',
+      cwd: '/w',
+      relay: { runIdFile: '/w/run-id' },
+    } as unknown as RunLedgerEntry),
+  });
+
+  function harness(bridge?: (runId: string) => NonNullable<RunOptions['permissionPrompt']>) {
+    const started: RunOptions[] = [];
+    const timers: (() => void)[] = [];
+    const retry = new RunRetry({
+      start: (_chatId, options) => {
+        started.push(options);
+        return true;
+      },
+      schedule: (run) => timers.push(run),
+      cancel: () => undefined,
+      now: () => NOW,
+      log: () => undefined,
+      ...(bridge ? { bridge } : {}),
+    });
+    return { retry, started, timers };
+  }
+
+  it('пустой адрес моста заменяется своим, под ключом разговора', () => {
+    const { retry, started, timers } = harness((runId) => ({
+      runId,
+      baseUrl: 'http://127.0.0.1:5178',
+      tokenFile: '/t/api-token',
+    }));
+    expect(retry.finished(reattached())).toMatchObject({ retrying: true, attempt: 1 });
+    timers[0]!();
+    expect(started[0]?.permissionPrompt).toEqual({
+      runId: 'child',
+      baseUrl: 'http://127.0.0.1:5178',
+      tokenFile: '/t/api-token',
+    });
+    expect(started[0]?.sessionId).toBe('sess-1');
+  });
+
+  it('прогон без моста прав моста и не получает', () => {
+    const { retry, started, timers } = harness((runId) => ({ runId, baseUrl: 'http://x' }));
+    const finished = reattached();
+    delete finished.options.permissionPrompt;
+    retry.finished(finished);
+    timers[0]!();
+    expect(started[0]?.permissionPrompt).toBeUndefined();
   });
 });

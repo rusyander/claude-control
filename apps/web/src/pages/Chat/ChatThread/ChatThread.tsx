@@ -28,6 +28,7 @@ export function ChatThread({
   localRun,
   chatId,
   permissions,
+  deferredPermissions,
   branchGates,
   queued,
   onCancelQueued,
@@ -88,6 +89,7 @@ export function ChatThread({
       runStartedAt={runStartedAt}
       localRun={localRun}
       permissions={permissions}
+      {...(deferredPermissions?.length ? { deferredPermissions } : {})}
       branchGates={branchGates}
       queued={queued}
       onCancelQueued={onCancelQueued}
@@ -158,6 +160,7 @@ export function ChatThread({
       onCompact={chatId ? onCompact : undefined}
       onFreshSession={chatId ? onFreshSession : undefined}
       onRefresh={onRefresh}
+      onKeepSession={chatId ? () => void agentRuns.keepSession(chatId) : undefined}
       costUnit={costUnit}
       // Кто рисовал и диктовал в карточке вложения (Т10): модель разговора
       // известна здесь, а второго её источника в ленте нет.

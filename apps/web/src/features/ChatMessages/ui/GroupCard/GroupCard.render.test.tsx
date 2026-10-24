@@ -97,6 +97,35 @@ describe('карточка группы в хабе', () => {
     expect(actions).toBeLessThan(overlap < 0 ? card.length : overlap);
   });
 
+  // Владелец 22.10.2026: «план › работа › работа › работа» читался кашей, и
+  // текущее звено терялось в конце строки.
+  it('путь группы: повторы подряд — счётом, текущее звено — своей фишкой', () => {
+    const rows = new Map<string, ChildStageGroup>([
+      [
+        splitGroupKey({ groupIndex: 0, id: 'c0' }),
+        {
+          chatId: 'c0',
+          title: 'Документация',
+          stages: ['plan', 'work', 'work', 'work', 'review'],
+          isRunning: true,
+        },
+      ],
+    ]);
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <ChildStages groups={mergeSplitGroups(rows, split)} onOpen={() => {}} />
+      </QueryClientProvider>,
+    );
+    const from = html.indexOf('data-hub-stages');
+    const stages = html
+      .slice(from, html.indexOf('</span></span>', from))
+      .replace(/^[^>]*>/, '')
+      .replace(/<[^>]+>/g, '|');
+    expect(stages).toBe('|план ›||работа ×3 ›||сейчас: ревью');
+    expect(html).toContain('data-hub-stage-current="review"');
+    expect(html).not.toContain('работа › работа');
+  });
+
   it('ветка — одной строкой, текст целиком в разметке', () => {
     const html = render();
     expect(html).toContain(BRANCH);

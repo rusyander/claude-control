@@ -27,12 +27,12 @@
  *
  * Коды возврата рассчитаны на CI: `report` отвечает 1, если есть провалённые
  * или заблокированные кейсы ВНЕ карантина, `run` — кодом самой команды прогона,
- * `diff` — 1 при НОВЫХ провалах (давно известная поломка не красит каждую
+ * (124 — прогон дольше предела на кейс, `--case-timeout`), `diff` — 1 при НОВЫХ провалах (давно известная поломка не красит каждую
  * следующую сборку), `lint` — только если спросили `--fail-on <серьёзность>`.
  * Кейс в карантине печатается отдельным списком и сборку не роняет: команда уже
  * решила, что он сейчас не сторожевой.
  */
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -115,6 +115,11 @@ const HELP = `Тест-кейсы проекта без панели.
                     (группе панели — по умолчанию, AGENTDECK_BRIEF_OUTPUT=1) | весь, как есть
   --memo | --fresh  для run: зелёный итог на том же дереве — из памяти, без прогона (группе
                     панели — по умолчанию; e2e по стенду — всегда заново) | прогнать заново
+  --case-timeout <мин>  для run: предел на кейс (по умолчанию 10 мин, иначе
+                    AGENTDECK_TESTS_CASE_TIMEOUT); прогон ждёт не дольше предела × число
+                    файлов кейсов; у своей команды с timeoutMinutes — его, если флаг не назван. Дольше —
+                    дерево процессов прогона снимается, кейсы ложатся в историю проваленными
+                    с причиной «предел времени», код 124
   --fail-on <s>     для lint: ронять сборку с этой серьёзности (error | warning | info)
   --budget <мин>    для plan: сколько минут отведено (у «дыма» по умолчанию 30)
   --release <веха>  для plan release: чью веху собирать
@@ -396,10 +401,20 @@ async function turnGate(project, options, positional) {
   const { judgeTurn } = await domain('turn-gate');
   const { readGroups } = await domain('store');
   const { readRuns } = await domain('runs-store');
+  const { currentStamps } = await domain('content-stamp');
+  const { casesTouching } = await domain('impact');
   const paths = positional.map((file) => toProjectRelative(project, file));
+  const groups = readGroups(project);
+  const runs = readRuns(project);
+  // Отпечатки задетых кейсов сейчас: прогон с тем же отпечатком свеж, правка
+  // непокрытого файла после него его не старит (`content-stamp`).
+  const touched = casesTouching(paths, groups).cases.map(
+    (item) => `${item.groupId}:${item.caseId}`,
+  );
   const gaps = judgeTurn({
-    groups: readGroups(project),
-    runs: readRuns(project),
+    groups,
+    runs,
+    stamps: currentStamps(project, groups, runs, touched),
     paths,
     untracked: untrackedOf(project, paths),
     since,
@@ -655,6 +670,14 @@ async function runTests(project, options) {
   console.log(`Команда: ${plan.line}`);
   // Список длиннее строки cmd.exe ушёл файлом — иначе по строке выглядит, будто гонится всё.
   if (plan.listed) console.log(`Файлов прогона: ${plan.listed} — списком в AGENTDECK_TEST_FILES`);
+  let cap;
+  try {
+    cap = runCap(options, files.length, plan.timeout);
+  } catch (error) {
+    dropTemp(plan.temp);
+    throw error;
+  }
+  console.log(`Предел: ${cap.shown}`);
   if (options.dry) {
     dropTemp(plan.temp);
     printSkipped(skipped);
@@ -674,24 +697,29 @@ async function runTests(project, options) {
     process.exit(0);
   }
 
+  // Отпечаток содержимого кейсов — ДО прогона: по нему ворота доставки и конца
+  // хода судят свежесть записи, и коммит после прогона её не старит, а правка
+  // во время прогона — старит (`content-stamp`).
+  const { contentStamps, stampInputs } = await domain('content-stamp');
+  const stamps = contentStamps(
+    project,
+    stampInputs(groups, new Set(automated.map(({ group, item }) => `${group}:${item.id}`))),
+  );
   const started = Date.now();
   const brief = !options.full && (Boolean(options.brief) || (await briefMarked()));
-  const result = spawnSync(plan.line, {
-    cwd: plan.cwd,
-    env: { ...process.env, ...plan.env },
-    shell: true,
-    stdio: brief ? ['inherit', 'pipe', 'pipe'] : 'inherit',
-    ...(brief ? { encoding: 'utf8', maxBuffer: BRIEF_MAX_BUFFER } : {}),
-    ...(plan.timeout ? { timeout: plan.timeout } : {}),
-  });
+  const result = await runPlan(plan, brief, cap.ms);
   if (brief) console.log(briefOutput(result));
-  if (result.error?.code === 'ETIMEDOUT') {
-    console.log(`\nПрогон дольше ${plan.timeout / 60_000} мин — остановлен.`);
-  }
   const exitCode = result.status ?? undefined;
   console.log(
     `\nКоманда завершилась с кодом ${exitCode ?? 'нет кода'} за ${Math.round((Date.now() - started) / 1000)} с`,
   );
+  if (result.timedOut) {
+    await recordTimeout(project, { plan, automated, cap, started, picked, options, stamps });
+    printSkipped(skipped);
+    dropTemp(plan.temp);
+    memo?.settle(undefined);
+    process.exit(TIMEOUT_EXIT);
+  }
 
   // Своя команда проекта: отчёт может быть каталогом (Gradle, Maven) или родным
   // выводом (go test -json, cargo test) — тот же сбор, что у кнопки панели,
@@ -751,12 +779,193 @@ async function runTests(project, options) {
     // Прогон части (--group, --case) — результаты на кейсы этих групп: одинаковый
     // ключ набора двух пакетов на весь проект двусмыслен, и его результат терялся.
     ...(options.group || picked ? { groups: [...new Set(automated.map((e) => e.group))] } : {}),
+    stamps,
   });
   printImport(imported, `Импортировано из ${plan.temp ? 'отчёта прогона' : file} (${format})`);
   memo?.settle(status === 0 && imported.read > 0 ? imported.runId : undefined);
   printSkipped(skipped);
   dropTemp(plan.temp);
   process.exit(status ?? 0);
+}
+
+/**
+ * Предел прогона на кейс (N2, журнал групп 23.10): повисший кейс держал группу
+ * часами — `run` ждал команду без срока, а `timeoutMinutes` есть только у своей
+ * команды проекта. Предел — на файл кейса (кейсы одного файла гоняются одним
+ * прогоном), команда целиком ждёт предел × число файлов. `timeoutMinutes`
+ * своей команды — её собственный предел, и он сильнее произведения в обе
+ * стороны (F-58): своя команда часто гонит весь набор, и 10 мин × 1 файл
+ * снимали здоровый получасовой прогон. Сильнее него — только `--case-timeout`,
+ * названный в этой самой команде.
+ */
+const CASE_TIMEOUT_ENV = 'AGENTDECK_TESTS_CASE_TIMEOUT';
+const CASE_TIMEOUT_DEFAULT_MIN = 10;
+/** Код выхода прогона, снятого по пределу, — как у `timeout` из coreutils. */
+const TIMEOUT_EXIT = 124;
+/**
+ * Дольше `setTimeout` не умеет: больше 2^31−1 мс он срабатывает через 1 мс
+ * (F-59) — `--case-timeout 40000` снимал здоровый прогон сразу, кодом 124.
+ */
+const TIMER_MAX_MS = 2 ** 31 - 1;
+/** Сколько дочитывать вывод после выхода команды, если трубу держит её фоновый внук. */
+const DRAIN_MS = 2_000;
+/** Сколько ждать выхода после SIGTERM дерева по пределу, прежде чем SIGKILL корня. */
+const KILL_GRACE_MS = 5_000;
+
+function runCap(options, fileCount, planTimeout) {
+  const flag = options['case-timeout'];
+  const env = process.env[CASE_TIMEOUT_ENV]?.trim();
+  const raw = flag ?? (env || undefined);
+  const source = flag !== undefined ? '--case-timeout' : raw ? CASE_TIMEOUT_ENV : 'по умолчанию';
+  const minutes =
+    raw === undefined ? CASE_TIMEOUT_DEFAULT_MIN : Number(String(raw).replace(',', '.'));
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    throw new Error(`${source} ждёт минуты числом больше нуля, а пришло «${raw}».`);
+  }
+  const perCase = Math.round(minutes * 60_000);
+  const total = perCase * Math.max(1, fileCount);
+  const own = planTimeout && flag === undefined;
+  const wanted = own ? planTimeout : total;
+  const ms = Math.min(wanted, TIMER_MAX_MS);
+  const fmt = (value) => `${Math.round((value / 60_000) * 100) / 100} мин`;
+  const clamped = ms < wanted ? `; таймер дольше ${fmt(TIMER_MAX_MS)} не умеет` : '';
+  const shown = own
+    ? `${fmt(ms)} (timeoutMinutes своей команды${clamped})`
+    : `${fmt(perCase)} на кейс × ${Math.max(1, fileCount)} = ${fmt(ms)} (${source}${clamped})`;
+  return { ms, perCase, shown };
+}
+
+/**
+ * Команда прогона без блокировки: по пределу снимается всё её дерево (оболочка,
+ * раннер, его воркеры). `spawnSync` с `timeout` снимал одну оболочку — vitest
+ * и dev-сервер под ней жили дальше и держали порты.
+ */
+async function runPlan(plan, brief, timeoutMs) {
+  const { stopTreeWithGrace } = await import(
+    pathToFileURL(join(REPO, 'apps', 'server', 'src', 'lib', 'kill-tree.mjs')).href
+  );
+  const spawnedAt = Date.now();
+  const child = spawn(plan.line, {
+    cwd: plan.cwd,
+    env: { ...process.env, ...plan.env },
+    shell: true,
+    stdio: brief ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+    windowsHide: true,
+  });
+  const out = { stdout: '', stderr: '' };
+  if (brief) {
+    for (const name of ['stdout', 'stderr']) {
+      child[name].setEncoding('utf8');
+      child[name].on('data', (chunk) => {
+        if (out[name].length < BRIEF_MAX_BUFFER) out[name] += chunk;
+      });
+    }
+  }
+  let timedOut = false;
+  let cancelEscalate = () => {};
+  const timer = setTimeout(() => {
+    timedOut = true;
+    console.log(`\nПрогон дольше предела — останавливаю дерево процессов (${plan.line}).`);
+    // Корень, пропустивший SIGTERM мимо ушей (POSIX), держал `run` без конца:
+    // через запас — SIGKILL по своему дескриптору, номер чужим не станет.
+    cancelEscalate = stopTreeWithGrace(child, { spawnedAt, graceMs: KILL_GRACE_MS });
+  }, timeoutMs);
+  const status = await new Promise((done) => {
+    let drain;
+    child.on('error', () => done(null));
+    // Внук, ушедший в фон с унаследованным выводом (`sleep 1000 &`, сервер из
+    // теста), держит трубу, и `close` ждал его жизнь целиком — и после предела
+    // (F-66). Конец прогона — выход самой команды: остаток вывода дочитывается
+    // запасом, потом трубы закрываются.
+    child.on('exit', (code) => {
+      drain = setTimeout(() => {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+        done(code);
+      }, DRAIN_MS);
+    });
+    child.on('close', (code) => {
+      clearTimeout(drain);
+      done(code);
+    });
+  });
+  clearTimeout(timer);
+  cancelEscalate();
+  return { status: timedOut ? TIMEOUT_EXIT : status, ...out, timedOut };
+}
+
+const xml = (text) =>
+  String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+/**
+ * Прогон снят по пределу — кейсы в историю проваленными с причиной: без записи
+ * проверка конца хода видела «прогона не было», а человек — зелёный прошлый итог.
+ * Общий отчёт раннера к этому моменту не дописан, ему не верим. Но отчёт, что
+ * звено цепочки (пакет vitest, модуль Go, класс Gradle) успело дописать до
+ * предела, — настоящий итог его кейсов (F-126): зелёные кейсы этих звеньев
+ * ложились проваленными. Проваленными по пределу — только кейсы, чей файл ни
+ * одним таким отчётом не назван; совпади кейс с обоими — побеждает худший.
+ */
+function finishedPart(plan, started) {
+  if (!plan.collect) return '';
+  try {
+    const content = plan.collect(started, { quiet: true })?.content ?? '';
+    return content
+      .replace(/<\?xml[^>]*\?>/g, '')
+      .replace(/<\/?testsuites\b[^>]*>/g, '')
+      .trim();
+  } catch {
+    return '';
+  }
+}
+
+async function recordTimeout(project, { plan, automated, cap, started, picked, options, stamps }) {
+  const seconds = Math.round((Date.now() - started) / 1000);
+  const reason = `Предел времени: прогон шёл ${seconds} с, предел ${cap.shown}. Дерево процессов прогона снято.`;
+  const suite = (entries) => {
+    if (entries.length === 0) return '';
+    const cases = entries
+      .map(({ item }) => {
+        // `[id]` — первым: метка кейса сильнее догадки по имени; `@` в заголовке читался бы ключом.
+        const name = `[${item.id}] ${String(item.title ?? '').replace(/@/g, '')}`;
+        return `<testcase classname="${xml(item.automation.file)}" name="${xml(name)}" time="${seconds}"><failure message="${xml(reason)}" type="timeout"/></testcase>`;
+      })
+      .join('');
+    return `<testsuite name="tests-cli run: timeout" tests="${entries.length}" failures="${entries.length}">${cases}</testsuite>`;
+  };
+  const finished = finishedPart(plan, started);
+  const left = automated.filter(
+    ({ item }) => !finished || !finished.includes(`="${xml(item.automation.file)}"`),
+  );
+  const { importResults } = await domain('import-results');
+  const write = (body) =>
+    importResults(project, {
+      format: 'junit',
+      content: `<?xml version="1.0" encoding="UTF-8"?><testsuites>${body}</testsuites>`,
+      origin: plan.origin,
+      scope: `tests-cli run (снят по пределу ${cap.shown}): ${plan.line}`,
+      exitCode: TIMEOUT_EXIT,
+      ...(options.group || picked ? { groups: [...new Set(automated.map((e) => e.group))] } : {}),
+      stamps,
+    });
+  let imported;
+  try {
+    imported = write(`${finished}${suite(left)}`);
+  } catch {
+    // Отчёт звена оборван посреди записи — ему не верим, как и общему.
+    imported = write(suite(automated));
+  }
+  console.log(reason);
+  printImport(
+    imported,
+    left.length < automated.length
+      ? `Кейсы записаны: успевшие звенья — своим итогом, остальные (${left.length}) — проваленными по пределу времени`
+      : 'Кейсы записаны проваленными по пределу времени',
+  );
 }
 
 /**
@@ -959,12 +1168,15 @@ async function vitestPlan(project, files) {
     // Цепочка гасит код провала (`|| echo -`): красное — из самого отчёта, и пакет
     // без отчёта (упал до тестов) тоже красный.
     failed: (content) => chained && (missing || /<(failure|error)\b/.test(content)),
-    collect: (started) => {
+    // `quiet` — сбор после снятия по пределу: недописавшие пакеты ложатся
+    // проваленными, «не тронуты» там было бы неправдой.
+    collect: (started, { quiet = false } = {}) => {
       const bodies = [];
       for (const [index, [dir]] of runs.entries()) {
         const path = join(temp, `vitest-${index}.xml`);
         if (!freshSince(path, started)) {
-          console.log(`Пакет ${dir || '.'}: vitest отчёта не записал — его кейсы не тронуты.`);
+          if (!quiet)
+            console.log(`Пакет ${dir || '.'}: vitest отчёта не записал — его кейсы не тронуты.`);
           missing = true;
           continue;
         }

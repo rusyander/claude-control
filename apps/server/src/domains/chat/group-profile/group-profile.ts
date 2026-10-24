@@ -1,5 +1,6 @@
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
+import { POWERSHELL_ONLY_ASK, withPowerShellTwins } from '../auto-approve/powershell-twins.ts';
 import { MAIN_SYNC_ASK } from '../main-sync/main-sync.ts';
 import { BASH_MAX_TIMEOUT_ENV, bashCeilingMs } from './bash-ceiling.ts';
 
@@ -359,14 +360,21 @@ const SILENT_TURN_REMINDER_ENV = 'CLAUDE_CODE_SILENT_TURN_REMINDER';
  * строка не советует (F-10): их запуск — по согласию человека (директива L9),
  * а промпт подагента без меток хука `agent-prompt-guard` отклоняется — каждый
  * первый вызов оплачивался бы отказом и повтором.
+ *
+ * Общая часть — без имён инструментов Claude: она же едет группам чужих CLI
+ * (`foreignChildExtra`). Фраза про `cd` — только Claude: заметку об окружении
+ * при смене каталога дописывает именно он.
  */
-const WORK_HABITS_NOTE =
+export const WORK_HABITS_SHARED_NOTE =
   'Economy (the human enabled it in the panel; every call re-sends this whole conversation): ' +
   'put independent reads and commands into one step — parallel tool calls or one `a; b; c` ' +
   'command — instead of a chain of single calls; read only what you will edit or judge. Keep ' +
-  'output narrow: grep, line ranges, `git diff --stat` before a full diff. Work from the copy ' +
-  'root with relative paths; do not `cd` — every directory change adds an environment note to ' +
-  'the conversation.';
+  'output narrow: grep, line ranges, `git diff --stat` before a full diff.';
+const WORK_HABITS_CD_NOTE =
+  'Work from the copy root with relative paths; do not `cd` — every directory change adds an ' +
+  'environment note to the conversation.';
+/** Строка привычек группы Claude — общая часть и фраза про `cd`. */
+export const WORK_HABITS_NOTE = `${WORK_HABITS_SHARED_NOTE} ${WORK_HABITS_CD_NOTE}`;
 
 /**
  * Навыки ревью, которые звено работы или правок звало у себя (директива L3):
@@ -385,7 +393,34 @@ export const REVIEW_AGENT_DENY = 'Agent';
  */
 export const DELIVERY_BASH_DENY: readonly string[] = [
   'Bash(git push*)',
-  'Bash(git -C * push*)',
+  // Любой глобальный ключ перед подкомандой (журнал 23.10: `git -c gc.auto=0 push`
+  // из звена ревью прошёл мимо формы `-C`; F-28: `-P`, `--no-pager`, `--git-dir`).
+  'Bash(git -* push*)',
+  // Тот же git другим именем: `command git`, полный путь, `git.exe` (F-28).
+  'Bash(command git push*)',
+  'Bash(command git -* push*)',
+  'Bash(*/git push*)',
+  'Bash(*/git -* push*)',
+  'Bash(*git.exe push*)',
+  'Bash(*git.exe -* push*)',
+  // Имя git другим регистром (Windows и macOS находят тот же git) и пакет мимо
+  // `git push`; вложенная оболочка и `eval` с пуш-шагом (RF-BGCD-07). Сопоставление
+  // CLI чувствительно к регистру. Остальные формы ловит брокер — `delivery-publish.ts`.
+  'Bash(Git push*)',
+  'Bash(GIT push*)',
+  'Bash(Git -* push*)',
+  'Bash(GIT -* push*)',
+  'Bash(*.EXE push*)',
+  'Bash(*.EXE -* push*)',
+  'Bash(git send-pack*)',
+  'Bash(git -* send-pack*)',
+  'Bash(* git send-pack*)',
+  'Bash(*/git send-pack*)',
+  'Bash(*git.exe send-pack*)',
+  'Bash(*sh -c*git push*)',
+  'Bash(*sh -c*git -* push*)',
+  'Bash(eval *git push*)',
+  'Bash(eval *git -* push*)',
   'Bash(gh pr create*)',
   'Bash(glab mr create*)',
 ];
@@ -428,7 +463,7 @@ export function aheadDeny(
   // Все серверы наружу, не только опознанные хранилищем кода: имя открытия MR
   // бывает только у форджа, а сервер «трекер + форж» опознаётся трекером.
   const deliver = ahead?.deliver
-    ? [...DELIVERY_BASH_DENY, ...outwardTools(kept, FORGE_OPEN_TOOLS)]
+    ? [...withPowerShellTwins(DELIVERY_BASH_DENY), ...outwardTools(kept, FORGE_OPEN_TOOLS)]
     : [];
   return [...review, ...deliver];
 }
@@ -470,6 +505,14 @@ function aheadNote(ahead: GroupProfileInput['ahead']): string | undefined {
  * конце каждого хода (решение владельца 19.10, пункт A).
  */
 export const TESTS_RUNS_AT_DELIVERY_ENV = 'AGENTDECK_TESTS_RUNS_AT_DELIVERY';
+/**
+ * Звено прогона и «за ним доставка» — для хука набора `gate-at-end`: полный гейт
+ * группы один, в звене доставки (владелец 23.10). Замер 23.10: 113 полных
+ * гейтов в звеньях работы, 22 в ревью, 36 в правках при 33 в доставке — каждое
+ * звено новая сессия, и счёт хука «первый гейт сессии свободен» шёл заново.
+ */
+export const GROUP_STAGE_ENV = 'AGENTDECK_GROUP_STAGE';
+export const GROUP_DELIVER_AHEAD_ENV = 'AGENTDECK_GROUP_DELIVER_AHEAD';
 const COMPACT_WINDOW_MIN = 100_000;
 const COMPACT_WINDOW_MAX = 1_000_000;
 
@@ -508,14 +551,46 @@ export function compactWindowOf(raw: string | undefined): number | undefined {
  * сервера до его запуска панель не знает. Имя — как его пишет CLI: знаки вне
  * `[A-Za-z0-9_-]` становятся `_`.
  */
-function outwardAsk(kept: readonly ProfileMcpEntry[]): { permissions: { ask: string[] } } {
+function outwardAsk(
+  kept: readonly ProfileMcpEntry[],
+  shellNames: readonly string[] = [],
+): { permissions: { ask: string[] } } {
   const servers = kept
     .filter((entry) => {
       const role = mcpRole(entry);
       return role === 'forge' || role === 'tracker';
     })
     .map((entry) => `mcp__${entry.id.replace(/[^A-Za-z0-9_-]/g, '_')}`);
-  return { permissions: { ask: [...servers, ...GROUP_DANGER_ASK, ...MAIN_SYNC_ASK] } };
+  return {
+    permissions: {
+      // Те же правила и для инструмента PowerShell (I-04): `Bash(…)` его не задевает.
+      ask: [
+        ...servers,
+        ...withPowerShellTwins([
+          ...GROUP_DANGER_ASK,
+          ...MAIN_SYNC_ASK,
+          ...shellNameAsk(shellNames),
+        ]),
+        ...POWERSHELL_ONLY_ASK,
+      ],
+    },
+  };
+}
+
+/** Имя, которое правило `ask` CLI передаст буквально: без `*`, скобок и пробелов. */
+const ASK_NAME = /^[\w.:@%+,-]+$/;
+
+/**
+ * Правила `ask` под имена снимка оболочки (повторная проверка 24.10, a/d):
+ * разбор судит псевдоним по развёртке, функцию — по телу, но в авторежиме
+ * CLI вызов `grb origin/main` или `gsync` не задет ни одним правилом выше и до
+ * брокера не доходил. Правило только ведёт вызов к брокеру; `ll` → `ls -la`
+ * брокер пропустит сам.
+ */
+export function shellNameAsk(names: readonly string[]): string[] {
+  return [...new Set(names)]
+    .filter((name) => ASK_NAME.test(name))
+    .flatMap((name) => [`Bash(${name})`, `Bash(${name} *)`]);
 }
 
 /**
@@ -526,27 +601,37 @@ function outwardAsk(kept: readonly ProfileMcpEntry[]): { permissions: { ask: str
  * `git branch -D`, `rm -rf src` проходили без карточки.
  *
  * Правило лишь ведёт вызов к брокеру; решает разбор команды
- * (`group-command.ts`): удаление настоящего, слияние, пуш в основную или
- * защищённую ветку и принудительный пуш — карточкой, пуш рабочей ветки, уборка
+ * (`group-command.ts`): удаление данных git (ветки, метки, тайник, ссылки),
+ * слияние не базы, пуш в основную или защищённую ветку и в чужую ветку силой,
+ * снос игнорируемого — карточкой; пуш и перезапись своей ветки, затирание
+ * правок своей копии (после снимка в `refs/agentdeck/backup/…`), уборка
  * временного и чтение — сами, без человека. `*` в правиле CLI — любая строка,
  * пустая тоже; составную команду CLI проверяет по звеньям. Формы проверены
  * настоящим CLI в `tools/qa/check-group-forge-ask.mjs`.
  */
 export const GROUP_DANGER_ASK: readonly string[] = [
-  // Пуш любой формы: куда и как — решает разбор у брокера.
-  'Bash(git push*)',
-  'Bash(git -C * push*)',
-  // Слияние, удаление веток, меток, копий, тайника.
-  'Bash(git merge*)',
-  'Bash(git -C * merge*)',
-  'Bash(git branch *)',
-  'Bash(git -C * branch *)',
-  'Bash(git tag *)',
-  'Bash(git -C * tag *)',
-  'Bash(git worktree remove*)',
-  'Bash(git -C * worktree remove*)',
-  'Bash(git stash drop*)',
-  'Bash(git stash clear*)',
+  // Весь git — к брокеру (F-28): глобальные ключи перед подкомандой (`-P`,
+  // `--no-pager`, `--git-dir`, `-c`) и другое имя git (`command git`, полный
+  // путь, `git.exe`) обходили перечень подкоманд. Чтение брокер пропускает сам.
+  'Bash(git *)',
+  'Bash(* git *)',
+  'Bash(*/git *)',
+  'Bash(*git.exe *)',
+  // Имя git другим регистром и вложенная оболочка (RF-BGCD-07): `Git push`,
+  // `GIT.EXE push`, `bash -c 'git push'` шли мимо брокера к классификатору
+  // авторежима. Брокер разбирает и вложенную команду: обычная работа идёт сама.
+  'Bash(Git *)',
+  'Bash(GIT *)',
+  'Bash(*.EXE *)',
+  'Bash(bash *)',
+  'Bash(sh *)',
+  'Bash(zsh *)',
+  'Bash(*/bash *)',
+  'Bash(*/sh *)',
+  'Bash(cmd *)',
+  'Bash(pwsh*)',
+  'Bash(powershell*)',
+  'Bash(eval *)',
   // Удаление файлов и каталогов.
   'Bash(rm *)',
   'Bash(rmdir *)',
@@ -588,7 +673,7 @@ const SHARED_PREFIX_ARG = '--exclude-dynamic-system-prompt-sections';
 export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
   const profile = groupMcpProfile(input);
   const connectors = wantsConnectors(input.extra);
-  const outward = outwardAsk(profile.kept);
+  const outward = outwardAsk(profile.kept, input.shellNames);
   const readOnly = readOnlyMcpDeny(profile.kept, input.stage);
   const economy = input.economy;
   const deny = [...readOnly, ...aheadDeny(profile.kept, input.ahead), ...mergeDeny(profile.kept)];
@@ -604,6 +689,8 @@ export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
     env: {
       ...(connectors ? {} : { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' }),
       [TESTS_RUNS_AT_DELIVERY_ENV]: '1',
+      ...(input.stage ? { [GROUP_STAGE_ENV]: input.stage } : {}),
+      ...(input.ahead?.deliver ? { [GROUP_DELIVER_AHEAD_ENV]: '1' } : {}),
       ...(input.compactWindow ? { [COMPACT_WINDOW_ENV]: String(input.compactWindow) } : {}),
       ...(input.heavyQueue ? { [HEAVY_QUEUE_ENV]: input.heavyQueue.dir } : {}),
       ...(economy?.detachIde ? { [AUTO_CONNECT_IDE_ENV]: 'false' } : {}),

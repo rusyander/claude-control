@@ -328,7 +328,7 @@ export function terminateByHandle(targets, run = spawnSync) {
 }
 
 /** `etime` из `ps`: `[[дд-]чч:]мм:сс` → секунды; не разобрать — `undefined`. */
-function etimeSeconds(text) {
+export function etimeSeconds(text) {
   const match = /^(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)$/.exec(text);
   if (!match) return undefined;
   const [, days, hours, minutes, seconds] = match;
@@ -411,7 +411,10 @@ export function killProcessTree(pid, options = {}, impl = {}) {
     const self = options.selfPid ?? process.pid;
     let pids;
     if (table) pids = planTreeKill(table, pid, options).pids;
-    else pids = options.spawnedAt === undefined && pid !== self ? [pid] : [];
+    else pids = options.spawnedAt === undefined && pid !== self && !options.keepRoot ? [pid] : [];
+    // Только потомки (`keepRoot`): дерево снимается одним снимком, пока оно
+    // цело, а корень уходит своим путём.
+    if (options.keepRoot) pids = pids.filter((target) => target !== pid);
     for (const target of pids) onKill(target);
     // Есть снимок — снимаем по дескриптору со сверкой времени создания. Подмена
     // сигнала в тестах (`impl.kill`) без подмены снятия — по номеру, как прежде.
@@ -427,7 +430,7 @@ export function killProcessTree(pid, options = {}, impl = {}) {
     return pids;
   }
 
-  if (options.group) {
+  if (options.group && !options.keepRoot) {
     onKill(pid);
     if (signal(-pid, 'SIGTERM')) return [pid];
   }
@@ -440,7 +443,7 @@ export function killProcessTree(pid, options = {}, impl = {}) {
   const table = readTable();
   // Снимка нет (busybox `ps` без `-A -o etime`) — проверить время нечем; голый
   // номер из журнала мог занять чужой процесс, его не трогаем, как и на Windows.
-  if (!table && options.spawnedAt !== undefined) return [];
+  if (!table && (options.spawnedAt !== undefined || options.keepRoot)) return [];
   const plan = table ? planTreeKill(table, pid, options) : undefined;
   if (plan?.skipped === 'root-reused') return [];
   const descendants = plan ? plan.pids.filter((target) => target !== pid) : [];
@@ -448,6 +451,7 @@ export function killProcessTree(pid, options = {}, impl = {}) {
     onKill(target);
     signal(target, 'SIGTERM');
   }
+  if (options.keepRoot) return descendants;
   if (!options.group) onKill(pid);
   if (!signal(pid, 'SIGTERM')) signal(pid, 'SIGKILL');
   return [...descendants, pid];
@@ -525,6 +529,33 @@ export function killChildProcessTree(child, options = {}, impl = {}) {
     // Процесс уже завершился — повторный сигнал не ошибка.
   }
   return killed;
+}
+
+/**
+ * Снять дерево по пределу и через `graceMs` добить корень SIGKILL, если он
+ * пропустил мягкий сигнал мимо ушей (POSIX: `trap '' TERM`) — иначе вызывающий
+ * ждал его выхода без конца (F-66). Добивание — по своему дескриптору
+ * (`child.kill`) и только пока `childIsRunning`: вышедший номер мог достаться
+ * чужому. Возвращает отмену добивания — выход дождались, таймер не нужен.
+ */
+export function stopTreeWithGrace(child, options = {}, impl = {}) {
+  const { graceMs = 5_000, unref = false, ...treeOptions } = options;
+  // Снятие дерева подменяемо: сервер снимает своим `killChildTree` (метка «снят
+  // нарочно», общий снимок, ошибки глушатся), а добивание остаётся одно на всех.
+  if (impl.killChild) impl.killChild(child);
+  else killChildProcessTree(child, treeOptions, impl);
+  // Таймер — глобальный (не импорт `node:timers`): подменные часы тестов видят только его.
+  const escalate = globalThis.setTimeout(() => {
+    if (!childIsRunning(child)) return;
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // Вышел между проверкой и сигналом.
+    }
+  }, graceMs);
+  // Выход панели не ждёт добивания: таймер не держит процесс сервера.
+  if (unref) escalate.unref?.();
+  return () => globalThis.clearTimeout(escalate);
 }
 
 /**

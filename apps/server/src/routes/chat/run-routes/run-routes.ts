@@ -16,11 +16,25 @@ import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
 import { RUN_UNKNOWN_DENIED } from '../../../domains/chat/run-ledger/run-ledger.ts';
 import {
   conflictsWith,
-  isMainSyncRequest,
+  isHiddenSync,
   isSoleSync,
+  isUnnamedRef,
   MAIN_SYNC_DENIED,
+  MAIN_SYNC_UNKNOWN,
+  remoteConflicts,
+  resolvedSyncText,
+  syncCandidate,
+  syncsWithTarget,
   syncTarget,
 } from '../../../domains/chat/main-sync/main-sync.ts';
+import { expandAliasText } from '../../../domains/chat/group-command/alias-text.ts';
+import {
+  PUBLISH_BEFORE_DELIVERY_DENIED,
+  publishesBeforeDelivery,
+  SEND_PACK_DENIED,
+  sendsPack,
+} from '../../../domains/chat/group-profile/delivery-publish.ts';
+import { GROUP_DELIVER_AHEAD_ENV } from '../../../domains/chat/group-profile/group-profile.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { apiTokenPath, readApiToken } from '../../../lib/api-token/api-token.ts';
 import {
@@ -96,13 +110,30 @@ import { allowedPermissionRules } from '@agentdeck/contracts/permission-rules';
 import { cachedMainOf, guardHitFor } from '../../../domains/backend-guard/backend-guard.ts';
 import { mainCheckoutOf } from '../../../domains/project-tests/project-tests.ts';
 import {
+  GROUP_REASK_LINE,
+  GROUP_REASK_MAX,
+  noteGroupQuestion,
   groupAutoApproveFor,
   groupDecision,
+  groupDiscards,
+  groupPushRefusal,
   needsMrState,
+  syncDanger,
+  withProcessFacts,
   withWorktree,
   recordGroupAutoNotice,
   type GroupAutoApprove,
 } from '../../../domains/chat/group-permissions.ts';
+import { gitDestroys, guardUncommitted } from '../../../domains/chat/group-tree-state.ts';
+import {
+  sessionScratchpad,
+  toolCallCwd,
+} from '../../../domains/chat/ChatTranscriptFile/tool-call-cwd.ts';
+import {
+  planAnswerMessage,
+  planAnswers,
+  recordGroupAnswerNotice,
+} from '../../../domains/chat/group-questions/group-questions.ts';
 import { readMergeRequestByUrl } from '../../../domains/integrations/forge.ts';
 import { forgeTokenForUrl } from '../../../domains/integrations/forge-pick.ts';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
@@ -113,6 +144,32 @@ import {
   permissionDecisionBodySchema,
   permissionRequestBodySchema,
 } from '@agentdeck/contracts/request-bodies';
+import {
+  alreadyQueuedDenial,
+  groupMainCopyRefusal,
+  humanRefusedDenial,
+  selfApprovalRefusal,
+  twinDecidedDenial,
+} from '../../../domains/chat/deferred-asks/deferred-asks.ts';
+import { deferredAsksOf } from '../deferred-routes/deferred-store.ts';
+import { humanOnly } from '../human-only/human-only.ts';
+import { humanOnlyDepsFor } from '../human-only/human-only-deps.ts';
+import {
+  branchFactsOf,
+  deferCall,
+  deferReason,
+  deliveryRefusal,
+  groupCopyOf,
+  MAIN_COPY_REASON,
+  MAIN_COPY_TOOL,
+  mainCopyInput,
+  protectedWriteRefusal,
+  reachesPanelDecision,
+  scopeOfRun,
+  sourceOfRun,
+  type DeferReason,
+} from './deferred-bridge.ts';
+import { answerDeferredFromCard } from './deferred-card.ts';
 
 /** Отказ на новое сообщение, пока прошлый ответ ещё генерируется. */
 const RUN_BUSY_MESSAGE =
@@ -185,10 +242,13 @@ const refuseExpired = (reply: FastifyReply): FastifyReply =>
  * потоком, догнав пропущенное. Остановка — только по явной кнопке.
  */
 /**
- * Снят ли MR группы с черновика — для пуша арендой её ветки (L7.12, журнал 19.10
- * 02:17:02). Фордж читается только когда этот вопрос решает исход
+ * Снят ли MR группы с черновика и есть ли у него конфликт — для перезаписи её
+ * ветки (L7.12, журнал 19.10 02:17:02; решение владельца 23.10: только при
+ * конфликте). Фордж читается только когда этот вопрос решает исход
  * (`needsMrState`): сеть на каждый запрос прав — лишняя. Ключа нет или фордж не
- * ответил — состояние неизвестно, и решает человек (`mrInReview` не ставится).
+ * ответил — `mrInReview` не ставится («на ревью»). Конфликт — по форджу ИЛИ по
+ * вершинам своей и целевой веток на сервере (`remoteConflicts`, сверка по хэшам):
+ * фордж считает его лениво, а `origin/*` копии пишет сам агент (F-31).
  */
 async function withMrState(
   store: AppStore,
@@ -199,14 +259,54 @@ async function withMrState(
 ): Promise<GroupAutoApprove> {
   if (!group.mr || !needsMrState(group, { toolName, input })) return group;
   const token = forgeTokenForUrl(store, appData, group.mr);
-  if (!token) return group;
-  try {
-    const mr = await readMergeRequestByUrl(group.mr, token);
-    return mr ? { ...group, mrInReview: mr.state === 'open' && !mr.draft } : group;
-  } catch (error) {
-    console.warn('group permissions: MR state unreadable', error);
-    return group;
+  const mr = token
+    ? await readMergeRequestByUrl(group.mr, token).catch((error: unknown) => {
+        console.warn('group permissions: MR state unreadable', error);
+        return undefined;
+      })
+    : undefined;
+  const target = mr?.targetBranch ?? group.base ?? 'main';
+  // Вершины веток — у сервера, не из `origin/*` копии, которые агент пишет сам (F-31).
+  const local =
+    group.worktree && group.ownBranch
+      ? await remoteConflicts(group.worktree, group.ownBranch, target)
+      : undefined;
+  const known = mr?.conflicts !== undefined || local !== undefined;
+  return {
+    ...group,
+    ...(mr ? { mrInReview: mr.state === 'open' && !mr.draft } : {}),
+    ...(known ? { mrConflicts: mr?.conflicts === true || local === true } : {}),
+  };
+}
+
+/** Догон, чью цель не назвать: решает человек (`syncRefOf`). */
+const UNNAMED_SYNC = Symbol('unnamed-sync');
+
+/**
+ * Догон целевой ветки группой (`main-sync.ts`): ссылка, с которой сверять
+ * конфликт, — названная целевой или «скрытая» (хэш коммита целевой,
+ * `checkout -B своя <старт>`), что git признал догоном. Повторная проверка 24.10:
+ * - `command` — текст с раскрытыми псевдонимами снимка (`expandAliasText`), как
+ *   его исполнит оболочка: `grb origin/main` при `grb='git rebase'` — догон (a);
+ * - догон, чью цель не назвать (`git rebase "$T"`, цель не нашлась), —
+ *   `UNNAMED_SYNC`: сверить конфликт нечем, решает человек (c);
+ * - инструмент PowerShell — тот же текст `git …`, та же сверка, что у Bash.
+ */
+async function syncRefOf(
+  group: GroupAutoApprove,
+  cwd: string,
+  toolName: string,
+  command: string,
+): Promise<string | typeof UNNAMED_SYNC | undefined> {
+  if (toolName !== 'Bash' && toolName !== 'PowerShell') return undefined;
+  if (syncsWithTarget(command)) {
+    const target = syncTarget(command);
+    return target === undefined || isUnnamedRef(target) ? UNNAMED_SYNC : target;
   }
+  const candidate = syncCandidate(command);
+  if (!candidate) return undefined;
+  if (isUnnamedRef(candidate)) return UNNAMED_SYNC;
+  return (await isHiddenSync(cwd, candidate, group.base)) ? candidate : undefined;
 }
 
 export function registerChatRunRoutes(
@@ -230,6 +330,9 @@ export function registerChatRunRoutes(
   heldOf?: (chatId: string) => boolean,
 ): void {
   const guardMainOf = cachedMainOf(mainCheckoutOf);
+  // Маршруты решений человека отвечают только человеку: процесс модели —
+  // потомок любого прогона или CLI панели — получает 403 (`human-only.ts`).
+  const humanDeps = humanOnlyDepsFor(registry);
   const sentOnce = new SentOnce();
   // Реестр считает расход, но тарифов не знает: прайс и свои цены пользователя
   // доступны только здесь. Отдаём ему саму функцию, а не таблицу, — тогда правка
@@ -822,19 +925,24 @@ export function registerChatRunRoutes(
    * дальше. Так клиент восстанавливает поток после обрыва связи и после
    * перезагрузки страницы. Если прогона нет — отвечаем маркером `gone`, чтобы
    * клиент прекратил переподключение, а не долбил впустую.
+   *
+   * `startedAt` — ход, к которому относится `from`: в разговоре успел начаться
+   * другой ход — он отдаётся с начала (см. `ChatRunRegistry.attach`). Без него —
+   * прежний договор, курсор как есть.
    */
-  app.get<{ Params: { chatId: string }; Querystring: { from?: string } }>(
+  app.get<{ Params: { chatId: string }; Querystring: { from?: string; startedAt?: string } }>(
     '/api/chat/:chatId/stream',
     async (request, reply) => {
       const { chatId } = request.params;
       const fromSeq = Number(request.query.from) || 0;
+      const startedAt = Number(request.query.startedAt) || undefined;
 
       if (!registry.has(chatId)) {
         streamGone(reply);
         return;
       }
 
-      await streamRun(registry, reply, chatId, fromSeq);
+      await streamRun(registry, reply, chatId, fromSeq, startedAt);
     },
   );
 
@@ -867,12 +975,39 @@ export function registerChatRunRoutes(
   });
 
   /**
+   * «Продолжить старый разговор» на заметке остывшей сессии (R5 ревью П1):
+   * новый разговор снимается, ход идёт старой сессией. 409 — повод уже прошёл:
+   * ход кончился или начат не правилом остывшей сессии.
+   */
+  app.post<{ Params: { chatId: string } }>('/api/chat/:chatId/keep-session', (request, reply) => {
+    const outcome = registry.keepColdSession(request.params.chatId);
+    if (outcome === 'started') return { ok: true };
+    if (outcome === 'unconfirmed') {
+      return refuse(
+        reply,
+        409,
+        'stop_unconfirmed',
+        'Процесс агента не остановлен: панель не смогла проверить, что номер всё ещё его, и не тронула его. Прогон идёт дальше — попробуйте «Остановить» ещё раз.',
+        { messageCode: 'chat-stop-unconfirmed' },
+      );
+    }
+    return refuse(
+      reply,
+      409,
+      'keep_session_gone',
+      'Новый разговор уже не идёт — вернуть ход в старый нечего.',
+      { messageCode: 'chat-keep-session-gone' },
+    );
+  });
+
+  /**
    * Тумблер автоподтверждения, щёлкнутый во время прогона. Без этого маршрута
    * новое положение действовало бы только со следующего сообщения, а человек
    * ждёт его сразу — он же щёлкает, потому что устал жать «Разрешить».
    */
   app.post<{ Params: { chatId: string }; Body: unknown }>(
     '/api/chat/:chatId/auto-approve',
+    { preHandler: humanOnly(humanDeps) },
     async (request, reply) => {
       // Запрос без тела значит «выключено», а не 500 — на пустом или обрезанном
       // теле панель не должна выглядеть сломанной; кривое тело — 400 с полем.
@@ -922,6 +1057,32 @@ export function registerChatRunRoutes(
     // и карточку прав значило бы повесить прогон до клика по кнопке, которая
     // ничего не решает (см. `QUESTION_DENIED`).
     if (toolName === 'AskUserQuestion') {
+      // Группа «по плану» (`group-questions.ts`): ответ на каждый вопрос сразу,
+      // отметка «ответ дан автоматически» — в хаб родителя. Тот же формат
+      // отказа, что у автовыбора: лента, реестр и сводка узнают его по метке.
+      const answers = registry.answersByPlan(runId) ? planAnswers(input) : null;
+      if (answers) {
+        const owner = registry.describe(runId) ?? registry.describeIdle(runId);
+        const group = groupAutoApproveFor(ctx.store, [runId, owner?.key]);
+        // Тот же вопрос снова и снова — петля (F-128): после потолка не отвечаем.
+        const asked = group
+          ? noteGroupQuestion(
+              group,
+              runId,
+              answers.map((answer) => answer.question),
+            )
+          : 0;
+        if (asked > GROUP_REASK_MAX) {
+          const message = `${planAnswerMessage(answers)}\n\n${GROUP_REASK_LINE}`;
+          return reply.send({ behavior: 'deny', message });
+        }
+        try {
+          if (group) recordGroupAnswerNotice(ctx.store, group, answers);
+        } catch {
+          // Отметка — для хаба: отказ диска не имеет права оставить вопрос без ответа.
+        }
+        return reply.send({ behavior: 'deny', message: planAnswerMessage(answers) });
+      }
       // Автономный чат (без глобального хука, который закрыл бы вопрос раньше):
       // тот же отказ с выбором, что пишет хук, — лента узнаёт его по метке.
       const picks = registry.isAutonomous(runId) ? pickRecommended(input) : null;
@@ -965,6 +1126,108 @@ export function registerChatRunRoutes(
     // видит лента. «Разговор не найден» здесь стояло 09.09.2026 на 24 отказах за
     // секунду.
     if (!held) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
+
+    // ОТЛОЖЕННЫЕ ВОПРОСЫ D-n (решения владельца 23.10). Вызов, тянущийся к
+    // маршрутам решений или ключу панели, — попытка ответить за человека: отказ
+    // раньше всего, даже разрешения ниже (`deferred-bridge.ts`).
+    if (reachesPanelDecision(toolName, input)) {
+      return reply.send({ behavior: 'deny', message: selfApprovalRefusal() });
+    }
+    const asks = deferredAsksOf(ctx);
+    const runKeys = [
+      ...new Set([runId, held.key, held.sessionId].filter((key): key is string => Boolean(key))),
+    ];
+    const scope = scopeOfRun(ctx.store, runKeys);
+    const grouped = scope.kind === 'group';
+    // Разовое разрешение человека на ровно этот вызов — раньше ворот и правил:
+    // человек сказал «да» именно ему. Погашается здесь же, второй раз не пройдёт.
+    if (asks.consume(scope, toolName, input)) {
+      return reply.send({ behavior: 'allow', updatedInput: input });
+    }
+    // Черновик MR, пока ждёт D-n, и номер D-n в публикуемом тексте — отказ с ответом.
+    const delivery = deliveryRefusal(asks, scope, toolName, input);
+    if (delivery) return reply.send({ behavior: 'deny', message: delivery });
+    // Никто не смотрит: группа или автономный чат, у которого не открыт ни один
+    // поток клиента, — вызов, который решает человек, откладывается сразу.
+    // Автономность включена по умолчанию (26.09), поэтому одной её мало: открыта
+    // вкладка или телефон — человек может смотреть, и карточка первой (решение 1),
+    // D-n — по сроку `deferAfterMinutes`. Фоновый субагент одиночного чата после
+    // конца хода — так же: его карточка заводит видимый прогон (`showCard`).
+    // `hostBackgroundAsk` здесь не звать: он сам заводит прогон, и простое чтение
+    // запустило бы его.
+    // «Смотрит» — с окном срока: при перезапуске панели вкладка переподключается,
+    // а CLI шлёт запрос заново, и мгновенное «потока нет» отложило бы вызов при
+    // человеке у экрана (`isAttended`). Срок ноль — окно по умолчанию, 10 минут.
+    const deferAfterMs = Math.max(0, ctx.store.getSettings().deferAfterMinutes ?? 10) * 60_000;
+    const unattended =
+      grouped ||
+      (registry.isAutonomous(runId) &&
+        !registry.isAttended(runId, deferAfterMs > 0 ? deferAfterMs : 10 * 60_000));
+    const deferIt = (reason: DeferReason, kind: 'permission' | 'branchGate' = 'permission') =>
+      deferCall(asks, {
+        scope,
+        runKeys,
+        toolName: kind === 'branchGate' ? MAIN_COPY_TOOL : toolName,
+        input: kind === 'branchGate' ? mainCopyInput(held.options.cwd) : input,
+        toolUseId,
+        reason: reason.text,
+        reasonCode: reason.code,
+        ...(reason.params ? { reasonParams: reason.params } : {}),
+        kind,
+        cwd: held.options.cwd,
+        source: sourceOfRun(ctx.store, scope, held.options.cwd, held.options.name),
+      });
+    // Карточка одиночного чата, на которую не ответили за срок настройки, сама
+    // становится D-n (решение 1); ноль — ждать человека, как раньше.
+    // Близнец (RF-DL-02): тот же вызов дважды в одном ответе модели — две
+    // карточки. Решение одной закрывает D-n другой (`cardDecided`), а срок
+    // другой после решения первой даёт отказ без новой D-n: вызов один.
+    const callKey = (kind: 'permission' | 'branchGate') =>
+      kind === 'branchGate'
+        ? { tool: MAIN_COPY_TOOL, call: mainCopyInput(held.options.cwd) }
+        : { tool: toolName, call: input };
+    const cardAnswered = (
+      kind: 'permission' | 'branchGate',
+      decision: { behavior: string; expired?: boolean },
+    ) => {
+      // Только ответ человека: карточка, ставшая D-n по сроку, «отвечена» отказом
+      // самой панели, и закрыть он обязан не свою же запись.
+      if (decision.expired || session.deferredIdOf(runId, toolUseId)) return;
+      if (!session.wasPermissionAnswered(runId, toolUseId)) return;
+      if (decision.behavior !== 'allow' && decision.behavior !== 'deny') return;
+      const { tool, call } = callKey(kind);
+      asks.cardDecided(scope, tool, call, decision.behavior);
+    };
+    const deferLater = (reason: DeferReason, kind: 'permission' | 'branchGate') => {
+      const shownAt = Date.now();
+      return deferAfterMs > 0
+        ? {
+            afterMs: deferAfterMs,
+            reply: () => {
+              const { tool, call } = callKey(kind);
+              const twin = asks.twinDecided(scope, tool, call, shownAt);
+              if (twin) {
+                return { reply: { behavior: 'deny' as const, message: twinDecidedDenial(twin) } };
+              }
+              const deferred = deferIt(reason, kind);
+              return {
+                reply: { behavior: 'deny' as const, message: deferred.message },
+                id: deferred.id,
+              };
+            },
+          }
+        : undefined;
+    };
+    const resolved = (decision: { behavior: 'allow' | 'deny'; expired?: boolean }) => {
+      const deferredId = session.deferredIdOf(runId, toolUseId);
+      registry.emitExternal(runId, {
+        kind: 'permissionResolved',
+        toolUseId,
+        behavior: decision.behavior,
+        ...(decision.expired ? { expired: true as const } : {}),
+        ...(deferredId ? { deferredId } : {}),
+      });
+    };
     if (
       !rules.has('editInMainCopy') &&
       held &&
@@ -972,6 +1235,41 @@ export function registerChatRunRoutes(
       isWritingCall(toolName, input) &&
       isMainWorkingCopy(held.options.cwd)
     ) {
+      // Человек уже ответил «пишите здесь» на D-n ворот — ворота сняты для чата.
+      if (asks.consume(scope, MAIN_COPY_TOOL, mainCopyInput(held.options.cwd))) {
+        session.settleBranchGate(runId);
+        return reply.send({ behavior: 'allow', updatedInput: input });
+      }
+      // Группа пишет в основную копию: ответ известен, если у неё своя копия;
+      // без копии место решает человек — D-n, работа идёт дальше.
+      if (grouped) {
+        const own = groupCopyOf(ctx.store, scope);
+        if (own && own.replace(/[\\/]+$/, '') !== held.options.cwd.replace(/[\\/]+$/, '')) {
+          return reply.send({ behavior: 'deny', message: groupMainCopyRefusal(own) });
+        }
+        return reply.send({
+          behavior: 'deny',
+          message: deferIt(MAIN_COPY_REASON, 'branchGate').message,
+        });
+      }
+      if (unattended) {
+        return reply.send({
+          behavior: 'deny',
+          message: deferIt(MAIN_COPY_REASON, 'branchGate').message,
+        });
+      }
+      // Ворота этого места уже стоят человеку: вторая карточка про то же ни к
+      // чему, и её разрешение исполнило бы правку дважды (D-L01, та же семья).
+      const gate = asks.retryOf(scope, MAIN_COPY_TOOL, mainCopyInput(held.options.cwd));
+      if (gate) {
+        return reply.send({
+          behavior: 'deny',
+          message:
+            gate.state === 'denied'
+              ? humanRefusedDenial(gate.id, gate.message)
+              : alreadyQueuedDenial(gate.id),
+        });
+      }
       // Имя ветки предлагаем по заданию прогона, а не по названию чата: задание
       // и есть то, ради чего ветку заводят, и в списке веток оно скажет больше.
       const branch = suggestBranchName(held.options.prompt, held.key);
@@ -989,19 +1287,12 @@ export function registerChatRunRoutes(
         ...(handed?.base ? { base: handed.base } : {}),
       });
       if (shown) {
-        const decision = await session.requestPermission({
-          runId,
-          toolName,
-          input,
-          toolUseId,
-          kind: 'branchGate',
-        });
-        registry.emitExternal(runId, {
-          kind: 'permissionResolved',
-          toolUseId,
-          behavior: decision.behavior,
-          ...(decision.expired ? { expired: true as const } : {}),
-        });
+        const decision = await session.requestPermission(
+          { runId, toolName, input, toolUseId, kind: 'branchGate' },
+          deferLater(MAIN_COPY_REASON, 'branchGate'),
+        );
+        cardAnswered('branchGate', decision);
+        resolved(decision);
         return reply.send(decision);
       }
     }
@@ -1016,6 +1307,16 @@ export function registerChatRunRoutes(
         behavior: 'deny',
         message: outsideCopyDenial(held.options.cwd, intoMain),
       });
+    }
+    // Звено до доставки не публикует (RF-BGCD-07): `deny` CLI — шаблон по тексту,
+    // и `bash -c 'git push'`, `Git push`, `git send-pack` доходили сюда, а разбор
+    // группы пуш своей ветки разрешает сам. Метку ставит профиль группы.
+    if (
+      held?.options.platformEnv?.[GROUP_DELIVER_AHEAD_ENV] === '1' &&
+      toolName === 'Bash' &&
+      publishesBeforeDelivery(String((input as { command?: unknown } | null)?.command ?? ''))
+    ) {
+      return reply.send({ behavior: 'deny', message: PUBLISH_BEFORE_DELIVERY_DENIED });
     }
 
     // Автоподтверждение: обратимый запрос разрешаем молча, не показывая
@@ -1041,9 +1342,45 @@ export function registerChatRunRoutes(
     const humanOn = auto?.enabled === true && auto.inherited !== true;
     const linked = humanOn ? undefined : groupAutoApproveFor(ctx.store, [runId, held?.key]);
     // Своя ветка группы — у git её копии, не из текста команды (`withWorktree`).
-    const found = linked && (await withWorktree(linked, held.options.cwd, { toolName, input }));
-    const group =
+    const placed = linked && (await withWorktree(linked, held.options.cwd, { toolName, input }));
+    // Каталог оболочки CLI — из записи транскрипта с этим вызовом (N4): после
+    // `cd подпроект` прошлой командой относительные пути судились от корня копии.
+    const shellCwd =
+      placed && toolName === 'Bash'
+        ? toolCallCwd(projectsDir(ctx), held.sessionId ?? held.key, toolUseId)
+        : undefined;
+    // Своя рабочая папка CLI этой сессии — уборка в ней своя (F-77).
+    const scratchpad =
+      placed && toolName === 'Bash'
+        ? sessionScratchpad(projectsDir(ctx), held.sessionId ?? held.key)
+        : undefined;
+    // Погашение номера или порта — сверка с деревом процессов группы (N3).
+    const found =
+      placed &&
+      (await withProcessFacts(
+        {
+          ...placed,
+          ...(shellCwd ? { shellCwd } : {}),
+          ...(scratchpad ? { scratchpad } : {}),
+        },
+        { toolName, input },
+        registry.processRootsOf(runId),
+      ));
+    const stated =
       found && (await withMrState(ctx.store, ctx.location.paths.appData, found, toolName, input));
+    // Незакоммиченное перед затиранием или сменой ветки (решения владельца 23.10):
+    // затирание — после снимка в `refs/agentdeck/backup/…`, смена ветки на грязном
+    // дереве и неудавшийся снимок — отказ агенту с причиной, не карточка.
+    const kept =
+      stated && !guard
+        ? await guardUncommitted(
+            stated.worktree,
+            String((input as { command?: unknown } | null)?.command ?? ''),
+            groupDiscards(stated, { toolName, input }),
+          )
+        : {};
+    if ('deny' in kept) return reply.send({ behavior: 'deny', message: kept.deny });
+    const group = stated && kept.tree ? { ...stated, tree: kept.tree } : stated;
     const groupLevel = group
       ? groupDecision(group, {
           toolName,
@@ -1052,22 +1389,58 @@ export function registerChatRunRoutes(
           allowedTools: allowedMcpTools(),
         })
       : 'human';
+    // Перезапись своей ветки, чей MR на ревью, без конфликта — отказ агенту с
+    // причиной, не карточка (решение владельца 23.10): решать человеку нечего.
+    const pushRefusal = !guard && group ? groupPushRefusal(group, { toolName, input }) : undefined;
+    if (pushRefusal) return reply.send({ behavior: 'deny', message: pushRefusal });
+    // `git send-pack` — пуш мимо разбора цели: разбор группы счёл его обычной
+    // командой и пускал даже в main (RF-BGCD-07). Группе он не нужен — есть `git push`.
+    if (
+      group &&
+      toolName === 'Bash' &&
+      sendsPack(String((input as { command?: unknown } | null)?.command ?? ''))
+    ) {
+      return reply.send({ behavior: 'deny', message: SEND_PACK_DENIED });
+    }
     // Догон main группой — только при конфликте с ним, без карточки
     // (`main-sync.ts`): отставший MR без конфликта человек обновит сам.
-    const syncCommand = String((input as { command?: unknown } | null)?.command ?? '');
-    const syncRef =
-      !guard && group && isMainSyncRequest(toolName, input) ? syncTarget(syncCommand) : undefined;
+    // Текст — как его исполнит оболочка: псевдонимы снимка раскрыты (повторная проверка 24.10, a).
+    const written = String((input as { command?: unknown } | null)?.command ?? '');
+    // Цель через `$(git rev-parse …)` или переменную — сама ссылка (`resolvedSyncText`).
+    const syncCommand = resolvedSyncText(
+      expandAliasText(written, toolName === 'Bash' ? group?.aliases : undefined),
+    );
+    const syncFound =
+      !guard && group && held
+        ? await syncRefOf(group, held.options.cwd, toolName, syncCommand)
+        : undefined;
+    // Цель догона не назвать — сверить конфликт нечем: решает человек, не строки группы (c).
+    const syncUnnamed = syncFound === UNNAMED_SYNC;
+    const syncRef = syncFound === UNNAMED_SYNC ? undefined : syncFound;
     if (syncRef && held) {
-      const conflict = await conflictsWith(held.options.cwd, syncRef);
+      // По вершине сервера, не по `origin/*` копии (RF-BGCD-05); база группы — где искать хэш.
+      const conflict = await conflictsWith(held.options.cwd, syncRef, group?.base);
       if (conflict === false) return reply.send({ behavior: 'deny', message: MAIN_SYNC_DENIED });
+      // Сверить не вышло — не «можно»: rebase без известного конфликта запрещён.
+      if (conflict === undefined) {
+        return reply.send({ behavior: 'deny', message: MAIN_SYNC_UNKNOWN });
+      }
       // Конфликт группа чинит сразу и без карточки: разбор команды счёл бы
       // `git merge origin/main` опасным слиянием и спросил человека.
-      if (conflict === true && group && isSoleSync(syncCommand)) {
+      // Догон, что разбор счёл опасным не из-за слияния (`-c core.editor=…`,
+      // `-x <команда>`, глобальные ключи с программой), коротким путём не идёт.
+      if (
+        conflict === true &&
+        group &&
+        isSoleSync(syncCommand) &&
+        // Разбор сам раскрывает псевдонимы — ему команда как написана.
+        !syncDanger(group, written, toolName)
+      ) {
         recordGroupAutoNotice(ctx.store, group, { toolName, input });
         return reply.send({ behavior: 'allow', updatedInput: input });
       }
     }
-    if (!guard && group && groupLevel !== 'human') {
+    if (!guard && group && groupLevel !== 'human' && !syncUnnamed) {
       // «С отметкой»: прошло без человека, но хаб родителя это покажет.
       if (groupLevel === 'notify') recordGroupAutoNotice(ctx.store, group, { toolName, input });
       return reply.send({ behavior: 'allow', updatedInput: input });
@@ -1075,7 +1448,12 @@ export function registerChatRunRoutes(
     if (
       !guard &&
       !group &&
-      (auto?.enabled || isReadOnlyTool(toolName)) &&
+      // Авторежим CLI шлёт сюда лишь задетое правилом `ask` (`CHAT_GIT_ASK`, L2):
+      // что не удаление и не правило человека — решают правила чата, как решил бы
+      // его классификатор, а не карточка при выключенном тумблере.
+      (auto?.enabled || held.options.permissionMode === 'auto' || isReadOnlyTool(toolName)) &&
+      // Удаление данных git и слияние — человеку и в одиночном чате (решение владельца 23.10).
+      !gitDestroys(toolName, input) &&
       shouldAutoApprove({
         toolName,
         input,
@@ -1091,6 +1469,41 @@ export function registerChatRunRoutes(
       return reply.send({ behavior: 'allow', updatedInput: input });
     }
 
+    // Слияние, push в защищённую ветку и пуш с недоказуемой целью — известный
+    // ответ, а не вопрос человеку (решение 2). Проверка стоит ДО карточки: иначе
+    // карточка по сроку сама стала бы D-n, который заводить запрещено, и человек
+    // решал бы одной кнопкой то, что решает только владелец (D-S02).
+    const protectedWrite = protectedWriteRefusal(
+      toolName,
+      input,
+      await branchFactsOf(held.options.cwd, toolName, input, group?.base),
+    );
+    if (protectedWrite) return reply.send({ behavior: 'deny', message: protectedWrite });
+
+    // Тот же вызов уже стоит человеку (или человек его запретил): ответ — запись,
+    // а не вторая карточка. Без этого повтор в чате при человеке получал свежую
+    // карточку, вызов исполнялся, а D-n оставалась ждать — и разрешённая позже
+    // исполняла его второй раз (D-L01, живой прогон R4).
+    const already = asks.retryOf(scope, toolName, input);
+    if (already) {
+      return reply.send({
+        behavior: 'deny',
+        message:
+          already.state === 'denied'
+            ? humanRefusedDenial(already.id, already.message)
+            : alreadyQueuedDenial(already.id),
+      });
+    }
+
+    // Никто не смотрит — карточки нет: вызов становится D-n, и прогон идёт
+    // дальше без человека.
+    if (unattended) {
+      return reply.send({
+        behavior: 'deny',
+        message: deferIt(deferReason(guard, grouped)).message,
+      });
+    }
+
     // Прогон мог уйти из реестра, пока шли проверки выше, — тот же отказ.
     const shown = showCard({
       kind: 'permission',
@@ -1101,25 +1514,36 @@ export function registerChatRunRoutes(
     });
     if (!shown) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
 
-    const decision = await session.requestPermission({ runId, toolName, input, toolUseId });
-    // Помечаем в потоке, что решение принято — карточка в чате обновится.
-    registry.emitExternal(runId, {
-      kind: 'permissionResolved',
-      toolUseId,
-      behavior: decision.behavior,
-      ...(decision.expired ? { expired: true as const } : {}),
-    });
+    const decision = await session.requestPermission(
+      { runId, toolName, input, toolUseId },
+      deferLater(deferReason(guard, false), 'permission'),
+    );
+    cardAnswered('permission', decision);
+    // Помечаем в потоке, что решение принято — карточка в чате обновится (или
+    // станет «отложено как D-n», если её решил срок).
+    resolved(decision);
     return reply.send(decision);
   });
 
   /** Решение пользователя по запросу прав (клик «Разрешить»/«Запретить»). */
   app.post<{ Params: { chatId: string }; Body: unknown }>(
     '/api/chat/:chatId/permission-decision',
+    { preHandler: humanOnly(humanDeps) },
     async (request, reply) => {
       const { chatId } = request.params;
       const body = parseBody(permissionDecisionBodySchema, request.body, reply);
       if (!body) return reply;
       const { toolUseId, behavior, message } = body;
+      // Карточка, ставшая D-n по сроку: CLI вызова уже не ждёт, ответ — записи,
+      // разрешение — продолжением разговора с разовым правом (`deferred-card.ts`).
+      const deferred = await answerDeferredFromCard(
+        ctx,
+        (key, use) => session.deferredIdOf(key, use),
+        chatId,
+        toolUseId,
+        { behavior, ...(message ? { message } : {}) },
+      );
+      if (deferred) return { ok: true, deferred };
       const outcome = session.answerPermission(
         chatId,
         toolUseId,
@@ -1182,6 +1606,7 @@ export function registerChatRunRoutes(
    */
   app.post<{ Params: { chatId: string }; Body: unknown }>(
     '/api/chat/:chatId/branch-decision',
+    { preHandler: humanOnly(humanDeps) },
     async (request, reply) => {
       const { chatId } = request.params;
       const body = parseBody(branchDecisionBodySchema, request.body, reply);

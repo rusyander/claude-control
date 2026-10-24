@@ -1,35 +1,53 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { TruncatedText } from '@shared/ui/truncated-text';
 import { cn } from '@shared/lib/cn';
-import { serverFieldList, serverFieldText } from '@shared/config/i18n';
+import { serverFieldText } from '@shared/config/i18n';
 import { GroupMeta } from '../GroupMeta/GroupMeta';
+import { MetricList } from '../MetricList/MetricList';
 import type { ChildStageGroup } from '../ChildStages.types';
 import styles from './GroupText.module.scss';
 import { pendingText } from '../../lib/pendingText';
 import { reviewCloseText } from '../../lib/reviewCloseText';
 import { tokenLedgerText } from '../../lib/tokenLedgerText';
+import { deliveryStopOf } from '../../lib/deliveryStop';
+import { DeliveryStop } from '../DeliveryStop/DeliveryStop';
 
-/** Название группы и строка её состояния — одна и та же у строки с чатом и без. */
+/**
+ * Тело карточки группы — под рядом «шапка + кнопки» (`GroupHead`), во всю её
+ * ширину (владелец 22.10.2026: справа кнопки занимали половину карточки, и
+ * строки счёта токенов ломались через слово).
+ *
+ * Порядок — по важности, блоками, а не сплошным текстом: что группа делает
+ * сейчас (индикатор хода) → беда, если есть (сбой, обрыв, повторы
+ * панели — своим цветом и своей плашкой, а не серым хвостом) → факты
+ * (ожидание, напоминания, тесты, итог) отдельными пунктами → колонки работы
+ * (модель, время, лимит) и ветка → раздел «Токены» числами под подписями →
+ * хвост ответа цитатой.
+ *
+ * Тело лежит под растянутой кнопкой карточки: клик по нему открывает чат
+ * группы, поэтому в нём нет ничего нажимаемого — кроме «ещё N» у списка
+ * остановленной доставки, поднятого над кнопкой (`DeliveryStop`).
+ */
 export function GroupText({ group, step }: { group: ChildStageGroup; step?: ReactNode }) {
   // Время — языком интерфейса, а не браузера: английский хаб в русском
   // браузере показывал русские даты (F-323).
   const { t, i18n } = useTranslation();
+  /** Что сделано и где группа стоит: стадии, ожидание, тесты, итог. */
   const parts: string[] = [];
-  if (group.stages.length > 0) {
-    parts.push(group.stages.map((stage) => t(`chat.cascade.stageFull.${stage}`)).join(' › '));
-  }
+  /** Что пошло не так: сбой, обрыв процесса, сколько раз панель продолжала сама. */
+  const problems: string[] = [];
+  // Остановлена на доставке — заголовком и пунктами, а не строкой через «; »
+  // (владелец 23.10.2026).
+  const deliveryStop = deliveryStopOf(group);
   if (group.pending) parts.push(pendingText(group, t));
   // Сдавшаяся группа с чатом: причина по коду, но не «не завелась» — она
   // работала (живой прогон 25.09, D5: так читались группы после 8–11 минут работы).
-  else if (group.error) {
-    parts.push(t('chat.cascade.hub.stopped', { message: serverFieldText(group, 'error') }));
+  else if (group.error && !deliveryStop) {
+    problems.push(t('chat.cascade.hub.stopped', { message: serverFieldText(group, 'error') }));
   }
-  // Строки пробелов доставки — по их кодам, на языке интерфейса.
-  const missing = serverFieldList(group, 'deliveryMissing');
-  if (group.retries) parts.push(t('chat.cascade.hub.retries', { count: group.retries }));
+  if (group.retries) problems.push(t('chat.cascade.hub.retries', { count: group.retries }));
   if (group.deliveryNudges) {
     parts.push(t('chat.cascade.hub.deliveryNudges', { count: group.deliveryNudges }));
   }
@@ -51,9 +69,9 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
       hour: '2-digit',
       minute: '2-digit',
     });
-    parts.push(t('chat.cascade.hub.interruptedAt', { time }));
+    problems.push(t('chat.cascade.hub.interruptedAt', { time }));
     if (group.interrupted.resumes) {
-      parts.push(t('chat.cascade.hub.interruptResumes', { count: group.interrupted.resumes }));
+      problems.push(t('chat.cascade.hub.interruptResumes', { count: group.interrupted.resumes }));
     }
   }
   // ЧТО сделано, а не просто «готово» (Д5): проверка без правок и правки с
@@ -74,86 +92,36 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
     .join(' · ');
 
   return (
-    <Stack gap="0" className={styles.text}>
-      <span className={styles.titleLine}>
-        <Typography variant="body-sm" as="span" truncate>
-          {group.title}
-        </Typography>
-        {/* Принято человеком (TK-accepted) — отметка его приёмки, не панели. */}
-        {group.acceptance?.acceptedAt && (
-          <Typography
-            variant="caption"
-            color="subtle"
-            as="span"
-            className={styles.chip}
-            title={new Date(group.acceptance.acceptedAt).toLocaleString(i18n.language)}
-            data-hub-accepted={group.acceptance.markedDoneAt ? 'marked' : 'accepted'}
-          >
-            {t(
-              group.acceptance.markedDoneAt
-                ? 'chat.cascade.hub.accept.markedMarker'
-                : 'chat.cascade.hub.accept.marker',
-            )}
-          </Typography>
-        )}
-        {/* MR влит или закрыт — перепроверять его нечего, и строка это говорит. */}
-        {group.mrClosed && (
-          <Typography
-            variant="caption"
-            color="subtle"
-            as="span"
-            className={styles.chip}
-            data-hub-mr-closed={group.mrClosed}
-          >
-            {t(`chat.cascade.hub.mrClosed.${group.mrClosed}`)}
-          </Typography>
-        )}
-        {group.isPaused && (
-          <Typography variant="caption" color="subtle" as="span" className={styles.chip}>
-            {t('chat.cascade.tree.paused')}
-          </Typography>
-        )}
-        {/* Стоит не просто так, а ждёт — и чаще всего человека (Д3, Д16). */}
-        {group.waitingFor && (
-          <Typography
-            variant="caption"
-            as="span"
-            className={cn(
-              styles.chip,
-              (group.waitingFor === 'question' || group.waitingFor === 'decision') &&
-                styles.chipAsk,
-            )}
-            data-hub-waiting={group.waitingFor}
-          >
-            {t(`chat.cascade.hub.waitingFor.${group.waitingFor}`)}
-          </Typography>
-        )}
-      </span>
+    <div className={styles.text}>
+      {/* Ход группы сейчас: состояние, шаг плана, полоса, текущий вызов. Путь
+          звеньев — в шапке, рядом с названием. */}
       {step}
-      <GroupMeta group={group} />
-      {/* Ветка — одной строкой (владелец 05.10): имя из десятка тикетов
-          переносом съедало две строки карточки. Целиком — по наведению. */}
-      {branch && (
-        <TruncatedText text={branch} variant="caption" color="subtle" className={styles.branch} />
+      {deliveryStop && <DeliveryStop stop={deliveryStop} {...(group.mr ? { mr: group.mr } : {})} />}
+      {/* Беда — плашкой своего цвета, каждая своей строкой. */}
+      {problems.length > 0 && (
+        <div className={styles.problem} data-hub-problem>
+          {problems.map((problem, index) => (
+            <Typography key={index} variant="caption" color="danger" as="span">
+              {problem}
+            </Typography>
+          ))}
+        </div>
       )}
+      {/* Факты — отдельными пунктами: перенос рвёт строку между ними, а не внутри. */}
       {parts.length > 0 && (
-        <Typography variant="caption" color="subtle" as="span" className={styles.wrap}>
-          {parts.join(' · ')}
-        </Typography>
-      )}
-      {/* Чего не хватило до доставки по фактам git: без этого «ждёт» у группы,
-          которой панель напомнила доделать MR, не объяснял ничего. */}
-      {missing.length > 0 && (
-        <Typography
-          variant="caption"
-          color="subtle"
-          as="span"
-          className={styles.wrap}
-          title={missing.join('\n')}
-          data-hub-delivery-missing
-        >
-          {t('chat.cascade.hub.deliveryMissing', { list: missing.join('; ') })}
-        </Typography>
+        <span className={styles.facts} data-hub-state>
+          {parts.map((part, index) => (
+            <Typography
+              key={index}
+              variant="caption"
+              color="muted"
+              as="span"
+              className={styles.fact}
+            >
+              {part}
+            </Typography>
+          ))}
+        </span>
       )}
       {/* Итог закрытия группы ревью (T13, T6/T11): правки в копии, временные копии
           и база — факты по git и docker, а не слова агента. */}
@@ -161,7 +129,7 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
         <Typography
           variant="caption"
           as="span"
-          className={cn(styles.wrap, styles.chipAsk)}
+          className={cn(styles.wrap, styles.chipAsk, styles.notice)}
           title={close.dirtList}
           data-hub-review-dirt
         >
@@ -179,37 +147,99 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
           {[...close.scratch, close.stand].filter(Boolean).join(' · ')}
         </Typography>
       )}
-      {/* Счёт токенов закрытой группы (E4): утечка инструкций или тяжёлый старт
-          видны на карточке, а не находятся разбором транскриптов руками. */}
+      <GroupMeta group={group} />
+      {/* Ветка — одной строкой (владелец 05.10): имя из десятка тикетов
+          переносом съедало две строки карточки. Целиком — по наведению. */}
+      {branch && (
+        <TruncatedText text={branch} variant="caption" color="subtle" className={styles.branch} />
+      )}
+      {/* Счёт токенов группы (E4): утечка инструкций или тяжёлый старт видны на
+          карточке, а не находятся разбором транскриптов руками. Пинги тёплого
+          кэша — и у ждущей группы: их расход в транскрипт не попадает. Числа —
+          колонками под подписями, по ряду на сессии и на подогрев. */}
       {tokens && (
-        <span className={styles.titleLine} data-hub-tokens>
-          {tokens.flags.map((flag) => (
+        <div className={styles.tokens} data-hub-tokens>
+          <span className={styles.tokensHead}>
             <Typography
-              key={flag}
               variant="caption"
+              weight="semibold"
               as="span"
-              className={cn(styles.chip, styles.chipAsk)}
+              className={styles.tokensTitle}
             >
-              {flag}
+              {t('chat.cascade.hub.tokens.title')}
             </Typography>
-          ))}
-          <Typography
-            variant="caption"
-            color="subtle"
-            as="span"
-            className={styles.wrap}
-            title={tokens.median}
-          >
-            {[tokens.usage, tokens.duplicates].filter(Boolean).join(' · ')}
-          </Typography>
-        </span>
+            {/* Итог подогрева — фишкой своего цвета: сберёг или переплатил
+                видно с первого взгляда, а не в конце строки счёта. */}
+            {tokens.keepWarmVerdict && (
+              <Typography
+                variant="caption"
+                weight="medium"
+                as="span"
+                className={cn(
+                  styles.chip,
+                  tokens.keepWarmVerdict.tone === 'saved' ? styles.chipSaved : styles.chipLost,
+                )}
+                data-hub-keep-warm-verdict={tokens.keepWarmVerdict.tone}
+              >
+                {tokens.keepWarmVerdict.text}
+              </Typography>
+            )}
+            {tokens.flags.map((flag) => (
+              <Typography
+                key={flag}
+                variant="caption"
+                as="span"
+                className={cn(styles.chip, styles.chipAsk)}
+                data-hub-token-flag
+              >
+                {flag}
+              </Typography>
+            ))}
+          </span>
+          {(tokens.usage.length > 0 || tokens.keepWarm.length > 0) && (
+            <div className={styles.tokenRows}>
+              {tokens.usage.length > 0 && (
+                <>
+                  <Typography variant="caption" color="muted" as="span" className={styles.rowTitle}>
+                    {t('chat.cascade.hub.tokens.rowUsage')}
+                  </Typography>
+                  <MetricList items={tokens.usage} attr="data-hub-usage" />
+                </>
+              )}
+              {tokens.keepWarm.length > 0 && (
+                <>
+                  <Typography variant="caption" color="muted" as="span" className={styles.rowTitle}>
+                    {t('chat.cascade.hub.tokens.rowKeepWarm')}
+                  </Typography>
+                  <MetricList items={tokens.keepWarm} attr="data-hub-keep-warm" />
+                </>
+              )}
+            </div>
+          )}
+          {tokens.keepWarmPending && (
+            <Typography
+              variant="caption"
+              color="subtle"
+              as="span"
+              className={styles.wrap}
+              data-hub-keep-warm-pending
+            >
+              {tokens.keepWarmPending}
+            </Typography>
+          )}
+          {tokens.duplicates && (
+            <Typography variant="caption" color="subtle" as="span" className={styles.wrap}>
+              {tokens.duplicates}
+            </Typography>
+          )}
+        </div>
       )}
       {/* Хвост последнего ответа (Д16): вопрос, заданный текстом, иначе не видно
-          из родителя. Целиком — по наведению. */}
+          из родителя. Цитатой с чертой слева — не путается с фактами панели. */}
       {group.tail && (
         <Typography
           variant="caption"
-          color="subtle"
+          color="muted"
           as="span"
           className={styles.tail}
           title={group.tail}
@@ -218,6 +248,6 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
           «{group.tail}»
         </Typography>
       )}
-    </Stack>
+    </div>
   );
 }

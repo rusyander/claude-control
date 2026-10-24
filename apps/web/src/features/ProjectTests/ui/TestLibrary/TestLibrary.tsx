@@ -128,7 +128,9 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
             </Typography>
           </Stack>
         )}
-        {board.groups.length === 0 && (
+        {/* Пока список не пришёл, групп «нет» только на вид: кнопка мелькала
+            на секунду и пропадала, а окно, открытое с неё, теряло, куда вернуть фокус. */}
+        {board.groups.length === 0 && !board.isLoading && (
           <Button
             variant="ghost"
             size="sm"

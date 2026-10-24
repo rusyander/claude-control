@@ -29,6 +29,8 @@ import type { RawEvent, RawLimitWindow } from '../chat-events.ts';
 export interface LimitRunRecord extends LimitRun {
   chatId: string;
   sessionId?: string;
+  /** Не ход разговора, а пинг тёплого кэша группы (`keep-warm`) — его трата окна. */
+  source?: 'keep-warm';
 }
 
 /** Недельное окно — самое длинное, что показывается; старше него запись не нужна. */
@@ -159,6 +161,43 @@ export function createLimitShareReader(appDataDir: string): () => Map<string, Li
     const shares = limitSharesByChat(readLimitRuns(appDataDir));
     cached = { mtimeMs, size, shares };
     return shares;
+  };
+}
+
+/** Замер пятичасового окна из журнала: когда, доля, сброс (секунды эпохи). */
+export interface FiveHourPoint {
+  t: number;
+  utilization: number;
+  resetsAt: number;
+}
+
+/**
+ * Замеры пятичасового окна всех прогонов аккаунта (прогноз R9 сторожа групп):
+ * окно одно на подписку, и замеры обычного чата рядом с группой — те же. Файл
+ * перечитывается, только когда изменился (сторож спрашивает каждую минуту).
+ */
+export function createFiveHourReader(appDataDir: string): () => FiveHourPoint[] {
+  let cached: { mtimeMs: number; size: number; points: FiveHourPoint[] } | undefined;
+  return () => {
+    const path = limitJournalPath(appDataDir);
+    if (!existsSync(path)) return [];
+    const { mtimeMs, size } = statSync(path);
+    if (cached?.mtimeMs === mtimeMs && cached.size === size) return cached.points;
+    const points = readLimitRuns(appDataDir).flatMap((run) =>
+      run.samples.flatMap((sample) =>
+        sample.fiveHour && Number.isFinite(sample.at)
+          ? [
+              {
+                t: sample.at,
+                utilization: sample.fiveHour.utilization,
+                resetsAt: sample.fiveHour.resetsAt,
+              },
+            ]
+          : [],
+      ),
+    );
+    cached = { mtimeMs, size, points };
+    return points;
   };
 }
 

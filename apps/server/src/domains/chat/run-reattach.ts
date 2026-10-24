@@ -1,3 +1,5 @@
+import { providerCliCommand } from '../../providers/cli/cli.ts';
+import { getProvider, isKnownProviderId, listProviders } from '../../providers/registry.ts';
 import type { RunOptions } from './ChatRunner/ChatRunner.ts';
 import type { RunMeta } from './ChatRunRegistry/ChatRunRegistry.types.ts';
 import { LiveSession, type LiveSessionPool } from './live-session/live-session.ts';
@@ -15,11 +17,72 @@ import type { RunLedgerEntry } from './run-ledger/run-ledger.ts';
  * после фона, «Остановить».
  */
 
-/** Параметры прогона из записи журнала — тот же набор, что знает `adopt`. */
-export function ledgerRunOptions(entry: RunLedgerEntry): RunOptions {
+/** Провайдер, чья это команда запуска (имя без каталога и регистра на Windows); чужая — `undefined`. */
+export function providerOfCommand(command: string): string | undefined {
+  const name = command.trim().replace(/^"|"$/g, '');
+  const base = (name.split(/[\\/]/).pop() ?? '').toLowerCase();
+  return listProviders().find((provider) =>
+    [provider.cli.command, provider.cli.windowsCommand].some(
+      (known) => known === name || known.toLowerCase() === base,
+    ),
+  )?.id;
+}
+
+/**
+ * Что журнал прогонов должен знать о запуске, чтобы продолжение усыновлённого
+ * прогона подняло тот же CLI (EF-190): команда, её провайдер, каталог
+ * конфигурации и источники настроек. Окружение — нет: в нём бывают ключи.
+ */
+export function ledgerLaunchOf(
+  options: Pick<RunOptions, 'command' | 'configDir' | 'settingSources'>,
+): Pick<RunLedgerEntry, 'command' | 'provider' | 'configDir' | 'settingSources'> {
+  const provider = options.command ? providerOfCommand(options.command) : undefined;
+  return {
+    ...(options.command ? { command: options.command } : {}),
+    ...(provider ? { provider } : {}),
+    ...(options.configDir ? { configDir: options.configDir } : {}),
+    ...(options.settingSources ? { settingSources: options.settingSources } : {}),
+  };
+}
+
+/** Записи без команды, о которых сервер уже сказал: одна строка на запись, не на каждый вызов. */
+const toldWithoutCommand = new Set<string>();
+
+/**
+ * Команда запуска по записи: записанная; нет её (поле было битым) — команда
+ * записанного провайдера для этой ОС; нет и провайдера — `undefined`, то есть
+ * CLI по умолчанию.
+ */
+function commandOf(entry: RunLedgerEntry): string | undefined {
+  if (entry.command) return entry.command;
+  return entry.provider && isKnownProviderId(entry.provider)
+    ? providerCliCommand(getProvider(entry.provider))
+    : undefined;
+}
+
+/**
+ * Параметры прогона из записи журнала — тот же набор, что знает `adopt`, и
+ * команда запуска. Запись прежней версии без команды и провайдера — CLI по
+ * умолчанию, с одной строкой в журнале сервера: молча подменённый CLI и был
+ * ошибкой.
+ */
+export function ledgerRunOptions(
+  entry: RunLedgerEntry,
+  log: (message: string) => void = (message) => console.warn(message),
+): RunOptions {
+  const command = commandOf(entry);
+  if (!command && !toldWithoutCommand.has(entry.key)) {
+    toldWithoutCommand.add(entry.key);
+    log(
+      `run ledger: entry ${entry.key} has no command (older panel); continuing with the default CLI`,
+    );
+  }
   return {
     prompt: '',
     cwd: entry.cwd,
+    ...(command ? { command } : {}),
+    ...(entry.configDir ? { configDir: entry.configDir } : {}),
+    ...(entry.settingSources ? { settingSources: entry.settingSources } : {}),
     ...(entry.model ? { model: entry.model } : {}),
     ...(entry.effort ? { effort: entry.effort } : {}),
     ...(entry.permissionMode ? { permissionMode: entry.permissionMode } : {}),
@@ -54,7 +117,9 @@ export function reattachSession(
   const session = LiveSession.reattach(
     { pipe: relay.pipe, pid: relay.pid, ...(relay.token ? { token: relay.token } : {}) },
     {
-      command: '',
+      // Процесс уже идёт за посредником, нового по этой записи не поднимут; команда —
+      // для сообщений о сбое процесса, тем же именем, что у него.
+      command: commandOf(entry) ?? '',
       args: [],
       cwd: entry.cwd,
       env: {},

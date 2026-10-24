@@ -20,6 +20,7 @@ import { StreamedAnswer } from '../StreamedAnswer/StreamedAnswer';
 import { QuestionCard } from '../QuestionCard/QuestionCard';
 import { AutoPickLine } from '../AutoPickLine/AutoPickLine';
 import { PermissionCard } from '../PermissionCard/PermissionCard';
+import { DeferredPermissionCard } from '../PermissionCard/DeferredPermissionCard';
 import { BranchGateCard } from '../BranchGateCard/BranchGateCard';
 import { ChildBlocks } from '../ChildBlocks/ChildBlocks';
 import { ReviewDecisionCard } from '../ReviewDecisionCard/ReviewDecisionCard';
@@ -52,6 +53,7 @@ export function ChatMessages({
   onPickOption,
   isRunning,
   permissions,
+  deferredPermissions,
   onPermissionDecide,
   branchGates,
   onBranchDecide,
@@ -84,6 +86,7 @@ export function ChatMessages({
   onCompact,
   onFreshSession,
   onRefresh,
+  onKeepSession,
   costUnit,
   effort,
   onSplit,
@@ -365,7 +368,7 @@ export function ChatMessages({
         </div>
       )}
 
-      <FeedNotices stream={stream} onRefresh={onRefresh} />
+      <FeedNotices stream={stream} onRefresh={onRefresh} onKeepSession={onKeepSession} />
 
       {/* Слой прогона не влезает в окно локальной модели — видно и между ходами (L6). */}
       {localRun && !stream.isRunning && (
@@ -384,6 +387,10 @@ export function ChatMessages({
 
       {permissions && permissions.length > 0 && onPermissionDecide && (
         <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
+      )}
+
+      {deferredPermissions && deferredPermissions.length > 0 && onPermissionDecide && (
+        <DeferredPermissionCard permissions={deferredPermissions} onDecide={onPermissionDecide} />
       )}
 
       {branchGates && branchGates.length > 0 && onBranchDecide && (

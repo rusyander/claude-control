@@ -52,9 +52,12 @@ describe('название чата мимо преамбулы панели', (
   });
 
   it('копия без подготовки и доставка до MR: обе преамбулы пропущены', () => {
-    const prompt = `${environmentPreamble({})}\n\n${deliveryPreamble({ branch: 'fix/login' })}\n\n${buildGroupPrompt(GROUP)}`;
+    // `deliverLater` — то, что шлёт группа с доставкой отдельным звеном (23.10).
+    for (const deliverLater of [false, true]) {
+      const prompt = `${environmentPreamble({})}\n\n${deliveryPreamble({ branch: 'fix/login', deliverLater })}\n\n${buildGroupPrompt(GROUP)}`;
 
-    expect(chatTitleText([userBlocks(prompt)])).toBe('Поправь валидацию формы входа');
+      expect(chatTitleText([userBlocks(prompt)])).toBe('Поправь валидацию формы входа');
+    }
   });
 
   it('работа в чужом MR: преамбула MR пропущена', () => {

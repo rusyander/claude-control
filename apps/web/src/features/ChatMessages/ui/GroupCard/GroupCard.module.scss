@@ -1,5 +1,8 @@
+// Карточка — контейнер: раскладка её верхнего ряда зависит от ширины самой
+// карточки, а не окна (хаб бывает и в узкой колонке широкого окна).
 .group {
   position: relative;
+  container: group-card / inline-size;
   padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -9,9 +12,13 @@
 // MR влит (владелец 06.10.2026): работа кончена совсем — зелёный оттенок и
 // приглушённый текст, карточка стоит в самом низу (`hubOrder.ts`). Закрытый MR —
 // только приглушён: он кончен, но не успехом.
+// Оттенок — лёгкий (6 % цвета поверх фона карточки), а статус несёт полоса
+// слева: сплошная зелёная и синяя заливка во всю карточку горели на тёмной теме
+// (владелец 22.10.2026).
 .groupMerged {
-  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
-  background: var(--color-success-subtle);
+  border-color: color-mix(in srgb, var(--color-success) 25%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 6%, var(--color-surface-sunken));
+  box-shadow: inset 3px 0 0 var(--color-success);
   color: var(--color-fg-muted);
 }
 
@@ -19,14 +26,26 @@
 // отличается и от доставленной (фон по умолчанию), и от влитой (зелёный).
 // Карточка стоит ниже ждущих приёмки (`orderHubGroups.ts`).
 .groupAccepted {
-  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
-  background: var(--color-accent-subtle);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-sunken));
   box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .groupClosed {
   color: var(--color-fg-muted);
   opacity: 0.8;
+}
+
+// Ждёт человека (вопрос, решение, ответ на остановку) — жёлтая полоса слева,
+// упала — красная: по ленте карточек видно, где нужен я, не читая их.
+.groupAsk {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
+  box-shadow: inset 3px 0 0 var(--color-warning);
+}
+
+.groupFailed {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  box-shadow: inset 3px 0 0 var(--color-danger);
 }
 
 // Карточка с чатом кликабельна целиком, поэтому наведение видно в ОБЕИХ темах.
@@ -38,31 +57,37 @@
   }
 }
 
-// Текст слева, кнопки справа сверху. Тесно — кнопки переносятся в своём же
-// блоке, оставаясь справа; под текст уходят только на узком экране.
-.groupBody {
+// Верхний ряд: название слева, кнопки справа. Ряд невысокий — кнопки занимают
+// до двух третей ширины, не отнимая её у тела карточки. Тесно — кнопки
+// переносятся в своём же блоке; под название уходят только на узком экране.
+.groupHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--spacing-2xs) var(--spacing-sm);
-
-  @media (max-width: 640px) {
-    flex-wrap: wrap;
-  }
 }
 
 .groupMain {
   display: flex;
-  flex: 1 1 240px;
+  flex: 1 1 300px;
   align-items: flex-start;
   gap: var(--spacing-2xs);
   min-width: 0;
+  padding-top: 4px;
 }
 
-// Точка — по строке названия, а не по середине карточки.
+// Точка — по строке названия, а не по середине ряда.
 .groupDot {
   display: inline-flex;
   flex: none;
-  margin-top: 6px;
+  margin-top: 7px;
+}
+
+// Тело — во всю ширину карточки, с отступом под название (мимо точки).
+.groupBody {
+  margin-top: var(--spacing-2xs);
+  padding-left: calc(8px + var(--spacing-2xs));
+  min-width: 0;
 }
 
 // Растянутая кнопка: её ::after накрывает карточку, так что открывает клик в
@@ -105,10 +130,14 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--spacing-2xs);
-  max-width: 65%;
+  // Тело карточки идёт ниже во всю ширину, так что кнопки отнимают место только
+  // у шапки; ей оставлено 300px — путь «план › работа ×2 › последнее звено:
+  // ревью» одной строкой. Кнопкам тесно — они переносятся вторым рядом.
+  max-width: calc(100% - 300px - var(--spacing-sm));
   margin-left: auto;
 
-  @media (max-width: 640px) {
+  // Узкая карточка (боковая панель, телефон) — кнопки уходят под шапку.
+  @container group-card (max-width: 640px) {
     max-width: none;
   }
 
@@ -137,6 +166,20 @@
   z-index: 1;
   margin-top: var(--spacing-2xs);
   padding-left: calc(8px + var(--spacing-2xs));
+}
+
+// «Не хватает для MR» — свёрнутым разделом с пунктами списком.
+.missing {
+  margin-top: var(--spacing-3xs);
+}
+
+.missingList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--spacing-3xs) 0 0;
+  padding-left: calc(16px + var(--spacing-xs));
+  overflow-wrap: anywhere;
 }
 
 .holdActions {

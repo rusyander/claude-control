@@ -23,4 +23,6 @@ export interface RunLike {
   tools?: StreamedTool[];
   /** Когда сервер завёл прогон, по его часам (мс). */
   startedAt?: number;
+  /** Лимит подписки отказал ходу. */
+  limitHit?: boolean;
 }

@@ -10,4 +10,5 @@ export type { MascotPrefs } from './prefs.types';
 export { TIP_KEYS, tipScope, pickTip } from './tips';
 export type { TipScope } from './tips.types';
 export { cameoLine, CAMEO_APPEAR_MS } from './cameo';
+export { registerMascotSpeechSlot, getMascotSpeechSlot, useMascotSpeechSlot } from './speech-slot';
 export type { CameoLine } from './cameo.types';

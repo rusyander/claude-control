@@ -116,7 +116,83 @@ describe('group watch signals', () => {
     expect(capped[0]?.id).toBe(`x${GROUP_SIGNALS_CAP + 2}`);
   });
 
-  it('notifies warn and alert only, once per key within the cooldown, again when severity rises', () => {
+  it('over the cap with only active signals: none is evicted, the oldest is not raised again', () => {
+    const active: GroupSignal[] = Array.from({ length: GROUP_SIGNALS_CAP + 1 }, (_, n) => ({
+      id: `a${n}`,
+      rule: n % 2 === 0 ? 'R4' : 'R12',
+      severity: 'warn',
+      groupIndex: 0,
+      chatId: `c${n}`,
+      at: new Date(T0 + n * 1000).toISOString(),
+      numbers: { runs: 3 },
+      textKey: '',
+    }));
+    expect(capSignals(active)).toHaveLength(GROUP_SIGNALS_CAP + 1);
+    // Самый старый активный (c0) остаётся и на следующей оценке находится, а не рождается заново.
+    const merged = mergeSignals(
+      active,
+      { chatId: 'c0', groupIndex: 0 },
+      [hit('R4', { runs: 3 })],
+      T0 + 60_000,
+      makeId,
+    );
+    expect(merged.raised).toEqual([]);
+    expect(merged.structural).toBe(false);
+    expect(merged.signals.find((signal) => signal.chatId === 'c0')?.id).toBe('a0');
+  });
+
+  it('merge scope: rules limit what is raised and closed, group scope finds the one signal by rule', () => {
+    const base = mergeSignals(
+      [],
+      scope,
+      [hit('R4', { runs: 3 }), hit('R8', { perHour: 50 })],
+      T0,
+      makeId,
+    );
+    // Слияние правил сессии не трогает сигнал группы R8, даже когда в попаданиях его нет.
+    const session = mergeSignals(base.signals, scope, [hit('R4', { runs: 4 })], T0 + 1, makeId, {
+      rules: new Set(['R4']),
+    });
+    expect(session.signals.find((signal) => signal.rule === 'R8')?.clearedAt).toBeUndefined();
+    // Сигнал группы ищется по правилу: другой чат того же звена обновляет его, а не заводит второй.
+    const other = { ...scope, chatId: 'c-review' };
+    const group = mergeSignals(
+      session.signals,
+      other,
+      [hit('R8', { perHour: 70 })],
+      T0 + 2,
+      makeId,
+      { rules: new Set(['R8']), group: true },
+    );
+    expect(group.raised).toEqual([]);
+    expect(group.signals.filter((signal) => signal.rule === 'R8')).toHaveLength(1);
+    expect(group.signals.find((signal) => signal.rule === 'R8')?.numbers).toEqual({ perHour: 70 });
+    // Условие группы кончилось — закрыт из любого чата, R4 чата c1 не тронут.
+    const quiet = mergeSignals(group.signals, other, [], T0 + 3, makeId, {
+      rules: new Set(['R8']),
+      group: true,
+    });
+    expect(quiet.signals.find((signal) => signal.rule === 'R8')?.clearedAt).toBeDefined();
+    expect(quiet.signals.find((signal) => signal.rule === 'R4')?.clearedAt).toBeUndefined();
+  });
+
+  it('clearChatSignals with rules closes only those rules of the chat', () => {
+    const both = mergeSignals(
+      [],
+      scope,
+      [hit('R4', { runs: 3 }), hit('R8', { perHour: 50 })],
+      T0,
+      makeId,
+    );
+    const cleared = clearChatSignals(both.signals, 'c1', T0 + 1, new Set(['R4']));
+    expect(cleared.changed).toBe(true);
+    expect(cleared.signals.find((signal) => signal.rule === 'R4')?.clearedAt).toBeDefined();
+    expect(cleared.signals.find((signal) => signal.rule === 'R8')?.clearedAt).toBeUndefined();
+    // Закрытый не закрывается второй раз.
+    expect(clearChatSignals(cleared.signals, 'c1', T0 + 2, new Set(['R4'])).changed).toBe(false);
+  });
+
+  it('notifies warn and alert only, once per key within the cooldown unless the severity rose', () => {
     const sent = new Map();
     const keyOf = (signal: GroupSignal) => `${signal.rule}:${signal.chatId}`;
     const make = (rule: GroupSignal['rule'], severity: GroupSignal['severity']): GroupSignal => ({
@@ -134,11 +210,42 @@ describe('group watch signals', () => {
     expect(
       signalsToNotify([make('R4', 'warn')], keyOf, sent, 30 * 60_000, T0 + 60_000),
     ).toHaveLength(0);
+    // Важность выросла (внимание → тревога) — наружу сразу, срок тишины её не держит (C02);
+    // та же тревога ещё раз внутри срока — нет.
     expect(
       signalsToNotify([make('R4', 'alert')], keyOf, sent, 30 * 60_000, T0 + 120_000),
     ).toHaveLength(1);
     expect(
+      signalsToNotify([make('R4', 'alert')], keyOf, sent, 30 * 60_000, T0 + 180_000),
+    ).toHaveLength(0);
+    expect(
+      signalsToNotify([make('R1', 'alert')], keyOf, sent, 30 * 60_000, T0 + 120_000),
+    ).toHaveLength(1);
+    expect(
       signalsToNotify([make('R4', 'warn')], keyOf, sent, 30 * 60_000, T0 + 31 * 60_000 + 120_000),
     ).toHaveLength(1);
+  });
+
+  it('a hit with a higher severity raises the active signal in place and offers it again (A2)', () => {
+    const warn = mergeSignals([], scope, [hit('R1b', { waitMin: 20 })], T0, makeId);
+    const id = warn.signals[0]?.id;
+    const same = mergeSignals(warn.signals, scope, [hit('R1b', { waitMin: 40 })], T0 + 1, makeId);
+    expect(same.raised).toEqual([]);
+    expect(same.structural).toBe(false);
+    const alert = mergeSignals(
+      same.signals,
+      scope,
+      [hit('R1b', { waitMin: 61 }, 'alert')],
+      T0 + 2,
+      makeId,
+    );
+    expect(alert.signals).toHaveLength(1);
+    expect(alert.signals[0]).toMatchObject({ id, severity: 'alert', numbers: { waitMin: 61 } });
+    expect(alert.raised.map((signal) => signal.id)).toEqual([id]);
+    expect(alert.structural).toBe(true);
+    // Вниз не идёт: тревога держится, пока условие не кончится.
+    const lower = mergeSignals(alert.signals, scope, [hit('R1b', { waitMin: 62 })], T0 + 3, makeId);
+    expect(lower.signals[0]?.severity).toBe('alert');
+    expect(lower.raised).toEqual([]);
   });
 });

@@ -1,0 +1,108 @@
+{
+  "topic": "chat",
+  "scenario": "deferred",
+  "frames": [
+    {
+      "id": "01-banner",
+      "side": "panel",
+      "file": "01-banner.png",
+      "masked": 0,
+      "width": 1140,
+      "height": 543,
+      "shotAt": "2026-10-23T18:04:48.289Z",
+      "text": "Ждёт решения (3) Вызовы, которые решает только человек. Агенты поставили их в список и работают дальше; ответ продолжит работу ровно с этим вызовом. Скрыть Все (3) Панель заказов · Группа 1 — Выгрузка заказов (1) Панель заказов · Группа 2 — Фильтры списка (1) Панель заказов · Отчёт по возвратам (1) D-3 Bash Панель заказов · Группа 1 — Выгрузка заказов спрошено 23.10, 13:40 git branch -D feature/orders-export-old Правила прав группы отдают этот вызов человеку. агент повторил вызов 1 раз Открыть чат Отклонить Разрешить D-4 Bash Панель заказов · Группа 2 — Фильтры списка спрошено 23.10, 13:52 npm publish --access public Правила прав группы отдают этот вызов человеку. Открыть чат Отклонить Разрешить D-5 Bash Панель заказов · Отчёт по возвратам спрошено 23.10, 13:55 docker compose down -v Вызов не покрыт правилами автоподтверждения. Открыть чат Отклонить Разрешить",
+      "en": {
+        "file": "01-banner.en.png",
+        "masked": 0,
+        "width": 1140,
+        "height": 543,
+        "shotAt": "2026-10-23T18:03:22.387Z",
+        "text": "Awaiting decision (3) Calls only a human decides. The agents queued them and keep working; an answer resumes the work with exactly this call. Hide All (3) Панель заказов · Group 1 — Orders export (1) Панель заказов · Group 2 — List filters (1) Панель заказов · Returns report (1) D-3 Bash Панель заказов · Group 1 — Orders export asked 10/23, 01:40 PM git branch -D feature/orders-export-old The group's permission rows send this call to a human. the agent repeated the call 1 time Open chat Deny Allow D-4 Bash Панель заказов · Group 2 — List filters asked 10/23, 01:52 PM npm publish --access public The group's permission rows send this call to a human. Open chat Deny Allow D-5 Bash Панель заказов · Returns report asked 10/23, 01:55 PM docker compose down -v The call is not covered by the auto-approve rules. Open chat Deny Allow"
+      },
+      "dark": {
+        "file": "01-banner.dark.png",
+        "masked": 0,
+        "width": 1140,
+        "height": 543,
+        "shotAt": "2026-10-23T18:03:48.286Z",
+        "text": "Ждёт решения (3) Вызовы, которые решает только человек. Агенты поставили их в список и работают дальше; ответ продолжит работу ровно с этим вызовом. Скрыть Все (3) Панель заказов · Группа 1 — Выгрузка заказов (1) Панель заказов · Группа 2 — Фильтры списка (1) Панель заказов · Отчёт по возвратам (1) D-3 Bash Панель заказов · Группа 1 — Выгрузка заказов спрошено 23.10, 13:40 git branch -D feature/orders-export-old Правила прав группы отдают этот вызов человеку. агент повторил вызов 1 раз Открыть чат Отклонить Разрешить D-4 Bash Панель заказов · Группа 2 — Фильтры списка спрошено 23.10, 13:52 npm publish --access public Правила прав группы отдают этот вызов человеку. Открыть чат Отклонить Разрешить D-5 Bash Панель заказов · Отчёт по возвратам спрошено 23.10, 13:55 docker compose down -v Вызов не покрыт правилами автоподтверждения. Открыть чат Отклонить Разрешить"
+      },
+      "darkEn": {
+        "file": "01-banner.dark.en.png",
+        "masked": 0,
+        "width": 1140,
+        "height": 543,
+        "shotAt": "2026-10-23T18:04:14.226Z",
+        "text": "Awaiting decision (3) Calls only a human decides. The agents queued them and keep working; an answer resumes the work with exactly this call. Hide All (3) Панель заказов · Group 1 — Orders export (1) Панель заказов · Group 2 — List filters (1) Панель заказов · Returns report (1) D-3 Bash Панель заказов · Group 1 — Orders export asked 10/23, 01:40 PM git branch -D feature/orders-export-old The group's permission rows send this call to a human. the agent repeated the call 1 time Open chat Deny Allow D-4 Bash Панель заказов · Group 2 — List filters asked 10/23, 01:52 PM npm publish --access public The group's permission rows send this call to a human. Open chat Deny Allow D-5 Bash Панель заказов · Returns report asked 10/23, 01:55 PM docker compose down -v The call is not covered by the auto-approve rules. Open chat Deny Allow"
+      }
+    },
+    {
+      "id": "02-hub",
+      "side": "panel",
+      "file": "02-hub.png",
+      "masked": 0,
+      "width": 782,
+      "height": 351,
+      "shotAt": "2026-10-23T18:04:51.397Z",
+      "text": "Ждёт решения у групп (2) Все (2) Панель заказов · Группа 1 — Выгрузка заказов (1) Панель заказов · Группа 2 — Фильтры списка (1) D-3 Bash Панель заказов · Группа 1 — Выгрузка заказов спрошено 23.10, 13:40 git branch -D feature/orders-export-old Правила прав группы отдают этот вызов человеку. агент повторил вызов 1 раз Открыть чат Отклонить Разрешить D-4 Bash Панель заказов · Группа 2 — Фильтры списка спрошено 23.10, 13:52 npm publish --access public Правила прав группы отдают этот вызов человеку. Открыть чат Отклонить Разрешить",
+      "en": {
+        "file": "02-hub.en.png",
+        "masked": 0,
+        "width": 782,
+        "height": 351,
+        "shotAt": "2026-10-23T18:03:25.448Z",
+        "text": "Awaiting decision in groups (2) All (2) Панель заказов · Group 1 — Orders export (1) Панель заказов · Group 2 — List filters (1) D-3 Bash Панель заказов · Group 1 — Orders export asked 10/23, 01:40 PM git branch -D feature/orders-export-old The group's permission rows send this call to a human. the agent repeated the call 1 time Open chat Deny Allow D-4 Bash Панель заказов · Group 2 — List filters asked 10/23, 01:52 PM npm publish --access public The group's permission rows send this call to a human. Open chat Deny Allow"
+      },
+      "dark": {
+        "file": "02-hub.dark.png",
+        "masked": 0,
+        "width": 782,
+        "height": 351,
+        "shotAt": "2026-10-23T18:03:51.346Z",
+        "text": "Ждёт решения у групп (2) Все (2) Панель заказов · Группа 1 — Выгрузка заказов (1) Панель заказов · Группа 2 — Фильтры списка (1) D-3 Bash Панель заказов · Группа 1 — Выгрузка заказов спрошено 23.10, 13:40 git branch -D feature/orders-export-old Правила прав группы отдают этот вызов человеку. агент повторил вызов 1 раз Открыть чат Отклонить Разрешить D-4 Bash Панель заказов · Группа 2 — Фильтры списка спрошено 23.10, 13:52 npm publish --access public Правила прав группы отдают этот вызов человеку. Открыть чат Отклонить Разрешить"
+      },
+      "darkEn": {
+        "file": "02-hub.dark.en.png",
+        "masked": 0,
+        "width": 782,
+        "height": 351,
+        "shotAt": "2026-10-23T18:04:17.446Z",
+        "text": "Awaiting decision in groups (2) All (2) Панель заказов · Group 1 — Orders export (1) Панель заказов · Group 2 — List filters (1) D-3 Bash Панель заказов · Group 1 — Orders export asked 10/23, 01:40 PM git branch -D feature/orders-export-old The group's permission rows send this call to a human. the agent repeated the call 1 time Open chat Deny Allow D-4 Bash Панель заказов · Group 2 — List filters asked 10/23, 01:52 PM npm publish --access public The group's permission rows send this call to a human. Open chat Deny Allow"
+      }
+    },
+    {
+      "id": "03-card",
+      "side": "panel",
+      "file": "03-card.png",
+      "masked": 0,
+      "width": 832,
+      "height": 217,
+      "shotAt": "2026-10-23T18:04:54.458Z",
+      "text": "Отложено как D-4 — агент работает дальше Bash npm publish --access public Ответ здесь решает D-4 в списке «Ждёт решения». Запретить Разрешить",
+      "en": {
+        "file": "03-card.en.png",
+        "masked": 0,
+        "width": 832,
+        "height": 217,
+        "shotAt": "2026-10-23T18:03:28.478Z",
+        "text": "Deferred as D-4 — the agent keeps working Bash npm publish --access public An answer here decides D-4 in the «Awaiting decision» list. Deny Allow"
+      },
+      "dark": {
+        "file": "03-card.dark.png",
+        "masked": 0,
+        "width": 832,
+        "height": 217,
+        "shotAt": "2026-10-23T18:03:54.381Z",
+        "text": "Отложено как D-4 — агент работает дальше Bash npm publish --access public Ответ здесь решает D-4 в списке «Ждёт решения». Запретить Разрешить"
+      },
+      "darkEn": {
+        "file": "03-card.dark.en.png",
+        "masked": 0,
+        "width": 832,
+        "height": 217,
+        "shotAt": "2026-10-23T18:04:20.513Z",
+        "text": "Deferred as D-4 — the agent keeps working Bash npm publish --access public An answer here decides D-4 in the «Awaiting decision» list. Deny Allow"
+      }
+    }
+  ]
+}

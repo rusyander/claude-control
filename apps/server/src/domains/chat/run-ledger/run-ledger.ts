@@ -57,6 +57,23 @@ export interface RunLedgerEntry {
    * правки групп пошли не в авторежиме и встали на карточке прав.
    */
   permissionMode?: string;
+  /**
+   * Команда запуска CLI (`RunOptions.command`) и провайдер, чья она (EF-190). Без
+   * них продолжение усыновлённого прогона (самостоятельное продолжение, повтор)
+   * поднимало CLI по умолчанию — `claude` из PATH, — а не тот, которым прогон шёл.
+   * У записи прежних версий команды нет: продолжение берёт CLI по умолчанию, и
+   * сервер пишет об этом строку (`ledgerRunOptions`).
+   */
+  command?: string;
+  provider?: string;
+  /**
+   * Каталог конфигурации CLI и `--setting-sources` прогона: без них продолжение
+   * прогона со своим каталогом шло бы на настоящей конфигурации человека.
+   * Окружение (`env`, `platformEnv`) сюда не пишется намеренно: в нём бывают
+   * ключи, а журнал лежит на диске открытым текстом.
+   */
+  configDir?: string;
+  settingSources?: string;
   /** Прогон шёл на локальной модели (`RunMeta.local`): без записи усыновлённый прогон терял это знание. */
   local?: true;
   /** Чем прогон был для контура (`RunMeta.origin`): ход, начатый CLI после подхвата, — тот же. */
@@ -130,7 +147,7 @@ export function readRunLedger(appDataDir: string, file?: string): RunLedgerEntry
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isEntry);
+    return parsed.filter(isEntry).map(withSaneLaunch);
   } catch {
     return [];
   }
@@ -145,6 +162,24 @@ function isEntry(value: unknown): value is RunLedgerEntry {
     typeof entry.cwd === 'string' &&
     typeof entry.startedAt === 'number'
   );
+}
+
+const LAUNCH_FIELDS = ['command', 'provider', 'configDir', 'settingSources'] as const;
+
+/**
+ * Поля запуска — непустой строкой или никак. Битое поле снимается, а запись
+ * остаётся: без неё прогон не усыновить, и каждый его запрос прав получил бы
+ * отказ. Снятая команда значит CLI по умолчанию — как у записи прежних версий.
+ */
+function withSaneLaunch(entry: RunLedgerEntry): RunLedgerEntry {
+  const raw = entry as unknown as Record<string, unknown>;
+  const bad = LAUNCH_FIELDS.filter(
+    (name) => raw[name] !== undefined && (typeof raw[name] !== 'string' || raw[name] === ''),
+  );
+  if (bad.length === 0) return entry;
+  const copy = { ...raw };
+  for (const name of bad) delete copy[name];
+  return copy as unknown as RunLedgerEntry;
 }
 
 /**

@@ -21,6 +21,7 @@ import type { WorktreeBootstrapState, WorktreeMirrorSettings } from '@agentdeck/
 import {
   addMergeRequestWorktree,
   addWorktree,
+  defaultBaseOf,
   describeMirror,
   mirrorLineForModel,
   isGitRepo,
@@ -75,6 +76,12 @@ export interface SplitGit {
    * `base` — от какой ветки отвести новую (группа, ждавшая предшественников).
    */
   addWorktree(dir: string, branch: string, base?: string): Promise<SplitCopy>;
+  /**
+   * Основная ветка проекта (`origin/main` и т. п.) — база новой ветки группы, у
+   * которой нет предшественников. Нет метода или `undefined` — от HEAD (тест без git,
+   * репозиторий без основной ветки).
+   */
+  defaultBase?(dir: string): Promise<string | undefined>;
   /**
    * Подготовить копию до старта агента (установка зависимостей). Ждётся;
    * `undefined` — команды нет. Провал — состояние, не исключение.
@@ -137,6 +144,7 @@ export function makeSplitGit(
         ...worktrees.worktrees.map((item) => item.branch ?? '').filter(Boolean),
       ];
     },
+    defaultBase: defaultBaseOf,
     async addWorktree(dir, branch, base) {
       const created = await addWorktree(dir, branch, mirrorFor(dir), base, claudeJsonPath);
       return {
@@ -478,6 +486,15 @@ export async function splitTasks({
   const chosen = (selected ?? proposal.groups.map((_, index) => index)).filter(
     (index) => index >= 0 && index < proposal.groups.length,
   );
+  // Ветка группы без предшественников отводится от основной ветки проекта, а не
+  // от того, что выгружено в папке проекта: стоит человеку оставить её на своей
+  // ветке задачи — и её коммиты уехали бы в ветку группы и в её MR. Узнаём один
+  // раз на запуск (там `fetch`), и только если копию правда заводим.
+  let mainBase: Promise<string | undefined> | undefined;
+  const baseOfProject = (): Promise<string | undefined> =>
+    git.defaultBase
+      ? git.defaultBase(projectPath).catch(() => undefined)
+      : Promise.resolve(undefined);
   for (const index of chosen) {
     const group = proposal.groups[index] as TaskSplitGroup;
     // Ревью-группа (Т7) ветку не выдумывает: её копия обязана стоять на ветке
@@ -530,7 +547,11 @@ export async function splitTasks({
                 branch,
                 ...(review.remote ? { remote: review.remote } : {}),
               })
-            : await git.addWorktree(projectPath, branch, context?.base);
+            : await git.addWorktree(
+                projectPath,
+                branch,
+                context?.base ?? (await (mainBase ??= baseOfProject())),
+              );
         if (copy.detached && review) review.detached = true;
         cwd = copy.path;
         mirror = copy.mirror;
@@ -621,6 +642,9 @@ export async function splitTasks({
             ...(reviewPublishGranted(proposal.shared, group.tasks) ? { publish: true } : {}),
           }
         : undefined;
+    // Строка старшинства обещает «полный прогон — в доставке» только группе, за
+    // работой которой это звено и пойдёт; иначе обещание неправда (RF-BGCD-06).
+    const groupPromptOptions = deliver && !review ? { deliver: true } : {};
     // Ревью по ссылке (Т7) — другое задание и другая стадия: план группе,
     // которая ничего не делает, не нужен, а понижать её нечем (класс `review`
     // держится на потолке).
@@ -643,11 +667,14 @@ export async function splitTasks({
             onMrBranch: target.onMrBranch,
             ...(target.detached ? { detached: true } : {}),
             ...(target.remote ? { remote: target.remote } : {}),
-          })}\n\n${buildGroupPrompt(group, proposal.shared)}`
-        : buildGroupPrompt(group, proposal.shared);
+          })}\n\n${buildGroupPrompt(group, proposal.shared, groupPromptOptions)}`
+        : buildGroupPrompt(group, proposal.shared, groupPromptOptions);
     // Развилки — человеку: строка едет в преамбулу доставки, а без доставки —
     // отдельным абзацем; ревью чужого MR развилок не решает, ему она не нужна.
     const asksHuman = groupQuestions === 'human' && !review;
+    // deliverLater: доставку ведёт звено каскада после работы (planStage: работа →
+    // ревью → правки → доставка; без ревьюера — сразу доставка): работе — правка
+    // и коммит, полный гейт один, в доставке (владелец 23.10).
     const delivered =
       deliver && !review
         ? `${deliveryPreamble({
@@ -657,6 +684,7 @@ export async function splitTasks({
             ...(foreign ? { foreign } : {}),
             ...(shots ? { shots } : {}),
             reviewPack,
+            deliverLater: true,
           })}\n\n${base}`
         : asksHuman
           ? `${groupQuestionsHumanLine(foreign)}\n\n${base}`

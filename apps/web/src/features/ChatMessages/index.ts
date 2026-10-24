@@ -45,6 +45,11 @@ export { ChildStages } from './ui/ChildStages/ChildStages';
  * настоящей отрисовкой, а не с копией разметки.
  */
 export { ChildBlocks } from './ui/ChildBlocks/ChildBlocks';
+/**
+ * Остров сторожа над лентой одиночного чата — та же отрисовка сигналов, что в
+ * карточке группы хаба; ставит его страница чата рядом с заметками критичного.
+ */
+export { ChatWatchIsland } from './ui/ChatWatchIsland/ChatWatchIsland';
 export type { ChildStageGroup, ChildStagesProps } from './ui/ChildStages.types';
 /**
  * Склейка строк хаба с записью конвейера уровней. Наружу — по той же причине:

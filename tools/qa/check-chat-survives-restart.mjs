@@ -366,6 +366,12 @@ function buildStand(stand) {
   // Встроенный набор панели: без него сборка набора падает, а прогон при сбое
   // сборки не запускается вовсе — сценарий обрывался «фальшивый CLI не поднялся».
   cpSync(join(serverFrom, 'assets'), join(serverTo, 'assets'), { recursive: true });
+  // Хук очереди тяжёлых шагов сервер зовёт по пути от своих исходников
+  // (`runtime.ts`): без него в копии хук группы падал ERR_MODULE_NOT_FOUND.
+  mkdirSync(join(stand, 'tools'), { recursive: true });
+  for (const file of ['heavy-queue-hook.mjs', 'heavy-queue-classify.mjs']) {
+    copyFileSync(join(REPO, 'tools', file), join(stand, 'tools', file));
+  }
   // Зависимости — ссылкой: копировать их незачем, а менять их проверка не
   // будет. Ссылка снимается первой при уборке (`unlinkStand`). Контракты сервер
   // берёт через неё же (`@agentdeck/contracts`), а сторожу нужен лишь каталог:

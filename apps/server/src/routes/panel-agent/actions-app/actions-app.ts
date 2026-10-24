@@ -345,9 +345,16 @@ const SETTINGS_KEY_TAB: Record<keyof typeof SETTINGS_KEYS, string> = {
   autoUpdateModels: SETTINGS_TAB.models,
 };
 
+/**
+ * Ключи, которых нет во входе `update_settings`, — с именами, чтобы агент сказал
+ * человеку, где их править, а не искал обход. Сторож и экономия групп — здесь
+ * же: агент, выключивший сторожа над собственной группой, отключил бы наблюдение
+ * за собой (F-60).
+ */
 const HUMAN_ONLY_SETTINGS =
   'claudeDirOverride, revealSecretsByDefault, backupBeforeWrite, encryptSecretBackups, autoApproveRules, chatAutoMode, ' +
-  'promptGate, modelPricing, platformGateway, remote access';
+  'promptGate, modelPricing, platformGateway, remote access, groupWatch, groupEconomy, ' +
+  'deferAfterMinutes, deferredTtlDays';
 
 const getSettings = definePanelAction({
   name: 'get_settings',

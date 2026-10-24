@@ -70,3 +70,33 @@ describe('PendingAsks: вопрос усыновлённого прогона и
     ]);
   });
 });
+
+// Живой случай RBAC 23.10: ход кончился ожиданием словами без «?» — вопрос
+// дерева не загорался, и человек в режиме «вопросы — человеку» его не видел.
+describe('PendingAsks: ожидание ответа словами — тоже вопрос дерева', () => {
+  const finished = (text: string): RunFinished => ({
+    chatId: 'new-g2',
+    sessionId: 'sess-g2',
+    text,
+    ok: true,
+    startedAt: 0,
+    options: { prompt: '', cwd: '/w' },
+    contextTokens: 0,
+  });
+  const asks = () => new PendingAsks({ isTreeChat: () => true, readAsked: () => undefined });
+
+  it('«начну после ответа» — текстовый вопрос; метка HUMAN: и отчёт — нет', () => {
+    const store = asks();
+    store.finished(
+      finished('Этапы D и E начну после ответа. Вопросы и рекомендации записаны в PROGRESS.md'),
+    );
+    expect(store.of(['sess-g2'], () => false)).toEqual([
+      expect.objectContaining({ kind: 'text', runId: 'new-g2' }),
+    ]);
+
+    const other = asks();
+    other.finished(finished('HUMAN: merge — MR !12 first. Once you confirm I will push.'));
+    other.finished(finished('Сделал этапы A–E.'));
+    expect(other.of(['sess-g2'], () => false)).toEqual([]);
+  });
+});

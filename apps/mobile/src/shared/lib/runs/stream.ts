@@ -19,7 +19,13 @@ import { runs, setRun, markStalled, markLive, applyEvent, lastSeqs } from './sto
  * заново с последнего `seq` и догоняем пропущенное.
  */
 
-type StreamOutcome = 'clean' | 'dirty' | 'gone' | 'refused';
+/**
+ * Чем кончился поток. `broken` — оборвался без конца хода, но перед этим жил
+ * (пришло событие или пульс): связь была, и переподключение не тратит попытки.
+ * `dirty` — оборвался, не дав ничего: столько подряд — и связь считается
+ * потерянной.
+ */
+type StreamOutcome = 'clean' | 'dirty' | 'broken' | 'gone' | 'refused';
 
 interface StreamInit {
   method: 'GET' | 'POST';
@@ -72,6 +78,7 @@ async function pump(
   const decoder = new TextDecoder();
   let buffer = '';
   let sawTerminal = false;
+  let lived = false;
 
   // Сторож простоя. Отсчёт ведём от последнего БАЙТА, а не события: между
   // шагами агента событий нет минутами, а пульс `: ping` идёт всегда. Сработал
@@ -98,21 +105,30 @@ async function pump(
         return 'dirty';
       }
       if (chunk.done) break;
+      // Поток сменён (новый ход с телефона поверх хвоста, «Стоп», другой
+      // компьютер): кадры, дочитанные им после этого, принадлежат не тому
+      // прогону, что сейчас под этим ключом, — ни события, ни конец хода.
+      // Наверх — как оборванное чтение: тот же путь, что у транспорта, который
+      // сам рвёт тело по сигналу.
+      if (controller.signal.aborted) throw new Error('aborted');
       markLive(id);
 
       buffer += decoder.decode(chunk.value, { stream: true });
       const parts = buffer.split('\n\n');
       buffer = parts.pop() ?? '';
       for (const part of parts) {
+        if (part.startsWith(': ping')) lived = true;
         const parsed = parseFrame(part);
         if (!parsed) continue;
+        lived = true;
         if (typeof parsed.seq === 'number') lastSeqs.set(id, parsed.seq);
         if ((parsed as { kind: string }).kind === 'gone') return 'gone';
         if (parsed.kind === 'done' || parsed.kind === 'error') sawTerminal = true;
         applyEvent(id, parsed);
       }
     }
-    return sawTerminal ? 'clean' : 'dirty';
+    if (sawTerminal) return 'clean';
+    return lived ? 'broken' : 'dirty';
   } finally {
     clearTimeout(timer);
   }
@@ -217,8 +233,14 @@ export async function openStream(
   } else {
     const from = lastSeqs.get(id) ?? 0;
     const target = runs.get(id)?.serverRunId ?? id;
+    // `startedAt` называет ход, к которому относится `from`: новый ход под тем же
+    // ключом нумерует события с нуля, и без этого курсор прошлого хода терял бы
+    // начало и конец нового (сервер отдаёт другой ход с начала).
     response = await openResponse(
-      apiUrl(`/chat/${encodeURIComponent(target)}/stream`, { from }),
+      apiUrl(`/chat/${encodeURIComponent(target)}/stream`, {
+        from,
+        startedAt: runs.get(id)?.startedAt,
+      }),
       { method: 'GET', headers: authHeaders() },
       controller,
     );

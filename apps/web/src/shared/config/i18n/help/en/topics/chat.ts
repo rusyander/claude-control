@@ -451,9 +451,16 @@ export const chatEn: typeof chatRu = {
         'have become chats.',
       sHub: 'Follow the groups from the parent',
       sHubText:
-        'The hub "2 split groups" with the "triage applied" chip shows, per group, ' +
-        'the chain of stages (plan, work, review), the model, the delay before the ' +
-        'first edit and the time at work. Until branches are compared it says so.',
+        'The hub "2 split groups" with the "triage applied" chip shows, per group, a ' +
+        'top row — the title with its “waiting for” chip and under it the chain of stages ' +
+        '(“plan › work ×3 › now: review”: repeats in a row as a count, the current stage ' +
+        'as its own pill), the group’s buttons on the right. Below, across the full card ' +
+        'width: the progress indicator, trouble (failure, interruption, panel retries) on ' +
+        'a red plate, facts as separate items, the “Model”, “Before first edit”, “Time at ' +
+        'work” columns, the branch and, below a rule, the “Tokens” section: numbers in ' +
+        'labelled columns in the “Sessions” and “Warming” rows. The summary above the ' +
+        'cards shows the cache-warming result over all groups: “cache warming: saved ≈ …” ' +
+        'or “overpaid ≈ …”. Until branches are compared it says so.',
       sAsk: 'Answer the children without visiting them',
       sAskText:
         "A child's permission request arrives in the parent conversation signed " +
@@ -1056,9 +1063,12 @@ export const chatEn: typeof chatRu = {
       'the first paragraph of its task and decides itself whether to retry or go ' +
       'without. Copies from a split are prepared in parallel, and the start waits for ' +
       'all of them. After the command the panel checks the lockfiles (package-lock.json, ' +
-      'pnpm-lock.yaml, yarn.lock, bun.lock): ones rewritten by the install are reverted to ' +
+      'pnpm-lock.yaml, yarn.lock, bun.lock, plus go.mod, go.sum and uv.lock that the Go and Python warm-up edits): ones rewritten by the install are reverted to ' +
       'the index version, newly created ones are removed, and the list shows on the card ' +
-      'and in the log. ' +
+      'and in the log. It looks in the copy root and in first-level directories; a file ' +
+      'changed before the preparation (that is the agent’s work) is not reverted, and what ' +
+      'the preparation still left in the tree the delivery check does not count as the ' +
+      'group’s uncommitted work while the agent has not edited that file. ' +
       'The Node version comes from .nvmrc, .node-version, .tool-versions, volta or engines and ' +
       'the install runs on it when the machine has one (nvm, fnm, volta); when none is found the ' +
       'install runs on what exists and a line under the card says so. The same Node comes first ' +
@@ -1183,7 +1193,10 @@ export const chatEn: typeof chatRu = {
       'of the above stays. A group in Codex or Qwen Code gets the task, the spend rule, the ' +
       'short check output and the light MCP set; the skill list instead of descriptions, ' +
       'short tracker replies, task lists without descriptions and the heavy-step queue rest ' +
-      'on Claude Code hooks and do not reach it.',
+      'on Claude Code hooks and do not reach it. A group in Aider has no tool loop of its ' +
+      'own and runs no commands: from the spend rule it gets only the lines about the task ' +
+      'notebook and the tracker task file, and instead of being asked to run checks it is ' +
+      'told never to claim that tests, lint or a build ran.',
 
     splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',
     splitCaption:
@@ -1313,9 +1326,12 @@ export const chatEn: typeof chatRu = {
       'displaces the oldest not-accepted one, and when there is nothing to displace it is not ' +
       'recorded and the card says so. When the copy has a Tests block, it is the block that says ' +
       '“verified” for the group: the cases its diff touches (by codePaths) must be run by a ' +
-      'run recorded after the group started and after its latest change — a commit or a ' +
-      'file in the working tree — and their latest result must not be red ' +
-      '(quarantine does not hold). No run, a run older than the change, a touched case not run, a red case, or a diff ' +
+      'run recorded after the group started and fresh for the case: the content of its ' +
+      'codePaths and test file is what the run saw. A commit, amend or rebase that leaves ' +
+      'those files alone keeps the run fresh; any edit in them makes it stale; an older run ' +
+      'without a content stamp is judged by the latest change, a commit or a working-tree ' +
+      'file, as before. Their latest result must not be red ' +
+      '(quarantine does not hold). No run, a stale run, a touched case not run, a red case, or a diff ' +
       'covered by no case while cases are linked to files — the group gets a reminder with ' +
       'the command that records a run, narrowed to the cases of its changed files (--case), ' +
       'and the group row in the hub reads “Tests block: N of M green”. When the branch is ' +
@@ -1331,10 +1347,18 @@ export const chatEn: typeof chatRu = {
       'run together with a fingerprint of the tree — the working files, regardless of ' +
       'line-ending settings — and notices when the same run already happened. A green run ' +
       'on the same tree does not run twice: the ledger returns the recorded output and exit ' +
-      'code, and its first line names the run it replayed. A vite build is replayed the ' +
-      'same way and puts the whole build folder back exactly as it was; a folder set in ' +
-      'the vite config (outDir or root) the ledger does not guess — such a build runs ' +
-      'again. After an edit, vitest runs not ' +
+      'code, and its first line names the run it replayed. The fingerprint includes the ' +
+      'launch environment too: variables (except service marks of the session, terminal ' +
+      'and package manager), node flags and NODE_OPTIONS, what node, npm, npx, pnpm, yarn, ' +
+      'git and the shell resolve to on PATH — the same run with a different environment ' +
+      'runs again, and the feed names the variables that differ, without values. A record ' +
+      'lives 72 hours from its last replay, and with no limit while the copy it was ' +
+      'recorded in and its branch are alive; the store cleans itself at most once an hour, ' +
+      'and above 1 GB the least recently used records go. A vite build is replayed the ' +
+      'same way and puts the whole build folder back exactly as it was — including one set ' +
+      'in the vite config by a single literal outDir inside build; an outDir given by an ' +
+      'expression, a plugin key or through root the ledger does not guess — such a build ' +
+      'runs again. After an edit, vitest runs not ' +
       'the whole suite but only the tests related to the files changed since the last green ' +
       'run (the “delta since green” line gives their count); an edit to dependencies, ' +
       'configs, setup files or snapshots, an edit to code outside every package (a script a ' +
@@ -1349,7 +1373,13 @@ export const chatEn: typeof chatRu = {
       'disagreed with the real run and under which CLIs the ledger fired. Panel environment ' +
       'variable AGENTDECK_VERIFY_LEDGER: empty or on — replays and narrowing, off or ' +
       'shadow — recording and comparison only, disabled — no ledger at all; ' +
-      'AGENTDECK_VERIFY_LEDGER_DELTA=off keeps replays but runs tests whole. If the module ' +
+      'AGENTDECK_VERIFY_LEDGER_DELTA=off keeps replays but runs tests whole. These are the ' +
+      'human’s choice in the panel’s own environment: when none is made, a model cannot ' +
+      'switch the ledger off in its command — the panel gives the CLIs it starts a lock, ' +
+      'and a split group’s command doing so is refused: the locked module ignores the ' +
+      'command’s environment variables, and an emptied NODE_OPTIONS in a group command is ' +
+      'refused too. The honest limit: a program the model wrote itself that rewrites ' +
+      'NODE_OPTIONS from inside or deletes the ledger files is not caught by the lock. If the module ' +
       'fails its self-test at panel start, nothing gets it, and the tile says “Not working” ' +
       'with the reason.',
     splitReview: 'Reviewing someone else’s merge requests',
@@ -1549,7 +1579,11 @@ export const chatEn: typeof chatRu = {
       'cards, without the reviewer’s prose around them. The link’s task ends with ' +
       'the paths of what earlier links left in the copy — before/after shots, the ' +
       'verification ledger, recorded test runs and gate logs — so nobody searches ' +
-      'for them again.',
+      'for them again. If the configuration folder holds a group rules card, ' +
+      'hooks/cards/group-rules.md, a stage gets it instead of the personal CLAUDE.md: a ' +
+      'short list of the rules that matter to a stage, and the stage opens the full file ' +
+      'itself when the card does not cover a case. Without the card the personal rules ' +
+      'load in full, as before.',
     cascadeLevels: 'Levels: one triage for the whole split and a plan per group',
     cascadeLevelsText:
       'With model selection on, the groups do not start at once. First a TRIAGE ' +
@@ -1566,7 +1600,13 @@ export const chatEn: typeof chatRu = {
       'On its verdict the panel creates the copies: groups with no waits right ' +
       'away, waiting ones once their predecessor’s chain ends (the copy then ' +
       'branches from ITS branch, not the main one), held ones after your answer ' +
-      'right in the summary under the parent. A waiting group is told in its task ' +
+      'right in the summary under the parent. The main branch is the one ' +
+      'origin/HEAD points to, or main or master without it; the panel fetches it ' +
+      'from the remote first. A group branch never starts from whatever is checked ' +
+      'out in the project folder: the folder may sit on your own task branch, and ' +
+      'its commits do not travel into the group branch and its MR. A repository ' +
+      'without a main branch gets the copy from the current HEAD. ' +
+      'A waiting group is told in its task ' +
       'who worked before it, on which branch and which files are already touched — ' +
       'from the branch comparison; the comparison did not make it in time — the ' +
       'files are simply not named, and the launch is not held up. ' +
@@ -1675,7 +1715,15 @@ export const chatEn: typeof chatRu = {
       '“delivery” link: commit, fresh main branch, push of its own branch, MR. Out of ' +
       'the box it runs on Sonnet (effort no higher than “high”): it is mechanics, and a ' +
       'call costs almost half. Turn off “Delivery on Sonnet” in “Settings” → “Groups” ' +
-      'and delivery runs on the work model; through a contour it always does. For a ' +
+      'and delivery runs on the work model. Through a contour delivery goes on the model of ' +
+      'the “sonnet” row of its name map, and the switch names it so; with no such row there ' +
+      'is no switch, and delivery runs on the work model. For Codex and Gemini groups the ' +
+      'same lever sends delivery to the lowest model of their ladder without raising the ' +
+      'effort: no higher than medium and no higher than the work’s, and when the work had none ' +
+      'of its own — as set in the CLI itself (through a contour — only if the map translates ' +
+      'that model’s name). If ' +
+      'the account or the route does not admit that model, a line about the refusal stays in ' +
+      'the feed and delivery starts over as a new conversation on the work model. For a ' +
       'single group it is decided on the split card: the group’s “Delivery on Sonnet” ' +
       'switch starts as set in Settings, cleared it keeps that group’s delivery on the ' +
       'work model, and on it sends the delivery to Sonnet even with the setting off. On the ' +
@@ -1696,9 +1744,26 @@ export const chatEn: typeof chatRu = {
       'on http or a custom port included), and without a forge it is not counted — ' +
       'and the “MR !N” button in the card’s ' +
       'corner opens the MR found that way in a new tab — only that button, a click ' +
-      'on the rest of the card goes to the chat. Something missing — the row says ' +
-      '“missing for the MR: …” and the ' +
-      'group gets a reminder, two at most; the remote not answering — the check ' +
+      'on the rest of the card goes to the chat. The button appears as soon as the ' +
+      'check finds the MR, even while something else is still missing for the ' +
+      'handover. Something missing — a folded “Missing for the MR: N” section sits ' +
+      'under the card, its items open as a list on a click, and from there ' +
+      'agents finish the delivery: a stage that cannot open an MR gets a new delivery ' +
+      'conversation, and stalled reminders get one diagnosis on a stronger model with the ' +
+      'round history. When that does not help either (or the reminders run out), the panel ' +
+      'stops reminding, and the card reads “Delivery stopped — N items” on a “waits for you” ' +
+      'plate: one line says why the panel stopped and what to do — continue the group with a ' +
+      'word in its chat, and the agent closes the items. A live check with no stand, a red ' +
+      'not caused by the branch and a case that cannot run here become notes in the MR ' +
+      'description, not a stop; for the security and data sieves (keys in the diff, ' +
+      'migrations, destructive statements) “not caused by the branch” ' +
+      'counts only with a run link (run:<id>) or a command with its output. The group calls a ' +
+      'human only for a merge, a deletion, a branch rewrite beyond a lease, a migration or a ' +
+      'database write, and credentials that exist nowhere: a merge gets the refusal “the ' +
+      'owner merges”, the rest becomes a D-n item in “Awaiting decision”. While at least one ' +
+      'D-n of the group waits, the MR stays a draft: the group is not allowed to take the ' +
+      'draft off, and a D-n number in a commit or MR text is refused — published text ' +
+      'describes the change only. The remote not answering — the check ' +
       'repeats (after one minute, five, fifteen, then every fifteen minutes for up to ' +
       'four hours) and only then gives up with the reason. The “Accept” button in a ' +
       'group’s row is your “I looked at the delivery and agree” mark: the panel never ' +
@@ -1713,7 +1778,21 @@ export const chatEn: typeof chatRu = {
       'the very bottom. ' +
       'Defects outside the tasks that groups found along the way ' +
       'collect in “Suggested tickets: N” — copy them, or “File in ‹project›” through ' +
-      'the tracker integration, only after you confirm. Steps a group cannot take (a ' +
+      'the tracker integration, only after you confirm. Before “File” the panel searches ' +
+      'the project’s open issues: if an issue about this defect is already open, it gets a ' +
+      'comment and no copy is filed (“already open — added as a comment”); if the search ' +
+      'fails, nothing is filed and another “File” tries again. “Resolve…” in the section ' +
+      'header takes every open ' +
+      'proposal at once. The dialog shows how many proposals are open, how many of them ' +
+      'are duplicates and how many issues will come out. Duplicates merge into one defect: ' +
+      'the same title or place, the same words in another order, a similar symptom in the ' +
+      'same file. Different defects of one file are gathered into one issue, each with its ' +
+      'own section: where, evidence, steps, expected and actual behaviour, who found it. ' +
+      '“Publish to Jira” checks open issues the same way as “File”; “Retry failed” tries ' +
+      'again. The panel’s model, when available, refines titles, area and severity; ' +
+      'without it the issues are built the same way, only without area and severity. ' +
+      '“Resolve here” opens one new project chat with the task of fixing every open ' +
+      'proposal and marks them “Taken into a chat”. Steps a group cannot take (a ' +
       'dependency between MRs, access, someone else’s service) collect in “For you to ' +
       'do: N” — the panel does not carry them out. A review-by-link group delivers ' +
       'nothing: it collects no steps for you, and a defect of the MR it reviews is a ' +
@@ -1769,7 +1848,11 @@ export const chatEn: typeof chatRu = {
       'nothing new. A pause stops the agent’s process together with its background ' +
       'commands (a stand server, a long check); “Resume” names the killed commands to ' +
       'the agent one by one, so it restarts the ones it needs instead of guessing from ' +
-      'a cut-off call. A queued group can be paused too — it does not start until you ' +
+      'a cut-off call. This holds between turns too: an agent waiting for a background ' +
+      'task is stopped as well and does not wake up after the pause. Processes started ' +
+      'from the group’s copy (dev server, test chain) are stopped by Pause, Drop and plan ' +
+      'cancel by the copy’s path; a stand in the project itself is left alone. A queued ' +
+      'group can be paused too — it does not start until you ' +
       '“Resume” it back into the queue. A message from the main chat to a paused group ' +
       'does not wake it: it waits and goes out after the turn you start. The group tab’s ' +
       'own queue works the same way: a message written while a turn ran does not go out ' +
@@ -1797,7 +1880,19 @@ export const chatEn: typeof chatRu = {
       'with “Remove” has none — a removed group does not come back. The group’s ' +
       'conversation is busy — “Continue” joins its queue, and a second click adds no ' +
       'second task. A group that gave ' +
-      'up passes the slot limit like a new one. “Cancel plan” stops every group of the split and closes the plan after ' +
+      'up passes the slot limit like a new one. A delivery the agents can finish by ' +
+      'themselves is not given up at once. The group conversation is busy at the moment of ' +
+      'delivery — the panel checks again in two minutes, for up to an hour in a row, and only ' +
+      'then stops with the reason “the group conversation was busy”. The copy could not be ' +
+      'read, the remote did not answer, or the delivery analysis stalled — the panel retries ' +
+      'on its own in 30 minutes, at most twice; the group row reads “the panel retries on its ' +
+      'own in 30 min (retry 1 of 2)”, and “Continue” is available at once, without waiting ' +
+      'for the retry. After the cap the group stops with “the panel retried and did not ' +
+      'finish”, but a panel restart and the remote answering again re-check such a group at ' +
+      'once. A corrupt git object store of the copy is not fixed by retrying — it is “a human ' +
+      'is needed” at once: run git fsck --full in the copy, restore the objects or recreate ' +
+      'the copy, then continue the group. For a group of another CLI, delivery runs as a new ' +
+      'conversation of that same CLI. “Cancel plan” stops every group of the split and closes the plan after ' +
       'asking for confirmation: chats, copies and branches stay, and after cancelling ' +
       'you can split again. A cancelled plan does not come back to life on a restart, ' +
       'and its groups’ questions are withdrawn: the project tab stops showing “agent ' +
@@ -1806,66 +1901,140 @@ export const chatEn: typeof chatRu = {
       'mark and the “Remove copy” button there.',
     cascadeRules: 'What a group decides on its own — “Settings” → “Groups”',
     cascadeRulesText:
-      'A group has no human by construction, so its permissions are decided by the ' +
-      'tab’s rows, each in one of three positions: “Itself”, “With a note” (also on ' +
-      'its own, but the parent’s summary keeps an “Allowed automatically” line you can ' +
-      '“Dismiss”; repeats in it are collapsed to “×N”, MCP calls are grouped under the ' +
-      'server name (“atlassian: jira_assign_issue ×6”), the full list is in the hover hint) ' +
-      'and “Human” — a card and a wait. A card asks you only about what ' +
-      'cannot be undone: deletion (branches locally and on the remote, tags, copies, ' +
-      'real files and directories, tables and databases), merging (git merge, an MR ' +
-      'merge through the hosting API or CLI; the MCP merge tool is closed to every group ' +
-      'stage outright), a push to a main or protected ' +
-      'branch and a force push. Everything else a group does by itself. Out of the ' +
-      'box it does by itself ordinary work, writes to git and temp cleanup; “With a ' +
-      'note” covers outward writes (replies in MR threads and edits of them, edits of ' +
-      'the MR description, tracker comments, attachments and status changes): the group writes on its own and every ' +
-      'such write stays as a line in the parent’s summary; a human gets deletion and ' +
-      'merging on the hosting, git history rewrites (reset --hard, clean), database ' +
-      'writes, infrastructure, package publishing and running downloaded code. ' +
-      'Reading MRs and issues raises no card, MR threads included; an MCP tool you ' +
-      'allowed by name in settings.json runs without a card too, except deleting and ' +
-      'merging. These cards come in the CLI’s auto mode ' +
-      'too: the panel takes push, merge, branch and file deletion, database clients ' +
-      'and hosting CLIs away from auto mode and decides them by parsing the command. ' +
-      'Routine goes without a card even as one compound command — ' +
-      '`cd <own copy> && …`, `git -C <copy> …`, `2>&1 | tail -5`, a trailing ' +
-      '`# comment`: add, commit (the words of its message are not commands), fetch, ' +
-      'stash push/pop, an ordinary push of a work branch ' +
-      '(its own or a new one) and deletion of temporary things — build output and ' +
-      'caches (dist, build, coverage, node_modules), .agent/tmp, *.log, /tmp/…. A ' +
-      'lease push (--force-with-lease) goes by itself only to the group’s OWN branch ' +
-      '— the one checked out in the copy according to git, never the one named in ' +
-      'the command — and only while its MR is a draft or not open yet. Reviewers read ' +
-      'the branch of an MR taken out of draft: rewriting it is a card, and so is the ' +
-      'case where the panel could not ask GitLab/GitHub whether it is a draft (no key, ' +
-      'a failure). Always a card, whatever the rows say: a push to main, master, ' +
-      'develop, release/… or origin’s default branch in any form (HEAD:main, ' +
-      'git -C … push origin main, inside &&), --force, -f, +branch, a lease on ' +
-      'someone else’s branch, --delete and :branch, git branch -d/-D, git tag -d, ' +
-      'git worktree remove, git stash drop/clear, a push from another directory, a ' +
-      'remote other than origin, forge push options (-o), any git merge (except ' +
-      '--abort), an MR merge through the hosting API or CLI, deletion of a ' +
-      'non-temporary file or directory inside the copy or outside it, and dropping a ' +
-      'database (DROP, TRUNCATE, DELETE FROM, dropdb, prisma migrate reset). ' +
-      'Catching up with the target branch (rebase, merge or pull of main, ' +
-      'origin/main, develop…) the panel checks itself: `git merge-tree` in the ' +
-      'group’s copy. No conflict — refused without a card: you update an MR that ' +
-      'merely fell behind yourself, when you want to, and the group finishes the task ' +
-      'on its own base instead of re-running checks because main moved. A conflict — ' +
-      'a bare catch-up as one command goes without a card, marked in the parent’s ' +
-      'summary, and the group fixes the conflict at once; a catch-up inside a ' +
-      'compound command goes through the usual parsing. ' +
-      'A group’s continuation in a clean session gets the previous session’s proposal ' +
-      'as a quote: “as the owner asked” in it is that session’s words, not yours, and ' +
-      'an outward write from it reaches you as a “For you to do” line. ' +
-      '“Group decision points”: decide by the plan itself (the recommended option, ' +
-      'with the decision written into the MR) or ask you and wait. The same tab holds ' +
-      'how many groups run at once on a light and a heavy project and what counts as ' +
-      'heavy; a project can set its own, and a row without its own is marked “as ' +
-      'shared”. A group stopped on a question or a permission is marked “waits for ' +
-      'you” in the chat list and the summary, and the panel calls you with a toast, a ' +
-      'sound and — on a hidden tab — a system notification.',
+      'A group has no human by construction, so its permissions are decided by the tab’s ' +
+      'rows, each in one of three positions: “Itself”, “With a note” (also on its own, but ' +
+      'the parent’s summary keeps an “Allowed automatically” line you can “Dismiss”; repeats ' +
+      'in it are collapsed to “×N”, MCP calls are grouped under the server name (“atlassian: ' +
+      'jira_assign_issue ×6”), the full list is in the hover hint) and “Human”. A group gets ' +
+      'no card: a “Human” call goes to the “Awaiting decision” list under a number D-n, and ' +
+      'the group carries on with everything that does not depend on it (see “Awaiting ' +
+      'decision: calls an agent set aside” below). Only what cannot be undone goes to a ' +
+      'human: deletion (a branch locally and on the remote, tags, a git stash entry, someone ' +
+      'else’s copy, files git cannot bring back, tables and databases), merging another ' +
+      'branch into the own one, push options and a remote other than origin, database writes, ' +
+      'infrastructure, package publishing, running downloaded code and killing someone else’s ' +
+      'processes. An MR merge and a push to a main or protected branch are not asked at all: ' +
+      'the group gets an immediate refusal with the known answer “the owner merges; push your ' +
+      'own branch and deliver the MR”, and the MCP merge tool is closed to every group stage. ' +
+      'Everything else a group does by itself. Out of the box it does by itself ordinary ' +
+      'work, writes to git, temp cleanup and git history rewrites in its own copy; “With a ' +
+      'note” covers outward writes (replies in MR threads and edits of them, edits of the MR ' +
+      'description, tracker comments, attachments and status changes): the group writes on ' +
+      'its own and every such write stays as a line in the parent’s summary. Reading MRs and ' +
+      'issues calls no human, MR threads included; an MCP tool you allowed by name in ' +
+      'settings.json goes by itself too, except deleting and merging. The same rules hold in ' +
+      'the CLI’s auto mode: the panel takes push, merge, branch and file deletion, database ' +
+      'clients and hosting CLIs away from auto mode and decides them by parsing the command. ' +
+      'Routine goes by itself even as one compound command — `cd <own copy> && …`, `git -C ' +
+      '<copy> …`, `2>&1 | tail -5`, a trailing `# comment`: add, commit (the words of its ' +
+      'message are not commands), fetch and fetch --prune, stash push/pop, renaming the own ' +
+      'branch, a tag and its push, an ordinary push of a work branch (its own or a new one), ' +
+      'safe `git -c` keys (author name, disabled hooks), reading git settings, and deletion ' +
+      'of temporary things — build output and caches (dist, build, coverage, node_modules), ' +
+      '.agent/tmp, *.log and a temp directory created by the same command. A `git -c` key ' +
+      'that runs a program (an editor, an ssh command and the like) and writing global git ' +
+      'settings go to a human. A command is judged link by link and by what will actually ' +
+      'run: variables (`B=…; rm -rf $B`), wrappers (bash -c, env with -S and -C, xargs, find ' +
+      '-exec, make -C, shell aliases, PowerShell), interpreter code and heredoc drafts are ' +
+      'unfolded, and the chat rule sees only the links the parser did not recognise. A ' +
+      'PowerShell tool call is judged the same way as Bash. A human gets git or a delete run ' +
+      'where the parser cannot see: through ssh, docker or kubectl exec, sudo -D, pwsh -wd ' +
+      'outside the copy, an encoded PowerShell command (-EncodedCommand in any abbreviation); ' +
+      'so do curl | sh, a write into the main copy through an interpreter, proxy variables ' +
+      'and PAGER= before git, and core.symlinks=true. env -C into the own copy is judged in ' +
+      'place, like an ordinary command. Deleting inside the copy (rm, git rm) goes by itself ' +
+      'when the target is temporary, git-ignored, or something git brings back; a human gets ' +
+      'the copy root, .git, the local layer (.agent/, .claude/, .env…), secret-named files ' +
+      'and everything outside the copy, the system’s shared temp directory included. A path ' +
+      'through a link (symlink, junction) made by the same command or found earlier in a temp ' +
+      'directory counts as foreign, and so does a C:name path (relative to the drive’s ' +
+      'current directory). Also by themselves: a worktree inside the own copy (git worktree ' +
+      'add and remove in .agent/tmp), git worktree prune when the live list shows it removes ' +
+      'only the group’s own, a trial merge in a detached head, comparing through merge-base ' +
+      'and merge-tree; removing a worktree outside the own copy and git branch -d / -D go to ' +
+      'a human. Uncommitted work is not lost. Discarding in the own copy ' +
+      '(reset --hard, checkout -- file, restore, clean -fd) on a dirty tree goes by itself, ' +
+      'but first the panel saves everything git status shows into a ref ' +
+      'refs/agentdeck/backup/… (to bring it back: git restore --source=<ref> --worktree -- . ' +
+      'or git stash apply <ref>; kept up to two weeks, at most fifty per copy). When the ' +
+      'snapshot fails, the group is refused with a reason. Switching branches (checkout, ' +
+      'switch, checkout -b) on a dirty tree is refused: commit this branch’s edits first, ' +
+      'then switch. On a clean tree both go without a snapshot. git clean -x (ignored files) ' +
+      'goes to a human. A branch rewrite (--force-with-lease, --force, -f) goes by itself ' +
+      'only to the group’s OWN branch — the one checked out in the copy according to git, ' +
+      'never the one named in the command — while its MR is a draft or not open yet. ' +
+      'Reviewers read the branch of an MR taken out of draft: rewriting it goes by itself, ' +
+      'with a note, only when it conflicts with the target branch (per GitLab/GitHub or per ' +
+      'git merge-tree of origin/<branch> against origin/<target>). Without a conflict, and ' +
+      'when the conflict cannot be learned, the group is refused with a reason: an MR without ' +
+      'a conflict needs no refresh. Rewriting someone else’s branch, +branch and deleting a ' +
+      'remote branch go to a human, as do a push with a pattern or to heads/<target>, a ' +
+      'forced or pruning fetch into local branches, a fetch into refs/remotes/<r>/* from ' +
+      'anything but <r>, and a branch switch through symbolic-ref HEAD or update-ref ' +
+      '--no-deref HEAD unless the branch is the group’s own; --force-with-lease=heads/<own> ' +
+      'is the same own branch. The panel judges a group’s command from the directory its ' +
+      'shell is in; the CLI writes it to the transcript on every call. After `cd ' +
+      'sub-project`, a path like `../x` is still the group’s own copy. No record — it is ' +
+      'judged from the copy root; the shell is outside the copy, or the directory cannot be ' +
+      'known (an earlier call of the same reply is not written yet) — the directory is ' +
+      'unknown, and deleting by a relative path goes to a human. A group may stop a process ' +
+      'by itself only if the process is in its own tree: a descendant of its CLI, or a ' +
+      'background child of the same command (`$!`, `%1`); a kill by port (the group’s own ' +
+      'dev server) is checked against whose process holds the port. Another process’s PID or port, ' +
+      '`pkill`, `killall`, `taskkill /IM`, and kills with no named target go to a human. ' +
+      'Catching up with the target branch (rebase, merge or pull of main, origin/main, ' +
+      'develop…, including by the hash of its commit and git checkout -B / switch -C from it) ' +
+      'the panel checks itself: `git merge-tree` in the group’s copy, and a trial merge in a ' +
+      'throwaway copy when git answers with an error. When the check fails, the group is ' +
+      'refused with a reason (git fetch first), never let through. No conflict — refused: you ' +
+      'update an MR that merely fell behind yourself, when you want to, and the group ' +
+      'finishes the task on its own base instead of re-running checks because main moved. A ' +
+      'conflict — a bare catch-up as one command goes by itself, marked in the parent’s ' +
+      'summary, and the group fixes the conflict at once; a catch-up inside a compound ' +
+      'command goes through the usual parsing. The panel recognises a catch-up in any form the ' +
+      'shell will run it: inside a wrapper (`bash -c`, `sh -c`, `dash`, `ksh`, `mksh` — in any case ' +
+      'and with `.exe`, after `env` or `timeout`, `eval`), inside a compound command (`{ …; }`, ' +
+      '`( … )`, `if`, `for`) with a redirect, with `exec >` and `>&`, with the target taken from ' +
+      '`$(git rev-parse …)` or a variable, and as a patch export by commit hash. A target that ' +
+      'cannot be named before it runs (`git rebase "$T"`, `git pull origin $(cat ref)`) leaves ' +
+      'nothing to compare against — you decide such a catch-up. The PowerShell tool is checked ' +
+      'the same way as Bash. A shell alias is judged by its expansion together with the call’s ' +
+      "words: `grb origin/main` with `alias grb='git rebase'` is the same catch-up. A function " +
+      'from `.bashrc` is judged by its body: git, rm, mv, kill, sudo, eval, a nested shell, a ' +
+      'database client, docker, curl, ssh or `. file` in the body goes to you, anything else ' +
+      'follows the chat rules. The names of snapshot aliases and functions become ask rules of ' +
+      'the group profile, so such a call reaches the panel in the CLI’s auto mode too. The ' +
+      'profile’s ask rules and the push ban before the delivery stage cover the PowerShell tool ' +
+      'as well. A git ' +
+      'line in PowerShell with typographic quotes or dashes, a non-breaking space or a lone ' +
+      'carriage return is not read as Bash (PowerShell splits it differently) and goes to you; ' +
+      '`make` with a directory in a bundle of switches (`-sC`) or in `--dir=`/`--directory=` ' +
+      'outside the copy is judged as leaving it. ' +
+      'A group’s continuation in a clean session gets ' +
+      'the previous session’s proposal as a quote: “as the owner asked” in it is that ' +
+      'session’s words, not yours, and an outward write from it reaches you as a “For you to ' +
+      'do” line. “Group decision points”: decide by the plan itself or ask you and wait. With ' +
+      '“by the plan” the panel answers a group question at once, every question of the call ' +
+      'and a repeated one too: the recommended option (the mark anywhere, in Russian or ' +
+      'English), without a mark the first one; an option that calls you or claims you already ' +
+      'did something (“logged in via qa:login”) is never taken — the one that goes on without ' +
+      'you is, and an action the group can do itself it tries once; when none fits, the group ' +
+      'decides by the plan itself. The decision goes into the MR, the parent summary shows an ' +
+      '“answered automatically” line, and such a question never marks the group “waits for ' +
+      'you”. A turn that ends with questions in text (“I will start after your answer”) is ' +
+      'resumed by the panel at once in the same session: apply your own recommendations and ' +
+      'go on; waiting again, the decisions are spelled out, at most three times in a row (the ' +
+      'count survives a panel restart and only your word resets it), and after “Stop all” ' +
+      'such a resume waits for “Resume all”. Lines naming a waiting D-n (“Waiting for the ' +
+      'human: D-n — …”) are a legal wait for the list, not a question in text: the panel ' +
+      'does not resume the turn for them. Autonomy switched off in the group chat itself ' +
+      'is not overridden. The same tab holds how many groups run at once on a light and a ' +
+      'heavy project and what counts as heavy; a project can set its own, and a row without ' +
+      'its own is marked “as shared”. A group stopped on a question is marked “waits for you” ' +
+      'in the chat list and the summary, and the panel calls you with a toast, a sound and — ' +
+      'on a hidden tab — a system notification. A group with nothing left but waiting D-n ' +
+      'items is marked “awaiting decision: D-n”: groups that depend on it do not start, and ' +
+      'the watcher and “decide yourself” are not spent on it.',
     cascadeEconomy: 'Group economy — “Settings” → “Groups”',
     cascadeEconomyText:
       'A group is a long conversation, and every call sends the model the whole ' +
@@ -1890,19 +2059,66 @@ export const chatEn: typeof chatRu = {
       'human answer) goes on as a new conversation with a brief the panel built from ' +
       'files: the group’s tasks and its stage task, the group’s notebook and tickets, its ' +
       'notes, commits and changes since the branch its copy was cut from, ' +
-      'the last answer. A feed ' +
+      'the last answer. A long note travels as its beginning (up to 4,000 characters) ' +
+      'with a mark that the group reads the rest from the file itself before acting. A feed ' +
       'line names the size of the previous window, and the previous conversation stays ' +
-      'on disk. Keeping ' +
+      'on disk. While the new conversation runs, the line carries a «Continue the old ' +
+      'conversation» button: the new one is stopped and the same turn goes on in the ' +
+      'previous session — for when this group’s full memory is worth more than rewriting ' +
+      'the window; the next continuation is decided by the rule again. Codex and Qwen Code ' +
+      'groups follow the same rule, with the pause set by their provider’s cache: 10 minutes ' +
+      'or more for Codex, 5 for Qwen Code; on a local model the cache costs nothing and the ' +
+      'conversation always continues — through the panel’s local contour and when a server ' +
+      'on this computer is set in the CLI’s own settings. The panel builds the brief the same way, takes the last ' +
+      'answer from the CLI’s own conversation, and the last two replies of the previous ' +
+      'conversation follow the brief; the feed line is the same, with no button back to the ' +
+      'old conversation. Warm cache while waiting: while a group waits for your answer or ' +
+      'permission, is paused or queued for a heavy step, ' +
+      'at minute 50 after its last call the panel sends its conversation one short word. ' +
+      'The ping reads the window from the cache and extends the one-hour cache, so the ' +
+      'continuation neither writes the window again nor turns into a new conversation (in ' +
+      'the measurement the ping cost a sixteenth of the rewrite). The group’s conversation ' +
+      'is not changed: the ping runs as a fork without a transcript and without tools. The ' +
+      'group card shows a “Warming” row in the “Tokens” section: how many pings reached the model, how many hit ' +
+      'the cache and how many missed, and the result in tokens at input price — “saved” (a ' +
+      'green pill next to the “Tokens” heading) or “overpaid” (a yellow one). The hub summary ' +
+      'adds the settled results of all groups into one pill, “cache warming: saved ≈ …” or ' +
+      '“overpaid ≈ …”; waits without a result are not counted. A wait is settled once its outcome is known: a saving counts only when ' +
+      'the group resumed more than an hour after its last call, while a ping still held the ' +
+      'cache, and read the window from the cache — then it is the window rewrite that did ' +
+      'not happen, minus the cost of that wait’s pings. A reply within the hour (the cache ' +
+      'would have been warm without a ping), a wait past the ping cap and a resume that ' +
+      'rewrote the window make the pings pure cost. While the outcome is unknown, a line under the row ' +
+      'names the cost of the current wait’s pings separately; the share of the subscription ' +
+      'window the pings used counts in the group’s limit share. A miss is a ping that read less than 90% of the window from the ' +
+      'cache or wrote more than 10%: the prefix diverged, and the pings of that wait stop. ' +
+      'Out of the box a wait gets three ' +
+      'pings — the cache stays warm for about three and a half hours; after that it goes ' +
+      'cold. No ping with a five-minute or unconfirmed one-hour cache, a window under the ' +
+      'watch threshold “Window from which a cold cache is a loss” or while a subscription ' +
+      'limit reset is awaited — the limit ' +
+      'would refuse the ping; none either through a contour that has already refused on its ' +
+      'budget, until that refusal is cleared on its card. Keeping ' +
       'groups off the editor stops diagnostics of the folder the panel was started ' +
       'from. Economical habits is a line in the task: independent reads in one step, ' +
-      'no folder changes, narrow output; it does not suggest subagents. With it the CLI ' +
+      'no folder changes, narrow output (a foreign CLI’s group gets it without the phrase ' +
+      'about folder changes); it does not suggest subagents. With it the CLI ' +
       'also stops telling the agent the human has not heard from it in a while: otherwise, ' +
       'after five turns without text, the agent spends a turn on a report nobody reads ' +
       'inside a stage. Each lever switches off on its own. The compaction threshold and ' +
-      'a new conversation after a pause apply from the group’s next turn, Sonnet ' +
+      'a new conversation after a pause apply from the group’s next turn, the warm cache ' +
+      'from the next minute, Sonnet ' +
       'delivery from the next delivery. The rest apply from the group’s next new ' +
       'conversation: one already started keeps its levers, or its whole cache would be ' +
-      'rewritten. A chat without a group is not affected.',
+      'rewritten. A chat without a group is not affected. The levers are shared by every CLI ' +
+      'but reach them differently, so each carries a “Where it works:” row — a mark per CLI: ' +
+      '“own setting” (green — the lever writes the CLI’s own setting), “by the panel” (blue — ' +
+      'the panel does the same), “not needed”, “no setting” and “not worth it” (muted — the ' +
+      'lever changes nothing in that CLI). The reason is in the hover hint. A working lever ' +
+      'that does not always work is marked “with a condition”, and the hint names it: for ' +
+      'example, in Qwen Code the cache lifetime works only with an Anthropic login, a new ' +
+      'conversation after a pause only on a cloud model, the compaction threshold only when ' +
+      'the model’s window is known.',
     cascadeWatch: 'Group watch — signals on the group card',
     cascadeWatchText:
       'While groups run, the panel itself watches their live stream and transcripts ' +
@@ -1914,19 +2130,105 @@ export const chatEn: typeof chatRu = {
       'delivery stage, a copy reading the panel’s own sources, a group’s spend or the ' +
       'five-hour window projection over the threshold, the subscription limit hit, a ' +
       'sleep-poll loop, the same file or chunk of it read three times with no edit. A ' +
-      'signal lands as the “Group watch” island on the group’s card in the ' +
+      'paused group (its own pause or the shared “Stop all”) whose session still acts (a ' +
+      'minute after the pause or later) raises an alarm with the number of calls; while ' +
+      'paused, the group’s other signals close and do not come back once the pause is ' +
+      'lifted, and the counts of heavy checks and delivery reminders start over. Heavy ' +
+      'checks in a loop: any check longer than the threshold (3 min by default) or a full ' +
+      'gate started in the background ran across the whole group as many times as set (2 ' +
+      'by default) within six hours — edits in between do not reset the count; a single ' +
+      'chat has no such rule. A new group conversation started over a still-warm previous ' +
+      'one (a pause shorter than the cooling time, or after a warm-cache ping) that wrote ' +
+      'more than the threshold into the cache again (50k tokens by default) is a note when ' +
+      'the reason is real (handover to delivery, a fix link, review, an MR re-check, a ' +
+      'handover by block, a stage change) and “attention” when the start was needless: the ' +
+      'briefing again over a warm cache, or a model switch on a warm continuation. A new ' +
+      'conversation redoing files another conversation of the group already committed at ' +
+      'this stage (the same edit text, or a rewrite where at least 60 % of the lines were ' +
+      'already there) is “attention” from two files. A group paused for over two minutes ' +
+      'while a server its session started with a port in the command (`--port N`, ' +
+      '`PORT=N`, `-p N`) still listens is “attention” with the port number while the port stays ' +
+      'open; a server on its default port is invisible to the watcher, and the port a client ' +
+      'connects to (`psql -p`, `ssh -p`) is not counted as its own server. A single chat has ' +
+      'none of these three rules. The thresholds of the new-conversation and redo rules are ' +
+      'in the watcher card in the settings. The spend signal clears not at the ' +
+      'threshold itself but once spend falls below 85 % of it, so it does not flicker ' +
+      'around the threshold. Seven ' +
+      'more rules catch leaks and delays: a subagent fan-out — six launches within an ' +
+      'hour (a skill call is not a launch) or their spend from 20 window units (an estimate of the share of the subscription window at model prices, not money); a huge tool result ' +
+      'in the window — from 20K ' +
+      'characters, a re-read of saved CLI output from 8K; a call that hit its own ' +
+      'timeout (timeouts under two minutes are deliberate probes and do not count); a ' +
+      'call open for over 12 minutes while its timeout has not run out (for a check whose ' +
+      'usual time the panel knows from the heavy-step queue — longer than usual with a ' +
+      'quarter to spare; a background call does not hold the turn and does not count); a wait in the ' +
+      'heavy-step queue over 10 minutes; five refusals by guards and access rules within ' +
+      '15 minutes; the first request of a new conversation heavier than 90K tokens — ' +
+      'only for a conversation started while the panel watches, a resume does not ' +
+      'count. The fan-out, the timeout and the queue wait are “attention”, the other ' +
+      'four are a “note”: they stay on the card and do not go out. A ' +
+      'signal lands as the “Group watch” island on the group’s card (a calm background, a coloured stripe on the left and a label on the row — by the most important signal) in the ' +
       'parent’s hub, and the number of active ones as a chip in the hub summary; ' +
       '“Open chat” leads to the conversation where the rule fired. When the condition ' +
       'ends, the signal closes by itself and stays as a folded row; a signal nobody ' +
       'watches after a panel restart closes when the group ends or its conversation ' +
-      'stays silent long enough. The watch stops ' +
-      'nothing: the decision is yours. “Attention” and “alarm” signals go to Telegram ' +
-      'when it is set up in integrations — the rule, the numbers, the stage and the project ' +
-      'folder name, the same signal at most once per 30 minutes. Thresholds, the watch ' +
-      'switch and the Telegram switch are on the “Split-group watch” card under ' +
+      'stays silent long enough. The watch itself stops ' +
+      'nothing: it shows the trouble and reports it. Spend is counted for the whole group — all its ' +
+      'conversations and subagents together — and the five-hour window projection is ' +
+      'one per account: it shows on the card of every running group but goes out as a ' +
+      'single message. One cause, one signal: when subagents carry more than half of the ' +
+      'group’s spend, the fan-out already names the cause and there is no separate spend ' +
+      'signal; spend of the conversation itself stays a spend signal, next to the fan-out ' +
+      'too. Likewise a long call does not duplicate the group’s silence, the fan-out does ' +
+      'not duplicate a review at the work stage (those are its own subagents), and a polling ' +
+      'loop started after a timeout does not duplicate the timeout itself. ' +
+      '“Attention” and “alarm” signals go to Telegram and the webhook ' +
+      'wherever the “Group watch signal” event is ticked in integrations — the rule, the ' +
+      'numbers, the stage and the project folder name, the same signal at most once per ' +
+      '30 minutes. Whoever got signals in Telegram before this event existed had it ticked ' +
+      'by the panel itself, once, on the update; the webhook is ticked by hand. ' +
+      'Thresholds and the watch switch are on the “Split-group watch” card under ' +
       '“Settings” → “Groups”; a threshold change applies at once, without restarting ' +
       'groups. A watch switched off closes the active signals; the history stays on ' +
-      'the cards.',
+      'the cards, and while it is off the thresholds on the card are locked — it does ' +
+      'not read them. Only the cold-cache window stays open while the warm cache is on: ' +
+      'the ping decides by it. Codex and Qwen Code groups are read by the watch from their ' +
+      'own conversation files, and the “Tokens” section of their card is counted the same ' +
+      'way; the subagent rules do not apply to them — these CLIs have no Claude subagents. ' +
+      'A cold cache there is judged by their provider’s pause — from 5 minutes for Qwen ' +
+      'Code, from 10 for Codex. These CLIs do not report cache writes, so the signal comes ' +
+      'only when the cache read dropped after the pause and the full-price input exceeds the ' +
+      'conversation base with a margin; the loss in the signal is only what dropped out of ' +
+      'the cache, not the whole input of the turn. A compaction resets that trace — a read drop right ' +
+      'after it is not cooling. On a local model the rule is off: the cache costs nothing ' +
+      'there. Twelve more rules catch what only a human used to notice. A group stands: ' +
+      'no turn, no question, no queue, and it will not continue by itself (20 minutes by ' +
+      'default, three times longer — an alarm; after your decision the count starts at the ' +
+      'decision). The same call hits its timeout, hangs longer than usual or fails with the ' +
+      'same error in two groups of a plan within an hour — the cause is shared, and there ' +
+      'is one signal, one message per plan; a repeated check with no edit does not count ' +
+      'here, and a paused group is left out. The same ' +
+      'call fails three times with the same error, no edits in between. An action a guard ' +
+      'refused is done another way within 30 minutes — an alarm; a corrected retry after a ' +
+      'refusal is not a bypass. The agent stops ' +
+      'processes it did not start itself. The turn ended with a question in the text, ' +
+      'without a card, and there has been no answer for 10 minutes. Two delivery ' +
+      'reminders went nowhere — the same things are still missing — or a reminder went to ' +
+      'the work, review or plan stage while delivery is still ahead. A tool that does not ' +
+      'exist in the session was called. An external service — the model, an MCP server or ' +
+      'the web (search and page fetches) — does not answer: three failures within 15 ' +
+      'minutes; a 4xx answer is a refusal, not an outage. Edits outside its own copy. ' +
+      'CLI service inserts above 20K chars within 15 minutes — a “note”. The review ' +
+      'verdict is written as text, without a review block — the pipeline will not see ' +
+      'it. A signal grows while the trouble lasts: an unanswered question — as a card or ' +
+      'as text — is “attention” first and an “alarm” after an hour (the “An unanswered ' +
+      'question turns into an alarm after” threshold); a raised signal goes to Telegram ' +
+      'and the webhook once more, even inside the quiet period, and is never lowered. ' +
+      'The watch also follows single chats started in the panel without a group (the ' +
+      '“Watch single chats too” switch, on by default): the rules that fit one ' +
+      'conversation apply there — no stages, no plan, no own copy. A signal shows as a ' +
+      'chip on the chat row and a “Chat watch” island above its feed; only an alarm goes ' +
+      'out. Groups of the other CLIs are not seen by the watch.',
     cascadeOverlap: 'Branch overlap after the work',
     cascadeOverlapText:
       'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +
@@ -1938,7 +2240,11 @@ export const chatEn: typeof chatRu = {
       'is OUTSIDE the group declared ownership — a boundary triage had agreed ' +
       'otherwise. Two rightful owners of one file are not painted red: you will ' +
       'still have to merge them, but nothing was violated. The merge order from the ' +
-      'triage waits is shown next to it. The same count goes into the task as well: ' +
+      'triage waits is shown next to it. The section is always folded to its heading ' +
+      'with the number of files: the rows, the count of files outside ownership and ' +
+      'the merge order open on a click on the heading. “For you to do: N”, the ' +
+      'proposed tickets and “Inactive: N” are folded the same way, so the group ' +
+      'cards stay in view. The same count goes into the task as well: ' +
       'a group branched from its predecessor’s branch receives the list of files ' +
       'that predecessor touched — up to twenty names, the rest as a number. ' +
       'A new overlap is announced once: a ' +
@@ -1955,8 +2261,13 @@ export const chatEn: typeof chatRu = {
     cascadePauseText:
       'The same summary carries a “Stop all (N)” button. It stops every running run of ' +
       'the tree — the children, their review and fix stages, clean-session continuations ' +
-      '— and remembers how to restart each one. While the tree is paused the panel starts ' +
-      'nothing in it on its own: continuations, stages and new children are queued. ' +
+      '— and remembers how to restart each one. It also stops groups idle between turns ' +
+      'that have a background task running, together with the processes of their copies: ' +
+      'such a group would otherwise wake by itself when the task ends. Processes are stopped ' +
+      'in the copies of every group of the tree, but only those agents started: your IDE and ' +
+      'your terminal on a copy are left alone. While the tree is paused the panel starts ' +
+      'nothing in it on its own: continuations (a group resumed after questions in text ' +
+      'too), stages and new children are queued. ' +
       '“Resume all (N)” restarts the stopped runs in their own sessions (the agent keeps ' +
       'its context and is only told it was interrupted and the last tool may not have run) ' +
       'and releases the queue in order. Pressed on a child it stops the same whole tree: ' +
@@ -2201,7 +2512,9 @@ export const chatEn: typeof chatRu = {
       'taken, and a muted “Auto-pick: …” line stays where the question card would ' +
       'be. It cannot be clicked — the answer has already gone; if you disagree, tell ' +
       'the agent in an ordinary message. A question without a recommended option ' +
-      'waits for you as usual. The switch takes effect from the next turn: the CLI ' +
+      'waits for you as usual — except in a split group under “Group decision ' +
+      'points: by the plan”, where every question is answered. The switch takes ' +
+      'effect from the next turn: the CLI ' +
       'process restarts with the new value.',
     autonomyEscalation: 'Critical goes to the main chat',
     autonomyEscalationText:
@@ -2221,7 +2534,74 @@ export const chatEn: typeof chatRu = {
     autonomyNote:
       'Autonomy answers only questions with an explicitly recommended option and ' +
       'never approves actions for you: permission cards still wait for you or for ' +
-      'the “Approve without asking” rules.',
+      'the “Approve without asking” rules, and without you they move to “Awaiting decision”.',
+
+    deferredTitle: 'Awaiting decision: calls an agent set aside',
+    deferredCaption:
+      'A call only a human decides does not hold the work: the agent puts it on a list under ' +
+      'a number D-n and does everything that does not depend on it. The answer resumes the ' +
+      'work with exactly that call.',
+    deferredWhen: 'When a call becomes D-n',
+    deferredWhenText:
+      'A split group — at once: a group has no card, nobody is at its screen. An autonomous ' +
+      'chat nobody opened in a tab or on the phone — at once too. A chat you are watching ' +
+      'first shows the usual “Allow / Deny” card; not answered within «Minutes before an ' +
+      'unanswered permission card moves to «Awaiting decision»» («Settings» → «Models», 10 ' +
+      'minutes by default, 0 — the card waits as long as it takes), the card turns into a ' +
+      '“Deferred as D-n — the agent keeps working” line, and answering it decides the same ' +
+      'item. An MR merge and a push to the main or a protected branch are not deferred at ' +
+      'all: the agent gets the refusal “the owner merges; push your own branch and deliver ' +
+      'the MR” at once. A push whose target the panel cannot prove (a branch in a variable, ' +
+      '--all, a pattern) is refused the same way, asking for the branch to be named ' +
+      'explicitly.',
+    deferredList: 'Where you see them',
+    deferredListText:
+      'Above every panel page — an “Awaiting decision (N)” plate with a hint and a “Show” ' +
+      'button: the list of everything waiting, filterable by group or chat — the number, ' +
+      'project, group or chat, the reason (“The group’s permission rows send this call to ' +
+      'a human”, “The call is not covered by the auto-approve rules”, “An edit in the main ' +
+      'copy of the project: you decide where it writes”, “Backend guard: …”), the command ' +
+      'itself (for an edit in the main copy — “What gets written”) and the time. When the agent repeats the same call there is no new item; the ' +
+      'old one shows “the agent repeated the call N times”. The parent’s group summary has ' +
+      'an “Awaiting decision in groups (N)” block, and a group with no other work left is ' +
+      'marked “awaiting decision: D-n”: groups that depend on it do not start until you ' +
+      'decide. On the phone waiting items come first in “Questions”, and with Telegram ' +
+      'answers on, a D-n reaches Telegram at once (the “Integrations” document).',
+    deferredDecide: 'The decision',
+    deferredDecideText:
+      '“Allow” issues a one-time permission for exactly this call with the same arguments — ' +
+      'for two hours and one execution — and the panel resumes the conversation: at once, ' +
+      'after the tree pause, or when the running turn ends, and with nothing to resume the ' +
+      'agent sees the answer at its next call; the line under the button says which. “Deny” hands the agent a refusal, and a repeated call gets the same answer. ' +
+      '“Open chat” goes to the conversation the call came from. Only a human answers: an ' +
+      'agent call that reaches the panel’s decision endpoints or its key is refused before ' +
+      'every rule — an agent cannot decide its own D-n.',
+    deferredLimits: 'Lifetime and limits',
+    deferredLimitsText:
+      'An item waits «Days a D-n ask waits for an answer» (7 by default, up to ' +
+      '90), then expires; an expired one keeps “Allow again”, which issues the permission ' +
+      'anew; the same call made again after expiry reopens the old number rather than a new ' +
+      'one. When a group’s item expires and nothing of the group waits any more, the panel ' +
+      'continues the group (unless you paused it): the agent finishes without that call and ' +
+      'names what stays blocked in the MR description. Every continuation after a decision ' +
+      'tells the agent to take the MR out of draft once no item waits. Several outcomes at ' +
+      'once (three refusals, three expiries, an allow and a refusal) reach the group as one ' +
+      'continuation naming every number. A pause or a panel restart does not lose the word: ' +
+      'after “Resume” or once the panel is back up, the group still learns how its D-n ' +
+      'ended. The same call repeated by the agent within one reply is one call: answering ' +
+      'one of its cards closes the other too, and it does not run twice. Cancelling the ' +
+      'plan withdraws the waiting items of all its groups, and “Remove” on a group withdraws ' +
+      'that group’s items: a withdrawn item cannot be allowed, an unused grant is gone, no ' +
+      'D-n word wakes the closed group, and the Telegram message is closed as “⌛ Уже не ' +
+      'актуально” (no longer relevant). The withdrawal survives a panel restart. Decided items ' +
+      'stay visible for a day. The list lives in the panel’s data directory and survives a ' +
+      'panel restart. While at least one D-n of a group waits, its MR stays a draft: the ' +
+      'panel refuses a call that takes the draft off. A commit or an MR whose text names a ' +
+      'D-n of its own is refused too: published text describes the change only.',
+    deferredNote:
+      'A D-n is not a default permission: nothing runs until you press “Allow”. The agent ' +
+      'gets the number in the refusal with an instruction not to work around the call with ' +
+      'another command; a workaround is caught by the group watcher.',
 
     codeTitle: 'Project code: what the agent changed, and editing on the spot',
     codeCaption:
@@ -2554,13 +2934,28 @@ export const chatEn: typeof chatRu = {
       'call go to the agent, because there is something to undo them with. What ' +
       'still asks is what leaves nothing to roll back to: deleting files (rm, ' +
       'Remove-Item), wiping work and history (git reset --hard, clean, restore, ' +
-      'force push, deleting a branch), tearing down data (DROP, TRUNCATE, DELETE ' +
+      'a force push beyond a lease, deleting a branch, a tag or a stash entry), any git ' +
+      'merge, tearing down data (DROP, TRUNCATE, DELETE ' +
       'FROM, rolling migrations back), tearing down containers and infrastructure ' +
       '(docker rm and prune, kubectl delete, helm uninstall, terraform destroy), ' +
       'publishing to someone else’s registry (npm publish), deleting and merging ' +
-      'on a repository host, shutting the machine down — and deleting MCP calls. ' +
+      'on a repository host, running downloaded code (curl … | bash), shutting the ' +
+      'machine down — and deleting MCP calls. Push --force-with-lease is an ordinary ' +
+      'write: git itself refuses when someone else’s work appeared on the remote. Deleting ' +
+      'git data and merging ask whatever the toggle and the rules say, in the CLI’s auto ' +
+      'mode too: the panel takes such commands away from its classifier with its own ask ' +
+      'rules. PowerShell tool commands are judged by the same rules as Bash commands. ' +
       'On top of that your own ask and deny rules from settings.json still ask: ' +
-      'where you wrote «ask me», the toggle does not decide for you. An unclear ' +
+      'where you wrote «ask me», the toggle does not decide for you. The reverse holds ' +
+      'too: a call you allowed yourself with an allow rule in settings.json is let through ' +
+      'by the CLI in the default and edit modes without asking the panel — there is no ' +
+      'card for it, even when it is irreversible. A card nobody decided the panel sets ' +
+      'aside as a D-n item after «Minutes before an unanswered permission card moves to ' +
+      '«Awaiting decision»» («Settings» → «Models», 10 minutes by default; 0 — the card ' +
+      'waits as long as it takes): the agent keeps working, and the call waits for you in ' +
+      'the “Awaiting decision” list. An autonomous chat nobody opened in a tab or on the ' +
+      'phone sets it aside at once, and a merge or a push to the main branch gets the ' +
+      'refusal “the owner merges” there. An unclear ' +
       'case goes to a human too: a command the panel could not parse counts as ' +
       'irreversible. With edits switched off, file edits stay yours even when ' +
       'auto-approval is on. The toggle takes effect immediately, mid-run included, ' +
@@ -2574,13 +2969,14 @@ export const chatEn: typeof chatRu = {
       'that is off brings back the «Allow/Deny» card. Out of the box WRITES are ' +
       'allowed (merge request comments and threads, Jira tickets, wiki pages, ' +
       'commits, branches and a plain push), while TEARDOWN asks: deleting files, ' +
-      'wiping git history and force-pushing, tearing down database data, ' +
+      'wiping git history and force-pushing beyond a lease, tearing down database data, ' +
       'containers and infrastructure, publishing packages, deleting and merging in ' +
       'external services, running what was downloaded from the network. The rules ' +
       'are shared: switched on in one project, they hold in every project and on ' +
       'the phone — they live in the panel settings, not in a conversation. What ' +
       'they do not override: your own ask and deny rules from settings.json (they ' +
-      'beat any rule you switch on), read-only mode and a question to a human.',
+      'beat any rule you switch on), read-only mode, a question to a human, and deleting ' +
+      'git data and merging — those ask whatever the rules say.',
 
     historyTitle: 'How a conversation continues',
     historyCaption:
@@ -2836,11 +3232,29 @@ export const chatEn: typeof chatRu = {
       '02-auto-pick': 'The group’s feed: an “Auto-pick: …” line in place of the question',
       '03-menu': 'The child’s menu: group and autonomy “from parent”',
     },
+    economy: {
+      '01-where':
+        'Settings → Groups, the “New conversation after a long pause” lever: the “Where it ' +
+        'works:” line — own setting, by the panel, with a condition, and the muted “not ' +
+        'needed” and “not worth it”',
+    },
+    deferred: {
+      '01-banner':
+        'The “Awaiting decision (3)” strip expanded: D-n items of two groups and a single ' +
+        'chat, the owner filter, and the reason and answers on each',
+      '02-hub':
+        'The parent’s group summary: “Awaiting decision in groups” holds only this split’s calls',
+      '03-card':
+        'A permission card in a group’s feed that got no answer: “Deferred as D-4 — the ' +
+        'agent keeps working”',
+    },
   },
   diagrams: {
     'message-path':
       'The path of one message: composer to panel server to CLI process to the transcript on disk, and the answer back as a stream. The panel has no database of its own.',
     'split-conveyor':
       'What happens after Split: triage, plan, work and review by stage — and where the human decides.',
+    'deferred-asks':
+      'The path of a call only a human decides: a refusal with a D-n number, work goes on, an answer from the panel, the phone or Telegram, and the work resumes with exactly that call.',
   },
 };

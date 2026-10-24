@@ -3,6 +3,7 @@ import { groupSchema, automationSchema } from './groups';
 import { hookSchema } from './hooks';
 import { projectSchema } from './projects';
 import { appSettingsSchema } from './app-settings';
+import { groupWatchSnapshotSchema } from './group-watch';
 import { providerChecksSchema } from './provider-check';
 
 /**
@@ -32,8 +33,15 @@ export const importStateSchema = object({
   envByGroup: record(string(), array(string())).optional(),
   /** Реестр проектов уровня конфигурации — запомненные пути к их каталогам. */
   projects: array(projectSchema).optional(),
-  /** Настройки самого приложения — проверяются контрактной схемой настроек. */
-  settings: appSettingsSchema.partial().optional(),
+  /**
+   * Настройки самого приложения — проверяются контрактной схемой настроек. Блок
+   * сторожа — схемой снимка (`groupWatchSnapshotSchema`, та же у сервера): снимок
+   * несёт только отличия, а битый порог отбрасывается поштучно.
+   */
+  settings: appSettingsSchema
+    .partial()
+    .extend({ groupWatch: groupWatchSnapshotSchema.optional() })
+    .optional(),
   /** Итоги проверки провайдеров: id провайдера → последний результат. */
   providerChecks: providerChecksSchema.optional(),
 });

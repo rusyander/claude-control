@@ -313,7 +313,7 @@
       "light-ru": {
         "file": "03-chat.png",
         "width": 584,
-        "height": 207
+        "height": 248
       },
       "light-en": {
         "file": "03-chat.en.png",
@@ -327,30 +327,52 @@
       },
       "dark-en": {
         "file": "03-chat.dark.en.png",
-        "width": 584,
-        "height": 248
+        "width": 563,
+        "height": 186
       }
     },
     "mascot/04-settings": {
       "light-ru": {
         "file": "04-settings.png",
         "width": 896,
-        "height": 249
+        "height": 355
       },
       "light-en": {
         "file": "04-settings.en.png",
         "width": 896,
-        "height": 249
+        "height": 355
       },
       "dark-ru": {
         "file": "04-settings.dark.png",
         "width": 896,
-        "height": 249
+        "height": 355
       },
       "dark-en": {
         "file": "04-settings.dark.en.png",
         "width": 896,
-        "height": 249
+        "height": 355
+      }
+    },
+    "mascot/05-react": {
+      "light-ru": {
+        "file": "05-react.png",
+        "width": 596,
+        "height": 102
+      },
+      "light-en": {
+        "file": "05-react.en.png",
+        "width": 596,
+        "height": 102
+      },
+      "dark-ru": {
+        "file": "05-react.dark.png",
+        "width": 596,
+        "height": 102
+      },
+      "dark-en": {
+        "file": "05-react.dark.en.png",
+        "width": 596,
+        "height": 102
       }
     },
     "safety/01-safety": {

@@ -9,7 +9,7 @@ import type { SelectFieldProps } from './select-field.types';
  * системный список правильно работает с клавиатурой, экранными дикторами
  * и мобильными, и его не нужно чинить при каждом обновлении браузера.
  */
-export function SelectField({ label, value, onChange, options, hint }: SelectFieldProps) {
+export function SelectField({ label, value, onChange, options, hint, disabled }: SelectFieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
 
@@ -23,6 +23,7 @@ export function SelectField({ label, value, onChange, options, hint }: SelectFie
         id={id}
         className={styles.field}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         aria-describedby={hint ? hintId : undefined}
       >

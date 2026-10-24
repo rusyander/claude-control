@@ -1,26 +1,26 @@
-// Остров сторожа: цвет по самому важному активному сигналу. Без активных —
-// нейтральный, остаются только свёрнутые закрытые.
+// Остров сторожа: спокойная поверхность, важность — полосой слева и меткой у
+// строки. Сплошная янтарная или красная заливка во всю ширину перекрикивала
+// заголовок группы и делала текст сигнала серым по цветному (проход
+// читаемости 22.10). Без активных сигналов полосы нет.
 .island {
   margin-top: var(--spacing-2xs);
   padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--color-border);
+  border-left-width: 3px;
   border-radius: 8px;
   background: var(--color-surface-sunken);
 }
 
 .island-info {
-  border-color: color-mix(in srgb, var(--color-info) 40%, var(--color-border));
-  background: var(--color-info-subtle);
+  border-left-color: var(--color-info);
 }
 
 .island-warn {
-  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
-  background: var(--color-warning-subtle);
+  border-left-color: var(--color-warning);
 }
 
 .island-alert {
-  border-color: color-mix(in srgb, var(--color-danger) 50%, var(--color-border));
-  background: var(--color-danger-subtle);
+  border-left-color: var(--color-danger);
 }
 
 .title {
@@ -50,6 +50,8 @@
   gap: var(--spacing-3xs) var(--spacing-2xs);
 }
 
+// Метка важности — тонированная капсула со своим цветом текста: цвет несёт
+// слово, а не фон всей карточки.
 .badge {
   flex: none;
   padding: 0 6px;
@@ -59,14 +61,17 @@
 }
 
 .info {
+  background: var(--color-info-subtle);
   color: var(--color-info);
 }
 
 .warn {
+  background: var(--color-warning-subtle);
   color: var(--color-warning);
 }
 
 .alert {
+  background: var(--color-danger-subtle);
   color: var(--color-danger);
 }
 
@@ -104,4 +109,18 @@
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
+}
+
+// Пояснение острова для скринридера (F-58): `title` читают не все, а на глаз
+// острову хватает заголовка — подсказка висит и в `title` для мыши.
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

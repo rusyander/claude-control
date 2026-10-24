@@ -78,6 +78,12 @@ export interface RunRetryDeps {
    * никогда. Не задан — таймер, как раньше.
    */
   persistsLimit?: (keys: readonly string[]) => boolean;
+  /**
+   * Мост прав повтора — к этой панели под ключом разговора. Прогон, подхваченный
+   * после перезапуска, несёт параметры из журнала с пустым адресом моста
+   * (`ledgerRunOptions`): повтор с ними отказывал бы каждому вызову инструмента.
+   */
+  bridge?: (runId: string) => NonNullable<RunOptions['permissionPrompt']>;
   now?: () => number;
   log: (message: string, error?: unknown) => void;
 }
@@ -116,9 +122,13 @@ export class RunRetry {
   finished(finished: RunFinished): RetryDecision | undefined {
     const key = finished.sessionId ?? finished.chatId;
     // Сессии нет — ход умер до первого слова модели: отправляем задачу ту же.
-    const options: RunOptions = finished.sessionId
+    const resumed: RunOptions = finished.sessionId
       ? { ...finished.options, prompt: retryPrompt(finished.error), sessionId: finished.sessionId }
       : finished.options;
+    const options: RunOptions =
+      resumed.permissionPrompt && this.deps.bridge
+        ? { ...resumed, permissionPrompt: this.deps.bridge(finished.chatId) }
+        : resumed;
     const meta: RunMeta = {
       ...(finished.origin ? { origin: finished.origin } : {}),
       ...(finished.projectPath ? { projectPath: finished.projectPath } : {}),

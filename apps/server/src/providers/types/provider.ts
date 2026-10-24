@@ -1,5 +1,6 @@
 import type { ClaudePaths } from '@agentdeck/contracts';
 import type { GroupLayerKind } from '@agentdeck/contracts/group-delivery';
+import type { ProviderGroupEconomy } from './economy.ts';
 import type { CapabilityMap, ProviderStatus } from './capabilities.ts';
 import type {
   ProviderAssistant,
@@ -394,4 +395,6 @@ export interface ConfigProvider {
    * системных настроек, Codex — накладка поверх его конфига.
    */
   groupLayer?: GroupLayerKind;
+  /** Рычаги экономии групп: где действуют и чем доходят до прогона (`types/economy.ts`). */
+  groupEconomy?: ProviderGroupEconomy;
 }

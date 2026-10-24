@@ -18,6 +18,8 @@ import {
   type RelayHooksStatus,
 } from '../../../domains/chat/outside-relay/outside-relay-install.ts';
 import { apiTokenPath } from '../../../lib/api-token/api-token.ts';
+import { humanOnly } from '../human-only/human-only.ts';
+import { humanOnlyDepsFor } from '../human-only/human-only-deps.ts';
 
 /** Самый короткий срез ожидания: хук между срезами смотрит, не ответили ли в окне. */
 const MIN_WAIT_MS = 1_000;
@@ -101,20 +103,25 @@ export function registerOutsideRelayRoutes(
     },
   );
 
-  app.post<{ Params: { id: string } }>('/api/outside/asks/:id/answer', (req, reply) => {
-    const parsed = outsideAnswerSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: 'body' });
-    const decided = relay.decide(
-      req.params.id,
-      'answers' in parsed.data
-        ? { state: 'answered', answers: parsed.data.answers }
-        : { state: 'decided', behavior: parsed.data.behavior },
-    );
-    // Запроса уже нет — его решили в окне, отпустили или он истёк. Телефон
-    // должен это сказать, а не сделать вид, что решение ушло.
-    if (!decided) return reply.code(409).send({ error: 'gone' });
-    return { ok: true };
-  });
+  // Ответ за человека от процесса модели панели — 403 (`human-only.ts`).
+  app.post<{ Params: { id: string } }>(
+    '/api/outside/asks/:id/answer',
+    { preHandler: humanOnly(humanOnlyDepsFor()) },
+    (req, reply) => {
+      const parsed = outsideAnswerSchema.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'body' });
+      const decided = relay.decide(
+        req.params.id,
+        'answers' in parsed.data
+          ? { state: 'answered', answers: parsed.data.answers }
+          : { state: 'decided', behavior: parsed.data.behavior },
+      );
+      // Запроса уже нет — его решили в окне, отпустили или он истёк. Телефон
+      // должен это сказать, а не сделать вид, что решение ушло.
+      if (!decided) return reply.code(409).send({ error: 'gone' });
+      return { ok: true };
+    },
+  );
 
   app.post<{ Params: { id: string } }>('/api/outside/asks/:id/release', (req) => ({
     ok: relay.release(req.params.id),

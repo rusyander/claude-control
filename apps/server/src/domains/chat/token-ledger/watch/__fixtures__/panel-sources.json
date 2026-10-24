@@ -18,7 +18,7 @@
       "id": "t1",
       "name": "Bash",
       "input": {
-        "command": "D=e2e/screenshots/before-after/proj-3-guardrails-agentgw; L=\".claude/tools/ticket-ledger.mjs\"\nnode $L add PROJ-3 04-before ok \"$D/1660-sandbox-sanitized_BEFORE.png: dev stand main, white-space normal, long token overflows (scrollWidth 1681 > 1116), lines merged\"\nnode $L add PROJ-5 04-before ok \"$D/1039-journal-after-reload_BEFORE.png: dev stand main, URL ?tab=journal&hours=720 without verdict, aft"
+        "command": "D=e2e/screenshots/before-after/proj-3-dashboards-agentgw; L=\".claude/tools/ticket-ledger.mjs\"\nnode $L add PROJ-3 04-before ok \"$D/1660-sandbox-sanitized_BEFORE.png: dev stand main, white-space normal, long token overflows (scrollWidth 1681 > 1116), lines merged\"\nnode $L add PROJ-5 04-before ok \"$D/1039-journal-after-reload_BEFORE.png: dev stand main, URL ?tab=journal&hours=720 without verdict, aft"
       }
     },
     { "kind": "toolResult", "t": 1792523465723, "id": "t1", "chars": 175 },
@@ -38,7 +38,7 @@
       "id": "t2",
       "name": "Write",
       "input": {
-        "file_path": "/work/app\\e2e\\screenshots\\before-after\\proj-3-guardrails-agentgw\\README.md"
+        "file_path": "/work/app\\e2e\\screenshots\\before-after\\proj-3-dashboards-agentgw\\README.md"
       }
     },
     { "kind": "toolResult", "t": 1792523472969, "id": "t2", "chars": 228 },
@@ -76,7 +76,7 @@
       "id": "t4",
       "name": "Bash",
       "input": {
-        "command": "ls .agent/tests/; cat .agent/tests/automation.json | head -20; grep -lE \"guardrail|agentic\" .agent/tests/*.tests.json"
+        "command": "ls .agent/tests/; cat .agent/tests/automation.json | head -20; grep -lE \"dashboard|billing\" .agent/tests/*.tests.json"
       }
     },
     { "kind": "toolResult", "t": 1792523490358, "id": "t4", "chars": 2624 },
@@ -116,7 +116,7 @@
       "id": "t6",
       "name": "Bash",
       "input": {
-        "command": "node -e \"\nfor (const [f,id] of [['suites-svc-admin-api','suites-svc-admin-api-011'],['suites-svc-config','suites-svc-config-006']]){const x=require('./.agent/tests/'+f+'.tests.json');const c=(x.cases||x).find(c=>c.id===id);console.log(id, c?JSON.stringify(c.automation):'MISSING', c&&c.title);}\nconst x=require('./.agent/tests/suites-svc-admin-ui.tests.json');(x.cases||x).filter(c=>/guardrails|agent"
+        "command": "node -e \"\nfor (const [f,id] of [['suites-svc-admin-api','suites-svc-admin-api-011'],['suites-svc-config','suites-svc-config-006']]){const x=require('./.agent/tests/'+f+'.tests.json');const c=(x.cases||x).find(c=>c.id===id);console.log(id, c?JSON.stringify(c.automation):'MISSING', c&&c.title);}\nconst x=require('./.agent/tests/suites-svc-admin-ui.tests.json');(x.cases||x).filter(c=>/dashboards|agent"
       }
     },
     { "kind": "toolResult", "t": 1792523504324, "id": "t6", "chars": 1648 },
@@ -154,7 +154,7 @@
       "id": "t8",
       "name": "Bash",
       "input": {
-        "command": "cd svc-admin-ui && git diff -U0 -- 'src/**/*.test.ts' 'src/**/*.test.tsx' | grep -E \"^\\+\\+\\+|^\\+.*\\b(it|test|describe)\\(\" ; git ls-files --others --exclude-standard src | grep test; cd .. && grep -n \"func Test\" svc-admin-api/internal/service/guardrail_service_test.go | grep -i metadata; grep -n \"func Test\" svc-config/internal/store/*_test.go | grep -i exception"
+        "command": "cd svc-admin-ui && git diff -U0 -- 'src/**/*.test.ts' 'src/**/*.test.tsx' | grep -E \"^\\+\\+\\+|^\\+.*\\b(it|test|describe)\\(\" ; git ls-files --others --exclude-standard src | grep test; cd .. && grep -n \"func Test\" svc-admin-api/internal/service/dashboard_service_test.go | grep -i metadata; grep -n \"func Test\" svc-config/internal/store/*_test.go | grep -i exception"
       }
     },
     { "kind": "toolResult", "t": 1792523515325, "id": "t8", "chars": 2627 },
@@ -408,7 +408,7 @@
       "id": "t21",
       "name": "Bash",
       "input": {
-        "command": "cd /work/app && grep -rlE \"it\\('\\[suites-\" --include=*.test.ts* svc-admin-ui/src cp-admin-ui/src svc-chat-ui/src 2>/dev/null | head -3; grep -rhoE \"(it|test)\\('\\[[a-z-]+-[0-9]{3}\\]\" --include=*.test.ts* svc-admin-ui/src cp-admin-ui/src svc-chat-ui/src shared-ui/src 2>/dev/null | head -3"
+        "command": "cd /work/app && grep -rlE \"it\\('\\[suites-\" --include=*.test.ts* svc-admin-ui/src op-admin-ui/src svc-chat-ui/src 2>/dev/null | head -3; grep -rhoE \"(it|test)\\('\\[[a-z-]+-[0-9]{3}\\]\" --include=*.test.ts* svc-admin-ui/src op-admin-ui/src svc-chat-ui/src shared-ui/src 2>/dev/null | head -3"
       }
     },
     { "kind": "toolResult", "t": 1792523656837, "id": "t21", "chars": 31 },
@@ -448,7 +448,7 @@
       "id": "t23",
       "name": "Bash",
       "input": {
-        "command": "cd svc-admin-ui/src/pages && sed -n 595p agentic-proxy/AgenticClientPage/index.test.tsx >/dev/null; echo ok"
+        "command": "cd svc-admin-ui/src/pages && sed -n 595p billing-proxy/BillingClientPage/index.test.tsx >/dev/null; echo ok"
       }
     },
     { "kind": "toolResult", "t": 1792523675112, "id": "t23", "chars": 2 },
@@ -468,7 +468,7 @@
       "id": "t24",
       "name": "Read",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticClientPage\\index.test.tsx",
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingClientPage\\index.test.tsx",
         "offset": 595,
         "limit": 1
       }
@@ -480,7 +480,7 @@
       "id": "t25",
       "name": "Read",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticEventPage\\index.test.tsx",
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingEventPage\\index.test.tsx",
         "offset": 205,
         "limit": 1
       }
@@ -492,7 +492,7 @@
       "id": "t26",
       "name": "Read",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\guardrails\\GuardrailCollectionPage\\ui\\CollectionSandbox\\index.test.tsx",
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\dashboards\\DashboardCollectionPage\\ui\\CollectionSandbox\\index.test.tsx",
         "offset": 225,
         "limit": 1
       }
@@ -504,7 +504,7 @@
       "id": "t27",
       "name": "Read",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\guardrails\\GuardrailCollectionPage\\ui\\ExceptionsSection\\index.test.tsx",
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\dashboards\\DashboardCollectionPage\\ui\\ExceptionsSection\\index.test.tsx",
         "offset": 306,
         "limit": 1
       }
@@ -516,7 +516,7 @@
       "id": "t28",
       "name": "Read",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\guardrails\\GuardrailCollectionPage\\ui\\ExceptionsSection\\ui\\ExceptionForm\\index.test.tsx",
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\dashboards\\DashboardCollectionPage\\ui\\ExceptionsSection\\ui\\ExceptionForm\\index.test.tsx",
         "offset": 158,
         "limit": 1
       }
@@ -538,7 +538,7 @@
       "id": "t29",
       "name": "Read",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticClientPage\\index.test.tsx",
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingClientPage\\index.test.tsx",
         "offset": 644,
         "limit": 20
       }
@@ -550,7 +550,7 @@
       "id": "t30",
       "name": "Read",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticEventPage\\index.test.tsx",
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingEventPage\\index.test.tsx",
         "offset": 230,
         "limit": 1
       }
@@ -572,7 +572,7 @@
       "id": "t31",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticClientPage\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingClientPage\\index.test.tsx"
       }
     },
     {
@@ -581,7 +581,7 @@
       "id": "t32",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticEventPage\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingEventPage\\index.test.tsx"
       }
     },
     {
@@ -590,7 +590,7 @@
       "id": "t33",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\guardrails\\GuardrailCollectionPage\\ui\\CollectionSandbox\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\dashboards\\DashboardCollectionPage\\ui\\CollectionSandbox\\index.test.tsx"
       }
     },
     {
@@ -599,7 +599,7 @@
       "id": "t34",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\guardrails\\GuardrailCollectionPage\\ui\\ExceptionsSection\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\dashboards\\DashboardCollectionPage\\ui\\ExceptionsSection\\index.test.tsx"
       }
     },
     {
@@ -608,7 +608,7 @@
       "id": "t35",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\guardrails\\GuardrailCollectionPage\\ui\\ExceptionsSection\\ui\\ExceptionForm\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\dashboards\\DashboardCollectionPage\\ui\\ExceptionsSection\\ui\\ExceptionForm\\index.test.tsx"
       }
     },
     { "kind": "toolResult", "t": 1792523698530, "id": "t31", "chars": 177 },
@@ -632,7 +632,7 @@
       "id": "t36",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticClientPage\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingClientPage\\index.test.tsx"
       }
     },
     {
@@ -641,7 +641,7 @@
       "id": "t37",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticEventPage\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingEventPage\\index.test.tsx"
       }
     },
     { "kind": "toolResult", "t": 1792523707083, "id": "t36", "chars": 177 },
@@ -662,7 +662,7 @@
       "id": "t38",
       "name": "Edit",
       "input": {
-        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\agentic-proxy\\AgenticClientPage\\index.test.tsx"
+        "file_path": "/work/app\\svc-admin-ui\\src\\pages\\billing-proxy\\BillingClientPage\\index.test.tsx"
       }
     },
     { "kind": "toolResult", "t": 1792523711687, "id": "t38", "chars": 177 },

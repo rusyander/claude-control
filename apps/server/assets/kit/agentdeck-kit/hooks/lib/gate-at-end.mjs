@@ -20,7 +20,10 @@
 // Escape: repeat the identical call. Subagents are skipped — the hook sees the parent's transcript.
 // State survives compaction in the kit state dir, gates/<session>.json.
 // Kit hook item: run by the event dispatcher (lib/run.mjs) or on its own; see lib/items.mjs.
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { copyFileSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { backgroundParam, stateDir, sessionKey } from './kit-paths.mjs';
 import {
@@ -49,6 +52,28 @@ const KINDS = [
 // per split group — fix → full gate → fix — instead of once per stage; `--dry` only prints a plan.
 const GATE_SCRIPT =
   /\b(npm|pnpm|yarn|bun)\s+(run\s+)?(gate|verify|ci|validate|check-all)\b|\bmake\s+(check|ci|verify|gate)\b|\bgate-run(\.mjs)?\b|\bcheck-ticket(\.mjs)?\b(?![^\n;&|]*\s--dry\b)/i;
+// `scripts/check_<x>.(mjs|py)` = a project's own gate script (`node scripts/check_all.mjs`,
+// `python scripts/check_backend.py`): unrecognised, groups ran it once per stage on the same tree.
+// Only the whole-side ones (F-35): `scripts/check_i18n.mjs` is one narrow check the project rules ask
+// for, and denying it in a work stage left a group no way to run it; and only as the command itself —
+// `eslint scripts/check_all.mjs` lints a file, it runs no gate.
+const GATE_SCRIPT_NAMES = /^(?:all|backend|frontend|full|gate|ci|ticket)$/i;
+const SCRIPT_RUNNER = /^(?:node|python3?|py|bun|tsx|deno|uv|poetry|pipenv|run)$/i;
+
+/** The segment runs `[runner] [./]…scripts/check_<whole-side>.(mjs|py)` as its own command. */
+function projectGateScript(seg) {
+  const words = seg
+    .replace(/^\s*(?:do|then|else)\s+/, '')
+    .trim()
+    .split(/\s+/);
+  let at = 0;
+  while (/^\w+=/.test(words[at] ?? '')) at += 1;
+  while (at < words.length && (SCRIPT_RUNNER.test(words[at]) || /^-/.test(words[at]))) at += 1;
+  const m = /^(?:\.{0,2}[\\/])?(?:[\w.@-]+[\\/])*scripts[\\/]check_([\w-]+)\.(?:mjs|py)$/i.exec(
+    words[at] ?? '',
+  );
+  return Boolean(m && GATE_SCRIPT_NAMES.test(m[1]));
+}
 const NOT_CHECK =
   /^\s*(git|grep|rg|cat|ls|dir|echo|type|find|curl|which|where|sed|head|tail|mkdir|rm|cp|mv|touch|ps|kill|taskkill|command|for)\b|\b(install|add|remove|uninstall|upgrade|update|outdated)\b|\s--version\b/i;
 const TRUNCATED = /\|\s*(tail|head|grep|rg|findstr|select-string|select-object)\b/i;
@@ -91,7 +116,7 @@ export function gateKinds(command) {
     const s = checkText(seg);
     if (!s || NOT_CHECK.test(s)) continue;
     // The gate runner is named by its path (`node <kit>/tools/gate-run.mjs`), so the whole segment.
-    if (GATE_SCRIPT.test(seg)) kinds.add('gate');
+    if (GATE_SCRIPT.test(seg) || projectGateScript(seg)) kinds.add('gate');
     for (const [name, re] of KINDS) if (re.test(s)) kinds.add(name);
   }
   return kinds;
@@ -321,12 +346,415 @@ export function firstHintFor(input, ts) {
 
 export const hhmm = (ts) => new Date(ts).toTimeString().slice(0, 5);
 
+// Panel split group (owner 23.10): ONE full gate per group, in its delivery stage. Every stage is a new
+// session, so "the first full gate of the session is free" restarted at each stage: the 23.10 day ran
+// full gates 113× in work stages, 22× in review, 36× in fix against 33× in delivery — often on one tree.
+// The panel names the stage (AGENTDECK_GROUP_STAGE) and whether a delivery stage follows
+// (AGENTDECK_GROUP_DELIVER_AHEAD=1); a per-copy ledger keyed by the working tree spans the stages.
+const groupStage = () => String(process.env.AGENTDECK_GROUP_STAGE ?? '').trim();
+const deliverAhead = () => process.env.AGENTDECK_GROUP_DELIVER_AHEAD === '1';
+const groupSession = () => Boolean(groupStage() || process.env.AGENTDECK_HEAVY_QUEUE_DIR);
+
+/**
+ * Segments of a shell command, each a list of words with their quotes kept: split on unquoted
+ * `&&`, `||`, `;`, `|`, `(`, `)` and newlines; heredoc bodies dropped (they are data).
+ */
+function shellSegments(command) {
+  const text = String(command).replace(/<<-?\s*['"]?(\w+)['"]?[^\n]*\n[\s\S]*?\n\s*\1\b/g, ' ');
+  const segments = [];
+  let words = [];
+  let word = '';
+  let quote = '';
+  const endWord = () => {
+    if (word) words.push(word);
+    word = '';
+  };
+  const endSegment = () => {
+    endWord();
+    if (words.length) segments.push(words);
+    words = [];
+  };
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (quote) {
+      word += c;
+      if (c === quote) quote = '';
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      word += c;
+    } else if (/[\s]/.test(c)) {
+      if (c === '\n') endSegment();
+      else endWord();
+    } else if (';|&()'.includes(c)) {
+      // `2>&1` / `&>` stay inside a word: `&` right after `>` or before `>` is a redirect.
+      if (c === '&' && (text[i - 1] === '>' || text[i + 1] === '>')) word += c;
+      else endSegment();
+    } else word += c;
+  }
+  endSegment();
+  return segments;
+}
+
+const unquote = (s) => String(s).replace(/^(["'])([\s\S]*)\1$/, '$2');
+const LEDGER_NAME = /^AGENTDECK_VERIFY_LEDGER(?:_LOCK|_HOME|_DELTA)?$/i;
+
+/**
+ * NODE_OPTIONS named as a variable — not a file (`node_options.test.ts`) or a longer identifier.
+ * Case-insensitive: Windows environment names are (`$env:node_options`, cmd's `set`).
+ */
+const NODE_OPTIONS_MENTION = /(?<![A-Za-z0-9_\-/])NODE_OPTIONS(?![A-Za-z0-9_]|\.[A-Za-z])/gi;
+/**
+ * An expansion that yields the inherited value whole, preload included: `$NODE_OPTIONS`,
+ * `${NODE_OPTIONS}`, `${NODE_OPTIONS:-…}`, `$env:NODE_OPTIONS`, `%NODE_OPTIONS%`. Every other
+ * expansion (`${NODE_OPTIONS%%--require*}`, `${NODE_OPTIONS/x/y}`, `${NODE_OPTIONS:0:0}`) rewrites it.
+ */
+const BARE_NODE_OPTIONS =
+  /\$NODE_OPTIONS(?![A-Za-z0-9_])|\$\{NODE_OPTIONS(?::?-[^}]*)?\}|\$env:NODE_OPTIONS(?![A-Za-z0-9_])|%NODE_OPTIONS%/gi;
+const count = (text, re) => (String(text).match(re) ?? []).length;
+
+/** Heads that only read or print: a NODE_OPTIONS in their words is text, not a change. */
+const READERS =
+  /^(?:echo|printf|printenv|grep|egrep|fgrep|rg|ag|cat|head|tail|less|more|wc|sort|uniq|diff|findstr|Select-String|sls|Get-Content|gc|type|ls|dir|stat|which|where|file|Write-Output|Write-Host)$/i;
+const GIT_READS = /^(?:grep|log|show|diff|blame|status|commit|add|shortlog|ls-files)$/;
+
+function readsOnly(words) {
+  const list = words.map(unquote);
+  const head = list[0] ?? '';
+  // `printf -v NODE_OPTIONS ''` assigns.
+  if (/^printf$/i.test(head)) return !list.some((w) => /^-v/.test(w));
+  if (READERS.test(head)) return true;
+  if (!/^git$/i.test(head) || !GIT_READS.test(list[1] ?? '')) return false;
+  // A pager, filter or config value is a program git runs: `-O<cmd>`, `--open-files-in-pager`, `-c`.
+  return !list.some((w) => /^(?:-c|-O|--open-files-in-pager|--ext-diff|--textconv|--exec)/.test(w));
+}
+
+/** The value keeps the inherited NODE_OPTIONS: `+=` appends; `=` needs only bare expansions in it. */
+function keepsNodeOptions(raw, append) {
+  if (append) return true;
+  // Single quotes do not expand: `NODE_OPTIONS='$NODE_OPTIONS'` is the literal text.
+  if (/'[^']*NODE_OPTIONS/i.test(raw)) return false;
+  const bare = count(raw, BARE_NODE_OPTIONS);
+  return bare > 0 && bare === count(raw, NODE_OPTIONS_MENTION);
+}
+
+/**
+ * The segment changes NODE_OPTIONS for what it runs (RF-BGCD-08). Inverted on purpose: the old rule
+ * listed the changing forms and every unlisted one passed (`export -n`, `declare +x`, `bash -c`, `eval`,
+ * `nice`, `npx --yes cross-env`, `cmd //c set`, `Clear-Item`, `[Environment]::Set…`, `delete
+ * process.env…`, a rewriting expansion). Now a mention passes only as a bare expansion, as an
+ * assignment that keeps one, or in a segment that only reads.
+ */
+function dropsNodeOptions(words) {
+  const mentions = (w) => count(w, NODE_OPTIONS_MENTION) > 0;
+  if (!words.some(mentions) || readsOnly(words)) return false;
+  for (let i = 0; i < words.length; i += 1) {
+    const raw = words[i];
+    if (!mentions(raw)) continue;
+    const assign =
+      /^(?:\$env:)?NODE_OPTIONS(\+?)=([\s\S]*)$/i.exec(raw) ??
+      /^(?:\$env:)?NODE_OPTIONS(\+?)=([\s\S]*)$/i.exec(unquote(raw));
+    if (assign) {
+      if (!keepsNodeOptions(assign[2], assign[1] === '+')) return true;
+      continue;
+    }
+    // PowerShell with spaces: `$env:NODE_OPTIONS = '…'`, `$env:NODE_OPTIONS += '…'`.
+    if (/^\$env:NODE_OPTIONS$/i.test(raw) && /^\+?=$/.test(words[i + 1] ?? '')) {
+      const append = words[i + 1] === '+=';
+      if (!keepsNodeOptions(words[i + 2] ?? '', append)) return true;
+      i += 2;
+      continue;
+    }
+    if (
+      count(raw, BARE_NODE_OPTIONS) === count(raw, NODE_OPTIONS_MENTION) &&
+      !/'[^']*NODE_OPTIONS/i.test(raw)
+    )
+      continue;
+    return true;
+  }
+  return false;
+}
+
+/** Command text a segment hands to another shell: `bash -c '…'`, `eval …`, `cmd /c …`, `pwsh -c …`. */
+function nestedCommand(words) {
+  const list = words.map(unquote);
+  const head = list[0] ?? '';
+  if (/^(?:ba|z|da|k)?sh(?:\.exe)?$/i.test(head)) {
+    const at = list.findIndex((w, i) => i > 0 && /^-\w*c$/.test(w));
+    return at > 0 ? (list[at + 1] ?? '') : null;
+  }
+  if (/^eval$/i.test(head)) return list.slice(1).join(' ');
+  if (/^cmd(?:\.exe)?$/i.test(head)) {
+    const at = list.findIndex((w, i) => i > 0 && /^\/\/?[ck]$/i.test(w));
+    return at > 0 ? list.slice(at + 1).join(' ') : null;
+  }
+  if (/^(?:pwsh|powershell)(?:\.exe)?$/i.test(head)) {
+    const at = list.findIndex((w, i) => i > 0 && /^-(?:c|command)$/i.test(w));
+    return at > 0 ? list.slice(at + 1).join(' ') : null;
+  }
+  return null;
+}
+
+/** Words that only wrap the command after them: `nice`, `time`, `npx --yes`, `pnpm dlx`, `timeout 60`. */
+const WRAPPER =
+  /^(?:npx|pnpm|pnpx|dlx|exec|command|sudo|nice|time|nohup|timeout|stdbuf|ionice|chrt|yes|bunx)$/i;
+
+/**
+ * Why the command switches the verify ledger off for what it runs, or `null` (F-30, F-37). Only the
+ * forms that change the environment count — an assignment or unset in the command's prefix
+ * (`X=…`, `export X=…`, `$env:X=…`, `set X=…`, `env -u X`, `unset X`, `env -i`) — so a `grep` that
+ * merely names the lock reads the panel's own code freely. Watched: the ledger's switch, narrowing
+ * and lock (`AGENTDECK_VERIFY_LEDGER[_DELTA|_LOCK]`), its home (`_HOME` — a fresh home holds no
+ * green to replay and no key to trust one) and `NODE_OPTIONS`, which carries the preload itself
+ * (`dropsNodeOptions`: any form but a bare expansion). A segment handing text to another shell is
+ * read through (`bash -c`, `eval`, `cmd /c`, `pwsh -c`). Left out deliberately: a program that
+ * rewrites its own environment from a file (`node script.js` doing `delete process.env…`) — catching
+ * it needs the run itself; a runtime check on the preload's own record would refuse every gate whose
+ * checks are not Node.
+ */
+export function ledgerEscape(command, depth = 0) {
+  const touched = (name, value) => {
+    const bare = name.toUpperCase();
+    if (!LEDGER_NAME.test(bare)) return null;
+    // `=on` keeps the ledger as it is; any other value, an empty one or an unset turns it off.
+    if (/^AGENTDECK_VERIFY_LEDGER(?:_DELTA)?$/.test(bare) && unquote(value ?? '') === 'on')
+      return null;
+    return bare;
+  };
+  for (const words of shellSegments(command)) {
+    if (dropsNodeOptions(words)) return 'NODE_OPTIONS (it carries the ledger preload)';
+    const nested = depth < 4 ? nestedCommand(words) : null;
+    if (nested) {
+      const hit = ledgerEscape(nested, depth + 1);
+      if (hit) return hit;
+      continue;
+    }
+    let at = 0;
+    const head = () => unquote(words[at] ?? '');
+    // `npx --yes cross-env X=…`, `nice -n 5 …`, `export`, `declare -x`, cmd's `set`, `Remove-Item env:X`.
+    while (WRAPPER.test(head()) || (at > 0 && /^(?:-\S*|\d+[smhd]?)$/.test(head()))) at += 1;
+    if (/^(?:unset|Remove-Item|rm|ri|del)$/i.test(head())) {
+      for (const word of words.slice(at + 1)) {
+        const name = unquote(word).replace(/^env:[\\/]?/i, '');
+        if (/^-/.test(name)) continue;
+        const hit = touched(name, undefined);
+        if (hit && (/^unset$/i.test(head()) || /^env:/i.test(unquote(word)))) return hit;
+      }
+      continue;
+    }
+    if (/^(?:export|declare|typeset|local|readonly|set)$/i.test(head())) {
+      at += 1;
+      while (/^-/.test(head())) at += 1;
+    }
+    const env = /^(?:env|cross-env)$/i.test(head());
+    if (env) at += 1;
+    for (; at < words.length; at += 1) {
+      const word = unquote(words[at]);
+      if (env && /^(?:-i|--ignore-environment|-)$/.test(word))
+        return 'the whole environment (env -i)';
+      const unset = env ? /^(?:-u|--unset)(?:=(.+))?$/.exec(word) : null;
+      if (unset) {
+        const name = unset[1] ?? unquote(words[(at += 1)] ?? '');
+        const hit = touched(name, undefined);
+        if (hit) return hit;
+        continue;
+      }
+      if (env && /^-/.test(word)) continue;
+      // `$env:X='…'`, `$env:X = '…'`, `X=…`.
+      const ps = /^\$env:(\w+)(?:=([\s\S]*))?$/i.exec(word);
+      if (ps) {
+        const value = ps[2] ?? (words[at + 1] === '=' ? (words[at + 2] ?? '') : undefined);
+        if (value === undefined) break;
+        const hit = touched(ps[1], unquote(value));
+        if (hit) return hit;
+        break;
+      }
+      const assign = /^(\w+)=([\s\S]*)$/.exec(word);
+      if (!assign) break;
+      const hit = touched(assign[1], unquote(assign[2]));
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/** The gate as the copy's ledger keys it (F-36): the command, without a `cd` in front or its logs. */
+export function gateKey(command) {
+  return String(command)
+    .replace(/^\s*cd\s+(?:"[^"]*"|'[^']*'|[^\s;&|]+)\s*(?:;|&&)/, '')
+    .replace(/\s+(?:\d?>{1,2}|&>)\s*(?:&\d|"[^"]*"|'[^']*'|[^\s;&|]+)/g, ' ')
+    .replace(/;\s*echo\b[^;&|]*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function git(cwd, args, env) {
+  return execFileSync('git', args, {
+    cwd,
+    env: env ?? process.env,
+    encoding: 'utf8',
+    timeout: 15_000,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+}
+
+/** Ignored files every JS check reads (the verify ledger's set): `.env*` and node_modules' hidden locks. */
+const HIDDEN_LOCKS = [
+  'node_modules/.package-lock.json',
+  'node_modules/.modules.yaml',
+  'node_modules/.pnpm/lock.yaml',
+];
+
+/**
+ * F-80: `add -A` follows .gitignore, so a changed `.env.local` or a reinstalled node_modules left the
+ * tree key as it was and replayed the old verdict. Their contents join the key — only these: the
+ * gate's own logs and build outputs are ignored too and change on every run. '' when none exist.
+ * Anywhere in the copy (RF-BGCD-12d), not only the top and the cwd: a monorepo keeps `apps/*\/.env*`
+ * and a node_modules per package. The list is git's own (`ls-files --others --ignored --directory`):
+ * an ignored `node_modules/` comes as one entry, so the walk does not descend into it.
+ */
+function ignoredInputsDigest(top) {
+  const hash = createHash('sha256');
+  let any = false;
+  let listed;
+  try {
+    listed = execFileSync(
+      'git',
+      ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'],
+      {
+        cwd: top,
+        encoding: 'utf8',
+        timeout: 15_000,
+        windowsHide: true,
+        maxBuffer: 32 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    )
+      .split('\0')
+      .filter(Boolean);
+  } catch {
+    return '';
+  }
+  const files = [];
+  for (const entry of listed) {
+    const name = entry.replace(/\/$/, '').split('/').pop() ?? '';
+    if (entry.endsWith('/') && name === 'node_modules') {
+      const dir = entry.slice(0, -'node_modules/'.length);
+      files.push(...HIDDEN_LOCKS.map((lock) => `${dir}${lock}`));
+    } else if (!entry.endsWith('/') && /^\.env/.test(name)) files.push(entry);
+  }
+  for (const rel of [...new Set(files)].sort()) {
+    try {
+      const body = readFileSync(join(top, rel));
+      hash.update(`${rel}\0`).update(body);
+      any = true;
+    } catch {
+      /* absent or a directory */
+    }
+  }
+  return any ? hash.digest('hex').slice(0, 12) : '';
+}
+
+/**
+ * The copy's working tree as a commit would take it now — `add -A` into a scratch copy of the index,
+ * then `write-tree` — and its own git dir (a worktree's, so the ledger is per copy and outside the
+ * tree). `null` outside git or on any git failure: then no ledger, the session rules alone.
+ */
+export function copyTree(cwd) {
+  let scratch = '';
+  try {
+    const gitDir = git(cwd, ['rev-parse', '--absolute-git-dir']);
+    scratch = join(tmpdir(), `agentdeck-gate-${process.pid}-${Date.now()}.index`);
+    try {
+      copyFileSync(join(gitDir, 'index'), scratch);
+    } catch {
+      /* no index yet: add -A builds it from scratch */
+    }
+    const env = { ...process.env, GIT_INDEX_FILE: scratch };
+    git(cwd, ['add', '-A'], env);
+    const tree = git(cwd, ['write-tree'], env);
+    const ignored = ignoredInputsDigest(git(cwd, ['rev-parse', '--show-toplevel']));
+    // Where in the copy the gate runs (RF-BGCD-11): `cd backend && pnpm gate` and
+    // `cd frontend && pnpm gate` are one key without it, on one whole-copy tree.
+    const prefix = git(cwd, ['rev-parse', '--show-prefix']).replace(/\/$/, '');
+    return { gitDir, tree: ignored ? `${tree}+${ignored}` : tree, prefix };
+  } catch {
+    return null;
+  } finally {
+    if (scratch) rmSync(scratch, { force: true });
+  }
+}
+
+const ledgerPath = (gitDir) => join(gitDir, 'agentdeck-gates.json');
+
+/** A full gate takes 13–20 min; a background one with no result an hour later died with its stage. */
+const RUNNING_STALE_MS = 60 * 60_000;
+
+function loadLedger(gitDir) {
+  try {
+    const s = JSON.parse(readFileSync(ledgerPath(gitDir), 'utf8'));
+    return Array.isArray(s?.runs) ? s.runs : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLedger(gitDir, runs) {
+  try {
+    writeFileSync(ledgerPath(gitDir), JSON.stringify({ runs: runs.slice(-30) }));
+  } catch {
+    /* best effort: a lost entry only lets one more gate through */
+  }
+}
+
+/** Outcome of a ledger entry, read from the transcript of the stage that ran it; `null` = unknown. */
+function ledgerOutcome(entry, cwd) {
+  try {
+    const raw = readTailText(entry.transcript, 4_000_000);
+    const runs = previousGates(toolEvents(readTail(entry.transcript)), raw, { runs: [] }, cwd);
+    return runs.find((r) => r.id === entry.id)?.outcome ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function gateAtEnd(input) {
   const tool = input?.tool_name;
   if (tool !== 'Bash' && tool !== 'PowerShell') return null;
   if (inSubagent(input)) return null;
   const command = String(input.tool_input?.command ?? '');
+  // The verify ledger's replay of a green run on the same tree is the panel's (owner 23.10): a group
+  // switched it off in its own command and paid the same gate again. The panel's lock lives in the
+  // preload's entry path (F-30), so `off`, `_LOCK=` or `_HOME=` reach nothing even through a script;
+  // what still would — dropping the preload from NODE_OPTIONS, `env -i` — is refused here, no repeat.
+  // The script the command runs is read too (RF-BGCD-08): `bash gate.sh` with `unset NODE_OPTIONS` in it.
+  const escape = groupSession()
+    ? (ledgerEscape(command) ?? ledgerEscape(scriptText(command, input.cwd)))
+    : null;
+  if (escape) {
+    return deny(
+      `gate-at-end: the verify ledger is not switched off from a panel group (this command changes ${escape}). ` +
+        'A "[verify-ledger] reused green" line means nothing the check depends on changed since that green run — ' +
+        "its output and exit code ARE this run's. Need a fresh run? Change the code it checks; otherwise use the " +
+        'reused result. Extra Node flags go after the inherited ones: NODE_OPTIONS="$NODE_OPTIONS --flag" ' +
+        '(or NODE_OPTIONS+=" --flag"); to read it: echo "$NODE_OPTIONS" or printenv NODE_OPTIONS.',
+    );
+  }
   if (!isGateRun(command, input.cwd)) return null;
+
+  // Not escapable by a repeat: the delivery stage that follows is where the gate runs, and a repeat
+  // here would only spend the 13–20 min run twice.
+  const stage = groupStage();
+  if (stage && stage !== 'deliver' && deliverAhead()) {
+    return deny(
+      `gate-at-end: this is the ${stage} stage of a panel split group, and a delivery stage follows it: the ` +
+        "group's full project checks run ONCE, there, on the final tree. That run is what satisfies a project " +
+        'rule asking for full checks before "done". Here check only what you touched: the tests of the touched ' +
+        'files (`vitest related <files> --run`, `pytest <file>`), lint and type-check of those files or their package.',
+    );
+  }
 
   let raw;
   let records;
@@ -366,6 +794,38 @@ export default function gateAtEnd(input) {
         'one gets re-run just to be read, and only a background gate can be stopped (TaskStop) if the task grows ' +
         'while it runs. After starting it: do the remaining non-code work or end the turn saying the gate is running; ' +
         'the completion notification wakes you — never sleep-poll. Repeat this exact call only if it must stay as is.',
+    );
+  }
+
+  // A group stage: the same full gate already run on exactly this tree — in this stage or an earlier
+  // one — is authoritative; its result is read, not produced again. The same gate, not any (F-36): a
+  // green `check_backend.py` says nothing about `check_frontend.mjs`; an entry from before the command
+  // was keyed names no gate and counts for none.
+  const id = String(input.tool_use_id ?? `t${Date.now()}`);
+  const copy = stage ? copyTree(commandCwd(command, input.cwd) ?? process.cwd()) : null;
+  // The copy's subdirectory joins the key (RF-BGCD-11); at the top it stays the bare command, as before.
+  const cmd = copy?.prefix ? `${copy.prefix}: ${gateKey(command)}` : gateKey(command);
+  const ledger = copy ? loadLedger(copy.gitDir) : [];
+  for (const entry of [...ledger].reverse()) {
+    if (entry.tree !== copy?.tree || entry.cmd !== cmd || entry.id === id) continue;
+    const outcome = ledgerOutcome(entry, input.cwd);
+    if (!outcome) continue;
+    const where = `at ${hhmm(entry.ts)} in the ${entry.stage ?? 'previous'} stage`;
+    if (outcome === 'running') {
+      // F-79: a stage whose session died never gets the notification — its entry would read
+      // "running" forever and hold every later stage on this tree. Past RUNNING_STALE_MS it is gone.
+      if (Date.now() - Number(entry.ts ?? 0) > RUNNING_STALE_MS) continue;
+      return deny(
+        `gate-at-end: a full gate on exactly this tree started ${where} is still running. Wait for its ` +
+          'result instead of starting a second one. Repeat this exact call only if that run is gone ' +
+          '(its stage ended without a result).',
+      );
+    }
+    return deny(
+      `gate-at-end: the full gate already ran on exactly this tree (git tree ${copy.tree.slice(0, 12)}) ${where} — ` +
+        `${outcome}. That result is authoritative: read it (transcript ${entry.transcript}, tool_use_id ${entry.id}, ` +
+        'or its log) instead of re-running; red → fix, then re-run only the red checks, narrowly. Repeat this ' +
+        'exact call only for a suspected flaky run.',
     );
   }
 
@@ -420,9 +880,14 @@ export default function gateAtEnd(input) {
   }
 
   // Allowed: remember it so the decision survives compaction.
-  const id = String(input.tool_use_id ?? `t${Date.now()}`);
   state.runs = state.runs.filter((r) => r.id !== id);
   state.runs.push({ id, ts: Date.now(), outcome: 'unknown' });
   saveState(path, state);
+  if (copy && input.transcript_path) {
+    saveLedger(copy.gitDir, [
+      ...ledger.filter((r) => r.id !== id),
+      { tree: copy.tree, cmd, id, transcript: input.transcript_path, ts: Date.now(), stage },
+    ]);
+  }
   return null;
 }

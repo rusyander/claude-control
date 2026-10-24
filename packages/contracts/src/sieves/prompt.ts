@@ -20,9 +20,16 @@ function mechanicsLines(mechanics: SieveMechanics | undefined): string[] {
     );
   }
   if (mechanics.foreignRemovals?.length) {
+    // Чей коммит и какие строки — тем же видом, что пробел судьи (`judge.ts`
+    // FLAGS `shown`): без них агенту нечем проверить «чужое», а одноимённые
+    // файлы он снимал именем без пути (живая группа 23.10).
+    const blame = mechanics.foreignBlame ?? {};
+    const shown = mechanics.foreignRemovals.map((path) =>
+      blame[path] ? `${path} (${blame[path]})` : path,
+    );
     lines.push(
       `The panel found removed lines that landed in main after the group started: ` +
-        `${list(mechanics.foreignRemovals)} — restore them, or name every file in the ` +
+        `${list(shown)} — restore them, or name every file by its full path in the ` +
         'foreign-removals row with why the removal is intended.',
     );
   }

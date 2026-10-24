@@ -20,6 +20,7 @@ export function summarizeHub(groups: ChildStageGroup[], now: number): HubSummary
     done: 0,
     running: 0,
     ask: 0,
+    deferred: 0,
     queued: 0,
     failed: 0,
     cancelled: 0,

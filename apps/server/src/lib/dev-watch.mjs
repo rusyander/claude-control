@@ -62,6 +62,13 @@ const RUNS_CAP_MS = process.env.AGENTDECK_DEV_RUNS_CAP_MS
  */
 export const CHECK_LEDGERS = ['e2e-runs.json', 'project-test-runs.json', 'mutation-runs.json'];
 
+/**
+ * Журналы идущих ходов: Claude (`run-ledger.ts`) и чужие CLI
+ * (`provider-chat/turn-ledger.ts`, F2: ход Codex/Qwen обрывался перезапуском).
+ * Оба — ходы, с одним пределом ожидания; совпадение имён держит тест.
+ */
+export const RUN_LEDGERS = ['runs.json', 'provider-runs.json'];
+
 /** Правка этого файла может изменить поведение сервера. */
 export function isWatched(path) {
   const parts = path.split(/[\\/]/);
@@ -187,6 +194,34 @@ export function busyRunNames(entries, isAlive) {
     .map((entry) => (typeof entry.cwd === 'string' && entry.cwd ? basename(entry.cwd) : entry.key))
     .filter((name) => typeof name === 'string' && name);
   return [...new Set(names)];
+}
+
+/**
+ * Ждать ли идущих ходов перед перезапуском (24.10, отказ от предела D1 21.10 для
+ * живых ходов). Ход с живым процессом ждут без предела — ход группы разделения
+ * тоже: перезапуск по пределу рвал поток хода посреди шага, и группа теряла
+ * недоделанную работу. Предел `capMs` остаётся только у «занято», которое ничем
+ * не доказано: журнал ходов не прочитался, а живого процесса в прочитанных нет —
+ * иначе битый файл держал бы правки вечно. Нетерпеливому — кнопка в панели.
+ * `ledgers` — результаты `readJsonSteady` журналов ходов; `capAt` — когда
+ * перезапустит предел (есть только у недоказанного «занято»).
+ */
+export function runsWait(ledgers, isAlive, deferredSince, now, capMs) {
+  const entries = ledgers.flatMap((ledger) => (Array.isArray(ledger?.value) ? ledger.value : []));
+  const live = busyRun(entries, isAlive);
+  const unproven = !live && ledgers.some((ledger) => ledger?.unreadable === true);
+  const capped = unproven && runsWaitCapped(deferredSince, now, capMs);
+  const wait = live || (unproven && !capped);
+  const capAt =
+    unproven && !capped && capMs > 0
+      ? new Date((deferredSince ?? now) + capMs).toISOString()
+      : undefined;
+  return {
+    wait,
+    capped,
+    ...(capAt ? { capAt } : {}),
+    runs: live ? busyRunNames(entries, isAlive).slice(0, 5) : [],
+  };
 }
 
 /** Подготовка копии старше этого — след процесса, умершего без перезапуска. */
@@ -317,7 +352,7 @@ function main() {
   ];
   const configRoot = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
   const appData = appDataDirOf(configRoot);
-  const ledgerFile = join(appData, 'runs.json');
+  const runLedgers = RUN_LEDGERS.map((name) => join(appData, name));
   // Автотесты, агентский прогон тестов и проверка поломкой — свои журналы
   // процессов (Ф11): перезапуск посреди них рвал прогон и оставлял копию.
   const checkLedgers = CHECK_LEDGERS.map((name) => join(appData, name));
@@ -405,33 +440,34 @@ function main() {
     // успел перезапустить сам) иначе сорвал бы следующую, и живые ходы
     // оборвались бы без клика (ревью 30.09).
     const forced = takeRestartRequest(appData) && deferredSince !== undefined;
-    // Ходы ждём до предела (D1), подготовку копий и проверки — без него.
-    const ledger = readJsonSteady(ledgerFile);
-    const entries = Array.isArray(ledger.value) ? ledger.value : [];
-    const runsBusy = ledger.unreadable === true || busyRun(entries, pidAlive);
-    const capped = runsWaitCapped(deferredSince, now, RUNS_CAP_MS);
+    // Живые ходы, подготовку копий и проверки ждём без предела; предел — только
+    // у нечитаемого журнала ходов без доказанного живого хода (`runsWait`).
+    const turns = runsWait(
+      runLedgers.map((file) => readJsonSteady(file)),
+      pidAlive,
+      deferredSince,
+      now,
+      RUNS_CAP_MS,
+    );
+    const { capped, runs } = turns;
     const waitingFor =
       defer && !forced
         ? deferReason(
-            runsBusy && !capped,
+            turns.wait,
             setupBusy(stateFile, now),
             checkLedgers.some((file) => ledgerBusy(file, pidAlive)),
           )
         : undefined;
-    const runs = runsBusy ? busyRunNames(entries, pidAlive).slice(0, 5) : [];
     if (waitingFor) {
       if (deferredSince === undefined) {
         deferredSince = now;
         log(
           RUNS_CAP_MS > 0
-            ? `правки ждут конца идущих ходов (предел ${capLabel(RUNS_CAP_MS)}), подготовки копий и проверок (без предела) — перезапуск отложен`
+            ? `правки ждут конца идущих ходов, подготовки копий и проверок (без предела; нечитаемый журнал ходов — до ${capLabel(RUNS_CAP_MS)}) — перезапуск отложен`
             : 'правки ждут конца идущих ходов, подготовки копий и проверок — перезапуск без предела отложен',
         );
       }
-      const capAt =
-        RUNS_CAP_MS > 0 && runsBusy && !capped
-          ? new Date(deferredSince + RUNS_CAP_MS).toISOString()
-          : undefined;
+      const capAt = turns.wait ? turns.capAt : undefined;
       writeRestartState(appData, {
         pid: process.pid,
         since: new Date(deferredSince).toISOString(),
@@ -444,9 +480,9 @@ function main() {
       return;
     }
     if (forced && deferredSince !== undefined) log('перезапуск по просьбе из панели');
-    else if (defer && capped && runsBusy) {
+    else if (defer && capped) {
       log(
-        `предел ожидания ходов (${capLabel(RUNS_CAP_MS)}): перезапуск, не дождавшись ${runs.length > 0 ? runs.join(', ') : 'идущих ходов'}`,
+        `предел ожидания нечитаемого журнала ходов (${capLabel(RUNS_CAP_MS)}): живых ходов в нём не видно — перезапуск`,
       );
     }
     deferredSince = undefined;

@@ -173,7 +173,7 @@
       "id": "t9",
       "name": "Bash",
       "input": {
-        "command": "git worktree list | head -3; mkdir -p .agent/tmp/review-proj-3; node ~/.claude/tools/review-plan.mjs plan --base origin/main --out .agent/tmp/review-proj-3/plan --slug proj-3-guardrails-agentgw --scope \"MR !1050 PROJ-4/1660/1039/1707\" 2>&1 | tail -25",
+        "command": "git worktree list | head -3; mkdir -p .agent/tmp/review-proj-3; node ~/.claude/tools/review-plan.mjs plan --base origin/main --out .agent/tmp/review-proj-3/plan --slug proj-3-dashboards-agentgw --scope \"MR !1050 PROJ-4/1660/1039/1707\" 2>&1 | tail -25",
         "timeout": 300000
       }
     },
@@ -194,7 +194,7 @@
       "id": "t10",
       "name": "Bash",
       "input": {
-        "command": "B=$(git merge-base HEAD origin/main); echo $B; node ~/.claude/tools/review-plan.mjs plan --base $B --out .agent/tmp/review-proj-3/plan --slug proj-3-guardrails-agentgw --scope \"MR !1050 PROJ-4/1660/1039/1707\" 2>&1 | tail -8; ls .agent/tmp/review-proj-3/plan/",
+        "command": "B=$(git merge-base HEAD origin/main); echo $B; node ~/.claude/tools/review-plan.mjs plan --base $B --out .agent/tmp/review-proj-3/plan --slug proj-3-dashboards-agentgw --scope \"MR !1050 PROJ-4/1660/1039/1707\" 2>&1 | tail -8; ls .agent/tmp/review-proj-3/plan/",
         "timeout": 300000
       }
     },
@@ -363,7 +363,7 @@
       "id": "t21",
       "name": "Bash",
       "input": {
-        "command": "cd /work/app; sed -n 1075,1095p svc-admin-api/cmd/admin-api/main.go; grep -n \"guardrail-collections\\|read :=\\|read =\" svc-admin-api/cmd/admin-api/main.go | head -20"
+        "command": "cd /work/app; sed -n 1075,1095p svc-admin-api/cmd/admin-api/main.go; grep -n \"dashboard-collections\\|read :=\\|read =\" svc-admin-api/cmd/admin-api/main.go | head -20"
       },
       "sidechain": true
     },
@@ -397,7 +397,7 @@
       "id": "t22",
       "name": "Bash",
       "input": {
-        "command": "cd /work/app; D=svc-admin-ui/src/pages/guardrails/GuardrailCollectionPage/ui/ExceptionsSection; cat -n $D/ui/ExceptionsSectionBody/index.tsx $D/ui/ExceptionsSectionBody/types.ts $D/ui/index.ts"
+        "command": "cd /work/app; D=svc-admin-ui/src/pages/dashboards/DashboardCollectionPage/ui/ExceptionsSection; cat -n $D/ui/ExceptionsSectionBody/index.tsx $D/ui/ExceptionsSectionBody/types.ts $D/ui/index.ts"
       },
       "sidechain": true
     },
@@ -407,7 +407,7 @@
       "id": "t23",
       "name": "Bash",
       "input": {
-        "command": "cd /work/app/svc-admin-ui/src; cat features/agentic-proxy/ui/VerdictCell/types.ts; grep -n \"reason\" entities/agentic-proxy/api/types.ts | head; grep -n \"reason\" ../../contracts/openapi/svc-admin-api.v0.1.yaml | grep -n \"\" | head -0; grep -n \"VerdictCell\" -B2 -A2 pages/agentic-proxy/AgenticSessionPage/ui/SessionTimeline/index.tsx pages/agentic-proxy/AgenticReviewGroupPage/constants.tsx | head -20"
+        "command": "cd /work/app/svc-admin-ui/src; cat features/billing-proxy/ui/VerdictCell/types.ts; grep -n \"reason\" entities/billing-proxy/api/types.ts | head; grep -n \"reason\" ../../contracts/openapi/svc-admin-api.v0.1.yaml | grep -n \"\" | head -0; grep -n \"VerdictCell\" -B2 -A2 pages/billing-proxy/BillingSessionPage/ui/SessionTimeline/index.tsx pages/billing-proxy/BillingReviewGroupPage/constants.tsx | head -20"
       },
       "sidechain": true
     },
@@ -429,7 +429,7 @@
       "id": "t24",
       "name": "Bash",
       "input": {
-        "command": "D=.agent/tmp/review-proj-3-guardrails-agentgw; for i in $(seq 1 170); do [ -f $D/lane-A.md ] && [ -f $D/lane-B.md ] && break; sleep 10; done; ls -la $D 2>&1 | tail -4",
+        "command": "D=.agent/tmp/review-proj-3-dashboards-agentgw; for i in $(seq 1 170); do [ -f $D/lane-A.md ] && [ -f $D/lane-B.md ] && break; sleep 10; done; ls -la $D 2>&1 | tail -4",
         "timeout": 1800000
       }
     },
@@ -450,7 +450,7 @@
       "id": "t25",
       "name": "Bash",
       "input": {
-        "command": "cd /work/app/svc-admin-ui/src; grep -rn \"writeBlocked\" pages/guardrails/GuardrailCollectionPage/index.tsx | head -5; grep -rn \"canWrite\\|usePermission\\|hasPermission\" pages/guardrails/GuardrailCollectionPage/index.tsx | head -5; grep -n \"agentic-proxy/clients/:\\|agentic-proxy/events/:\\|guardrails/collections/:\" -A3 app/config/router/index.tsx | grep -i \"perm\\|guard\\|path\" | head"
+        "command": "cd /work/app/svc-admin-ui/src; grep -rn \"writeBlocked\" pages/dashboards/DashboardCollectionPage/index.tsx | head -5; grep -rn \"canWrite\\|usePermission\\|hasPermission\" pages/dashboards/DashboardCollectionPage/index.tsx | head -5; grep -n \"billing-proxy/clients/:\\|billing-proxy/events/:\\|dashboards/collections/:\" -A3 app/config/router/index.tsx | grep -i \"perm\\|guard\\|path\" | head"
       },
       "sidechain": true
     },
@@ -472,7 +472,7 @@
       "id": "t26",
       "name": "Bash",
       "input": {
-        "command": "cd /work/app; D=svc-admin-ui/src/pages/guardrails/GuardrailCollectionPage/ui/ExceptionsSection; ls $D $D/ui; grep -rn \"block_kind\\|blockKind\" $D/ui/ExceptionsTable -r | grep -v test; grep -rn \"writeBlocked\" svc-admin-ui/src/pages/guardrails/GuardrailCollectionPage/index.tsx | head -5; grep -rn \"retry\" svc-admin-ui/src/app/providers/*.tsx 2>/dev/null | head"
+        "command": "cd /work/app; D=svc-admin-ui/src/pages/dashboards/DashboardCollectionPage/ui/ExceptionsSection; ls $D $D/ui; grep -rn \"block_kind\\|blockKind\" $D/ui/ExceptionsTable -r | grep -v test; grep -rn \"writeBlocked\" svc-admin-ui/src/pages/dashboards/DashboardCollectionPage/index.tsx | head -5; grep -rn \"retry\" svc-admin-ui/src/app/providers/*.tsx 2>/dev/null | head"
       },
       "sidechain": true
     },

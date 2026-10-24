@@ -17,6 +17,19 @@ import {
 } from '../native-tools.ts';
 import { localizeText, type TextLanguage } from '../../../../lib/server-texts/server-texts.ts';
 import { clientToolsTravel, type PlatformClientTools } from '@agentdeck/contracts/platform-presets';
+import { anthropicUsage, cacheTokensOf } from './cache-usage.ts';
+import { cacheMarkOf, toolListMark, type CacheMark } from './cache-marks.ts';
+
+// Расход и кэш живут своим модулем; прежние имена отсюда остаются для `frames.ts`
+// и конвейера — путь импорта не меняется.
+export {
+  anthropicUsage,
+  cachedTokensOf,
+  cacheTokensOf,
+  openAiUsage,
+  type CacheTokens,
+} from './cache-usage.ts';
+export { forwardsCacheMarks } from './cache-marks.ts';
 
 /**
  * Перевод диалектов: клиент говорит по-Anthropic, контур — по-OpenAI.
@@ -78,6 +91,12 @@ export interface DialectRow {
    * зависит от драйвера, и таблица обязана говорить правду у каждого.
    */
   native?: { fate: DialectFate; note: string };
+  /**
+   * Что с полем делает мост, когда драйвер объявил модели пометки кэша
+   * (`cacheMarkModels`, n4): у модели Claude платформы компании `cache_control`
+   * доезжает, у остальных теряется. Та же причина, что у `withShim`.
+   */
+  withMarks?: { fate: DialectFate; note: string };
 }
 
 /**
@@ -168,7 +187,14 @@ export const DIALECT_TABLE: DialectRow[] = [
     anthropic: 'cache_control',
     openai: '',
     fate: 'dropped',
-    note: 'кэш промпта — свойство вендорного API, у контура его нет',
+    // Прежняя строка «у контура его нет» устарела: платформа компании доносит
+    // пометку до Anthropic (замер 22.10.2026). Теряется она теперь только там,
+    // где драйвер её модели не объявил (`cacheMarkModels`).
+    note: 'пометка кэша переносится только моделям, которым драйвер её объявил (семейство claude у платформы компании); у остальных её некому прочесть, а лишний ключ строгий шлюз вправе отвергнуть',
+    withMarks: {
+      fate: 'mapped',
+      note: 'пометка едет на ту же часть содержимого, очищенная до типа и срока; пометка системы — на дописку прослойки после списка инструментов, пометка списка инструментов сливается с ней; пометок наверх не больше, чем прислал клиент',
+    },
   },
   {
     anthropic: 'content[].image',
@@ -220,13 +246,20 @@ export const DIALECT_TABLE: DialectRow[] = [
     anthropic: 'usage.input_tokens ← usage.prompt_tokens',
     openai: 'usage.prompt_tokens',
     fate: 'renamed',
-    note: 'расход переименовывается; прочитанное из кэша вычитается — у Anthropic вход его не включает',
+    note: 'расход переименовывается; прочитанное из кэша и записанное в кэш вычитаются — у Anthropic вход не включает ни то, ни другое',
   },
   {
     anthropic: 'usage.cache_read_input_tokens ← usage.prompt_tokens_details.cached_tokens',
     openai: 'usage.prompt_tokens_details.cached_tokens',
     fate: 'renamed',
-    note: 'есть только когда апстрим его прислал; сам контур кэш не считает и списывает весь вход',
+    note: 'есть только когда апстрим его прислал; учёт расхода панели считает прочитанное по ставке чтения',
+  },
+  {
+    anthropic:
+      'usage.cache_creation_input_tokens / cache_creation ← usage.prompt_tokens_details.cache_write_tokens',
+    openai: 'usage.prompt_tokens_details.cache_write_tokens / cache_creation_token_details',
+    fate: 'renamed',
+    note: 'запись в кэш и её разбивка на 5 минут и час — поля LiteLLM, у платформы компании их присылают модели Claude; верхнее поле вендора сильнее пересказа; полей нет — записи нет',
   },
 ];
 
@@ -380,9 +413,13 @@ function lose(lost: DialectLoss[], field: string, fields?: readonly DriverReques
   lost.push({ field, note: rowNote(field, fields) });
 }
 
-/** Часть содержимого в форме OpenAI: текст либо картинка. */
-type OpenAiPart =
-  { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+/**
+ * Часть содержимого в форме OpenAI: текст либо картинка. Пометка кэша — только
+ * когда мост их переносит (`marks`): та же часть, что несла её у клиента.
+ */
+type OpenAiPart = (
+  { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
+) & { cache_control?: CacheMark };
 
 /**
  * Блоки Anthropic → части OpenAI. Возвращает пусто, если переносить нечего:
@@ -394,6 +431,8 @@ function blocksToParts(
   lost: DialectLoss[],
   fold?: FoldTraces,
   native?: NativeTraces,
+  /** Мост переносит пометки кэша (`forwardsCacheMarks`): каждая едет на свою часть. */
+  marks = false,
 ): OpenAiPart[] {
   if (typeof content === 'string') return content ? [{ type: 'text', text: content }] : [];
   if (!Array.isArray(content)) return [];
@@ -401,54 +440,77 @@ function blocksToParts(
   const parts: OpenAiPart[] = [];
   for (const block of content) {
     if (typeof block === 'string') {
-      if (block) parts.push({ type: 'text', text: block });
+      if (block && (!marks || block.trim())) parts.push({ type: 'text', text: block });
       continue;
     }
     if (!isRecord(block)) continue;
-    if (block.cache_control !== undefined) lose(lost, 'cache_control');
+    const mark = marks ? cacheMarkOf(block.cache_control) : undefined;
+    if (block.cache_control !== undefined && !mark) lose(lost, 'cache_control');
 
-    if (block.type === 'text' && typeof block.text === 'string') {
-      parts.push({ type: 'text', text: block.text });
-      continue;
+    // С пометками части едут частями, а не склеенной строкой, и пустой или из одних
+    // пробелов текстовый блок дошёл бы до Anthropic сам по себе — такой запрос он
+    // отвергает целиком (ревью K, ⚪8). Без пометок путь прежний: в склеенной строке
+    // такой блок — лишняя пустая строка, а не отдельный блок.
+    const produced = blockParts(block, lost, fold, native).filter(
+      (part) => !marks || part.type !== 'text' || part.text.trim() !== '',
+    );
+    if (mark) {
+      // Пометка — граница кэшируемого префикса. Блок, от которого не осталось
+      // части (след вызова у родных инструментов, документ), отдаёт её части
+      // перед собой: префикс короче, но граница настоящая. Части нет вовсе —
+      // пометка потеряна и названа.
+      const target = produced[produced.length - 1] ?? parts[parts.length - 1];
+      if (target) target.cache_control = mark;
+      else lose(lost, 'cache_control');
     }
-    if (block.type === 'image' && isRecord(block.source)) {
-      const url = imageUrl(block.source);
-      if (url) parts.push({ type: 'image_url', image_url: { url } });
-      continue;
-    }
-    if (block.type === 'document') {
-      lose(lost, 'content[].document');
-      continue;
-    }
-    if (block.type === 'tool_use' || block.type === 'tool_result') {
-      // Платформа принимает вызовы полем — след уходит в своей упаковке, а не
-      // частью текста: реплику собирает вызывающий.
-      if (native) {
-        collectNativeTrace(block, native);
-        continue;
-      }
-      // Прослойка выключена — след вызова уходит вместе с инструментами.
-      if (!fold) {
-        lose(lost, 'content[].tool_use / tool_result');
-        continue;
-      }
-      if (block.type === 'tool_use' && typeof block.name === 'string') {
-        parts.push({ type: 'text', text: encodeToolUse(block.name, block.input) });
-        fold.shimmed();
-        continue;
-      }
-      const result = encodeToolResult(block, fold.names);
-      if (result.dropped) lose(lost, 'content[].tool_result (внутри картинка)');
-      parts.push({ type: 'text', text: result.text });
-      fold.shimmed();
-      continue;
-    }
-    if (block.type === 'thinking' || block.type === 'redacted_thinking') {
-      lose(lost, 'thinking');
-      continue;
-    }
+    parts.push(...produced);
   }
   return parts;
+}
+
+/** Один блок Anthropic → его части OpenAI (пусто — блок не переносится частью). */
+function blockParts(
+  block: Record<string, unknown>,
+  lost: DialectLoss[],
+  fold?: FoldTraces,
+  native?: NativeTraces,
+): OpenAiPart[] {
+  if (block.type === 'text' && typeof block.text === 'string') {
+    return [{ type: 'text', text: block.text }];
+  }
+  if (block.type === 'image' && isRecord(block.source)) {
+    const url = imageUrl(block.source);
+    return url ? [{ type: 'image_url', image_url: { url } }] : [];
+  }
+  if (block.type === 'document') {
+    lose(lost, 'content[].document');
+    return [];
+  }
+  if (block.type === 'tool_use' || block.type === 'tool_result') {
+    // Платформа принимает вызовы полем — след уходит в своей упаковке, а не
+    // частью текста: реплику собирает вызывающий.
+    if (native) {
+      collectNativeTrace(block, native);
+      return [];
+    }
+    // Прослойка выключена — след вызова уходит вместе с инструментами.
+    if (!fold) {
+      lose(lost, 'content[].tool_use / tool_result');
+      return [];
+    }
+    if (block.type === 'tool_use' && typeof block.name === 'string') {
+      fold.shimmed();
+      return [{ type: 'text', text: encodeToolUse(block.name, block.input) }];
+    }
+    const result = encodeToolResult(block, fold.names);
+    if (result.dropped) lose(lost, 'content[].tool_result (внутри картинка)');
+    fold.shimmed();
+    return [{ type: 'text', text: result.text }];
+  }
+  if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+    lose(lost, 'thinking');
+  }
+  return [];
 }
 
 /** Картинка Anthropic приезжает base64 либо ссылкой; наружу — data-адрес. */
@@ -465,8 +527,14 @@ function imageUrl(source: Record<string, unknown>): string {
  * Части → содержимое реплики. Один текст остаётся строкой: массив из одной
  * текстовой части понимают не все совместимые шлюзы, а строку — все.
  */
-function partsToContent(parts: OpenAiPart[]): string | OpenAiPart[] | undefined {
+function partsToContent(parts: OpenAiPart[], marks = false): string | OpenAiPart[] | undefined {
   if (parts.length === 0) return undefined;
+  // С пометками кэша несколько частей остаются частями ВСЕГДА, а не только когда
+  // на них пометка: Claude Code переносит пометку сообщений на последнее каждый
+  // ход, и реплика, склеенная в строку на следующем ходу, стала бы другим
+  // префиксом — запись прошлого хода не прочёл бы никто. Одна часть без пометки
+  // остаётся строкой: вендор читает строку как один текстовый блок.
+  if (marks && (parts.length > 1 || parts[0]!.cache_control)) return parts;
   if (parts.every((part) => part.type === 'text')) {
     return parts.map((part) => (part.type === 'text' ? part.text : '')).join('\n\n');
   }
@@ -484,6 +552,11 @@ export function anthropicRequestToOpenAi(
   input: unknown,
   fields: readonly DriverRequestField[],
   route?: ToolRoute,
+  /**
+   * Пометки кэша едут наверх (`forwardsCacheMarks`: драйвер объявил их модели).
+   * Нет — путь ровно прежний: пометки теряются и названы потерей.
+   */
+  marks = false,
 ): TranslatedRequest {
   const lost: DialectLoss[] = [];
   const shimmed: string[] = [];
@@ -510,13 +583,15 @@ export function anthropicRequestToOpenAi(
   const addendum = shim ? systemAddendum(shim.protocolText, tools) : '';
 
   if (input.system !== undefined || addendum) {
-    if (Array.isArray(input.system)) lose(lost, 'system[] (массив блоков)');
-    const parts = blocksToParts(input.system, lost);
+    // С пометками блоки системы едут блоками — склеивать, а значит терять, нечего.
+    if (Array.isArray(input.system) && !marks) lose(lost, 'system[] (массив блоков)');
+    const parts = blocksToParts(input.system, lost, undefined, undefined, marks);
     // Правила протокола дописываются ПОСЛЕ системной строки клиента: последнее
     // в системном сообщении модель держит ближе всего к делу, а спорить с
     // промптом CLI прослойке нечем — он длиннее её в сотню раз.
-    if (addendum) parts.push({ type: 'text', text: addendum });
-    const content = partsToContent(parts);
+    if (addendum)
+      parts.push({ type: 'text', text: addendum, ...addendumMark(parts, input, marks) });
+    const content = partsToContent(parts, marks);
     if (content !== undefined) messages.push({ role: 'system', content });
   }
 
@@ -525,7 +600,10 @@ export function anthropicRequestToOpenAi(
       if (!isRecord(message)) continue;
       const role = message.role === 'assistant' ? 'assistant' : 'user';
       const traces = native ? emptyTraces() : undefined;
-      const content = partsToContent(blocksToParts(message.content, lost, fold, traces));
+      const content = partsToContent(
+        blocksToParts(message.content, lost, fold, traces, marks),
+        marks,
+      );
       if (traces) {
         if (traces.droppedResultParts) lose(lost, 'content[].tool_result (внутри картинка)');
         // Результаты — ПЕРЕД остальным текстом реплики: роль `tool` обязана идти
@@ -613,6 +691,35 @@ function translateNativeTools(
   }
   body.tool_choice = choice.value;
   if (choice.parallel === false) body.parallel_tool_calls = false;
+}
+
+/**
+ * Пометка кэша для дописки прослойки. Последняя пометка системы ПЕРЕЕЗЖАЕТ на неё
+ * (снимается с блока системы): в дописке список инструментов, и граница после
+ * неё кладёт в кэш систему вместе с инструментами — у вендора инструменты и так
+ * стоят до системы. Пометка списка инструментов, которой у текста больше негде
+ * стоять, — сюда же, когда у системы своей нет. Пометок при этом не прибавляется:
+ * у вендора их предел — четыре на запрос.
+ *
+ * Есть своя у системы — пометка списка инструментов СЛИВАЕТСЯ с ней (ревью K, ⚪6):
+ * список стоит в самой дописке, и граница после неё уже кладёт его в кэш. Потерей
+ * это не названо намеренно: `lost` сказал бы, что кэша инструментов нет, а он есть.
+ * Срок у слитой границы — срок пометки системы; Claude Code ставит всем один.
+ */
+function addendumMark(
+  parts: OpenAiPart[],
+  input: Record<string, unknown>,
+  marks: boolean,
+): { cache_control?: CacheMark } {
+  if (!marks) return {};
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const mark = parts[index]!.cache_control;
+    if (!mark) continue;
+    delete parts[index]!.cache_control;
+    return { cache_control: mark };
+  }
+  const tools = toolListMark(input.tools);
+  return tools ? { cache_control: tools } : {};
 }
 
 /** Что нужно свёртке следов: имена вызовов и куда записать, что она сработала. */
@@ -750,51 +857,8 @@ export function openAiResponseToAnthropic(payload: unknown, model: string, idSuf
     usage: anthropicUsage(
       numberOf(usage.prompt_tokens),
       numberOf(usage.completion_tokens),
-      cachedTokensOf(usage),
+      cacheTokensOf(usage),
     ),
-  };
-}
-
-/**
- * Сколько входа модель прочла из кэша. Контур тело модели не переписывает, и
- * OpenAI-совместимый апстрим (OpenAI, vLLM) кладёт это в `prompt_tokens_details`.
- */
-export function cachedTokensOf(usage: unknown): number {
-  const details =
-    isRecord(usage) && isRecord(usage.prompt_tokens_details) ? usage.prompt_tokens_details : {};
-  return numberOf(details.cached_tokens);
-}
-
-/**
- * Расход в форме Anthropic. Там `input_tokens` кэша НЕ включает, а у OpenAI
- * `prompt_tokens` — включает: перенос одним числом записывал в транскрипт CLI
- * весь вход свежим, и прочитанное из кэша исчезало из учёта.
- */
-export function anthropicUsage(
-  prompt: number,
-  completion: number,
-  cached: number,
-): Record<string, number> {
-  const read = Math.min(cached, prompt);
-  return {
-    input_tokens: prompt - read,
-    ...(read > 0 ? { cache_read_input_tokens: read } : {}),
-    output_tokens: completion,
-  };
-}
-
-/** Расход в форме OpenAI; кэш — только когда он был, как отдаёт сам OpenAI. */
-export function openAiUsage(
-  prompt: number,
-  completion: number,
-  total: number,
-  cached: number,
-): Record<string, unknown> {
-  return {
-    prompt_tokens: prompt,
-    completion_tokens: completion,
-    total_tokens: total,
-    ...(cached > 0 ? { prompt_tokens_details: { cached_tokens: cached } } : {}),
   };
 }
 

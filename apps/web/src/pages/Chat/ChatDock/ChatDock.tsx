@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useDraftValue, type DraftBox } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { formatBytesIn } from '@shared/lib/format';
+import { MascotSpeechSlot } from '@shared/ui/mascot';
+import { Stack } from '@shared/ui/stack';
 import { ChatComposer, MAX_FILE_BYTES, type AttachRejection } from '@features/ChatComposer';
 import { SUPPORTED_UPLOAD_EXTENSIONS } from '../lib/uploads';
 import { ChatQueue } from '@features/ChatQueue';
@@ -87,6 +89,13 @@ export function ChatDock({
       {/* Дописанное, пока агент занят: видно, что уйдёт следующим, и можно
           передумать до отправки. */}
       <ChatQueue items={queued} onCancel={onCancelQueued} />
+
+      {/* Реплика Деки в чате — здесь, в потоке над полем ввода: облачко у
+          боковой панели накрывало список разговоров. Пустое место высоты не
+          занимает. */}
+      <Stack padding="0 var(--spacing-xl)">
+        <MascotSpeechSlot />
+      </Stack>
 
       <DraftComposer
         {...(focusKey ? { focusKey } : {})}

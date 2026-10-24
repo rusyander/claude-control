@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>human gate harness</title>
+  </head>
+  <body>
+    <p id="out">…</p>
+    <script>
+      // Страница проверки ворот «решает только человек» (`check-deferred-human-gate.mjs`):
+      // её отдаёт Vite стенда (`/@fs/…`), и решение уходит тем же путём, что из
+      // настоящей панели, — относительным адресом через прокси Vite. Итог проверка
+      // читает на сервере, а не отсюда.
+      const params = new URLSearchParams(location.search);
+      fetch(`/api/chat/deferred/${encodeURIComponent(params.get('id') ?? '')}/decision`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ behavior: params.get('behavior') ?? 'allow', via: 'web' }),
+      }).then(
+        async (response) => {
+          document.getElementById('out').textContent =
+            `${response.status} ${await response.text()}`;
+          document.title = `done ${response.status}`;
+        },
+        (error) => {
+          document.getElementById('out').textContent = String(error);
+          document.title = 'done 0';
+        },
+      );
+    </script>
+  </body>
+</html>

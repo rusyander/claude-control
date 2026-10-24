@@ -91,6 +91,29 @@ function commandOf(input: unknown): string {
   return '';
 }
 
+/**
+ * Запись в файл кодом интерпретатора (`node -e "fs.writeFileSync(…)"`,
+ * `python -c "open(…, 'w')"`) и скачиванием в файл (`curl -o`, `wget -O`,
+ * `iwr -OutFile`). Для правки из копии в основную (ревью 23.10, R-C05): такая
+ * запись в `e2e/` основной копии проходила сама — `SHELL_WRITE` её не видит.
+ * Воротам основной копии (`isWritingCall`) это не добавлено: там карточка на
+ * каждый `node -e` с записью во временное была бы новой карточкой на обычную
+ * работу.
+ */
+const PROGRAM_WRITE = [
+  /\b(writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream|copyFileSync|copyFile|cpSync|renameSync|symlinkSync|mkdirSync|outputFileSync)\s*\(/,
+  /\bopen\s*\([^)]*['"][rwax]?[wax]\+?b?['"]/,
+  /\b(write_text|write_bytes|shutil\s*\.\s*(copy\w*|move))\s*\(/,
+  // Вывод в никуда (`-o /dev/null` у проверки порта) — не запись.
+  /(^|[\s|(;&])(curl|wget|iwr|Invoke-WebRequest|irm|Invoke-RestMethod)(\.exe)?\s[^\n|;&]*?\s(-o|-O|--output|--output-document|-OutFile|-P|--directory-prefix)(=|\s+)(?!["']?(\/dev\/null|nul|\$null)["']?(\s|$))/i,
+];
+
+function writesThroughProgram(toolName: string, input: unknown): boolean {
+  if (!SHELL_TOOL_NAMES.has(toolName.toLowerCase())) return false;
+  const command = commandOf(input);
+  return command.length > 0 && PROGRAM_WRITE.some((pattern) => pattern.test(command));
+}
+
 /** Правит ли этот вызов файлы в рабочей копии. */
 export function isWritingCall(toolName: string, input: unknown): boolean {
   const name = toolName.toLowerCase();
@@ -187,7 +210,7 @@ export function mainCopyTargetOf(
   toolName: string,
   input: unknown,
 ): string | undefined {
-  if (!isWritingCall(toolName, input)) return undefined;
+  if (!isWritingCall(toolName, input) && !writesThroughProgram(toolName, input)) return undefined;
   const gitDir = gitSync(cwd, ['rev-parse', '--absolute-git-dir']);
   const common = gitSync(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
   if (!gitDir || !common || normalize(gitDir) === normalize(common)) return undefined;

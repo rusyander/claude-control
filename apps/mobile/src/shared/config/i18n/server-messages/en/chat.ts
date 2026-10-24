@@ -21,6 +21,15 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The run waiting on the branch decision has finished: there is no one to create the copy for.',
   'permission-expired':
     'This permission request has expired: the agent stopped waiting for an answer, so the decision would not run anything. If it asks again, answer the new request.',
+  'decision-human-only':
+    'Decision rejected: it came from a process of a panel agent. Only a human answers permission requests and queued items.',
+  'decision-peer-unknown':
+    'Decision not taken: the panel could not check who sent it. Try again in a few seconds.',
+  'decision-device-unverified':
+    'Decision not taken: the panel did not recognise the window it came from. Open the panel in a browser on this computer and answer there.',
+  'decision-remote-unverified':
+    'Decision not taken: a remote answer is accepted only through this machine’s Tailscale Serve with the access token.',
+  'deferred-not-found': 'There is no queued item {{id}}: it was removed or the number is wrong.',
   'editor-not-found': 'Code editor not found. Set it in the settings or install code/cursor.',
   'handoff-proposal-invalid':
     'The proposal could not be parsed: “what is done” and “how to continue” are required',
@@ -126,6 +135,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'split-relaunch-nothing': 'There is no split here: nothing to relaunch',
   'split-ticket-missing': 'This split has no such suggested ticket',
   'split-ticket-tracker-missing': 'No tracker is linked to the project: nowhere to file the ticket',
+  'split-ticket-batch-empty': 'No open suggested tickets: all are filed or taken into a chat',
+  'split-ticket-take-not-started': 'The chat did not start: a run with this key is already going',
   'split-relaunch-running': 'This split is already being relaunched',
   'split-relaunch-unconfirmed':
     'Runs not stopped: {{count}} — the panel could not verify their processes and left them alone. The relaunch did not start: retry once they finish or are stopped.',
@@ -167,6 +178,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'Group “{{group}}” is the inactive side of its pair in this project: the other side is in effect. Pick that one, or switch the pair side on the Groups page.',
   'chat-stop-unconfirmed':
     "The agent process was not stopped: the panel could not verify that the number is still the agent's, so it left it alone. The run goes on — try Stop again.",
+  'chat-keep-session-gone':
+    'The new conversation is no longer running — there is no turn to move back to the old one.',
   'branch-stop-unconfirmed':
     'The copy {{path}} was created, but the agent process was not stopped: the panel could not verify the number still belongs to it and left it alone. The conversation stays in the main copy; the agent waits at the same card.',
   'chat-pin-invalid': 'The pinned field must be true or false',

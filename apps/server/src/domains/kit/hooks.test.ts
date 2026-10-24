@@ -26,7 +26,15 @@ function runNode(script: string, input: string, env: NodeJS.ProcessEnv = {}) {
   const result = spawnSync(process.execPath, [script], {
     input,
     encoding: 'utf8',
-    env: { ...process.env, AGENTDECK_KIT_VARIANT: '', ...env },
+    // Маркеры звена группы сняты: окружение прогона тестов может их нести, а карточки вместо
+    // правил эти проверки не ждут.
+    env: {
+      ...process.env,
+      AGENTDECK_KIT_VARIANT: '',
+      AGENTDECK_SPLIT_CHILD: '',
+      AGENTDECK_USER_MEMORY_OFF: '',
+      ...env,
+    },
     timeout: 15_000,
   });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };

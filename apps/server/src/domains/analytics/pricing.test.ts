@@ -68,6 +68,7 @@ describe('findEntry — сопоставление модели со строк�
     expect(findEntry('claude-3-5-haiku-20241022', BUILT_IN_ENTRIES, AT)?.id).toBe(
       'claude-haiku-3-5',
     );
+    expect(findEntry('claude-3-opus-20240229', BUILT_IN_ENTRIES, AT)?.price.input).toBe(15);
   });
 
   it('незнакомая версия откатывается на самую свежую модель семейства', () => {

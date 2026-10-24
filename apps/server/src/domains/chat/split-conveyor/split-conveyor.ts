@@ -19,6 +19,7 @@ import {
 import {
   splitPlanRunning,
   type SplitGroupCleaned,
+  type SplitGroupKeepWarm,
   type SplitGroupRechecked,
   type SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
@@ -47,6 +48,7 @@ import { normalizePath } from '../../project-runner/targets.ts';
 import { localizeText, matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
 import { ownerCoverageGaps } from '../owner-coverage/owner-coverage.ts';
 import { hasOwnerRequest } from '@agentdeck/contracts/quality-floor';
+import { groupSignalsOf, type GroupSignal } from '@agentdeck/contracts/group-watch';
 import {
   deliveryIncompleteText,
   deliveryMissingCodesOf,
@@ -54,8 +56,14 @@ import {
 } from '../split-group-texts.ts';
 import { groupIdentityLine } from '../panel-preamble.ts';
 import { trackerKeys } from '../tracker-keys.ts';
+import { SplitTicketMarks, type TicketFiling } from '../split-ticket-batch/ticket-marks.ts';
 import { groupTaskKeys } from '../split-tasks/split-tasks.ts';
-import { continuable, continuePrompt } from '../split-continue.ts';
+import {
+  continuable,
+  continuePrompt,
+  HUMAN_ONLY_LINE,
+  type HumanAskKind,
+} from '../split-continue.ts';
 
 /**
  * Конвейер уровней разделения (Т1): разбор ПЕРЕД копиями, порции запуска
@@ -86,6 +94,16 @@ export interface SplitConveyorStore {
   set(record: SplitPlanRecord): void;
   findByTriage(chatIds: readonly string[]): SplitPlanRecord | undefined;
   all(): Record<string, SplitPlanRecord>;
+  /**
+   * Сигналы сторожа группы — свой срез хранилища (F-42), только для вида:
+   * конвейер их не пишет, и его запись после `await` их не сотрёт.
+   */
+  watchSignals?(parentChatId: string, groupIndex: number): unknown;
+  /**
+   * Счёт пингов тёплого кэша группы — свой файл учёта пингов, только для вида:
+   * проводка пинга не пишет запись плана и не гоняется с конвейером за неё.
+   */
+  keepWarm?(parentChatId: string, groupIndex: number): SplitGroupKeepWarm | undefined;
 }
 
 export interface SplitConveyorDeps {
@@ -248,6 +266,13 @@ export interface DeliveryVerdict {
   branch?: string;
   /** Вердикт блока «Тесты» копии: задетые кейсы и их итог в прогонах группы. */
   tests?: GroupTestsVerdict;
+  /**
+   * Заметки, а не пробелы (решение владельца 23.10): живое сито «не
+   * проверено», красное не из-за ветки. Группу не держат — карточке и MR.
+   */
+  notes?: string[];
+  /** HEAD копии на этой проверке: по нему видно, двигалась ли группа между напоминаниями. */
+  head?: string;
 }
 
 export interface SplitDeliveryDeps {
@@ -264,10 +289,70 @@ export interface SplitDeliveryDeps {
    */
   nudge: (group: SplitPlanGroupRecord, prompt: string) => 'sent' | 'queued' | 'refused';
   schedule?: (run: () => void, ms: number) => unknown;
+  /** Стадия разговора группы сейчас (`stageOf` её связи); не знать — `undefined`. */
+  stage?: (group: SplitPlanGroupRecord) => string | undefined;
+  /**
+   * Новый разговор группы стадией ДОСТАВКИ (пуш и MCP записи разрешены):
+   * `deliver` — вместо напоминания сессии, которая MR открыть не может (ревью,
+   * план); `escalate` — разбор пробелов с историей на усиленной модели, когда
+   * напоминания встали или кончились. Нет — только напоминания, как раньше.
+   * `busy` — разговор группы сейчас идёт: конвейер сверит снова, а не сдастся.
+   */
+  freshStage?: (
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    prompt: string,
+    mode: FreshDeliveryMode,
+  ) => FreshDelivery;
 }
 
-/** Сколько раз панель напоминает группе доделать доставку, прежде чем сдаться. */
-export const MAX_DELIVERY_NUDGES = 2;
+/** Ответ нового разговора доставки (`SplitDeliveryDeps.freshStage`). */
+export type FreshDelivery = 'sent' | 'queued' | 'refused' | 'busy';
+
+/** Зачем панель заводит новый разговор доставки (`SplitDeliveryDeps.freshStage`). */
+export type FreshDeliveryMode = 'deliver' | 'escalate';
+
+/**
+ * Стадии, которым MR не открыть: MCP хранилища кода у них только на чтение
+ * (`READ_ONLY_STAGES` в `group-profile.ts`), а пуш закрыт звеном доставки
+ * впереди. Живая группа 23.10: четыре напоминания «откройте MR» ушли в сессию
+ * ревью, у которой нет `create_merge_request`.
+ */
+export const DELIVERY_READ_ONLY_STAGES: ReadonlySet<string> = new Set(['plan', 'review']);
+
+/** Сколько кругов доставки помнит запись группы для разбора (`deliveryHistory`). */
+export const DELIVERY_HISTORY_MAX = 8;
+
+function rememberDeliveryRound(
+  group: SplitPlanGroupRecord,
+  verdict: DeliveryVerdict,
+  now: Date,
+): void {
+  const round = {
+    at: now.toISOString(),
+    ...(verdict.head ? { head: verdict.head } : {}),
+    missing: [...verdict.missing],
+  };
+  group.deliveryHistory = [...(group.deliveryHistory ?? []), round].slice(-DELIVERY_HISTORY_MAX);
+}
+
+/**
+ * Потолок напоминаний о доставке (решение владельца 23.10: группа идёт до
+ * готового MR сама). Раньше группа сдавалась после двух напоминаний, даже
+ * когда каждое что-то двигало: rebase, прогон, новая строка отчёта. Теперь
+ * сдаётся раньше потолка только напоминание, которое ничего не изменило
+ * (`deliveryProgressKey`); потолок держит от бесконечного круга.
+ */
+export const MAX_DELIVERY_NUDGES = 6;
+
+/**
+ * Состояние доставки на напоминании: голова ветки и набор пробелов. Тот же
+ * ключ на следующей проверке — напоминание ничего не изменило, и следующее
+ * не изменит тоже.
+ */
+export function deliveryProgressKey(head: string | undefined, missing: readonly string[]): string {
+  return [head ?? '', ...[...missing].sort()].join('\n');
+}
 /** Пауза перед повторной сверкой: ссылка MR у форджа появляется не сразу после push. */
 export const DELIVERY_SETTLE_MS = 20_000;
 /** Паузы между проверками, когда удалённый не отвечает; дальше — `failed` с причиной. */
@@ -276,6 +361,76 @@ export const DELIVERY_RECHECK_MS: readonly number[] = [60_000, 300_000, 900_000]
 export const DELIVERY_BLOCKED_PROBE_MS = 15 * 60_000;
 /** …столько раз (4 часа), дальше — `failed` с причиной. */
 export const DELIVERY_BLOCKED_PROBES = 16;
+/**
+ * Остановка, которую агенты могут снять сами (решение владельца 23.10: пробелы
+ * доставки доводят агенты, не человек): напоминания и разбор встали, удалённый
+ * не ответил, копия не прочлась. Раньше такая группа сразу падала, и `failed`
+ * не трогал уже никто — ни сторож, ни конвейер (трасса автономии 24.10, §2).
+ * Теперь через столько панель повторяет сама — разбором с журналом кругов или
+ * новой сверкой фактов…
+ */
+export const DELIVERY_RETRY_MS = 30 * 60_000;
+/** …не больше стольких раз; дальше — сдача с пунктом «панель повторила доставку сама». */
+export const DELIVERY_RETRY_MAX = 2;
+/**
+ * Разговор группы занят в миг нового разговора доставки (`busy`): сверка снова
+ * через столько, а не сдача с разбором, который так и не ушёл (§2.2)…
+ */
+export const DELIVERY_BUSY_RECHECK_MS = 2 * 60_000;
+/** …столько раз подряд (час); дальше — обычная сдача с причиной. */
+export const DELIVERY_BUSY_RECHECKS = 30;
+
+/**
+ * Хранилище объектов копии повреждено (INST-D): ни повтор, ни разбор этого не
+ * починят — сначала `git fsck` руками. Раньше такая группа падала «копия не
+ * читается» без шага, и повтор крутился бы впустую.
+ */
+const CORRUPT_STORE =
+  /unresolved deltas|\bbad tree\b|fatal: bad object|\bloose object [0-9a-f]+ .*is corrupt|object file .* is empty|\bpackfile .* (?:is corrupt|cannot be accessed)|fatal: (?:index-pack|unpack-objects) failed/i;
+
+/** Поломка хранилища объектов в тексте git (`CORRUPT_STORE`); эхо команды не считается. */
+export function corruptObjectStore(reason: string): boolean {
+  const text = reason
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('Command failed:'))
+    .join('\n');
+  return CORRUPT_STORE.test(text);
+}
+
+/** Ответ удалённого будит повторы и пробы соседей не чаще, чем раз в столько на группу. */
+const REMOTE_BACK_MS = 10 * 60_000;
+
+/** Коды сдачи на сверке (записи до `deliveryRetry`): такую группу читает проба. */
+const VERIFY_FAIL_CODES: ReadonlySet<string> = new Set([
+  'split-delivery-unverifiable',
+  'split-delivery-local-failed',
+]);
+
+/**
+ * Сданная на сверке, а не на пробелах: копия не прочлась или удалённый молчал.
+ * Её факты стоит прочесть ещё раз — вдруг доставка уже лежит.
+ */
+function probeable(group: SplitPlanGroupRecord): boolean {
+  if (group.status !== 'failed') return false;
+  if (group.deliveryRetry?.kind === 'verify') return true;
+  const code = group.error ? matchText(group.error)?.messageCode : undefined;
+  return code !== undefined && VERIFY_FAIL_CODES.has(code);
+}
+
+/** Состояние круга доставки группы — снимается, когда доставка найдена. */
+const DELIVERY_STATE_FIELDS = [
+  'deliveryMissing',
+  'deliveryNudges',
+  'deliveryNudgeKey',
+  'deliveryNudgeStage',
+  'deliveryHistory',
+  'deliveryEscalatedAt',
+  'deliveryEscalatedAfter',
+  'deliveryRetry',
+  'deliveryChecks',
+  'blockedSince',
+  'deliveryNotes',
+] as const satisfies readonly (keyof SplitPlanGroupRecord)[];
 
 export { trackerKeys } from '../tracker-keys.ts';
 
@@ -326,6 +481,15 @@ export function claimedBranches(record: SplitPlanRecord, index: number): string[
   // Группы прежнего плана того же разговора (F5.2) держат свои ветки и MR.
   for (const group of record.retiredGroups ?? []) claimed.add(group.branch);
   return [...claimed];
+}
+
+/**
+ * Сигналы сторожа для вида группы (F-64): блок с диска читается без схемы, и
+ * `watch: {}` от ручной правки `state.json` ронял весь `/tree`. Битое — мимо.
+ */
+function watchSignalsView(watch: unknown): { watchSignals?: GroupSignal[] } {
+  const signals = groupSignalsOf(watch);
+  return signals.length > 0 ? { watchSignals: signals } : {};
 }
 
 /** Разбор разделения заведён и ещё не кончился — группы ждут его блока. */
@@ -385,14 +549,101 @@ export function reportOnlyGaps(missing: readonly string[]): boolean {
   );
 }
 
+/** Пробелы, которые снимает только перенос ветки на свежую основную. */
+const INTEGRATION_GAPS: ReadonlySet<string> = new Set(['sieve-gap-conflicts']);
+/**
+ * «Чужие −» rebase не снимает (F-49): ветка сама удаляет строки, пришедшие в
+ * основную, — их возвращают обычным коммитом или называют в отчёте. Перезапись
+ * ветки с MR на ревью без конфликта брокер к тому же отказывает.
+ */
+const FOREIGN_REMOVALS_GAPS: ReadonlySet<string> = new Set(['sieve-gap-foreign-removals']);
+const FOREIGN_REMOVALS_LINE =
+  'Foreign removals: the branch deletes lines that landed on the target branch after the group ' +
+  'started. Restore them with a normal commit and a normal push, or — when the deletion is ' +
+  'intended — name every such file by its full path in the foreign-removals row of the sieve ' +
+  'report with the reason. Do not rebase or force-push for this: it does not clear the gap.';
+/** Пробелы «ветка не на удалённом / MR нет» — их снимает push и открытие MR. */
+const PUSH_GAPS: ReadonlySet<string> = new Set(['delivery-gap-not-pushed', 'delivery-gap-no-mr']);
+
+/**
+ * Конфликт со свежей основной снимает только rebase (живая группа 23.10 встала
+ * на нём после двух напоминаний): сказать прямо, что делать и что всё это
+ * разрешено, — кроме слияния в целевую ветку.
+ */
+const INTEGRATION_LINE = (branch: string): string =>
+  'Integration: the branch must sit on the fresh target branch. Do it now: `git fetch ' +
+  'origin`, `git rebase origin/<target>` (<target> = the MR target branch; origin/HEAD ' +
+  'when unsure), resolve every conflict keeping the intent of both sides, re-run the ' +
+  'checks of the files you touched (and re-record the Tests-block run the lines above ' +
+  `ask for), then \`git push --force-with-lease origin ${branch}\`. Every git operation ` +
+  'is allowed for this group except merging into the target branch.';
+
+/** Что можно только человеку (решение владельца 23.10) — код пункта карточки остановки. */
+export { humanAsksOf, type HumanAskKind } from '../split-continue.ts';
+const HUMAN_CODES = {
+  merge: 'delivery-human-merge',
+  destructive: 'delivery-human-destructive',
+  credentials: 'delivery-human-credentials',
+} as const satisfies Record<HumanAskKind, string>;
+
+/**
+ * Отказ удалённого в доступе (а не сеть): токен, ключ, логин. Код 401/403 —
+ * только в ответе сервера («HTTP 403», «returned error: 403»): голое число
+ * ловило имя ветки `feat/PROJ-401` в эхе команды (F-40).
+ */
+const REMOTE_AUTH_FAILURE =
+  /authentication failed|permission denied \(publickey|could not read (?:username|password)|terminal prompts disabled|HTTP Basic: Access denied|access denied|invalid (?:username or password|credentials)|(?:\bHTTP(?:\/[\d.]+)?|\berror:|\bstatus(?: code)?:?)\s*(?:401|403)\b/i;
+
+/** Эхо упавшей команды (`Command failed: git …`) — не текст ошибки: в нём имена веток и адреса. */
+function remoteAuthFailure(reason: string): boolean {
+  const text = reason
+    .split('\n')
+    .filter((line) => !/^Command failed:/.test(line.trim()))
+    .join('\n');
+  return REMOTE_AUTH_FAILURE.test(text);
+}
+
+function hasGap(missing: readonly string[], codes: ReadonlySet<string>): boolean {
+  return missing.some((line) => {
+    const code = matchText(line)?.messageCode;
+    return code !== undefined && codes.has(code);
+  });
+}
+
+/**
+ * Как сдать то, что группу держать не должно (решение владельца 23.10): та же
+ * пара меток, что в задании сит (`NOTE_MARKS_LINE`), — промпт и панель
+ * согласны, и группа не крутится на «стенда нет».
+ */
+const NOTE_MARKS_HINT =
+  'A live check you cannot run here (no stand with this branch, no browser, no network) is not ' +
+  'a blocker: report its row as fail with evidence starting "not checked: <reason>". A red ' +
+  'check or case not caused by the branch (red on the target branch too, platform-only, a ' +
+  'timeout in code the diff does not touch) — evidence starting "not caused by the branch: ' +
+  '<why>". A Tests-block case that cannot run here (no stand, no browser) is recorded as ' +
+  'blocked, not left unrun: an automated one through its run command (the run records it ' +
+  'blocked), a manual one with `tests-cli record <group>:<case>=blocked --note "<why>"`. The ' +
+  'panel records all of these as notes; name each in the MR description.';
+
 /** Напоминание группе: чего не хватает, и что делать, если доставка невозможна. */
-export function deliveryNudgePrompt(branch: string, missing: readonly string[]): string {
+export function deliveryNudgePrompt(
+  branch: string,
+  missing: readonly string[],
+  notes: readonly string[] = [],
+): string {
   const lines = [
     "The panel checked the group's delivery against git — it is not finished. Missing:",
     // Строки пробелов — тексты сервера (русские, с кодом): модели — их английская сторона.
     ...missing.map((line) => `- ${localizeText(line, 'en')}`),
     '',
   ];
+  if (notes.length > 0) {
+    lines.push(
+      'Notes — they do not hold the group, but the MR description must name each:',
+      ...notes.map((line) => `- ${localizeText(line, 'en')}`),
+      '',
+    );
+  }
   if (reportOnlyGaps(missing)) {
     return [
       ...lines,
@@ -400,14 +651,96 @@ export function deliveryNudgePrompt(branch: string, missing: readonly string[]):
         'missing — run what a line above names (the exact command it gives) and answer with ' +
         'the missing rows. Do not commit, push, rebase or touch the MR for this: nothing in ' +
         'the code changes.',
+      NOTE_MARKS_HINT,
     ].join('\n');
+  }
+  if (hasGap(missing, INTEGRATION_GAPS)) lines.push(INTEGRATION_LINE(branch), '');
+  if (hasGap(missing, FOREIGN_REMOVALS_GAPS)) lines.push(FOREIGN_REMOVALS_LINE, '');
+  if (hasGap(missing, PUSH_GAPS)) {
+    lines.push(
+      `Push the branch ${branch} and open the MR yourself (or update the existing one) — ` +
+        'creating the MR is allowed for this group and needs nobody to confirm it.',
+      '',
+    );
   }
   return [
     ...lines,
+    INVESTIGATE_LINE,
     `Finish it with the delivery skill: commit the work, push the branch ${branch}, open an MR ` +
-      '(or update the existing one) and give its link as the last line. If delivery is ' +
-      "impossible (no access, the decision is the human's) — ask the human with a question, not a report.",
+      '(or update the existing one) and give its link as the last line.',
+    HUMAN_ONLY_LINE,
+    NOTE_MARKS_HINT,
   ].join('\n');
+}
+
+/**
+ * Каждый пробел — к причине, а не к пересказу (решение владельца 23.10): группа
+ * сама читает журнал, гоняет упавшую проверку и смотрит MR, а потом чинит или
+ * снимает заметкой. Панель перепроверит после хода.
+ */
+const INVESTIGATE_LINE =
+  'For every line above, find the cause with your own tools before you answer: read the log of ' +
+  'the check it names, run the failing check or case yourself, inspect the MR (pipeline, ' +
+  'description) through the forge tools, read git log/status. Then fix the cause, or — when it ' +
+  'is not caused by the branch or cannot run here — record a justified waiver (marks below). ' +
+  'The panel re-checks every line after your turn.';
+
+/**
+ * Разбор доставки новым разговором на усиленной модели: напоминания встали
+ * (та же голова, те же пробелы) или кончились. Несёт всю историю кругов —
+ * что уже пробовали и что не сдвинулось, — чтобы разбор не повторил их.
+ */
+export function deliveryEscalationPrompt(input: {
+  branch: string;
+  missing: readonly string[];
+  notes?: readonly string[];
+  history: readonly { at: string; head?: string; missing: readonly string[] }[];
+  /** Почему разбор: напоминание ничего не изменило или потолок напоминаний. */
+  reason: 'stalled' | 'cap';
+  nudges: number;
+}): string {
+  const why =
+    input.reason === 'stalled'
+      ? `the reminder ${input.nudges} changed nothing (same branch head, same gaps)`
+      : `${input.nudges} reminders did not finish it`;
+  const lines = [
+    `This is a NEW diagnose-and-fix run for the delivery of the branch ${input.branch}, on a ` +
+      `stronger model: ${why}. Do not repeat what was tried — find why it did not work.`,
+    '',
+    'Gaps now:',
+    ...input.missing.map((line) => `- ${localizeText(line, 'en')}`),
+  ];
+  if (input.notes?.length) {
+    lines.push(
+      '',
+      'Notes (they do not hold the group; the MR description names each):',
+      ...input.notes.map((line) => `- ${localizeText(line, 'en')}`),
+    );
+  }
+  if (input.history.length > 0) {
+    lines.push('', 'Earlier rounds (when, branch head, gaps the panel sent):');
+    for (const round of input.history) {
+      lines.push(
+        `- ${round.at}, head ${round.head ?? '—'}: ` +
+          round.missing.map((line) => localizeText(line, 'en')).join('; '),
+      );
+    }
+  }
+  lines.push(
+    '',
+    'Restore the state from the facts first: git status, git log of the branch, the MR and its ' +
+      'pipeline, .agent/PROGRESS.md in the copy if present, the Tests-block history.',
+    INVESTIGATE_LINE,
+  );
+  if (hasGap(input.missing, INTEGRATION_GAPS)) lines.push(INTEGRATION_LINE(input.branch));
+  if (hasGap(input.missing, FOREIGN_REMOVALS_GAPS)) lines.push(FOREIGN_REMOVALS_LINE);
+  lines.push(
+    `Then deliver: commit, push the branch ${input.branch}, open the MR (or update the existing ` +
+      'one) and give its link as the last line. Creating the MR is allowed for this group.',
+    HUMAN_ONLY_LINE,
+    NOTE_MARKS_HINT,
+  );
+  return lines.join('\n');
 }
 
 /**
@@ -553,6 +886,11 @@ export interface ChainOutcome {
   waitingFor?: SplitPlanRecord['groups'][number]['waitingFor'];
   /** Хвост ответа — строке группы в хабе (Д16). */
   tail?: string;
+  /**
+   * Строки `HUMAN:` из ПОЛНОГО текста хода (`humanAsksOf`), не из хвоста: хвост
+   * обрезан до 280 знаков спереди и терял метку длинной строки.
+   */
+  humanAsks?: { kind: HumanAskKind; what: string }[];
   /** Ссылка на MR, названная в ответе (доставка группы). */
   mr?: string;
   /** Что сделано по фактам копии (Д5). */
@@ -671,10 +1009,19 @@ export class SplitConveyor {
    * продолжил бы те же группы второй раз — он узнаёт себя устаревшим по номеру.
    */
   private limitWakeToken = 0;
+  /**
+   * Сверки подряд, на которых разговор группы был занят (`busy`), по
+   * `${родитель}#${номер}`. В памяти: перезапуск и так сверяет заново
+   * (`recoverDeliveryChecks`), а счёт лишь не даёт ждать вечно.
+   */
+  private readonly deliveryBusy = new Map<string, number>();
+  /** Когда ответ удалённого последний раз будил группу (`remoteBack`), мс. */
+  private readonly remoteBackAt = new Map<string, number>();
 
   constructor(deps: SplitConveyorDeps) {
     this.deps = deps;
     this.now = deps.now ?? (() => new Date());
+    this.ticketMarks = new SplitTicketMarks(deps.store, () => this.now());
   }
 
   /**
@@ -1242,6 +1589,23 @@ export class SplitConveyor {
   }
 
   /**
+   * Счёт группы в виде с пингами тёплого кэша: они видны и у ждущей группы —
+   * счёт закрытия к ним дописывается позже. Пинги — из учёта пингов; запись
+   * плана — только старое поле, писавшееся до него.
+   */
+  private groupTokenView(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+  ): Partial<ReturnType<SplitConveyor['tokenView']>> {
+    const keepWarm = this.deps.store.keepWarm?.(record.parentChatId, group.index) ?? group.keepWarm;
+    if (!group.tokenLedger && !keepWarm) return {};
+    return this.tokenView(record, {
+      ...(group.tokenLedger ?? { at: keepWarm?.lastAt ?? '' }),
+      ...(keepWarm ? { keepWarm } : {}),
+    });
+  }
+
+  /**
    * Проверка доставки по фактам git. Асинхронная (`ls-remote` ходит в сеть),
    * и после ответа запись перечитывается: за это время человек мог продолжить
    * группу, и тогда итог проверки уже не про неё.
@@ -1266,7 +1630,11 @@ export class SplitConveyor {
         this.deps.log('split conveyor: delivery facts failed', error);
         return { missing: [], failed: error instanceof Error ? error.message : String(error) };
       })
-      .then((verdict) => this.onDeliveryFacts(parentChatId, index, outcome, verdict, settled));
+      .then((verdict) => {
+        this.onDeliveryFacts(parentChatId, index, outcome, verdict, settled);
+        // Удалённый ответил — повторы и сдачи соседей по нему же не ждут своего срока.
+        if (!verdict.failed && !verdict.unreachable) this.remoteBack(parentChatId, index);
+      });
   }
 
   /** Группа всё ещё ждёт проверки доставки — иначе ответ проверки не про неё. */
@@ -1300,13 +1668,42 @@ export class SplitConveyor {
       schedule(() => this.verifyDelivery(parentChatId, index, outcome, asSettled), ms);
     };
 
-    if (verdict.failed) {
+    // Хранилище объектов копии повреждено (INST-D) — ни повтор, ни разбор это
+    // не починят: сразу «нужен человек» с шагом `git fsck --full`.
+    const corrupt = [verdict.failed, verdict.unreachable].find(
+      (reason): reason is string => typeof reason === 'string' && corruptObjectStore(reason),
+    );
+    if (corrupt) {
+      this.deliveryBusy.delete(`${parentChatId}#${index}`);
+      const line = serverText('delivery-human-corrupt-store', {
+        path: group.path ?? '—',
+        what: corrupt.replace(/\s+/g, ' ').trim().slice(0, 200),
+      });
       delete group.deliveryChecks;
       delete group.blockedSince;
+      delete group.deliveryRetry;
+      group.deliveryMissing = [line];
       this.settle(record, group, {
         ...withoutMr(outcome),
         status: 'failed',
-        error: serverText('split-delivery-local-failed', { reason: verdict.failed.slice(0, 300) }),
+        error: deliveryIncompleteText([line]),
+      });
+      return;
+    }
+
+    if (verdict.failed) {
+      delete group.deliveryChecks;
+      delete group.blockedSince;
+      // Копия не прочлась (каталог занят, сбой git на миг) — не сдача сразу, а
+      // новая сверка через `DELIVERY_RETRY_MS` (трасса автономии 24.10, §2).
+      const unread = serverText('split-delivery-local-failed', {
+        reason: verdict.failed.slice(0, 300),
+      });
+      if (this.retryLater(record, group, 'verify', [unread])) return;
+      this.settle(record, group, {
+        ...withoutMr(outcome),
+        status: 'failed',
+        error: deliveryIncompleteText(group.deliveryMissing ?? [unread]),
       });
       return;
     }
@@ -1318,6 +1715,22 @@ export class SplitConveyor {
     // когда он ответит, доводит доставку обычным путём — напоминанием группе.
     // Кончился и этот запас — группа сдаётся с причиной, а не висит.
     if (verdict.unreachable) {
+      // Удалённый отказал в доступе — это не сеть: ждать четыре часа нечего,
+      // и агенту это не починить. Пункт «нужен человек» карточке остановки.
+      if (remoteAuthFailure(verdict.unreachable)) {
+        const line = serverText('delivery-human-credentials', {
+          what: verdict.unreachable.replace(/\s+/g, ' ').trim().slice(0, 200),
+        });
+        delete group.deliveryChecks;
+        delete group.blockedSince;
+        group.deliveryMissing = [line];
+        this.settle(record, group, {
+          ...withoutMr(outcome),
+          status: 'failed',
+          error: deliveryIncompleteText([line]),
+        });
+        return;
+      }
       const checks = (group.deliveryChecks ?? 0) + 1;
       const blocked = checks > DELIVERY_RECHECK_MS.length;
       const delay =
@@ -1344,18 +1757,28 @@ export class SplitConveyor {
       }
       delete group.deliveryChecks;
       delete group.blockedSince;
+      const silent = serverText('split-delivery-unverifiable', {
+        checks,
+        reason: verdict.unreachable,
+      });
+      if (this.retryLater(record, group, 'verify', [silent])) return;
       this.settle(record, group, {
         ...withoutMr(outcome),
         status: 'failed',
-        error: serverText('split-delivery-unverifiable', {
-          checks,
-          reason: verdict.unreachable,
-        }),
+        error: deliveryIncompleteText(group.deliveryMissing ?? [silent]),
       });
       return;
     }
     delete group.blockedSince;
     delete group.deliveryChecks;
+
+    // MR найден по голове ветки — он на карточке сразу, а не после того, как
+    // группа досдаст остальное: иначе кнопка MR и «MR влит» жили только у
+    // групп без единого пробела, а ссылка остальных тонула в хвосте ответа.
+    if (verdict.mr && verdict.mr !== group.mr) {
+      group.mr = verdict.mr;
+      this.deps.store.set(record);
+    }
 
     // Описание MR не прочитать — не повод держать группу, но человек должен
     // знать, что эту часть готовности панель не проверила (аудит 25.09, L110).
@@ -1402,9 +1825,31 @@ export class SplitConveyor {
       }
     }
 
+    // Заметки (живое сито «не проверено», красное не из-за ветки) — на
+    // карточку, а не в пробелы: группу они не держат (решение владельца 23.10).
+    if (verdict.notes?.length) group.deliveryNotes = verdict.notes;
+    else delete group.deliveryNotes;
+
     if (verdict.missing.length === 0) {
+      this.deliveryBusy.delete(`${parentChatId}#${index}`);
+      delete group.deliveryRetry;
       delete group.deliveryMissing;
       delete group.deliveryNudges;
+      delete group.deliveryNudgeKey;
+      delete group.deliveryNudgeStage;
+      delete group.deliveryHistory;
+      delete group.deliveryEscalatedAt;
+      delete group.deliveryEscalatedAfter;
+      if (verdict.notes?.length) {
+        const params = { group: group.title, notes: verdict.notes.join('; ') };
+        this.deps.notify?.(record.parentChatId, {
+          kind: 'notice',
+          code: 'deliveryUnchecked',
+          text: serverText('split-delivery-notes-notice', params),
+          textCode: 'split-delivery-notes-notice',
+          textParams: params,
+        });
+      }
       this.settle(record, group, {
         ...withoutMr(outcome),
         status: 'done',
@@ -1420,24 +1865,354 @@ export class SplitConveyor {
       return;
     }
 
-    group.deliveryMissing = verdict.missing;
-    const nudges = group.deliveryNudges ?? 0;
-    if (nudges < MAX_DELIVERY_NUDGES && group.chatId && group.path) {
-      const sent = this.deps.delivery?.nudge(
-        group,
-        this.withIdentity(record, group, deliveryNudgePrompt(group.branch, verdict.missing)),
+    // Группа сама сказала, что её держит то, что можно только человеку
+    // (`HUMAN_ONLY_LINE`): напоминание и разбор этого не сдвинут — стоп с
+    // пунктами «нужен человек» первыми, карточка показывает их отдельно.
+    const human = outcome.humanAsks ?? [];
+    if (human.length > 0) {
+      const lines = human.map((ask) =>
+        serverText(HUMAN_CODES[ask.kind], { what: ask.what.slice(0, 200) }),
       );
-      if (sent === 'sent' || sent === 'queued') {
-        group.deliveryNudges = nudges + 1;
+      delete group.deliveryNudges;
+      delete group.deliveryNudgeKey;
+      delete group.deliveryNudgeStage;
+      group.deliveryMissing = [...lines, ...verdict.missing];
+      this.settle(record, group, {
+        ...withoutMr(outcome),
+        status: 'failed',
+        error: deliveryIncompleteText(group.deliveryMissing),
+      });
+      return;
+    }
+
+    group.deliveryMissing = verdict.missing;
+    // Счёт напоминаний — на стадию (D3 разбора остановок 23.10): напоминание,
+    // ушедшее в сессию работы (ей пуш и MR закрыты), съедало запас доставки,
+    // и группа падала после одного слова в самой доставке.
+    const stageNow = this.deps.delivery?.stage?.(group);
+    if (group.deliveryNudgeStage && stageNow && stageNow !== group.deliveryNudgeStage) {
+      delete group.deliveryNudges;
+      delete group.deliveryNudgeKey;
+    }
+    const nudges = group.deliveryNudges ?? 0;
+    // Напоминания идут, пока группа движется (23.10): сдаётся только то
+    // напоминание, после которого и голова ветки, и пробелы те же, что были
+    // при нём, — или потолок `MAX_DELIVERY_NUDGES`.
+    const key = deliveryProgressKey(verdict.head, verdict.missing);
+    const stalled = group.deliveryNudgeKey === key;
+    const capped = nudges >= MAX_DELIVERY_NUDGES;
+    const escalated = Boolean(group.deliveryEscalatedAt);
+    if (group.chatId && group.path) {
+      // Встали или кончились напоминания — не сдаваться, а один раз отдать
+      // пробелы с их историей новому разговору на сильной модели (решение
+      // владельца 23.10: «решение за вами» — не обычный путь доставки).
+      const sent =
+        !stalled && !capped
+          ? this.deliveryWord(record, group, verdict)
+          : escalated
+            ? undefined
+            : this.escalateDelivery(record, group, verdict);
+      // Разговор группы занят в миг нового разговора доставки — сверить снова
+      // после хода, а не сдаться с разбором, который так и не ушёл (§2.2).
+      const busyKey = `${parentChatId}#${index}`;
+      const busy = (this.deliveryBusy.get(busyKey) ?? 0) + 1;
+      if (sent === 'busy' && busy <= DELIVERY_BUSY_RECHECKS) {
+        this.deliveryBusy.set(busyKey, busy);
+        group.deliveryMissing = verdict.missing;
         this.deps.store.set(record);
+        again(true, DELIVERY_BUSY_RECHECK_MS);
+        return;
+      }
+      this.deliveryBusy.delete(busyKey);
+      if (sent === 'busy') {
+        // Занят все сверки подряд: слово не ушло ни разу — причина пунктом и
+        // повтор панели (`verify` — снова сверка и новая доставка), а не сдача
+        // одними пробелами, которую карточка читала «закроет агент».
+        const lines = [
+          serverText('split-delivery-busy', { checks: DELIVERY_BUSY_RECHECKS }),
+          ...verdict.missing,
+        ];
+        group.deliveryMissing = lines;
+        if (this.retryLater(record, group, 'verify', lines)) return;
+        this.settle(record, group, {
+          ...withoutMr(outcome),
+          status: 'failed',
+          error: deliveryIncompleteText(group.deliveryMissing),
+        });
+        return;
+      }
+      if (sent === 'sent' || sent === 'queued') {
+        // Старт хода зовёт `onChainResumed` изнутри слова: запись в хранилище
+        // уже новее этой (статус «работает», чат группы — новый разговор
+        // доставки). Счёт кладётся в неё, а не затирает её прежней копией.
+        const latest = this.deps.store.get(record.parentChatId);
+        const same = latest?.groups.find((item) => item.index === group.index);
+        const target = latest && same ? same : group;
+        target.deliveryMissing = verdict.missing;
+        if (verdict.notes?.length) target.deliveryNotes = verdict.notes;
+        else delete target.deliveryNotes;
+        if (group.deliveryHistory) target.deliveryHistory = group.deliveryHistory;
+        rememberDeliveryRound(target, verdict, this.now());
+        if (stalled || capped) {
+          target.deliveryEscalatedAt = this.now().toISOString();
+          // Сколько слов дошло до разбора — их и назовёт причина остановки (RF-EF-04):
+          // журнал кругов считает и слова в очереди, и круги после разбора, и
+          // обрезан до `DELIVERY_HISTORY_MAX`.
+          target.deliveryEscalatedAfter = nudges;
+          // Разбор — первое слово нового круга: не сдвинет и он — сдача.
+          target.deliveryNudges = 1;
+        } else if (sent === 'sent') {
+          target.deliveryNudges = nudges + 1;
+        }
+        // Слово в очереди занятой группы ещё не дошло — в счёт не идёт (D3: у
+        // группы стояло «2 из 2» при одном дошедшем напоминании). Ключ — идёт:
+        // круг без движения после него всё равно виден.
+        target.deliveryNudgeKey = key;
+        // Стадия, в которую ушло слово: новая доставка уже перевела группу на свой разговор.
+        const stageAfter = this.deps.delivery?.stage?.(target) ?? stageNow;
+        if (stageAfter) target.deliveryNudgeStage = stageAfter;
+        this.deps.store.set(latest && same ? latest : record);
         return;
       }
     }
+    delete group.deliveryNudgeKey;
+    // Почему панель перестала напоминать — первым пунктом причины, а сами
+    // пробелы остаются списком в `deliveryMissing`.
+    const why: string[] = [];
+    if (stalled && escalated) {
+      // Счёт после разбора начат заново (разбор — первое слово нового круга), и
+      // причина говорила «после 1 напоминаний» при шести дошедших (F-115). Число —
+      // дошедшие до разбора (RF-EF-04); у записи старше поля — прежняя оценка по
+      // журналу кругов (один из них — сам разбор).
+      const reminders =
+        group.deliveryEscalatedAfter ?? Math.max(nudges, (group.deliveryHistory?.length ?? 0) - 1);
+      why.push(serverText('split-delivery-escalation-stalled', { nudges: reminders }));
+    } else if (stalled) why.push(serverText('split-delivery-stalled', { nudges }));
+    else if (capped) why.push(serverText('split-delivery-nudge-cap', { nudges }));
+    // Причина — и пунктом с кодом (F-23): `error` карточка не показывает, а без
+    // пункта она читала остановленную группу как «панель доводит сама».
+    const lines = [...why, ...verdict.missing];
+    group.deliveryMissing = lines;
+    // Встали напоминания или разбор — агенты могут снять это сами (решение
+    // владельца 23.10): разбор с журналом кругов через `DELIVERY_RETRY_MS`, а не
+    // `failed`, которого больше не трогал никто (трасса автономии 24.10, §2).
+    const canEscalate = Boolean(group.chatId && group.path && this.deps.delivery?.freshStage);
+    if (why.length > 0 && canEscalate && this.retryLater(record, group, 'escalate', lines)) return;
     this.settle(record, group, {
       ...withoutMr(outcome),
       status: 'failed',
-      error: deliveryIncompleteText(verdict.missing),
+      error: deliveryIncompleteText(group.deliveryMissing),
     });
+  }
+
+  /**
+   * Повтор панели через `DELIVERY_RETRY_MS` вместо сдачи: `verify` — новая
+   * сверка фактов (копия не прочлась, удалённый молчал), `escalate` — разбор на
+   * сильной модели. Потолок `DELIVERY_RETRY_MAX` на слово человека — дальше
+   * `false`, и вызывающий сдаёт группу с пунктом «панель повторила доставку сама»
+   * первым (он уже в `deliveryMissing`).
+   */
+  private retryLater(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    kind: 'escalate' | 'verify',
+    lines: readonly string[],
+  ): boolean {
+    const count = group.deliveryRetry?.count ?? 0;
+    if (count >= DELIVERY_RETRY_MAX) {
+      // Счёт и вид остаются: по виду `verify` перезапуск и ответ удалённого
+      // ещё раз читают факты сданной группы (`probeDelivery`).
+      group.deliveryRetry = { count, kind };
+      group.deliveryMissing = [
+        serverText('split-delivery-retry-cap', { retries: count }),
+        ...lines,
+      ];
+      return false;
+    }
+    const at = new Date(this.now().getTime() + DELIVERY_RETRY_MS).toISOString();
+    group.deliveryRetry = { count: count + 1, at, kind };
+    group.deliveryMissing = [
+      serverText('split-delivery-retry', {
+        minutes: DELIVERY_RETRY_MS / 60_000,
+        attempt: count + 1,
+        max: DELIVERY_RETRY_MAX,
+      }),
+      ...lines,
+    ];
+    this.deps.store.set(record);
+    this.scheduleRetry(record.parentChatId, group.index, at, DELIVERY_RETRY_MS);
+    return true;
+  }
+
+  /** Таймер повтора; `ms` нет — остаток до срока `at` (после перезапуска). */
+  private scheduleRetry(parentChatId: string, index: number, at: string, ms?: number): void {
+    const schedule = this.deps.delivery?.schedule ?? setTimeout;
+    const delay = ms ?? Math.max(0, Date.parse(at) - this.now().getTime());
+    schedule(() => this.retryDelivery(parentChatId, index, at), delay);
+  }
+
+  /**
+   * Срок повтора настал. Срок не тот (человек продолжил группу, повтор
+   * переназначен, перезапуск уже повторил) — молчим: таймер не отменить.
+   */
+  private retryDelivery(parentChatId: string, index: number, at: string): void {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    const retry = group?.deliveryRetry;
+    if (!record || !group || !retry || retry.at !== at) return;
+    if (!this.deliveryPending(parentChatId, index)) return;
+    delete retry.at;
+    delete group.blockedSince;
+    if (retry.kind === 'escalate') {
+      // Потолок напоминаний без отметки разбора — следующая сверка заводит
+      // разбор (`escalateDelivery`) с журналом кругов, а не ещё одно слово.
+      group.deliveryNudges = MAX_DELIVERY_NUDGES;
+      delete group.deliveryEscalatedAt;
+      delete group.deliveryEscalatedAfter;
+      delete group.deliveryNudgeKey;
+      delete group.deliveryNudgeStage;
+      delete group.deliveryChecks;
+    } else {
+      // Повтор сверки — одна попытка, а не новая лестница в четыре часа:
+      // удалённый снова молчит — сразу следующий повтор или потолок.
+      group.deliveryChecks = DELIVERY_RECHECK_MS.length + DELIVERY_BLOCKED_PROBES;
+    }
+    this.deps.store.set(record);
+    this.verifyDelivery(
+      parentChatId,
+      index,
+      { status: 'done', ...(group.mr ? { mr: group.mr } : {}) },
+      true,
+    );
+  }
+
+  /**
+   * Удалённый ответил на сверке группы `index` (не на пробе): ждущие повтора
+   * `verify` того же корня копий сверяются сейчас, а сданные с ним — читаются
+   * пробой. Зовётся ПОСЛЕ разбора ответа (`verifyDelivery`): запись
+   * вызывающего уже легла, и правка соседа в ней не затрётся. Не чаще
+   * `REMOTE_BACK_MS` на группу.
+   */
+  private remoteBack(parentChatId: string, index: number): void {
+    const source = this.deps.store.get(parentChatId);
+    if (!source) return;
+    const root = copyRootOf(source);
+    const now = this.now().getTime();
+    for (const record of Object.values(this.deps.store.all())) {
+      if (copyRootOf(record) !== root) continue;
+      for (const group of record.groups) {
+        if (record.parentChatId === parentChatId && group.index === index) continue;
+        const key = `${record.parentChatId}#${group.index}`;
+        const pending = group.deliveryRetry?.kind === 'verify' && group.deliveryRetry.at;
+        if (!pending && !probeable(group)) continue;
+        if (now - (this.remoteBackAt.get(key) ?? -Infinity) < REMOTE_BACK_MS) continue;
+        this.remoteBackAt.set(key, now);
+        if (pending) this.retryDelivery(record.parentChatId, group.index, pending);
+        else this.probeDelivery(record.parentChatId, group.index);
+      }
+    }
+  }
+
+  /**
+   * Сданная на сверке группа (`verify`: копия не прочлась, удалённый молчал) —
+   * чтение фактов без слова группе: доставлено чисто — `done`, иначе тишина.
+   * Ни напоминания, ни разбора: сданную группу продолжает только человек.
+   */
+  private probeDelivery(parentChatId: string, index: number): void {
+    const delivery = this.deps.delivery;
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    if (!delivery || !record || !group || !probeable(group)) return;
+    void delivery
+      .facts(group, group.mr, copyRootOf(record), claimedBranches(record, index))
+      .then((verdict) => {
+        const fresh = this.deps.store.get(parentChatId);
+        const same = fresh?.groups[index];
+        if (!fresh || !same || !probeable(same) || verdict.failed || verdict.unreachable) return;
+        const gaps = [
+          ...verdict.missing,
+          ...stageTraceGaps(same.stageTrace),
+          ...ownerCoverageGaps(same.sieveRows, hasOwnerRequest(fresh.proposal.shared)),
+        ];
+        if (gaps.length > 0) return;
+        this.deps.log(`split conveyor: group «${same.title}» found delivered on a probe`);
+        for (const field of DELIVERY_STATE_FIELDS) delete same[field];
+        if (verdict.notes?.length) same.deliveryNotes = verdict.notes;
+        this.settle(fresh, same, { status: 'done', ...(verdict.mr ? { mr: verdict.mr } : {}) });
+      })
+      .catch((error: unknown) => {
+        this.deps.log('split conveyor: delivery probe failed', error);
+      });
+  }
+
+  /**
+   * Слово доставки группе. Сессии, которой MR не открыть (ревью, план), — не
+   * напоминание, а новый разговор стадией доставки: живая группа 23.10 четыре
+   * раза получила «откройте MR» в сессию ревью без `create_merge_request`.
+   * Напоминание не ушло (разговор не продолжить) — тоже новая доставка.
+   */
+  private deliveryWord(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    verdict: DeliveryVerdict,
+  ): FreshDelivery | undefined {
+    const delivery = this.deps.delivery;
+    const prompt = this.withIdentity(
+      record,
+      group,
+      deliveryNudgePrompt(group.branch, verdict.missing, verdict.notes),
+    );
+    const fresh = (): FreshDelivery | undefined =>
+      this.freshDelivery(record, group, prompt, 'deliver');
+    const stage = delivery?.stage?.(group);
+    if (stage && DELIVERY_READ_ONLY_STAGES.has(stage)) {
+      const started = fresh();
+      // Занят — ждать хода, а не слать «откройте MR» в очередь сессии, где MR
+      // не открыть (тот же круг впустую, ради которого новая доставка и есть).
+      if (started === 'sent' || started === 'queued' || started === 'busy') return started;
+    }
+    const sent = delivery?.nudge(group, prompt);
+    if (sent === 'sent' || sent === 'queued') return sent;
+    return fresh() ?? sent;
+  }
+
+  /** Разбор пробелов новым разговором на сильной модели — один раз на круг доставки. */
+  private escalateDelivery(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    verdict: DeliveryVerdict,
+  ): FreshDelivery | undefined {
+    const nudges = group.deliveryNudges ?? 0;
+    const stalled = group.deliveryNudgeKey === deliveryProgressKey(verdict.head, verdict.missing);
+    const prompt = this.withIdentity(
+      record,
+      group,
+      deliveryEscalationPrompt({
+        branch: group.branch,
+        missing: verdict.missing,
+        ...(verdict.notes?.length ? { notes: verdict.notes } : {}),
+        history: group.deliveryHistory ?? [],
+        reason: stalled ? 'stalled' : 'cap',
+        nudges,
+      }),
+    );
+    return this.freshDelivery(record, group, prompt, 'escalate');
+  }
+
+  private freshDelivery(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    prompt: string,
+    mode: FreshDeliveryMode,
+  ): FreshDelivery | undefined {
+    const start = this.deps.delivery?.freshStage;
+    if (!start) return undefined;
+    try {
+      return start(record, group, prompt, mode);
+    } catch (error) {
+      this.deps.log(`split conveyor: fresh delivery (${mode}) failed`, error);
+      return 'refused';
+    }
   }
 
   /**
@@ -1458,6 +2233,20 @@ export class SplitConveyor {
       for (const group of queued) delete group.continueQueuedAt;
       if (lost.length > 0 || queued.length > 0) this.deps.store.set(record);
       for (const group of record.groups) {
+        // Таймер повтора умер с процессом. Сверка (`verify`) — сейчас: она только
+        // читает факты. Разбор (`escalate`) — в свой срок: без него перезапуск
+        // заводил бы новый разговор на сильной модели при каждом старте панели.
+        const retryAt = group.deliveryRetry?.at;
+        if (retryAt && group.status === 'awaiting' && group.waitingFor === 'delivery') {
+          if (group.deliveryRetry?.kind === 'escalate') {
+            this.scheduleRetry(record.parentChatId, group.index, retryAt);
+          } else this.retryDelivery(record.parentChatId, group.index, retryAt);
+          continue;
+        }
+        if (probeable(group)) {
+          this.probeDelivery(record.parentChatId, group.index);
+          continue;
+        }
         if (group.status === 'awaiting' && group.waitingFor === 'delivery') {
           this.verifyDelivery(record.parentChatId, group.index, {
             status: 'done',
@@ -1885,12 +2674,18 @@ export class SplitConveyor {
     });
     const cleaned = { at: this.now().toISOString(), branch };
     group.cleaned = cleaned;
+    // `remove` шёл секунды и минуты: за это время запись могли заменить — новое
+    // «Разделить» у того же родителя, переезд к продолжению, откат состояния.
+    // Пишем ту, что правда сейчас (F-42), а не взятую до ожидания: старая легла
+    // бы поверх нового разделения. Записи не стало — не воскрешаем.
+    const live = this.deps.store.get(parentChatId);
+    if (!live) return cleaned;
     // Копии больше нет ни у кого, кто её делил: иначе у соседа по ней — из
     // того же или прошлого плана — осталась бы кнопка уборки несуществующего.
-    for (const other of [...record.groups, ...(record.retiredGroups ?? [])]) {
+    for (const other of [...live.groups, ...(live.retiredGroups ?? [])]) {
       if (other.path && !other.cleaned && norm(other.path) === norm(path)) other.cleaned = cleaned;
     }
-    this.deps.store.set(record);
+    this.deps.store.set(live);
     return cleaned;
   }
 
@@ -1942,6 +2737,13 @@ export class SplitConveyor {
         'deliver',
         'deliveryMissing',
         'deliveryNudges',
+        'deliveryNudgeKey',
+        'deliveryNudgeStage',
+        'deliveryNotes',
+        'deliveryHistory',
+        'deliveryEscalatedAt',
+        'deliveryEscalatedAfter',
+        'deliveryRetry',
         'deliveryChecks',
         'blockedSince',
         'mr',
@@ -1977,21 +2779,30 @@ export class SplitConveyor {
     return this.deps.ticketTracker?.(record.projectPath);
   }
 
-  /** Заводы тикетов в полёте: двойной клик не заводит одну находку дважды. */
-  private readonly filing = new Map<string, Promise<string>>();
+  /**
+   * Отметки находок и заводы в полёте (`split-ticket-batch/ticket-marks.ts`):
+   * одни слоты у «Завести» строки и у «Опубликовать в Jira» всего списка —
+   * двойной клик и публикация рядом не заводят одну находку дважды.
+   */
+  readonly ticketMarks: SplitTicketMarks;
 
   /**
    * Завести предложенный тикет в трекере (L277): человек подтвердил в хабе.
    * Заводит `create` (запись в чужой сервис — дело маршрута), конвейер отвечает
    * за «один дефект — одна задача»: уже заведённый ключ возвращается как есть,
    * одновременный второй вызов ждёт первый, а отметка ложится на тот же дефект
-   * во всех группах.
+   * во всех группах. `create` может не заводить, а прокомментировать уже
+   * открытую задачу про то же (R3.6) — тогда ответ `created: false, commented: true`.
    */
   async fileTicket(
     parentChatId: string,
     key: string,
-    create: (ticket: SplitTicketView, projectKey: string) => Promise<string>,
-  ): Promise<{ key: string; created: boolean }> {
+    create: (
+      ticket: SplitTicketView,
+      projectKey: string,
+      groups: string[],
+    ) => Promise<TicketFiling>,
+  ): Promise<{ key: string; created: boolean; commented?: true }> {
     const record = this.deps.store.get(parentChatId);
     const matches = (record?.groups ?? []).flatMap((group) =>
       (group.tickets ?? [])
@@ -2011,28 +2822,12 @@ export class SplitConveyor {
         'split-ticket-tracker-missing',
       );
     }
-    const slot = `${parentChatId}|${key}`;
-    const running = this.filing.get(slot);
-    if (running) return { key: await running, created: false };
-    const job = create(first.ticket, projectKey);
-    this.filing.set(slot, job);
-    try {
-      const issueKey = await job;
-      // Запись перечитывается: пока трекер отвечал, конвейер мог её сменить.
-      const fresh = this.deps.store.get(parentChatId);
-      if (fresh) {
-        const at = this.now().toISOString();
-        for (const group of fresh.groups) {
-          for (const ticket of group.tickets ?? []) {
-            if (splitTicketKey(ticket) === key) ticket.filed = { key: issueKey, at };
-          }
-        }
-        this.deps.store.set(fresh);
-      }
-      return { key: issueKey, created: true };
-    } finally {
-      this.filing.delete(slot);
-    }
+    const groups = [...new Set(matches.map((match) => match.group.title))];
+    const done = await this.ticketMarks.fileKeys(parentChatId, [key], ([ticket]) =>
+      create(ticket ?? first.ticket, projectKey, groups),
+    );
+    if (done.commented) return { key: done.key, created: false, commented: true };
+    return { key: done.key, created: done.created };
   }
 
   /** Запись для пульта: по любому разговору дерева, новейшая из подходящих. */
@@ -2088,9 +2883,10 @@ export class SplitConveyor {
             }
           : {}),
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
+        ...(group.deliveryRetry?.at ? { deliveryRetryAt: group.deliveryRetry.at } : {}),
         ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
-        ...(group.tokenLedger ? this.tokenView(record, group.tokenLedger) : {}),
-        ...(group.watch?.signals.length ? { watchSignals: group.watch.signals } : {}),
+        ...this.groupTokenView(record, group),
+        ...watchSignalsView(this.deps.store.watchSignals?.(record.parentChatId, group.index)),
         ...(group.reviewClose ? { reviewClose: group.reviewClose } : {}),
         ...(group.deliver !== undefined ? { deliver: group.deliver } : {}),
         ...(group.interruptedAt ? { interruptedAt: group.interruptedAt } : {}),
@@ -2577,6 +3373,13 @@ export class SplitConveyor {
     if (fresh && same) {
       delete same.retries;
       delete same.deliveryNudges;
+      delete same.deliveryNudgeKey;
+      delete same.deliveryNudgeStage;
+      delete same.deliveryHistory;
+      delete same.deliveryEscalatedAt;
+      delete same.deliveryEscalatedAfter;
+      // Слово человека — новый счёт и повторов панели (`DELIVERY_RETRY_MAX`).
+      delete same.deliveryRetry;
       if (outcome === 'queued') same.continueQueuedAt = this.now().toISOString();
       this.deps.store.set(fresh);
     }

@@ -222,21 +222,22 @@ describe('GET /api/chats — доля окна лимита у звена гру
     clock = 1_001_000;
     run?.emitRaw(limitRaw(0.1));
     run?.emit(usage(3000));
-    clock = 1_041_000;
+    // Через пять минут после первой записи (каденция журнала, F-71) — снова на диск.
+    clock = 1_301_000;
     run?.emitRaw(limitRaw(0.15));
     // Звено ещё работает — запись уже в файле, с обоими замерами и токенами.
     const midRun = readLimitRuns(appData);
     expect(midRun).toHaveLength(1);
     expect(midRun[0]?.samples.map((sample) => sample.fiveHour?.utilization)).toEqual([0.1, 0.15]);
     expect(midRun[0]?.tokens).toBe(3000);
-    expect(midRun[0]?.endedAt).toBe(1_041_000);
+    expect(midRun[0]?.endedAt).toBe(1_301_000);
 
-    // Чаще раза в полминуты файл не переписывается; замер не теряется — он в памяти.
-    clock = 1_046_000;
+    // Чаще раза в пять минут файл не переписывается; замер не теряется — он в памяти.
+    clock = 1_306_000;
     run?.emitRaw(limitRaw(0.2));
     expect(readLimitRuns(appData)[0]?.samples).toHaveLength(2);
 
-    clock = 1_050_000;
+    clock = 1_310_000;
     run?.finish();
     await flush();
     // Конец прогона заменяет ту же запись, а не дописывает вторую.

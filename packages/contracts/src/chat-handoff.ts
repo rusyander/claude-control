@@ -11,6 +11,7 @@ import type { ReviewDepthGap, ReviewTier } from './model-cascade.ts';
 import {
   labelledCut,
   OWNER_PRECEDENCE_LINE,
+  OWNER_PRECEDENCE_PLAIN_LINE,
   OWNER_TEXT_MAX,
   withoutPrecedence,
 } from './quality-floor.ts';
@@ -528,7 +529,7 @@ const OUTWARD_WRITES =
 export function buildHandoffPrompt(
   proposal: HandoffProposal,
   rootTask?: string,
-  options: { group?: boolean } = {},
+  options: { group?: boolean; deliver?: boolean } = {},
 ): string {
   const task = rootTask
     ? labelledCut(withoutPrecedence(continuationEnvironment(rootTask)), HANDOFF_ROOT_TASK_MAX)
@@ -555,7 +556,8 @@ export function buildHandoffPrompt(
       task,
       '',
       ANSWER_LANGUAGE_LINE,
-      OWNER_PRECEDENCE_LINE,
+      // Исключение о полном прогоне — только группе со звеном доставки (RF-BGCD-06).
+      options.deliver ? OWNER_PRECEDENCE_LINE : OWNER_PRECEDENCE_PLAIN_LINE,
     ].join('\n');
   }
   const lines = [
@@ -571,7 +573,8 @@ export function buildHandoffPrompt(
   if (task) {
     lines.push('', HANDOFF_ROOT_TASK_LINE, task);
   }
-  lines.push('', ANSWER_LANGUAGE_LINE, OWNER_PRECEDENCE_LINE);
+  // Одиночный чат: звена доставки с полным прогоном проверок у него нет (F-57).
+  lines.push('', ANSWER_LANGUAGE_LINE, OWNER_PRECEDENCE_PLAIN_LINE);
   return lines.join('\n');
 }
 
@@ -867,6 +870,43 @@ export interface SplitGroupTokenLedger {
     instructionPct: number;
   };
   duplicates?: string[];
+  /** Пинги тёплого кэша, пока группа ждала (`keep-warm`): их расход отдельной строкой. */
+  keepWarm?: SplitGroupKeepWarm;
+}
+
+/**
+ * Расход пингов тёплого кэша группы. Пинг — разовый ход ответвления её сессии без
+ * транскрипта, поэтому в счёт сессий (`usage`) он не попадает и копится здесь.
+ */
+export interface SplitGroupKeepWarm {
+  /** Пинги, дошедшие до модели: попадания и промахи вместе. */
+  pings: number;
+  /** Пинг прочитал окно из кэша (≥ 90 % окна, запись ≤ 10 %) — кэш согрет. */
+  hits?: number;
+  /** Пинг окно не прочитал: префикс разошёлся, пинги этого ожидания прекращены. */
+  misses?: number;
+  input: number;
+  cacheRead: number;
+  cacheWrite: number;
+  output: number;
+  /**
+   * Сбережено по ожиданиям с подведённым итогом (`settled`), в токенах по цене
+   * входа модели (та же формула веса окна W, что у сторожа). Экономия только
+   * состоявшаяся: продолжение прочитало окно из кэша, который без пингов остыл
+   * бы (пришло через час и позже после последнего настоящего вызова), — тогда
+   * перезапись окна по часовой цене минус его чтение; минус вес всех пингов
+   * ожидания, промахи тоже. Ответ раньше часа, остывший кэш, новый разговор —
+   * пинги чистый расход. Бывает отрицательным.
+   */
+  saved?: number;
+  /** Расход пингов ожиданий, чей итог ещё не известен (продолжения не было), по цене входа. */
+  pending?: number;
+  /** Ожиданий с подведённым итогом. */
+  settled?: number;
+  /** Из них — продолжение действительно прочитало кэш, удержанный пингами. */
+  realized?: number;
+  /** Последний пинг, ISO. */
+  lastAt: string;
 }
 
 /**
@@ -965,6 +1005,11 @@ export interface SplitPlanView {
       deliveryMissing?: string[];
       /** Сколько раз панель напомнила группе доделать доставку. */
       deliveryNudges?: number;
+      /**
+       * Когда панель сама повторит доставку (сверку или разбор) вместо сдачи;
+       * до срока группу можно продолжить словом, не дожидаясь повтора.
+       */
+      deliveryRetryAt?: string;
       /**
        * Чем проверена работа группы — блоком «Тесты» её копии: автоматических
        * кейсов, задетых диффом, из них зелёных в прогонах группы и последний прогон.
@@ -1067,7 +1112,12 @@ export interface SplitPlanView {
        * Что панель разрешила группе сама по строке «с отметкой» (`notify`):
        * хаб показывает строкой «разрешено автоматически», пока её не уберут.
        */
-      autoNotices?: { at: string; summary: string }[];
+      /**
+       * `kind: 'answer'` — панель сама ответила на вопрос группы (развилки «по
+       * плану»): строка «ответ дан автоматически: <вариант>»; `free` — ответ
+       * свободным текстом, вариант не подошёл.
+       */
+      autoNotices?: { at: string; summary: string; kind?: 'answer'; free?: boolean }[];
     })[];
   /**
    * Лимит подписки исчерпан до этого момента (ISO): очередь не заводит новых
@@ -1227,7 +1277,13 @@ export type SplitGroupWait =
   | 'retry'
   | 'delivery'
   | 'interrupted'
-  | 'limit';
+  | 'limit'
+  /**
+   * Ход кончился, а открытыми остались только отложенные вопросы D-n
+   * (`deferred-asks.ts`): законное ожидание решения человека — не вопрос, на
+   * который панель отвечает за него, и не тишина для сторожа.
+   */
+  | 'human-op';
 
 export interface ChatTreeView {
   root: string;

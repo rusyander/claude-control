@@ -3,10 +3,12 @@ import {
   DELIVERY_CHECKS_LINE,
   labelledCut,
   OWNER_PRECEDENCE_LINE,
+  OWNER_PRECEDENCE_PLAIN_LINE,
   OWNER_TEXT_MAX,
   RULE_SOURCES,
   SKILL_ROUTE_LINE,
   SYNC_ON_CONFLICT_LINE,
+  WORK_STAGE_CHECKS_LINE,
   withoutPrecedence,
 } from './quality-floor.ts';
 
@@ -716,7 +718,8 @@ export function namesProjectChecks(prompt: string): boolean {
   return (
     prompt.includes(PROJECT_CHECKS_LINE) ||
     prompt.includes(DELIVERY_CHECKS_LINE) ||
-    prompt.includes(FIX_CHECKS_BEFORE_DELIVERY)
+    prompt.includes(FIX_CHECKS_BEFORE_DELIVERY) ||
+    prompt.includes(WORK_STAGE_CHECKS_LINE)
   );
 }
 
@@ -997,6 +1000,13 @@ export function reviewStagePrompt(input: {
   context?: Omit<StageContext, 'task' | 'branch'>;
   /** Абзац сит перед MR (`sievePromptBlock` из `@agentdeck/contracts/sieves`). */
   sieves?: string;
+  /**
+   * Строка пакета ревью (`reviewPackLine`, 5.3). Строкой, а не импортом: сабпаты
+   * контрактов друг друга не импортируют. Раньше её несла преамбула доставки
+   * работы, но своё ревью работе больше не положено (владелец 23.10) — пакет
+   * нужен ревьюерам этого звена.
+   */
+  reviewPack?: string;
 }): string {
   // Ревью само называет свой навык (deep-review) — общая строка навыков в
   // задании группы ему лишняя (L2.3); слова владельца остаются.
@@ -1012,7 +1022,9 @@ export function reviewStagePrompt(input: {
       'loop, nothing written into any MR. The skill plans its own lanes, agent count and rounds; ' +
       'the risk tier is its hint, never a cap. No such skill — do the same yourself: ' +
       'git status, git diff and git log of this branch, every touched file read in full together ' +
-      'with its callers, tests, docs and locales, and the project checks run.',
+      'with its callers, tests, docs and locales, and the checks of what changed run — narrow ' +
+      'ones only: the full project checks belong to a later stage, never to the review.',
+    ...(input.reviewPack ? [input.reviewPack] : []),
     ...(input.delta ? reviewDeltaLines(input.delta) : []),
     'Check the work against EVERY point of the task below, one by one: a point not done or done ' +
       'differently is a finding.',
@@ -1174,7 +1186,9 @@ export function fixStagePrompt(
     deliver ? FIX_CHECKS_BEFORE_DELIVERY : PROJECT_CHECKS_LINE,
     ANSWER_LANGUAGE_LINE,
     ESCALATE_LINE,
-    OWNER_PRECEDENCE_LINE,
+    // Без звена доставки полный прогон проверок никто не сделает — строка без
+    // исключения о расписании панели (F-57).
+    deliver ? OWNER_PRECEDENCE_LINE : OWNER_PRECEDENCE_PLAIN_LINE,
     ...(context ? ['', context] : []),
   ].join('\n');
 }
@@ -1256,15 +1270,16 @@ export function deliverStagePrompt(input: {
     '1. `git status`: commit the work of the group following the project convention for ' +
       'messages; do not put temporary files, screenshots or .agent/ notes into the commit.',
     `2. Main branch: ${SYNC_ON_CONFLICT_LINE}`,
-    '3. A rebase conflict of a not-yet-pushed branch within the tasks of the group — resolve it ' +
-      `yourself. The branch was already pushed — a conflict of that rebase: ${ask} with a ` +
-      'recommended option (`git rebase --abort` returns the branch as it was). A decision that ' +
-      `belongs to the human or to another group (foreign code, a product choice) — also ${ask}, ` +
-      'not a report.',
+    // Владелец 23.10: rebase и перезапись MR — только при конфликте и сами; звено,
+    // отдававшее конфликт отправленной ветки человеку, держало MR до утра.
+    '3. A rebase conflict within the tasks of the group — before or after the first push — is ' +
+      'resolved by the group itself, never handed to the human (`git rebase --abort` only to ' +
+      'restart a botched attempt). Only a decision that belongs to the human or to another ' +
+      `group (foreign code, a product choice) — ${ask}, not a report.`,
     `4. Run the project's checks — the ones its rules name (${RULE_SOURCES}), all of them,` +
-      ' in the order named, frontend and backend alike, ONCE on this final tree (the earlier ' +
-      'stages ran only narrow ones); fix what is red without going beyond the tasks of the ' +
-      'group, re-running only the red ones. Any check still red — no MR.',
+      " in the order named, frontend and backend alike, ONCE on this final tree: it is the group's" +
+      ' one full run; fix what is red without going beyond the tasks of the group, re-running ' +
+      'only the red ones. Any check still red — no MR.',
     `5. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
       `a pushed branch after a conflict rebase — \`git push --force-with-lease origin ${target}\`, and ` +
       "only your own group branch, never the main, a protected or another group's branch. Open " +

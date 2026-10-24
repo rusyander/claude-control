@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { ChatRunRegistry } from '../ChatRunRegistry/ChatRunRegistry.ts';
+import { ChatRunRegistry } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import { streamRun } from './ChatStream.ts';
 
 describe('streamRun', () => {
@@ -35,6 +35,35 @@ describe('streamRun', () => {
       clearTimeout(timer);
       abort.abort();
     }
+  });
+
+  // Брокер прав показывает автономному чату карточку, только пока его кто-то
+  // смотрит (решение владельца 23.10): открытый поток — это и есть «смотрит».
+  it('открытый поток — человек смотрит; закрыли — нет', async () => {
+    const registry = new ChatRunRegistry(() => ({
+      start: () => new Promise<void>(() => undefined),
+      stop: () => undefined,
+    }));
+    registry.start('чат', { prompt: 'x', cwd: '/tmp/x' }, {});
+    // Служебная подписка панели (очередь на занятый ход) — не человек.
+    registry.attach('чат', Number.MAX_SAFE_INTEGER, { send: () => undefined, close: () => {} });
+    expect(registry.hasViewer('чат')).toBe(false);
+    app = Fastify();
+    app.get('/stream', (_request, reply) => streamRun(registry, reply, 'чат', 0));
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const abort = new AbortController();
+    try {
+      await fetch(`${address}/stream`, { signal: abort.signal });
+      expect(registry.hasViewer('чат')).toBe(true);
+    } finally {
+      abort.abort();
+    }
+    const deadline = Date.now() + 2_000;
+    while (registry.hasViewer('чат') && Date.now() < deadline) {
+      await new Promise((done) => setTimeout(done, 10));
+    }
+    expect(registry.hasViewer('чат')).toBe(false);
+    registry.stopAll();
   });
 });
 

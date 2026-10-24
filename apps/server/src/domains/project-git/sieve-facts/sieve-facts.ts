@@ -238,7 +238,7 @@ async function consumersOf(
 async function foreignRemovalsOf(
   cwd: string,
   input: { mainRef: string; base: string; startedAt: string; removed: RemovedHunk[] },
-): Promise<string[] | undefined> {
+): Promise<{ files: string[]; blame: Record<string, string> } | undefined> {
   const atStart = await run(cwd, [
     'rev-list',
     '-1',
@@ -251,12 +251,13 @@ async function foreignRemovalsOf(
   // Развилка не новее основной на старте — ветка не переносилась, чужих строк
   // под ней нет.
   const moved = await run(cwd, ['merge-base', '--is-ancestor', input.base, startBase]);
-  if (moved.code === 0) return [];
+  if (moved.code === 0) return { files: [], blame: {} };
 
-  const foreign = new Set<string>();
+  // Чей коммит и какие строки (живая группа 23.10: имя файла без автора и
+  // строк агент проверить не мог — какой коммит «чужой», где именно).
+  const foreign = new Map<string, { sha: string; ranges: string[] }>();
   const known = new Map<string, boolean>();
   for (const hunk of input.removed.slice(0, HUNKS_MAX)) {
-    if (foreign.has(hunk.path)) continue;
     const blame = await run(cwd, [
       'blame',
       '--porcelain',
@@ -279,12 +280,28 @@ async function foreignRemovalsOf(
         known.set(sha, late);
       }
       if (late) {
-        foreign.add(hunk.path);
+        const end = hunk.start + hunk.count - 1;
+        const range = end > hunk.start ? `${hunk.start}-${end}` : String(hunk.start);
+        const entry = foreign.get(hunk.path);
+        if (entry) entry.ranges.push(range);
+        else foreign.set(hunk.path, { sha, ranges: [range] });
         break;
       }
     }
   }
-  return [...foreign];
+  const subjects = new Map<string, string>();
+  const blame: Record<string, string> = {};
+  for (const [path, { sha, ranges }] of foreign) {
+    let subject = subjects.get(sha);
+    if (subject === undefined) {
+      const log = await run(cwd, ['log', '-1', '--format=%s', sha]);
+      subject = log.code === 0 ? log.stdout.trim().slice(0, 80) : '';
+      subjects.set(sha, subject);
+    }
+    const shown = ranges.slice(0, 3).join(', ') + (ranges.length > 3 ? ', …' : '');
+    blame[path] = `${sha.slice(0, 10)}${subject ? ` «${subject}»` : ''}, lines ${shown}`;
+  }
+  return { files: [...foreign.keys()], blame };
 }
 
 /**
@@ -401,7 +418,10 @@ export async function readSieveFacts(input: {
       removed: (base === mainBase ? diff : await zeroDiff(mainBase)).removed,
     });
     if (foreign === undefined) unchecked.push('foreign-removals');
-    else if (foreign.length > 0) mechanics.foreignRemovals = foreign;
+    else if (foreign.files.length > 0) {
+      mechanics.foreignRemovals = foreign.files;
+      mechanics.foreignBlame = foreign.blame;
+    }
   }
   const consumers = await consumersOf(cwd, removedTokens(diff));
   if (consumers.length > 0) mechanics.consumers = consumers;

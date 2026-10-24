@@ -84,6 +84,12 @@ export interface ContinuationInput {
    * любом простое, решает только окно.
    */
   afterLimit?: boolean;
+  /**
+   * Последний пинг тёплого кэша сессии (`keep-warm`), мс эпохи. Пинг идёт без
+   * транскрипта, и время файла о нём не знает: без этой отметки согретая сессия
+   * считалась бы остывшей и уходила в новый разговор — пинг был бы зря.
+   */
+  warmedAt?: number;
   now: number;
 }
 
@@ -100,8 +106,13 @@ export function decideContinuation(input: ContinuationInput): Continuation {
   if (!input.economy?.freshOnColdResume) return { kind: 'resume' };
   const warmth = sessionWarmth(input.dir, input.sessionId, input.now);
   if (!warmth) return { kind: 'resume' };
+  // Пинг после последней записи сессии — кэш свежее файла; и ожидание лимита
+  // тогда не значит «остыл при любом простое»: его грели всё ожидание.
+  const warmedIdle = input.warmedAt !== undefined ? input.now - input.warmedAt : undefined;
+  const warmed = warmedIdle !== undefined && warmedIdle < warmth.idleMs;
+  const idleMs = warmed ? warmedIdle : warmth.idleMs;
   const cold = coldResume({
-    idleMs: input.afterLimit ? Number.POSITIVE_INFINITY : warmth.idleMs,
+    idleMs: input.afterLimit && !warmed ? Number.POSITIVE_INFINITY : idleMs,
     contextTokens: warmth.contextTokens,
     freshBase: warmth.freshBase,
     ...(input.economy.cacheTtl ? { cacheTtl: input.economy.cacheTtl } : {}),

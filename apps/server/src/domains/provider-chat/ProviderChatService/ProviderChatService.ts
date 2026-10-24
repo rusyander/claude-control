@@ -34,8 +34,23 @@ import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { ForeignSendQueue } from '../queue.ts';
+import { markProviderTurn } from '../turn-ledger.ts';
 import type { GroupLayerHook } from '../../groups/run-layer/run-layer.types.ts';
 import type { LivePermissionAsk, LivePermissionPolicy } from '../live/types.ts';
+import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
+import type {
+  ColdPlan,
+  ColdPlanRequest,
+  EconomyRunRequest,
+  ForeignWatchFeed,
+} from './ProviderChatService.types.ts';
+
+export type {
+  ColdPlan,
+  ColdPlanRequest,
+  EconomyRunRequest,
+  ForeignWatchFeed,
+} from './ProviderChatService.types.ts';
 
 /**
  * Живые ответы чужих провайдеров: прогон принадлежит серверу, а не запросу.
@@ -87,7 +102,10 @@ interface LiveRun {
   steerable?: boolean;
   subscribers: Set<ProviderChatSubscriber>;
   isRunning: boolean;
-  /** Прогон идёт через контур локальной модели (есть окно сервера в маршруте). */
+  /**
+   * Прогон идёт на локальной модели: через контур локальной модели (окно сервера в
+   * маршруте) или на свой локальный сервер CLI по его настройкам (`setOwnLocal`).
+   */
   local?: boolean;
   /** Когда прогон начался: по нему считается время ответа (Т1 партии чужих CLI). */
   startedAt: number;
@@ -107,11 +125,46 @@ interface LiveRun {
    * отказом на всё, что ещё ждёт.
    */
   asks: Map<string, PendingAsk>;
+  /** Что сказать сторожу групп на конце хода (`setWatchListener`); нет — старта он не видел. */
+  watch?: { group: boolean; sessionId?: string };
 }
 
 interface PendingAsk {
   view: ProviderChatPermission;
   resolve: (decision: 'allow' | 'deny') => void;
+  /** Каталог хода — подпись проекта для ответов из Telegram. */
+  workdir?: string;
+}
+
+/** Ждущая просьба чужого CLI — по всем разговорам (ответы из Telegram). */
+export interface ForeignPendingAsk {
+  chatId: string;
+  providerId: string;
+  workdir?: string;
+  ask: ProviderChatPermission;
+}
+
+/**
+ * Начало новой сессии после паузы: вводная панели первой репликой, затем хвост из
+ * `tail` последних сохранённых реплик и новая реплика человека. В файл разговора
+ * вводная не пишется — как указание панели (`systemPrefix`).
+ */
+export function coldOpening(
+  history: readonly ProviderChatMessage[],
+  cold: { brief: string; tail: number },
+): ProviderChatMessage[] {
+  const want = Math.max(0, Math.floor(cold.tail));
+  const brief: ProviderChatMessage = {
+    id: 'cold-brief',
+    role: 'user',
+    content: cold.brief,
+    at: new Date().toISOString(),
+  };
+  const last = history.at(-1);
+  // Хвост — реплики разговора: строки ленты (`notice`, вроде «начат новый
+  // разговор») модели не реплики и место хвоста не занимают (ревью A9).
+  const dialogue = history.slice(0, -1).filter((item) => item.role !== 'notice');
+  return [brief, ...(want > 0 ? dialogue.slice(-want) : []), ...(last ? [last] : [])];
 }
 
 /** Прогон, который не поднимает процесс: его старт — сразу отказ с этим текстом. */
@@ -219,6 +272,10 @@ export interface ChildRun {
   mcp?: { off: string[]; note: string };
   /** Группа разделения (не разбор): у неё без человека выключены и фоновые вызовы CLI (6.3). */
   group?: boolean;
+  /** Рычаги экономии группы, закреплённые на первом старте разговора (`setEconomyRun`). */
+  economy?: GroupEconomy;
+  /** Окно сжатия группы — читается на ходу, у всех CLI одним рычагом (2.1, 6.2). */
+  compactWindow?: number;
 }
 
 /** Группы к старту ответа: слой на прогон вместо тумблера каталогов Claude. */
@@ -559,6 +616,114 @@ export class ProviderChatService {
     }
   }
 
+  /**
+   * Рычаги экономии группы на один прогон (план экономии чужих CLI): у каждого CLI
+   * свой канал (`economy-run/economy-run.ts`) — ключ запуска Codex, слой настроек
+   * Qwen Code… Решатель зовётся только у группы, после тишины и до строки о каталоге:
+   * слой настроек ложится поверх уже выбранного файла, а строка — последней.
+   * `undefined` — у этого CLI канала нет, прогон идёт как шёл.
+   */
+  setEconomyRun(
+    resolve: (
+      providerId: string,
+      run: EconomyRunRequest,
+      env: NodeJS.ProcessEnv,
+    ) => Record<string, string> | undefined,
+  ): void {
+    this.economyRunOf = resolve;
+  }
+
+  private economyRunOf?: (
+    providerId: string,
+    run: EconomyRunRequest,
+    env: NodeJS.ProcessEnv,
+  ) => Record<string, string> | undefined;
+
+  private economyRunEnv(
+    providerId: string,
+    run: EconomyRunRequest,
+    env: Record<string, string>,
+  ): Record<string, string> | undefined {
+    try {
+      return this.economyRunOf?.(providerId, run, { ...process.env, ...env });
+    } catch {
+      // Экономия не главнее разговора: осечка — прогон с настройками CLI по умолчанию.
+      return undefined;
+    }
+  }
+
+  /**
+   * Продолжение группы после паузы (`freshOnColdResume` у чужого CLI): решатель
+   * смотрит переписку CLI и говорит, продолжать ли его сессию или начать новую с
+   * вводной панели. Спрашивается только у группы и только перед сверкой живой
+   * сессии; нет решателя или осечка — сессия продолжается, как до него.
+   */
+  setColdPlan(resolve: (request: ColdPlanRequest) => ColdPlan | undefined): void {
+    this.coldPlanOf = resolve;
+  }
+
+  private coldPlanOf?: (request: ColdPlanRequest) => ColdPlan | undefined;
+
+  private coldPlan(request: ColdPlanRequest): ColdPlan | undefined {
+    try {
+      return this.coldPlanOf?.(request);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Свой локальный сервер моделей CLI (`ownLocalEndpoint`): Qwen Code или Codex,
+   * направленный на него собственными настройками, мимо контура. Спрашивается,
+   * только когда маршрут не повёл прогон через контур; нет решателя — облако.
+   */
+  setOwnLocal(
+    resolve: (
+      providerId: string,
+      env: NodeJS.ProcessEnv,
+      run: { workdir?: string; model?: string },
+    ) => boolean,
+  ): void {
+    this.ownLocalOf = resolve;
+  }
+
+  private ownLocalOf?: (
+    providerId: string,
+    env: NodeJS.ProcessEnv,
+    run: { workdir?: string; model?: string },
+  ) => boolean;
+
+  private ownLocal(
+    providerId: string,
+    env: Record<string, string>,
+    run: { workdir?: string; model?: string },
+  ): boolean {
+    try {
+      return this.ownLocalOf?.(providerId, { ...process.env, ...env }, run) === true;
+    } catch {
+      // Ложное «локальный» спрятало бы расход: осечка — облако.
+      return false;
+    }
+  }
+
+  /**
+   * Старт и конец хода — сторожу групп, тем же слушателем, что у реестра Claude
+   * (`setWatchListener`), но без потока событий. Ошибка слушателя ходу не мешает.
+   */
+  setWatchListener(listener: (feed: ForeignWatchFeed) => void): void {
+    this.onWatch = listener;
+  }
+
+  private onWatch?: (feed: ForeignWatchFeed) => void;
+
+  private watchFeed(feed: ForeignWatchFeed): void {
+    try {
+      this.onWatch?.(feed);
+    } catch {
+      // Сторож не главнее разговора.
+    }
+  }
+
   private localLimitsEnv(
     providerId: string,
     limits: { contextWindow: number; timeoutMs: number; idleMs: number },
@@ -643,6 +808,10 @@ export class ProviderChatService {
     };
     if (existing?.cleanupTimer) clearTimeout(existing.cleanupTimer);
     this.runs.set(chatId, live);
+    markProviderTurn(appDataDir, foreignChatKey(providerId, chatId), {
+      cwd: chat.workdir ?? '',
+      startedAt: live.startedAt,
+    });
     try {
       this.onStarted?.(providerId, chatId);
     } catch {
@@ -726,7 +895,17 @@ export class ProviderChatService {
     const childOnly = Object.keys(child?.env ?? {}).filter((key) => !(key in layered));
     // Окно локальной модели ложится слоем настроек ДО строки о каталоге: та читает файл,
     // выбранный здесь, и дописывает свой слой поверх.
-    if (route.localLimits) live.local = true;
+    // Ход на локальной модели: локальный контур (окно сервера в маршруте) или, мимо
+    // контура (`env` маршрута пуст), свой локальный сервер CLI по его настройкам.
+    // Один ответ — держателю сна, решателю паузы и сторожу групп.
+    const local =
+      route.localLimits !== undefined ||
+      (Object.keys(route.env).length === 0 &&
+        this.ownLocal(providerId, runEnv, {
+          ...(chat.workdir ? { workdir: chat.workdir } : {}),
+          ...(model ? { model } : {}),
+        }));
+    if (local) live.local = true;
     if (route.localLimits) {
       Object.assign(runEnv, this.localLimitsEnv(providerId, route.localLimits, runEnv));
     }
@@ -736,6 +915,27 @@ export class ProviderChatService {
     // Без лишних фоновых вызовов модели — тоже поверх, до строки о каталоге.
     const quiet = this.quietRunEnv(providerId, child?.group === true, runEnv);
     if (quiet) Object.assign(runEnv, quiet);
+    // Рычаги экономии группы — поверх тишины, до строки о каталоге. Ключ, которого до
+    // них в окружении не было, — настройка прогона, как окружение ребёнка: с общего
+    // или живого сервера ход он не уводит (как порог сжатия Codex до диспетчера).
+    const economy =
+      child?.group && (child.economy || child.compactWindow)
+        ? this.economyRunEnv(
+            providerId,
+            {
+              ...(child.economy ? { economy: child.economy } : {}),
+              ...(child.compactWindow ? { compactWindow: child.compactWindow } : {}),
+              ...(model ? { model } : {}),
+              ...(route.localLimits ? { localContextWindow: route.localLimits.contextWindow } : {}),
+              ...(route.modelContext ? { modelContext: route.modelContext } : {}),
+              ...(chat.workdir ? { workdir: chat.workdir } : {}),
+            },
+            runEnv,
+          )
+        : undefined;
+    const economyOnly = Object.keys(economy ?? {}).filter((key) => !(key in runEnv));
+    if (economy) Object.assign(runEnv, economy);
+    const optionalKeys = [...childOnly, ...economyOnly];
     // Строка о снятых серверах — частью системной строки: она одна на разговор (E6),
     // и сервер, подключённый по просьбе группы, приходит переменой в реплике.
     const current = [
@@ -789,27 +989,66 @@ export class ProviderChatService {
     // и каталог — те же, что она видела. Сверка — по сохранённым репликам, а не по
     // `history`: строка о каталоге и сводка детей в файл разговора не пишутся.
     const liveRun = { model, workdir: chat.workdir ?? '' };
-    let previousSession: ReturnType<typeof planLiveSession>;
+    let mark: ReturnType<typeof readChatLiveSession>;
     try {
-      previousSession = planLiveSession(readChatLiveSession(appDataDir, providerId, chatId), {
-        messages: chat.messages,
-        ...liveRun,
-      });
+      mark = readChatLiveSession(appDataDir, providerId, chatId);
     } catch {
-      previousSession = undefined;
+      mark = undefined;
     }
+    // Пауза группы (`freshOnColdResume`): кэш сессии остыл — дешевле начать новую с
+    // вводной панели, чем перечитать всю историю по цене записи. Решает решатель.
+    const cold = child?.group
+      ? this.coldPlan({
+          providerId,
+          chatId,
+          appDataDir,
+          ...(chat.workdir ? { workdir: chat.workdir } : {}),
+          ...(mark ? { session: { kind: mark.kind, id: mark.id } } : {}),
+          ...(local ? { local: true } : {}),
+          messages: chat.messages,
+        })
+      : undefined;
+    let previousSession: ReturnType<typeof planLiveSession>;
+    if (cold?.kind === 'fresh') {
+      // Только id: прогон удалит прежнюю сессию и начнёт новую (`liveSessionRequest`).
+      previousSession = mark ? { kind: mark.kind, id: mark.id } : undefined;
+    } else {
+      try {
+        previousSession = planLiveSession(mark, { messages: chat.messages, ...liveRun });
+      } catch {
+        previousSession = undefined;
+      }
+    }
+    const runHistory = cold?.kind === 'fresh' ? coldOpening(history, cold) : history;
+    if (cold?.kind === 'fresh' && cold.notice) {
+      appendMessage(appDataDir, providerId, chatId, { role: 'notice', content: cold.notice });
+    }
+    // Сторож групп видит старт хода; поток событий он читает из переписки CLI сам.
+    live.watch = {
+      group: child?.group === true,
+      ...(previousSession?.covered !== undefined ? { sessionId: previousSession.id } : {}),
+    };
+    this.watchFeed({
+      kind: 'start',
+      providerId,
+      chatId,
+      ...(live.watch.sessionId ? { sessionId: live.watch.sessionId } : {}),
+      group: live.watch.group,
+      cwd: chat.workdir ?? '',
+      ...(local ? { local: true } : {}),
+    });
 
     void live.run
       .start(
         {
           ...runDeps,
-          history,
+          history: runHistory,
           chatId,
           appDataDir,
           liveSession: previousSession ? { previous: previousSession } : {},
           // Набор панели (В2) — у Qwen Code свой `QWEN_HOME` в режиме «Наши».
           platformEnv: { ...runEnv, ...noteEnv },
-          ...(childOnly.length > 0 ? { optionalEnvKeys: childOnly } : {}),
+          ...(optionalKeys.length > 0 ? { optionalEnvKeys: optionalKeys } : {}),
           ...(supervisor
             ? {
                 supervisor:
@@ -857,6 +1096,7 @@ export class ProviderChatService {
             });
             if (event.liveSession) {
               this.rememberLiveSession(appDataDir, providerId, chatId, event.liveSession, liveRun);
+              if (live.watch) live.watch.sessionId = event.liveSession.id;
             }
             this.finish(chatId, live, {
               type: 'done',
@@ -970,6 +1210,28 @@ export class ProviderChatService {
     });
   }
 
+  /** Все ждущие просьбы о разрешении — по всем идущим разговорам чужих CLI. */
+  pendingAsks(): ForeignPendingAsk[] {
+    const out: ForeignPendingAsk[] = [];
+    for (const [chatId, live] of this.runs) {
+      if (!live.isRunning) continue;
+      for (const pending of live.asks.values()) {
+        out.push({
+          chatId,
+          providerId: live.providerId,
+          ...(pending.workdir ? { workdir: pending.workdir } : {}),
+          ask: pending.view,
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Идёт ли ход разговора чужого CLI. */
+  isChatRunning(chatId: string): boolean {
+    return this.runs.get(chatId)?.isRunning === true;
+  }
+
   /**
    * Ответ человека на просьбу CLI о разрешении. `false` — просьбы уже нет (ход
    * кончился, ответили в другой вкладке): решать больше нечего.
@@ -1006,6 +1268,7 @@ export class ProviderChatService {
           at: new Date().toISOString(),
         },
         resolve,
+        ...(workdir ? { workdir } : {}),
       });
       this.broadcast(live, { type: 'permissions', permissions: pendingViews(live) });
       try {
@@ -1221,6 +1484,7 @@ export class ProviderChatService {
   private finish(chatId: string, live: LiveRun, event: ProviderChatEvent): void {
     if (!live.isRunning) return;
     live.isRunning = false;
+    markProviderTurn(live.appDataDir, foreignChatKey(live.providerId, chatId), undefined);
     denyPending(live);
     this.broadcast(live, event);
     for (const subscriber of live.subscribers) subscriber.close();
@@ -1230,6 +1494,16 @@ export class ProviderChatService {
       if (this.runs.get(chatId) === live) this.runs.delete(chatId);
     }, GRACE_MS);
     live.cleanupTimer.unref?.();
+
+    if (live.watch) {
+      this.watchFeed({
+        kind: 'finish',
+        providerId: live.providerId,
+        chatId,
+        ...(live.watch.sessionId ? { sessionId: live.watch.sessionId } : {}),
+        group: live.watch.group,
+      });
+    }
 
     if (this.onFinished) {
       try {

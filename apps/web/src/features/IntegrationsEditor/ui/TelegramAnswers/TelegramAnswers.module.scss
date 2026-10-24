@@ -1,0 +1,17 @@
+/* Блок ответов из Telegram — отделён чертой от событий карточки над ним. */
+.block {
+  margin-top: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Минуты — короткое число, владелец — до 20 цифр: поля разной ширины. */
+.narrow {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+
+.wide {
+  flex: 1 1 280px;
+  min-width: 200px;
+}

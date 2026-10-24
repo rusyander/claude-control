@@ -76,6 +76,15 @@ await runOnStand(
     const browser = await chromium.launch();
     try {
       const page = await stand.newPage(browser);
+      // Переключатель хуков — маршрут человека: ворота читают таблицы процессов ОС
+      // (на Windows ~2 с), поэтому ждём ответ сервера, а не фиксированную паузу.
+      const turnHooksSaved = () =>
+        page.waitForResponse(
+          (response) =>
+            response.url().includes('/api/project-tests/turn-hooks') &&
+            response.request().method() === 'PUT',
+          { timeout: 20_000 },
+        );
       await page.goto(`${stand.webUrl}/tests`, { waitUntil: 'domcontentloaded' });
       await page
         .getByRole('button', { name: 'Изменить группу' })
@@ -96,13 +105,11 @@ await runOnStand(
         'переключатель показывает «включена»',
         (await toggle.getAttribute('aria-checked')) === 'true',
       );
-      await toggle.click();
-      await wait(800);
+      await Promise.all([turnHooksSaved(), toggle.click()]);
       check('выключение убрало файл, которого до панели не было', !existsSync(settingsFile));
       const off = await stand.api(`/project-tests/turn-hooks?path=${encodeURIComponent(project)}`);
       check('сервер помнит «выключена»', off.body?.state === 'off', JSON.stringify(off.body));
-      await toggle.click();
-      await wait(800);
+      await Promise.all([turnHooksSaved(), toggle.click()]);
       check('включение вернуло хуки', existsSync(settingsFile));
       await page.keyboard.press('Escape');
 

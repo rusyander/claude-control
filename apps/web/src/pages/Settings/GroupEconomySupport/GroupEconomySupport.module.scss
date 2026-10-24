@@ -1,0 +1,25 @@
+// Строка «Где действует» под полем рычага: подпись и отметки CLI в одну строку с переносом.
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+// Рычаг у этого CLI не действует: отметка — пунктирной рамкой на прозрачном фоне,
+// без прозрачности текста. `opacity` роняла контраст подписи ниже AA (≈2,4:1 в
+// светлой теме), а состояние и так названо словом в самой отметке.
+.muted > * {
+  border: 1px dashed var(--color-border-strong);
+  background-color: transparent;
+}
+
+// Причина для чтеца: видна только ему, зрячему — подсказкой при наведении.
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

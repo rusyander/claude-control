@@ -19,4 +19,6 @@ export interface GroupCardProps {
   questions?: ChildQuestion[];
   /** Ответ на них уходит в чат группы. Без обработчика островка нет. */
   onAnswer?: (chatId: string, answer: string) => void;
+  /** Свёрнутые разделы карточки («не хватает для MR») открыты сразу — для тестов и снимков. */
+  sectionsOpen?: boolean;
 }

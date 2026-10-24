@@ -16,6 +16,8 @@ export interface ColdContinuationDeps {
   store: Pick<AppStore, 'getChatLink' | 'setChatLink' | 'getSettings' | 'getSplitPlan'>;
   /** Каталог транскриптов CLI (`projects`) — на каждом старте: каталог конфига меняется на лету. */
   projectsDir: () => string;
+  /** Последний пинг тёплого кэша сессии (`keep-warm`); нет — сессию не грели. */
+  warmedAt?: (sessionId: string) => number | undefined;
   now?: () => number;
 }
 
@@ -49,6 +51,7 @@ export function wireColdContinuation(
     // Группа ждала сброса лимита (§L8): ждали до `resetsAt`, кэш остыл при
     // любом простое. Отметка ещё стоит — снимает её старт этого же хода.
     const waitedLimit = group?.status === 'awaiting' && group.waitingFor === 'limit';
+    const warmedAt = deps.warmedAt?.(options.sessionId);
     const decided = decideContinuation({
       dir: deps.projectsDir(),
       sessionId: options.sessionId,
@@ -57,6 +60,7 @@ export function wireColdContinuation(
       intro: continuationIntro(link, plan),
       ...(group?.base ? { base: group.base } : {}),
       afterLimit: Boolean(meta.afterLimit) || waitedLimit,
+      ...(warmedAt !== undefined ? { warmedAt } : {}),
       now: now(),
     });
     if (decided.kind === 'resume') {

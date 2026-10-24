@@ -206,6 +206,26 @@ describe('mergeSplitGroups — управление группой', () => {
     expect(rows[0]?.control?.actions).toEqual(['continue', 'pause']);
   });
 
+  it('ждёт повтора доставки панелью — «Продолжить» сразу, а не через час; без срока — нет', () => {
+    const waiting = mergeSplitGroups(
+      new Map([chatRow(9, false)]),
+      plan([
+        group(9, {
+          status: 'awaiting',
+          waitingFor: 'delivery',
+          path: 'C:/copies/9',
+          deliveryRetryAt: '2026-10-24T12:00:00Z',
+        }),
+      ]),
+    );
+    expect(waiting[0]?.control?.actions).toEqual(['continue', 'pause']);
+    const checking = mergeSplitGroups(
+      new Map([chatRow(9, false)]),
+      plan([group(9, { status: 'awaiting', waitingFor: 'delivery', path: 'C:/copies/9' })]),
+    );
+    expect(checking[0]?.control?.actions ?? []).not.toContain('continue');
+  });
+
   it('продолжать негде — убранная копия, отменённый план, нет копии', () => {
     const cleaned = mergeSplitGroups(
       new Map([chatRow(10, false)]),

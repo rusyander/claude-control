@@ -7,6 +7,7 @@ import { PlanCancel } from '../PlanCancel/PlanCancel';
 import { StatusAsk } from '../StatusAsk/StatusAsk';
 import { SplitTasksMove } from '../SplitTasksMove/SplitTasksMove';
 import { HubSummary } from '../HubSummary/HubSummary';
+import { HubDeferred } from '../HubDeferred/HubDeferred';
 import { RetiredChats } from '../RetiredChats/RetiredChats';
 import { GroupCard } from '../GroupCard/GroupCard';
 import { SplitFollowUps } from '../SplitFollowUps/SplitFollowUps';
@@ -49,6 +50,7 @@ export function ChildStages({
   releaseBusy,
   onCheckOverlap,
   overlapBusy,
+  sectionsOpen = false,
   onResumeInterrupted,
   resumeInterruptedBusy,
   foreign,
@@ -146,6 +148,9 @@ export function ChildStages({
 
       <HubSummary groups={live} now={now} />
 
+      {/* Вызовы D-n групп этого разделения — ответ прямо из хаба, с фильтром по группе. */}
+      {split && <HubDeferred parentChatId={split.parentChatId} onOpen={onOpen} />}
+
       {/* Вопрос о ходе групп — в лёгкий чат со сводкой, а не в родителя (5.1).
           Только у Claude: лёгкий чат заводит реестр прогонов Claude. */}
       {split && !foreign && <StatusAsk parentChatId={split.parentChatId} onOpen={onOpen} />}
@@ -169,6 +174,7 @@ export function ChildStages({
             {...(onAnswer && group.chatId && questions?.has(group.chatId)
               ? { questions: questions.get(group.chatId), onAnswer }
               : {})}
+            sectionsOpen={sectionsOpen}
           />
         ))}
       </div>
@@ -181,12 +187,21 @@ export function ChildStages({
         titleOf={(index) => split?.groups[index]?.title ?? String(index + 1)}
         {...(onCheckOverlap ? { onCheck: onCheckOverlap } : {})}
         {...(overlapBusy !== undefined ? { busy: overlapBusy } : {})}
+        defaultExpanded={sectionsOpen}
       />
 
-      {/* После пересечений — то, что осталось человеку: шаги и тикеты групп. */}
-      {split && <SplitFollowUps split={split} />}
+      {/* После пересечений — то, что осталось человеку: шаги и тикеты групп.
+          Всё под карточками групп свёрнуто до заголовков (владелец 22.10.2026). */}
+      {split && (
+        <SplitFollowUps
+          split={split}
+          defaultExpanded={sectionsOpen}
+          onOpen={onOpen}
+          {...(foreign !== undefined ? { foreign } : {})}
+        />
+      )}
 
-      <RetiredChats chats={retired} onOpen={onOpen} />
+      <RetiredChats chats={retired} onOpen={onOpen} defaultExpanded={sectionsOpen} />
     </div>
   );
 }

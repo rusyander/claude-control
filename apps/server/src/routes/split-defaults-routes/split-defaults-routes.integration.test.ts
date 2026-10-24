@@ -88,11 +88,12 @@ describe('вкладка «Группы»: общие правила и прое
     expect(defaults).toEqual(builtIn);
     expect(defaults).toMatchObject({ parallelLight: 8, parallelHeavy: 4 });
     expect(defaults.heavy).toEqual({ chains: 1, steps: 1 });
-    // Затирание истории из коробки у человека (аудит 25.09, L163).
+    // Затирание истории своей копии из коробки — само (решение владельца 23.10);
+    // вне копии его держит разбор команды, а не строка.
     expect(defaults.permissions).toMatchObject({
       routine: 'auto',
       gitWrite: 'auto',
-      gitHistory: 'human',
+      gitHistory: 'auto',
       database: 'human',
     });
     expect(defaults.groupQuestions).toBe('plan');
@@ -163,11 +164,12 @@ describe('вкладка «Группы»: общие правила и прое
     expect(res.json<SplitDefaultsView>().defaults).toEqual(next);
     expect(kicked).toEqual([project]);
 
-    // На диске — только отклонение от коробки.
+    // На диске — только отклонение от коробки и ревизия коробки, от которой оно считано (F-33).
     const saved = JSON.parse(readFileSync(join(appData, 'state.json'), 'utf8')) as {
       splitDefaults?: unknown;
     };
     expect(saved.splitDefaults).toEqual({
+      revision: 2,
       permissions: { gitWrite: 'human' },
       parallelLight: 5,
       parallelHeavy: 2,

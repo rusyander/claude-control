@@ -8,13 +8,21 @@ import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import { groupKeyOf } from '@agentdeck/contracts/group-sources';
 import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import { leverWorks } from '@agentdeck/contracts/group-economy-support';
+import { getProvider } from '../../../providers/registry.ts';
 import { knobsLineForChoice } from '../../groups/knobs/knobs.ts';
 import { readChat } from '../../provider-chat/store/store.ts';
 import { chatPathSteps, scenarioLine, skillInsertsLine } from '../path-steps/path-steps.ts';
 import { childAppendPrompt, stageOf } from '../ChatCascadeStages/ChatCascadeStages.ts';
 import { chatGroupSettingsView, storeTreeReader } from '../chat-autonomy/chat-autonomy.ts';
 import { pinnedChoiceAt } from '../group-auto-pick/group-auto-pick.ts';
-import { FOREIGN_CHILD_PROMPT, GROUP_ECONOMY_PROMPT } from '../initiative/initiative.ts';
+import {
+  FOREIGN_CHILD_NO_TOOL_LOOP_PROMPT,
+  FOREIGN_CHILD_PROMPT,
+  FOREIGN_GROUP_ECONOMY_PROMPT,
+  NO_TOOL_LOOP_ECONOMY_PROMPT,
+} from '../initiative/initiative.ts';
+import { WORK_HABITS_SHARED_NOTE } from '../group-profile/group-profile.ts';
 
 /**
  * Строки группы в системной дописке прогона: «числа» группы, выбранной в чате
@@ -29,7 +37,7 @@ import { FOREIGN_CHILD_PROMPT, GROUP_ECONOMY_PROMPT } from '../initiative/initia
 
 type GroupStore = Pick<
   AppStore,
-  'getGroups' | 'getChatGroupSettings' | 'getChatLink' | 'canonicalChatKey'
+  'getGroups' | 'getChatGroupSettings' | 'getChatLink' | 'canonicalChatKey' | 'getSettings'
 >;
 
 /**
@@ -150,6 +158,29 @@ export function linkedChildAppend(
 }
 
 /**
+ * Строка привычек группы чужого CLI (рычаг `workHabits`) — общая часть строки
+ * Claude, без фразы про `cd`. Рычаг — закреплённый на первом старте разговора
+ * (`linkEconomy` в runtime): строка едет в начале переписки, и смена посреди тёплой сессии
+ * переписала бы её кэш, как у Claude. Рычагов в настройках нет — строки нет.
+ */
+function foreignHabits(store: GroupStore, chatKey: string): string | undefined {
+  const current = store.getSettings().groupEconomy;
+  if (!current) return undefined;
+  // Каталог CLI говорит, что строке у него нечего менять (aider: инструментов нет) —
+  // строки нет: отметка «не нужен» и токены каждого хода не должны расходиться.
+  const providerId = parseForeignChatKey(chatKey)?.providerId;
+  const declared = providerId
+    ? getProvider(providerId).groupEconomy?.support.workHabits
+    : undefined;
+  if (declared && !leverWorks(declared)) return undefined;
+  // Только смотрит: закрепляет рычаги старт прогона (`setChildRun` в runtime), как
+  // у Claude. Дополнение строится и при заведении звена, задолго до его хода
+  // (отложенный старт) — закрепление здесь брало бы рычаги того момента.
+  const economy = store.getChatLink(chatKey)?.economy ?? current;
+  return economy.workHabits ? WORK_HABITS_SHARED_NOTE : undefined;
+}
+
+/**
  * Дополнение звена ЧУЖОГО CLI — по его связи (`codex:…`), тем же
  * `childStageExtra`, что у ребёнка Claude. Собирается из одних связи и групп,
  * поэтому совпадает у всех, кто его строит: старт ребёнка, переход стадии,
@@ -175,10 +206,15 @@ export function foreignChildExtra(
   const stage = stageOf(link);
   // Правила ребёнка — всем звеньям группы, кроме разбора: он не группа, а
   // общий прогон до них (TQ-06).
-  const child =
-    link.parentChatId && stage !== 'triage'
-      ? `${FOREIGN_CHILD_PROMPT} ${GROUP_ECONOMY_PROMPT}`
-      : '';
+  const group = Boolean(link.parentChatId) && stage !== 'triage';
+  // CLI без цикла инструментов (каталог, `noToolLoop`) получает из строки экономии
+  // только то, что исполнит правкой файла: фразы о вызовах и оболочке ему не по силам.
+  const noToolLoop = Boolean(parsed && getProvider(parsed.providerId).groupEconomy?.noToolLoop);
+  const economy = noToolLoop ? NO_TOOL_LOOP_ECONOMY_PROMPT : FOREIGN_GROUP_ECONOMY_PROMPT;
+  const rules = noToolLoop ? FOREIGN_CHILD_NO_TOOL_LOOP_PROMPT : FOREIGN_CHILD_PROMPT;
+  const child = group
+    ? [rules, economy, foreignHabits(store, chatKey)].filter(Boolean).join(' ')
+    : '';
   return (
     [child, childStageExtra(stage, chatKnobsLine(store, appData, [chatKey], cwd))]
       .filter(Boolean)

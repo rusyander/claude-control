@@ -45,6 +45,7 @@ const WAIT: Record<NonNullable<SplitPlanView['groups'][number]['waitingFor']>, s
   delivery: 'the panel is checking the delivery against git (branch, MR)',
   interrupted: 'the process broke off mid-turn — waits to be continued',
   limit: 'hit the subscription limit — continues after the reset',
+  'human-op': 'the turn ended with only deferred D-n calls left — waits for the human decision',
 };
 
 const RESULT: Record<NonNullable<SplitPlanView['groups'][number]['result']>['kind'], string> = {

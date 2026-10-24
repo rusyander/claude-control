@@ -78,4 +78,17 @@ export const homeEn: HomeTexts = {
   running: 'the agent is working — the answer goes when it finishes the turn',
   outside:
     'You cannot answer from here: the request waits in a terminal or VS Code window. To decide from the phone, turn on «The agent on the computer» in Settings and add the panel hooks.',
+  deferredTitle: (count: number) => `Awaiting decision (${count})`,
+  deferredHint:
+    'Calls only a human may decide. The agents put them on this list and kept working; «Allow» resumes the work with exactly that call.',
+  deferredGroup: (number: number, title?: string) =>
+    title ? `group ${number} — ${title}` : `group ${number}`,
+  deferredExpired: 'Expired — you can allow it again',
+  deferredAllowAgain: 'Allow again',
+  deferredReasons: {
+    'group-rows': "The group's permission rows send this call to a human.",
+    'not-auto-approved': 'The call is not covered by the auto-approve rules.',
+    'main-copy': 'An edit in the main copy of the project: you decide where it writes.',
+    'backend-guard': (rule: string, match: string) => `Backend guard: ${rule} — “${match}”.`,
+  },
 };

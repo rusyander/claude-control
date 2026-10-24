@@ -88,7 +88,16 @@ export const phoneEn: typeof phoneRu = {
     screenQuestionsText:
       'Everything that waits for a human, one card per chat: agent questions with options, ' +
       'permission requests and «first edit in the main copy». Cards come oldest first; the ' +
-      'answers of one chat are collected and sent as one message.',
+      'answers of one chat are collected and sent as one message. When a group is restarted and ' +
+      'the panel starts a new conversation instead of the old one, the old one’s questions leave ' +
+      'the screen: nobody is waiting for them any more. Under the card title is whose ' +
+      'question it is: the CLI, the panel or «outside the panel», whether it is a background ' +
+      'turn, and for a split group its number, title, stage and parent conversation. A ' +
+      'request to launch an agent names what it is asked to do, which agent, which model, ' +
+      'which effort and whether it runs in the background. At the top of the tab sits an ' +
+      '«Awaiting decision (N)» block: D-n calls the agents set aside while they keep working ' +
+      '(the «Chat» document), with the reason and «Deny» and «Allow» buttons; an expired ' +
+      'item can be «Allowed again». The badge on the «Questions» tab counts them too.',
     screenChat: 'Chat',
     screenChatText:
       'The same conversation as in the panel: the messages, the agent turn live, which agents ' +
@@ -219,10 +228,14 @@ export const phoneEn: typeof phoneRu = {
     offlineStream: 'A running chat turn',
     offlineStreamText:
       'The turn stream reconnects by itself («Connection lost, reconnecting…») and resumes ' +
-      'from the last event it received — nothing is lost and nothing repeats. A stream silent ' +
-      'for more than 30 seconds counts as a break too. Once the attempts run out — «Lost the ' +
-      'connection to the panel», and the conversation is re-read from the server when the ' +
-      'panel answers again.',
+      'from the last event it received — nothing is lost and nothing repeats. A turn that ' +
+      'started while the phone was in the background or offline is shown from its beginning, ' +
+      'not from the middle. A stream silent for more than 30 seconds counts as a break too. ' +
+      'Once the attempts run out — «Lost the connection to the panel», but the app does not ' +
+      'give up: the phone asks the panel every few seconds and every time it comes back on ' +
+      'screen, and as soon as the panel answers — after a network change, the computer waking ' +
+      'up or a panel restart — the turn is picked up again and the conversation is re-read ' +
+      'from the server. There is no need to reopen the app.',
     offlineAgent: 'A panel agent turn',
     offlineAgentText:
       'Sending the app to the background or losing the connection does not stop the turn: the ' +
@@ -234,7 +247,12 @@ export const phoneEn: typeof phoneRu = {
     offlineQueueText:
       'Goes to the agent at once: it reads it at its next step and carries on with the same ' +
       'turn. Offline, with an attachment or with another CLI it goes into a queue that is ' +
-      'sent when the turn ends. The queue lives on the phone and ' +
+      'sent when the turn ends. A queued message never disappears silently: it either reaches ' +
+      'the agent or stays in the queue while the chat says «The message was not sent» and why; ' +
+      'one that failed on the network the phone sends by itself as soon as the panel answers ' +
+      'again. A message that failed straight from the input field stays in the field: send it ' +
+      'again — the server recognises the repeat and the agent gets it once. The queue lives on ' +
+      'the phone and ' +
       'survives an app restart, but only for 2 hours: anything older is dropped so that the ' +
       'agent does not receive something long out of date.',
     offlineAnswered: 'An answer to a question',

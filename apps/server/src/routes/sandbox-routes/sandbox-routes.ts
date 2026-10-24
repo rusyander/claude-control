@@ -22,6 +22,7 @@ import {
 } from '../../domains/sandbox/HookProbe.ts';
 import { listMcpTools, callMcpTool } from '../../domains/sandbox/McpProbe.ts';
 import { ChatRun, type ChatEvent } from '../../domains/chat/ChatRunner/ChatRunner.ts';
+import { isInternalChatEvent } from '../../domains/chat/chat-events.ts';
 import { readClaudeCredentials } from '../../lib/credentials/credentials.ts';
 import { readHooks } from '../../domains/hooks/hooks.ts';
 import { readEnvLookup } from '../../domains/env/env.ts';
@@ -346,6 +347,8 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       });
 
       const send = (event: ChatEvent): void => {
+        // Сжатие окна и результат вызова — для реестра и сторожа групп; песочнице они не нужны.
+        if (isInternalChatEvent(event)) return;
         reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
       };
 

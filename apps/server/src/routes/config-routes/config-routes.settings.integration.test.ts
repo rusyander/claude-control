@@ -145,14 +145,14 @@ describe('config-routes: валидация настроек и импорта',
       expect((await getSettings()).groupWatch).toEqual(GROUP_WATCH_DEFAULTS);
       expect((await patch({ groupWatch: { stallMinutes: 30 } })).statusCode).toBe(200);
       // Второй ключ не возвращает первый к заводскому.
-      expect((await patch({ groupWatch: { telegram: false } })).statusCode).toBe(200);
+      expect((await patch({ groupWatch: { enabled: false } })).statusCode).toBe(200);
       expect((await getSettings()).groupWatch).toEqual({
         ...GROUP_WATCH_DEFAULTS,
         stallMinutes: 30,
-        telegram: false,
+        enabled: false,
       });
       const disk = JSON.parse(readFileSync(join(root, 'agentdeck', 'state.json'), 'utf8'));
-      expect(disk.settings.groupWatch).toEqual({ stallMinutes: 30, telegram: false });
+      expect(disk.settings.groupWatch).toEqual({ stallMinutes: 30, enabled: false });
       expect((await patch({ groupWatch: { stallMinutes: 0 } })).statusCode).toBe(400);
     });
 

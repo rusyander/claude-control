@@ -20,6 +20,11 @@ import {
 import { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
 import { SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
+import {
+  DEFERRED_ASKS_FILE,
+  DeferredAsks,
+} from '../../domains/chat/deferred-asks/deferred-asks.ts';
+import { decideDeferred, deferredAsksOf } from '../chat/deferred-routes/deferred-store.ts';
 
 /**
  * Управление группой из хаба по HTTP (журнал 81, 89): пауза останавливает
@@ -38,6 +43,7 @@ describe('разделение: пауза, продолжение, запуск
   let conveyor: SplitConveyor;
   let app: FastifyInstance;
   let resumed: { index: number; prompt: string }[];
+  let ctx: ServerContext;
   const PARENT = 'родитель';
 
   beforeEach(async () => {
@@ -55,7 +61,7 @@ describe('разделение: пауза, продолжение, запуск
       };
     });
     store = new AppStore(join(root, 'agentdeck'));
-    const ctx = {
+    ctx = {
       location: {
         paths: {
           root,
@@ -342,6 +348,56 @@ describe('разделение: пауза, продолжение, запуск
     expect(forced.json()).toEqual({ index: 0, outcome: 'sent' });
     expect(resumed.at(-1)?.index).toBe(0);
     expect(resumed.at(-1)?.prompt).toContain('Not logged in · Please run /login');
+  });
+
+  /** D-n группы — той же записью, что заводит мост прав (`deferred-bridge.ts`). */
+  const askOf = (index: number, command: string) =>
+    deferredAsksOf(ctx).ask({
+      scope: { kind: 'group', parentChatId: PARENT, groupIndex: index },
+      runKeys: [`chat-${index}`],
+      toolName: 'Bash',
+      input: { command },
+      reason: 'human gate',
+    }).record.id;
+  /** Запись с диска — как её прочтёт панель после перезапуска. */
+  const fromDisk = () => new DeferredAsks({ file: join(root, 'agentdeck', DEFERRED_ASKS_FILE) });
+
+  it('«Убрать» группу на паузе отзывает её D-n: на диске, после перезапуска, решить нельзя (RF-DL-10)', async () => {
+    const waiting = askOf(0, 'git push');
+    const allowed = askOf(0, 'npm publish');
+    const other = askOf(1, 'git push');
+    await decideDeferred(ctx, allowed, { behavior: 'allow', via: 'web' });
+    expect((await post('pause', { index: 0 })).statusCode).toBe(200);
+    await settle();
+
+    const dropped = await post('drop-group', { index: 0 });
+    expect(dropped.statusCode).toBe(200);
+    expect(group(0)?.droppedAt).toBeDefined();
+
+    const disk = fromDisk();
+    expect(disk.get(waiting)).toMatchObject({ state: 'withdrawn', closedAt: expect.any(String) });
+    expect(disk.get(allowed)).toMatchObject({ state: 'withdrawn', closedAt: expect.any(String) });
+    // Чужая группа того же плана не тронута.
+    expect(disk.get(other)?.state).toBe('waiting');
+    // Разовое разрешение убранной группы не доживает ни до чего.
+    expect(
+      disk.consume({ kind: 'group', parentChatId: PARENT, groupIndex: 0 }, 'Bash', {
+        command: 'npm publish',
+      }),
+    ).toBeUndefined();
+    // Позднее «Разрешить» (окно, телефон, Telegram — один путь) ничего не меняет.
+    const late = await decideDeferred(ctx, waiting, { behavior: 'allow', via: 'telegram' });
+    expect(late?.changed).toBe(false);
+    expect(fromDisk().get(waiting)?.state).toBe('withdrawn');
+  });
+
+  it('«Отменить план» отзывает D-n всех групп и держит отзыв после перезапуска (RF-DL-10)', async () => {
+    const first = askOf(0, 'git push');
+    const second = askOf(1, 'git push');
+    expect((await post('cancel', {})).statusCode).toBe(200);
+    const disk = fromDisk();
+    expect(disk.get(first)?.state).toBe('withdrawn');
+    expect(disk.get(second)?.state).toBe('withdrawn');
   });
 
   it('номер не тот — 400; группа не в том состоянии — 409 с кодом', async () => {

@@ -324,6 +324,20 @@ describe('scanAnalytics — чужие CLI', () => {
     }
   });
 
+  // Q1: сессию, брошенную панелью (ход без ответа, смена сессии), qwen-serve
+  // убирает в `chats/archive/` — её расход потрачен и в аналитике остаётся.
+  it('Qwen: архивная сессия (chats/archive) тоже считается', async () => {
+    const ts = recent();
+    write(chat(), [qUser(ts), qTelemetry(ts, 'c1', 10, 0, 1)]);
+    write(join(home, 'projects', 'c--work-qwen-demo', 'chats', 'archive', 'dropped.jsonl'), [
+      qUser(ts),
+      qTelemetry(ts, 'a1', 500, 0, 5),
+    ]);
+    const result = await scanAnalytics(home, options('qwen'));
+    expect(result.scannedFiles).toBe(2);
+    expect(result.overall).toMatchObject({ input: 510, requests: 2 });
+  });
+
   it('обрезанная последняя строка идущей сессии не роняет разбор', async () => {
     const ts = recent();
     write(rollout(), [codexMeta(ts), turn(ts, 't1', 'gpt-5'), record(ts, 't1', 'r', 10, 0, 1)]);

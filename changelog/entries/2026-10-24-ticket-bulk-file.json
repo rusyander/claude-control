@@ -1,0 +1,48 @@
+{
+  "title": {
+    "ru": "Предложенные группами тикеты разбираются разом: в Jira без повторов или в новом чате",
+    "en": "Tickets suggested by groups are handled at once: into Jira without duplicates, or in a new chat"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В заголовке раздела «Предложить тикет» хаба появилась кнопка «Разобрать…». Окно показывает, сколько предложений открыто, сколько из них повторы и сколько выйдет задач. «Опубликовать в Jira» одним нажатием заводит задачи в выбранный проект: показывает ключи ссылками, а упавшие — с причиной и кнопкой «Повторить упавшие». «Решить здесь» открывает один новый чат проекта с задачей исправить все открытые предложения и отмечает их «Взято в чат». Раньше каждое предложение заводилось отдельно, и десять строк от разных групп превращались в десять задач про три дефекта.",
+        "en": "The hub's «Suggest a ticket» section header has a «Resolve…» button. The dialog shows how many proposals are open, how many of them are duplicates and how many issues will come out. «Publish to Jira» files the issues into the chosen project in one click: it lists the keys as links, and failed ones with the reason and a «Retry failed» button. «Resolve here» opens one new project chat with the task of fixing every open proposal and marks them «Taken into a chat». Before, each proposal was filed on its own, and ten rows from different groups became ten issues about three defects."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Перед заведением панель ищет открытые задачи проекта Jira. Если про дефект задача уже открыта, в неё уходит комментарий с новыми находками, а копия не заводится; в итоге такая строка подписана «уже была открыта — добавлено комментарием». Если поиск не удался, не заводится ничего: «Повторить упавшие» ищет заново.",
+        "en": "Before filing, the panel searches open issues of the Jira project. If an issue about the defect is already open, it gets a comment with the new findings and no copy is filed; in the result such a row reads «already open — added as a comment». If the search fails, nothing is filed, and «Retry failed» searches again."
+      },
+      "how": {
+        "ru": "В каждой задаче и каждом комментарии есть строка отпечатков находок (agentdeck-fp:). По ней задача узнаётся и после того, как её название поправили. Задачу, которую завёл человек, панель узнаёт по близкому названию.",
+        "en": "Every issue and every comment carries a line of finding fingerprints (agentdeck-fp:). By it the issue is recognised even after its title was edited. An issue a human filed is recognised by a close title."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "«Завести» у отдельной строки хаба тоже сначала ищет открытые задачи проекта: если про дефект задача уже открыта, в неё уходит комментарий, а строка подписана «уже была открыта — добавлено комментарием». Если поиск не удался, задача не заводится, и панель показывает причину. Новая задача несёт строку отпечатка, поэтому следующая публикация её узнаёт.",
+        "en": "«File» on a single hub row also searches open issues of the project first: if an issue about the defect is already open, it gets a comment and the row reads «already open — added as a comment». If the search fails, nothing is filed and the panel shows the reason. A new issue carries the fingerprint line, so the next publish recognises it."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Повторы сводятся в один дефект: одинаковое название или место, те же слова в другом порядке и с другими окончаниями, похожий симптом в том же файле. Разные дефекты одного файла собираются в одну задачу, но не сливаются. В задаче на каждый дефект свой раздел: что, где, доказательства, шаги, что ожидалось и что на деле, какие группы нашли и какие повторы сведены. Что склеено, видно и до публикации, и в итоге.",
+        "en": "Duplicates merge into one defect: the same title or place, the same words in another order or with other endings, a similar symptom in the same file. Different defects of one file are gathered into one issue but are not merged. The issue has a section per defect: what, where, evidence, steps, expected and actual behaviour, which groups found it and which duplicates were merged. What was merged is visible both before publishing and in the result."
+      },
+      "how": {
+        "ru": "Сведение, сборку задач и текст описания делает сервер без модели. Модель панели, если доступна, предлагает названия, область, серьёзность и подробности дефекта, но разделить связку или придумать находку не может. Без модели задачи собираются так же, только без области и серьёзности.",
+        "en": "Merging, grouping into issues and the description text are done by the server without a model. The panel's model, when available, suggests titles, area, severity and defect details, but cannot split a group of defects or invent a finding. Without a model the issues are built the same way, only without area and severity."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    }
+  ]
+}

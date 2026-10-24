@@ -6,6 +6,8 @@
 // when the user's own message is about tokens/keys/env: they are then doing this deliberately.
 // Reasons are English: a deny reason is read by the model, not by the user.
 import { consentGate, ASK_THE_USER } from './consent.mjs';
+import { grantStoreWrite } from './spawn-grant.mjs';
+import { deny } from './transcript.mjs';
 
 const SECRET_PATTERNS = [
   { id: 'private-key', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, why: 'a private key' },
@@ -38,6 +40,13 @@ const SECRET_INTENT =
   /(?<![а-яё])(?:токен|ключ|секрет|пароль|кред|переменн)[а-яё]*|\b(?:token|key|secret|password|credential|env)s?\b/i;
 
 export default function secretGuard(input) {
+  // The spawn grant is a credential too: only the human's own prompt may write it. No consent
+  // door and no repeat escape — a model that can open either grants itself.
+  const forged = grantStoreWrite(input);
+  if (forged)
+    return deny(
+      `${forged}: the kit state holds the spawn grant, which only the user's typed prompt may write. Read it without a redirect; to get a grant, ask the user to type it.`,
+    );
   const ti = input?.tool_input ?? {};
   const filePath = String(ti.file_path ?? '');
   const payload = [ti.content, ti.new_string, ti.command].filter(Boolean).join('\n');

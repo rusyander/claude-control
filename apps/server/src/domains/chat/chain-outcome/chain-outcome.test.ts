@@ -267,6 +267,27 @@ describe('chainOutcomeOf: лимит на исходе и вердикт рев�
     ).toBeUndefined();
     expect(chainOutcomeOf({ link: WORK, ok: true, text }).reviewFindings).toBeUndefined();
   });
+
+  it('последний ход ревью без блока — вердикт хода с продолжением из связи (журнал 23.10)', () => {
+    const review: ChatLink = {
+      parentChatId: 'p',
+      createdAt: '',
+      branch: 'b',
+      stage: 'review',
+      reviewVerdict: ['a.ts:1 — x', 'b.ts:2 — y'],
+    };
+    expect(
+      chainOutcomeOf({ link: review, ok: true, text: 'Перепроверил, APPROVE.' }).reviewFindings,
+    ).toBe(2);
+    // Чистый вердикт — тоже вердикт: ноль, а не «вердикта нет».
+    expect(
+      chainOutcomeOf({ link: { ...review, reviewVerdict: [] }, ok: true, text: 'Готово.' })
+        .reviewFindings,
+    ).toBe(0);
+    // Блок последнего хода сильнее записанного.
+    const fresh = ['```agentdeck:review', '{"findings":[]}', '```'].join('\n');
+    expect(chainOutcomeOf({ link: review, ok: true, text: fresh }).reviewFindings).toBe(0);
+  });
 });
 
 describe('chainOutcomeOf: отчёт о ситах', () => {

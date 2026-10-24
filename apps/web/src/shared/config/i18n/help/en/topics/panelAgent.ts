@@ -581,7 +581,9 @@ export const panelAgentEn: typeof panelAgentRu = {
     limitHooks: 'Settings only you change',
     limitHooksText:
       'The config directory, revealing secrets, backups before writing and their encryption, ' +
-      'rule auto-approval, the auto permission mode in every chat, the prompt gate, model prices, the gateway port and remote access are ' +
+      'rule auto-approval, the auto permission mode in every chat, the prompt gate, model prices, the gateway port, remote access, ' +
+      'group economy, the group-watch thresholds, the D-n timings (minutes before a card ' +
+      'moves to «Awaiting decision» and days an item waits) and answers from Telegram are ' +
       'not changed by the agent — it asks you to do it in «Settings». The agent writes hooks, ' +
       'but read the hook command in full on the card: Claude Code will run it.',
     limitStartChat: 'Starting a chat',

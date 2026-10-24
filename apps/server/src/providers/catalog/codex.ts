@@ -106,6 +106,43 @@ export const codexProvider: ConfigProvider = {
   // зарегистрирован в `domains/groups/run-layer/run-layer.ts`, прогон получает честное
   // «слоя нет», а не тумблер каталогов Claude.
   groupLayer: 'codex-overlay',
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, таблица §1). Ключи —
+  // `-c` на запуск (`economy-run/codex.ts` → `kit/codex.ts`): конфиг человека цел.
+  // Имена обоих ключей сверены со списком полей конфига в бинарнике codex-cli 0.155.1.
+  groupEconomy: {
+    channel: 'codex',
+    support: {
+      // `model_auto_compact_token_limit` — порог в токенах, тот же рычаг, что окно Claude.
+      compactWindow: { support: 'native' },
+      // `tool_output_token_limit` — ОДИН предел на все инструменты: из обоих рычагов
+      // берётся больший, max(ceil(знаки оболочки / 4), токены чтения) (решение O2),
+      // чтобы предел оболочки не урезал чтение. Ноль у любого из двух — ключа нет.
+      // Ключ уходит, ТОЛЬКО если предел меньше 2500 токенов — собственного предела
+      // Codex (`CODEX_DEFAULT_TOOL_OUTPUT_TOKENS`, замер 0.155.1): больший ключ не
+      // ужал бы, а поднял предел (`economy-run/codex.ts`). Следствие: при чтении по
+      // умолчанию (10 000 токенов) рычаг оболочки ОДИН ключа не даёт никогда — ключ
+      // появляется, лишь когда чтение опущено ниже 2500 и оболочка не выше 9996 знаков.
+      bashOutputChars: { support: 'native' },
+      readOutputTokens: { support: 'native' },
+      // `prompt_cache_options.ttl` есть лишь во вложенной документации, ключа конфига нет.
+      cacheTtl: { support: 'impossible', note: 'economy-note-cache-implicit' },
+      // Контекст редактора у Codex живёт только в TUI (`/ide`, модуль `tui/ide_context`
+      // в бинарнике): app-server и `exec` его сами не подтягивают, а панель шлёт в
+      // `turn/start` лишь текст (`live/codex-session.ts`).
+      detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
+      // Доставка — на младшей модели лестницы (`modelLadder`), а не на «Sonnet»
+      // (`provider-chat/cascade/cheap-deliver.ts`); семейства нет в каталоге, через контур
+      // нет строки карты для неё — модель работы; аккаунт её отверг — доставка заново
+      // на модели работы. Глубина не выше глубины младшей ступени (`medium`).
+      sonnetDeliver: { support: 'emulated' },
+      // Пауза — по времени последней записи переписки Codex; решает панель.
+      freshOnColdResume: { support: 'emulated' },
+      // Скрытый пинг поменял бы отпечаток живой сессии, а наценки за запись у OpenAI нет.
+      keepWarm: { support: 'disproportionate', note: 'economy-note-keep-warm-cost' },
+      // Строка привычек — нейтральная часть той же строки, что у Claude.
+      workHabits: { support: 'emulated' },
+    },
+  },
   // Ассистент Codex: API — OpenAI (ключ OPENAI_API_KEY), есть рабочий CLI (`codex`).
   // One-shot: `codex exec <prompt>` — неинтерактивный запуск (флаг задокументирован).
   assistant: {

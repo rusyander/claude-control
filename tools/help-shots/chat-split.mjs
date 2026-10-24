@@ -476,6 +476,9 @@ export async function shootSplit(browser, web, scenario) {
       .first()
       .click();
     await page.waitForTimeout(2000);
+    // Раздел свёрнут до заголовка — для кадра его раскрывают, как человек.
+    await page.locator('[data-hub-overlap] button[aria-expanded="false"]').first().click();
+    await page.waitForTimeout(300);
     // Поля почти нет: над панелью идёт строка группы, и на обычном поле она
     // попадала в кадр обрезанной наполовину.
     await scenario.shot(page, '05-overlap', { clip: '[data-hub-overlap]', padding: 4 });

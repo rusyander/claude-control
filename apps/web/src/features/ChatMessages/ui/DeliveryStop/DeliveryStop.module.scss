@@ -1,0 +1,71 @@
+.stop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  overflow-wrap: anywhere;
+}
+
+// Группа остановлена и сама не продолжит (F-23) — плашка «ждёт вас»: это не
+// сбой, пункты закроет агент, но продолжить группу должен человек.
+.stopWait {
+  border-left-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+}
+
+// Есть пункт только для человека (мерж, разрушительная операция, доступ) —
+// плашка беды, как у сбоя группы (GroupText `.problem`).
+.stopHuman {
+  border-left-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  margin: var(--spacing-3xs) 0 0;
+  padding-left: calc(12px + var(--spacing-xs));
+  color: var(--color-fg);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-normal);
+}
+
+// Имя сита или блока — первое, за что цепляется глаз в строке.
+.name {
+  font-weight: 600;
+}
+
+// «Что сделать» — своей строкой под пунктом, тише текста пункта.
+.todo {
+  display: block;
+  color: var(--color-fg-muted);
+}
+
+// Над растянутой кнопкой карточки (её ::after накрывает тело): иначе нажатие
+// открывало бы чат группы вместо списка.
+.more {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  padding: 2px var(--spacing-3xs);
+  margin-left: calc(12px + var(--spacing-xs) - var(--spacing-3xs));
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}

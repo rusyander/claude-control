@@ -3,7 +3,9 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { StatusDot } from '@shared/ui/status-dot';
 import { cn } from '@shared/lib/cn';
-import { serverFieldText } from '@shared/config/i18n';
+import { Typography } from '@shared/ui/typography';
+import { serverFieldList, serverFieldText } from '@shared/config/i18n';
+import { HubFold } from '../HubFold/HubFold';
 import { GroupCopyCleanup } from '../GroupCopyCleanup/GroupCopyCleanup';
 import { GroupControl } from '../GroupControl/GroupControl';
 import { GroupAcceptance } from '../GroupAcceptance/GroupAcceptance';
@@ -11,6 +13,7 @@ import { GroupRecheck } from '../GroupRecheck/GroupRecheck';
 import { SplitTasksMove } from '../SplitTasksMove/SplitTasksMove';
 import { GroupAutoNotices } from '../GroupAutoNotices/GroupAutoNotices';
 import { GroupText } from '../GroupText/GroupText';
+import { GroupHead } from '../GroupText/GroupHead';
 import { GroupAsk } from '../GroupAsk/GroupAsk';
 import { GroupSignals } from '../GroupSignals/GroupSignals';
 import { MergeOrderChip } from '../MergeOrderChip/MergeOrderChip';
@@ -18,6 +21,7 @@ import type { GroupCardProps } from './GroupCard.types';
 import styles from './GroupCard.module.scss';
 import { isMrSettled } from '../../lib/isMrSettled';
 import { hubBucket } from '../../lib/hubBucket';
+import { deliveryStopOf } from '../../lib/deliveryStop';
 import { statusTone } from '../../lib/statusTone';
 import { HoldAnswer } from './HoldAnswer/HoldAnswer';
 import { GroupProgress } from '../GroupProgress/GroupProgress';
@@ -25,8 +29,9 @@ import { RunInputs } from '../RunInputs/RunInputs';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 
 /**
- * Карточка группы в хабе родителя (владелец 05.10.2026): текст слева, все
- * кнопки ЭТОЙ группы — в её же карточке, справа сверху. Кнопками-соседями под
+ * Карточка группы в хабе родителя (владелец 05.10.2026): все кнопки ЭТОЙ
+ * группы — в её же карточке, справа в ряду названия; тело — под этим рядом во
+ * всю ширину (22.10.2026). Кнопками-соседями под
  * строкой они читались как кнопки следующей группы. Клик по карточке открывает
  * чат группы (растянутая кнопка под текстом), а MR — только своей кнопкой:
  * ссылка внутри кликабельной строки уводила то в MR, то в чат.
@@ -44,6 +49,7 @@ export function GroupCard({
   resumeInterruptedBusy,
   questions,
   onAnswer,
+  sectionsOpen = false,
 }: GroupCardProps) {
   const { t } = useTranslation();
   const chatId = group.chatId;
@@ -55,13 +61,26 @@ export function GroupCard({
     ? 'chat.cascade.hub.pr'
     : 'chat.cascade.hub.mr';
   const cleanup = group.copy && parentChatId ? group.copy : undefined;
+  const watchSignals = group.watchSignals?.length ? group.watchSignals : undefined;
+  // Чего не хватило до доставки по фактам git — пунктами, свёрнуто (владелец
+  // 22.10.2026): одной строкой через «;» список в десяток пунктов занимал пол-
+  // карточки. В подвале, а не в тексте: текст лежит внутри кнопки «открыть чат».
+  // Остановленная на доставке группа показывает те же пункты в теле
+  // (`DeliveryStop`) — второй раз свёрнутым разделом они не нужны.
+  const missing = deliveryStopOf(group) ? [] : serverFieldList(group, 'deliveryMissing');
   const release =
     !chatId && group.pending === 'waiting' && group.groupIndex !== undefined && onRelease;
   const settled = isMrSettled(group) ? group.mrClosed : undefined;
   // Принятая человеком — своим фоном (владелец 09.10.2026): «Принять» должно
   // быть видно с первого взгляда, а не только по подписи кнопки. Влитый MR
   // важнее: с ним группа кончена совсем, и красится она зелёным.
-  const accepted = !settled && hubBucket(group) === 'accepted';
+  const bucket = hubBucket(group);
+  const accepted = !settled && bucket === 'accepted';
+  // Ждёт человека или упала — своей полосой слева (владелец 22.10.2026: что
+  // требует меня, должно читаться с первого взгляда по ленте карточек).
+  // Ждёт решения по D-n — тоже человек, хоть остальная работа и сделана.
+  const needsHuman = !settled && (bucket === 'ask' || bucket === 'deferred');
+  const failed = !settled && bucket === 'failed';
 
   return (
     <div
@@ -71,12 +90,18 @@ export function GroupCard({
         settled === 'merged' && styles.groupMerged,
         settled === 'closed' && styles.groupClosed,
         accepted && styles.groupAccepted,
+        needsHuman && styles.groupAsk,
+        failed && styles.groupFailed,
       )}
       data-hub-row={chatId ? 'chat' : group.pending}
+      data-hub-bucket={bucket}
       {...(settled ? { 'data-hub-settled': settled } : {})}
       {...(accepted ? { 'data-hub-accepted': '' } : {})}
     >
-      <div className={styles.groupBody}>
+      {/* Верхний ряд: название с фишками слева, кнопки группы справа. Тело —
+          под ним во всю ширину карточки (владелец 22.10.2026): колонка кнопок
+          справа во всю высоту сжимала текст до трети, и числа шли столбиком. */}
+      <div className={styles.groupHead}>
         <div className={styles.groupMain}>
           {/* Идущий прогон пульсирует, законченное звено стоит ровно; у группы
               без чата точка ровная всегда: она ждёт, чего — сказано текстом. */}
@@ -89,6 +114,8 @@ export function GroupCard({
               )}
             />
           </span>
+          {/* Растянутая кнопка несёт название, а её ::after накрывает всю
+              карточку — тело ниже открывает чат тем же кликом. */}
           {openable && chatId ? (
             <button
               type="button"
@@ -97,10 +124,10 @@ export function GroupCard({
               data-hub-open
               onClick={() => onOpen?.(chatId)}
             >
-              <GroupText group={group} step={<GroupProgress chatId={chatId} group={group} />} />
+              <GroupHead group={group} />
             </button>
           ) : (
-            <GroupText group={group} />
+            <GroupHead group={group} />
           )}
         </div>
 
@@ -174,16 +201,49 @@ export function GroupCard({
         </div>
       </div>
 
+      <div className={styles.groupBody}>
+        <GroupText
+          group={group}
+          {...(openable && chatId ? { step: <GroupProgress chatId={chatId} group={group} /> } : {})}
+        />
+      </div>
+
       {/* Что под карточкой — во всю её ширину и над растянутой кнопкой:
           форма ответа, отметка уборки копии, предупреждения панели. */}
-      {(asks || cleanup?.cleaned || group.hold || group.autoNotices || group.watchSignals) && (
+      {/* Пустой список сигналов — не повод для подвала: пустой блок дал бы лишний отступ. */}
+      {(asks ||
+        cleanup?.cleaned ||
+        group.hold ||
+        group.autoNotices ||
+        watchSignals ||
+        missing.length > 0) && (
         <div className={styles.groupFoot}>
           {asks && onAnswer && (
             <GroupAsk questions={asks} stage={group.stages.at(-1)} onAnswer={onAnswer} />
           )}
-          {group.watchSignals && (
+          {missing.length > 0 && (
+            <div className={styles.missing} data-hub-delivery-missing={missing.length}>
+              <HubFold
+                title={t('chat.cascade.hub.deliveryMissing', { count: missing.length })}
+                hint={t('chat.cascade.hub.deliveryMissingHint')}
+                defaultExpanded={sectionsOpen}
+                tone="warning"
+              >
+                <ul className={styles.missingList}>
+                  {missing.map((line, index) => (
+                    <li key={index}>
+                      <Typography variant="caption" color="muted" as="span">
+                        {line}
+                      </Typography>
+                    </li>
+                  ))}
+                </ul>
+              </HubFold>
+            </div>
+          )}
+          {watchSignals && (
             <GroupSignals
-              signals={group.watchSignals}
+              signals={watchSignals}
               {...(onOpen ? { onOpen: (target: string) => onOpen(target) } : {})}
             />
           )}

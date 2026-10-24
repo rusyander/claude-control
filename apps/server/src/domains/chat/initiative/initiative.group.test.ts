@@ -2,12 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { HANDOFF_BLOCK_LANG, HANDOFF_SYSTEM_PROMPT } from '@agentdeck/contracts/chat-handoff';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
 import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
+import { WORK_HABITS_SHARED_NOTE } from '../group-profile/group-profile.ts';
 import {
   BACKGROUND_PROMPT,
   CHILD_PROMPT,
   FOREIGN_CHILD_PROMPT,
+  FOREIGN_GROUP_ECONOMY_PROMPT,
   GROUP_ECONOMY_PROMPT,
   GROUP_LSP_PROMPT,
+  NO_TOOL_LOOP_ECONOMY_PROMPT,
   SPLIT_FOREGROUND_PROMPT,
   QUESTION_PROMPT,
   STEER_PROMPT,
@@ -54,8 +57,50 @@ describe('дописка группы разделения', () => {
    * +170 — правка через Edit, не оболочкой (журнал 19.10 19:42–19:50).
    */
   it('правила группы в чужом CLI — не длиннее 2170 знаков', () => {
-    expect(`${FOREIGN_CHILD_PROMPT} ${GROUP_ECONOMY_PROMPT}`.length).toBeLessThanOrEqual(2170);
-    expect(`${FOREIGN_CHILD_PROMPT} ${GROUP_ECONOMY_PROMPT}`).not.toContain('LSP');
+    const foreign = `${FOREIGN_CHILD_PROMPT} ${FOREIGN_GROUP_ECONOMY_PROMPT}`;
+    expect(foreign.length).toBeLessThanOrEqual(2170);
+    expect(foreign).not.toContain('LSP');
+  });
+
+  /**
+   * С тумблером «привычки работы» (22.10) звено чужого CLI получает ещё и общую
+   * часть заметки о привычках — `foreignChildExtra` склеивает её третьей: +340.
+   * Потолок меряет то, что реально едет в каждом вызове, а не две строки из трёх.
+   */
+  it('правила группы в чужом CLI с привычками работы — не длиннее 2510 знаков', () => {
+    const foreign = [
+      FOREIGN_CHILD_PROMPT,
+      FOREIGN_GROUP_ECONOMY_PROMPT,
+      WORK_HABITS_SHARED_NOTE,
+    ].join(' ');
+    expect(foreign.length).toBeLessThanOrEqual(2510);
+  });
+
+  /**
+   * План экономии чужих CLI (22.10): инструмента `Edit` у чужого CLI нет — его
+   * вариант строки называет правку без имени, а строка Claude не меняется.
+   */
+  it('строка экономии чужого CLI — без имени инструмента Edit, остальное то же', () => {
+    expect(FOREIGN_GROUP_ECONOMY_PROMPT).not.toContain('with Edit');
+    expect(FOREIGN_GROUP_ECONOMY_PROMPT).toContain('edit files (one call per file');
+    expect(GROUP_ECONOMY_PROMPT).toContain('edit with Edit (one call per file');
+    expect(FOREIGN_GROUP_ECONOMY_PROMPT.replace('edit files (', 'edit with Edit (')).toBe(
+      GROUP_ECONOMY_PROMPT,
+    );
+  });
+
+  /**
+   * CLI без цикла инструментов (aider, 23.10): из строки экономии — только тетрадь и
+   * задачи трекера, вырезкой из той же строки; переформулировка строки Claude, сдвинувшая
+   * опоры вырезки, ловится здесь, а не пустой или чужой строкой у aider.
+   */
+  it('строка экономии без цикла инструментов — тетрадь и задачи трекера, ничего больше', () => {
+    expect(NO_TOOL_LOOP_ECONOMY_PROMPT).toBe(
+      'Each fact you had to find out (stand access, commands, ports, places, decisions): one ' +
+        `line into ${TASK_NOTEBOOK}, never a secret; read it before searching again. Tracker ` +
+        `tasks: read ${TASK_TICKETS} first.`,
+    );
+    expect(GROUP_ECONOMY_PROMPT).toContain(NO_TOOL_LOOP_ECONOMY_PROMPT);
   });
 
   /** 9.5: задачи трекера панель кладёт в копию — группа читает файл раньше трекера. */

@@ -280,6 +280,10 @@ export function registerProjectGitRoutes(
    * Запустить бутстрап копии в фоне. Ответ на запрос его не ждёт: установка
    * идёт минуты, а карточка копии читает состояние из списка. Пустая команда
    * (ни настроенной, ни lock-файла) — тишина, не ошибка.
+   *
+   * Синхронно (L5, ревью 23.10): между проверкой «уже идёт» и запуском нет
+   * ожидания, иначе второй запрос в этот промежуток получал 200. Снимок грязного
+   * дерева до установки (F-64) делает сам реестр — обвязка `PREP_TREE_HOOKS`.
    */
   const startBootstrap = (path: string, copy: string): string | undefined => {
     const plan = bootstrapPlanFor(copy, ctx.store.getWorktreeMirror(path).bootstrap);

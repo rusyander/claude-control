@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
+import type { InboxChat, InboxDeferred } from '@agentdeck/contracts/chat-inbox';
 import { Button, Chips, Empty, Icon, Loading, Segmented } from '../../src/shared/ui';
 import { colors, font, space } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
@@ -27,6 +27,9 @@ import { pendingCount } from '../../src/entities/inbox/pendingCount';
 import { staleSent } from '../../src/entities/inbox/staleSent';
 import type { QuestionCardData } from '../../src/entities/inbox/questionCards';
 import { questionCards } from '../../src/entities/inbox/questionCards';
+import { openDeferred, waitingDeferred } from '../../src/entities/inbox/deferred';
+import { useInboxDeferred } from '../../src/entities/inbox/deferredApi';
+import { DeferredSection } from '../../src/features/inbox/DeferredSection/DeferredSection';
 
 type HomeTab = 'chats' | 'questions';
 
@@ -55,6 +58,12 @@ export default function HomeScreen() {
   const groups = useMemo(() => projectGroups(chats, sent), [chats, sent]);
   const cards = useMemo(() => questionCards(chats, sent), [chats, sent]);
   const pending = useMemo(() => pendingCount(chats, sent), [chats, sent]);
+  // D-n агента не держат (он работает дальше), поэтому в «ждут ответа» и на
+  // нижнюю вкладку они не идут; на вкладке «Вопросы» — своим числом в её
+  // значке, иначе запись, ждущую решения, на телефоне не заметить.
+  const deferredQuery = useInboxDeferred(configured);
+  const deferred = useMemo(() => deferredQuery.data ?? [], [deferredQuery.data]);
+  const deferredWaiting = waitingDeferred(deferred);
   const running = groups.reduce((sum, group) => sum + group.running, 0);
   const projects = groups.filter((group) => !group.isSandbox).length;
 
@@ -113,7 +122,7 @@ export default function HomeScreen() {
               value: 'questions',
               label: t.home.tabQuestions,
               a11y: t.home.tabQuestionsA11y(pending),
-              badge: pending,
+              badge: pending + deferredWaiting,
             },
           ]}
           value={tab}
@@ -194,25 +203,28 @@ export default function HomeScreen() {
         ) : null}
 
         {loaded && tab === 'questions' ? (
-          <QuestionsTab cards={cards} now={now} onOpen={open} />
+          <QuestionsTab cards={cards} deferred={deferred} now={now} onOpen={open} />
         ) : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/** Вкладка «Вопросы» — карточка на чат или пустое состояние. */
+/** Вкладка «Вопросы» — список D-n сверху, карточка на чат или пустое состояние. */
 function QuestionsTab({
   cards,
+  deferred,
   now,
   onOpen,
 }: {
   cards: readonly QuestionCardData[];
+  deferred: readonly InboxDeferred[];
   now: number;
   onOpen: (chat: InboxChat) => void;
 }) {
   const t = useT();
-  if (cards.length === 0) {
+  const hasDeferred = openDeferred(deferred).length > 0;
+  if (cards.length === 0 && !hasDeferred) {
     return (
       <Empty
         title={t.home.noQuestions}
@@ -225,6 +237,7 @@ function QuestionsTab({
   }
   return (
     <>
+      <DeferredSection items={deferred} now={now} />
       {cards.map((card) => (
         <AskCard
           key={stableChatKey(card.chat)}

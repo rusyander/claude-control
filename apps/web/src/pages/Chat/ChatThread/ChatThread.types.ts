@@ -48,6 +48,8 @@ export interface ChatThreadProps {
   /** Ключ прогона этого разговора: по нему уходят права и повтор. */
   chatId?: string;
   permissions: PendingPermission[];
+  /** Карточки прав, отложенные как D-n (агент работает дальше): ответ — тем же маршрутом. */
+  deferredPermissions?: PendingPermission[];
   /** Ворота ветки: первая правка в основной копии ждёт решения человека. */
   branchGates: PendingBranchGate[];
   /** Дописанное, ждущее конца хода: лента рисует его пузырём-призраком. */

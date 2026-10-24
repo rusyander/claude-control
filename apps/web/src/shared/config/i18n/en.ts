@@ -22,6 +22,8 @@ import { contourConfigEn } from './contour-config/en.ts';
 import { presetsEn } from './presets/en.ts';
 import { localModelsEn } from './local-models/en.ts';
 import { kitEn } from './kit/en.ts';
+import { telegramAnswersEn } from './telegram-answers/en.ts';
+import { deferredAsksEn } from './deferred-asks/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
@@ -44,9 +46,11 @@ export const en: TranslationSchema = {
   chatProjects: chatProjectsEn,
   watcher: watcherEn,
   mascot: mascotEn,
+  telegramAnswers: telegramAnswersEn,
   groupWatch: groupWatchEn,
   usageLimits: usageLimitsEn,
   devRestart: devRestartEn,
+  deferredAsks: deferredAsksEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
   /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/en.ts`. */
@@ -1027,6 +1031,12 @@ export const en: TranslationSchema = {
           'This group’s commit, push, MR and sieves run on Sonnet. Work, review and fixes ' +
           'stay on the group’s own model. Clear it for a group whose delivery its own model ' +
           'should do; the default follows Settings → Split group economy.',
+        sonnetDeliverRouted: 'Delivery on Sonnet — {{model}} by the contour map',
+        sonnetDeliverHintRouted:
+          'Through the "{{title}}" contour, delivery follows the model map’s "sonnet" row — ' +
+          'onto {{model}}. This group’s commit, push, MR and sieves run on it; work, review and ' +
+          'fixes stay on the group’s own model. Without that row the lever has no effect ' +
+          'through the contour.',
       },
       triageStarted: 'Split triage started — the groups start on its verdict',
       triageDeferred: 'Tree paused — the triage is created, it starts on “Resume all”',
@@ -1146,6 +1156,10 @@ export const en: TranslationSchema = {
           ask_few: 'waiting for you: {{count}}',
           ask_many: 'waiting for you: {{count}}',
           ask_other: 'waiting for you: {{count}}',
+          deferred_one: 'awaiting decision: {{count}}',
+          deferred_few: 'awaiting decision: {{count}}',
+          deferred_many: 'awaiting decision: {{count}}',
+          deferred_other: 'awaiting decision: {{count}}',
           queued_one: 'queued: {{count}}',
           queued_few: 'queued: {{count}}',
           queued_many: 'queued: {{count}}',
@@ -1163,6 +1177,10 @@ export const en: TranslationSchema = {
           idle_many: 'stopped: {{count}}',
           idle_other: 'stopped: {{count}}',
           elapsed: 'elapsed {{time}}',
+          keepWarmSaved: 'cache warming: saved ≈ {{tokens}} tokens',
+          keepWarmLost: 'cache warming: overpaid ≈ {{tokens}} tokens',
+          keepWarmHint:
+            'Sum of cache-warming results over groups whose wait is settled (groups: {{count}}), in tokens at input price. Waits without a result are not counted',
           idleHint:
             'No run and no outcome: waiting on background work, a retry or delivery, stopped, or paused before its chat',
         },
@@ -1213,18 +1231,79 @@ export const en: TranslationSchema = {
           delivery: 'panel is checking delivery',
           interrupted: 'interrupted',
           limit: 'subscription limit',
+          'human-op': 'awaiting decision: D-n',
         },
         failed: 'did not start: {{message}}',
         stopped: 'stopped: {{message}}',
-        deliveryMissing: 'missing for the MR: {{list}}',
+        deliveryStop: {
+          stopped_one: 'Delivery stopped — {{count}} item',
+          stopped_few: 'Delivery stopped — {{count}} items',
+          stopped_many: 'Delivery stopped — {{count}} items',
+          stopped_other: 'Delivery stopped — {{count}} items',
+          action: {
+            stalled:
+              'A reminder moved nothing and the panel no longer reminds. See what holds the group and continue it with a word in its chat — the agent closes the items.',
+            nudgeCap:
+              'Reminder cap reached: the group was moving but did not finish, and the panel no longer reminds. Continue it with a word in its chat — the agent closes the items.',
+            escalationStalled:
+              'The diagnosis on a stronger model moved nothing either — a human is needed. Look at the items and continue the group with a word in its chat.',
+            retryCap:
+              'The panel retried delivery on its own up to its cap and did not finish. Look at the items and continue the group with a word in its chat — the agent closes them.',
+            stopped:
+              'The group has stopped and will not resume by itself. Continue it with a word in its chat — the agent closes the items.',
+          },
+          humanOnly_one: 'Delivery is waiting for you — {{count}} item',
+          humanOnly_few: 'Delivery is waiting for you — {{count}} items',
+          humanOnly_many: 'Delivery is waiting for you — {{count}} items',
+          humanOnly_other: 'Delivery is waiting for you — {{count}} items',
+          needMerge: 'Merge of {{mr}} is needed',
+          need: {
+            merge: 'Merge needed: {{action}}',
+            destructive: 'Confirmation needed: {{action}}',
+            credentials: 'Access needed: {{action}}',
+            'corrupt-store':
+              'The git object store of the copy is corrupt — run git fsck --full in it, restore the objects or recreate the copy, then continue the group: {{action}}',
+          },
+          todo: 'to do: {{text}}',
+          more_one: '{{count}} more item',
+          more_few: '{{count}} more items',
+          more_many: '{{count}} more items',
+          more_other: '{{count}} more items',
+          less: 'collapse',
+        },
+        deliveryMissing: 'Missing for the MR: {{count}}',
+        deliveryMissingHint: 'What delivery checks found missing, by git and forge facts',
+        stageNow: 'now',
+        stageLast: 'last stage',
+        stageRepeat: '×{{count}}',
         deliveryNudges: 'delivery reminders: {{count}}',
         testsVerdict: 'Tests block: {{passed}} of {{count}} green',
         testsNone: 'Tests block: the diff touched no automated cases',
         tokens: {
-          usage:
-            'tokens: start {{cold}} · turns {{turns}} · average context {{avg}} · from cache {{cache}}% · compactions {{compactions}} · instructions {{instructions}}%',
-          median: 'project median start {{median}}',
+          title: 'Tokens',
+          rowUsage: 'Sessions',
+          rowKeepWarm: 'Warming',
+          metric: {
+            coldStart: 'First request',
+            avgCtx: 'Average window',
+            cache: 'From cache',
+            instructions: 'Instructions in window',
+            turns: 'Turns',
+            compactions: 'Compactions',
+            sessions: 'Sessions',
+            pings: 'Pings',
+            hits: 'Cache hits',
+            misses: 'Misses',
+            read: 'Read',
+            write: 'Written',
+          },
+          percent: '{{value}}%',
+          median: 'project median {{median}}',
           duplicates: 'same instruction text under different paths: {{list}}',
+          keepWarmSaved: 'saved ≈ {{tokens}} tokens at input price',
+          keepWarmLost: 'overpaid ≈ {{tokens}} tokens at input price',
+          keepWarmPending:
+            'the current wait costs ≈ {{tokens}} tokens at input price; whether it paid off shows when the group resumes',
           flag: {
             'cold-start': 'start heavier than usual for the project',
             compactions: 'many compactions',
@@ -1242,6 +1321,8 @@ export const en: TranslationSchema = {
         interruptedAt: 'process cut short at {{time}}',
         interruptResumes: 'resumed by the panel: {{count}}',
         autoNotices: 'Allowed automatically: {{list}}',
+        autoAnswers: 'Answered automatically: {{list}}',
+        autoAnswerFree: 'free answer — decide yourself',
         autoNoticesDismiss: 'Dismiss',
         resumeInterrupted: 'Resume',
         resumeAllInterrupted: 'Resume interrupted ({{count}})',
@@ -1427,7 +1508,7 @@ export const en: TranslationSchema = {
           title_few: 'Suggested tickets: {{count}}',
           title_many: 'Suggested tickets: {{count}}',
           title_other: 'Suggested tickets: {{count}}',
-          hint: 'Defects outside the groups’ tasks found along the way. The panel does not file tickets — copy and file them yourself',
+          hint: 'Defects outside the groups’ tasks found along the way. Copy them, file one by one, or handle all at once — «Resolve…»',
           foundBy: 'found by: {{groups}}',
           copy: 'Copy',
           copied: 'Copied',
@@ -1437,7 +1518,81 @@ export const en: TranslationSchema = {
           fileAsk: 'File an issue in {{project}}?',
           fileConfirm: 'File',
           filed: 'Filed: {{key}}',
+          filedCommented: '{{key}}: already open — added as a comment',
           fileFailed: 'Could not file: {{message}}',
+          taken: 'Taken into a chat',
+          resolve: {
+            action: 'Resolve…',
+            hint: 'All open proposals at once: publish to Jira or resolve in a new chat',
+            title: 'Resolve suggested tickets',
+            open_one: '{{count}} open proposal.',
+            open_few: '{{count}} open proposals.',
+            open_many: '{{count}} open proposals.',
+            open_other: '{{count}} open proposals.',
+            duplicates_one: '{{count}} of them is an obvious duplicate and goes with the original.',
+            duplicates_few: '{{count}} of them are obvious duplicates and go with the originals.',
+            duplicates_many: '{{count}} of them are obvious duplicates and go with the originals.',
+            duplicates_other: '{{count}} of them are obvious duplicates and go with the originals.',
+            duplicateOf: 'same: {{title}}',
+            planned_one:
+              '{{count}} issue to file — before the model pass and the check against open Jira issues.',
+            planned_few:
+              '{{count}} issues to file — before the model pass and the check against open Jira issues.',
+            planned_many:
+              '{{count}} issues to file — before the model pass and the check against open Jira issues.',
+            planned_other:
+              '{{count}} issues to file — before the model pass and the check against open Jira issues.',
+            bundleFiles: 'one issue — shared file {{files}}',
+            explain:
+              '«Publish to Jira» — duplicates merge into one defect, defects of one file into one issue with a section each (what, where, evidence, expected and actual); the model adds titles, area and severity. Before filing, the panel searches open issues of the Jira project: what is already open gets a comment, not a copy. This click is the consent. «Resolve here» — a new chat in this project with the task of fixing every open proposal; they get marked «taken into a chat».',
+            site: 'Jira: {{site}}',
+            project: 'Project',
+            projectFrom: {
+              bound: 'linked to the panel project',
+              last: 'picked last time',
+              first: 'first in the Jira list',
+            },
+            issueType: 'Issue type',
+            targetLoading: 'Reading Jira projects…',
+            targetFailed: 'Jira did not answer: {{message}}',
+            offline:
+              'Jira is not connected — nowhere to publish. Connect it in settings, «Integrations»; «Resolve here» works without it.',
+            offlineShort: 'Jira is not connected',
+            noProjects: 'No Jira projects available',
+            noTarget: 'No Jira project selected',
+            nothingOpen: 'No open proposals',
+            connect: 'Connect Jira',
+            publish: 'Publish to Jira',
+            publishHint:
+              'The model groups the proposals into issues and the panel files them right away — there is no separate confirmation',
+            take: 'Resolve here',
+            takeHint: 'A new chat in this project with a task built from every open proposal',
+            created_one: '{{count}} issue filed',
+            created_few: '{{count}} issues filed',
+            created_many: '{{count}} issues filed',
+            created_other: '{{count}} issues filed',
+            merged_one: '{{count}} proposal',
+            merged_few: '{{count}} proposals',
+            merged_many: '{{count}} proposals',
+            merged_other: '{{count}} proposals',
+            existing: 'already filed',
+            commented: 'already open — added as a comment',
+            defectMerged: 'merged: {{titles}}',
+            failed_one: '{{count}} issue was not filed — its proposals stay open',
+            failed_few: '{{count}} issues were not filed — their proposals stay open',
+            failed_many: '{{count}} issues were not filed — their proposals stay open',
+            failed_other: '{{count}} issues were not filed — their proposals stay open',
+            fallback:
+              'The model is unavailable: issues were built without it — duplicates together, defects of one file in one issue; no area or severity.',
+            retry: 'Retry failed',
+            close: 'Close',
+            takenToast_one: 'Chat started: {{count}} proposal',
+            takenToast_few: 'Chat started: {{count}} proposals',
+            takenToast_many: 'Chat started: {{count}} proposals',
+            takenToast_other: 'Chat started: {{count}} proposals',
+            publishFailed: 'Could not publish: {{message}}',
+            takeFailed: 'The chat did not start: {{message}}',
+          },
         },
         humanSteps: {
           title_one: 'For you to do: {{count}}',
@@ -1625,6 +1780,7 @@ export const en: TranslationSchema = {
     messageCrash: 'This message could not be rendered. The rest of the conversation is intact.',
     branchSwitched: 'Switched to branch {{branch}}',
     showFromHistory: 'Show from the history',
+    keepColdSession: 'Continue the old conversation',
     detachedNotice:
       'The panel restarted: this run was picked up without its output stream. The answer is read from the conversation, permission requests still work.',
     progress: {
@@ -1760,6 +1916,8 @@ export const en: TranslationSchema = {
     platformModel: 'Through the "{{title}}" contour: {{model}}.',
     platformModelReplaced:
       'Through the "{{title}}" contour: no "{{asked}}" there, the request goes with {{model}}.',
+    platformModelMapped:
+      'Through the "{{title}}" contour: "{{asked}}" by the contour map — {{model}}.',
     platformModelUnset:
       'The "{{title}}" contour assigned no model (empty catalog, or the probe never ran) — the request goes as it is.',
     platformNoEffort: 'The "{{title}}" contour takes no reasoning effort — it is not sent.',
@@ -4012,9 +4170,10 @@ export const en: TranslationSchema = {
       },
       'shim-no-cache': {
         name: 'The tool list is paid for on every turn',
-        how: 'Tool schemas travel in every request: the contour has no prompt cache. Measured on real runs: 24 tools — 58 thousand characters of system text and 86 KB per request on every turn (`claude -p` through the gateway), 108,546 characters and 154 KB on an interactive run with the full CLI prompt. Same order either way — tens of kilobytes for every step the agent takes; which is why a run through a contour uses the panel’s short prompt by default instead of the CLI’s.',
-        why: 'A prompt cache is a vendor API feature and the contour has none; the panel will not trim schemas on the client’s behalf — a trimmed schema breaks the call silently.',
-        revisitWhen: 'If the contour gains a prompt cache or accepts tools as a separate field.',
+        how: 'Tool schemas travel in every request. Measured on real runs: 24 tools — 58 thousand characters of system text and 86 KB per request on every turn (`claude -p` through the gateway), 108,546 characters and 154 KB on an interactive run with the full CLI prompt. For the contour’s Claude models the gateway passes the cache marks on, so from the second turn the schemas are read from the cache at the read price; GPT models cache the start of the request on their own; the contour’s self-hosted models report no cache, and there the schemas are paid in full on every turn. Which is why a run through a contour uses the panel’s short prompt by default instead of the CLI’s.',
+        why: 'The panel will not trim schemas on the client’s behalf — a trimmed schema breaks the call silently; not every contour model has a cache.',
+        revisitWhen:
+          'If the contour starts accepting tools as a separate field or gives its self-hosted models a prompt cache.',
       },
       'media-by-capability': {
         name: 'Images and slides by the declared capability',
@@ -5094,6 +5253,14 @@ export const en: TranslationSchema = {
       '(deletion, rolling back uncommitted work, rewriting history) and your ask/deny rules still ' +
       'wait for you. For models without auto mode (haiku) and other CLIs, the panel’s auto-approve ' +
       'does the same. The permissions toggle in the chat menu beats this setting either way.',
+    deferAfterMinutes: 'Minutes before an unanswered permission card moves to «Awaiting decision»',
+    deferAfterMinutesHint:
+      'The agent is told «queued for the human as D-n» and keeps working, and the call waits for ' +
+      'you in the «Awaiting decision» list. 0 means the card waits as long as it takes. Groups and ' +
+      'an autonomous chat nobody has open defer at once.',
+    deferredTtlDays: 'Days a D-n ask waits for an answer',
+    deferredTtlDaysHint:
+      'After that it expires; an expired one can still be allowed from the list — a fresh grant is issued.',
     chatLeanTools: 'Lean tool set in chats',
     chatLeanToolsHint:
       'On out of the box: Claude chats started from the panel run without the Artifact, Workflow ' +
@@ -5157,6 +5324,22 @@ export const en: TranslationSchema = {
       "group's notes, commits and changes since the main branch, the last answer. Continuing the " +
       'cold conversation would write the whole window again. The previous conversation stays on ' +
       'disk, and the group can search it.',
+    groupKeepWarm: 'Keep the cache warm while a group waits',
+    groupKeepWarmHint:
+      'The group waits for an answer or a permission, is paused or queued for a heavy step: ten ' +
+      'minutes before the one-hour cache expires the panel sends its conversation one short ' +
+      'word. The ping reads the window from the cache and extends it by another hour, so the ' +
+      'continuation does not write the whole window again (sixteen times cheaper in the ' +
+      'measurement). The conversation itself is not changed. No ping with a five-minute cache, ' +
+      'a window under the threshold “Window from which a cold cache is a loss” (set on the ' +
+      '“Split-group watch” card, even with the watch off) or while a subscription limit reset is awaited; ' +
+      'a ping that did not read the window from the cache stops the pings of that wait.',
+    groupKeepWarmPings: 'Pings per wait',
+    groupKeepWarmPingsHint:
+      'After that the cache goes cold, and the continuation starts a new conversation with the ' +
+      "panel's brief.",
+    groupKeepWarmPingsValue: '{{count}} — warm for up to {{hours}} h of waiting',
+    groupKeepWarmPingsDefault: '{{count}} — warm for up to {{hours}} h of waiting (recommended)',
     groupDetachIde: 'Keep groups off the editor',
     groupDetachIdeHint:
       'A panel started from a VS Code terminal handed its groups the editor connection, and every ' +
@@ -5167,6 +5350,20 @@ export const en: TranslationSchema = {
       'without changing folders, narrow command output. The agent reads only what it edits or ' +
       'judges; the line does not suggest subagents. The CLI also stops reminding the agent about a ' +
       'long silence: nobody reads an interim report inside a stage.',
+    groupEconomySupportLabel: 'Where it works:',
+    groupEconomySupportNative: '{{name}} · own setting',
+    groupEconomySupportNativeTitle: "The CLI's own setting",
+    groupEconomySupportConditional: 'with a condition',
+    groupEconomySupportEmulated: '{{name}} · by the panel',
+    groupEconomySupportEmulatedTitle:
+      'The CLI has no setting — the panel does it itself: a line in the task or its own model choice',
+    groupEconomySupportMeaningless: '{{name}} · not needed',
+    groupEconomySupportMeaninglessTitle: 'Nothing for this lever to change in this CLI',
+    groupEconomySupportImpossible: '{{name}} · no setting',
+    groupEconomySupportImpossibleTitle: 'This CLI has no such setting',
+    groupEconomySupportDisproportionate: '{{name}} · not worth it',
+    groupEconomySupportDisproportionateTitle:
+      'The setting exists, but turning it on costs more than it saves',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:
@@ -6833,6 +7030,7 @@ export const en: TranslationSchema = {
         permission: 'Agent asks for rights',
         question: 'Agent asked a question',
         budget: 'Contour budget running out',
+        groupSignal: 'Group watch signal (“attention” and “alarm”)',
       },
       test: 'Send a test message',
       sent: 'Test message sent',

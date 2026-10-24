@@ -201,6 +201,8 @@ export interface NewIssue {
   /** Тип задачи; пусто — «Bug»: панель заводит именно дефекты. */
   issueType?: string;
   labels?: string[];
+  /** Имя приоритета, как его знает эта установка (`listPriorities`); пусто — по умолчанию Jira. */
+  priority?: string;
 }
 
 /**
@@ -228,6 +230,7 @@ export async function createIssue(access: AtlassianAccess, draft: NewIssue): Pro
         issuetype: { name: draft.issueType?.trim() || 'Bug' },
         description: access.deployment === 'cloud' ? toAdf(draft.description) : draft.description,
         ...(draft.labels?.length ? { labels: draft.labels } : {}),
+        ...(draft.priority?.trim() ? { priority: { name: draft.priority.trim() } } : {}),
       },
     },
   });

@@ -4,7 +4,13 @@ import { Toggle } from '@shared/ui/toggle';
 import type { SettingToggleRowProps } from './SettingToggleRow.types';
 
 /** Строка настройки: название, пояснение и переключатель. */
-export function SettingToggleRow({ label, hint, checked, onChange }: SettingToggleRowProps) {
+export function SettingToggleRow({
+  label,
+  hint,
+  checked,
+  disabled,
+  onChange,
+}: SettingToggleRowProps) {
   return (
     // Переключатель прижат к правой границе карточки — так все тумблеры блока
     // стоят в одну колонку и читаются как единый столбец состояний. Ширину
@@ -22,7 +28,12 @@ export function SettingToggleRow({ label, hint, checked, onChange }: SettingTogg
           </Typography>
         )}
       </Stack>
-      <Toggle checked={checked} onCheckedChange={onChange} aria-label={label} />
+      <Toggle
+        checked={checked}
+        onCheckedChange={onChange}
+        aria-label={label}
+        {...(disabled === undefined ? {} : { disabled })}
+      />
     </Stack>
   );
 }

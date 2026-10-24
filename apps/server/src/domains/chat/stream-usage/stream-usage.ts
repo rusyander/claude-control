@@ -100,9 +100,12 @@ export class TurnTracker {
    * время до первого токена, и на локальной модели оно отдельная величина.
    */
   private readonly now: () => number;
+  /** Отдавать начало хода (`turnStart`) — пингу тёплого кэша, чей ход обрывают до его расхода. */
+  private readonly emitStart: boolean;
 
-  constructor(now: () => number = Date.now) {
+  constructor(now: () => number = Date.now, options: { emitStart?: boolean } = {}) {
     this.now = now;
+    this.emitStart = options.emitStart === true;
   }
 
   /** События интерфейса по одной строке потока: расход хода, разделители блоков, остаток. */
@@ -116,13 +119,19 @@ export class TurnTracker {
   private trackStream(event: NonNullable<RawEvent['event']>): ChatEvent[] {
     if (event.type === 'message_start') {
       const message = event.message;
-      this.turn = {
-        id: message?.id ?? '',
-        model: message?.model,
-        start: tokensOf(message?.usage),
-        toolIds: [],
-      };
-      return [];
+      const start = tokensOf(message?.usage);
+      this.turn = { id: message?.id ?? '', model: message?.model, start, toolIds: [] };
+      if (!this.emitStart) return [];
+      return [
+        {
+          kind: 'turnStart',
+          input: start.input,
+          cacheRead: start.cacheRead,
+          cacheCreation: start.cacheCreation,
+          ...(start.cacheCreation1h ? { cacheCreation1h: start.cacheCreation1h } : {}),
+          ...(message?.model ? { model: message.model } : {}),
+        },
+      ];
     }
 
     // Разделитель ставим не на границе блока, а на первом его содержимом:

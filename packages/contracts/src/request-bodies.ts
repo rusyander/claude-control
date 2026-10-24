@@ -123,6 +123,20 @@ export const permissionDecisionBodySchema = object({
 export type PermissionDecisionBody = Infer<typeof permissionDecisionBodySchema>;
 
 /**
+ * Решение человека по отложенному вопросу D-n (`deferred-asks.ts`). `via` —
+ * откуда ответили (окно, телефон, кнопка в Telegram — тем же маршрутом изнутри
+ * процесса): только подпись в списке, не право — кто решает, проверяет
+ * `humanOnly` маршрута по сокету, а не по телу запроса.
+ * Сообщение отказа уходит агенту как есть — потолок держит транскрипт в рамках.
+ */
+export const deferredDecisionBodySchema = object({
+  behavior: zodEnum(['allow', 'deny']),
+  message: string().max(2000).optional(),
+  via: zodEnum(['web', 'mobile', 'telegram']).optional(),
+});
+export type DeferredDecisionBody = Infer<typeof deferredDecisionBodySchema>;
+
+/**
  * Ответ человека воротам ветки. `copy` — завести копию с веткой и продолжить
  * разговор в ней, `here` — писать в основной копии (до конца прогона больше не
  * спрашивать), `stop` — отклонить саму правку.

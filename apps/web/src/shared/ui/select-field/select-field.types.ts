@@ -11,4 +11,6 @@ export interface SelectFieldProps {
   onChange: (value: string) => void;
   options: SelectOption[];
   hint?: string;
+  /** Весь выбор недоступен; причину пишет экран рядом (подпись или `hint`). */
+  disabled?: boolean;
 }

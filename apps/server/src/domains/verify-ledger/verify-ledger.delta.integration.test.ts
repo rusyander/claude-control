@@ -14,8 +14,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 const DIR = resolve(__dirname, '../../../../../tools/verify-ledger');
 const PRELOAD = join(DIR, 'preload.cjs').replace(/\\/g, '/');
 
-const FAKE_VITEST = `console.log('ARGS ' + JSON.stringify(process.argv.slice(2)));
-process.exitCode = Number(process.env.FAKE_EXIT || 0);
+// Код выхода — окружением (оно в ключе и в семействе сужения) или файлом вне репозитория `FAKE_CTL`.
+const FAKE_VITEST = `import fs from 'node:fs';
+console.log('ARGS ' + JSON.stringify(process.argv.slice(2)));
+const ctl = process.env.FAKE_CTL && fs.existsSync(process.env.FAKE_CTL) ? JSON.parse(fs.readFileSync(process.env.FAKE_CTL, 'utf8')) : {};
+process.exitCode = Number(ctl.FAKE_EXIT || process.env.FAKE_EXIT || 0);
 `;
 
 let root: string;
@@ -76,6 +79,9 @@ function vitest(args: string[], env: Record<string, string> = {}): Run {
       NODE_OPTIONS: `--require "${PRELOAD}"`,
       AGENTDECK_VERIFY_LEDGER_HOME: home,
       AGENTDECK_VERIFY_LEDGER: '',
+      // Прогон под панелью приносит её замок — тест сам решает, есть ли он.
+      AGENTDECK_VERIFY_LEDGER_LOCK: '',
+      FAKE_CTL: join(root, 'ctl.json'),
       ...env,
     },
     timeout: 30_000,
@@ -183,6 +189,20 @@ describe('verify-ledger: сужение от последнего зелёног
     expect(vitest(['run'], { AGENTDECK_VERIFY_LEDGER_DELTA: 'off' }).args).toEqual(['run']);
   });
 
+  it('под замком панели _DELTA=off и shadow из команды модели сужение не выключают', () => {
+    vitest(['run']);
+    put('web/src/a.ts', 'export const a = 2;\n');
+    const lock = { AGENTDECK_VERIFY_LEDGER_LOCK: '1' };
+    const off = vitest(['run'], { ...lock, AGENTDECK_VERIFY_LEDGER_DELTA: 'off' });
+    expect(off.args).not.toEqual(['run']);
+    expect(off.args).toContain('related');
+    // Строка сужения больше не подсказывает, как его выключить.
+    expect(off.err).not.toContain('DELTA=off');
+    put('web/src/a.ts', 'export const a = 3;\n');
+    const shadow = vitest(['run'], { ...lock, AGENTDECK_VERIFY_LEDGER: 'shadow' });
+    expect(shadow.args).toContain('related');
+  });
+
   it('тень (shadow) не сужает: она только мерит', () => {
     vitest(['run']);
     put('web/src/a.ts', 'export const a = 2;\n');
@@ -198,7 +218,10 @@ describe('verify-ledger: сужение от последнего зелёног
   it('красное сужение на том же дереве — дальше целиком', () => {
     vitest(['run']);
     put('web/src/a.ts', 'export const a = 2;\n');
-    expect(vitest(['run'], { FAKE_EXIT: '1' }).args?.[0]).toBe('related');
+    // Красный — мимо ключа: окружение сменило бы семейство, и сужения не было бы вовсе.
+    writeFileSync(join(root, 'ctl.json'), JSON.stringify({ FAKE_EXIT: '1' }));
+    expect(vitest(['run']).args?.[0]).toBe('related');
+    writeFileSync(join(root, 'ctl.json'), '{}');
     expect(vitest(['run']).args).toEqual(['run']);
   });
 

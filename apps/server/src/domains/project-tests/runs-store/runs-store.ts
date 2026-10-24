@@ -125,6 +125,7 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     costUsd: typeof record.costUsd === 'number' ? record.costUsd : undefined,
     sessionId: optional(record.sessionId),
     ...(record.attested === true ? { attested: true } : {}),
+    ...withStamps(record.stamps),
     results,
     summary,
     planned: typeof record.planned === 'number' ? record.planned : undefined,
@@ -133,6 +134,21 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     generate: parseStamp(record.generate),
     tms: parseTms(record.tms),
   };
+}
+
+/**
+ * Отпечатки содержимого по кейсам (`content-stamp`): только строка на строку.
+ * Мусорный ключ отбрасывается, и кейс без отпечатка судится по времени — как
+ * старая запись, а не как свежая.
+ */
+function withStamps(raw: unknown): Pick<ProjectTestRunRecord, 'stamps'> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const stamps = Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== '',
+    ),
+  );
+  return Object.keys(stamps).length > 0 ? { stamps } : {};
 }
 
 /**

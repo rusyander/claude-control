@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettings } from '@entities/AppConfig';
-import { systemTheme } from './ThemeProvider.lib';
+import { applyWindowBar, systemTheme } from './ThemeProvider.lib';
 import type { ThemeProviderProps } from './ThemeProvider.types';
 
 /**
@@ -22,6 +22,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     const applyTheme = (): void => {
       const resolved = theme === 'system' ? systemTheme() : theme;
       root.dataset.theme = resolved;
+      applyWindowBar(resolved);
     };
 
     applyTheme();

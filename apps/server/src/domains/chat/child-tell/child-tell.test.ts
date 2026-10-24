@@ -142,6 +142,77 @@ describe('ChildTells (Д7)', () => {
     expect(deferred).toHaveLength(1);
   });
 
+  /**
+   * D-L02: продолжение D-n помечалось сделанным уже на «в очереди», а очередь
+   * живёт в памяти — перезапуск панели до конца хода терял слово навсегда.
+   * Теперь о доставке говорит сама доставка.
+   */
+  it('«дошло» зовётся в момент доставки, а не постановки в очередь', () => {
+    const { tells, deferred, busy } = setup(new Set(['sess-2']));
+    const sent: string[] = [];
+    const message = {
+      chatId: 'new-2',
+      prompt: 'Человек разрешил D-5.',
+      cwd: '/c/t',
+      title: 'Тесты',
+      onSent: () => sent.push('D-5'),
+    };
+
+    expect(tells.send(message)).toBe('queued');
+    expect(sent).toEqual([]);
+
+    busy.clear();
+    tells.childFinished(['sess-2']);
+    deferred.forEach((run) => run());
+    expect(sent).toEqual(['D-5']);
+  });
+
+  it('слово, которое доставлено сразу, помечается тут же', () => {
+    const { tells } = setup();
+    const sent: string[] = [];
+    expect(
+      tells.send({
+        chatId: 'new-1',
+        prompt: 'Человек разрешил D-6.',
+        cwd: '/c/h',
+        title: 'Шапка',
+        onSent: () => sent.push('D-6'),
+      }),
+    ).toBe('sent');
+    expect(sent).toEqual(['D-6']);
+  });
+
+  /**
+   * RF-DL-01: слово об исходах D-n, пролежавшее в очереди до конца хода, —
+   * текст на миг доставки; сказать уже нечего — старта нет и «дошло» не зовётся.
+   */
+  it('текст слова складывается в миг доставки; нечего сказать — старта нет', () => {
+    const { tells, starts, deferred, busy } = setup(new Set(['sess-2']));
+    const sent: string[] = [];
+    let now = 'Человек разрешил D-7.';
+    let left: string | undefined = 'x';
+    const message = {
+      chatId: 'new-2',
+      prompt: 'устаревший текст',
+      cwd: '/c/t',
+      title: 'Тесты',
+      onSent: () => sent.push('told'),
+      render: () => (left === undefined ? undefined : now),
+    };
+    expect(tells.send(message)).toBe('queued');
+    now = 'Человек разрешил D-7 и отказал D-8.';
+    busy.clear();
+    tells.childFinished(['sess-2']);
+    deferred.forEach((run) => run());
+    expect(starts.map((start) => start.prompt)).toEqual(['Человек разрешил D-7 и отказал D-8.']);
+    expect(sent).toEqual(['told']);
+
+    left = undefined;
+    expect(tells.send({ ...message, chatId: 'new-1', cwd: '/c/h' })).toBe('sent');
+    expect(starts).toHaveLength(1);
+    expect(sent).toEqual(['told']);
+  });
+
   it('группе без чата и несуществующей группе — отказ в заметке, без запуска', () => {
     const { tells, starts, notices } = setup();
 

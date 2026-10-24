@@ -1,5 +1,16 @@
 import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumers';
 import type { ChatEvent } from '../chat-events.ts';
+import type { RunOptions } from '../ChatRunner/ChatRunner.ts';
+
+/** Самый поздний ход разговора — параметры пингу тёплого кэша (`latestRunOf`). */
+export interface LatestRun {
+  chatId: string;
+  sessionId: string;
+  options: RunOptions;
+  meta: RunMeta;
+  /** Параметры из журнала прогонов после перезапуска панели: префикс хода по ним не собрать. */
+  adopted?: true;
+}
 
 /** Сведения о прогоне для группировки и переподключения (в т.ч. после F5). */
 export interface RunMeta {
@@ -29,6 +40,13 @@ export interface RunMeta {
    */
   afterLimit?: true;
   /**
+   * Человек вернул ход в остывшую сессию кнопкой на заметке «начат новый
+   * разговор» (R5 ревью П1): правило остывшей сессии на этом старте не
+   * спрашивают. В запись прогона не попадает — следующее продолжение решает
+   * правило, как обычно.
+   */
+  keepSession?: true;
+  /**
    * Прогон уехал ступенью НИЖЕ потолка разговора (веер параллельного запуска).
    * Само присутствие поля и означает понижение; внутри — чем именно ведут, уже
    * развёрнутым именем. По этой отметке прогон попадает в журнал сдачи: без неё
@@ -53,8 +71,11 @@ export interface RunMeta {
  * слушатель, а не подписка вкладки: внутренние события в буфер не попадают.
  */
 export type RunWatchFeed =
-  /** `detached` — прогон подхвачен после перезапуска без потока: событий не будет, только конец. */
-  | { kind: 'start'; sessionId?: string; cwd: string; detached?: true }
+  /**
+   * `detached` — прогон подхвачен после перезапуска без потока: событий не будет, только конец.
+   * `forkOf` — ответвление (`--fork-session`) этой сессии: окно и кэш начинаются с её.
+   */
+  | { kind: 'start'; sessionId?: string; cwd: string; detached?: true; forkOf?: string }
   | { kind: 'event'; event: ChatEvent; sessionId?: string }
   | { kind: 'finish'; sessionId?: string };
 

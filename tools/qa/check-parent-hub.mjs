@@ -463,6 +463,13 @@ check(
   `сверка ушла одним запросом и адресована родителю: ${JSON.stringify(overlapCalls)}`,
 );
 
+// Раздел свёрнут до заголовка (владелец 22.10.2026): строки — по нажатию на него.
+check(
+  (await page.locator('[data-overlap-file]').count()) === 0,
+  'после сверки раздел свёрнут: строк файлов не видно',
+);
+await page.locator('[data-hub-overlap] button[aria-expanded="false"]').click();
+
 // Файл — группы: строка отвечает на «кто ещё это трогал», не заставляя человека
 // открывать ветки.
 const shared = page.locator('[data-overlap-file]');

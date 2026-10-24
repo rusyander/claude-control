@@ -187,9 +187,10 @@ const check = (ok, text) => {
 const composer = page.getByRole('textbox').last();
 await composer.fill('Первый вопрос');
 await page.getByRole('button', { name: 'Отправить' }).click();
-await page.waitForTimeout(900);
-
 const busyBox = page.getByRole('textbox', { name: /уйдёт, как только кончится ответ/ });
+// Ждём само поле, а не фиксированную паузу: под нагрузкой (параллельные прогоны)
+// 900 мс не хватало, и проверка краснела без дефекта (прогон 59eb48e1).
+await busyBox.waitFor({ timeout: 10_000 }).catch(() => {});
 check(
   (await busyBox.count()) === 1,
   'пока идёт ответ, поле говорит, что дописанное уйдёт после него',

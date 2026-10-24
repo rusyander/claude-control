@@ -21,6 +21,7 @@ import {
   PENDING_ASKS_FILE,
   wirePendingAsks,
 } from '../../../domains/chat/pending-asks/pending-asks.ts';
+import { DEFERRED_ASKS_FILE } from '../../../domains/chat/deferred-asks/store.ts';
 import { registerChatRoutes } from '../../chat-routes/chat-routes.ts';
 import { registerChatTreeRoutes } from './tree-routes.ts';
 
@@ -83,7 +84,9 @@ describe('дерево разговоров: вопросы и права гру
       },
       asksOf: (keys) => asks.of(keys, (runId) => registry.isRunning(runId)),
     });
-    const ctx = { location: { paths: { root } }, store } as unknown as ServerContext;
+    // `appData` — каталог данных панели: запрос прав читает в нём отложенные D-n
+    // (`deferredAsksOf`); без него маршрут падал 500 до карточки.
+    const ctx = { location: { paths: { root, appData: data } }, store } as unknown as ServerContext;
     app = Fastify();
     registerChatRoutes(app, ctx, registry, new ChatSession(registry));
     registerChatTreeRoutes(app, ctx, tree);
@@ -212,19 +215,25 @@ describe('дерево разговоров: вопросы и права гру
 
   it('запрос прав: карточка с ключом прогона, решение из хаба доходит до брокера и снимает её', async () => {
     await startGroup('new-g2');
+    // Пуш с названной веткой — вопрос человеку. `origin HEAD` из копии, чью ветку
+    // панель не прочитала (каталог теста — не git), с D-S02 карточки не даёт:
+    // цель недоказуема, ответ известен заранее — отказ агенту (следующий тест).
     const pending = app.inject({
       method: 'POST',
       url: '/api/chat/permission-request',
       payload: {
         runId: 'new-g2',
         toolName: 'Bash',
-        input: { command: 'git push --force origin HEAD' },
+        input: { command: 'git push --force origin feature/g2' },
         toolUseId: 'toolu_p',
       },
     });
-    await tick();
-
-    const waiting = await nodeOf('sess-new-g2');
+    // До карточки маршрут спрашивает git о ветке копии — это десятки миллисекунд.
+    let waiting = await nodeOf('sess-new-g2');
+    for (let at = 0; at < 100 && !waiting?.asks; at += 1) {
+      await tick();
+      waiting = await nodeOf('sess-new-g2');
+    }
     expect(waiting?.asks).toEqual([
       expect.objectContaining({ kind: 'permission', runId: 'new-g2', toolUseId: 'toolu_p' }),
     ]);
@@ -241,6 +250,32 @@ describe('дерево разговоров: вопросы и права гру
     const after = await nodeOf('sess-new-g2');
     expect(after?.asks).toBeUndefined();
     expect(after?.status).toBe('running');
+  });
+
+  // D-S02 (решение 2): пуш с недоказуемой целью — известный ответ, а не вопрос.
+  // Человеку в дереве ждать нечего: ни карточки, ни D-n; агент получает причину.
+  it('пуш в HEAD из копии с непрочитанной веткой — отказ агенту, в дереве вопроса нет', async () => {
+    await startGroup('new-g4');
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/api/chat/permission-request',
+      payload: {
+        runId: 'new-g4',
+        toolName: 'Bash',
+        input: { command: 'git push --force origin HEAD' },
+        toolUseId: 'toolu_h',
+      },
+    });
+    expect(refused.json()).toEqual({
+      behavior: 'deny',
+      message: expect.stringContaining('could not read which branch this copy is on'),
+    });
+    const node = await nodeOf('sess-new-g4');
+    expect(node?.asks).toBeUndefined();
+    expect(node?.status).toBe('running');
+    // И не D-n: запись отложенных вызова не знает.
+    const file = join(data, DEFERRED_ASKS_FILE);
+    expect(existsSync(file) ? readFileSync(file, 'utf8') : '').not.toContain('origin HEAD');
   });
 
   it('вопрос одним текстом (журнал 97 g7): карточка с хвостом ответа; итог без вопроса карточки не даёт', async () => {

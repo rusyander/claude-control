@@ -10,7 +10,9 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { LedgerInstall, LedgerSummary, LedgerEvent } from './verify-ledger.types.ts';
 
 /**
@@ -43,6 +45,23 @@ try {
   if (/^[0-9a-f]{12}$/.test(v)) require(path.join(__dirname, v, 'preload.cjs'));
 } catch {
   /* no version, no ledger: the check runs as is */
+}
+`;
+
+/**
+ * Вход с замком `bin/preload-locked.cjs`: панель ставит его группам разделения. Замок и
+ * дом журнала живут в самом входе (глобальный символ до загрузки preload), поэтому ни
+ * `AGENTDECK_VERIFY_LEDGER=off`, ни снятый `_LOCK`, ни чужой `_HOME`, ни `_DELTA=off`
+ * журнал не выключают — это переменные окружения, а вход задан путём.
+ */
+const LOCKED_SHIM = `'use strict';
+// Locked entry of the verify ledger (written by the agentdeck panel for split groups).
+try {
+  const path = require('node:path');
+  globalThis[Symbol.for('agentdeck.verify-ledger.locked')] = { home: path.dirname(__dirname) };
+  require(path.join(__dirname, 'preload.cjs'));
+} catch {
+  /* no ledger: the check runs as is */
 }
 `;
 
@@ -108,7 +127,10 @@ export function installLedger(opts: {
     const shim = join(bin, 'preload.cjs');
     if (!existsSync(shim) || readFileSync(shim, 'utf8') !== STABLE_SHIM)
       writeAtomic(shim, STABLE_SHIM);
-    return { preload: forNodeOptions(shim), version };
+    const lockedShim = join(bin, 'preload-locked.cjs');
+    if (!existsSync(lockedShim) || readFileSync(lockedShim, 'utf8') !== LOCKED_SHIM)
+      writeAtomic(lockedShim, LOCKED_SHIM);
+    return { preload: forNodeOptions(shim), lockedPreload: forNodeOptions(lockedShim), version };
   } catch (error) {
     return { preload: null, reason: `install failed: ${(error as Error).message}` };
   }
@@ -225,6 +247,44 @@ export function ledgerSummary(
     offReasons,
     seen,
   };
+}
+
+/** Итог уборки хранилища (`ledger.cjs` prune). */
+export interface LedgerPruneResult {
+  keys: number;
+  drop: { dead: number; lru: number; orphans: number; tmp: number; flaky: number };
+  bytes: { before: number; after: number };
+}
+
+interface LedgerModule {
+  repoOf: (cwd: string) => { off?: string };
+  prune: (repo: object, opts: { removed: string[] }) => LedgerPruneResult;
+}
+
+/** Исходники журнала в репозитории панели — тот же путь, что ставит `runtime.ts`. */
+const LEDGER_SOURCE = fileURLToPath(new URL('../../../../../tools/verify-ledger', import.meta.url));
+
+/**
+ * Уборка записей убранной копии группы: ключи, которых касалась только она, уходят
+ * сразу, а не через срок (владелец 24.10: записи живут, пока жива работа, — до уборки
+ * группы). Записи, которые повторяла и живая работа (основная папка, соседняя копия),
+ * остаются. Зовёт тот, кто убирает копию (`split-cleanup.ts` `removeGroupCopy`, после
+ * `removeWorktree`); сбой уборки — `null`, саму уборку копии он не останавливает.
+ */
+export function pruneLedgerForRemovedCopy(input: {
+  projectPath: string;
+  copyPath: string;
+  sourceDir?: string;
+}): LedgerPruneResult | null {
+  try {
+    const load = createRequire(import.meta.url);
+    const ledger = load(join(input.sourceDir ?? LEDGER_SOURCE, 'ledger.cjs')) as LedgerModule;
+    const repo = ledger.repoOf(input.projectPath);
+    if (repo.off) return null;
+    return ledger.prune(repo, { removed: [input.copyPath] });
+  } catch {
+    return null;
+  }
 }
 
 function modeOf(value: string | undefined): LedgerSummary['mode'] {

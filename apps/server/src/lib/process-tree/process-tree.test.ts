@@ -208,3 +208,74 @@ describe.runIf(process.platform === 'win32')('killChildTree на настоящ�
     }
   }, 30_000);
 });
+
+/**
+ * Пауза группы (N1b, 23.10): цепочка `timeout` → tests-cli → vitest пережила
+ * снятие, потому что её родитель-оболочка умер раньше и обход от CLI её уже не
+ * видел. Сервер теперь снимает всё под посредником одним снимком, пока дерево
+ * цело (`keepRoot`), а сам посредник остаётся — он скажет код выхода CLI.
+ * Настоящие процессы: корень → середина → лист.
+ */
+describe('killPidTree с keepRoot на настоящих процессах', () => {
+  const isAlive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const waitFor = async (check: () => boolean, ms: number): Promise<boolean> => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      if (check()) return true;
+      await new Promise((tick) => setTimeout(tick, 100));
+    }
+    return check();
+  };
+
+  it('потомки сняты одним снимком, корень жив', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kill-tree-keep-root-'));
+    const at = Date.now();
+    const pidFile = (name: string): string => join(dir, `${name}.pid`);
+    const leaf = join(dir, 'leaf.cjs');
+    const mid = join(dir, 'mid.cjs');
+    writeFileSync(
+      leaf,
+      `require('fs').writeFileSync(${JSON.stringify(pidFile('leaf'))}, String(process.pid));\n` +
+        'setInterval(() => {}, 1000);\n',
+    );
+    writeFileSync(
+      mid,
+      `const { spawn } = require('child_process');\n` +
+        `spawn(process.execPath, [${JSON.stringify(leaf)}], { stdio: 'ignore', windowsHide: true });\n` +
+        `require('fs').writeFileSync(${JSON.stringify(pidFile('mid'))}, String(process.pid));\n` +
+        'setInterval(() => {}, 1000);\n',
+    );
+    const root = spawn(
+      process.execPath,
+      [
+        '-e',
+        `require('child_process').spawn(process.execPath, [${JSON.stringify(mid)}], { stdio: 'ignore', windowsHide: true }); setInterval(() => {}, 1000);`,
+      ],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    try {
+      expect(
+        await waitFor(() => existsSync(pidFile('mid')) && existsSync(pidFile('leaf')), 15_000),
+      ).toBe(true);
+      const below = ['mid', 'leaf'].map((name) => Number(readFileSync(pidFile(name), 'utf8')));
+      expect(below.every(isAlive)).toBe(true);
+
+      const killed = killPidTree(root.pid!, { spawnedAt: at, keepRoot: true });
+
+      expect(killed).toEqual(expect.arrayContaining(below));
+      expect(killed).not.toContain(root.pid);
+      expect(await waitFor(() => below.every((pid) => !isAlive(pid)), 10_000)).toBe(true);
+      expect(isAlive(root.pid!)).toBe(true);
+    } finally {
+      killPidTree(root.pid!, { spawnedAt: at });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 40_000);
+});

@@ -116,14 +116,20 @@ await runOnStand(
       check('шаг каталога: «Далее» доступно без .claude', await next.isEnabled());
       await next.click();
       await dialog.getByRole('button', { name: 'Выбрать Qwen Code' }).click();
-      await dialog
-        .getByRole('button', { name: /Qwen Code/ })
-        .and(page.locator('[disabled]'))
-        .waitFor({ timeout: 10_000 });
+      // Кнопка заперта и пока выбор сохраняется, а счётчик считается от сохранённого
+      // провайдера: ждём сам счётчик, иначе читаем «из 4» до ответа сервера.
       // Шаг доступа Claude у другого CLI выпадает: выбор провайдера — последний из трёх.
+      const threeSteps = await dialog
+        .getByText('Шаг 3 из 3')
+        .waitFor({ timeout: 10_000 })
+        .then(
+          () => true,
+          () => false,
+        );
       check(
         'у Qwen шагов три: выбор CLI — «Шаг 3 из 3»',
-        await dialog.getByText('Шаг 3 из 3').isVisible(),
+        threeSteps,
+        (await dialog.innerText()).slice(0, 400),
       );
       const done = dialog.getByRole('button', { name: 'Готово' });
       check('последний шаг: «Готово» доступно', await done.isEnabled());

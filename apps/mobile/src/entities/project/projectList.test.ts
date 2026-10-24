@@ -35,9 +35,9 @@ describe('pathKey / copyOwner', () => {
   });
 
   it('копия ветки указывает на свой репозиторий', () => {
-    expect(copyOwner('C:\\work\\acme-worktrees\\fix-GOR-1')).toEqual({
+    expect(copyOwner('C:\\work\\acme-worktrees\\fix-PROJ-1')).toEqual({
       main: 'C:/work/acme',
-      copy: 'fix-GOR-1',
+      copy: 'fix-PROJ-1',
     });
     expect(copyOwner('C:\\work\\acme')).toBeUndefined();
     expect(copyOwner('C:\\-worktrees\\x')).toBeUndefined();

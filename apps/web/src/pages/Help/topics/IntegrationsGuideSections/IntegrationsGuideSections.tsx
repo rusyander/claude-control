@@ -68,6 +68,14 @@ export function IntegrationsGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('notifyTelegram')} text={g('notifyTelegramText')}>
             <HelpShot topic="integrations" scenario="notify" frame="04-telegram" side="panel" />
           </GuideStep>
+          <GuideStep title={g('notifyAnswers')} text={g('notifyAnswersText')}>
+            <HelpShot
+              topic="integrations"
+              scenario="notify"
+              frame="05-telegram-answers"
+              side="panel"
+            />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
     </>

@@ -48,12 +48,15 @@ function render(
   runs: ActiveRunView[],
   split: SplitPlanView,
   nodes: ChatTreeNode[] = [],
+  // Разделы под группами в панели свёрнуты; проверки их содержимого рисуют
+  // хаб раскрытым, свёрнутый вид проверяется отдельно (`open = false`).
+  open = true,
 ): string {
   const groups = collectChildStages(chats, 'parent', runs, split);
   const tree = { root: 'parent', running: 0, nodes, split };
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
-      <ChildStages groups={groups} onOpen={() => {}} tree={tree} />
+      <ChildStages groups={groups} onOpen={() => {}} tree={tree} sectionsOpen={open} />
     </QueryClientProvider>,
   );
 }
@@ -240,7 +243,7 @@ describe('хаб разделения — «Предложить тикет» (9
       why: 'операции нет в инструментах',
       at: '2026-09-25T10:30:00.000Z',
     };
-    const html = render(chats, [], {
+    const split: SplitPlanView = {
       parentChatId: 'parent',
       triage: TRIAGE,
       order: [0, 1],
@@ -248,7 +251,8 @@ describe('хаб разделения — «Предложить тикет» (9
         group(0, { status: 'done', chatId: 'c0', humanSteps: [step] }),
         group(1, { status: 'done', chatId: 'c1', humanSteps: [{ ...step, why: 'нужна мне' }] }),
       ],
-    });
+    };
+    const html = render(chats, [], split);
     const list = html.slice(html.indexOf('data-split-human-steps'));
 
     expect(html).toContain('data-split-human-steps="1"');
@@ -256,6 +260,53 @@ describe('хаб разделения — «Предложить тикет» (9
     expect(textOf(list)).toContain('Выставить зависимость MR !808 от !789');
     expect(textOf(list)).toContain('просит: Группа 0, Группа 1');
     expect(html).not.toContain('data-split-tickets');
+
+    // В панели раздел свёрнут: заголовок с числом, шагов нет до нажатия.
+    const folded = render(chats, [], split, [], false);
+    const foldedList = folded.slice(folded.indexOf('data-split-human-steps'));
+    expect(textOf(foldedList)).toContain('Сделать человеку: 1');
+    expect(foldedList).toContain('data-hub-fold="closed"');
+    expect(textOf(foldedList)).not.toContain('Выставить зависимость MR !808 от !789');
+  });
+
+  /** Владелец 22.10.2026: всё под карточками групп свёрнуто до заголовков. */
+  it('в панели тикеты, шаги человеку и пересечения свёрнуты до заголовков', () => {
+    vi.useFakeTimers({ now: Date.parse('2026-09-25T11:00:00.000Z') });
+    const step = { action: 'Влить MR !1', where: '', why: '', at: '2026-09-25T10:30:00.000Z' };
+    const html = render(
+      chats,
+      [],
+      {
+        parentChatId: 'parent',
+        triage: TRIAGE,
+        order: [0, 1],
+        overlap: {
+          at: '2026-09-25T10:40:00.000Z',
+          files: [{ path: 'src/a.ts', groups: [0, 1], outside: [1] }],
+          mergeOrder: [0, 1],
+          counted: [],
+          unread: [],
+        },
+        groups: [
+          group(0, {
+            status: 'done',
+            chatId: 'c0',
+            humanSteps: [step],
+            tickets: [{ title: 'Падает экспорт', where: '', why: '', at: step.at }],
+          }),
+          group(1, { status: 'done', chatId: 'c1' }),
+        ],
+      } as SplitPlanView,
+      [],
+      false,
+    );
+
+    expect(html.match(/data-hub-fold="closed"/g)?.length).toBe(2);
+    expect(html).toContain('data-overlap-fold="closed"');
+    expect(html).not.toContain('data-overlap-file');
+    expect(textOf(html)).not.toContain('Порядок слияния');
+    expect(textOf(html)).not.toContain('Падает экспорт');
+    expect(textOf(html)).not.toContain('Влить MR !1');
   });
 });
 

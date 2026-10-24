@@ -124,6 +124,27 @@ describe('механика сит на настоящем git', () => {
 
     const facts = await readSieveFacts({ cwd: work, startedAt: STARTED });
     expect(facts.mechanics.foreignRemovals).toEqual(['late.ts']);
+    // Чей коммит и какие строки — агенту есть что проверить (живая группа 23.10).
+    const sha = git(main, ['rev-parse', 'HEAD']).trim().slice(0, 10);
+    expect(facts.mechanics.foreignBlame).toEqual({
+      'late.ts': `${sha} «landed after start», lines 2`,
+    });
+  });
+
+  // Живая группа 23.10: основная ушла вперёд, ветка не переносилась. Двухточечный
+  // дифф с основной «удаляет» её новые строки — сито судит от развилки и молчит.
+  it('ветка не переносилась, основная ушла вперёд — её новые строки не «чужие −»', async () => {
+    const { main, work } = repo({ 'users.mdx': 'title\nintro\nend\n' });
+    commit(work, { 'users.mdx': 'title\nintro rewritten\nend\n' }, STARTED);
+    landOnMain(main, { 'users.mdx': 'title\nintro\nend\nlate section\n' });
+    git(work, ['fetch', '-q', 'origin'], AFTER);
+
+    const twoDot = git(work, ['diff', '-U0', 'origin/main', 'HEAD', '--', 'users.mdx']);
+    expect(twoDot).toContain('-late section');
+    const facts = await readSieveFacts({ cwd: work, startedAt: STARTED });
+    expect(facts.mechanics.foreignRemovals).toBeUndefined();
+    expect(facts.mechanics.conflicts).toBeUndefined();
+    expect(facts.unchecked).toBeUndefined();
   });
 
   it('потребители вне диффа: удалённое имя и тест-id, которые ещё ищутся', async () => {

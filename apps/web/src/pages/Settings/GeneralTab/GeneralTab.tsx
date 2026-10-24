@@ -127,6 +127,12 @@ export function GeneralTab({ settings, patch }: SettingsTabProps) {
             checked={mascot.chatty}
             onChange={(chatty) => setMascotPrefs({ chatty })}
           />
+          <SettingToggleRow
+            label={t('mascot.settings.reactions')}
+            hint={t('mascot.settings.reactionsHint')}
+            checked={mascot.reactions}
+            onChange={(reactions) => setMascotPrefs({ reactions })}
+          />
         </Stack>
       </Card>
 

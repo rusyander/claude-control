@@ -24,12 +24,13 @@ describe('завести тикет группы', () => {
       parentChatId: 'родитель 1',
       key: 'падает экспорт|a.ts:1',
       description: 'текст',
+      lang: 'en',
     });
 
     expect(result).toEqual({ key: 'PROJ-7', created: true });
     expect(post).toHaveBeenCalledWith(
       `/chat/split/${encodeURIComponent('родитель 1')}/tickets/file`,
-      { key: 'падает экспорт|a.ts:1', description: 'текст' },
+      { key: 'падает экспорт|a.ts:1', description: 'текст', lang: 'en' },
     );
   });
 });

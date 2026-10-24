@@ -1,3 +1,4 @@
+import { errorHeadOf, toolOutcome } from './tool-outcome.ts';
 import type { WatchEvent } from './watch.types.ts';
 
 /**
@@ -49,6 +50,16 @@ export function createTranscriptReader(options: { sidechain?: boolean } = {}) {
       return [{ kind: 'compact', t, ...(manual ? { manual: true } : {}) }];
     }
 
+    // Запрос к модели сорвался, CLI повторяет (`request_retry`): сбой связи (R30). Лимит — R10.
+    if (record.type === 'system' && record.subtype === 'api_error') {
+      const error = obj(record.error);
+      const status = error?.status;
+      if (status === 429 || error?.rateLimits) return [];
+      const formatted = typeof error?.formatted === 'string' ? error.formatted : '';
+      const message = typeof error?.message === 'string' ? error.message : '';
+      return [{ kind: 'apiError', t, head: errorHeadOf(formatted || message || 'api_error') }];
+    }
+
     const attachment = obj(record.attachment);
     if (attachment) {
       const type = typeof attachment.type === 'string' ? attachment.type : 'attachment';
@@ -81,6 +92,13 @@ export function createTranscriptReader(options: { sidechain?: boolean } = {}) {
       }
       for (const block of Array.isArray(content) ? content : []) {
         const part = obj(block);
+        // Текст самой сессии — хвост хода (R27, R33); блоки отделены пустой строкой, как абзацы.
+        // Ответ об ошибке API пишет CLI, а не модель: не хвост.
+        if (part?.type === 'text' && typeof part.text === 'string' && !sidechain) {
+          if (record.isApiErrorMessage !== true)
+            out.push({ kind: 'say', t, text: `${part.text}\n\n` });
+          continue;
+        }
         if (part?.type !== 'tool_use') continue;
         out.push({
           kind: 'tool',
@@ -95,10 +113,30 @@ export function createTranscriptReader(options: { sidechain?: boolean } = {}) {
     }
 
     if (record.type === 'user' && message) {
-      const results = (Array.isArray(content) ? content : []).flatMap((block): WatchEvent[] => {
+      const blocks = (Array.isArray(content) ? content : []).filter(
+        (block) => obj(block)?.type === 'tool_result',
+      );
+      // Поля строки (`toolUseResult`, `toolDenialKind`) — об одном вызове: при нескольких не делятся.
+      const extra =
+        blocks.length === 1
+          ? {
+              timedOutAfterMs: obj(record.toolUseResult)?.timedOutAfterMs,
+              denialKind: record.toolDenialKind,
+            }
+          : {};
+      const results = blocks.flatMap((block): WatchEvent[] => {
         const part = obj(block);
-        if (part?.type !== 'tool_result' || typeof part.tool_use_id !== 'string') return [];
-        return [{ kind: 'toolResult', t, id: part.tool_use_id, chars: textChars(part.content) }];
+        if (typeof part?.tool_use_id !== 'string') return [];
+        const outcome = toolOutcome(part, extra);
+        return [
+          {
+            kind: 'toolResult',
+            t,
+            id: part.tool_use_id,
+            chars: textChars(part.content),
+            ...outcome,
+          },
+        ];
       });
       if (results.length > 0) return results;
       // Реплика человека или панели начинает ход; служебные строки CLI — нет.

@@ -490,6 +490,28 @@ describe('createForeignStagePlanner', () => {
   });
 
   /**
+   * Ожидание ответа словами, без «?» (живой случай RBAC 23.10): тем же правилом
+   * `waitsForAnswer`, что и у итога группы, ход — пауза. Иначе ревью стартовало
+   * поверх хода, который итог группы уже счёл вопросом человеку.
+   */
+  it('ход, ждущий ответа словами без «?», ревью не заводит', () => {
+    workChat('work');
+    const send = vi.fn().mockReturnValue({ ok: true });
+
+    planner(send)({
+      providerId: 'codex',
+      appDataDir: dir,
+      startedAt: 0,
+      chatId: 'work',
+      ok: true,
+      text: 'Сделал этапы A–C.\n\nЭтапы D и E начну после ответа. Вопросы и рекомендации записаны в PROGRESS.md.',
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(readChatCascade(dir, 'codex', 'work')?.reviewedAt).toBeFalsy();
+  });
+
+  /**
    * Связь звена (Т5 партии чужих CLI). Без неё дерево чужого разделения видит
    * одну работу: хаб родителя молчит о ревью и правках, а пауза их не держит.
    */
@@ -565,6 +587,51 @@ describe('createForeignStagePlanner', () => {
     expect(saved.lowered).toBeUndefined();
     expect(saved.model).toBeUndefined();
     expect(saved.effort).toBeUndefined();
+  });
+
+  // F-110: звено чужого CLI — новый разговор; окно и отметки прошлого звена —
+  // его (у звеньев Claude `base` в `ChatCascadeStages` их не переносит тоже).
+  it('новое звено чужого CLI не наследует окно, вердикт и отметки прошлого (F-110)', () => {
+    workChat('work');
+    const saveLink = vi.fn();
+    const send = vi.fn().mockReturnValue({ ok: true });
+
+    planner(send, false, {
+      linkOf: (key) =>
+        key === 'codex:work'
+          ? {
+              parentChatId: 'codex:parent',
+              createdAt: '2026-10-12T00:00:00.000Z',
+              stage: 'work',
+              branch: 'feature/a',
+              stageSince: '2026-10-12T00:00:00.000Z',
+              reviewVerdict: ['a.ts:1 — забыт await'],
+              reviewedAt: '2026-10-12T01:00:00.000Z',
+              plannedAt: '2026-10-12T01:10:00.000Z',
+              deliveredAt: '2026-10-12T01:20:00.000Z',
+            }
+          : undefined,
+      saveLink,
+    })({
+      providerId: 'codex',
+      appDataDir: dir,
+      startedAt: 0,
+      chatId: 'work',
+      ok: true,
+      text: 'Нужна миграция — останавливаюсь.',
+    });
+
+    const [, saved] = saveLink.mock.calls[0] as [string, ChatLink];
+    expect(saved.branch).toBe('feature/a');
+    for (const field of [
+      'stageSince',
+      'reviewVerdict',
+      'reviewedAt',
+      'plannedAt',
+      'deliveredAt',
+    ] as const) {
+      expect(saved[field], field).toBeUndefined();
+    }
   });
 
   it('связанный разговор без шапки всё равно закрывает цепочку группы (F3)', () => {

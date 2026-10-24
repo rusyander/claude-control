@@ -15,6 +15,7 @@ import {
   type ProfileMcpEntry,
   type SkillScopeInput,
 } from '../../domains/chat/group-profile/group-profile.ts';
+import { shellSnapshotSync, snapshotNames } from '../../domains/chat/shell-aliases.ts';
 import { stageOf, stagesAhead } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
 import {
   runCompactWindow,
@@ -42,9 +43,11 @@ import { liveNaIds, type SieveReportRow, type SieveStage } from '@agentdeck/cont
 import type { SplitGroupRechecked, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink, SplitPlanGroupRecord } from '../../lib/app-store/app-store.types.ts';
 import type { ServerContext } from '../../context.ts';
+import type { ChatEvent } from '../../domains/chat/chat-events.ts';
 import { localizeText, serverText } from '../../lib/server-texts/server-texts.ts';
 import {
   ChatRunRegistry,
+  type RunFinished,
   type RunNotice,
 } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { appendLoweredRun } from '../../domains/chat/lowered-journal/lowered-journal.ts';
@@ -60,7 +63,7 @@ import {
 } from '../../domains/chat/run-ledger/run-ledger.ts';
 import { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import { HandoffChains, HandoffChainStore } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
-import { TreePause } from '../../domains/chat/tree-pause/tree-pause.ts';
+import { rootOf, TreePause } from '../../domains/chat/tree-pause/tree-pause.ts';
 import type { BackgroundWatcher } from '../../domains/watcher/watcher.ts';
 import { createBackgroundWatcher } from '../watcher/watcher.ts';
 import {
@@ -73,8 +76,11 @@ import {
 import { createTreeRuns } from '../../domains/chat/tree-runs/tree-runs.ts';
 import { createParentNotice } from '../../domains/chat/parent-notice/parent-notice.ts';
 import { wireChatAutonomy } from '../chat-autonomy-wiring.ts';
+import { apiTokenPath } from '../../lib/api-token/api-token.ts';
 import { wireGroupActivation } from '../group-activation-wiring/group-activation-wiring.ts';
 import { wireColdContinuation } from '../cold-continuation-wiring/cold-continuation-wiring.ts';
+import { wireKeepWarm } from '../keep-warm-wiring/keep-warm-wiring.ts';
+import { createKeepWarmLedgerReader, warmedAtOf } from '../../domains/chat/keep-warm/keep-warm.ts';
 import {
   appendMessage,
   chatTranscriptPath,
@@ -92,12 +98,12 @@ import {
   listProviders,
 } from '../../providers/registry.ts';
 import { foreignProviderId } from '@agentdeck/contracts/platform-consumers';
+import { foreignDeliverContourRoute } from './foreign-deliver-route.ts';
 import { KitService } from '../../domains/kit/service.ts';
-import {
-  CODEX_COMPACT_LIMIT_ENV,
-  CODEX_MCP_OFF_ENV,
-  kitComposeRefusal,
-} from '../../domains/kit/codex.ts';
+import { CODEX_MCP_OFF_ENV, kitComposeRefusal } from '../../domains/kit/codex.ts';
+import { economyRunEnv } from '../../domains/provider-chat/economy-run/economy-run.ts';
+import { ownLocalEndpoint } from '../../domains/provider-chat/own-endpoint/own-endpoint.ts';
+import { readPlatforms } from '../../domains/platform/store/store.ts';
 import {
   writeQwenMcpExcluded,
   writeQwenQuietRun,
@@ -142,8 +148,8 @@ import {
 } from '../../domains/platform/routing/routing.ts';
 import { createRunNotifier } from '../../domains/remote-notify.ts';
 import {
-  createGroupSignalTelegram,
   createTelegramNotifier,
+  type GroupSignalNotice,
   type TelegramNotice,
 } from '../../domains/notify/telegram.ts';
 import { wireGroupWatch } from '../group-watch-wiring/group-watch-wiring.ts';
@@ -192,6 +198,7 @@ import {
   createRecheckSession,
   readRecheckScope,
 } from '../../domains/chat/split-recheck/recheck-session.ts';
+import { createDeliverStageSession } from '../../domains/chat/split-deliver-stage/deliver-stage.ts';
 import { SieveStore } from '../../domains/chat/sieve-store/sieve-store.ts';
 import { sieveDeliveryGaps, sievePrompt } from '../../domains/chat/sieve-gate/sieve-gate.ts';
 import { testsDeliveryGaps } from '../../domains/chat/tests-gate/tests-gate.ts';
@@ -200,6 +207,8 @@ import { readMergeRequestStates } from '../../domains/integrations/mr-state/mr-s
 import { childrenBrief } from '../../domains/chat/children-brief/children-brief.ts';
 import { branchGateContext } from '../../domains/chat/ChatBranchGate/ChatBranchGate.ts';
 import { ChildTells } from '../../domains/chat/child-tell/child-tell.ts';
+import { scheduleDeferredReDrive, wireDeferredAsks } from '../deferred-wiring/deferred-wiring.ts';
+import { deferredAsksOf } from '../../routes/chat/deferred-routes/deferred-store.ts';
 import {
   RunRetry,
   retriesLink,
@@ -210,6 +219,8 @@ import {
   pausedGroupOf,
   pauseOnForeignStop,
   pauseOnHumanStop,
+  sweepGroupCopies,
+  treePausedGroupOf,
 } from '../../routes/chat/split-control-routes.ts';
 import {
   continueOnBackgroundLost,
@@ -264,6 +275,7 @@ import { ActivatingTestRunRegistry } from '../activating-test-runs/activating-te
 import { createReviewStarter } from '../../routes/chat/review-starter.ts';
 import { coldResumeBrief, lostConversationBrief } from '../../domains/chat/split-continue.ts';
 import { withStageTask } from '../../domains/chat/cold-continuation/cold-continuation.ts';
+import { createForeignColdPlan } from '../../domains/chat/cold-continuation/foreign-cold-plan.ts';
 import { activateLedger } from '../../domains/verify-ledger/verify-ledger.ts';
 import type { LedgerInstall } from '../../domains/verify-ledger/verify-ledger.types.ts';
 
@@ -368,6 +380,20 @@ export interface Runtime {
 
 /** Как часто смотрим, идёт ли локальный прогон: запрет сна и отложенный перезапуск. */
 const LOCAL_RUN_POLL_MS = 5_000;
+
+// Маршрут дешёвой доставки чужой группы живёт рядом, отдельным модулем; путь
+// импорта `runtime.ts` у него прежний.
+export { foreignDeliverContourRoute };
+
+/**
+ * Свой срок остывания кэша чужого CLI для живой проверки
+ * (`AGENTDECK_FOREIGN_COLD_AFTER_MS`); нет — срок провайдера. Один на решение
+ * «начать новую сессию» и сигнал сторожа R2.
+ */
+function foreignColdAfterMsEnv(): number | undefined {
+  const raw = Number(process.env.AGENTDECK_FOREIGN_COLD_AFTER_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+}
 
 export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime {
   // Журнал проверок (стадия 0 — тень): preload уходит в окружение самой панели
@@ -503,6 +529,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   wireColdContinuation(chatRuns, {
     store: ctx.store,
     projectsDir: () => projectsDir(ctx),
+    // Согретая пингом сессия — тёплая, хоть файл её и не менялся (`keep-warm`).
+    warmedAt: (sessionId) => warmedAtOf(ctx.location.paths.appData, sessionId),
   });
   // Родитель разделения видит своих детей в начале каждого хода (Д6), лёгкий
   // чат вопросов о ходе — группы своего разделения (5.1). Конвейер заводится
@@ -602,34 +630,85 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     readAsked: (chatId, sessionId) => lastAskedInput(projectsDir(ctx), sessionId ?? chatId),
   });
   // Сторож групп (фаза 2, W): правила по живому потоку звеньев вместо агента-наблюдателя.
-  const groupSignalTelegram = createGroupSignalTelegram({
-    settings: () => ctx.store.getSettings().integrations.telegram,
-    token: () => readToken(ctx.location.paths.appData, 'telegram'),
-    // Срок тишины сигнала уже начат: неотправленное не повторится — пусть хоть останется в логе.
-    onError: (error) => console.warn('[group-watch] telegram send failed', error),
-  });
   const groupWatcher = wireGroupWatch(chatRuns, {
     settings: () => ctx.store.getSettings().groupWatch,
     link: (chatId) => ctx.store.getChatLink(chatId),
     plan: (parentChatId) => ctx.store.getSplitPlan(parentChatId),
     plans: () => ctx.store.getSplitPlans(),
-    save: (record) => ctx.store.setSplitPlan(record),
+    // Свой срез хранилища (F-42): запись конвейера, собранная до `await`, сигналов не сотрёт.
+    signals: {
+      get: (parentChatId, groupIndex) => ctx.store.getGroupWatchSignals(parentChatId, groupIndex),
+      set: (parentChatId, groupIndex, record) =>
+        ctx.store.putGroupWatchSignals(parentChatId, groupIndex, record),
+      all: () => ctx.store.getAllGroupWatchSignals(),
+      save: () => ctx.store.saveGroupWatchSignals(),
+    },
     asksOf: (keys) => pendingAsks.of(keys, (runId) => chatRuns.isRunning(runId)),
+    // Группа ждёт решения по D-n — стоит законно, R22 о ней молчит.
+    deferredWaiting: (parentChatId, groupIndex) =>
+      deferredAsksOf(ctx).waiting({ kind: 'group', parentChatId, groupIndex }).length > 0,
     projectsDir: () => projectsDir(ctx),
     heavyQueueDir: heavyQueueDir(ctx.location.paths.appData),
     notify: (signal, target) => {
-      const projectPath = ctx.store.getSplitPlan(target.parentChatId)?.projectPath;
-      groupSignalTelegram({
+      // Одиночный чат: плана нет, проект — каталог его прогона.
+      const projectPath =
+        target.scope === 'chat'
+          ? target.cwd
+          : ctx.store.getSplitPlan(target.parentChatId)?.projectPath;
+      // Подписка — событие `groupSignal` в списках Telegram и вебхука, как у остальных событий.
+      const notice: GroupSignalNotice = {
+        kind: 'groupSignal',
         rule: signal.rule,
         severity: signal.severity,
         numbers: signal.numbers,
         ...(target.stage ? { stage: target.stage } : {}),
         ...(projectPath ? { projectPath } : {}),
-      });
+      };
+      telegram(notice);
+      webhook(notice);
     },
     canonical: (chatId) => ctx.store.canonicalChatKey(chatId),
+    appDataDir: ctx.location.paths.appData,
+    // R2 у чужого CLI — тем же сроком остывания, что решение «начать новую сессию».
+    foreignColdAfterMs: foreignColdAfterMsEnv,
+    // `events` заводится ниже по сборке; сторож зовёт это только после старта, когда он уже есть.
+    changed: (parentChatId) => events.broadcast(['chat-tree'], parentChatId),
+    // Одиночные чаты (A1): свой срез, своя рассылка строке чата и шапке.
+    chatSignals: {
+      get: (chatId) => ctx.store.getChatWatchSignals(chatId),
+      set: (chatId, record) => ctx.store.putChatWatchSignals(chatId, record),
+      all: () => ctx.store.getAllChatWatchSignals(),
+    },
+    chatChanged: (chatId) => events.broadcast(['chat-signals'], chatId),
+    // Вопрос о ходе групп — служебный чат панели, не разговор человека.
+    internal: (keys) => statusChats.parentOf(keys) !== undefined,
+    links: () => ctx.store.getChatLinks(),
+    // `treePause` заводится ниже; до него тик не доходит (первый — через минуту).
+    treePaused: (chatId) => treePause.isPaused(chatId),
+    // Время паузы — из записи дерева (F-54): действия между нажатием и первым тиком — тоже R20.
+    treePausedAt: (chatId) => {
+      const at = ctx.store.getTreePause(rootOf(ctx.store.getChatLinks(), chatId))?.at;
+      return at ? Date.parse(at) : undefined;
+    },
     log: (message, error) => console.warn(message, error),
   });
+  // Пинг тёплого кэша ждущих групп (X2, 22.10): тем же путём сборки, что их ход.
+  const keepWarm = wireKeepWarm(chatRuns, {
+    economy: () => ctx.store.getSettings().groupEconomy,
+    coldContextTokens: () => ctx.store.getSettings().groupWatch.coldContextTokens,
+    plans: () => ctx.store.getSplitPlans(),
+    asksOf: (keys) => pendingAsks.of(keys, (runId) => chatRuns.isRunning(runId)),
+    canonical: (chatId) => ctx.store.canonicalChatKey(chatId),
+    projectsDir: () => projectsDir(ctx),
+    heavyQueueDir: heavyQueueDir(ctx.location.paths.appData),
+    appDataDir: ctx.location.paths.appData,
+    watcher: groupWatcher,
+    changed: (parentChatId) => events.broadcast(['chat-tree'], parentChatId),
+    bridge: (runId) => ({ runId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() }),
+    log: (message, error) => console.warn(message, error ?? ''),
+  });
+  keepWarm.start();
+  const keepWarmLedger = createKeepWarmLedgerReader(ctx.location.paths.appData);
   const treePause = new TreePause({
     links: () => ctx.store.getChatLinks(),
     runs: treeRuns,
@@ -645,6 +724,19 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       arm: (chatId, state) => chatSession.armAutoApprove(chatId, state),
     },
     reviewView: (link) => splitReviewRef.current?.view(link),
+    // «Остановить всё» — как пауза каждой группы (23.10): ждущий процесс группы
+    // с фоном гасится, процессы её копии добираются по пути.
+    idle: {
+      snapshot: (chatId) =>
+        parseForeignChatKey(chatId) ? undefined : chatRuns.idleWithBackground(chatId),
+      close: (chatId) => chatRuns.closeLive(chatId),
+    },
+    afterPause: (keys) => {
+      void sweepGroupCopies(ctx.store, keys).then((killed) => {
+        if (killed.length > 0) console.warn('tree pause: copy processes swept', killed);
+      });
+    },
+    bridge: (runId) => ({ runId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() }),
   });
   /**
    * Конвейер уровней разделения (Т1). Память — в хранилище (`splitPlans`),
@@ -714,6 +806,15 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     chatRuns,
     say: (chatId, event) => sayToParent(chatId, event),
     broadcast: (domains, path) => events.broadcast(domains, path),
+    // Ход, который панель продолжает сама (ожидание группы «по плану»), — мост к себе.
+    bridge: (runId) => ({ runId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() }),
+    // F-44: продолжение на стоящем дереве — в очередь паузы; отказ реестра в старте —
+    // конец хода обычным путём (`settleFinish` заведён ниже, зовут его только прогоны).
+    gate: treePause,
+    refused: (finished) => {
+      const event = settleFinish(finished);
+      if (event) chatRuns.emitExternal(finished.chatId, event);
+    },
   });
   // Выбранная группа чата — на каждом старте обоих провайдеров (`group-activation-wiring.ts`).
   wireGroupActivation({
@@ -855,6 +956,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     chatId: string,
     cwd: string,
     prompt: string,
+    // Слово дошло до разговора (а не легло в очередь в памяти) — отложенным
+    // вопросам D-n это нужно, чтобы помечать продолжение по факту (D-L02).
+    onSent?: () => void,
+    // Текст в миг доставки: слово об исходах D-n складывается тогда (RF-DL-01).
+    render?: () => string | undefined,
   ): 'sent' | 'queued' | 'refused' => {
     const link = ctx.store.getChatLink(chatId);
     const parent = link?.parentChatId;
@@ -875,6 +981,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       // Остывший разговор с большим окном запуск продолжит новым (рычаг экономии).
       cold: stageTask ? withStageTask(brief, stageTask) : brief,
       ...(group.base ? { base: group.base } : {}),
+      ...(onSent ? { onSent } : {}),
+      ...(render ? { render } : {}),
     });
   };
   // Непорождённое звено правок или доставки (F-07 ревью П1) стартует заново
@@ -912,12 +1020,14 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   const resumeGroup = (
     group: SplitPlanGroupRecord,
     prompt: string,
+    onSent?: () => void,
+    render?: () => string | undefined,
   ): 'sent' | 'queued' | 'refused' => {
     if (!group.chatId || !group.path) return 'refused';
     const links = ctx.store.getChatLinks();
     const keys = conversationKeys(links, group.chatId);
     if ([group.chatId, ...keys].some((key) => !key.startsWith('new-'))) {
-      return tellGroup(group, group.chatId, group.path, prompt);
+      return tellGroup(group, group.chatId, group.path, prompt, onSent, render);
     }
     const unborn = links[group.chatId];
     if (unborn?.stage === 'fix' || unborn?.stage === 'deliver') {
@@ -934,8 +1044,13 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         }
       }
     }
-    return tellGroup(group, target.chatId, group.path, prompt);
+    return tellGroup(group, target.chatId, group.path, prompt, onSent, render);
   };
+  // Отложенные вопросы D-n: решение человека продолжает группу тем же путём
+  // (`resumeGroup`), одиночный чат — тем же разговором; разрешённое до
+  // перезапуска панели продолжается обходом при старте.
+  const deferredWiring = wireDeferredAsks({ ctx, runs: chatRuns, resumeGroup });
+  scheduleDeferredReDrive(deferredWiring);
   const splitConveyor = new SplitConveyor({
     backgroundTasks: (chatId) => chatRuns.backgroundTasksOf(chatId),
     store: {
@@ -943,6 +1058,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       set: (record) => ctx.store.setSplitPlan(record),
       findByTriage: (chatIds) => ctx.store.findSplitPlanByTriage(chatIds),
       all: () => ctx.store.getSplitPlans(),
+      watchSignals: (parent, index) => ctx.store.getGroupWatchSignals(parent, index),
+      keepWarm: keepWarmLedger,
     },
     ticketTracker: (projectPath) => ticketTracker.projectOf(projectPath),
     tasksConnected: () => taskTracker.connected(),
@@ -968,6 +1085,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     tokenLedger: groupTokenLedger({
       links: () => ctx.store.getChatLinks(),
       projectsDir: () => projectsDir(ctx),
+      // Расход групп Codex и Qwen Code — из переписки CLI (дом Qwen «Наши» — в данных панели).
+      appDataDir: ctx.location.paths.appData,
     }),
     // Закрытие группы ревью (T13, T6/T11): `git status` копии, временные копии и
     // одноразовая база. Копии групп всех разделений — не временные.
@@ -1022,18 +1141,6 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           },
         });
         const missing = missingDelivery(facts, facts.branch ?? group.branch);
-        // Описание MR читается форджем только у найденного по голове MR.
-        const description = facts.mr
-          ? await mrDescriptionGap(
-              facts.mr,
-              async (url) => {
-                const token = forgeToken(url);
-                if (!token) return undefined;
-                return readMergeRequestReview(url, token);
-              },
-              liveNaIds(group.sieveRows ?? []),
-            )
-          : {};
         // Сита перед MR (решение владельца 28.09): механика git панели и судья
         // отчёта группы. Сеть уже не ответила — сита ждут следующей проверки.
         const sieves = facts.unreachable
@@ -1063,6 +1170,22 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           console.warn('split delivery: tests block unreadable', error);
           return undefined;
         });
+        // Заметки доставки (23.10): «не проверено» и красное не из-за ветки —
+        // не пробелы, но описание MR обязано их назвать.
+        const notes = [...(sieves?.notes ?? []), ...(tests?.notes ?? [])];
+        // Описание MR читается форджем только у найденного по голове MR.
+        const description = facts.mr
+          ? await mrDescriptionGap(
+              facts.mr,
+              async (url) => {
+                const token = forgeToken(url);
+                if (!token) return undefined;
+                return readMergeRequestReview(url, token);
+              },
+              liveNaIds(group.sieveRows ?? []),
+              [...(sieves?.noted ?? []), ...(tests?.noted ?? [])],
+            )
+          : {};
         return {
           missing: [
             ...missing,
@@ -1070,6 +1193,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
             ...(sieves?.missing ?? []),
             ...(tests?.missing ?? []),
           ],
+          ...(notes.length > 0 ? { notes } : {}),
+          ...(facts.head ? { head: facts.head } : {}),
           ...(tests?.verdict ? { tests: tests.verdict } : {}),
           ...(sieves?.classes.length ? { sieveClasses: sieves.classes } : {}),
           ...(facts.mr ? { mr: facts.mr } : {}),
@@ -1081,6 +1206,33 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       // `childTells` объявлен ниже: к моменту первой проверки он уже есть.
       nudge: (group, prompt): 'sent' | 'queued' | 'refused' =>
         group.chatId && group.path ? tellGroup(group, group.chatId, group.path, prompt) : 'refused',
+      // Стадия разговора группы: ревью и план MR не откроют — им новая доставка.
+      stage: (group) => {
+        const link = group.chatId ? ctx.store.getChatLink(group.chatId) : undefined;
+        return link ? stageOf(link) : undefined;
+      },
+      // Новый разговор доставки / разбор на сильной модели (решение владельца 23.10).
+      freshStage: createDeliverStageSession({
+        links: () => ctx.store.getChatLinks(),
+        setLink: (chatId, link) => ctx.store.setChatLink(chatId, link),
+        removeLink: (chatId) => ctx.store.clearChatLink(chatId),
+        // Ход чужого CLI идёт у его сервиса, а не у прогонов Claude (§2.3).
+        running: (chatId) => {
+          const foreign = parseForeignChatKey(chatId);
+          return foreign ? providerChats.isChatRunning(foreign.chatId) : chatRuns.isRunning(chatId);
+        },
+        start: stageStarter,
+        // Связь переехала на настоящий ключ чужого разговора уже после старта.
+        resumed: (chatId, link) => splitConveyor.onChainResumed(link, chatId),
+        ceiling: () => {
+          const settings = ctx.store.getSettings();
+          return {
+            ...(settings.chatModel ? { model: settings.chatModel } : {}),
+            ...(settings.chatEffort ? { effort: settings.chatEffort } : {}),
+          };
+        },
+        log: (message, error) => console.warn(message, error),
+      }),
     },
     resume: resumeGroup,
     // «Перепроверить MR» — новым разговором с вводной (R2/R5, 19.10.2026).
@@ -1159,6 +1311,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         const link = ctx.store.getChatLink(key);
         return Boolean(link && retriesLink(link) && splitConveyor.tracksGroup(link));
       }),
+    // Повтор подхваченного после перезапуска прогона — мост к этой панели (как F-45).
+    bridge: (runId) => ({ runId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() }),
     log: (message, error) => console.warn(message, error),
   });
   // Обычный чат на локальной модели после обрыва продолжает сам (L4b): сервер поднимает
@@ -1181,10 +1335,15 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     start: (chatId, options, meta) => chatRuns.start(chatId, options, meta),
     isLocal: (finished) =>
       finished.local === true || isLocalClaudeRun(finished.options, finished.origin),
+    bridge: (runId) => ({ runId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() }),
     log: (message, error) => console.warn(message, error),
   });
   // «Стоп» человека в чате группы — пауза группы (журнал 89c).
   chatRuns.setHumanStopListener(pauseOnHumanStop(ctx.store, splitConveyor));
+  // Конец фоновой задачи не будит группу на паузе (N1a): реестр гасит процесс.
+  // И группу в стоящем дереве («Остановить всё»): то же решение человека.
+  const treePausedGroup = treePausedGroupOf(ctx.store, treePause);
+  chatRuns.setWakeGuard((keys) => keys.some((key) => pausedGroup(key) || treePausedGroup(key)));
   // Процесс группы умер, держа фон, — обрыв с продолжением, а не провал (W3-4c).
   const interruptGroup = interruptOnBackgroundLost(ctx.store, splitConveyor);
   const continueLocal = continueOnBackgroundLost(ctx.store, chatRuns, autoContinue);
@@ -1200,6 +1359,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     runRetry.started(keys);
     autoContinue.started(keys);
     pendingAsks.started(keys);
+    chatAutonomy.started(keys);
     for (const key of keys) {
       const link = ctx.store.getChatLink(key);
       if (link && link.stage !== 'triage') {
@@ -1227,21 +1387,72 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     const link = ctx.store.getChatLink(foreignChatKey(providerId, chatId));
     if (!link?.parentChatId) return undefined;
     const env = childRunEnv(process.env);
+    // Рычаги экономии закрепляются здесь — на старте прогона, как у Claude, а не
+    // при заведении звена: дополнение (`foreignChildExtra`) только смотрит, и
+    // отложенное звено берёт рычаги своего первого хода (ревью A8).
+    const current = ctx.store.getSettings().groupEconomy;
+    const economy = current
+      ? ctx.store.linkEconomy([foreignChatKey(providerId, chatId)], current)
+      : undefined;
     const input = splitConveyor.profileInput(link);
     if (!input) return { env };
-    // Группа и без выключателя серверов у CLI — группа: строка о тестах ей без вопросов.
-    if (!mcpOffChannel(providerId)) return { env, group: true };
-    // Порог сжатия группы (6.2) — тот же рычаг A/B, что окно Claude (2.1). Порог в
-    // токенах документирован только у Codex; у Qwen Code — лишь доля окна, а окно
-    // облачной модели панели не известно, так что туда рычаг не едет.
+    // Рычаги экономии — у каждой группы, с выключателем серверов или без: канал
+    // своего CLI (`setEconomyRun` ниже) решает, что из них доходит до прогона.
+    // Окно сжатия — на ходу, остальное — закреплённое на первом старте разговора,
+    // как у групп Claude (`groupRunProfile`).
     const compactWindow = groupWindow();
-    if (providerId === 'codex' && compactWindow) {
-      env[CODEX_COMPACT_LIMIT_ENV] = String(compactWindow);
-    }
+    const levers = {
+      ...(economy ? { economy } : {}),
+      ...(compactWindow ? { compactWindow } : {}),
+    };
+    // Группа и без выключателя серверов у CLI — группа: строка о тестах ей без вопросов.
+    if (!mcpOffChannel(providerId)) return { env, group: true, ...levers };
     const mcp = foreignGroupMcp({ entries: providerMcpEntries(providerId), ...input });
     return mcp.note
-      ? { env, group: true, mcp: { off: mcp.off, note: mcp.note } }
-      : { env, group: true };
+      ? { env, group: true, ...levers, mcp: { off: mcp.off, note: mcp.note } }
+      : { env, group: true, ...levers };
+  });
+  // Канал рычагов экономии — из каталога провайдера (`groupEconomy.channel`):
+  // порог сжатия Codex, слой настроек Qwen Code… Канала нет — прогон как был.
+  providerChats.setEconomyRun((providerId, run, env) =>
+    economyRunEnv(getProvider(providerId).groupEconomy?.channel, {
+      ...run,
+      env,
+      appData: ctx.location.paths.appData,
+    }),
+  );
+  // Пауза группы Codex / Qwen Code (`freshOnColdResume`): остывшую сессию CLI не
+  // продолжать, а начать новую с вводной панели — то же правило, что у Claude.
+  // `AGENTDECK_FOREIGN_COLD_AFTER_MS` — свой срок остывания для живой проверки.
+  providerChats.setColdPlan(
+    createForeignColdPlan({
+      store: ctx.store,
+      appDataDir: ctx.location.paths.appData,
+      coldAfterMs: foreignColdAfterMsEnv,
+    }),
+  );
+  // Сторож групп и у чужого CLI: старт и конец хода звена — без потока, как прогон,
+  // подхваченный после перезапуска (`detached`). Сессия CLI ещё неизвестна (первый
+  // ход) — её место занимает ключ разговора: без id сторож счёл бы молчание
+  // хода зависанием, а с ним, не найдя транскрипта, честно ничего не видит.
+  providerChats.setWatchListener((feed) => {
+    if (!feed.group) return;
+    const key = foreignChatKey(feed.providerId, feed.chatId);
+    const sessionId = feed.sessionId ?? key;
+    // Провайдер — сторожу: переписку CLI (Codex, Qwen Code) он читает своим разбором.
+    groupWatcher.onFeed(
+      key,
+      feed.kind === 'start'
+        ? {
+            kind: 'start',
+            sessionId,
+            cwd: feed.cwd,
+            detached: true,
+            provider: feed.providerId,
+            ...(feed.local ? { local: true } : {}),
+          }
+        : { kind: 'finish', sessionId },
+    );
   });
   /** Выключатель серверов: Codex — ключом запуска, Qwen Code — слоем настроек. */
   function mcpOffChannel(providerId: string): 'codex' | 'qwen' | undefined {
@@ -1393,6 +1604,16 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       identityOf: (link) => splitConveyor.identityOf(link),
       delivers: (link) => splitConveyor.delivers(link),
       sonnetDeliverOf: (link) => splitConveyor.sonnetDeliverOf(link),
+      deferredOf: (link) =>
+        link.parentChatId && typeof link.groupIndex === 'number'
+          ? deferredAsksOf(ctx)
+              .waiting({
+                kind: 'group',
+                parentChatId: link.parentChatId,
+                groupIndex: link.groupIndex,
+              })
+              .map((record) => record.id)
+          : [],
     },
     // Ревью по ссылке (Т7): замечания из ответа — в связь, карточка — человеку.
     review: { onReviewFinished: (input) => splitReview.finished(input) },
@@ -1412,7 +1633,23 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     if (finished.sessionId) releaseSessionLeases(heavyQueue.dir, finished.sessionId);
     const keys = finished.sessionId ? [finished.chatId, finished.sessionId] : [finished.chatId];
     tellsOnFinish(keys, finished.ok, finished.text);
+    deferredWiring.finished(keys);
     chatAutonomy.finished(keys, finished.text);
+    // Группа «по плану» кончила ход ожиданием ответа текстом — панель уже
+    // продолжила ту же сессию: ни «ждёт вас», ни звена конвейера на этом конце.
+    if (chatAutonomy.resumeWaiting(finished)) {
+      pendingAsks.forget(keys);
+      return undefined;
+    }
+    return settleFinish(finished);
+  });
+  /**
+   * Конец хода обычным путём: вопросы хаба, повтор надзора, конвейер, продолжение.
+   * Отдельно — потому что его же проводит отказ реестра в старте продолжения
+   * группы «по плану» (F-44): иначе такой конец не дошёл бы ни до конвейера, ни до хаба.
+   */
+  function settleFinish(finished: RunFinished): ChatEvent | undefined {
+    const keys = finished.sessionId ? [finished.chatId, finished.sessionId] : [finished.chatId];
     pendingAsks.finished(finished);
     // Обрыв — не упавший ход: его продолжает конвейер с восстановлением
     // состояния, и повтор надзора поверх завёл бы второй прогон той же группы.
@@ -1433,13 +1670,26 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       textCode: notice.textCode,
       textParams: notice.params,
     };
-  });
+  }
   /**
    * Тот же конвейер «работа → ревью → правки», но у чужих CLI. Живёт не на
    * реестре прогонов (их разговоры идут мимо него вовсе), а на завершении ответа
    * и стадии в шапке разговора; решение принимает домен, снаружи ему нужны
    * провайдер, каталог моделей, настройки и один вопрос к git.
    */
+  // Шлюз контуров: тоже слушатель на петле, тоже переживает запрос. Ключ он
+  // читает сам, в момент запроса, — поэтому создаётся без настроек и знает
+  // только состояние панели. Создан до планировщика стадий: маршрут дешёвой
+  // доставки спрашивает его порт, и порядок вызовов тут ничего не решает.
+  const platformGateway = new PlatformGateway();
+  // Основа маршрутизации контура: хранилище, каталог данных, порт шлюза. Полный
+  // набор (`platformRouting` ниже) добавляет к ней лишь части Claude и
+  // локальных моделей — для маршрута `foreign:<cli>` они ничего не решают.
+  const platformRoutingBase: PlatformRoutingDeps = {
+    store: ctx.store,
+    appDataDir: ctx.location.paths.appData,
+    gatewayPort: () => (platformGateway.status().running ? platformGateway.status().port : 0),
+  };
   const foreignStagePlanner = createForeignStagePlanner({
     chats: providerChats,
     // Claude сюда не попадает никогда: у него свой чат и свой конвейер.
@@ -1470,6 +1720,14 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
     // Доставка группы у чужого CLI — тем же звеном, что у Claude (W3-3).
     delivers: (link) => splitConveyor.delivers(link),
+    // Доставка на самой дешёвой модели лестницы (рычаг `sonnetDeliver`) — тем же
+    // выбором группы, что у Claude (`sonnetDeliverOf` его проводки выше).
+    sonnetDeliverOf: (link) => splitConveyor.sonnetDeliverOf(link),
+    // Маршрут CLI через контур — для дешёвой доставки: на контуре младшая ступень
+    // берётся, только если её имя есть в карте моделей. Без этой зависимости
+    // дешёвая доставка выключена (закрыто по умолчанию). Основа маршрутизации
+    // объявлена выше — замыкание не зависит от того, когда его позовут.
+    contourRoute: (providerId) => foreignDeliverContourRoute(platformRoutingBase, providerId),
     // Сита перед MR — тем же абзацем, что у звеньев Claude.
     sieves: stageSieves,
     // Ревью MR по ссылке (Т6): тот же домен, что у Claude, — замечания
@@ -1511,10 +1769,6 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
   // всегда, поднимается — только если человек включил его в настройках.
   const dlpProxy = new DlpProxy();
-  // Шлюз контуров: тоже слушатель на петле, тоже переживает запрос. Ключ он
-  // читает сам, в момент запроса, — поэтому создаётся без настроек и знает
-  // только состояние панели.
-  const platformGateway = new PlatformGateway();
   /**
    * Порог бюджета контура — тем же слоем, что и концы прогонов (A-5).
    *
@@ -1683,6 +1937,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         boardHook,
         heavyQueue,
         bashCeilings: bashCeilingsAt(ctx.location.paths.settings, cwd),
+        // Псевдонимы и функции снимка — правилами `ask`: их вызов судит брокер (24.10, a/d).
+        shellNames: snapshotNames(shellSnapshotSync()),
         ...(compactWindow ? { compactWindow } : {}),
         ...(economy ? { economy } : {}),
       });
@@ -1769,9 +2025,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     console.warn('local models: server for the Claude switch did not start', error);
   });
   const platformRouting: PlatformRoutingDeps = {
-    store: ctx.store,
-    appDataDir: ctx.location.paths.appData,
-    gatewayPort: () => (platformGateway.status().running ? platformGateway.status().port : 0),
+    ...platformRoutingBase,
     claudeSettingsRoute: () => {
       const model = localModels.claudeModel();
       return model
@@ -1857,6 +2111,18 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // провайдеру разговора. Без этой строки галочка «Qwen Code» в мастере была бы
   // нарисованной — контур сохранил бы её, а прогон ушёл бы в облако вендора.
   providerChats.setPlatformRouting(runRoute);
+  // Qwen Code / Codex на своём локальном сервере моделей (мимо контура) — тоже локальный
+  // ход: без кэша провайдера, R2 молчит, пауза группы разговор не обрывает. Шлюз
+  // панели (петлевой, но облачный) отличается по контурам и порту шлюза.
+  providerChats.setOwnLocal((providerId, env, run) =>
+    ownLocalEndpoint({
+      providerId,
+      env,
+      ...run,
+      platformIds: readPlatforms(ctx.store).map((platform) => platform.id),
+      gatewayPort: platformRouting.gatewayPort(),
+    }),
+  );
   // Вызовы инструментов через контур видит только шлюз: чужой CLI их никуда не
   // пишет, а подсказка «модель могла не справиться» без счёта была бы гаданием.
   providerChats.setContourToolCalls((since) => platformGateway.toolCallsSince(since));
@@ -1917,6 +2183,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   const toolGates = new ToolGateRegistry();
   platformGateway.setToolGate((runTag) => toolGates.gateOf(runTag));
   const events = createEventHub();
+  // Список D-n изменился — значок «Ждёт решения», хаб групп и телефон
+  // перечитывают его сразу, а не на следующем опросе.
+  deferredAsksOf(ctx).onChanged(() => events.broadcast(['chat-deferred', 'chat-tree'], ''));
   // Папки e2e проектов реестра — под тем же тумблером, что и конфиги. Сверка
   // ждёт, пока проект держит прогон агента или идут автотесты. Оба реестра
   // находят проект в любом написании пути: корни здесь — как в реестре проектов.
@@ -2064,6 +2333,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     platformWatch.stop();
     // Сторож групп: отложенные числа сигналов — на диск, тик гаснет.
     groupWatcher.stop();
+    // Пинги тёплого кэша: тик гаснет, идущий пинг погасил `detachAll` выше.
+    keepWarm.stop();
     // Ждущие карточки агента — ответить отменой: иначе запрос переходника висит
     // до таймаута уже мёртвого процесса.
     panelPending.cancelAll();

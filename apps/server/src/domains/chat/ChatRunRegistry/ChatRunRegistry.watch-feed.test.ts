@@ -57,6 +57,106 @@ describe('ChatRunRegistry → сторож групп', () => {
     expect(feeds.map((entry) => entry.feed.kind)).toEqual(['start', 'finish']);
   });
 
+  it('ответвление тёплой сессии называет сторожу родителя (forkOf), обычный ход — нет', () => {
+    const registry = new ChatRunRegistry(() => new FakeRun());
+    const feeds = watched(registry);
+    registry.start(
+      'child-deliver',
+      { prompt: 'доставка', cwd: '/work', sessionId: 's-work', fork: true },
+      { origin: 'chat' },
+    );
+    registry.start('child-work', { prompt: 'работа', cwd: '/work' }, { origin: 'chat' });
+    expect(feeds.map((entry) => entry.feed)).toEqual([
+      { kind: 'start', sessionId: undefined, cwd: '/work', forkOf: 's-work' },
+      { kind: 'start', sessionId: undefined, cwd: '/work' },
+    ]);
+  });
+
+  it('сжатие окна идёт только сторожу: ни в буфер, ни подписчику ленты', () => {
+    let emit: ((event: ChatEvent) => void) | undefined;
+    class Capturing extends FakeRun {
+      override start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
+        emit = onEvent;
+        return super.start(options, onEvent);
+      }
+    }
+    const registry = new ChatRunRegistry(() => new Capturing());
+    const feeds = watched(registry);
+    registry.start('child-3', { prompt: 'задача', cwd: '/work' }, { origin: 'chat' });
+    const seen: string[] = [];
+    registry.attach('child-3', 0, {
+      send: (frame: { event: ChatEvent }) => seen.push(frame.event.kind),
+    } as never);
+    emit?.({ kind: 'compact', trigger: 'auto' } as ChatEvent);
+    emit?.({ kind: 'text', text: 'дальше' });
+    const watchedKinds = feeds.flatMap((entry) =>
+      entry.feed.kind === 'event' ? [entry.feed.event.kind] : [],
+    );
+    expect(watchedKinds).toEqual(['compact', 'text']);
+    expect(seen).not.toContain('compact');
+    expect(seen).toContain('text');
+  });
+
+  it('повтор запроса к модели (R30) идёт только сторожу: ни подписчику ленты, ни в буфер для поздней вкладки', () => {
+    let emit: ((event: ChatEvent) => void) | undefined;
+    class Capturing extends FakeRun {
+      override start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
+        emit = onEvent;
+        return super.start(options, onEvent);
+      }
+    }
+    const registry = new ChatRunRegistry(() => new Capturing());
+    const feeds = watched(registry);
+    registry.start('child-5', { prompt: 'задача', cwd: '/work' }, { origin: 'chat' });
+    const live: string[] = [];
+    registry.attach('child-5', 0, {
+      send: (frame: { event: ChatEvent }) => live.push(frame.event.kind),
+    } as never);
+    emit?.({ kind: 'apiRetry', attempt: 1, status: 529, error: 'overloaded' });
+    emit?.({ kind: 'text', text: 'дальше' });
+    const watchedKinds = feeds.flatMap((entry) =>
+      entry.feed.kind === 'event' ? [entry.feed.event.kind] : [],
+    );
+    expect(watchedKinds).toEqual(['apiRetry', 'text']);
+    expect(live).toEqual(['text']);
+    // Вкладка, открытая позже, получает буфер с начала — повтора в нём нет.
+    const late: string[] = [];
+    registry.attach('child-5', 0, {
+      send: (frame: { event: ChatEvent }) => late.push(frame.event.kind),
+    } as never);
+    expect(late).not.toContain('apiRetry');
+    expect(late).toContain('text');
+  });
+
+  it('выход сервера пишет в журнал лимита замеры идущего прогона, которые ждали пятиминутного шага', () => {
+    let emit: ((event: ChatEvent) => void) | undefined;
+    class Detachable extends FakeRun {
+      readonly live = { pipe: 'p', pid: 1, signature: 's' };
+      override start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
+        emit = onEvent;
+        return super.start(options, onEvent);
+      }
+      detach(): void {}
+    }
+    const registry = new ChatRunRegistry(() => new Detachable());
+    const journal: Array<{ samples: readonly unknown[] }> = [];
+    registry.setLimitJournal((record) => journal.push(record));
+    registry.start('child-4', { prompt: 'задача', cwd: '/work' }, { origin: 'chat' });
+    const limit = (utilization: number): ChatEvent => ({
+      kind: 'limit',
+      resetsAt: 2_000_000_000,
+      type: 'five_hour',
+      status: 'allowed',
+      sample: { at: Date.now(), fiveHour: { utilization, resetsAt: 2_000_000_000 } },
+    });
+    emit?.(limit(0.1));
+    emit?.(limit(0.4));
+    // Первый замер записан сразу, второй ждёт шага.
+    expect(journal.map((record) => record.samples.length)).toEqual([1]);
+    registry.detachAll();
+    expect(journal.at(-1)?.samples).toHaveLength(2);
+  });
+
   it('«Стоп» идущего прогона кормит сторожу конец хода', () => {
     const registry = new ChatRunRegistry(() => new FakeRun());
     const feeds = watched(registry);

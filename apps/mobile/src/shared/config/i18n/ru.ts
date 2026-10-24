@@ -185,6 +185,9 @@ export const ru = {
     platformModel: (title: string, model: string) => `Через контур «${title}»: ${model}.`,
     platformModelReplaced: (title: string, asked: string, model: string) =>
       `Через контур «${title}»: имени «${asked}» там нет, запрос уйдёт с ${model}.`,
+    /** Имя переведено строкой карты контура — словом самого человека, не подмена. */
+    platformModelMapped: (title: string, asked: string, model: string) =>
+      `Через контур «${title}»: «${asked}» по карте контура — ${model}.`,
     platformModelUnset: (title: string) =>
       `Контур «${title}» модель не назначил (каталог пуст или проба не проходила) — запрос уйдёт как есть.`,
     platformNoEffort: (title: string) =>
@@ -199,6 +202,8 @@ export const ru = {
       platformModel: (_title: string, model: string) => `Локальная модель · llama.cpp: ${model}.`,
       platformModelReplaced: (_title: string, asked: string, model: string) =>
         `Локальная модель · llama.cpp: имени «${asked}» там нет, запрос уйдёт с ${model}.`,
+      platformModelMapped: (_title: string, _asked: string, model: string) =>
+        `Локальная модель · llama.cpp: ${model}.`,
       platformModelUnset: (_title: string) =>
         'Локальная модель · llama.cpp: модель не назначена — запрос уйдёт как есть.',
       platformNoEffort: (_title: string) =>

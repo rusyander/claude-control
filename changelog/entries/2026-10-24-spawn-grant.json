@@ -1,0 +1,28 @@
+{
+  "title": {
+    "ru": "Подагенты без вопроса на время, названное человеком в чате",
+    "en": "Subagents without the question for a time the human names in chat"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Разрешение запускать подагентов, данное словами в чате («агенты без вопроса на 2 ч», «можешь сам запускать агентов, не спрашивай, на 8 часов»), теперь доходит до сторожа запусков набора: до названного срока подагент проходит без вопроса, каждый такой запуск отмечается в журнале сессии. Раньше слова оставались только в памяти агента, а вопрос всплывал на каждом запуске. Срок — не больше суток: «на сутки», «на одни сутки» и «на день» дают 24 часа; без разрешения вопрос заканчивается этой фразой.",
+        "en": "A permission to spawn subagents given in chat words (“agents without asking for 2 h”, “spawn agents yourself, don't ask, for 8 hours”) now reaches the kit's spawn guard: until the named time a subagent goes through without the question, and each such spawn is noted in the session log. Before, the words stayed only in the agent's memory and the question came up on every spawn. The time is at most a day: “for a day” gives 24 hours; without a permission the question ends with this phrase."
+      },
+      "how": {
+        "ru": "Разрешение читается только из того, что человек напечатал: уведомления, продолжение после сжатия, сообщения другой сессии и цитаты его не дают. «Больше не разрешаю агентов», «спрашивай снова» и отрицания снимают его сразу. Действует в своей сессии и на одиночных подагентов; workflow с веером агентов по-прежнему спрашивает.",
+        "en": "The permission is read only from what the human typed: notifications, the continuation after compaction, messages from another session and quotes do not grant it. “No more agents”, “ask again” and negations lift it at once. It works within its own session and for single subagents; a workflow fanning out agents still asks."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Разрешение на подагентов нельзя подделать: запись в его хранилище из команды модели отклоняется раньше всех правил, группа разделения разрешения не получает вовсе, а без сторожа секретов набора разрешение не действует — без него хранилище нечем защитить.",
+        "en": "The subagent permission cannot be forged: a write to its store from a model command is refused before every rule, a split group never gets the permission, and without the kit's secret guard the permission does not apply — without it nothing protects the store."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    }
+  ]
+}

@@ -14,7 +14,13 @@
  * (`path-guards`), рекурсивные копирование/удаление (`fs-entry`).
  */
 
-export { assertValidJson, readJsonFile, readTextFile, readTextForm } from './read.ts';
+export {
+  assertValidJson,
+  readJsoncFile,
+  readJsonFile,
+  readTextFile,
+  readTextForm,
+} from './read.ts';
 export { renameWithRetry, writeBinaryFile, writeJsonFile, writeTextFile } from './write.ts';
 export type { WriteOptions } from './safe-io.types.ts';
 export {

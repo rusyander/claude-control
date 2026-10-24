@@ -8,6 +8,15 @@ import type { PathStep } from '@agentdeck/contracts/group-path';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { projectKey, updateGroupSources } from '../../../lib/app-store/group-sources.ts';
 import { createChat } from '../../provider-chat/store/store.ts';
+import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
+import {
+  FOREIGN_CHILD_NO_TOOL_LOOP_PROMPT,
+  FOREIGN_CHILD_PROMPT,
+  FOREIGN_GROUP_ECONOMY_PROMPT,
+} from '../initiative/initiative.ts';
+import { WORK_HABITS_SHARED_NOTE } from '../group-profile/group-profile.ts';
+import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
+import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
 import {
   chatKnobsLine,
   childStageExtra,
@@ -165,5 +174,108 @@ describe('ASK планировщика ревью в группе без чел�
     expect(prompt).toContain('do not tune --chunk or --per-round');
     expect(prompt).toContain('the agents of every round plus the verifiers');
     expect(prompt).toContain('name in "uncovered"');
+  });
+});
+
+/**
+ * План экономии чужих CLI (22.10): рычаг `workHabits` у звена Codex / Qwen Code —
+ * общая часть строки привычек Claude, без фразы про `cd`, закреплённая на первом
+ * старте разговора, как у Claude (`linkEconomy`).
+ */
+describe('group-run-lines', () => {
+  let dir: string;
+  let store: AppStore;
+
+  beforeEach(() => {
+    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-run-habits-')));
+    store = new AppStore(dir);
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const link = (key: string, stage?: string): void =>
+    store.setChatLink(key, {
+      parentChatId: 'p',
+      createdAt: '2026-10-22T10:00:00.000Z',
+      ...(stage ? { stage } : {}),
+    });
+
+  it('foreign habits note follows pinned workHabits', () => {
+    store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, workHabits: true } });
+    link('codex:on');
+    const on = foreignChildExtra(store, dir, 'codex:on') ?? '';
+    expect(on).toContain(FOREIGN_CHILD_PROMPT);
+    expect(on).toContain(FOREIGN_GROUP_ECONOMY_PROMPT);
+    expect(on.split(WORK_HABITS_SHARED_NOTE)).toHaveLength(2);
+    // Фраза про `cd` — только Claude: у чужого CLI нет заметки о смене каталога.
+    expect(on).not.toContain('do not `cd`');
+
+    // Закрепляет старт прогона (`setChildRun` в runtime), не дополнение (ревью A8).
+    expect(store.getChatLink('codex:on')?.economy).toBeUndefined();
+    store.linkEconomy(['codex:on'], store.getSettings().groupEconomy!);
+    // Выключили после первого старта — у начатого разговора строка остаётся
+    // (смена посреди тёплой сессии переписала бы кэш), новый стартует без неё.
+    store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, workHabits: false } });
+    expect(foreignChildExtra(store, dir, 'codex:on')).toBe(on);
+    link('codex:off');
+    const off = foreignChildExtra(store, dir, 'codex:off') ?? '';
+    expect(off).toContain(FOREIGN_GROUP_ECONOMY_PROMPT);
+    expect(off).not.toContain(WORK_HABITS_SHARED_NOTE);
+  });
+
+  it('foreign habits: звено, заведённое до правки, берёт рычаги своего первого хода', () => {
+    // Отложенный старт (A8): дополнение строится при заведении звена, а ход —
+    // позже; между ними рычаг выключили. Закрепления при заведении нет, и первый
+    // ход берёт нынешние рычаги, как у Claude.
+    store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, workHabits: true } });
+    link('codex:deferred');
+    expect(foreignChildExtra(store, dir, 'codex:deferred')).toContain(WORK_HABITS_SHARED_NOTE);
+    expect(store.getChatLink('codex:deferred')?.economy).toBeUndefined();
+    store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, workHabits: false } });
+    store.linkEconomy(['codex:deferred'], store.getSettings().groupEconomy!);
+    expect(foreignChildExtra(store, dir, 'codex:deferred')).not.toContain(WORK_HABITS_SHARED_NOTE);
+  });
+
+  it('foreign habits follow the declared workHabits support: aider gets none, codex and goose do', () => {
+    // Ревью D (F6): у aider нет инструментов — строка о параллельных вызовах и узком
+    // выводе ему не по силам, каталог зовёт рычаг «не нужен»; строка, которую он всё
+    // равно получал бы, стоила бы токенов на каждом ходе. Отметка и дописка совпадают.
+    store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, workHabits: true } });
+    for (const key of ['aider:a1', 'codex:c1', 'goose:g1']) link(key);
+    const aider = foreignChildExtra(store, dir, 'aider:a1') ?? '';
+    expect(aider).toContain(FOREIGN_CHILD_NO_TOOL_LOOP_PROMPT);
+    expect(aider).not.toContain(WORK_HABITS_SHARED_NOTE);
+    expect(foreignChildExtra(store, dir, 'codex:c1')).toContain(WORK_HABITS_SHARED_NOTE);
+    expect(foreignChildExtra(store, dir, 'goose:g1')).toContain(WORK_HABITS_SHARED_NOTE);
+  });
+
+  it('aider: из строки экономии — только тетрадь и задачи трекера; остальным CLI — целиком', () => {
+    // У aider один `--message` без своих инструментов: ни вызовов, ни чтений, ни
+    // оболочки (`--no-suggest-shell-commands`), ни сжатия своей переписки. Фразы о
+    // них ему не по силам и стоили бы токенов каждого хода; тетрадь и файл задач
+    // трекера он исполняет правкой файла и добавлением его в чат.
+    link('aider:a2');
+    link('codex:c2');
+    const aider = foreignChildExtra(store, dir, 'aider:a2') ?? '';
+    expect(aider).toContain(FOREIGN_CHILD_NO_TOOL_LOOP_PROMPT);
+    expect(aider).not.toContain(FOREIGN_GROUP_ECONOMY_PROMPT);
+    // Оболочку панель aider выключает: просьба прогнать проверки ему не по силам.
+    expect(aider).not.toContain("Run the group's checks");
+    expect(foreignChildExtra(store, dir, 'codex:c2')).toContain(FOREIGN_CHILD_PROMPT);
+    for (const gone of ['batch independent reads', 'timeout 1800000', 'full gate', 'compacted']) {
+      expect(aider).not.toContain(gone);
+    }
+    expect(aider).toContain(`one line into ${TASK_NOTEBOOK}, never a secret`);
+    expect(aider).toContain(`Tracker tasks: read ${TASK_TICKETS} first.`);
+    expect(foreignChildExtra(store, dir, 'codex:c2')).toContain(FOREIGN_GROUP_ECONOMY_PROMPT);
+  });
+
+  it('разбор (triage) не группа — ни правил, ни привычек', () => {
+    store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, workHabits: true } });
+    link('codex:triage', 'triage');
+    const extra = foreignChildExtra(store, dir, 'codex:triage') ?? '';
+    expect(extra).not.toContain(FOREIGN_CHILD_PROMPT);
+    expect(extra).not.toContain(WORK_HABITS_SHARED_NOTE);
   });
 });

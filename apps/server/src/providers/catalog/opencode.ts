@@ -162,6 +162,26 @@ export const opencodeProvider: ConfigProvider = {
     if (dirname(file) !== opencodeConfigDir()) locations.push(file);
     return locations;
   },
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026). Канала нет: ключи
+  // (`compaction.*`, `tool_output.*`) доходят только через `OPENCODE_CONFIG_CONTENT`
+  // окружения, а общий `opencode serve` окружения прогона не видит — ход с ним ушёл
+  // бы одиночным `opencode run` (`ProviderChatRun.ts`, `bindsEnv`). Потеря живой
+  // сессии стоит дороже любого из трёх рычагов.
+  groupEconomy: {
+    support: {
+      compactWindow: { support: 'disproportionate', note: 'economy-note-live-session' },
+      bashOutputChars: { support: 'disproportionate', note: 'economy-note-live-session' },
+      readOutputTokens: { support: 'disproportionate', note: 'economy-note-live-session' },
+      // Срока кэша у OpenCode нет ни ключом, ни переменной.
+      cacheTtl: { support: 'impossible', note: 'economy-note-no-key' },
+      detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
+      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
+      // Провайдер — выбор человека в OpenCode: цены и срока его кэша панель не знает.
+      freshOnColdResume: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
+      keepWarm: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
+      workHabits: { support: 'emulated' },
+    },
+  },
   // Ассистент OpenCode: есть рабочий CLI (`opencode`) → раннер `cli`.
   // Прямого API у панели для OpenCode НЕТ (D1): `apiKind` остаётся
   // `openai-compat`, но адреса (`apiBaseUrl`) нет намеренно. OpenCode — шлюз ко

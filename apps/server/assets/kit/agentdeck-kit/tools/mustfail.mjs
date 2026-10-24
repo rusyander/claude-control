@@ -860,6 +860,19 @@ const GRAPH =
  *    alone, run just those failed test files by name (no `related` graph walk). Past --budget these are
  *    printed «UNCHECKED» and never block. Runs bypass the verify ledger: a replay skips the reporter.
  */
+/**
+ * Env for a mutant run: the ledger off and the panel's lock lifted (a replayed green on a mutated
+ * tree would read as "not covered"). The lock also lives in the entry path the panel puts in
+ * NODE_OPTIONS (`bin/preload-locked.cjs`), so that entry is swapped back to the plain one.
+ */
+function unlockedLedgerEnv() {
+  const env = { AGENTDECK_VERIFY_LEDGER: 'off', AGENTDECK_VERIFY_LEDGER_LOCK: '' };
+  const options = process.env.NODE_OPTIONS ?? '';
+  if (options.includes('/bin/preload-locked.cjs"'))
+    env.NODE_OPTIONS = options.replace('/bin/preload-locked.cjs"', '/bin/preload.cjs"');
+  return env;
+}
+
 async function graphMode() {
   const started = Date.now();
   const left = () => BUDGET_MS - (Date.now() - started);
@@ -869,7 +882,8 @@ async function graphMode() {
   );
   const graphOut = join(STATE, `graph-${process.pid}.json`);
   const abs = (p) => join(root, p).replace(/\\/g, '/');
-  const env = { MUSTFAIL_GRAPH_OUT: graphOut, AGENTDECK_VERIFY_LEDGER: 'off' };
+  // The panel's lock is lifted for mutant runs only (unlockedLedgerEnv).
+  const env = { MUSTFAIL_GRAPH_OUT: graphOut, ...unlockedLedgerEnv() };
   const graphRun = async (label, targets) => {
     mkdirSync(STATE, { recursive: true });
     rmSync(graphOut, { force: true });
@@ -976,9 +990,11 @@ async function graphMode() {
     // The runner's own absolute ids: a path re-derived against --cwd breaks on an 8.3 short spelling.
     const tests = hit.map((t) => `"${t}"`).join(' ');
     revert(f);
-    const own = await execTree(CMD.replace(/\brelated\s+\{file\}/, tests), left(), {
-      AGENTDECK_VERIFY_LEDGER: 'off',
-    });
+    const own = await execTree(
+      CMD.replace(/\brelated\s+\{file\}/, tests),
+      left(),
+      unlockedLedgerEnv(),
+    );
     putBack(f);
     spent += own.ms;
     if (own.timedOut) unchecked([f], 'own run cut by budget');

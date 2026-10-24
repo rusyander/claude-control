@@ -36,7 +36,7 @@ export function setSplitPlan(state: AppState, record: SplitPlanRecord): void {
 }
 
 /** Ключ, под которым запись родителя живёт сейчас, — по цепочке переездов. */
-function currentParent(state: AppState, parentChatId: string): string {
+export function currentParent(state: AppState, parentChatId: string): string {
   let key = parentChatId;
   const seen = new Set<string>();
   const moves = state.splitPlanMoves ?? {};
@@ -64,6 +64,13 @@ export function moveSplitPlan(state: AppState, from: readonly string[], to: stri
   delete state.splitPlans[previous];
   state.splitPlans[to] = { ...record, parentChatId: to };
   state.splitPlanMoves = { ...state.splitPlanMoves, [previous]: to };
+  // Сигналы сторожа живут своим срезом (F-42) — едут вместе с записью.
+  const signals = state.groupWatchSignals;
+  if (signals && Object.hasOwn(signals, previous) && !Object.hasOwn(signals, to)) {
+    const moved = signals[previous];
+    delete signals[previous];
+    if (moved) signals[to] = moved;
+  }
   for (const link of Object.values(state.chatLinks ?? {})) {
     if (link.parentChatId === previous) link.parentChatId = to;
   }
@@ -87,7 +94,11 @@ function prune(state: AppState): void {
   const ordered = keys.sort((a, b) =>
     (records[a]?.createdAt ?? '').localeCompare(records[b]?.createdAt ?? ''),
   );
-  for (const key of ordered.slice(0, keys.length - MAX_RECORDS)) delete records[key];
+  for (const key of ordered.slice(0, keys.length - MAX_RECORDS)) {
+    delete records[key];
+    // Сигналам вытесненной записи показываться негде (срез сторожа, F-42).
+    if (state.groupWatchSignals) delete state.groupWatchSignals[key];
+  }
   // Переезды к вытесненным записям больше некуда вести.
   const moves = state.splitPlanMoves;
   if (!moves) return;

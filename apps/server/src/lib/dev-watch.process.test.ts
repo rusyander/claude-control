@@ -30,7 +30,10 @@ import { join } from 'node:path';
  * живые — ни деревом, ни по имени, ни по порту.
  */
 
-const DEV_WATCH = new URL('./dev-watch.mjs', import.meta.url);
+/** `DW_SRC` — сторож под проверкой (прогон на прежнем коде для «красного до»). */
+const DEV_WATCH = process.env.DW_SRC
+  ? new URL(`file:///${process.env.DW_SRC.replace(/\\/g, '/')}`)
+  : new URL('./dev-watch.mjs', import.meta.url);
 const PROBE = new URL('./dev-boot-probe.mjs', import.meta.url);
 const BRAND = new URL('./brand.mjs', import.meta.url);
 const RESTART = new URL('./dev-restart.mjs', import.meta.url);
@@ -292,9 +295,9 @@ describe('dev-сторож как процесс', () => {
       files: ['apps/server/src/lib/part.ts'],
       runs: ['k'],
     });
-    // Предел по умолчанию — 30 мин от начала ожидания (D1).
-    expect(Date.parse(state.capAt) - Date.parse(state.since)).toBe(30 * 60_000);
-    expect(log).toMatch(/предел 30 мин/);
+    // Живой ход ждут без срока (24.10): срока перезапуска в состоянии нет.
+    expect(state.capAt).toBeUndefined();
+    expect(log).toMatch(/без предела; нечитаемый журнал ходов — до 30 мин/);
     // Десятки сверок подряд — сервер тот же: ход не рвётся.
     await pause(3_000);
     expect(launches()).toHaveLength(1);
@@ -308,17 +311,15 @@ describe('dev-сторож как процесс', () => {
     // L6.1: под keepalive stdout сторожа выброшен — решения остаются в файле.
     const journal = readFileSync(join(appData, 'dev-watch.log'), 'utf8');
     expect(journal.match(/сервер запущен \(pid \d+, сторож \d+\)/g)).toHaveLength(2);
-    expect(journal).toMatch(/предел 30 мин/);
+    expect(journal).toMatch(/нечитаемый журнал ходов — до 30 мин/);
     expect(journal).toMatch(/по просьбе из панели/);
     expect(journal).toMatch(/перезапуск: .*part\.ts/);
   }, 120_000);
 
-  /**
-   * D1 (владелец 21.10): ходы ждут не дольше предела. Прогон 20.10 — две группы
-   * держали правку больше часа; процесс агента перезапуск переживает (E3).
-   */
-  it('правка ждёт живой ход до предела, затем перезапускает сама и называет недождавшийся ход', async () => {
-    root = mkdtempSync(join(tmpdir(), 'dev-watch-cap-'));
+  // 24.10: живой ход — и ход группы разделения — ждут без предела (предел D1 21.10
+  // рвал поток хода посреди шага); перезапуск — когда ход кончился.
+  it('правка ждёт живой ход группы и после предела, перезапускает, когда ход кончился', async () => {
+    root = mkdtempSync(join(tmpdir(), 'dev-watch-live-'));
     const serverDir = join(root, 'apps', 'server');
     const lib = join(serverDir, 'src', 'lib');
     mkdirSync(lib, { recursive: true });
@@ -353,7 +354,7 @@ describe('dev-сторож как процесс', () => {
         ...process.env,
         CLAUDE_CONFIG_DIR: config,
         AGENTDECK_DEV_DEFER_POLL_MS: '200',
-        AGENTDECK_DEV_RUNS_CAP_MS: '4000',
+        AGENTDECK_DEV_RUNS_CAP_MS: '3000',
         PIDS_FILE: pidsFile,
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
@@ -377,19 +378,82 @@ describe('dev-сторож как процесс', () => {
       `состояние ожидания\n${log}`,
     );
     expect(state).toMatchObject({ waitingFor: 'runs', runs: ['feat-export-1a2b3c'] });
-    expect(Date.parse(state.capAt) - Date.parse(state.since)).toBe(4_000);
-    // До предела сервер тот же: ход не рвётся.
-    await pause(1_500);
+    expect(state.capAt).toBeUndefined();
+    // Вдвое дольше предела — сервер тот же: ход не рвётся.
+    await pause(6_000);
     expect(launches()).toHaveLength(1);
 
+    // Ход кончился — запись ушла из журнала, правка доезжает сама.
+    writeFileSync(join(appData, 'runs.json'), '[]');
+    const second = await until(() => launches()[1], 60_000, `перезапуск после хода\n${log}`);
+    expect(second.split(' ')[1]).toBe('v2');
+    expect(existsSync(stateFile)).toBe(false);
+    const journal = readFileSync(join(appData, 'dev-watch.log'), 'utf8');
+    expect(journal).not.toMatch(/предел ожидания/);
+    expect(journal).not.toMatch(/по просьбе из панели/);
+  }, 120_000);
+
+  // Битый журнал ходов — «занято», которое ничем не доказано: его ждут только до предела.
+  it('нечитаемый журнал ходов ждут до предела, затем перезапуск сам', async () => {
+    root = mkdtempSync(join(tmpdir(), 'dev-watch-cap-'));
+    const serverDir = join(root, 'apps', 'server');
+    const lib = join(serverDir, 'src', 'lib');
+    mkdirSync(lib, { recursive: true });
+    mkdirSync(join(root, 'packages', 'contracts', 'src'), { recursive: true });
+    copyFileSync(DEV_WATCH, join(lib, 'dev-watch.mjs'));
+    copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
+    copyFileSync(BRAND, join(lib, 'brand.mjs'));
+    copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
+    writeFileSync(
+      join(serverDir, 'src', 'index.ts'),
+      `import { appendFileSync } from 'node:fs';\nimport { part } from './lib/part.ts';\nappendFileSync(process.env.PIDS_FILE as string, \`\${process.pid} \${part}\\n\`);\nsetInterval(() => {}, 1000);\n`,
+    );
+    const config = join(root, 'config');
+    const { appDataDirOf } = (await import(BRAND.href)) as {
+      appDataDirOf: (configRoot: string) => string;
+    };
+    const appData = appDataDirOf(config);
+    mkdirSync(appData, { recursive: true });
+    writeFileSync(join(appData, 'runs.json'), '{ битый');
+    const pidsFile = join(root, 'pids.txt');
+    let log = '';
+    watch = spawn(process.execPath, [join(lib, 'dev-watch.mjs')], {
+      cwd: serverDir,
+      env: {
+        ...process.env,
+        CLAUDE_CONFIG_DIR: config,
+        AGENTDECK_DEV_DEFER_POLL_MS: '200',
+        AGENTDECK_DEV_RUNS_CAP_MS: '3000',
+        PIDS_FILE: pidsFile,
+      },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      windowsHide: true,
+    });
+    watch.stdout?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    watch.stderr?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    const launches = (): string[] => {
+      if (!existsSync(pidsFile)) return [];
+      const rows = readFileSync(pidsFile, 'utf8').split(/\r?\n/).filter(Boolean);
+      for (const row of rows) recorded.add(Number(row.split(' ')[0]));
+      return rows;
+    };
+    await until(() => launches()[0], 30_000, `первый запуск\n${log}`);
+
+    writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v2';\n");
+    const stateFile = join(appData, 'dev-restart.json');
+    const state = await until(
+      () => (existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : undefined),
+      30_000,
+      `состояние ожидания\n${log}`,
+    );
+    expect(state).toMatchObject({ waitingFor: 'runs' });
+    expect(Date.parse(state.capAt) - Date.parse(state.since)).toBe(3_000);
     const second = await until(() => launches()[1], 60_000, `перезапуск по пределу\n${log}`);
     expect(second.split(' ')[1]).toBe('v2');
     expect(existsSync(stateFile)).toBe(false);
     const journal = readFileSync(join(appData, 'dev-watch.log'), 'utf8');
-    expect(journal).toMatch(
-      /предел ожидания ходов \(4 с\): перезапуск, не дождавшись feat-export-1a2b3c/,
-    );
-    expect(journal).not.toMatch(/по просьбе из панели/);
+    expect(journal).toMatch(/предел ожидания нечитаемого журнала ходов \(3 с\)/);
   }, 120_000);
 
   // Ф11: перезапуск посреди автотестов или проверки поломкой рвал прогон и

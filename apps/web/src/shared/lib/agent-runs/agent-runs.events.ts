@@ -19,10 +19,45 @@ export function applyEvent(id: string, event: ChatEvent): void {
   const next: AgentRun = { ...run, lastEventAt: Date.now() };
   let firePermission = false;
   let fireHandoff: HandoffEvent | undefined;
+  let turnReset = false;
   switch (event.kind) {
     case 'session':
       next.sessionId = event.sessionId;
       next.startedAt = event.startedAt ?? run.startedAt;
+      // Сервер отдал с начала ДРУГОЙ ход: вкладка вернулась к потоку с курсором
+      // прошлого (скрытая вкладка, обрыв связи), а под тем же ключом уже идёт
+      // новый. Пузырь прошлого хода к нему не относится — его правда в
+      // транскрипте; без сброса новый ход дописывался бы к старому тексту.
+      if (
+        event.startedAt !== undefined &&
+        run.startedAt !== undefined &&
+        event.startedAt !== run.startedAt
+      ) {
+        turnReset = true;
+        pendingUsage.delete(id);
+        Object.assign(next, {
+          status: 'running',
+          text: '',
+          thinking: '',
+          tools: [],
+          tokens: 0,
+          textUsage: undefined,
+          costUsd: undefined,
+          error: undefined,
+          errorCode: undefined,
+          errorParams: undefined,
+          errorOverflow: undefined,
+          errorRetriable: undefined,
+          askedQuestion: false,
+          permissions: [],
+          // Новый ход — отложенные карточки прошлого живут в списке «Ждёт решения».
+          deferredPermissions: undefined,
+          stalled: undefined,
+          dropped: undefined,
+          tailOnly: undefined,
+          steered: undefined,
+        } satisfies Partial<AgentRun>);
+      }
       break;
     case 'text':
       // Хвост завершённого прогона: ответ уже в истории, пузырю он не нужен.
@@ -66,6 +101,8 @@ export function applyEvent(id: string, event: ChatEvent): void {
       break;
     case 'limit':
       next.limitResetsAt = event.resetsAt;
+      // `allowed`/`allowed_warning` — лимит ещё пускает; отказ — только `rejected`.
+      next.limitHit = event.status === 'rejected';
       break;
     case 'usage': {
       // Токены прогона — для бейджа этого разговора; общий счётчик за сеанс
@@ -160,11 +197,23 @@ export function applyEvent(id: string, event: ChatEvent): void {
       firePermission = !already;
       break;
     }
-    case 'permissionResolved':
+    case 'permissionResolved': {
+      // Отложена как D-n — карточка переезжает в свой список: агента она больше
+      // не держит, а кнопки решают запись.
+      const deferred = event.deferredId
+        ? run.permissions.find((p) => p.toolUseId === event.toolUseId)
+        : undefined;
+      if (deferred && event.deferredId) {
+        next.deferredPermissions = [
+          ...(run.deferredPermissions ?? []).filter((p) => p.toolUseId !== event.toolUseId),
+          { ...deferred, deferredId: event.deferredId },
+        ];
+      }
       next.permissions = run.permissions.filter((p) => p.toolUseId !== event.toolUseId);
       // Ворота ветки отвечают тем же `toolUseId` — снимаем и их карточку.
       next.branchGates = run.branchGates.filter((gate) => gate.toolUseId !== event.toolUseId);
       break;
+    }
     case 'handoff':
       // В самом прогоне ничего не меняется: он закрыт, а работа уехала в другой
       // разговор. Колбэк вызываем ПОСЛЕ записи снимка, ниже, — обработчик
@@ -203,7 +252,8 @@ export function applyEvent(id: string, event: ChatEvent): void {
     event.kind === 'permissionResolved' ||
     event.kind === 'usage' ||
     (event.kind === 'tool' && event.name === 'AskUserQuestion') ||
-    event.kind === 'autoPick';
+    event.kind === 'autoPick' ||
+    turnReset;
   if (shownInSnapshot) rebuildStatuses();
   emit();
   if (firePermission) callbacks.onPermissionRequest?.(next);

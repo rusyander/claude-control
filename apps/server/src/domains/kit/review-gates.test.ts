@@ -67,7 +67,7 @@ describe('подсказка навыка ревью в наборе', () => {
   });
 
   it('«посмотри задачу … замечания в MR» и английский вариант ведут к ревью', () => {
-    expect(hint('посмотри задачу GOR-1 и оставь замечания в MR')).toContain('deep-review');
+    expect(hint('посмотри задачу PROJ-1 и оставь замечания в MR')).toContain('deep-review');
     expect(hint('look at the ticket and leave comments on the PR')).toContain('deep-review');
   });
 });

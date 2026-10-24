@@ -409,6 +409,14 @@ export interface BootstrapOptions {
    * состояние. Не задано — ничего.
    */
   afterRun?: (dir: string) => Promise<string[]>;
+  /**
+   * Что сделать в копии ДО команды — снимок грязного дерева (F-64). Зовётся
+   * внутри запуска, когда копия уже «идёт»: второй запрос видит занятую копию,
+   * а не делает свой снимок поверх идущей установки (тогда переписанный ею
+   * lock-файл попал бы в «грязное до подготовки» и не откатился). Отказ снимка
+   * установку не останавливает.
+   */
+  beforeRun?: (dir: string) => Promise<unknown>;
   /** Рантаймы машины (версии, менеджеры версий) — в тесте подменяются. */
   runtimes?: RuntimeDeps;
   /** Потолок мягкой цепочки (Python, Go); по умолчанию `SOFT_CHAIN_TIMEOUT_MS`. */
@@ -422,6 +430,7 @@ export class WorktreeBootstraps {
   private readonly now: () => Date;
   private readonly logDir: string;
   private readonly afterRun?: (dir: string) => Promise<string[]>;
+  private readonly beforeRun?: (dir: string) => Promise<unknown>;
   private readonly runtimes: RuntimeDeps;
   private readonly softTimeoutMs: number;
 
@@ -430,6 +439,7 @@ export class WorktreeBootstraps {
     this.timeoutMs = options.timeoutMs ?? BOOTSTRAP_TIMEOUT_MS;
     this.now = options.now ?? (() => new Date());
     this.afterRun = options.afterRun;
+    this.beforeRun = options.beforeRun;
     this.runtimes = options.runtimes ?? realRuntimeDeps();
     this.softTimeoutMs = options.softTimeoutMs ?? SOFT_CHAIN_TIMEOUT_MS;
   }
@@ -529,6 +539,7 @@ export class WorktreeBootstraps {
     plan: BootstrapPlan,
     state: WorktreeBootstrapState,
   ): Promise<WorktreeBootstrapState> {
+    if (this.beforeRun) await this.beforeRun(dir).catch(() => undefined);
     mkdirSync(this.logDir, { recursive: true });
     const chunks: string[] = [];
     let size = 0;

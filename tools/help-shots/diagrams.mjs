@@ -56,7 +56,7 @@ const SETS = [
   {
     source: 'docs/diagrams/chat-guide/chat-guide.drawio',
     topic: 'chat',
-    pages: ['message-path', 'split-conveyor'],
+    pages: ['message-path', 'split-conveyor', 'deferred-asks'],
   },
   {
     source: 'docs/diagrams/rules-guide/rules-guide.drawio',

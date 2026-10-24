@@ -167,8 +167,14 @@ export async function openStream(
       const from = lastSeqs.get(id) ?? 0;
       // Прогон мог быть заведён на сервере под другим ключом (см. serverRunId).
       const target = runs.get(id)?.serverRunId ?? id;
+      // `from` — номер кадра ХОДА, а новый ход под тем же ключом нумерует кадры
+      // с нуля. Ход, начавшийся, пока вкладка была скрыта или без связи, с
+      // курсором прошлого приходил без начала, а то и пустым. `startedAt`
+      // называет ход курсора: ход на сервере другой — он отдаётся с начала.
+      const startedAt = runs.get(id)?.startedAt;
+      const turn = startedAt !== undefined ? `&startedAt=${startedAt}` : '';
       response = await openResponse(
-        `${apiClient.defaults.baseURL}/chat/${target}/stream?from=${from}`,
+        `${apiClient.defaults.baseURL}/chat/${target}/stream?from=${from}${turn}`,
         { method: 'GET' },
         controller,
       );

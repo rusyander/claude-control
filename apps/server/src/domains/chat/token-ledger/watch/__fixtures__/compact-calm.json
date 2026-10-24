@@ -20,7 +20,7 @@
       "id": "t2",
       "name": "Bash",
       "input": {
-        "command": "../.agent/tmp/venv-llm/Scripts/python.exe -m pytest tests/test_tool_result_blocked_event.py tests/test_tool_guard.py tests/test_guardrails_fail_closed.py -q > ../.agent/tmp/pytest-390.log 2>&1; echo rc=$?; tail -30 ../.agent/tmp/pytest-390.log | cut -c1-300",
+        "command": "../.agent/tmp/venv-llm/Scripts/python.exe -m pytest tests/test_tool_result_blocked_event.py tests/test_tool_guard.py tests/test_dashboards_fail_closed.py -q > ../.agent/tmp/pytest-390.log 2>&1; echo rc=$?; tail -30 ../.agent/tmp/pytest-390.log | cut -c1-300",
         "timeout": 1800000
       }
     },
@@ -61,7 +61,7 @@
       "id": "t4",
       "name": "Bash",
       "input": {
-        "command": "cd svc-llm && PYTHONPATH=\"../shared-python/src;src\" ../.agent/tmp/venv-llm/Scripts/python.exe -m pytest tests/test_tool_result_blocked_event.py tests/test_tool_guard.py tests/test_guardrails_fail_closed.py -q > ../.agent/tmp/pytest-390.log 2>&1; echo rc=$?; tail -30 ../.agent/tmp/pytest-390.log | cut -c1-300",
+        "command": "cd svc-llm && PYTHONPATH=\"../shared-python/src;src\" ../.agent/tmp/venv-llm/Scripts/python.exe -m pytest tests/test_tool_result_blocked_event.py tests/test_tool_guard.py tests/test_dashboards_fail_closed.py -q > ../.agent/tmp/pytest-390.log 2>&1; echo rc=$?; tail -30 ../.agent/tmp/pytest-390.log | cut -c1-300",
         "timeout": 1800000
       }
     },
@@ -81,21 +81,21 @@
       "t": 1792524300979,
       "id": "t5",
       "name": "Edit",
-      "input": { "file_path": "/work/app\\svc-docs-ui\\content\\ru\\guardrails\\index.mdx" }
+      "input": { "file_path": "/work/app\\svc-docs-ui\\content\\ru\\dashboards\\index.mdx" }
     },
     {
       "kind": "tool",
       "t": 1792524303034,
       "id": "t6",
       "name": "Edit",
-      "input": { "file_path": "/work/app\\svc-docs-ui\\content\\en\\guardrails\\index.mdx" }
+      "input": { "file_path": "/work/app\\svc-docs-ui\\content\\en\\dashboards\\index.mdx" }
     },
     {
       "kind": "tool",
       "t": 1792524305933,
       "id": "t7",
       "name": "Edit",
-      "input": { "file_path": "/work/app\\svc-docs-ui\\content\\uz\\guardrails\\index.mdx" }
+      "input": { "file_path": "/work/app\\svc-docs-ui\\content\\uz\\dashboards\\index.mdx" }
     },
     {
       "kind": "tool",

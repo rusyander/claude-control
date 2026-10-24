@@ -1,6 +1,7 @@
 import { steer } from './agent-runs.steer';
 import { enqueue } from './agent-runs.commands';
 import { retryRun, startRun } from './agent-runs.lifecycle';
+import { keepSession } from './keepSession';
 import { ensureSlotsWatch, setWatched } from './agent-runs.slots';
 import { loadSpend } from './agent-runs.spend';
 import { cancelQueued } from './cancelQueued';
@@ -52,6 +53,7 @@ export const agentRuns = {
   stop: stopRun,
   haltQueued,
   retry: retryRun,
+  keepSession,
   continue: continueRun,
   stopAll,
   clear: clearRun,

@@ -11,10 +11,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
  * поддельный `node_modules/vite/bin/vite.js` пишет каталог сборки и считает, сколько
  * раз его действительно запускали.
  */
-const PRELOAD = resolve(__dirname, '../../../../../tools/verify-ledger/preload.cjs').replace(
-  /\\/g,
-  '/',
-);
+/** `VL_DIR` — каталог журнала под проверкой (прогон на прежнем коде для «красного до»). */
+const PRELOAD = resolve(
+  process.env.VL_DIR ?? resolve(__dirname, '../../../../../tools/verify-ledger'),
+  'preload.cjs',
+).replace(/\\/g, '/');
 
 /** Поддельный vite: каталог сборки из исходника, счётчик настоящих запусков, вывод. */
 const FAKE_VITE = `
@@ -22,7 +23,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 const args = process.argv.slice(2);
 const at = args.indexOf('--outDir');
-const out = at >= 0 ? args[at + 1] : 'dist';
+const conf = fs.existsSync('vite.config.ts') ? fs.readFileSync('vite.config.ts', 'utf8') : '';
+const fromConf = /build:\\s*\\{\\s*outDir:\\s*'([^']+)'/.exec(conf);
+const out = at >= 0 ? args[at + 1] : fromConf ? fromConf[1] : 'dist';
 const src = fs.readFileSync('src.txt', 'utf8').trim();
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'assets'), { recursive: true });
@@ -131,17 +134,35 @@ describe('журнал проверок: сборка vite', () => {
     expect(dist('out').html).toBe('<p>A</p>');
   });
 
-  it('outDir в конфиге — прогон пишется, но не повторяется: каталог не угадываем', () => {
+  it('outDir в конфиге литералом внутри build — повтор кладёт сборку в этот каталог', () => {
     writeFileSync(join(repo, 'vite.config.ts'), "export default { build: { outDir: 'out' } };\n");
     git('add', '-A');
     git('commit', '-qm', 'config');
-    build();
+    expect(build().code).toBe(0);
+    rmSync(join(repo, 'out'), { recursive: true, force: true });
     const again = build();
-    expect(again.err).not.toContain('reused green');
-    expect(realRuns()).toBe(2);
-    expect(events().some((e) => e.kind === 'miss' && e.reason === 'vite outDir from config')).toBe(
-      true,
-    );
+    expect(again.err).toContain('reused green');
+    expect(realRuns()).toBe(1);
+    expect(dist('out').html).toBe('<p>A</p>');
+    expect(existsSync(join(repo, 'dist'))).toBe(false);
+  });
+
+  it('outDir в конфиге выражением или ключом плагина — прогон пишется, но не повторяется', () => {
+    for (const config of [
+      'export default { build: { outDir: process.env.OUT ?? "dist" } };\n',
+      "export default { plugins: [dts({ outDir: 'types' })], build: { sourcemap: true } };\n",
+      "export default { build: { outDir: 'a' }, worker: { outDir: 'b' } };\n",
+    ]) {
+      writeFileSync(join(repo, 'vite.config.ts'), config);
+      const runs = realRuns();
+      build();
+      const again = build();
+      expect(again.err).not.toContain('reused green');
+      expect(realRuns()).toBe(runs + 2);
+    }
+    expect(
+      events().filter((e) => e.kind === 'miss' && e.reason === 'vite outDir from config'),
+    ).toHaveLength(6);
   });
 
   it('не сборка (dev-сервер, --watch) — не проверка, журнал молчит', () => {

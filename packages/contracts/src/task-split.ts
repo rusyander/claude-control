@@ -29,9 +29,11 @@ import {
   DELIVERY_CHECKS_LINE,
   labelledCut,
   OWNER_PRECEDENCE_LINE,
+  OWNER_PRECEDENCE_PLAIN_LINE,
   OWNER_TEXT_MAX,
   SKILL_ROUTE_LINE,
   SYNC_ON_CONFLICT_LINE,
+  WORK_STAGE_CHECKS_LINE,
 } from './quality-floor.ts';
 
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
@@ -1109,6 +1111,58 @@ export function groupQuestionsHumanLine(foreign = false): string {
 export const GROUP_QUESTIONS_HUMAN_LINE = groupQuestionsHumanLine();
 
 /**
+ * Шаг, который вопрос отдаёт человеку, а агент может сделать сам (владелец,
+ * 23.10: «Войду через qa:login (рекомендую)» стоял, пока человек не нажал) —
+ * сперва сам, одной попыткой; не вышло — дальше без него, пробел в MR.
+ * Цель — как авторежим Claude Code: человека зовут только слияние и
+ * разрушительное или системное, а это спрашивает брокер прав сам.
+ */
+export const GROUP_SELF_FIRST_LINE =
+  "A step a question would hand to the human but you can take yourself (sign in again with the project's " +
+  'own account and credentials files, start the service, refresh the session) — take it yourself: one ' +
+  'attempt, no retry after a failure, never brute-force a login; when it fails, continue without it ' +
+  'and name the gap in the MR description.';
+
+/**
+ * Развилки группы — по плану (`groupQuestions: 'plan'`). У Claude вопрос
+ * `AskUserQuestion` закрывает брокер панели сам (`group-questions.ts`), и
+ * ждать на нём нечего; у чужого CLI инструмента нет — вопрос строкой остаётся
+ * для того, без чего не обойтись.
+ */
+export function groupQuestionsPlanLine(foreign = false): string {
+  const head =
+    'Decide a fork for which you have a recommended option yourself: take it and record it in ' +
+    'the MR description as a decision for the review.';
+  const asking = foreign
+    ? 'A question to the human in the last line of your answer — only when the step is irreversible ' +
+      "or goes beyond the group's tasks (someone else's task, a DB migration is needed, nothing to " +
+      'recommend); once answered, continue from the same stage.'
+    : 'The human does not answer the questions of this group: the panel answers AskUserQuestion ' +
+      'itself at once (the recommended option, else one that continues without the human). Never end ' +
+      'a turn waiting for an answer — not with a question in text, not with "after your answer", not ' +
+      'with questions left in a file: decide by your own recommendation, record it in the MR ' +
+      'description and continue; a turn that ends waiting is resumed by the panel with that same ' +
+      'instruction. Operations only the human approves (a deletion — any git deletion or anything ' +
+      "outside your copy; a force-push beyond the delivery's lease; a DB migration, DDL or data " +
+      'write; credentials; a package publish) are not waited for: the panel refuses such a call ' +
+      'at once and queues it for the human as D-n. Do not retry or work around it, continue everything ' +
+      'else, keep the MR a draft while an item waits, and end the turn with one line per open ' +
+      'item: "Waiting for the human: D-n — <what it unblocks>". Merging and pushing to the main ' +
+      "branch are the owner's step: push your own branch and deliver the MR.";
+  return `${head} ${asking} ${GROUP_SELF_FIRST_LINE}`;
+}
+
+/**
+ * Ответ панели на вопрос группы, когда ни один вариант не годится, — слова
+ * владельца (23.10) и шаг «сначала сам». По-английски, как всё, что уходит
+ * модели (решение D-E, `server-model-english.test.ts`).
+ */
+export const GROUP_PLAN_FREE_ANSWER =
+  'Autonomous mode: the human will not answer. Decide yourself — the recommended option if it ' +
+  'needs no action from the human, otherwise the one that continues the work without the human; ' +
+  `record the decision and the reason in the MR description. ${GROUP_SELF_FIRST_LINE}`;
+
+/**
  * Находка, которая не воспроизвелась (аудит 25.09, L258): группа, получив
  * замечание ревью, которое у неё не повторилось, тянула в проект новые
  * зависимости, CI и тестовую обвязку «чтобы проверить наверняка». Такая
@@ -1154,7 +1208,7 @@ export function shotCommandLine(shots: ShotCommand): string {
  */
 export function reviewPackLine(command: string): string {
   return (
-    'Review subagents (the review stage of the delivery skill, with its count and depth unchanged): ' +
+    'Review subagents (the review skill or the review stage of the delivery skill, with its count and depth unchanged): ' +
     `before spawning them, build the review package — \`${command} --plan <your plan or progress file>\` ` +
     'writes one file with the commits, the changed files, the plan and the whole diff of the copy ' +
     '(uncommitted and new files included) and prints its path. Give every reviewer that path and, in ' +
@@ -1202,8 +1256,17 @@ export function deliveryPreamble(input: {
   shots?: ShotCommand;
   /** Команда пакета ревью (5.3): `node "<abs>/tools/review-pack.mjs"`. */
   reviewPack?: string;
+  /**
+   * Доставку ведёт отдельное звено панели после работы (каскад заводит его всегда,
+   * когда доставка включена). Тогда работе — только правка и коммит: полный гейт,
+   * пуш, MR и своё ревью — дело звена доставки (владелец 23.10: один полный гейт
+   * на группу). Замер 23.10: звенья работы гнали полный гейт 113 раз за день,
+   * потому что задание работы велело «проверки проекта, пуш, MR, ревью».
+   */
+  deliverLater?: boolean;
 }): string {
   const foreign = input.foreign === true;
+  if (input.deliverLater) return workStageDeliveryPreamble(input, foreign);
   return [
     "Delivering a ready MR is this group's duty: the human enabled it on the project, and that is " +
       'their permission to commit, push, create and update the MR and to move the tracker tasks of ' +
@@ -1233,21 +1296,49 @@ export function deliveryPreamble(input: {
     // собственная, и переписать её арендой не значит тронуть общую историю.
     `Before the push — ${SYNC_ON_CONFLICT_LINE} Already pushed → after that rebase ` +
       '`git push --force-with-lease origin <group branch>`: only your own branch, never the main, ' +
-      "a protected branch or another group's branch; a conflict in such a rebase is a question to " +
-      'the human with a recommended option.',
+      "a protected branch or another group's branch; a conflict in such a rebase is resolved by the " +
+      'group itself, never handed to the human.',
     // Автономия по умолчанию (журнал 78, T24): группа стояла на развилке, для
     // которой сама назвала рекомендацию, пока человека не было у панели. Кто
     // решает развилки, выбирает человек во вкладке «Группы» (аудит 25.09, L40).
     input.questions === 'human'
       ? groupQuestionsHumanLine(foreign)
-      : 'Decide a fork for which you have a recommended option yourself: take it and record it in ' +
-        `the MR description as a decision for the review. A question to the human ${foreign ? 'in the last line of your answer' : 'with the AskUserQuestion tool'} ` +
-        "— only when the step is irreversible or goes beyond the group's tasks " +
-        "(someone else's task, a DB migration is needed, nothing to recommend); once answered, " +
-        'continue from the same stage.',
+      : groupQuestionsPlanLine(foreign),
     unconfirmedFindingLine(foreign),
     'The last line of your answer is the MR link.',
     'The plan stage only takes this section into account in the plan; the work stage carries it out.',
+  ].join('\n');
+}
+
+/**
+ * Преамбула доставки для работы, за которой идёт звено доставки (`deliverLater`).
+ * Строка «правила проекта сильнее строк панели» иначе читалась как «гейт проекта
+ * перед “готово” — в каждом звене»: охват проверок здесь назван панельным, и
+ * правило проекта о полных проверках выполняет прогон в доставке.
+ */
+function workStageDeliveryPreamble(
+  input: Parameters<typeof deliveryPreamble>[0],
+  foreign: boolean,
+): string {
+  // F-125: этот текст читает и звено плана (под «EDIT NOTHING»), поэтому
+  // строка называет звено, которое правит, а плану — только учесть.
+  return [
+    "Delivering a ready MR is this group's duty, and the panel runs it as a separate stage after " +
+      'the work. The work stage makes the change and commits it on this branch following the ' +
+      'project convention for messages.',
+    WORK_STAGE_CHECKS_LINE,
+    ...(input.shots ? [shotCommandLine(input.shots)] : []),
+    'All tasks of the group are ONE branch and ONE MR: the delivery stage puts the task keys into ' +
+      'the MR description.',
+    input.mergeRequest
+      ? `The MR already exists: ${input.mergeRequest}; the delivery stage pushes to its branch.`
+      : `The panel has already created the copy's branch: ${input.branch}. Do not create another.`,
+    input.questions === 'human'
+      ? groupQuestionsHumanLine(foreign)
+      : groupQuestionsPlanLine(foreign),
+    unconfirmedFindingLine(foreign),
+    'The plan stage only takes this section into account in the plan and changes nothing; the ' +
+      'work stage carries it out.',
   ].join('\n');
 }
 
@@ -1330,7 +1421,17 @@ export function chatDeliveryPrompt(input: { skill?: string; foreign?: boolean })
   );
 }
 
-export function buildGroupPrompt(group: TaskSplitGroup, shared?: string): string {
+/**
+ * Задание группы. `deliver` — за работой идёт звено доставки с полным прогоном
+ * проверок: только тогда строка старшинства обещает «правило о полном прогоне
+ * выполнит доставка». Без доставки обещание неправда — полный прогон никто не
+ * сделает, и группа пропустила бы то, что требует правило (RF-BGCD-06, F-57).
+ */
+export function buildGroupPrompt(
+  group: TaskSplitGroup,
+  shared?: string,
+  options: { deliver?: boolean } = {},
+): string {
   const parts: string[] = [];
   if (shared) parts.push(shared);
   if (group.brief) parts.push(group.brief);
@@ -1346,6 +1447,9 @@ export function buildGroupPrompt(group: TaskSplitGroup, shared?: string): string
   // или его агентом, и всё, что панель допишет к прогону потом (преамбулы,
   // стадии), читается под ней, а не поверх неё. Навык по роду работы (U12) —
   // над ней: это добавка панели, и старшинство накрывает и её.
-  parts.push(SKILL_ROUTE_LINE, OWNER_PRECEDENCE_LINE);
+  parts.push(
+    SKILL_ROUTE_LINE,
+    options.deliver ? OWNER_PRECEDENCE_LINE : OWNER_PRECEDENCE_PLAIN_LINE,
+  );
   return parts.join('\n\n').trim();
 }

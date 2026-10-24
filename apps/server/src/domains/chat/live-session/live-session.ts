@@ -594,6 +594,20 @@ export class LiveSessionPool {
     return this.sessions.size;
   }
 
+  /**
+   * Номера процессов всех живых сессий, и ждущих следующего хода тоже: фоновая
+   * команда тёплой сессии — такой же процесс модели, как идущий ход (защита
+   * решений человека от самоодобрения, `human-only.ts`).
+   */
+  pids(): number[] {
+    const out: number[] = [];
+    for (const session of this.sessions.values()) {
+      const pid = session.alive ? session.pid : undefined;
+      if (typeof pid === 'number' && pid > 0) out.push(pid);
+    }
+    return out;
+  }
+
   /** Процесс сессии держит фоновую работу агента (Д3). */
   backgroundOf(sessionId: string | undefined): boolean {
     if (!sessionId) return false;

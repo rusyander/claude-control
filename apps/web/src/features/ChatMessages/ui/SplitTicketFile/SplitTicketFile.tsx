@@ -20,15 +20,28 @@ export function SplitTicketFile({
   tracker,
   description,
 }: SplitTicketFileProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const file = useFileSplitTicket();
   const queryClient = useQueryClient();
   const [asking, setAsking] = useState(false);
 
   if (ticket.filed) {
+    // Ушло комментарием в уже открытую задачу — подпись та же, что в итоге «Разобрать…».
+    const commented = ticket.filed.commented === true;
     return (
-      <Typography variant="caption" color="subtle" as="span" data-ticket-filed={ticket.filed.key}>
-        {t('chat.cascade.hub.tickets.filed', { key: ticket.filed.key })}
+      <Typography
+        variant="caption"
+        color="subtle"
+        as="span"
+        data-ticket-filed={ticket.filed.key}
+        {...(commented ? { 'data-ticket-commented': '' } : {})}
+      >
+        {t(
+          commented ? 'chat.cascade.hub.tickets.filedCommented' : 'chat.cascade.hub.tickets.filed',
+          {
+            key: ticket.filed.key,
+          },
+        )}
       </Typography>
     );
   }
@@ -43,12 +56,20 @@ export function SplitTicketFile({
   }
 
   const confirm = (): void => {
+    const lang = i18n.language.startsWith('en') ? 'en' : 'ru';
     file.mutate(
-      { parentChatId, key: ticket.key, description },
+      { parentChatId, key: ticket.key, description, lang },
       {
         onSuccess: (result) => {
           setAsking(false);
-          toast.success(t('chat.cascade.hub.tickets.filed', { key: result.key }));
+          toast.success(
+            t(
+              result.commented
+                ? 'chat.cascade.hub.tickets.filedCommented'
+                : 'chat.cascade.hub.tickets.filed',
+              { key: result.key },
+            ),
+          );
           void queryClient.invalidateQueries({ queryKey: chatTreeKeys.all });
         },
         onError: (error) =>

@@ -18,6 +18,7 @@ import {
   isWatched,
   ledgerBusy,
   readJsonSteady,
+  runsWait,
   splitSetupRunning,
 } from './dev-watch.mjs';
 import {
@@ -269,5 +270,70 @@ describe('отложенный перезапуск — общий файл ст
     expect(takeRestartRequest(dir)).toBe(true);
     expect(takeRestartRequest(dir)).toBe(false);
     expect(readRestartState(dir, () => true).requested).toBe(false);
+  });
+});
+
+// 24.10: ход с живым процессом — и ход группы разделения — ждут без предела;
+// предел ожидания остаётся только у нечитаемого журнала без живого хода.
+describe('ждать ли идущих ходов', () => {
+  const CAP = 30 * 60_000;
+  const now = Date.parse('2026-10-24T12:00:00.000Z');
+  const groupTurn = { key: 'k', pid: 7, cwd: '/w/worktrees/feat-export-1a2b3c' };
+
+  it('живой ход группы через 31 мин отсрочки — ждём дальше, без срока', () => {
+    const verdict = runsWait(
+      [{ value: [groupTurn] }],
+      (pid) => pid === 7,
+      now - 31 * 60_000,
+      now,
+      CAP,
+    );
+    expect(verdict).toEqual({ wait: true, capped: false, runs: ['feat-export-1a2b3c'] });
+  });
+
+  it('ход кончился (процесс умер или запись ждущая) — ждать нечего', () => {
+    expect(runsWait([{ value: [groupTurn] }], () => false, now - 60_000, now, CAP).wait).toBe(
+      false,
+    );
+    expect(
+      runsWait([{ value: [{ ...groupTurn, idle: true }] }], () => true, now - 60_000, now, CAP)
+        .wait,
+    ).toBe(false);
+  });
+
+  it('нечитаемый журнал без живого хода — ждём до предела, затем перезапуск', () => {
+    const since = now - 10 * 60_000;
+    expect(runsWait([{ unreadable: true }, { value: [] }], () => true, since, now, CAP)).toEqual({
+      wait: true,
+      capped: false,
+      capAt: new Date(since + CAP).toISOString(),
+      runs: [],
+    });
+    expect(runsWait([{ unreadable: true }], () => true, now - CAP, now, CAP)).toEqual({
+      wait: false,
+      capped: true,
+      runs: [],
+    });
+    // Отсрочка только начинается — срок от «сейчас».
+    expect(runsWait([{ unreadable: true }], () => true, undefined, now, CAP).capAt).toBe(
+      new Date(now + CAP).toISOString(),
+    );
+    // Предел выключен — нечитаемый журнал ждут без срока.
+    expect(runsWait([{ unreadable: true }], () => true, now - 2 * CAP, now, 0)).toEqual({
+      wait: true,
+      capped: false,
+      runs: [],
+    });
+  });
+
+  it('нечитаемый журнал Claude и живой ход чужого CLI — ждём без предела', () => {
+    const verdict = runsWait(
+      [{ unreadable: true }, { value: [groupTurn] }],
+      () => true,
+      now - 2 * CAP,
+      now,
+      CAP,
+    );
+    expect(verdict).toEqual({ wait: true, capped: false, runs: ['feat-export-1a2b3c'] });
   });
 });

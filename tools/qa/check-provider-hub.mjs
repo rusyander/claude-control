@@ -306,6 +306,8 @@ check(
   (await overlapPanel.getAttribute('data-hub-overlap')) === 'checked',
   'после сверки раздел показывает счёт, а не прежнее «не сверялись»',
 );
+// Раздел свёрнут до заголовка (владелец 22.10.2026): строки — по нажатию на него.
+await overlapPanel.locator('button[aria-expanded="false"]').click();
 const overlapText = await overlapPanel.textContent();
 check(overlapText.includes('shared.ts'), `общий файл назван: ${overlapText}`);
 check(

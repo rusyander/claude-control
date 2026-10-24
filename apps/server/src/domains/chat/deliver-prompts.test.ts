@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { deliverStagePrompt, fixStagePrompt } from '@agentdeck/contracts/model-cascade';
 import { deliveryPreamble } from '@agentdeck/contracts/task-split';
+import { OWNER_PRECEDENCE_LINE } from '@agentdeck/contracts/quality-floor';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { asksDelivery, planCascadeStage } from './ChatCascadeStages/ChatCascadeStages.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
@@ -47,7 +48,10 @@ describe('звено доставки (журнал 59a, 61b)', () => {
   // без него брокер откажет, и задание «догони» стоило бы хода и гейта заново.
   it('основная до пуша: fetch, проверка конфликта, rebase только при нём', () => {
     expect(prompt).toContain('git fetch origin');
-    expect(prompt).toContain('git merge-tree --write-tree --quiet HEAD origin/<main>');
+    // Без `--quiet`: группа #0 23.10 получила код 0 при семи конфликтах.
+    expect(prompt).toContain('git merge-tree --write-tree HEAD origin/<main>` (without `--quiet`');
+    expect(prompt).not.toContain('--write-tree --quiet');
+    expect(prompt).toContain('exit 1 or any CONFLICT line = a real conflict');
     expect(prompt).toContain('stay on the current base, never rebase');
     expect(prompt).not.toContain('pushed but behind the main branch');
     // Отправленную отставшую — тоже, но пуш только с арендой (W3-3); `--force` — никогда.
@@ -62,7 +66,7 @@ describe('звено доставки (журнал 59a, 61b)', () => {
     const preamble = deliveryPreamble({ branch: 'fix-PROJ-7' });
 
     expect(preamble).toContain('git fetch origin');
-    expect(preamble).toContain('exit 1 = a real conflict');
+    expect(preamble).toContain('= a real conflict');
     expect(preamble).not.toContain('has fallen behind main');
   });
 
@@ -72,6 +76,57 @@ describe('звено доставки (журнал 59a, 61b)', () => {
 
     expect(preamble).toContain('run ONCE on the final tree right before the push');
     expect(prompt).toContain('ONCE on this final tree');
+    // Ложное «прошлые звенья гнали только узкие» снято: звено доставки — единственный полный прогон.
+    expect(prompt).not.toContain('the earlier stages ran only narrow ones');
+    expect(prompt).toContain("it is the group's one full run");
+  });
+
+  // Владелец 23.10: один полный гейт на группу, в доставке. Замер 23.10 — звенья
+  // работы гнали гейт 113 раз за день по заданию «проверки проекта, пуш, MR, ревью».
+  it('работа перед звеном доставки: правка и коммит, узкие проверки, без гейта, пуша, MR и ревью', () => {
+    const work = deliveryPreamble({
+      branch: 'fix-PROJ-7',
+      reviewPack: 'node "/p/tools/review-pack.mjs"',
+      deliverLater: true,
+    });
+
+    expect(work).toContain('commits it on this branch');
+    expect(work).toContain('no full project gate, no push, no MR and no review pass of your own');
+    // Правило проекта «полные проверки перед “готово”» выполняет прогон доставки.
+    expect(work).toContain('that run is what satisfies a project rule asking for full checks');
+    expect(work).toContain('fix-PROJ-7');
+    expect(work).toContain('ONE branch and ONE MR');
+    expect(work).toContain('recommended option');
+    for (const gone of [
+      'review-pack.mjs',
+      'merge-tree',
+      'force-with-lease',
+      'ONCE on the final tree right before the push',
+      'The last line of your answer is the MR link',
+    ])
+      expect(work, gone).not.toContain(gone);
+    expect(
+      deliveryPreamble({ branch: 'b', mergeRequest: 'https://x/mr/1', deliverLater: true }),
+    ).toContain('The MR already exists: https://x/mr/1; the delivery stage pushes to its branch.');
+  });
+
+  // F-125: ту же преамбулу читает звено плана под «EDIT NOTHING» — правку и
+  // коммит строка поручает звену работы, а плану велит только учесть.
+  it('преамбула работы не велит звену плана править и коммитить', () => {
+    const work = deliveryPreamble({ branch: 'fix-PROJ-7', deliverLater: true });
+
+    expect(work).not.toContain('Your stage is the work');
+    expect(work).toContain('The work stage makes the change and commits it');
+    expect(work).toContain('The plan stage only takes this section into account in the plan');
+  });
+
+  // Строка старшинства отдавала охват правилам проекта — и звено читало в ней
+  // «гейт проекта перед “готово” — в каждом звене». Когда идёт полный гейт, решает панель.
+  it('старшинство правил проекта не переносит полный гейт в каждое звено', () => {
+    expect(OWNER_PRECEDENCE_LINE).toContain(
+      "except WHEN the full project checks run: that is the panel's schedule (once per group, at delivery)",
+    );
+    expect(OWNER_PRECEDENCE_LINE).not.toContain('\n');
   });
 
   it('пуш своей ветки обычным push, MR и ссылка последней строкой', () => {

@@ -77,6 +77,35 @@ export const gooseProvider: ConfigProvider = {
     skills: { format: 'skill-md-dir', relativeDir: '.agents/skills' },
   },
   configLocations: () => [gooseConfigDir()],
+  // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, живые пробы goose 1.54.0).
+  // Переменные окружения запуска (`economy-run/goose.ts`): Goose ставит их выше
+  // `config.yaml`, и до `goose acp` на каждый ответ они доходят — снято пробой.
+  groupEconomy: {
+    channel: 'goose',
+    support: {
+      // `GOOSE_AUTO_COMPACT_THRESHOLD` — доля окна. Действует, когда окно модели
+      // известно (`GOOSE_CONTEXT_LIMIT` человека, окно локальной модели, окно облачной
+      // по каталогу моделей панели для `GOOSE_MODEL`), иначе молчит — условие в подсказке.
+      compactWindow: { support: 'native', note: 'economy-note-window-known-only' },
+      // `GOOSE_MAX_TOOL_RESPONSE_SIZE` — знаки, ОДИН ключ на все инструменты: больший из
+      // двух рычагов (чтение × 4), сверх него ответ уходит в файл со ссылкой. Меньший
+      // рычаг поэтому сам по себе не режет — подсказка говорит это у обоих.
+      bashOutputChars: { support: 'native', note: 'economy-note-shared-tool-limit-larger' },
+      readOutputTokens: { support: 'native', note: 'economy-note-shared-tool-limit-larger' },
+      // `GOOSE_CACHE_TTL` есть, но провайдер Anthropic с ним шлёт тот же
+      // `cache_control` без срока (проба на заглушке): рычаг ничего бы не менял.
+      cacheTtl: { support: 'impossible', note: 'economy-note-no-effect' },
+      // `goose acp` и `goose run` без редактора.
+      detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
+      // Модель выбирается в самом Goose, лестницы моделей у панели нет.
+      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
+      // Провайдер — выбор человека в Goose: ни цены кэша, ни срока его жизни панель не
+      // знает, а без них паузу «кэш остыл» и окупаемость пинга не посчитать.
+      freshOnColdResume: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
+      keepWarm: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
+      workHabits: { support: 'emulated' },
+    },
+  },
   // Своего модельного API у Goose нет: модель даёт провайдер, который настроен
   // внутри самого Goose, а ключ лежит в его связке ключей. Поэтому `none` +
   // запуск через CLI (подписка/настройка пользователя), без ключа в панели.

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import type { ChatTreeAsk } from '@agentdeck/contracts/chat-handoff';
 import { writeJsonFile } from '../../../lib/safe-io/safe-io.ts';
-import { endsWithQuestion } from '../chain-outcome/chain-outcome.ts';
+import { waitsForAnswer } from '../chain-outcome/chain-outcome.ts';
 import type { ChatEvent } from '../chat-events.ts';
 import type { ChatRunRegistry, RunFinished } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import { findTranscript, readTailRecords } from '../ChatTranscriptFile/ChatTranscriptFile.ts';
@@ -141,7 +141,9 @@ export class PendingAsks {
         return;
       }
     }
-    if (finished.asked || endsWithQuestion(finished.text)) {
+    // Ожидание словами без «?» — тоже вопрос дерева (`waitsForAnswer`, то же
+    // правило, что у паузы хода): иначе «ждёт вас» не загорался вовсе.
+    if (finished.asked || waitsForAnswer(finished.text)) {
       const text = tailOf(finished.text);
       if (text) this.put(keys, { kind: 'text', runId: finished.chatId, text, askedAt: this.now() });
     }

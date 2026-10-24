@@ -82,6 +82,9 @@ export const BUILT_IN_ENTRIES: PricingEntry[] = [
   { id: 'claude-opus-4-5', label: 'Claude Opus 4.5', price: p(5, 25, 0.5, 6.25) },
   { id: 'claude-opus-4-1', label: 'Claude Opus 4.1', price: p(15, 75, 1.5, 18.75) },
   { id: 'claude-opus-4', label: 'Claude Opus 4', price: p(15, 75, 1.5, 18.75) },
+  // Старое имя `claude-3-opus-…` без своей строки уходило в семейство и считалось
+  // по цене нынешнего Opus — втрое дешевле настоящей.
+  { id: 'claude-opus-3', label: 'Claude Opus 3', price: p(15, 75, 1.5, 18.75) },
   {
     id: 'claude-sonnet-5',
     label: 'Claude Sonnet 5',

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { HANDOFF_BLOCK_LANG, HANDOFF_GROUP_MAX_CHAIN } from '@agentdeck/contracts/chat-handoff';
 import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
+import { OWNER_PRECEDENCE_PLAIN_LINE } from '@agentdeck/contracts/quality-floor';
 import { WARM_DELIVER_LINE } from '../../domains/chat/group-continuation/group-continuation.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
@@ -19,6 +20,7 @@ import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
 import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace/ChatWorkspace.ts';
 import { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
+import { carriedStageLink } from '../../lib/app-store/chat-links.ts';
 
 /**
  * Доставка группы разделения (журнал 55/57/58/59/65, 42/44/45): звено доставки
@@ -271,6 +273,25 @@ describe('звено доставки группы разделения', () => 
     // Ход пробуждения — уже без фона: он и есть итог правок, доставка заводится.
     planner(finished);
     expect(links.get(stageRuns(runs)[0]?.chatId ?? '')?.stage).toBe('deliver');
+  });
+
+  // Живой случай RBAC 23.10, режим «вопросы — человеку»: ход кончился ожиданием
+  // словами без «?». `pausedTurn` видел только «?» — звено доставки шло без ответа.
+  it('конец хода правок ожиданием ответа словами не заводит доставку: группа ждёт ответа', () => {
+    const { planner, links, runs, ended } = build('', { delivers: true });
+    links.set('чат-правки', FIX_LINK);
+    planner({
+      chatId: 'чат-правки',
+      sessionId: 'sess-правки',
+      projectPath: CWD,
+      text: 'Сделал этапы A–C.\n\nЭтапы D и E начну после ответа. Вопросы и рекомендации записаны в .agent/PROGRESS.md',
+      ok: true,
+      startedAt: Date.now(),
+      contextTokens: 0,
+      options: { prompt: FIRST_PROMPT, cwd: CWD },
+    });
+    expect(stageRuns(runs)).toEqual([]);
+    expect(ended).toEqual([{ stage: 'fix', status: 'awaiting' }]);
   });
 
   // Ревью сит, 28.09, п. 12: пути копии читаются асинхронно — git на большой копии
@@ -618,6 +639,35 @@ describe('звено доставки группы разделения', () => 
 
       expect(stageRuns(runs)[0]).toMatchObject({ model: 'claude-opus-5', fork: true });
     });
+
+    // n6: у контура своя строка «sonnet» в карте — доставка просит её, и маршрут
+    // переводит просьбу в дешёвую модель контура (haiku вместо fable).
+    it('через контур со строкой «sonnet» в карте доставка идёт на Sonnet', async () => {
+      const { registry, links, runs } = build('Поправил.', {
+        delivers: true,
+        context: 30_000,
+        sonnetDeliver: true,
+      });
+      registry.setPlatformRouting((_origin, asked) => ({
+        env: {},
+        model: {
+          model: asked === 'sonnet' ? 'claude-haiku-5-5' : 'claude-fable-5',
+          asked,
+          source: 'mapped',
+          replaced: true,
+        },
+        effort: false,
+        modelMapKeys: ['opus', 'sonnet'],
+      }));
+      links.set('чат-правки', OPUS_FIX_LINK);
+
+      await start(registry, 'чат-правки', { model: 'claude-opus-5', effort: 'xhigh' });
+
+      const deliver = stageRuns(runs)[0];
+      expect(links.get(deliver?.chatId ?? '')).toMatchObject({ stage: 'deliver', model: 'sonnet' });
+      expect(deliver).toMatchObject({ model: 'sonnet' });
+      expect(deliver?.fork).toBeUndefined();
+    });
   });
 
   it('правки группы с доставкой знают, что доставка идёт следом (журнал 59d)', async () => {
@@ -767,6 +817,87 @@ ${FIRST_PROMPT}`),
     ).toBeGreaterThan(prompt.indexOf('коммит, пуш, MR'));
     // За потолком ход группы кончился, и дальше её ведёт конвейер — один раз.
     expect(ended).toHaveLength(1);
+  });
+
+  // RF-BGCD-06: продолжение группы без доставки обещало «правило о полном прогоне
+  // выполнит доставка» — звена доставки за ней нет. С доставкой обещание остаётся.
+  it('строка старшинства продолжения группы — по наличию звена доставки', async () => {
+    const SCHEDULE = 'a rule asking for them is met by that run';
+    const continuation = async (delivers: boolean) => {
+      const { registry, links, runs } = build(`Правки сделал.\n\n${handoffBlock()}`, {
+        mtime: Date.now() + 60_000,
+        context: FULL_WINDOW,
+        delivers,
+      });
+      links.set('чат-работа', { ...WORK_LINK, lowered: false });
+      await run(registry, 'чат-работа');
+      const prompt = stageRuns(runs)[0]?.prompt ?? '';
+      expect(prompt.startsWith('This is a new session of a split group')).toBe(true);
+      return prompt;
+    };
+    expect(await continuation(false)).not.toContain(SCHEDULE);
+    expect(await continuation(true)).toContain(SCHEDULE);
+  });
+
+  // RF-BGCD-06, остаток: доставка этого круга уже заведена (`deliveredAt`) —
+  // второй не будет, и обещание «полный прогон сделает доставка» на каждом
+  // продолжении врало и стоило места в задании. Просьба человека доставить
+  // снова (`asksDelivery`) возвращает доставку — и обещание с ней.
+  it('доставка круга уже прошла — продолжение без обещания полного прогона', async () => {
+    const SCHEDULE = 'a rule asking for them is met by that run';
+    const continuation = async (prompt: string) => {
+      const { registry, links, runs } = build(`Правки сделал.\n\n${handoffBlock()}`, {
+        mtime: Date.now() + 60_000,
+        context: FULL_WINDOW,
+        delivers: true,
+        // Блок продолжения — на любое задание, не только на `FIRST_PROMPT`.
+        every: true,
+      });
+      links.set('чат-работа', {
+        ...WORK_LINK,
+        lowered: false,
+        deliveredAt: '2026-09-07T11:00:00.000Z',
+      });
+      registry.start('чат-работа', { prompt, cwd: CWD }, { projectPath: CWD });
+      await new Promise((done) => setTimeout(done, 20));
+      const text = stageRuns(runs)[0]?.prompt ?? '';
+      expect(text.startsWith('This is a new session of a split group')).toBe(true);
+      return text;
+    };
+    const after = await continuation(FIRST_PROMPT);
+    expect(after).not.toContain(SCHEDULE);
+    expect(after).toContain(OWNER_PRECEDENCE_PLAIN_LINE);
+    expect(await continuation('доставь заново')).toContain(SCHEDULE);
+  });
+
+  // RF-BGCD-06 + F-110: отметка `deliveredAt` — факт разговора, а не группы.
+  // Продолжение того же круга (`carriedLink`) несёт её дальше — второй хоп тоже
+  // без обещания. Новый разговор доставки (`carriedStageLink`) её не берёт: он и
+  // есть доставка, и его продолжение получает строку целиком.
+  it('отметка доставки: второй хоп того же круга без обещания, новая доставка — с ним', async () => {
+    const SCHEDULE = 'a rule asking for them is met by that run';
+    const hops = async (link: ChatLink) => {
+      const { registry, links, runs } = build(`Правки сделал.\n\n${handoffBlock()}`, {
+        mtime: Date.now() + 60_000,
+        context: FULL_WINDOW,
+        delivers: true,
+        every: true,
+      });
+      links.set('чат-звено', link);
+      registry.start('чат-звено', { prompt: FIRST_PROMPT, cwd: CWD }, { projectPath: CWD });
+      await new Promise((done) => setTimeout(done, 100));
+      return stageRuns(runs).map((hop) => hop.prompt ?? '');
+    };
+    const delivered = { ...WORK_LINK, lowered: false, deliveredAt: '2026-09-07T11:00:00.000Z' };
+
+    const sameRound = await hops(delivered);
+    expect(sameRound.length).toBeGreaterThanOrEqual(2);
+    expect(sameRound[0]).not.toContain(SCHEDULE);
+    expect(sameRound[1]).not.toContain(SCHEDULE);
+
+    const fresh = await hops({ ...carriedStageLink(delivered), stage: 'deliver' });
+    expect(fresh[0]?.startsWith('This is a new session of a split group')).toBe(true);
+    expect(fresh[0]).toContain(SCHEDULE);
   });
 
   // E1 (замер 29.09–20.10): 24 чистые сессии групп — 13 % траты деревьев, и каждая

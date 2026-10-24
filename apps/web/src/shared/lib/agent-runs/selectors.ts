@@ -24,6 +24,8 @@ export interface ActiveRunView {
    * (живой прогон 20.10: «работает · 21ч 09м» при часе работы).
    */
   startedAt?: number;
+  /** Лимит подписки отказал ходу — маскот называет причину словами лимита. */
+  limitHit?: boolean;
   /**
    * Вызовы прогона. Нужны не только его собственной ленте: вопрос дочернего
    * чата (`AskUserQuestion`) показывается и в РОДИТЕЛЬСКОМ разговоре, чтобы
@@ -62,6 +64,7 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
       tokens: run.tokens,
       ...(run.model ? { model: run.model } : {}),
       ...(run.startedAt !== undefined ? { startedAt: run.startedAt } : {}),
+      ...(run.limitHit ? { limitHit: true } : {}),
       // Вопросы носим только у тех, кто спрашивал: у остальных это лишний
       // массив на каждый пересчёт пульта агентов.
       ...(run.tools?.some(isOpenAsk) ? { tools: run.tools } : {}),

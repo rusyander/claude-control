@@ -312,7 +312,7 @@ describe('m5: копия не читается при проверке дост�
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
 
-  it('git не прочёл копию — группа закрыта сбоем с причиной сразу, место свободно', async () => {
+  it('git не прочёл копию — повторы панели, затем сбой с причиной и потолком, место свободно', async () => {
     const copy = mkdtempSync(join(tmpdir(), 'cc-split-nogit-'));
     dirs.push(copy);
     const scheduled: (() => void)[] = [];
@@ -337,12 +337,26 @@ describe('m5: копия не читается при проверке дост�
     await t.begin();
 
     t.conveyor.onChainEnded(t.link(0), { status: 'done' });
-    for (let i = 0; i < 100 && t.group(0)?.status !== 'failed'; i += 1) await t.flush();
+    const retries: (number | undefined)[] = [];
+    for (let i = 0; i < 200 && t.group(0)?.status !== 'failed'; i += 1) {
+      await t.flush();
+      // Копия не прочлась — не сдача сразу: повтор сверки через срок (§2 трассы 24.10).
+      if (scheduled.length > 0 && t.group(0)?.status === 'awaiting') {
+        retries.push(t.group(0)?.deliveryRetry?.count);
+        expect(t.group(0)?.deliveryMissing?.[1]).toMatch(/копия группы не читается/);
+        scheduled.shift()?.();
+      }
+    }
+    expect(retries).toEqual([1, 2]);
 
     const view = t.conveyor.view([PARENT])?.groups[0];
-    expect(view).toMatchObject({ status: 'failed', errorCode: 'split-delivery-local-failed' });
-    expect(view?.error).toMatch(/^доставку не проверить: копия группы не читается \(.+\)$/);
-    // Ни повторных проверок, ни напоминаний: ждать тут нечего.
+    expect(view?.status).toBe('failed');
+    expect(view?.error).toMatch(/панель повторила доставку сама \(повторов: 2\)/);
+    expect(view?.error).toMatch(/копия группы не читается \(.+\)/);
+    expect(t.group(0)?.deliveryMissing?.[0]).toMatch(
+      /^панель повторила доставку сама \(повторов: 2\)/,
+    );
+    // Напоминаний нет: сверке нечего сказать группе. Таймеров после сдачи нет.
     expect(scheduled).toEqual([]);
     expect(nudges).toEqual([]);
     expect(t.group(0)).not.toHaveProperty('deliveryChecks');

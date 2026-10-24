@@ -245,7 +245,14 @@ export const platformEn: typeof platformRu = {
       'worth reconciling with the admin panel as an order of magnitude, not to the cent. A ' +
       'gateway that publishes prices in the model list itself (OpenRouter does) is counted by ' +
       'them: the panel takes a model’s price from the last connection check, by exact name. ' +
-      'Your own prices in settings still win over it.',
+      'Your own prices in settings still win over it. Input cache is counted at its own ' +
+      'rates: what was read from the cache at the read price (about a tenth of the input ' +
+      'price), what was written at the write price, a one-hour write at its own, and only the ' +
+      'rest of the input at the input price. The contour sends these fields for Claude models; ' +
+      'a model that does not send them is counted wholly at the input price, as before. A ' +
+      'gateway that names an input price but no cache price gets the input price for its ' +
+      'cache. The budget bar on the card and the 85 % threshold run off the same estimate — ' +
+      'cache included.',
     screenExhausted: 'Refused on a spend limit',
     screenExhaustedText:
       'A 402 is a fact from the platform itself, and the panel reads what ran out from its ' +
@@ -259,7 +266,10 @@ export const platformEn: typeof platformRu = {
       'five causes instead of advising ' +
       'you to reissue the key. The 402 line survives a panel ' +
       'restart and clears only through your button: dropping a fact on a guess would hand back ' +
-      'a cheerful “there is room” where the platform already refuses.',
+      'a cheerful “there is room” where the platform already refuses. While the line stands, ' +
+      'ordinary turns through the contour are not stopped — the contour decides, and its ' +
+      'refusal reaches the CLI — but the pings that keep a group’s cache warm do not go ' +
+      'through it: such a ping would be a certain refusal.',
 
     driftTitle: 'Values edited after the apply are left alone by the rollback',
     driftText:
@@ -505,7 +515,16 @@ export const platformEn: typeof platformRu = {
       'model. A run that names a model itself goes with the model flag, and that flag beats the ' +
       'address variable: without the map the vendor name reaches the contour. Case does not ' +
       'matter. A name the contour lists in its own catalog needs no translation — it travels ' +
-      'as is.',
+      'as is. A translation by the map is your own word, not a replacement: the chat header ' +
+      'says “sonnet” by the contour map — such-and-such model, in the ordinary colour, with ' +
+      'no warning. The “sonnet” row also decides “Delivery on Sonnet” for split groups: through ' +
+      'the contour the delivery link goes on that row’s model, and the toggle on the split card ' +
+      'says so — “such-and-such by the contour map”. No row — the lever does nothing through the ' +
+      'contour, the toggle is gone, and delivery goes on the work model. A foreign CLI’s group ' +
+      'follows the same rule for the lowest model of its ladder: delivery through the contour ' +
+      'goes there only if the map translates that name. If the contour’s catalog declares the ' +
+      'window of the run’s model, a group window above it is pressed down to it: otherwise the ' +
+      'contour would refuse before the CLI had a chance to compact its history.',
     modelsUnknownTitle: 'An unknown name is replaced, and the replacement is named',
     modelsUnknownText:
       'If the named model is in neither the map nor the contour’s catalog, the conversation ' +
@@ -603,9 +622,11 @@ export const platformEn: typeof platformRu = {
 
     layersTitle: 'Our layers: what travels from `~/.claude` into a run',
     layersCaption:
-      'The “Our layers in the run” block — the “Rules” tab, “Our layers” column. Through a corporate contour a ' +
-      'request goes without prompt caching, and everything the panel adds of its own is paid for ' +
-      'again on every turn — which is why layers can be dropped. The price is stated honestly: ' +
+      'The “Our layers in the run” block — the “Rules” tab, “Our layers” column. Through a corporate contour ' +
+      'everything the panel adds of its own travels in every request. For the contour’s Claude models the ' +
+      'gateway passes the cache marks on, so from the second turn it is read from the cache at the read price; ' +
+      'the contour’s self-hosted models have no cache, and there it is paid for again on every turn — which ' +
+      'is why layers can be dropped. The price is stated honestly: ' +
       'the agent works without your rules and the answer will not show it, so what was dropped is ' +
       'named both on the card and in the chat header.',
     layersColumn: 'Switch',
@@ -708,9 +729,12 @@ export const platformEn: typeof platformRu = {
       'platform would not have to run the tools: the CLI calls them locally.',
     askCache: 'Stop dropping the prompt cache mark',
     askCacheText:
-      'Today the tool schemas travel afresh on every turn — tens of kilobytes per agent step. ' +
-      'A cache mark passed through to the provider would remove that price. We do not ask the ' +
-      'platform to build a cache of its own.',
+      'Withdrawn for Claude models: the cache mark passes the contour to the provider — the ' +
+      'second turn through the contour read 45,591 tokens from the cache, and from the second ' +
+      'turn the tool schemas are paid at the read price. GPT models cache the start of a request ' +
+      'on their own. What remains are the contour’s self-hosted models: no cache shows in their ' +
+      'usage, and the schemas travel afresh on every turn — tens of kilobytes per agent step. ' +
+      'We do not ask the platform to build a cache of its own.',
     askTimeout: 'Raise the 120-second ceiling on an answer',
     askTimeoutText:
       'The contour’s server cuts any answer off in its second minute, streams included. A ' +
@@ -848,7 +872,11 @@ export const platformEn: typeof platformRu = {
       'the single moment anything leaves the machine. On the contour’s side the request passes ' +
       'the content checks, receives the company’s tools and knowledge, and reaches the model. ' +
       'The gateway translates the answer back into the dialect the client expects and records ' +
-      'the spend. Translation can be incomplete both ways: a request field the contour does not ' +
+      'the spend. Prompt-cache marks survive the translation only for the contour’s Claude ' +
+      'models — the platform driver declares them for those; every other model gets the request ' +
+      'without marks, as before. How much was read from the cache and how much written to it ' +
+      'the gateway takes from the contour’s answer and records in the spend apart from fresh ' +
+      'input. Translation can be incomplete both ways: a request field the contour does not ' +
       'take, and a part of the answer the client’s dialect cannot carry (a contour picture is ' +
       'exactly that), never reach the other side. It never happens silently — whatever did not ' +
       'make it is named in the request trace, by name. For a platform whose driver declares a ' +
@@ -1064,12 +1092,16 @@ export const platformEn: typeof platformRu = {
       'the same thing twice.',
     shimPrice: 'What it costs',
     shimPriceText:
-      'The contour has no prompt cache, so the schemas travel AGAIN on every turn. Measured on ' +
+      'The schemas travel on EVERY turn. Measured on ' +
       'a real Claude Code run: 24 tools — about 58 thousand characters of system text and 86 ' +
       'KB per request on every turn; an interactive run with the full CLI prompt gave 108,546 ' +
       'characters and 154 KB. The figure grows with the tool set: a run with 30 tools gave ' +
       '77 thousand characters. Same order either way: tens of kilobytes for every step the ' +
-      'agent takes.',
+      'agent takes. For the contour’s Claude models the gateway passes the cache marks on, so ' +
+      'from the second turn the schemas are read from the cache — at the read price, about a ' +
+      'tenth of the input price; GPT models cache the start of a request on their own; the ' +
+      'contour’s self-hosted models have no cache, and there the schemas are paid in full on ' +
+      'every turn.',
     shimPrompt: 'The contour’s short prompt',
     shimPromptText:
       'That is why a run through the contour goes with the panel’s short prompt from the ' +
@@ -1470,7 +1502,8 @@ export const platformEn: typeof platformRu = {
         'Under the model picker there are two lines: “Through the "<your title>" contour: ' +
         'qwen2.5:0.5b.” and “takes no reasoning effort — it is not sent.” That is what really ' +
         'leaves: the header’s model list holds vendor names, and through a contour the name map ' +
-        'translates them. A name that is neither in the map nor in the key catalogue is ' +
+        'translates them. A name the map translated is named so — “"sonnet" by the contour map ' +
+        '— …”, with no warning. A name that is neither in the map nor in the key catalogue is ' +
         'replaced with the contour model, and the caption then says “no "…" there, the request ' +
         'goes with …”. The same function the server uses computes it, so the caption and the ' +
         'real request cannot drift apart.',
@@ -1547,9 +1580,10 @@ export const platformEn: typeof platformRu = {
         'not block a turn without a call.',
       agPriceTitle: 'The price of every turn',
       agPriceText:
-        'The contour has no prompt cache, so the tool schemas travel afresh on every turn: 24 ' +
+        'The tool schemas travel on every turn: 24 ' +
         'Claude Code tools are about 58 thousand characters of system text and 86 KB of request ' +
-        'per agent step. That is why a run through a contour uses the panel’s short prompt by ' +
+        'per agent step. For the contour’s Claude models they are read from the cache at the read ' +
+        'price from the second turn; for its self-hosted models they are paid in full every turn. That is why a run through a contour uses the panel’s short prompt by ' +
         'default, and why the shim is worth switching off on a contour you only use for text. ' +
         'Details in the “Tools through the contour” section below.',
 

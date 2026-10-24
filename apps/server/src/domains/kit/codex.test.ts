@@ -8,6 +8,7 @@ import {
   CODEX_KIT_ENV,
   CODEX_MCP_OFF_ENV,
   CODEX_SKILL_DESCRIPTION_MAX,
+  CODEX_TOOL_OUTPUT_LIMIT_ENV,
   CodexKitTooLarge,
   buildCodexOverlay,
   codexSkillIndex,
@@ -248,6 +249,47 @@ describe('withCodexKit', () => {
       const result = withCodexKit(['exec', '-'], { [CODEX_COMPACT_LIMIT_ENV]: raw }, 'exec');
       expect(result.args).toEqual(['exec', '-']);
       expect(result.env).toEqual({});
+    }
+  });
+
+  it('tool_output_token_limit arg only for positive int', () => {
+    const run = (raw: string) =>
+      withCodexKit(['app-server'], { [CODEX_TOOL_OUTPUT_LIMIT_ENV]: raw }, 'appServer');
+    expect(run('10000').args).toEqual(['app-server', '-c', 'tool_output_token_limit=10000']);
+    for (const raw of ['', '0', '10k', '-5', '1e4', '12.5', ' 100', '0100']) {
+      expect(run(raw).args, raw).toEqual(['app-server']);
+    }
+    // Рядом с порогом сжатия и выключателями MCP — в том же блоке группы, после них.
+    const both = withCodexKit(
+      ['exec', '-'],
+      {
+        [CODEX_MCP_OFF_ENV]: '["inbox"]',
+        [CODEX_COMPACT_LIMIT_ENV]: '160000',
+        [CODEX_TOOL_OUTPUT_LIMIT_ENV]: '2500',
+      },
+      'exec',
+    );
+    expect(both.args).toEqual([
+      'exec',
+      '-c',
+      'mcp_servers.inbox.enabled=false',
+      '-c',
+      'model_auto_compact_token_limit=160000',
+      '-c',
+      'tool_output_token_limit=2500',
+      '-',
+    ]);
+  });
+
+  it('env var never reaches the child', () => {
+    for (const raw of ['10000', 'мусор', '']) {
+      const result = withCodexKit(
+        ['exec', '-'],
+        { [CODEX_TOOL_OUTPUT_LIMIT_ENV]: raw, KEEP: '1' },
+        'exec',
+      );
+      expect(result.env).toEqual({ KEEP: '1' });
+      expect(JSON.stringify(result)).not.toContain(CODEX_TOOL_OUTPUT_LIMIT_ENV);
     }
   });
 });

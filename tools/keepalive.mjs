@@ -30,9 +30,10 @@
  *   pnpm keepalive:off       снять автозапуск
  *   pnpm keepalive:status    что сейчас живо
  *
- * Автозапуск двухслойный и весь пользовательский, без UAC: ярлык в
- * «Автозагрузке» поднимает сторож при входе в систему, задача планировщика раз
- * в 5 минут поднимает его же, если он умер. Окна не будет — обе точки идут
+ * Автозапуск трёхслойный и весь пользовательский, без UAC: задача планировщика
+ * на вход ЭТОГО пользователя поднимает сторож сразу после входа, ярлык в
+ * «Автозагрузке» — запасной путь, если задачу не дала завести политика, задача
+ * раз в 5 минут поднимает его же, если он умер. Окна не будет — все точки идут
  * через `keepalive-hidden.vbs`. Дублей не будет: pid-файл в
  * %LOCALAPPDATA%\agentdeck\ заставляет лишний экземпляр молча выйти.
  */
@@ -110,6 +111,7 @@ const LOG_MAX_BYTES = 2 * 1024 * 1024;
 
 const TASK_MAIN = 'AgentDeckKeepalive';
 const TASK_WATCH = 'AgentDeckKeepaliveWatch';
+const TASK_LOGON = 'AgentDeckKeepaliveLogon';
 /** Задачи и ярлык под прежним именем продукта: снимаются и при установке, и при снятии. */
 const LEGACY_TASKS = [`${LEGACY_BRAND_PASCAL}Keepalive`, `${LEGACY_BRAND_PASCAL}KeepaliveWatch`];
 const LEGACY_STARTUP_NAME = `${LEGACY_BRAND_SLUG}-keepalive.vbs`;
@@ -387,13 +389,85 @@ async function tick() {
 // === Автозапуск ===
 
 function schtasks(args) {
-  return execFileSync(SCHTASKS, args, { encoding: 'utf8', windowsHide: true });
+  // stderr не наследуем: «не удаётся найти файл» при снятии несуществующей
+  // прежней задачи читалось как провал установки.
+  return execFileSync(SCHTASKS, args, {
+    encoding: 'utf8',
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function taskArguments() {
+  const vbs = join(ROOT, 'tools', 'keepalive-hidden.vbs');
+  const script = join(ROOT, 'tools', 'keepalive.mjs');
+  return `"${vbs}" "${process.execPath}" "${script}"`;
 }
 
 function taskAction() {
-  const vbs = join(ROOT, 'tools', 'keepalive-hidden.vbs');
-  const script = join(ROOT, 'tools', 'keepalive.mjs');
-  return `"${WSCRIPT}" "${vbs}" "${process.execPath}" "${script}"`;
+  return `"${WSCRIPT}" ${taskArguments()}`;
+}
+
+/**
+ * Задача на вход в систему текущего пользователя. `schtasks /sc ONLOGON` без
+ * пользователя — это «любой вход», его планировщик отдаёт только
+ * администратору; триггер со своим UserId заводится без UAC, но только через
+ * XML. Нужна потому, что «Автозагрузку» Проводник запускает последней, после
+ * всех ключей Run, и ждёт каждый до 30 секунд: 23.10.2026 сторож поднялся
+ * через 2 мин 44 с после входа, и открытая раньше панель отвечала отказом.
+ */
+function logonTaskXml(user) {
+  const xml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <UserId>${xml(user)}</UserId>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>${xml(user)}</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>${xml(WSCRIPT)}</Command>
+      <Arguments>${xml(taskArguments())}</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+`;
+}
+
+/** `true` — задача на вход заведена; `false` — не дали, остаётся «Автозагрузка». */
+function installLogonTask() {
+  const user = process.env.USERDOMAIN
+    ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+    : (process.env.USERNAME ?? '');
+  if (!user) return false;
+  const file = join(STATE_DIR, 'keepalive-logon.xml');
+  try {
+    mkdirSync(STATE_DIR, { recursive: true });
+    // schtasks читает XML задачи только в UTF-16 с меткой порядка байт.
+    writeFileSync(file, `\uFEFF${logonTaskXml(user)}`, 'utf16le');
+    schtasks(['/create', '/tn', TASK_LOGON, '/xml', file, '/f']);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(file, { force: true });
+  }
 }
 
 /** Ярлык в «Автозагрузке» текущего пользователя. */
@@ -428,9 +502,9 @@ function install({ app = false } = {}) {
   const action = taskAction();
   removeLegacyAutostart();
 
-  // Вход в систему держим на «Автозагрузке», а не на задаче /sc ONLOGON:
-  // триггер логона планировщик отдаёт только администратору, а панель — вещь
-  // пользовательская, просить ради неё UAC не за что.
+  const logon = installLogonTask();
+
+  // «Автозагрузка» — запасной вход: поздно, но без планировщика.
   const startup = startupFile();
   mkdirSync(dirname(startup), { recursive: true });
   // Строковый литерал VBScript: кавычка внутри удваивается, обратные слеши
@@ -453,6 +527,7 @@ function install({ app = false } = {}) {
 
   console.log(`\n✓ Сторож установлен.
 
+  ${TASK_LOGON}  — ${logon ? 'сторож сразу после входа в систему' : '✕ планировщик не дал завести, вход только через «Автозагрузку» (позже)'}
   Автозагрузка   ${startup}
   ${TASK_WATCH}  — подхват раз в 5 минут, если сторож умер
   Окно панели при старте Windows: ${openAppEnabled(STATE_DIR) ? 'да (снять: pnpm keepalive:app:off)' : 'нет (включить: pnpm keepalive:app)'}
@@ -466,7 +541,7 @@ function install({ app = false } = {}) {
 function uninstall() {
   removeLegacyAutostart();
   setOpenApp(STATE_DIR, false);
-  for (const name of [TASK_MAIN, TASK_WATCH]) {
+  for (const name of [TASK_MAIN, TASK_WATCH, TASK_LOGON]) {
     try {
       schtasks(['/delete', '/tn', name, '/f']);
     } catch {

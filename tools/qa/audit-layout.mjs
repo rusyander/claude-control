@@ -173,10 +173,23 @@ for (const theme of themes) {
       let result;
       try {
         result = await page.evaluate(measureLayout, {});
-      } catch (error) {
-        unverified += 1;
-        console.log(`${label} — НЕ ПРОВЕРЕНО: ${String(error.message).split('\n')[0]}`);
-        continue;
+      } catch (first) {
+        // Страница ушла посреди замера (HMR стенда от чужой правки): тот же один
+        // повтор, что и для пустого <main> ниже; снова мимо — не проверено.
+        try {
+          await page.waitForTimeout(3000);
+          await openPanelPage(page, BASE_URL, entry);
+          if (injectCss) await page.addStyleTag({ content: injectCss });
+          await page.setViewportSize({ width, height: HEIGHT_FOR[width] ?? 900 });
+          await settle(page);
+          result = await page.evaluate(measureLayout, {});
+        } catch (error) {
+          unverified += 1;
+          console.log(
+            `${label} — НЕ ПРОВЕРЕНО: ${String(error.message).split('\n')[0]} (первый раз: ${String(first.message).split('\n')[0]})`,
+          );
+          continue;
+        }
       }
       // Нет <main>: стенд перезагрузился от чужой правки посреди замера. Раздел
       // открывается заново один раз; снова пусто — он не проверен, а не «сломан».

@@ -20,8 +20,17 @@ function count(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-/** Вход «с кэшем внутри» → три поля Claude: вход без кэша, чтение кэша, запись. */
-function usageOf(input: unknown, cached: unknown, output: unknown, written?: unknown): RawUsage {
+/**
+ * Вход «с кэшем внутри» → три поля Claude: вход без кэша, чтение кэша, запись.
+ * Тем же счётом читает переписку CLI карточка и сторож групп (`token-ledger/foreign`):
+ * числа на карточке и в аналитике обязаны сходиться.
+ */
+export function usageOf(
+  input: unknown,
+  cached: unknown,
+  output: unknown,
+  written?: unknown,
+): RawUsage {
   const read = Math.min(count(cached), count(input));
   return {
     input_tokens: count(input) - read,
@@ -72,7 +81,7 @@ function toolCall(
 }
 
 /** Аргументы `function_call` Codex — JSON строкой; битая строка — без аргументов. */
-function codexArguments(value: unknown): Record<string, unknown> {
+export function codexArguments(value: unknown): Record<string, unknown> {
   if (typeof value !== 'string') return obj(value);
   try {
     return obj(JSON.parse(value));
@@ -273,7 +282,20 @@ export function collectForeignFiles(
       if (!existsSync(projects)) continue;
       for (const project of readdirSync(projects, { withFileTypes: true })) {
         if (project.isDirectory()) {
-          walk(join(projects, project.name, 'chats'), 0, (name) => name.endsWith('.jsonl'));
+          // `chats/archive/` — сессии, которые панель бросила (ход без ответа, смена
+          // сессии): их расход тоже потрачен.
+          // Архив Qwen файл ПЕРЕНОСИТ — одна сессия лежит в одном месте. Если всё же
+          // в обоих (копия вернула сессию в работу), живой файл — тот же журнал с
+          // дописанным продолжением: архивный не считается, иначе расход удвоился бы
+          // (повторы ответов снимаются только внутри файла, `scan-file`).
+          const chats = join(projects, project.name, 'chats');
+          const live = new Set<string>();
+          walk(chats, 0, (name) => {
+            if (!name.endsWith('.jsonl')) return false;
+            live.add(name);
+            return true;
+          });
+          walk(join(chats, 'archive'), 0, (name) => name.endsWith('.jsonl') && !live.has(name));
         }
       }
     }

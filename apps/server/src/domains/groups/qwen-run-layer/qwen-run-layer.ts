@@ -281,8 +281,11 @@ function writeQwenLayer(
       writeTextFile(hookShimPath(join(staging, 'hooks'), config), buildHookShimSource(config));
     }
     writeJsonFile(join(staging, 'system-settings.json'), layerSettings(payload, dir));
-    // Каталог без файла настроек — недописанный прошлый (сбой посреди сборки).
-    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    // Каталог без файла настроек — недописанный прошлый (сбой посреди сборки). Файл
+    // есть — соседний прогон успел первым, пока писался черновик: его каталог не трогать,
+    // запущенный им CLI читает оттуда (ревью B ⚪4).
+    const settingsFile = join(dir, 'system-settings.json');
+    if (existsSync(dir) && !existsSync(settingsFile)) rmSync(dir, { recursive: true, force: true });
     try {
       renameWithRetry(staging, dir);
     } catch {
@@ -299,6 +302,45 @@ function writeQwenLayer(
     env: { ...plan.env, [QWEN_SYSTEM_SETTINGS_ENV]: join(dir, 'system-settings.json') },
     dir,
   };
+}
+
+/**
+ * Слой из одного файла системных настроек Qwen — каталогом по содержимому в своём
+ * корне: два прогона с одинаковыми настройками делят каталог, и ни один не
+ * переписывает файл, который в эту секунду читает уже запущенный CLI. Каждый
+ * писатель такого слоя держит СВОЙ корень и чистит его той же уборкой
+ * (`pruneStaleLayers`) — корень, которого уборка не видит, рос бы без конца.
+ * Сейчас так пишут рычаги экономии групп (`economy-run/qwen.ts`).
+ */
+export function writeQwenSettingsLayer(
+  root: string,
+  digest: string,
+  merged: Record<string, unknown>,
+  at?: number,
+): Record<string, string> {
+  const dir = join(root, digest);
+  const now = at ?? Date.now();
+  const file = join(dir, 'system-settings.json');
+  if (!existsSync(file)) {
+    const staging = join(root, `.${digest}-${randomUUID().slice(0, 8)}`);
+    mkdirSync(staging, { recursive: true });
+    writeJsonFile(join(staging, 'system-settings.json'), merged);
+    // Каталог без файла настроек — недописанный прошлый (сбой посреди сборки). Файл
+    // есть — соседний прогон успел первым, пока писался черновик: его каталог не трогать.
+    if (existsSync(dir) && !existsSync(file)) rmSync(dir, { recursive: true, force: true });
+    try {
+      renameWithRetry(staging, dir);
+    } catch {
+      // Соседний прогон успел первым — его каталог того же содержимого.
+      rmSync(staging, { recursive: true, force: true });
+    }
+  } else {
+    // Слой в ходу: свежая метка не даёт уборке снести его под работающим CLI.
+    const stamp = new Date(now);
+    utimesSync(dir, stamp, stamp);
+  }
+  pruneStaleLayers(root, digest, now);
+  return { [QWEN_SYSTEM_SETTINGS_ENV]: file };
 }
 
 /** Убрать слои старше недели, кроме текущего; занятый CLI каталог — в другой раз. */

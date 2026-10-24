@@ -24,10 +24,26 @@ export const DELIVERY_CHECKS_LINE = `The project's checks are the ones its rules
  * MUST #1). Без конфликта брокер всё равно откажет (`MAIN_SYNC_DENIED`), и
  * задание, велящее догонять, стоило бы хода на отказ и гейта заново.
  */
+/**
+ * Без `--quiet`: группа #0 23.10 получила код 0 от `merge-tree --quiet` при семи
+ * конфликтах и потеряла 2,7 ч доставки; панель сверяет так же (`main-sync/conflicts.ts`).
+ */
 export const SYNC_ON_CONFLICT_LINE =
-  '`git fetch origin`; `git merge-tree --write-tree --quiet HEAD origin/<main>` exit 0 = no ' +
-  'conflict: stay on the current base, never rebase, merge or pull main; exit 1 = a real ' +
-  'conflict: `git rebase origin/<main>` and resolve it.';
+  '`git fetch origin`; `git merge-tree --write-tree HEAD origin/<main>` (without `--quiet`, ' +
+  'which can exit 0 over real conflicts): exit 0 and no CONFLICT line = no conflict: stay on ' +
+  'the current base, never rebase, merge or pull main (the panel refuses it); exit 1 or any ' +
+  'CONFLICT line = a real conflict: `git rebase origin/<main>` and resolve it yourself.';
+
+/**
+ * Проверки звена работы, за которым идёт доставка (владелец 23.10: один полный
+ * гейт на группу, в доставке). Охват назван панельным прямо: строка старшинства
+ * иначе отдавала его правилу проекта «полные проверки перед “готово”».
+ */
+export const WORK_STAGE_CHECKS_LINE =
+  "Checks in this stage: only the touched files' own (their package's tests, type-check and " +
+  'lint), no full project gate, no push, no MR and no review pass of your own. This schedule is ' +
+  "the panel's: the delivery stage runs the project's full checks ONCE on the final tree, and " +
+  'that run is what satisfies a project rule asking for full checks before "done".';
 
 /**
  * Нижняя планка качества заданий, которые панель пишет агентам (владелец, 12.10.2026:
@@ -45,13 +61,47 @@ export const SYNC_ON_CONFLICT_LINE =
  * задают охват, глубину и формат; строки панели только ДОБАВЛЯЮТ проверки,
  * навыки и подтверждения. Где строка панели кажется уже задания, побеждает
  * владелец. Неизменны только предохранители, которых владелец сам требует
- * всегда: не вливать, не одобрять, не закрывать чужие треды, не пушить голым
- * `--force`, стадия только для чтения кода не правит.
+ * всегда: не вливать, не одобрять, не закрывать чужие треды, не переписывать
+ * силой чужую ветку (свою — можно, решение владельца 23.10, F-62), стадия только
+ * для чтения кода не правит.
  *
  * ОДНА СТРОКА — как и вся системная дописка: на Windows аргумент уезжает через
  * оболочку, и перевод строки внутри него cmd.exe разрывает командную строку.
  */
-export const OWNER_PRECEDENCE_LINE = `Precedence: the global and project rules (${RULE_SOURCES}) and the owner's own words in the task set the scope, depth, format and permissions of this run; the panel's lines only ADD checks, skills and verification on top. Where a panel line seems narrower than what the owner asked or a rule requires, follow the owner and the rule. Fixed regardless of anything: never merge, approve or resolve threads, never push with a bare --force, and a read-only stage edits no code.`;
+const PRECEDENCE_HEAD = `Precedence: the global and project rules (${RULE_SOURCES}) and the owner's own words in the task set the scope, depth, format and permissions of this run; the panel's lines only ADD checks, skills and verification on top. Where a panel line seems narrower than what the owner asked or a rule requires, follow the owner and the rule`;
+const PRECEDENCE_FIXED = `Fixed regardless of anything: never merge, approve or resolve threads, never force-push any branch but your own, and a read-only stage edits no code.`;
+/**
+ * Исключение о полном прогоне проверок — только у цепочки со звеном доставки:
+ * там его и делает расписание панели. Без доставки (одиночный чат, правки без
+ * доставки) полный прогон никто не сделает — строка `PLAIN` (F-57).
+ */
+const SCHEDULE_EXCEPTION = ` — except WHEN the full project checks run: that is the panel's schedule (once per group, at delivery), and a rule asking for them is met by that run.`;
+
+export const OWNER_PRECEDENCE_LINE = `${PRECEDENCE_HEAD}${SCHEDULE_EXCEPTION} ${PRECEDENCE_FIXED}`;
+
+/** Та же строка без исключения о расписании проверок — цепочке без доставки (F-57). */
+export const OWNER_PRECEDENCE_PLAIN_LINE = `${PRECEDENCE_HEAD}. ${PRECEDENCE_FIXED}`;
+
+/**
+ * Прежние формы строки: задания, сохранённые до обновления (продолжение,
+ * повтор звена), несут их дословно, и повтор абзаца снимается так же (F-124).
+ */
+const LEGACY_FIXED = `Fixed regardless of anything: never merge, approve or resolve threads, never push with a bare --force, and a read-only stage edits no code.`;
+const PRECEDENCE_FORMS: readonly string[] = [
+  OWNER_PRECEDENCE_LINE,
+  OWNER_PRECEDENCE_PLAIN_LINE,
+  `${PRECEDENCE_HEAD}${SCHEDULE_EXCEPTION} ${LEGACY_FIXED}`,
+  `${PRECEDENCE_HEAD}. ${LEGACY_FIXED}`,
+];
+
+/**
+ * Строка старшинства любой формы, нынешней или прежней (F-124, RF-BGCD-12c):
+ * название чата снимает её построчно, и старое задание продолжения иначе
+ * назвало бы чат английской строкой правил.
+ */
+export function isPrecedenceLine(line: string): boolean {
+  return PRECEDENCE_FORMS.includes(line.trim());
+}
 
 /**
  * Кто ведёт доставку в строке навыков (владелец 20.10). Отдельно — им же старые
@@ -76,9 +126,7 @@ export const SKILL_ROUTE_LINE = `Skills: before acting, load the skill this kind
  * в каждом ходе и ничего не добавляет.
  */
 export function withoutPrecedence(text: string): string {
-  return text
-    .split(OWNER_PRECEDENCE_LINE)
-    .join('')
+  return PRECEDENCE_FORMS.reduce((rest, form) => rest.split(form).join(''), text)
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

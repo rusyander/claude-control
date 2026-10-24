@@ -14,9 +14,9 @@ import {
 } from '@agentdeck/contracts/chat-handoff';
 import { planStagePrompt } from '@agentdeck/contracts/split-plan';
 import {
+  isPrecedenceLine,
   OWNER_MESSAGE_OPENER,
   OWNER_MESSAGES_LEFT_OUT,
-  OWNER_PRECEDENCE_LINE,
   OWNER_REQUEST_HEADER,
   SKILL_ROUTE_LINE,
 } from '@agentdeck/contracts/quality-floor';
@@ -111,6 +111,7 @@ const LEADING = [
     environmentPreamble({ mirror: MARK }),
     environmentPreamble({}),
     deliveryPreamble({ branch: MARK }),
+    deliveryPreamble({ branch: MARK, deliverLater: true }),
     mergeRequestWorkPreamble({ url: MARK }),
     buildHandoffPrompt(HANDOFF),
     // Шапка блока слов владельца (U1) и его служебные строки — панельные; сами
@@ -189,7 +190,8 @@ export function withoutPanelPreamble(text: string): string {
  * модели по-английски (решение владельца D-E) и в названии чата стояла бы
  * английской фразой; справка об исходном задании продолжения — тоже: название
  * продолжения — что делать дальше, а не пересказ всей работы. Строка
- * старшинства (`OWNER_PRECEDENCE_LINE`) и строка навыков (`SKILL_ROUTE_LINE`) — тоже
+ * старшинства (любая форма, `isPrecedenceLine`: полная, простая и прежние) и
+ * строка навыков (`SKILL_ROUTE_LINE`) — тоже
  * хвост панели, и стоят они то отдельным абзацем, то строкой сразу под строкой
  * языка: поэтому отбрасываются построчно, а не абзацами.
  */
@@ -202,7 +204,9 @@ function withoutPanelTail(text: string): string {
       const trimmed = line.trim();
       return (
         trimmed !== ANSWER_LANGUAGE_LINE &&
-        trimmed !== OWNER_PRECEDENCE_LINE &&
+        // Любая форма строки старшинства, и прежние тоже: старые задания продолжения
+        // несут их дословно (F-124, RF-BGCD-12c).
+        !isPrecedenceLine(trimmed) &&
         trimmed !== SKILL_ROUTE_LINE
       );
     })

@@ -22,6 +22,8 @@ export function decidePermission(
     runs.set(key, {
       ...current,
       permissions: current.permissions.filter((p) => p.toolUseId !== toolUseId),
+      // Отложенная карточка отвечается тем же маршрутом: сервер решает её D-n.
+      deferredPermissions: current.deferredPermissions?.filter((p) => p.toolUseId !== toolUseId),
     });
     rebuildStatuses();
     emit();

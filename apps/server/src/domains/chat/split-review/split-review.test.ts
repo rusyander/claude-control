@@ -270,6 +270,35 @@ describe('решение человека', () => {
     expect(fixLink?.conversation).toBeUndefined();
   });
 
+  // F-110: окно и отметки звена ревью — его; правки с ними считали бы коммиты
+  // до ревью своими и прошли бы мимо доставки за собой (`deliveredAt`).
+  it('чат правок не наследует окно, вердикт и отметки звена ревью (F-110)', async () => {
+    const { review, links, started } = stand();
+    links.c1 = {
+      ...waiting(),
+      stageSince: '2026-10-23T00:00:00.000Z',
+      reviewVerdict: ['src/a.ts:10 — забыт await'],
+      reviewedAt: '2026-10-23T00:10:00.000Z',
+      plannedAt: '2026-10-23T00:11:00.000Z',
+      deliveredAt: '2026-10-23T00:12:00.000Z',
+    };
+
+    await review.decide({ chatId: 'c1', decision: 'fix' });
+
+    const fixLink = links[started[0]?.chatId ?? ''];
+    expect(fixLink?.stage).toBe('fix');
+    for (const field of [
+      'stageSince',
+      'reviewVerdict',
+      'reviewedAt',
+      'plannedAt',
+      'deliveredAt',
+    ] as const) {
+      expect(fixLink?.[field], field).toBeUndefined();
+    }
+    expect(fixLink?.review?.url).toBe(URL);
+  });
+
   it('«отписать» пишет ОДИН сводный комментарий и правок не заводит', async () => {
     const { review, links, started, posted } = stand();
     links.c1 = waiting(['src/a.ts:10 — забыт await', 'src/b.ts — нет теста']);

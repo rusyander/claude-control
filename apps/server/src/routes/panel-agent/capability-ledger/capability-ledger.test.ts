@@ -152,6 +152,11 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/mobile/apk/build': 'human:remote',
   'POST /api/mobile/apk/install': 'human:remote',
   'POST /api/remote/token': 'human:remote',
+  // 24.10: подпись решений ключом телефона — привязка, отзыв, режим.
+  'GET /api/phone-signing': 'human:remote',
+  'POST /api/phone-signing/devices': 'human:remote',
+  'POST /api/phone-signing/devices/:id/revoke': 'human:remote',
+  'POST /api/phone-signing/mode': 'human:remote',
   // 16.10: гибернация и сон компьютера с телефона.
   'GET /api/power': 'human:remote',
   'POST /api/power': 'human:remote',

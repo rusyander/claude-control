@@ -24,7 +24,9 @@ import {
   type SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
 import {
+  LEARN_SIEVES_LINE,
   mergeSieveRows,
+  SIEVE_REPORT_LINE,
   type LearnedSieveRow,
   type SieveClass,
   type SieveReportRow,
@@ -44,6 +46,8 @@ import type { SplitGroupContext } from '../ChatSplit/ChatSplit.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
 import type { GroupTestsVerdict } from '../tests-gate/tests-gate.ts';
+import type { MrReviewThread } from '../../integrations/mr-review/mr-review.ts';
+import { noteRelayed, REVIEW_REPLY_LINES } from '../mr-watch/review-threads.ts';
 import { normalizePath } from '../../project-runner/targets.ts';
 import { localizeText, matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
 import { ownerCoverageGaps } from '../owner-coverage/owner-coverage.ts';
@@ -266,6 +270,11 @@ export interface DeliveryVerdict {
   branch?: string;
   /** Вердикт блока «Тесты» копии: задетые кейсы и их итог в прогонах группы. */
   tests?: GroupTestsVerdict;
+  /**
+   * Ветки ревьюера без ответа, ушедшие пробелом: дошедшее слово отмечает их
+   * переданными (`mrWatch`), и сито, выученное из них, принимается.
+   */
+  reviewThreads?: MrReviewThread[];
   /**
    * Заметки, а не пробелы (решение владельца 23.10): живое сито «не
    * проверено», красное не из-за ветки. Группу не держат — карточке и MR.
@@ -562,8 +571,31 @@ const FOREIGN_REMOVALS_LINE =
   'started. Restore them with a normal commit and a normal push, or — when the deletion is ' +
   'intended — name every such file by its full path in the foreign-removals row of the sieve ' +
   'report with the reason. Do not rebase or force-push for this: it does not clear the gap.';
+/**
+ * Пробелы блока «Тесты»: панель считает их раз за круг, и список устаревает, как только
+ * дифф вырос (rebase: два кейса в напоминании, 27 на деле, 24.10.2026) — группа сверяет
+ * его сама командой `gaps` до ответа, а не узнаёт следующим кругом.
+ */
+const TESTS_GAPS: ReadonlySet<string> = new Set([
+  'tests-gap-no-run',
+  'tests-gap-word-only',
+  'tests-gap-stale',
+  'tests-gap-unrun',
+  'tests-gap-failed',
+]);
+const TESTS_SELF_CHECK_LINE =
+  'Tests block: before you answer, re-check it yourself — the tests-cli named above with `gaps` ' +
+  'in place of `run …` (`gaps --project .`) prints exactly the Tests-block lines this check will ' +
+  'print, from the same code, for the branch as it is now. Close every line it prints in this ' +
+  'turn; it exits 0 when nothing is left.';
 /** Пробелы «ветка не на удалённом / MR нет» — их снимает push и открытие MR. */
 const PUSH_GAPS: ReadonlySet<string> = new Set(['delivery-gap-not-pushed', 'delivery-gap-no-mr']);
+/**
+ * Ветки ревьюера без ответа (24.10): тот же текст, что у наблюдателя MR после
+ * «готово», — ответ в ветке и сито из каждого блокера.
+ */
+const REVIEW_THREAD_GAPS: ReadonlySet<string> = new Set(['delivery-gap-review-threads']);
+const REVIEW_THREAD_LINES: readonly string[] = [...REVIEW_REPLY_LINES, LEARN_SIEVES_LINE];
 
 /**
  * Конфликт со свежей основной снимает только rebase (живая группа 23.10 встала
@@ -610,6 +642,17 @@ function hasGap(missing: readonly string[], codes: ReadonlySet<string>): boolean
   });
 }
 
+/** Пробел сита, который снимает строка отчёта (конфликт снимает только rebase). */
+function hasSieveRowGap(missing: readonly string[]): boolean {
+  return missing.some((line) => {
+    const code = matchText(line)?.messageCode;
+    return code?.startsWith('sieve-gap-') === true && !INTEGRATION_GAPS.has(code);
+  });
+}
+
+/** «Сдай строку заново» без формата сдачи группа 24.10 сдала прозой — круг впустую. */
+const SIEVE_REPORT_HINT = `${SIEVE_REPORT_LINE} — one row for every sieve line above.`;
+
 /**
  * Как сдать то, что группу держать не должно (решение владельца 23.10): та же
  * пара меток, что в задании сит (`NOTE_MARKS_LINE`), — промпт и панель
@@ -644,6 +687,8 @@ export function deliveryNudgePrompt(
       '',
     );
   }
+  if (hasGap(missing, TESTS_GAPS)) lines.push(TESTS_SELF_CHECK_LINE, '');
+  if (hasSieveRowGap(missing)) lines.push(SIEVE_REPORT_HINT, '');
   if (reportOnlyGaps(missing)) {
     return [
       ...lines,
@@ -656,6 +701,7 @@ export function deliveryNudgePrompt(
   }
   if (hasGap(missing, INTEGRATION_GAPS)) lines.push(INTEGRATION_LINE(branch), '');
   if (hasGap(missing, FOREIGN_REMOVALS_GAPS)) lines.push(FOREIGN_REMOVALS_LINE, '');
+  if (hasGap(missing, REVIEW_THREAD_GAPS)) lines.push(...REVIEW_THREAD_LINES, '');
   if (hasGap(missing, PUSH_GAPS)) {
     lines.push(
       `Push the branch ${branch} and open the MR yourself (or update the existing one) — ` +
@@ -684,6 +730,32 @@ const INVESTIGATE_LINE =
   'description) through the forge tools, read git log/status. Then fix the cause, or — when it ' +
   'is not caused by the branch or cannot run here — record a justified waiver (marks below). ' +
   'The panel re-checks every line after your turn.';
+
+/** Пробел круга в истории — начало строки: полный текст нынешних пробелов стоит выше. */
+const HISTORY_GAP_MAX = 200;
+
+/**
+ * История кругов для разбора: у круга — только пробелы, которых не было в прошлом
+ * круге, и сколько перешло из него. Полным текстом каждого круга история была 20,6 тыс.
+ * знаков из 36 тыс. задания (!1072, 24.10): восемь кругов повторяли одни и те же списки.
+ */
+function historyLines(
+  history: readonly { at: string; head?: string; missing: readonly string[] }[],
+): string[] {
+  let previous = new Set<string>();
+  return history.map((round) => {
+    const gaps = round.missing.map((line) => localizeText(line, 'en'));
+    const fresh = gaps.filter((line) => !previous.has(line));
+    const carried = gaps.length - fresh.length;
+    previous = new Set(gaps);
+    const head = `- ${round.at}, head ${round.head?.slice(0, 12) ?? '—'}: `;
+    if (fresh.length === 0) return `${head}same gaps as the round before`;
+    const clipped = fresh.map((line) =>
+      line.length > HISTORY_GAP_MAX ? `${line.slice(0, HISTORY_GAP_MAX)}…` : line,
+    );
+    return head + clipped.join('; ') + (carried > 0 ? `; +${carried} from the round before` : '');
+  });
+}
 
 /**
  * Разбор доставки новым разговором на усиленной модели: напоминания встали
@@ -718,13 +790,11 @@ export function deliveryEscalationPrompt(input: {
     );
   }
   if (input.history.length > 0) {
-    lines.push('', 'Earlier rounds (when, branch head, gaps the panel sent):');
-    for (const round of input.history) {
-      lines.push(
-        `- ${round.at}, head ${round.head ?? '—'}: ` +
-          round.missing.map((line) => localizeText(line, 'en')).join('; '),
-      );
-    }
+    lines.push(
+      '',
+      'Earlier rounds (when, branch head, gaps the panel sent):',
+      ...historyLines(input.history),
+    );
   }
   lines.push(
     '',
@@ -734,6 +804,8 @@ export function deliveryEscalationPrompt(input: {
   );
   if (hasGap(input.missing, INTEGRATION_GAPS)) lines.push(INTEGRATION_LINE(input.branch));
   if (hasGap(input.missing, FOREIGN_REMOVALS_GAPS)) lines.push(FOREIGN_REMOVALS_LINE);
+  if (hasGap(input.missing, REVIEW_THREAD_GAPS)) lines.push(...REVIEW_THREAD_LINES);
+  if (hasSieveRowGap(input.missing)) lines.push(SIEVE_REPORT_HINT);
   lines.push(
     `Then deliver: commit, push the branch ${input.branch}, open the MR (or update the existing ` +
       'one) and give its link as the last line. Creating the MR is allowed for this group.',
@@ -749,15 +821,35 @@ export function deliveryEscalationPrompt(input: {
  */
 export const MAX_INTERRUPT_RESUMES = 2;
 
+/** Пробелы последней сверки доставки, с которыми группа встала. */
+type PendingDelivery = Pick<SplitPlanGroupRecord, 'deliveryMissing' | 'deliveryNotes'>;
+
+/**
+ * Продолжение посреди доставки несёт её пробелы (живой прогон 24.10): на голое
+ * «продолжай» группа с паузы ответила «доделывать нечего», а ход без движения
+ * сверка читает «встали» — доставка ушла бы в разбор, хотя пробелов группа не
+ * видела. С пробелами продолжение — то же напоминание.
+ */
+function pendingDeliveryLines(branch: string, pending: PendingDelivery | undefined): string[] {
+  if (!pending?.deliveryMissing?.length) return [];
+  return [deliveryNudgePrompt(branch, pending.deliveryMissing, pending.deliveryNotes ?? [])];
+}
+
+const CLOSE_PENDING_LINE = 'Then close what the last delivery check before this stop found:';
+
 /** Продолжение оборванной группы: сперва восстановить состояние по фактам, потом работать. */
-export function interruptResumePrompt(branch: string): string {
+export function interruptResumePrompt(branch: string, pending?: PendingDelivery): string {
+  const gaps = pendingDeliveryLines(branch, pending);
   return [
     "This group's process broke off in the middle of a turn (a panel restart or the CLI died): " +
       'background commands died, whatever was not written to files is lost.',
     'First restore the state from the facts: git status, git log, what is already done — from ' +
       'your transcript; run the interrupted checks again.',
-    `Then continue from where you stopped on the branch ${branch}. If the work was already ` +
-      'finished, repeat the summary of the last turn (what was done, the MR link) and stop.',
+    gaps.length > 0
+      ? CLOSE_PENDING_LINE
+      : `Then continue from where you stopped on the branch ${branch}. If the work was already ` +
+        'finished, repeat the summary of the last turn (what was done, the MR link) and stop.',
+    ...gaps,
   ].join('\n');
 }
 
@@ -808,13 +900,17 @@ function collectProposals(group: SplitPlanGroupRecord, outcome: ChainOutcome, no
 export const LIMIT_RESUME_STAGGER_MS = 60_000;
 
 /** Продолжение группы, ждавшей сброса лимита подписки. */
-export function limitResumePrompt(branch: string): string {
+export function limitResumePrompt(branch: string, pending?: PendingDelivery): string {
+  const gaps = pendingDeliveryLines(branch, pending);
   return [
     "The group's previous turn hit the subscription limit; the limit has reset and the panel " +
       'continues the work.',
     'First check the state against the facts (git status, git log, your transcript) — run the ' +
       'interrupted checks again.',
-    `Then continue from where you stopped on the branch ${branch}.`,
+    gaps.length > 0
+      ? CLOSE_PENDING_LINE
+      : `Then continue from where you stopped on the branch ${branch}.`,
+    ...gaps,
   ].join('\n');
 }
 
@@ -826,7 +922,12 @@ const MAX_PAUSED_TASKS = 8;
  * поимённо: сервер стенда посреди приёмки агент иначе искал по оборванному
  * вызову и поднимал заново наугад (L7.6, 19.10.2026).
  */
-export function pauseResumePrompt(branch: string, killed: readonly string[] = []): string {
+export function pauseResumePrompt(
+  branch: string,
+  killed: readonly string[] = [],
+  pending?: PendingDelivery,
+): string {
+  const gaps = pendingDeliveryLines(branch, pending);
   return [
     'The human paused the group and is now resuming it. The turn that was running before the ' +
       'pause was stopped: whatever was not written to files may be lost.',
@@ -837,7 +938,10 @@ export function pauseResumePrompt(branch: string, killed: readonly string[] = []
         ]
       : []),
     'First check the state against the facts (git status, git log, your transcript), then ' +
-      `continue from where you stopped on the branch ${branch}.`,
+      (gaps.length > 0
+        ? 'close what the last delivery check before the pause found:'
+        : `continue from where you stopped on the branch ${branch}.`),
+    ...gaps,
   ].join('\n');
 }
 
@@ -1953,6 +2057,11 @@ export class SplitConveyor {
         else delete target.deliveryNotes;
         if (group.deliveryHistory) target.deliveryHistory = group.deliveryHistory;
         rememberDeliveryRound(target, verdict, this.now());
+        if (verdict.mr && verdict.reviewThreads?.length) {
+          // Круг наблюдения назначит «готово» (`MrWatch.arm`); переданное он помнит.
+          target.mrWatch ??= { cycle: '', checks: 0 };
+          noteRelayed(target.mrWatch, verdict.reviewThreads, verdict.mr);
+        }
         if (stalled || capped) {
           target.deliveryEscalatedAt = this.now().toISOString();
           // Сколько слов дошло до разбора — их и назовёт причина остановки (RF-EF-04):
@@ -2466,7 +2575,7 @@ export class SplitConveyor {
     // него уже меняет он.
     group.interruptResumes = count;
     this.deps.store.set(record);
-    const prompt = this.withIdentity(record, group, interruptResumePrompt(group.branch));
+    const prompt = this.withIdentity(record, group, interruptResumePrompt(group.branch, group));
     if (this.deps.resume(group, prompt) !== 'refused') return true;
     const fresh = this.deps.store.get(record.parentChatId);
     const same = fresh?.groups[group.index];
@@ -3531,7 +3640,7 @@ export class SplitConveyor {
     const prompt = this.withIdentity(
       record,
       group,
-      pauseResumePrompt(group.branch, group.pausedTasks),
+      pauseResumePrompt(group.branch, group.pausedTasks, group),
     );
     if (group.pausedTasks) {
       delete group.pausedTasks;
@@ -3950,7 +4059,7 @@ export class SplitConveyor {
       this.armLimitWake();
       return;
     }
-    const prompt = this.withIdentity(record, group, limitResumePrompt(group.branch));
+    const prompt = this.withIdentity(record, group, limitResumePrompt(group.branch, group));
     const outcome =
       this.deps.resume && group.chatId && group.path ? this.deps.resume(group, prompt) : 'refused';
     if (outcome !== 'refused') return;

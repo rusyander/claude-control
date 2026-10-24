@@ -369,7 +369,9 @@ export function guardHitFor(
   mainOf?: (dir: string) => string | undefined,
 ): GuardHit | undefined {
   if (!cwd) return undefined;
-  if (toolName !== 'Bash' && !toolName.startsWith('mcp__')) return undefined;
+  const shell = toolName === 'Bash' || toolName === 'PowerShell';
+  if (!shell && !toolName.startsWith('mcp__')) return undefined;
   const config = guardConfigFor(cwd, mainOf);
-  return config ? classifyCall(toolName, input, config) : undefined;
+  // PowerShell — те же слова, что Bash (R4): `classifyCall` смотрит команду Bash.
+  return config ? classifyCall(shell ? 'Bash' : toolName, input, config) : undefined;
 }

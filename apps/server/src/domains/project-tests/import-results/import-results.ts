@@ -518,8 +518,11 @@ export function prepareResultsForRun(
   const parsed = parseByFormat(input.format, sources);
 
   const scope = input.groups?.length ? new Set(input.groups) : undefined;
-  const groups = readGroups(root).filter((group) => !scope || scope.has(group.id));
-  const index = buildIndex(groups);
+  const library = readGroups(root);
+  const index = buildIndex(library.filter((group) => !scope || scope.has(group.id)));
+  // Один файл тестов несёт кейсы нескольких групп, а прогон берёт только просимые: тест кейса
+  // чужой группы — не «без кейса» и не повод завести дубликат (25.10: «без кейса 2» в зелёном прогоне).
+  const elsewhere = scope ? buildIndex(library) : undefined;
   const matched = new Map<string, { ref: CaseRef; result: ImportedTestResult }>();
   // Счёт тестов кейса-набора: «упало 3 из 40» — первое, что спрашивают о каталоге.
   const tally = new Map<string, SuiteTally>();
@@ -529,6 +532,7 @@ export function prepareResultsForRun(
   for (const result of parsed) {
     const ref = matchCase(result, index);
     if (!ref) {
+      if (elsewhere && matchCase(result, elsewhere)) continue;
       if (result.name && !unmatched.includes(result.name)) {
         unmatched.push(result.name);
         unmatchedResults.push(result);

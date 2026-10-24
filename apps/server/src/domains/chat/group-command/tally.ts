@@ -8,8 +8,8 @@ interface Effects {
   deletes: boolean;
   /**
    * Номера процессов и порты, которые команда гасит (N3): своё ли это, по
-   * тексту не узнать — маршрут прав сверяет их с деревом процессов группы.
-   * Цель, которую не назвать числом, — уже `danger`.
+   * тексту не узнать — маршрут прав сверяет их с процессами группы. Цель,
+   * которую не назвать числом, — `unnamed`: отказ агенту, не карточка.
    */
   kills?: KillTargets;
 }
@@ -27,6 +27,7 @@ export class Tally {
   private readonly effects: Effects = { writes: false, lease: false, deletes: false };
   private readonly pids = new Set<number>();
   private readonly ports = new Set<number>();
+  private unnamed = false;
   private readonly texts: string[] = [];
   private readonly rules = new Set<CodeRule>();
 
@@ -44,14 +45,21 @@ export class Tally {
       this.effects.deletes ||= verdict.deletes === true;
       for (const pid of verdict.kills?.pids ?? []) this.pids.add(pid);
       for (const port of verdict.kills?.ports ?? []) this.ports.add(port);
+      this.unnamed ||= verdict.kills?.unnamed === true;
     }
   }
 
   result(): GroupCommandVerdict {
     if (this.danger) return { kind: 'danger' };
     const kills =
-      this.pids.size + this.ports.size > 0
-        ? { kills: { pids: [...this.pids], ports: [...this.ports] } }
+      this.pids.size + this.ports.size > 0 || this.unnamed
+        ? {
+            kills: {
+              pids: [...this.pids],
+              ports: [...this.ports],
+              ...(this.unnamed ? { unnamed: true } : {}),
+            },
+          }
         : {};
     const effects = { ...this.effects, ...kills };
     if (this.other || !this.seen) {

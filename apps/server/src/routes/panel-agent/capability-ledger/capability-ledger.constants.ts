@@ -776,6 +776,12 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/mobile/apk/file': 'human:download',
   'POST /api/mobile/apk/build': 'human:remote',
   'POST /api/mobile/apk/install': 'human:remote',
+  // phone-signing-routes/phone-signing-routes.ts — подпись решений ключом телефона:
+  // привязка, отзыв и режим — только человек, агент панели их не трогает.
+  'GET /api/phone-signing': 'human:remote',
+  'POST /api/phone-signing/devices': 'human:remote',
+  'POST /api/phone-signing/devices/:id/revoke': 'human:remote',
+  'POST /api/phone-signing/mode': 'human:remote',
   // power-routes.ts — усыпить компьютер с телефона: только человек, агент панели
   // машину не выключает (обратно её с телефона не поднять).
   'GET /api/power': 'human:remote',

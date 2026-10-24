@@ -487,4 +487,38 @@ describe('импорт результатов в группу пакета', () 
     expect(status('suites-admin')).toBe('failed');
     expect(status('suites-chat')).toBe('unknown');
   });
+
+  // Живой прогон 25.10: прогон кейсов двух групп, а файл несёт и кейсы третьей — «не сопоставлено (2)».
+  it('тест кейса группы вне прогона — не «без кейса»; тест без кейса — по-прежнему без кейса', () => {
+    const dir = join(root, '.agent', 'tests');
+    const linked = (id: string) => ({
+      id,
+      title: id,
+      steps: [],
+      automation: { status: 'automated', file: 'a.test.ts', testName: `тест ${id}` },
+      status: 'unknown',
+    });
+    for (const group of ['ga', 'gb']) {
+      writeFileSync(
+        join(dir, `${group}.tests.json`),
+        JSON.stringify({ version: 1, title: group, cases: [linked(`${group}-1`)] }),
+      );
+    }
+    const report =
+      '<testsuites><testsuite name="vitest">' +
+      '<testcase classname="a.test.ts" name="[ga-1] тест ga-1"/>' +
+      '<testcase classname="a.test.ts" name="[gb-1] тест gb-1"/>' +
+      '<testcase classname="a.test.ts" name="тест без кейса"/>' +
+      '</testsuite></testsuites>';
+    const result = importResults(root, {
+      format: 'junit',
+      content: report,
+      now: NOW,
+      groups: ['ga'],
+    });
+    expect(result.matched).toBe(1);
+    expect(result.unmatched).toEqual(['тест без кейса']);
+    expect(status('ga')).toBe('passed');
+    expect(status('gb')).toBe('unknown');
+  });
 });

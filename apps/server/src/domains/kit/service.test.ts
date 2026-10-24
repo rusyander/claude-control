@@ -83,13 +83,20 @@ describe('режимы по провайдерам', () => {
     expect(view.builtinDir).toBe(builtinKitDir());
     expect(view.mineDir).toBe(join(appData, 'kit', 'mine'));
     expect(view.providers).toEqual([
-      { id: 'claude', title: 'Claude Code', mode: 'global', modes: ['global', 'hybrid', 'ours'] },
+      {
+        id: 'claude',
+        title: 'Claude Code',
+        mode: 'global',
+        modes: ['global', 'hybrid', 'ours'],
+        hooks: 'run',
+      },
       {
         id: 'qwen',
         title: 'Qwen Code',
         mode: 'global',
         modes: ['global', 'ours'],
         localOnly: true,
+        hooks: 'run',
       },
       {
         id: 'codex',
@@ -97,9 +104,33 @@ describe('режимы по провайдерам', () => {
         mode: 'global',
         modes: ['global', 'hybrid'],
         carries: ['rule', 'skill'],
+        hooks: 'variant',
       },
     ]);
     expect(existsSync(statePath())).toBe(false);
+  });
+
+  it('куда доходят хуки набора — у каждого из десяти CLI своя честная отметка', () => {
+    const ids = ['claude', 'qwen', 'codex', 'gemini', 'goose', 'kimi', 'opencode'];
+    const all = [...ids, 'continue', 'cursor', 'aider'];
+    const view = new KitService({
+      appDataDir: appData,
+      claudeDir: () => claudeDir,
+      providers: () => all.map((id) => ({ id, name: id })),
+      legacyModes: () => legacy,
+    }).describe();
+    expect(Object.fromEntries(view.providers.map((p) => [p.id, p.hooks]))).toEqual({
+      claude: 'run',
+      qwen: 'run',
+      codex: 'variant',
+      gemini: 'variant',
+      goose: 'variant',
+      kimi: 'variant',
+      opencode: 'variant',
+      continue: 'never-fire',
+      cursor: 'not-runnable',
+      aider: 'no-tool-loop',
+    });
   });
 
   it('смена режима записывается и читается новым экземпляром', () => {

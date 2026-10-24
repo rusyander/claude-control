@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LEARN_SIEVES_LINE } from '@agentdeck/contracts/sieves';
 import { matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
 import { HUMAN_ONLY_LINE } from '../split-continue.ts';
 import {
@@ -325,6 +326,98 @@ describe('напоминание о «чужих −» — не rebase и не �
     expect(deliveryNudgePrompt('feature/users', [conflicts])).toContain(
       'git push --force-with-lease origin feature/users',
     );
+  });
+});
+
+describe('напоминание о ситах называет формат сдачи строки', () => {
+  // Живая группа 24.10: на семь строк «report the row again» ответила прозой
+  // («Ответы по строкам панели»), блока не было — следующий круг, те же пробелы.
+  const stale = serverText('sieve-gap-stale', { sieve: 'browser-focus', files: 'src/a.tsx' });
+  const removals = serverText('sieve-gap-foreign-removals', { files: 'src/a.ts' });
+  const conflicts = serverText('sieve-gap-conflicts', { files: 'src/a.ts' });
+
+  it('пробел сита — в напоминании и разборе язык блока и «проза не в счёт»', () => {
+    for (const prompt of [
+      deliveryNudgePrompt('feature/users', [stale]),
+      deliveryNudgePrompt('feature/users', [removals, stale]),
+      deliveryEscalationPrompt({
+        branch: 'feature/users',
+        missing: [stale],
+        history: [],
+        reason: 'stalled',
+        nudges: 3,
+      }),
+    ]) {
+      expect(prompt).toContain('code block in the language agentdeck:sieves');
+      expect(prompt).toContain('a row written as prose is not reported');
+    }
+  });
+
+  it('без пробелов сит и при одном конфликте формата нет', () => {
+    expect(deliveryNudgePrompt('feature/users', [conflicts])).not.toContain('agentdeck:sieves');
+    expect(deliveryNudgePrompt('feature/users', ['нет MR'])).not.toContain('agentdeck:sieves');
+  });
+});
+
+describe('пробел блока «Тесты» — группа сверяет его сама командой gaps', () => {
+  // Живая группа 24.10: после rebase дифф вырос, напоминание назвало два
+  // кейса, на деле их было 27 — каждый следующий группа узнавала кругом позже.
+  it('напоминание с пробелом блока называет `gaps --project .`; без него — нет', () => {
+    const unrun = serverText('tests-gap-unrun', { cases: 'suites:001', command: 'tests-cli run' });
+    expect(deliveryNudgePrompt('feature/users', [unrun])).toContain('`gaps --project .`');
+    expect(deliveryNudgePrompt('feature/users', [NO_MR])).not.toContain('gaps --project');
+  });
+});
+
+describe('ветки ревьюера без ответа держат доставку', () => {
+  // Живая группа 24.10: MR на ревью сутки, четыре нерешённые ветки (три
+  // блокера), ни одного ответа — наблюдатель MR смотрит только `done`, а
+  // сверка доставки тредов не читала.
+  const MR = 'https://git.acme.local/team/app/-/merge_requests/1072';
+  const reviewThread = {
+    id: 'd6286503',
+    resolvable: true,
+    resolved: false,
+    path: 'src/rbac.mdx',
+    notes: [{ id: '91', author: 'simonenko', body: 'строки 372 и 377 противоречат друг другу' }],
+  };
+  const gap = serverText('delivery-gap-review-threads', {
+    mr: MR,
+    count: '1',
+    threads: `simonenko · ${MR}#note_91: "строки 372 и 377 противоречат друг другу"`,
+  });
+
+  it('напоминание и разбор: ответ в той же ветке и сито из блокера', () => {
+    for (const prompt of [
+      deliveryNudgePrompt('feature/users', [gap]),
+      deliveryEscalationPrompt({
+        branch: 'feature/users',
+        missing: [gap],
+        history: [],
+        reason: 'cap',
+        nudges: 3,
+      }),
+    ]) {
+      expect(prompt).toContain(`${MR}#note_91`);
+      expect(prompt).toContain('reply in the same discussion thread');
+      expect(prompt).toContain(LEARN_SIEVES_LINE);
+    }
+    expect(deliveryNudgePrompt('feature/users', [NO_MR])).not.toContain(LEARN_SIEVES_LINE);
+  });
+
+  it('дошедшее напоминание отмечает ветки переданными — сито из них принимается', async () => {
+    const h = harness([
+      { missing: [gap], head: 'h1', mr: MR, reviewThreads: [reviewThread] },
+      { missing: [gap], head: 'h2', mr: MR, reviewThreads: [reviewThread] },
+    ]);
+    await h.start();
+    await h.round();
+    expect(h.words[0]?.prompt).toContain('reply in the same discussion thread');
+    expect(h.group()?.mrWatch).toMatchObject({
+      relayed: ['d6286503:91'],
+      relayedLinks: [`${MR}#note_91`],
+      relayedPaths: { [`${MR}#note_91`]: 'src/rbac.mdx' },
+    });
   });
 });
 

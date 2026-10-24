@@ -21,6 +21,7 @@ import {
   SKILL_ROUTE_LINE,
 } from '@agentdeck/contracts/quality-floor';
 import { LEGACY_IDENTITY, LEGACY_LEADING, LEGACY_WHOLE } from './panel-preamble-legacy.ts';
+import { coldResumeBrief, lostConversationBrief } from './split-continue.ts';
 
 /**
  * Первая строка каждого сообщения, которое панель сама шлёт в чат группы
@@ -142,6 +143,12 @@ const WHOLE = [
     // Продолжение группы в чистой сессии: задание группы в нём — цитата из
     // предложения, своих слов человека там нет.
     buildHandoffPrompt(HANDOFF, MARK, { group: true }),
+    // Новый разговор группы вместо остывшего или пропавшего (живой прогон
+    // 23.10): вводная, факты копии и задание стадии — панельные целиком, и чат
+    // звался «The panel started a new conversation…» в карточке запроса прав,
+    // в списке и в уведомлениях. Ответ человека за вводной — тоже не название.
+    coldResumeBrief({ branch: MARK }, []),
+    lostConversationBrief({ branch: MARK }, []),
   ]),
 ];
 

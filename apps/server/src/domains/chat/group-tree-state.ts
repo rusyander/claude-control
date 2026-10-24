@@ -203,6 +203,33 @@ function powershellDestroys(command: string): boolean {
     );
 }
 
+/** Звено запускает другую программу или строку: имя исполняемого — не первое слово. */
+const PS_LAUNCHER =
+  /\b(start-process|saps|start|iex|invoke-expression|invoke-command|icm|cmd(?:\.exe)?|pwsh(?:\.exe)?|powershell(?:\.exe)?|bash(?:\.exe)?|sh|wsl(?:\.exe)?)\b/i;
+/** Рекурсивное удаление cmd/PowerShell словами: `rd /s`, `rmdir /s`, `del /s`, `Remove-Item -Recurse`. */
+const PS_RECURSIVE_DELETE =
+  /\b(rd|rmdir|del|erase)\b[\s\S]*\/s\b|\b(remove-item|rm|ri|rmdir|del)\b[\s\S]*\s-r[a-z]*\b|\brm\b[\s\S]*\s-[a-z]*r[a-z]*\b/i;
+
+/**
+ * Звено инструмента PowerShell, что запускает git или удаление чужими руками
+ * (`Start-Process git -ArgumentList 'branch','-D','x'`, `Start-Process cmd '/c rd /s /q src'`,
+ * `iex 'git push …'`) — для строк группы (P-02, R1). Разбор такое звено не видит:
+ * `groupDecision` пропускал его строкой «обычная работа». Решает человек; простой
+ * `git …` первым словом судит разбор, как и прежде.
+ */
+export function powershellLaunchDestroys(command: string): boolean {
+  const named = command.replace(/\bgit(?:\.exe)?\b/gi, 'git').replace(/[–-―]/g, '-');
+  return named.split(/[;\n\r|&]+/).some((part) => {
+    if (PS_PLAIN_GIT.test(part) || !PS_LAUNCHER.test(part)) return false;
+    const words = part.replace(/[`'",‘-„]/g, ' ');
+    return (
+      UNPARSED_DESTROYS.test(words) ||
+      /\bgit\b[\s\S]*\bpush\b/.test(words) ||
+      PS_RECURSIVE_DELETE.test(words)
+    );
+  });
+}
+
 function bashDestroys(command: string): boolean {
   const steps = parse(command);
   if (steps === UNPARSED) return UNPARSED_DESTROYS.test(command);

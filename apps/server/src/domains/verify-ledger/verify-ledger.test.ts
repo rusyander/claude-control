@@ -65,7 +65,7 @@ describe('installLedger', () => {
   it('T17: preload, роняющий node, не ставится — панель ничего не подмешивает', () => {
     const broken = join(appData, 'src');
     mkdirSync(broken);
-    for (const name of ['checks.cjs', 'delta.cjs', 'ledger.cjs']) {
+    for (const name of ['checks.cjs', 'delta.cjs', 'ledger.cjs', 'vcs-delta.mjs']) {
       copyFileSync(join(SOURCE, name), join(broken, name));
     }
     // Ошибка вне try/catch preload — то, что уронило бы КАЖДЫЙ процесс node.
@@ -74,6 +74,84 @@ describe('installLedger', () => {
     expect(install.preload).toBeNull();
     expect(install.reason).toMatch(/self-test failed/);
     expect(ledgerEnv(install, appData, {})).toEqual({});
+  });
+
+  // 24.10: голый `node -e` грузил только preload, а delta.cjs и прочие тот грузит лениво.
+  describe('проба грузит каждый модуль', () => {
+    it.each([
+      ['delta.cjs', 'module.exports = {'],
+      ['vcs-delta.mjs', 'export const = 1;'],
+    ])('синтаксическая ошибка в %s — версия не ставится', (name, body) => {
+      const broken = join(appData, 'src');
+      mkdirSync(broken);
+      for (const file of readdirSync(SOURCE)) copyFileSync(join(SOURCE, file), join(broken, file));
+      writeFileSync(join(broken, name), body);
+      const install = installLedger({ appData, sourceDir: broken });
+      expect(install.preload).toBeNull();
+      expect(install.reason).toMatch(/self-test failed/);
+      expect(existsSync(join(appData, 'verify-ledger', 'bin', 'current'))).toBe(false);
+    });
+  });
+
+  describe('загрузка панели ставит только записанное в git (24.10: недописанный журнал ушёл группам)', () => {
+    let src = '';
+    const git = (...args: string[]) => {
+      const r = spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+        cwd: src,
+        encoding: 'utf8',
+      });
+      if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+    };
+    const installed = (install: { version?: string }, name: string) =>
+      join(appData, 'verify-ledger', 'bin', install.version!, name);
+
+    beforeEach(() => {
+      src = join(appData, 'repo');
+      mkdirSync(src);
+      for (const file of ['checks.cjs', 'delta.cjs', 'ledger.cjs', 'preload.cjs']) {
+        copyFileSync(join(SOURCE, file), join(src, file));
+      }
+      git('init', '-q');
+      git('add', '.');
+      git('commit', '-q', '-m', 'ledger');
+      // Правка посреди работы: новый модуль ещё не записан, preload переписан наполовину.
+      copyFileSync(join(SOURCE, 'vcs-delta.mjs'), join(src, 'vcs-delta.mjs'));
+      writeFileSync(
+        join(src, 'preload.cjs'),
+        `${readFileSync(join(src, 'preload.cjs'), 'utf8')}\n// wip\n`,
+      );
+    });
+
+    it('грязный каталог — версия HEAD: без недописанного preload и без незаписанного модуля', () => {
+      const install = installLedger({ appData, sourceDir: src, committedOnly: true });
+      expect(install.reason).toBeUndefined();
+      expect(install.source).toBe('head');
+      expect(readFileSync(installed(install, 'preload.cjs'), 'utf8')).not.toContain('// wip');
+      expect(existsSync(installed(install, 'vcs-delta.mjs'))).toBe(false);
+      expect(readFileSync(join(appData, 'verify-ledger', 'bin', 'current'), 'utf8')).toBe(
+        install.version,
+      );
+    });
+
+    it('флаг AGENTDECK_VERIFY_LEDGER_SOURCE=tree — рабочее дерево как есть', () => {
+      const install = installLedger({
+        appData,
+        sourceDir: src,
+        committedOnly: true,
+        env: { ...process.env, AGENTDECK_VERIFY_LEDGER_SOURCE: 'tree' },
+      });
+      expect(install.source).toBe('tree');
+      expect(readFileSync(installed(install, 'preload.cjs'), 'utf8')).toContain('// wip');
+    });
+
+    it('чистый каталог — рабочее дерево; без флага (тесты) — тоже дерево', () => {
+      expect(installLedger({ appData, sourceDir: src }).source).toBe('tree');
+      git('add', '.');
+      git('commit', '-q', '-m', 'done');
+      const install = installLedger({ appData, sourceDir: src, committedOnly: true });
+      expect(install.source).toBe('tree');
+      expect(existsSync(installed(install, 'vcs-delta.mjs'))).toBe(true);
+    });
   });
 
   it('выключатель disabled — без установки', () => {

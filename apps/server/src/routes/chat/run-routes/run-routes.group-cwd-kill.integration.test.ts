@@ -222,14 +222,15 @@ describe('маршрут прав группы: каталог оболочки 
     expect(await ask(`rm -rf "${other}/probe"`, 'toolu_f77_other')).toBe('deferred');
   });
 
-  it('N3: ребёнок своего CLI гасится сам, чужой процесс — карточка', async () => {
+  // D-1 (решение владельца 24.10): чужое и неназванное — отказ агенту с причиной,
+  // не карточка человеку.
+  it('N3: ребёнок своего CLI гасится сам, чужой процесс — отказ агенту', async () => {
     expect(await ask(`taskkill //PID ${childPid} //F`, 'toolu_n3_own')).toBe('allow');
     expect(await ask(`kill -9 ${childPid}`, 'toolu_n3_own_kill')).toBe('allow');
-    expect(await ask(`taskkill //PID ${stranger.pid} //F`, 'toolu_n3_foreign')).toBe('deferred');
+    expect(await ask(`taskkill //PID ${stranger.pid} //F`, 'toolu_n3_foreign')).toBe('deny');
     expect(
       await ask(`taskkill //PID ${childPid} //PID ${stranger.pid} //F`, 'toolu_n3_mixed'),
-    ).toBe('deferred');
-    // Цель не назвать — человеку.
-    expect(await ask('lsof -ti:5173 | xargs kill -9', 'toolu_n3_pipe')).toBe('deferred');
+    ).toBe('deny');
+    expect(await ask('lsof -ti:5173 | xargs kill -9', 'toolu_n3_pipe')).toBe('deny');
   });
 });

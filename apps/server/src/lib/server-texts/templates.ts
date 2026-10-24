@@ -1467,6 +1467,10 @@ export const serverTextTemplates = {
     ru: 'в описании MR {{mr}} нет причины n/a живой проверки ({{sieves}}) — впишите в описание id сита и почему оно не применимо',
     en: 'the description of MR {{mr}} does not give the n/a reason of the live check ({{sieves}}) — add the sieve id and why it does not apply',
   },
+  'delivery-gap-review-threads': {
+    ru: 'MR {{mr}}: ветки ревьюера без ответа ({{count}}) — на каждую правка в ветке и ответ в той же ветке обсуждения, или ответ, почему не меняете: {{threads}}',
+    en: 'MR {{mr}}: reviewer threads with no answer ({{count}}) — for each, a fix in the branch and a reply in the same discussion thread, or a reply why you do not change it: {{threads}}',
+  },
   'delivery-gap-no-copy': { ru: 'нет копии группы', en: 'the group has no copy' },
   'sieve-gap-conflicts': {
     ru: 'сито «интеграция»: слияние со свежей основной веткой даёт конфликт в {{files}} — перенесите ветку на свежую основную (rebase) и разрешите конфликт',
@@ -1727,6 +1731,10 @@ export const serverTextTemplates = {
   'group-layer-notice-refused': {
     ru: 'Не едет:',
     en: 'Not delivered:',
+  },
+  'foreign-shell-denied': {
+    ru: 'Панель не пропустила команду `{{command}}`. Агенту ушло: {{reason}}',
+    en: 'The panel refused the command `{{command}}`. The agent was told: {{reason}}',
   },
   'group-layer-kind-rule': {
     ru: 'правила: {{names}}',

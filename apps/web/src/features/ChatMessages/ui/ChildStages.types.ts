@@ -17,6 +17,7 @@ import type { GroupAcceptanceState } from './GroupAcceptance.types';
 import type { GroupRecheckState } from './GroupRecheck.types';
 import type { GroupAutoNoticesState } from './GroupAutoNotices.types';
 import type { ChildQuestion } from './ChildQuestion.types';
+import type { ChildPermission } from './ChildPermission.types';
 
 /**
  * Группа разделения глазами родителя: где она сейчас и чем ведётся.
@@ -33,6 +34,11 @@ import type { ChildQuestion } from './ChildQuestion.types';
  */
 export interface ChildStageGroup {
   chatId: string;
+  /**
+   * Ключи ВСЕХ звеньев группы в списке чатов. Запрос прав и вопрос любого звена
+   * — в карточке группы (владелец 23.10), а не только последнего.
+   */
+  chatIds?: string[];
   title: string;
   branch?: string;
   /** Пройденные звенья по порядку; последнее — нынешнее состояние группы. */
@@ -267,4 +273,11 @@ export interface ChildStagesProps {
   questions?: ReadonlyMap<string, ChildQuestion[]>;
   /** Ответ на вопрос группы — уходит в её чат. */
   onAnswer?: (chatId: string, answer: string) => void;
+  /**
+   * Запросы прав по ключу чата карточки (владелец 23.10) — каждый в карточке
+   * своей группы, а не плашкой над хабом.
+   */
+  permissions?: ReadonlyMap<string, ChildPermission[]>;
+  /** Решение по правам — уходит в прогон ребёнка, под ключом которого он спросил. */
+  onPermissionDecide?: (chatId: string, toolUseId: string, behavior: 'allow' | 'deny') => void;
 }

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { HelpSection, FieldTable, Callout, OptionCards, HelpDiagram } from '../../ui';
 import { PhoneGuideSections } from '../PhoneGuideSections/PhoneGuideSections';
 import { PhoneLimitsSections } from '../PhoneLimitsSections/PhoneLimitsSections';
+import { PhoneSigningSection } from '../PhoneSigningSection/PhoneSigningSection';
 
 /**
  * Документ «Телефон» — приложение для Android над той же панелью.
@@ -86,6 +87,8 @@ export function PhoneTopic() {
           ]}
         />
       </HelpSection>
+
+      <PhoneSigningSection tr={tr} />
 
       <HelpSection title={tr('offlineTitle')} caption={tr('offlineCaption')}>
         <FieldTable

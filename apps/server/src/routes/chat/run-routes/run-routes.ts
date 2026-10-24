@@ -31,6 +31,7 @@ import { expandAliasText } from '../../../domains/chat/group-command/alias-text.
 import {
   PUBLISH_BEFORE_DELIVERY_DENIED,
   publishesBeforeDelivery,
+  publishTextOf,
   SEND_PACK_DENIED,
   sendsPack,
 } from '../../../domains/chat/group-profile/delivery-publish.ts';
@@ -116,6 +117,7 @@ import {
   groupAutoApproveFor,
   groupDecision,
   groupDiscards,
+  groupKillRefusal,
   groupPushRefusal,
   needsMrState,
   syncDanger,
@@ -127,6 +129,7 @@ import {
 import { gitDestroys, guardUncommitted } from '../../../domains/chat/group-tree-state.ts';
 import {
   sessionScratchpad,
+  sessionTranscriptDir,
   toolCallCwd,
 } from '../../../domains/chat/ChatTranscriptFile/tool-call-cwd.ts';
 import {
@@ -250,7 +253,7 @@ const refuseExpired = (reply: FastifyReply): FastifyReply =>
  * вершинам своей и целевой веток на сервере (`remoteConflicts`, сверка по хэшам):
  * фордж считает его лениво, а `origin/*` копии пишет сам агент (F-31).
  */
-async function withMrState(
+export async function withMrState(
   store: AppStore,
   appData: string,
   group: GroupAutoApprove,
@@ -280,7 +283,7 @@ async function withMrState(
 }
 
 /** Догон, чью цель не назвать: решает человек (`syncRefOf`). */
-const UNNAMED_SYNC = Symbol('unnamed-sync');
+export const UNNAMED_SYNC = Symbol('unnamed-sync');
 
 /**
  * Догон целевой ветки группой (`main-sync.ts`): ссылка, с которой сверять
@@ -292,7 +295,7 @@ const UNNAMED_SYNC = Symbol('unnamed-sync');
  *   `UNNAMED_SYNC`: сверить конфликт нечем, решает человек (c);
  * - инструмент PowerShell — тот же текст `git …`, та же сверка, что у Bash.
  */
-async function syncRefOf(
+export async function syncRefOf(
   group: GroupAutoApprove,
   cwd: string,
   toolName: string,
@@ -1313,8 +1316,7 @@ export function registerChatRunRoutes(
     // группы пуш своей ветки разрешает сам. Метку ставит профиль группы.
     if (
       held?.options.platformEnv?.[GROUP_DELIVER_AHEAD_ENV] === '1' &&
-      toolName === 'Bash' &&
-      publishesBeforeDelivery(String((input as { command?: unknown } | null)?.command ?? ''))
+      publishesBeforeDelivery(publishTextOf(toolName, input) ?? '')
     ) {
       return reply.send({ behavior: 'deny', message: PUBLISH_BEFORE_DELIVERY_DENIED });
     }
@@ -1354,7 +1356,11 @@ export function registerChatRunRoutes(
       placed && toolName === 'Bash'
         ? sessionScratchpad(projectsDir(ctx), held.sessionId ?? held.key)
         : undefined;
-    // Погашение номера или порта — сверка с деревом процессов группы (N3).
+    // Погашение номера или порта — сверка с процессами группы (N3): живое дерево,
+    // метка группы, текст запуска сироты в транскриптах копии (D-1).
+    const transcriptDir = placed
+      ? sessionTranscriptDir(projectsDir(ctx), held.sessionId ?? held.key)
+      : undefined;
     const found =
       placed &&
       (await withProcessFacts(
@@ -1365,6 +1371,8 @@ export function registerChatRunRoutes(
         },
         { toolName, input },
         registry.processRootsOf(runId),
+        undefined,
+        transcriptDir ? { transcriptDir } : {},
       ));
     const stated =
       found && (await withMrState(ctx.store, ctx.location.paths.appData, found, toolName, input));
@@ -1393,13 +1401,13 @@ export function registerChatRunRoutes(
     // причиной, не карточка (решение владельца 23.10): решать человеку нечего.
     const pushRefusal = !guard && group ? groupPushRefusal(group, { toolName, input }) : undefined;
     if (pushRefusal) return reply.send({ behavior: 'deny', message: pushRefusal });
+    // Погашение не своего или неназванного — отказ агенту с тем, как погасить
+    // своё, не карточка (D-1, 24.10, решение владельца): человеку решать нечего.
+    const killRefusal = !guard && group ? groupKillRefusal(group, { toolName, input }) : undefined;
+    if (killRefusal) return reply.send({ behavior: 'deny', message: killRefusal });
     // `git send-pack` — пуш мимо разбора цели: разбор группы счёл его обычной
     // командой и пускал даже в main (RF-BGCD-07). Группе он не нужен — есть `git push`.
-    if (
-      group &&
-      toolName === 'Bash' &&
-      sendsPack(String((input as { command?: unknown } | null)?.command ?? ''))
-    ) {
+    if (group && sendsPack(publishTextOf(toolName, input) ?? '')) {
       return reply.send({ behavior: 'deny', message: SEND_PACK_DENIED });
     }
     // Догон main группой — только при конфликте с ним, без карточки

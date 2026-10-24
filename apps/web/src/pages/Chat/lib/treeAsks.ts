@@ -33,7 +33,14 @@ export function collectTreeAsks(
     const byRun = new Map<string, ChildPermission>();
     for (const ask of node.asks ?? []) {
       if (ask.kind === 'permission' && ask.toolUseId) {
-        const entry = byRun.get(ask.runId) ?? { chatId: ask.runId, title, permissions: [] };
+        // Все ключи разговора — по ним запрос находит карточку своей группы:
+        // ключ прогона (`new-…`) с ключом карточки не совпадает.
+        const entry = byRun.get(ask.runId) ?? {
+          chatId: ask.runId,
+          title,
+          permissions: [],
+          chatKeys: [...new Set([ask.runId, ...keys])],
+        };
         entry.permissions.push({
           toolName: ask.toolName ?? '',
           input: ask.input,
@@ -44,7 +51,12 @@ export function collectTreeAsks(
       }
       // Ответ уходит в ЧАТ ребёнка под ключом, под которым его знает список:
       // временный ключ прогона после перезапуска не найти.
-      const common = { chatId: node.chatId, title, isRunning: node.running };
+      const common = {
+        chatId: node.chatId,
+        title,
+        isRunning: node.running,
+        chatKeys: [...new Set([...keys, ask.runId])],
+      };
       if (ask.kind === 'question' && ask.input !== undefined) {
         questions.push({
           ...common,

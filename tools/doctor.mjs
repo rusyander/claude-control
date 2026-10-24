@@ -192,7 +192,7 @@ if (existsSync(join(process.cwd(), 'apps', 'mobile', 'android'))) {
   if (bytes > 2 * 1024 ** 3) {
     warn(
       `Промежуточные файлы сборки телефона: ${formatGb(bytes)}`,
-      'Это мусор нативной сборки внутри node_modules. Уберите: pnpm mobile:clean',
+      'Это мусор нативной сборки внутри node_modules или в короткой копии сборки APK. Уберите: pnpm mobile:clean',
     );
   } else if (bytes > 0) {
     ok(`Промежуточные файлы сборки телефона: ${formatGb(bytes)}`);

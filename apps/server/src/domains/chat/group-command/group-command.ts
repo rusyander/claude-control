@@ -37,6 +37,7 @@ import {
   DANGER,
   OTHER,
   ROUTINE,
+  UNNAMED_KILL,
   Walk,
   isAbsolute,
   steersGit,
@@ -93,6 +94,12 @@ export { isProtectedBranch } from './walk.ts';
 type Env = ReadonlyMap<string, string | undefined>;
 const NO_ENV: Env = new Map();
 
+/** Сценарий, который не разобрать: опасное — человеку, погашение — цель без имени. */
+function unparsedVerdict(script: string): SegmentVerdict {
+  if (risky(script)) return DANGER;
+  return killsProcess(script) ? UNNAMED_KILL : OTHER;
+}
+
 /**
  * Сценарий из обёртки. `same` — в этой же оболочке; `child` — новый процесс:
  * только экспортированное и окружение префикса (F-03); `deferred` — при выходе
@@ -110,8 +117,9 @@ function scriptVerdict(
     return ROUTINE;
   }
   const steps = parse(script);
-  // Погашение в сценарии, который не разобрать, — цель не назвать (N3).
-  if (steps === UNPARSED) return risky(script) || killsProcess(script) ? DANGER : OTHER;
+  // Погашение в сценарии, который не разобрать, — цель не назвать (N3): отказ
+  // агенту маршрутом прав, не карточка (D-1, 24.10).
+  if (steps === UNPARSED) return unparsedVerdict(script);
   if (scope === 'child') walk.enterChild(env);
   else if (scope === 'blind') {
     walk.enter();
@@ -515,7 +523,9 @@ function judgeDeferred(walk: Walk, tally: Tally): void {
       if (tally.danger) return;
       const steps = parse(script);
       if (steps === UNPARSED) {
-        tally.add(risky(script) ? DANGER : OTHER, script);
+        // Погашение и здесь — неназванная цель: раньше такой сценарий уходил в
+        // «прочее», и правила чата погашения не видели вовсе.
+        tally.add(unparsedVerdict(script), script);
         continue;
       }
       if (blind) {
@@ -540,8 +550,9 @@ export function groupCommandVerdict(
 ): GroupCommandVerdict {
   const steps = parse(command);
   if (steps === UNPARSED) {
-    // Погашение в строке, которую не разобрать, — цель не назвать (N3).
-    if (risky(command) || killsProcess(command)) return { kind: 'danger' };
+    if (risky(command)) return { kind: 'danger' };
+    // Погашение в строке, которую не разобрать, — цель не назвать (N3): отказ
+    // агенту маршрутом прав, не карточка (D-1, 24.10).
     return {
       kind: 'other',
       texts: [command],
@@ -549,6 +560,7 @@ export function groupCommandVerdict(
       writes: false,
       lease: false,
       deletes: false,
+      ...(killsProcess(command) ? { kills: { pids: [], ports: [], unnamed: true } } : {}),
     };
   }
   const tally = new Tally();

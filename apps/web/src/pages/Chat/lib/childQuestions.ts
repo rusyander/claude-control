@@ -2,6 +2,7 @@ import type { ChatSummary } from '@agentdeck/contracts';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
 import { isOpenAsk } from '@shared/lib/chat-stream';
 import type { ChildQuestion } from '@features/ChatMessages';
+import { runKeys } from './childPermissions';
 
 /**
  * Вопросы, которыми дочерние разговоры ждут человека.
@@ -53,6 +54,8 @@ export function collectChildQuestions(
       // прямо, иначе «отправлено» выглядит как «уже читает».
       isRunning: run.status === 'running',
       ...(asked.id ? { toolUseId: asked.id } : {}),
+      // Карточка группы в хабе знает чат по ключу списка, а не прогона `new-…`.
+      chatKeys: runKeys(run, child.id),
     });
   }
   return found;

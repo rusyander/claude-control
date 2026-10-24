@@ -182,6 +182,35 @@ describe('qwen serve: сообщение посреди хода', () => {
     expect(result).toEqual({ kind: 'done', reply: 'ответ на рос человека / разрешение: cancel' });
   });
 
+  it('команда оболочки при судье: уходит судье с каталогом, его «да» — proceed_once', async () => {
+    const judged: unknown[] = [];
+    const turn = new QwenServeTurn();
+    const result = await turn.run(
+      {
+        ...options('fake-qwen-serve.mjs', {
+          FAKE_MODE: 'permission',
+          FAKE_TOOL_COMMAND: 'pnpm build',
+        }),
+        permission: {
+          allowEdits: false,
+          ask: async () => 'deny',
+          judge: async (shell) => (judged.push(shell), { behavior: 'allow' }),
+        },
+      },
+      () => {},
+    );
+    expect(judged).toHaveLength(1);
+    expect(judged[0]).toMatchObject({
+      command: 'pnpm build',
+      shell: process.platform === 'win32' ? 'unknown' : 'bash',
+    });
+    expect((judged[0] as { cwd?: string }).cwd).toBeTruthy();
+    expect(result).toEqual({
+      kind: 'done',
+      reply: 'ответ на рос человека / разрешение: proceed_once',
+    });
+  });
+
   it('промпт ждёт, пока qwen поднимет серверы MCP', async () => {
     // qwen 0.25 поднимает MCP фоном после POST /session, а serve живёт один
     // ответ — промпт, ушедший сразу, не видел медленного сервера (переходник
@@ -557,6 +586,27 @@ describe('codex app-server: права потока по переключате�
       sandbox: 'read-only',
     });
     expect(codexThreadRights(undefined, 'win32')).toEqual({ approvalPolicy: 'never' });
+  });
+
+  it('права при судье команд (Q3): POSIX спрашивает (untrusted) в той же песочнице, Windows как был', () => {
+    const judge = async () => ({ behavior: 'allow' as const });
+    // `never` не спросил бы ни о чём — судья не увидел бы `git branch -D`.
+    expect(codexThreadRights({ allowEdits: true, judge }, 'linux')).toEqual({
+      approvalPolicy: 'untrusted',
+      sandbox: 'workspace-write',
+    });
+    expect(codexThreadRights({ allowEdits: true, judge }, 'darwin')).toEqual({
+      approvalPolicy: 'untrusted',
+      sandbox: 'workspace-write',
+    });
+    expect(codexThreadRights({ allowEdits: true, judge }, 'win32')).toEqual({
+      approvalPolicy: 'untrusted',
+      sandbox: 'read-only',
+    });
+    expect(codexThreadRights({ allowEdits: false, judge }, 'linux')).toEqual({
+      approvalPolicy: 'untrusted',
+      sandbox: 'read-only',
+    });
   });
 
   it('правки выключены — read-only, и каждое действие спрашивается (untrusted)', async () => {

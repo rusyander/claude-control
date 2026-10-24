@@ -94,6 +94,9 @@ function vitest(args: string[], env: Record<string, string> = {}): Run {
   };
 }
 
+// Пути related от пакета; настоящие абсолютные формы того же файла (junction, `RUSYAN~1`) — отдельно.
+const rel = (a: string[] | null) => a?.filter((x) => !/^([a-z]:)?\//i.test(x)) ?? null;
+
 const events = () =>
   existsSync(join(home, 'events.jsonl'))
     ? readFileSync(join(home, 'events.jsonl'), 'utf8')
@@ -122,14 +125,14 @@ describe('verify-ledger: сужение от последнего зелёног
     vitest(['run']);
     put('web/src/a.ts', 'export const a = 2;\n');
     const r = vitest(['run']);
-    expect(r.args).toEqual(['related', 'src/a.ts', '--run', '--passWithNoTests']);
+    expect(rel(r.args)).toEqual(['related', 'src/a.ts', '--run', '--passWithNoTests']);
     expect(r.err).toContain('[verify-ledger] delta since green');
   });
 
   it('помощник в testing/ отдельной фичи — по графу, а не целиком', () => {
     vitest(['run']);
     put('web/src/feature/testing/helper.ts', 'export const h = 2;\n');
-    expect(vitest(['run']).args).toEqual([
+    expect(rel(vitest(['run']).args)).toEqual([
       'related',
       'src/feature/testing/helper.ts',
       '--run',
@@ -142,7 +145,12 @@ describe('verify-ledger: сужение от последнего зелёног
     put('web/src/a.ts', 'export const a = 2;\n');
     vitest(['run']);
     put('web/src/b.ts', 'export const b = 2;\n');
-    expect(vitest(['run']).args).toEqual(['related', 'src/b.ts', '--run', '--passWithNoTests']);
+    expect(rel(vitest(['run']).args)).toEqual([
+      'related',
+      'src/b.ts',
+      '--run',
+      '--passWithNoTests',
+    ]);
   });
 
   it.each([
@@ -173,14 +181,21 @@ describe('verify-ledger: сужение от последнего зелёног
     expect(r.err).not.toContain('reused');
   });
 
-  it('правка чужого пакета и документации вне пакета — повтор зелёного без прогона', () => {
-    put('other/package.json', '{"name":"other"}\n');
+  it('правка документации вне пакета — повтор зелёного без прогона', () => {
     vitest(['run']);
-    put('other/x.ts', 'export const x = 2;\n');
     put('docs/page.md', '# B\n');
     const r = vitest(['run']);
     expect(r.code).toBe(0);
     expect(r.err).toContain('[verify-ledger] nothing the tests can see changed');
+  });
+
+  it('код чужого пакета — related по нему путём от пакета, не повтор (ревью 25.10 R1)', () => {
+    put('other/package.json', '{"name":"other"}\n');
+    vitest(['run']);
+    put('other/x.ts', 'export const x = 2;\n');
+    const r = vitest(['run']);
+    expect(rel(r.args)).toEqual(['related', '../other/x.ts', '--run', '--passWithNoTests']);
+    expect(r.err).not.toContain('reused');
   });
 
   it('AGENTDECK_VERIFY_LEDGER_DELTA=off — целиком', () => {
@@ -229,7 +244,7 @@ describe('verify-ledger: сужение от последнего зелёног
     vitest(['related', 'src/a.ts', '--run']);
     put('web/src/b.ts', 'export const b = 2;\n');
     // b изменён — входит в Δ; a не менялся и был в зелёном.
-    expect(vitest(['related', 'src/a.ts', 'src/b.ts', '--run']).args).toEqual([
+    expect(rel(vitest(['related', 'src/a.ts', 'src/b.ts', '--run']).args)).toEqual([
       'related',
       'src/b.ts',
       '--run',

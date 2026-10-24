@@ -7,6 +7,7 @@ import {
   getActiveProvider,
 } from '../../providers/registry.ts';
 import { parseForeignChatKey, foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import { continuationEnvironment } from '@agentdeck/contracts/task-split';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
 import {
   createChat,
@@ -263,8 +264,10 @@ export function createReviewStarter(
           cwd: input.cwd,
           economy: settings.groupEconomy,
           // Вводную собрал вызвавший из задания связи — у дерева до смены схемы
-          // стадий старого; новый разговор получает его переведённым (§10).
-          ...(input.cold ? { intro: upgradeStageScheme(input.cold) } : {}),
+          // стадий старого; новый разговор получает его переведённым (§10) и с
+          // преамбулой окружения сжатой, как во вводной реестра: «Продолжить» группы
+          // 25.10 несло в новый разговор 3,9 тыс. знаков подготовки копии.
+          ...(input.cold ? { intro: continuationEnvironment(upgradeStageScheme(input.cold)) } : {}),
           ...(input.base ? { base: input.base } : {}),
           ...warmedAt(ctx.location.paths.appData, sessionId),
           now: Date.now(),

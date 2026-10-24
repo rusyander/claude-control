@@ -463,18 +463,21 @@ export const chatEn: typeof chatRu = {
         'or “overpaid ≈ …”. Until branches are compared it says so.',
       sAsk: 'Answer the children without visiting them',
       sAskText:
-        "A child's permission request arrives in the parent conversation signed " +
-        'with the group it came from. The decision goes back where it is awaited — ' +
-        'there is no need to open the group chat.',
-      sCardAsk: 'The agent’s question sits in its group’s card',
+        'A group’s permission request stands in the card of the group that stopped: ' +
+        '“The agent waits for permission”, the stage of the link and the start of the ' +
+        'chat key, with Allow and Deny below. The decision goes back where it is ' +
+        'awaited — there is no need to open the group chat. A request from any link ' +
+        'of the group — work, review, fixes — lands in the same card, including a ' +
+        'chat the panel has only just started.',
+      sCardAsk: 'The agent’s question sits in its group’s card too',
       sCardAskText:
         'A question the group’s agent asks mid-turn stands in the group’s card as a ' +
         'separate yellow island: “The agent asks”, the stage of the link and the start ' +
         'of the chat key (the full key is in the tooltip). The group may still be ' +
         '“running”: the question shows at once, not after the turn ends. Answer right ' +
-        'in the card; the answer goes to the group’s chat. A question from a chat ' +
-        'with no card of its own in the hub stands in the strip above the hub, like ' +
-        'permission requests.',
+        'in the card; the answer goes to the group’s chat. A question or permission ' +
+        'request from a chat with no card of its own in the hub (a nested chat of a ' +
+        'group, say) stands in the strip above the hub, signed “Requested by “…””.',
       sOverlap: 'Compare the branches once the work is done',
       sOverlapText:
         'Compare branches counts the overlaps: two here. ' +
@@ -1313,7 +1316,13 @@ export const chatEn: typeof chatRu = {
       'docs-or-contract-only change, and then the reason with the sieve id goes into the MR ' +
       'description — without it “done” does not come either. ' +
       'A sieve not passed holds the group: “done” does not ' +
-      'come and the group gets a reminder, as with an unpushed branch. When a reviewer ' +
+      'come and the group gets a reminder, as with an unpushed branch; it names the format of ' +
+      'the report line, because a sieve answered in prose counts as not passed. Unresolved reviewer ' +
+      'threads on its MR hold it the same way, when the last word is neither the MR author’s ' +
+      'nor a bot’s: the reminder names each with its link, and for each the group fixes the ' +
+      'branch and replies in the same discussion thread — or replies why it does not change ' +
+      'it; the reviewer resolves the thread. The group’s reply releases the thread, a new ' +
+      'reviewer reply holds it again. When a reviewer ' +
       'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
       'one, with the code area where the blocker was found (from the thread’s file). It ' +
       'reaches group tasks only once you accept it in “Settings” → “Groups” → “Pre-MR ' +
@@ -1334,7 +1343,12 @@ export const chatEn: typeof chatRu = {
       '(quarantine does not hold). No run, a stale run, a touched case not run, a red case, or a diff ' +
       'covered by no case while cases are linked to files — the group gets a reminder with ' +
       'the command that records a run, narrowed to the cases of its changed files (--case), ' +
-      'and the group row in the hub reads “Tests block: N of M green”. When the branch is ' +
+      'and the group row in the hub reads “Tests block: N of M green”. The list in the ' +
+      'reminder is a snapshot of the check, and the diff may have grown since, so before ' +
+      'answering the group re-checks it itself: the same command with gaps in place of run ' +
+      'prints exactly the lines the panel will check. A continuation in the middle of ' +
+      'delivery — after a pause or a panel restart — carries its current gaps, not a bare ' +
+      '“continue”. When the branch is ' +
       'pushed and the MR is in place and only the report is missing — sieve rows, task ' +
       'points or a recorded run — the reminder says so outright: leave git alone, no ' +
       'commit, no push, no MR edit. No cases in the copy at all — nothing to check with, and it does not ' +
@@ -1360,11 +1374,25 @@ export const chatEn: typeof chatRu = {
       'expression, a plugin key or through root the ledger does not guess — such a build ' +
       'runs again. After an edit, vitest runs not ' +
       'the whole suite but only the tests related to the files changed since the last green ' +
-      'run (the “delta since green” line gives their count); an edit to dependencies, ' +
-      'configs, setup files or snapshots, an edit to code outside every package (a script a ' +
-      'test launches as a separate process), a deleted file, a junit report, a rerun after a ' +
-      'red narrowed run, and ten narrowed runs in a row or a day without a whole run bring ' +
-      'the whole run back. A tool launched through a node_modules/.bin link (as npm, yarn and bun install it on Linux and macOS) ' +
+      'run (the “delta since green” line gives their count). The same holds for a run given ' +
+      'as files (vitest run a.test.ts b.test.ts): an edit those tests cannot see replays the ' +
+      'last green run of the same list, and an edit in code they import runs only the listed ' +
+      'tests it reaches — vitest itself computes the intersection; a test that names a ' +
+      'changed script or directory in its text runs too. Code in a neighbouring package ' +
+      'that a test reaches through an alias or a relative import counts as changed, and ' +
+      'the tests it reaches run. A test that launches a process, walks a directory or ' +
+      'imports a computed path runs on any edit: vitest’s graph cannot see its ' +
+      'dependencies. An edit to dependencies, configs, setup files and everything they ' +
+      'import, snapshots, the package’s data files (json and anything else a test reads ' +
+      'from disk), an edit to code outside every package (a script a test launches as a ' +
+      'separate process), a deleted file, a rerun after a red narrowed run, and ten ' +
+      'narrowed runs in a row or a day without a whole run bring the whole run back. Nor ' +
+      'is a run narrowed when it has its own root (root or dir in the vitest config, ' +
+      '--root, -r or --dir in the command) or a flag the ledger does not know, and a file ' +
+      'list is not narrowed on a vitest older than 4.1.10 or of another major either. A run ' +
+      'with a junit report is never narrowed but is replayed when the tests cannot see the ' +
+      'edit and the green run left its report. A folder opened through a link (junction) ' +
+      'narrows the same way: the changed files reach vitest in their real path form too. A tool launched through a node_modules/.bin link (as npm, yarn and bun install it on Linux and macOS) ' +
       'is recognised by the package’s real file. The ledger is shared by the main folder and all its copies: a ' +
       'green run in one copy counts for any other with the same tree. The last green run ' +
       'for narrowing is each copy’s own, and a new copy’s first run narrows from a ' +
@@ -1379,7 +1407,12 @@ export const chatEn: typeof chatRu = {
       'and a split group’s command doing so is refused: the locked module ignores the ' +
       'command’s environment variables, and an emptied NODE_OPTIONS in a group command is ' +
       'refused too. The honest limit: a program the model wrote itself that rewrites ' +
-      'NODE_OPTIONS from inside or deletes the ledger files is not caught by the lock. If the module ' +
+      'NODE_OPTIONS from inside or deletes the ledger files is not caught by the lock. ' +
+      'At start the panel installs the module from the committed version of ' +
+      'tools/verify-ledger while that folder has uncommitted edits: a half-written ledger ' +
+      'never reaches live groups, and an edit takes effect after its commit ' +
+      '(AGENTDECK_VERIFY_LEDGER_SOURCE=tree in the panel’s environment installs the files ' +
+      'on disk as they are). If the module ' +
       'fails its self-test at panel start, nothing gets it, and the tile says “Not working” ' +
       'with the reason.',
     splitReview: 'Reviewing someone else’s merge requests',
@@ -1978,10 +2011,15 @@ export const chatEn: typeof chatRu = {
       'judged from the copy root; the shell is outside the copy, or the directory cannot be ' +
       'known (an earlier call of the same reply is not written yet) — the directory is ' +
       'unknown, and deleting by a relative path goes to a human. A group may stop a process ' +
-      'by itself only if the process is in its own tree: a descendant of its CLI, or a ' +
-      'background child of the same command (`$!`, `%1`); a kill by port (the group’s own ' +
-      'dev server) is checked against whose process holds the port. Another process’s PID or port, ' +
-      '`pkill`, `killall`, `taskkill /IM`, and kills with no named target go to a human. ' +
+      'by itself only if the process is its own: a descendant of its CLI, a background child ' +
+      'of the same command (`$!`, `%1`), a process carrying the group’s mark in its ' +
+      'environment, or an orphan whose launch is recorded verbatim in its copy’s transcripts ' +
+      '(the group’s CLI died, its dev server stayed); a kill by port is checked against ' +
+      'whose process holds the port, and a port nobody holds has nothing to kill, so it passes. ' +
+      'Another process’s PID or port, `pkill`, `killall`, `taskkill /IM`, and kills with no ' +
+      'named target reach neither execution nor you: the agent gets a refusal naming the ' +
+      'process and how to name its own. Such a question still waiting from an earlier ' +
+      'version is re-judged by the panel itself on restart. ' +
       'Catching up with the target branch (rebase, merge or pull of main, origin/main, ' +
       'develop…, including by the hash of its commit and git checkout -B / switch -C from it) ' +
       'the panel checks itself: `git merge-tree` in the group’s copy, and a trial merge in a ' +
@@ -2574,8 +2612,14 @@ export const chatEn: typeof chatRu = {
       'after the tree pause, or when the running turn ends, and with nothing to resume the ' +
       'agent sees the answer at its next call; the line under the button says which. “Deny” hands the agent a refusal, and a repeated call gets the same answer. ' +
       '“Open chat” goes to the conversation the call came from. Only a human answers: an ' +
-      'agent call that reaches the panel’s decision endpoints or its key is refused before ' +
-      'every rule — an agent cannot decide its own D-n.',
+      'agent call that reaches the panel’s decision endpoints, the phone signing mode or ' +
+      'its key is refused before every rule — an agent cannot decide its own D-n. One ' +
+      'exception: a group’s waiting process kill is judged again by today’s rules when ' +
+      'the panel restarts — its own process is allowed, another’s or an unnamed one is ' +
+      'refused with the reason — and the record is closed; the agent hears that the panel ' +
+      'decided, not you. With “decisions only with the phone’s signature” on (the ' +
+      '“Phone” document), “Allow” is accepted only from a paired phone, while “Deny” ' +
+      'works from anywhere.',
     deferredLimits: 'Lifetime and limits',
     deferredLimitsText:
       'An item waits «Days a D-n ask waits for an answer» (7 by default, up to ' +
@@ -2904,7 +2948,28 @@ export const chatEn: typeof chatRu = {
       'feed as the same «Allow / Deny» card Claude uses, plus a phone notification; the ' +
       'card survives leaving the page and F5. «Deny» reaches the CLI as a refusal, and ' +
       '«Stop» or the end of the reply declines everything still waiting. With the switch ' +
-      'on, the panel answers «yes» itself: edits go through without cards. The position ' +
+      'on, the panel answers «yes» to file edits itself, while shell commands from Codex, ' +
+      'Qwen, Goose and OpenCode pass the same boundary as Claude with «Permissions auto»: ' +
+      'reversible work (a build, a commit, a push of your own branch) goes through, while ' +
+      'deleting a branch or tag, a merge and a command matched by the CLI’s own «ask» rule ' +
+      '(Qwen permissions.ask, OpenCode permission.bash) arrive as a card. A command the CLI ' +
+      'runs in PowerShell is read as PowerShell; when the CLI does not name its shell (Qwen ' +
+      'and Goose on Windows), the command is judged both as Bash and as PowerShell and the ' +
+      'stricter answer wins. In a split group the rows of the «Groups» tab decide a foreign ' +
+      'CLI’s commands, as they do for a Claude group: a push to main and a merge are refused ' +
+      'with the reason, and whatever the human decides becomes a D-n item in the decision ' +
+      'list; the group keeps working, and «Allow» on the item lets exactly that call through ' +
+      'once. The model gets the panel’s refusal with its reason — inserted into the running ' +
+      'answer before the CLI hears «no» (OpenCode: in the refusal itself) — and does not ' +
+      'retry the same command blindly; the conversation keeps a note «The panel refused the ' +
+      'command … The agent was told: …». A foreign CLI group may stop a process itself by the ' +
+      'same rules as a Claude group: its own is a descendant of the CLI process (the panel ' +
+      'knows its number for Codex and Qwen) or a process carrying the group mark in its ' +
+      'environment; someone else’s or an unnamed one is refused to the agent with the reason, ' +
+      'no D-n item. So that commands reach this boundary, Codex on Linux and macOS asks about every ' +
+      'command (untrusted) in the same workspace-write sandbox when the switch is on, and ' +
+      'Goose is moved to approve. Kimi Code with the switch on still answers «yes» to ' +
+      'everything. The position ' +
       'is stored in the conversation; cascade stages, a clean session and parallel-launch ' +
       'tasks take it from the conversation they started from, while task triage and ' +
       'review by link run with edits allowed, as with Claude. If the server mode did not ' +
@@ -3217,7 +3282,7 @@ export const chatEn: typeof chatRu = {
       '01-proposal': 'An offer to split: three groups, branches, kind of work and model',
       '02-tree': 'After the split: links in the list on the left and the hub in the parent feed',
       '03-hub': 'The hub: chain stages, model, time at work and the branch comparison button',
-      '04-child-ask': "A child's permission request lands in the parent with the group name",
+      '04-child-ask': 'A group’s permission request in its card: stage, chat, Allow and Deny',
       '04b-card-ask': 'The group agent’s question as a yellow island in its card: stage and chat',
       '05-overlap': 'Branch overlap: a shared file and a file taken outside the group it owns',
       '06-paused': 'The tree on pause: a mark on every group and the resume button',

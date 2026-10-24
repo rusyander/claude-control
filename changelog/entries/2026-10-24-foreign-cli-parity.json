@@ -1,0 +1,129 @@
+{
+  "title": {
+    "ru": "Группы на Codex, Qwen, Goose и OpenCode судятся как группы Claude, хуки набора доходят до других CLI",
+    "en": "Groups on Codex, Qwen, Goose and OpenCode are judged like Claude groups, kit hooks reach other CLIs"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Команды Codex, Qwen, Goose и OpenCode в группе разделения судятся теми же строками вкладки «Группы», что и команды группы Claude: решение человека становится пунктом D-n, публикация до доставки и `git send-pack` получают отказ. Раньше переключатель «Разрешить правки» отвечал «да» любой команде чужого CLI.",
+        "en": "Codex, Qwen, Goose and OpenCode commands in a split group are judged by the same rows of the «Groups» tab as a Claude group's: a human decision becomes a D-n item, publishing before delivery and `git send-pack` are refused. Before, the «Allow edits» switch answered «yes» to any foreign CLI command."
+      },
+      "area": {
+        "ru": "Чужие CLI",
+        "en": "Foreign CLIs"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В разговоре чужого CLI удаление ветки или метки git, слияние и рекурсивное удаление уходят карточкой человеку и при включённых правках — как у Claude с тем же переключателем. Раньше такие команды проходили молча.",
+        "en": "In a foreign CLI conversation, deleting a git branch or tag, merging and recursive deletion go to a human as a card even with edits allowed, as they do for Claude with the same switch. Before, such commands passed silently."
+      },
+      "area": {
+        "ru": "Чужие CLI",
+        "en": "Foreign CLIs"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Команды, спрятанные в `Start-Process`, `iex` или `cmd /c` инструментом PowerShell, судятся тем, что запустится на самом деле: удаление ветки, пуш и рекурсивное удаление уходят человеку и в группе, и в одиночном чате с автоподтверждением; защита бэкенда тоже читает PowerShell как Bash. Раньше программа и её аргументы в кавычках списка проходили мимо правил.",
+        "en": "Commands hidden in `Start-Process`, `iex` or `cmd /c` through the PowerShell tool are judged by what will actually run: branch deletion, push and recursive deletion go to a human both in a group and in a single chat with auto-approve; backend protection reads PowerShell like Bash too. Before, a program and its arguments in a quoted list slipped past the rules."
+      },
+      "area": {
+        "ru": "Права",
+        "en": "Permissions"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Отказ панели модель чужого CLI получает с причиной — вставкой в идущий ответ до того, как CLI узнает «нет» (у OpenCode — в самом отказе), а в переписке остаётся заметка о не пропущенной команде. Раньше модель видела лишь «отклонено пользователем» и повторяла ту же команду.",
+        "en": "A foreign CLI's model gets the panel's refusal with its reason — inserted into the running answer before the CLI hears «no» (OpenCode: in the refusal itself) — and the conversation keeps a note about the refused command. Before, the model saw only «rejected by user» and retried the same command."
+      },
+      "area": {
+        "ru": "Чужие CLI",
+        "en": "Foreign CLIs"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа чужого CLI гасит свой процесс сама по тем же правилам, что группа Claude: свой — потомок процесса CLI или процесс с меткой группы в окружении, чужой или неназванный — отказ агенту с причиной, а не пункт D-n. Раньше любое погашение такой группы ждало человека.",
+        "en": "A foreign CLI group stops its own process itself by the same rules as a Claude group: its own is a descendant of the CLI process or a process carrying the group mark in its environment; someone else's or an unnamed one is refused to the agent with the reason, not a D-n item. Before, every stop by such a group waited for a human."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Собственные правила `ask` и `deny` Qwen (`permissions`) и OpenCode (`permission.bash`) сильнее переключателя «Разрешить правки»: совпавшая команда уходит человеку или получает отказ, чтобы настройка самого CLI не терялась под панелью.",
+        "en": "Qwen's own `ask` and `deny` rules (`permissions`) and OpenCode's (`permission.bash`) outrank the «Allow edits» switch: a matching command goes to a human or is refused, so the CLI's own setting is not lost under the panel."
+      },
+      "area": {
+        "ru": "Чужие CLI",
+        "en": "Foreign CLIs"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа, продолжившая работу новым разговором (остывший или пропавший транскрипт), зовётся в списке, карточках и уведомлениях именем группы. Раньше заголовком становилась первая строка вводной панели.",
+        "en": "A group that continues in a new conversation (cold or missing transcript) is called by the group's name in the list, cards and notifications. Before, the first line of the panel's brief became its title."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Запрос прав и вопрос группы стоят в карточке этой группы в хабе и решаются там же, в том числе с клавиатуры, а счётчик «ждёт человека» их учитывает. Раньше запросы прав всегда уходили в общую полосу над лентой, а вопросы ранних звеньев карточку не находили.",
+        "en": "A group's permission request and question sit in that group's card in the hub and are answered there, keyboard included, and the «needs a human» count includes them. Before, permission requests always went to the shared strip above the feed, and questions of earlier links missed the card."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Хуки экономии и охраны набора есть вариантом для Gemini CLI, Goose, Kimi Code и OpenCode: ставятся по описанию в наборе, каждый вызов разбирает тот же диспетчер, ответ уходит в форме этого CLI.",
+        "en": "The kit's economy and guard hooks come as a variant for Gemini CLI, Goose, Kimi Code and OpenCode: installed by the kit's instructions, every call is parsed by the same dispatcher, and the answer goes back in that CLI's form."
+      },
+      "area": {
+        "ru": "Набор панели",
+        "en": "Panel kit"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка «Кто получает набор» показывает строкой у каждого CLI, где действуют хуки набора: на каждом запуске, вариантом, который ставится вручную, или не действуют — с причиной.",
+        "en": "The «Who gets the kit» card shows for each CLI where the kit's hooks act: on every run, as a variant installed by hand, or not at all — with the reason."
+      },
+      "area": {
+        "ru": "Набор панели",
+        "en": "Panel kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "У CLI без ответа «спросить» вызов, который требует решения человека, отклоняется с просьбой сначала спросить человека в чате, а не проходит молча.",
+        "en": "On a CLI with no «ask» answer, a call that needs a human decision is refused with a request to ask the human in the chat first, instead of passing silently."
+      },
+      "area": {
+        "ru": "Набор панели",
+        "en": "Panel kit"
+      }
+    }
+  ]
+}

@@ -11,8 +11,12 @@
  *      «Разрешить» → файл записан;
  *   2. переключатель выключен, вопрос из открытой вкладки — карточка приходит
  *      потоком, «Запретить» → файла нет;
- *   3. переключатель включён в шапке — карточки нет, файл записан.
- * Доказательство — файл на диске, а не текст ответа.
+ *   3. переключатель включён в шапке — карточки нет, файл записан;
+ *   4. переключатель включён, команда `git branch -D probe` — карточка (судья
+ *      команд, P-03), «Запретить» → ветка цела;
+ *   4б. переключатель включён, рекурсивное удаление каталога — карточка (P-04),
+ *      «Запретить» → каталог цел.
+ * Доказательство — файл, ветка и каталог на диске, а не текст ответа.
  *
  * Подменена только модель (сетевая граница). CLI — настоящий: из
  * `STEER_CLI_DIR` (каталоги через разделитель PATH), иначе из PATH. Нет его —
@@ -30,6 +34,10 @@ import { chromium } from 'playwright';
 import { NotChecked, REPO, reporter, startStand, wait } from './throwaway-stand.mjs';
 import { startStubModel } from './stub-steer-model.mjs';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
+// Снятие процессов, переживших стенд, — общее у живых проверок чужих CLI: сервер
+// CLI и его дети (у codex — `git`, клонирующий плагины в `CODEX_HOME/.tmp`) держат
+// временный каталог (EPERM). Снимается ровно то, чего до прогона не было.
+import { cliProcesses, reap } from './foreign-cli.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const SHOTS = join(REPO, '.agent', 'screenshots', 'foreign-permissions');
@@ -41,61 +49,6 @@ function findCli(name) {
     ...(process.env.PATH ?? process.env.Path ?? '').split(delimiter),
   ];
   return dirs.find((dir) => dir && names.some((file) => existsSync(join(dir, file))));
-}
-
-/**
- * PID процессов, в командной строке которых есть один из каталогов. Стенд снимает
- * панель жёстко: сервер CLI и его дети (у codex — `git`, клонирующий плагины в
- * `CODEX_HOME/.tmp`) переживают проверку и держат временный каталог (EPERM).
- * Снимаем ровно то, чего до прогона не было.
- */
-function processesUnder(dirs) {
-  const norm = (text) => text.toLowerCase().replace(/[\\/]+/g, '/');
-  // `tmpdir()` на Windows — короткое имя (`RUSYAN~1`), а в командной строке `git`
-  // стоит длинное: ищем оба.
-  const long = (dir) => {
-    try {
-      return realpathSync.native(dir);
-    } catch {
-      return dir;
-    }
-  };
-  const needles = dirs
-    .flatMap((dir) => [dir, long(dir)])
-    .map((dir) => norm(dir).replace(/\/+$/, ''));
-  try {
-    const rows = IS_WIN
-      ? execFileSync(
-          'powershell',
-          [
-            '-NoProfile',
-            '-Command',
-            'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }',
-          ],
-          { encoding: 'utf8' },
-        )
-      : execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
-    return new Set(
-      rows
-        .split(/\r?\n/)
-        .map((row) => row.trim().match(/^(\d+)\s+(.*)$/))
-        .filter((match) => match && needles.some((needle) => norm(match[2]).includes(needle)))
-        .map((match) => Number(match[1])),
-    );
-  } catch {
-    return new Set();
-  }
-}
-
-function reap(before, dirs) {
-  for (const pid of processesUnder(dirs)) {
-    if (before.has(pid) || pid === process.pid) continue;
-    try {
-      process.kill(pid);
-    } catch {
-      // уже вышел
-    }
-  }
 }
 
 async function until(probe, seconds) {
@@ -171,15 +124,20 @@ const TOOL_LINE = {
 // Оболочкой нельзя — режим `auto` (умолчание qwen 0.25) спрашивает про команду и
 // тогда, когда правки файлов идут молча; проверка была зелёной при правках без вопроса.
 let scenarioDir = '';
+// Сценарий 4 зовёт оболочку и у qwen: строка и правка файла — на каждый запрос.
+let toolLine = TOOL_LINE[CLI];
+let writesFile = true;
 const stub = await startStubModel({
   marker: 'never-steered',
   holdMs: 300,
-  toolLine: TOOL_LINE[CLI],
+  toolLine: () => toolLine,
   // Длинное имя: короткое `RUSYAN~1` из `tmpdir()` qwen serve не пишет (-32603).
-  ...(CLI === 'qwen' ? { fileWrite: () => join(realpathSync.native(scenarioDir), PROBE) } : {}),
+  ...(CLI === 'qwen'
+    ? { fileWrite: () => (writesFile ? join(realpathSync.native(scenarioDir), PROBE) : undefined) }
+    : {}),
 });
 const root = mkdtempSync(join(tmpdir(), 'cc-fperm-'));
-const before = processesUnder([cliDir, root]);
+const before = cliProcesses(cliDir, CLI, [root]);
 const saved = {};
 const added = {
   ...CLIS[CLI](root, `http://127.0.0.1:${stub.port}`),
@@ -302,6 +260,93 @@ try {
   check('ход кончился', Boolean(await ended(onId)));
   check('включено → файл записан без карточки', existsSync(join(dirOn, PROBE)));
   check('карточки не было', (await card().count()) === 0);
+
+  // 4. Переключатель включён, но команда удаляет ветку git: та же граница, что у
+  //    Claude с тумблером (P-03) — карточка, «Запретить» → ветка цела.
+  console.log('\n4. Включено, `git branch -D` — карточка');
+  const dirDestroy = project('destroy');
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+      cwd: dirDestroy,
+      encoding: 'utf8',
+    });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'init');
+  git('branch', 'probe');
+  toolLine = 'git branch -D probe';
+  writesFile = false;
+  const destroyId = await newChat(dirDestroy);
+  await page.goto(`${stand.webUrl}/chat`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Новый разговор').first().click({ timeout: 60_000 });
+  await page.getByLabel('Разрешить правки без вопроса').click({ timeout: 30_000 });
+  const patched4 = await until(
+    async () => (await stand.api(`/provider-chat/chats/${destroyId}`)).body?.allowEdits === true,
+    20,
+  );
+  check('переключатель включён', Boolean(patched4));
+  const box4 = page.locator('textarea').last();
+  await box4.fill('Удали ветку probe.');
+  await box4.press('Enter');
+  const destroyCard = await card()
+    .waitFor({ timeout: 120_000 })
+    .then(() => true)
+    .catch(() => false);
+  check('включено, `git branch -D` → карточка, а не «да» переключателя', destroyCard);
+  const pending4 = (await status(destroyId))?.permissions?.[0];
+  check(
+    'в карточке — команда удаления ветки',
+    JSON.stringify(pending4 ?? {}).includes('branch -D probe'),
+    JSON.stringify(pending4),
+  );
+  await page.screenshot({ path: join(shots, '4-destroy-card.png') });
+  check('ветка цела, пока человек молчит', git('branch', '--list', 'probe').includes('probe'));
+  await page.getByRole('button', { name: 'Запретить', exact: true }).click();
+  check('ход кончился', Boolean(await ended(destroyId)));
+  check('«Запретить» → ветка probe цела', git('branch', '--list', 'probe').includes('probe'));
+
+  // 4б. Переключатель включён, команда рекурсивно удаляет каталог (P-04): тот же
+  //     суд — карточка, «Запретить» → каталог цел. Переключатель — запросом в шапку:
+  //     путь кнопки уже прошли сценарии 3 и 4.
+  console.log('\n4б. Включено, рекурсивное удаление — карточка');
+  const dirTree = project('tree');
+  mkdirSync(join(dirTree, 'victim', 'inner'), { recursive: true });
+  writeFileSync(join(dirTree, 'victim', 'inner', 'keep.txt'), 'keep');
+  const treeAlive = () => existsSync(join(dirTree, 'victim', 'inner', 'keep.txt'));
+  // Оболочка, которой CLI исполняет команду: codex на Windows — PowerShell, qwen — cmd.
+  toolLine =
+    CLI === 'codex' && IS_WIN
+      ? 'Remove-Item -Recurse -Force victim'
+      : IS_WIN
+        ? 'rd /s /q victim'
+        : 'rm -rf victim';
+  const treeId = await newChat(dirTree);
+  const on = await stand.api(`/provider-chat/chats/${treeId}`, {
+    method: 'PATCH',
+    body: { allowEdits: true },
+  });
+  check('переключатель включён в шапке', on.body?.allowEdits === true, on.text);
+  const sentTree = await stand.api(`/provider-chat/chats/${treeId}/send`, {
+    method: 'POST',
+    body: { text: 'Удали каталог victim.' },
+  });
+  check('вопрос принят', sentTree.status === 200, sentTree.text);
+  const pendingTree = await until(async () => (await status(treeId))?.permissions?.[0], 120);
+  check(
+    `включено, «${toolLine}» → ${CLI} спросил человека`,
+    Boolean(pendingTree),
+    JSON.stringify({ status: await status(treeId), last: stub.requests.at(-1)?.tools }),
+  );
+  check('каталог цел, пока человек молчит', treeAlive());
+  await openChat('Удали каталог');
+  const treeCard = await card()
+    .waitFor({ timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+  check('карточка в ленте', treeCard);
+  await page.screenshot({ path: join(shots, '4b-delete-card.png') });
+  if (treeCard) await page.getByRole('button', { name: 'Запретить', exact: true }).click();
+  check('ход кончился', Boolean(await ended(treeId)));
+  check('«Запретить» → каталог victim цел', treeAlive());
   check('ошибок страницы нет', page.errors.length === 0, page.errors.join('\n'));
 } catch (error) {
   if (error instanceof NotChecked) {
@@ -311,7 +356,7 @@ try {
 } finally {
   if (browser) await browser.close();
   if (stand) await stand.stop();
-  reap(before, [cliDir, root, ...(stand ? [stand.root] : [])]);
+  reap(before, cliDir, CLI, [root, ...(stand ? [stand.root] : [])]);
   await stub.close();
   for (const [key, value] of Object.entries(saved)) {
     if (value === undefined) delete process.env[key];

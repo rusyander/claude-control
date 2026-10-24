@@ -90,12 +90,18 @@ describe('обходы ревью 23.10 — человеку', () => {
     ['F-16', 'source ./env.sh; rm -rf src'],
     ['F-16', 'hash -p ./x ls; ls'],
     ['F-17', 'sort --compress-program=./x.sh big.txt'],
-    ['F-18', 'npm run dev & P=$!; kill -9 -1 $P'],
     ['F-19', 'git checkout -Cmain && git push origin HEAD'],
     ['F-19', 'git checkout - && git push origin HEAD'],
   ])('%s: %s', (_id, command) => {
     expect(kind(command)).toBe('danger');
     expect(decide(command)).toBe('human');
+  });
+
+  it('F-18: `kill -9 -1 $P` — цель не названа, своё не доказать: суд не пускает (D-1)', () => {
+    const verdict = groupCommandVerdict('npm run dev & P=$!; kill -9 -1 $P', SCOPE);
+    expect(verdict.kind).not.toBe('danger');
+    expect(verdict).toMatchObject({ kills: { unnamed: true } });
+    expect(decide('npm run dev & P=$!; kill -9 -1 $P')).toBe('human');
   });
 
   it('F-19: `checkout main --` — смена ветки, пуш HEAD следом к человеку', () => {

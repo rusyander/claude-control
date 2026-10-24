@@ -66,6 +66,8 @@ function harness(
     known?: boolean;
     /** Что отвечает очередь группы: доставлено сразу или положено в очередь. */
     groupOutcome?: 'sent' | 'queued' | 'refused';
+    /** Повторный суд ждущих записей при старте (`rejudge.ts`). */
+    rejudge?: DeferredWiringDeps['rejudge'];
   } = {},
 ): Harness {
   const ctx = context(root, extra.groupStatus);
@@ -115,6 +117,7 @@ function harness(
       }
       return outcome;
     },
+    ...(extra.rejudge ? { rejudge: extra.rejudge } : {}),
     setTimer: (run) => timers.push(run),
     setInterval: (run, ms) => intervals.push({ run, ms }),
   });
@@ -695,5 +698,93 @@ describe('deferred-wiring › слово в очереди не уходит у�
     } as SplitPlanRecord);
     h.deliveries[0]!();
     expect(h.delivered).toEqual([]);
+  });
+});
+
+/**
+ * Повторный суд при старте (D-1, 24.10): запись группы, ушедшая человеку по
+ * старому правилу, снимается панелью, если правило теперь решает её само. Слово
+ * группе говорит, что решила панель, а не человек.
+ */
+describe('повторный суд ждущих записей при старте (D-1)', () => {
+  it('разрешение панели: запись «allowed» с пометкой auto, слово — от панели', async () => {
+    const root = tempRoot();
+    const first = harness(root);
+    const kill = askGroupCall(first.ctx, 'npx kill-port 5284');
+    await restart();
+    const judged: string[] = [];
+    const h = harness(root, {
+      rejudge: async (record) => {
+        judged.push(record.id);
+        return { behavior: 'allow' };
+      },
+    });
+    await h.wiring.reDrive();
+    expect(judged).toEqual([kill.id]);
+    expect(deferredAsksOf(h.ctx).get(kill.id)).toMatchObject({
+      state: 'allowed',
+      decidedVia: 'auto',
+    });
+    expect(h.delivered).toHaveLength(1);
+    expect(h.delivered[0]).toContain(`The panel re-checked and allowed ${kill.id}`);
+    expect(h.delivered[0]).not.toContain('The human');
+  });
+
+  it('отказ панели несёт причину, человек его не ждёт', async () => {
+    const root = tempRoot();
+    const first = harness(root);
+    const kill = askGroupCall(first.ctx, 'taskkill //PID 200 //F');
+    await restart();
+    const h = harness(root, {
+      rejudge: async () => ({ behavior: 'deny', message: 'This group did not start pid 200.' }),
+    });
+    await h.wiring.reDrive();
+    expect(deferredAsksOf(h.ctx).get(kill.id)).toMatchObject({
+      state: 'denied',
+      decidedVia: 'auto',
+    });
+    expect(h.delivered[0]).toContain(
+      `The panel re-checked ${kill.id} and refused it, so nothing waits for the human on it: This group did not start pid 200.`,
+    );
+    expect(h.delivered[0]).not.toContain('The human refused');
+  });
+
+  it('суд не решил или упал — запись ждёт человека, следующая судится', async () => {
+    const root = tempRoot();
+    const first = harness(root);
+    const failing = askGroupCall(first.ctx, 'kill 1');
+    const open = askGroupCall(first.ctx, 'kill 2');
+    const allowed = askGroupCall(first.ctx, 'kill 3');
+    await restart();
+    const h = harness(root, {
+      rejudge: async (record) => {
+        if (record.id === failing.id) throw new Error('table gone');
+        return record.id === allowed.id ? { behavior: 'allow' } : undefined;
+      },
+    });
+    await h.wiring.reDrive();
+    const asks = deferredAsksOf(h.ctx);
+    expect(asks.get(failing.id)?.state).toBe('waiting');
+    expect(asks.get(open.id)?.state).toBe('waiting');
+    expect(asks.get(allowed.id)).toMatchObject({ state: 'allowed', decidedVia: 'auto' });
+  });
+
+  it('одиночный чат и решённое — суду не отдаются', async () => {
+    const root = tempRoot();
+    const first = harness(root);
+    const chat = askChat(first.ctx);
+    const decided = askGroupCall(first.ctx, 'kill 4');
+    await decideDeferred(first.ctx, decided.id, { behavior: 'deny', via: 'web' });
+    await restart();
+    const judged: string[] = [];
+    const h = harness(root, {
+      rejudge: async (record) => {
+        judged.push(record.id);
+        return { behavior: 'allow' };
+      },
+    });
+    await h.wiring.reDrive();
+    expect(judged).toEqual([]);
+    expect(deferredAsksOf(h.ctx).get(chat.id)?.state).toBe('waiting');
   });
 });

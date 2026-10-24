@@ -13,7 +13,7 @@
  * - перезапускает сервер только при настоящей правке: изменились время записи
  *   или размер, файл появился или исчез; чтение файла перезапуском не считается;
  * - тесты, фикстуры, объявления типов, .md и всё вне кода не смотрит;
- * - собирает правки пачкой (пауза `DEBOUNCE_MS`), а не перезапускает на каждую;
+ * - собирает правки пачкой (тишина `QUIET_MS`, предел `MAX_WAIT_MS`), а не перезапускает на каждую;
  * - валит только процесс сервера, не дерево (ни `taskkill /T`, ни группы):
  *   посредники живых сессий (`live-relay.mjs`) отвязаны и переживают
  *   перезапуск вместе с CLI; запущенный с IPC уходит вместе с родителем;
@@ -29,7 +29,7 @@
  * - упавший сам сервер поднимает снова (паузы `RELAUNCH_DELAYS_MS`): панель не
  *   остаётся пустой до следующей правки, а посредники чатов — без сервера.
  */
-/* global process, setTimeout, clearTimeout, console, URL */
+/* global process, setTimeout, clearTimeout, setInterval, console, URL */
 import { spawn } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, watch } from 'node:fs';
 import { homedir } from 'node:os';
@@ -49,7 +49,16 @@ import {
 const CODE = new Set(['.ts', '.mts', '.mjs', '.js', '.json']);
 const SKIP_DIRS = new Set(['node_modules', '__fixtures__', 'coverage', 'dist']);
 const TEST_FILE = /\.(test|spec)\.[cm]?[jt]s$/;
-const DEBOUNCE_MS = 300;
+/**
+ * Тишина перед перезапуском (владелец 25.10). Агент сохраняет файл раз в 6–60 с (журнал 23–24.10: медиана
+ * 12 с), и прежняя пауза в 300 мс давала перезапуск на каждое сохранение: 897 за 23.10 и 363 за 24.10.
+ * Пачка закрывается после `QUIET_MS` без правок, но не позже `MAX_WAIT_MS` от первой правки пачки — серия
+ * правок не откладывает перезапуск без конца. Те же журналы через это окно — 83 и 73 перезапуска.
+ * Не дожидаясь тишины — `pnpm dev:restart` (тот же `dev-restart.request`, что и у панели).
+ */
+export const QUIET_MS = Number(process.env.AGENTDECK_DEV_QUIET_MS) || 60_000;
+export const MAX_WAIT_MS = Number(process.env.AGENTDECK_DEV_MAX_WAIT_MS) || 300_000;
+const REQUEST_POLL_MS = 2_000;
 const DEFER_POLL_MS = Number(process.env.AGENTDECK_DEV_DEFER_POLL_MS) || 5_000;
 /** Предел ожидания ходов; `0` выключает его (ждать, как до 21.10, без предела). */
 const RUNS_CAP_MS = process.env.AGENTDECK_DEV_RUNS_CAP_MS
@@ -117,14 +126,16 @@ function scan(dir, out) {
  * отпечатков.
  */
 export class SourceWatcher {
-  constructor(roots, onChange, debounceMs = DEBOUNCE_MS) {
+  constructor(roots, onChange, quietMs = QUIET_MS, maxWaitMs = MAX_WAIT_MS) {
     this.roots = roots;
     this.onChange = onChange;
-    this.debounceMs = debounceMs;
+    this.quietMs = quietMs;
+    this.maxWaitMs = maxWaitMs;
     this.stamps = new Map();
     this.pending = new Set();
     this.watchers = [];
     this.timer = undefined;
+    this.firstAt = 0;
   }
 
   start() {
@@ -155,9 +166,23 @@ export class SourceWatcher {
     if (current === this.stamps.get(path)) return;
     if (current === undefined) this.stamps.delete(path);
     else this.stamps.set(path, current);
+    const now = Date.now();
+    if (!this.pending.size) this.firstAt = now;
     this.pending.add(path);
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.flush(), this.debounceMs);
+    const left = Math.max(0, this.firstAt + this.maxWaitMs - now);
+    this.timer = setTimeout(() => this.flush(), Math.min(this.quietMs, left));
+  }
+
+  /** Пачка ждёт тишины. */
+  waiting() {
+    return this.pending.size > 0;
+  }
+
+  /** Закрыть пачку сейчас, не дожидаясь тишины (просьба о перезапуске). */
+  flushNow() {
+    clearTimeout(this.timer);
+    this.flush();
   }
 
   /** Событие без имени файла — сверяем весь каталог. */
@@ -521,10 +546,22 @@ function main() {
     }
   };
 
-  new SourceWatcher(roots, (files) => {
+  const sources = new SourceWatcher(roots, (files) => {
     for (const file of files) pending.add(file);
     if (deferredSince === undefined) void restart();
   }).start();
+  // Просьба о перезапуске, пока пачка ждёт тишины, закрывает её сразу; посреди отсрочки просьбу забирает
+  // ожидание ходов (`restart`), как прежде. Просьба без ждущих правок снимается: оставшись в файле, она
+  // закрыла бы следующую пачку на первом же сохранении.
+  setInterval(() => {
+    if (deferredSince !== undefined || probing || !takeRestartRequest(appData)) return;
+    if (sources.waiting()) {
+      log('перезапуск по просьбе, не дожидаясь тишины');
+      sources.flushNow();
+    } else {
+      log('просьба о перезапуске снята: ждущих правок нет');
+    }
+  }, REQUEST_POLL_MS);
   launch();
   const stop = () => {
     const current = child;

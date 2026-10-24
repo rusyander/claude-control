@@ -515,7 +515,7 @@
         {
           "path": "apps/server/src/domains/chat/auto-approve/auto-approve.ts",
           "why": "«Меню разговора»: тумблеры прав и правила, разрешающие без вопроса",
-          "sha": "3b637bfb026c717e"
+          "sha": "b075265020e8db84"
         },
         {
           "path": "apps/server/src/domains/chat/group-questions/group-questions.ts",
@@ -540,7 +540,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "abfe4b7e0d916542"
+          "sha": "2da4e311007bb3aa"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -555,7 +555,7 @@
         {
           "path": "apps/server/src/domains/chat/group-command/group-command.ts",
           "why": "«Права группы»: рутина без карточки и что всегда карточка",
-          "sha": "e654b1e57f6d788c"
+          "sha": "d9131dea70235be8"
         },
         {
           "path": "apps/server/src/domains/chat/group-command/targets.ts",
@@ -570,12 +570,12 @@
         {
           "path": "apps/server/src/domains/verify-ledger/verify-ledger.ts",
           "why": "«Журнал проверок»: установка, самопроверка, кому подмешивается, сводка плитки",
-          "sha": "83f9d693c59f193b"
+          "sha": "cfc0b5846dd656e9"
         },
         {
           "path": "tools/verify-ledger/preload.cjs",
           "why": "«Журнал проверок»: режимы shadow/on/off, когда прогон записывается и когда повторяется",
-          "sha": "abb36d675f58cc45"
+          "sha": "5961d2bc2e259b9f"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap/split-overlap.ts",
@@ -685,7 +685,7 @@
         {
           "path": "packages/contracts/src/sieves/judge.ts",
           "why": "«Сита перед MR»: что держит «готово» — механика панели, названные файлы и команды, свежесть строки, прогон блока «Тесты»",
-          "sha": "1a82d7f521eb1a95"
+          "sha": "8c925ff8befef549"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-gate/sieve-gate.ts",
@@ -710,7 +710,22 @@
         {
           "path": "apps/server/src/domains/provider-chat/live/codex-app-server.ts",
           "why": "«Правки в чате другого CLI»: права потока Codex по переключателю и ответ на его просьбы о разрешении",
-          "sha": "4cb3e57d0b599698"
+          "sha": "34565a2b968969f5"
+        },
+        {
+          "path": "apps/server/src/domains/chat/foreign-shell-judge/foreign-shell-judge.ts",
+          "why": "«Правки в чате другого CLI»: какие команды чужого CLI идут сами, какие — карточкой, D-n или отказом; оболочка без имени судится строже из двух",
+          "sha": "a29a720b790e6ae3"
+        },
+        {
+          "path": "apps/server/src/domains/chat/foreign-shell-judge/foreign-ask-rules.ts",
+          "why": "«Правки в чате другого CLI»: чьи правила «спрашивать» (Qwen permissions.ask, OpenCode permission.bash) отдают команду человеку",
+          "sha": "792035b48cb926e1"
+        },
+        {
+          "path": "apps/server/src/domains/provider-chat/live/shell-ask.ts",
+          "why": "«Правки в чате другого CLI»: у каких CLI панель видит команду и какой оболочкой её читает",
+          "sha": "4cfab0fe83687a06"
         },
         {
           "path": "apps/server/src/domains/chat/split-tasks/split-tasks.ts",
@@ -775,7 +790,7 @@
         {
           "path": "tools/heavy-queue-hook.mjs",
           "why": "Очередь тяжёлых шагов групп: 25 минут ожидания, отказ хука, срок аренды, фон по опыту",
-          "sha": "332a9be0634c8cd5"
+          "sha": "846b4f0ace28c31d"
         },
         {
           "path": "tools/heavy-queue-classify.mjs",
@@ -785,7 +800,7 @@
         {
           "path": "apps/server/src/domains/chat/group-profile/group-profile.ts",
           "why": "Лёгкий профиль группы: набор MCP, навыки по имени, дописка с правилом расхода, хуки трекера и очереди; запреты звена, пока впереди доставка или ревью; слияние закрыто каждому звену",
-          "sha": "1259dc03b613c072"
+          "sha": "376cb5c21c5737f3"
         },
         {
           "path": "apps/server/src/domains/chat/group-profile/bash-ceiling.ts",
@@ -810,7 +825,7 @@
         {
           "path": "apps/server/src/domains/chat/cold-continuation/cold-continuation.ts",
           "why": "«Новый разговор после долгой паузы»: одно решение на каждом пути продолжения группы (слово панели, повтор, «Продолжить всё», ответ человека)",
-          "sha": "a2aab8a4bed4456e"
+          "sha": "9affacab3511c8af"
         },
         {
           "path": "apps/server/src/domains/chat/cold-brief/cold-brief.ts",
@@ -830,7 +845,7 @@
         {
           "path": "tools/verify-ledger/delta.cjs",
           "why": "Журнал проверок: сужение vitest от последнего зелёного и когда прогон снова целиком",
-          "sha": "c39f8bf747e58abb"
+          "sha": "fc4be668b8d5b82e"
         },
         {
           "path": "tools/verify-ledger/checks.cjs",
@@ -855,7 +870,7 @@
         {
           "path": "apps/web/src/features/ChatMessages/lib/cardQuestions.ts",
           "why": "Чей вопрос — островком в карточке группы, а чей — в полосе над сводкой",
-          "sha": "fca5d825581e4b20"
+          "sha": "6d120ae8ce97b74e"
         },
         {
           "path": "apps/server/src/domains/chat/deferred-asks/store.ts",
@@ -865,12 +880,12 @@
         {
           "path": "apps/server/src/domains/chat/deferred-asks/texts.ts",
           "why": "«Отложенные вопросы D-n»: что агент получает вместо ответа и что видит после решения",
-          "sha": "68be0443fb87e3ac"
+          "sha": "a15498a81063d827"
         },
         {
           "path": "apps/server/src/routes/chat/run-routes/deferred-bridge.ts",
           "why": "«Отложенные вопросы D-n»: когда карточка становится D-n, что отказывается сразу, запреты доставки при открытом D-n",
-          "sha": "506e3b46cce1e8e0"
+          "sha": "2925caf0a5e7694e"
         },
         {
           "path": "apps/web/src/features/DeferredAsksBanner/ui/DeferredAsksBanner.tsx",
@@ -908,7 +923,7 @@
           "sha": "363a1b61bd18425d"
         }
       ],
-      "confirmedAt": "2026-10-24T14:28:52.786Z"
+      "confirmedAt": "2026-10-24T21:44:37.294Z"
     },
     {
       "topic": "tests",
@@ -947,7 +962,7 @@
         {
           "path": "apps/server/src/domains/project-tests/import-results/import-results.ts",
           "why": "«Импорт из CI»: отчёт junit становится записью прогона",
-          "sha": "956aeadd4fffbbf5"
+          "sha": "6489123ace50ae8b"
         },
         {
           "path": "apps/server/src/domains/project-tests/coverage-matrix/coverage-matrix.ts",
@@ -1092,12 +1107,12 @@
         {
           "path": "apps/server/src/lib/dev-watch.mjs",
           "why": "«Проверка набора поломкой»: перезапуск dev-сервера панели ждёт конца идущих проверок",
-          "sha": "ed4ad2fa417615a1"
+          "sha": "550e25eb8188772d"
         },
         {
           "path": "apps/server/src/domains/project-tests/suites/suites.ts",
           "why": "кейс на каталог, итог — худший тест, сам один раз, рецепт без своей команды",
-          "sha": "7216870bfc08cf79"
+          "sha": "9525fb0822db6a1c"
         },
         {
           "path": "apps/server/src/domains/project-tests/turn-hooks/turn-hooks.ts",
@@ -1125,7 +1140,7 @@
           "sha": "8c3dbfdb5307309b"
         }
       ],
-      "confirmedAt": "2026-10-24T09:52:17.846Z"
+      "confirmedAt": "2026-10-24T20:36:30.507Z"
     },
     {
       "topic": "rules",
@@ -1308,10 +1323,10 @@
         {
           "path": "apps/server/src/domains/chat/auto-approve/auto-approve.ts",
           "why": "«Разрешения в разговоре»: что автоодобрение пропускает молча и что всё равно останавливает прогон",
-          "sha": "3b637bfb026c717e"
+          "sha": "b075265020e8db84"
         }
       ],
-      "confirmedAt": "2026-10-24T12:29:38.811Z"
+      "confirmedAt": "2026-10-24T19:47:29.305Z"
     },
     {
       "topic": "mcp",
@@ -3057,7 +3072,7 @@
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic/PhoneTopic.tsx",
-      "confirmedAt": "2026-10-23T18:26:29.458Z",
+      "confirmedAt": "2026-10-24T16:27:01.773Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate/access-gate.ts",
@@ -3147,7 +3162,7 @@
         {
           "path": "apps/mobile/app/(tabs)/settings.tsx",
           "why": "«Настройки: не отвечает»: откуда берётся статус связи и что делает жест вниз",
-          "sha": "09193765710aaf78"
+          "sha": "f0eff08813798e0a"
         },
         {
           "path": "apps/mobile/app/(tabs)/projects.tsx",
@@ -3187,19 +3202,54 @@
         {
           "path": "apps/mobile/src/shared/lib/runs/stream.ts",
           "why": "«Когда панель не отвечает», идущий ход: курсор потока со startedAt — ход, начатый без телефона, с начала; тишина потока — обрыв",
-          "sha": "cc503775ef0b60e1"
+          "sha": "f5bbd2b9ced6ec9b"
         },
         {
           "path": "apps/mobile/src/shared/lib/runs/constants.ts",
           "why": "«Когда панель не отвечает»: числа документа — 30 секунд тишины потока до обрыва, 2 часа жизни очереди",
           "sha": "54f53ddc91c3b9ec"
+        },
+        {
+          "path": "apps/server/src/routes/phone-signing-routes/phone-signing-gate.ts",
+          "why": "«Подпись решений», таблица: какие «Разрешить» ждут подписи (разрешения, D-n, ворота ветки, карточки агента, автоподтверждение, отправка с полным доступом), «Запретить» и «Стоп» без подписи, отказ окну панели и Telegram",
+          "sha": "f70002f4ae25e398"
+        },
+        {
+          "path": "apps/server/src/domains/phone-signing/levers.ts",
+          "why": "«Подпись решений», «Ослабление прав»: какие изменения не принимаются при включённом режиме (авторежим во всех чатах, правила автоподтверждения, права групп, импорт настроек)",
+          "sha": "6cecdaf66afb42b9"
+        },
+        {
+          "path": "apps/server/src/routes/phone-signing-routes/phone-signing-routes.ts",
+          "why": "«Подпись решений», шаги 1–4: привязка подписана новым ключом и закрыта при включённом режиме, отозванный ключ не привязывается снова, включение только при том же наборе ключей, отзыв без подписи",
+          "sha": "ed19057583364db9"
+        },
+        {
+          "path": "packages/contracts/src/phone-signing.ts",
+          "why": "«Подпись решений», «Отказ подписи»: причины отказа и 5 минут расхождения часов, одноразовость подписи",
+          "sha": "f164d911031ad9c6"
+        },
+        {
+          "path": "apps/server/src/domains/phone-signing/store.ts",
+          "why": "«Потеряли телефон»: файл ~/.agentdeck/phone-signing.json — режим и все привязки в одном файле, удаление выключает режим",
+          "sha": "f0e79e2d6e68680b"
+        },
+        {
+          "path": "apps/web/src/pages/Settings/PhoneSigningCard/PhoneSigningCard.tsx",
+          "why": "«Подпись решений», шаги 2 и 4, кадры panel 01–02: карточка во вкладке «Доступ», отпечатки ключей, «Отозвать», отдельное предупреждение об отзыве последнего ключа",
+          "sha": "27a425951059c25d"
+        },
+        {
+          "path": "apps/mobile/src/features/signing/SigningCard/SigningCard.tsx",
+          "why": "«Подпись решений», шаги 1 и 3: «Привязать этот телефон», отпечаток под карточкой, подтверждение включения со списком отпечатков и путём файла, включение и выключение только здесь",
+          "sha": "b35095f77fe8d456"
         }
       ]
     },
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-23T18:26:29.573Z",
+      "confirmedAt": "2026-10-24T19:47:29.410Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
@@ -3214,7 +3264,7 @@
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Чей набор у агента»: что каждый режим добавляет или снимает у Claude Code и Qwen Code (runExtras)",
-          "sha": "c831d7a6ebaecc1e"
+          "sha": "153f1f58dc1b5d65"
         },
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
@@ -3311,12 +3361,12 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-24T12:29:38.936Z",
+      "confirmedAt": "2026-10-24T21:44:37.392Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Как набор доезжает до прогона», «Режимы», «Какой CLI что умеет»: runExtras, отказы, сброс в архив",
-          "sha": "c831d7a6ebaecc1e"
+          "sha": "153f1f58dc1b5d65"
         },
         {
           "path": "apps/server/src/domains/kit/compose.ts",
@@ -3331,7 +3381,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "9398f34eed1825e4"
+          "sha": "44597327346e2f71"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",
@@ -3357,6 +3407,21 @@
           "path": "apps/server/src/domains/kit/codex.ts",
           "why": "«Какой CLI что умеет», строка Codex: что доезжает (правила ключом после собственных инструкций, навыки каталогом), что нет",
           "sha": "fe67763df53be588"
+        },
+        {
+          "path": "apps/web/src/features/KitModes/ui/KitModesCard.tsx",
+          "why": "«Хуки набора в других CLI»: строка «Где действуют хуки набора» на карточке «Кто получает набор»",
+          "sha": "9b13772627103ef2"
+        },
+        {
+          "path": "apps/server/assets/kit/agentdeck-kit/hooks/lib/kit-paths.mjs",
+          "why": "«Хуки набора в других CLI»: у каких CLI нет ответа «спросить» (ASKLESS) и диалекты имён инструментов",
+          "sha": "2c4dea644f0b3583"
+        },
+        {
+          "path": "apps/server/assets/kit/variants/README.md",
+          "why": "«Хуки набора в других CLI»: куда ставить вариант каждого CLI и почему Continue, Cursor, Aider без хуков",
+          "sha": "806c049c35542aa1"
         },
         {
           "path": "apps/server/assets/kit/agentdeck-kit/hooks/lib/local-discipline.mjs",

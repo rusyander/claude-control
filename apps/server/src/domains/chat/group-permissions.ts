@@ -7,7 +7,9 @@ import {
 } from '@agentdeck/contracts/split-groups';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
 import type { SplitAutoNotice, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
-import { planTreeKill, readProcessTableAsync, type ProcessRow } from '../../lib/kill-tree.mjs';
+import { planTreeKill, type ProcessRow } from '../../lib/kill-tree.mjs';
+import { readCommandTable } from '../../lib/process-tree/path-sweep.ts';
+import { readMarks } from '../../lib/process-tree/process-env-mark.ts';
 import { git } from '../project-git/exec/exec.ts';
 import { findPortHolders } from '../project-runner/ports.ts';
 import { isReadOnlyTool, ruleFor, shouldAutoApprove } from './auto-approve/auto-approve.ts';
@@ -28,7 +30,19 @@ import {
   type KillTargets,
 } from './group-command/group-command.ts';
 import { collectGitEffects, type GitDiscard } from './group-command/git-guards.ts';
-import { gitDiscards, treeBlocks, type GitTree } from './group-tree-state.ts';
+import {
+  groupProcessMark,
+  processLabel,
+  provenOwn,
+  type OwnerEvidence,
+  type OwnerRow,
+} from './group-process-owner.ts';
+import {
+  gitDiscards,
+  powershellLaunchDestroys,
+  treeBlocks,
+  type GitTree,
+} from './group-tree-state.ts';
 import { shellAliases, shellFunctions, type ShellAliases } from './shell-aliases.ts';
 import type { ShellFunctions } from './shell-functions.ts';
 
@@ -129,13 +143,16 @@ export interface GroupAutoApprove {
    */
   functions?: ShellFunctions;
   /**
-   * Своё дерево процессов группы на момент запроса (`withProcessFacts`, только
-   * для команд, гасящих номер или порт): потомки процесса её CLI. `undefined` —
-   * не читали или снимок не удался: погашение решает человек.
+   * Свои процессы группы среди целей погашения (`withProcessFacts`, только для
+   * команд, гасящих номер или порт): живое дерево CLI, метка группы в окружении,
+   * сирота с текстом запуска из транскрипта копии (`group-process-owner.ts`).
+   * `undefined` — снимок не удался: погашение отказывается агенту.
    */
   ownPids?: ReadonlySet<number>;
   /** Кто слушает порты, которые команда гасит (`withProcessFacts`). */
   portHolders?: ReadonlyMap<number, readonly number[]>;
+  /** Подписи целей для отказа агенту: номер → командная строка (`withProcessFacts`). */
+  processLabels?: ReadonlyMap<number, string>;
   /**
    * Незакоммиченное копии перед командой, что его сотрёт или унесёт
    * (`guardUncommitted`): чистое, грязное и уже снятое в `refs/agentdeck/backup/…`
@@ -410,18 +427,62 @@ function otherRules(verdict: Extract<GroupCommandVerdict, { kind: 'other' }>): G
 }
 
 /**
- * Всё, что команда гасит, — из своего дерева процессов группы: каждый номер, и
- * у каждого порта есть держатель и все держатели свои. Дерева нет (не читали,
- * снимок не удался) или порт никто не держит по данным ОС — своё не доказано.
+ * Всё, что команда гасит, — свои процессы группы: каждый номер и каждый
+ * держатель каждого порта. Порт, который никто не держит, гасить нечего — он
+ * не мешает (D-1, 24.10: раньше это было «своё не доказано»). Снимка нет или
+ * цель без имени — своё не доказано.
  */
 function killsOwnOnly(group: GroupAutoApprove, kills: KillTargets): boolean {
+  if (kills.unnamed) return false;
   const own = group.ownPids;
-  if (!own || own.size === 0) return false;
+  if (!own) return false;
   if (!kills.pids.every((pid) => own.has(pid))) return false;
-  return kills.ports.every((port) => {
-    const holders = group.portHolders?.get(port) ?? [];
-    return holders.length > 0 && holders.every((pid) => own.has(pid));
-  });
+  if (kills.ports.length > 0 && !group.portHolders) return false;
+  return kills.ports.every((port) =>
+    (group.portHolders?.get(port) ?? []).every((pid) => own.has(pid)),
+  );
+}
+
+/** Команда для агента: как погасить своё, чтобы суд узнал цель. */
+const KILL_OWN_HOWTO =
+  'Stop only what you started, named by number: `kill $!` right after you launched it, or by its port — ' +
+  '`for p in $(netstat -ano | grep ":PORT " | grep LISTENING | awk \'{print $5}\' | sort -u); do taskkill //PID $p //F; done` ' +
+  '(Windows) or `kill $(lsof -t -iTCP:PORT -sTCP:LISTEN)` (Linux/macOS).';
+
+/**
+ * Отказ агенту вместо карточки человеку (D-1, 24.10, решение владельца: такие
+ * вызовы человек не решает): погашение не своего или неназванного. Ничего из
+ * команды не исполнилось — агенту сказано, что повторить без погашения.
+ * `undefined` — погашения нет или всё гасимое своё.
+ */
+export function groupKillRefusal(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+): string | undefined {
+  const verdict = verdictOf(group, request);
+  if (!verdict || verdict.kind === 'danger' || !verdict.kills) return undefined;
+  const kills = verdict.kills;
+  if (killsOwnOnly(group, kills)) return undefined;
+  const rest =
+    'Nothing in this command ran: re-run what you still need without the stop, as separate commands.';
+  if (kills.unnamed) {
+    return `This command stops a process it does not name by number (an image name, a pattern, a pid read at run time, or a line the panel cannot parse), so the panel cannot tell it is yours. ${KILL_OWN_HOWTO} ${rest}`;
+  }
+  if (!group.ownPids || (kills.ports.length > 0 && !group.portHolders)) {
+    return `The panel could not read the process table to confirm the target is yours. Retry once; if it repeats, leave the process running and use another port. ${rest}`;
+  }
+  const own = group.ownPids;
+  const label = (pid: number) =>
+    `pid ${pid} (${group.processLabels?.get(pid) ?? 'not in the process table'})`;
+  const foreign = [
+    ...kills.pids.filter((pid) => !own.has(pid)).map(label),
+    ...kills.ports.flatMap((port) =>
+      (group.portHolders?.get(port) ?? [])
+        .filter((pid) => !own.has(pid))
+        .map((pid) => `port ${port} held by ${label(pid)}`),
+    ),
+  ];
+  return `This group did not start ${foreign.join('; ')}: it belongs to the owner, the panel or another group. Do not stop it — run your own server on another free port (e.g. \`--port <free> --strictPort\`). ${rest}`;
 }
 
 /** Что команда гасит — номера и порты (N3), или `undefined`: не гасит ничего числом. */
@@ -433,41 +494,68 @@ export function killTargetsOf(
   return verdict && verdict.kind !== 'danger' ? verdict.kills : undefined;
 }
 
-/** Снимок процессов и держатели портов — подменяемы в тесте (граница ОС). */
+/** Снимок процессов, держатели портов, метки окружения — подменяемы в тесте (граница ОС). */
 export interface ProcessFactsIo {
-  readTable: () => Promise<readonly ProcessRow[] | undefined>;
+  readTable: () => Promise<readonly OwnerRow[] | undefined>;
   portHolders: (port: number) => number[];
+  readMarks?: (
+    rows: readonly ProcessRow[],
+    name: string,
+  ) => Promise<ReadonlyMap<number, boolean> | undefined>;
+  ran?: OwnerEvidence['ran'];
+  platform?: string;
 }
 
 const realProcessIo: ProcessFactsIo = {
-  readTable: () => readProcessTableAsync(),
+  readTable: () => readCommandTable(),
   portHolders: findPortHolders,
+  readMarks: (rows, name) => readMarks(rows, name),
 };
 
 /**
- * Своё дерево процессов группы — только когда команда гасит номер или порт
- * (N3): снимок стоит ~0.3–0.5 с, на каждое разрешение он не нужен. Своё —
- * потомки корней прогона (посредник, оболочка, сам CLI: `processRootsOf`) по
- * тому же обходу, что снимает дерево (`planTreeKill`: ребёнок создан не раньше
- * родителя, иначе сирота на чужом номере). Корней нет или снимок не удался —
- * дерева нет, и погашение решает человек.
+ * Свои процессы группы среди целей — только когда команда гасит номер или порт
+ * (N3): снимок с командными строками стоит ~1 с, на каждое разрешение он не
+ * нужен. Своё — потомки корней прогона (посредник, оболочка, сам CLI:
+ * `processRootsOf`) по тому же обходу, что снимает дерево (`planTreeKill`), и
+ * сироты, доказанные меткой группы или текстом запуска (`provenOwn`, D-1):
+ * корней может и не быть (прогон закончил ход — пересуд D-n при старте).
+ * Снимок не удался — фактов нет, и погашение отказывается агенту.
  */
 export async function withProcessFacts(
   group: GroupAutoApprove,
   request: { toolName: string; input: unknown },
   roots: readonly number[],
   io: ProcessFactsIo = realProcessIo,
+  evidence: { transcriptDir?: string } = {},
 ): Promise<GroupAutoApprove> {
   const kills = killTargetsOf(group, request);
-  if (!kills || roots.length === 0) return group;
+  if (!kills || kills.pids.length + kills.ports.length === 0) return group;
   const table = await io.readTable().catch(() => undefined);
   if (!table) return group;
-  const own = new Set<number>();
-  for (const root of roots) for (const pid of planTreeKill([...table], root).pids) own.add(pid);
-  if (own.size === 0) return group;
+  const tree = new Set<number>();
+  for (const root of roots) for (const pid of planTreeKill([...table], root).pids) tree.add(pid);
   const portHolders = new Map<number, number[]>();
   for (const port of kills.ports) portHolders.set(port, io.portHolders(port));
-  return { ...group, ownPids: own, portHolders };
+  const targets = [...new Set([...kills.pids, ...[...portHolders.values()].flat()])];
+  const candidates = table.filter((row) => targets.includes(row.pid) && !tree.has(row.pid));
+  const marks =
+    candidates.length > 0 && io.readMarks
+      ? await io
+          .readMarks(candidates, groupProcessMark(group.parentChatId, group.groupIndex))
+          .catch(() => undefined)
+      : undefined;
+  const own = provenOwn(table, targets, {
+    tree,
+    ...(marks ? { marks } : {}),
+    ...(evidence.transcriptDir ? { transcriptDir: evidence.transcriptDir } : {}),
+    ...(io.ran ? { ran: io.ran } : {}),
+    ...(io.platform ? { platform: io.platform } : {}),
+  });
+  const byPid = new Map(table.map((row) => [row.pid, row]));
+  const processLabels = new Map(
+    targets.filter((pid) => byPid.has(pid)).map((pid) => [pid, processLabel(byPid.get(pid))]),
+  );
+  return { ...group, ownPids: own, portHolders, processLabels };
 }
 
 /** MR известен, а снят ли с черновика — нет (не читали, сбой форджа): считаем «на ревью». */
@@ -525,6 +613,8 @@ export function groupDecision(
   if (request.toolName === 'PowerShell') {
     const command = commandOf(request.input);
     if (command !== undefined && powershellToolStorage(command, scopeOf(group))) return 'human';
+    // git или удаление внутри `Start-Process`/`iex`/`cmd /c` — разбор их не видит (R1).
+    if (command !== undefined && powershellLaunchDestroys(command)) return 'human';
   }
   const rows = group.rows;
   // Команда оболочки разобрана по звеньям (`group-command.ts`): опасное —
@@ -535,8 +625,9 @@ export function groupDecision(
   // Затирание или смена ветки без прочитанного дерева, смена ветки на грязном
   // (маршрут прав отказал бы раньше, `guardUncommitted`) — человеку.
   if (verdict && treeBlocks(group.tree, groupDiscards(group, request))) return 'human';
-  // Погашение не своего процесса или порта — человеку (N3): 23.10 группа сняла
-  // по номерам из netstat dev-серверы на :5173-5175, порт стенда владельца.
+  // Погашение не своего процесса или порта (N3: 23.10 группа сняла по номерам из
+  // netstat dev-серверы на :5173-5175, порт стенда владельца) маршрут прав
+  // отказывает агенту раньше (`groupKillRefusal`); здесь — страховка вызова мимо.
   if (verdict?.kills && !killsOwnOnly(group, verdict.kills)) return 'human';
   if (verdict) {
     // Перезапись своей ветки, чей MR на ревью (L7.12), затирает то, что читают

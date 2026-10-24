@@ -35,7 +35,19 @@ export function collectChildPermissions(
     if (permissions.length === 0) continue;
     const child = children.find((chat) => chat.id === run.id || chat.id === run.sessionId);
     if (!child) continue;
-    found.push({ chatId: run.id, title: child.title || child.id, permissions });
+    found.push({
+      chatId: run.id,
+      title: child.title || child.id,
+      permissions,
+      // Ключ прогона бывает временным `new-…`, а карточка группы в хабе знает
+      // чат по ключу списка: без всех ключей запрос не нашёл бы свою карточку.
+      chatKeys: runKeys(run, child.id),
+    });
   }
   return found;
+}
+
+/** Все ключи разговора прогона: сам прогон, его сессия и ключ в списке чатов. */
+export function runKeys(run: ActiveRunView, listId: string): string[] {
+  return [...new Set([run.id, ...(run.sessionId ? [run.sessionId] : []), listId])];
 }

@@ -29,6 +29,28 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'Decision not taken: the panel did not recognise the window it came from. Open the panel in a browser on this computer and answer there.',
   'decision-remote-unverified':
     'Decision not taken: a remote answer is accepted only through this machine’s Tailscale Serve with the access token.',
+  'decision-signature-required':
+    'Decision not taken: “decisions only with the phone’s signature” is on and the request carries no signature. Answer from the phone the key is bound to (Settings → Decision signing) — it signs the decision itself. Denying works from anywhere.',
+  'decision-signature-lever':
+    'Change not applied: “decisions only with the phone’s signature” is on, and this change loosens the rights of every future decision. Switch signing off on the phone (Settings → Decision signing), make the change, then switch it back on.',
+  'decision-signature-invalid':
+    'Decision not taken: the phone’s signature does not match — the key is not bound to this panel or the request was altered on the way.',
+  'decision-signature-revoked':
+    'Decision not taken: this phone’s key was revoked in the panel. Bind the phone again while signing is off.',
+  'decision-signature-stale':
+    'Decision not taken: the phone’s and the computer’s clocks differ by more than 5 minutes. Check the time on both and answer again.',
+  'decision-signature-replayed':
+    'Decision not taken: this signature was already used. The same request is not accepted twice — answer again.',
+  'decision-signature-no-device':
+    'Decision not taken: signing is on but no bound phone is left. To switch it off without a phone, delete the file {{path}} on this computer.',
+  'phone-signing-body-invalid': 'The signing mode request is malformed.',
+  'phone-signing-enabled':
+    'New key not bound: signing is on. Switch it off on a phone that is already bound, bind the new one, then switch it back on.',
+  'phone-signing-device-not-found': 'There is no such key among the bound ones.',
+  'phone-signing-devices-changed':
+    'Signing not switched on: the list of bound phones changed. Refresh the screen and compare the fingerprints again.',
+  'phone-signing-key-revoked':
+    'Key not bound: it was revoked in the panel. The phone will create a new key — bind that one.',
   'deferred-not-found': 'There is no queued item {{id}}: it was removed or the number is wrong.',
   'editor-not-found': 'Code editor not found. Set it in the settings or install code/cursor.',
   'handoff-proposal-invalid':

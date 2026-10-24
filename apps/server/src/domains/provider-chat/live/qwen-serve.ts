@@ -3,6 +3,7 @@ import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { freePort } from '../../opencode-serve/opencode-serve.ts';
 import { decidePermission, pickOption, type PermissionOption } from './permission.ts';
+import { qwenShellAsk } from './shell-ask.ts';
 import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
 
 /**
@@ -363,11 +364,16 @@ export class QwenServeTurn implements LiveTurn {
     if (!requestId || !this.sessionId) return;
     const options = Array.isArray(data.options) ? (data.options as PermissionOption[]) : [];
     const toolCall = data.toolCall as { title?: string; kind?: string } | undefined;
+    const shell = qwenShellAsk(data.toolCall);
+    // pid `qwen serve` — корень дерева для суда погашения группы (P-06).
+    const pid = this.child?.pid;
     const decision = await decidePermission(this.permission, {
       cli: 'qwen',
       requestId,
       ...(toolCall?.kind ? { tool: toolCall.kind } : {}),
       ...(toolCall?.title ? { title: toolCall.title } : {}),
+      ...(shell ? { shell } : {}),
+      ...(pid ? { pid } : {}),
     });
     const optionId = pickOption(options, decision);
     // Нет варианта под решение — `cancelled`: для CLI это отказ, «да» не выдумываем.

@@ -1,0 +1,19 @@
+// Тот же островок, что у вопроса группы (`GroupAsk`): в карточке, где всё
+// остальное — отчёт о работе, это единственное, что ждёт человека.
+.island {
+  margin-top: var(--spacing-2xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+  border-radius: 8px;
+  background: var(--color-warning-subtle);
+}
+
+.ask + .ask {
+  margin-top: var(--spacing-xs);
+}
+
+.from {
+  display: block;
+  margin-bottom: var(--spacing-3xs);
+  font-weight: 600;
+}

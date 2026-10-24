@@ -3,6 +3,7 @@ import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { StdioRpc, type RpcIncoming, type RpcReply } from './stdio-rpc.ts';
 import { decidePermission, pickOption, type PermissionOption } from './permission.ts';
+import { gooseShellAsk } from './shell-ask.ts';
 import type { LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
 
 /**
@@ -172,11 +173,13 @@ export class GooseAcpTurn implements LiveTurn {
               : [];
             const toolCall = message.params?.toolCall as
               { toolCallId?: string; title?: string; kind?: string } | undefined;
+            const shell = gooseShellAsk(message.params?.toolCall);
             void decidePermission(options.permission, {
               cli: 'goose',
               requestId: toolCall?.toolCallId ?? String(message.id),
               ...(toolCall?.kind ? { tool: toolCall.kind } : {}),
               ...(toolCall?.title ? { title: toolCall.title } : {}),
+              ...(shell ? { shell } : {}),
             }).then((decision) => {
               const optionId = pickOption(choices, decision);
               rpc.respond(message.id, {
@@ -246,7 +249,10 @@ export class GooseAcpTurn implements LiveTurn {
           }
         }
         this.sessionId = sessionId;
-        if (!options.permission?.allowEdits) {
+        // При судье команд — `approve` и с разрешёнными правками (Q3, живая проба
+        // 1.54): иначе `auto` исполнил бы `git branch -D` молча, мимо судьи; правки
+        // файлов судья не видит — на них отвечает переключатель.
+        if (!options.permission?.allowEdits || options.permission.judge) {
           const modes = session?.result?.modes as { currentModeId?: unknown } | undefined;
           const current = typeof modes?.currentModeId === 'string' ? modes.currentModeId : '';
           if (!GUARDED_MODES.has(current)) {

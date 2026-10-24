@@ -119,16 +119,22 @@ function mentions(text: string, name: string): boolean {
   return false;
 }
 
-function namesAll(evidence: string, files: readonly string[]): boolean {
+/** Отмеченные, которых доказательство не называет (`files` в исходном виде). */
+function unnamedOf(evidence: string, files: readonly string[]): string[] {
   const low = evidence.replace(/\\/g, '/').toLowerCase();
   const paths = files.map((file) => file.replace(/\\/g, '/').toLowerCase());
   const baseOf = (path: string): string => path.split('/').pop() ?? path;
   const bases = paths.map(baseOf);
-  return paths.every((path) => {
+  return files.filter((_, at) => {
+    const path = paths[at] ?? '';
     const base = baseOf(path);
     const unique = bases.filter((other) => other === base).length === 1;
-    return mentions(low, path) || (unique && mentions(low, base));
+    return !(mentions(low, path) || (unique && mentions(low, base)));
   });
+}
+
+function namesAll(evidence: string, files: readonly string[]): boolean {
+  return unnamedOf(evidence, files).length === 0;
 }
 
 const flat = (value: string): string => value.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -325,7 +331,9 @@ export function rowGap(
 ): SieveGap | undefined {
   if (!row) return { code: 'sieve-gap-unreported', params: { sieve: sieve.id, lang: SIEVE_LANG } };
   if (row.status === 'fail') {
-    return { code: 'sieve-gap-failed', params: { sieve: sieve.id, evidence: row.evidence } };
+    // Строка сита с именами длиннее обычной (`NAMING_SIEVES`) — в напоминание её начало.
+    const evidence = row.evidence.length > 600 ? `${row.evidence.slice(0, 600)}…` : row.evidence;
+    return { code: 'sieve-gap-failed', params: { sieve: sieve.id, evidence } };
   }
   if (row.evidence.length < EVIDENCE_MIN) {
     return { code: 'sieve-gap-no-evidence', params: { sieve: sieve.id } };
@@ -353,6 +361,8 @@ function consumersGap(
   ) {
     return undefined;
   }
+  // Назвать нужно каждый файл — пробел называет каждый ещё не названный.
+  const left = row && row.status !== 'fail' ? unnamedOf(row.evidence, files) : files;
   return {
     code: 'sieve-gap-consumers',
     params: {
@@ -360,7 +370,7 @@ function consumersGap(
         .slice(0, NAMED_MAX)
         .map((hit) => hit.token)
         .join(', '),
-      files: named(files),
+      files: (left.length > 0 ? left : files).join(', '),
     },
   };
 }
@@ -408,9 +418,19 @@ export function judgeSieves(input: {
   for (const flag of FLAGS) {
     const items = flag.items(mechanics);
     if (items.length === 0) continue;
-    if (!cleared(flag.id, items, flag.id !== 'tests-alongside')) {
-      const shown = flag.shown ? items.map((item) => flag.shown?.(mechanics, item) ?? item) : items;
-      gaps.push({ code: flag.code, params: { [flag.param]: named(shown) } });
+    const byNames = flag.id !== 'tests-alongside';
+    if (!cleared(flag.id, items, byNames)) {
+      // Требуется назвать каждый — пробел и называет каждый, кого строка ещё не
+      // назвала: «(+7)» прятал семь путей, и группа гадала их (!1072, 24.10).
+      const row = rows.get(flag.id);
+      const left =
+        byNames && row && row.status !== 'fail' ? unnamedOf(row.evidence, items) : [...items];
+      const todo = left.length > 0 ? left : [...items];
+      const shown = flag.shown ? todo.map((item) => flag.shown?.(mechanics, item) ?? item) : todo;
+      gaps.push({
+        code: flag.code,
+        params: { [flag.param]: byNames ? shown.join(', ') : named(shown) },
+      });
       continue;
     }
     const moved = movedSinceRow(flag, items, input.proof);

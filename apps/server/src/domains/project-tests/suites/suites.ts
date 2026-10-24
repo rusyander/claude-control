@@ -170,6 +170,23 @@ export function discoverSuites(root: string): { suites: DiscoveredSuite[]; trunc
 }
 
 /**
+ * Что гонять у кейса-набора JS (`file` — каталог `pkg/dir/`, `pkg` — ближайший к нему
+ * package.json). Набор мельче `JS_DEPTH` владеет только файлами самого каталога, а
+ * фильтр-каталог vitest рекурсивен: набор корня пакета гнал весь пакет, и inst-docs-ui
+ * упирался в предел 10 мин ради пяти проверок одного файла (24.10.2026). На глубине
+ * `JS_DEPTH` набор собирает и потомков — тогда каталог и есть его прогон.
+ */
+export function jsSuiteRunPaths(root: string, pkg: string, dirFile: string): string[] {
+  const dir = dirFile.replace(/\/$/, '');
+  const inside = pkg ? dir.slice(pkg.length).replace(/^\//, '') : dir;
+  if (inside && inside.split('/').length >= JS_DEPTH) return [dirFile];
+  const own = listDir(join(root, dir))
+    .filter((name) => JS_TEST.test(name) && isFile(join(root, dir, name)))
+    .sort();
+  return own.length > 0 ? own.map((name) => posix.join(dir, name)) : [dirFile];
+}
+
+/**
  * Ключи, под которыми владелец теста из отчёта может найти свой набор, — от
  * точного к общему. Путь (`/`): сам, потом каждый предок — файл JS ложится в
  * каталог-набор, пакет Go без своего кейса — в ближайший набор выше. Имя через

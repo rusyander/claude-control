@@ -23,7 +23,16 @@ import { createHash } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { KIT_ROOT, cliOf, logSessionEvent, normalize, sessionEvents } from './kit-paths.mjs';
+import {
+  ASKLESS,
+  KIT_ROOT,
+  cliOf,
+  isHandInstalled,
+  logSessionEvent,
+  normalize,
+  sessionEvents,
+  withCommon,
+} from './kit-paths.mjs';
 import { CAP, cap, readInput } from './dispatch.mjs';
 import recordPrompt from './prompt/record-prompt.mjs';
 import { isSyntheticPrompt } from './transcript.mjs';
@@ -188,6 +197,31 @@ function attempt(fn, ...args) {
 const write = (obj) => process.stdout.write(JSON.stringify(obj));
 
 /**
+ * A refusal in the calling CLI's protocol. Gemini (hooks reference) and Goose (hooks docs, «stdout Is
+ * the Decision Channel») read a top-level `{decision:'block', reason}` — Goose only that exact value,
+ * Gemini takes `block` as an alias of `deny`. Kimi and the OpenCode shim read Claude's
+ * `hookSpecificOutput.permissionDecision`, as do Claude, Qwen and Codex.
+ */
+const TOP_LEVEL_BLOCK = new Set(['gemini', 'goose']);
+
+/** Gemini's names for the events whose text it injects; Goose and Kimi take none (see emitText). */
+const GEMINI_EVENT = {
+  PostToolUse: 'AfterTool',
+  UserPromptSubmit: 'BeforeAgent',
+  SessionStart: 'SessionStart',
+};
+
+/** What the session log keeps of a call: the stop gate rebuilds a turn from it on CLIs without a readable transcript. */
+function callDetail(call) {
+  const tool = String(call?.tool_name ?? '');
+  const ti = call?.tool_input ?? {};
+  if (/^(Bash|PowerShell)$/.test(tool)) return { cmd: String(ti.command ?? '').slice(0, 400) };
+  if (/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(tool))
+    return { file: String(ti.file_path ?? ti.notebook_path ?? '') };
+  return {};
+}
+
+/**
  * Guards whose refusal promises «repeat the identical call to go through». Each keeps that promise by
  * finding its own refusal in Claude's transcript (`wasJustRefused`); Qwen and Codex write theirs in
  * other formats, so there every repeat was refused again — the escape was a lie on 2 of 3 CLIs. On
@@ -280,6 +314,7 @@ async function runPre(input, only) {
           kind: 'call',
           tool: String(call?.tool_name ?? ''),
           key: callKey(call),
+          ...callDetail(call),
         });
   }
   const sieves = items.find((i) => i.name === 'push-sieves')?.module;
@@ -287,11 +322,14 @@ async function runPre(input, only) {
   let verdict = deny ?? ask;
   // Codex has no "ask" for a hook: an ask becomes a deny whose reason tells the model to get the
   // user's yes in chat first — the consent gate then opens on that answer (kit session log).
-  if (verdict?.decision === 'ask' && cliOf(input) === 'codex')
+  const cli = cliOf(input);
+  if (verdict?.decision === 'ask' && ASKLESS.has(cli))
     verdict = {
       decision: 'deny',
       reason: `Needs the user's yes first — ask in chat, naming this exact call, then repeat it after they agree. ${verdict.reason}`,
     };
+  if (verdict && TOP_LEVEL_BLOCK.has(cli))
+    return void write({ decision: 'block', reason: cap(withRoot(verdict.reason), CAP.pre) });
   if (verdict) {
     write({
       hookSpecificOutput: {
@@ -305,7 +343,9 @@ async function runPre(input, only) {
     });
     return;
   }
-  if (only) return;
+  // A hand-installed CLI takes no context from a pre hook: Goose reads any stdout but a decision as
+  // a hook failure, Kimi and the OpenCode plugin only a deny, Gemini documents none for BeforeTool.
+  if (only || isHandInstalled(cli)) return;
   // Spawns get no rules: their surface is the prompt, and agent-prompt-guard already owns it.
   const tool = String(calls[0]?.tool_name ?? '');
   let rules = null;
@@ -352,13 +392,26 @@ async function runText(event, input, only, prompt) {
 }
 
 /** Run one hook event over stdin. `only` = `{name, module}` when an item file runs standalone. */
-export async function runEvent(event, input, only = null) {
-  if (!input || typeof input !== 'object' || !EVENT_NAME[event]) return;
+export async function runEvent(event, raw, only = null) {
+  if (!raw || typeof raw !== 'object' || !EVENT_NAME[event]) return;
+  // Claude, Qwen and Codex input passes through as the same object; the hand-installed CLIs get the
+  // fields the modules read (kit-paths.mjs `withCommon`).
+  const input = withCommon(raw);
+  const cli = cliOf(input);
   if (event === 'pre') return runPre(input, only);
 
   if (event === 'stop') {
     for (const item of await itemsFor('stop', only)) {
       const v = attempt(item.run, input);
+      // Kimi blocks a Stop only through the deny form; its top-level `decision` is ignored (hooks docs).
+      if (v && cli === 'kimi')
+        return write({
+          hookSpecificOutput: {
+            hookEventName: 'Stop',
+            permissionDecision: 'deny',
+            permissionDecisionReason: withRoot(v.reason),
+          },
+        });
       if (v) return write({ ...v, reason: withRoot(v.reason) });
     }
     return;
@@ -390,8 +443,13 @@ export async function runEvent(event, input, only = null) {
   // PreCompact output is plain text: its JSON shape is not the same on every CLI build.
   if (event === 'precompact') return void process.stdout.write(text);
   const max = event.startsWith('post-') ? CAP.post : 4000;
+  // Goose runs these events for observation only and Kimi fires them and forgets: text reaches no
+  // model there, so nothing is printed. Gemini takes it under its own event name.
+  if (cli === 'goose' || cli === 'kimi') return;
+  const name =
+    cli === 'gemini' ? (GEMINI_EVENT[EVENT_NAME[event]] ?? EVENT_NAME[event]) : EVENT_NAME[event];
   write({
-    hookSpecificOutput: { hookEventName: EVENT_NAME[event], additionalContext: cap(text, max) },
+    hookSpecificOutput: { hookEventName: name, additionalContext: cap(text, max) },
   });
 }
 

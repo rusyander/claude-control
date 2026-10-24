@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest';
 import type { TaskSplitResult } from '@agentdeck/contracts/task-split';
 import type { ChatLink, SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts';
 import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
-import { SplitConveyor, type ChainOutcome, type SplitConveyorDeps } from './split-conveyor.ts';
+import { localizeText } from '../../../lib/server-texts/server-texts.ts';
+import { missingDelivery } from '../../project-git/delivery-facts/delivery-facts.ts';
+import {
+  interruptResumePrompt,
+  limitResumePrompt,
+  SplitConveyor,
+  type ChainOutcome,
+  type SplitConveyorDeps,
+} from './split-conveyor.ts';
 
 /**
  * Управление группой из хаба (журнал 81, 89): пауза одной группы, её
@@ -224,6 +232,56 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
     );
     // Продолжение их назвало — в записи их больше нет: следующая пауза без фона чиста.
     expect(t.group(0)?.pausedTasks).toBeUndefined();
+  });
+
+  it('продолжение посреди доставки называет пробелы последней сверки (живой прогон 24.10)', async () => {
+    // Группа стояла на паузе с «Не хватает для MR»; голое «продолжай» она прочла
+    // «доделывать нечего», ход без движения читался «встали» — и доставка уходила
+    // в разбор, а пробелов группа так и не видела.
+    const t = build({ parallel: 1 });
+    await t.begin();
+    const [noMr = ''] = missingDelivery({ dirty: [], pushed: true }, 'feature/one');
+    t.conveyor.pause(PARENT, 0);
+    const record = t.records.get(PARENT);
+    if (!record?.groups[0]) throw new Error('нет записи группы');
+    record.groups[0].deliveryMissing = [noMr];
+    record.groups[0].deliveryNotes = ['живое сито: not checked: нет стенда'];
+
+    expect(t.conveyor.resumePaused(PARENT, 0)).toBe('sent');
+    const prompt = t.resumed[0]?.prompt ?? '';
+    expect(prompt).toMatch(/paused the group/);
+    expect(prompt).toContain("The panel checked the group's delivery against git");
+    expect(prompt).toContain(`- ${localizeText(noMr, 'en')}`);
+    expect(prompt).toContain('- живое сито: not checked: нет стенда');
+    expect(prompt).not.toContain('continue from where you stopped');
+
+    // Без пробелов — прежнее продолжение.
+    t.conveyor.onChainResumed(t.link(0), 'chat-0');
+    t.conveyor.pause(PARENT, 0);
+    const clean = t.records.get(PARENT);
+    if (!clean?.groups[0]) throw new Error('нет записи группы');
+    delete clean.groups[0].deliveryMissing;
+    delete clean.groups[0].deliveryNotes;
+    t.conveyor.resumePaused(PARENT, 0);
+    expect(t.resumed[1]?.prompt).toContain('continue from where you stopped on the branch');
+    expect(t.resumed[1]?.prompt).not.toContain('delivery against git');
+  });
+
+  it('продолжения после лимита и обрыва тоже несут пробелы доставки', () => {
+    const [noMr = ''] = missingDelivery({ dirty: [], pushed: true }, 'feature/one');
+    const pending = { deliveryMissing: [noMr] };
+    for (const prompt of [
+      limitResumePrompt('feature/one', pending),
+      interruptResumePrompt('feature/one', pending),
+    ]) {
+      expect(prompt).toContain(`- ${localizeText(noMr, 'en')}`);
+      expect(prompt).toContain('Then close what the last delivery check before this stop found:');
+      expect(prompt).not.toContain('continue from where you stopped');
+    }
+    expect(interruptResumePrompt('feature/one', {})).toContain(
+      'repeat the summary of the last turn',
+    );
+    expect(limitResumePrompt('feature/one')).toContain('continue from where you stopped');
   });
 
   it('«Продолжить» при свободном месте — сразу; не на паузе — отказ', async () => {

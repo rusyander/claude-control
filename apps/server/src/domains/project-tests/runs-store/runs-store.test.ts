@@ -83,6 +83,25 @@ describe('project-tests/runs-store', () => {
     expect(readRun(project, 'нет-такого')).toBeUndefined();
   });
 
+  /**
+   * Отчёты, CLI и строки сит называют прогон коротким номером — первыми восемью
+   * знаками (`run:2c80ca0e`). Живьём 24.10 группа стояла на доставке сутки:
+   * три её прогона лежали в истории, а сито писало «прогона нет в истории».
+   */
+  it('прогон читается по короткому номеру; двусмысленный или слишком короткий — нет', () => {
+    writeRun(project, record('2c80ca0e-35d2-4fa0-b7f6-ae3d367593ab', '2026-10-23T07:13:44.000Z'));
+    writeRun(project, record('77aa11bb-0000-4000-8000-000000000001', '2026-10-23T08:00:00.000Z'));
+    writeRun(project, record('77aa11bb-0000-4000-8000-000000000002', '2026-10-23T09:00:00.000Z'));
+
+    expect(readRun(project, '2c80ca0e')?.id).toBe('2c80ca0e-35d2-4fa0-b7f6-ae3d367593ab');
+    expect(readRun(project, '2C80CA0E-35d2')?.id).toBe('2c80ca0e-35d2-4fa0-b7f6-ae3d367593ab');
+    expect(readRun(project, '77aa11bb')).toBeUndefined();
+    expect(readRun(project, '77aa11bb-0000-4000-8000-000000000002')?.id).toBe(
+      '77aa11bb-0000-4000-8000-000000000002',
+    );
+    expect(readRun(project, '2c80ca0')).toBeUndefined();
+  });
+
   it('мигающий кейс попадает в нестабильные, ровный — нет', () => {
     const runs: ProjectTestRunRecord[] = [
       record('r3', '2026-09-03T10:00:00.000Z', [{ status: 'failed' }, { status: 'passed' }]),

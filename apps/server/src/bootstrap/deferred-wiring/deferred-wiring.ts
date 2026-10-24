@@ -14,10 +14,12 @@ import {
   type OutcomeItem,
 } from '../../domains/chat/deferred-asks/deferred-asks.ts';
 import {
+  decideDeferred,
   deferredAsksOf,
   setDeferredResumer,
   type DeferredResumeOutcome,
 } from '../../routes/chat/deferred-routes/deferred-store.ts';
+import type { PanelDecision } from './rejudge.ts';
 
 /** Через сколько после старта панели продолжать разрешённое: реестр успевает подхватить прогоны. */
 const BOOT_REDRIVE_MS = 5_000;
@@ -48,6 +50,12 @@ export interface DeferredWiringDeps {
      */
     render?: () => string | undefined,
   ) => 'sent' | 'queued' | 'refused';
+  /**
+   * Повторный суд ждущей записи группы при старте (`rejudge.ts`): правило,
+   * по которому вызов ушёл человеку, могло с тех пор научиться решать его само
+   * (D-1). `undefined` — по-прежнему человеку. Нет — записи ждут как есть.
+   */
+  rejudge?: (record: DeferredAskRecord) => Promise<PanelDecision | undefined>;
   setTimer?: (run: () => void, ms: number) => void;
   /** Повторный обход (по умолчанию каждую минуту) — для проверок он задаётся. */
   setInterval?: (run: () => void, ms: number) => void;
@@ -56,7 +64,10 @@ export interface DeferredWiringDeps {
 export interface DeferredWiring {
   /** Конец хода разговора: отложенные до него продолжения одиночного чата — сейчас. */
   finished(keys: readonly string[]): void;
-  /** Обход при старте: исходы, о которых разговорам не сказано (перезапуск между ними). */
+  /**
+   * Обход при старте: сначала повторный суд ждущих записей групп, затем
+   * исходы, о которых разговорам не сказано (перезапуск между ними).
+   */
   reDrive(): Promise<void>;
 }
 
@@ -237,6 +248,25 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
   };
 
   /**
+   * Ждущие записи групп, которые панель теперь решает сама: решение — тем же
+   * путём, что ответ человека (`decideDeferred`), с пометкой `auto`, и слово
+   * группе говорит, что решила панель. Сбой суда одной записи оставляет её
+   * человеку и не мешает остальным.
+   */
+  const rejudgeWaiting = async (
+    rejudge: NonNullable<DeferredWiringDeps['rejudge']>,
+  ): Promise<void> => {
+    for (const record of asks.all()) {
+      if (record.state !== 'waiting' || record.scope.kind !== 'group') continue;
+      if (removed(record.scope)) continue;
+      const decision = await rejudge(record).catch(() => undefined);
+      if (!decision) continue;
+      await decideDeferred(ctx, record.id, { ...decision, via: 'auto' });
+      console.info(`deferred: ${record.id} decided by the panel re-check (${decision.behavior})`);
+    }
+  };
+
+  /**
    * Повторный обход: исход, который некуда было сказать (пауза группы, разговор
    * не в реестре, занятый старт, отказ очереди), иначе ждал перезапуска панели —
    * человек разрешил, а группа узнавала об этом только после рестарта (D-L05).
@@ -264,6 +294,7 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
       }
     },
     async reDrive() {
+      if (deps.rejudge) await rejudgeWaiting(deps.rejudge);
       driveAll();
     },
   };

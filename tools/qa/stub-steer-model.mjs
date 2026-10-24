@@ -43,8 +43,10 @@ export function startStubModel({
     const required = schema?.required ?? Object.keys(props).slice(0, 1);
     const out = {};
     // Медленный инструмент — чтобы сообщение пришло, пока он идёт.
+    // Функция — строка на каждый запрос: сценарии одного стенда зовут разные команды.
     const line =
-      toolLine ?? (slowTool ? (IS_WIN ? 'ping -n 7 127.0.0.1' : 'sleep 6') : 'echo steer-probe');
+      (typeof toolLine === 'function' ? toolLine() : toolLine) ??
+      (slowTool ? (IS_WIN ? 'ping -n 7 127.0.0.1' : 'sleep 6') : 'echo steer-probe');
     for (const key of required) {
       const type = props[key]?.type;
       if (type === 'array')
@@ -252,7 +254,8 @@ export function startStubModel({
       requests.push(entry);
       let plan;
       if (seen) plan = { text: 'STEER_SEEN' };
-      else if (!entry.toolResult && fileWrite && entry.tools.includes('write_file')) {
+      // `fileWrite` вернул пусто — сценарию нужна оболочка, а не правка файла.
+      else if (!entry.toolResult && fileWrite?.() && entry.tools.includes('write_file')) {
         plan = {
           tool: { name: 'write_file', args: { file_path: fileWrite(), content: 'edited' } },
         };

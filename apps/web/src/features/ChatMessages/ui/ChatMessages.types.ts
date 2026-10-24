@@ -11,6 +11,7 @@ import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
 import type { BranchGateCardProps, PendingBranchGate } from './BranchGateCard.types';
 import type { ChildBranch } from './TaskSplitCard.types';
 import type { ChildQuestion } from './ChildQuestion.types';
+import type { ChildPermission } from './ChildPermission.types';
 
 /**
  * Всё, что карточке продолжения нужно от страницы, одним объектом. Плоскими
@@ -49,14 +50,7 @@ export interface SplitDecision {
 export type { ChildQuestion };
 
 /** Запросы прав дочернего разговора и подпись, чей он. */
-export interface ChildPermission {
-  /** Ключ прогона ребёнка — по нему уходит решение. */
-  chatId: string;
-  /** Как назван этот чат в списке: человеку нужно понимать, кого он разрешает. */
-  title: string;
-  /** Всё, на чём ребёнок сейчас стоит: за один ход запросов бывает несколько. */
-  permissions: PendingPermission[];
-}
+export type { ChildPermission };
 
 export interface ChatMessagesProps {
   messages: ChatMessage[];

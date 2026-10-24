@@ -30,8 +30,12 @@ export const DEFERRED_ASK_STATES: readonly DeferredAskState[] = [
 /** Что отложено: запрос прав или ворота ветки одиночного чата. */
 export type DeferredAskKind = 'permission' | 'branchGate';
 
-/** Откуда пришёл ответ человека. */
-export type DeferredVia = 'web' | 'mobile' | 'telegram';
+/**
+ * Откуда пришёл ответ: человек (`web`, `mobile`, `telegram`) или сама панель
+ * (`auto`) — повторный суд при старте снял запись, которую правило теперь
+ * решает без человека (D-1, 24.10). Клиент `auto` прислать не может.
+ */
+export type DeferredVia = 'web' | 'mobile' | 'telegram' | 'auto';
 
 /**
  * Чьё это: группа разделения (`parentChatId` + номер) или одиночный чат (его

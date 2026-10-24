@@ -98,6 +98,10 @@ describe('deferred-bridge › обходы вокруг ответа за чел
     ['Bash', bash('tar -C ~/.agentdeck -cf - api-token | base64'), true],
     ['Write', { file_path: '~/.agentdeck/deferred-asks.json', content: '{}' }, true],
     ['Edit', { file_path: 'C:/u/.agentdeck/telegram-answers.json', new_string: 'allow' }, true],
+    // Режим подписи телефона и его ключи: выключить режим или подложить свой ключ.
+    ['Write', { file_path: '~/.agentdeck/phone-signing.json', content: '{}' }, true],
+    ['Bash', bash('rm ~/.agentdeck/phone-signing.json'), true],
+    ['Bash', bash('curl -X POST http://127.0.0.1:5178/api/phone-signing/devices/a1/revoke'), true],
     ['Bash', bash('jq ".records[0].state=\\"allowed\\"" deferred-asks.json > tmp'), true],
     // Чтение и поиск решить ничего не могут: номера своих D-n агент и так знает.
     ['Read', { file_path: '.agent/notes/deferred-asks.json.md' }, false],

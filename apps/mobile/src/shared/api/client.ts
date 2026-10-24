@@ -2,6 +2,7 @@ import type { ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import { serverMessage } from './server-message';
 import { authHeaders } from './authHeaders';
 import { currentConnection } from './connection';
+import { signatureHeaders } from './signing/signatureHeaders';
 import { dict } from '../config/i18n';
 
 /**
@@ -46,11 +47,16 @@ async function request<T>(
     body?: unknown;
     /** Свой потолок ожидания: рисование картинки — минуты, а не секунды. */
     timeoutMs?: number;
+    /** Свои заголовки поверх общих — подпись привязки ключа делает свою. */
+    headers?: Record<string, string>;
   } = {},
 ): Promise<T> {
   const { url } = currentConnection();
   if (!url) throw new ApiError(0, dict().api.notConfigured);
 
+  // Разрешающее решение подписывается ключом телефона (`signing/`): при
+  // включённом режиме подписи панель без неё «Разрешить» не примет.
+  const signature = await signatureHeaders(method, path, options.body);
   let response: Response;
   try {
     response = await fetch(apiUrl(path, options.query), {
@@ -58,6 +64,8 @@ async function request<T>(
       headers: {
         ...authHeaders(),
         ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...signature,
+        ...options.headers,
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
@@ -105,8 +113,11 @@ export const api = {
     query?: Record<string, string | number | undefined>,
     options?: { timeoutMs?: number },
   ) => request<T>('GET', path, { query, ...options }),
-  post: <T>(path: string, body?: unknown, options?: { timeoutMs?: number }) =>
-    request<T>('POST', path, { body, ...options }),
+  post: <T>(
+    path: string,
+    body?: unknown,
+    options?: { timeoutMs?: number; headers?: Record<string, string> },
+  ) => request<T>('POST', path, { body, ...options }),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),
   delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, { body }),
   /**

@@ -9,14 +9,14 @@
       "masked": 0,
       "width": 905,
       "height": 879,
-      "shotAt": "2026-10-22T16:52:21.436Z",
+      "shotAt": "2026-10-24T15:26:07.144Z",
       "text": "Разделить задачи: 3 группы Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут проектирование haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Только завести чаты, не запускать агентов Чатов: 3 · прогонов сейчас: 3 · до 16 прогонов: разбор, планы, работа и проверки Разделить на 3 чата Делать здесь по очереди",
       "en": {
         "file": "01-proposal.en.png",
         "masked": 0,
         "width": 905,
         "height": 879,
-        "shotAt": "2026-10-22T16:54:00.478Z",
+        "shotAt": "2026-10-24T15:27:05.699Z",
         "text": "Split the tasks: 3 groups Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут design haiku sonnet opus Low Medium High Delivery on Sonnet Only create the chats, do not start the agents Chats: 3 · runs right now: 3 · up to 16 runs: triage, plans, work and reviews Split into 3 chats Do it here, one by one"
       },
       "dark": {
@@ -24,7 +24,7 @@
         "masked": 0,
         "width": 905,
         "height": 879,
-        "shotAt": "2026-10-22T16:55:50.411Z",
+        "shotAt": "2026-10-24T15:28:01.049Z",
         "text": "Разделить задачи: 3 группы Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут проектирование haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Только завести чаты, не запускать агентов Чатов: 3 · прогонов сейчас: 3 · до 16 прогонов: разбор, планы, работа и проверки Разделить на 3 чата Делать здесь по очереди"
       },
       "darkEn": {
@@ -32,7 +32,7 @@
         "masked": 0,
         "width": 905,
         "height": 879,
-        "shotAt": "2026-10-22T16:57:35.319Z",
+        "shotAt": "2026-10-24T15:35:11.664Z",
         "text": "Split the tasks: 3 groups Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут design haiku sonnet opus Low Medium High Delivery on Sonnet Only create the chats, do not start the agents Chats: 3 · runs right now: 3 · up to 16 runs: triage, plans, work and reviews Split into 3 chats Do it here, one by one"
       }
     },
@@ -43,31 +43,31 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-10-22T16:52:28.306Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 6 из 6 СЕЙЧАС РАБОТАЮТ Разбор задач orders-panel 36 мин назад · 4 Выгрузка заказов · work feature/orders-export 14 мин назад · 4 Фильтры списка · work feature/orders-filters 9 мин назад · 4 Ещё 3 Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Разделить задачи: 3 группы Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут проектирование haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Уже разделено: 2 из 3 групп стали чатами Просит «Фильтры списка · work» Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Спрашивает «Выгрузка заказов · work» Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 35м 06с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов работает план › работа › ревью Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Пауза Что получил агент Фильтры списка ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки «Фильтры списка · work» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "shotAt": "2026-10-24T15:26:14.058Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 6 из 6 СЕЙЧАС РАБОТАЮТ Разбор задач orders-panel 35 мин назад · 4 Выгрузка заказов · work feature/orders-export 13 мин назад · 4 Фильтры списка · work feature/orders-filters 8 мин назад · 4 Ещё 3 Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Разделить задачи: 3 группы Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут проектирование haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Уже разделено: 2 из 3 групп стали чатами Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 34м 48с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов план › работа › сейчас: ревью Пауза Что получил агент работает Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Агент спрашивает · ревью · чат help-spl Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Фильтры списка план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки «Фильтры списка · work» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "02-tree.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:54:06.939Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 RUNNING NOW Разбор задач orders-panel 36 min ago · 4 Выгрузка заказов · work feature/orders-export 14 min ago · 4 Фильтры списка · work feature/orders-filters 9 min ago · 4 3 more Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Split the tasks: 3 groups Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут design haiku sonnet opus Low Medium High Delivery on Sonnet Already split: 2 of 3 groups became chats Requested by “Фильтры списка · work” The agent needs permission Bash git reset --hard origin/main Deny Allow Asked by “Выгрузка заказов · work” Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 35m 04s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов working plan › work › review Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export Pause What the agent got Фильтры списка waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches “Фильтры списка · work” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-10-24T15:27:12.562Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 RUNNING NOW Разбор задач orders-panel 35 min ago · 4 Выгрузка заказов · work feature/orders-export 13 min ago · 4 Фильтры списка · work feature/orders-filters 8 min ago · 4 3 more Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Split the tasks: 3 groups Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут design haiku sonnet opus Low Medium High Delivery on Sonnet Already split: 2 of 3 groups became chats Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 34m 28s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов plan › work › now: review Pause What the agent got working Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export The agent asks · review · chat help-spl Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Фильтры списка plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches “Фильтры списка · work” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line"
       },
       "dark": {
         "file": "02-tree.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:55:57.019Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 6 из 6 СЕЙЧАС РАБОТАЮТ Разбор задач orders-panel 36 мин назад · 4 Выгрузка заказов · work feature/orders-export 14 мин назад · 4 Фильтры списка · work feature/orders-filters 9 мин назад · 4 Ещё 3 Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Разделить задачи: 3 группы Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут проектирование haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Уже разделено: 2 из 3 групп стали чатами Просит «Фильтры списка · work» Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Спрашивает «Выгрузка заказов · work» Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 35м 05с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов работает план › работа › ревью Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Пауза Что получил агент Фильтры списка ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки «Фильтры списка · work» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки"
+        "shotAt": "2026-10-24T15:28:07.633Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 6 из 6 СЕЙЧАС РАБОТАЮТ Разбор задач orders-panel 35 мин назад · 4 Выгрузка заказов · work feature/orders-export 13 мин назад · 4 Фильтры списка · work feature/orders-filters 8 мин назад · 4 Ещё 3 Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Разделить задачи: 3 группы Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы реализация haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут проектирование haiku sonnet opus Низкая Средняя Высокая Доставка на Sonnet Уже разделено: 2 из 3 групп стали чатами Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 34м 33с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов план › работа › сейчас: ревью Пауза Что получил агент работает Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Агент спрашивает · ревью · чат help-spl Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Фильтры списка план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки «Фильтры списка · work» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки"
       },
       "darkEn": {
         "file": "02-tree.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:57:43.177Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 RUNNING NOW Разбор задач orders-panel 36 min ago · 4 Выгрузка заказов · work feature/orders-export 14 min ago · 4 Фильтры списка · work feature/orders-filters 9 min ago · 4 3 more Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Split the tasks: 3 groups Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут design haiku sonnet opus Low Medium High Delivery on Sonnet Already split: 2 of 3 groups became chats Requested by “Фильтры списка · work” The agent needs permission Bash git reset --hard origin/main Deny Allow Asked by “Выгрузка заказов · work” Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 35m 10s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов working plan › work › review Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export Pause What the agent got Фильтры списка waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches “Фильтры списка · work” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-10-24T15:35:18.549Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 RUNNING NOW Разбор задач orders-panel 35 min ago · 4 Выгрузка заказов · work feature/orders-export 13 min ago · 4 Фильтры списка · work feature/orders-filters 8 min ago · 4 3 more Разбор задач C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам. Задачи независимы: общий у них только каталог. Жду решения. Split the tasks: 3 groups Общий контекст: панель на React, правки в src/pages/Orders. Выгрузка заказов feature/orders-export собрать CSV из тех же данных, что и таблица кнопку выгрузки в шапку страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Фильтры списка feature/orders-filters фильтр по статусу фильтр по дате сохранять выбор в адресе страницы implementation haiku sonnet opus Low Medium High Delivery on Sonnet Отчёт по возвратам feature/returns-report посчитать возвраты за период вынести в отдельный маршрут design haiku sonnet opus Low Medium High Delivery on Sonnet Already split: 2 of 3 groups became chats Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 34m 30s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов plan › work › now: review Pause What the agent got working Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export The agent asks · review · chat help-spl Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Фильтры списка plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches “Фильтры списка · work” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line"
       }
     },
     {
@@ -76,32 +76,32 @@
       "side": "panel",
       "masked": 0,
       "width": 832,
-      "height": 846,
-      "shotAt": "2026-10-22T16:52:28.977Z",
-      "text": "Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 35м 07с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов работает план › работа › ревью Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Пауза Что получил агент Фильтры списка ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки",
+      "height": 900,
+      "shotAt": "2026-10-24T15:26:14.719Z",
+      "text": "Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 34м 49с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов план › работа › сейчас: ревью Пауза Что получил агент работает Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Агент спрашивает · ревью · чат help-spl Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Фильтры списка план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки",
       "en": {
         "file": "03-hub.en.png",
         "masked": 0,
         "width": 832,
-        "height": 846,
-        "shotAt": "2026-10-22T16:54:07.609Z",
-        "text": "Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 35m 05s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов working plan › work › review Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export Pause What the agent got Фильтры списка waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches"
+        "height": 900,
+        "shotAt": "2026-10-24T15:27:13.255Z",
+        "text": "Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 34m 29s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов plan › work › now: review Pause What the agent got working Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export The agent asks · review · chat help-spl Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Фильтры списка plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches"
       },
       "dark": {
         "file": "03-hub.dark.png",
         "masked": 0,
         "width": 832,
-        "height": 846,
-        "shotAt": "2026-10-22T16:55:57.700Z",
-        "text": "Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 35м 06с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов работает план › работа › ревью Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Пауза Что получил агент Фильтры списка ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки"
+        "height": 900,
+        "shotAt": "2026-10-24T15:28:08.296Z",
+        "text": "Группы разделения: 2 разбор применён Остановить всё (2) Отменить план идёт: 1 стоит: 1 с начала 34м 34с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов план › работа › сейчас: ревью Пауза Что получил агент работает Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Агент спрашивает · ревью · чат help-spl Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Фильтры списка план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант Пересечения веток не сверялись Сверить ветки"
       },
       "darkEn": {
         "file": "03-hub.dark.en.png",
         "masked": 0,
         "width": 832,
-        "height": 846,
-        "shotAt": "2026-10-22T16:57:43.873Z",
-        "text": "Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 35m 11s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов working plan › work › review Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export Pause What the agent got Фильтры списка waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches"
+        "height": 900,
+        "shotAt": "2026-10-24T15:35:19.455Z",
+        "text": "Split groups: 2 triage applied Stop all (2) Cancel plan running: 1 stopped: 1 elapsed 34m 30s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов plan › work › now: review Pause What the agent got working Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export The agent asks · review · chat help-spl Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Фильтры списка plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words Branch overlap not checked Check branches"
       }
     },
     {
@@ -109,33 +109,33 @@
       "file": "04-child-ask.png",
       "side": "panel",
       "masked": 0,
-      "width": 832,
-      "height": 212,
-      "shotAt": "2026-10-22T16:52:30.469Z",
-      "text": "Просит «Фильтры списка · work» Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить",
+      "width": 768,
+      "height": 238,
+      "shotAt": "2026-10-24T15:26:16.186Z",
+      "text": "Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить",
       "en": {
         "file": "04-child-ask.en.png",
         "masked": 0,
-        "width": 832,
-        "height": 212,
-        "shotAt": "2026-10-22T16:54:09.079Z",
-        "text": "Requested by “Фильтры списка · work” The agent needs permission Bash git reset --hard origin/main Deny Allow"
+        "width": 768,
+        "height": 238,
+        "shotAt": "2026-10-24T15:27:14.742Z",
+        "text": "The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow"
       },
       "dark": {
         "file": "04-child-ask.dark.png",
         "masked": 0,
-        "width": 832,
-        "height": 212,
-        "shotAt": "2026-10-22T16:55:59.159Z",
-        "text": "Просит «Фильтры списка · work» Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить"
+        "width": 768,
+        "height": 238,
+        "shotAt": "2026-10-24T15:28:09.754Z",
+        "text": "Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить"
       },
       "darkEn": {
         "file": "04-child-ask.dark.en.png",
         "masked": 0,
-        "width": 832,
-        "height": 212,
-        "shotAt": "2026-10-22T16:57:45.377Z",
-        "text": "Requested by “Фильтры списка · work” The agent needs permission Bash git reset --hard origin/main Deny Allow"
+        "width": 768,
+        "height": 238,
+        "shotAt": "2026-10-24T15:35:20.954Z",
+        "text": "The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow"
       }
     },
     {
@@ -144,32 +144,32 @@
       "file": "04b-card-ask.png",
       "masked": 0,
       "width": 806,
-      "height": 481,
-      "shotAt": "2026-10-22T16:52:31.142Z",
-      "text": "Фильтры списка ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант",
+      "height": 705,
+      "shotAt": "2026-10-24T15:26:16.871Z",
+      "text": "Фильтры списка план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант",
       "en": {
         "file": "04b-card-ask.en.png",
         "masked": 0,
         "width": 806,
-        "height": 481,
-        "shotAt": "2026-10-22T16:54:09.750Z",
-        "text": "Фильтры списка waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words"
+        "height": 705,
+        "shotAt": "2026-10-24T15:27:15.423Z",
+        "text": "Фильтры списка plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words"
       },
       "dark": {
         "file": "04b-card-ask.dark.png",
         "masked": 0,
         "width": 806,
-        "height": 481,
-        "shotAt": "2026-10-22T16:55:59.830Z",
-        "text": "Фильтры списка ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант"
+        "height": 705,
+        "shotAt": "2026-10-24T15:28:10.432Z",
+        "text": "Фильтры списка план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Агент спрашивает · работа · чат 3f9a1c2e Нужен ваш выбор Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Свой вариант"
       },
       "darkEn": {
         "file": "04b-card-ask.dark.en.png",
         "masked": 0,
         "width": 806,
-        "height": 481,
-        "shotAt": "2026-10-22T16:57:46.087Z",
-        "text": "Фильтры списка waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words"
+        "height": 705,
+        "shotAt": "2026-10-24T15:35:21.631Z",
+        "text": "Фильтры списка plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow The agent asks · work · chat 3f9a1c2e Your choice is needed Фильтры Хранить выбранные фильтры между заходами? Да, в адресе страницы Ссылкой можно поделиться. Нет, сбрасывать Каждый заход — с полного списка. Answer in your own words"
       }
     },
     {
@@ -178,32 +178,32 @@
       "side": "panel",
       "masked": 0,
       "width": 782,
-      "height": 111,
-      "shotAt": "2026-10-22T16:52:34.068Z",
-      "text": "Пересечения веток: 2 файла Сверить ветки src/shared/api/client.ts Выгрузка заказов, Фильтры списка · вне владения: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Порядок слияния: Выгрузка заказов → Фильтры списка",
+      "height": 131,
+      "shotAt": "2026-10-24T15:26:20.122Z",
+      "text": "Пересечения веток: 2 файла Сверить ветки Вне владения: 1 файл src/shared/api/client.ts Выгрузка заказов, Фильтры списка · вне владения: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Порядок слияния: Выгрузка заказов → Фильтры списка",
       "en": {
         "file": "05-overlap.en.png",
         "masked": 0,
         "width": 782,
-        "height": 111,
-        "shotAt": "2026-10-22T16:54:12.730Z",
-        "text": "Branch overlap: 2 files Check branches src/shared/api/client.ts Выгрузка заказов, Фильтры списка · outside ownership: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Merge order: Выгрузка заказов → Фильтры списка"
+        "height": 131,
+        "shotAt": "2026-10-24T15:27:18.674Z",
+        "text": "Branch overlap: 2 files Check branches Outside ownership: 1 file src/shared/api/client.ts Выгрузка заказов, Фильтры списка · outside ownership: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Merge order: Выгрузка заказов → Фильтры списка"
       },
       "dark": {
         "file": "05-overlap.dark.png",
         "masked": 0,
         "width": 782,
-        "height": 47,
-        "shotAt": "2026-10-22T16:56:02.759Z",
-        "text": "Пересечения веток: 2 файла Сверить ветки"
+        "height": 131,
+        "shotAt": "2026-10-24T15:28:13.686Z",
+        "text": "Пересечения веток: 2 файла Сверить ветки Вне владения: 1 файл src/shared/api/client.ts Выгрузка заказов, Фильтры списка · вне владения: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Порядок слияния: Выгрузка заказов → Фильтры списка"
       },
       "darkEn": {
         "file": "05-overlap.dark.en.png",
         "masked": 0,
         "width": 782,
-        "height": 47,
-        "shotAt": "2026-10-22T16:57:49.038Z",
-        "text": "Branch overlap: 2 files Check branches"
+        "height": 131,
+        "shotAt": "2026-10-24T15:35:24.903Z",
+        "text": "Branch overlap: 2 files Check branches Outside ownership: 1 file src/shared/api/client.ts Выгрузка заказов, Фильтры списка · outside ownership: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Merge order: Выгрузка заказов → Фильтры списка"
       }
     },
     {
@@ -212,32 +212,32 @@
       "side": "panel",
       "masked": 0,
       "width": 832,
-      "height": 591,
-      "shotAt": "2026-10-22T16:52:36.671Z",
-      "text": "Группы разделения: 2 разбор применён на паузе Продолжить всё (5) Отменить план идёт: 1 стоит: 1 с начала 35м 15с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов на паузе работает план › работа › ревью Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Пауза Что получил агент Фильтры списка на паузе ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Пересечения веток: 2 файла Сверить ветки src/shared/api/client.ts Выгрузка заказов, Фильтры списка · вне владения: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Порядок слияния: Выгрузка заказов → Фильтры списка",
+      "height": 900,
+      "shotAt": "2026-10-24T15:26:22.732Z",
+      "text": "Группы разделения: 2 разбор применён на паузе Продолжить всё (5) Отменить план идёт: 1 стоит: 1 с начала 34м 57с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов на паузе план › работа › сейчас: ревью Пауза Что получил агент работает Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Агент спрашивает · ревью · чат help-spl Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Фильтры списка на паузе план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Пересечения веток: 2 файла Сверить ветки Вне владения: 1 файл src/shared/api/client.ts Выгрузка заказов, Фильтры списка · вне владения: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Порядок слияния: Выгрузка заказов → Фильтры списка",
       "en": {
         "file": "06-paused.en.png",
         "masked": 0,
         "width": 832,
-        "height": 591,
-        "shotAt": "2026-10-22T16:54:15.353Z",
-        "text": "Split groups: 2 triage applied paused Resume all (5) Cancel plan running: 1 stopped: 1 elapsed 35m 13s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов paused working plan › work › review Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export Pause What the agent got Фильтры списка paused waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got Branch overlap: 2 files Check branches src/shared/api/client.ts Выгрузка заказов, Фильтры списка · outside ownership: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Merge order: Выгрузка заказов → Фильтры списка"
+        "height": 900,
+        "shotAt": "2026-10-24T15:27:21.285Z",
+        "text": "Split groups: 2 triage applied paused Resume all (5) Cancel plan running: 1 stopped: 1 elapsed 34m 37s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов paused plan › work › now: review Pause What the agent got working Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export The agent asks · review · chat help-spl Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Фильтры списка paused plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow Branch overlap: 2 files Check branches Outside ownership: 1 file src/shared/api/client.ts Выгрузка заказов, Фильтры списка · outside ownership: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Merge order: Выгрузка заказов → Фильтры списка"
       },
       "dark": {
         "file": "06-paused.dark.png",
         "masked": 0,
         "width": 832,
-        "height": 529,
-        "shotAt": "2026-10-22T16:56:05.407Z",
-        "text": "Группы разделения: 2 разбор применён на паузе Продолжить всё (5) Отменить план идёт: 1 стоит: 1 с начала 35м 14с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов на паузе работает план › работа › ревью Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Пауза Что получил агент Фильтры списка на паузе ждёт разрешения план › работа Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Пауза Что получил агент Пересечения веток: 2 файла Сверить ветки"
+        "height": 900,
+        "shotAt": "2026-10-24T15:28:16.277Z",
+        "text": "Группы разделения: 2 разбор применён на паузе Продолжить всё (5) Отменить план идёт: 1 стоит: 1 с начала 34м 42с Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить Выгрузка заказов на паузе план › работа › сейчас: ревью Пауза Что получил агент работает Модель claude-opus-5 До первой правки 12с Время работы 28м 00с feature/orders-export Агент спрашивает · ревью · чат help-spl Нужен ваш выбор Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Свой вариант Фильтры списка на паузе план › последнее звено: работа Пауза Что получил агент ждёт разрешения Модель claude-sonnet-4-5 До первой правки 9с Время работы 26м 00с feature/orders-filters Агент ждёт разрешения · работа · чат 3f9a1c2e Агент просит разрешение Bash git reset --hard origin/main Запретить Разрешить Пересечения веток: 2 файла Сверить ветки Вне владения: 1 файл src/shared/api/client.ts Выгрузка заказов, Фильтры списка · вне владения: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Порядок слияния: Выгрузка заказов → Фильтры списка"
       },
       "darkEn": {
         "file": "06-paused.dark.en.png",
         "masked": 0,
         "width": 832,
-        "height": 529,
-        "shotAt": "2026-10-22T16:57:51.665Z",
-        "text": "Split groups: 2 triage applied paused Resume all (5) Cancel plan running: 1 stopped: 1 elapsed 35m 19s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов paused working plan › work › review Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export Pause What the agent got Фильтры списка paused waiting for permission plan › work Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters Pause What the agent got Branch overlap: 2 files Check branches"
+        "height": 900,
+        "shotAt": "2026-10-24T15:35:27.550Z",
+        "text": "Split groups: 2 triage applied paused Resume all (5) Cancel plan running: 1 stopped: 1 elapsed 34m 39s Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask Выгрузка заказов paused plan › work › now: review Pause What the agent got working Model claude-opus-5 To first edit 12s Run time 28m 00s feature/orders-export The agent asks · review · chat help-spl Your choice is needed Кнопка Куда класть кнопку выгрузки? В шапку страницы Рядом с фильтром. В меню строки По заказу, а не по списку. Answer in your own words Фильтры списка paused plan › last stage: work Pause What the agent got waiting for permission Model claude-sonnet-4-5 To first edit 9s Run time 26m 00s feature/orders-filters The agent waits for permission · work · chat 3f9a1c2e The agent needs permission Bash git reset --hard origin/main Deny Allow Branch overlap: 2 files Check branches Outside ownership: 1 file src/shared/api/client.ts Выгрузка заказов, Фильтры списка · outside ownership: Фильтры списка src/pages/Orders/OrdersPage.tsx Выгрузка заказов, Фильтры списка Merge order: Выгрузка заказов → Фильтры списка"
       }
     },
     {
@@ -247,14 +247,14 @@
       "masked": 0,
       "width": 800,
       "height": 1200,
-      "shotAt": "2026-10-22T16:52:39.104Z",
+      "shotAt": "2026-10-24T15:26:25.199Z",
       "text": "Изменено файлов: 4 · впереди на 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Ветка main feature/orders-export feature/login Подтянуть изменения Текущая ветка origin/main origin/feature/orders-export Pull Отправить ветку впереди на 2 Push Новая ветка Создать Сообщение коммита Закоммитить Параллельные ветки main основная C:/work/orders-panel Открыть вкладкой feature/orders-export C:/work/orders-panel-worktrees/feature-orders-export Открыть вкладкой Обновить локальный слой Убрать зависимости есть Лог Повторить установку feature/orders-filters C:/work/orders-panel-worktrees/feature-orders-filters Открыть вкладкой Обновить локальный слой Убрать зависимости есть Лог Повторить установку Завести копию Копия — отдельный каталог рядом с проектом со своей веткой и общей историей: в ней работает свой агент, не мешая остальным. Ветка показана та, что в копии сейчас, — внутри агент волен переключаться сам. Слияние веток панель не делает Настройка копий Коммит берёт все изменения рабочего дерева. Pull может привести к слиянию — конфликт панель не разбирает. Push отправляет только текущую ветку и только вперёд: --force не передаётся. Удаления веток и ребейза здесь нет",
       "en": {
         "file": "07-worktrees.en.png",
         "masked": 0,
         "width": 800,
         "height": 1200,
-        "shotAt": "2026-10-22T16:54:17.808Z",
+        "shotAt": "2026-10-24T15:27:23.737Z",
         "text": "Changed files: 4 · ahead by 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Branch main feature/orders-export feature/login Pull changes Current branch origin/main origin/feature/orders-export Pull Push branch ahead by 2 Push New branch Create Commit message Commit Parallel branches main main copy C:/work/orders-panel Open as a tab feature/orders-export C:/work/orders-panel-worktrees/feature-orders-export Open as a tab Refresh local layer Remove dependencies ready Log Retry install feature/orders-filters C:/work/orders-panel-worktrees/feature-orders-filters Open as a tab Refresh local layer Remove dependencies ready Log Retry install Create a copy A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches Copy settings A commit takes every change in the working tree. Pull may merge — the panel does not resolve conflicts. Push sends the current branch only and only forward: --force is never passed. No branch deletions or rebases here"
       },
       "dark": {
@@ -262,7 +262,7 @@
         "masked": 0,
         "width": 800,
         "height": 1200,
-        "shotAt": "2026-10-22T16:56:07.884Z",
+        "shotAt": "2026-10-24T15:28:18.734Z",
         "text": "Изменено файлов: 4 · впереди на 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Ветка main feature/orders-export feature/login Подтянуть изменения Текущая ветка origin/main origin/feature/orders-export Pull Отправить ветку впереди на 2 Push Новая ветка Создать Сообщение коммита Закоммитить Параллельные ветки main основная C:/work/orders-panel Открыть вкладкой feature/orders-export C:/work/orders-panel-worktrees/feature-orders-export Открыть вкладкой Обновить локальный слой Убрать зависимости есть Лог Повторить установку feature/orders-filters C:/work/orders-panel-worktrees/feature-orders-filters Открыть вкладкой Обновить локальный слой Убрать зависимости есть Лог Повторить установку Завести копию Копия — отдельный каталог рядом с проектом со своей веткой и общей историей: в ней работает свой агент, не мешая остальным. Ветка показана та, что в копии сейчас, — внутри агент волен переключаться сам. Слияние веток панель не делает Настройка копий Коммит берёт все изменения рабочего дерева. Pull может привести к слиянию — конфликт панель не разбирает. Push отправляет только текущую ветку и только вперёд: --force не передаётся. Удаления веток и ребейза здесь нет"
       },
       "darkEn": {
@@ -270,7 +270,7 @@
         "masked": 0,
         "width": 800,
         "height": 1200,
-        "shotAt": "2026-10-22T16:57:54.132Z",
+        "shotAt": "2026-10-24T15:35:29.976Z",
         "text": "Changed files: 4 · ahead by 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Branch main feature/orders-export feature/login Pull changes Current branch origin/main origin/feature/orders-export Pull Push branch ahead by 2 Push New branch Create Commit message Commit Parallel branches main main copy C:/work/orders-panel Open as a tab feature/orders-export C:/work/orders-panel-worktrees/feature-orders-export Open as a tab Refresh local layer Remove dependencies ready Log Retry install feature/orders-filters C:/work/orders-panel-worktrees/feature-orders-filters Open as a tab Refresh local layer Remove dependencies ready Log Retry install Create a copy A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches Copy settings A commit takes every change in the working tree. Pull may merge — the panel does not resolve conflicts. Push sends the current branch only and only forward: --force is never passed. No branch deletions or rebases here"
       }
     },
@@ -281,14 +281,14 @@
       "masked": 0,
       "width": 940,
       "height": 880,
-      "shotAt": "2026-10-22T16:52:43.449Z",
+      "shotAt": "2026-10-24T15:26:29.560Z",
       "text": "Перевести задачи в Jira PROJ-41 Выгрузка заказов In Progress PROJ-42 Выгрузка заказов In Progress PROJ-43 Фильтры списка Code Review Новый статус Code Review Ready for QA Только статусы, доступные каждой прочитанной задаче Отмена Перевести",
       "en": {
         "file": "08-move-tasks.en.png",
         "masked": 0,
         "width": 940,
         "height": 880,
-        "shotAt": "2026-10-22T16:54:32.743Z",
+        "shotAt": "2026-10-24T15:27:28.263Z",
         "text": "Move tasks in Jira PROJ-41 Выгрузка заказов In Progress PROJ-42 Выгрузка заказов In Progress PROJ-43 Фильтры списка Code Review New status Code Review Ready for QA Only statuses every task that was read can move to Cancel Move"
       },
       "dark": {
@@ -296,7 +296,7 @@
         "masked": 0,
         "width": 940,
         "height": 880,
-        "shotAt": "2026-10-22T16:56:12.861Z",
+        "shotAt": "2026-10-24T15:28:23.007Z",
         "text": "Перевести задачи в Jira PROJ-41 Выгрузка заказов In Progress PROJ-42 Выгрузка заказов In Progress PROJ-43 Фильтры списка Code Review Новый статус Code Review Ready for QA Только статусы, доступные каждой прочитанной задаче Отмена Перевести"
       },
       "darkEn": {
@@ -304,7 +304,7 @@
         "masked": 0,
         "width": 940,
         "height": 880,
-        "shotAt": "2026-10-22T16:57:58.457Z",
+        "shotAt": "2026-10-24T15:35:33.906Z",
         "text": "Move tasks in Jira PROJ-41 Выгрузка заказов In Progress PROJ-42 Выгрузка заказов In Progress PROJ-43 Фильтры списка Code Review New status Code Review Ready for QA Only statuses every task that was read can move to Cancel Move"
       }
     },
@@ -315,14 +315,14 @@
       "masked": 0,
       "width": 806,
       "height": 135,
-      "shotAt": "2026-10-22T16:52:44.064Z",
+      "shotAt": "2026-10-24T15:26:30.172Z",
       "text": "Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить",
       "en": {
         "file": "09-status-ask.en.png",
         "masked": 0,
         "width": 806,
         "height": 135,
-        "shotAt": "2026-10-22T16:54:33.361Z",
+        "shotAt": "2026-10-24T15:27:28.874Z",
         "text": "Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask"
       },
       "dark": {
@@ -330,7 +330,7 @@
         "masked": 0,
         "width": 806,
         "height": 135,
-        "shotAt": "2026-10-22T16:56:13.473Z",
+        "shotAt": "2026-10-24T15:28:23.619Z",
         "text": "Спросить о ходе групп Ответит новый лёгкий чат по сводке групп — родитель с его длинной историей не тратится. Написать самому родителю — полем ввода внизу Спросить"
       },
       "darkEn": {
@@ -338,7 +338,7 @@
         "masked": 0,
         "width": 806,
         "height": 135,
-        "shotAt": "2026-10-22T16:57:59.088Z",
+        "shotAt": "2026-10-24T15:35:34.519Z",
         "text": "Ask about group progress A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below Ask"
       }
     },
@@ -349,31 +349,31 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-10-22T16:52:48.637Z",
+      "shotAt": "2026-10-24T15:26:34.700Z",
       "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 6 из 6 СЕГОДНЯ Разбор задач orders-panel 36 мин назад · 4 Ещё 5 Панель заказов C:/work/orders-panel Sonnet Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Средняя Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Sonnet думает над ответом идёт 2с Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "10-status-chat.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:54:37.732Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 TODAY Разбор задач orders-panel 36 min ago · 4 5 more Панель заказов C:/work/orders-panel Sonnet Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Medium Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Sonnet is thinking running 2s Message Stop Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-10-24T15:27:33.338Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 TODAY Разбор задач orders-panel 35 min ago · 4 5 more Панель заказов C:/work/orders-panel Sonnet Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Medium Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Sonnet is thinking running 2s Message Stop Enter to send, Shift+Enter for a new line"
       },
       "dark": {
         "file": "10-status-chat.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:56:17.925Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 6 из 6 СЕГОДНЯ Разбор задач orders-panel 36 мин назад · 4 Ещё 5 Панель заказов C:/work/orders-panel Sonnet Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Средняя Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Sonnet думает над ответом идёт 2с Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки"
+        "shotAt": "2026-10-24T15:28:28.057Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 6 из 6 СЕГОДНЯ Разбор задач orders-panel 35 мин назад · 4 Ещё 5 Панель заказов C:/work/orders-panel Sonnet Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Средняя Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Sonnet думает над ответом идёт 2с Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки"
       },
       "darkEn": {
         "file": "10-status-chat.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:58:03.716Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 TODAY Разбор задач orders-panel 36 min ago · 4 5 more Панель заказов C:/work/orders-panel Sonnet Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Medium Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Sonnet is thinking running 2s Message Stop Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-10-24T15:35:39.089Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 6 of 6 TODAY Разбор задач orders-panel 35 min ago · 4 5 more Панель заказов C:/work/orders-panel Sonnet Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Medium Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Sonnet is thinking running 2s Message Stop Enter to send, Shift+Enter for a new line"
       }
     }
   ]

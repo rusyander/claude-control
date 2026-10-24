@@ -57,6 +57,8 @@ export function ChildStages({
   providerId,
   questions,
   onAnswer,
+  permissions,
+  onPermissionDecide,
 }: ChildStagesProps) {
   const { t } = useTranslation();
   // Время разбора и всего разделения тикает, только пока что-то идёт.
@@ -173,6 +175,9 @@ export function ChildStages({
             {...(resumeInterruptedBusy !== undefined ? { resumeInterruptedBusy } : {})}
             {...(onAnswer && group.chatId && questions?.has(group.chatId)
               ? { questions: questions.get(group.chatId), onAnswer }
+              : {})}
+            {...(onPermissionDecide && group.chatId && permissions?.has(group.chatId)
+              ? { permissions: permissions.get(group.chatId), onPermissionDecide }
               : {})}
             sectionsOpen={sectionsOpen}
           />

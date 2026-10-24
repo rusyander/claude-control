@@ -2,6 +2,7 @@ import { Stack } from '@shared/ui/stack';
 import { AccountCard } from '../AccountCard/AccountCard';
 import { ClaudeDirField } from '../ClaudeDirField/ClaudeDirField';
 import { CredentialsCard } from '../CredentialsCard/CredentialsCard';
+import { PhoneSigningCard } from '../PhoneSigningCard/PhoneSigningCard';
 import { RemoteAccessCard } from '../RemoteAccessCard/RemoteAccessCard';
 
 /**
@@ -16,6 +17,7 @@ export function AccessTab() {
       <CredentialsCard />
       <ClaudeDirField />
       <RemoteAccessCard />
+      <PhoneSigningCard />
     </Stack>
   );
 }

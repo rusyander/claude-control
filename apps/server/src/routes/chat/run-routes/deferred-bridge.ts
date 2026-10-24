@@ -49,7 +49,7 @@ function flatText(input: unknown, depth = 0): string {
  * Вызов, который до них тянется, — попытка ответить за человека.
  */
 const DECISION_ROUTE =
-  /\/api\/(?:chat\/[^\s'"`]*\/(?:permission-decision|branch-decision|auto-approve|auto-mode)|chat\/deferred(?:\/|\b)|outside\/asks\/[^\s'"`]*\/answer|chat\/split\/[^\s'"`]*\/review-decision)/i;
+  /\/api\/(?:chat\/[^\s'"`]*\/(?:permission-decision|branch-decision|auto-approve|auto-mode)|chat\/deferred(?:\/|\b)|outside\/asks\/[^\s'"`]*\/answer|chat\/split\/[^\s'"`]*\/review-decision|phone-signing\b)/i;
 const TOKEN_FILE = /\.agentdeck[\\/]+(?:api-token|\*|\?)/i;
 /**
  * Путь можно разорвать: `cd ~/.agentdeck && cat api-token`, `--directory
@@ -67,7 +67,7 @@ const TOKEN_PARTS = [/\.agentdeck\b/i, /\bapi-token\b/i];
  * — тот же импорт настроек, что закрыт воротами (RF-DS-07).
  */
 const DECISION_STORE =
-  /\b(?:deferred-asks|telegram-answers)\.json\b|\bsettings-snapshot\.(?:json|seen)\b/i;
+  /\b(?:deferred-asks|telegram-answers|phone-signing)\.json\b|\bsettings-snapshot\.(?:json|seen)\b/i;
 /**
  * Каталог данных панели отрезком пути: `<конфигурация>/agentdeck`, `~/.agentdeck`,
  * прежнее имя под `.claude*`. Пакет `@agentdeck/…` и `agentdeck-kit` — не он.

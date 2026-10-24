@@ -114,6 +114,11 @@ export type SegmentVerdict =
 export const ROUTINE: SegmentVerdict = { kind: 'routine' };
 export const OTHER: SegmentVerdict = { kind: 'other' };
 export const DANGER: SegmentVerdict = { kind: 'danger' };
+/** Погашение цели, которую не назвать числом: отказ агенту маршрутом прав, не человеку. */
+export const UNNAMED_KILL: SegmentVerdict = {
+  kind: 'routine',
+  kills: { pids: [], ports: [], unnamed: true },
+};
 
 /** Обработчик `trap`: исполнится при выходе, с тем состоянием, что будет тогда. */
 export interface Deferred {

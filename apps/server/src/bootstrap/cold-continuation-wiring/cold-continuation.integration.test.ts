@@ -215,6 +215,28 @@ describe('продолжение группы после остывшего кэ
     expect(coldNotice('sess-t2')).toBeDefined();
   });
 
+  it('новый разговор несёт задание звена со сжатой преамбулой окружения (живой прогон 24.10)', () => {
+    // Задание до 20.10 хранило список команд подготовки целиком — 2,6 тыс. знаков в
+    // каждой холодной вводной, хотя окружение давно готово.
+    const install = Array.from({ length: 30 }, (_, i) => `[svc-${i}] go mod download`).join(' · ');
+    transcript('sess-env', HOUR2);
+    link('sess-env', {
+      task: [
+        'Сделай задачи группы.',
+        `The panel prepared this copy: Local layer: 3 copied; dependencies installed with "${install}".`,
+        'The environment is ready — do not set it up again (MCP, local layer, dependencies), start with the task right away.',
+        'If a tool the task needs is missing (an MCP server, a skill, a CLI), say so in the first lines of your answer and name what it blocks — never work around it silently.',
+      ].join('\n'),
+    });
+    retryLimit('sess-env', 'transient');
+    expect(last().sessionId).toBeUndefined();
+    expect(last().prompt).toContain('Сделай задачи группы.');
+    expect(last().prompt).toContain(
+      "dependencies installed by the project's copy preparation (30 steps)",
+    );
+    expect(last().prompt).not.toContain('go mod download');
+  });
+
   it('«Продолжить всё» после паузы дерева на 2 часа — новый разговор', () => {
     transcript('sess-p1', HOUR2);
     link('sess-p1');
@@ -496,6 +518,31 @@ describe('продолжение группы после остывшего кэ
     it('вводная той же ветки без ключа задачи строку сохраняет — ключ нужен сторожу git', () => {
       const run = tell('sess-r3c', coldResumeBrief({ branch: 'feat/csv' }, ['Выгрузка CSV']));
       expect(run.prompt).toContain(`${IDENTITY}\n\nПродолжай.`);
+    });
+
+    // Живой прогон 25.10, группа #3: «Продолжить» собирает вводную само (`tellGroup`) из задания стадии,
+    // записанного 23.10, — 2,6 тыс. знаков команд подготовки и 1,3 тыс. знаков модулей вне зоны.
+    it('вводная «Продолжить» с заданием стадии — преамбула окружения сжата', () => {
+      const install = Array.from({ length: 30 }, (_, i) => `[svc-${i}] go mod download`).join(
+        ' · ',
+      );
+      const outside = Array.from({ length: 30 }, (_, i) => `svc-${i}/`).join(', ');
+      const stage = [
+        'Доставь MR группы.',
+        `The panel prepared this copy: Local layer: 3 copied; dependencies installed with "${install}".`,
+        `Outside this group's zone (not needed for its tasks): Go ready on 1.27.0 in ${outside} — run: go test ./....`,
+        'The environment is ready — do not set it up again (MCP, local layer, dependencies), start with the task right away.',
+        'If a tool the task needs is missing (an MCP server, a skill, a CLI), say so in the first lines of your answer and name what it blocks — never work around it silently.',
+      ].join('\n');
+      const run = tell(
+        'sess-env-tell',
+        withStageTask(coldResumeBrief({ branch: 'feat/csv' }, ['PROJ-1 Выгрузка CSV']), stage),
+      );
+      expect(run.sessionId).toBeUndefined();
+      expect(run.prompt).toContain('Доставь MR группы.');
+      expect(run.prompt).not.toContain('go mod download');
+      expect(run.prompt).not.toContain('svc-7/');
+      expect(run.prompt).toContain('Go ready on 1.27.0 in 30 modules — run: go test ./...');
     });
   });
 

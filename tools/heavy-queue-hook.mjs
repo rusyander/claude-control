@@ -80,23 +80,47 @@ const RENAME_BUSY = new Set(['EPERM', 'EACCES', 'EBUSY']);
 const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
+ * Сбой, который Windows отдаёт, пока файл держит сосед (антивирус, читатель,
+ * удаляющий): проходит сам. Под нагрузкой такой сбой посреди ожидания обрывал
+ * его, и команда шла мимо очереди (`error:EPERM` в bypass.log, 1 из 60 в пробе).
+ */
+const transient = (error) => RENAME_BUSY.has(error?.code);
+/** Сколько терпеть такие сбои подряд, прежде чем уйти без аренды с записью в журнал. */
+const TRANSIENT_DEFAULT_MS = 10_000;
+
+/** Повторять, пока файл занят соседом: до 10 попыток через 20 мс. */
+function retryBusy(action) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return action();
+    } catch (error) {
+      if (attempt >= 10 || !transient(error)) throw error;
+      pause(20);
+    }
+  }
+}
+
+/** Убрать файл по возможности: занятый уберёт следующий опрос. */
+function dropFile(path) {
+  try {
+    rmSync(path, { force: true });
+  } catch (error) {
+    if (!transient(error)) throw error;
+  }
+}
+
+/**
  * Запись целиком или никак: читатель полузаписанного файла счёл бы его битым и
  * удалил. Неудача убирает за собой временный файл (ревью A-F03).
  */
 function writeAtomic(path, value) {
   const temp = `${path}.${process.pid}.tmp`;
   writeFileSync(temp, JSON.stringify(value));
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      renameSync(temp, path);
-      return;
-    } catch (error) {
-      if (attempt >= 10 || !RENAME_BUSY.has(error?.code)) {
-        rmSync(temp, { force: true });
-        throw error;
-      }
-      pause(20);
-    }
+  try {
+    retryBusy(() => renameSync(temp, path));
+  } catch (error) {
+    rmSync(temp, { force: true });
+    throw error;
   }
 }
 
@@ -125,6 +149,17 @@ function readJson(path) {
     return JSON.parse(readFileSync(path, 'utf8'));
   } catch {
     return null;
+  }
+}
+
+/** Файл, который сейчас держит сосед: ни прочесть, ни счесть битым. */
+const BUSY = Symbol('busy');
+/** `readJson`, но занятый файл — `BUSY`, а не `null`: битым его считать нельзя. */
+function readEntry(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    return transient(error) ? BUSY : null;
   }
 }
 
@@ -222,14 +257,19 @@ function backgroundSpan(command, learned) {
   return Math.min(BACKGROUND_CAP_MS, Math.max(60_000, Math.round(Math.max(...known) * 1.25)));
 }
 
-/** Живые аренды; просроченные и битые убираются по пути. */
+/**
+ * Живые аренды; просроченные и битые убираются по пути. Занятая соседом —
+ * место на этот опрос держит: её как раз переписывают или отдают, и удалить её
+ * как битую значило бы пустить вторую команду рядом.
+ */
 function leases(dir, now) {
   const root = join(dir, 'leases');
   const out = [];
   for (const name of existsSync(root) ? readdirSync(root) : []) {
     if (!name.endsWith('.json')) continue;
-    const lease = readJson(join(root, name));
-    if (!lease || !(lease.until > now)) rmSync(join(root, name), { force: true });
+    const lease = readEntry(join(root, name));
+    if (lease === BUSY) out.push({ session: undefined, until: Number.NaN });
+    else if (!lease || !(lease.until > now)) dropFile(join(root, name));
     else out.push(lease);
   }
   return out;
@@ -246,9 +286,14 @@ function tickets(dir, now, maxAge) {
   const out = [];
   for (const name of existsSync(root) ? readdirSync(root).sort() : []) {
     if (!name.endsWith('.json')) continue;
-    const ticket = readJson(join(root, name));
+    const ticket = readEntry(join(root, name));
+    // Занятый билет стоит на своём месте: кто его держит, узнаем на следующем опросе.
+    if (ticket === BUSY) {
+      out.push({ name });
+      continue;
+    }
     const stale = !ticket || !alive(ticket.pid) || !(now - ticket.created <= maxAge);
-    if (stale) rmSync(join(root, name), { force: true });
+    if (stale) dropFile(join(root, name));
     else out.push({ ...ticket, name });
   }
   return out;
@@ -304,44 +349,65 @@ export async function acquire(dir, input, now = Date.now, learned = undefined, h
   // Команда — в билете: состояние очереди (`status`) показывает, кто чего ждёт.
   const command = shownCommand(input.tool_input?.command);
   const own = { pid: process.pid, session, created: start, command };
-  writeAtomic(ticketPath, own);
+  // Не записался сразу — запишет первый опрос (позиция −1 ниже).
+  try {
+    writeAtomic(ticketPath, own);
+  } catch (error) {
+    if (!transient(error)) throw error;
+  }
   // Свой билет живёт, пока ждём: срок — само ожидание с запасом на опрос.
   const maxAge = maxWait + poll * 2 + MARGIN_MS;
+  const patience = numberEnv('AGENTDECK_HEAVY_TRANSIENT_MS', TRANSIENT_DEFAULT_MS);
+  /** С какого опроса файлы заняты соседом подряд; `null` — последний прошёл. */
+  let troubledSince = null;
   try {
     for (;;) {
       const time = now();
-      // Билеты — раньше аренд: прошедший пишет аренду и лишь потом убирает билет.
-      // В обратном порядке чтения между ними он успевал и то и другое — аренды
-      // ещё нет, билета уже нет, и вторая команда шла рядом (ревью B2-F10).
-      const queue = tickets(dir, time, maxAge).filter(
-        (item) => item.session !== session || item.name === ticket,
-      );
-      const foreign = leases(dir, time).filter((lease) => lease.session !== session);
-      held.splice(0, held.length, ...foreign);
-      const busy = foreign.length;
-      const slots = slotsOf(dir);
-      const position = queue.findIndex((item) => item.name === ticket);
-      // Своего билета нет (его убрал чужой читатель) — вернуть на то же место и
-      // ждать дальше: позиция −1 прежде пускала команду вперёд очереди (ревью A2-F6).
-      if (position < 0) {
-        writeAtomic(ticketPath, own);
-      } else if (busy + position < slots) {
-        writeAtomic(join(dir, 'leases', `${id}.json`), {
-          session,
-          lane: laneOf(input),
-          toolUseId: input.tool_use_id ?? null,
-          foreground: !background,
-          since: time,
-          until: time + span,
-          command,
-        });
-        return time - start;
+      try {
+        // Билеты — раньше аренд: прошедший пишет аренду и лишь потом убирает билет.
+        // В обратном порядке чтения между ними он успевал и то и другое — аренды
+        // ещё нет, билета уже нет, и вторая команда шла рядом (ревью B2-F10).
+        const queue = tickets(dir, time, maxAge).filter(
+          (item) => item.session !== session || item.name === ticket,
+        );
+        const foreign = leases(dir, time).filter((lease) => lease.session !== session);
+        held.splice(0, held.length, ...foreign);
+        const busy = foreign.length;
+        const slots = slotsOf(dir);
+        const position = queue.findIndex((item) => item.name === ticket);
+        // Своего билета нет (его убрал чужой читатель) — вернуть на то же место и
+        // ждать дальше: позиция −1 прежде пускала команду вперёд очереди (ревью A2-F6).
+        if (position < 0) {
+          writeAtomic(ticketPath, own);
+        } else if (busy + position < slots) {
+          writeAtomic(join(dir, 'leases', `${id}.json`), {
+            session,
+            lane: laneOf(input),
+            toolUseId: input.tool_use_id ?? null,
+            foreground: !background,
+            since: time,
+            until: time + span,
+            command,
+          });
+          return time - start;
+        }
+        troubledSince = null;
+      } catch (error) {
+        // Занятый файл — переждать опрос, а не идти мимо очереди. Каталог, сломанный
+        // насовсем, держит не дольше `patience`: дальше обход с записью, как прежде.
+        if (!transient(error)) throw error;
+        troubledSince ??= time;
+        if (time - troubledSince >= patience) throw error;
       }
       if (time - start >= maxWait) return null;
       await sleep(poll);
     }
   } finally {
-    rmSync(ticketPath, { force: true });
+    try {
+      rmSync(ticketPath, { force: true });
+    } catch {
+      // Билет ушедшего уберёт следующий читатель: его процесса уже нет.
+    }
   }
 }
 
@@ -418,7 +484,8 @@ export function finish(dir, input, now = Date.now()) {
   const response = input.tool_response ?? {};
   const moved = !explicit && Boolean(response.backgroundTaskId);
   // Аренда — первой: всё ниже по возможности, и его сбой место держать не должен.
-  if (!explicit && !moved) rmSync(leasePath, { force: true });
+  // Занятую соседом — несколько попыток: иначе место держалось бы до её срока.
+  if (!explicit && !moved) retryBusy(() => rmSync(leasePath, { force: true }));
   const startPath = join(dir, 'starts', `${id}.json`);
   const stamp = readJson(startPath);
   try {

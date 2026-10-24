@@ -88,6 +88,39 @@ describe('goose acp: режим сессии под «Разрешить пра�
     });
   });
 
+  it('правки разрешены, но есть судья команд — approve, команда уходит судье, не «да» переключателя', async () => {
+    const judged: string[] = [];
+    let asked = 0;
+    const { opts, stderr } = options({
+      FAKE_GOOSE_MODE: 'auto',
+      FAKE_TOOL_COMMAND: 'git branch -D old',
+    });
+    const result = await new GooseAcpTurn().run(
+      {
+        ...opts,
+        permission: {
+          allowEdits: true,
+          ask: async () => (asked++, 'allow'),
+          judge: async (shell) => (
+            judged.push(`${shell.shell}:${shell.command}`),
+            { behavior: 'deny', message: 'нет' }
+          ),
+        },
+      },
+      () => {},
+    );
+    // Без approve Goose в auto не спросил бы вовсе — и судья не увидел бы `git branch -D`.
+    expect(stderr()).toContain('set_mode approve');
+    expect(judged).toEqual([
+      `${process.platform === 'win32' ? 'unknown' : 'bash'}:git branch -D old`,
+    ]);
+    expect(asked).toBe(0);
+    expect(result).toEqual({
+      kind: 'done',
+      reply: 'ответ на рос человека / разрешение: reject_once',
+    });
+  });
+
   it('режим сменить не удалось — ход не начинается (unavailable), без правок молча не бывает', async () => {
     const { opts } = options({ FAKE_GOOSE_MODE: 'auto', FAKE_SET_MODE: 'error' });
     const result = await new GooseAcpTurn().run(

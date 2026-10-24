@@ -238,10 +238,12 @@ describe('MrWatch: ветки ревьюера после «готово»', () 
     // Группа поработала и снова закрылась — ветка не решена, ответа нет.
     t.group().doneAt = '2026-09-24T19:00:00.000Z';
     t.watch.sync('parent');
+    // Ссылки переданного переживают круг: сито, сданное ходом позже, ещё принимается.
     expect(t.group().mrWatch).toMatchObject({
       cycle: '2026-09-24T19:00:00.000Z',
       checks: 0,
       relayed: ['d1:17928'],
+      relayedLinks: [`${MR}#note_17928`],
     });
     await t.fire();
     expect(t.resumed).toHaveLength(1);

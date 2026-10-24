@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   mkdirSync,
   mkdtempSync,
@@ -13,6 +13,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   CHECK_LEDGERS,
+  MAX_WAIT_MS,
+  QUIET_MS,
   SourceWatcher,
   busyRun,
   isWatched,
@@ -134,6 +136,63 @@ describe('dev-сторож сервера', () => {
     expect(splitSetupRunning(plan(setup), now + 60 * 60_000)).toBe(false);
     expect(splitSetupRunning({}, now)).toBe(false);
     expect(splitSetupRunning(null, now)).toBe(false);
+  });
+});
+
+// 25.10: пауза в 300 мс давала перезапуск на каждое сохранение агента (897 за 23.10). Время подделано,
+// файлы и их отпечатки — настоящие; `touched` зовётся прямо, как его зовёт `fs.watch`.
+describe('пачка правок ждёт тишины, но не дольше предела', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function saves(quietMs: number, maxWaitMs: number, everyMs: number, count: number): number {
+    dir = mkdtempSync(join(tmpdir(), 'dev-watch-'));
+    const file = join(dir, 'brand.mjs');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const batches: string[][] = [];
+    watcher = new SourceWatcher([dir], (files) => batches.push(files), quietMs, maxWaitMs);
+    for (let i = 0; i < count; i += 1) {
+      if (i > 0) vi.advanceTimersByTime(everyMs);
+      // Размер растёт — отпечаток меняется при любой точности времени записи.
+      writeFileSync(file, `export const x = '${'x'.repeat(i)}';\n`);
+      watcher.touched(file);
+    }
+    vi.advanceTimersByTime(quietMs + maxWaitMs);
+    expect(batches.every((batch) => batch.length === 1 && batch[0] === file)).toBe(true);
+    // Вызов не последний в тесте — убирает за собой сам.
+    watcher.close();
+    watcher = undefined;
+    vi.useRealTimers();
+    rmSync(dir, { recursive: true, force: true });
+    return batches.length;
+  }
+
+  it('сохранения раз в 12 с — один перезапуск после тишины, а не десять', () => {
+    expect(saves(QUIET_MS, MAX_WAIT_MS, 12_000, 10)).toBe(1);
+    // Прежняя пауза на тех же сохранениях.
+    expect(saves(300, MAX_WAIT_MS, 12_000, 10)).toBe(10);
+  });
+
+  it('правки без перерыва 10 минут — перезапуск по пределу, раз в 5 минут', () => {
+    expect(saves(QUIET_MS, MAX_WAIT_MS, 10_000, 60)).toBe(2);
+  });
+
+  it('просьба о перезапуске закрывает ждущую пачку сразу', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dev-watch-'));
+    const file = join(dir, 'brand.mjs');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const batches: string[][] = [];
+    watcher = new SourceWatcher([dir], (files) => batches.push(files));
+    expect(watcher.waiting()).toBe(false);
+    writeFileSync(file, 'export const x = 1;\n');
+    watcher.touched(file);
+    expect(watcher.waiting()).toBe(true);
+    watcher.flushNow();
+    expect(batches).toEqual([[file]]);
+    expect(watcher.waiting()).toBe(false);
+    vi.advanceTimersByTime(QUIET_MS + MAX_WAIT_MS);
+    expect(batches).toHaveLength(1);
   });
 });
 

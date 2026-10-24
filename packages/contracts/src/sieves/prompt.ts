@@ -147,14 +147,23 @@ export function sievePromptBlock(input: {
     lines.push(
       'A row counts for the code it was written on: change that code afterwards and the sieve ' +
         'must be reported again.',
-      `Report at the end of the answer in a code block in the language ${SIEVE_LANG}: ` +
-        '{"sieves":[{"id":"<sieve id>","status":"pass|fail|n/a","evidence":"command and the line ' +
-        'of its output, or why it does not apply"}]} — one row per numbered sieve, plus a row ' +
-        'for any panel check you clear by naming its files.',
+      `${SIEVE_REPORT_LINE} — one row per numbered sieve, plus a row for any panel check you ` +
+        'clear by naming its files.',
     );
   }
   return lines.join('\n');
 }
+
+/**
+ * Формат сдачи строк — один текст для задания звена и напоминания доставки:
+ * группа 24.10 ответила на семь строк напоминания прозой («Ответы по строкам
+ * панели»), блока не было, и следующий круг принёс те же семь пробелов.
+ */
+export const SIEVE_REPORT_LINE =
+  `Report at the end of the answer in a code block in the language ${SIEVE_LANG}: ` +
+  '{"sieves":[{"id":"<sieve id>","status":"pass|fail|n/a","evidence":"command and the line of ' +
+  'its output, or why it does not apply"}]}. The panel reads only this block: a row written ' +
+  'as prose is not reported';
 
 /**
  * Хвост задания по MR-тредам: как разложить каждый тред в сито. Ссылку треда

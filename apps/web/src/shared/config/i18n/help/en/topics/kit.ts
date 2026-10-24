@@ -105,11 +105,39 @@ export const kitEn: typeof kitRu = {
       'skills, and in a one-off launch (codex exec) it gets them as a «name — description — ' +
       'path to SKILL.md» list in the same instructions; on a local model, or when the list does not fit the limit, its descriptions are cut to 240 characters, and if it still does not fit only names and paths remain. Pipelines and subagents do ' +
       'not: Codex cannot take them for one launch. Hooks neither: Codex runs a hook only after ' +
-      'it is approved in Codex itself. The panel does not touch `~/.codex`.',
+      'it is approved in Codex itself, so they cannot be attached for a launch — the hooks variant is ' +
+      'installed by hand, see the section below. The panel does not touch `~/.codex`.',
     cliOther: 'The rest',
     cliOtherText:
       'They do not get the kit — the page names them and the reason: no way to attach it for one ' +
-      'launch, or the CLI is not installed. The panel does not write into their folders.',
+      'launch, or the CLI is not installed. The panel does not write into their folders. The kit ' +
+      'hooks can be installed into some of them by hand — see the section below.',
+
+    hooksTitle: 'Kit hooks in other CLIs',
+    hooksCaption:
+      'The economy and guard hooks are the same for every CLI: the kit dispatcher judges each call, and ' +
+      'the answer goes back in the form this CLI reads. Where they act is shown on the «Who gets the ' +
+      'kit» card, in the «Where the kit hooks act» line.',
+    hooksHeader: 'How they arrive',
+    hooksWhat: 'CLI and what to do',
+    hooksRun: 'On every launch',
+    hooksRunText:
+      'Claude Code and Qwen Code (on a local model, «Panel kit only»): the panel attaches the hooks ' +
+      'itself, nothing to do.',
+    hooksVariant: 'A variant you install',
+    hooksVariantText:
+      'Codex, Gemini CLI, Goose, Kimi Code, OpenCode. They cannot take hooks for one launch, so you ' +
+      'install the variant from `apps/server/assets/kit/variants/<cli>` yourself, following the README ' +
+      'beside it: Gemini CLI — as an extension in `~/.gemini/extensions`, Goose — as a plugin in ' +
+      '`.agents/plugins`, Kimi Code — as a `[[hooks]]` block in `config.toml` with the path to a kit ' +
+      'copy, OpenCode — as a plugin file in `~/.config/opencode/plugins` plus the `AGENTDECK_KIT_DIR` ' +
+      'variable. These CLIs have no «ask you» answer: such a call is refused with a request to ask in ' +
+      'the chat first. OpenCode has no end-of-turn check — its turn-end event cannot hold a turn. Goose ' +
+      'on Windows calls hooks through `sh`: Git for Windows must be on PATH.',
+    hooksNone: 'Do not act',
+    hooksNoneText:
+      'Continue — `cn` has a hook format, but release 1.5.47 never calls it (checked by a run); ' +
+      'Cursor — the panel does not launch it; Aider — it has no tool calls, nothing to intercept.',
 
     globalTitle: 'Checking against the global layer',
     globalCaption: 'Every row shows how it relates to the same-named item in `~/.claude`.',

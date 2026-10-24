@@ -38,6 +38,10 @@ vi.mock('../../api/client', () => ({
 vi.mock('../../api/authHeaders', () => ({
   authHeaders: () => ({}),
 }));
+vi.mock('../../api/signing/keyStore', () => ({
+  loadKey: async () => undefined,
+  freshNonce: () => 'nonce',
+}));
 vi.mock('../../config/i18n', () => ({
   dict: () => ({
     api: { tokenRejected: 'token rejected' },

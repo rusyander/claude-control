@@ -77,6 +77,8 @@ import { registerMediaRoutes } from '../routes/media-routes/media-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
+import { phoneSigningGateFor } from '../routes/phone-signing-routes/phone-signing-gate.ts';
+import { registerPhoneSigningRoutes } from '../routes/phone-signing-routes/phone-signing-routes.ts';
 import { registerPowerRoutes } from '../routes/power-routes.ts';
 import { registerMobileApkRoutes } from '../routes/mobile-apk-routes/mobile-apk-routes.ts';
 import { registerChangelogRoutes } from '../routes/changelog-routes/changelog-routes.ts';
@@ -144,6 +146,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Первым: ворота «только человек» на каждый маршрут `human:*` журнала
     // возможностей ставит хук `onRoute`, а он видит лишь маршруты после себя.
     gateHumanRoutesFor,
+    // Вторым: подпись телефона на маршрутах решений встаёт ПОСЛЕ ворот человека.
+    phoneSigningGateFor(chatRuns, chatSession),
     registerConfigRoutes,
     registerEnvTransferRoutes,
     registerEntityRoutes,
@@ -342,6 +346,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         },
       ),
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
+    registerPhoneSigningRoutes,
     // Гибернация и сон машины с телефона; запрет на сон от локального прогона снимается перед сном.
     (instance) =>
       registerPowerRoutes(instance, {

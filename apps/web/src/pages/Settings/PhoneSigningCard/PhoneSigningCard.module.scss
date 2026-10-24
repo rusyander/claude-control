@@ -1,0 +1,42 @@
+/**
+ * Карточка подписи решений. Нестандартны две вещи: отпечаток ключа набран
+ * моноширинным (его сверяют с телефоном группа за группой) и блок
+ * восстановления — режим без телефонов выключается только удалением файла.
+ */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) 0;
+}
+
+.deviceText {
+  min-width: 0;
+}
+
+.revoked {
+  text-decoration: line-through;
+}
+
+.fingerprint,
+.path {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  word-break: break-all;
+}
+
+.recovery {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+}

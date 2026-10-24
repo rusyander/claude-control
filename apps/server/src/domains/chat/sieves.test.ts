@@ -173,6 +173,27 @@ describe('блок отчёта о ситах', () => {
     expect(merged.find((row) => row.id === 's0')).toMatchObject({ evidence: 'fresh' });
     expect(merged.some((row) => row.id === 's1')).toBe(false);
   });
+
+  // Живая группа !1072 (24.10): снимок отчёта в звене цепочки (23.10) ложился
+  // поверх строк, сданных группой сегодня, и судья читал их «устаревшими».
+  it('строка старше уже записанной её не затирает; без штампа — как раньше', () => {
+    const fresh = {
+      id: 'a',
+      status: 'pass' as const,
+      evidence: 'today',
+      at: '2026-10-24T17:41:46Z',
+    };
+    const old = {
+      id: 'a',
+      status: 'pass' as const,
+      evidence: 'yesterday',
+      at: '2026-10-23T05:38:47Z',
+    };
+    expect(mergeSieveRows([fresh], [old])).toEqual([fresh]);
+    expect(mergeSieveRows([old], [fresh])).toEqual([fresh]);
+    const unstamped = { id: 'a', status: 'fail' as const, evidence: 'no stamp' };
+    expect(mergeSieveRows([fresh], [unstamped])).toEqual([unstamped]);
+  });
 });
 
 describe('судья сит перед «доставлено»', () => {

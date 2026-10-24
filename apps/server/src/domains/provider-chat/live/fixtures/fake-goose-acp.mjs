@@ -156,7 +156,14 @@ async function runTurn(promptId, prompt) {
   if (mode === 'permission' || (mode === 'tool' && sessionMode === 'approve')) {
     const result = await ask('session/request_permission', {
       sessionId: 'ses-1',
-      toolCall: { toolCallId: 'call-1' },
+      // FAKE_TOOL_COMMAND — инструмент оболочки, как его шлёт goose 1.54 (живая проба 24.10).
+      toolCall: process.env.FAKE_TOOL_COMMAND
+        ? {
+            toolCallId: 'call-1',
+            title: `shell · ${process.env.FAKE_TOOL_COMMAND}`,
+            rawInput: { command: process.env.FAKE_TOOL_COMMAND },
+          }
+        : { toolCallId: 'call-1' },
       options: [
         { optionId: 'allow_once', kind: 'allow_once', name: 'Allow' },
         { optionId: 'reject_once', kind: 'reject_once', name: 'Reject' },

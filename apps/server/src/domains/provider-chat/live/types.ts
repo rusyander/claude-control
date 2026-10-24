@@ -64,13 +64,46 @@ export interface LivePermissionAsk {
   readonly tool?: string;
   /** Короткое описание действия, если CLI его дал. */
   readonly title?: string;
+  /** Просьба о команде оболочки — сама команда, снятая с провода (`shell-ask.ts`). */
+  readonly shell?: LiveShellCall;
+  /** pid процесса CLI этого хода — корень живого дерева для суда погашения группы. */
+  readonly pid?: number;
 }
+
+/**
+ * Команда оболочки из просьбы CLI. `shell` — чем CLI её исполнит; `unknown` —
+ * провод не говорит (qwen на Windows: Git Bash или cmd), и судья читает строку
+ * и как Bash, и как PowerShell.
+ */
+export interface LiveShellCall {
+  readonly command: string;
+  readonly shell: 'powershell' | 'bash' | 'cmd' | 'unknown';
+  /** Каталог оболочки, если CLI его назвал. */
+  readonly cwd?: string;
+}
+
+/** Решение судьи команд: `human` — вопрос человеку (`ask`), как без судьи. */
+export type LiveShellJudgement =
+  | { readonly behavior: 'allow' }
+  | { readonly behavior: 'deny'; readonly message?: string }
+  | { readonly behavior: 'human' };
 
 export interface LivePermissionPolicy {
   /** Переключатель «Разрешить правки» чата: включён — CLI правит без вопроса. */
   readonly allowEdits: boolean;
   /** Вопрос человеку; без него при выключенных правках — отказ. */
   readonly ask?: (request: LivePermissionAsk) => Promise<'allow' | 'deny'>;
+  /**
+   * Судья команд оболочки (P-01..P-05): та же граница, что у брокера Claude.
+   * Есть он и в просьбе есть `shell` — решает он раньше переключателя.
+   */
+  readonly judge?: (shell: LiveShellCall, pid?: number) => Promise<LiveShellJudgement>;
+  /**
+   * Отказ судьи с причиной — модели и человеку (best effort: CLI без канала
+   * причину не увидит). Ответ CLI ждёт его конца: Codex кладёт вставку в
+   * следующий же запрос модели, только если она пришла раньше отказа.
+   */
+  readonly onRefusal?: (message: string, shell: LiveShellCall) => void | Promise<void>;
 }
 
 /**

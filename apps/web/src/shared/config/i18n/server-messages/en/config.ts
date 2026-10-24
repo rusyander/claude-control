@@ -385,6 +385,8 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'group-layer-notice-delivered': 'Delivered to the run as a layer — {{members}}.',
   'group-layer-notice-nothing': 'No member reached the run.',
   'group-layer-notice-refused': 'Not delivered:',
+  'foreign-shell-denied':
+    'The panel refused the command `{{command}}`. The agent was told: {{reason}}',
   'group-layer-kind-rule': 'rules: {{names}}',
   'group-layer-kind-skill': 'skills: {{names}}',
   'group-layer-kind-mcp': 'MCP: {{names}}',

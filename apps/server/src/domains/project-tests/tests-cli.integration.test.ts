@@ -825,6 +825,35 @@ describe('tests-cli run: кейсы vitest мимо своей команды Go
     expect(status('suites-chat')).toBe('failed');
   }, 150_000);
 
+  // Набор корня пакета (`file: 'admin/'`, ключ `.`) владеет только файлами самого корня:
+  // фильтр-каталог vitest рекурсивен, и такой кейс гнал весь пакет — inst-docs-ui упирался
+  // в предел 10 мин ради пяти проверок одного файла (24.10.2026).
+  it('набор корня пакета гонит файлы корня, а не весь пакет', () => {
+    writeFileSync(
+      join(project, 'admin', 'root.test.ts'),
+      `import { it, expect } from 'vitest';\nit('корень', () => expect(1).toBe(1));\n`,
+    );
+    writeFileSync(
+      join(project, 'admin', 'src', 'boom.test.ts'),
+      `import { it, expect } from 'vitest';\nit('чужой набор', () => expect(1).toBe(2));\n`,
+    );
+    writeGroup(project, {
+      ...createGroup(project, 'root', 'root'),
+      cases: [
+        {
+          id: 'root-001',
+          title: 'admin: корень',
+          automation: { status: 'automated', file: 'admin/', suite: '.' },
+        },
+      ].flatMap((raw, index) => parseCase(raw, index) ?? []),
+    });
+    const result = run('root');
+    expect(result.out).toMatch(/Команда: .*--root .*admin.* root\.test\.ts\s*$/m);
+    expect(result.out).not.toContain('чужой набор');
+    expect(result.code).toBe(0);
+    expect(status('root-001')).toBe('passed');
+  }, 150_000);
+
   it('своя команда JUnit — по-прежнему она, даже для файлов vitest', () => {
     writeFileSync(
       join(project, '.agent', 'tests', 'automation.json'),

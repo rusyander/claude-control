@@ -6,6 +6,7 @@ import {
   type KitTwinKind,
   type KitItem,
   type KitItemContent,
+  type KitHooksReach,
   type KitItemKind,
   type KitProviderView,
   type KitResponse,
@@ -86,6 +87,26 @@ const SUPPORT: Record<string, { modes: KitMode[]; localOnly?: boolean; carries?:
     // хук без одобрения в `/hooks` самого Codex не сработает.
     codex: { modes: ['global', 'hybrid'], carries: ['rule', 'skill'] },
   };
+
+/**
+ * Куда доходят хуки набора (экономия и охрана). На запуск — только Claude и Qwen Code
+ * («Наши» на контуре локальной модели). Codex, Gemini CLI, Goose, Kimi Code и OpenCode — вариант
+ * руками (`assets/kit/variants/<cli>/`): слоя на один запуск у них нет, у Codex хук ещё и ждёт
+ * одобрения в `/hooks`, а `opencode serve` панели общий на все разговоры. Continue — формат есть,
+ * выпуск `cn` 1.5.47 хуки не зовёт (`tools/qa/check-kit-variant-live.mjs continue`).
+ */
+const HOOKS: Record<string, KitHooksReach> = {
+  claude: 'run',
+  qwen: 'run',
+  codex: 'variant',
+  gemini: 'variant',
+  goose: 'variant',
+  kimi: 'variant',
+  opencode: 'variant',
+  continue: 'never-fire',
+  cursor: 'not-runnable',
+  aider: 'no-tool-loop',
+};
 
 /** Каталоги и файлы, по которым видно, что человек настроил CLI сам. */
 const OWN_LAYER_DIRS = ['skills', 'commands', 'agents', 'prompts'];
@@ -297,6 +318,7 @@ export class KitService {
         ...(support ? {} : { reason: 'no-run-layer' as const }),
         ...(support?.localOnly ? { localOnly: true } : {}),
         ...(support?.carries ? { carries: support.carries } : {}),
+        ...(HOOKS[id] ? { hooks: HOOKS[id] } : {}),
       };
     });
     return {

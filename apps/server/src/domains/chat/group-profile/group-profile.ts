@@ -689,6 +689,7 @@ export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
     env: {
       ...(connectors ? {} : { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' }),
       [TESTS_RUNS_AT_DELIVERY_ENV]: '1',
+      ...(input.processMark ? { [input.processMark]: '1' } : {}),
       ...(input.stage ? { [GROUP_STAGE_ENV]: input.stage } : {}),
       ...(input.ahead?.deliver ? { [GROUP_DELIVER_AHEAD_ENV]: '1' } : {}),
       ...(input.compactWindow ? { [COMPACT_WINDOW_ENV]: String(input.compactWindow) } : {}),

@@ -42,8 +42,19 @@ export declare function ledgerBusy(
 /** Группа разделения готовит копию (стартовала, чата нет, моложе получаса). */
 export declare function splitSetupRunning(state: unknown, now: number): boolean;
 
+export declare const QUIET_MS: number;
+export declare const MAX_WAIT_MS: number;
+
 export declare class SourceWatcher {
-  constructor(roots: string[], onChange: (files: string[]) => void, debounceMs?: number);
+  constructor(
+    roots: string[],
+    onChange: (files: string[]) => void,
+    quietMs?: number,
+    maxWaitMs?: number,
+  );
   start(): this;
   close(): void;
+  touched(path: string): void;
+  waiting(): boolean;
+  flushNow(): void;
 }

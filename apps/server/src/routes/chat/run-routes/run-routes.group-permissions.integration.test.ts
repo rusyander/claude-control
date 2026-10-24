@@ -250,6 +250,29 @@ describe('маршрут прав: строки вкладки «Группы»'
     }
     expect(await ask(GROUP, 'git commit -m "группа"')).toBe('allow');
     expect(await ask(GROUP, "bash -c 'pnpm build'")).toBe('allow');
+    // Инструмент PowerShell — тот же рубеж (R3): раньше проверка смотрела только Bash.
+    for (const command of [
+      'git push origin feature/a',
+      '& git push origin feature/a',
+      'git.exe push origin feature/a',
+      "Start-Process git -ArgumentList 'push','origin','feature/a'",
+      'gh pr create --fill',
+    ]) {
+      expect(`PS ${command} → ${await ask(GROUP, command, 'PowerShell')}`).toBe(
+        `PS ${command} → deny`,
+      );
+      expect(lastMessage).toBe(PUBLISH_BEFORE_DELIVERY_DENIED);
+    }
+    expect(await ask(GROUP, 'git commit -m "группа"', 'PowerShell')).toBe('allow');
+  });
+
+  it('инструмент PowerShell: `git send-pack` группе — отказ, как в Bash (R2)', async () => {
+    for (const command of ['git send-pack origin main', 'git send-pack origin feature/a']) {
+      expect(`PS ${command} → ${await ask(GROUP, command, 'PowerShell')}`).toBe(
+        `PS ${command} → deny`,
+      );
+      expect(lastMessage).toBe(SEND_PACK_DENIED);
+    }
   });
 
   it('звено доставки пушит свою ветку, но не `git send-pack` (RF-BGCD-07)', async () => {

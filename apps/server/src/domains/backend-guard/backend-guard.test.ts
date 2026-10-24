@@ -209,6 +209,15 @@ describe('настройки и брокер', () => {
     expect(guardHitFor(sub, 'Edit', { file_path: 'drop table.sql' })).toBeUndefined();
   });
 
+  /** R4: инструмент PowerShell (и оболочка чужого CLI) — те же слова защиты, что у Bash. */
+  it('инструмент PowerShell судится как Bash', () => {
+    installGuard(deps(), project, SETTINGS);
+    expect(guardHitFor(project, 'PowerShell', { command: 'terraform destroy' })?.rule).toBe(
+      'infra-change',
+    );
+    expect(guardHitFor(project, 'PowerShell', { command: 'Get-ChildItem' })).toBeUndefined();
+  });
+
   it('копия ветки без .claude — настройки основной копии', () => {
     installGuard(deps(), project, SETTINGS);
     const copy = join(root, 'shop-worktrees', 'feature');

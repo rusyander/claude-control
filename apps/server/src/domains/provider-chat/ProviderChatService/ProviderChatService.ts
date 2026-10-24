@@ -36,7 +36,24 @@ import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { ForeignSendQueue } from '../queue.ts';
 import { markProviderTurn } from '../turn-ledger.ts';
 import type { GroupLayerHook } from '../../groups/run-layer/run-layer.types.ts';
-import type { LivePermissionAsk, LivePermissionPolicy } from '../live/types.ts';
+import type {
+  LivePermissionAsk,
+  LivePermissionPolicy,
+  LiveShellCall,
+  LiveShellJudgement,
+} from '../live/types.ts';
+
+/** Суд одной команды оболочки разговора — подаёт сборка (`runtime.ts`). */
+export type ShellJudge = (call: {
+  providerId: string;
+  chatId: string;
+  workdir: string | undefined;
+  allowEdits: boolean;
+  title?: string;
+  /** pid процесса CLI хода — корень дерева для суда погашения группы (P-06). */
+  pid?: number;
+  shell: LiveShellCall;
+}) => Promise<LiveShellJudgement>;
 import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
 import type {
   ColdPlan,
@@ -193,6 +210,9 @@ export function withWorkspaceNote(content: string, note: string): string {
 
 /** След остановленного прогона, который не успел ответить ни словом. */
 const STOPPED_TEXT = serverText('chat-run-stopped-no-answer');
+
+/** Сколько ответ CLI на отказ судьи ждёт доставки причины модели (`tellRefusal`). */
+const REFUSAL_STEER_MS = 5000;
 
 /** Разговор, у которого закончился ответ, — то, что видит слушатель. */
 export interface ProviderChatFinished {
@@ -485,6 +505,50 @@ export class ProviderChatService {
   }
 
   private childRunOf?: (providerId: string, chatId: string) => ChildRun | undefined;
+
+  /**
+   * Судья команд оболочки чужого CLI (`domains/chat/foreign-shell-judge`): группа —
+   * строки вкладки «Группы» и D-n, одиночный чат — авторежим при включённых
+   * правках. Не задан — как раньше: переключатель и карточка.
+   */
+  setShellJudge(judge: ShellJudge): void {
+    this.shellJudgeOf = judge;
+  }
+
+  private shellJudgeOf?: ShellJudge;
+
+  /**
+   * Отказ судьи с причиной: агенту — вставкой в идущий ход ДО ответа CLI (Codex
+   * кладёт её в следующий же запрос модели, иначе модель видит лишь «rejected by
+   * user» и повторяет команду), человеку — заметкой в переписке. Вставка, что не
+   * доехала за `REFUSAL_STEER_MS`, ответ не держит: CLI ждёт его.
+   */
+  private async tellRefusal(
+    appDataDir: string,
+    providerId: string,
+    chatId: string,
+    live: LiveRun,
+    reason: string,
+    shell: LiveShellCall,
+  ): Promise<void> {
+    if (live.isRunning && !live.stopped && live.run.steer) {
+      await Promise.race([
+        live.run.steer(`[agentdeck] ${reason}`).catch(() => false),
+        new Promise((done) => setTimeout(done, REFUSAL_STEER_MS).unref?.()),
+      ]);
+    }
+    try {
+      appendMessage(appDataDir, providerId, chatId, {
+        role: 'notice',
+        content: serverText('foreign-shell-denied', {
+          command: shell.command.slice(0, 300),
+          reason,
+        }),
+      });
+    } catch {
+      // Заметка — не часть решения: её сбой отказ не отменяет.
+    }
+  }
 
   /**
    * Строка о каталоге разговора (тесты проекта, папка e2e) — той же функцией,
@@ -870,9 +934,29 @@ export class ProviderChatService {
     // «Разрешить правки» — из шапки разговора на КАЖДОМ сообщении: переключатель,
     // сдвинутый между ходами, действует со следующего. Нет поля (разговор старше
     // переключателя) — вопрос человеку, а не молчаливое «да» и не отказ всем.
+    // Команды оболочки судит судья (P-01..P-05) — та же граница, что у брокера
+    // Claude; его отказ с причиной едет модели входом посреди хода до ответа CLI
+    // (best effort) и заметкой человеку (`tellRefusal`).
+    const shellJudge = this.shellJudgeOf;
     const permission: LivePermissionPolicy = {
       allowEdits: chat.allowEdits === true,
       ask: (request) => this.askHuman(chatId, live, request, chat.workdir),
+      ...(shellJudge
+        ? {
+            judge: (shell: LiveShellCall, pid?: number) =>
+              shellJudge({
+                providerId,
+                chatId,
+                workdir: chat.workdir,
+                allowEdits: chat.allowEdits === true,
+                ...(chat.title ? { title: chat.title } : {}),
+                ...(pid ? { pid } : {}),
+                shell,
+              }),
+            onRefusal: (reason: string, shell: LiveShellCall) =>
+              this.tellRefusal(appDataDir, providerId, chatId, live, reason, shell),
+          }
+        : {}),
     };
 
     // Окружение ребёнка разделения — первым: контур и слой группы сильнее.

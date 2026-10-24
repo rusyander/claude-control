@@ -11,7 +11,8 @@ import type {
   ProviderChatRunLike,
   ProviderChatRunOptions,
 } from '../ProviderChatRun/ProviderChatRun.ts';
-import { createChat, patchChat } from '../store/store.ts';
+import { createChat, patchChat, readChat } from '../store/store.ts';
+import { decidePermission } from '../live/permission.ts';
 
 /**
  * «Разрешить правки» и вопрос человеку у чата чужого CLI: служба отдаёт прогону
@@ -116,6 +117,114 @@ describe('ProviderChatService: права хода и вопрос челове�
     // Ход снят — новая просьба сразу получает отказ, человеку её не показывают.
     await expect(ask()).resolves.toBe('deny');
     expect(service.status('chat').permissions).toBeUndefined();
+  });
+
+  it('судья команд (P-01..P-05): получает разговор и команду; отказ с причиной уходит модели, карточки нет', async () => {
+    const calls: unknown[] = [];
+    const steered: string[] = [];
+    (run as FakeRun & { steer: (text: string) => Promise<boolean> }).steer = async (text) => {
+      steered.push(text);
+      return true;
+    };
+    service.setShellJudge(async (call) => {
+      calls.push(call);
+      return call.shell.command.startsWith('git branch -D')
+        ? { behavior: 'deny', message: 'D-1 ждёт человека' }
+        : { behavior: 'allow' };
+    });
+    patchChat(dir, 'qwen', 'chat', { allowEdits: true });
+    send();
+    const judge = run.options!.permission!.judge!;
+    expect(typeof run.options?.permission?.onRefusal).toBe('function');
+    const shellAsk = (command: string) =>
+      decidePermission(run.options!.permission, {
+        cli: 'qwen',
+        requestId: 'r1',
+        tool: 'execute',
+        shell: { command, shell: 'bash' },
+      });
+    await expect(shellAsk('git branch -D old')).resolves.toBe('deny');
+    await expect(shellAsk('pnpm build')).resolves.toBe('allow');
+    expect(calls[0]).toEqual({
+      providerId: 'qwen',
+      chatId: 'chat',
+      workdir: dir,
+      allowEdits: true,
+      title: 'Новый разговор',
+      shell: { command: 'git branch -D old', shell: 'bash' },
+    });
+    expect(steered).toEqual(['[agentdeck] D-1 ждёт человека']);
+    expect(service.status('chat').permissions).toBeUndefined();
+    expect(judge).toBeDefined();
+  });
+
+  /**
+   * Отказ судьи — ДО ответа CLI (Codex кладёт вставку в следующий же запрос
+   * модели, только если она пришла раньше отказа; иначе модель видит лишь
+   * «rejected by user»), заметкой человеку в переписке; pid CLI доходит до судьи.
+   */
+  it('отказ судьи: вставка в ход дождана до ответа, заметка в переписке, pid CLI у судьи', async () => {
+    const order: string[] = [];
+    const calls: unknown[] = [];
+    let release: () => void = () => undefined;
+    (run as FakeRun & { steer: (text: string) => Promise<boolean> }).steer = (text) =>
+      new Promise<boolean>((done) => {
+        order.push(`steer: ${text}`);
+        release = () => {
+          order.push('steer delivered');
+          done(true);
+        };
+      });
+    service.setShellJudge(async (call) => {
+      calls.push(call);
+      return { behavior: 'deny', message: 'D-1 ждёт человека' };
+    });
+    patchChat(dir, 'qwen', 'chat', { allowEdits: true });
+    send();
+    const decision = decidePermission(run.options!.permission, {
+      cli: 'qwen',
+      requestId: 'r7',
+      tool: 'execute',
+      pid: 4242,
+      shell: { command: 'git branch -D x', shell: 'unknown' },
+    }).then((answer) => (order.push(`answer: ${answer}`), answer));
+    await new Promise((done) => setTimeout(done, 20));
+    // Вставка ещё в пути — CLI ответа не получил.
+    expect(order).toEqual(['steer: [agentdeck] D-1 ждёт человека']);
+    release();
+    await expect(decision).resolves.toBe('deny');
+    expect(order).toEqual([
+      'steer: [agentdeck] D-1 ждёт человека',
+      'steer delivered',
+      'answer: deny',
+    ]);
+    expect(calls[0]).toMatchObject({ pid: 4242, shell: { command: 'git branch -D x' } });
+    const notice = readChat(dir, 'qwen', 'chat')?.messages.at(-1);
+    expect(notice?.role).toBe('notice');
+    expect(notice?.content).toContain('git branch -D x');
+    expect(notice?.content).toContain('D-1 ждёт человека');
+  });
+
+  it('судья ответил «человеку» — карточка, как без судьи; судья упал — тоже карточка, не «да»', async () => {
+    service.setShellJudge(async (call) => {
+      if (call.shell.command === 'boom') throw new Error('сломан');
+      return { behavior: 'human' };
+    });
+    patchChat(dir, 'qwen', 'chat', { allowEdits: true });
+    send();
+    for (const command of ['git merge feat/x', 'boom']) {
+      const decision = decidePermission(run.options!.permission, {
+        cli: 'qwen',
+        requestId: `r-${command}`,
+        tool: 'execute',
+        shell: { command, shell: 'bash' },
+      });
+      await new Promise((done) => setTimeout(done, 20));
+      const pending = service.status('chat').permissions;
+      expect(pending, command).toHaveLength(1);
+      service.answerPermission('chat', pending![0]!.id, 'deny');
+      await expect(decision).resolves.toBe('deny');
+    }
   });
 
   it('ответ пришёл — ждущая просьба отклонена, карточки больше нет', async () => {

@@ -65,16 +65,27 @@ function prune(root: string): void {
  * идентификатор прогона: список отдаёт записи под их `id`, а имя файла сделано
  * хронологическим ради сортировки — принимать только его значило бы, что
  * открыть прогон из истории нельзя.
+ *
+ * И короткий номер — начало `id` не короче восьми знаков, без учёта регистра:
+ * им прогон называют отчёты, CLI и строки сит (`run:2c80ca0e`). Без него
+ * записанный прогон считался отсутствующим, и группа сутки стояла на доставке
+ * (24.10). Начало, подходящее к двум прогонам, не читается: угадывать нельзя.
  */
 export function readRun(root: string, id: string): ProjectTestRunRecord | undefined {
   const direct = parseRun(readJson(root, `${RUNS_DIR}/${id}${SUFFIX}`).data, id);
   if (direct) return direct;
+  const prefix = id.length >= SHORT_ID_MIN ? id.toLowerCase() : undefined;
+  const byPrefix: ProjectTestRunRecord[] = [];
   for (const fileId of listFiles(root, RUNS_DIR, SUFFIX).reverse()) {
     const record = parseRun(readJson(root, `${RUNS_DIR}/${fileId}${SUFFIX}`).data, fileId);
     if (record?.id === id) return record;
+    if (prefix && record?.id.toLowerCase().startsWith(prefix)) byPrefix.push(record);
   }
-  return undefined;
+  return byPrefix.length === 1 ? byPrefix[0] : undefined;
 }
+
+/** Короче восьми знаков номер прогона не принимается: так его печатает сама история. */
+const SHORT_ID_MIN = 8;
 
 /** Прогоны от новых к старым. */
 export function readRuns(root: string, limit = 50): ProjectTestRunRecord[] {

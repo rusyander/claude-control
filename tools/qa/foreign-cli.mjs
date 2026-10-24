@@ -54,12 +54,17 @@ const long = (path) => {
  * Там признак — путь CLI (как вызвали и настоящий) и каталог его пакета npm.
  */
 export function cliNeedles(dir, name, homes = []) {
-  const own = homes.flatMap((home) => [home, long(home)]).map((home) => ({ within: norm(home) }));
+  const own = homeNeedles(homes);
   if (IS_WIN) return [{ within: norm(dir) }, ...own];
   const entry = join(dir, name);
   const real = norm(long(entry));
   const pkg = /^(.*\/node_modules\/(?:@[^/]+\/)?[^/]+)\//.exec(real)?.[1];
   return [{ path: norm(entry) }, { path: real }, ...(pkg ? [{ path: pkg }] : []), ...own];
+}
+
+/** Признаки временных домов прогона — их до прогона не было, путь у прогона свой. */
+function homeNeedles(homes) {
+  return homes.flatMap((home) => [home, long(home)]).map((home) => ({ within: norm(home) }));
 }
 
 /** Подходит ли командная строка под один из признаков. */
@@ -105,13 +110,113 @@ export function cliProcesses(dir, name, homes = []) {
 }
 
 /**
+ * Таблица процессов: родитель, старт (мс, 0 — неизвестен) и командная строка.
+ * Старт отличает настоящего родителя от процесса, получившего его номер позже.
+ */
+function processTable() {
+  try {
+    const rows = IS_WIN
+      ? execFileSync(
+          'powershell',
+          [
+            '-NoProfile',
+            '-Command',
+            'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)`t$($_.ParentProcessId)`t$(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { 0 })`t$($_.CommandLine)" }',
+          ],
+          { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+        )
+      : execFileSync('ps', ['-eo', 'pid=,ppid=,lstart=,args='], {
+          encoding: 'utf8',
+          env: { ...process.env, LC_ALL: 'C' },
+        });
+    return parseProcessRows(rows, IS_WIN);
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Строки таблицы → `pid → { ppid, start, args }`. Windows — через табуляцию, старт в мс;
+ * POSIX — `ps … lstart` («Sat Oct 24 18:00:00 2026» под `LC_ALL=C`, с точностью до секунды).
+ */
+export function parseProcessRows(rows, windows) {
+  const table = new Map();
+  for (const row of rows.split(/\r?\n/)) {
+    const line = row.trim();
+    const match = windows
+      ? /^(\d+)\t(\d+)\t(\d+)\t(.*)$/.exec(line)
+      : /^(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4})\s+(.*)$/.exec(line);
+    if (!match) continue;
+    const start = windows ? Number(match[3]) : Date.parse(match[3]);
+    table.set(Number(match[1]), {
+      ppid: Number(match[2]),
+      start: Number.isFinite(start) ? start : 0,
+      args: match[4] ?? '',
+    });
+  }
+  return table;
+}
+
+// Сироту на POSIX усыновляет init/launchd или подсборщик `systemd --user`: такой родитель — не владелец.
+const ADOPTER = /^(?:\S*\/)?(?:systemd|launchd|init)(?:\s|$)/;
+
+/** Живой родитель процесса или `undefined`: родителя нет, его номер занят позже, сирота. */
+function liveParent(table, pid, self) {
+  const row = table.get(pid);
+  if (!row) return undefined;
+  if (row.ppid === self) return self;
+  const parent = table.get(row.ppid);
+  if (!parent || row.ppid <= 1) return undefined;
+  if (parent.start && row.start && parent.start > row.start) return undefined;
+  if (ADOPTER.test(parent.args)) return undefined;
+  return row.ppid;
+}
+
+/**
+ * Что из таблицы — остаток ЭТОГО прогона. Признак CLI (его каталог) — общий для всех:
+ * под ним и чат человека в живой панели, и CLI соседней проверки. Снимать их нельзя
+ * (kit-029: 3 из 8 прогонов теряли OpenCode — его снимала соседняя проверка, 24.10).
+ * Свой — процесс из временного дома прогона; CLI, чьи живые предки поднимаются к этому
+ * процессу; CLI, чья цепочка оборвалась (стенд снят жёстко) на предке, родившемся уже во
+ * время прогона. Цепочка панели человека или соседней проверки упирается в процесс
+ * старше прогона (терминал, рабочий стол) — она чужая. Старт неизвестен — только потомки.
+ */
+export function runLeftovers(table, { before, self, cli, own }) {
+  const since = table.get(self)?.start ?? 0;
+  const ours = (pid) => {
+    const seen = new Set();
+    let root = pid;
+    for (let at = pid; at !== undefined && !seen.has(at); at = liveParent(table, at, self)) {
+      if (at === self) return true;
+      seen.add(at);
+      root = at;
+    }
+    const start = table.get(root)?.start ?? 0;
+    return since > 0 && start >= since;
+  };
+  const out = [];
+  for (const [pid, row] of table) {
+    if (before.has(pid) || pid === self) continue;
+    if (own.length > 0 && matchesCli(row.args, own)) out.push(pid);
+    else if (matchesCli(row.args, cli) && ours(pid)) out.push(pid);
+  }
+  return out;
+}
+
+/**
  * `homes` — временные дома прогона: их до прогона не было, и всё, что запущено
  * оттуда, — его остаток (Codex клонирует плагины `git` в свой дом, и клон
- * переживает стенд, держа каталог).
+ * переживает стенд, держа каталог). CLI вне домов снимается, только если он свой
+ * (`runLeftovers`).
  */
 export function reap(before, dir, name, homes = []) {
-  for (const pid of cliProcesses(dir, name, homes)) {
-    if (before.has(pid) || pid === process.pid) continue;
+  const leftovers = runLeftovers(processTable(), {
+    before,
+    self: process.pid,
+    cli: cliNeedles(dir, name),
+    own: homeNeedles(homes),
+  });
+  for (const pid of leftovers) {
     // Деревом: у `git fetch` ребёнок `git remote-https`, в строке которого пути дома нет.
     if (IS_WIN) {
       try {

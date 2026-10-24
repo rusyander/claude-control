@@ -1,0 +1,31 @@
+# agentdeck kit hooks for Kimi Code — append to the config.toml Kimi reads, then replace <kit> with
+# the absolute path of your kit copy (forward slashes work on Windows too). Kimi has no plugin-root
+# variable for hooks, so the path is written out. Format: kimi-cli docs/en/customization/hooks.md.
+
+[[hooks]]
+event = "UserPromptSubmit"
+command = "node \"<kit>/hooks/lib/run.mjs\" prompt --cli=kimi"
+timeout = 10
+
+[[hooks]]
+event = "PreToolUse"
+matcher = "^(Shell|WriteFile|StrReplaceFile|ReadFile|Grep|Glob|SetTodoList|Agent)$"
+command = "node \"<kit>/hooks/lib/run.mjs\" pre --cli=kimi"
+timeout = 30
+
+[[hooks]]
+event = "PostToolUse"
+matcher = "^Shell$"
+command = "node \"<kit>/hooks/lib/run.mjs\" post-any --cli=kimi"
+timeout = 10
+
+[[hooks]]
+event = "PostToolUseFailure"
+matcher = "^Shell$"
+command = "node \"<kit>/hooks/lib/run.mjs\" post-fail --cli=kimi"
+timeout = 10
+
+[[hooks]]
+event = "Stop"
+command = "node \"<kit>/hooks/lib/run.mjs\" stop --cli=kimi"
+timeout = 15

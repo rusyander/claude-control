@@ -214,6 +214,67 @@ export const phoneEn: typeof phoneRu = {
       'otherwise the computer would hibernate again right after waking. A refusal by the ' +
       'system shows in the card the next time it opens.',
 
+    signingTitle: 'Decisions signed by the phone’s key',
+    signingCaption:
+      'The «decisions only with the phone signature» mode: the panel accepts «Allow» only when ' +
+      'the key of a bound phone signed it. The mode is off by default, and everything works as ' +
+      'before.',
+    signingBind: '1. Bind the phone',
+    signingBindText:
+      'On the phone: Settings → «Link» → «Decision signing» → «Bind this phone». The phone ' +
+      'creates an Ed25519 key pair: the private key stays in the phone’s protected storage and ' +
+      'never leaves it, the panel gets only the public one. The binding is signed by the new key ' +
+      'itself — that is how the panel knows the private key really is on the phone. While the ' +
+      'mode is on, a new key is not bound: first turn the mode off on a phone that is already bound.',
+    signingCheck: '2. Compare the fingerprint in the panel window',
+    signingCheckText:
+      'Panel settings → «Access» → «Decisions signed by the phone»: the bound keys with their ' +
+      'fingerprints. The fingerprint must match the one the phone shows under its card. An ' +
+      'unfamiliar fingerprint is a key you did not bind: revoke it.',
+    signingEnable: '3. Turn the mode on from the phone',
+    signingEnableText:
+      '«Turn the mode on» opens a confirmation with the fingerprints of the live keys and the ' +
+      'path of the mode file. The panel turns the mode on only if the set of keys has not ' +
+      'changed since it was shown to the phone. The mode cannot be turned on or off from the ' +
+      'panel window: such a button could be pressed by modified code of the window itself.',
+    signingRevoke: '4. Revoke a key',
+    signingRevokeText:
+      'In the panel window — «Revoke» on a key. Revoking only tightens, so it needs no ' +
+      'signature. A revoked key is never bound again — the phone creates a new one. Revoking ' +
+      'the last key while the mode is on gets its own warning: after it nobody can «Allow».',
+    signingColumn: 'What',
+    signingMeaningColumn: 'With the mode on',
+    signingAllow: '«Allow»',
+    signingAllowText:
+      'Chat permissions, D-n asks, branch gates, panel-agent cards, turning auto-approve on, ' +
+      'sending with full access or auto-approve — only with a signature. The phone signs by ' +
+      'itself: there is nothing extra to press.',
+    signingDeny: '«Deny» and «Stop»',
+    signingDenyText: 'No signature, from anywhere: tightening needs no proof.',
+    signingWindow: 'The panel window',
+    signingWindowText:
+      '«Allow» from the window does not go through: the card stays in place and a notification ' +
+      'names the reason. Answer from the phone.',
+    signingTelegram: 'Telegram',
+    signingTelegramText:
+      '«Allow» from Telegram is refused: modified window code can rewrite the bot settings, so ' +
+      'an answer from the chat proves nothing.',
+    signingLevers: 'Loosening rights',
+    signingLeversText:
+      'Changes that loosen the rights of every future decision — auto mode in every chat, ' +
+      'auto-approve rules, group permissions, settings import — are refused. Turn the mode off ' +
+      'on the phone, make the change, then turn it back on.',
+    signingRefusal: 'Signature refused',
+    signingRefusalText:
+      'The reason is always named: no signature, the key is revoked, the signature does not ' +
+      'match, the phone clock is more than 5 minutes off the computer, the request is repeated. ' +
+      'Every signature is single-use: an intercepted request does not pass a second time.',
+    signingLostTitle: 'Lost the phone',
+    signingLostText:
+      'Without the phone the mode is turned off only by deleting the file ' +
+      '~/.agentdeck/phone-signing.json on this computer — from a terminal, not from the panel. ' +
+      'All bindings go with the mode: a new phone is bound from scratch.',
+
     offlineTitle: 'When the panel does not answer',
     offlineCaption:
       'The computer fell asleep, the panel is restarting, the phone is off the network. The ' +
@@ -506,6 +567,12 @@ export const phoneEn: typeof phoneRu = {
       '06-tests': 'Project tests: cases by group and statuses of the last run',
       '07-analytics':
         'The «Analytics» tab, «Overview»: spend, tokens, requests, cache and the chart by day',
+    },
+    signing: {
+      '01-panel-card':
+        'The «Decisions signed by the phone» card on the «Access» tab: the mode is on, Pixel 8 is bound, Galaxy S21 is revoked, each key with its fingerprint',
+      '02-panel-revoke-last':
+        'Revoking the last bound phone while the mode is on: the window warns and names the file that turns the mode off without the phone',
     },
     offline: {
       '01-home-silent': 'The panel is stopped: home shows the last data received and says so',

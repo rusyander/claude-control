@@ -14,18 +14,34 @@
  * Удалять их безопасно: всё пересоберётся из исходников. Плата — следующая
  * сборка снова полная, минут десять.
  *
+ * На Windows релизный APK собирается из короткой копии приложения
+ * (`shortCopyDir`), и гигабайты копятся уже там — уборка снимает копию целиком.
+ *
  * Файл работает двумя способами: командой `pnpm mobile:clean` (`--dry` — только
  * посчитать) и как модуль — `pnpm mobile:apk` зовёт `sweepMobileBuild()` сразу
  * после того, как APK лёг в корень репозитория. Оттого гигабайты и не копятся:
  * их снимает та же сборка, которая их произвела.
  */
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, rmdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mobile = join(root, 'apps', 'mobile');
-const modules = join(mobile, 'node_modules');
+
+/**
+ * Короткая копия `apps/mobile`, из которой на Windows собирается релизный APK
+ * (почему — шапка `build-mobile-apk.mjs`). У каждого клона своя: метка из пути
+ * корня, иначе две копии репозитория собирали бы в одном каталоге. Лежит в
+ * корне системного диска, а не в профиле: путь профиля сам бывает длиннее
+ * запаса. `AGENTDECK_APK_DIR` переносит копии в другое место.
+ */
+export function shortCopyDir(repoRoot = root, env = process.env) {
+  const base = env.AGENTDECK_APK_DIR || join(`${env.SystemDrive || 'C:'}\\`, 'adapk');
+  const tag = createHash('sha1').update(repoRoot.toLowerCase()).digest('hex').slice(0, 6);
+  return join(base, tag);
+}
 
 /** Размер каталога рекурсивно; недоступное считаем нулём, а не падаем. */
 function size(path) {
@@ -55,7 +71,7 @@ function size(path) {
 }
 
 /** Каталоги сборки внутри нативных библиотек. */
-function libraryTargets() {
+function libraryTargets(modules) {
   if (!existsSync(modules)) return [];
   const found = [];
   const packages = readdirSync(modules, { withFileTypes: true }).filter((entry) =>
@@ -80,17 +96,28 @@ function libraryTargets() {
   return found;
 }
 
-/** Всё, что подлежит уборке: остатки библиотек плюс сборка самого приложения. */
-function allTargets() {
+/** Промежуточная сборка в каталоге приложения: остатки библиотек плюс сборка самого приложения. */
+export function buildDirsOf(mobileDir) {
   return [
-    ...libraryTargets(),
+    ...libraryTargets(join(mobileDir, 'node_modules')),
     // Сам проект: результат сборки приложения и кеш Gradle. APK из корня
     // репозитория не трогаем — он уже собран и лежит отдельно.
-    join(mobile, 'android', 'build'),
-    join(mobile, 'android', '.gradle'),
-    join(mobile, 'android', 'app', 'build'),
-    join(mobile, 'android', 'app', '.cxx'),
+    join(mobileDir, 'android', 'build'),
+    join(mobileDir, 'android', '.gradle'),
+    join(mobileDir, 'android', 'app', 'build'),
+    join(mobileDir, 'android', 'app', '.cxx'),
   ].filter((path) => existsSync(path));
+}
+
+/** Всё, что подлежит уборке. */
+function allTargets() {
+  const copy = shortCopyDir();
+  return [
+    ...buildDirsOf(mobile),
+    // Короткая копия — целиком: в ней только повтор apps/mobile и промежуточные
+    // файлы. Так уходит и копия, брошенная прерванной сборкой.
+    ...(process.platform === 'win32' && existsSync(copy) ? [copy] : []),
+  ];
 }
 
 /**
@@ -124,13 +151,24 @@ export function sweepMobileBuild({ dry = false } = {}) {
       locked.push(target);
     }
   }
+  // Пустой общий каталог копий в корне диска не оставляем; копия другого клона его
+  // сохранит. Каталог, названный в AGENTDECK_APK_DIR, — выбор человека, его не трогаем.
+  if (!dry && process.platform === 'win32' && !process.env.AGENTDECK_APK_DIR) {
+    try {
+      rmdirSync(dirname(shortCopyDir()));
+    } catch {
+      // Не пуст или его нет — так и должно быть.
+    }
+  }
   return { count, bytes, locked };
 }
 
 /** Строка о каталогах, которые не дались, — или пусто, если таких нет. */
 export function lockedNote(locked) {
   if (locked.length === 0) return '';
-  const names = locked.map((path) => path.slice(mobile.length + 1)).join(', ');
+  const names = locked
+    .map((path) => (path.startsWith(mobile) ? path.slice(mobile.length + 1) : path))
+    .join(', ');
   return (
     `Не удалось убрать каталогов: ${locked.length} (${names}) — их держит открытым другой ` +
     'процесс, обычно демон Kotlin после сборки; он гаснет сам. Повторите pnpm mobile:clean позже.'

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GROUP_REQUEST_IDS, type GroupRequestId } from '@agentdeck/contracts/split-groups';
 import {
   groupDecision,
+  groupKillRefusal,
   withProcessFacts,
   type GroupAutoApprove,
   type ProcessFactsIo,
@@ -64,12 +65,13 @@ describe('groupDecision — погашение процессов (N3)', () => {
     expect(decide(own, 'taskkill //PID 102 //PID 200 //F')).toBe('human');
   });
 
-  it('порт: все держатели свои — само; никого или чужой — человеку', () => {
+  it('порт: все держатели свои или никого — само; чужой — не само', () => {
     const own = new Set([100, 101, 102]);
     const at = (holders: number[]) =>
       group({ ownPids: own, portHolders: new Map([[5173, holders]]) });
     expect(decide(at([102]), 'npx kill-port 5173')).toBe('auto');
-    expect(decide(at([]), 'npx kill-port 5173')).toBe('human');
+    // Порт никто не держит — гасить нечего, он не мешает (D-1, 24.10).
+    expect(decide(at([]), 'npx kill-port 5173')).toBe('auto');
     expect(decide(at([102, 200]), 'npx kill-port 5173')).toBe('human');
   });
 
@@ -94,10 +96,11 @@ describe('groupDecision — погашение по номеру из запро
     `for p in 5273 5274; do pid=$(netstat -ano | grep -E ":$p .*LISTENING" | awk '{print $5}' | head -1); [ -n "$pid" ] && taskkill //PID $pid //T //F >/dev/null 2>&1 && echo "stopped :$p"; done`,
     `for port in 5273 5274; do for pid in $(netstat -ano | grep -E "LISTENING" | grep -E "[:.]$port\\s" | awk '{print $NF}' | sort -u); do taskkill //PID $pid //T //F 2>&1 | tail -1; done; done`,
     `kill $(lsof -t -iTCP:5273 -sTCP:LISTEN)`,
-  ])('держатели свои — само, чужой или никого — человеку: %s', async (command) => {
+  ])('держатели свои или никого — само, чужой — не само: %s', async (command) => {
     expect(await decideWith(command, { 5273: [102], 5274: [102] })).toBe('auto');
     expect(await decideWith(command, { 5273: [102, 200], 5274: [102] })).toBe('human');
-    expect(await decideWith(command, { 5274: [102] })).toBe('human');
+    // :5273 никто не держит — гасить нечего (D-1, 24.10).
+    expect(await decideWith(command, { 5274: [102] })).toBe('auto');
   });
 
   it.each([
@@ -126,7 +129,8 @@ describe('groupDecision — погашение по номеру из запро
 describe('withProcessFacts — своё дерево по снимку ОС', () => {
   it('потомки корней прогона — свои; чужой и сирота на чужом номере — нет', async () => {
     const facts = await withProcessFacts(group(), bash('kill 102'), [100], io());
-    expect([...(facts.ownPids ?? [])].sort()).toEqual([100, 101, 102]);
+    // Своё — среди целей: 102 потомок корня 100.
+    expect([...(facts.ownPids ?? [])]).toEqual([102]);
     expect(decide(facts, 'kill 102')).toBe('auto');
     const foreign = await withProcessFacts(group(), bash('kill 200'), [100], io());
     expect(decide(foreign, 'kill 200')).toBe('human');
@@ -176,6 +180,82 @@ describe('groupDecision — каталог оболочки (N4)', () => {
   it('каталог вне копии мягче не делает', () => {
     expect(decide(group({ shellCwd: 'C:/work/shop-worktrees/other/inst-docs-ui' }), command)).toBe(
       'human',
+    );
+  });
+});
+
+/**
+ * Погашение, которое человек не решает (D-1, 24.10, решение владельца): своё —
+ * само, чужое и неназванное — отказ агенту с причиной и тем, как погасить своё.
+ */
+describe('groupKillRefusal — отказ агенту вместо человека (D-1)', () => {
+  const facts = (command: string, holders: Record<number, number[]> = {}, roots = [100]) =>
+    withProcessFacts(group(), bash(command), roots, io(holders));
+
+  it('своё — без отказа', async () => {
+    const own = await facts('taskkill //PID 102 //F');
+    expect(groupKillRefusal(own, bash('taskkill //PID 102 //F'))).toBeUndefined();
+    const port = await facts('npx kill-port 5173', { 5173: [102] });
+    expect(groupKillRefusal(port, bash('npx kill-port 5173'))).toBeUndefined();
+  });
+
+  it('чужой номер и чужой держатель порта — отказ с подписью процесса', async () => {
+    const foreign = await facts('taskkill //PID 200 //F');
+    const text = groupKillRefusal(foreign, bash('taskkill //PID 200 //F'));
+    expect(text).toContain('This group did not start pid 200');
+    expect(text).toContain('Nothing in this command ran');
+    const port = await facts('npx kill-port 5173', { 5173: [102, 200] });
+    expect(groupKillRefusal(port, bash('npx kill-port 5173'))).toContain(
+      'port 5173 held by pid 200',
+    );
+  });
+
+  it('цель без номера — отказ с тем, как назвать своё', () => {
+    const text = groupKillRefusal(group(), bash('pkill -f vite'));
+    expect(text).toContain('does not name by number');
+    expect(text).toContain('kill $!');
+  });
+
+  it('снимок не прочитан — отказ «повторите», не человек', async () => {
+    const failing = io();
+    failing.readTable.mockRejectedValueOnce(new Error('wmic gone'));
+    const failed = await withProcessFacts(group(), bash('kill 102'), [100], failing);
+    expect(groupKillRefusal(failed, bash('kill 102'))).toContain(
+      'could not read the process table',
+    );
+  });
+
+  it('опасное и без погашения — не его дело', () => {
+    expect(groupKillRefusal(group(), bash('git status'))).toBeUndefined();
+    expect(groupKillRefusal(group(), bash('ssh host kill 4321'))).toBeUndefined();
+  });
+
+  it('без корней (ход кончен): сирота с меткой группы — своя', async () => {
+    const marked = await withProcessFacts(group(), bash('kill 300'), [], {
+      ...io(),
+      readMarks: async (rows) => new Map(rows.map((row) => [row.pid, row.pid === 300])),
+    });
+    expect(decide(marked, 'kill 300')).toBe('auto');
+    expect(groupKillRefusal(marked, bash('kill 300'))).toBeUndefined();
+  });
+
+  it('без корней: сирота с текстом запуска из копии — своя, тот же текст без записи — нет', async () => {
+    const stub = `bash -c "eval 'npx vite --port 5284 &' < /dev/null"`;
+    const table = [
+      { pid: 400, ppid: 4, created: 10n, command: stub },
+      { pid: 401, ppid: 400, created: 11n, command: 'node vite.js' },
+    ];
+    const withRan = (ran: boolean) =>
+      withProcessFacts(
+        group(),
+        bash('kill 401'),
+        [],
+        { readTable: async () => table, portHolders: () => [], ran: () => ran, platform: 'win32' },
+        { transcriptDir: 'C:/projects/copy' },
+      );
+    expect(decide(await withRan(true), 'kill 401')).toBe('auto');
+    expect(groupKillRefusal(await withRan(false), bash('kill 401'))).toContain(
+      'did not start pid 401 (node vite.js)',
     );
   });
 });

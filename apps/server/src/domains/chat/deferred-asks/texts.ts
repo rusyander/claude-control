@@ -1,4 +1,8 @@
-import { DEFERRED_MARKER, PANEL_REFUSAL_MARKER } from '@agentdeck/contracts/deferred-asks';
+import {
+  DEFERRED_MARKER,
+  PANEL_REFUSAL_MARKER,
+  type DeferredVia,
+} from '@agentdeck/contracts/deferred-asks';
 import { canonicalJson, significantInput } from './hash.ts';
 
 /**
@@ -128,12 +132,28 @@ export function allowResumePrompt(record: {
   id: string;
   toolName: string;
   input: unknown;
+  decidedVia?: DeferredVia;
 }): string {
+  const who = record.decidedVia === 'auto' ? PANEL_RECHECK : 'The human allowed';
   return (
-    `The human allowed ${record.id}. Make exactly that call now — tool ${record.toolName} with this ` +
+    `${who} ${record.id}. Make exactly that call now — tool ${record.toolName} with this ` +
     `input, unchanged (a one-time grant; any other call is not covered):\n${exactCall(record)}\n\n` +
     'Then continue the remaining work. Do not mention the item in commits or the MR text. ' +
     UNDRAFT_WHEN_CLEAR
+  );
+}
+
+/**
+ * Запись сняла сама панель (`decidedVia: 'auto'`): правило, по которому вызов
+ * ушёл человеку, с тех пор решает его без человека (D-1, 24.10). Слово не
+ * приписывает решение человеку, а отказ несёт причину и что делать вместо.
+ */
+const PANEL_RECHECK = 'The panel re-checked and allowed';
+
+function panelRefused(id: string, said: string): string {
+  return (
+    `The panel re-checked ${id} and refused it, so nothing waits for the human on it${said} ` +
+    'Do not repeat that call as it was.'
   );
 }
 
@@ -148,8 +168,13 @@ export function allowMainCopyPrompt(record: { id: string; input: unknown }): str
 }
 
 /** Продолжение после «запретить», когда группа уже кончила ход ожиданием. */
-export function denyResumePrompt(record: { id: string; message?: string }): string {
+export function denyResumePrompt(record: {
+  id: string;
+  message?: string;
+  decidedVia?: DeferredVia;
+}): string {
   const said = record.message?.trim() ? `: ${record.message.trim()}` : '';
+  if (record.decidedVia === 'auto') return `${panelRefused(record.id, said)} ${UNDRAFT_WHEN_CLEAR}`;
   return (
     `The human refused ${record.id}${said}. Do not make that call and do not work around it. ` +
     'Finish the work without it; if something stays blocked, name it as a gap in the MR ' +
@@ -195,6 +220,8 @@ export interface OutcomeItem {
   toolName: string;
   input: unknown;
   message?: string;
+  /** `auto` — решила сама панель повторным судом, не человек: слово говорит это. */
+  decidedVia?: DeferredVia;
   /** Было разрешение: у истёкшей записи это «разрешение истекло неиспользованным». */
   grantUntil?: string;
 }
@@ -219,13 +246,18 @@ function outcomeLine(item: OutcomeItem): string {
         `${path ? ` (${path})` : ''}. Repeat the write that was refused there.`
       );
     }
+    const who =
+      item.decidedVia === 'auto'
+        ? 'the panel re-checked it and allowed it'
+        : 'the human allowed it';
     return (
-      `- ${item.id}: the human allowed it. Make exactly that call now — tool ${item.toolName} with ` +
+      `- ${item.id}: ${who}. Make exactly that call now — tool ${item.toolName} with ` +
       `this input, unchanged (a one-time grant; any other call is not covered):\n${exactCall(item)}`
     );
   }
   if (item.state === 'denied') {
     const said = item.message?.trim() ? `: ${item.message.trim()}` : '';
+    if (item.decidedVia === 'auto') return `- ${panelRefused(item.id, said)}`;
     return `- ${item.id}: the human refused it${said}. Do not make that call and do not work around it.`;
   }
   if (isLapsedGrant(item)) {

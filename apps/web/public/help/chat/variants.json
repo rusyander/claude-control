@@ -423,110 +423,110 @@
       "light-ru": {
         "file": "03-hub.png",
         "width": 832,
-        "height": 846
+        "height": 900
       },
       "light-en": {
         "file": "03-hub.en.png",
         "width": 832,
-        "height": 846
+        "height": 900
       },
       "dark-ru": {
         "file": "03-hub.dark.png",
         "width": 832,
-        "height": 846
+        "height": 900
       },
       "dark-en": {
         "file": "03-hub.dark.en.png",
         "width": 832,
-        "height": 846
+        "height": 900
       }
     },
     "split/04-child-ask": {
       "light-ru": {
         "file": "04-child-ask.png",
-        "width": 832,
-        "height": 212
+        "width": 768,
+        "height": 238
       },
       "light-en": {
         "file": "04-child-ask.en.png",
-        "width": 832,
-        "height": 212
+        "width": 768,
+        "height": 238
       },
       "dark-ru": {
         "file": "04-child-ask.dark.png",
-        "width": 832,
-        "height": 212
+        "width": 768,
+        "height": 238
       },
       "dark-en": {
         "file": "04-child-ask.dark.en.png",
-        "width": 832,
-        "height": 212
+        "width": 768,
+        "height": 238
       }
     },
     "split/04b-card-ask": {
       "light-ru": {
         "file": "04b-card-ask.png",
         "width": 806,
-        "height": 481
+        "height": 705
       },
       "light-en": {
         "file": "04b-card-ask.en.png",
         "width": 806,
-        "height": 481
+        "height": 705
       },
       "dark-ru": {
         "file": "04b-card-ask.dark.png",
         "width": 806,
-        "height": 481
+        "height": 705
       },
       "dark-en": {
         "file": "04b-card-ask.dark.en.png",
         "width": 806,
-        "height": 481
+        "height": 705
       }
     },
     "split/05-overlap": {
       "light-ru": {
         "file": "05-overlap.png",
         "width": 782,
-        "height": 111
+        "height": 131
       },
       "light-en": {
         "file": "05-overlap.en.png",
         "width": 782,
-        "height": 111
+        "height": 131
       },
       "dark-ru": {
         "file": "05-overlap.dark.png",
         "width": 782,
-        "height": 47
+        "height": 131
       },
       "dark-en": {
         "file": "05-overlap.dark.en.png",
         "width": 782,
-        "height": 47
+        "height": 131
       }
     },
     "split/06-paused": {
       "light-ru": {
         "file": "06-paused.png",
         "width": 832,
-        "height": 591
+        "height": 900
       },
       "light-en": {
         "file": "06-paused.en.png",
         "width": 832,
-        "height": 591
+        "height": 900
       },
       "dark-ru": {
         "file": "06-paused.dark.png",
         "width": 832,
-        "height": 529
+        "height": 900
       },
       "dark-en": {
         "file": "06-paused.dark.en.png",
         "width": 832,
-        "height": 529
+        "height": 900
       }
     },
     "split/07-worktrees": {

@@ -1,7 +1,7 @@
 import { killVerdict } from './kill.ts';
 import type { Redirect, Word } from './shell-parse.ts';
 import { targetKind } from './targets.ts';
-import { DANGER, OTHER, ROUTINE, type SegmentVerdict, type Walk } from './walk.ts';
+import { OTHER, ROUTINE, UNNAMED_KILL, type SegmentVerdict, type Walk } from './walk.ts';
 
 /**
  * Части суда над звеном, которым не нужен обход вложенных сценариев: имя
@@ -43,13 +43,14 @@ export function teeVerdict(words: Word[], walk: Walk): SegmentVerdict {
  * Звено погашения процесса (N3): свои дети оболочки (`$!`, `%1`, проба
  * `kill -0`) — рутина; номер или порт — рутина с целями, которые маршрут прав
  * сверит с деревом процессов группы; цель, которую числом не назвать (`/IM`,
- * `pkill -f`, `$(lsof …)`), — человеку.
+ * `pkill -f`, `$(cat pidfile)`), — рутина с меткой `unnamed`: маршрут прав
+ * отказывает агенту сам, с тем, как назвать своё (D-1, 24.10: человеку не идёт).
  */
 export function killSegment(words: Word[], walk: Walk): SegmentVerdict | undefined {
   const verdict = killVerdict(words, walk.childMark, (word) => walk.portsOf(word));
   if (!verdict) return undefined;
   if (verdict.kind === 'own') return ROUTINE;
-  if (verdict.kind === 'unknown') return DANGER;
+  if (verdict.kind === 'unknown') return UNNAMED_KILL;
   return { kind: 'routine', kills: verdict.targets };
 }
 

@@ -12,6 +12,8 @@ import type { ServerContext } from '../../../context.ts';
 import { registerChatTranscriptRoutes } from './transcript-routes.ts';
 import { groupIdentityLine } from '../../../domains/chat/panel-preamble.ts';
 import { buildHandoffPrompt } from '@agentdeck/contracts/chat-handoff';
+import { coldResumeBrief, lostConversationBrief } from '../../../domains/chat/split-continue.ts';
+import { withStageTask } from '../../../domains/chat/cold-continuation/cold-continuation.ts';
 
 /**
  * Название чата группы в списке (живой стенд 25.09.2026): звено, чья первая
@@ -204,6 +206,38 @@ ${workAfterPlanPrompt({ task })}`,
     const title = (await list()).get('handoff-1')?.title;
 
     expect(title).toBe('Форма входа');
+  });
+
+  // Живой прогон 23.10: группа после долгой паузы пошла новым разговором, и он
+  // назывался первой строкой вводной панели — «The panel started a new
+  // conversation instead of continuing the previou…» в карточке запроса прав, в
+  // списке и в уведомлениях. Вводная, факты копии и задание стадии собраны
+  // панелью целиком; ответ человека за ними — не название группы.
+  it('новый разговор вместо остывшего называется именем группы', async () => {
+    const brief = withStageTask(
+      coldResumeBrief({ branch: 'fix/login' }, ['Поправь валидацию формы входа']),
+      'Поправь валидацию формы входа',
+    );
+    transcript(
+      'cold-1',
+      `${brief}\n\nGit: 3 commits on fix/login since main.\n\nПродолжай по .agent/PROGRESS.md`,
+    );
+    store.setChatLink('cold-1', { ...link('Форма входа'), stage: 'work' });
+
+    const chat = (await list()).get('cold-1');
+
+    expect(chat?.title).toBe('Форма входа');
+    expect(chat?.title).not.toContain('The panel started');
+  });
+
+  it('новый разговор вместо пропавшего транскрипта называется именем группы', async () => {
+    transcript(
+      'lost-1',
+      `${lostConversationBrief({ branch: 'fix/login' }, ['Поправь валидацию формы входа'])}\n\nПродолжай.`,
+    );
+    store.setChatLink('lost-1', link('Форма входа'));
+
+    expect((await list()).get('lost-1')?.title).toBe('Форма входа');
   });
 
   it('чат без связи с одной преамбулой — как раньше, имя проекта', async () => {

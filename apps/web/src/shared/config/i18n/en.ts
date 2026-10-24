@@ -24,6 +24,7 @@ import { localModelsEn } from './local-models/en.ts';
 import { kitEn } from './kit/en.ts';
 import { telegramAnswersEn } from './telegram-answers/en.ts';
 import { deferredAsksEn } from './deferred-asks/en.ts';
+import { phoneSigningEn } from './phone-signing/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
@@ -51,6 +52,7 @@ export const en: TranslationSchema = {
   usageLimits: usageLimitsEn,
   devRestart: devRestartEn,
   deferredAsks: deferredAsksEn,
+  phoneSigning: phoneSigningEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
   /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/en.ts`. */
@@ -1209,6 +1211,8 @@ export const en: TranslationSchema = {
         openHint: 'Open the group’s chat',
         askFrom: 'The agent asks · {{stage}} · chat {{chat}}',
         askFromNoStage: 'The agent asks · chat {{chat}}',
+        permissionFrom: 'The agent waits for permission · {{stage}} · chat {{chat}}',
+        permissionFromNoStage: 'The agent waits for permission · chat {{chat}}',
         waiting: 'waiting for: {{names}}',
         held: 'waiting for your answer',
         holdAnswered: 'answered',

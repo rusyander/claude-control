@@ -7,6 +7,7 @@ import { usageLimitsRu } from './usage-limits/ru.ts';
 import { foreignChatRu } from './foreign-chat/ru.ts';
 import { projectsRu } from './projects/ru.ts';
 import { computersRu } from './computers/ru.ts';
+import { signingRu } from './signing/ru.ts';
 
 /**
  * Русский словарь — источник истины. Английский типизирован по нему, поэтому
@@ -309,6 +310,7 @@ export const ru = {
   // Вкладка «Проекты» и экран проекта — отдельным модулем (`projects/`).
   projects: projectsRu,
   computers: computersRu,
+  signing: signingRu,
 
   git: {
     title: 'Git',

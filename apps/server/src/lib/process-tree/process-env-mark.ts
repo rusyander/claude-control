@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -236,7 +237,11 @@ function readDarwinMarks(
   });
 }
 
-/** Метка по номеру для кандидатов; `undefined` — на этой ОС не прочесть. */
+/**
+ * Метка по номеру для кандидатов; `undefined` — на этой ОС не прочесть. Linux
+ * здесь — для суда над погашением (`group-process-owner.ts`); добор после паузы
+ * читает `/proc` сам (`path-sweep.ts`).
+ */
 export async function readMarks(
   rows: readonly ProcessRow[],
   name: string,
@@ -248,5 +253,17 @@ export async function readMarks(
     return new Map([...verdicts].map(([pid, verdict]) => [pid, verdict === 'yes']));
   }
   if (platform === 'darwin') return readDarwinMarks(rows, name);
+  if (platform === 'linux') return new Map(rows.map((row) => [row.pid, linuxMark(row.pid, name)]));
   return undefined;
+}
+
+/** Linux: окружение лежит файлом `/proc/<pid>/environ` (`A=1\0B=2`). */
+function linuxMark(pid: number, name: string): boolean {
+  try {
+    return readFileSync(`/proc/${pid}/environ`, 'utf8')
+      .split('\0')
+      .some((pair) => pair.startsWith(`${name}=`) && pair.length > name.length + 1);
+  } catch {
+    return false;
+  }
 }

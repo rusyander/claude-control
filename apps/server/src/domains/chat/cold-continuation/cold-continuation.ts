@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs';
 import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
+import { continuationEnvironment } from '@agentdeck/contracts/task-split';
 import type { ChatLink, SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import type { ChatEvent } from '../chat-events.ts';
@@ -158,5 +159,6 @@ export function continuationIntro(link: ChatLink, plan: SplitPlanRecord | undefi
     ? coldResumeBrief(group, plan.proposal.groups[group.index]?.tasks ?? [])
     : COLD_RESUME_INTRO;
   const task = link.stagePrompt ?? link.task;
-  return task ? withStageTask(head, task) : head;
+  // Окружение к продолжению давно готово: преамбула — сжатая, как в передаче стадии.
+  return task ? withStageTask(head, continuationEnvironment(task)) : head;
 }

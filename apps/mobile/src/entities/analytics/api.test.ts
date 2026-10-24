@@ -11,6 +11,10 @@ vi.mock('../../shared/api/connection', () => ({
   currentConnection: () => ({ url: 'http://panel', token: 'phone-token' }),
   isConfigured: () => true,
 }));
+vi.mock('../../shared/api/signing/keyStore', () => ({
+  loadKey: async () => undefined,
+  freshNonce: () => 'nonce',
+}));
 vi.mock('../../shared/config/i18n', async () => {
   const { en } = await import('../../shared/config/i18n/en');
   return { dict: () => en };

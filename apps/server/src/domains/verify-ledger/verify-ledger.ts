@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -12,7 +11,7 @@ import {
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { LedgerInstall, LedgerSummary, LedgerEvent } from './verify-ledger.types.ts';
 
 /**
@@ -27,7 +26,7 @@ import type { LedgerInstall, LedgerSummary, LedgerEvent } from './verify-ledger.
  * содержимого, старые версии не удаляются: их ещё держат запущенные сессии.
  */
 
-const FILES = ['checks.cjs', 'delta.cjs', 'ledger.cjs', 'preload.cjs'] as const;
+const FILES = ['checks.cjs', 'delta.cjs', 'ledger.cjs', 'preload.cjs', 'vcs-delta.mjs'] as const;
 const LEDGER_ENV = 'AGENTDECK_VERIFY_LEDGER';
 
 /**
@@ -79,8 +78,67 @@ function writeAtomic(file: string, body: string): void {
 /** Путь для NODE_OPTIONS: обратный слеш там — экранирование (проверено 19.10), значит только `/`. */
 const forNodeOptions = (path: string) => path.replace(/\\/g, '/');
 
+/** `AGENTDECK_VERIFY_LEDGER_SOURCE=tree` — поставить рабочее дерево, даже недописанное. */
+const SOURCE_ENV = 'AGENTDECK_VERIFY_LEDGER_SOURCE';
+
+interface LedgerSources {
+  names: string[];
+  bodies: Buffer[];
+  source: 'tree' | 'head';
+}
+
 /**
- * Ставит версию preload и проверяет её живым `node -e 0`. Не прошла — `preload: null`
+ * Что ставить. `committedOnly` (загрузка панели): рабочее дерево — только когда каталог журнала в
+ * git чист; иначе версия из HEAD. 24.10 сохранение агента посреди правки журнала перезапускало
+ * dev-сервер, и он ставил живым группам недописанный журнал (версии 275ba0ca, f15abf50). Не git
+ * (поставлено пакетом) — дерево как есть. Тесты зовут без флага: проверяют то, что в дереве.
+ */
+function ledgerSources(
+  sourceDir: string,
+  committedOnly: boolean,
+  env: NodeJS.ProcessEnv,
+): LedgerSources {
+  const tree = (): LedgerSources => ({
+    names: [...FILES],
+    bodies: FILES.map((name) => readFileSync(join(sourceDir, name))),
+    source: 'tree',
+  });
+  if (!committedOnly || String(env[SOURCE_ENV] ?? '').toLowerCase() === 'tree') return tree();
+  const git = (args: string[]) =>
+    spawnSync('git', ['-C', sourceDir, ...args], { timeout: 10_000, windowsHide: true });
+  const status = git(['status', '--porcelain', '--untracked-files=all', '--', '.']);
+  if (status.status !== 0 || String(status.stdout).trim() === '') return tree();
+  const names: string[] = [];
+  const bodies: Buffer[] = [];
+  // Файл, которого в HEAD ещё нет, — часть недописанной версии: версия HEAD обходится без него.
+  for (const name of FILES) {
+    const shown = git(['show', `HEAD:./${name}`]);
+    if (shown.status !== 0) continue;
+    names.push(name);
+    bodies.push(shown.stdout);
+  }
+  if (!names.includes('preload.cjs')) throw new Error('no committed preload.cjs in HEAD');
+  return { names, bodies, source: 'head' };
+}
+
+/**
+ * Проба версии: preload через NODE_OPTIONS и КАЖДЫЙ модуль версии. preload грузит delta.cjs и
+ * прочие лениво, поэтому голый `node -e` пропускал синтаксическую ошибку в них (24.10).
+ */
+function probeScript(dir: string, names: string[]): string {
+  const cjs = names.filter((name) => name.endsWith('.cjs')).map((name) => join(dir, name));
+  const esm = names
+    .filter((name) => name.endsWith('.mjs'))
+    .map((name) => pathToFileURL(join(dir, name)).href);
+  return (
+    `for (const file of ${JSON.stringify(cjs)}) require(file);` +
+    `Promise.all(${JSON.stringify(esm)}.map((url) => import(url)))` +
+    `.then(() => process.stdout.write("ok"), () => process.exit(4));`
+  );
+}
+
+/**
+ * Ставит версию preload и проверяет её живым node (`probeScript`). Не прошла — `preload: null`
  * и причина: панель тогда ничего не подмешивает, проверки идут как раньше.
  */
 export function installLedger(opts: {
@@ -88,36 +146,38 @@ export function installLedger(opts: {
   sourceDir: string;
   nodePath?: string;
   env?: NodeJS.ProcessEnv;
+  /** Загрузка панели: недописанное рабочее дерево журнала не ставится (`ledgerSources`). */
+  committedOnly?: boolean;
 }): LedgerInstall {
   const env = opts.env ?? process.env;
   if (String(env[LEDGER_ENV] ?? '').toLowerCase() === 'disabled') {
     return { preload: null, reason: 'disabled' };
   }
   try {
-    const bodies = FILES.map((name) => readFileSync(join(opts.sourceDir, name)));
+    const { names, bodies, source } = ledgerSources(
+      opts.sourceDir,
+      opts.committedOnly ?? false,
+      env,
+    );
     const hash = createHash('sha256');
     for (const body of bodies) hash.update(body);
     const version = hash.digest('hex').slice(0, 12);
     const dir = join(ledgerHome(opts.appData), 'bin', version);
-    if (!FILES.every((name) => existsSync(join(dir, name)))) {
+    if (!names.every((name) => existsSync(join(dir, name)))) {
       const tmp = `${dir}.${process.pid}.tmp`;
       rmSync(tmp, { recursive: true, force: true });
       mkdirSync(tmp, { recursive: true });
-      for (const name of FILES) copyFileSync(join(opts.sourceDir, name), join(tmp, name));
+      names.forEach((name, i) => writeFileSync(join(tmp, name), bodies[i]!));
       rmSync(dir, { recursive: true, force: true });
       renameSync(tmp, dir);
     }
     const preload = forNodeOptions(join(dir, 'preload.cjs'));
-    const probe = spawnSync(
-      opts.nodePath ?? process.execPath,
-      ['-e', 'process.stdout.write("ok")'],
-      {
-        env: { ...env, NODE_OPTIONS: withPreload(env.NODE_OPTIONS, preload) },
-        encoding: 'utf8',
-        timeout: 15_000,
-        windowsHide: true,
-      },
-    );
+    const probe = spawnSync(opts.nodePath ?? process.execPath, ['-e', probeScript(dir, names)], {
+      env: { ...env, NODE_OPTIONS: withPreload(env.NODE_OPTIONS, preload) },
+      encoding: 'utf8',
+      timeout: 15_000,
+      windowsHide: true,
+    });
     if (probe.status !== 0 || probe.stdout !== 'ok') {
       return { preload: null, reason: `self-test failed (${probe.status ?? probe.signal})` };
     }
@@ -130,7 +190,12 @@ export function installLedger(opts: {
     const lockedShim = join(bin, 'preload-locked.cjs');
     if (!existsSync(lockedShim) || readFileSync(lockedShim, 'utf8') !== LOCKED_SHIM)
       writeAtomic(lockedShim, LOCKED_SHIM);
-    return { preload: forNodeOptions(shim), lockedPreload: forNodeOptions(lockedShim), version };
+    return {
+      preload: forNodeOptions(shim),
+      lockedPreload: forNodeOptions(lockedShim),
+      version,
+      source,
+    };
   } catch (error) {
     return { preload: null, reason: `install failed: ${(error as Error).message}` };
   }
@@ -172,7 +237,7 @@ export function ledgerEnv(
  * и для проверки окружения прогонов — проверка видит ровно то, что делает панель.
  */
 export function activateLedger(appData: string, sourceDir: string): LedgerInstall {
-  const install = installLedger({ appData, sourceDir });
+  const install = installLedger({ appData, sourceDir, committedOnly: true });
   Object.assign(process.env, ledgerEnv(install, appData, process.env));
   return install;
 }

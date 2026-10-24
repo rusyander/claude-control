@@ -11,6 +11,7 @@ import { readProviderChatStatus } from '../lib/readProviderChatStatus';
 import { openProviderChatStream } from '../lib/openProviderChatStream';
 import { providerChatKeys } from '../api/ProviderChatApi.constants';
 import { toErrorMessage } from '../../../shared/api/toErrorMessage';
+import { signatureRefusalText } from '@shared/api/signatureRefusal';
 
 /**
  * Идущий ответ открытого разговора: текст, который уже напечатан, и признак
@@ -318,6 +319,11 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
         await answerProviderChatPermission(chatId, askId, decision);
       } catch (cause) {
         setError(toErrorMessage(cause));
+        // Режим подписи телефона не принял «Разрешить» из окна: просьба на
+        // сервере ждёт, карточка возвращается — «Запретить» с неё проходит.
+        if (signatureRefusalText(cause) === undefined) return;
+        const status = await readProviderChatStatus(chatId).catch(() => undefined);
+        if (status?.permissions) setPermissions(status.permissions);
       }
     },
     [chatId],

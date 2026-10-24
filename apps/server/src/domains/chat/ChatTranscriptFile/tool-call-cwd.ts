@@ -98,6 +98,24 @@ export function sessionScratchpad(
   }
 }
 
+/**
+ * Каталог транскриптов, где лежит разговор `sessionId`: у группы это все её
+ * разговоры в копии (продолжения, доставка) — по ним суд узнаёт команды, которыми
+ * группа заводила процессы (`group-process-owner.ts`, D-1).
+ */
+export function sessionTranscriptDir(
+  projectsDir: string,
+  sessionId: string | undefined,
+): string | undefined {
+  if (!sessionId || !/^[A-Za-z0-9-]+$/.test(sessionId)) return undefined;
+  try {
+    const file = findTranscript(projectsDir, sessionId);
+    return file ? dirname(file) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Каталог оболочки для вызова `toolUseId` разговора `sessionId`; `undefined` — не узнать. */
 export function toolCallCwd(
   projectsDir: string,

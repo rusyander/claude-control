@@ -107,6 +107,7 @@ describe('dev-сторож как процесс', () => {
       cwd: serverDir,
       env: {
         ...process.env,
+        AGENTDECK_DEV_QUIET_MS: '300',
         CLAUDE_CONFIG_DIR: join(root, 'config'),
         AGENTDECK_DEV_DEFER: '0',
         PIDS_FILE: pidsFile,
@@ -198,6 +199,7 @@ describe('dev-сторож как процесс', () => {
       cwd: serverDir,
       env: {
         ...process.env,
+        AGENTDECK_DEV_QUIET_MS: '300',
         CLAUDE_CONFIG_DIR: join(root, 'config'),
         AGENTDECK_DEV_DEFER: '0',
         PIDS_FILE: pidsFile,
@@ -263,6 +265,7 @@ describe('dev-сторож как процесс', () => {
       cwd: serverDir,
       env: {
         ...process.env,
+        AGENTDECK_DEV_QUIET_MS: '300',
         CLAUDE_CONFIG_DIR: config,
         AGENTDECK_DEV_DEFER_POLL_MS: '200',
         PIDS_FILE: pidsFile,
@@ -352,6 +355,7 @@ describe('dev-сторож как процесс', () => {
       cwd: serverDir,
       env: {
         ...process.env,
+        AGENTDECK_DEV_QUIET_MS: '300',
         CLAUDE_CONFIG_DIR: config,
         AGENTDECK_DEV_DEFER_POLL_MS: '200',
         AGENTDECK_DEV_RUNS_CAP_MS: '3000',
@@ -422,6 +426,7 @@ describe('dev-сторож как процесс', () => {
       cwd: serverDir,
       env: {
         ...process.env,
+        AGENTDECK_DEV_QUIET_MS: '300',
         CLAUDE_CONFIG_DIR: config,
         AGENTDECK_DEV_DEFER_POLL_MS: '200',
         AGENTDECK_DEV_RUNS_CAP_MS: '3000',
@@ -489,6 +494,7 @@ describe('dev-сторож как процесс', () => {
       cwd: serverDir,
       env: {
         ...process.env,
+        AGENTDECK_DEV_QUIET_MS: '300',
         CLAUDE_CONFIG_DIR: config,
         AGENTDECK_DEV_DEFER_POLL_MS: '200',
         PIDS_FILE: pidsFile,

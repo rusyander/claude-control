@@ -16,6 +16,7 @@ import {
   type SkillScopeInput,
 } from '../../domains/chat/group-profile/group-profile.ts';
 import { shellSnapshotSync, snapshotNames } from '../../domains/chat/shell-aliases.ts';
+import { groupMarkEnv, groupProcessMark } from '../../domains/chat/group-process-owner.ts';
 import { stageOf, stagesAhead } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
 import {
   runCompactWindow,
@@ -78,6 +79,7 @@ import { createParentNotice } from '../../domains/chat/parent-notice/parent-noti
 import { wireChatAutonomy } from '../chat-autonomy-wiring.ts';
 import { apiTokenPath } from '../../lib/api-token/api-token.ts';
 import { wireGroupActivation } from '../group-activation-wiring/group-activation-wiring.ts';
+import { wireForeignShellJudge } from '../foreign-shell-judge-wiring/foreign-shell-judge-wiring.ts';
 import { wireColdContinuation } from '../cold-continuation-wiring/cold-continuation-wiring.ts';
 import { wireKeepWarm } from '../keep-warm-wiring/keep-warm-wiring.ts';
 import { createKeepWarmLedgerReader, warmedAtOf } from '../../domains/chat/keep-warm/keep-warm.ts';
@@ -191,7 +193,7 @@ import {
 } from '../../domains/chat/review-stand/review-stand.ts';
 import { execDocker } from '../../domains/compose/docker.ts';
 import { copyRootOf, SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
-import { MrWatch } from '../../domains/chat/mr-watch/mr-watch.ts';
+import { MrWatch, reviewThreadsGap } from '../../domains/chat/mr-watch/mr-watch.ts';
 import { MrStateRefresh } from '../../domains/chat/mr-state-refresh/mr-state-refresh.ts';
 import { recheckDeliveredMr } from '../../domains/chat/split-recheck/split-recheck.ts';
 import {
@@ -208,6 +210,7 @@ import { childrenBrief } from '../../domains/chat/children-brief/children-brief.
 import { branchGateContext } from '../../domains/chat/ChatBranchGate/ChatBranchGate.ts';
 import { ChildTells } from '../../domains/chat/child-tell/child-tell.ts';
 import { scheduleDeferredReDrive, wireDeferredAsks } from '../deferred-wiring/deferred-wiring.ts';
+import { rejudgeDepsFor, rejudgeGroupAsk } from '../deferred-wiring/rejudge.ts';
 import { deferredAsksOf } from '../../routes/chat/deferred-routes/deferred-store.ts';
 import {
   RunRetry,
@@ -1049,7 +1052,14 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Отложенные вопросы D-n: решение человека продолжает группу тем же путём
   // (`resumeGroup`), одиночный чат — тем же разговором; разрешённое до
   // перезапуска панели продолжается обходом при старте.
-  const deferredWiring = wireDeferredAsks({ ctx, runs: chatRuns, resumeGroup });
+  // Ждущие записи групп, которые правило теперь решает само (D-1), — решаются при старте.
+  const rejudgeDeps = rejudgeDepsFor(ctx);
+  const deferredWiring = wireDeferredAsks({
+    ctx,
+    runs: chatRuns,
+    resumeGroup,
+    rejudge: (record) => rejudgeGroupAsk(record, rejudgeDeps),
+  });
   scheduleDeferredReDrive(deferredWiring);
   const splitConveyor = new SplitConveyor({
     backgroundTasks: (chatId) => chatRuns.backgroundTasksOf(chatId),
@@ -1173,23 +1183,27 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         // Заметки доставки (23.10): «не проверено» и красное не из-за ветки —
         // не пробелы, но описание MR обязано их назвать.
         const notes = [...(sieves?.notes ?? []), ...(tests?.notes ?? [])];
-        // Описание MR читается форджем только у найденного по голове MR.
+        // Описание MR и ветки ревьюера — одним чтением форджа, только у
+        // найденного по голове MR.
+        const mrToken = facts.mr ? forgeToken(facts.mr) : undefined;
+        const review =
+          facts.mr && mrToken
+            ? await readMergeRequestReview(facts.mr, mrToken).catch(() => undefined)
+            : undefined;
         const description = facts.mr
-          ? await mrDescriptionGap(
-              facts.mr,
-              async (url) => {
-                const token = forgeToken(url);
-                if (!token) return undefined;
-                return readMergeRequestReview(url, token);
-              },
-              liveNaIds(group.sieveRows ?? []),
-              [...(sieves?.noted ?? []), ...(tests?.noted ?? [])],
-            )
+          ? await mrDescriptionGap(facts.mr, async () => review, liveNaIds(group.sieveRows ?? []), [
+              ...(sieves?.noted ?? []),
+              ...(tests?.noted ?? []),
+            ])
           : {};
+        // Ветки ревьюера держат доставку (24.10): наблюдатель MR смотрит только
+        // группы в `done`, и группа в доставке сутки не видела трёх блокеров.
+        const threads = review && facts.mr ? reviewThreadsGap(review, facts.mr) : undefined;
         return {
           missing: [
             ...missing,
             ...(description.missing ? [description.missing] : []),
+            ...(threads ? [threads.line] : []),
             ...(sieves?.missing ?? []),
             ...(tests?.missing ?? []),
           ],
@@ -1201,6 +1215,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           ...(facts.branch ? { branch: facts.branch } : {}),
           ...(facts.unreachable ? { unreachable: facts.unreachable } : {}),
           ...(description.unchecked ? { descriptionUnchecked: true } : {}),
+          ...(threads ? { reviewThreads: threads.threads } : {}),
         };
       },
       // `childTells` объявлен ниже: к моменту первой проверки он уже есть.
@@ -1253,6 +1268,13 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       caught: (classes) => sieveStore().caught(classes),
     },
     log: (message, error) => console.warn(message, error),
+  });
+  // Команды оболочки чужих CLI — тем же судом, что брокер Claude (P-01..P-05).
+  wireForeignShellJudge({
+    ctx,
+    store: ctx.store,
+    providerChats,
+    deliverAhead: (link) => splitConveyor.deliverAhead(link),
   });
   // MR доставленной группы после «готово» (WP1j): ветки ревьюеров и исход
   // конвейера — по расписанию, только чтением; нашлось — группа продолжается.
@@ -1386,7 +1408,12 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   providerChats.setChildRun((providerId, chatId) => {
     const link = ctx.store.getChatLink(foreignChatKey(providerId, chatId));
     if (!link?.parentChatId) return undefined;
-    const env = childRunEnv(process.env);
+    // Метка группы в окружении, как у групп Claude (`groupRunProfile`): суд
+    // погашения узнаёт по ней сирот группы чужого CLI (D-1, P-06).
+    const env = {
+      ...childRunEnv(process.env),
+      ...groupMarkEnv({ parentChatId: link.parentChatId, groupIndex: link.groupIndex }),
+    };
     // Рычаги экономии закрепляются здесь — на старте прогона, как у Claude, а не
     // при заведении звена: дополнение (`foreignChildExtra`) только смотрит, и
     // отложенное звено берёт рычаги своего первого хода (ревью A8).
@@ -1939,6 +1966,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         bashCeilings: bashCeilingsAt(ctx.location.paths.settings, cwd),
         // Псевдонимы и функции снимка — правилами `ask`: их вызов судит брокер (24.10, a/d).
         shellNames: snapshotNames(shellSnapshotSync()),
+        // Метка группы в окружении: суд погашения узнаёт по ней её сирот (D-1).
+        ...(link && typeof link.groupIndex === 'number'
+          ? { processMark: groupProcessMark(link.parentChatId, link.groupIndex) }
+          : {}),
         ...(compactWindow ? { compactWindow } : {}),
         ...(economy ? { economy } : {}),
       });

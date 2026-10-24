@@ -1,0 +1,74 @@
+{
+  "topic": "phone",
+  "scenario": "signing",
+  "frames": [
+    {
+      "id": "01-panel-card",
+      "side": "panel",
+      "file": "01-panel-card.png",
+      "masked": 1,
+      "width": 896,
+      "height": 602,
+      "shotAt": "2026-10-24T16:24:44.973Z",
+      "text": "Подпись решений телефоном Включена включена 20 окт. 2026 г., 14:20 Включённый режим принимает «Разрешить» — по правам, D-n, воротам ветки, карточкам агента панели, автоподтверждению и полному доступу — только с подписью ключа привязанного телефона. Ключ создаётся и хранится на телефоне: ни процесс модели, ни изменённый код панели в этом окне подписать за вас не смогут. «Запретить» и «Стоп» принимаются откуда угодно. Привязать телефон, включить и выключить режим можно только на телефоне: «Настройки» → «Связь» → «Подпись решений». Здесь видно состояние и можно отозвать ключ: кнопку «включить» в этом окне мог бы нажать и изменённый код самого окна. Пока режим включён, «Разрешить» в окне панели и в Telegram не проходит — ответьте с телефона. Изменения, которые ослабляют права всех будущих решений (авторежим во всех чатах, правила автоподтверждения, права групп, импорт настроек), не принимаются: выключите подпись на телефоне, внесите изменение и включите её снова. Привязанные телефоны Отпечаток должен совпасть с тем, что показывает телефон. Незнакомый отпечаток — ключ, который привязали не вы: отзовите его. Pixel 8 Отпечаток FE81 2C12 F3AB 4CE6 привязан 20 окт. 2026 г., 14:15 · последняя подпись 24 окт. 2026 г., 13:40 Отозвать Galaxy S21 Отпечаток DBC2 9825 1C51 321B привязан 2 сент. 2026 г., 17:00 · отозван 20 окт. 2026 г., 14:10",
+      "en": {
+        "file": "01-panel-card.en.png",
+        "masked": 1,
+        "width": 896,
+        "height": 582,
+        "shotAt": "2026-10-24T16:24:50.796Z",
+        "text": "Decisions signed by the phone On on since Oct 20, 2026, 02:20 PM With this mode on, “Allow” — for permissions, D-n asks, branch gates, panel-agent cards, auto-approve and full access — is accepted only with the signature of a paired phone’s key. The key is created and kept on the phone: neither a model process nor modified panel code in this window can sign for you. “Deny” and “Stop” are accepted from anywhere. Pairing a phone and switching the mode on or off happen on the phone only: Settings → Link → Decision signing. Here you see the state and can revoke a key: an “enable” button in this window could be pressed by modified code of the window itself. While the mode is on, “Allow” from the panel window and from Telegram does not go through — answer from the phone. Changes that loosen the rights of every future decision (auto mode in every chat, auto-approve rules, group permissions, settings import) are refused: switch signing off on the phone, make the change, then switch it back on. Paired phones The fingerprint must match the one the phone shows. An unfamiliar fingerprint is a key you did not pair: revoke it. Pixel 8 Fingerprint FE81 2C12 F3AB 4CE6 paired Oct 20, 2026, 02:15 PM · last signature Oct 24, 2026, 01:40 PM Revoke Galaxy S21 Fingerprint DBC2 9825 1C51 321B paired Sep 2, 2026, 05:00 PM · revoked Oct 20, 2026, 02:10 PM"
+      },
+      "dark": {
+        "file": "01-panel-card.dark.png",
+        "masked": 1,
+        "width": 896,
+        "height": 602,
+        "shotAt": "2026-10-24T16:24:57.401Z",
+        "text": "Подпись решений телефоном Включена включена 20 окт. 2026 г., 14:20 Включённый режим принимает «Разрешить» — по правам, D-n, воротам ветки, карточкам агента панели, автоподтверждению и полному доступу — только с подписью ключа привязанного телефона. Ключ создаётся и хранится на телефоне: ни процесс модели, ни изменённый код панели в этом окне подписать за вас не смогут. «Запретить» и «Стоп» принимаются откуда угодно. Привязать телефон, включить и выключить режим можно только на телефоне: «Настройки» → «Связь» → «Подпись решений». Здесь видно состояние и можно отозвать ключ: кнопку «включить» в этом окне мог бы нажать и изменённый код самого окна. Пока режим включён, «Разрешить» в окне панели и в Telegram не проходит — ответьте с телефона. Изменения, которые ослабляют права всех будущих решений (авторежим во всех чатах, правила автоподтверждения, права групп, импорт настроек), не принимаются: выключите подпись на телефоне, внесите изменение и включите её снова. Привязанные телефоны Отпечаток должен совпасть с тем, что показывает телефон. Незнакомый отпечаток — ключ, который привязали не вы: отзовите его. Pixel 8 Отпечаток FE81 2C12 F3AB 4CE6 привязан 20 окт. 2026 г., 14:15 · последняя подпись 24 окт. 2026 г., 13:40 Отозвать Galaxy S21 Отпечаток DBC2 9825 1C51 321B привязан 2 сент. 2026 г., 17:00 · отозван 20 окт. 2026 г., 14:10"
+      },
+      "darkEn": {
+        "file": "01-panel-card.dark.en.png",
+        "masked": 1,
+        "width": 896,
+        "height": 582,
+        "shotAt": "2026-10-24T16:25:03.715Z",
+        "text": "Decisions signed by the phone On on since Oct 20, 2026, 02:20 PM With this mode on, “Allow” — for permissions, D-n asks, branch gates, panel-agent cards, auto-approve and full access — is accepted only with the signature of a paired phone’s key. The key is created and kept on the phone: neither a model process nor modified panel code in this window can sign for you. “Deny” and “Stop” are accepted from anywhere. Pairing a phone and switching the mode on or off happen on the phone only: Settings → Link → Decision signing. Here you see the state and can revoke a key: an “enable” button in this window could be pressed by modified code of the window itself. While the mode is on, “Allow” from the panel window and from Telegram does not go through — answer from the phone. Changes that loosen the rights of every future decision (auto mode in every chat, auto-approve rules, group permissions, settings import) are refused: switch signing off on the phone, make the change, then switch it back on. Paired phones The fingerprint must match the one the phone shows. An unfamiliar fingerprint is a key you did not pair: revoke it. Pixel 8 Fingerprint FE81 2C12 F3AB 4CE6 paired Oct 20, 2026, 02:15 PM · last signature Oct 24, 2026, 01:40 PM Revoke Galaxy S21 Fingerprint DBC2 9825 1C51 321B paired Sep 2, 2026, 05:00 PM · revoked Oct 20, 2026, 02:10 PM"
+      }
+    },
+    {
+      "id": "02-panel-revoke-last",
+      "side": "panel",
+      "file": "02-panel-revoke-last.png",
+      "masked": 0,
+      "width": 420,
+      "height": 320,
+      "shotAt": "2026-10-24T16:24:45.876Z",
+      "text": "Отозвать ключ телефона? Это последний привязанный телефон, а режим включён: после отзыва «Разрешить» не примет никто. Выключить режим без телефона можно, только удалив на этом компьютере файл ~/.agentdeck/phone-signing.json. Отмена Отозвать",
+      "en": {
+        "file": "02-panel-revoke-last.en.png",
+        "masked": 0,
+        "width": 420,
+        "height": 320,
+        "shotAt": "2026-10-24T16:24:51.669Z",
+        "text": "Revoke the phone’s key? This is the last paired phone and the mode is on: after revoking, nobody can “Allow”. Without a phone the mode can be switched off only by deleting the file ~/.agentdeck/phone-signing.json on this computer. Cancel Revoke"
+      },
+      "dark": {
+        "file": "02-panel-revoke-last.dark.png",
+        "masked": 0,
+        "width": 420,
+        "height": 320,
+        "shotAt": "2026-10-24T16:24:58.271Z",
+        "text": "Отозвать ключ телефона? Это последний привязанный телефон, а режим включён: после отзыва «Разрешить» не примет никто. Выключить режим без телефона можно, только удалив на этом компьютере файл ~/.agentdeck/phone-signing.json. Отмена Отозвать"
+      },
+      "darkEn": {
+        "file": "02-panel-revoke-last.dark.en.png",
+        "masked": 0,
+        "width": 420,
+        "height": 320,
+        "shotAt": "2026-10-24T16:25:04.553Z",
+        "text": "Revoke the phone’s key? This is the last paired phone and the mode is on: after revoking, nobody can “Allow”. Without a phone the mode can be switched off only by deleting the file ~/.agentdeck/phone-signing.json on this computer. Cancel Revoke"
+      }
+    }
+  ]
+}

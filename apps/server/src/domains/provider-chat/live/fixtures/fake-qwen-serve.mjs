@@ -185,6 +185,17 @@ async function runTurn(prompt) {
   if (mode === 'permission') {
     emit('permission_request', 'p1', {
       requestId: 'req-1',
+      // FAKE_TOOL_COMMAND — команда оболочки, как её шлёт qwen 0.24 (живая проба 24.10).
+      ...(process.env.FAKE_TOOL_COMMAND
+        ? {
+            toolCall: {
+              kind: 'execute',
+              title: process.env.FAKE_TOOL_COMMAND,
+              _meta: { toolName: 'run_shell_command' },
+              rawInput: { command: process.env.FAKE_TOOL_COMMAND, directory: process.cwd() },
+            },
+          }
+        : {}),
       options: [
         { optionId: 'proceed_once', kind: 'allow_once' },
         { optionId: 'cancel', kind: 'reject_once' },

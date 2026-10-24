@@ -13,6 +13,7 @@ import type {
 import type { SplitConveyorStore } from '../split-conveyor/split-conveyor.ts';
 import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { noteRelayed, pendingThreads, REVIEW_REPLY_LINES, threadLines } from './review-threads.ts';
 
 /**
  * Наблюдатель MR после «готово» (WP1j; живой прогон 24.09, журнал 104, 114).
@@ -123,87 +124,13 @@ export interface MrWatchDeps {
   log: (message: string, error?: unknown) => void;
 }
 
-/** Ключ реплики, на которую группа должна ответить. */
-function relayKey(thread: MrReviewThread): string {
-  return `${thread.id}:${thread.notes[thread.notes.length - 1]?.id ?? ''}`;
-}
-
-/**
- * Ветки, которые ждут группу: нерешённые, последняя реплика — не автора MR и
- * не бота, и её ещё не передавали.
- */
-export function pendingThreads(review: MrReview, relayed: readonly string[]): MrReviewThread[] {
-  return review.threads.filter((thread) => {
-    if (!thread.resolvable || thread.resolved) return false;
-    const last = thread.notes[thread.notes.length - 1];
-    if (!last || last.bot) return false;
-    if (review.author && last.author === review.author) return false;
-    return !relayed.includes(relayKey(thread));
-  });
-}
-
-/**
- * Ссылка на тред — от форджа, если он её дал (GitHub), иначе якорь GitLab.
- * Та же строка уходит в задание группе и в `relayedLinks`: по ней панель
- * сверяет выученное сито с настоящим тредом.
- */
-export function threadLink(thread: MrReviewThread, mr: string): string | undefined {
-  const last = thread.notes[thread.notes.length - 1];
-  if (!last) return undefined;
-  return last.url ?? `${mr}#note_${last.id}`;
-}
-
-/** Реплика в одну строку: промпт — не место для простыней ревьюера. */
-function excerpt(text: string, limit = 300): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  return flat.length > limit ? `${flat.slice(0, limit)}…` : flat;
-}
-
-/** Ветки ревьюера строками задания: кто, где, ссылка, первая и последняя реплика. */
-export function threadLines(threads: readonly MrReviewThread[], mr: string): string[] {
-  const lines: string[] = [];
-  for (const thread of threads) {
-    const first = thread.notes[0];
-    const last = thread.notes[thread.notes.length - 1];
-    if (!first || !last) continue;
-    const where = thread.path ? ` · ${thread.path}${thread.line ? `:${thread.line}` : ''}` : '';
-    const reply =
-      last !== first ? ` — last reply by ${last.author}: "${excerpt(last.body, 200)}"` : '';
-    lines.push(
-      `- ${first.author}${where} · ${threadLink(thread, mr)}: "${excerpt(first.body)}"${reply}`,
-    );
-  }
-  return lines;
-}
-
-/**
- * Переданные группе ветки — в запись наблюдения: второй раз их не передают, а
- * по ссылкам и файлам панель сверяет выученное из них сито.
- */
-export function noteRelayed(
-  watch: SplitMrWatch,
-  threads: readonly MrReviewThread[],
-  mr: string,
-): void {
-  // Перепроверка шлёт и уже переданное — повтором в памяти оно не встаёт.
-  const known = new Set(watch.relayed ?? []);
-  const fresh = threads.map(relayKey).filter((key) => !known.has(key));
-  watch.relayed = [...(watch.relayed ?? []), ...fresh].slice(-MAX_RELAYED);
-  const links = threads.map((thread) => threadLink(thread, mr)).filter(Boolean) as string[];
-  if (links.length === 0) return;
-  const seen = new Set(watch.relayedLinks ?? []);
-  const added = links.filter((link) => !seen.has(link));
-  watch.relayedLinks = [...(watch.relayedLinks ?? []), ...added].slice(-MAX_RELAYED);
-  // Файл треда — область выученного из него сита: держим только пересланное.
-  const paths = { ...watch.relayedPaths };
-  for (const thread of threads) {
-    const link = threadLink(thread, mr);
-    if (link && thread.path) paths[link] = thread.path;
-  }
-  const kept = new Set(watch.relayedLinks);
-  const entries = Object.entries(paths).filter(([link]) => kept.has(link));
-  if (entries.length > 0) watch.relayedPaths = Object.fromEntries(entries);
-}
+export {
+  noteRelayed,
+  pendingThreads,
+  reviewThreadsGap,
+  threadLines,
+  threadLink,
+} from './review-threads.ts';
 
 /**
  * Продолжение группы по её MR. Кроме списка — две вещи, ради которых он и
@@ -241,11 +168,7 @@ export function mrWatchPrompt(input: {
   }
   lines.push(
     '',
-    'First re-read ALL MR discussions in full, not only the ones listed: new ones may have ' +
-      'arrived while you were not working.',
-    'For each comment — fix it in the branch and reply in the same discussion thread with what ' +
-      'was done, or reply why you do not change it. The reviewer resolves the thread, not you. ' +
-      'Write the replies in the language of the discussion.',
+    ...REVIEW_REPLY_LINES,
     `Finish the delivery as before: commit, push the branch ${input.branch}, the same MR. ` +
       'Before saying "done" again, re-read the MR discussions once more — anything new that ' +
       'arrived during the work is yours too.',
@@ -303,10 +226,13 @@ export class MrWatch {
     if (this.timers.get(this.key(record.parentChatId, group.index)) === cycle) return;
     let watch = group.mrWatch;
     if (!watch || watch.cycle !== cycle) {
-      // Новый круг: счёт проверок и стоп — заново; переданное, взгляд на
+      // Новый круг: счёт проверок и стоп — заново; переданное (с ссылками и
+      // файлами: по ним принимается сито, сданное ходом позже), взгляд на
       // конвейер и потолок продолжений — помним.
       const fresh: SplitMrWatch = { cycle, checks: 0 };
       if (watch?.relayed) fresh.relayed = watch.relayed;
+      if (watch?.relayedLinks) fresh.relayedLinks = watch.relayedLinks;
+      if (watch?.relayedPaths) fresh.relayedPaths = watch.relayedPaths;
       if (watch?.pipeline) fresh.pipeline = watch.pipeline;
       if (watch?.resumes) fresh.resumes = watch.resumes;
       if (watch?.infraRetried) fresh.infraRetried = watch.infraRetried;

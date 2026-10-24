@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { kitItemKinds, type KitProviderView } from '@agentdeck/contracts/kit';
+import { KIT_HOOKS_REACH, kitItemKinds, type KitProviderView } from '@agentdeck/contracts/kit';
 import type { KitMode } from '@agentdeck/contracts/local-models';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
@@ -38,6 +38,13 @@ export function KitModesCard({ providers, footer }: KitModesCardProps) {
         return acc;
       }, {}),
   );
+
+  // Хуки набора доходят не туда же, куда режимы: у Codex режим есть, а хуки — только вариантом
+  // руками. Строка на способ, в порядке от «действуют сами» к «не действуют».
+  const hooks = KIT_HOOKS_REACH.flatMap((reach) => {
+    const titles = providers.filter((p) => p.hooks === reach).map((p) => p.title);
+    return titles.length ? [{ reach, list: titles.join(', ') }] : [];
+  });
 
   /** Набор доходит частично (Codex: правила и навыки) — сказать, что именно не доедет. */
   const carriesNote = (provider: KitProviderView): string => {
@@ -99,6 +106,18 @@ export function KitModesCard({ providers, footer }: KitModesCardProps) {
             {t(`kit.modes.unsupported.${reason}`, { list: titles.join(', ') })}
           </Typography>
         ))}
+        {hooks.length > 0 ? (
+          <Stack gap="var(--spacing-2xs)" data-kit-hooks="">
+            <Typography variant="body-sm" color="muted">
+              {t('kit.modes.hooksLabel')}
+            </Typography>
+            {hooks.map(({ reach, list }) => (
+              <Typography key={reach} variant="body-sm" color="subtle" data-reach={reach}>
+                {t(`kit.modes.hooks.${reach}`, { list })}
+              </Typography>
+            ))}
+          </Stack>
+        ) : null}
         {footer}
       </Stack>
     </Card>

@@ -52,6 +52,7 @@
     "./panel-agent-feed": "./src/panel-agent-feed.ts",
     "./permission-pattern": "./src/permission-pattern.ts",
     "./permission-rules": "./src/permission-rules.ts",
+    "./phone-signing": "./src/phone-signing.ts",
     "./platform": "./src/platform.ts",
     "./platform-layers": "./src/platform-layers.ts",
     "./platform-consumers": "./src/platform-consumers.ts",

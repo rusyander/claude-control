@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { matchText } from '../../../lib/server-texts/server-texts.ts';
-import { deliveryNudgePrompt, humanAsksOf, MAX_DELIVERY_NUDGES } from './split-conveyor.ts';
+import {
+  deliveryEscalationPrompt,
+  deliveryNudgePrompt,
+  humanAsksOf,
+  MAX_DELIVERY_NUDGES,
+} from './split-conveyor.ts';
 import { harness, NO_MR } from './split-conveyor.escalation.fixture.ts';
 
 /**
@@ -57,6 +62,44 @@ describe('доставка: стадия, которой MR не открыть'
 
     expect(h.words.map((word) => word.via)).toEqual(['nudge', 'deliver']);
     expect(h.group()?.status).not.toBe('failed');
+  });
+});
+
+describe('разбор: история кругов без повторов', () => {
+  // Форма живой записи !1072 (24.10): длинный пробел «чужие −» в каждом круге.
+  const long = (name: string): string =>
+    `${name}: ${'inst-chat-ui/src/app/x/index.tsx, '.repeat(30)}`;
+  const A = long('foreign-removals sieve');
+  const B = long('sieve consumers-repo-wide');
+  const C = long('sieve project-checks');
+  const history = [
+    { at: 't1', head: 'ede4693e56d16a443b0829db7c70c60664943fb8', missing: [A, B] },
+    { at: 't2', head: '5970eeb28a456d323f02368cf912ea03bf772b92', missing: [A, B] },
+    { at: 't3', head: '8583f276ddab5aba231de49275467cb272981917', missing: [A, C] },
+  ];
+  const prompt = deliveryEscalationPrompt({
+    branch: 'feature/users',
+    missing: [C],
+    history,
+    reason: 'cap',
+    nudges: 6,
+  });
+  const section = prompt.slice(
+    prompt.indexOf('Earlier rounds'),
+    prompt.indexOf('Restore the state'),
+  );
+
+  it('круг с теми же пробелами — одной строкой, новый пробел — началом, перешедшие — счётом', () => {
+    expect(section).toContain('- t2, head 5970eeb28a45: same gaps as the round before');
+    expect(section).toMatch(
+      /- t3, head 8583f276ddab: sieve project-checks: [^;]{0,200}…; \+1 from the round before/,
+    );
+    expect(section).not.toContain(A);
+  });
+
+  it('полный текст нынешнего пробела — в «Gaps now», история короче одного такого пробела на круг', () => {
+    expect(prompt).toContain(`- ${C}`);
+    expect(section.length).toBeLessThan(history.length * 600);
   });
 });
 

@@ -39,6 +39,17 @@ export const kitEn: typeof kitRu = {
         'Do not get the kit: {{list}}. These CLIs have no way to attach it for one launch, and the panel will not write into their folders.',
       'not-installed': 'Not installed: {{list}}.',
     },
+    hooksLabel: 'Where the kit hooks act (economy and safety):',
+    hooks: {
+      run: 'on every launch — {{list}};',
+      variant:
+        'through a variant you install — {{list}}: the panel does not attach them per launch, files and steps are in apps/server/assets/kit/variants;',
+      'never-fire':
+        'do not act — {{list}}: the CLI has a hook format, but its release never calls them;',
+      'not-runnable': 'do not act — {{list}}: the panel does not run this CLI;',
+      'no-tool-loop':
+        'do not act — {{list}}: the CLI makes no tool calls, there is nothing to intercept.',
+    },
     saved: 'Kit mode saved',
   },
   tabs: {

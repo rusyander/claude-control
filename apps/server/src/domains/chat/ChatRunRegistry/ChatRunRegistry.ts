@@ -1731,6 +1731,13 @@ export class ChatRunRegistry {
       workspace: workspace.state,
     };
     this.runs.set(chatId, registered);
+    // Сначала конвейер переводит группу в «стартует», потом сторож снимает её состояние на старте хода:
+    // в обратном порядке продолжение с паузы снималось «на паузе» и первый же вызов давал R20 (25.10).
+    try {
+      this.onRunStart?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]);
+    } catch {
+      // Слушатель чужой: его сбой не имеет права сорвать старт прогона.
+    }
     this.feedWatch(chatId, {
       kind: 'start',
       sessionId: meta.sessionId,
@@ -1738,11 +1745,6 @@ export class ChatRunRegistry {
       // Ответвление тёплой сессии: сторожу R2 нужен конец её последнего вызова.
       ...(options.fork && options.sessionId ? { forkOf: options.sessionId } : {}),
     });
-    try {
-      this.onRunStart?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]);
-    } catch {
-      // Слушатель чужой: его сбой не имеет права сорвать старт прогона.
-    }
     // Отказанный контуром прогон не стартует вовсе — и группу включать не за
     // чем: включение пишет в каталог конфига и пережило бы несостоявшийся ход.
     try {

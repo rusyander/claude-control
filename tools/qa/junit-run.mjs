@@ -312,12 +312,22 @@ function runVitest(file, cases) {
     `  тестов в файле ${tests.length}, код ${result.status ?? 'нет'} за ${Math.round(seconds)} с`,
   );
 
+  // Пропуск в отчёте vitest — решение самого теста (`it.skip`, `ctx.skip()`): стенда этот путь
+  // не ждёт. 25.10 тест гонки, не поймавший гонку, звался «из-за стенда» и давал код 1 зелёному прогону.
+  const own = (result) =>
+    result.status === 'skipped'
+      ? {
+          ...result,
+          message: result.message ?? 'Пропущен самим тестом (it.skip или ctx.skip()).',
+          authoredSkip: true,
+        }
+      : result;
   const whole = worst(tests);
   const suite = { name: file, cases: [] };
   const targets = cases.length > 0 ? cases : [{ caseId: undefined, testName: undefined }];
   for (const { caseId, testName } of targets) {
     if (!testName) {
-      suite.cases.push({ caseId, name: file, file, seconds, ...whole });
+      suite.cases.push(own({ caseId, name: file, file, seconds, ...whole }));
       continue;
     }
     // Имя блока describe связывает кейс со всеми тестами под ним: красный любой — красный кейс.
@@ -327,7 +337,7 @@ function runVitest(file, cases) {
       (nested.length > 0 ? worst(nested) : undefined);
     suite.cases.push(
       hit
-        ? { caseId, name: `${file} › ${testName}`, file, ...hit }
+        ? own({ caseId, name: `${file} › ${testName}`, file, ...hit })
         : {
             caseId,
             name: `${file} › ${testName}`,
@@ -497,6 +507,8 @@ function worst(tests) {
   }
   if (tests.length === 0)
     return { status: 'failed', message: 'В отчёте vitest нет ни одного теста.' };
+  // Все пропущены — не проверено ничего: зелёный здесь был бы вердиктом без единой проверки.
+  if (tests.every((test) => test.status === 'skipped')) return { status: 'skipped' };
   return { status: 'passed' };
 }
 

@@ -426,6 +426,8 @@ describe('OpencodeServe: просьбы о разрешении решает dec
       requestId: 'per_1',
       tool: 'bash',
       title: 'echo hi > f',
+      // Команда с провода — для судьи (P-01); без судьи решает человек, как раньше.
+      shell: { command: 'echo hi > f', shell: process.platform === 'win32' ? 'unknown' : 'bash' },
     });
     expect(replies).toEqual([
       { id: 'per_1', body: { reply: 'reject', message: OPENCODE_DECLINE_MESSAGE } },
@@ -453,6 +455,30 @@ describe('OpencodeServe: просьбы о разрешении решает dec
     );
     expect(human).not.toHaveBeenCalled();
     expect(replies).toEqual([{ id: 'per_1', body: { reply: 'once' } }]);
+  });
+
+  it('правки включены, есть судья команд → команда bash уходит судье; его отказ — reject с причиной', async () => {
+    const { fetchImpl, replies } = fakeServer({
+      pending: [{ ...ask, patterns: ['git branch -D old'] }],
+      holdUntilAnswered: true,
+    });
+    const judge = vi.fn(async () => ({ behavior: 'deny' as const, message: 'нет' }));
+    await new OpencodeServe().ask(
+      'conv-1',
+      'вопрос',
+      depsOf(fetchImpl, { permission: { allowEdits: true, ask: async () => 'allow', judge } }),
+    );
+    // Сервер общий на все разговоры — pid хода не назвать.
+    expect(judge).toHaveBeenCalledWith(
+      {
+        command: 'git branch -D old',
+        shell: process.platform === 'win32' ? 'unknown' : 'bash',
+      },
+      undefined,
+    );
+    // Причина судьи — модели в самом отказе: без неё модель видит общий отказ и
+    // повторяет команду.
+    expect(replies).toEqual([{ id: 'per_1', body: { reply: 'reject', message: 'нет' } }]);
   });
 
   it('прав не передали (ассистент формы) → отказ, молча «да» не бывает', async () => {

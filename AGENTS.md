@@ -35,12 +35,15 @@ default and the only verified one. No database — **source of truth = Claude Co
 - `packages/contracts` — shared types + zod schemas
 - `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs), `tailscale-serve.mjs`
   (`pnpm remote` / `off`), `keepalive.mjs` (`pnpm keepalive[:install|:off|:status]` — watchdog over
-  both dev halves), `build-mobile-apk.mjs`, `clean-mobile-build.mjs` (Gradle native intermediates in
-  `node_modules/*/android/{build,.cxx}`, ~10 GB per release build; the build sweeps them, `--keep-build` opts
-  out, `--dry` measures), `make-mobile-icons.mjs` (one SVG mark → every icon/splash size),
-  `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record` — the QA workspace
+  both dev halves), `build-mobile-apk.mjs` (Windows: builds from a short real-path mirror `C:\adapk\<clone tag>`
+  — SDK ninja 1.10 breaks on >260-char library paths of any long clone; `AGENTDECK_APK_DIR` moves it),
+  `clean-mobile-build.mjs` (Gradle native intermediates in
+  `node_modules/*/android/{build,.cxx}`, ~10 GB per release build, plus that mirror; the build sweeps them,
+  `--keep-build` opts out, `--dry` measures), `make-mobile-icons.mjs` (one SVG mark → every icon/splash size),
+  `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record|gaps` — the QA workspace
   of a project without the panel; CI exit codes: `report` 1 on a failure outside quarantine, `diff` 1 on NEW
-  failures only, `lint` 1 only with `--fail-on`), `docs/` — PDF guides: `shots-{chat,tests}-guide.mjs` shoot a
+  failures only, `lint` 1 only with `--fail-on`, `gaps` 1 on any Tests-block delivery gap — same code as the
+  panel's delivery check), `docs/` — PDF guides: `shots-{chat,tests}-guide.mjs` shoot a
   fully stubbed panel, `build-guide.mjs` prints through Chromium (`build-*-guide.mjs` = source, out, footer) →
   `docs/{CHAT,TESTS}-GUIDE.ru.pdf`; sources and frames in `.agent/{chat,tests}-guide/`, OUT of git (a fresh
   clone re-shoots against a running stand). `PAGES=<dir>` rasterises page by page — every page is looked at

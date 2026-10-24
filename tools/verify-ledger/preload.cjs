@@ -138,11 +138,13 @@ function main() {
   }
 
   const D = require('./delta.cjs');
-  const delta =
+  let delta =
     !hit && mode === 'on' && decision.reason === 'no-record'
       ? D.plan({ repo, parts, match, cwd, tree: start.tree, now: startedAt })
       : null;
-  if (delta?.files) narrow(L, D, { repo, delta, base, event, startedAt });
+  // Повтор не состоялся — прогон целиком и записывается как целый, не как звено сужения (F5).
+  if (delta?.files && !narrow(L, D, { repo, match, cwd, delta, base, event, startedAt }))
+    delta = null;
 
   const capture = startCapture();
   process.on('exit', (code) => {
@@ -159,23 +161,30 @@ function main() {
 }
 
 /**
- * Сужение от последнего зелёного (`delta.cjs`): argv становится `vitest related <Δ>`.
- * Внутри пакета не изменилось ничего видимого тестам — повтор зелёного G, как при
- * совпадении ключа. Строка о сужении печатается всегда: прогон уже не тот, что набран.
+ * Сужение от последнего зелёного (`delta.cjs`): argv становится `vitest related <Δ>`, у
+ * списка файлов — `vitest run F --changed` с Δ от поставщика. Внутри пакета не изменилось
+ * ничего видимого тестам — повтор зелёного G, как при совпадении ключа (отчёт — по пути
+ * ЭТОГО запуска). Строка о сужении печатается всегда: прогон уже не тот, что набран.
  */
-function narrow(L, D, { repo, delta, base, event, startedAt }) {
+function narrow(L, D, { repo, match, cwd, delta, base, event, startedAt }) {
   const { last } = delta;
   const at = new Date(last.at).toISOString();
   if (delta.files.length === 0) {
-    const green = L.records(repo, last.key).find((r) => r.runId === last.runId);
-    if (!green) return;
-    const bodies = L.replayBodies(repo, green);
+    // Повтор G — под теми же стражами, что повтор по ключу: красный на ключе, нестабильная
+    // проверка (два зелёных), неполный вывод, пропавший артефакт (ревью 25.10, F2).
+    const d = L.decide(repo, last.key, {
+      now: startedAt,
+      flaky: L.isFlaky(repo, base.checkId, startedAt),
+    });
+    const green = d.hit;
+    if (!green || !L.coversReports(green, match)) return false;
+    const bodies = L.replayBodies(repo, green, match);
     writeAll(1, bodies.stdout);
     writeAll(2, bodies.stderr);
     writeAll(
       2,
       Buffer.from(
-        `[verify-ledger] nothing the tests can see changed since green ${last.runId} from ${at}; reused${forceHint(L, 'AGENTDECK_VERIFY_LEDGER_DELTA=off forces a run')}\n`,
+        `[verify-ledger] nothing the tests can see changed since green ${green.runId} from ${new Date(green.startedAt).toISOString()}; reused${forceHint(L, 'AGENTDECK_VERIFY_LEDGER_DELTA=off forces a run')}\n`,
       ),
     );
     const empty = Buffer.alloc(0);
@@ -185,29 +194,49 @@ function narrow(L, D, { repo, delta, base, event, startedAt }) {
         ...base,
         exit: 0,
         ms: Date.now() - startedAt,
-        reusedFrom: last.runId,
+        reusedFrom: green.runId,
         scope: `delta:${last.tree.slice(0, 12)}`,
       },
       { stdout: empty, stderr: empty, complete: false },
     );
-    L.appendEvent({ ...event, kind: 'hit', savedMs: green.ms, delta: 0 });
+    L.appendEvent({ ...event, kind: 'hit', savedMs: green.ms, delta: 0, mode: delta.shape.mode });
     process.exit(0);
   }
-  process.argv = [process.argv[0], process.argv[1], ...D.narrowedArgs(delta.shape, delta.files)];
+  const listed = delta.shape.mode === 'files';
+  if (listed) Object.assign(process.env, D.deltaEnv(cwd, delta.files));
+  process.argv = [
+    process.argv[0],
+    process.argv[1],
+    ...D.narrowedArgs(delta.shape, delta.files, { args: match.args, cwd }),
+  ];
   base.scope = `delta:${last.tree.slice(0, 12)}`;
   base.chain = (last.chain ?? 0) + 1;
+  const names = `${delta.files.slice(0, 5).join(', ')}${delta.files.length > 5 ? ', …' : ''}`;
+  const what = listed
+    ? `vitest run of the ${delta.shape.files.length} listed file(s) limited to tests whose imports reach ${delta.files.length} changed file(s) (${names}); the rest keep that green's verdict, none selected = none affected`
+    : `vitest related on ${delta.files.length} changed file(s) (${names})`;
   writeAll(
     2,
     Buffer.from(
-      `[verify-ledger] delta since green ${last.runId} from ${at}: vitest related on ${delta.files.length} changed file(s) (${delta.files.slice(0, 5).join(', ')}${delta.files.length > 5 ? ', …' : ''})${forceHint(L, 'AGENTDECK_VERIFY_LEDGER_DELTA=off runs the whole set')}\n`,
+      `[verify-ledger] delta since green ${last.runId} from ${at}: ${what}${forceHint(L, 'AGENTDECK_VERIFY_LEDGER_DELTA=off runs the whole set')}\n`,
     ),
   );
-  L.appendEvent({ ...event, kind: 'delta', files: delta.files.length, chain: base.chain });
+  L.appendEvent({
+    ...event,
+    kind: 'delta',
+    files: delta.files.length,
+    chain: base.chain,
+    ...(listed ? { mode: 'files' } : {}),
+  });
+  return true;
 }
 
-/** Зелёный прогон — новая точка отсчёта для сужения того же семейства. */
+/**
+ * Зелёный прогон — новая точка отсчёта для сужения того же семейства. С машинным отчётом
+ * тоже: его не сужают, но повторяют, пока тесты не видят изменений (`delta.cjs` plan).
+ */
 function rememberGreen(D, { repo, match, parts, cwd, start, delta, base, runId }) {
-  if (match.id !== 'vitest' || match.noSkip || match.wholeOnly) return;
+  if (match.id !== 'vitest' || match.noSkip) return;
   const shape = delta?.shape ?? D.vitestShape(match.args);
   if (!shape) return;
   const family = delta?.family ?? D.familyOf(parts, shape);

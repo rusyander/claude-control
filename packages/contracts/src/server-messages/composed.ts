@@ -170,6 +170,7 @@ export const composedMessageParams = {
   'sieve-note-not-branch': ['sieve', 'reason'],
   'sieve-note-run-red': ['run', 'cases'],
   'delivery-gap-mr-notes': ['mr', 'items'],
+  'delivery-gap-review-threads': ['mr', 'count', 'threads'],
   'split-delivery-stalled': ['nudges'],
   'split-delivery-nudge-cap': ['nudges'],
   'split-delivery-notes-notice': ['group', 'notes'],

@@ -5,6 +5,7 @@ import { serverMessage } from '../../api/server-message';
 import { STREAM_CONNECT_MS, STREAM_STALL_MS } from './constants';
 import type { ChatEvent, SendOutcome, StartInput } from './types';
 import { authHeaders } from '../../api/authHeaders';
+import { signatureHeaders } from '../../api/signing/signatureHeaders';
 import { dict } from '../../config/i18n';
 import { runs, setRun, markStalled, markLive, applyEvent, lastSeqs } from './store';
 
@@ -221,11 +222,14 @@ export async function openStream(
 ): Promise<StreamOutcome> {
   let response: Response;
   if (mode === 'send') {
+    // Отправка с полным доступом или автоподтверждением — тоже решение: при
+    // включённом режиме подписи панель ждёт подпись ключа телефона.
+    const signature = await signatureHeaders('POST', '/chat/send', input);
     response = await openResponse(
       apiUrl('/chat/send'),
       {
         method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        headers: { ...authHeaders(), 'Content-Type': 'application/json', ...signature },
         body: JSON.stringify(input),
       },
       controller,

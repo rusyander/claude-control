@@ -10,8 +10,15 @@ import {
   steerCodexTurn,
 } from './codex-session.ts';
 import { decidePermission } from './permission.ts';
+import { codexShellAsk } from './shell-ask.ts';
 import { StdioRpc, type RpcIncoming } from './stdio-rpc.ts';
-import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
+import type {
+  LivePermissionPolicy,
+  LiveShellCall,
+  LiveTurn,
+  LiveTurnOptions,
+  LiveTurnResult,
+} from './types.ts';
 
 /**
  * Codex через `codex app-server` (JSON-RPC строками по stdio) — на один ответ.
@@ -53,8 +60,14 @@ export function codexThreadRights(
   // writable root sets» (оба — живой прогон 0.160). Поэтому там «включено» = тот же
   // `untrusted`, что и «выключено», а «да» на каждую просьбу отвечает сама панель
   // (`decidePermission`): правки идут, карточек нет.
+  // POSIX при судье команд (Q3, 24.10): `never` не спросил бы ни о чём, и судья не
+  // увидел бы `git branch -D` — поэтому `untrusted`, песочница та же
+  // (`workspace-write`), «да» обратимому отвечает судья. Без живой проверки: Linux и
+  // macOS здесь не прогнать.
   if (policy.allowEdits && platform !== 'win32') {
-    return { approvalPolicy: 'never', sandbox: 'workspace-write' };
+    return policy.judge
+      ? { approvalPolicy: 'untrusted', sandbox: 'workspace-write' }
+      : { approvalPolicy: 'never', sandbox: 'workspace-write' };
   }
   return { approvalPolicy: 'untrusted', sandbox: 'read-only' };
 }
@@ -74,20 +87,28 @@ function grantedProfile(requested: unknown): Record<string, unknown> {
 export async function answerCodexApproval(
   message: RpcIncoming,
   policy: LivePermissionPolicy | undefined,
+  /** pid процесса `codex app-server` — корень дерева для суда погашения (P-06). */
+  pid?: number,
 ): Promise<unknown> {
   const params = (message.params ?? {}) as Record<string, unknown>;
   const text = (value: unknown): string | undefined =>
     typeof value === 'string' && value.trim() ? value.trim() : undefined;
-  const ask = (tool: string, title: string | undefined) =>
+  const ask = (tool: string, title: string | undefined, shell?: LiveShellCall) =>
     decidePermission(policy, {
       cli: 'codex',
       requestId: String(message.id ?? ''),
       tool,
       ...(title ? { title } : {}),
+      ...(shell ? { shell } : {}),
+      ...(pid ? { pid } : {}),
     });
   switch (message.method) {
     case 'item/commandExecution/requestApproval': {
-      const decision = await ask('command', text(params.command) ?? text(params.reason));
+      const decision = await ask(
+        'command',
+        text(params.command) ?? text(params.reason),
+        codexShellAsk(params),
+      );
       return { decision: decision === 'allow' ? 'accept' : 'decline' };
     }
     case 'item/fileChange/requestApproval': {
@@ -106,6 +127,7 @@ export async function answerCodexApproval(
       const decision = await ask(
         message.method === 'execCommandApproval' ? 'command' : 'fileChange',
         command ?? text(params.reason),
+        message.method === 'execCommandApproval' ? codexShellAsk(params) : undefined,
       );
       return {
         decision:
@@ -253,7 +275,7 @@ export class CodexAppServerTurn implements LiveTurn {
           // Вопрос сервера о разрешении — по политике хода (ответ асинхронный:
           // поток уведомлений не ждёт человека). Прочие вопросы — отказ.
           onRequest: (message) => {
-            void answerCodexApproval(message, options.permission).then((result) =>
+            void answerCodexApproval(message, options.permission, child.pid).then((result) =>
               rpc.respond(
                 message.id,
                 result === undefined

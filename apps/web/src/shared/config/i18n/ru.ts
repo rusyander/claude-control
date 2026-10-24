@@ -23,6 +23,7 @@ import { localModelsRu } from './local-models/ru.ts';
 import { kitRu } from './kit/ru.ts';
 import { telegramAnswersRu } from './telegram-answers/ru.ts';
 import { deferredAsksRu } from './deferred-asks/ru.ts';
+import { phoneSigningRu } from './phone-signing/ru.ts';
 
 export const ru = {
   /** Тексты сервера по коду — `server-message.ts`, `contracts/server-messages.ts`. */
@@ -65,6 +66,8 @@ export const ru = {
   devRestart: devRestartRu,
   /** Отложенные вопросы D-n: плашка, список, хаб, карточка в ленте — `deferred-asks/ru.ts`. */
   deferredAsks: deferredAsksRu,
+  /** Подпись решений телефоном: карточка в «Доступе» — `phone-signing/ru.ts`. */
+  phoneSigning: phoneSigningRu,
   /** Окно «Окружение» из чата проекта — `environment/ru.ts`. */
   environment: environmentRu,
   /** Раздел «Проекты — конфигурация»: шапка проекта, вкладки, документ инструкций — `projects/ru.ts`. */
@@ -1333,6 +1336,8 @@ export const ru = {
         // Вопрос агента группы — островком в её карточке (карточка 27 прогона 20.10).
         askFrom: 'Агент спрашивает · {{stage}} · чат {{chat}}',
         askFromNoStage: 'Агент спрашивает · чат {{chat}}',
+        permissionFrom: 'Агент ждёт разрешения · {{stage}} · чат {{chat}}',
+        permissionFromNoStage: 'Агент ждёт разрешения · чат {{chat}}',
         waiting: 'ждёт: {{names}}',
         held: 'ждёт вашего ответа',
         holdAnswered: 'ответ дан',

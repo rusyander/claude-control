@@ -1,0 +1,218 @@
+{
+  "title": {
+    "ru": "Группы отвечают на замечания ревью сами и не ходят по одинаковым кругам доставки",
+    "en": "Groups answer review comments themselves and stop repeating identical delivery rounds"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Доставка группы читает обсуждения своего MR: открытые замечания ревьюера попадают в список недостающего со ссылками, и группа отвечает на каждое, не дожидаясь человека. Раньше замечания видел только наблюдатель за MR, и включался он лишь после завершения группы.",
+        "en": "A group's delivery reads its MR discussions: open reviewer comments land in the missing list with links, and the group answers each one without waiting for a human. Before, only the MR watcher saw them, and it started only after the group finished."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Длинная строка отчёта о сите, которое требует назвать каждый найденный путь, больше не обрезается: судья видит её целиком, а напоминание перечисляет полностью только то, что ещё не названо. Раньше хвост списка терялся, и группа по нескольку раз сдавала одну и ту же строку, пока круг не уходил человеку.",
+        "en": "A long report row of a sieve that demands every found path be named is no longer cut: the judge sees it whole, and the reminder lists in full only what is still unnamed. Before, the tail of the list was lost and the group handed in the same row several times until the round went to a human."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Строки сит, которые группа переотчитала, переживают конец цепочки: более старая копия строки больше не затирает свежую, и ложное «изменилось после строки» не появляется.",
+        "en": "Sieve rows a group re-reported survive the end of the chain: an older copy of a row no longer overwrites the fresh one, and a false “changed after the row” no longer appears."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Напоминание о недостающих строках сит показывает формат строки, а не просит «отчитаться снова» словами.",
+        "en": "The reminder about missing sieve rows shows the row format instead of asking in words to “report again”."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Остановку процесса, который группа сама запустила и потеряла (осиротевший, без имени), судья признаёт по дереву процессов, метке окружения или журналу группы и пропускает без вопроса человеку; вопросы, ждавшие с прошлого запуска панели, пересуживаются при старте.",
+        "en": "Stopping a process the group itself started and lost (orphaned, unnamed) is recognised by the process tree, an environment mark or the group's transcript and goes through without asking a human; questions left over from the previous panel start are re-judged at boot."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа видит вердикт блока «Тесты» до того, как объявить доставку (`pnpm tests gaps`), и напоминание называет эту команду — лишний круг на каждое расширение изменений пропал.",
+        "en": "A group sees the Tests block verdict before it declares delivery (`pnpm tests gaps`), and the reminder names that command — the extra round on every widened change is gone."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вводная эскалации показывает по каждому прошлому кругу только новые недостающие пункты, а одинаковый круг — одной строкой. Раньше полный текст всех кругов повторялся и занимал больше половины вводной.",
+        "en": "The escalation brief shows only the newly missing items per earlier round, and an identical round as one line. Before, the full text of every round repeated and took more than half of the brief."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Набор тестов, указанный каталогом в корне пакета, запускает только свои файлы, а не весь пакет, и больше не упирается в предел времени прогона.",
+        "en": "A test suite given as a directory at a package root runs only its own files, not the whole package, and no longer hits the run time limit."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Очередь тяжёлых шагов не пропускает команду мимо себя, когда файл очереди на мгновение занят другим процессом Windows: занятый файл переждан, чужая аренда не удаляется, а настоящая поломка всё равно обрывает ожидание через несколько секунд.",
+        "en": "The heavy-step queue no longer lets a command bypass it when a queue file is briefly held by another Windows process: a busy file is waited out, another session's lease is never removed, and a real fault still ends the wait within seconds."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Сервер панели в режиме разработки перезапускается пачкой: через минуту без новых правок, но не позже пяти минут от первой. Раньше каждое сохранение агента перезапускало его отдельно — до 900 раз в день, и идущие ходы ждали каждый перезапуск. `pnpm dev:restart` перезапускает сразу, если правки ждут.",
+        "en": "In development mode the panel server restarts in batches: after a minute with no new edits, and no later than five minutes after the first one. Before, every agent save restarted it on its own — up to 900 times a day, and running turns waited out each restart. `pnpm dev:restart` restarts at once when edits are waiting."
+      },
+      "area": {
+        "ru": "Панель",
+        "en": "Panel"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Релизный APK собирается и из копии проекта с длинным путём: сборка идёт в зеркале приложения по короткому пути, которое уборка после сборки удаляет. Раньше нативная сборка падала на путях длиннее 260 символов.",
+        "en": "The release APK also builds from a project copy with a long path: the build runs in a mirror of the app at a short path, which the post-build sweep removes. Before, the native build failed on paths over 260 characters."
+      },
+      "how": {
+        "ru": "Подмена диска не помогала: автосвязывание Expo передаёт Gradle настоящий путь. Каталог зеркала можно задать переменной `AGENTDECK_APK_DIR` — тогда уборка его не трогает.",
+        "en": "A substituted drive did not help: Expo autolinking hands Gradle the real path. The mirror directory can be set with `AGENTDECK_APK_DIR` — the sweep then leaves it alone."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Журнал проверок не гоняет заново прогон тестов, перечисленных файлами, после правки, которую эти тесты не видят: результат последнего зелёного прогона того же списка повторяется. Правка в коде, который тесты импортируют, запускает только задетые ею тесты списка. Раньше любая правка в копии гнала весь список целиком.",
+        "en": "The verify ledger no longer reruns a test run given as a file list after an edit those tests cannot see: the last green run of the same list is replayed. An edit in code the tests import runs only the listed tests it reaches. Before, any edit anywhere in the copy reran the whole list."
+      },
+      "how": {
+        "ru": "Пересечение списка с затронутыми тестами считает сам vitest по своему графу импортов. Всё, чего граф не видит, — конфиги, setup-файлы и всё, что они импортируют, файлы данных пакета, удаления, скрипты вне пакетов — по-прежнему запускает весь список; тест, который называет изменённый скрипт текстом, запускает процесс или обходит каталог, тоже идёт. Свой корень vitest (`root` в конфиге, `--root`, `-r`, `--dir`) и незнакомый журналу флаг сужение снимают. `AGENTDECK_VERIFY_LEDGER_DELTA=off` отключает сужение.",
+        "en": "vitest itself intersects the list with the affected tests through its import graph. Anything the graph cannot see — configs, setup files and everything they import, the package’s data files, deletions, scripts outside packages — still runs the whole list; a test that names a changed script in its text, launches a process or walks a directory runs too. A vitest root of its own (`root` in the config, `--root`, `-r`, `--dir`) or a flag the ledger does not know turns narrowing off. `AGENTDECK_VERIFY_LEDGER_DELTA=off` turns narrowing off."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сужение прогона vitest больше не даёт зелёный без прогона после правки, которую тест видит мимо графа vitest: кода соседнего пакета под алиасом или относительным импортом, файла данных пакета, исходника, который тест читает обходом каталога, файла, импортированного setup-файлом через другой модуль, и в папке, открытой через ссылку. Раньше такие правки повторяли старый зелёный или выбирали ноль тестов с кодом 0, и сломанный тест проходил.",
+        "en": "Narrowing a vitest run no longer gives a green without running after an edit a test sees past vitest’s graph: code of a neighbouring package under an alias or a relative import, a data file of the package, a source the test reads by walking a directory, a file a setup file imports through another module, and in a folder opened through a link. Before, such edits replayed the old green or selected zero tests with exit code 0, and a broken test passed."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа, продолженная после паузы, больше не получает сигнал сторожа «на паузе, а сессия действует» на первом же своём ходу. Раньше сторож успевал увидеть старую запись о паузе раньше, чем группа отмечалась запущенной.",
+        "en": "A group resumed after a pause no longer gets the watcher signal \"paused, yet a session acts\" on its very first turn. Before, the watcher saw the old pause record before the group was marked as started."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вводная, с которой группа начинает новый разговор по кнопке «Продолжить», несёт сжатую преамбулу окружения: число шагов подготовки и число модулей вместо полных списков. Раньше этот путь передавал задание стадии целиком — до 39 тыс. знаков.",
+        "en": "The brief a group starts a new conversation with on \"Continue\" carries a compact environment preamble: the number of preparation steps and modules instead of full lists. Before, this path passed the whole stage task — up to 39k characters."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Панель ставит группам только записанную в git версию журнала проверок: пока его исходники правятся, работает версия последнего коммита, а каждая версия перед установкой загружает все свои модули. Раньше перезапуск сервера посреди правки отдавал живым группам недописанный журнал.",
+        "en": "The panel gives groups only the committed version of the verify ledger: while its sources are being edited, the last commit's version runs, and every version loads all its modules before it is installed. Before, a server restart in the middle of an edit handed live groups a half-written ledger."
+      },
+      "how": {
+        "ru": "`AGENTDECK_VERIFY_LEDGER_SOURCE=tree` ставит рабочую версию осознанно, без коммита.",
+        "en": "`AGENTDECK_VERIFY_LEDGER_SOURCE=tree` installs the working version on purpose, without a commit."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Тест, который пропустил себя сам, в прогоне кейсов считается пропущенным самим тестом, а не «не засчитанным из-за стенда», и не делает зелёный прогон красным. Кейс на блок тестов, где пропущено всё, получает «пропущен», а не «прошёл».",
+        "en": "A test that skipped itself counts in a case run as skipped by the test, not as \"not counted because of the stand\", and no longer turns a green run red. A case on a test block where everything was skipped gets \"skipped\", not \"passed\"."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Прогон кейсов нескольких групп не числит «без кейса» тесты, у которых кейс есть в другой группе, и не предлагает завести их заново.",
+        "en": "A case run over some groups no longer lists tests whose case lives in another group as \"without a case\", and no longer offers to create them again."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    }
+  ]
+}

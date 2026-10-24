@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Typography } from '@shared/ui/typography';
-import { cardQuestions } from '../../lib/cardQuestions';
+import { cardPermissions, cardQuestions } from '../../lib/cardQuestions';
 import { ChildQuestionBody } from '../ChildQuestionBody/ChildQuestionBody';
 import { PermissionCard } from '../PermissionCard/PermissionCard';
 import { ChildStages } from '../ChildStages/ChildStages';
@@ -40,11 +40,17 @@ export function ChildBlocks({
   onAnswer,
 }: ChildBlocksProps) {
   const { t } = useTranslation();
-  // Вопрос группы с карточкой в хабе — в самой карточке (карточка 27); полоса
-  // держит запросы прав и вопросы чатов, у которых своей карточки нет.
-  const { inCards, strip } = cardQuestions(onOpenChild ? (stages ?? []) : [], questions ?? []);
+  // Вопрос и запрос прав группы с карточкой в хабе — в самой карточке
+  // (карточка 27, владелец 23.10); полоса держит только запросы чатов, у
+  // которых своей карточки нет.
+  const cards = onOpenChild ? (stages ?? []) : [];
+  const { inCards, strip } = cardQuestions(cards, questions ?? []);
+  const { inCards: permitsInCards, strip: permitsStrip } = cardPermissions(
+    cards,
+    permissions ?? [],
+  );
   const hasAsks =
-    (Boolean(onPermissionDecide) && (permissions ?? []).length > 0) ||
+    (Boolean(onPermissionDecide) && permitsStrip.length > 0) ||
     (Boolean(onAnswer) && strip.length > 0);
 
   return (
@@ -63,7 +69,7 @@ export function ChildBlocks({
           человек не должен.
         */}
           {onPermissionDecide &&
-            (permissions ?? []).map((child) => (
+            permitsStrip.map((child) => (
               <div key={child.chatId} className={styles.childAsk}>
                 <Typography variant="caption" color="subtle" className={styles.childAskFrom}>
                   {t('chat.permissionFromChild', { title: child.title })}
@@ -119,6 +125,9 @@ export function ChildBlocks({
           onCheckOverlap={onCheckOverlap}
           overlapBusy={overlapBusy}
           {...(onAnswer && inCards.size > 0 ? { questions: inCards, onAnswer } : {})}
+          {...(onPermissionDecide && permitsInCards.size > 0
+            ? { permissions: permitsInCards, onPermissionDecide }
+            : {})}
         />
       )}
     </>

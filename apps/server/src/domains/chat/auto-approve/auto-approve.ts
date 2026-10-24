@@ -5,6 +5,7 @@ import {
   allowedPermissionRules,
   type PermissionRuleId,
 } from '@agentdeck/contracts/permission-rules';
+import { startProcessLines } from '../group-command/start-process.ts';
 
 /**
  * Автоподтверждение прав в чате.
@@ -327,9 +328,13 @@ export function ruleFor(toolName: string, input: unknown): PermissionRuleId | un
   const command = bashCommand(input);
   if (command === undefined) return undefined;
 
-  const parts = segments(command);
+  // `Start-Process prog -ArgumentList 'a','b'` — программа и аргументы в кавычках
+  // списка, и `rd /s /q` или `git branch -D` правила не видели (P-04): судится и
+  // строка, которую запуск исполнит. Правило — первое по порядку из всех строк.
+  const texts = [command, ...(toolName === 'PowerShell' ? startProcessLines(command) : [])];
+  const parts = texts.flatMap(segments);
   for (const rule of COMMAND_RULES) {
-    if (rule.whole?.some((pattern) => pattern.test(command))) return rule.id;
+    if (rule.whole?.some((pattern) => texts.some((text) => pattern.test(text)))) return rule.id;
     if (rule.segment?.some((pattern) => parts.some((part) => pattern.test(part)))) return rule.id;
   }
 

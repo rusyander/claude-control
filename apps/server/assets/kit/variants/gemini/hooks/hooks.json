@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "name": "agentdeck-kit-prompt",
+            "type": "command",
+            "command": "node \"${extensionPath}/hooks/lib/run.mjs\" prompt --cli=gemini",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "^(run_shell_command|write_file|replace|read_file|read_many_files|grep_search|search_file_content|glob|write_todos)$",
+        "hooks": [
+          {
+            "name": "agentdeck-kit-pre",
+            "type": "command",
+            "command": "node \"${extensionPath}/hooks/lib/run.mjs\" pre --cli=gemini",
+            "timeout": 30000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "^(write_file|replace)$",
+        "hooks": [
+          {
+            "name": "agentdeck-kit-post-edit",
+            "type": "command",
+            "command": "node \"${extensionPath}/hooks/lib/run.mjs\" post-edit --cli=gemini",
+            "timeout": 20000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "name": "agentdeck-kit-stop",
+            "type": "command",
+            "command": "node \"${extensionPath}/hooks/lib/run.mjs\" stop --cli=gemini",
+            "timeout": 15000
+          }
+        ]
+      }
+    ]
+  }
+}

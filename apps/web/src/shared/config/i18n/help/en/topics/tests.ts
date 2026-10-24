@@ -651,7 +651,10 @@ export const testsEn: typeof testsRu = {
       'git). The panel installs it into every registry project itself, and into a new one ' +
       'when it is added; the “Agents” tab in Library settings turns it off, and the file ' +
       'is restored byte for byte if nobody edited it after the panel. Without the panel the ' +
-      'same check is pnpm tests gate.',
+      'same check is pnpm tests gate. Before saying “delivered”, a split group checks the ' +
+      'block of its copy with tests-cli gaps — the same code the panel runs at the delivery ' +
+      'check, for the branch as it is now; exit code 1 means gaps remain, and the command ' +
+      'names each.',
 
     sourceTitle: 'Where generation takes its material from',
     sourceCaption:
@@ -1550,7 +1553,10 @@ export const testsEn: typeof testsRu = {
         'case in the group suites-<top folder>; the case result is the worst of its tests, but ' +
         'a test skipped by its author (it.skip, t.Skip) does not spoil it: a suite is “skipped” ' +
         'only as a whole. The note carries the count of passed tests (“✓ 12” or “✗ 2/12 · name: reason”), and a package that failed ' +
-        'to build gets only its own build error lines. The case text is written from the tests ' +
+        'to build gets only its own build error lines. A JS/TS suite above the third level from ' +
+        'the package root owns only the tests of its own folder, and running its case ' +
+        'runs exactly those files, not the whole package below it; at the third level a suite ' +
+        'gathers its subfolders too and the whole folder runs. The case text is written from the tests ' +
         'themselves, with no model: the title is the describe or the module docstring, a step is ' +
         'a behaviour checked (the test name, the rows of a Go table test, the first sentence of a ' +
         'pytest docstring), and its expected names the test that proves it; past fourteen ' +

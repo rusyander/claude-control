@@ -50,6 +50,26 @@ export interface SieveScan {
 
 /** Потолки — отчёт уезжает в запись группы и в напоминания. */
 const EVIDENCE_MAX = 600;
+/**
+ * Сита, чьё доказательство обязано назвать КАЖДЫЙ отмеченный панелью файл или
+ * имя (`judge.ts`: FLAGS, потребители, проверки проекта, разрушающая миграция).
+ * Обычный потолок обрезал у них список: 12 полных путей не влезали в 600 знаков,
+ * судья ни разу не видел строку целиком, и группа сдавала её кругами (!1072, 24.10).
+ * Новое сито с именами в доказательстве — сюда же.
+ */
+export const NAMING_SIEVES: ReadonlySet<string> = new Set([
+  'foreign-removals',
+  'lockfile-sync',
+  'secrets',
+  'debug-leftovers',
+  'committed-artifacts',
+  'env-config',
+  'consumers-repo-wide',
+  'project-checks',
+  'migration-safety',
+]);
+/** Потолок для них: список механики ограничен (до 80 файлов), строка — нет. */
+const NAMING_EVIDENCE_MAX = 16_000;
 // Строки сит и пунктов задания владельца (U2, `owner-N`) — в одном отчёте.
 export const SIEVE_ROWS_MAX = 80;
 const LEARNED_MAX = 20;
@@ -97,7 +117,8 @@ export function parseSieveBody(
     rows.push({
       id,
       status: status as SieveStatus,
-      evidence: text(row.evidence, EVIDENCE_MAX) ?? '',
+      evidence:
+        text(row.evidence, NAMING_SIEVES.has(id) ? NAMING_EVIDENCE_MAX : EVIDENCE_MAX) ?? '',
     });
     if (rows.length >= SIEVE_ROWS_MAX) break;
   }
@@ -192,6 +213,10 @@ export function mergeSieveRows(
   const byId = new Map((previous ?? []).map((row) => [row.id, row]));
   // Удалить перед записью: свежая строка встаёт в конец и не уходит под обрезку первой.
   for (const row of next) {
+    // Новее — по штампу, а не по месту в вызове: звено цепочки хранит свой
+    // снимок отчёта, и его строки 23.10 ложились поверх сданных 24.10 (!1072).
+    const prior = byId.get(row.id);
+    if (prior?.at && row.at && Date.parse(row.at) < Date.parse(prior.at)) continue;
     byId.delete(row.id);
     byId.set(row.id, row);
   }

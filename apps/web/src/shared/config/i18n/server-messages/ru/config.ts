@@ -368,6 +368,7 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'group-layer-notice-delivered': 'Едет слоем на прогон — {{members}}.',
   'group-layer-notice-nothing': 'Ни один участник до прогона не доехал.',
   'group-layer-notice-refused': 'Не едет:',
+  'foreign-shell-denied': 'Панель не пропустила команду `{{command}}`. Агенту ушло: {{reason}}',
   'group-layer-kind-rule': 'правила: {{names}}',
   'group-layer-kind-skill': 'скиллы: {{names}}',
   'group-layer-kind-mcp': 'MCP: {{names}}',

@@ -124,4 +124,25 @@ describe('сборка: «Остановить всё» — время пауз�
     const rules = groupSignalsOf(store.getGroupWatchSignals(PARENT, 0)).map((item) => item.rule);
     expect(rules).toContain('R20');
   });
+
+  // Живой прогон 25.10, группа #3: «Продолжить» после паузы в 35 ч — и R20 «группа на паузе, а сессия
+  // действует» на первом же вызове. Сторож снимал состояние группы на старте хода раньше, чем конвейер
+  // переводил её в «стартует», и держал снятое до ближайшего обхода.
+  it('продолжение группы с паузы — первый вызов хода не R20', async () => {
+    const pausedAt = new Date(Date.now() - 35 * 3_600_000).toISOString();
+    const plan = structuredClone(SPLIT);
+    plan.groups[0] = { ...plan.groups[0], status: 'paused', pausedAt } as (typeof plan.groups)[0];
+    store.setSplitPlan({ ...plan, projectPath: project });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/send',
+      payload: { chatId: CHILD, prompt: 'Продолжай', projectPath: project },
+    });
+    expect(response.statusCode).toBe(200);
+    await new Promise((done) => setTimeout(done, 300));
+    // Ход прошёл целиком (поддельный CLI сразу кончает) — группа уже не на паузе.
+    expect(store.getSplitPlan(PARENT)?.groups[0]?.status).not.toBe('paused');
+    const rules = groupSignalsOf(store.getGroupWatchSignals(PARENT, 0)).map((item) => item.rule);
+    expect(rules).not.toContain('R20');
+  });
 });

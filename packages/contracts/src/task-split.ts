@@ -1033,6 +1033,11 @@ const RUNTIME_ROW =
   /^(⚠ )?(Node|Python|Go) in (.+?): the project asks for (.*?) \(([^()]*)\)([;:,] .*)$/;
 const COPY_PREP_ROW =
   /^⚠ Copy preparation: the command ".*" (was stopped at the 10-minute ceiling|exited with code \S+)\. (.*)$/;
+/** Удачная установка в задании до `installedLine` (20.10) — команда целиком. */
+const INSTALLED_WITH = /dependencies installed with "(.*?)"(?=; |\.$)/;
+const OUTSIDE_ZONE = "Outside this group's zone (not needed for its tasks): ";
+/** Список модулей строки вне зоны (`in a/, b/` или `for a/`): каждый — путь с косой чертой на конце. */
+const OUTSIDE_MODULES = /( (?:in|for) )([^\s,;()«»]+\/(?:, [^\s,;()«»]+\/)*)/g;
 
 /**
  * Преамбула окружения в задании, которое продолжение группы получает заново.
@@ -1054,10 +1059,27 @@ export function continuationEnvironment(task: string): string {
   type Row = { head: string; rest: string; where: string[]; wanted: string[] };
   const out: Array<string | Row> = [];
   const groups = new Map<string, Row>();
-  for (const line of lines.slice(start, end)) {
+  for (const [i, line] of lines.slice(start, end).entries()) {
+    // Удачная подготовка старого задания — то же сжатие, что `installedLine`
+    // даёт новым: у живой группы 24.10 — 2,6 тыс. знаков в каждой вводной.
+    if (i === 0) {
+      out.push(line.replace(INSTALLED_WITH, (_, command: string) => installedLine(command)));
+      continue;
+    }
     const prep = COPY_PREP_ROW.exec(line);
     if (prep) {
       out.push(`⚠ Copy preparation ${prep[1]} when the group started. ${prep[2]}`);
+      continue;
+    }
+    // Модули вне зоны группа не правит: продолжению хватает сред, версий и команд без списков
+    // модулей — у живой группы 25.10 строка весила 1,3 тыс. знаков в каждой вводной.
+    if (line.startsWith(OUTSIDE_ZONE)) {
+      out.push(
+        line.replace(OUTSIDE_MODULES, (_, lead: string, list: string) => {
+          const n = list.split(', ').length;
+          return `${lead}${n} ${n === 1 ? 'module' : 'modules'}`;
+        }),
+      );
       continue;
     }
     const row = RUNTIME_ROW.exec(line);

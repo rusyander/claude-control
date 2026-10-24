@@ -447,17 +447,17 @@ export async function shootSplit(browser, web, scenario) {
     await page.waitForTimeout(600);
     await scenario.shot(page, '03-hub', { clip: '[data-child-hub]' });
 
-    // ── 04. Ребёнок спрашивает — отвечают в родителе ─────────────────────────
-    // Карточка ребёнка стоит в самом низу ленты и на рабочем окне обрезается
-    // полем ввода: окно выше, и карточка выведена на середину.
+    // ── 04. Группа просит прав — решают в её карточке ────────────────────────
+    // Запрос прав группы стоит островком в её карточке (владелец 23.10), а не
+    // полосой над сводкой. Окно выше, и островок выведен на середину.
     await page.setViewportSize({ width: 1440, height: 1240 });
     await page.waitForTimeout(800);
     await page
-      .locator('[class*="_childAsk_"]')
+      .locator('[data-group-permission]')
       .first()
       .evaluate((node) => node.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(600);
-    await scenario.shot(page, '04-child-ask', { clip: '[class*="_childAsk_"]' });
+    await scenario.shot(page, '04-child-ask', { clip: '[data-group-permission]' });
 
     // ── 04b. Вопрос группы — в её карточке ───────────────────────────────────
     const cardB = `[data-hub-row="chat"]:has-text("${B.title}")`;

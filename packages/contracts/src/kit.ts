@@ -43,6 +43,23 @@ export interface KitItem {
 /** Почему провайдер не получает набор — код для словаря, не текст. */
 export type KitUnsupportedReason = 'no-run-layer' | 'not-installed';
 
+/**
+ * Куда доходят хуки набора (экономия и охрана, `hooks/lib/run.mjs`) — код для словаря:
+ * - `run` — панель подключает их сама на каждый запуск;
+ * - `variant` — человек ставит вариант руками (`variants/<cli>/`), панель на запуск их не несёт;
+ * - `never-fire` — формат хуков у CLI есть, но выпуск их не зовёт (Continue `cn` 1.5.47);
+ * - `not-runnable` — панель этот CLI не запускает (Cursor);
+ * - `no-tool-loop` — у CLI нет цикла инструментов, перехватывать нечего (Aider).
+ */
+export const KIT_HOOKS_REACH = [
+  'run',
+  'variant',
+  'never-fire',
+  'not-runnable',
+  'no-tool-loop',
+] as const;
+export type KitHooksReach = (typeof KIT_HOOKS_REACH)[number];
+
 export interface KitProviderView {
   id: string;
   title: string;
@@ -54,6 +71,8 @@ export interface KitProviderView {
   localOnly?: boolean;
   /** Что из набора доезжает до CLI; нет поля — всё. У Codex — правила и навыки. */
   carries?: KitItemKind[];
+  /** Куда доходят хуки набора; нет поля — провайдер не объявлен (`run`/`variant`/причина). */
+  hooks?: KitHooksReach;
 }
 
 /** Навык, команда или субагент, который есть только в глобальном слое. */

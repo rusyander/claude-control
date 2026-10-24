@@ -123,6 +123,50 @@ describe('преамбула окружения в продолжении гру
     expect(count(compact, 'Run it with: go test ./...')).toBe(1);
   });
 
+  it('удачная подготовка задания до 20.10: вместо списка команд — число шагов (живой прогон 24.10)', () => {
+    // Задание, записанное до `installedLine`, несло 2,6 тыс. знаков «installed with
+    // "[mod] go mod download · …"» в каждую холодную вводную группы.
+    const long = GO_MODS.map((m) => `[${m}] go mod download`).join(' · ');
+    const legacyOk = [
+      ...BEFORE,
+      `The panel prepared this copy: Local layer: 12 copied; dependencies installed with "${long}".`,
+      NODE(NODE_MODS[0]),
+      'The environment is ready — do not set it up again (MCP, local layer, dependencies), start with the task right away.',
+      ...AFTER,
+    ].join('\n');
+    const compact = continuationEnvironment(legacyOk);
+    expect(compact).not.toContain('go mod download');
+    expect(compact).toContain(
+      `The panel prepared this copy: Local layer: 12 copied; dependencies installed by the project's copy preparation (${GO_MODS.length} steps).`,
+    );
+    expect(compact).toContain('Use 22.23.2 for installs and runs');
+    expect(continuationEnvironment(compact)).toBe(compact);
+    // Короткая команда остаётся как была.
+    const short = legacyOk.replace(long, 'npm ci');
+    expect(continuationEnvironment(short)).toContain('dependencies installed with "npm ci".');
+  });
+
+  it('строка о модулях вне зоны: среды, версии, команды и провалы на месте, списков модулей нет (живой прогон 25.10)', () => {
+    const outside = `Outside this group's zone (not needed for its tasks): Node ready on 22.23.2 in shared-ui/, cp-admin-ui/, inst-chat-ui/; Go ready on 1.27.0 in ${GO_MODS.map((m) => `${m}/`).join(', ')} — run: go test ./...; ⚠ Python preparation failed in box-a/, box-b/ («.venv/python -m pip install -r requirements.txt» exited with code 1); ⚠ Go >=1.26 not installed for apps/edge/; Python ready on 3.15.0 in shared-python/ — run: .venv/Scripts/python.exe -m pytest.`;
+    const task = [
+      ...BEFORE,
+      'The panel prepared this copy: Local layer: 12 copied.',
+      NODE(NODE_MODS[0]),
+      outside,
+      'The environment is ready — do not set it up again (MCP, local layer, dependencies), start with the task right away.',
+      ...AFTER,
+    ].join('\n');
+    const line = continuationEnvironment(task)
+      .split('\n')
+      .find((row) => row.startsWith("Outside this group's zone"));
+    expect(line).toBe(
+      "Outside this group's zone (not needed for its tasks): Node ready on 22.23.2 in 3 modules; Go ready on 1.27.0 in 30 modules — run: go test ./...; ⚠ Python preparation failed in 2 modules («.venv/python -m pip install -r requirements.txt» exited with code 1); ⚠ Go >=1.26 not installed for 1 module; Python ready on 3.15.0 in 1 module — run: .venv/Scripts/python.exe -m pytest.",
+    );
+    expect(line!.length).toBeLessThan(outside.length * 0.6);
+    const compact = continuationEnvironment(task);
+    expect(continuationEnvironment(compact)).toBe(compact);
+  });
+
   it('продолжение группы получает сжатую преамбулу', () => {
     const prompt = buildHandoffPrompt(
       { next: 'Run the review stage.', checkpoint: '.agent/PROGRESS.md' } as never,

@@ -15,6 +15,7 @@ import { GroupAutoNotices } from '../GroupAutoNotices/GroupAutoNotices';
 import { GroupText } from '../GroupText/GroupText';
 import { GroupHead } from '../GroupText/GroupHead';
 import { GroupAsk } from '../GroupAsk/GroupAsk';
+import { GroupPermission } from '../GroupPermission/GroupPermission';
 import { GroupSignals } from '../GroupSignals/GroupSignals';
 import { MergeOrderChip } from '../MergeOrderChip/MergeOrderChip';
 import type { GroupCardProps } from './GroupCard.types';
@@ -49,11 +50,14 @@ export function GroupCard({
   resumeInterruptedBusy,
   questions,
   onAnswer,
+  permissions,
+  onPermissionDecide,
   sectionsOpen = false,
 }: GroupCardProps) {
   const { t } = useTranslation();
   const chatId = group.chatId;
   const asks = chatId && onAnswer && questions?.length ? questions : undefined;
+  const permits = chatId && onPermissionDecide && permissions?.length ? permissions : undefined;
   const openable = Boolean(chatId && onOpen);
   const mrId = group.mr?.match(/(\d+)$/)?.[1] ?? '';
   // PR GitHub — «PR #12», MR GitLab — «MR !12»: слово и знак своего форджа.
@@ -79,7 +83,10 @@ export function GroupCard({
   // Ждёт человека или упала — своей полосой слева (владелец 22.10.2026: что
   // требует меня, должно читаться с первого взгляда по ленте карточек).
   // Ждёт решения по D-n — тоже человек, хоть остальная работа и сделана.
-  const needsHuman = !settled && (bucket === 'ask' || bucket === 'deferred');
+  // Запрос прав или вопрос в карточке — тоже человек (владелец 23.10): прогон
+  // на запросе прав числится не «стоит», а полоса должна быть видна.
+  const needsHuman =
+    !settled && (bucket === 'ask' || bucket === 'deferred' || Boolean(permits || asks));
   const failed = !settled && bucket === 'failed';
 
   return (
@@ -211,13 +218,22 @@ export function GroupCard({
       {/* Что под карточкой — во всю её ширину и над растянутой кнопкой:
           форма ответа, отметка уборки копии, предупреждения панели. */}
       {/* Пустой список сигналов — не повод для подвала: пустой блок дал бы лишний отступ. */}
-      {(asks ||
+      {(permits ||
+        asks ||
         cleanup?.cleaned ||
         group.hold ||
         group.autoNotices ||
         watchSignals ||
         missing.length > 0) && (
         <div className={styles.groupFoot}>
+          {/* Запрос прав — первым: на нём группа стоит, на вопросе — нет. */}
+          {permits && onPermissionDecide && (
+            <GroupPermission
+              permissions={permits}
+              stage={group.stages.at(-1)}
+              onDecide={onPermissionDecide}
+            />
+          )}
           {asks && onAnswer && (
             <GroupAsk questions={asks} stage={group.stages.at(-1)} onAnswer={onAnswer} />
           )}

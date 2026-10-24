@@ -288,6 +288,7 @@ export const configMessageParams = {
   'group-layer-notice-delivered': ['members'],
   'group-layer-notice-nothing': [],
   'group-layer-notice-refused': [],
+  'foreign-shell-denied': ['command', 'reason'],
   'group-layer-kind-rule': ['names'],
   'group-layer-kind-skill': ['names'],
   'group-layer-kind-mcp': ['names'],

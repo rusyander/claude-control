@@ -22,6 +22,7 @@ import {
   currentUserPrompt,
   inSubagent,
 } from './transcript.mjs';
+import { cliOf, isHandInstalled, sessionEvents } from './kit-paths.mjs';
 
 const CODE =
   /\.(m?[jt]sx?|c[jt]s|vue|svelte|go|py|rs|java|kt|cs|rb|php|s?css|less|sql|graphql|proto|ya?ml|toml|sh|ps1)$/i;
@@ -60,7 +61,11 @@ const runsEdited = (command, edits) => {
 
 export function editedCodeWithoutCheck(records) {
   const { index } = lastUserSpeech(records);
-  const events = toolEvents(records.slice(index + 1)); // index -1 → the whole tail is the turn
+  return editsWithoutCheck(toolEvents(records.slice(index + 1))); // index -1 → the whole tail is the turn
+}
+
+/** The same judgement over one turn's tool calls, `{kind:'use', name, input}` each. */
+export function editsWithoutCheck(events) {
   const edits = [];
   let lastEdit = -1;
   events.forEach((e, i) => {
@@ -79,11 +84,46 @@ export function editedCodeWithoutCheck(records) {
   return checked ? null : edits;
 }
 
+/**
+ * One turn from the kit's own session log (items.mjs logs every call it let through, with its file or
+ * command) — for the hand-installed CLIs, whose transcript is not Claude's or is not sent at all
+ * (Goose, Kimi). Calls after the last prompt the user typed; null when the log has no prompt yet.
+ */
+export function turnFromLog(log) {
+  let start = -1;
+  for (let i = log.length - 1; i >= 0; i--)
+    if (log[i]?.kind === 'prompt') {
+      start = i;
+      break;
+    }
+  if (start < 0) return null;
+  const calls = log
+    .slice(start + 1)
+    .filter((e) => e?.kind === 'call')
+    .map((e) => ({
+      kind: 'use',
+      name: e.tool,
+      input: e.cmd !== undefined ? { command: e.cmd } : { file_path: e.file },
+    }));
+  return { prompt: String(log[start].text ?? ''), calls };
+}
+
+function fromLog(input) {
+  const turn = turnFromLog(sessionEvents(input));
+  if (!turn) return null;
+  const edits = editsWithoutCheck(turn.calls);
+  return edits && !OPT_OUT.test(turn.prompt) ? edits : null;
+}
+
 export default function verifyAtStop(input) {
   if (process.env.AGENTDECK_KIT_VERIFY_AT_STOP === '0' || process.env.CLAUDE_VERIFY_AT_STOP === '0')
     return null;
   if (input?.stop_hook_active) return null;
   if (inSubagent(input)) return null;
+  if (isHandInstalled(cliOf(input))) {
+    const edits = fromLog(input);
+    return edits ? block(edits) : null;
+  }
   let records;
   try {
     records = sinceLastCompact(readTail(String(input?.transcript_path ?? '')));
@@ -100,6 +140,10 @@ export default function verifyAtStop(input) {
     /* no prompt store → no opt-out */
   }
   if (OPT_OUT.test(prompt)) return null;
+  return block(edits);
+}
+
+function block(edits) {
   const names = [...new Set(edits.map((p) => p.split(/[\\/]/).pop()))];
   const shown = names.slice(0, 4).join(', ') + (names.length > 4 ? `, +${names.length - 4}` : '');
   return {

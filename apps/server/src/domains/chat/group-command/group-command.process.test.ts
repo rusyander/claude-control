@@ -120,6 +120,8 @@ describe('погашение процессов (N3)', () => {
     expect(result).toMatchObject({ kills: { pids, ports } });
   });
 
+  // Решение владельца 24.10 (D-1): такое человеку не уходит — маршрут прав
+  // отказывает агенту с тем, как погасить своё (`groupKillRefusal`).
   it.each([
     'kill $(lsof -t -i:5173)',
     'lsof -ti:5173 | xargs kill -9',
@@ -130,11 +132,19 @@ describe('погашение процессов (N3)', () => {
     'Stop-Process -Name node',
     'kill -- -4321',
     'kill -9 -1',
+    'P=child.abc; kill $P',
+  ])('цель не названа числом — «неназванное», не опасное: %s', (command) => {
+    const result = verdict(command);
+    expect(result.kind).not.toBe('danger');
+    expect(result).toMatchObject({ kills: { unnamed: true } });
+  });
+
+  it.each([
     'powershell -Command "Stop-Process -Id 4321 -Force"',
     'ssh host kill 4321',
     'node -e "process.kill(4321)"',
     'python -c "import os; os.kill(4321, 9)"',
-  ])('цель не назвать — человеку: %s', (command) => {
+  ])('погашение чужим языком или на другой машине — человеку: %s', (command) => {
     expect(verdict(command).kind).toBe('danger');
   });
 
@@ -151,10 +161,6 @@ describe('погашение процессов (N3)', () => {
     const result = verdict(command);
     expect(result.kind).not.toBe('danger');
     expect(result).not.toHaveProperty('kills');
-  });
-
-  it('метку своего ребёнка словами не написать', () => {
-    expect(verdict('P=child.abc; kill $P').kind).toBe('danger');
   });
 
   it('распознаватель хода чата узнаёт те же погашения', () => {

@@ -8,6 +8,7 @@ import { usageLimitsEn } from './usage-limits/en.ts';
 import { foreignChatEn } from './foreign-chat/en.ts';
 import { projectsEn } from './projects/en.ts';
 import { computersEn } from './computers/en.ts';
+import { signingEn } from './signing/en.ts';
 
 /**
  * English mirrors `ru.ts` and is typed against it: a missing or renamed key
@@ -264,6 +265,7 @@ export const en: Dictionary = {
 
   projects: projectsEn,
   computers: computersEn,
+  signing: signingEn,
 
   git: {
     title: 'Git',

@@ -46,9 +46,10 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../apps/server/src/lib/brand.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
@@ -90,6 +91,9 @@ const HELP = `Тест-кейсы проекта без панели.
   suites    каталоги с тестами — в кейсы-наборы (кейс на каталог, итог — худший тест); --dry — только счёт
   gate      пробелы хода агента: gate --since <ISO> [--changed-at <ISO>] <файл…>; код 1 — есть пробелы
             (его зовёт хук конца хода: правил код — кейс, прогон, запись)
+  gaps      пробелы блока «Тесты» перед «доставлено» — тем же кодом, что сверяет панель:
+            gaps [--since <ISO начала группы>]; без --since начало берётся из состояния панели
+            по пути копии; код 1 — есть пробелы
   record    записать проверенное вручную (только ручные кейсы, в разделе — «вручную»):
             record <группа>:<кейс>=passed|failed|blocked|skipped …; автокейс — только run
 
@@ -159,6 +163,7 @@ async function main() {
   if (command === 'case') return await saveCase(project, options);
   if (command === 'record') return await recordResults(project, options, positional);
   if (command === 'gate') return await turnGate(project, options, positional);
+  if (command === 'gaps') return await deliveryGaps(project, options);
   if (command === 'suites') return await syncSuiteCases(project, options);
   throw new Error(`Неизвестная команда «${command}». Список — node tools/tests-cli.mjs help`);
 }
@@ -425,6 +430,58 @@ async function turnGate(project, options, positional) {
   });
   for (const gap of gaps) console.log(gap);
   if (gaps.length > 0) process.exitCode = 1;
+}
+
+/**
+ * Пробелы блока «Тесты» перед «доставлено» — тем же `testsDeliveryGaps`, что сверяет
+ * панель: группа видит весь список до сдачи, а не по кругу напоминаний. После rebase
+ * задетых кейсов стало 27, а напоминание называло два — каждый такой круг стоил
+ * группе хода, перепроверки и нового напоминания (24.10.2026).
+ */
+async function deliveryGaps(project, options) {
+  const since = typeof options.since === 'string' ? options.since : groupStartOf(project);
+  const { testsDeliveryGaps } = await import(
+    pathToFileURL(
+      join(REPO, 'apps', 'server', 'src', 'domains', 'chat', 'tests-gate', 'tests-gate.ts'),
+    ).href
+  );
+  const verdict = await testsDeliveryGaps({
+    cwd: project,
+    ...(since ? { startedAt: since } : {}),
+    command: `node "${fileURLToPath(import.meta.url)}" run --project .`,
+  });
+  if (!since)
+    console.log(
+      'Начало группы не найдено (дайте --since <ISO>): сверка берёт все прогоны, панель может назвать больше.',
+    );
+  if (verdict.unchecked) console.log(`Блок не сверен: ${verdict.unchecked}`);
+  for (const line of verdict.missing) console.log(`- ${line}`);
+  for (const line of verdict.notes ?? []) console.log(`заметка (в описание MR): ${line}`);
+  if (verdict.missing.length > 0) process.exitCode = 1;
+  else console.log('Блок «Тесты»: пробелов перед сдачей нет.');
+}
+
+/** Начало группы разделения, чья копия — `project`: из состояния панели (каталог настроек CLI). */
+function groupStartOf(project) {
+  const same = (path) =>
+    resolve(String(path ?? ''))
+      .replaceAll('\\', '/')
+      .toLowerCase();
+  const want = same(project);
+  const roots = [process.env.CLAUDE_CONFIG_DIR, join(homedir(), '.claude')].filter(Boolean);
+  for (const root of roots)
+    for (const name of [BRAND_SLUG, LEGACY_BRAND_SLUG]) {
+      let state;
+      try {
+        state = JSON.parse(readFileSync(join(root, name, 'state.json'), 'utf8'));
+      } catch {
+        continue;
+      }
+      for (const plan of Object.values(state?.splitPlans ?? {}))
+        for (const group of plan?.groups ?? [])
+          if (group?.path && same(group.path) === want && group.startedAt) return group.startedAt;
+    }
+  return undefined;
 }
 
 /**
@@ -1127,9 +1184,16 @@ async function vitestPlan(project, files) {
   if (!automation && rootTestScript(project)) return undefined;
   // Пути файлов пишет и агент (`automation.file`): та же защита от подстановок оболочки, что у `{files}`.
   const { shellArg } = await domain('e2e-command');
+  const { jsSuiteRunPaths } = await domain('suites');
+  // Кейс-набор — файлами, которыми он владеет: каталог корня пакета дал бы весь пакет.
+  const owned = files.flatMap((file) =>
+    file.endsWith('/')
+      ? jsSuiteRunPaths(project, packageRootOf(project, `${file}x`), file)
+      : [file],
+  );
 
   const byPackage = new Map();
-  for (const file of files) {
+  for (const file of owned) {
     const dir = packageRootOf(project, file);
     byPackage.set(dir, [...(byPackage.get(dir) ?? []), dir ? file.slice(dir.length + 1) : file]);
   }

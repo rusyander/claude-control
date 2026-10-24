@@ -33,6 +33,7 @@ import { OutsideRelayCard } from '../../src/features/inbox/OutsideRelayCard/Outs
 import { ActiveComputerCard } from '../../src/features/computers/ActiveComputerCard/ActiveComputerCard';
 import { ComputersCard } from '../../src/features/computers/ComputersCard/ComputersCard';
 import { PowerCard } from '../../src/features/computers/PowerCard/PowerCard';
+import { SigningCard } from '../../src/features/signing/SigningCard/SigningCard';
 
 /** Вердикт → стиль строки. Три состояния: успех, беда и «ещё не смотрели». */
 const STATE_STYLE = { ok: 'stateOk', bad: 'stateBad', quiet: 'stateQuiet' } as const;
@@ -93,8 +94,8 @@ export default function SettingsScreen() {
 }
 
 /**
- * Связь: выбранный компьютер, список спаренных, питание выбранного и доступ
- * снаружи. Питание здесь, а не отдельной вкладкой: это действие над тем самым
+ * Связь: выбранный компьютер, список спаренных, питание выбранного, подпись
+ * решений ключом телефона и доступ снаружи. Питание здесь, а не отдельной вкладкой: это действие над тем самым
  * компьютером, что в карточке выше, — рядом видно, какой именно уснёт.
  */
 function LinkTab() {
@@ -108,6 +109,7 @@ function LinkTab() {
       <ActiveComputerCard online={online} />
       <ComputersCard />
       {online ? <PowerCard /> : null}
+      {online ? <SigningCard /> : null}
 
       {status ? (
         <Card>

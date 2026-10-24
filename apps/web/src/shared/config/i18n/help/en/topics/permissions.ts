@@ -343,7 +343,8 @@ export const permissionsEn: typeof permissionsRu = {
       '-f, +branch) asks. Deleting branches, tags and the stash and any git merge always ' +
       'ask, regardless of the rules. PowerShell tool commands are judged by the same rules ' +
       'as Bash: Remove-Item -Recurse is a deletion, git push --force from PowerShell wipes ' +
-      'history. Your own “ask” ' +
+      'history; a program launched through Start-Process is judged by what it will run: ' +
+      "Start-Process cmd -ArgumentList '/c','rd','/s','/q','src' is a deletion too. Your own “ask” " +
       'and “deny” rules outrank auto-approve — a matching call brings the card back; a ' +
       'PowerShell(…) rule matches regardless of case, as PowerShell itself does. Your ' +
       '“allow” on an MCP tool by name (mcp__server__tool) the panel applies even where the ' +

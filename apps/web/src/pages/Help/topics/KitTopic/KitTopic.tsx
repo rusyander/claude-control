@@ -75,6 +75,15 @@ export function KitTopic() {
         />
       </HelpSection>
 
+      {/* Хуки — отдельно от режимов: у пяти CLI они доходят только вариантом, который ставит человек. */}
+      <HelpSection title={tr('hooksTitle')} caption={tr('hooksCaption')}>
+        <FieldTable
+          nameHeader={tr('hooksHeader')}
+          descriptionHeader={tr('hooksWhat')}
+          rows={[row('hooksRun'), row('hooksVariant'), row('hooksNone')]}
+        />
+      </HelpSection>
+
       <HelpSection title={tr('globalTitle')} caption={tr('globalCaption')}>
         <GuideSteps>
           <GuideStep title={tr('globalDiffers')} text={tr('globalCaption')}>

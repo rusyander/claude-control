@@ -46,6 +46,7 @@ describe('collectChildQuestions', () => {
         input: ask('Формат даты?').input,
         toolUseId: 'tu-1',
         isRunning: false,
+        chatKeys: ['kid'],
       },
     ]);
   });
@@ -72,6 +73,8 @@ describe('collectChildQuestions', () => {
     expect(found).toHaveLength(1);
     // Ответ уходит по ключу ПРОГОНА, а не по id чата: под ним прогон и живёт.
     expect(found[0]?.chatId).toBe('new-1712');
+    // Карточка группы в хабе знает чат по ключу списка — он тоже едет с вопросом.
+    expect(found[0]?.chatKeys).toEqual(['new-1712', 'real-session']);
   });
 
   /**

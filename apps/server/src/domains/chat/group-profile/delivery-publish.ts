@@ -97,6 +97,18 @@ export function publishesBeforeDelivery(command: string): boolean {
   return pushesBranch(command) || opensRequest(command);
 }
 
+/**
+ * Текст вызова оболочки для проверок публикации — Bash как есть, PowerShell с
+ * запятыми списка аргументов как разделителями (`Start-Process git -ArgumentList
+ * 'push','origin'`), прочие инструменты — `undefined` (R2/R3: инструмент
+ * PowerShell проходил мимо `sendsPack` и `publishesBeforeDelivery`).
+ */
+export function publishTextOf(toolName: string, input: unknown): string | undefined {
+  if (toolName !== 'Bash' && toolName !== 'PowerShell') return undefined;
+  const command = String((input as { command?: unknown } | null)?.command ?? '');
+  return toolName === 'PowerShell' ? command.replace(/,/g, ' ') : command;
+}
+
 /** Отказ звену до доставки — модели, по-английски, как и вся системная дописка. */
 export const PUBLISH_BEFORE_DELIVERY_DENIED =
   'Publishing is refused in this stage: a later delivery stage of this chain pushes the branch ' +

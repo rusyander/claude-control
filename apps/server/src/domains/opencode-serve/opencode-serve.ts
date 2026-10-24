@@ -1,7 +1,8 @@
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { killChildTree } from '../../lib/process-tree/process-tree.ts';
-import { decidePermission } from '../provider-chat/live/permission.ts';
+import { judgePermission } from '../provider-chat/live/permission.ts';
+import { opencodeShellAsk } from '../provider-chat/live/shell-ask.ts';
 import type { LivePermissionPolicy } from '../provider-chat/live/types.ts';
 import { watchOpencodeEvents } from './opencode-events.ts';
 
@@ -546,18 +547,22 @@ export class OpencodeServe {
 
     const answer = async (ask: PendingPermission): Promise<void> => {
       const title = ask.patterns.filter((item) => typeof item === 'string').join(', ');
-      const decision = await decidePermission(deps.permission, {
+      const shell = opencodeShellAsk(ask);
+      // Сервер общий на все разговоры — pid хода не назвать; причина отказа судьи
+      // едет модели в самом отказе.
+      const { decision, message } = await judgePermission(deps.permission, {
         cli: 'opencode',
         requestId: ask.id,
         tool: ask.permission,
         ...(title ? { title: title.slice(0, 300) } : {}),
+        ...(shell ? { shell } : {}),
       });
       await this.request(
         baseUrl,
         `/permission/${encodeURIComponent(ask.id)}/reply${query}`,
         decision === 'allow'
           ? { reply: 'once' }
-          : { reply: 'reject', message: OPENCODE_DECLINE_MESSAGE },
+          : { reply: 'reject', message: message ?? OPENCODE_DECLINE_MESSAGE },
         deps,
       );
     };

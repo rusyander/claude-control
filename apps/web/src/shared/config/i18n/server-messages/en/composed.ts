@@ -267,6 +267,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'run {{run}}: red not caused by the branch (red before the group started or failed on the environment, untouched by the diff): {{cases}} — they do not hold the group; name them in the MR description',
   'delivery-gap-mr-notes':
     'MR {{mr}} description: the delivery notes ({{items}}) are not named — add each to the description: what was not checked or is red not because of the branch, and why',
+  'delivery-gap-review-threads':
+    'MR {{mr}}: reviewer threads with no answer ({{count}}) — for each, a fix in the branch and a reply in the same discussion thread, or a reply why you do not change it: {{threads}}',
   'split-delivery-stalled':
     'reminder {{nudges}} changed nothing: the same branch head and the same gaps — see what holds the group and continue it with a word',
   'split-delivery-nudge-cap':

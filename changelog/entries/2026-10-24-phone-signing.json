@@ -1,0 +1,41 @@
+{
+  "title": {
+    "ru": "Решения человека подписываются ключом телефона",
+    "en": "Human decisions are signed with the phone’s key"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Решения человека можно подписывать ключом телефона: во включённом режиме «Разрешить» панель принимает только с подписью привязанного телефона, ослабление общих прав закрыто, а «Отклонить» работает откуда угодно, в том числе из Telegram. Так изменённый код окна браузера или процесс модели не может ответить «да» за человека.",
+        "en": "Human decisions can be signed with the phone's key: with the mode on, the panel accepts «Allow» only with a paired phone's signature, loosening of shared rights is closed, and «Deny» works from anywhere, Telegram included. This way modified browser window code or a model process cannot answer «yes» for the human."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В настройках телефона карточка подписи: привязка ключа, включение режима с подтверждением по списку отпечатков, отвязка. В панели — карточка с привязанными телефонами и отзывом ключа; включить режим из браузера нельзя.",
+        "en": "A signing card in the phone's settings: binding a key, turning the mode on with a confirmation listing the fingerprints, unbinding. In the panel, a card with the paired phones and key revocation; the mode cannot be turned on from the browser."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отправка сообщения, которая включает полный доступ или автоподтверждение разговора, проходит проверку, что её сделал человек, при любом режиме подписи. Раньше процесс модели мог ослабить права разговора таким запросом сам.",
+        "en": "Sending a message that turns on full access or auto-approve for the conversation is checked to come from a human in every signing mode. Before, a model process could loosen the conversation's rights with such a request itself."
+      },
+      "area": {
+        "ru": "Права",
+        "en": "Permissions"
+      }
+    }
+  ]
+}

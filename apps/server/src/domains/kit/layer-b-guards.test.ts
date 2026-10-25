@@ -315,6 +315,27 @@ describe('review-report: один отказ — полный список', () 
     const list = shapeProblems('## Findings\n- F-01 🟡 thesis. Status: open\n- F-02 ❓ x\n');
     expect(list.join(' · ')).toMatch(/F-01, F-02 — written as a list item/);
   });
+
+  it('отказ на Write отчёта называет скелет review-plan и review-score --write (C2)', async () => {
+    // Три полных Write подряд отклонены за ~2.5 мин: отказ не говорил, что шапку печатает инструмент.
+    type Guard = (input: unknown) => { decision: string; reason: string } | null;
+    const guard = (
+      (await import(
+        pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'review-report.mjs')).href
+      )) as {
+        default: Guard;
+      }
+    ).default;
+    const file = join(dir, 'proj', '.agent', 'reviews', 'r.agent.md');
+    const write = guard({
+      tool_name: 'Write',
+      tool_input: { file_path: file, content: '# Review\n' },
+    });
+    expect(write?.decision).toBe('deny');
+    expect(write?.reason).toMatch(/review-plan\.mjs skeleton --plan <plan\.json>/);
+    expect(write?.reason).toMatch(/review-score\.mjs <report> --write/);
+    expect(write?.reason.length).toBeLessThan(1200);
+  });
 });
 
 describe('push-sieves: удаление чужого — выход раньше списка, список в файле', () => {
@@ -342,7 +363,7 @@ describe('push-sieves: удаление чужого — выход раньше
   };
   // main получил строку после начала задачи; ветка переписала файл со старой копии и стёрла её.
   const world = () => {
-    const base = join(ROOT, 'push');
+    const base = join(ROOT, `push-${++n}`);
     const remote = join(base, 'remote.git');
     const other = join(base, 'other');
     const work = join(base, 'work');
@@ -381,6 +402,39 @@ describe('push-sieves: удаление чужого — выход раньше
     );
     expect(push('# sieve-ack: @.agent/tmp/sieve-ack.txt\ngit push origin feat')).toBe('');
   });
+
+  // Журнал 24.10 (группа №1, D15…D41): те же намеренные удаления отказывали на каждом
+  // пуше ветки; D28: строка списка «путь — причина» не совпадала ни с чем.
+  it('подтверждение помнится для ветки, строка «путь — причина» в списке принимается', () => {
+    const work = world();
+    const push = (command: string) => pre('Bash', { command }, start, work);
+    expect(push('git push origin feat')).toMatch(/remembered for this branch/);
+    writeFileSync(
+      join(work, '.agent', 'tmp', 'sieve-ack.txt'),
+      'f.txt — rewritten by this ticket\n',
+    );
+    expect(push('# sieve-ack: @.agent/tmp/sieve-ack.txt\ngit push origin feat')).toBe('');
+    const acks = join(work, '.agent', 'tmp', 'sieve-acks.json');
+    expect(JSON.parse(readFileSync(acks, 'utf8'))).toEqual({ feat: ['f.txt'] });
+    // Следующий пуш той же ветки — без отказа, с одной строкой в контексте.
+    const raw = run('pre', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'git push origin feat' },
+      transcript_path: transcript(start),
+      session_id: 'kit-layer-b',
+      cwd: work,
+    });
+    const hook = JSON.parse(raw) as {
+      hookSpecificOutput?: { permissionDecision?: string; additionalContext?: string };
+    };
+    expect(hook.hookSpecificOutput?.permissionDecision).not.toBe('deny');
+    expect(hook.hookSpecificOutput?.additionalContext).toMatch(
+      /acked on an earlier push of this branch/,
+    );
+    writeFileSync(acks, '{"other":["f.txt"]}\n');
+    expect(push('git push origin feat')).toMatch(/push-sieves\(foreign-removal\)/);
+  });
 });
 
 describe('git-guard: своя заначка группы сбрасывается без вопроса', () => {
@@ -416,6 +470,52 @@ describe('git-guard: своя заначка группы сбрасываетс
   });
 });
 
+// Сообщение, набранное посреди хода, CLI пишет вложением `queued_command`, а не записью
+// пользователя (25.10: «да» владельца посреди хода не открыло коммит, пришлось повторять).
+describe('git-guard: ответ, набранный посреди хода, — ответ пользователя', () => {
+  const queued = (text: string, origin: object = { kind: 'human' }) => ({
+    type: 'attachment',
+    attachment: {
+      type: 'queued_command',
+      prompt: [{ type: 'text', text }],
+      commandMode: 'prompt',
+      origin,
+      humanTurn: (origin as { kind?: string }).kind === 'human',
+    },
+  });
+  const asked = [say('посмотри тесты'), answer('Гейт зелёный. Закоммитить? Ответьте «да».')];
+  const commit = (records: object[]) => pre('Bash', { command: 'git commit -m x' }, records);
+
+  it('«да» человека посреди хода открывает коммит, ответ субагента и уведомление — нет', () => {
+    expect(commit(asked)).toMatch(/git-guard\(commit\)/);
+    expect(commit([...asked, queued('да')])).toBe('');
+    expect(commit([say('посмотри тесты'), queued('закоммить')])).toBe('');
+    expect(commit([...asked, queued('да', { kind: 'peer', from: 'a1' })])).toMatch(
+      /git-guard\(commit\)/,
+    );
+    expect(
+      commit([...asked, queued('<task-notification> done', { kind: 'task-notification' })]),
+    ).toMatch(/git-guard\(commit\)/);
+  });
+});
+
+describe('git-guard: операция — подкоманда git, а не слово дальше в команде', () => {
+  const run = (command: string) => pre('Bash', { command }, [say('посмотри тесты')]);
+
+  it('«push» в пути или имени файла не читается как git push', () => {
+    expect(run('git status -- hooks/tests/push-sieves.test.mjs')).toBe('');
+    expect(run('cd /c/x; for f in git-files.ts push-sieves; do echo $f; done')).toBe('');
+    expect(run('git -C "C:/work/my dir" status')).toBe('');
+  });
+
+  it('подкоманда после глобальных опций и пути к git по-прежнему ловится', () => {
+    expect(run('git -C "C:/work/my dir" push origin main')).toMatch(/git-guard\(push\)/);
+    expect(run('git -c core.editor=true commit -m x')).toMatch(/git-guard\(commit\)/);
+    expect(run('/usr/bin/git push origin main')).toMatch(/git-guard\(push\)/);
+    expect(run('git status && git push')).toMatch(/git-guard\(push\)/);
+  });
+});
+
 describe('destructive-guard: проба в рабочей копии группы', () => {
   const git = (cwd: string, ...args: string[]) =>
     spawnSync('git', ['-C', cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -447,10 +547,34 @@ describe('destructive-guard: проба в рабочей копии групп�
     expect(rm('cp ../x.mjs e2e/zz-run.mjs; node e2e/zz-run.mjs; rm e2e/zz-run.mjs')).toBe('');
   });
 
-  it('чужой неотслеживаемый файл, отслеживаемый и перенос mv — отказ с подсказкой для группы', () => {
+  it('чужой неотслеживаемый файл и перенос mv — отказ с подсказкой для группы', () => {
     expect(rm('rm -f e2e/scenario.mjs', compacted)).toMatch(/no human watching/);
-    expect(rm('rm app.ts')).toMatch(/destructive-guard\(rm\)/);
     expect(rm('mv e2e/scenario.mjs e2e/zz-x.mjs; rm e2e/zz-x.mjs')).toMatch(
+      /destructive-guard\(rm\)/,
+    );
+  });
+
+  it('названный отслеживаемый файл без правок против HEAD проходит; правленый и -r — отказ', () => {
+    // Решение владельца: HEAD хранит каждый байт чистого файла, удаление ничего не теряет.
+    for (const f of ['old.ts', 'gone.ts', 'dirty.ts', 'staged.ts'])
+      writeFileSync(join(wt, 'e2e', f), 'v1');
+    git(wt, 'add', 'e2e/old.ts', 'e2e/gone.ts', 'e2e/dirty.ts', 'e2e/staged.ts');
+    git(wt, 'commit', '-qm', 'tracked');
+    writeFileSync(join(wt, 'e2e', 'dirty.ts'), 'v2');
+    writeFileSync(join(wt, 'e2e', 'staged.ts'), 'v2');
+    git(wt, 'add', 'e2e/staged.ts');
+    expect(rm('rm app.ts')).toBe('');
+    expect(rm('git rm e2e/old.ts')).toBe('');
+    expect(rm('rm -f e2e/gone.ts')).toBe('');
+    expect(rm('rm e2e/dirty.ts')).toMatch(/destructive-guard\(rm\).*HEAD keeps them/);
+    expect(rm('rm e2e/staged.ts')).toMatch(/destructive-guard\(rm\)/);
+    expect(rm('rm -r e2e/old.ts')).toMatch(/destructive-guard\(rm\)/);
+    expect(rm('git rm -rf e2e')).toMatch(/destructive-guard\(rm\)/);
+    expect(rm('rm e2e/*.ts')).toMatch(/destructive-guard\(rm\)/);
+  });
+
+  it('тот же чистый отслеживаемый файл в основной копии — отказ', () => {
+    expect(pre('Bash', { command: 'rm app.ts' }, [say('дальше')], main)).toMatch(
       /destructive-guard\(rm\)/,
     );
   });

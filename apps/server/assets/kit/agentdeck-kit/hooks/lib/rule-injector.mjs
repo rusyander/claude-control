@@ -34,7 +34,8 @@ import {
   writeFileSync,
   appendFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { dirname, join } from 'node:path';
 import { RULES_DIR, STATE_DIR, stateDir } from './kit-paths.mjs';
 
 const RULES = RULES_DIR;
@@ -190,6 +191,27 @@ const sizeOf = (name) => {
 // contact); a human session is untouched. The `.sent` mark outlives compaction on purpose.
 export const CARD_MAX = 1000;
 const splitChild = () => process.env.AGENTDECK_SPLIT_CHILD === '1';
+// Every stage of a group is a NEW session, so the `.sent` mark above never carried — one measured group
+// got verification-depth whole 10×7.1k, live-check 8×4.2k, review-depth 3×6.4k (5.22M cache_read). A
+// rule ≥ COPY_CARD_MIN that reached ANY session of the same copy (the git worktree root of cwd) arrives
+// as the card in later stages; shorter rules stay whole per session (the card would save little and a
+// new session holds none of the earlier text).
+export const COPY_CARD_MIN = 4000;
+/** `copy-<hash>` of the git root above cwd (a worktree has a `.git` file), or null outside a repo. */
+export function copyKey(cwd) {
+  let dir = String(cwd ?? '');
+  if (!dir) return null;
+  for (let i = 0; i < 40; i++) {
+    if (existsSync(join(dir, '.git'))) {
+      const norm = dir.split('\\').join('/').replace(/\/+$/, '').toLowerCase();
+      return `copy-${createHash('sha1').update(norm).digest('hex').slice(0, 12)}`;
+    }
+    const up = dirname(dir);
+    if (up === dir) return null;
+    dir = up;
+  }
+  return null;
+}
 
 /** Ceiling the dispatcher must allow so the largest deliberate payload is not clipped on its way out. */
 export const MAX_RULE_CEILING = Math.max(MAX_RULE * 2, ...[...BIG_RULES].map(sizeOf)) + 512;
@@ -271,13 +293,41 @@ export function runnable(cmd) {
 
 /** @returns {string|null} the rule text to inject, or null. */
 export default function ruleInjector(input) {
-  if (process.env.AGENTDECK_KIT_RULE_INJECT === '0' || process.env.CLAUDE_RULE_INJECT === '0')
-    return null;
+  if (injectOff()) return null;
+  const session = String(input?.session_id ?? 'x').slice(0, 12);
+  const wanted = wantedOf(input);
+  if (!wanted.length) return null;
+
+  const out = [];
+  const group = splitChild();
+  const copy = group ? copyKey(input?.cwd) : null;
+  for (const { rule, text } of wanted) {
+    if (alreadySent(session, rule)) continue;
+    let body = text ? text() : read(rule);
+    if (body) {
+      const big = body.length >= COPY_CARD_MIN;
+      const inSession = group && existsSync(sentOf(session, rule));
+      const inCopy = !inSession && big && copy && existsSync(sentOf(copy, rule));
+      const path = join(RULES, `${rule}.md`);
+      if (inSession || inCopy) body = cardOf(body, path, rule, inCopy ? 'copy' : 'session');
+      out.push(body);
+      logDelivery(session, rule, body.length);
+      if (group) markSent(session, rule);
+      if (big && copy) markSent(copy, rule);
+      if (inSession || inCopy) armCard(session, rule, path, body);
+    }
+  }
+  return out.length ? out.join('\n\n') : null;
+}
+
+const injectOff = () =>
+  process.env.AGENTDECK_KIT_RULE_INJECT === '0' || process.env.CLAUDE_RULE_INJECT === '0';
+
+/** The rules this call is a trigger for, in delivery order (`{ rule, text? }`). */
+function wantedOf(input) {
   const tool = String(input?.tool_name ?? '');
   const cmd = String(input?.tool_input?.command ?? '');
   const run = runnable(cmd); // what the line EXECUTES — see runnable()
-  const session = String(input?.session_id ?? 'x').slice(0, 12);
-
   const wanted = [];
   if (PUBLISH_CMD.test(cmd) || isPublishMcp(tool)) wanted.push({ rule: 'published-text' });
   if (FORGE_MCP.test(tool)) wanted.push({ rule: 'forge-protocol' });
@@ -306,23 +356,133 @@ export default function ruleInjector(input) {
     (WRITE_TOOL.test(tool) && PDF_SOURCE.test(editPath) && PDF_MARKUP.test(written))
   )
     wanted.push({ rule: 'pdf-layout' });
+  return wanted;
+}
 
-  if (!wanted.length) return null;
+// Card gate (owner, 25.10.2026: the token cuts must not lower quality). A card saves tokens only when
+// the agent skips the Read, and skipping it IS the quality loss. So a split-group session that got a
+// card for rule R has every call that triggers R denied until it has Read R's file (any window; after
+// the last compaction for a re-send card) — the first such call is the one the card came with. The
+// transcript is the evidence. Fail-open: an unreadable rule file or no transcript allows. Deliberately
+// without a repeat-escape: repeating the call without the Read changes nothing the rule needs.
+const gateOf = (session) => join(CACHE, `rule-cards-${session}.json`);
+function readGate(session) {
+  try {
+    return JSON.parse(readFileSync(gateOf(session), 'utf8')) ?? {};
+  } catch {
+    return {};
+  }
+}
+function writeGate(session, gate) {
+  try {
+    if (Object.keys(gate).length) {
+      stateDir('rules');
+      writeFileSync(gateOf(session), JSON.stringify(gate));
+    } else if (existsSync(gateOf(session))) unlinkSync(gateOf(session));
+  } catch {
+    /* a lost gate costs one unread card, never the call */
+  }
+}
+function armCard(session, rule, file, card) {
+  const gate = readGate(session);
+  gate[rule] = { file, head: card.split('\n').slice(0, 2).join('\n') };
+  writeGate(session, gate);
+}
+// The last four path segments: `C:\Users\RUSYAN~1\…` and `C:/Users/<name>/…` spell one file.
+const pathTail = (p) =>
+  String(p ?? '')
+    .replace(/\\/g, '/')
+    .toLowerCase()
+    .split('/')
+    .filter(Boolean)
+    .slice(-4)
+    .join('/');
 
-  const out = [];
-  const group = splitChild();
-  for (const { rule, text } of wanted) {
-    if (alreadySent(session, rule)) continue;
-    let body = text ? text() : read(rule);
-    if (body) {
-      if (group && existsSync(sentOf(session, rule)))
-        body = cardOf(body, join(RULES, `${rule}.md`), rule);
-      out.push(body);
-      logDelivery(session, rule, body.length);
-      if (group) markSent(session, rule);
+// A Read of the file, or a Bash pure read (`cat`/`sed -n`/`head`) naming its last two segments.
+function opened(block, want) {
+  if (block.name === 'Read') return pathTail(block.input?.file_path) === want;
+  if (block.name !== 'Bash') return false;
+  const cmd = String(block.input?.command ?? '')
+    .replace(/\\+/g, '/')
+    .toLowerCase();
+  return (
+    /^\s*(cat|head|tail|sed\s+-n|type|less)\b/.test(cmd) &&
+    cmd.includes(want.split('/').slice(-2).join('/'))
+  );
+}
+
+/** Did this session Read `file` (any window) after its last compaction? null = no transcript to tell. */
+export function readInTranscript(transcript, file) {
+  let text;
+  try {
+    text = readFileSync(String(transcript ?? ''), 'utf8');
+  } catch {
+    return null;
+  }
+  const lines = text.split('\n');
+  let from = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].includes('"compact_boundary"')) {
+      from = i + 1;
+      break;
     }
   }
-  return out.length ? out.join('\n\n') : null;
+  const want = pathTail(file);
+  for (let i = from; i < lines.length; i++) {
+    if (!lines[i].includes('"tool_use"')) continue;
+    let rec;
+    try {
+      rec = JSON.parse(lines[i]);
+    } catch {
+      continue;
+    }
+    const blocks = Array.isArray(rec?.message?.content) ? rec.message.content : [];
+    if (blocks.some((b) => b?.type === 'tool_use' && opened(b, want))) return true;
+  }
+  return false;
+}
+
+/** @returns {string|null} a deny reason while a card this call triggers is still unread, else null. */
+export function cardGate(input) {
+  if (!splitChild() || injectOff()) return null;
+  // Lookups act on nothing, and the Read that lifts the gate must never be the call it denies (a Read
+  // of a test file is a verification-depth trigger).
+  if (/^(Read|Grep|Glob)$/.test(String(input?.tool_name ?? ''))) return null;
+  const session = String(input?.session_id ?? 'x').slice(0, 12);
+  if (!existsSync(gateOf(session))) return null;
+  const gate = readGate(session);
+  const due = wantedOf(input)
+    .map((w) => w.rule)
+    .filter((rule) => gate[rule]);
+  if (!due.length) return null;
+  const open = [];
+  let changed = false;
+  for (const rule of due) {
+    const { file, head } = gate[rule];
+    let readable = true;
+    try {
+      readFileSync(file);
+    } catch {
+      readable = false;
+    }
+    const seen = readable ? readInTranscript(input?.transcript_path, file) : null;
+    if (!readable || seen !== false) {
+      delete gate[rule];
+      changed = true;
+    } else open.push({ file, head });
+  }
+  if (changed) writeGate(session, gate);
+  if (!open.length) return null;
+  return (
+    'rule-card: this call needs a rule this session got only as a card — the card is not the rule. ' +
+    open
+      .map(
+        ({ file, head }) =>
+          `${head}\nRead ${String(file).replace(/\\/g, '/')} (the section covering your work, offset/limit) first`,
+      )
+      .join('\n') +
+    ', then repeat this call.'
+  );
 }
 
 /**
@@ -341,7 +501,11 @@ export function clearRuleStamps(session) {
   if (key.length >= 4) logDelivery(key, '#compact', 0);
   try {
     for (const f of readdirSync(CACHE)) {
-      if (!f.startsWith('rule-') || !(f.endsWith('.stamp') || f.endsWith('.sent'))) continue;
+      if (
+        !f.startsWith('rule-') ||
+        !(f.endsWith('.stamp') || f.endsWith('.sent') || f.endsWith('.json'))
+      )
+        continue;
       const path = join(CACHE, f);
       // Own stamps go now; anyone else's go once they are a week stale — the cache had grown to
       // 200 dead files from finished sessions. A `.sent` mark is never "own": it must outlive compaction.
@@ -368,7 +532,7 @@ function markSent(session, name) {
  * Split-group re-delivery (see CARD_MAX): the header and the Read pointer go first so a clip never
  * eats them; the lead (text before the first section) fills what is left. Binding as a whole.
  */
-export function cardOf(body, file, name = 'rule') {
+export function cardOf(body, file, name = 'rule', reached = 'session') {
   const title = /^# +(.+)$/m.exec(body)?.[1]?.trim() ?? name;
   const path = file.split('\\').join('/');
   let lines = [];
@@ -385,7 +549,9 @@ export function cardOf(body, file, name = 'rule') {
     )
     .join(' · ');
   const head =
-    `# ${title} — card (split group, re-sent after compaction; the full text reached this session before)\n` +
+    (reached === 'copy'
+      ? `# ${title} — card (split group: the full text reached an earlier stage of this copy, not this session)\n`
+      : `# ${title} — card (split group, re-sent after compaction; the full text reached this session before)\n`) +
     `Still binding in full: Read ${path}${windows ? ` — the section covering your work, before acting: ${windows}` : ' before acting'}\n`;
   const titleAt = body.search(/^# /m);
   const afterTitle = titleAt < 0 ? body : body.slice(body.indexOf('\n', titleAt) + 1);

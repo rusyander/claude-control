@@ -824,7 +824,7 @@ export const en: TranslationSchema = {
       title: 'Delivery to MR — this project',
       deliver: 'Take tasks to a ready MR',
       deliverHint:
-        'Plain chat: the agent takes a code-change task to an MR — branch, checks, commit, push, MR, review, description; questions and reviews without edits open no MR. Split: each group is one branch and one MR, its link shows in the group summary',
+        'Plain chat: the agent takes a code-change task to an MR — branch, review, live check, checks once, commit, push, MR, description; questions and reviews without edits open no MR. Split: each group is one branch and one MR, its link shows in the group summary',
       noRemote:
         'The repository has no remote (git remote) — there is nowhere to open an MR, delivery is off',
       skill:

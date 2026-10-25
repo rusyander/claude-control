@@ -4,6 +4,8 @@ import { POWERSHELL_ONLY_ASK, withPowerShellTwins } from '../auto-approve/powers
 import { MAIN_SYNC_ASK } from '../main-sync/main-sync.ts';
 import {
   chatRunProfile,
+  CLI_HELP_AGENT_DENY,
+  DELIVERY_SKILLS,
   foreignGroupMcp,
   compactWindowOf,
   DELIVERY_BASH_DENY,
@@ -174,7 +176,9 @@ const shellAsk = (extra: string[] = []): string[] => [
 const OUTWARD = {
   permissions: {
     ask: ['mcp__atlassian-work', 'mcp__gitlab-work', ...shellAsk()],
-    deny: MERGE_RULES,
+    // Задачи фикстур о вики молчат — имена вики трекера сняты (группа 1, 25.10).
+    // Подагенты справки CLI сняты в каждом прогоне группы (F9, 25.10).
+    deny: [...MERGE_RULES, 'mcp__atlassian-work__confluence_*', ...CLI_HELP_AGENT_DENY],
   },
 };
 
@@ -212,11 +216,18 @@ describe('groupRunProfile', () => {
     });
     expect(odd.settings.permissions).toEqual({
       ask: ['mcp__gitlab_work', ...shellAsk()],
-      deny: ['mcp__gitlab_work__merge_merge_request', 'mcp__gitlab_work__merge_pull_request'],
+      deny: [
+        'mcp__gitlab_work__merge_merge_request',
+        'mcp__gitlab_work__merge_pull_request',
+        ...CLI_HELP_AGENT_DENY,
+      ],
     });
     // Без хранилища кода и трекера остаются правила опасных команд оболочки и догона main.
     const none = groupRunProfile({ entries: [ENTRIES[6]!], tasksText: '', extra: [] });
-    expect(none.settings.permissions).toEqual({ ask: shellAsk() });
+    expect(none.settings.permissions).toEqual({
+      ask: shellAsk(),
+      deny: [...CLI_HELP_AGENT_DENY],
+    });
   });
 
   it('инструмент PowerShell — к брокеру теми же правилами, что Bash, и своими (I-04)', () => {
@@ -253,6 +264,7 @@ describe('groupRunProfile', () => {
     });
     expect(run.settings.permissions).toEqual({
       ask: shellAsk(['Bash(grb)', 'Bash(grb *)', 'Bash(gsync)', 'Bash(gsync *)']),
+      deny: [...CLI_HELP_AGENT_DENY],
     });
   });
 
@@ -566,9 +578,10 @@ describe('потолок профиля группы', () => {
     }
   });
 
-  it('из семи серверов владельца задаче без макета едут три; строка о снятых — не длиннее 450 знаков', () => {
+  // +150 знаков строки о вики: она снимает 33 имени вики (~1,7 тыс. знаков) в каждом вызове.
+  it('из семи серверов владельца задаче без макета едут три; строка о снятых — не длиннее 600 знаков', () => {
     expect(run.mcp.ids).toHaveLength(3);
-    expect(run.note.length).toBeLessThanOrEqual(450);
+    expect(run.note.length).toBeLessThanOrEqual(600);
   });
 });
 
@@ -713,7 +726,14 @@ describe('groupRunProfile — работа следующих звеньев з�
       ...(ahead ? { ahead } : {}),
     });
     const rules = (settings.permissions as { deny?: string[] }).deny ?? [];
-    return rules.filter((rule) => !MERGE_RULES.includes(rule));
+    // Снятые имена вики трекера и подагенты справки CLI — не запрет «на будущее»
+    // (свои случаи ниже).
+    return rules.filter(
+      (rule) =>
+        !MERGE_RULES.includes(rule) &&
+        !rule.endsWith('__confluence_*') &&
+        !CLI_HELP_AGENT_DENY.includes(rule),
+    );
   };
 
   it('за звеном ревью — навыки ревью выключены из перечня и под запретом, строка называет, кто прочитает', () => {
@@ -859,5 +879,77 @@ describe('groupRunProfile — работа следующих звеньев з�
     expect(deny({ review: false, deliver: false })).toEqual([]);
     const run = groupRunProfile({ entries: [], tasksText: '', extra: [] });
     expect(run.note).not.toContain('Later stages');
+  });
+});
+
+describe('вики трекера: имена confluence_* только по задаче или просьбе', () => {
+  const tracker: ProfileMcpEntry = {
+    id: 'atlassian-x',
+    config: { command: 'npx', args: ['mcp-atlassian'] },
+  };
+  const forge: ProfileMcpEntry = { id: 'gitlab', config: { command: 'npx', args: ['gitlab-mcp'] } };
+  const denyOf = (tasksText: string, extra: string[] = []) =>
+    (
+      groupRunProfile({ entries: [tracker, forge], tasksText, extra }).settings?.permissions as
+        { deny?: string[] } | undefined
+    )?.deny ?? [];
+
+  it('задачи о вики молчат — deny на confluence_* сервера трекера и строка группе', () => {
+    expect(denyOf('PROJ-1 fix the button')).toContain('mcp__atlassian-x__confluence_*');
+    expect(denyOf('PROJ-1').some((rule) => rule.startsWith('mcp__gitlab__confluence'))).toBe(false);
+    const run = groupRunProfile({ entries: [tracker], tasksText: 'PROJ-1', extra: [] });
+    expect(run.note).toContain('server: confluence');
+  });
+
+  it('задача называет вики или группа попросила её — имена на месте', () => {
+    for (const text of [
+      'обновить страницу в Confluence',
+      'see the wiki',
+      'https://x.example.com/wiki/spaces/A',
+    ])
+      expect(denyOf(text), text).not.toContain('mcp__atlassian-x__confluence_*');
+    expect(denyOf('PROJ-1', ['Confluence'])).not.toContain('mcp__atlassian-x__confluence_*');
+  });
+});
+
+describe('перечни подагентов и навыков звена (F9)', () => {
+  const settingsOf = (input: Partial<Parameters<typeof groupRunProfile>[0]>) =>
+    groupRunProfile({ entries: [], tasksText: '', extra: [], ...input }).settings as {
+      permissions: { deny?: string[] };
+      skillOverrides?: Record<string, string>;
+    };
+
+  it('подагенты справки CLI сняты в каждом звене; сам Agent — только перед ревью', () => {
+    for (const stage of ['work', 'plan', 'review', 'fix', 'deliver', undefined] as const) {
+      const deny = settingsOf(stage ? { stage } : {}).permissions.deny ?? [];
+      expect(deny, `звено ${stage ?? '—'}`).toEqual(
+        expect.arrayContaining([...CLI_HELP_AGENT_DENY]),
+      );
+      expect(deny, `звено ${stage ?? '—'}`).not.toContain('Agent');
+    }
+    expect(CLI_HELP_AGENT_DENY).toEqual(['Agent(claude-code-guide)', 'Agent(statusline-setup)']);
+  });
+
+  it('с доставкой впереди навыкам доставки — имя; навыку групп панели — описание', () => {
+    const skills = {
+      user: ['prepare-mr', 'changelog-builder', 'mr-visual-report', 'skill-map'],
+      group: ['changelog-builder'],
+      plugins: [],
+    };
+    const ahead = settingsOf({ stage: 'work', skills, ahead: { deliver: true } }).skillOverrides;
+    expect(ahead).toMatchObject({ 'prepare-mr': 'name-only', 'mr-visual-report': 'name-only' });
+    expect(ahead).not.toHaveProperty('changelog-builder');
+    expect(ahead).not.toHaveProperty('skill-map');
+    expect(DELIVERY_SKILLS).toEqual(['prepare-mr', 'changelog-builder', 'mr-visual-report']);
+    // Без доставки впереди описания доставки у работы остаются.
+    const alone = settingsOf({ stage: 'work', skills }).skillOverrides ?? {};
+    for (const name of DELIVERY_SKILLS) expect(alone, name).not.toHaveProperty(name);
+    // Ревью и доставка впереди: навыки ревью выключены, навыки доставки — имя.
+    const both = settingsOf({ stage: 'work', skills, ahead: { review: true, deliver: true } });
+    expect(both.skillOverrides).toMatchObject({
+      'deep-review': 'off',
+      'style-conformance-review': 'off',
+      'prepare-mr': 'name-only',
+    });
   });
 });

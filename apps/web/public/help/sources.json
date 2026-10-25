@@ -540,7 +540,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "2da4e311007bb3aa"
+          "sha": "5094fe86b850a3dc"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -550,7 +550,7 @@
         {
           "path": "apps/server/src/domains/chat/main-sync/main-sync.ts",
           "why": "«Права группы»: догон целевой ветки — отказ без конфликта, голый догон при конфликте сам",
-          "sha": "a5ab6eb68c6b2a8a"
+          "sha": "62d11f61069b71ba"
         },
         {
           "path": "apps/server/src/domains/chat/group-command/group-command.ts",
@@ -680,7 +680,7 @@
         {
           "path": "packages/contracts/src/sieves/catalog.ts",
           "why": "«Сита перед MR»: встроенные сита, виды путей, уровень риска и план отката",
-          "sha": "ab8fac9361171d13"
+          "sha": "91f4e9969851c221"
         },
         {
           "path": "packages/contracts/src/sieves/judge.ts",
@@ -715,7 +715,7 @@
         {
           "path": "apps/server/src/domains/chat/foreign-shell-judge/foreign-shell-judge.ts",
           "why": "«Правки в чате другого CLI»: какие команды чужого CLI идут сами, какие — карточкой, D-n или отказом; оболочка без имени судится строже из двух",
-          "sha": "a29a720b790e6ae3"
+          "sha": "a1f5c588aacdcd78"
         },
         {
           "path": "apps/server/src/domains/chat/foreign-shell-judge/foreign-ask-rules.ts",
@@ -800,7 +800,7 @@
         {
           "path": "apps/server/src/domains/chat/group-profile/group-profile.ts",
           "why": "Лёгкий профиль группы: набор MCP, навыки по имени, дописка с правилом расхода, хуки трекера и очереди; запреты звена, пока впереди доставка или ревью; слияние закрыто каждому звену",
-          "sha": "376cb5c21c5737f3"
+          "sha": "a79d10c4ba9edf4c"
         },
         {
           "path": "apps/server/src/domains/chat/group-profile/bash-ceiling.ts",
@@ -815,7 +815,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatCascadeStages/ChatCascadeStages.ts",
           "why": "«Доставка»: когда звено доставки идёт на Sonnet и с какой глубиной",
-          "sha": "029082dc9e7852b3"
+          "sha": "befda6ffeca48ab5"
         },
         {
           "path": "apps/server/src/domains/chat/group-continuation/group-continuation.ts",
@@ -830,7 +830,7 @@
         {
           "path": "apps/server/src/domains/chat/cold-brief/cold-brief.ts",
           "why": "Вводная нового разговора группы: что панель собирает из файлов (задачи, задание стадии, блокнот, тикеты, заметки, коммиты, последний ответ)",
-          "sha": "1d16ef2bedc76598"
+          "sha": "a8a6366202b0cb36"
         },
         {
           "path": "apps/server/src/domains/project-git/seed-node-modules.ts",
@@ -923,7 +923,7 @@
           "sha": "363a1b61bd18425d"
         }
       ],
-      "confirmedAt": "2026-10-24T21:44:37.294Z"
+      "confirmedAt": "2026-10-25T07:58:34.836Z"
     },
     {
       "topic": "tests",
@@ -1080,6 +1080,11 @@
           "sha": "92f39f81e5465a02"
         },
         {
+          "path": "tools/tests-cli.mjs",
+          "why": "«Без панели»: sync и run, --case/--group, --memo/--fresh, предел времени прогона, код 124, снятие при синхронной блокировке",
+          "sha": "953a68181d3d5c91"
+        },
+        {
           "path": "apps/server/src/domains/project-tests/pyramid/pyramid.ts",
           "why": "«Пирамида тестов»: слой только при каркасе, названном проектом, «не известно» вместо нуля, деление по меткам, имя из переменных отдельно",
           "sha": "51bded1aaa31b2f8"
@@ -1140,7 +1145,7 @@
           "sha": "8c3dbfdb5307309b"
         }
       ],
-      "confirmedAt": "2026-10-24T20:36:30.507Z"
+      "confirmedAt": "2026-10-24T23:16:56.816Z"
     },
     {
       "topic": "rules",

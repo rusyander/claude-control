@@ -413,11 +413,27 @@ export function applicableSieves(paths: readonly string[]): SieveDef[] {
   });
 }
 
+/** Каталог фикстур — данные для тестов, а не сами тесты. */
+const FIXTURE_DIR = /(^|\/)(__)?fixtures?(__)?\//i;
+
+/**
+ * Сам тест (файл кода с тестовым путём), не его данные, доки или заметки агента:
+ * `*.test.*`, `*.spec.*`, `__tests__/`, код под `e2e/`/`tests/` вне `src/`.
+ */
+function isTestCode(raw: string): boolean {
+  const path = raw.replace(/\\/g, '/');
+  if (DOT_DIR.test(path) || FIXTURE_DIR.test(path) || !isTestByPath(path)) return false;
+  return CODE_EXT.test(path) || UI_EXT.test(path) || BACKEND_EXT.test(path);
+}
+
 /** Касается ли набор путей этого сита — по видам (пусто у сита — любой код). */
 export function touchesSieve(sieve: SieveDef, paths: readonly string[]): string[] {
   return paths.filter((path) => {
     const kinds = touchKinds([path]);
     if (sieve.when.length === 0) return kinds.has('code') || kinds.has('data');
-    return sieve.when.some((kind) => kinds.has(kind));
+    if (sieve.when.some((kind) => kinds.has(kind))) return true;
+    // Строка проверок проекта говорит «тесты прошли на последнем коммите»: правка теста
+    // после неё делает это неправдой (25.10) — строку сдают заново. Другие сита — как были.
+    return sieve.id === 'project-checks' && isTestCode(path);
   });
 }

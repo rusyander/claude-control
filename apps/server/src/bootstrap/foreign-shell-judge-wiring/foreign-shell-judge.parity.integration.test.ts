@@ -513,10 +513,13 @@ describe('паритет правил оболочки: Claude и чужие CLI
     });
     try {
       expect(child.pid).toBeTruthy();
-      // Номера гасимого разбор знает у Bash (`kill`); `Stop-Process` инструментом
-      // PowerShell целей не называет — и у Claude, и здесь это D-n (строка таблицы).
-      const command = `kill ${child.pid}`;
-      const codexAsk = async (pid: number | undefined) => {
+      // Номера гасимого разбор знает и у Bash (`kill`), и у PowerShell
+      // (`Stop-Process -Id`, Q2 24.10): оба провода судятся одинаково.
+      const bash = `/bin/bash -lc ${shQuote(`kill ${child.pid}`)}`;
+      const pwsh = `"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command ${psQuote(
+        `Stop-Process -Id ${child.pid} -Force`,
+      )}`;
+      const codexAsk = async (pid: number | undefined, command = bash) => {
         let verdict: LiveShellJudgement | undefined;
         const policy: LivePermissionPolicy = {
           allowEdits: true,
@@ -539,7 +542,7 @@ describe('паритет правил оболочки: Claude и чужие CLI
             id: 9,
             method: 'item/commandExecution/requestApproval',
             params: {
-              command: `/bin/bash -lc ${shQuote(command)}`,
+              command,
               cwd: '.',
               itemId: 'i9',
             },
@@ -557,9 +560,55 @@ describe('паритет правил оболочки: Claude и чужие CLI
       const message = blind.verdict?.behavior === 'deny' ? (blind.verdict.message ?? '') : '';
       expect(deferredIdOf(message)).toBeFalsy();
       expect(message).toContain('did not start');
+      // PowerShell-провод: своё — само, без номера CLI — отказ агенту, не D-n.
+      const ownPs = await codexAsk(process.pid, pwsh);
+      expect(ownPs.verdict).toEqual({ behavior: 'allow' });
+      const blindPs = await codexAsk(undefined, pwsh);
+      expect(blindPs.decision).toBe('decline');
+      const psMessage = blindPs.verdict?.behavior === 'deny' ? (blindPs.verdict.message ?? '') : '';
+      expect(deferredIdOf(psMessage)).toBeFalsy();
+      expect(psMessage).toContain('did not start');
     } finally {
       child.kill();
     }
+  });
+
+  // D33 у чужого CLI: посреди перебазирования на main сторона main для файла —
+  // разрешение конфликта, как у маршрута Claude; новый догон сверяется по-прежнему.
+  it('D33: сторона целевой посреди идущего догона — сама и у чужого CLI', async () => {
+    const wire = WIRES.find((one) => one.name === 'codex posix (bash -lc)')!;
+    const g = (...args: string[]): void => {
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+        cwd: copyB,
+        stdio: 'ignore',
+      });
+    };
+    g('checkout', '-q', '-b', 'mainline');
+    writeFileSync(join(copyB, 'a.txt'), 'theirs\n');
+    g('add', 'a.txt');
+    g('commit', '-qm', 'main side');
+    g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    g('checkout', '-q', 'feature/b');
+    writeFileSync(join(copyB, 'a.txt'), 'ours\n');
+    g('add', 'a.txt');
+    g('commit', '-qm', 'own side');
+    expect(() => g('rebase', 'origin/main')).toThrow();
+    const restore = 'git show origin/main:a.txt > a.txt';
+    expect(await foreign(wire, FOREIGN_GROUP, copyB, restore)).toBe('allow');
+    expect(await foreign(wire, FOREIGN_GROUP, copyB, 'git merge origin/main')).toBe('deny');
+    g('rebase', '--abort');
+    expect(await foreign(wire, FOREIGN_GROUP, copyB, restore)).toBe('deny');
+  });
+
+  it('Stop-Process инструментом PowerShell у Claude судится как kill у Bash, не D-n (Q2)', async () => {
+    const bash = await reference(GROUP, `kill ${process.pid}`, ['Bash']);
+    const ps = await reference(GROUP, `Stop-Process -Id ${process.pid} -Force`, ['PowerShell']);
+    expect(ps).not.toBe('deferred');
+    expect(ps).toBe(bash);
+    // Имя образа — «неназванное»: отказ агенту с подсказкой, тоже не D-n.
+    expect(await reference(GROUP, 'Stop-Process -Name node -Force', ['PowerShell'])).not.toBe(
+      'deferred',
+    );
   });
 
   it('D-n группы: «запретить» человека — отказ с его словами, не новая запись', async () => {

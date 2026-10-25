@@ -106,6 +106,12 @@ export const REVIEW_REPLY_LINES: readonly string[] = [
   'For each comment — fix it in the branch and reply in the same discussion thread with what ' +
     'was done, or reply why you do not change it. The reviewer resolves the thread, not you. ' +
     'Write the replies in the language of the discussion.',
+  // Отказы D-n группы №1 24.10: ответ в тред отклонялся — чтение обсуждений было старше
+  // 15 минут (сторож публикации ревью), а перезапись ветки в ревью — сторожем git.
+  'Read the MR discussions again right before posting the replies: a reply is refused when the ' +
+    'last read of the discussions is older than 15 minutes.',
+  'A push to this branch while its MR is in review is a plain `git push`, never forced; the ' +
+    'lease (`--force-with-lease`) only right after a rebase that resolved a conflict.',
 ];
 
 /**

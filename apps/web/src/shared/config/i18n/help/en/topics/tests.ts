@@ -1481,7 +1481,10 @@ export const testsEn: typeof testsRu = {
         '--case-timeout <min> or the AGENTDECK_TESTS_CASE_TIMEOUT variable; the command’s own ' +
         'timeoutMinutes wins when it is shorter. Past the cap, the run is stopped together with ' +
         'every process under it, and its cases are recorded in history as failed with the ' +
-        'reason "Time limit", exit code 124.',
+        'reason "Time limit", exit code 124; the stopped run names the files that did not ' +
+        'finish and how long they were silent. A vitest test that reports a timeout yet ran ' +
+        'twice as long holds the thread synchronously — run stops at once, without waiting for ' +
+        'the cap, and records the case with the reason "synchronous block".',
       limitsTitle: 'What the sync cannot do',
       limitsText:
         'Parsing is textual, not a run: a test whose name is built from variables (a template ' +

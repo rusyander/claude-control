@@ -201,8 +201,13 @@ export default function destructiveGuard(input) {
         const rest = simpleCommand(command, m.index);
         if (unless?.test(original.slice(m.index, m.index + rest.length))) return false;
         const before = original.slice(0, m.index);
+        const call = original.slice(m.index, m.index + rest.length);
         return !targets(original, m, rest.length, input).every(
-          (t) => inAgentZone(t) || ownScratch(t, input, before) || inScratchZone(t, input),
+          (t) =>
+            inAgentZone(t) ||
+            ownScratch(t, input, before) ||
+            inScratchZone(t, input) ||
+            (targets === rmTargets && cleanTracked(t, input, call)),
         );
       });
       if (!hit) continue;
@@ -221,7 +226,7 @@ export default function destructiveGuard(input) {
       intent,
       asked,
       reconfirm,
-      reason: `${why}. The user has not authorised it in this turn. ${ASK_THE_USER}${id === 'rm' ? ' Probes and scratch files belong in the session scratchpad or <repo>/.agent/tmp/ — deletes there need no answer.' + (ownSplitAt(input?.cwd, input?.cwd) ? ' Split group (no human watching): untracked probe-named or self-made files pass; anything else — leave it and name it in the stage report.' : '') : ''}`,
+      reason: `${why}. The user has not authorised it in this turn. ${ASK_THE_USER}${id === 'rm' ? ' Probes and scratch files belong in the session scratchpad or <repo>/.agent/tmp/ — deletes there need no answer.' + (ownSplitAt(input?.cwd, input?.cwd) ? ' Split group (no human watching): untracked probe-named or self-made files pass, and so do NAMED tracked files clean against HEAD (no -r; HEAD keeps them); a dirty tracked file or anything else — leave it and name it in the stage report.' : '') : ''}`,
     });
   }
   return null;
@@ -242,7 +247,7 @@ const TEMP_VAR = /^(?:TEMP|TMP|TMPDIR)$/;
 const PWD = /\$\(pwd\)|\$\{?PWD\}?(?!\w)/g;
 
 /** Variables the command itself defines before `at`: name → possible values. */
-function variables(text, at) {
+export function variables(text, at) {
   const vars = new Map();
   const before = text.slice(0, at);
   for (const m of before.matchAll(ASSIGN)) {
@@ -254,7 +259,7 @@ function variables(text, at) {
 }
 
 /** Every concrete value a word can take; an unknown variable stays as `$NAME`. */
-function expand(word, vars, depth = 0) {
+export function expand(word, vars, depth = 0) {
   const m = word.match(/\$\{?([A-Za-z_]\w*)\}?/);
   if (!m || depth > 4 || TEMP_VAR.test(m[1]) || !vars.has(m[1])) return [word];
   return vars
@@ -553,6 +558,40 @@ function ownScratch(target, input, before = '') {
     });
     if (r.status !== 1) return false;
     return !exists || PROBE_NAME.test(path.basename(abs)) || madeThisSession(input, abs);
+  } catch {
+    return false;
+  }
+}
+
+const RECURSIVE = /^(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)$/;
+
+/**
+ * A NAMED tracked file inside the own split worktree whose content equals HEAD (index and disk): HEAD
+ * keeps every byte, so the delete loses nothing. Owner's call: a group removing files the task drops
+ * stopped on a card six rounds. A dirty file, a directory, a glob, `-r` — the ordinary door.
+ */
+function cleanTracked(target, input, call) {
+  try {
+    if (!target || /[$`*?[]/.test(target)) return false;
+    if (shellWords(call).some((w) => RECURSIVE.test(w))) return false;
+    const abs = path.resolve(slash(target));
+    if (!statSync(abs).isFile()) return false;
+    const own = ownSplitAt(path.dirname(abs), input?.cwd);
+    if (!own) return false;
+    const rel = path.relative(path.resolve(own.root), abs);
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
+    const git = (...args) =>
+      spawnSync('git', ['-C', own.root, ...args, '--', slash(rel)], {
+        encoding: 'utf8',
+        timeout: 5000,
+        windowsHide: true,
+      }).status;
+    // 0 = tracked; then 0 = no difference between HEAD and the index or the working file.
+    return (
+      git('ls-files', '--error-unmatch') === 0 &&
+      git('diff', '--quiet', 'HEAD') === 0 &&
+      git('diff', '--quiet', '--cached', 'HEAD') === 0
+    );
   } catch {
     return false;
   }

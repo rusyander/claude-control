@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   BRIEF_LAST_ANSWER_CHARS,
   BRIEF_NOTEBOOK_CHARS,
+  BRIEF_NOTEBOOK_WHOLE,
   coldBriefFacts,
+  interruptedStretch,
   lastAnswer,
 } from './cold-brief.ts';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
@@ -115,7 +117,7 @@ describe('coldBriefFacts', () => {
   it('длинные заметки и ответ обрезаны с пометкой; не репозиторий и нет заметок — разделов нет', () => {
     dir = mkdtempSync(join(tmpdir(), 'cold-brief-'));
     mkdirSync(join(dir, '.agent'));
-    writeFileSync(join(dir, '.agent', 'PROGRESS.md'), 'x'.repeat(BRIEF_NOTEBOOK_CHARS + 50));
+    writeFileSync(join(dir, '.agent', 'PROGRESS.md'), 'x'.repeat(BRIEF_NOTEBOOK_WHOLE + 50));
     const transcript = join(dir, 's.jsonl');
     writeFileSync(transcript, answer('y'.repeat(BRIEF_LAST_ANSWER_CHARS + 50)));
     const facts = coldBriefFacts(dir, transcript);
@@ -129,6 +131,93 @@ describe('coldBriefFacts', () => {
     expect(facts).not.toContain('## Commits');
     expect(facts).not.toContain('## Uncommitted');
     expect(facts).not.toContain('notes.md');
+  });
+
+  it('заметки ≤ 8k — целиком; длиннее — по строке, с номером строки остатка (группа 1, 25.10)', () => {
+    dir = mkdtempSync(join(tmpdir(), 'cold-brief-'));
+    mkdirSync(join(dir, '.agent'));
+    const progress = Array.from({ length: 160 }, (_, i) => `- шаг ${i}: ${'п'.repeat(30)}`);
+    const transcript = join(dir, 's.jsonl');
+    writeFileSync(transcript, answer('итог'));
+    // 6,4k — как PROGRESS.md группы 1: раньше 4k текстом и «дочитай сам» → файл заново целиком.
+    writeFileSync(join(dir, '.agent', 'PROGRESS.md'), progress.join('\n'));
+    const whole = coldBriefFacts(dir, transcript);
+    expect(whole).toContain('- шаг 159:');
+    expect(whole).not.toContain('…(');
+    // Длиннее 8k — обрез на границе строки и строка, с которой читать.
+    const long = Array.from({ length: 320 }, (_, i) => `- шаг ${i}: ${'п'.repeat(30)}`);
+    writeFileSync(join(dir, '.agent', 'PROGRESS.md'), long.join('\n'));
+    const cut = coldBriefFacts(dir, transcript);
+    const shown =
+      /…\(lines 1–(\d+) of 320 shown — read the rest of \.agent\/PROGRESS\.md from line (\d+) \(Read offset=(\d+)\)/.exec(
+        cut,
+      );
+    expect(shown).not.toBeNull();
+    expect(Number(shown![2])).toBe(Number(shown![1]) + 1);
+    expect(shown![3]).toBe(shown![2]);
+    // Строка `from line N` — первая НЕ показанная: показанная последней — N−1.
+    const from = Number(shown![2]);
+    expect(cut).toContain(`${long[from - 2]}\n…(lines`);
+    expect(cut).not.toContain(long[from - 1]);
+  });
+
+  it('шапка фактов — с отметкой времени и «git только о том, что после»', () => {
+    dir = mkdtempSync(join(tmpdir(), 'cold-brief-'));
+    const transcript = join(dir, 's.jsonl');
+    writeFileSync(transcript, answer('итог'));
+    expect(coldBriefFacts(dir, transcript)).toMatch(
+      /^Facts the panel collected for you at \d{4}-\d\d-\d\dT[\d:.]+Z — current as of then; do not collect them again, run git only for what changed after:/,
+    );
+  });
+
+  it('оборванный ход: найденное между вызовами едет в вводную, «последний ответ» не дублирует', () => {
+    dir = mkdtempSync(join(tmpdir(), 'cold-brief-'));
+    const transcript = join(dir, 's.jsonl');
+    const tool = (id: string, text?: string) =>
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            ...(text ? [{ type: 'text', text }] : []),
+            { type: 'tool_use', id, name: 'Bash', input: { command: 'x' } },
+          ],
+        },
+      });
+    const result = (id: string) =>
+      JSON.stringify({
+        type: 'user',
+        message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+      });
+    const human = JSON.stringify({ type: 'user', message: { content: 'почини зависание' } });
+    writeFileSync(
+      transcript,
+      [
+        answer('СТАРЫЙ-ИТОГ прошлого хода'),
+        human,
+        tool('t1', 'Смотрю профиль.'),
+        result('t1'),
+        tool('t2', 'ПРИЧИНА: cpSync копирует node_modules, 68,5 с.'),
+        result('t2'),
+        tool('t3', 'Запускаю ещё раз.'),
+        result('t3'),
+        tool('t4'),
+      ].join('\n'),
+    );
+    expect(interruptedStretch(transcript)).toContain('ПРИЧИНА: cpSync');
+    const facts = coldBriefFacts(dir, transcript);
+    expect(facts).toContain('## The previous turn broke off mid-work');
+    expect(facts).toContain('ПРИЧИНА: cpSync копирует node_modules, 68,5 с.');
+    expect(facts).not.toContain('СТАРЫЙ-ИТОГ');
+    expect(facts).not.toContain('## Your last answer');
+    // Ход кончился итогом — раздела нет, итог — «последним ответом», как было.
+    writeFileSync(
+      transcript,
+      [human, tool('t1', 'Смотрю.'), result('t1'), answer('ИТОГ')].join('\n'),
+    );
+    expect(interruptedStretch(transcript)).toBe('');
+    expect(coldBriefFacts(dir, transcript)).toContain(
+      '## Your last answer in the previous conversation\nИТОГ',
+    );
   });
 
   it('последний ответ — последний НЕпустой текст модели, не реплика человека', () => {

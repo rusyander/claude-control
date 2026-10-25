@@ -480,6 +480,13 @@ export function writeProblems(next) {
   return problems;
 }
 
+// A whole report written from memory missed the shape three times in a row (three 5-10k Writes refused in
+// ~2.5 min). The skeleton tool prints every demanded line, computable ones filled.
+const SKELETON_HINT =
+  'Start from the skeleton instead of retyping: `node <kit>/tools/review-plan.mjs skeleton --plan <plan.json> ' +
+  '<lane reports…>` prints every demanded line (shas and Ledger filled, the rest as blanks to fill); fill the ' +
+  'blanks and Write that text, then `node <kit>/tools/review-score.mjs <report> --write`. ';
+
 /** PreToolUse (Write|Edit). */
 export default function reviewReportGuard(input) {
   if (OFF()) return null;
@@ -517,6 +524,7 @@ export default function reviewReportGuard(input) {
     decision: 'deny',
     reason:
       `review-report: ${filePath.split(/[\\/]/).pop()} — ${problems.join(' · ')}. ` +
+      (tool === 'Write' ? SKELETON_HINT : '') +
       'Shape: <kit>/skills/deep-review/references/report-shape.md. After a status flip or a publish, ' +
       '`node <kit>/tools/review-score.mjs <report> --write` recomputes Summary and Score.',
   };

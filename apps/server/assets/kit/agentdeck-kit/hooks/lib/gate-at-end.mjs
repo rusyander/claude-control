@@ -56,8 +56,10 @@ const GATE_SCRIPT =
 // `python scripts/check_backend.py`): unrecognised, groups ran it once per stage on the same tree.
 // Only the whole-side ones (F-35): `scripts/check_i18n.mjs` is one narrow check the project rules ask
 // for, and denying it in a work stage left a group no way to run it; and only as the command itself —
-// `eslint scripts/check_all.mjs` lints a file, it runs no gate.
-const GATE_SCRIPT_NAMES = /^(?:all|backend|frontend|full|gate|ci|ticket)$/i;
+// `eslint scripts/check_all.mjs` lints a file, it runs no gate. `<side>_tests` is a whole side too:
+// a project's tests gate `check_frontend_tests.mjs` was 12 of the 27 full runs of group #1 (24.10),
+// none of them seen.
+const GATE_SCRIPT_NAMES = /^(?:(?:all|backend|frontend|full)(?:_tests)?|gate|ci|ticket)$/i;
 const SCRIPT_RUNNER = /^(?:node|python3?|py|bun|tsx|deno|uv|poetry|pipenv|run)$/i;
 
 /** The segment runs `[runner] [./]…scripts/check_<whole-side>.(mjs|py)` as its own command. */
@@ -299,6 +301,33 @@ function previousGates(events, rawTail, state, cwd) {
     seen.set(e.id, { id: e.id, ts, outcome, index: i, taskId });
   });
   return [...seen.values()].filter((r) => r.outcome !== 'stopped').sort((a, b) => a.ts - b.ts);
+}
+
+/**
+ * A narrow check (check kinds, no full gate) passed after the last edit that follows event `from`.
+ * Delivery stage of group #1 (24.10): red full gate → fix → full gate → fix, 7 full runs in 10 min
+ * (843 s) where one red lint or one red test file needed a 5–40 s re-run of its own.
+ */
+function narrowGreenAfter(events, rawTail, from, cwd) {
+  let lastEdit = -1;
+  for (let i = Math.max(from + 1, 0); i < events.length; i += 1)
+    if (events[i].kind === 'use' && EDIT_TOOL.test(String(events[i].name))) lastEdit = i;
+  for (let i = lastEdit + 1; i < events.length; i += 1) {
+    const e = events[i];
+    if (e.kind !== 'use' || !/^(Bash|PowerShell)$/.test(String(e.name))) continue;
+    const command = String(e.input?.command ?? '');
+    if (gateKinds(command).size === 0 || isGateRun(command, cwd)) continue;
+    const res = resultFor(events.slice(i), e.id);
+    if (!res || res.body.includes('[ctx-guard]')) continue;
+    const bg = /running in background with ID:\s*(\w+)/i.exec(res.body);
+    const outcome = bg
+      ? backgroundOutcome(rawTail, bg[1], command, cwd)
+      : looksRed(res)
+        ? 'red'
+        : 'green';
+    if (outcome === 'green') return true;
+  }
+  return false;
 }
 
 function editsAfter(events, index) {
@@ -765,6 +794,24 @@ export default function gateAtEnd(input) {
     return null;
   }
   const events = toolEvents(records);
+  // Delivery stage, not escapable by a repeat (that is exactly the fix → full gate loop): after a red
+  // full gate and an edit, the next full gate waits for a narrow check that passes on the fixed code.
+  if (stage === 'deliver') {
+    const ran = previousGates(events, raw, loadState(statePath(input)), input.cwd);
+    const last = ran[ran.length - 1];
+    if (
+      last?.outcome === 'red' &&
+      editsAfter(events, last.index) > 0 &&
+      !narrowGreenAfter(events, raw, last.index, input.cwd)
+    ) {
+      return deny(
+        `gate-at-end: the full gate at ${hhmm(last.ts)} was red and the code was edited since. In the delivery ` +
+          'stage the next full gate waits until the red checks pass narrowly on the fixed code: re-run only ' +
+          'them — `cd <package> && npm run lint:ci` / `npm run type-check`, `npx vitest related <files> --run`, ' +
+          '`pytest <file>`, `npx eslint <files>` — then the full gate once, on the final tree.',
+      );
+    }
+  }
   const key = command.replace(/\s+/g, ' ').trim();
   if (
     wasJustRefused(

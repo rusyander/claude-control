@@ -94,6 +94,12 @@ export interface CascadeStageInput {
   ok: boolean;
   /** Хвост ответа — в нём ищется блок вердикта ревью. */
   text: string;
+  /**
+   * Итог хода — текст после последнего вызова инструмента (`RunFinished.answer`).
+   * Им, а не хвостом `text`, следующее звено узнаёт исход прошлого: хвост нёс ход
+   * рассуждений между вызовами. Короче `ANSWER_MIN` — итог в одну строку, тогда хвост.
+   */
+  answer?: string;
   /** Задание закончившегося прогона: по нему ревьюер сверяет сделанное. */
   task: string;
   /**
@@ -282,6 +288,18 @@ function stageContextOf(
     ...(link.branch ? { branch: link.branch } : {}),
     ...(previous?.text.trim() ? { previous } : {}),
   };
+}
+
+/**
+ * Короче — итог хода не отчёт, а реплика вроде «готово»: тогда исход звена —
+ * хвост всего текста, как было (ход мог кончиться инструментом без слов).
+ */
+const ANSWER_MIN = 400;
+
+/** Исход звена для следующего: итог хода (после последнего инструмента) или хвост. */
+export function outcomeText(input: Pick<CascadeStageInput, 'text' | 'answer'>): string {
+  const answer = input.answer?.trim() ?? '';
+  return answer.length >= ANSWER_MIN ? answer : input.text;
 }
 
 /** Файлы копии для контекста звена: путь плана и артефакты, оба — по запросу. */
@@ -561,6 +579,8 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
   const sievesFor = (stage: SieveStage): string | undefined =>
     input.sieves?.(stage, sieveRows) || undefined;
   const files = stageFilesOf(link, input);
+  // Исход прошлого звена — итог хода, а не хвост всего текста; блоки ревью ищутся в `text`.
+  const outcome = outcomeText(input);
   const contextAfter = (previousText: string): StageContext =>
     stageContextOf(link, groupTask, { stage, text: previousText }, files);
 
@@ -577,11 +597,11 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     // заводит: итог проверки идёт в доставку. Уже заведена — доставку заведёт она.
     if (verifiesFixes(link)) {
       if (link.reviewedAt) return undefined;
-      return verifyPlan(link, base, contextAfter(text));
+      return verifyPlan(link, base, contextAfter(outcome));
     }
     // Связь правок до U6 (замечаний не несёт) — в доставку сразу (журнал 59a).
     return input.deliver && !deliveredOnce(link, input)
-      ? deliverPlan(link, base, 'fix', contextAfter(text), sievesFor('deliver'))
+      ? deliverPlan(link, base, 'fix', contextAfter(outcome), sievesFor('deliver'))
       : undefined;
   }
 
@@ -597,7 +617,7 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     // Пустую работу не доставляем: MR без правок — не итог группы.
     const deliverNow = (): CascadeStagePlan | undefined =>
       input.deliver && !deliveredOnce(link, input) && hasWork()
-        ? deliverPlan(link, base, 'work', contextAfter(text), sievesFor('deliver'))
+        ? deliverPlan(link, base, 'work', contextAfter(outcome), sievesFor('deliver'))
         : undefined;
     // Ревью на работу заводится ровно один раз. Без отметки второе сообщение
     // человека в тот же чат заводило бы ещё одну проверку — и так на каждый ход.
@@ -634,7 +654,7 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
         ...(link.branch ? { branch: link.branch } : {}),
         context: {
           ...planContext(link, files),
-          ...(text.trim() ? { previous: { stage, text } } : {}),
+          ...(outcome.trim() ? { previous: { stage, text: outcome } } : {}),
         },
         ...(reviewSieves ? { sieves: reviewSieves } : {}),
         // Пакет ревью (5.3) — ревьюерам звена ревью доставляющей группы: работа
@@ -666,7 +686,7 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
       link,
       base,
       'verify',
-      contextAfter(verified.text),
+      contextAfter(scanReviewBlocks(outcome).text),
       sievesFor('deliver'),
       verified.findings ? { open: verified.findings } : { unverified: true },
     );
@@ -684,7 +704,7 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
           link,
           base,
           'review',
-          contextAfter(scanReviewBlocks(text).text),
+          contextAfter(scanReviewBlocks(outcome).text),
           sievesFor('deliver'),
         )
       : undefined;

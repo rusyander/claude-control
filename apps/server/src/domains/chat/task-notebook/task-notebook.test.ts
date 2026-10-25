@@ -87,6 +87,17 @@ describe('тетрадь задачи', () => {
     expect(readFileSync(join(copy, TASK_NOTEBOOK), 'utf8')).not.toContain('## From the panel');
   });
 
+  /** Группа 1 (23.10): «add a line» без инструмента — `echo >>`, отказ стража, ход впустую. */
+  it('шапка называет инструмент дописки: Edit, а `>>` оболочки — отказ', () => {
+    const { copy } = repoWithCopy();
+
+    seedTaskNotebook(copy, '', 'Вход');
+
+    const text = readFileSync(join(copy, TASK_NOTEBOOK), 'utf8');
+    expect(text).toContain('add a line with Edit');
+    expect(text).toContain('shell >> into .md is refused');
+  });
+
   it('копия с тетрадью удаляется обычным git worktree remove, без --force', () => {
     const { repo, copy } = repoWithCopy();
     seedTaskNotebook(copy, 'заметка', 'Вход');

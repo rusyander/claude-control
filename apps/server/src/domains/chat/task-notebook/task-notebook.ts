@@ -22,10 +22,15 @@ export const TASK_NOTEBOOK = `${RUN_DIR}/notebook.agent.md`;
  */
 const LEGACY_NOTEBOOK = `${RUN_DIR}/notebook.md`;
 
+/**
+ * Шапка называет инструмент дописки: «add a line» без него группа 1 (23.10)
+ * исполняла `echo … >>` и получала отказ стража — ход впустую.
+ */
 const HEADER =
   '# Task notebook\n\n' +
   'Facts this task had to find out — one line each, never a secret. ' +
-  'Read before searching again; add a line when you find something new.\n';
+  'Read before searching again; add a line with Edit when you find something new ' +
+  '(shell >> into .md is refused).\n';
 
 /**
  * Завести тетрадь в каталоге группы и положить в неё посев этой группы — своим

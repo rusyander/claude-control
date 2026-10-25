@@ -593,6 +593,33 @@ describe('разделение задач по чатам', () => {
     }
   });
 
+  /**
+   * P-08 (25.10): развилки по плану у чужого CLI — без вопроса. Строка
+   * «спроси, если шаг необратим» ставила группу на вопрос посреди задачи;
+   * необратимое теперь уходит человеку отказом панели и D-n. Без доставки
+   * строки развилок в задании нет — её несёт правило ребёнка (`initiative.ts`).
+   */
+  it('группа чужого CLI с развилками по плану не спрашивает, необратимое — D-n (P-08)', async () => {
+    const prompts: string[] = [];
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git: fakeGit(),
+      foreign: true,
+      deliver: true,
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+    const prompt = prompts[0] ?? '';
+    expect(prompt).toContain('Do not ask about forks');
+    expect(prompt).toContain('queues it as D-n');
+    expect(prompt).toContain('"Waiting for the human: D-n');
+    expect(prompt).not.toContain('only when the step is irreversible');
+  });
+
   it('доставка выключена — задание как раньше, без слова о MR', async () => {
     const prompts: string[] = [];
 

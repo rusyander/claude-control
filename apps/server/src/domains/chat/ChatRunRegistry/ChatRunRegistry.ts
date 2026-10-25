@@ -110,6 +110,12 @@ export interface RunFinished {
   projectPath?: string;
   /** Хвост ответа агента — в нём ищется блок предложения. */
   text: string;
+  /**
+   * Итог хода — текст после последнего вызова инструмента, без хода рассуждений
+   * между вызовами. Его, а не хвост всего текста, читает следующее звено группы:
+   * хвост в 24k нёс пересказ по ходу работы и блоки сит (группа 1, 25.10).
+   */
+  answer?: string;
   /** Прогон закончился без ошибки (лимит и остановка тоже приходят ошибкой). */
   ok: boolean;
   startedAt: number;
@@ -309,6 +315,8 @@ interface RegisteredRun {
   startedAt: number;
   /** Хвост ответа агента: в нём ищется блок предложения продолжить. */
   text: string;
+  /** Текст после последнего вызова инструмента — итог хода (см. `RunFinished.answer`). */
+  answer?: string;
   events: BufferedEvent[];
   /** Размер буфера в байтах (JSON кадров) — для предела `MAX_BUFFERED_BYTES`. */
   eventBytes: number;
@@ -2190,7 +2198,10 @@ export class ChatRunRegistry {
     // весь разговор (см. TEXT_TAIL).
     if (event.kind === 'text') {
       run.text = (run.text + event.text).slice(-TEXT_TAIL);
+      run.answer = ((run.answer ?? '') + event.text).slice(-TEXT_TAIL);
     }
+    // Вызов инструмента закрывает промежуточный текст: итог — то, что после последнего.
+    if (event.kind === 'tool') run.answer = '';
 
     // Накопленный расход считаем здесь, на сервере: тогда счётчик за сеанс не
     // обнуляется при перезагрузке вкладки, как и сами прогоны. Дублируем вклад в
@@ -2394,6 +2405,8 @@ export class ChatRunRegistry {
     const clipped = !run.detached && run.text.length >= TEXT_TAIL;
     const closing = run.detached || inherited || clipped ? this.closingTurnOf(run) : undefined;
     const text = run.detached ? (closing?.text ?? '') : (closing?.text ?? run.text);
+    // Закрывающий ход из транскрипта — уже итог; иначе — текст после последнего инструмента.
+    const answer = closing?.text ?? run.answer ?? '';
     // Ожидаемый автовыбор так и не пришёл до конца хода — вопрос висит.
     const asked = run.asked || Boolean(closing?.asked) || (run.expectedPicks?.size ?? 0) > 0;
     // Закрывающего хода нет — процесс умер посреди него. Раньше здесь молчали,
@@ -2421,6 +2434,7 @@ export class ChatRunRegistry {
           sessionId: run.sessionId,
           projectPath: run.meta.projectPath,
           text,
+          ...(answer.trim() ? { answer } : {}),
           ok: !run.errored,
           startedAt: run.startedAt,
           options: run.options,

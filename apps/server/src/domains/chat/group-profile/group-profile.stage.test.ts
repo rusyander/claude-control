@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  CLI_HELP_AGENT_DENY,
   GROUP_SKILLS,
   groupRunProfile,
   mergeDeny,
   readOnlyMcpDeny,
+  wikiDeny,
   STAGE_SKILLS,
   stageSkills,
   type ProfileMcpEntry,
@@ -82,13 +84,21 @@ describe('MCP наружу только на чтение — звеньям п�
     const permissions = review.settings.permissions as { ask: string[]; deny?: string[] };
     expect(permissions.ask).toContain('mcp__gitlab-work');
     const kept = review.mcp.ids.map(byId);
-    expect(permissions.deny).toEqual([...readOnlyMcpDeny(kept, 'review'), ...mergeDeny(kept)]);
+    const wiki = wikiDeny(kept, input.tasksText, []);
+    expect(permissions.deny).toEqual([
+      ...readOnlyMcpDeny(kept, 'review'),
+      ...mergeDeny(kept),
+      ...wiki,
+      ...CLI_HELP_AGENT_DENY,
+    ]);
     expect(review.note).toContain('write tools are not in this run');
     const work = groupRunProfile({ ...input, stage: 'work' });
     // У работы под запретом только слияние MR (F-13) — запись открыта.
-    expect((work.settings.permissions as { deny?: string[] }).deny).toEqual(
-      mergeDeny(work.mcp.ids.map(byId)),
-    );
+    expect((work.settings.permissions as { deny?: string[] }).deny).toEqual([
+      ...mergeDeny(work.mcp.ids.map(byId)),
+      ...wiki,
+      ...CLI_HELP_AGENT_DENY,
+    ]);
     expect(work.note).not.toContain('write tools are not in this run');
   });
 });

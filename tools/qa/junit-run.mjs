@@ -521,18 +521,38 @@ function parseJUnitCases(xml) {
     const time = Number(attributes.match(/\btime="([^"]*)"/)?.[1]);
     const failure = body.match(/<(failure|error)\b([^>]*)>?([\s\S]*?)(?:<\/\1>|$)/);
     const skipped = /<skipped\b/.test(body);
+    const seconds = Number.isFinite(time) ? time : undefined;
+    const message = failure
+      ? decode(failure[2].match(/\bmessage="([^"]*)"/)?.[1] ?? failure[3] ?? '').slice(0, 2000)
+      : undefined;
     list.push({
       name,
       // classname vitest — путь файла теста от корня пакета.
       owner: decode(attributes.match(/\bclassname="([^"]*)"/)?.[1] ?? ''),
-      seconds: Number.isFinite(time) ? time : undefined,
+      seconds,
       status: failure ? 'failed' : skipped ? 'skipped' : 'passed',
-      message: failure
-        ? decode(failure[2].match(/\bmessage="([^"]*)"/)?.[1] ?? failure[3] ?? '').slice(0, 2000)
-        : undefined,
+      message: message === undefined ? undefined : withSyncBlock(message, seconds),
     });
   }
   return list;
+}
+
+/**
+ * Асинхронный тест vitest снимает ровно в срок; шедший вдвое дольше срока держал поток синхронно
+ * (cpSync/spawnSync/Atomics.wait) — срок сработал, лишь когда поток освободился. 24.10.2026 такую
+ * запись «Test timed out in 1000ms» группа прочла как медленный стенд и трижды повторила прогон.
+ * Признак тот же, что у `tests-cli run`: «timed out in X ms» и длительность ≥ 2X.
+ */
+function withSyncBlock(message, seconds) {
+  const limit = Number(message.match(/(?:Test|Hook) timed out in (\d+)\s*ms/)?.[1]);
+  if (!limit || seconds === undefined || seconds * 1000 < 2 * limit) return message;
+  const round = (ms) => Math.round(ms / 100) / 10;
+  return (
+    `Синхронная блокировка: тест шёл ${round(seconds * 1000)} с при пределе ${round(limit)} с — ` +
+    'vitest не прерывает синхронный код: тест или его оснастка держит поток синхронным вызовом ' +
+    '(cpSync/rmSync/spawnSync/execSync по большому дереву, Atomics.wait). Повтор прогона и ' +
+    `больший testTimeout не помогут — ищи этот вызов в файле и его фикстурах. ${message}`
+  );
 }
 
 function norm(value) {

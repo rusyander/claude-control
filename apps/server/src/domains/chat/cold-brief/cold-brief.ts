@@ -19,6 +19,12 @@ import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
 
 /** Сколько заметок группы едет в вводную: дальше — путь, модель дочитает сама. */
 export const BRIEF_NOTEBOOK_CHARS = 4_000;
+/**
+ * Заметки до этого размера едут целиком: обрезанный на 4k PROGRESS.md в 6,4k
+ * новая сессия первым же вызовом перечитывала ЦЕЛИКОМ (группа 1, 25.10) — 4k
+ * дважды. Длиннее — обрез по строке с номером строки, с которой читать остаток.
+ */
+export const BRIEF_NOTEBOOK_WHOLE = 8_000;
 /** Последний ответ прежнего разговора — итог стадии, а не весь её ход. */
 export const BRIEF_LAST_ANSWER_CHARS = 3_000;
 const BRIEF_GIT_LINES = 40;
@@ -44,6 +50,27 @@ function clip(text: string, max: number, rest: string): string {
     : trimmed;
 }
 
+/**
+ * Заметка группы: целиком до `BRIEF_NOTEBOOK_WHOLE`, иначе — по границе строки до
+ * `BRIEF_NOTEBOOK_CHARS` и номер строки, с которой начинается остаток: «дочитай»
+ * без него читался как «прочти файл заново», и первые 4k шли в окно дважды.
+ */
+function clipNotebook(text: string, rel: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= BRIEF_NOTEBOOK_WHOLE) return trimmed;
+  const cut = trimmed.lastIndexOf('\n', BRIEF_NOTEBOOK_CHARS);
+  if (cut <= 0) {
+    return clip(trimmed, BRIEF_NOTEBOOK_CHARS, `read the rest of ${rel} yourself before acting`);
+  }
+  const kept = trimmed.slice(0, cut);
+  const next = kept.split('\n').length + 1;
+  const total = trimmed.split('\n').length;
+  return (
+    `${kept}\n…(lines 1–${next - 1} of ${total} shown — read the rest of ${rel} from line ` +
+    `${next} (Read offset=${next}) before acting, not from the top)`
+  );
+}
+
 // Только хвост: ведущий пробел у `git status --short` — смысл (« M» — правка
 // не в индексе, «M » — в индексе), а у `--stat` — выравнивание колонок.
 function clipLines(text: string): string {
@@ -65,6 +92,48 @@ export function lastAnswer(transcript: string): string {
     if (text.trim()) return text;
   }
   return '';
+}
+
+const isToolResultOnly = (record: { message?: { content?: unknown } }): boolean => {
+  const content = record.message?.content;
+  return (
+    Array.isArray(content) &&
+    content.length > 0 &&
+    content.every((block) => (block as { type?: string }).type === 'tool_result')
+  );
+};
+
+/**
+ * Ход, оборванный посреди работы (пауза, перезапуск, смерть CLI): его последний
+ * вызов — инструмент, итога нет. Найденное в нём — причина, вывод — лежит в
+ * тексте МЕЖДУ вызовами; последний такой текст — часто «запускаю ещё раз», а
+ * причина — на абзац раньше (23.10: найденная причина зависания cpSync 68,5 с
+ * пропала с паузой, новая сессия искала её заново). Тексты этого хода, новые
+ * последними; закончился ход итогом — пусто: итог несёт `lastAnswer`.
+ */
+export function interruptedStretch(transcript: string, max = BRIEF_LAST_ANSWER_CHARS): string {
+  const records = readTailRecords(transcript);
+  const texts: string[] = [];
+  let endedWithTool = false;
+  let seenAssistant = false;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index]!;
+    if (record.type === 'user') {
+      if (isToolResultOnly(record)) continue;
+      if (textOf(record).trim()) break;
+      continue;
+    }
+    if (record.type !== 'assistant') continue;
+    const content = record.message?.content;
+    const tool = Array.isArray(content) && content.some((block) => block.type === 'tool_use');
+    if (!seenAssistant) endedWithTool = tool && !textOf(record).trim();
+    seenAssistant = true;
+    const text = textOf(record).trim();
+    if (text) texts.unshift(text);
+  }
+  if (!endedWithTool || texts.length < 2) return '';
+  const joined = texts.join('\n…\n');
+  return joined.length > max ? `…${joined.slice(-max)}` : joined;
 }
 
 /**
@@ -112,17 +181,17 @@ export function coldBriefFacts(
   base?: string,
   read?: { lastAnswer?: string; openQuestion?: string },
 ): string {
-  const parts: string[] = ['Facts the panel collected for you — do not collect them again:'];
+  // Отметка времени снимает противоречие с продолжениями «сверь состояние с фактами
+  // (git status, git log)»: факты ниже — на этот миг, git — только о том, что после.
+  const parts: string[] = [
+    `Facts the panel collected for you at ${new Date().toISOString()} — current as of then; ` +
+      'do not collect them again, run git only for what changed after:',
+  ];
   for (const rel of NOTEBOOK_FILES) {
     const file = join(cwd, rel);
     if (!existsSync(file)) continue;
     const text = readFileSync(file, 'utf8');
-    if (text.trim()) {
-      parts.push(
-        `## Notebook ${rel}`,
-        clip(text, BRIEF_NOTEBOOK_CHARS, `read the rest of ${rel} yourself before acting`),
-      );
-    }
+    if (text.trim()) parts.push(`## Notebook ${rel}`, clipNotebook(text, rel));
   }
   const branch = gitSync(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
   const fork = mergeBase(cwd, base);
@@ -141,7 +210,9 @@ export function coldBriefFacts(
   if (status !== undefined) {
     parts.push('## Uncommitted (git status --short)', status.trim() ? clipLines(status) : 'clean');
   }
-  const answer = read ? (read.lastAnswer ?? '') : lastAnswer(transcript);
+  // Оборванный ход — его тексты целиком (последний среди них); иначе — итог хода.
+  const stretch = read ? '' : interruptedStretch(transcript);
+  const answer = stretch ? '' : read ? (read.lastAnswer ?? '') : lastAnswer(transcript);
   if (answer) {
     parts.push(
       '## Your last answer in the previous conversation',
@@ -150,6 +221,13 @@ export function coldBriefFacts(
         BRIEF_LAST_ANSWER_CHARS,
         'the rest is the last answer in the previous transcript',
       ),
+    );
+  }
+  if (stretch) {
+    parts.push(
+      '## The previous turn broke off mid-work — what you found and said in it (newest last; a ' +
+        'cause found here is a fact, do not search for it again)',
+      stretch,
     );
   }
   const asked = read ? (read.openQuestion ?? '') : openQuestion(transcript);

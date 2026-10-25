@@ -32,7 +32,9 @@ import {
   isSoleSync,
   MAIN_SYNC_DENIED,
   MAIN_SYNC_UNKNOWN,
+  movesHistory,
   resolvedSyncText,
+  syncUnderway,
 } from '../main-sync/main-sync.ts';
 import type {
   ForeignShellCall,
@@ -221,7 +223,14 @@ async function groupReading(
   const syncFound =
     !guard && cwd ? await deps.bridge.syncRefOf(group, cwd, toolName, syncCommand) : undefined;
   const syncRef = syncFound === 'unnamed' ? undefined : syncFound;
-  if (syncRef && cwd) {
+  // Догон уже идёт: сторона целевой для файла посреди него — разрешение
+  // конфликта, не новый догон (D33), как у маршрута Claude; перенос истории
+  // посреди него сверяется заново.
+  const resolving =
+    Boolean(syncRef && cwd) &&
+    !movesHistory(syncCommand) &&
+    (await syncUnderway(cwd ?? '', group.base));
+  if (syncRef && cwd && !resolving) {
     const conflict = await conflictsWith(cwd, syncRef, group.base);
     if (conflict === false) return { level: 'deny', toolName, message: MAIN_SYNC_DENIED };
     if (conflict === undefined) return { level: 'deny', toolName, message: MAIN_SYNC_UNKNOWN };

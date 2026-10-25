@@ -133,6 +133,44 @@ describe('звено доставки (журнал 59a, 61b)', () => {
     expect(prompt).toContain('git push -u origin fix-PROJ-7');
     expect(prompt).toContain('The last line of the answer is the link to the MR');
   });
+
+  // Группа №1 24.10: ревью и живая проверка шли ПОСЛЕ пуша — 4 дерева и 7 полных прогонов за
+  // доставку. Порядок `ticket-delivery-2`: ревью → живая проверка → проверки один раз → пуш.
+  it('ревью, живая проверка и сверка диффа — до проверок проекта и пуша', () => {
+    const at = (text: string, part: string) => {
+      const index = text.indexOf(part);
+      expect(index, part).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const preamble = deliveryPreamble({ branch: 'fix-PROJ-7' });
+    const checks = at(preamble, "the project's checks ONCE on that tree");
+    expect(at(preamble, 'change, review, live check')).toBeLessThan(checks);
+    expect(checks).toBeLessThan(at(preamble, 'commit, push, draft MR'));
+
+    const live = at(prompt, 'live check after the edits');
+    const diff = at(prompt, 'Compare the diff of the branch against main');
+    const full = at(prompt, 'ONCE on this final tree');
+    const push = at(prompt, 'git push -u origin fix-PROJ-7');
+    expect(live).toBeLessThan(full);
+    expect(diff).toBeLessThan(full);
+    expect(full).toBeLessThan(push);
+  });
+
+  it('пуш в ветку с MR в ревью — обычный git push; аренда только после rebase с конфликтом', () => {
+    expect(prompt).toContain(
+      'any other push to a branch with an MR in review is a plain `git push`',
+    );
+    expect(deliveryPreamble({ branch: 'fix-PROJ-7' })).toContain(
+      'Any other push to a branch with an MR in review is a plain `git push`',
+    );
+  });
+
+  it('звено работы перед доставкой не пушит: пуш и MR — звена доставки', () => {
+    const work = deliveryPreamble({ branch: 'fix-PROJ-7', deliverLater: true });
+    expect(work).toContain(
+      'does not push: the push, the MR and its threads belong to the delivery stage',
+    );
+  });
 });
 
 describe('группа решает сама (журнал 78, T24)', () => {

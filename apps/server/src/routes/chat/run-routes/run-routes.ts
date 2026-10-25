@@ -21,11 +21,13 @@ import {
   isUnnamedRef,
   MAIN_SYNC_DENIED,
   MAIN_SYNC_UNKNOWN,
+  movesHistory,
   remoteConflicts,
   resolvedSyncText,
   syncCandidate,
   syncsWithTarget,
   syncTarget,
+  syncUnderway,
 } from '../../../domains/chat/main-sync/main-sync.ts';
 import { expandAliasText } from '../../../domains/chat/group-command/alias-text.ts';
 import {
@@ -1425,7 +1427,15 @@ export function registerChatRunRoutes(
     // Цель догона не назвать — сверить конфликт нечем: решает человек, не строки группы (c).
     const syncUnnamed = syncFound === UNNAMED_SYNC;
     const syncRef = syncFound === UNNAMED_SYNC ? undefined : syncFound;
-    if (syncRef && held) {
+    // Догон уже идёт (его пропустила сверка, когда он начинался): сторона целевой
+    // для файла посреди него — разрешение конфликта, не новый догон (журнал 24.10,
+    // D33: `git show origin/main:a > a` посреди перебазирования — MAIN_SYNC_UNKNOWN).
+    // Перенос истории и посреди него сверяется заново.
+    const resolving =
+      Boolean(syncRef && held) &&
+      !movesHistory(syncCommand) &&
+      (await syncUnderway(held?.options.cwd ?? '', group?.base));
+    if (syncRef && held && !resolving) {
       // По вершине сервера, не по `origin/*` копии (RF-BGCD-05); база группы — где искать хэш.
       const conflict = await conflictsWith(held.options.cwd, syncRef, group?.base);
       if (conflict === false) return reply.send({ behavior: 'deny', message: MAIN_SYNC_DENIED });

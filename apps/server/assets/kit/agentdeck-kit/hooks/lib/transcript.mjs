@@ -157,10 +157,27 @@ export function userSpeech(records) {
 
 /** The text a record carries when it is the user speaking, '' otherwise. */
 function typedText(r) {
+  // A message typed while a turn runs is not a user record: the CLI writes it as a `queued_command`
+  // attachment and splices it into the next tool result (live 25.10.2026 — a mid-turn "yes" never
+  // opened the consent gate, the owner had to repeat it). Peer hand-backs and task notifications ride
+  // the same attachment type, so only origin.kind 'human' is the user.
+  if (r?.type === 'attachment') {
+    const a = r.attachment;
+    if (
+      a?.type !== 'queued_command' ||
+      (a.origin ? a.origin.kind !== 'human' : a.humanTurn !== true)
+    )
+      return '';
+    return speechOf(a.prompt);
+  }
   // NB: promptId is present on EVERY user record, tool results included — it does not mark a
   // typed message. isCompactSummary is the reliable flag for harness-generated text.
   if (r?.type !== 'user' || r.isCompactSummary) return '';
-  const c = r.message?.content;
+  return speechOf(r.message?.content);
+}
+
+/** Text parts of a message body (string or content array), '' for harness-written text. */
+function speechOf(c) {
   let text = '';
   if (typeof c === 'string') text = c;
   else if (Array.isArray(c)) {
@@ -257,18 +274,37 @@ export function ownTranscript(input) {
  * absent (hook not registered yet, first turn after an upgrade) so nothing depends on it.
  */
 export function currentUserPrompt(input, records) {
+  // Messages typed mid-turn are this turn's words too, and UserPromptSubmit never saw them.
+  const queued = midTurnSpeech(records || []);
   const session = String(input?.session_id ?? '').replace(/[^a-zA-Z0-9-]/g, '');
   if (session) {
     try {
       const body = readFileSync(join(STATE_DIR, 'prompts', `${session}.json`), 'utf8');
       const saved = JSON.parse(body);
       if (saved && typeof saved.prompt === 'string' && saved.prompt)
-        return stripReminders(saved.prompt);
+        return [stripReminders(saved.prompt), ...queued].join('\n');
     } catch {
       /* fall through to the transcript */
     }
   }
+  if (queued.length) {
+    const said = userSpeech(records);
+    const turn = said.findLast((s) => records[s.index]?.type === 'user');
+    return [...(turn ? [turn.text] : []), ...queued].join('\n');
+  }
   return lastUserPrompt(records || []);
+}
+
+/** Messages the user typed while the current turn ran — the queued speech after the last typed prompt. */
+function midTurnSpeech(records) {
+  const out = [];
+  for (let i = records.length - 1; i >= 0; i--) {
+    const text = typedText(records[i]);
+    if (!text) continue;
+    if (records[i].type !== 'attachment') break;
+    out.unshift(text);
+  }
+  return out;
 }
 
 /**

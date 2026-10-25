@@ -11,7 +11,9 @@
 // A shell write into a Markdown file (redirect, tee, Set-Content) is denied too, scratch places aside:
 // it puts a doc past the language and doc-location guards on Edit/Write.
 import { normalize } from 'node:path';
+import { expand, variables } from './destructive-guard.mjs';
 import { commandText, executedText } from './shell-text.mjs';
+import { shellWords } from './split-worktree.mjs';
 import { deny, ownTranscript, readTail, toolEvents, wasJustRefused } from './transcript.mjs';
 
 const INLINE =
@@ -31,6 +33,8 @@ function pathWords(text) {
   for (const m of text.matchAll(PATH_WORD)) {
     const word = m[1];
     if (/^(?:https?|file):/i.test(word) || /\.(?:exe|cmd|bat)$/i.test(word)) continue;
+    // The tail of a URL (`http://inst.localhost` → `//inst.localhost`) names no file.
+    if (word.startsWith('//') && text[m.index - 1] === ':') continue;
     // A sed/perl script (`s/a/b/g`, `y/ab/cd/`; PATH_WORD's `\b` may cut its last delimiter) names no file.
     if (/^[sy]([/|#,:@]).*\1/.test(word) && !/\.\w+$/.test(word)) continue;
     out.push(word);
@@ -45,19 +49,70 @@ const ABSOLUTE = /^(?:[A-Za-z]:)?[\\/]|^[~$%]/;
  * cwd, then every `cd` before it). Paths of the other segments are not targets: `sed -i … .agent/tmp/x.json
  * && node tools/tests-cli.mjs …` edits a scratch file only, and `cd .agent/tmp/r; sed -i … x.mjs` too.
  */
-function targets(text, cwd) {
+function targets(raw, cwd) {
+  const text = commandText(raw);
   let dir = String(cwd ?? '');
   const out = [];
-  for (const seg of text.split(/&&|\|\||;|\n/)) {
+  for (const { seg, at } of segments(raw)) {
     const cd = /^\s*cd\s+["']?([^\s"';&|]+)/.exec(seg);
     if (cd) {
       dir = resolveIn(dir, cd[1]);
       continue;
     }
     if (!SED_INPLACE.test(seg) && !INLINE.test(seg) && !WRITES.test(seg)) continue;
-    for (const word of pathWords(seg)) out.push(resolveIn(dir, word));
+    const words = (SED_INPLACE.test(seg) && sedFiles(seg)) || pathWords(seg);
+    const vars = variables(text, at);
+    for (const word of words)
+      for (const value of expand(word, vars)) out.push(resolveIn(dir, value));
   }
   return out;
+}
+
+/**
+ * The simple commands of `raw` with their offsets in `commandText(raw)`. Separators inside quoted data
+ * do not split: a sed script `"s#a';#b#"` is one word (the split cut the script at `;`, so the file
+ * operand fell into another segment and a URL in the script was taken as the target).
+ */
+function segments(raw) {
+  const text = commandText(raw);
+  const run = executedText(raw, { code: 'spawn' });
+  const out = [];
+  let at = 0;
+  for (const part of run.split(/(?<=&&|\|\||;|\n)/)) {
+    out.push({ seg: text.slice(at, at + part.length).replace(/(?:&&|\|\||;|\n)$/, ''), at });
+    at += part.length;
+  }
+  return out;
+}
+
+/**
+ * The FILE operands of a `sed -i` command — the words after the script (`-e`/`-f` value, else the first
+ * plain word), up to a pipe or redirect. A path inside the script is not a target. `null` = no operand
+ * found (judge every path word, as before).
+ */
+function sedFiles(seg) {
+  const words = shellWords(seg);
+  const at = words.findIndex((w) => /(?:^|[\\/])sed(?:\.exe)?$/i.test(w));
+  if (at < 0) return null;
+  const files = [];
+  let script = false;
+  for (let i = at + 1; i < words.length; i++) {
+    const w = words[i];
+    if (/^(?:\||&|\d*>|<|&>)/.test(w)) break;
+    if (/^(?:-e|--expression|-f|--file)$/.test(w)) {
+      script = true;
+      i++;
+    } else if (/^--(?:expression|file)=/.test(w)) script = true;
+    else if (/^(?:-l|--line-length)$/.test(w)) i++;
+    else if (/^(?:-i|--in-place)/.test(w) || w === '--') continue;
+    else if (/^-[a-zA-Z]*[ef]$/.test(w)) {
+      script = true;
+      i++;
+    } else if (w.startsWith('-') && w.length > 1) continue;
+    else if (!script) script = true;
+    else files.push(w);
+  }
+  return files.length ? files : null;
 }
 
 function resolveIn(dir, word) {
@@ -89,7 +144,10 @@ export function markdownWrites(raw, cwd = '') {
     }
     for (const m of part.matchAll(MD_OP)) {
       const target = MD_TARGET.exec(original.slice(m.index + m[0].length));
-      if (target) out.push(resolveIn(dir, target[1]));
+      if (!target) continue;
+      // `P=.agent/tmp/x; … > $P/y.md` writes scratch: a variable the command assigned is expanded.
+      const vars = variables(text, offset - part.length + m.index);
+      for (const value of expand(target[1], vars)) out.push(resolveIn(dir, value));
     }
   }
   return out;
@@ -107,7 +165,7 @@ export function inlineEdit(raw, cwd = '') {
   const sed = SED_INPLACE.test(executedText(raw, { code: 'spawn' }));
   if (!sed && !(INLINE.test(command) && WRITES.test(command))) return null;
   // Targets keep their quotes' content — a quoted scratch path is still a scratch path.
-  const paths = targets(commandText(raw), cwd);
+  const paths = targets(raw, cwd);
   if (paths.length > 0 && paths.every((p) => SCRATCH.test(p))) return null;
   return sed ? 'sed -i' : 'inline code writing a file';
 }

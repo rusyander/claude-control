@@ -1156,9 +1156,12 @@ export function groupQuestionsPlanLine(foreign = false): string {
     'Decide a fork for which you have a recommended option yourself: take it and record it in ' +
     'the MR description as a decision for the review.';
   const asking = foreign
-    ? 'A question to the human in the last line of your answer — only when the step is irreversible ' +
-      "or goes beyond the group's tasks (someone else's task, a DB migration is needed, nothing to " +
-      'recommend); once answered, continue from the same stage.'
+    ? 'Do not ask about forks: with nothing to recommend, take the option that continues without the ' +
+      "human. Work beyond the group's tasks: leave it and name it at the end. An irreversible step " +
+      '(deleting data, a DB migration, a merge, a force-push beyond your own branch) is the ' +
+      "human's: if the panel refuses the call and queues it as D-n, continue everything else, keep the " +
+      'MR a draft and end the turn with "Waiting for the human: D-n — <what it unblocks>"; with no ' +
+      'such refusal, finish the rest and end the turn with one question about that step in the last line.'
     : 'The human does not answer the questions of this group: the panel answers AskUserQuestion ' +
       'itself at once (the recommended option, else one that continues without the human). Never end ' +
       'a turn waiting for an answer — not with a question in text, not with "after your answer", not ' +
@@ -1294,10 +1297,14 @@ export function deliveryPreamble(input: {
       'their permission to commit, push, create and update the MR and to move the tracker tasks of ' +
       'this group. Merging and deleting branches stay forbidden; so does force-push, except for the ' +
       'one case below about your own branch.',
+    // Порядок — как в `ticket-delivery-2` (§9 ревью → §10 живая проверка → §6 гейт → §8 пуш):
+    // группа №1 24.10 пушила раньше ревью и живой проверки, и каждая находка после пуша давала
+    // новое дерево и новый полный гейт (4 дерева, 7 полных прогонов за доставку).
     `${GROUP_DELIVERY_SKILL_CLAUSE} tracker tasks into work on yourself, the ` +
-      "change, the project's checks, commit, push, draft MR, review, live check, design comparison " +
-      'if a mockup is attached to the task, fixing what was found, the MR description — and take the ' +
-      'draft off when all is clean.',
+      'change, review, live check, design comparison if a mockup is attached to the task, fixing ' +
+      "what was found, then the project's checks ONCE on that tree, commit, push, draft MR, the MR " +
+      'description — and take the draft off when all is clean. Review and live check come BEFORE the ' +
+      'push: a finding after it makes a new tree, and that tree needs its own full run.',
     // Проверки проекта — те, что названы в его правилах, все и по порядку (U7):
     // «типы, линт, тесты» вообще пропускали гейт документации проекта и
     // backend-гейты, и MR уезжал с красным CI.
@@ -1319,7 +1326,8 @@ export function deliveryPreamble(input: {
     `Before the push — ${SYNC_ON_CONFLICT_LINE} Already pushed → after that rebase ` +
       '`git push --force-with-lease origin <group branch>`: only your own branch, never the main, ' +
       "a protected branch or another group's branch; a conflict in such a rebase is resolved by the " +
-      'group itself, never handed to the human.',
+      'group itself, never handed to the human. Any other push to a branch with an MR in review is a ' +
+      'plain `git push` — never forced, the lease included.',
     // Автономия по умолчанию (журнал 78, T24): группа стояла на развилке, для
     // которой сама назвала рекомендацию, пока человека не было у панели. Кто
     // решает развилки, выбирает человек во вкладке «Группы» (аудит 25.09, L40).
@@ -1347,7 +1355,8 @@ function workStageDeliveryPreamble(
   return [
     "Delivering a ready MR is this group's duty, and the panel runs it as a separate stage after " +
       'the work. The work stage makes the change and commits it on this branch following the ' +
-      'project convention for messages.',
+      'project convention for messages, and does not push: the push, the MR and its threads belong ' +
+      'to the delivery stage.',
     WORK_STAGE_CHECKS_LINE,
     ...(input.shots ? [shotCommandLine(input.shots)] : []),
     'All tasks of the group are ONE branch and ONE MR: the delivery stage puts the task keys into ' +
@@ -1434,8 +1443,9 @@ export function chatDeliveryPrompt(input: { skill?: string; foreign?: boolean })
   return (
     'The human enabled delivery up to an MR on this project in the panel. If the message is a ' +
     'code-change task (ticket, bug, feature, review fixes) and the work is ready, take it to a ' +
-    `ready MR ${skill}: a separate branch, not the main one; the project's checks, commit, push, ` +
-    'draft MR, review, live check, MR description — and take the draft off when all is clean; the ' +
+    `ready MR ${skill}: a separate branch, not the main one; review, live check, fixing what was ` +
+    "found, then the project's checks ONCE on that tree, commit, push, draft MR, MR description — " +
+    'and take the draft off when all is clean; the ' +
     "last line of the answer is the MR link. Enabling it is the human's permission to commit, " +
     'push, create and update the MR for this task; merging, deleting branches and force-push are ' +
     'forbidden. A question, an explanation, a review or research without edits needs no MR. A ' +

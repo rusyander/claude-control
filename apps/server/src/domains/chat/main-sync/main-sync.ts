@@ -18,6 +18,7 @@ import {
   serverConflicts,
   type GitRunner,
 } from './conflicts.ts';
+import { syncUnderway } from './sync-underway.ts';
 
 /**
  * Оболочки, чей сценарий текстом (`bash -c '…'`) разбор догона читает
@@ -798,7 +799,27 @@ export function isUnnamedRef(ref: string): boolean {
   return /[$`]/.test(ref);
 }
 
-export { conflictsBetween, isHiddenSync, remoteConflicts };
+export { conflictsBetween, isHiddenSync, remoteConflicts, syncUnderway };
+
+/** Звенья git, что двигают историю или ветки, а не берут содержимое. */
+const HISTORY_SUBS =
+  /^(rebase|merge|pull|reset|branch|switch|update-ref|fetch|cherry-pick|am|worktree|commit-tree|symbolic-ref|replace)$/;
+
+/**
+ * Команда двигает историю или ветку (`rebase`, `merge`, `reset`, `checkout -B`,
+ * `fetch` с назначением, обёртка с таким внутри) — её догон сверяется всегда,
+ * и посреди уже идущего догона тоже. Только содержимое целевой в файлы
+ * (`git show origin/main:a > a`, `checkout origin/main -- a`, заплатка) — нет.
+ */
+export function movesHistory(command: string): boolean {
+  const moves = segments(command).some((segment) => {
+    const call = gitCall(segment);
+    if (!call) return false;
+    if (HISTORY_SUBS.test(call.sub)) return true;
+    return call.sub === 'checkout' && call.args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a));
+  });
+  return moves || wrappedScripts(command).some(movesHistory);
+}
 
 /**
  * Есть ли у HEAD конфликт с целевой веткой, куда ведёт догон `ref`, — по

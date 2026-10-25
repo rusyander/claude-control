@@ -398,6 +398,7 @@ export function createHandoffPlanner({
       ...(link ? { link } : {}),
       ok: finished.ok,
       text: finished.text,
+      ...(finished.answer ? { answer: finished.answer } : {}),
       task: finished.options.prompt ?? '',
       // Работа — с начала звена, а не этого разговора: продолжение в чистой
       // сессии иначе не видело коммитов прошлой (D6).

@@ -71,6 +71,17 @@ export function gitTooOld(versionText) {
   return maj < MIN_GIT[0] || (maj === MIN_GIT[0] && min < MIN_GIT[1]);
 }
 
+// A list-file line is a path, often followed by a reason («a/b.tsx — rewritten by this ticket»): the
+// whole line taken as the path matched nothing and cost a second identical deny. The whole line still
+// counts (a path with a space), plus the part before a dash/hash and the first word.
+function ackLine(line, add) {
+  const text = line.trim();
+  if (!text || text.startsWith('#')) return;
+  add(text);
+  add(text.split(/\s+(?:[—–#]|-{1,2})\s*/)[0].trim());
+  add(text.split(/\s+/)[0]);
+}
+
 /** Files named on `# sieve-ack:` comment lines of the raw command; `@<file>` adds every line of that file. */
 export function ackedFiles(raw, cwd) {
   const out = new Set();
@@ -84,7 +95,7 @@ export function ackedFiles(raw, cwd) {
             path.resolve(String(cwd ?? '.'), f.slice(1)),
             'utf8',
           ).split(/\r?\n/))
-            add(line.trim());
+            ackLine(line, add);
         } catch {
           add(f);
         }
@@ -364,6 +375,8 @@ function sieve(git, t, input) {
     t.ref === 'HEAD'
       ? git(cwd, ['symbolic-ref', '--quiet', '--short', 'HEAD']).stdout.trim()
       : t.ref;
+  res.root = repoAt(cwd)?.root ?? null;
+  res.branch = branch || null;
   const target =
     t.target ||
     (branch ? git(cwd, ['config', '--get', `branch.${branch}.gh-merge-base`]).stdout.trim() : '') ||
@@ -544,6 +557,38 @@ const list = (files) =>
   files.slice(0, LIST_MAX).join(', ') +
   (files.length > LIST_MAX ? ` (+${files.length - LIST_MAX} more)` : '');
 
+// Foreign removals acked on an earlier push of the same branch, `{"<branch>": [file…]}` in the repo's
+// `.agent/tmp/sieve-acks.json`: the same intentional removals were denied on EVERY push of the branch,
+// though nothing new was flagged. An ack is the agent's own visible declaration; remembering it per
+// branch asks again only about a NEW file.
+const ACKS_FILE = path.join('.agent', 'tmp', 'sieve-acks.json');
+function readAcks(root) {
+  if (!root) return {};
+  try {
+    const data = JSON.parse(readFileSync(path.join(root, ACKS_FILE), 'utf8'));
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  } catch {
+    return {};
+  }
+}
+export function priorAcks(root, branch) {
+  const files = branch ? readAcks(root)[branch] : null;
+  return new Set(Array.isArray(files) ? files.filter((f) => typeof f === 'string') : []);
+}
+export function rememberAcks(root, branch, files) {
+  if (!root || !branch || !files.length) return;
+  try {
+    const data = readAcks(root);
+    const known = Array.isArray(data[branch]) ? data[branch] : [];
+    data[branch] = [...new Set([...known, ...files])].sort();
+    const file = path.join(root, ACKS_FILE);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
+  } catch {
+    /* a lost memory only means the next push asks again */
+  }
+}
+
 export default function pushSieves(input) {
   pending = null;
   const raw = input?.tool_input?.command;
@@ -582,8 +627,9 @@ export default function pushSieves(input) {
         'Publishing the conflict on purpose (a backup push, resolving in the forge UI): add a comment line `# sieve-ack: conflict` and run it again.',
     );
   }
+  const priors = results.map((r) => (r.foreign.length ? priorAcks(r.root, r.branch) : new Set()));
   const foreign = results
-    .map((r) => ({ ...r, open: r.foreign.filter((f) => !acked.has(f)) }))
+    .map((r, i) => ({ ...r, open: r.foreign.filter((f) => !acked.has(f) && !priors[i].has(f)) }))
     .filter((r) => r.open.length);
   if (foreign.length) {
     const r0 = foreign[0];
@@ -600,7 +646,7 @@ export default function pushSieves(input) {
           ? `the \`# sieve-ack:\` line names none of the flagged files («${named.join(' ').slice(0, 60)}») — it takes paths. `
           : '') +
         `Removal intended → add the comment line \`# sieve-ack: ${ackFile ? `@${ackFile}` : '<every file below>'}\`` +
-        `${ackFile ? ` (it lists all ${all.length} flagged files)` : ''} and run it again. Otherwise restore what was not yours: ` +
+        `${ackFile ? ` (it lists all ${all.length} flagged files)` : ''} and run it again; the ack is remembered for this branch, later pushes ask only about new files. Otherwise restore what was not yours: ` +
         `usually lost to a rebase or a file rewritten from a stale copy; \`git log -p ${r0.startSha}..${r0.mainShort} -- <file>\` shows what landed. ` +
         foreign
           .map(
@@ -610,6 +656,16 @@ export default function pushSieves(input) {
           .join(' '),
     );
   }
+  const remembered = [];
+  results.forEach((r, i) => {
+    const earlier = r.foreign.filter((f) => !acked.has(f) && priors[i].has(f));
+    if (earlier.length) remembered.push(`\`${r.label}\` ${list(earlier)}`);
+    rememberAcks(
+      r.root,
+      r.branch,
+      r.foreign.filter((f) => acked.has(f) && !priors[i].has(f)),
+    );
+  });
   // 3. Content sieves over what the branch adds (push-sieves-scan.mjs). A thrown scan is a note, never a deny.
   const blocked = [];
   const advisories = [];
@@ -642,6 +698,10 @@ export default function pushSieves(input) {
   if (targets.length > REFS_MAX)
     notes.push(`only the first ${REFS_MAX} pushed branches were sieved`);
   const parts = [];
+  if (remembered.length)
+    parts.push(
+      `[push-sieves] foreign removals acked on an earlier push of this branch, not asked again (${ACKS_FILE.replace(/\\/g, '/')}): ${remembered.join('; ')}.`,
+    );
   if (advisories.length)
     parts.push(`[push-sieves] not blocking, answer each in the MR — ${advisories.join('; ')}.`);
   if (notes.length)

@@ -324,6 +324,19 @@ export async function isHiddenSync(
   for (const target of await targetRefs(cwd, base, run)) {
     if (await isAncestor(cwd, ref, target, run)) return true;
   }
+  return inTarget(cwd, ref, base, run);
+}
+
+/** Коммит уже в целевой ветке: по ссылкам копии, затем по вершинам сервера. */
+export async function inTarget(
+  cwd: string,
+  ref: string,
+  base: string | undefined,
+  run: GitRunner,
+): Promise<boolean> {
+  for (const target of await targetRefs(cwd, base, run)) {
+    if (await isAncestor(cwd, ref, target, run)) return true;
+  }
   const tips = await serverTips(cwd, 'origin', targetHeads(base), run);
   for (const tip of tips?.values() ?? []) {
     if (await isAncestor(cwd, ref, tip, run)) return true;

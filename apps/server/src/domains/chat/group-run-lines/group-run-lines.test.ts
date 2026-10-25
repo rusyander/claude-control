@@ -271,6 +271,32 @@ describe('group-run-lines', () => {
     expect(foreignChildExtra(store, dir, 'codex:c2')).toContain(FOREIGN_GROUP_ECONOMY_PROMPT);
   });
 
+  it('P-08: группа любого чужого CLI не спрашивает о развилках, необратимое — через D-n', () => {
+    // Живой прогон 25.10: чужая группа по «спроси, если шаг необратим» вставала
+    // вопросом посреди задачи. Строка едет каждому CLI каталога, aider — в своём
+    // варианте без цикла инструментов; проверяем то, что реально уходит в вызов.
+    const providers = [
+      'codex',
+      'qwen',
+      'goose',
+      'opencode',
+      'gemini',
+      'kimi',
+      'continue',
+      'cursor',
+      'aider',
+    ];
+    for (const p of providers) link(`${p}:p08`);
+    for (const p of providers) {
+      const extra = foreignChildExtra(store, dir, `${p}:p08`) ?? '';
+      expect(extra, p).toContain('do not ask about forks');
+      expect(extra, p).toContain('queues it as D-n');
+      expect(extra, p).toContain('"Waiting for the human: D-n');
+      expect(extra, p).not.toContain('Ask only if');
+      if (p !== 'aider') expect(extra, p).toContain('does not hold it for background work');
+    }
+  });
+
   it('разбор (triage) не группа — ни правил, ни привычек', () => {
     store.updateSettings({ groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, workHabits: true } });
     link('codex:triage', 'triage');

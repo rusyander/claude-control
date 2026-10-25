@@ -5,7 +5,7 @@ import {
   ceilingModelRank,
   deliverStagePrompt,
 } from '@agentdeck/contracts/model-cascade';
-import { OWNER_PRECEDENCE_LINE } from '@agentdeck/contracts/quality-floor';
+import { withoutPrecedence } from '@agentdeck/contracts/quality-floor';
 import type {
   ChatLink,
   SplitPlanGroupRecord,
@@ -149,12 +149,14 @@ export function deliverFreshBrief(input: {
     'Restore the context from the facts: git status, git log of the branch, the MR, ' +
       '.agent/PROGRESS.md in the copy if present.',
   ];
-  const task = input.task?.trim();
+  // Строку старшинства задание группы уже несёт, а задание доставки ставит её само
+  // последним абзацем (`deliverStagePrompt`): здесь — ни своей, ни из задания
+  // (разговор доставки после эскалации нёс её дважды, 24.10).
+  const task = withoutPrecedence(input.task ?? '');
   if (task) lines.push('', "The group's task, as it was given:", task);
   else if (input.tasks.length > 0) {
     lines.push('', "The group's tasks:", ...input.tasks.map((item) => `- ${item}`));
   }
-  lines.push('', OWNER_PRECEDENCE_LINE);
   return lines.join('\n');
 }
 

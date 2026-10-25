@@ -257,4 +257,31 @@ describe('журнал проверок: окружение в ключе', () =
     expect(other.reused).toBe(true);
     expect(realRuns()).toBe(1);
   });
+
+  it('метка владельца, флаги панели, AI_AGENT и dp0 шима npm ключ не меняют; PROJ_SCOPE_BASE — меняет', () => {
+    // 24.10 группа №1: 13 промахов подряд на нетронутых пакетах — менялась только эта часть окружения.
+    const first = {
+      AGENTDECK_OWNER_0123456789ABCDEF: '1',
+      AGENTDECK_DEV_RESTART_DIR: 'C:/a',
+      AI_AGENT: 'claude-code_2-1-301_agent',
+      dp0: 'C:/npm/',
+      BASH_MAX_TIMEOUT_MS: '600000',
+      APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL: '1',
+    };
+    expect(vitest({ env: first }).code).toBe(0);
+    const other = vitest({
+      env: {
+        AGENTDECK_OWNER_FEDCBA9876543210: '1',
+        AGENTDECK_USER_MEMORY_OFF: '1',
+        AI_AGENT: 'claude-code_2-1-302_sdk',
+        dp0: 'C:/other/',
+      },
+    });
+    expect(other.reused, other.err).toBe(true);
+    expect(realRuns()).toBe(1);
+    // Переменная, которую читает скрипт проверки проекта, — вход: тот же прогон с другой — идёт.
+    const scoped = vitest({ env: { ...first, PROJ_SCOPE_BASE: 'origin/main' } });
+    expect(scoped.reused).toBe(false);
+    expect(realRuns()).toBe(2);
+  });
 });

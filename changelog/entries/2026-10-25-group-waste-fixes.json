@@ -1,0 +1,160 @@
+{
+  "title": {
+    "ru": "Группа не тратит ходы на ожидание, повторные гейты и ложные отказы стражей",
+    "en": "A group no longer spends turns on waiting, repeated gates and false guard refusals"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа больше не гоняет полный гейт проекта в каждом звене: решение о полном прогоне в группе принимает набор панели и в режиме «глобальные хуки». Вне группы scripts/check_frontend*.mjs тоже считается полным гейтом.",
+        "en": "A group no longer runs the project's full gate at every stage: the panel's kit decides on a full run in a group in the «global hooks» mode too. Outside a group scripts/check_frontend*.mjs also counts as a full gate."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В доставке после красного полного гейта и правки следующий полный прогон ждёт узкой зелёной проверки исправленного кода.",
+        "en": "In delivery, after a red full gate and an edit, the next full run waits for a narrow green check of the fixed code."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Задание доставки идёт в порядке навыка: ревью и живая проверка — до проверок проекта, проверки один раз, затем коммит, push и MR. В ветку с MR в ревью — обычный push; перед ответом в треды — свежее чтение обсуждений.",
+        "en": "The delivery task follows the skill's order: review and the live check come before the project checks, the checks run once, then commit, push and MR. A branch with an MR in review gets a plain push; replies to threads follow a fresh read of the discussions."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сито проверок проекта снова открывается после правки тестового файла: зелёный ответ до правки теста больше не засчитывается.",
+        "en": "The project-checks sieve reopens after a test file is edited: a green answer from before the test edit no longer counts."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа разделения больше не ждёт фоновых подагентов циклом sleep: она кончает ход строкой с их именами, панель держит её до возврата агента и будит его итогом; страж отказывает в таком опросе любым способом (stat, ls, grep, node) без выхода повтором.",
+        "en": "A split group no longer waits for background subagents with a sleep loop: it ends the turn with a line naming them, the panel holds it until the agent returns and wakes it with the result; the guard refuses such polling by any means (stat, ls, grep, node), with no repeat escape."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа разделения не задаёт вопросов — ни дочерняя группа Claude, ни группа другой CLI: развилку решает рекомендованным вариантом и называет решение в описании MR, необратимый шаг ждёт человека в списке D-n.",
+        "en": "A split group asks no questions — neither a Claude child nor another CLI's group: it decides a fork with the recommended option and names the decision in the MR description, an irreversible step waits for the human in the D-n list."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правила группы и шапка тетради задачи называют Edit для дописки строки: дописка в .md оболочкой (>>) больше не тратит ход на отказ стража.",
+        "en": "The group rules and the task notebook header name Edit for appending a line: an append to .md through the shell (>>) no longer spends a turn on a guard refusal."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Группа не перечитывает лишнего: одиночные чтения подряд собираются в один ход, целые файлы и полный diff оболочкой — диапазонами, длинное правило в следующем этапе той же копии приходит карточкой и открывает вызов только после чтения самого правила.",
+        "en": "Groups stop re-reading: lone reads in a row are batched into one turn, whole files and a full diff via the shell are read in ranges, and a long rule in the next stage of the same copy arrives as a card that unlocks the call only once the rule itself is read."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Короче каждый вызов модели группы: ответ форджа на правку MR — ссылка и состояние вместо всего MR, инструменты вики трекера — только когда задачи о ней, нет подагентов справки CLI, а описания навыков доставки — только у звена доставки.",
+        "en": "Every group model call is shorter: the forge answers an MR edit with its link and state instead of the whole MR, the tracker's wiki tools come only when the tasks are about it, CLI self-help subagents are gone, and delivery-skill descriptions stay with the delivery stage."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Задание звена несёт итог прошлого звена без прозы хода и служебных блоков, правила доставки — один раз на разговор, а заметки группы до 8000 знаков — целиком. Ход, оборванный посреди работы, передаёт новому разговору то, что агент успел выяснить.",
+        "en": "A stage task carries the previous stage's final answer without turn narration or service blocks, delivery rules once per conversation, and group notes up to 8,000 characters whole. A turn cut off mid-work hands the new conversation what the agent had found out."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа сама чинит конфликт посреди догона main: сторона main для файла и checkout --ours/--theirs без -- больше не останавливают её, затирание на неслитом индексе снимается снимком.",
+        "en": "A group fixes a conflict in the middle of catching up with main by itself: taking main's side for a file and checkout --ours/--theirs without -- no longer stop it, an overwrite on an unmerged index is covered by a snapshot."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Подтверждение сит перед пушем помнится для ветки, а удаление своих отслеживаемых файлов без правок в копии группы и остановка своего процесса через Stop-Process -Id в PowerShell проходят сами.",
+        "en": "The sieves confirmation before a push is remembered for the branch, and removing its own unedited tracked files in the group's copy and stopping its own process with Stop-Process -Id in PowerShell go through by themselves."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Охранник правок встроенным кодом судит sed -i по его файлам и раскрывает переменные команды, а отказ отчёта ревью сразу называет скелет review-plan.mjs skeleton.",
+        "en": "The inline-edit guard judges sed -i by its files and expands the command's variables, and a review report refusal names the review-plan.mjs skeleton right away."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Страж git судит операцию по подкоманде git, а не по слову дальше в команде: git status -- …/push-sieves.test.mjs и цикл по именам файлов вида git-files.ts больше не отказываются как push; git -C \"путь с пробелом\" push и pull --rebase по-прежнему ждут разрешения.",
+        "en": "The git guard judges the operation by git's subcommand, not by a word further on: git status -- …/push-sieves.test.mjs and a loop over file names like git-files.ts are no longer refused as a push; git -C \"path with space\" push and pull --rebase still wait for permission."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Согласие на коммит или push, напечатанное посреди хода, пока агент работал, доходит до стража git: раньше он видел только сообщение, начавшее ход, и отказывал снова.",
+        "en": "A consent to commit or push typed in the middle of a turn, while the agent was working, reaches the git guard: before, it saw only the message that started the turn and refused again."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "tests-cli run: тест vitest, синхронно занявший поток, останавливает прогон на первом признаке, а не к пределу, — кейс ложится проваленным с причиной «синхронная блокировка».",
+        "en": "tests-cli run: a vitest test that holds the thread synchronously stops the run at the first sign instead of at the limit — the case is recorded failed with the cause «synchronous block»."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Прогон, снятый по пределу, называет незаконченные файлы и сколько они молчали; провал в цепочке пакетов виден в коротком выводе со строками падений и счётом «упало / прошло».",
+        "en": "A run stopped at the limit names the unfinished files and how long they were silent; a failure in a chain of packages shows in the short output with the failure lines and the «failed / passed» count."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Журнал проверок повторяет зелёный прогон и в новом разговоре группы (метки сессии больше не в ключе), не путает порядок файлов eslint и prettier и не повторяет зелёный tsc на устаревшей сборке соседнего пакета.",
+        "en": "The verify ledger replays a green run in a group's new conversation too (session marks are no longer in the key), is not thrown by the order of eslint and prettier files, and does not replay a green tsc over a neighbouring package's stale build."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "junit-run: запись кейса отличает синхронную блокировку от обычного срока теста.",
+        "en": "junit-run: the case record tells a synchronous block from an ordinary test timeout."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    }
+  ]
+}

@@ -4,8 +4,8 @@ Full text: `<kit>/rules/` (standard, safety, delegation, workspace) — Read the
 
 - Do the stage task, nothing extra; keep the change to what was asked. Never wait for or re-read a CI pipeline.
 - Merging is never yours. Commit, push and MR only as this stage's contract says; no reset, force-push or history rewrite. Other forge or tracker writes: only what the stage names.
-- Migrations, CI, deploy and infra configs: read freely, edit only within the task. Databases: SELECT / EXPLAIN / schema only; a write or DDL stops and asks.
-- Deleting real files outside agent zones (system temp, `.agent/`, regenerable caches) asks first; retire to `.agent/archive/`. Never ask for, print or write a token, password or key.
+- Migrations, CI, deploy and infra configs: read freely, edit only within the task. Databases: SELECT / EXPLAIN / schema only; a write or DDL is the human's: the panel refuses the call and queues it as D-n — never retry or work around it, continue the rest.
+- Deleting real files outside agent zones (system temp, `.agent/`, regenerable caches) is the human's: refused by the panel and queued as D-n, never retried or worked around. In the group's own worktree a self-made probe and a NAMED tracked file clean against HEAD (no `-r`) pass; a dirty one stays and is named in the stage report. Retire to `.agent/archive/`. Never ask for, print or write a token, password or key.
 - Language: text a human reads (MR/PR, tracker comments, changelogs, human docs, questions) is in the user's language; agent docs, `.agent/`, prompts are compressed English. Identifiers stay as is.
 - Published text says WHAT changed and WHY, impersonally, then stops: no authorship or attribution, no process narration, no asides.
 - Verification: a check proves only what it executes; before trusting green feed it a value that must fail; a fix carries red-before/green-after on the real path; report exactly what ran; unverified is never "done".

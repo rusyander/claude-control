@@ -444,6 +444,23 @@ describe('inline-edit-guard: правка файла встроенным код
     expect(edit(`sed -i 's/a/b/' src/x.ts && ls .agent/tmp`)).toMatch(/sed -i/);
   });
 
+  it('цель sed -i — его файловый операнд: URL и `;` внутри скрипта целью не считаются (B5)', () => {
+    // Скрипт с `;` и адресом в кавычках резал команду на куски, хвост URL `//inst…` судился как путь.
+    const scratch = 'C:/Users/u/AppData/Local/Temp/c.json';
+    expect(edit(`sed -i "s#http://inst.localhost';#http://x#" ${scratch}`)).toBeUndefined();
+    expect(edit(`sed -i -e 's#a/b#c/d#' ${scratch}`)).toBeUndefined();
+    // Файл проекта как операнд — по-прежнему отказ, сколько бы путей ни было в скрипте.
+    expect(edit(`sed -i "s#.agent/tmp/a#b#" src/x.ts`)).toMatch(/sed -i/);
+  });
+
+  it('переменная, заданная в той же команде, раскрывается в цели (B6)', () => {
+    const S = 'C:/Users/u/AppData/Local/Temp/scratchpad';
+    expect(edit(`S=${S}; sed -i 's/a/b/' $S/x.json`)).toBeUndefined();
+    expect(edit(`P=.agent/tmp/r; cat > $P/notes.md <<'EOF'\nx\nEOF`)).toBeUndefined();
+    expect(edit(`S=src; sed -i 's/a/b/' $S/x.ts`)).toMatch(/sed -i/);
+    expect(edit(`P=docs; echo x > $P/notes.md`)).toMatch(/Markdown file/);
+  });
+
   it('в субагенте повтор ищется в его собственном транскрипте, а не у родителя', () => {
     // CLI отдаёт субагенту transcript_path родителя; отказ лежит в файле самого субагента.
     const command = `sed -i 's/a/b/' src/y.ts`;

@@ -25,13 +25,29 @@ export interface GitPlace {
  */
 function checkoutPaths(args: Word[]): Word[] | undefined {
   const end = args.findIndex((arg) => arg.text === '--');
-  if (end < 0) return undefined;
+  if (end < 0) return sidePaths(args);
   const before = args
     .slice(0, end)
     .filter((arg) => !/^(-q|--quiet|-f|--force|--ours|--theirs)$/.test(arg.text));
   if (before.length > 1 || before.some((arg) => arg.text.startsWith('-'))) return undefined;
   const paths = args.slice(end + 1);
   return paths.length > 0 ? paths : undefined;
+}
+
+/**
+ * `git checkout --ours|--theirs пути` без `--`: со стороной конфликта git ветку
+ * не сменит вовсе («cannot be used with switching branches»), так что все
+ * слова — пути (журнал 24.10, D30: разрешение конфликта посреди перебазирования
+ * судили сменой ветки на грязном дереве). `-m`/`--conflict` сюда не входят: с
+ * ними git и ветку меняет (`checkout -m main`) — без `--` это смена ветки.
+ */
+function sidePaths(args: Word[]): Word[] | undefined {
+  if (!args.some((arg) => /^--(ours|theirs)$/.test(arg.text))) return undefined;
+  const rest = args.filter((arg) => !/^(-q|--quiet|-f|--force|--ours|--theirs)$/.test(arg.text));
+  if (rest.length === 0 || rest.some((arg) => arg.dynamic || arg.text.startsWith('-'))) {
+    return undefined;
+  }
+  return rest;
 }
 
 /**

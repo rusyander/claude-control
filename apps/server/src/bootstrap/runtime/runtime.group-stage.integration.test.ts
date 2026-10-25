@@ -10,6 +10,7 @@ import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { registerChatRoutes } from '../../routes/chat-routes/chat-routes.ts';
 import { removeWhenFree } from '../../lib/remove-when-free.ts';
+import { CLI_HELP_AGENT_DENY } from '../../domains/chat/group-profile/group-profile.ts';
 import { createRuntime, type Runtime } from './runtime.ts';
 
 /**
@@ -158,14 +159,16 @@ describe('звено группы получает свой профиль за�
     expect(settings.skillOverrides?.['deep-review']).toBeUndefined();
   });
 
+  // Слияние MR закрыто в каждом звене (F-13); подагенты справки CLI не нужны ни одному (контекст g2 F9).
   const MERGE_ONLY = [
     'mcp__gitlab-work__merge_merge_request',
     'mcp__gitlab-work__merge_pull_request',
+    ...CLI_HELP_AGENT_DENY,
   ];
 
   it('доставка: запись на месте, описание — у навыка доставки, ревью — имя', async () => {
     const settings = await settingsOf('deliver');
-    // Под запретом только слияние MR — оно закрыто в каждом звене (F-13).
+    // Под запретом только слияние MR и подагенты справки CLI.
     expect(settings.permissions?.deny).toEqual(MERGE_ONLY);
     expect(settings.skillOverrides?.['deep-review']).toBe('name-only');
     expect(settings.skillOverrides?.['prepare-mr']).toBeUndefined();

@@ -62,6 +62,29 @@ function stamp(now: Date): string {
 }
 
 /**
+ * Дерево индекса для второго родителя снимка. На неслитом индексе (конфликт
+ * перебазирования, слияния, переноса) `write-tree` отказывает — журнал 24.10,
+ * D31/D32: снимок не выходил, и сторож отказывал самому разрешению конфликта
+ * (`checkout --ours`, `restore`), хотя перебазирование панель разрешила сама.
+ * Тогда индекс — как у `HEAD`: неслитых записей в коммит не положить, а всё,
+ * что лежит в файлах копии (и маркеры конфликта), `add -A` следом соберёт.
+ */
+async function stagedTreeOf(
+  cwd: string,
+  env: Record<string, string>,
+  head: string,
+): Promise<string> {
+  try {
+    return await git(cwd, ['write-tree'], env);
+  } catch (error) {
+    const unmerged = await git(cwd, ['ls-files', '-u', '-z'], env).catch(() => '');
+    // Без HEAD неслитого индекса не бывает: сливать и перебазировать не на что.
+    if (unmerged === '' || !head) throw error;
+    return git(cwd, ['rev-parse', `${head}^{tree}`]);
+  }
+}
+
+/**
  * Снять незакоммиченное в `refs/agentdeck/backup/…`. `undefined` — не вышло
  * (git не ответил, ссылка не читается тем, что записали): вызывающий обязан
  * отказать команде, а не пропустить её.
@@ -80,7 +103,7 @@ export async function snapshotUncommitted(
     const env = { GIT_INDEX_FILE: index };
     const head = await git(cwd, ['rev-parse', '--verify', '-q', 'HEAD^{commit}']).catch(() => '');
     const parents = head ? ['-p', head] : [];
-    const stagedTree = await git(cwd, ['write-tree'], env);
+    const stagedTree = await stagedTreeOf(cwd, env, head);
     await git(cwd, ['add', '-A', '--', ':/'], env);
     const tree = await git(cwd, ['write-tree'], env);
     // Дата снимка — та, по которой его потом уберёт `pruneBackups`.

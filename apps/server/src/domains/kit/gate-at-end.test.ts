@@ -818,4 +818,66 @@ describe('gate-at-end: группа гоняет полный гейт один 
     expect(gate(cwd, 'n1', transcript([prompt('сделай')]), {}).decision).toBeUndefined();
     expect(gate(cwd, 'n2', transcript([prompt('сделай')]), {}).decision).toBeUndefined();
   });
+
+  // Группа №1 24.10: тестовый гейт проекта `check_frontend_tests.mjs` — 12 из 27 полных прогонов,
+  // и ни один не был виден хуку.
+  it('F1b: тестовый гейт стороны scripts/check_<side>_tests — тоже гейт; check_i18n — узкий', () => {
+    const work = { AGENTDECK_GROUP_STAGE: 'work', AGENTDECK_GROUP_DELIVER_AHEAD: '1' };
+    for (const full of [
+      'node scripts/check_frontend_tests.mjs > .agent/tmp/g.log 2>&1',
+      'python scripts/check_backend_tests.py',
+    ])
+      expect(groupPre(full, work), full).toBe('deny');
+    for (const narrow of [
+      'node scripts/check_i18n.mjs',
+      'npx eslint scripts/check_frontend_tests.mjs',
+    ])
+      expect(groupPre(narrow, work), narrow).toBeUndefined();
+  });
+
+  // Группа №1 24.10, доставка: красный гейт → правка → полный гейт → правка, 7 полных прогонов за
+  // 10 минут (843 с), где красному линту или одному тесту хватало своего узкого прогона.
+  it('F2: доставка — после красного гейта и правки полный гейт ждёт узкой зелёной проверки', () => {
+    const plain = mkdtempSync(join(dir, 'deliver-'));
+    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
+    const red = [
+      prompt('доставь'),
+      use('Bash', { command: GATE }, 'r1'),
+      result('r1', 'Exit code 1\n✖ 3 problems (3 errors, 0 warnings)'),
+    ];
+    const fixed = [...red, ...edit()];
+    const first = gate(plain, 'd1', transcript(fixed), deliver);
+    expect(first.decision).toBe('deny');
+    expect(first.reason).toContain('pass narrowly on the fixed code');
+    expect(first.reason).toContain('vitest related <files> --run');
+    // Повтор того же вызова отказ не снимает: это и есть петля «правка → полный гейт».
+    const repeated = [
+      ...fixed,
+      use('Bash', { command: GATE }, 'd1'),
+      result('d1', `PreToolUse:Bash hook error: ${first.reason}`),
+    ];
+    expect(gate(plain, 'd2', transcript(repeated), deliver).decision).toBe('deny');
+    const narrow = (body: string) => {
+      const id = `n${++n}`;
+      return [use('Bash', { command: 'npx vitest related src/a.ts --run' }, id), result(id, body)];
+    };
+    // Узкая проверка после правки прошла — полный гейт один раз.
+    expect(
+      gate(plain, 'd3', transcript([...fixed, ...narrow('Test Files  1 passed (1)')]), deliver)
+        .decision,
+    ).toBeUndefined();
+    // Узкая красная, или зелёная ДО последней правки, — не довод.
+    expect(
+      gate(plain, 'd4', transcript([...fixed, ...narrow('Exit code 1\n 1 failed')]), deliver)
+        .decision,
+    ).toBe('deny');
+    expect(
+      gate(plain, 'd5', transcript([...red, ...narrow('Test Files  1 passed'), ...edit()]), deliver)
+        .decision,
+    ).toBe('deny');
+    // Вне доставки — прежнее правило: после красного и правки гейт можно.
+    expect(gate(plain, 'd6', transcript(fixed), { AGENTDECK_GROUP_STAGE: 'fix' }).decision).toBe(
+      undefined,
+    );
+  });
 });

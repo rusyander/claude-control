@@ -341,15 +341,18 @@ function factsOf(body) {
   if (!body) return undefined;
   const text = JSON.stringify(body.system ?? '') + JSON.stringify(body.messages ?? []);
   const tools = (body.tools ?? []).map((tool) => tool.name);
+  // Инструмент MCP — в `tools` со схемой или отложенным именем в сообщениях: CLI
+  // 2.1.3xx откладывает схемы MCP (ToolSearch), в `tools` их больше нет.
+  const attached = (name) => tools.includes(name) || text.includes(name);
   return {
     rules: text.includes(MARK.rule),
     skill: text.includes(MARK.skill),
     hook: text.includes(MARK.hook),
-    mcp: tools.includes(MARK.mcp),
+    mcp: attached(MARK.mcp),
     project: text.includes(MARK.project),
     projectSkill: text.includes(MARK.projectSkill),
-    projectMcp: tools.includes(MARK.projectMcp),
-    broker: tools.includes(MARK.broker),
+    projectMcp: attached(MARK.projectMcp),
+    broker: attached(MARK.broker),
     append: text.includes(MARK.append),
     ancestor: text.includes(MARK.ancestor),
     home: text.includes(MARK.home),
@@ -797,6 +800,7 @@ ${MARK.ancestor}
       'execute_graphql',
     ],
   };
+  const WIKI_TOOLS = ['jira_get_issue', 'confluence_get_page', 'confluence_search'];
   /** `input` — первое сообщение и дописка настоящей группы (`--group-base --input`). */
   const runStage = async (stage, ahead, input = {}) => {
     const { groupRunProfile, GROUP_SKILLS } =
@@ -814,7 +818,7 @@ ${MARK.ancestor}
       );
     }
     const profile = groupRunProfile({
-      entries: [
+      entries: input.entries ?? [
         {
           id: 't8-gitlab',
           config: {
@@ -823,8 +827,8 @@ ${MARK.ancestor}
           },
         },
       ],
-      tasksText: 'PROJ-1',
-      extra: [],
+      tasksText: input.tasksText ?? 'PROJ-1',
+      extra: input.extra ?? [],
       skills: { user: [...GROUP_SKILLS], group: [], plugins: [] },
       stage,
       ...(ahead ? { ahead } : {}),
@@ -889,10 +893,18 @@ ${MARK.ancestor}
       chars: all.length,
       read: STAGE_TOOLS.read.filter(tool),
       write: STAGE_TOOLS.write.filter(tool),
+      // Имена сервера трекера (`--group-wiki`): задачи и вики на одном сервере.
+      tracker: WIKI_TOOLS.filter((name) =>
+        new RegExp(`mcp__t8-atlassian__${name}(?![A-Za-z0-9_])`).test(all),
+      ),
       described: GROUP_SKILLS.filter((name) => all.includes(`${STAGE_DESC}-${name}`)),
       named: GROUP_SKILLS.filter((name) => all.includes(name)),
       // Инструмент подагентов в перечне запроса (F-09: перед ревью он под запретом).
       agent: (body.tools ?? []).some((entry) => entry?.name === 'Agent'),
+      // Перечень подагентов (F9): типы справки CLI сняты, прочие — на месте.
+      agentTypes: ['claude-code-guide', 'statusline-setup', 'Explore', 'general-purpose'].filter(
+        (name) => all.includes(`- ${name}:`),
+      ),
     };
   };
 
@@ -1061,6 +1073,47 @@ ${MARK.ancestor}
     check(off.includes(MARK.rule), 'контроль без карточки — личные правила доезжают');
     check(!off.includes(CARD), 'контроль без карточки — метки нет, хук молчит');
     console.log(`     тело запроса: с карточкой ${on.length} знаков, без неё ${off.length}`);
+    stub.close();
+    removeDir(kitData);
+    finish();
+  }
+
+  // `--group-wiki` (группа 1, 25.10): сервер трекера несёт задачи и вики рядом; задачи
+  // о вики молчат — имён `confluence_*` нет ни в перечне, ни в списке отложенных,
+  // задачи на месте. Контроли: задача называет вики, группа попросила её блоком `mcp`.
+  if (process.argv.includes('--group-wiki')) {
+    const tracker = [
+      {
+        id: 't8-atlassian',
+        config: { command: process.execPath, args: [MCP_SERVER, '--tools', WIKI_TOOLS.join(',')] },
+      },
+    ];
+    const silent = await runStage('work', undefined, { entries: tracker, tasksText: 'PROJ-1' });
+    const named = await runStage('work', undefined, {
+      entries: tracker,
+      tasksText: 'PROJ-1: обновить страницу в Confluence',
+    });
+    const asked = await runStage('work', undefined, {
+      entries: tracker,
+      tasksText: 'PROJ-1',
+      extra: ['confluence'],
+    });
+    check(Boolean(silent && named && asked), 'вики трекера: все три запроса записаны');
+    check(
+      silent?.tracker.join() === 'jira_get_issue',
+      `задачи о вики молчат — в запросе только задачи: ${silent?.tracker.join(', ')}`,
+    );
+    check(
+      named?.tracker.length === WIKI_TOOLS.length,
+      `задача называет вики — все имена на месте: ${named?.tracker.join(', ')}`,
+    );
+    check(
+      asked?.tracker.length === WIKI_TOOLS.length,
+      `группа попросила вики блоком mcp — все имена на месте: ${asked?.tracker.join(', ')}`,
+    );
+    console.log(
+      `     тело запроса: без вики ${silent?.chars ?? 0} знаков, с вики ${named?.chars ?? 0}`,
+    );
     stub.close();
     removeDir(kitData);
     finish();
@@ -1259,6 +1312,28 @@ ${MARK.ancestor}
           stageDeliver.named.includes('deep-review'),
         `звено группы, доставка: описания только своих навыков, прочим — имя: ${stageDeliver.described.join(', ')}`,
       );
+      // F9: подагентов справки CLI нет в перечне ни одного звена; Explore и
+      // general-purpose — контроль, что проба перечень видит.
+      for (const [name, stage] of [
+        ['работа', stageWork],
+        ['ревью', stageReview],
+        ['доставка', stageDeliver],
+      ]) {
+        check(
+          stage.agentTypes.join(',') === 'Explore,general-purpose',
+          `звено группы, ${name}: в перечне подагентов только не справочные типы: ${stage.agentTypes.join(', ')}`,
+        );
+      }
+      if (stageAhead) {
+        check(
+          stageWork.described.includes('prepare-mr') &&
+            !stageAhead.described.includes('prepare-mr') &&
+            !stageAhead.described.includes('changelog-builder') &&
+            !stageAhead.described.includes('mr-visual-report') &&
+            stageAhead.named.includes('prepare-mr'),
+          `звено группы, работа перед доставкой: навыкам доставки — имя без описания: ${stageAhead.described.join(', ')}`,
+        );
+      }
       console.log(
         `     тело запроса: работа ${stageWork.chars} знаков, ревью ${stageReview.chars}, доставка ${stageDeliver.chars}`,
       );
@@ -1391,7 +1466,11 @@ ${MARK.ancestor}
         f.text.includes('agent of the AgentDeck panel'),
         'агент панели: его системная дописка на месте',
       );
-      const foreign = f.tools.filter((name) => !name.startsWith('mcp__agentdeck-panel__'));
+      // `DeferredToolPlaceholder` — заглушка самого CLI на месте отложенных схем,
+      // не инструмент: возможностей агенту она не даёт.
+      const foreign = f.tools.filter(
+        (name) => !name.startsWith('mcp__agentdeck-panel__') && name !== 'DeferredToolPlaceholder',
+      );
       check(
         f.tools.length > 0 && foreign.length === 0,
         `агент панели: инструменты только переходника панели (${f.tools.join(', ') || 'нет'})`,
@@ -1549,8 +1628,12 @@ ${MARK.ancestor}
       check(lean.facts.skill, 'облегчённый набор: личные скиллы на месте (достижимы)');
       check(lean.facts.project, 'облегчённый набор: проектный CLAUDE.md на месте');
       check(
-        lean.facts.toolChars < full.facts.toolChars / 2,
-        `облегчённый набор: схемы инструментов ${lean.facts.toolChars} знаков вместо ${full.facts.toolChars}`,
+        // 0,6, а не половина: CLI 2.1.3xx откладывает схемы MCP и части расширенных
+        // инструментов (Cron*, …) и в полном наборе (замер 25.10: 20,4k против 38,4k).
+        // Состав облегчённого набора держит проверка `extras` выше.
+        lean.facts.toolChars < full.facts.toolChars * 0.6,
+        `облегчённый набор: схемы инструментов ${lean.facts.toolChars} знаков вместо ${full.facts.toolChars}` +
+          ` (облегчённый: ${lean.facts.tools.join(', ')}; полный: ${full.facts.tools.join(', ')})`,
       );
       console.log(
         `     тело запроса: полный набор ${full.facts.chars} знаков, облегчённый ${lean.facts.chars}`,

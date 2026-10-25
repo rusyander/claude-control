@@ -1123,7 +1123,9 @@ export const chatEn: typeof chatRu = {
       'in the shared directory gets no preamble: that environment is yours. A group also gets ' +
       'its own lean MCP set: the tracker, the code host and servers whose role the panel does ' +
       'not know go into the run, design servers only when the group tasks carry a Figma link ' +
-      'or talk about a mockup or layout. Messengers, a second connector of the same tracker ' +
+      'or talk about a mockup or layout. The tracker’s wiki tools (Confluence) ride along ' +
+      'only when the group tasks name the wiki or the group asked for it with an mcp block ' +
+      '(server: confluence). Messengers, a second connector of the same tracker ' +
       'and the claude.ai connectors (mail, calendar, drive) are off: their tools would ' +
       'otherwise ride along in every model call. When a switched-off server is needed after ' +
       'all, the group agent asks for it with a block at the end of its turn, and the panel ' +
@@ -1137,7 +1139,9 @@ export const chatEn: typeof chatRu = {
       'skills and the panel group’s skills keep their description, other personal and ' +
       'built-in service skills reach the agent by name only and are invoked as before; ' +
       'project skills are untouched, and a design plugin without a mockup in the tasks and ' +
-      'messenger plugins are off for this run. Chain stages narrow it further: the plan and ' +
+      'messenger plugins are off for this run. The CLI’s built-in self-help subagents ' +
+      '(claude-code-guide, statusline-setup) are not in a group’s list. ' +
+      'Chain stages narrow it further: the plan and ' +
       'the review (fix verification included) get the tracker, the code host and the designs ' +
       'read-only — their run has no write tools, writing is for the work, fixes and delivery; ' +
       'the review, fixes and delivery keep descriptions only for their own stage’s skills, ' +
@@ -1163,6 +1167,9 @@ export const chatEn: typeof chatRu = {
       'A status change, an assignment, a field edit or a comment in the tracker answers the group with a ' +
       'short line (key, new status, assignee) instead of the whole issue; reading an issue ' +
       'still returns all of it, and your own hooks keep running alongside. ' +
+      'Editing or opening an MR through the forge MCP answers the group just as briefly — ' +
+      'number, link, branches, state and the description’s length instead of the whole MR; ' +
+      'reading an MR still returns all of it. ' +
       'Full gates and builds of Claude Code and Qwen Code groups run at most a quarter of the ' +
       'machine’s cores at a time (at least two, four on 16 cores), and a stopped or crashed group ' +
       'frees its slot at once: a group whose gate waits in the queue makes no model calls, and the command ' +
@@ -1263,7 +1270,7 @@ export const chatEn: typeof chatRu = {
       'box; to turn it off everywhere — “Settings” → “Models” → “Take tasks to a ready ' +
       'MR”. Delivery follows the general `ticket-delivery-2` skill (a project delivery ' +
       'skill, if any, is only a source of project facts; its name shows in the button panel):in a plain chat the agent takes a ' +
-      'code-change task to an MR — branch, checks, commit, push, MR, review, ' +
+      'code-change task to an MR — branch, review, live check, checks once, commit, push, MR, ' +
       'description — while questions and reviews without edits open no MR; in a split ' +
       'each group is one branch and one MR, and the group summary shows its link as ' +
       '“MR !N”. A group with no changes of its own since its start closes as “nothing to ' +
@@ -1302,7 +1309,7 @@ export const chatEn: typeof chatRu = {
       'finding is cleared only by a report row that names every file or name — “checked, ' +
       'all fine” does not pass; a conflict only by a rebase. Consumers of removed names the ' +
       'panel re-checks, and the group still hands in its own search. A row counts for the ' +
-      'code it was written on: if the branch changed the code the sieve covers after it, ' +
+      'code it was written on: if the branch changed the code the sieve covers after it (for the project-checks row, tests too), ' +
       'the row is stale and the sieve has to be passed again; this holds for a row that ' +
       'cleared a mechanical finding too. Freshness is judged by what the branch held at the ' +
       'moment of the row, so a rebase without edits to the covered code does not age it. ' +
@@ -1504,13 +1511,19 @@ export const chatEn: typeof chatRu = {
       'and what it brings to you is decided by the rows of “Settings” → “Groups” (see ' +
       '“What a group decides on its own”); an auto-approval toggle you switched on in ' +
       'the group’s chat yourself beats the rows, while one inherited from the parent ' +
-      'does not get in their way. A child asks only through the card: a question typed at the ' +
-      'end of its answer is invisible from the parent, and it is told so. A group run by ' +
-      'another CLI has no question tool, so it asks in the last line of its answer — with ' +
-      'options and its recommendation — ends the turn and continues from the same stage ' +
-      'once the answer arrives. Children ' +
+      'does not get in their way. A child does not ask about forks at all — neither through ' +
+      'the card nor in text: it decides itself (the recommended option, else the one that ' +
+      'goes on without you) and names the decision in its answer and the MR description; ' +
+      'an irreversible step is refused by the panel and queued under «Awaiting decision» as ' +
+      'D-n, while the group finishes the rest. A group run by another CLI works the same ' +
+      'way; an irreversible step its CLI cannot queue as D-n (gemini, continue, cursor, ' +
+      'kimi) it names in one question in the last line of its answer, ends the turn and ' +
+      'continues from the same stage once the answer arrives. Under “Group decision points: asks ' +
+      'a human and waits” a group asks about forks too: Claude only through the card (a ' +
+      'question typed at the end of its answer is invisible from the parent), another CLI ' +
+      'in the last line with options and its recommendation. Children ' +
       'cannot strike deals with each other — the session messaging tools are closed ' +
-      'to them, and a fork becomes a question to you. The parent, in turn, knows its ' +
+      'to them. The parent, in turn, knows its ' +
       'children: every turn of it carries a summary of the groups (branch, copy, ' +
       'state, result), and work handed to a group it does not do itself but passes ' +
       'on — the message goes to the group’s chat when its turn ends, queued if the ' +
@@ -1767,7 +1780,8 @@ export const chatEn: typeof chatRu = {
       'be learned again. Otherwise delivery runs in a new session, and review always ' +
       'does. A link does not do another link’s work: while delivery is ahead, the work ' +
       'and fix links commit but neither push the branch nor open an MR — by command or ' +
-      'through MCP; while review is ahead, review skills and subagents are closed to ' +
+      'through MCP, and see the delivery skills by name only; while review is ahead, ' +
+      'review skills and subagents are closed to ' +
       'them — the review at the ceiling would repeat that pass anyway. A link with no ' +
       'delivery after it may push. The panel does not take the agent’s word for it: when the link ends ' +
       'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
@@ -2018,7 +2032,8 @@ export const chatEn: typeof chatRu = {
       'whose process holds the port, and a port nobody holds has nothing to kill, so it passes. ' +
       'Another process’s PID or port, `pkill`, `killall`, `taskkill /IM`, and kills with no ' +
       'named target reach neither execution nor you: the agent gets a refusal naming the ' +
-      'process and how to name its own. Such a question still waiting from an earlier ' +
+      'process and how to name its own. PowerShell `Stop-Process -Id` is judged by its PIDs ' +
+      'just like `taskkill //PID`; by name (`-Name`) like `taskkill /IM`. Such a question still waiting from an earlier ' +
       'version is re-judged by the panel itself on restart. ' +
       'Catching up with the target branch (rebase, merge or pull of main, origin/main, ' +
       'develop…, including by the hash of its commit and git checkout -B / switch -C from it) ' +
@@ -2029,7 +2044,10 @@ export const chatEn: typeof chatRu = {
       'finishes the task on its own base instead of re-running checks because main moved. A ' +
       'conflict — a bare catch-up as one command goes by itself, marked in the parent’s ' +
       'summary, and the group fixes the conflict at once; a catch-up inside a compound ' +
-      'command goes through the usual parsing. The panel recognises a catch-up in any form the ' +
+      'command goes through the usual parsing. In the middle of a sync already under way, taking ' +
+      'the target side for a file (`git show origin/main:a > a`, `git checkout --theirs a`) is ' +
+      'conflict resolution and passes on its own; a new sync or a history move is checked ' +
+      'again. The panel recognises a catch-up in any form the ' +
       'shell will run it: inside a wrapper (`bash -c`, `sh -c`, `dash`, `ksh`, `mksh` — in any case ' +
       'and with `.exe`, after `env` or `timeout`, `eval`), inside a compound command (`{ …; }`, ' +
       '`( … )`, `if`, `for`) with a redirect, with `exec >` and `>&`, with the target taken from ' +
@@ -2097,8 +2115,10 @@ export const chatEn: typeof chatRu = {
       'human answer) goes on as a new conversation with a brief the panel built from ' +
       'files: the group’s tasks and its stage task, the group’s notebook and tickets, its ' +
       'notes, commits and changes since the branch its copy was cut from, ' +
-      'the last answer. A long note travels as its beginning (up to 4,000 characters) ' +
-      'with a mark that the group reads the rest from the file itself before acting. A feed ' +
+      'the last answer. A note up to 8,000 characters travels whole; a longer one travels ' +
+      'as its beginning (up to 4,000 characters, cut at a line) with the line number from ' +
+      'which the group reads the rest of the file before acting. A turn cut off mid-work ' +
+      'hands the brief what the agent found out between its calls. A feed ' +
       'line names the size of the previous window, and the previous conversation stays ' +
       'on disk. While the new conversation runs, the line carries a «Continue the old ' +
       'conversation» button: the new one is stopped and the same turn goes on in the ' +

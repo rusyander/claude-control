@@ -196,7 +196,10 @@ ones: a review where everything blocks is applied nowhere.
 `.agent/reviews/<slug>.agent.md`, read tomorrow by the user and unattended by a **fix agent**: every
 finding stands alone under a stable id (`F-01`) with a `Status` line and carries what that agent needs
 — thesis, evidence, fix direction — and the report ends where the findings do. A second review of the
-scope opens with `review-sync --write` and updates the same file in place. Header lines, section order,
+scope opens with `review-sync --write` and updates the same file in place. A first report starts from
+`node <kit>/tools/review-plan.mjs skeleton --plan <plan.json> <lane reports…>` (every demanded header line,
+computable ones filled), never typed from memory: a whole report written blind was refused three Writes in a
+row. Close with `review-score.mjs <report> --write`. Header lines, section order,
 fields, `Coverage` / `Passes` / `Acceptance` / `Classes` / `Live`, computed counts:
 [references/report-shape.md](references/report-shape.md). Chat digest: scope, **raised · published ·
 confirmed**, every 🔴/🟡/❓ as a references/finding-card.md card, never a list item; 🟢 as a

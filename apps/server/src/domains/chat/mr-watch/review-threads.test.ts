@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { localizeText, matchText } from '../../../lib/server-texts/server-texts.ts';
 import type { MrReview, MrReviewThread } from '../../integrations/mr-review/mr-review.ts';
-import { reviewThreadsGap } from './review-threads.ts';
+import { mrWatchPrompt } from './mr-watch.ts';
+import { REVIEW_REPLY_LINES, reviewThreadsGap } from './review-threads.ts';
 
 /**
  * Пробел доставки «ветки ревьюера без ответа» (24.10): группа в доставке сутки
@@ -90,5 +91,19 @@ describe('reviewThreadsGap: ветки ревьюера держат доста�
         MR,
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('ответы в треды MR: что звено знает о сторожах до первого отказа', () => {
+  // Отказы группы №1 24.10: ответ в тред — чтение обсуждений старше 15 минут; перезапись
+  // ветки в ревью арендой без конфликта — сторож git. Строки задания называют оба правила.
+  it('свежее чтение обсуждений перед ответом и обычный git push в ветку с MR в ревью', () => {
+    const prompt = mrWatchPrompt({ branch: 'feature/a', mr: MR, threads: [] });
+    expect(prompt).toContain('Read the MR discussions again right before posting the replies');
+    expect(prompt).toContain('older than 15 minutes');
+    expect(prompt).toContain('is a plain `git push`, never forced');
+    expect(REVIEW_REPLY_LINES.join('\n')).toContain(
+      'only right after a rebase that resolved a conflict',
+    );
   });
 });

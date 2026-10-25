@@ -176,6 +176,54 @@ describe('bg-wait-guard: ожидание файлов своего агента
     expect(pre(poll, refused(lanes), CHILD)).toMatch(/does not lift it/);
   });
 
+  // Группа 1 (23.10, #g1:345 и #g1:354 — дословно): 698 и 722 с хода на опросе отчётов своих
+  // полос через `stat -c %Y`; проверка файла была не `[ -f`, и страж знал только её. Теперь
+  // любой цикл со сном по файлам агента, пока тот идёт, — отказ, чем бы цикл ни проверял.
+  const statLoop =
+    'D=.agent/tmp/review-gor1298; for i in $(seq 1 150); do a=$(stat -c %Y $D/lane-A.md 2>/dev/null || echo 0); b=$(stat -c %Y $D/lane-B.md 2>/dev/null || echo 0); now=$(date +%s); if [ $a -gt 0 ] && [ $b -gt 0 ] && [ $((now-a)) -gt 240 ] && [ $((now-b)) -gt 240 ]; then echo "both stable after $i"; break; fi; sleep 10; done; ls -la $D/';
+  const g1 = [
+    statLoop,
+    'D=.agent/tmp/review-gor1298; for i in $(seq 1 170); do a=$(stat -c %Y $D/lane-A-r2.md 2>/dev/null || echo 0); b=$(stat -c %Y $D/lane-B-r2.md 2>/dev/null || echo 0); now=$(date +%s); if [ $a -gt 0 ] && [ $b -gt 0 ] && [ $((now-a)) -gt 240 ] && [ $((now-b)) -gt 240 ]; then echo "stable after $i"; break; fi; sleep 10; done; ls -la $D/*.md',
+    'for i in $(seq 1 60); do n=$(ls .agent/tmp/review-x/*.md 2>/dev/null | wc -l); [ "$n" -ge 2 ] && break; sleep 10; done',
+    'while ! grep -q "Журнал" .agent/tmp/review-x/lane-A.md 2>/dev/null; do sleep 20; done',
+    "for i in $(seq 1 90); do node -e \"process.exit(require('fs').existsSync('.agent/tmp/review-x/lane-A.md')?0:1)\" && break; sleep 10; done",
+  ];
+
+  it('опрос любым способом (stat, ls, grep, node) — отказ без выхода повтором', () => {
+    for (const command of g1) {
+      expect(pre(command, lanes, CHILD), command).toMatch(
+        /sleep loop waiting for files of an agent/,
+      );
+    }
+    expect(
+      pre(
+        statLoop,
+        [
+          ...lanes,
+          use('Bash', { command: statLoop }, 'p2'),
+          result('p2', '[ctx-guard] bg-wait-guard: …'),
+        ],
+        CHILD,
+      ),
+    ).toMatch(/does not lift it/);
+  });
+
+  it('вне группы опрос своего агента циклом ≥ 60 с — отказ с выходом повтором', () => {
+    expect(pre(statLoop, lanes, HUMAN)).toMatch(/while an agent this session spawned is running/);
+    expect(
+      pre(
+        statLoop,
+        [
+          ...lanes,
+          use('Bash', { command: statLoop }, 'p3'),
+          result('p3', '[ctx-guard] bg-wait-guard: …'),
+        ],
+        HUMAN,
+      ),
+    ).toBe('');
+    expect(pre(statLoop, [...lanes, done], HUMAN)).toBe('');
+  });
+
   it('проходит: агент уже сообщил, вне группы, без агентов, короткий цикл, в субагенте', () => {
     expect(pre(poll, [...lanes, done], CHILD)).toBe('');
     expect(pre(poll, lanes, HUMAN)).not.toMatch(/split-group run launched/);

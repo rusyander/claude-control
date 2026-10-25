@@ -303,7 +303,7 @@ async function viaRegistry(
 }
 
 describe('ChatRun: прогон ребёнка разделения', () => {
-  it('ребёнку закрыт обмен с другими сессиями и велено спрашивать инструментом (Д16, Д18)', async () => {
+  it('ребёнку закрыт обмен с другими сессиями и запрещены вопросы (Д16, Д18, 23.10)', async () => {
     const call = await viaRegistry(['new-1'], 'new-1');
 
     // Fix-чат и push-чат договорились сами и передали «User decided: stop»,
@@ -314,8 +314,11 @@ describe('ChatRun: прогон ребёнка разделения', () => {
 
     const appended = call.args[call.args.indexOf('--append-system-prompt') + 1] ?? '';
     expect(appended.startsWith('Инициативы панели.')).toBe(true);
-    // Вопрос текстом из родителя не виден: «твоего вопроса я не видел» (Д16).
-    expect(appended).toContain('ONLY with AskUserQuestion, never as text at the end');
+    // Вопрос текстом из родителя не виден: «твоего вопроса я не видел» (Д16); а
+    // вопрос инструментом группе 1 (23.10) стоил трёх ходов с ответом-рекомендацией —
+    // развилку группа решает сама, необратимое панель ставит человеку D-n.
+    expect(appended).toContain('do not ask, neither with a tool nor in text');
+    expect(appended).toContain('Waiting for the human: D-n');
     expect(appended).toContain('Make no deals with other CLI sessions');
   });
 

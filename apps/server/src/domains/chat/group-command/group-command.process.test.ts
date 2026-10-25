@@ -114,6 +114,10 @@ describe('погашение процессов (N3)', () => {
     ['npx kill-port 5173 5174', [], [5173, 5174]],
     ['fuser -k 5173/tcp', [], [5173]],
     ['netstat -ano | grep 5173; taskkill //PID 51234 //F 2>&1 | tail -2', [51234], []],
+    // Q2 (24.10): Stop-Process внутри PowerShell — те же цели, что у Bash.
+    ['powershell -Command "Stop-Process -Id 4321 -Force"', [4321], []],
+    ["pwsh -NoProfile -Command 'Stop-Process -Id 4321,4322 -Force'", [4321, 4322], []],
+    ['powershell -c "spps 4321"', [4321], []],
   ])('цели числом — маршрут сверит, чьи: %s', (command, pids, ports) => {
     const result = verdict(command);
     expect(result.kind).not.toBe('danger');
@@ -133,6 +137,8 @@ describe('погашение процессов (N3)', () => {
     'kill -- -4321',
     'kill -9 -1',
     'P=child.abc; kill $P',
+    "pwsh -NoProfile -Command 'Stop-Process -Name node -Force'",
+    'powershell -c "kill -Name vite"',
   ])('цель не названа числом — «неназванное», не опасное: %s', (command) => {
     const result = verdict(command);
     expect(result.kind).not.toBe('danger');
@@ -140,7 +146,8 @@ describe('погашение процессов (N3)', () => {
   });
 
   it.each([
-    'powershell -Command "Stop-Process -Id 4321 -Force"',
+    'powershell -Command "Get-Process node | Stop-Process"',
+    'powershell -Command "Stop-Process -Id $pid"',
     'ssh host kill 4321',
     'node -e "process.kill(4321)"',
     'python -c "import os; os.kill(4321, 9)"',

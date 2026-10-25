@@ -106,16 +106,23 @@ export function runningAgents(transcriptText) {
 // in total) over agent files — `.agent/tmp/`, `subagents/`, `tasks/` — while an agent this session
 // launched in the background still runs is refused in a split child with no repeat escape: the
 // agent's completion notification wakes the run. No running agent → not judged here.
-const FILE_TEST = /\[\[?\s+(?:!\s+)?-[efs]\s|\btest\s+(?:!\s+)?-[efs]\s/;
+// Split group 1 (#g1:345, #g1:354): the same wait spelled `stat -c %Y $D/lane-A.md` plus mtime
+// arithmetic held 698 + 722 s and passed — only `[ -f` / `test -f` counted as a wait. What the loop
+// tests is no signal (stat, ls|wc, grep -q, node -e existsSync…): a sleeping loop over agent files
+// while an agent this session launched still runs IS the wait, whatever its spelling. The main
+// session is judged the same way from 60 s in total, keeping its repeat escape.
 const AGENT_FILES = /\.agent[\\/]tmp[\\/]|[\\/]subagents[\\/]|[\\/]tasks[\\/]/;
 
-/** Seconds a loop testing for a file can sleep in total; 0 when the command is no such loop. */
-export function fileWaitTotal(command) {
+/** Seconds a sleeping loop can wait in total; 0 when the command is no loop or probes a server. */
+export function loopWaitTotal(command) {
   const bare = bareCommand(command);
   const m = SLEEP.exec(bare);
-  if (!m || !LOOP.test(bare) || !FILE_TEST.test(bare) || PROBE.test(bare)) return 0;
+  if (!m || !LOOP.test(bare) || PROBE.test(bare)) return 0;
   return Number(m[1]) * Math.max(1, loopRounds(bare));
 }
+
+const span = (seconds) =>
+  Number.isFinite(seconds) ? `${Math.round(seconds)} s` : 'an unbounded loop';
 
 const ownTaskReason = (wait) =>
   `bg-wait-guard: sleeping ${wait} on the output of a background command THIS session started is blind ` +
@@ -127,42 +134,39 @@ export default function bgWaitGuard(input) {
   if (tool !== 'Bash' && tool !== 'PowerShell') return null;
   const command = String(input.tool_input?.command ?? '');
   const slept = Number(SLEEP.exec(bareCommand(command))?.[1] ?? 0);
-  if (slept >= 60 && AGENT_TMP.test(command) && !inSubagent(input)) {
+  const loopWait = AGENT_FILES.test(command) ? loopWaitTotal(command) : 0;
+  if (process.env.AGENTDECK_SPLIT_CHILD === '1' && !inSubagent(input) && loopWait >= 20) {
+    try {
+      if (runningAgents(readTailText(ownTranscript(input), OWN_TASK_BYTES)).length) {
+        return deny(
+          `bg-wait-guard: a ${span(loopWait)} sleep loop waiting for files of an agent this split-group run ` +
+            'launched is blind polling, and repeating the call does not lift it. Do the work that does not ' +
+            'need the agent, then END THE TURN with one line naming the running agents: the panel holds the ' +
+            "group while they run, and each agent's handback wakes this session with its result.",
+        );
+      }
+    } catch {
+      /* no transcript → nothing known of agents */
+    }
+  }
+  const agentWait = Math.max(
+    slept >= 60 && AGENT_TMP.test(command) ? slept : 0,
+    loopWait >= 60 ? loopWait : 0,
+  );
+  if (agentWait && !inSubagent(input)) {
     try {
       const transcript = ownTranscript(input);
       const events = toolEvents(readTail(transcript));
       const repeated = wasJustRefused(events, tool, (o) => String(o?.command ?? '') === command);
       if (!repeated && runningAgents(readTailText(transcript, OWN_TASK_BYTES)).length)
         return deny(
-          `bg-wait-guard: sleeping ${slept} s then reading .agent/tmp/ while an agent this session spawned is ` +
-            'running is blind polling: its completion notification (and handback) wakes you. Do other work, or ' +
-            'end the turn saying what is running. Repeat this exact call if the wait is on something else.',
+          `bg-wait-guard: sleeping ${span(agentWait)} then reading agent files while an agent this session ` +
+            'spawned is running is blind polling: its completion notification (and handback) wakes you. Do ' +
+            'other work, or end the turn naming what is running. Repeat this exact call if the wait is on ' +
+            'something else.',
         );
     } catch {
       /* no transcript → nothing known of agents */
-    }
-  }
-  if (
-    process.env.AGENTDECK_SPLIT_CHILD === '1' &&
-    !inSubagent(input) &&
-    AGENT_FILES.test(command)
-  ) {
-    const fileWait = fileWaitTotal(command);
-    if (fileWait >= 20) {
-      try {
-        if (runningAgents(readTailText(ownTranscript(input), OWN_TASK_BYTES)).length) {
-          const span = Number.isFinite(fileWait)
-            ? `${Math.round(fileWait)} s`
-            : 'an unbounded loop';
-          return deny(
-            `bg-wait-guard: a ${span} sleep loop waiting for files of an agent this split-group run launched is ` +
-              'blind polling, and repeating the call does not lift it. End the turn saying what is running: the ' +
-              "agent's completion notification wakes this session with its result.",
-          );
-        }
-      } catch {
-        /* no transcript → nothing known of agents */
-      }
     }
   }
   const total = sleepTotal(command);

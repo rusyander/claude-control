@@ -50,9 +50,12 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../apps/server/src/lib/brand.mjs';
+import { PROGRESS_MARK } from './qa/vitest-progress-reporter.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
+/** Метки хода vitest (начало/конец файла, итог теста) — по ним видно, кто держит прогон. */
+const PROGRESS_REPORTER = join(HERE, 'qa', 'vitest-progress-reporter.mjs').replaceAll('\\', '/');
 const DOMAIN = join(REPO, 'apps', 'server', 'src', 'domains', 'project-tests');
 
 /** Где чужие прогоны обычно оставляют отчёт — по этим путям ищем, если не сказано. */
@@ -667,7 +670,12 @@ function pruneBriefLogs(dir) {
   }
 }
 
-function briefOutput(result) {
+/**
+ * `red` — итог прогона, а не код оболочки: цепочка пакетов (`… || echo -`) гасит код
+ * провала, и прогон с 19 упавшими тестами печатал «кодом 0» без единой строки падений
+ * (группа 23.10.2026) — красное агент искал руками.
+ */
+function briefOutput(result, red = result.status !== 0) {
   const text = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   const dir = join(tmpdir(), 'agentdeck-tests-logs');
   mkdirSync(dir, { recursive: true });
@@ -678,16 +686,139 @@ function briefOutput(result) {
   const lines = text.split(/\r?\n/).filter((line) => line.trim());
   // Зелёный прогон падений не печатает: «failed» и «Error» живут и в именах
   // проходящих тестов, и агент читал их как падения (ревью B2-F12).
-  const failures =
-    result.status === 0
-      ? []
-      : lines.filter((line) => FAILURE_LINE.test(line)).slice(0, BRIEF_FAILURES);
+  const failures = red
+    ? lines.filter((line) => FAILURE_LINE.test(line)).slice(0, BRIEF_FAILURES)
+    : [];
   return [
     ...(failures.length > 0
       ? ['Первые строки падений:', ...failures.map((line) => `  ${line.trim().slice(0, 300)}`)]
       : []),
     `Полный вывод (${lines.length} строк): ${log}`,
   ].join('\n');
+}
+
+/**
+ * Синхронная блокировка теста. Предел vitest (`testTimeout`) — гонка обещаний: тест,
+ * занявший поток синхронным вызовом, он не прерывает — тест идёт сколько идёт, а потом
+ * получает «Test timed out in N ms». Признак — снят по пределу И шёл не меньше двух
+ * пределов: асинхронный зависший тест vitest обрывает ровно на пределе (23.10.2026:
+ * `cpSync` через junction, 19 тестов по 52–114 с при пределе 20 с, файл — 42 мин).
+ */
+const SYNC_BLOCK_FACTOR = 2;
+const TIMED_OUT_TEXT = /(?:Test|Hook) timed out in (\d+)\s*ms/g;
+const FAILED_TEST_LINE = /^\s*(?:×|✗)\s+(.+?)\s+(\d+)\s*ms\s*$/;
+
+const isSyncBlock = (ms, limit) =>
+  Number.isFinite(ms) && Number.isFinite(limit) && limit > 0 && ms >= SYNC_BLOCK_FACTOR * limit;
+
+/** Тот же признак по обычному выводу vitest — у своей команды проекта меток хода нет. */
+function syncBlockFromText(text) {
+  const limits = [...String(text).matchAll(TIMED_OUT_TEXT)].map((found) => Number(found[1]));
+  if (limits.length === 0) return undefined;
+  // Самый длинный из пределов: при двух проектах с разными пределами — без ложной тревоги.
+  const limit = Math.max(...limits);
+  for (const line of String(text).split(/\r?\n/)) {
+    const found = FAILED_TEST_LINE.exec(line);
+    if (found && isSyncBlock(Number(found[2]), limit))
+      return { where: found[1].trim(), ms: Number(found[2]), limit };
+  }
+  return undefined;
+}
+
+const secs = (ms) => Math.round(ms / 1000);
+
+function syncBlockLine(block) {
+  return (
+    `Синхронная блокировка: ${block.where} шёл ${secs(block.ms)} с при пределе ` +
+    `${secs(block.limit)} с — vitest не прерывает синхронный код: тест или его оснастка ` +
+    `держит поток синхронным вызовом (cpSync/rmSync/spawnSync/execSync по большому дереву, ` +
+    `Atomics.wait). Повтор прогона и больший testTimeout не помогут — ищи этот вызов в файле ` +
+    `и его фикстурах.`
+  );
+}
+
+/**
+ * Ручной прогон под `timeout N` после снятого прогона стоил группе 24.10.2026 три прогона
+ * по 4 мин: снятый сроком обёртки воркер печатает «Worker exited unexpectedly», а
+ * обвязка проекта называла это нехваткой ресурсов — агент мерил свободную память.
+ */
+const WRAP_TIP =
+  'Файл напрямую не гоняй и не оборачивай vitest в `timeout N`: воркер, снятый сроком ' +
+  'обёртки, печатает «Worker exited unexpectedly» — это срок обёртки, а не нехватка ресурсов. ' +
+  'Повтор — тем же `tests-cli run`, предел — `--case-timeout`.';
+
+/** Путь файла набора от корня проекта (метки vitest несут абсолютный). */
+function projectRelative(project, file) {
+  const root = upperDrive(project).replaceAll('\\', '/').replace(/\/$/, '');
+  const path = upperDrive(String(file)).replaceAll('\\', '/');
+  return path.toLowerCase().startsWith(`${root.toLowerCase()}/`)
+    ? path.slice(root.length + 1)
+    : path;
+}
+
+/** Ход прогона по меткам `vitest-progress-reporter`: какие файлы начаты, какие закончены. */
+function newProgress() {
+  const files = new Map();
+  return {
+    files,
+    see(event) {
+      const now = Date.now();
+      const entry = files.get(event.file) ?? { started: now, last: undefined, ended: false };
+      if (event.e === 'start') entry.started = now;
+      else if (event.e === 'end') entry.ended = true;
+      else entry.last = now;
+      files.set(event.file, entry);
+    },
+  };
+}
+
+function progressEvent(line) {
+  const at = line.indexOf(PROGRESS_MARK);
+  if (at === -1) return undefined;
+  try {
+    const event = JSON.parse(line.slice(at + PROGRESS_MARK.length).trim());
+    return event && typeof event.e === 'string' ? event : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Незаконченные к остановке файлы — по одному в строке, с тем, сколько они молчат. */
+function unfinishedLines(project, progress) {
+  if (!progress) return [];
+  const now = Date.now();
+  return [...progress.files]
+    .filter(([, entry]) => !entry.ended)
+    .slice(0, 10)
+    .map(
+      ([file, entry]) =>
+        `Не закончили к остановке: ${projectRelative(project, file)} — начат ${secs(now - entry.started)} с назад, ` +
+        (entry.last === undefined
+          ? 'итога ни одного теста так и не пришло'
+          : `последний итог теста ${secs(now - entry.last)} с назад`),
+    );
+}
+
+/** Счёт отчёта JUnit: сколько тестов упало, прошло, пропущено. */
+function junitCounts(xml) {
+  const counts = { failed: 0, passed: 0, skipped: 0 };
+  for (const found of String(xml).matchAll(/<testcase\b[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+    const body = found[1] ?? '';
+    if (/<(failure|error)\b/.test(body)) counts.failed++;
+    else if (/<skipped\b/.test(body)) counts.skipped++;
+    else counts.passed++;
+  }
+  return counts;
+}
+
+/** Красное по отчётам звеньев цепочки, когда её код погашен `|| echo -`. */
+function reportRed(plan, started) {
+  if (!plan.failed || !plan.collect) return false;
+  try {
+    return plan.failed(plan.collect(started, { quiet: true })?.content ?? '');
+  } catch {
+    return false;
+  }
 }
 
 async function runTests(project, options) {
@@ -765,13 +896,38 @@ async function runTests(project, options) {
   const started = Date.now();
   const brief = !options.full && (Boolean(options.brief) || (await briefMarked()));
   const result = await runPlan(plan, brief, cap.ms);
-  if (brief) console.log(briefOutput(result));
+  const stopped = result.timedOut || Boolean(result.syncBlock);
+  const masked = !stopped && result.status === 0 && reportRed(plan, started);
+  if (brief) console.log(briefOutput(result, result.status !== 0 || masked));
+  const syncBlock =
+    result.syncBlock ??
+    (brief ? syncBlockFromText(`${result.stdout ?? ''}${result.stderr ?? ''}`) : undefined);
+  const unfinished = stopped ? unfinishedLines(project, result.progress) : [];
+  for (const line of [
+    ...(syncBlock ? [syncBlockLine(syncBlock)] : []),
+    ...unfinished,
+    ...(stopped || syncBlock ? [WRAP_TIP] : []),
+  ])
+    console.log(line);
   const exitCode = result.status ?? undefined;
   console.log(
-    `\nКоманда завершилась с кодом ${exitCode ?? 'нет кода'} за ${Math.round((Date.now() - started) / 1000)} с`,
+    `\nКоманда завершилась с кодом ${exitCode ?? 'нет кода'} за ${Math.round((Date.now() - started) / 1000)} с` +
+      (masked ? ' (код звеньев погашен цепочкой; по отчёту — красный)' : ''),
   );
-  if (result.timedOut) {
-    await recordTimeout(project, { plan, automated, cap, started, picked, options, stamps });
+  if (stopped) {
+    await recordTimeout(project, {
+      plan,
+      automated,
+      cap,
+      started,
+      picked,
+      options,
+      stamps,
+      syncBlock: result.syncBlock,
+      unfinished: [...(result.progress?.files ?? [])]
+        .filter(([, entry]) => !entry.ended)
+        .map(([name]) => projectRelative(project, name)),
+    });
     printSkipped(skipped);
     dropTemp(plan.temp);
     memo?.settle(undefined);
@@ -838,7 +994,11 @@ async function runTests(project, options) {
     ...(options.group || picked ? { groups: [...new Set(automated.map((e) => e.group))] } : {}),
     stamps,
   });
-  printImport(imported, `Импортировано из ${plan.temp ? 'отчёта прогона' : file} (${format})`);
+  printImport(
+    imported,
+    `Импортировано из ${plan.temp ? 'отчёта прогона' : file} (${format})`,
+    format === 'junit' ? (content ?? readFileSync(path, 'utf8')) : undefined,
+  );
   memo?.settle(status === 0 && imported.read > 0 ? imported.runId : undefined);
   printSkipped(skipped);
   dropTemp(plan.temp);
@@ -896,36 +1056,87 @@ function runCap(options, fileCount, planTimeout) {
  * Команда прогона без блокировки: по пределу снимается всё её дерево (оболочка,
  * раннер, его воркеры). `spawnSync` с `timeout` снимал одну оболочку — vitest
  * и dev-сервер под ней жили дальше и держали порты.
+ *
+ * План с метками хода vitest (`plan.progress`) читается всегда, не только коротким
+ * выводом: метки из вывода вырезаются, остальное идёт человеку как было. По ним
+ * прогон останавливается на первом признаке синхронной блокировки — остальные тесты
+ * такого файла шли бы тем же путём (23.10.2026: 42 мин одного файла), — а снятый
+ * прогон называет файлы, которые не закончили.
  */
 async function runPlan(plan, brief, timeoutMs) {
   const { stopTreeWithGrace } = await import(
     pathToFileURL(join(REPO, 'apps', 'server', 'src', 'lib', 'kill-tree.mjs')).href
   );
   const spawnedAt = Date.now();
+  const piped = brief || Boolean(plan.progress);
   const child = spawn(plan.line, {
     cwd: plan.cwd,
-    env: { ...process.env, ...plan.env },
+    // Труба вместо терминала гасит цвета vitest — человеку у терминала их возвращаем.
+    env: {
+      ...process.env,
+      ...(piped && !brief && process.stdout.isTTY ? { FORCE_COLOR: '1' } : {}),
+      ...plan.env,
+    },
     shell: true,
-    stdio: brief ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+    stdio: piped ? ['inherit', 'pipe', 'pipe'] : 'inherit',
     windowsHide: true,
   });
   const out = { stdout: '', stderr: '' };
-  if (brief) {
-    for (const name of ['stdout', 'stderr']) {
-      child[name].setEncoding('utf8');
-      child[name].on('data', (chunk) => {
-        if (out[name].length < BRIEF_MAX_BUFFER) out[name] += chunk;
-      });
-    }
-  }
+  const progress = plan.progress ? newProgress() : undefined;
   let timedOut = false;
+  let syncBlock;
   let cancelEscalate = () => {};
-  const timer = setTimeout(() => {
-    timedOut = true;
-    console.log(`\nПрогон дольше предела — останавливаю дерево процессов (${plan.line}).`);
+  const stopTree = () => {
     // Корень, пропустивший SIGTERM мимо ушей (POSIX), держал `run` без конца:
     // через запас — SIGKILL по своему дескриптору, номер чужим не станет.
     cancelEscalate = stopTreeWithGrace(child, { spawnedAt, graceMs: KILL_GRACE_MS });
+  };
+  const see = (event) => {
+    progress.see(event);
+    if (syncBlock || timedOut || event.e !== 'case' || event.state !== 'failed') return;
+    if (!isSyncBlock(event.ms, event.limit)) return;
+    // Где — от корня проекта, как у кейсов: метка несёт абсолютный путь (`plan.cwd` — корень).
+    syncBlock = {
+      where: `${projectRelative(plan.cwd, event.file)} > ${event.name}`,
+      ms: event.ms,
+      limit: event.limit,
+    };
+    console.log(`\nСинхронная блокировка теста — останавливаю дерево процессов (${plan.line}).`);
+    stopTree();
+  };
+  const flushers = [];
+  if (piped) {
+    for (const name of ['stdout', 'stderr']) {
+      const take = (text) => {
+        if (brief) {
+          if (out[name].length < BRIEF_MAX_BUFFER) out[name] += text;
+        } else process[name].write(text);
+      };
+      let rest = '';
+      child[name].setEncoding('utf8');
+      child[name].on('data', (chunk) => {
+        if (!progress) return take(chunk);
+        const lines = `${rest}${chunk}`.split('\n');
+        rest = lines.pop() ?? '';
+        let kept = '';
+        for (const line of lines) {
+          const event = progressEvent(line);
+          if (event) see(event);
+          else kept += `${line}\n`;
+        }
+        if (kept) take(kept);
+      });
+      flushers.push(() => {
+        if (rest && !progressEvent(rest)) take(rest);
+        rest = '';
+      });
+    }
+  }
+  const timer = setTimeout(() => {
+    if (syncBlock) return;
+    timedOut = true;
+    console.log(`\nПрогон дольше предела — останавливаю дерево процессов (${plan.line}).`);
+    stopTree();
   }, timeoutMs);
   const status = await new Promise((done) => {
     let drain;
@@ -948,7 +1159,14 @@ async function runPlan(plan, brief, timeoutMs) {
   });
   clearTimeout(timer);
   cancelEscalate();
-  return { status: timedOut ? TIMEOUT_EXIT : status, ...out, timedOut };
+  for (const flush of flushers) flush();
+  return {
+    status: timedOut || syncBlock ? TIMEOUT_EXIT : status,
+    ...out,
+    timedOut,
+    syncBlock,
+    progress,
+  };
 }
 
 const xml = (text) =>
@@ -980,9 +1198,23 @@ function finishedPart(plan, started) {
   }
 }
 
-async function recordTimeout(project, { plan, automated, cap, started, picked, options, stamps }) {
+/**
+ * `syncBlock` — прогон остановлен не пределом, а признаком синхронной блокировки: та же
+ * запись проваленными, своя причина. `unfinished` — файлы, что не закончили, в причину.
+ */
+async function recordTimeout(
+  project,
+  { plan, automated, cap, started, picked, options, stamps, syncBlock, unfinished = [] },
+) {
   const seconds = Math.round((Date.now() - started) / 1000);
-  const reason = `Предел времени: прогон шёл ${seconds} с, предел ${cap.shown}. Дерево процессов прогона снято.`;
+  const named =
+    unfinished.length > 0 ? ` Не закончили: ${unfinished.slice(0, 10).join(', ')}.` : '';
+  const reason = syncBlock
+    ? `Остановлен: синхронная блокировка — ${syncBlock.where} шёл ${secs(syncBlock.ms)} с при пределе ` +
+      `${secs(syncBlock.limit)} с; vitest такой тест не прерывает, остальные тесты файла шли бы так же. ` +
+      `Прогон шёл ${seconds} с, дерево процессов снято.${named}`
+    : `Предел времени: прогон шёл ${seconds} с, предел ${cap.shown}. Дерево процессов прогона снято.${named}`;
+  const cut = syncBlock ? 'синхронная блокировка' : 'по пределу времени';
   const suite = (entries) => {
     if (entries.length === 0) return '';
     const cases = entries
@@ -1004,7 +1236,9 @@ async function recordTimeout(project, { plan, automated, cap, started, picked, o
       format: 'junit',
       content: `<?xml version="1.0" encoding="UTF-8"?><testsuites>${body}</testsuites>`,
       origin: plan.origin,
-      scope: `tests-cli run (снят по пределу ${cap.shown}): ${plan.line}`,
+      scope: syncBlock
+        ? `tests-cli run (снят: синхронная блокировка): ${plan.line}`
+        : `tests-cli run (снят по пределу ${cap.shown}): ${plan.line}`,
       exitCode: TIMEOUT_EXIT,
       ...(options.group || picked ? { groups: [...new Set(automated.map((e) => e.group))] } : {}),
       stamps,
@@ -1020,8 +1254,8 @@ async function recordTimeout(project, { plan, automated, cap, started, picked, o
   printImport(
     imported,
     left.length < automated.length
-      ? `Кейсы записаны: успевшие звенья — своим итогом, остальные (${left.length}) — проваленными по пределу времени`
-      : 'Кейсы записаны проваленными по пределу времени',
+      ? `Кейсы записаны: успевшие звенья — своим итогом, остальные (${left.length}) — проваленными: ${cut}`
+      : `Кейсы записаны проваленными: ${cut}`,
   );
 }
 
@@ -1215,7 +1449,7 @@ async function vitestPlan(project, files) {
     const enter = `${process.platform === 'win32' ? 'cd /d' : 'cd'} ${shellQuote(cwd)} && `;
     return (
       `${enter}${shellQuote(process.execPath)} ${shellQuote(bin)} run --root ${shellQuote(cwd)} ` +
-      `--reporter=default --reporter=junit ` +
+      `--reporter=default --reporter=junit --reporter=${shellQuote(PROGRESS_REPORTER)} ` +
       `--outputFile.junit=${shellQuote(report)} ${inside.filter(Boolean).map(shellArg).join(' ')}`
     );
   });
@@ -1228,6 +1462,8 @@ async function vitestPlan(project, files) {
     env: {},
     temp,
     origin: 'ci',
+    // Метки `vitest-progress-reporter` в выводе: `runPlan` по ним видит, кто держит прогон.
+    progress: true,
     reportShown: `${temp}/vitest-*.xml`,
     // Цепочка гасит код провала (`|| echo -`): красное — из самого отчёта, и пакет
     // без отчёта (упал до тестов) тоже красный.
@@ -1441,8 +1677,16 @@ function resolveInside(project, file) {
   return isAbsolute(file) ? file : join(project, file);
 }
 
-function printImport(result, title) {
+/** `junit` — текст отчёта: счёт «упало / прошло» виден сразу, без чтения истории. */
+function printImport(result, title, junit) {
   console.log(`\n${title}`);
+  if (junit !== undefined) {
+    const counts = junitCounts(junit);
+    console.log(
+      `  итог отчёта: упало ${counts.failed} / прошло ${counts.passed}` +
+        (counts.skipped ? ` / пропущено ${counts.skipped}` : ''),
+    );
+  }
   console.log(`  прочитано: ${result.read}`);
   console.log(`  обновлено кейсов: ${result.matched}`);
   if (result.created) console.log(`  заведено кейсов: ${result.created}`);

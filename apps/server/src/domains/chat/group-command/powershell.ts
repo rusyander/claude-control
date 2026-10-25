@@ -55,6 +55,27 @@ function gitLine(line: string, cwd: Word | undefined): Unwrapped | undefined {
   return { kind: 'command', words: only.words, ...(cwd ? { cwd } : {}) };
 }
 
+/**
+ * `Stop-Process -Id 4321,4322 -Force`, `spps 4321`, `kill -Name node` (в PowerShell
+ * `kill` — псевдоним `Stop-Process`) простыми словами: снимается в `Stop-Process`,
+ * и цели судит разбор погашения, как `taskkill //PID` у Bash. Раньше любая такая
+ * строка инструментом PowerShell шла D-n человеку, даже погашение своего ребёнка
+ * (журнал слияния 24.10, Q2). Имя образа (`-Name`) там же становится «неназванным»
+ * — отказом агенту с подсказкой, как у `taskkill /IM`. Труба, переменная, блок — не
+ * снимаются: их судит обёртка целиком.
+ */
+const STOP_LINE = /^(?:stop-process|spps|kill)(?:[ \t]+[-\w.*]+(?:,[-\w.*]+)*)*$/i;
+
+function stopLine(line: string, cwd: Word | undefined): Unwrapped | undefined {
+  if (!STOP_LINE.test(line) || PS_BASH_SPLIT.test(line)) return undefined;
+  const tail = line.split(/[ \t]+/).slice(1);
+  const words: Word[] = [
+    { text: 'Stop-Process', dynamic: false },
+    ...tail.map((text): Word => ({ text, dynamic: false })),
+  ];
+  return { kind: 'command', words, ...(cwd ? { cwd } : {}) };
+}
+
 /** Имя ключа без знака (`-`, `/`, `--`, тире) и без `:значения`; `undefined` — не ключ. */
 function switchKey(text: string): string | undefined {
   const match = /^(?:--|[-/\u2013\u2014\u2015])([^:]+)/.exec(text);
@@ -111,6 +132,8 @@ export function powershellUnwrap(args: Word[]): Unwrapped | undefined {
   const body = args.slice(i + 1);
   if (body.some((word) => word.dynamic)) return undefined;
   const line = body.map((word) => word.text).join(' ');
+  const stop = stopLine(line, cwd);
+  if (stop) return stop;
   if (PS_META.test(line)) return gitLine(line, cwd);
   const [name = '', ...tail] = line.split(/\s+/).filter(Boolean);
   if (!PS_REMOVERS.has(name.toLowerCase())) return gitLine(line, cwd);

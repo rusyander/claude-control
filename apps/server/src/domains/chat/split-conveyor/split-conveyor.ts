@@ -433,6 +433,7 @@ const DELIVERY_STATE_FIELDS = [
   'deliveryNudgeKey',
   'deliveryNudgeStage',
   'deliveryHistory',
+  'deliveryPolicy',
   'deliveryEscalatedAt',
   'deliveryEscalatedAfter',
   'deliveryRetry',
@@ -668,16 +669,110 @@ const NOTE_MARKS_HINT =
   'blocked), a manual one with `tests-cli record <group>:<case>=blocked --note "<why>"`. The ' +
   'panel records all of these as notes; name each in the MR description.';
 
-/** Напоминание группе: чего не хватает, и что делать, если доставка невозможна. */
+/**
+ * Правила круга доставки, которые не меняются от круга к кругу: id → полный текст и
+ * короткое имя. Полным текстом — один раз на разговор (группа 1, 25.10: десять
+ * напоминаний в одном разговоре несли по ~2,2k знаков тех же правил); дальше
+ * напоминание называет их строкой (`given` в `deliveryNudgePrompt`).
+ */
+const DELIVERY_POLICY = {
+  'tests-self-check': {
+    text: () => TESTS_SELF_CHECK_LINE,
+    short: 'close every Tests-block line `tests-cli gaps --project .` prints',
+  },
+  'sieve-report': {
+    text: () => SIEVE_REPORT_HINT,
+    short: 'a sieves-block row for every sieve line',
+  },
+  integration: {
+    text: (branch: string) => INTEGRATION_LINE(branch),
+    short: 'rebase on the fresh target, then `git push --force-with-lease`',
+  },
+  'foreign-removals': {
+    text: () => FOREIGN_REMOVALS_LINE,
+    short:
+      'foreign removals: restore by a normal commit or name each file in the row, never rebase',
+  },
+  'review-threads': {
+    text: () => REVIEW_THREAD_LINES.join('\n'),
+    short: 'answer every reviewer thread and learn a sieve from each blocker',
+  },
+  investigate: {
+    text: () => INVESTIGATE_LINE,
+    short: 'find the cause of each line with your own tools, then fix or waive',
+  },
+  'human-only': {
+    text: () => HUMAN_ONLY_LINE,
+    short:
+      'ask the human only for merge, deletions, DB writes, a force-push beyond the lease, missing credentials',
+  },
+  'note-marks': {
+    text: () => NOTE_MARKS_HINT,
+    short:
+      '"not checked: <reason>" / "not caused by the branch: <why>" marks, blocked Tests-block records',
+  },
+} as const satisfies Record<string, { text: (branch: string) => string; short: string }>;
+type DeliveryPolicyId = keyof typeof DELIVERY_POLICY;
+
+/** Правила, которые несёт напоминание с этими пробелами, — по порядку текста. */
+export function deliveryPolicyIds(missing: readonly string[]): DeliveryPolicyId[] {
+  const ids: DeliveryPolicyId[] = [];
+  if (hasGap(missing, TESTS_GAPS)) ids.push('tests-self-check');
+  if (hasSieveRowGap(missing)) ids.push('sieve-report');
+  if (reportOnlyGaps(missing)) return [...ids, 'note-marks'];
+  if (hasGap(missing, INTEGRATION_GAPS)) ids.push('integration');
+  if (hasGap(missing, FOREIGN_REMOVALS_GAPS)) ids.push('foreign-removals');
+  if (hasGap(missing, REVIEW_THREAD_GAPS)) ids.push('review-threads');
+  return [...ids, 'investigate', 'human-only', 'note-marks'];
+}
+
+/**
+ * Строки «сито X: код менялся после строки (файлы)» с одними и теми же файлами — одной
+ * строкой: шесть сит на один путь были шестью строками по ~530 знаков (группа 1, 25.10).
+ */
+function foldStaleSieveLines(lines: readonly string[]): string[] {
+  const byFiles = new Map<string, string[]>();
+  for (const line of lines) {
+    const matched = matchText(line);
+    const files = matched?.params?.files;
+    const sieve = matched?.params?.sieve;
+    if (matched?.messageCode !== 'sieve-gap-stale' || typeof files !== 'string') continue;
+    if (typeof sieve !== 'string') continue;
+    byFiles.set(files, [...(byFiles.get(files) ?? []), sieve]);
+  }
+  const done = new Set<string>();
+  return lines.flatMap((line) => {
+    const matched = matchText(line);
+    const files = matched?.params?.files;
+    const sieves = typeof files === 'string' ? byFiles.get(files) : undefined;
+    if (matched?.messageCode !== 'sieve-gap-stale' || !sieves || sieves.length < 2) {
+      return [`- ${localizeText(line, 'en')}`];
+    }
+    if (done.has(files as string)) return [];
+    done.add(files as string);
+    return [
+      `- sieves ${sieves.join(', ')}: the branch changed the code these sieves cover after ` +
+        `their rows were reported (${files as string}) — check again on the final commit and ` +
+        'report each row again',
+    ];
+  });
+}
+
+/**
+ * Напоминание группе: чего не хватает, и что делать, если доставка невозможна.
+ * `given` — правила, которые этот разговор уже получил полным текстом: они
+ * названы одной строкой в конце, а не повторены.
+ */
 export function deliveryNudgePrompt(
   branch: string,
   missing: readonly string[],
   notes: readonly string[] = [],
+  given: ReadonlySet<string> = new Set(),
 ): string {
   const lines = [
     "The panel checked the group's delivery against git — it is not finished. Missing:",
     // Строки пробелов — тексты сервера (русские, с кодом): модели — их английская сторона.
-    ...missing.map((line) => `- ${localizeText(line, 'en')}`),
+    ...foldStaleSieveLines(missing),
     '',
   ];
   if (notes.length > 0) {
@@ -687,8 +782,20 @@ export function deliveryNudgePrompt(
       '',
     );
   }
-  if (hasGap(missing, TESTS_GAPS)) lines.push(TESTS_SELF_CHECK_LINE, '');
-  if (hasSieveRowGap(missing)) lines.push(SIEVE_REPORT_HINT, '');
+  const ids = deliveryPolicyIds(missing);
+  const repeated = ids.filter((id) => given.has(id));
+  const policy = (id: DeliveryPolicyId): string[] =>
+    ids.includes(id) && !given.has(id) ? [DELIVERY_POLICY[id].text(branch)] : [];
+  const stillHolds =
+    repeated.length > 0
+      ? [
+          'Still in force from the panel’s earlier reminder in this conversation (not repeated): ' +
+            `${repeated.map((id) => DELIVERY_POLICY[id].short).join('; ')}.`,
+        ]
+      : [];
+  const spaced = (id: DeliveryPolicyId): string[] =>
+    policy(id).length > 0 ? [...policy(id), ''] : [];
+  lines.push(...spaced('tests-self-check'), ...spaced('sieve-report'));
   if (reportOnlyGaps(missing)) {
     return [
       ...lines,
@@ -696,12 +803,11 @@ export function deliveryNudgePrompt(
         'missing — run what a line above names (the exact command it gives) and answer with ' +
         'the missing rows. Do not commit, push, rebase or touch the MR for this: nothing in ' +
         'the code changes.',
-      NOTE_MARKS_HINT,
+      ...policy('note-marks'),
+      ...stillHolds,
     ].join('\n');
   }
-  if (hasGap(missing, INTEGRATION_GAPS)) lines.push(INTEGRATION_LINE(branch), '');
-  if (hasGap(missing, FOREIGN_REMOVALS_GAPS)) lines.push(FOREIGN_REMOVALS_LINE, '');
-  if (hasGap(missing, REVIEW_THREAD_GAPS)) lines.push(...REVIEW_THREAD_LINES, '');
+  lines.push(...spaced('integration'), ...spaced('foreign-removals'), ...spaced('review-threads'));
   if (hasGap(missing, PUSH_GAPS)) {
     lines.push(
       `Push the branch ${branch} and open the MR yourself (or update the existing one) — ` +
@@ -711,11 +817,12 @@ export function deliveryNudgePrompt(
   }
   return [
     ...lines,
-    INVESTIGATE_LINE,
+    ...policy('investigate'),
     `Finish it with the delivery skill: commit the work, push the branch ${branch}, open an MR ` +
       '(or update the existing one) and give its link as the last line.',
-    HUMAN_ONLY_LINE,
-    NOTE_MARKS_HINT,
+    ...policy('human-only'),
+    ...policy('note-marks'),
+    ...stillHolds,
   ].join('\n');
 }
 
@@ -837,14 +944,24 @@ function pendingDeliveryLines(branch: string, pending: PendingDelivery | undefin
 
 const CLOSE_PENDING_LINE = 'Then close what the last delivery check before this stop found:';
 
+/**
+ * Откуда брать состояние на продолжении. Остывший разговор уходит в новый с блоком
+ * фактов панели («не собирай их заново»), и прежнее «сверь с фактами (git status,
+ * git log, транскрипт)» ему противоречило (группа 1, 25.10): новая сессия собирала
+ * всё заново. Одна строка на оба случая.
+ */
+const STATE_FROM_FACTS =
+  'the panel facts block above, when there is one, is current as of its timestamp — run git ' +
+  'only for what changed after it; without that block, git status, git log and your transcript';
+
 /** Продолжение оборванной группы: сперва восстановить состояние по фактам, потом работать. */
 export function interruptResumePrompt(branch: string, pending?: PendingDelivery): string {
   const gaps = pendingDeliveryLines(branch, pending);
   return [
     "This group's process broke off in the middle of a turn (a panel restart or the CLI died): " +
       'background commands died, whatever was not written to files is lost.',
-    'First restore the state from the facts: git status, git log, what is already done — from ' +
-      'your transcript; run the interrupted checks again.',
+    `First restore the state from the facts (${STATE_FROM_FACTS}); run the interrupted checks ` +
+      'again.',
     gaps.length > 0
       ? CLOSE_PENDING_LINE
       : `Then continue from where you stopped on the branch ${branch}. If the work was already ` +
@@ -905,8 +1022,8 @@ export function limitResumePrompt(branch: string, pending?: PendingDelivery): st
   return [
     "The group's previous turn hit the subscription limit; the limit has reset and the panel " +
       'continues the work.',
-    'First check the state against the facts (git status, git log, your transcript) — run the ' +
-      'interrupted checks again.',
+    `First check the state against the facts (${STATE_FROM_FACTS}) — run the interrupted ` +
+      'checks again.',
     gaps.length > 0
       ? CLOSE_PENDING_LINE
       : `Then continue from where you stopped on the branch ${branch}.`,
@@ -937,7 +1054,7 @@ export function pauseResumePrompt(
             `needs before relying on them: ${killed.join('; ')}.`,
         ]
       : []),
-    'First check the state against the facts (git status, git log, your transcript), then ' +
+    `First check the state against the facts (${STATE_FROM_FACTS}), then ` +
       (gaps.length > 0
         ? 'close what the last delivery check before the pause found:'
         : `continue from where you stopped on the branch ${branch}.`),
@@ -2073,6 +2190,18 @@ export class SplitConveyor {
         } else if (sent === 'sent') {
           target.deliveryNudges = nudges + 1;
         }
+        // Правила круга, отданные разговору полным текстом: в тот же разговор —
+        // накопленные, в новый (доставка перевела группу) — только эти. После
+        // разбора — заново полным текстом: его задание собрано иначе.
+        const policyChat = target.chatId;
+        if (stalled || capped || !policyChat) delete target.deliveryPolicy;
+        else {
+          const before = group.deliveryPolicy?.chat === policyChat ? group.deliveryPolicy.ids : [];
+          target.deliveryPolicy = {
+            chat: policyChat,
+            ids: [...new Set([...before, ...deliveryPolicyIds(verdict.missing)])],
+          };
+        }
         // Слово в очереди занятой группы ещё не дошло — в счёт не идёт (D3: у
         // группы стояло «2 из 2» при одном дошедшем напоминании). Ключ — идёт:
         // круг без движения после него всё равно виден.
@@ -2271,6 +2400,19 @@ export class SplitConveyor {
       group,
       deliveryNudgePrompt(group.branch, verdict.missing, verdict.notes),
     );
+    // Тот же разговор уже получил правила круга полным текстом — напоминание их
+    // только называет. Новый разговор доставки (`fresh`) — всегда полным текстом.
+    const given =
+      group.chatId && group.deliveryPolicy?.chat === group.chatId
+        ? new Set(group.deliveryPolicy.ids)
+        : undefined;
+    const nudgePrompt = given
+      ? this.withIdentity(
+          record,
+          group,
+          deliveryNudgePrompt(group.branch, verdict.missing, verdict.notes, given),
+        )
+      : prompt;
     const fresh = (): FreshDelivery | undefined =>
       this.freshDelivery(record, group, prompt, 'deliver');
     const stage = delivery?.stage?.(group);
@@ -2280,7 +2422,7 @@ export class SplitConveyor {
       // не открыть (тот же круг впустую, ради которого новая доставка и есть).
       if (started === 'sent' || started === 'queued' || started === 'busy') return started;
     }
-    const sent = delivery?.nudge(group, prompt);
+    const sent = delivery?.nudge(group, nudgePrompt);
     if (sent === 'sent' || sent === 'queued') return sent;
     return fresh() ?? sent;
   }
@@ -2850,6 +2992,7 @@ export class SplitConveyor {
         'deliveryNudgeStage',
         'deliveryNotes',
         'deliveryHistory',
+        'deliveryPolicy',
         'deliveryEscalatedAt',
         'deliveryEscalatedAfter',
         'deliveryRetry',

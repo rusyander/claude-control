@@ -27,15 +27,15 @@ export const SWITCH_REFUSAL =
   'old state stays in the history and the reflog. If you meant to restore files rather than ' +
   'switch, put the paths after `--` (git checkout <options> -- <paths>).';
 
-// Снимок не снимается и на неслитом индексе (конфликт слияния/перебазирования):
-// там «закоммить» невыполнимо, поэтому отказ называет и выход из слияния (A-19).
+// Неслитый индекс снимок держит (`git-snapshot.ts`, журнал 24.10 D31/D32):
+// разрешение конфликта затиранием (`checkout --ours`, `restore`) идёт само.
+// Сюда доходит лишь отказ самого git (копия не читается, нет места).
 export const SNAPSHOT_REFUSAL =
   'This command would discard uncommitted changes, and the panel could not save them first ' +
   '(snapshot under refs/agentdeck/backup/ failed), so it is refused. Commit the current edits ' +
   '(a wip commit is fine), then repeat; after the commit the old state is in the history and ' +
-  'the reflog. If a merge, rebase or cherry-pick is in progress (`git status` lists unmerged ' +
-  'paths), a commit is not possible yet: resolve the conflicts and `git add` them, or end it ' +
-  'with `git merge --abort` / `git rebase --abort` / `git cherry-pick --abort`, first.';
+  'the reflog. While a merge or rebase has unmerged paths, take a side without discarding: ' +
+  '`git cat-file -p :2:<path> > <path>` (ours) or `:3:` (theirs), then `git add <path>`.';
 
 /** Признаки, что строку не разобрать, а git в ней что-то стирает или меняет ветку. */
 const UNPARSED_DISCARD =

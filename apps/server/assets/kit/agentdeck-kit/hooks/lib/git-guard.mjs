@@ -62,8 +62,22 @@ import {
 
 // `stash push` saves work, it publishes nothing (5 denials in a replay of retained refusals).
 // `merge --abort/--quit` backs out of a conflicted merge — the opposite of merging.
-const MUTATING_GIT =
-  /\bgit\b[^\n|;&]*\b(commit|(?<!stash\s+)push|rebase|merge(?!-(?:base|tree|file)\b)(?!\s+--(?:abort|quit)\b)|cherry-pick|revert|reset\s+--hard|checkout\s+-b|switch\s+-c|branch\s+-(D|d|m)|tag\s+(?!-l\b|--list\b)\S+|stash\s+(drop|clear|pop)|filter-branch)\b/;
+// The op is git's SUBCOMMAND — the first word after `git` and its global options — never a word further
+// on: `git status -- hooks/tests/push-sieves.test.mjs` was refused as a push, and a loop over file names
+// `git-files.ts … push-sieves` read `git-` as git (fleet g2, 25.10.2026). A word boundary is a space or,
+// in interpreter code, an argv element boundary (`'git', ['commit'`). A quoted `-C` value arrives masked
+// by `executedText`, so a shell word is quoted chunks or plain characters. `pull --rebase`/`-r` is the
+// rebase it runs.
+const SHELL_WORD = /(?:"[^"\n]*"|'[^'\n]*'|[^\s"'|;&])+/.source;
+const GIT_SEP = /['"]?(?:\s*,\s*\[?\s*|\s+)['"]?/.source;
+const GIT_GLOBAL_OPTS =
+  `(?:${GIT_SEP}(?:-C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env)${GIT_SEP}${SHELL_WORD}` +
+  `|${GIT_SEP}-{1,2}[A-Za-z][\\w-]*(?:=${SHELL_WORD})?)*`;
+const MUTATING_GIT = new RegExp(
+  `(?<![\\w.-])git(?:\\.exe)?${GIT_GLOBAL_OPTS}${GIT_SEP}` +
+    /(commit|push|rebase|pull\b(?=[^\n|;&]*\s(?:--rebase|-r)\b)|merge(?!-(?:base|tree|file)\b)(?!\s+--(?:abort|quit)\b)|cherry-pick|revert|reset\s+--hard|checkout\s+-b|switch\s+-c|branch\s+-(D|d|m)|tag\s+(?!-l\b|--list\b)\S+|stash\s+(drop|clear|pop)|filter-branch)\b/
+      .source,
+);
 
 // "all git operations are allowed" — the user naming git ops as a class, this turn.
 // Covers only ops that stay recoverable inside a branch; merge, force-push, reset --hard, branch
@@ -246,7 +260,8 @@ export default function gitGuard(input) {
   // commit used to carry the push through unasked. Two pushes to different branches are two ops.
   const seen = new Set();
   for (const m of matches) {
-    const op = (String(m[1]).match(/^[a-z-]+/) || ['git'])[0];
+    const word = (String(m[1]).match(/^[a-z-]+/) || ['git'])[0];
+    const op = word === 'pull' ? 'rebase' : word;
     const simple = command.slice(m.index).match(/^[^\n|;&]*/)[0];
     // Flags may follow the op word, so "forced" is read over the whole simple command. A `+refspec`
     // is a force push spelled without the flag.

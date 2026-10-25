@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
 import { POWERSHELL_ONLY_ASK, withPowerShellTwins } from '../auto-approve/powershell-twins.ts';
@@ -387,6 +388,28 @@ export const REVIEW_SKILLS: readonly string[] = ['deep-review', 'style-conforman
 export const REVIEW_AGENT_DENY = 'Agent';
 
 /**
+ * Встроенные подагенты CLI о самом CLI — справка по Claude Code и строка
+ * состояния (F9, замер 25.10 на 2.1.310: их описания — 1,2 тыс. из 3 тыс. знаков
+ * перечня подагентов в каждом вызове). Задаче группы они не нужны никогда.
+ * `deny` на `Agent(<тип>)` снимает тип из перечня (замер `check-run-layers.mjs`),
+ * остальные подагенты и сам инструмент остаются.
+ */
+export const CLI_HELP_AGENT_DENY: readonly string[] = [
+  'Agent(claude-code-guide)',
+  'Agent(statusline-setup)',
+];
+
+/**
+ * Навыки доставки (F9): звену работы с доставкой впереди их не звать — пуш и MR
+ * у звена доставки, — поэтому описания им не нужны; имя остаётся, вызов возможен.
+ */
+export const DELIVERY_SKILLS: readonly string[] = [
+  'prepare-mr',
+  'changelog-builder',
+  'mr-visual-report',
+];
+
+/**
  * Публикация, которую делает звено доставки (L3). Коммит не запрещён: дельту
  * ревью и доставку считают по коммитам ветки. Правило `deny` старше `ask`
  * брокера — пуш до доставки не доходит до карточки вовсе.
@@ -448,6 +471,38 @@ export function mergeDeny(kept: readonly ProfileMcpEntry[]): string[] {
 }
 
 /**
+ * Есть ли в задачах вики трекера. Сервер трекера несёт и задачи, и вики
+ * (`confluence_*` — 33 имени, 1,7 тыс. знаков в каждом вызове, группа 1, 25.10:
+ * ни одного вызова). Снять сервер нельзя — задачи нужны; снимаются имена вики.
+ */
+export function needsWiki(text: string): boolean {
+  return /confluence|конфлюенс|\bwiki\b|вики|\/wiki\//i.test(text);
+}
+
+/** Блок `mcp` с этим именем возвращает вики трекера (`server: confluence`). */
+export const WIKI_EXTRA = 'confluence';
+
+/**
+ * `deny` на инструменты вики трекера, когда задачи о вики молчат и группа её не
+ * просила; иначе пусто. CLI снимает подходящие под шаблон имена из запроса и из
+ * списка отложенных (тот же путь, что `readOnlyMcpDeny`).
+ */
+export function wikiDeny(
+  kept: readonly ProfileMcpEntry[],
+  tasksText: string,
+  extra: readonly string[],
+): string[] {
+  if (needsWiki(tasksText) || extra.some((name) => name.toLowerCase() === WIKI_EXTRA)) return [];
+  return kept
+    .filter(
+      (entry) => mcpRole(entry) === 'tracker' && /atlassian|confluence/.test(signature(entry)),
+    )
+    .map((entry) => `mcp__${cliServerName(entry.id)}__${WIKI_EXTRA}_*`);
+}
+
+const WIKI_NOTE = `Tracker wiki tools (${WIKI_EXTRA}_*) are off: the tasks never name the wiki; need a page → the mcp block, server: ${WIKI_EXTRA}.`;
+
+/**
  * Чего звену не делать: за ним идут ревью и/или доставка; иначе пусто. Перед
  * ревью закрыт и `Agent` (F-09): ревью-полоса подагентом — тот же второй проход,
  * что и навык ревью, а без человека подагентов звену звать не с чьего согласия
@@ -472,18 +527,26 @@ export function aheadDeny(
  * Перечень навыков звена (1.3) с навыками ревью, выключенными перед ревью (L3):
  * `deny` на `Skill(…)` в 2.1.286 лишь отказывает вызову, а описание остаётся в
  * каждом запросе — `off` снимает его из перечня (замер `check-run-layers.mjs`).
+ * С доставкой впереди навыкам доставки — только имя (F9); навыку групп панели
+ * описание остаётся всегда.
  */
 function skillsWithAhead(input: GroupProfileInput): Record<string, unknown> {
   const base = input.skills
     ? skillSettings(input.skills, needsDesign(input.tasksText), input.stage)
     : {};
-  if (!input.ahead?.review) return base;
+  if (!input.ahead?.review && !input.ahead?.deliver) return base;
   const overrides = (base.skillOverrides ?? {}) as Record<string, string>;
+  const group = new Set(input.skills?.group ?? []);
+  const delivery = input.ahead?.deliver
+    ? DELIVERY_SKILLS.filter((name) => !group.has(name)).map((name) => [name, 'name-only'])
+    : [];
+  const review = input.ahead?.review ? REVIEW_SKILLS.map((name) => [name, 'off']) : [];
   return {
     ...base,
     skillOverrides: {
       ...overrides,
-      ...Object.fromEntries(REVIEW_SKILLS.map((name) => [name, 'off'])),
+      ...Object.fromEntries(delivery),
+      ...Object.fromEntries(review),
     },
   };
 }
@@ -513,6 +576,16 @@ export const TESTS_RUNS_AT_DELIVERY_ENV = 'AGENTDECK_TESTS_RUNS_AT_DELIVERY';
  */
 export const GROUP_STAGE_ENV = 'AGENTDECK_GROUP_STAGE';
 export const GROUP_DELIVER_AHEAD_ENV = 'AGENTDECK_GROUP_DELIVER_AHEAD';
+/**
+ * Каталог хуков набора панели — для глобального `~/.claude/hooks/lib/gate-at-end.mjs`:
+ * в режиме набора «глобальные» группа исполняет только его, а правила звеньев
+ * (один полный гейт в доставке, журнал дерева копии) живут в копии набора. Группа
+ * №1 24.10 прогнала 21 полный гейт (~84 мин): глобальный хук этих правил не знал.
+ */
+export const KIT_HOOKS_DIR_ENV = 'AGENTDECK_KIT_HOOKS_DIR';
+export const KIT_HOOKS_DIR = fileURLToPath(
+  new URL('../../../../assets/kit/agentdeck-kit/hooks/', import.meta.url),
+);
 const COMPACT_WINDOW_MIN = 100_000;
 const COMPACT_WINDOW_MAX = 1_000_000;
 
@@ -676,10 +749,18 @@ export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
   const outward = outwardAsk(profile.kept, input.shellNames);
   const readOnly = readOnlyMcpDeny(profile.kept, input.stage);
   const economy = input.economy;
-  const deny = [...readOnly, ...aheadDeny(profile.kept, input.ahead), ...mergeDeny(profile.kept)];
+  const wiki = wikiDeny(profile.kept, input.tasksText, input.extra);
+  const deny = [
+    ...readOnly,
+    ...aheadDeny(profile.kept, input.ahead),
+    ...mergeDeny(profile.kept),
+    ...wiki,
+    ...CLI_HELP_AGENT_DENY,
+  ];
   const ahead = aheadNote(input.ahead);
   const notes = [
     groupProfileNote(profile, connectors),
+    ...(wiki.length > 0 ? [WIKI_NOTE] : []),
     ...(readOnly.length > 0 ? [READ_ONLY_NOTE] : []),
     ...(ahead ? [ahead] : []),
     ...(economy?.workHabits ? [WORK_HABITS_NOTE] : []),
@@ -692,6 +773,7 @@ export function groupRunProfile(input: GroupProfileInput): ServerSetRunProfile {
       ...(input.processMark ? { [input.processMark]: '1' } : {}),
       ...(input.stage ? { [GROUP_STAGE_ENV]: input.stage } : {}),
       ...(input.ahead?.deliver ? { [GROUP_DELIVER_AHEAD_ENV]: '1' } : {}),
+      ...(input.stage || input.heavyQueue ? { [KIT_HOOKS_DIR_ENV]: KIT_HOOKS_DIR } : {}),
       ...(input.compactWindow ? { [COMPACT_WINDOW_ENV]: String(input.compactWindow) } : {}),
       ...(input.heavyQueue ? { [HEAVY_QUEUE_ENV]: input.heavyQueue.dir } : {}),
       ...(economy?.detachIde ? { [AUTO_CONNECT_IDE_ENV]: 'false' } : {}),

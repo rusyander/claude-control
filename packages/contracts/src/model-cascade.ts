@@ -666,11 +666,30 @@ export function scanReviewBlocks(source: string): ReviewScan {
 const TASK_EXCERPT = OWNER_TEXT_MAX;
 const PLAN_EXCERPT = OWNER_TEXT_MAX;
 /**
- * Итог прошлого звена — хвост его ответа: итог и выводы звено пишет в конце, а
- * весь ответ с ходом рассуждений следующему звену не нужен. 24 000 знаков
- * вмещают отчёт ревью или доставки целиком.
+ * Итог прошлого звена — его заключительный ответ (сервер берёт текст после
+ * последнего инструмента), хвостом. 8 000 знаков вмещают отчёт ревью или доставки;
+ * прежние 24 000 везли в каждое звено ход рассуждений и блоки сит (группа 1, 25.10).
  */
-const PREVIOUS_TAIL = 24_000;
+const PREVIOUS_TAIL = 8_000;
+
+/**
+ * Служебные блоки панели (`agentdeck:sieves`, `:review`, `:handoff`…) в итоге
+ * прошлого звена: панель их уже разобрала и везёт своими полями (строки сит —
+ * `sieveRows`, замечания — карточками), а текстом это повтор на тысячи знаков.
+ * Незакрытый блок срезается до конца текста.
+ */
+const PANEL_BLOCK = new RegExp(
+  `(^|\\n)[ \\t]*\`\`\`[ \\t]*${blockLangPattern('[a-z-]+')}[^\\n]*\\n[\\s\\S]*?(?:\\n[ \\t]*\`\`\`[ \\t]*(?=\\r?\\n|$)|$)`,
+  'g',
+);
+
+/** Итог звена без служебных блоков панели — на месте каждого короткая метка. */
+export function withoutPanelBlocks(text: string): string {
+  return text.replace(
+    PANEL_BLOCK,
+    (_match, lead: string) => `${lead}[panel block omitted — the panel carries it]`,
+  );
+}
 
 /**
  * Как выглядит замечание — одно правило для всех заданий ревью (звено ревью,
@@ -917,7 +936,7 @@ export function stageContextBlock(
     // Хвост, а не начало: итог и вывод звено пишет в конце ответа.
     lines.push(
       `Outcome of the previous stage (${STAGE_NAMES[context.previous.stage]}):`,
-      excerpt(context.previous.text, PREVIOUS_TAIL, true),
+      excerpt(withoutPanelBlocks(context.previous.text), PREVIOUS_TAIL, true),
     );
   }
   const artifacts = (context.artifacts ?? [])
@@ -1276,29 +1295,37 @@ export function deliverStagePrompt(input: {
       'resolved by the group itself, never handed to the human (`git rebase --abort` only to ' +
       'restart a botched attempt). Only a decision that belongs to the human or to another ' +
       `group (foreign code, a product choice) — ${ask}, not a report.`,
-    `4. Run the project's checks — the ones its rules name (${RULE_SOURCES}), all of them,` +
-      " in the order named, frontend and backend alike, ONCE on this final tree: it is the group's" +
-      ' one full run; fix what is red without going beyond the tasks of the group, re-running ' +
-      'only the red ones. Any check still red — no MR.',
-    `5. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
-      `a pushed branch after a conflict rebase — \`git push --force-with-lease origin ${target}\`, and ` +
-      "only your own group branch, never the main, a protected or another group's branch. Open " +
-      'the MR by the delivery skill (or update the open one): task keys in the ' +
-      'description, decisions taken without the human listed there too. Stages of the skill not ' +
-      'passed yet (live check after the edits, before/after shots, tracker) are yours as well.',
-    // Итог по MR без его обсуждений (аудит 25.09, L199): ревьюер оставил тред,
-    // группа сказала «готово», а тред так и висел открытым.
-    '6. Before "done" re-read ALL discussions of the MR (threads and reviewer comments): ' +
-      'fix what is unresolved in this branch; list what you did not fix in the answer as ' +
-      '"not fixed" with the reason — a thread left silently is not an outcome.',
+    // Порядок `ticket-delivery-2` (§10 живая проверка → §6 гейт → §8 пуш): группа №1 24.10
+    // делала живую проверку и сверку диффа ПОСЛЕ пуша — каждая находка давала новое дерево
+    // и новый полный прогон (4 дерева за доставку).
+    '4. Before the checks, everything that can still change the tree: stages of the delivery ' +
+      'skill not passed yet (live check after the edits, before/after shots), fixing what they ' +
+      'find. A finding after the push makes a new tree, and that tree needs its own full run.',
     // Автономия группы держится на границе задания (аудит 25.09, L163): без
     // сверки в MR уезжали правки «заодно», которых задание не просило.
-    '7. Compare the diff of the branch against main (`git diff --stat origin/<main>...HEAD`) ' +
+    '5. Compare the diff of the branch against main (`git diff --stat origin/<main>...HEAD`) ' +
       'with the task of the group: every change must follow from its tasks. What the project ' +
       'rules require for such a change (docs updated with it, tests beside the code, every locale, ' +
       'the API contract first) follows from the task too — keep it. Revert the rest; a step beyond ' +
       'the tasks of the group (a foreign module, a migration, infrastructure) — do not do it, ' +
       `${ask}.`,
+    `6. Run the project's checks — the ones its rules name (${RULE_SOURCES}), all of them,` +
+      " in the order named, frontend and backend alike, ONCE on this final tree: it is the group's" +
+      ' one full run; fix what is red without going beyond the tasks of the group, re-running ' +
+      'only the red ones. Any check still red — no MR.',
+    `7. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
+      `a pushed branch after a conflict rebase — \`git push --force-with-lease origin ${target}\`, and ` +
+      "only your own group branch, never the main, a protected or another group's branch; any " +
+      'other push to a branch with an MR in review is a plain `git push`, never forced. Open ' +
+      'the MR by the delivery skill (or update the open one): task keys in the ' +
+      'description, decisions taken without the human listed there too. The tracker stage of the ' +
+      'skill is yours as well.',
+    // Итог по MR без его обсуждений (аудит 25.09, L199): ревьюер оставил тред,
+    // группа сказала «готово», а тред так и висел открытым.
+    '8. Before "done" re-read ALL discussions of the MR (threads and reviewer comments): ' +
+      'fix what is unresolved in this branch; list what you did not fix in the answer as ' +
+      '"not fixed" with the reason — a thread left silently is not an outcome. Fix every thread ' +
+      'first, then one run of the checks on that tree and one push.',
     ...(open.length > 0
       ? [
           '',

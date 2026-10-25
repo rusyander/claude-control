@@ -6,6 +6,7 @@ import { WORK_HABITS_SHARED_NOTE } from '../group-profile/group-profile.ts';
 import {
   BACKGROUND_PROMPT,
   CHILD_PROMPT,
+  FOREIGN_CHILD_NO_TOOL_LOOP_PROMPT,
   FOREIGN_CHILD_PROMPT,
   FOREIGN_GROUP_ECONOMY_PROMPT,
   GROUP_ECONOMY_PROMPT,
@@ -42,10 +43,63 @@ describe('дописка группы разделения', () => {
    * +170 — полный гейт раз на этап (план скорости гейтов, строка 6): окупается одним
    * несделанным гейтом на 8–13 минут; +170 — правка через Edit, не оболочкой
    * (журнал 19.10 19:42–19:50: 6 отказов стража за 10 минут в трёх группах, каждый —
-   * ход по ~190 тыс. контекста): окупается одним отказом.
+   * ход по ~190 тыс. контекста): окупается одним отказом. +70 (25.10, журнал группы 1,
+   * 23.10) — три правила при ужатых источнике, вопросе, сообщении в работе и этапах:
+   * фоновые подагенты — конец хода (два цикла sleep по 700 с), без вопросов и
+   * «Waiting for the human: D-n» (три хода AskUserQuestion), `>>` в списке оболочки
+   * (отказы стража на дописке в .md).
    */
-  it('не длиннее 4510 знаков при обоих тумблерах', () => {
-    expect(group.length).toBeLessThanOrEqual(4510);
+  it('не длиннее 4580 знаков при обоих тумблерах', () => {
+    expect(group.length).toBeLessThanOrEqual(4580);
+  });
+
+  /**
+   * Журнал группы 1 (23.10): лиды ревью ждали фоновых агентов циклом `sleep` над их
+   * файлами 698 + 722 с, потому что строка переднего плана звала конец хода
+   * «результатом группы». Панель держит группу, пока живы фоновые задачи CLI
+   * (`chainOutcomeOf` → `background`), и будит её возвратом агента.
+   */
+  it('передний план: фоновые подагенты — исключение, ход кончается строкой с их именами', () => {
+    for (const anchor of [
+      'Background subagents (Agent with run_in_background) are the exception',
+      'the panel holds the group while they run',
+      'END THE TURN with one line naming them',
+      'never sleep-loop on them',
+      'a background command dies with the process',
+    ]) {
+      expect(SPLIT_FOREGROUND_PROMPT, anchor).toContain(anchor);
+    }
+    expect(SPLIT_FOREGROUND_PROMPT).not.toContain(
+      "treats the end of your turn as the group's result",
+    );
+  });
+
+  /**
+   * Без вопросов (23.10, отказы D4/D11/D25): развилку группа решает сама, необратимое
+   * панель отказывает и ставит человеку D-n — ход кончается строкой, которую читают
+   * `chain-outcome` и `deferred-asks`, а не вопросом.
+   */
+  it('автономия: не спрашивать, необратимое — строка «Waiting for the human: D-n»', () => {
+    for (const anchor of [
+      'do not ask',
+      'else the one that continues without the human',
+      'decision for the review',
+      'queues it as D-n',
+      '"Waiting for the human: D-n — <what it unblocks>"',
+    ]) {
+      expect(CHILD_PROMPT, anchor).toContain(anchor);
+    }
+    expect(CHILD_PROMPT).not.toContain('ONLY with AskUserQuestion');
+  });
+
+  /**
+   * Дописка в .md оболочкой (`>>`) — отказ стража и потерянный ход (журнал группы 1,
+   * 23.10): строка экономии называет `>>` и дописку строки, перенос в архив — с Edit.
+   */
+  it('дописка строки — тоже Edit: `>>` в списке оболочки, архив переносится с Edit', () => {
+    expect(GROUP_ECONOMY_PROMPT).toContain('or a line appended), never through the shell');
+    expect(GROUP_ECONOMY_PROMPT).toContain('heredoc, >>, a script writing a file');
+    expect(group).toContain('into .agent/ARCHIVE.md with Edit');
   });
 
   /**
@@ -55,25 +109,44 @@ describe('дописка группы разделения', () => {
    * едет: у чужих CLI такого инструмента нет. +170 — полный гейт раз на этап
    * (19.10): 11 гейтов по 8–13 минут на группу стоили дороже этих знаков в вызове.
    * +170 — правка через Edit, не оболочкой (журнал 19.10 19:42–19:50).
+   * +170 — P-08 (25.10): «не спрашивай о развилках» и D-n для необратимого шага
+   * вместо «спроси, если шаг необратим» — чужая группа вставала на вопросе.
    */
-  it('правила группы в чужом CLI — не длиннее 2170 знаков', () => {
+  it('правила группы в чужом CLI — не длиннее 2340 знаков', () => {
     const foreign = `${FOREIGN_CHILD_PROMPT} ${FOREIGN_GROUP_ECONOMY_PROMPT}`;
-    expect(foreign.length).toBeLessThanOrEqual(2170);
+    expect(foreign.length).toBeLessThanOrEqual(2340);
     expect(foreign).not.toContain('LSP');
+  });
+
+  /**
+   * P-08 (25.10): ребёнок чужого CLI не спрашивает о развилках, необратимое
+   * отдаёт человеку через D-n, а исключения про фоновых подагентов у него нет —
+   * конвейер чужих CLI не держит группу на фоне (`chainOutcomeOf` без `background`).
+   */
+  it('ребёнок чужого CLI не спрашивает, необратимое — D-n, конец хода — результат', () => {
+    for (const prompt of [FOREIGN_CHILD_PROMPT, FOREIGN_CHILD_NO_TOOL_LOOP_PROMPT]) {
+      expect(prompt).toContain('do not ask about forks');
+      expect(prompt).toContain('queues it as D-n');
+      expect(prompt).toContain('"Waiting for the human: D-n');
+      expect(prompt).not.toContain('Ask only if the step is irreversible');
+    }
+    expect(FOREIGN_CHILD_PROMPT).toContain('does not hold it for background work');
+    expect(FOREIGN_CHILD_PROMPT).not.toContain('run_in_background');
   });
 
   /**
    * С тумблером «привычки работы» (22.10) звено чужого CLI получает ещё и общую
    * часть заметки о привычках — `foreignChildExtra` склеивает её третьей: +340.
    * Потолок меряет то, что реально едет в каждом вызове, а не две строки из трёх.
+   * +170 — P-08 (25.10), как и потолок без привычек.
    */
-  it('правила группы в чужом CLI с привычками работы — не длиннее 2510 знаков', () => {
+  it('правила группы в чужом CLI с привычками работы — не длиннее 2680 знаков', () => {
     const foreign = [
       FOREIGN_CHILD_PROMPT,
       FOREIGN_GROUP_ECONOMY_PROMPT,
       WORK_HABITS_SHARED_NOTE,
     ].join(' ');
-    expect(foreign.length).toBeLessThanOrEqual(2510);
+    expect(foreign.length).toBeLessThanOrEqual(2680);
   });
 
   /**

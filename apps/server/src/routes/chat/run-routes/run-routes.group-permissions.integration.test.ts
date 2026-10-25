@@ -453,6 +453,37 @@ describe('маршрут прав: строки вкладки «Группы»'
     expect(await ask(GROUP, inCopy('rm -rf dist coverage && rm -f build.log'))).toBe('allow');
   });
 
+  // Журнал 24.10, D33: посреди перебазирования на main, которое панель пустила
+  // сама, сторона main для файла (`git show origin/main:a > a`) получала
+  // MAIN_SYNC_UNKNOWN — сервера у копии нет, конфликт «не сверить». Это
+  // разрешение конфликта, не новый догон; перенос истории сверяется по-прежнему.
+  it('D33: сторона целевой посреди идущего догона — разрешение конфликта, не догон', async () => {
+    const g = (...args: string[]): void => {
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+        cwd: copy,
+        stdio: 'ignore',
+      });
+    };
+    g('checkout', '-q', '-b', 'mainline');
+    writeFileSync(join(copy, 'a.txt'), 'theirs\n');
+    g('add', 'a.txt');
+    g('commit', '-qm', 'main side');
+    g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    g('checkout', '-q', 'feature/a');
+    writeFileSync(join(copy, 'a.txt'), 'ours\n');
+    g('add', 'a.txt');
+    g('commit', '-qm', 'own side');
+    expect(() => g('rebase', 'origin/main')).toThrow();
+    expect(await ask(GROUP, 'git show origin/main:a.txt > a.txt && echo ok')).toBe('allow');
+    expect(await ask(GROUP, inCopy('git checkout origin/main -- a.txt'))).toBe('allow');
+    // Новый догон посреди идущего — та же сверка, что и всегда.
+    expect(await ask(GROUP, 'git merge origin/main')).toBe('deny');
+    expect(lastMessage).toContain('could not check');
+    g('rebase', '--abort');
+    // Догона нет — запись содержимого main в файл по-прежнему догон.
+    expect(await ask(GROUP, 'git show origin/main:a.txt > a.txt')).toBe('deny');
+  });
+
   it('сверка с основной, подстановки и черновик heredoc — сами; исполнимое в них — карточка (23.10)', async () => {
     checkout(OWN);
     // Команды с карточек владельца 23.10: `$(…)`, `${…}`, `@{u}`, heredoc шли человеку.

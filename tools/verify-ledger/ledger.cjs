@@ -83,6 +83,17 @@ const ENV_SESSION = [
   // Их же ставят npm (COLOR, EDITOR), pnpm, yarn и cmd.exe под `shell` (PROMPT) — замер 24.10:
   // без этого прямой запуск и `npm run` того же скрипта на том же дереве не делили ключ.
   /^(COLOR|EDITOR|PROMPT|YARN_WRAP_OUTPUT|PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN)$/i,
+  // Метка владельца процессов группы (`group-process-owner.ts`): своя у каждого разговора —
+  // 24.10 21:40 она одна дала 13 промахов подряд (~139 с) на нетронутых пакетах.
+  /^AGENTDECK_OWNER_[0-9A-F]{16}$/i,
+  // Флаги панели о самой панели и слоях CLI: прогон проверки они не трогают, но появлялись и
+  // пропадали между звеньями группы (24.10 20:16–22:28) и рвали повтор нетронутого пакета.
+  /^AGENTDECK_(DEV_RESTART_DIR|USER_MEMORY_OFF)$/i,
+  // `AI_AGENT` ставит сам Claude Code (`claude-code_<версия>_<обвязка>` — меняется с версией CLI и
+  // видом сессии); `DP0` — каталог шима npm (`SET dp0=%~dp0` в `claude.cmd` протекает в дочерние);
+  // `BASH_MAX_TIMEOUT_MS` — потолок оболочки CLI (`bash-ceiling.ts`); последнее — диагностика
+  // Application Insights (VS Code).
+  /^(AI_AGENT|DP0|BASH_MAX_TIMEOUT_MS|APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL)$/i,
 ];
 /** Каталог обёрток `yarn run` (yarn 1): `node.cmd`/`yarn.cmd` в нём ведут на тот же node, что запустил yarn. */
 const PM_SHIM_DIR = /^yarn--\d+-[\d.]+$/;
@@ -524,6 +535,65 @@ function ignoredInputs(top, cwd, declared) {
   return out;
 }
 
+/** Пути входа пакета из `package.json`: types/typings/main/module и все строки `exports`. */
+function entryTargets(pj) {
+  const out = [];
+  const walk = (v) => {
+    if (typeof v === 'string') out.push(v);
+    else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x);
+  };
+  for (const k of ['types', 'typings', 'main', 'module', 'exports']) walk(pj[k]);
+  return out;
+}
+
+/**
+ * Собранный выход соседа по `file:`/`link:`/`workspace:` — вне git, а потребитель читает
+ * именно его: `chat-ui` берёт типы `@proj/shared-ui` из `shared-ui/dist`. Без него
+ * в ключе зелёный tsc, записанный при свежем `dist`, повторялся бы на устаревшем (24.10:
+ * `TS2305 … has no exported member 'createRefetchUnlessFresh'`, красный, которого ключ не
+ * видел). Берётся верхний каталог каждой цели входа; отслеживаемый git — уже в дереве ключа.
+ */
+function linkedOutputs(top, cwd) {
+  const out = {};
+  let linked;
+  try {
+    linked = require('./delta.cjs').linkedDirs(realDir(top), packageDir(top, cwd));
+  } catch {
+    return out;
+  }
+  for (const rel of linked) {
+    const abs = path.join(top, rel);
+    let pj;
+    try {
+      pj = JSON.parse(fs.readFileSync(path.join(abs, 'package.json'), 'utf8'));
+    } catch {
+      continue;
+    }
+    const firsts = new Set();
+    for (const target of entryTargets(pj)) {
+      const inside = slash(path.relative(abs, path.resolve(abs, target)));
+      if (!inside || inside.startsWith('..')) continue;
+      firsts.add(inside.split('/')[0]);
+    }
+    for (const first of [...firsts].sort()) {
+      const p = path.join(abs, first);
+      const st = fs.statSync(p, { throwIfNoEntry: false });
+      let tracked = '';
+      try {
+        tracked = git(top, ['ls-files', '--', slash(path.join(rel, first))]).trim();
+      } catch {
+        /* git не ответил — считаем выход неотслеживаемым: лишний промах, не чужой зелёный */
+      }
+      if (tracked) continue;
+      let digest = 'absent';
+      if (st?.isDirectory()) digest = dirDigest(p) ?? 'too-large';
+      else if (st) digest = fileDigest(p);
+      out[`linked:${slash(path.join(rel, first))}`] = digest;
+    }
+  }
+  return out;
+}
+
 const WIN = process.platform === 'win32';
 
 /** Переменная по имени; на Windows имя без регистра (`Path` и `PATH` — одна). */
@@ -772,6 +842,59 @@ function normalizeArgs(args, top) {
   });
 }
 
+/**
+ * Ключи eslint и prettier без значения. Значение незнакомого ключа неизвестно — следующее за ним
+ * слово считается значением и остаётся на месте (осторожно: лишний промах, не чужой зелёный).
+ */
+const LINT_BOOL_FLAGS = new Set([
+  '--cache',
+  '--check',
+  '-c',
+  '--list-different',
+  '-l',
+  '--no-warn-ignored',
+  '--no-eslintrc',
+  '--no-config-lookup',
+  '--no-inline-config',
+  '--no-ignore',
+  '--no-error-on-unmatched-pattern',
+  '--pass-on-no-patterns',
+  '--exit-on-fatal-error',
+  '--report-unused-disable-directives',
+  '--quiet',
+  '--color',
+  '--no-color',
+  '--debug',
+  '--ignore-unknown',
+  '-u',
+  '--no-config',
+  '--no-editorconfig',
+]);
+
+/**
+ * Список файлов eslint и prettier — множество: порядок не меняет того, что проверено, а скрипты
+ * проекта (`eslint_scoped.mjs`) собирают его в нестабильном порядке — 24.10 группа №1 (#21 → #22)
+ * дала промах на тех же 87 файлах. Каждая подряд идущая серия позиционных слов сортируется на
+ * своём месте; ключи и их значения не двигаются. vitest и tsc — порядок как есть.
+ */
+function sortFileArgs(id, args) {
+  if (id !== 'eslint' && id !== 'prettier') return args;
+  const out = [...args];
+  let i = 0;
+  while (i < out.length) {
+    if (out[i].startsWith('-')) {
+      const flag = out[i];
+      i += flag.includes('=') || LINT_BOOL_FLAGS.has(flag) ? 1 : 2;
+      continue;
+    }
+    let j = i;
+    while (j < out.length && !out[j].startsWith('-')) j++;
+    out.splice(i, j - i, ...out.slice(i, j).sort());
+    i = j;
+  }
+  return out;
+}
+
 /** Путь файла отчёта не меняет того, что проверено: в ключе — метка вместо пути. */
 function maskReports(args, reports) {
   if (!reports?.length) return args;
@@ -947,11 +1070,14 @@ function keyParts({
   return {
     v: VERSION,
     check: match.id,
-    args: normalizeArgs(maskReports(match.args, match.reports), repo.top),
+    args: sortFileArgs(match.id, normalizeArgs(maskReports(match.args, match.reports), repo.top)),
     cwd: slash(path.relative(repo.top, path.resolve(cwd))),
     tree: scopeTree(repo, tree, cwd, match),
     base: entry?.base ? baseTree(repo, entry.base) : null,
-    ignored: ignoredInputs(repo.top, cwd, entry?.inputs),
+    ignored: {
+      ...ignoredInputs(repo.top, cwd, entry?.inputs),
+      ...(match.id === 'prettier' ? {} : linkedOutputs(repo.top, cwd)),
+    },
     tool: {
       node: process.version,
       platform: process.platform,

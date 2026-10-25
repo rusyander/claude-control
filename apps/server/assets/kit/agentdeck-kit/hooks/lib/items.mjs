@@ -8,6 +8,7 @@
 // `{ tools: RegExp, run }` for tool events. Events:
 //   pre          PreToolUse         (input) → null | {decision:'deny'|'ask', reason}
 //   rules        PreToolUse, after the verdict, only when every guard stayed silent → string | null
+//                | {decision:'deny', reason, context} (rule-injector's card gate)
 //   post-edit    PostToolUse on Write/Edit → string | null
 //   post-any     PostToolUse on any tool → string | null
 //   post-fail    PostToolUseFailure (a call that ended non-zero gets only this) → string | null
@@ -59,8 +60,11 @@ export const MANIFEST = {
     'todo-throttle',
     'gate-at-end',
     'check-cost',
+    'bash-read-cap',
     'verify-throttle',
     'search-discipline',
+    // After every read guard: any other refusal outranks a batching one.
+    'batch-nudge',
     'review-publish-guard',
     'pipeline-watch-guard',
     // Last on purpose: the only item that may touch the network (one `git fetch` before a publish),
@@ -69,9 +73,15 @@ export const MANIFEST = {
     // After every verdict: it stamps the start of a call that will run, so nothing may refuse after it.
     'cmd-duration',
   ],
-  rules: ['rule-injector'],
+  rules: ['batch-nudge', 'rule-injector'],
   'post-edit': ['format-on-edit', 'doc-bloat-guard', 'doc-daily-review'],
-  'post-any': ['context-watch', 'review-publish-guard', 'cmd-duration', 'batch-nudge'],
+  'post-any': [
+    'context-watch',
+    'review-publish-guard',
+    'cmd-duration',
+    'batch-nudge',
+    'mr-echo-trim',
+  ],
   'post-fail': ['cmd-duration'],
   // verify-at-stop first: its block makes the model run the gate and write the summary again, and
   // that summary is what reply-language judges — the other order costs a possible third turn.
@@ -136,8 +146,10 @@ export const PRE_TOOLS = {
   'todo-throttle': TOOLS.CTX,
   'gate-at-end': TOOLS.CTX,
   'check-cost': TOOLS.BASH,
+  'bash-read-cap': TOOLS.BASH,
   'verify-throttle': TOOLS.CTX,
   'search-discipline': TOOLS.CTX,
+  'batch-nudge': TOOLS.CTX,
   'review-publish-guard': new RegExp(
     `${TOOLS.BASH.source}|${TOOLS.EDIT.source}|${TOOLS.FORGE.source}`,
     'i',
@@ -236,8 +248,10 @@ export const REPEAT_ESCAPE = new Set([
   'todo-throttle',
   'gate-at-end',
   'check-cost',
+  'bash-read-cap',
   'verify-throttle',
   'search-discipline',
+  'batch-nudge',
   'cmd-duration',
 ]);
 
@@ -350,14 +364,34 @@ async function runPre(input, only) {
   const tool = String(calls[0]?.tool_name ?? '');
   let rules = null;
   let ceiling = 2400;
+  // rule-injector's card gate: a rules item may return `{decision:'deny', reason, context}`.
+  let gate = null;
   if (!TOOLS.SPAWN.test(tool)) {
+    // Every rules item adds its text: a later item used to overwrite an earlier one.
+    const all = [];
     for (const item of await itemsFor('rules')) {
-      const texts = calls.map((c) => attempt(item.run, c)).filter(Boolean);
-      if (texts.length) rules = texts.join('\n\n');
+      for (const out of calls.map((c) => attempt(item.run, c))) {
+        if (out && typeof out === 'object' && out.decision === 'deny') {
+          gate ??= out.reason;
+          if (out.context) all.push(out.context);
+        } else if (out) all.push(out);
+      }
       ceiling = item.module?.MAX_RULE_CEILING ?? ceiling;
     }
+    if (all.length) rules = all.join('\n\n');
   }
   const context = [note, rules].filter(Boolean).join('\n\n');
+  if (gate && TOP_LEVEL_BLOCK.has(cli))
+    return void write({ decision: 'block', reason: cap(withRoot(gate), CAP.pre) });
+  if (gate)
+    return void write({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: cap(withRoot(gate), CAP.pre),
+        ...(context ? { additionalContext: cap(withRoot(context), ceiling) } : {}),
+      },
+    });
   if (context)
     write({
       hookSpecificOutput: {
@@ -376,7 +410,8 @@ const HUMAN_SESSION = new Set([
   'review-sync-brief',
 ]);
 
-async function runText(event, input, only, prompt) {
+// `rewrite` collects a post item's `{updatedMCPToolOutput}` (mr-echo-trim) — an output, never text.
+async function runText(event, input, only, prompt, rewrite = null) {
   const calls = event.startsWith('post-') ? normalize(input) : [input];
   const out = [];
   const group = event === 'session' && Boolean(process.env.AGENTDECK_HEAVY_QUEUE_DIR);
@@ -385,7 +420,10 @@ async function runText(event, input, only, prompt) {
     for (const call of calls) {
       if (item.tools && !item.tools.test(String(call?.tool_name ?? ''))) continue;
       const msg = attempt(item.run, call, prompt);
-      if (msg) out.push(msg);
+      if (msg && typeof msg === 'object') {
+        if (rewrite && msg.updatedMCPToolOutput != null)
+          rewrite.output ??= msg.updatedMCPToolOutput;
+      } else if (msg) out.push(msg);
     }
   }
   return out.length ? withRoot(out.join('\n\n')) : null;
@@ -438,7 +476,17 @@ export async function runEvent(event, raw, only = null) {
     attempt(recordPrompt, input, prompt);
   }
 
-  const text = await runText(event, input, only, prompt);
+  const rewrite = {};
+  const text = await runText(event, input, only, prompt, rewrite);
+  // Only Claude documents a PostToolUse output rewrite; elsewhere the output stays whole.
+  if (event.startsWith('post-') && rewrite.output != null && cli === 'claude')
+    return write({
+      hookSpecificOutput: {
+        hookEventName: 'PostToolUse',
+        ...(text ? { additionalContext: cap(text, CAP.post) } : {}),
+        updatedMCPToolOutput: rewrite.output,
+      },
+    });
   if (!text) return;
   // PreCompact output is plain text: its JSON shape is not the same on every CLI build.
   if (event === 'precompact') return void process.stdout.write(text);

@@ -20,9 +20,9 @@ export function IntegrationFields({ id, draft, onChange, missing }: IntegrationF
       {INTEGRATION_FIELDS[id].map((field) => {
         const label = t(`integrations.field.${id}.${field.key}`);
         const hint = t(`integrations.hint.${id}.${field.key}`);
-        const error = missing.includes(field.key)
-          ? t('integrations.card.fieldRequired')
-          : undefined;
+        // Минуты не «не заполнены», а вне границ: подсказка — сами границы.
+        const refusal = field.kind === 'minutes' ? '0…1440' : t('integrations.card.fieldRequired');
+        const error = missing.includes(field.key) ? refusal : undefined;
 
         if (field.kind === 'select') {
           return (

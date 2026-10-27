@@ -6,15 +6,22 @@
  * Панель знает только общие инструменты (vitest run, tsc --noEmit, eslint без
  * --fix, prettier --check, vite build): код панели не знает ни одного проекта. Проверки
  * проекта, их входы вне дерева и артефакты описывает сам проект —
- * `.claude/tools/verify-checks.json` (обычно вне git).
+ * `.claude/tools/verify-checks.json` (обычно вне git) — или человек в доме журнала
+ * (`<дом>/verify-checks.json`, по репозиторию): в проект, куда писать нельзя, реестр
+ * не положить, и его проверки шли вживую на неизменном дереве (26.10: `content:check`
+ * по 8 с на каждом повторе стадии).
  *
  * Модуль вызывается из preload в КАЖДОМ процессе node под CLI, поэтому путь
  * «не проверка» — одна регулярка по argv и пара stat вверх по дереву, без git.
  */
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const REGISTRY = path.join('.claude', 'tools', 'verify-checks.json');
+
+/** Реестр в доме журнала: `{ repos: [{ commonDir, checks }] }`. */
+const HOME_REGISTRY = 'verify-checks.json';
 
 /** Путь со слешами вперёд: на Windows argv и git отдают разные. */
 const slash = (p) => String(p).replace(/\\/g, '/');
@@ -248,20 +255,110 @@ function findRegistry(cwd) {
   return null;
 }
 
+/** Записи реестра, годные к сверке, и все названные id (запись без `script` тоже занимает id). */
+function checksOf(list) {
+  const all = Array.isArray(list) ? list : [];
+  return {
+    checks: all.filter((c) => c && typeof c.id === 'string' && typeof c.script === 'string'),
+    ids: new Set(all.filter((c) => c && typeof c.id === 'string').map((c) => c.id)),
+  };
+}
+
 function readRegistry(found) {
   const raw = fs.readFileSync(found.file, 'utf8');
-  const parsed = JSON.parse(raw);
-  const checks = Array.isArray(parsed.checks) ? parsed.checks : [];
-  return {
-    raw,
-    checks: checks.filter((c) => c && typeof c.id === 'string' && typeof c.script === 'string'),
-  };
+  return { root: found.root, raw, ...checksOf(JSON.parse(raw).checks) };
+}
+
+/**
+ * Дом журнала. Без переменной — каталог, где лежит сама копия preload (`<дом>/bin/<ver>/`):
+ * одна лента на всех. Под замком входа (F-30) дом — тот, что поставила панель: свежий дом
+ * из команды модели не хранил бы ни зелёного для повтора, ни ключа подписи, ни реестра дома.
+ */
+function homeDir(env = process.env) {
+  const lock = entryLock();
+  if (lock) return lock.home;
+  if (env.AGENTDECK_VERIFY_LEDGER_HOME) return env.AGENTDECK_VERIFY_LEDGER_HOME;
+  if (path.basename(path.dirname(__dirname)) === 'bin')
+    return path.dirname(path.dirname(__dirname));
+  return path.join(os.homedir(), '.agentdeck', 'verify-ledger');
+}
+
+/**
+ * Копия и общий каталог git по файлам, без git: `.git` — каталог (основная папка) или файл
+ * `gitdir: …` (копия `git worktree`, у неё `commondir` ведёт в общий каталог). Общий каталог —
+ * то же, чем журнал делит записи между копиями (`ledger.cjs repoOf`, `--git-common-dir`):
+ * один реестр дома на репозиторий находит каждая его копия.
+ */
+function gitDirsOf(cwd) {
+  let dir = path.resolve(cwd);
+  for (let i = 0; i < 40; i += 1) {
+    const dotgit = path.join(dir, '.git');
+    const st = fs.statSync(dotgit, { throwIfNoEntry: false });
+    if (st?.isDirectory()) return { top: dir, commonDir: dotgit };
+    if (st?.isFile()) {
+      const m = /^gitdir:\s*(.+?)\s*$/m.exec(fs.readFileSync(dotgit, 'utf8'));
+      if (!m) return null;
+      const gitDir = path.resolve(dir, m[1]);
+      let commonDir = gitDir;
+      try {
+        commonDir = path.resolve(
+          gitDir,
+          fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim(),
+        );
+      } catch {
+        /* без commondir (подмодуль) общий каталог — сам каталог git */
+      }
+      return { top: dir, commonDir };
+    }
+    const up = path.dirname(dir);
+    if (up === dir) return null;
+    dir = up;
+  }
+  return null;
+}
+
+/** Путь для сравнения: настоящий (`RUSYAN~1` и ссылки раскрыты), слеши вперёд, регистр там, где диск его не различает. */
+function pathKey(p) {
+  let real = path.resolve(p);
+  try {
+    real = fs.realpathSync.native(real);
+  } catch {
+    /* пути нет — сравнивается как записан */
+  }
+  const s = slash(real).replace(/\/+$/, '');
+  return process.platform === 'win32' || process.platform === 'darwin' ? s.toLowerCase() : s;
+}
+
+/**
+ * Реестр дома для репозитория процесса или `null`. Корень путей `script` — верх копии.
+ * В ключ идёт блок своего репозитория, а не файл целиком: правка чужого блока зелёных
+ * этого репозитория не сбрасывает. Сбой разбора — `null`: проверка идёт вживую.
+ */
+function findHomeRegistry(cwd, env = process.env) {
+  try {
+    const file = path.join(homeDir(env), HOME_REGISTRY);
+    if (!fs.existsSync(file)) return null;
+    const git = gitDirsOf(cwd);
+    if (!git) return null;
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const want = pathKey(git.commonDir);
+    const block = (Array.isArray(parsed.repos) ? parsed.repos : []).find(
+      (r) =>
+        r &&
+        typeof r.commonDir === 'string' &&
+        pathKey(r.commonDir.replace(/^~(?=[/\\])/, os.homedir())) === want,
+    );
+    if (!block) return null;
+    return { root: git.top, raw: JSON.stringify(block), ...checksOf(block.checks) };
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Проверка ли этот процесс. `argv` — `process.argv` целиком (node, скрипт, ключи).
  * Ответ: `null` — не проверка; иначе `{ id, script, args, noSkip, entry }`, где
- * `entry` — запись реестра проекта (для общих инструментов её нет).
+ * `entry` — запись реестра проекта или дома (для общих инструментов её нет).
  */
 function realOf(file) {
   try {
@@ -271,7 +368,7 @@ function realOf(file) {
   }
 }
 
-function recognize(argv, cwd) {
+function recognize(argv, cwd, env = process.env) {
   const script = argv[1];
   if (!script) return null;
   const asGiven = slash(path.resolve(cwd, script));
@@ -296,15 +393,30 @@ function recognize(argv, cwd) {
       : null;
   }
   const found = findRegistry(cwd);
-  if (!found) return null;
-  let registry;
-  try {
-    registry = readRegistry(found);
-  } catch {
-    return null;
+  let project = null;
+  if (found) {
+    try {
+      project = readRegistry(found);
+    } catch {
+      // Битый реестр проекта — не знаем, что проект решил: вживую, реестр дома не подменяет его.
+      return null;
+    }
   }
-  const rel = slash(path.relative(found.root, file));
-  const entry = registry.checks.find((c) => slash(c.script) === rel);
+  const pick = (reg) => {
+    const rel = slash(path.relative(reg.root, file));
+    return reg.checks.find((c) => slash(c.script) === rel) ?? null;
+  };
+  let registry = project;
+  let entry = project ? pick(project) : null;
+  if (!entry) {
+    // Реестр дома — только там, где проект промолчал: тот же id в проекте побеждает (и `never` тоже).
+    const home = findHomeRegistry(cwd, env);
+    const fromHome = home ? pick(home) : null;
+    if (fromHome && !project?.ids.has(fromHome.id)) {
+      registry = home;
+      entry = fromHome;
+    }
+  }
   if (!entry || entry.never) return null;
   const noSkip =
     Array.isArray(entry.noSkipFlags) && hasFlag(args, entry.noSkipFlags)
@@ -353,6 +465,9 @@ function panelLocked(env = process.env) {
 module.exports = {
   recognize,
   findRegistry,
+  findHomeRegistry,
+  gitDirsOf,
+  homeDir,
   slash,
   gitTimeoutMs,
   entryLock,

@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import {
+  appendFileSync,
   closeSync,
   existsSync,
   openSync,
@@ -15,6 +16,7 @@ import type {
   MobileApkState,
   MobileApkStatus,
 } from '@agentdeck/contracts/mobile-apk';
+import { killProcessTree } from '../../lib/kill-tree.mjs';
 
 /** Имя файла сборки — то же, что кладёт `tools/build-mobile-apk.mjs`. */
 export const APK_FILE = 'agentdeck.apk';
@@ -176,6 +178,34 @@ export function startApkBuild(paths: ApkPaths): boolean {
     JSON.stringify({ state: 'building', startedAt: new Date().toISOString(), pid: child.pid }),
   );
   writeFileSync(join(paths.stateDir, LOG_FILE), '');
+  return true;
+}
+
+/**
+ * Отменить идущую сборку. Снимается всё дерево запускающего процесса — сборщик, Gradle и его
+ * демон: один корень оставил бы Gradle собирать дальше и держать файлы копии. Итог пишется
+ * здесь, снятый процесс его уже не напишет. `false` — отменять нечего.
+ */
+export function cancelApkBuild(paths: ApkPaths, kill = killProcessTree): boolean {
+  const stored = readState(paths);
+  if (stored.state !== 'building' || !stored.pid) return false;
+  const spawnedAt = stored.startedAt ? Date.parse(stored.startedAt) : Number.NaN;
+  // Обход дерева по снимку, а не группа: демон Gradle уходит в свою сессию, и сигнал группе
+  // его не достаёт, а сирота-java на Windows не гаснет вместе с заданием (job) родителя.
+  kill(stored.pid, Number.isNaN(spawnedAt) ? {} : { spawnedAt });
+  writeFileSync(
+    join(paths.stateDir, STATE_FILE),
+    JSON.stringify({
+      state: 'cancelled',
+      startedAt: stored.startedAt,
+      finishedAt: new Date().toISOString(),
+      pid: stored.pid,
+    }),
+  );
+  appendFileSync(
+    join(paths.stateDir, LOG_FILE),
+    '\nСборка отменена. Промежуточные файлы уберёт следующая сборка или pnpm mobile:clean.\n',
+  );
   return true;
 }
 

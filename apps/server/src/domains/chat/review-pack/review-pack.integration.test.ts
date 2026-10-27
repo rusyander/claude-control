@@ -139,6 +139,55 @@ describe('review-pack.mjs', () => {
     expect(text).not.toContain('AGENT_NOTE_BODY');
   });
 
+  /** Группа #5 25.10: пакет 198 КБ при потолке Read 10 000 токенов — три отказа Read, куски наугад. */
+  it('карта чтения: куски под потолок Read подряд до конца, у каждого файла — его строки', () => {
+    const root = repo();
+    for (const name of ['big-a.ts', 'big-b.ts', 'big-c.ts']) {
+      const body = Array.from({ length: 200 }, (_, i) => `export const v${i} = 'строка ${i}';`);
+      writeFileSync(join(root, name), `${body.join('\n')}\n`);
+    }
+    const cap = 2000;
+    const run = spawnSync(process.execPath, [script], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS: String(cap) },
+    });
+    expect(run.status).toBe(0);
+    const text = readFileSync(join(root, '.agent', 'tmp', 'review-pack.md'), 'utf8');
+    const lines = text.replace(/\n$/, '').split('\n');
+    const chunks = [...text.matchAll(/^- offset=(\d+) limit=(\d+) \(lines \d+–\d+\)$/gm)].map(
+      (m) => ({ from: Number(m[1]), limit: Number(m[2]) }),
+    );
+    expect(text).toContain(`under the Read cap (${cap} tokens)`);
+    expect(chunks.length).toBeGreaterThan(2);
+    // Подряд, без дыр и нахлёста, с первой строки до последней.
+    let next = 1;
+    for (const chunk of chunks) {
+      expect(chunk.from).toBe(next);
+      next = chunk.from + chunk.limit;
+      // Знак латиницы — не дешевле 1/2.6 токена, номер строки Read — ещё ~7 знаков.
+      const chars = lines
+        .slice(chunk.from - 1, next - 1)
+        .reduce((sum, line) => sum + line.length + 7, 0);
+      expect(chars).toBeLessThanOrEqual(cap * 2.6);
+    }
+    expect(next - 1).toBe(lines.length);
+    // Режем по началу файла, где можно.
+    expect(chunks.slice(1).some((chunk) => lines[chunk.from - 1]?.startsWith('diff --git '))).toBe(
+      true,
+    );
+    // Строки файла: первая — его `diff --git`, следующая за последней — чужой файл или ограда.
+    for (const name of ['big-a.ts', 'big-b.ts', 'big-c.ts', 'service.ts', 'fresh.md']) {
+      const at = new RegExp(`^- ${name.replace('.', '\\.')} .* · lines (\\d+)–(\\d+)$`, 'm').exec(
+        text,
+      );
+      expect(at, name).not.toBeNull();
+      const [from, to] = [Number(at?.[1]), Number(at?.[2])];
+      expect(lines[from - 1]).toBe(`diff --git a/${name} b/${name}`);
+      expect(lines[to]).toMatch(/^(diff --git |`{3,}$)/);
+    }
+  });
+
   it('--out пишет в указанный файл', () => {
     const root = repo();
     const out = join(temp(), 'nested', 'pack.md');

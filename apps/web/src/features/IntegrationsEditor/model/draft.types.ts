@@ -13,7 +13,8 @@ export type IntegrationDraft = Record<string, string>;
  * его можно только явной кнопкой — иначе сохранение адреса стирало бы ключ.
  */
 
-export type IntegrationFieldKind = 'text' | 'select';
+/** `minutes` — целое число минут 0…1440 строкой формы, на сервер уходит числом. */
+export type IntegrationFieldKind = 'text' | 'select' | 'minutes';
 
 export interface IntegrationField {
   /** Ключ в настройках коннектора и часть ключа словаря подписи. */
@@ -23,4 +24,6 @@ export interface IntegrationField {
   options?: readonly string[];
   /** Без него включать коннектор бессмысленно. */
   isRequired?: boolean;
+  /** Значение формы, когда в настройках поля нет (старые настройки). */
+  fallback?: string;
 }

@@ -111,3 +111,32 @@ describe('Хуки пересылки следуют переключателю'
     expect(on.json()).toMatchObject({ enabled: true, installed: false });
   });
 });
+
+describe('конец хода сессии вне панели', () => {
+  it('Stop без сообщений в очереди — «ход кончился»; шаг и Stop с сообщением — нет', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-relay-stop-'));
+    const store = new AppStore(dir);
+    const ctx = {
+      location: { paths: { settings: join(dir, 'settings.json') }, source: 'home', isValid: true },
+      store,
+    } as unknown as ServerContext;
+    const relay = new OutsideRelay({ enabled: () => true, ownSession: () => false });
+    const ended: string[] = [];
+    const app = Fastify();
+    registerOutsideRelayRoutes(app, ctx, relay, (sessionId) => ended.push(sessionId));
+    await app.ready();
+    try {
+      const take = (payload: object) =>
+        app.inject({ method: 'POST', url: '/api/outside/messages/take', payload });
+      await take({ sessionId: 's1', event: 'PostToolUse' });
+      await take({ sessionId: 's1' });
+      relay.queue('s2', 'ещё вот что');
+      await take({ sessionId: 's2', event: 'Stop' });
+      await take({ sessionId: 's3', event: 'Stop' });
+      expect(ended).toEqual(['s3']);
+    } finally {
+      await app.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

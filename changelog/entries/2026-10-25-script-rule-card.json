@@ -1,0 +1,36 @@
+{
+  "title": {
+    "ru": "Правка файла скриптом или перенаправлением оболочки ждёт то же правило, что и правка этого файла напрямую",
+    "en": "Editing a file through a script or a shell redirect waits for the same rule as editing that file directly"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Скрипт, запущенный по пути (в том числе записанный тем же вызовом через heredoc), судится по файлам, которые он пишет: если правило для этих файлов после сжатия контекста не прочитано, вызов получает тот же отказ с текстом правила, что и правка этого файла напрямую. Раньше такой обход позволял менять файлы интерфейса, не прочитав правило.",
+        "en": "A script run by path (including one written by the same call through a heredoc) is judged by the files it writes: if the rule for those files was not read after a context compaction, the call gets the same refusal with the rule text as a direct edit of that file. Before, this route changed interface files with the rule unread."
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Так же судится запись в исходный файл перенаправлением оболочки: `cat > файл <<EOF`, `cat >>`, `tee` и `tee -a`, `printf … >`, `echo … >`, с учётом `cd` и кавычек. Перенаправление в /dev/null, дублирование дескрипторов, черновые места и журналы проверок (`> out.log`) правила не требуют.",
+        "en": "A write into a source file through a shell redirect is judged the same way: `cat > file <<EOF`, `cat >>`, `tee` and `tee -a`, `printf … >`, `echo … >`, honouring `cd` and quotes. Redirects to /dev/null, descriptor duplications, scratch places and check logs (`> out.log`) need no rule."
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Сразу после сжатия контекста группа разделения получает карточки тех правил, которые были нужны её правкам до сжатия, с названным окном чтения, и запрет на правку до чтения взводится в тот же момент. Раньше карточка приходила только с первым отказом, и вся пачка параллельных правок отклонялась разом — до девяти отказов и лишний ход на каждое сжатие. Правило, которое до сжатия не понадобилось, не присылается; сессия человека ничего не получает.",
+        "en": "Right after a context compaction a split group gets the cards of the rules its edits needed before the compaction, with the window to read named, and the no-edit-before-reading gate is armed at the same moment. Before, the card came only with the first refusal, and the whole batch of parallel edits was refused at once — up to nine refusals and an extra turn per compaction. A rule not needed before the compaction is not sent; a human session gets nothing."
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Окно чтения, которое называет карточка или отказ, всегда помещается в одно чтение: раздел или файл больше предела называется частями, и прочитать нужно каждую. Раньше отказ называл весь большой файл одним окном, чтение падало на пределе, и лишний ход уходил на повтор. Чтение, на которое инструмент ответил ошибкой, правило больше не засчитывает. Правке скрипта node вне исходников пакета (scripts, tools, .mjs и .cjs вне src) нужен только раздел о коде, а не разделы об интерфейсе; если отказ всё же называет несколько окон, он говорит, что хватит одного, и первым ставит самое подходящее.",
+        "en": "The read window a card or a refusal names always fits in one read: a section or file over the limit is named in parts, and every part must be read. Before, a refusal named a whole large file as one window, the read failed at the limit, and a turn went on the retry. A read the tool answered with an error no longer counts as reading the rule. Editing a node script outside a package's sources (scripts, tools, .mjs and .cjs outside src) needs only the code section, not the interface sections; when a refusal still names several windows, it says one is enough and puts the best match first."
+      }
+    }
+  ]
+}

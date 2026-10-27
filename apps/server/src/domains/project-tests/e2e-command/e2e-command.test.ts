@@ -25,6 +25,15 @@ describe('playwrightFileArg', () => {
     );
   });
 
+  it('каталог-набор — все спеки под ним и только под ним', () => {
+    const arg = playwrightFileArg('QA/auto/frontend/inst/users/', 'linux');
+    expect(arg).toBe(String.raw`'/(^|/)QA/auto/frontend/inst/users//'`);
+    const source = arg.slice(2, -2);
+    const re = new RegExp(source);
+    expect(re.test('/w/QA/auto/frontend/inst/users/list/a.spec.ts')).toBe(true);
+    expect(re.test('/w/QA/auto/frontend/inst/users-admin/a.spec.ts')).toBe(false);
+  });
+
   it('одинарная кавычка в имени не рвёт кавычки sh; раскрываемое оболочкой — отказ', () => {
     expect(playwrightFileArg("e2e/it's.spec.ts", 'linux')).toBe(
       String.raw`'/(^|/)e2e/it'\''s\.spec\.ts$/'`,

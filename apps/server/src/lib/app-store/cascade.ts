@@ -34,3 +34,19 @@ export function setProjectCascade(state: AppState, path: string, enabled: boolea
   if (enabled) delete state.projectCascade[key];
   else state.projectCascade[key] = false;
 }
+
+/**
+ * «Ревью после работы» — по проекту, тем же устройством: ключа нет — включено
+ * (Telegram R3(d), 26.10). Отдельная таблица, а не второе значение в
+ * `projectCascade`: файл состояния старых версий читает там `boolean`.
+ */
+export function projectReviewEntries(state: AppState): Array<[string, boolean]> {
+  return Object.entries(state.projectReviewAfterWork);
+}
+
+export function setProjectReviewAfterWork(state: AppState, path: string, enabled: boolean): void {
+  const key = normalizeProjectPath(path);
+  if (!key) return;
+  if (enabled) delete state.projectReviewAfterWork[key];
+  else state.projectReviewAfterWork[key] = false;
+}

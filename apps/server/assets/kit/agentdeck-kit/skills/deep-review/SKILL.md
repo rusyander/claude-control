@@ -23,16 +23,21 @@ every probe, harness and stand runs from a scratch clone (§4).
 
 **Scope** — read it off the prompt; ask only when it names none:
 
-| form                 | how to take it                                                                                                       |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| MR / PR              | diff via forge MCP; description = frame; versions NOW; threads + pipeline first ([§1](references/gitlab-publish.md)) |
-| branch               | `git diff <base>...HEAD`; `git fetch`, then read from `origin/<branch>` — the checkout stays                         |
-| working tree         | `git diff` plus `git status` — uncommitted work counts                                                               |
-| feature / dir / repo | file list first; no diff, so the baseline is the project's idiom                                                     |
+| form                  | how to take it                                                                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MR / PR               | diff via forge MCP; description = frame; versions NOW; threads + pipeline first ([§1](references/gitlab-publish.md))                                        |
+| branch                | `git diff <base>...HEAD`; `git fetch`, then read from `origin/<branch>` — the checkout stays                                                                |
+| working tree          | `git diff` plus `git status` — uncommitted work counts                                                                                                      |
+| commits since `<sha>` | `git log --first-parent <sha>..HEAD`; a plain commit `git show`, a merge `git show --remerge-diff` (its conflict resolutions only); never `<target>...HEAD` |
+| feature / dir / repo  | file list first; no diff, so the baseline is the project's idiom                                                                                            |
 
 The diff is the **starting point, not the boundary**: every touched symbol is followed to its other
 call sites; findings outside the changed lines go to their own section, labelled pre-existing. A
 generated diff (lockfile, sqlc output, a client built from a spec) is reviewed at its input.
+A scope the prompt narrows ("commits since `<sha>`", a range-diff) is a hard edge: the branch's whole
+diff against its target is not re-read, `risk-tier.mjs` and `review-plan.mjs` get `--base <sha>`, and a defect
+in code the scope did not change is pre-existing — its own list (a panel review block: `preExisting`),
+never a finding the fix stage acts on.
 
 **Frame** — the authority the code answers to, walked as a checklist: every ticket the MR names AND
 every child of an epic it closes (tracker), the spec by line number, the MR description. One row per
@@ -67,6 +72,8 @@ verdict is "not fully checked", naming what stayed uncovered.
 
 **Lanes** — `review-plan.mjs plan` sizes the fleet; review agents run unasked.
 Command, sizing, protocol: [references/lanes.md](references/lanes.md).
+On a continuation (new session, pause, compaction) run `review-plan.mjs status --plan <plan.json>` first:
+stored tier, lanes, rounds run and the next command — never re-run risk-tier or re-read lanes.md for them.
 
 Criterion: one line before the first finding — scope, files, the three shas, frame sources (tickets,
 spec, criteria counted), tier, zones, radius totals, lanes.

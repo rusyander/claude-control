@@ -50,7 +50,7 @@ A batch of review remarks (MR threads, a reviewer's list) is claims, not tasks. 
 - After verification fill "Solution" and tick criterion checkboxes for every task; be honest about partial/blocked — what is not done and why, what is needed from the user.
 - After the whole batch of fixes → run skill `agentdeck-kit:style-conformance-review`; mention its result in the batch summary.
 - End with a summary table (no. → name → status).
-- Delivered entries follow the repo's TASKS.md lifecycle — the project CLAUDE.md wins (some repos delete entries outright); global default: move them to `.agent/archive/TASKS-done-<date>.md` in the same pass. The FILE and other people's batches always stay.
+- Delivered entries follow the repo's TASKS.md lifecycle — the project CLAUDE.md wins (some repos delete entries outright); global default (task ledger, `situational-rules` → `task-ledger`): finished items marked `[x]` in place, a task with every item `[x]` moved to `.agent/archive/TASKS-done-<date>.md` in the same pass. The FILE and other people's batches always stay.
 
 ## Red flags — run against the finished TASKS.md
 

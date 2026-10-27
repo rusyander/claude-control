@@ -68,6 +68,8 @@ export function ChatHeaderMenu({
   const cascade = useCascadeRule(projectPath);
   const setCascade = useSetCascadeRule(projectPath);
   const cascadeOn = cascade.data?.enabled ?? true;
+  // «Ревью после работы» (R3(d), 26.10) — тот же проект, своё умолчание «включено».
+  const reviewOn = cascade.data?.reviewAfterWork ?? true;
 
   // Escape закрывает меню и возвращает фокус на кнопку: без возврата клавиатура
   // оказывается в начале страницы, а человек — там, где не был.
@@ -198,7 +200,7 @@ export function ChatHeaderMenu({
                 <Toggle
                   size="sm"
                   checked={cascadeOn}
-                  onCheckedChange={(next) => setCascade.mutate(next)}
+                  onCheckedChange={(next) => setCascade.mutate({ enabled: next })}
                   aria-label={t('chat.rules.modelCascade')}
                 />
                 <span className={styles.ruleText}>
@@ -207,6 +209,28 @@ export function ChatHeaderMenu({
                   </Typography>
                   <Typography variant="caption" color="subtle" as="span">
                     {t('chat.rules.modelCascadeHint')}
+                  </Typography>
+                </span>
+              </Stack>
+            )}
+
+            {/* Ревью после работы группы — рядом с подбором и той же области: раньше
+                снять его можно было только вместе с дешёвыми моделями (R3(d)).
+                Выключенное: работа группы идёт в доставку без ревью на потолке. */}
+            {projectPath && (
+              <Stack as="label" direction="row" className={styles.ruleRow}>
+                <Toggle
+                  size="sm"
+                  checked={reviewOn}
+                  onCheckedChange={(next) => setCascade.mutate({ reviewAfterWork: next })}
+                  aria-label={t('chat.rules.reviewAfterWork')}
+                />
+                <span className={styles.ruleText}>
+                  <Typography variant="body-sm" color={reviewOn ? 'default' : 'subtle'} as="span">
+                    {t('chat.rules.reviewAfterWork')}
+                  </Typography>
+                  <Typography variant="caption" color="subtle" as="span">
+                    {t('chat.rules.reviewAfterWorkHint')}
                   </Typography>
                 </span>
               </Stack>

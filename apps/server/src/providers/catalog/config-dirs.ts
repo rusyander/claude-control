@@ -102,6 +102,15 @@ export function opencodeConfigDir(): string {
 }
 
 /**
+ * Каталог данных OpenCode (база сессий `opencode.db`, `auth.json`):
+ * `$XDG_DATA_HOME/opencode`, иначе `~/.local/share/opencode` — на Windows тоже
+ * (проверено opencode 1.18.35).
+ */
+export function opencodeDataDir(): string {
+  return join(envDir('XDG_DATA_HOME') ?? join(homedir(), '.local', 'share'), 'opencode');
+}
+
+/**
  * Файл конфигурации OpenCode: `OPENCODE_CONFIG` (задокументированный перенос
  * самого файла), иначе `opencode.json` в каталоге конфигурации. Значение
  * прогоняется через `path.resolve` — как у `CODEX_HOME`/`XDG_CONFIG_HOME`;

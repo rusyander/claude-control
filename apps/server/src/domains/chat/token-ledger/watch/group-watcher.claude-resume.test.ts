@@ -43,6 +43,7 @@ function setup() {
       watcher.onFeed('s-claude', { kind: 'event', event, sessionId: 's-claude' }),
     finish: () => watcher.onFeed('s-claude', { kind: 'finish', sessionId: 's-claude' }),
     rules: () => (group.watch?.signals ?? []).map((signal) => signal.rule),
+    textKeys: () => (group.watch?.signals ?? []).map((signal) => signal.textKey),
   };
 }
 
@@ -72,6 +73,9 @@ describe('GroupWatcher (Claude resume keyed by its session id)', () => {
     w.event(usage(150_000));
     const rules = w.rules();
     expect(rules).toContain('R2');
-    expect(rules).not.toContain('R19');
+    // Тяжёлого первого запроса нет: это продолжение. Рост окна над первым увиденным вызовом
+    // (30k → 150k) — другой вид R19, он здесь честный.
+    expect(w.textKeys()).not.toContain('groupWatch.rule.R19');
+    expect(w.textKeys()).toContain('groupWatch.rule.R19grow');
   });
 });

@@ -51,6 +51,7 @@ const STATE_KEYS = {
   settings: 'portable',
   projectCodeLayout: 'portable',
   projectCascade: 'portable',
+  projectReviewAfterWork: 'portable',
   // Рычаги решений (`settings-snapshot-levers.ts`): пересылка вопросов на телефон
   // (`human:rights`) и приём черновиков тестов без просмотра — у каждой машины свои.
   outsideRelay: 'local',
@@ -87,6 +88,7 @@ const STATE_KEYS = {
   platformThinkTail: 'local',
   chatGroupSettings: 'local',
   chatKeyAliases: 'local',
+  chatForks: 'local',
   chatEscalations: 'local',
 } as const satisfies Record<keyof AppState, 'portable' | 'local'>;
 

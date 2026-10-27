@@ -9,6 +9,7 @@ import {
   limitResumePrompt,
   SplitConveyor,
   type ChainOutcome,
+  type DeliveryVerdict,
   type SplitConveyorDeps,
 } from './split-conveyor.ts';
 
@@ -42,6 +43,8 @@ function build(
     refuse?: boolean;
     /** Фоновые команды живого процесса по чату — что убьёт пауза. */
     background?: Record<string, string[]>;
+    /** Факты доставки копии (git + фордж) — внешняя граница; без неё доставки нет. */
+    facts?: () => Promise<DeliveryVerdict>;
   } = {},
 ) {
   const records = new Map<string, SplitPlanRecord>();
@@ -96,6 +99,18 @@ function build(
     log: () => undefined,
     ...(options.background
       ? { backgroundTasks: (chatId: string) => options.background?.[chatId] ?? [] }
+      : {}),
+    ...(options.facts
+      ? {
+          delivery: {
+            facts: options.facts,
+            nudge: () => 'sent' as const,
+            schedule: (run: () => void, ms: number) => {
+              timers.push({ at: clock.now + ms, run });
+              return timers.length;
+            },
+          },
+        }
       : {}),
     now: () => new Date(clock.now),
   };
@@ -214,8 +229,26 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
     expect(t.conveyor.resumePaused(PARENT, 0)).toBe('sent');
     expect(t.resumed[0]?.index).toBe(0);
     expect(t.resumed[0]?.prompt).toMatch(/^Group branch: feature\/one\. Group tasks: PROJ-1\./);
-    expect(t.resumed[0]?.prompt).toMatch(/paused the group/);
+    expect(t.resumed[0]?.prompt).toMatch(/The group was paused and is now resumed/);
     expect(t.resumed[0]?.prompt).not.toMatch(/killed these background commands/);
+  });
+
+  // N2 (g5 25.10): паузу ставил наблюдатель, продолжение звало его «человеком» и не
+  // называло ни причины, ни первого шага — группа перезапустила убитую 20-минутную проверку.
+  it('N2: продолжение с заметкой называет причину паузы и первый шаг, проверку не перезапускает', async () => {
+    const t = build();
+    await t.begin();
+    t.conveyor.pause(PARENT, 0);
+    await t.flush();
+
+    const note =
+      'the watcher fixed the pipeline-watch guard. Do first: read the failed job log, not the local check';
+    expect(t.conveyor.resumePaused(PARENT, 0, false, note)).toBe('sent');
+    const prompt = t.resumed[0]?.prompt ?? '';
+    expect(prompt).toContain('Paused because: the watcher fixed the pipeline-watch guard.');
+    expect(prompt).toContain('Do first: read the failed job log, not the local check');
+    expect(prompt).toContain('A check the pause interrupted is re-decided, not re-run by default');
+    expect(prompt).not.toContain('The human paused');
   });
 
   it('продолжение называет фоновые команды, которые убила пауза, — один раз', async () => {
@@ -249,7 +282,7 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
 
     expect(t.conveyor.resumePaused(PARENT, 0)).toBe('sent');
     const prompt = t.resumed[0]?.prompt ?? '';
-    expect(prompt).toMatch(/paused the group/);
+    expect(prompt).toMatch(/The group was paused/);
     expect(prompt).toContain("The panel checked the group's delivery against git");
     expect(prompt).toContain(`- ${localizeText(noMr, 'en')}`);
     expect(prompt).toContain('- живое сито: not checked: нет стенда');
@@ -265,6 +298,73 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
     t.conveyor.resumePaused(PARENT, 0);
     expect(t.resumed[1]?.prompt).toContain('continue from where you stopped on the branch');
     expect(t.resumed[1]?.prompt).not.toContain('delivery against git');
+  });
+
+  // g3 25.10: вводная после паузы назвала «панель проверила доставку» список последней сверки ДО
+  // паузы — за паузу правки панели (перезапуск) переложили его пункты в заметки, а группа
+  // досдавала уже сданное.
+  describe('список недоделанного остановленной группы — сверкой после остановки', () => {
+    const STALE = 'owner-4 не выполнен: красное не из-за ветки';
+    const FRESH = 'описание MR не называет заметку owner-4';
+    const NOTE = 'красное не из-за ветки: suites-005 красный и до старта группы';
+    const stopped = async (verdict: () => Promise<DeliveryVerdict>) => {
+      const t = build({ parallel: 1, facts: verdict });
+      await t.begin();
+      const record = t.records.get(PARENT);
+      if (!record?.groups[0]) throw new Error('нет записи группы');
+      record.groups[0].deliver = true;
+      record.groups[0].deliveryMissing = [STALE];
+      return t;
+    };
+
+    it('пауза: сверка после остановки, продолжение несёт её список и заметки', async () => {
+      const t = await stopped(async () => ({ missing: [FRESH], notes: [NOTE] }));
+      t.conveyor.pause(PARENT, 0);
+      await t.advance(60_000);
+
+      expect(t.group(0)?.deliveryMissing).toEqual([FRESH]);
+      expect(t.conveyor.resumePaused(PARENT, 0)).toBe('sent');
+      const prompt = t.resumed[0]?.prompt ?? '';
+      expect(prompt).toContain(`- ${FRESH}`);
+      expect(prompt).toContain(`- ${NOTE}`);
+      expect(prompt).not.toContain(STALE);
+    });
+
+    it('перезапуск панели: остановленные группы сверяются заново при старте', async () => {
+      const t = await stopped(async () => ({ missing: [FRESH] }));
+      t.conveyor.pause(PARENT, 0);
+      const record = t.records.get(PARENT);
+      if (!record?.groups[0]) throw new Error('нет записи группы');
+      record.groups[0].deliveryMissing = [STALE];
+      // Новый процесс над той же записью: таймер паузы умер с прежним.
+      const after = new SplitConveyor(t.deps);
+      after.recoverDeliveryChecks();
+      await t.flush();
+
+      expect(t.group(0)?.deliveryMissing).toEqual([FRESH]);
+    });
+
+    it('лимит: сверка после остановки, продолжение после сброса несёт её список', async () => {
+      const t = await stopped(async () => ({ missing: [FRESH] }));
+      const reset = START + 60 * 60_000;
+      t.conveyor.onChainEnded(t.link(0), limitOutcome(reset));
+      await t.advance(60_000);
+      expect(t.group(0)?.deliveryMissing).toEqual([FRESH]);
+
+      await t.advance(60 * 60_000);
+      const prompt = t.resumed[0]?.prompt ?? '';
+      expect(prompt).toMatch(/subscription limit/);
+      expect(prompt).toContain(`- ${FRESH}`);
+      expect(prompt).not.toContain(STALE);
+    });
+
+    it('удалённый не ответил — прежний список остаётся, а не пустеет', async () => {
+      const t = await stopped(async () => ({ missing: [], unreachable: 'ls-remote: timeout' }));
+      t.conveyor.pause(PARENT, 0);
+      await t.advance(60_000);
+
+      expect(t.group(0)?.deliveryMissing).toEqual([STALE]);
+    });
   });
 
   it('продолжения после лимита и обрыва тоже несут пробелы доставки', () => {

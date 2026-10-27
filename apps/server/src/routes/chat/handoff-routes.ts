@@ -14,6 +14,7 @@ import {
   scanHandoffProse,
   type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
+import type { GroupScope } from '@agentdeck/contracts/model-cascade';
 import type { ServerContext } from '../../context.ts';
 import type { ChatEvent } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import type {
@@ -81,7 +82,7 @@ import {
 } from '@agentdeck/contracts/sieves';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
-import { carriedLink } from '../../lib/app-store/chat-links.ts';
+import { continuationLink } from '../../lib/app-store/chat-links.ts';
 import { chainOutcomeOf, waitsForAnswer } from '../../domains/chat/chain-outcome/chain-outcome.ts';
 import type { ChainOutcome } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import type { TreeStartGate } from '../../domains/chat/tree-pause/tree-pause.ts';
@@ -96,6 +97,8 @@ import { getActiveProvider, getActiveProviderId } from '../../providers/registry
 import { supportsCliAutoMode } from '../../providers/auto-mode/auto-mode.ts';
 import { providerCliCommand } from '../../providers/cli/cli.ts';
 import { apiTokenPath } from '../../lib/api-token/api-token.ts';
+import { writeOwnerBrief } from '../../domains/chat/owner-brief/owner-brief.ts';
+import { writeReviewFindings } from '../../domains/chat/review-findings/review-findings.ts';
 
 /**
  * Продолжение работы в чистой сессии — маршруты и планировщик.
@@ -175,9 +178,10 @@ export interface HandoffPlannerDeps {
    * Перенести связь закрываемого разговора на продолжение. Прогон продолжения
    * идёт теми же параметрами и без этого (они копируются целиком), но СЛЕДУЮЩЕЕ
    * сообщение человека приходит уже без модели — и без записи уехало бы на
-   * дефолте, посреди работы, которую вели подобранной моделью.
+   * дефолте, посреди работы, которую вели подобранной моделью. `prompt` —
+   * вводная продолжения: группа хранит её до рождения разговора (`continuationLink`).
    */
-  carryLink?: (from: string[], to: string) => void;
+  carryLink?: (from: string[], to: string, prompt?: string) => void;
   /**
    * Конвейер подбора модели: чем платится понижение. Нет поля — звеньев ревью и
    * правок не бывает вовсе, и всё ведёт себя как до этапа 2.
@@ -249,12 +253,27 @@ export interface SplitStageDeps {
   onChainInterrupted?: (link: ChatLink) => void;
   /** Ветка и задачи группы — первой строкой звену за ней (журнал 98). */
   identityOf?: (link: ChatLink) => string | undefined;
+  /** Границы группы по плану разделения — правкам и проверке (N2, `groupScopeOf`). */
+  scopeOf?: (link: ChatLink) => GroupScope | undefined;
   /** Группа связи доводит работу до MR — за правками идёт звено доставки (журнал 59a). */
   delivers?: (link: ChatLink) => boolean;
   /** «Доставка на Sonnet» группы с карточки; `undefined` — решает общий рычаг (F-12). */
   sonnetDeliverOf?: (link: ChatLink) => boolean | undefined;
   /** Номера D-n, ждущие решения человека по группе связи; нет — отложенных нет. */
   deferredOf?: (link: ChatLink) => readonly string[];
+  /** Группа связи на паузе — следующее звено ждёт «Продолжить», а не стартует само. */
+  isPaused?: (link: ChatLink) => boolean;
+  /**
+   * Пауза сторожа на безопасной точке (F1): планировщик решил завести следующее
+   * звено, а у группы горит правило «трата по кругу» и пауза сторожа включена —
+   * `true`: группа встала на паузу, звено не заводится. Нет — звено как обычно.
+   */
+  pauseAtSafePoint?: (link: ChatLink) => boolean;
+  /**
+   * Ход звена попросил сервер вне своего набора MCP (N8), и конец цепочки продолжит
+   * эту же сессию с ним — следующее звено не заводится.
+   */
+  resumesWithMcp?: (link: ChatLink, outcome: ChainOutcome) => boolean;
 }
 
 /** Что планировщику нужно снаружи, чтобы завести звено конвейера. */
@@ -272,8 +291,9 @@ export interface CascadeStageDeps {
   /**
    * Что работа изменила против опубликованной ветки (L7.13): пустой rebase
    * доставленной группы ревью не заводит, частичный — ревью только дельты.
+   * `startSha` — коммит начала группы (владелец 26.10): охват — её коммиты от него.
    */
-  reviewDelta?: (cwd: string, since?: string) => ReviewDelta;
+  reviewDelta?: (cwd: string, since?: string, startSha?: string) => ReviewDelta;
   /** Настройки — из них собирается системная дописка звена. */
   settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'> &
     Partial<Pick<AppSettings, 'groupEconomy'>>;
@@ -394,11 +414,26 @@ export function createHandoffPlanner({
     // Абзац сит план получает меткой: пути копии читаются асинхронно, и
     // подставляет его запуск звена ниже (см. `SIEVE_SLOT`).
     let sieveAsk = undefined as SieveAsk | undefined;
+    // Границы группы из плана разделения — правкам и проверке (аудит g8 26.10, N2).
+    const scope = link?.parentChatId ? split?.scopeOf?.(link) : undefined;
+    // Охват ревью — один запуск git на конец хода: планировщик спрашивает его лениво,
+    // а причину пропуска ревью ниже читает тот же ответ (владелец 26.10).
+    let delta: ReviewDelta | undefined;
+    const reviewDelta = cascade.reviewDelta
+      ? (): ReviewDelta => (delta ??= cascade.reviewDelta!(cwd, since, link?.startSha))
+      : undefined;
+    // Ревью выключено в проекте (R3(d), 26.10): планировщик отмечает, строка — ниже.
+    let reviewOff = false;
     const plan = planCascadeStage({
       ...(link ? { link } : {}),
+      noteReviewOff: () => {
+        reviewOff = true;
+      },
+      ...(scope ? { scope } : {}),
       ok: finished.ok,
       text: finished.text,
       ...(finished.answer ? { answer: finished.answer } : {}),
+      ...(finished.summary ? { summary: finished.summary } : {}),
       task: finished.options.prompt ?? '',
       // Работа — с начала звена, а не этого разговора: продолжение в чистой
       // сессии иначе не видело коммитов прошлой (D6).
@@ -407,8 +442,16 @@ export function createHandoffPlanner({
       // только §5–§8, начало открывают по пути. Не игнорируется git — файла нет,
       // звено получит план целиком. Артефакты прошлых звеньев — путями (L7.4).
       planFile: (groupPlan) => writeGroupPlanFile(cwd, groupPlan),
+      // Находки ревью с номерами R-n / V-n — файлом в копии (R7): после сжатия группа
+      // искала их по старому транскрипту.
+      findingsFile: (kind, findings) =>
+        writeReviewFindings(cwd, {
+          kind,
+          findings,
+          ...(link?.branch ? { branch: link.branch } : {}),
+        }),
       artifacts: () => readStageArtifacts(cwd, since),
-      ...(cascade.reviewDelta ? { reviewDelta: () => cascade.reviewDelta!(cwd, since) } : {}),
+      ...(reviewDelta ? { reviewDelta } : {}),
       // Сита — только там, где их отчёт судит доставка группы: абзац обещает, что
       // несданное сито держит «готово», а в обычном чате с подбором модели его
       // никто не проверил бы (ревью сит, 28.09).
@@ -420,7 +463,9 @@ export function createHandoffPlanner({
             },
           }
         : {}),
-      paused: pausedTurn(finished),
+      // Группа на паузе (журнал 26.10, g8): ревью стартовало через 24 с после
+      // паузы — на дереве посреди перебазирования. Звено заведёт ход после «Продолжить».
+      paused: pausedTurn(finished) || Boolean(link && split?.isPaused?.(link)),
       ...(link?.parentChatId && split?.delivers?.(link) ? { deliver: true } : {}),
       // Доставка раз на круг (W3-3): повтор — только когда человек о нём попросил.
       ...(link?.deliveredAt && asksDelivery(finished.options.prompt ?? '')
@@ -440,7 +485,33 @@ export function createHandoffPlanner({
         ? { cheapDeliver: true }
         : {}),
     });
+    // Ревью не заведено, потому что своего у работы нет: строка причины в ленту
+    // закончившегося хода (владелец 26.10) — иначе «ревью пропало» без следа.
+    // Событием, а не ответом: ответ планировщика заменил бы конец цепочки группы.
+    if (delta?.kind === 'none' && (!plan || plan.stage === 'deliver')) {
+      const params = { from: delta.from };
+      runs.emitExternal(finished.chatId, {
+        kind: 'notice',
+        code: 'reviewSkipped',
+        text: serverText('review-skipped-notice', params),
+        textCode: 'review-skipped-notice',
+        textParams: params,
+      });
+    }
+    // Ревью выключено в проекте (R3(d), 26.10): строка причины — и у доставки без
+    // ревью, и у группы без доставки, где цепочка кончилась работой.
+    if (reviewOff) {
+      runs.emitExternal(finished.chatId, {
+        kind: 'notice',
+        code: 'reviewSkipped',
+        text: serverText('review-off-notice'),
+        textCode: 'review-off-notice',
+      });
+    }
     if (!plan) return undefined;
+    // Безопасная точка паузы сторожа (F1): ход кончился, звено ещё не заведено. Пауза —
+    // та же, что у человека на конце хода: конец цепочки ниже её не снимет.
+    if (link && split?.pauseAtSafePoint?.(link)) return undefined;
 
     // Ключ — общим счётчиком с переносом: работа и её подъём на потолок могут
     // стартовать в одну миллисекунду, и второй затёр бы связь первого.
@@ -555,6 +626,22 @@ export function createHandoffPlanner({
           }
         : {}),
     };
+    // Слова владельца, сданные строки и сита звена — файлом в копию (живая группа
+    // 26.10): после сжатия группа искала их в своём транскрипте. Ошибка записи
+    // звено не держит — без файла группа работает, как до него.
+    const briefOwner = (paragraph?: string): void => {
+      if (!link?.parentChatId) return;
+      try {
+        writeOwnerBrief(cwd, {
+          task: plan.link.groupTask ?? plan.link.task,
+          group: plan.link.title ?? '',
+          ...(plan.link.sieveRows ? { rows: plan.link.sieveRows } : {}),
+          ...(paragraph ? { sieves: paragraph } : {}),
+        });
+      } catch (error) {
+        console.warn('owner brief not written', chatId, error);
+      }
+    };
     // Дерево на паузе — звено заведено (связь записана), но не запущено:
     // ляжет в очередь и стартует по «Продолжить всё».
     const sieves = sieveAsk && link && cascade.sieves;
@@ -567,6 +654,7 @@ export function createHandoffPlanner({
       void sieves(cwd, link, ask.stage, ask.done)
         .catch(() => '')
         .then((paragraph) => {
+          briefOwner(paragraph);
           options.prompt = fillSieveSlot(options.prompt ?? '', paragraph);
           // Сохранённое задание звена — с тем же абзацем сит, а не с меткой.
           const kept = cascade.linkOf([chatId]);
@@ -580,6 +668,7 @@ export function createHandoffPlanner({
           if (!runs.start(chatId, options, meta)) console.warn('stage did not start', chatId);
         });
     } else {
+      briefOwner();
       deferred = gate?.defer('stage', chatId, options, meta) ?? false;
       if (!deferred && !runs.start(chatId, options, meta)) return undefined;
     }
@@ -872,7 +961,23 @@ export function createHandoffPlanner({
       // Продолжения не будет — значит работа закончена, и настал черёд конвейера.
       // Порядок именно такой: предложение агента означает, что он ещё в работе,
       // и проверять на этом месте было бы нечего.
-      const staged = planStage(finished, aliases);
+      // Звено попросило снятый сервер (N8) — следующего звена нет: конец цепочки
+      // ниже продолжит эту же сессию с сервером (`resumeWithMcp` конвейера).
+      const mcpTurn = Boolean(
+        link &&
+        split?.resumesWithMcp?.(
+          link,
+          chainOutcomeOf({
+            link,
+            ok: finished.ok,
+            text: finished.text,
+            ...(finished.background ? { background: true } : {}),
+            ...(finished.asked ? { asked: true } : {}),
+            ...deferredInput(link),
+          }),
+        ),
+      );
+      const staged = mcpTurn ? undefined : planStage(finished, aliases);
       if (staged) return staged;
       // Ревью чужого MR (Т7): звена после него не бывает — замечания ложатся в
       // связь, а дальше ждут человека. Считается ДО конца цепочки, чтобы хаб
@@ -1032,7 +1137,7 @@ export function createHandoffPlanner({
         // Связь — тоже от закрытого разговора, и строго ДО запуска: перенос на
         // настоящий `sessionId` ищет запись по временному ключу и, не найдя,
         // молча ничего не делает (см. `SplitLink`).
-        carryLink?.(aliases, chatId);
+        carryLink?.(aliases, chatId, prompt);
         // Происхождение — тоже от закрытого прогона: продолжение в чистой
         // сессии остаётся тем же потребителем контура, что и работа до него.
         const meta = {
@@ -1334,7 +1439,7 @@ export function continuationStarter(
     // продолжение уже не знало бы, чем ведётся работа). Заводим только там,
     // где связь была: у обычного разговора наследовать нечего.
     if (assigned) {
-      ctx.store.setChatLink(nextId, carriedLink(assigned));
+      ctx.store.setChatLink(nextId, continuationLink(assigned, prompt));
     }
     // Родитель разделения уносит группы с собой — тоже ДО запуска: первый же ход
     // свежей сессии получает сводку групп (`withChildrenBrief` по её ключу).

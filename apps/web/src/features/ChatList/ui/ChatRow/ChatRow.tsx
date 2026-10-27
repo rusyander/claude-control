@@ -35,6 +35,18 @@ export function ChatRow({
   // берётся из транскрипта, поэтому в списке она та, где агент СЕЙЧАС, — с
   // иконкой, иначе имя ветки читается как ещё одно название проекта.
   const subtitle = () => {
+    // Ветка правки реплики — первой: у неё та же история и то же название, что
+    // у исходного, и без подписи в списке стоят два одинаковых чата (Telegram 26.10).
+    if (chat.forkOf) {
+      return (
+        <span data-chat-fork-of={chat.forkOf.id}>
+          <Icon name="branch" size={12} />{' '}
+          {chat.forkOf.title
+            ? t('chat.fork.of', { title: chat.forkOf.title })
+            : t('chat.fork.ofUnknown')}
+        </span>
+      );
+    }
     if (chat.branch) {
       return (
         <>

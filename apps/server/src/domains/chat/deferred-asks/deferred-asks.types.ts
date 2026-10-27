@@ -51,6 +51,12 @@ export interface DeferredAskRecord {
   closedAt?: string;
   /** Каталог прогона: ворота ветки одиночного чата снимаются по нему. */
   cwd?: string;
+  /**
+   * Каталог оболочки, от которого судили вживую, — у чужого CLI (P-26): транскрипта
+   * Claude по `toolUseId` у него нет, а обход убранных папок (`rejudge.ts`) судит
+   * относительный `cd` только от названного каталога.
+   */
+  shellCwd?: string;
   source: DeferredAskSource;
 }
 
@@ -74,6 +80,7 @@ export interface DeferredAskInput {
   reasonParams?: DeferredReasonParams;
   kind?: DeferredAskKind;
   cwd?: string;
+  shellCwd?: string;
   source?: DeferredAskSource;
 }
 

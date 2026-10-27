@@ -64,6 +64,71 @@ const PS_LINK = /\b(SymbolicLink|Junction|HardLink)\b/i;
 /** `mklink` словом внутри строки `cmd`. */
 const MKLINK = /(^|[\s"'&|;(])mklink(\.exe)?(?=[\s"']|$)/i;
 
+/** Ключи самого `cmd` до команды (`/d`, `/s`, `/q`, `/c`); `//c` — так его пишут из Git Bash. */
+const CMD_SWITCH = /^\/\/?[a-z](:(on|off))?$/i;
+/** Ключ `mklink` одной буквой: `/J`, `//J`, `/D`, `/H`. */
+const MKLINK_SWITCH = /^\/\/?[a-z]$/i;
+/** Ссылка каталога: точка соединения (`/J`) или символьная ссылка (`/D`). */
+const MKLINK_DIR = /^\/\/?[jd]$/i;
+/** `$(cygpath -w путь)` — тот же путь в другом написании; в пути — слова и `$ИМЯ`. */
+const CYGPATH = /^\$\(cygpath(?:\s+-[wmua]+)*\s+((?:[^\s$`()"';&|<>%^]|\$\{?[A-Za-z_]\w*\}?)+)\)$/;
+/** Пробел и знаки строки `cmd` (соединение команд, вывод, `%ИМЯ%`) — путь не проследить. */
+const CMD_UNSAFE = /[\s"&|<>^%]/;
+
+/** Путь операнда `mklink`: слово как есть или путь из `$(cygpath …)` (переменные раскроет обход). */
+function cmdOperand(word: Word): Word | undefined {
+  if (!word.dynamic) return CMD_UNSAFE.test(word.text) ? undefined : word;
+  const path = CYGPATH.exec(word.text)?.[1];
+  return path === undefined
+    ? undefined
+    : { text: path, dynamic: path.includes('$'), unsplit: true };
+}
+
+/** Строка `cmd` одним словом, где кроме слов через пробел ничего: ни кавычек, ни соединений, ни `%ИМЯ%`. */
+const CMD_STRING = /^mklink(\.exe)?\s[^"&|<>^%()!]*$/i;
+
+/**
+ * `cmd //c "mklink /J a b"` (D-12, 26.10) — вся строка `cmd` одним словом: слова
+ * её те же, что у `cmd //c mklink /J a b`. Только простая строка — без кавычек,
+ * соединений и подстановок `cmd`; иначе `undefined`, как раньше.
+ */
+function splitCmdString(args: Word[]): Word[] | undefined {
+  const last = args.at(-1);
+  if (!last || last.dynamic || !CMD_STRING.test(last.text)) return undefined;
+  const words = last.text
+    .trim()
+    .split(/\s+/)
+    .map((text): Word => ({ text, dynamic: false }));
+  return [...args.slice(0, -1), ...words];
+}
+
+/**
+ * `cmd /c mklink /J|/D <ссылка> <цель>` (D-7, 25.10) — ссылка каталога, у которой
+ * оба пути названы словами или `$(cygpath -w путь)`; вся строка `cmd` одним
+ * простым словом — те же слова (D-12). Что-то сверх этого в строке `cmd` (вторая
+ * команда, другой ключ, путь из иной подстановки) — `undefined`: путь не
+ * проследить, как раньше. `args` — без самого `cmd`.
+ */
+export function cmdMklink(args: Word[]): { link: Word; target: Word } | undefined {
+  const at = args.findIndex((arg) => /^mklink(\.exe)?$/i.test(arg.text));
+  if (at < 0) {
+    const split = splitCmdString(args);
+    return split ? cmdMklink(split) : undefined;
+  }
+  const switches = args.slice(0, Math.max(at, 0));
+  if (at < 1 || !switches.every((arg) => CMD_SWITCH.test(arg.text))) return undefined;
+  if (!switches.some((arg) => /^\/\/?[ck]$/i.test(arg.text))) return undefined;
+  const rest = args.slice(at + 1);
+  const flags = rest.filter((arg) => MKLINK_SWITCH.test(arg.text));
+  const paths = rest.filter((arg) => !MKLINK_SWITCH.test(arg.text));
+  if (flags.length !== 1 || !MKLINK_DIR.test((flags[0] as Word).text) || paths.length !== 2) {
+    return undefined;
+  }
+  const link = cmdOperand(paths[0] as Word);
+  const target = cmdOperand(paths[1] as Word);
+  return link && target ? { link, target } : undefined;
+}
+
 /** Операнды без ключей и значений ключей; значение `-t` — каталог ссылок. */
 function operands(args: Word[]): { rest: Word[]; directory: Word | undefined } {
   const rest: Word[] = [];
@@ -119,8 +184,12 @@ export function linkPaths(name: string, words: Word[]): (Word | undefined)[] {
     case 'mount':
     case 'bindfs':
       return name === 'bindfs' || args.some((arg) => /bind/.test(arg.text)) ? [args.at(-1)] : [];
-    case 'cmd':
+    case 'cmd': {
+      // Названная ссылка каталога — в учёт её путём (D-7); иначе — «где угодно».
+      const made = cmdMklink(args);
+      if (made) return [made.link];
       return args.some((arg) => MKLINK.test(arg.text)) ? [undefined] : [];
+    }
     case 'powershell':
     case 'pwsh':
     case 'new-item':

@@ -389,7 +389,8 @@ export const analyticsEn: typeof analyticsRu = {
       'The panel asks Anthropic’s server for each window’s percent and reset time under ' +
       'the Claude Code login — the same answer /usage shows — once a minute while the ' +
       'panel is open. Precision is whole percents, as the server returns them. No answer ' +
-      'shows the last known sample marked “stale”.',
+      'shows the last known sample marked “stale”. Under each window’s name: the time left ' +
+      'until the reset (“resets in 1 d 22 h”); the exact day and hour are in the tooltip.',
     noteCostTitle: 'The cost is an estimate, not a bill',
     noteCostText:
       'Tokens are recomputed at API rates. On a subscription none of these sums are ' +

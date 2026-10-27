@@ -10,6 +10,7 @@ import { formatBytes } from '@shared/lib/formatBytes';
 import { formatDateTime } from '@shared/lib/formatDateTime';
 import {
   useBuildMobileApk,
+  useCancelMobileApk,
   useInstallMobileApk,
   useMobileApk,
   type MobileApkStatus,
@@ -22,6 +23,7 @@ const STATE_TONE = {
   building: 'info',
   succeeded: 'success',
   failed: 'danger',
+  cancelled: 'neutral',
 } as const;
 
 /** Подпись под кнопкой: с какого часа идёт сборка или когда она кончилась. */
@@ -50,6 +52,7 @@ export function MobileApkCard() {
   const { t, i18n } = useTranslation();
   const { data: status } = useMobileApk();
   const build = useBuildMobileApk();
+  const cancel = useCancelMobileApk();
   const install = useInstallMobileApk();
   // Вывод сборки читают снизу: последние строки — то, что идёт сейчас.
   const logRef = useRef<HTMLPreElement>(null);
@@ -65,6 +68,10 @@ export function MobileApkCard() {
   );
   const startBuild = (): void =>
     build.mutate(undefined, {
+      onError: (error) => toast.error(toErrorMessage(error)),
+    });
+  const cancelBuild = (): void =>
+    cancel.mutate(undefined, {
       onError: (error) => toast.error(toErrorMessage(error)),
     });
   const installOn = (device: string): void =>
@@ -98,6 +105,11 @@ export function MobileApkCard() {
             >
               {status.file ? t('settings.phone.rebuild') : t('settings.phone.build')}
             </Button>
+            {building ? (
+              <Button variant="secondary" onClick={cancelBuild} isLoading={cancel.isPending}>
+                {t('settings.phone.cancel')}
+              </Button>
+            ) : null}
             {timing ? (
               <Typography variant="body-sm" color="subtle">
                 {timing}

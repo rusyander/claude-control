@@ -3,6 +3,7 @@ import type {
   ChatInbox,
   InboxAsk,
   InboxChat,
+  InboxClient,
   InboxQuestion,
 } from '@agentdeck/contracts/chat-inbox';
 import type { PendingPermissionInfo } from '../ChatPermissions/ChatPermissions.ts';
@@ -13,6 +14,7 @@ import type { AskedCall } from './transcript-tail.ts';
 export {
   ASKED_CACHE_MAX,
   OUTSIDE_LIVE_MS,
+  clientIn,
   createTranscriptTailReader,
   isHumanPrompt,
   lastAskedIn,
@@ -90,6 +92,8 @@ export interface InboxSources {
   replaced?: (sessionId: string) => boolean;
   /** Идёт ли ход вне панели (терминал, VS Code) — по хвосту транскрипта. */
   liveOutside?: (chatId: string) => boolean;
+  /** Кто ведёт сессию — по `entrypoint` хвоста транскрипта. */
+  clientOf?: (chatId: string) => InboxClient | undefined;
   /** Имя группы разделения для чата без своего названия. */
   groupTitle?: (chatId: string) => string | undefined;
   now: number;
@@ -162,6 +166,11 @@ export function buildInbox(sources: InboxSources): ChatInbox {
     if (draft.running || !draft.sessionId || !sources.liveOutside?.(draft.sessionId)) continue;
     draft.running = true;
     draft.outside = true;
+  }
+
+  for (const draft of drafts.values()) {
+    const client = draft.sessionId ? sources.clientOf?.(draft.sessionId) : undefined;
+    if (client) draft.client = client;
   }
 
   for (const permission of sources.permissions) {

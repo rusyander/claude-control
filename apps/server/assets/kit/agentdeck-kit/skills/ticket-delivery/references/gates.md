@@ -19,6 +19,10 @@ or CI files move; human overrides live in `.agent/affected.json` (`alwaysFull`, 
 `cheapSeconds` (180) the next verdict is FULL, the scope not being worth a miss. A changed zone with
 no derivable command is FULL plus a hint naming the override. The review (§9) and the live run (§10)
 follow the same map: the zones it names are the radius.
+**Tests block on** (`.agent/tests/` exists): a test gate carries `{junit}` —
+`"test=npx vitest run --reporter=default --reporter=junit --outputFile.junit={junit}"` — and gate-run
+imports that report into the block (CLI from `--tests-cli`, `AGENTDECK_TESTS_CLI` or the kit's own
+checkout). The gate's own run is the record; a second `tests-cli run` of the same suite is a repeat.
 
 ## A gate the local machine cannot run (§6)
 

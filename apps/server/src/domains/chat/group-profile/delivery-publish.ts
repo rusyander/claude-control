@@ -113,7 +113,8 @@ export function publishTextOf(toolName: string, input: unknown): string | undefi
 export const PUBLISH_BEFORE_DELIVERY_DENIED =
   'Publishing is refused in this stage: a later delivery stage of this chain pushes the branch ' +
   'and opens the MR. Commit your work and finish the stage — do not push, send-pack or open the ' +
-  'MR by any other form (a shell wrapper, another spelling of git, eval).';
+  'MR by any other form (a shell wrapper, another spelling of git, eval). This is no decision for ' +
+  'the human: never raise or wait on a D-n for it.';
 
 /** Отказ группе на `git send-pack`: цель такого пуша брокер не разбирает. */
 export const SEND_PACK_DENIED =

@@ -1,11 +1,11 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readDeliveryFacts } from './delivery-facts/delivery-facts.ts';
-import { WorktreeBootstraps } from './bootstrap.ts';
+import { bootstrapPlanFor, WorktreeBootstraps } from './bootstrap.ts';
 import { PREP_TREE_HOOKS, settlePrepTree, snapshotPrepTree } from './lockfiles.ts';
 
 /**
@@ -178,4 +178,69 @@ describe('повторная установка посреди работы не
       dropTemp(logs);
     }
   });
+});
+
+const HAS_GO = spawnSync('go', ['version'], { encoding: 'utf8' }).status === 0;
+
+/**
+ * g9 26.10 (F8): копия, подготовленная до отката манифестов, несла `cp-ca/go.mod` и
+ * `inst-telemetry/go.mod`, переписанные `go mod download` (MVS поднял версии косвенных
+ * зависимостей), — две смены ветки отказали, доставка краснела «не закоммичено». Здесь
+ * настоящий `go` и настоящий план подготовки: без обвязки панели go.mod грязный (значит,
+ * фикстура и правда воспроизводит правку go), с обвязкой — дерево чистое.
+ */
+describe.runIf(HAS_GO)('настоящий go mod download при подготовке копии', () => {
+  let dir: string;
+  let logs: string;
+  const run = (...args: string[]) =>
+    execFileSync('git', args, { cwd: dir, stdio: 'pipe', encoding: 'utf8' });
+  const CA_MOD =
+    'module example.com/ca\n\ngo 1.21\n\nrequire (\n\texample.com/shared v0.0.0\n' +
+    '\texample.com/dep v1.0.0 // indirect\n)\n\nreplace (\n\texample.com/shared => ../shared\n' +
+    '\texample.com/dep => ../dep\n)\n';
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-prep-go-'));
+    logs = mkdtempSync(join(tmpdir(), 'cc-prep-go-logs-'));
+    run('init', '-q', '-b', 'feature/users');
+    const files: Record<string, string> = {
+      'dep/go.mod': 'module example.com/dep\n\ngo 1.21\n',
+      'dep/dep.go': 'package dep\n',
+      'shared/go.mod':
+        'module example.com/shared\n\ngo 1.21\n\nrequire example.com/dep v1.2.0\n\n' +
+        'replace example.com/dep => ../dep\n',
+      'shared/shared.go': 'package shared\n\nimport _ "example.com/dep"\n',
+      'cp-ca/go.mod': CA_MOD,
+      'cp-ca/ca.go': 'package ca\n\nimport _ "example.com/shared"\n',
+    };
+    for (const [path, body] of Object.entries(files)) {
+      mkdirSync(join(dir, path, '..'), { recursive: true });
+      writeFileSync(join(dir, path), body);
+    }
+    run('add', '-A');
+    run('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init');
+  });
+  afterEach(() => {
+    dropTemp(dir);
+    dropTemp(logs);
+  });
+
+  it('go mod download правит go.mod модуля; обвязка панели откатывает его до работы группы', async () => {
+    const plan = bootstrapPlanFor(dir);
+    expect(plan?.summary).toContain('[cp-ca] go mod download');
+
+    // Без обвязки (подготовка до 24.10): go.mod переписан, доставка видит его работой группы.
+    const bare = await new WorktreeBootstraps(logs).run(dir, plan!);
+    expect(bare.status).toBe('ok');
+    expect(run('status', '--porcelain', '--', 'cp-ca/go.mod')).toContain('cp-ca/go.mod');
+    expect(readFileSync(join(dir, 'cp-ca', 'go.mod'), 'utf8')).toContain('example.com/dep v1.2.0');
+    run('checkout', '--', '.');
+
+    const state = await new WorktreeBootstraps(logs, PREP_TREE_HOOKS).run(dir, plan!);
+    expect(state.status).toBe('ok');
+    expect(state.reverted).toContain('cp-ca/go.mod');
+    expect(readFileSync(join(dir, 'cp-ca', 'go.mod'), 'utf8')).toBe(CA_MOD);
+    expect(run('status', '--porcelain')).toBe('');
+    const facts = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
+    expect(facts.dirty).toEqual([]);
+  }, 120_000);
 });

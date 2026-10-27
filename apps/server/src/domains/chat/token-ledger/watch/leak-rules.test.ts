@@ -256,9 +256,13 @@ describe('R16 долгий вызов в своём сроке', () => {
     expect(hit(open(), 'R16', { now, settings: { longCallMinutes: 14 } })).toBeUndefined();
   });
 
-  it('ответ пришёл (28 мин) — сигнал закрыт', () => {
+  it('ответ пришёл (28 мин) — «открыт долго» закрыт, вместо него «шёл долго» на полчаса', () => {
     const full = events('R16-long-call/fire.jsonl');
-    expect(hit(full, 'R16')).toBeUndefined();
+    const done = hit(full, 'R16');
+    expect(done).toMatchObject({ textKey: 'groupWatch.rule.R16slow', numbers: { ranMin: 28 } });
+    expect(done?.numbers.openMin).toBeUndefined();
+    const end = full.at(-1)?.t ?? 0;
+    expect(hit(full, 'R16', { now: end + 31 * MIN })).toBeUndefined();
   });
 
   it('проверка 10 мин — тишина; порог 9 — сигнал', () => {
@@ -421,6 +425,66 @@ describe('R19 тяжёлый первый запрос', () => {
     const list = events('R19-first-request/fire.jsonl');
     const resumed: WatchEvent[] = [{ kind: 'start', t: (list[0]?.t ?? 0) - 1000 }, ...list];
     expect(hit(resumed, 'R19', { prime: (state) => (state.firstCtx = 109_800) })).toBeUndefined();
+  });
+
+  // Вид «окно выросло посреди сессии» (CTX+ внешнего сторожа).
+  const T = Date.parse('2026-10-27T10:00:00Z');
+  /** Вызов сессии с окном `ctxK` тыс. токенов на минуте `minute`. */
+  const step = (minute: number, ctxK: number, sidechain = false): WatchEvent => ({
+    kind: 'call',
+    t: T + minute * MIN,
+    input: 10,
+    cacheRead: ctxK * 1000 - 2010,
+    cacheWrite: 2000,
+    cacheWrite1h: 0,
+    output: 300,
+    ...(sidechain ? { sidechain: true } : {}),
+  });
+  const grown = [step(0, 30), step(5, 80), step(9, 131), step(12, 140)];
+
+  it('рост: окно ушло на 110k выше первого — сведение с ростом, нынешним и первым окном; с первого вызова над порогом', () => {
+    expect(hit(grown, 'R19')).toEqual({
+      rule: 'R19',
+      severity: 'info',
+      numbers: { growK: 110, nowK: 140, firstK: 30 },
+      since: T + 9 * MIN,
+      textKey: 'groupWatch.rule.R19grow',
+    });
+    // Порог читается: 120k — 110k роста ещё не повод.
+    expect(hit(grown, 'R19', { settings: { contextGrowthTokens: 120_000 } })).toBeUndefined();
+  });
+
+  it('рост, близкий промах: 99k — тишина; окно субагента в рост сессии не идёт', () => {
+    expect(hit([step(0, 30), step(5, 129)], 'R19')).toBeUndefined();
+    expect(hit([step(0, 30), step(5, 60), step(6, 190, true)], 'R19')).toBeUndefined();
+  });
+
+  it('рост: сжатие роняет окно — строка закрывается; база — первый вызов после сжатия, ручного тоже', () => {
+    for (const manual of [false, true]) {
+      const compact: WatchEvent = {
+        kind: 'compact',
+        t: T + 13 * MIN,
+        ...(manual ? { manual } : {}),
+      };
+      const compacted: WatchEvent[] = [...grown, compact, step(14, 45)];
+      expect(hit(compacted, 'R19')).toBeUndefined();
+      // От первой базы (30k) 135k — уже 105k роста, но от новой (45k) только 90k — тишина.
+      expect(hit([...compacted, step(20, 135)], 'R19')).toBeUndefined();
+      expect(hit([...compacted, step(20, 135), step(22, 150)], 'R19')).toMatchObject({
+        numbers: { growK: 105, nowK: 150, firstK: 45 },
+        since: T + 22 * MIN,
+      });
+    }
+  });
+
+  it('рост: тяжёлый первый запрос в свои полчаса важнее роста — одна строка на правило', () => {
+    const start: WatchEvent = { kind: 'start', t: T - 1000, fresh: true };
+    const heavy = [start, step(0, 95), step(5, 200)];
+    expect(hit(heavy, 'R19')?.numbers).toEqual({ firstK: 95 });
+    expect(hit(heavy, 'R19', { now: T + 40 * MIN })).toMatchObject({
+      numbers: { growK: 105 },
+      textKey: 'groupWatch.rule.R19grow',
+    });
   });
 
   it('битое число окна (NaN из кривого потока) — не тяжёлый старт', () => {

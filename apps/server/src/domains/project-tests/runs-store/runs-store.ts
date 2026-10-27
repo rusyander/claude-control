@@ -87,15 +87,67 @@ export function readRun(root: string, id: string): ProjectTestRunRecord | undefi
 /** Короче восьми знаков номер прогона не принимается: так его печатает сама история. */
 const SHORT_ID_MIN = 8;
 
+/**
+ * Прогоны кейсов на развилке ветки с основной (`tests-cli run --base`, #g0:109):
+ * отдельно от истории, потому что это не результат ветки — последним прогоном кейса
+ * для ворот, отчётов и статусов он не становится. Читает их одно правило «красное не
+ * из-за ветки»; `commit` — полный хеш развилки, на которой гонялись.
+ */
+const BASE_DIR = 'runs-base';
+const BASE_KEEP = 50;
+
+export function writeBaseRun(root: string, record: ProjectTestRunRecord): void {
+  writeJson(root, `${BASE_DIR}/${runFileId(record.id, record.startedAt)}${SUFFIX}`, record);
+  const ids = listFiles(root, BASE_DIR, SUFFIX);
+  for (const id of ids.slice(0, Math.max(0, ids.length - BASE_KEEP))) {
+    rmSync(testsPath(root, `${BASE_DIR}/${id}${SUFFIX}`), { force: true });
+  }
+}
+
+/**
+ * От новых к старым по `startedAt` до миллисекунды. Имя файла несёт время до
+ * секунды и случайный хвост id: два прогона в одну секунду (импорт сразу за
+ * импортом) шли в случайном порядке, и «последний результат» кейса брался из
+ * старого (флак теста `run --base`, 25.10). Равные — в порядке файлов.
+ */
+function newestFirst(runs: ProjectTestRunRecord[]): ProjectTestRunRecord[] {
+  return runs
+    .map((run, index) => ({ run, index, at: Date.parse(run.startedAt) || 0 }))
+    .sort((a, b) => b.at - a.at || a.index - b.index)
+    .map((item) => item.run);
+}
+
+/** Прогоны на развилке от новых к старым. */
+export function readBaseRuns(root: string): ProjectTestRunRecord[] {
+  return newestFirst(
+    listFiles(root, BASE_DIR, SUFFIX)
+      .reverse()
+      .map((id) => parseRun(readJson(root, `${BASE_DIR}/${id}${SUFFIX}`).data, id))
+      .filter((run): run is ProjectTestRunRecord => run !== undefined),
+  );
+}
+
 /** Прогоны от новых к старым. */
 export function readRuns(root: string, limit = 50): ProjectTestRunRecord[] {
   const ids = listFiles(root, RUNS_DIR, SUFFIX).reverse().slice(0, limit);
-  return ids
-    .map((id) => readRun(root, id))
-    .filter((run): run is ProjectTestRunRecord => run !== undefined);
+  return newestFirst(
+    ids
+      .map((id) => readRun(root, id))
+      .filter((run): run is ProjectTestRunRecord => run !== undefined),
+  );
 }
 
 /** Разбор записи прогона: чужой файл может быть неполным. */
+/** Счёт тестов отчёта (F-12); битое поле — как отсутствие: точным счётом его не назвать. */
+function parseTally(value: unknown): { tests?: ProjectTestRunRecord['tests'] } {
+  if (!value || typeof value !== 'object') return {};
+  const { passed, failed, skipped } = value as Record<string, unknown>;
+  const count = (item: unknown): item is number =>
+    typeof item === 'number' && Number.isInteger(item) && item >= 0;
+  if (!count(passed) || !count(failed) || !count(skipped)) return {};
+  return { tests: { passed, failed, skipped } };
+}
+
 function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefined {
   if (!data || typeof data !== 'object') return undefined;
   const record = data as Record<string, unknown>;
@@ -137,8 +189,10 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     sessionId: optional(record.sessionId),
     ...(record.attested === true ? { attested: true } : {}),
     ...withStamps(record.stamps),
+    ...(optional(record.tree) ? { tree: optional(record.tree) } : {}),
     results,
     summary,
+    ...parseTally(record.tests),
     planned: typeof record.planned === 'number' ? record.planned : undefined,
     unwalked: parseUnwalked(record.unwalked),
     draft: parseDraftOutcome(record.draft),

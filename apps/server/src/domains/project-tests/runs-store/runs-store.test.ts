@@ -64,6 +64,14 @@ describe('project-tests/runs-store', () => {
     expect(readRuns(project).map((run) => run.id)).toEqual(['bbbbbbbb', 'aaaaaaaa']);
   });
 
+  it('два прогона в одну секунду — новее тот, что позже по миллисекундам, а не по хвосту id', () => {
+    // Имя файла — время до секунды и id: «ffffffff» сортируется после «11111111».
+    writeRun(project, record('ffffffff', '2026-09-01T10:00:00.100Z'));
+    writeRun(project, record('11111111', '2026-09-01T10:00:00.900Z'));
+
+    expect(readRuns(project).map((run) => run.id)).toEqual(['11111111', 'ffffffff']);
+  });
+
   it('прогон читается по идентификатору файла', () => {
     const run = record('cccccccc', '2026-09-03T09:30:00.000Z');
     writeRun(project, run);

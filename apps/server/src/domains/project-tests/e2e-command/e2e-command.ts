@@ -72,11 +72,14 @@ const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
  * экранированный и привязанный к концу пути (`/…$/` Playwright берёт как
  * регулярку как есть). `$` и `^` — буквы в кавычках своей оболочки: в двойных у
  * cmd, в одинарных у sh; символы, которые оболочка раскроет, отказаны `shellArg`.
+ * Каталог (`…/`, кейс-набор) — без привязки к концу: все спеки под ним, и только под
+ * ним (`inst/users/` не берёт `inst/users-admin/`).
  */
 export function playwrightFileArg(file: string, platform = process.platform): string {
   shellArg(file);
   const path = file.replace(/\\/g, '/').replace(/^\.\//, '');
-  const pattern = `/(^|/)${path.replace(REGEX_SPECIAL, '\\$&')}$/${platform === 'win32' ? 'i' : ''}`;
+  const end = path.endsWith('/') ? '' : '$';
+  const pattern = `/(^|/)${path.replace(REGEX_SPECIAL, '\\$&')}${end}/${platform === 'win32' ? 'i' : ''}`;
   return platform === 'win32' ? `"${pattern}"` : `'${pattern.replace(/'/g, `'\\''`)}'`;
 }
 

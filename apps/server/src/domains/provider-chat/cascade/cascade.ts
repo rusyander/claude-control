@@ -3,10 +3,15 @@ import {
   deliverStagePrompt,
   fixStagePrompt,
   loweredWorkPrompt,
+  provenLines,
+  REVIEW_OFF_REASON,
+  reviewSkipReason,
   reviewStagePrompt,
   verifyStagePrompt,
   scanReviewBlocks,
   type CascadeStage,
+  type GroupScope,
+  type ReviewDelta,
   type StageContext,
   type TaskKind,
 } from '@agentdeck/contracts/model-cascade';
@@ -28,13 +33,17 @@ import {
 } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 import { carriedStageLink } from '../../../lib/app-store/chat-links.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { readReviewDelta } from '../../project-git/review-delta.ts';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
 import type { RunOptions } from '../../chat/ChatRunner/ChatRunner.ts';
 import type { RunMeta } from '../../chat/ChatRunRegistry/ChatRunRegistry.ts';
 import type { ChatEvent } from '../../chat/chat-events.ts';
 import type { TreeStartGate } from '../../chat/tree-pause/tree-pause.ts';
 import { fillSieveSlot, SIEVE_SLOT, type SieveAsk } from '../../chat/sieve-gate/sieve-gate.ts';
+import { writeReviewFindings } from '../../chat/review-findings/review-findings.ts';
 import { initiativePrompt } from '../../chat/initiative/initiative.ts';
+import { deliveryCheckCommand } from '../../chat/delivery-self-check.ts';
 import { reviewNoticeText } from '../../chat/split-review/split-review.ts';
 import {
   chainOutcomeOf,
@@ -42,6 +51,7 @@ import {
   type ChainOutcomeInput,
 } from '../../chat/chain-outcome/chain-outcome.ts';
 import { asksDelivery } from '../../chat/ChatCascadeStages/ChatCascadeStages.ts';
+import { writeOwnerBrief } from '../../chat/owner-brief/owner-brief.ts';
 import type { ChainOutcome } from '../../chat/split-conveyor/split-conveyor.ts';
 import type { HandoffChains, HashFile, StatFile } from '../../chat/ChatHandoff/ChatHandoff.ts';
 import { planForeignHandoff, type ForeignHandoffDeps } from '../handoff/handoff.ts';
@@ -125,9 +135,19 @@ export interface ForeignStagePlan {
    * не наследует ни модели, ни «ниже» остановившейся работы.
    */
   raised?: boolean;
+  /**
+   * Найденное ревью вне охвата группы (`ReviewScan.preExisting`, владелец 26.10) — в
+   * связь следующего звена, как у Claude: правкам не уходит, доставка называет в MR.
+   */
+  preExisting?: string[];
 }
 
 export interface ForeignStageInput {
+  /**
+   * Ревью законченной работы не заведено: в проекте выключено «Ревью после работы»
+   * (R3(d), 26.10) — лента называет причину, как у Claude (`review-off-notice`).
+   */
+  noteReviewOff?: () => void;
   /** Стадия закончившегося разговора; нет — это не звено конвейера. */
   cascade?: ProviderChatCascade;
   /** Прогон закончился успешно. После ошибки или остановки проверять нечего. */
@@ -158,6 +178,15 @@ export interface ForeignStageInput {
    * затронутым путям копии, выученным ситам и уже сданным строкам.
    */
   sieves?: (stage: SieveStage, done: readonly SieveReportRow[]) => string;
+  /** Границы группы по плану разделения — правкам и проверке, как у Claude (N2). */
+  scope?: GroupScope;
+  /**
+   * Охват ревью от коммита начала группы (`link.startSha`, владелец 26.10) — тот же
+   * `readReviewDelta`, что у Claude. Нет — ревью всей работы, как раньше.
+   */
+  reviewDelta?: () => ReviewDelta;
+  /** Находки файлом в копии (R7) — тот же `writeReviewFindings`, что у Claude. */
+  findingsFile?: (kind: 'fix' | 'open', findings: readonly string[]) => string | undefined;
 }
 
 const STAGE_WORDS: Record<ForeignStagePlan['stage'], string> = {
@@ -187,12 +216,16 @@ function foreignDeliverPlan(
   sieveRows: SieveReportRow[],
   context: StageContext,
   /** Итог прохода проверки (U6): что осталось открытым или что он не отчитался. */
-  verification?: { open?: string[]; unverified?: boolean },
+  verification?: { open?: string[]; openFile?: string; unverified?: boolean },
+  /** Ревью не заводилось, и почему (`reviewSkipReason`, 26.10); и «было до группы». */
+  scoped?: { reviewSkipped?: string; preExisting?: string[] },
 ): ForeignStagePlan | undefined {
   if (!input.deliver) return undefined;
   if (cascade.deliveredAt && !input.redeliver) return undefined;
   const model = cascade.workModel;
   const sieves = input.sieves?.('deliver', sieveRows);
+  const preExisting = scoped?.preExisting ?? input.link?.preExisting;
+  const startSha = input.link?.startSha;
   return {
     stage: 'deliver',
     title: stageTitle(cascade, 'deliver'),
@@ -201,11 +234,17 @@ function foreignDeliverPlan(
       foreign: true,
       ...(cascade.branch ? { branch: cascade.branch } : {}),
       context,
+      deliveryCheck: deliveryCheckCommand(),
       ...(sieves ? { sieves } : {}),
       ...(verification?.open?.length ? { open: verification.open } : {}),
+      ...(verification?.openFile ? { openFile: verification.openFile } : {}),
       ...(verification?.unverified ? { unverified: true } : {}),
+      ...(preExisting?.length ? { preExisting } : {}),
+      ...(scoped?.reviewSkipped ? { reviewSkipped: scoped.reviewSkipped } : {}),
+      ...(startSha ? { startSha } : {}),
     }),
     ...(sieveRows.length > 0 ? { sieveRows } : {}),
+    ...(preExisting?.length ? { preExisting } : {}),
     ...(model ? { model } : {}),
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
     cascade: {
@@ -267,6 +306,8 @@ function afterForeignPlan(
       ...(cascade.lowered ? { lowered: true } : {}),
       workModel: model,
       ...(cascade.workEffort ? { workEffort: cascade.workEffort } : {}),
+      // «Ревью после работы» выключено (R3(d)) — работа после плана идёт без ревью.
+      ...(cascade.reviewAfterWork === false ? { reviewAfterWork: false as const } : {}),
     },
   };
 }
@@ -298,6 +339,7 @@ function raisedForeignPlan(
       ...(cascade.group ? { group: cascade.group } : {}),
       ...(cascade.branch ? { branch: cascade.branch } : {}),
       ...(cascade.kind ? { kind: cascade.kind } : {}),
+      ...(cascade.reviewAfterWork === false ? { reviewAfterWork: false as const } : {}),
     },
   };
 }
@@ -353,6 +395,8 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
         findings: cascade.fixFindings,
         ...(cascade.branch ? { branch: cascade.branch } : {}),
         context: contextAfter(text),
+        ...(input.scope ? { scope: input.scope } : {}),
+        proven: provenLines(text),
       }),
       ...carried,
       // Ни модели, ни глубины: проверяет настройка CLI, как и ревью.
@@ -383,6 +427,25 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
     // в тот же разговор заводило бы ещё одну проверку — и так на каждый ход.
     if (cascade.reviewedAt) return undefined;
     if (!hasWork()) return raisedForeignPlan(cascade, input);
+    // «Ревью после работы» выключено в проекте (R3(d), 26.10) — как у Claude: ревью
+    // нет, работа идёт в доставку с причиной; подъём без правок остался выше.
+    if (cascade.reviewAfterWork === false) {
+      input.noteReviewOff?.();
+      return foreignDeliverPlan(cascade, input, 'work', sieveRows, contextAfter(text), undefined, {
+        reviewSkipped: REVIEW_OFF_REASON,
+      });
+    }
+    // Охват группы от её коммита начала (владелец 26.10), как у Claude: своего с начала
+    // нет — ревью не заводится, доставка называет причину; есть — ревью только его.
+    const delta = input.reviewDelta?.();
+    if (delta?.kind === 'none') {
+      return delta.published
+        ? undefined
+        : foreignDeliverPlan(cascade, input, 'work', sieveRows, contextAfter(text), undefined, {
+            reviewSkipped: reviewSkipReason(delta),
+          });
+    }
+    const reviewScope = delta?.kind === 'delta' || delta?.kind === 'commits' ? delta : undefined;
     const sieves = input.sieves?.('review', sieveRows);
 
     return {
@@ -390,6 +453,7 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
       title: stageTitle(cascade, 'review'),
       prompt: reviewStagePrompt({
         task: groupTask ?? task,
+        ...(reviewScope ? { delta: reviewScope } : {}),
         ...(cascade.workModel ? { model: cascade.workModel } : {}),
         ...(kind ? { kind } : {}),
         ...(cascade.branch ? { branch: cascade.branch } : {}),
@@ -416,13 +480,14 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   if (cascade.fixFindings) {
     const verified = scanReviewBlocks(text);
     const open = verified.findings;
+    const openFile = open?.length && input.deliver ? input.findingsFile?.('open', open) : undefined;
     return foreignDeliverPlan(
       cascade,
       input,
       'verify',
       sieveRows,
       contextAfter(verified.text),
-      open ? { open } : { unverified: true },
+      open ? { open, ...(openFile ? { openFile } : {}) } : { unverified: true },
     );
   }
 
@@ -431,14 +496,27 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   const reviewed = scanReviewBlocks(text);
   const findings = reviewed.findings;
   if (!findings) return undefined;
+  // Найденное вне охвата группы (26.10) правкам не уходит: едет связью до доставки.
+  const preExisting = reviewed.preExisting?.length
+    ? [...(link?.preExisting ?? []), ...reviewed.preExisting]
+    : undefined;
   // Замечаний нет — чинить нечего, а доставлять группе с доставкой есть что.
   if (findings.length === 0) {
-    return foreignDeliverPlan(cascade, input, 'review', sieveRows, contextAfter(reviewed.text));
+    return foreignDeliverPlan(
+      cascade,
+      input,
+      'review',
+      sieveRows,
+      contextAfter(reviewed.text),
+      undefined,
+      preExisting ? { preExisting } : undefined,
+    );
   }
 
   // Работа шла на потолке, то есть настройкой самого CLI (F3): правки идут ею
   // же — без модели и без «ниже настройки».
   const model = cascade.workModel;
+  const findingsFile = input.findingsFile?.('fix', findings);
 
   return {
     stage: 'fix',
@@ -453,11 +531,15 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
       // Замечания уже в задании карточками — прозу ревью вокруг них правки не
       // получают (L2.2, как у Claude): до 24 тыс. знаков в каждом ходе правок.
       context: contextAfter(''),
+      ...(input.scope ? { scope: input.scope } : {}),
+      ...(link?.startSha ? { startSha: link.startSha } : {}),
+      ...(findingsFile ? { findingsFile } : {}),
     }),
     ...(model ? { model } : {}),
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
     findings,
     ...carried,
+    ...(preExisting ? { preExisting } : {}),
     cascade: {
       ...base,
       stage: 'fix',
@@ -517,6 +599,10 @@ export function foreignChatPrefix(
           // Задание правок само называет проверки проекта (TQ-10).
           ...(lowered.stage === 'fix' ? { review: false, checksInTask: true } : {}),
           ...(lowered.stage === 'fix' && lowered.fixFindings?.length ? { verify: true } : {}),
+          // «Ревью после работы» выключено (R3(d)): ревью не обещается, подъём — да.
+          ...(lowered.stage === 'work' && lowered.reviewAfterWork === false
+            ? { review: false, raise: true }
+            : {}),
         })
       : '',
     childExtra ?? '',
@@ -626,8 +712,18 @@ export interface ForeignStagePlannerDeps {
    * считаются: за планом работа заводится всегда.
    */
   onChainEnded?: (link: ChatLink, outcome: ChainOutcome) => void;
+  /** Группа связи на паузе — следующее звено ждёт «Продолжить» (как у Claude). */
+  isPaused?: (link: ChatLink) => boolean;
+  /**
+   * Пауза сторожа на безопасной точке (F1): планировщик решил завести следующее
+   * звено, а у группы горит правило «трата по кругу» и пауза сторожа включена —
+   * `true`: группа встала на паузу, звено не заводится. Нет — звено как обычно.
+   */
+  pauseAtSafePoint?: (link: ChatLink) => boolean;
   /** Группа связи доводит работу до MR — за правками идёт доставка (W3-3). */
   delivers?: (link: ChatLink) => boolean;
+  /** Границы группы по плану разделения — правкам и проверке (N2, как у Claude). */
+  scopeOf?: (link: ChatLink) => GroupScope | undefined;
   /** Абзац сит для задания звена в копии `cwd` (как у Claude). Не задан — без сит. */
   sieves?: (
     cwd: string,
@@ -853,7 +949,10 @@ export function createForeignStagePlanner(
       // не виден: его ход кончается вместе с процессом.
       // Правило то же, что у итога группы (`waitsForAnswer`): иначе звено шло
       // за ходом, который `chainOutcomeOf` уже счёл вопросом.
-      const paused = finished.ok && waitsForAnswer(finished.text);
+      // Группа на паузе — тоже пауза (журнал 26.10, g8): звено после неё заведёт
+      // ход после «Продолжить», а не старт через секунды после паузы.
+      const paused =
+        (finished.ok && waitsForAnswer(finished.text)) || Boolean(link && deps.isPaused?.(link));
       if (link?.review) {
         const reviewPath = link.review.path;
         const reviewWork = reviewPath ? () => deps.hasWork(reviewPath, link.createdAt) : undefined;
@@ -1021,12 +1120,37 @@ export function createForeignStagePlanner(
       // Абзац сит план получает меткой (см. `SIEVE_SLOT`): пути копии читаются
       // асинхронно, и подставляются перед запуском звена.
       let sieveAsk = undefined as SieveAsk | undefined;
+      const scope = link?.parentChatId ? deps.scopeOf?.(link) : undefined;
+      // Охват ревью от коммита начала группы (владелец 26.10) — тем же git, что у Claude.
+      // Только при известном начале: окна по журналу ссылок (L7.13) у чужого CLI не было.
+      const startSha = link?.startSha;
+      let delta: ReviewDelta | undefined;
+      const reviewDelta = startSha
+        ? (): ReviewDelta => (delta ??= readReviewDelta(cwd, undefined, startSha))
+        : undefined;
+      // Ревью выключено в проекте (R3(d), 26.10): планировщик отмечает, строка — ниже.
+      let reviewOff = false;
       let plan = planForeignStage({
         cascade,
+        ...(scope ? { scope } : {}),
+        ...(reviewDelta ? { reviewDelta } : {}),
+        noteReviewOff: () => {
+          reviewOff = true;
+        },
         ok: finished.ok,
         text,
         task,
         hasWork: () => deps.hasWork(cwd, chat.createdAt),
+        ...(cwd
+          ? {
+              findingsFile: (kind: 'fix' | 'open', findings: readonly string[]) =>
+                writeReviewFindings(cwd, {
+                  kind,
+                  findings,
+                  ...(cascade.branch ? { branch: cascade.branch } : {}),
+                }),
+            }
+          : {}),
         ...(link ? { link } : {}),
         ...(paused ? { paused } : {}),
         ...(link?.parentChatId && deps.delivers?.(link) ? { deliver: true } : {}),
@@ -1041,6 +1165,24 @@ export function createForeignStagePlanner(
             }
           : {}),
       });
+      // Ревью не заведено, потому что своего у группы нет: строка причины в ленту,
+      // как у Claude (`review-skipped-notice`).
+      if (delta?.kind === 'none' && (!plan || plan.stage === 'deliver')) {
+        appendMessage(appDataDir, providerId, chatId, {
+          role: 'notice',
+          content: serverText('review-skipped-notice', { from: delta.from }),
+        });
+      }
+      // Ревью выключено в проекте (R3(d), 26.10) — строка причины, как у Claude; и у
+      // группы без доставки, где звена нет вовсе.
+      if (reviewOff) {
+        appendMessage(appDataDir, providerId, chatId, {
+          role: 'notice',
+          content: serverText('review-off-notice'),
+        });
+      }
+      // Безопасная точка паузы сторожа (F1), как у Claude: звено решено, но не заведено.
+      if (plan && link && deps.pauseAtSafePoint?.(link)) plan = undefined;
       if (!plan) {
         // Звена больше не будет — цепочка группы кончилась. План сюда не
         // попадает: за ним работа заводится всегда, а если не завелась, то
@@ -1136,17 +1278,30 @@ export function createForeignStagePlanner(
           ...(plan.cascade.lowered ? { lowered: true } : {}),
           ...(plan.sieveRows ? { sieveRows: plan.sieveRows } : {}),
           ...(plan.planSummary ? { planSummary: plan.planSummary } : {}),
+          ...(plan.preExisting ? { preExisting: plan.preExisting } : {}),
         });
       }
 
       const ask = sieveAsk;
-      const prompt =
+      const paragraph =
         ask && link && deps.sieves
-          ? fillSieveSlot(
-              plan.prompt,
-              await deps.sieves(cwd, link, ask.stage, ask.done).catch(() => ''),
-            )
-          : plan.prompt;
+          ? await deps.sieves(cwd, link, ask.stage, ask.done).catch(() => '')
+          : undefined;
+      const prompt = paragraph === undefined ? plan.prompt : fillSieveSlot(plan.prompt, paragraph);
+      // Слова владельца, сданные строки и сита звена — файлом в копию, как у
+      // Claude (`handoff-routes`): Codex и Qwen сжимают переписку так же.
+      if (link?.parentChatId) {
+        try {
+          writeOwnerBrief(cwd, {
+            task: link.groupTask ?? link.task,
+            group: link.title ?? plan.title,
+            ...(plan.sieveRows ? { rows: plan.sieveRows } : {}),
+            ...(paragraph ? { sieves: paragraph } : {}),
+          });
+        } catch (error) {
+          deps.onError?.(error);
+        }
+      }
 
       // Дерево стоит — звено заведено, но не запущено: старт лёг в очередь и
       // уйдёт по «Продолжить всё».

@@ -184,6 +184,7 @@ describe('qwen serve: сообщение посреди хода', () => {
 
   it('команда оболочки при судье: уходит судье с каталогом, его «да» — proceed_once', async () => {
     const judged: unknown[] = [];
+    const sessions: (string | undefined)[] = [];
     const turn = new QwenServeTurn();
     const result = await turn.run(
       {
@@ -194,12 +195,18 @@ describe('qwen serve: сообщение посреди хода', () => {
         permission: {
           allowEdits: false,
           ask: async () => 'deny',
-          judge: async (shell) => (judged.push(shell), { behavior: 'allow' }),
+          judge: async (shell, _pid, session) => {
+            judged.push(shell);
+            sessions.push(session);
+            return { behavior: 'allow' };
+          },
         },
       },
       () => {},
     );
     expect(judged).toHaveLength(1);
+    // P-26 (D-10): судья получает сессию qwen serve — `session_id` хука набора.
+    expect(sessions).toEqual(['ses-1']);
     expect(judged[0]).toMatchObject({
       command: 'pnpm build',
       shell: process.platform === 'win32' ? 'unknown' : 'bash',
@@ -559,7 +566,12 @@ describe('codex app-server: права потока по переключате�
       () => {},
     );
     expect(asked).toEqual([
-      expect.objectContaining({ tool: 'command', title: 'Set-Content probe.txt edited' }),
+      // P-26 (D-10): поток хода — `session_id` хука набора, по нему улика своей копии.
+      expect.objectContaining({
+        tool: 'command',
+        title: 'Set-Content probe.txt edited',
+        session: 'thr-1',
+      }),
     ]);
     expect(yes.kind === 'done' && yes.reply).toContain('разрешение: accept');
     const no = await new CodexAppServerTurn().run(
@@ -570,6 +582,16 @@ describe('codex app-server: права потока по переключате�
       () => {},
     );
     expect(no.kind === 'done' && no.reply).toContain('разрешение: decline');
+    // Просьба без `threadId` — сессия та, что ход открыл (`thread/start`).
+    const bare: LivePermissionAsk[] = [];
+    await new CodexAppServerTurn().run(
+      {
+        ...options('fake-codex-app-server.mjs', { ...env, FAKE_APPROVAL_NO_THREAD: '1' }),
+        permission: { allowEdits: false, ask: async (r) => (bare.push(r), 'allow') },
+      },
+      () => {},
+    );
+    expect(bare).toEqual([expect.objectContaining({ tool: 'command', session: 'thr-1' })]);
   });
 
   it('права под платформу: workspace-write на Windows без песочницы отклоняет всё', () => {

@@ -1,22 +1,71 @@
 import {
   AUTONOMOUS_PICK_MARKER,
   parseAutonomousPickMessage,
-  pickRecommended,
   type RecommendedPick,
 } from '@agentdeck/contracts/chat-group-settings';
 import type { ChatBlock } from '@agentdeck/contracts';
+import { needsHuman, recommendedIndex } from '../group-questions/group-questions.ts';
 
 /**
  * Автовыбор под автономией чата — как его узнаёт панель.
  *
  * Вопрос `AskUserQuestion` закрывают ДВА места, и оба пишут в результат вызова
  * один и тот же текст `autonomousPickMessage` с меткой
- * `AUTONOMOUS_PICK_MARKER`: глобальный хук `PreToolUse` (он срабатывает раньше
- * брокера) и брокер прав панели (там, где хука нет). Поэтому признак берётся не
+ * `AUTONOMOUS_PICK_MARKER`: брокер прав панели и хук `PreToolUse`
+ * `autonomous-pick` (в наборе панели и его двойник в `~/.claude/hooks`) — хук
+ * отвечает там, где брокера нет: прогон с полным доступом брокер не подключает.
+ * Выбор у обоих один — `recommendedPicks` ниже, у хука его копия, сверенная
+ * тестом. Поэтому признак берётся не
  * из брокера, а из РЕЗУЛЬТАТА вызова — он один на оба пути: в потоке прогона
  * это строка `user` с блоком `tool_result`, в транскрипте — та же строка. Один
  * результат на один вызов — и повтор между путями невозможен по устройству.
  */
+
+interface PickOption {
+  label?: unknown;
+  description?: unknown;
+}
+
+interface PickQuestion {
+  question?: unknown;
+  header?: unknown;
+  options?: unknown;
+}
+
+const CRITICAL_HEADER = /^\s*\[?critical\]?\s*$/i;
+
+/**
+ * Что автономия выбирает сама на вызове `AskUserQuestion`: у КАЖДОГО вопроса —
+ * вариант с рекомендацией (подпись или описание, ru/en, без отрицания — как у
+ * группы «по плану», `recommendedIndex`). Нет рекомендации хоть у одного — `null`,
+ * вызов целиком идёт человеку: первый вариант рекомендацией не считается.
+ *
+ * Рекомендованный вариант, который зовёт человека или утверждает сделанное им
+ * («Я войду», «Session refreshed — continue», `needsHuman`), — тоже `null`: взять
+ * его значит соврать агенту от имени человека. Прежний выбор (только
+ * «(Recommended)» в подписи) такие варианты брал, а «(рекомендую)» и
+ * рекомендацию в описании не узнавал и звал человека зря.
+ */
+export function recommendedPicks(input: unknown): RecommendedPick[] | null {
+  const questions = (input as { questions?: unknown } | null | undefined)?.questions;
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const picks: RecommendedPick[] = [];
+  for (const raw of questions as (PickQuestion | null)[]) {
+    if (typeof raw?.question !== 'string') return null;
+    const options = (Array.isArray(raw.options) ? raw.options : []).filter(
+      (option): option is PickOption =>
+        Boolean(option) && typeof (option as PickOption).label === 'string',
+    );
+    const chosen = options[recommendedIndex(options)];
+    if (!chosen || needsHuman(chosen)) return null;
+    picks.push({
+      question: raw.question,
+      label: String(chosen.label),
+      critical: typeof raw.header === 'string' && CRITICAL_HEADER.test(raw.header),
+    });
+  }
+  return picks;
+}
 
 /** Блок `tool_result` — столько, сколько панель из него читает. */
 interface ResultBlockLike {
@@ -53,7 +102,7 @@ export function autoPickResults(content: unknown): { toolUseId: string; text: st
 /**
  * Что выбрано. Выбор — тот, что записан в тексте отказа: ответ группы «по
  * плану» (`group-questions.ts`) берёт не всегда рекомендованный вариант, и
- * пересчёт по `pickRecommended` подменял бы его. Тело вызова известно — из него
+ * пересчёт по `recommendedPicks` подменял бы его. Тело вызова известно — из него
  * только заголовок `critical`; не известно (вызов пришёл раньше, чем панель его
  * увидела) — критичность неизвестна, и такой выбор в главный чат не сообщается.
  * Текст не разобрался — выбор считается по телу, как его считают хук и брокер.
@@ -61,7 +110,7 @@ export function autoPickResults(content: unknown): { toolUseId: string; text: st
 export function picksFor(input: unknown, text: string): RecommendedPick[] {
   const parsed = parseAutonomousPickMessage(text) ?? [];
   if (parsed.length > 0) return withCritical(input, parsed);
-  const fromInput = input === undefined ? null : pickRecommended(input);
+  const fromInput = input === undefined ? null : recommendedPicks(input);
   return fromInput ?? [];
 }
 
@@ -75,10 +124,8 @@ export function confirmedPicks(
   picks: readonly { question: string; label: string }[],
 ): RecommendedPick[] {
   if (picks.length > 0) return withCritical(input, picks);
-  return pickRecommended(input) ?? [];
+  return recommendedPicks(input) ?? [];
 }
-
-const CRITICAL_HEADER = /^\s*\[?critical\]?\s*$/i;
 
 /** Критичность выбора — по заголовку его вопроса в теле вызова. */
 export function withCritical(

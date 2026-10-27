@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { HUMAN_ONLY_LINE } from '../split-continue.ts';
@@ -57,6 +58,30 @@ describe('напоминание доставки: правила один ра�
     );
     expect(prompt).toContain('- sieve contract-by-request: the branch changed the code');
     expect(prompt.split('src/guard.tsx').length - 1).toBe(1);
+  });
+
+  it('пункты одного пробела — наставление один раз, номера списком; разный `why` — своей строкой (g0 F5)', () => {
+    const unsourced = (point: string) => serverText('delivery-gap-task-unsourced', { point });
+    const flip = (point: string, why: string) =>
+      serverText('delivery-gap-task-flip', { point, why });
+    const prompt = deliveryNudgePrompt('feature/users', [
+      unsourced('task-1654'),
+      unsourced('task-1655'),
+      flip('task-1', 'run gone'),
+      unsourced('task-1656'),
+      flip('task-2', 'file moved'),
+    ]);
+    expect(prompt).toContain(
+      '- task point task-1654 is pass with no source: quote the point itself word for word',
+    );
+    expect(prompt).toContain('— the same holds for task-1655, task-1656');
+    expect(prompt.split('is pass with no source').length - 1).toBe(1);
+    expect(prompt).toContain(
+      '- task point task-1: the row turned pass with no new proof — run gone',
+    );
+    expect(prompt).toContain(
+      '- task point task-2: the row turned pass with no new proof — file moved',
+    );
   });
 });
 
@@ -135,5 +160,72 @@ describe('продолжения не спорят с блоком фактов 
       expect(prompt).not.toContain('from the facts: git status, git log');
       expect(prompt).toContain('current as of its timestamp');
     }
+  });
+});
+
+/**
+ * N1 (g3 25.10): описание MR и строки сит группа узнавала только следующим кругом
+ * (~427k токенов за круг). Напоминание с такими пробелами называет команду, которой
+ * группа сверит всё сама до ответа, — путём к настоящему `tests-cli.mjs`.
+ */
+describe('напоминание доставки: самопроверка до ответа', () => {
+  const MR = 'https://git.example.com/team/app/-/merge_requests/1';
+  const notes = serverText('delivery-gap-mr-notes', { mr: MR, items: 'browser-focus' });
+
+  it('пробел описания MR — команда `tests-cli delivery` с путём к CLI панели', () => {
+    const prompt = deliveryNudgePrompt('feature/users', [notes]);
+    const command = /`node "([^"]+)" delivery --project \. --answer /.exec(prompt);
+    expect(command?.[1]).toMatch(/[\\/]tools[\\/]tests-cli\.mjs$/);
+    expect(existsSync(command?.[1] ?? '')).toBe(true);
+    expect(deliveryPolicyIds([notes])).toContain('delivery-self-check');
+    // F-14 (аудит g0 25.10): описание публикуют один раз и проверяют живое MR через панель,
+    // а не пишут файлом для --mr-description и затем то же — в фордж.
+    expect(prompt).toContain('post the MR description to the MR once');
+    expect(prompt).not.toContain('--mr-description <file with the MR description>');
+    // R5 (аудит g9 27.10): повторную публикацию страж набора пускает только после проверки черновика.
+    expect(prompt).toContain('a description already posted that must change goes through it first');
+  });
+
+  it('переворот сита — отчётный пробел: без коммита и push, с самопроверкой', () => {
+    const flip = serverText('sieve-gap-flip', { sieve: 'browser-focus', why: 'same' });
+    const prompt = deliveryNudgePrompt('feature/users', [flip]);
+    expect(prompt).toContain('Only the report is missing');
+    expect(prompt).toContain('delivery --project .');
+  });
+
+  it('нет MR — самопроверки доставки нет (её нечем пройти до push)', () => {
+    expect(deliveryPolicyIds([NO_MR])).not.toContain('delivery-self-check');
+  });
+
+  it('пробелы источника строк следа задач — отчётные: без коммита и push, только названные строки (g1 F3)', () => {
+    const lines = [
+      serverText('delivery-gap-task-unsourced', { point: 'task-1670' }),
+      serverText('delivery-gap-task-quote-unfound', { point: 'task-1669', quote: 'чужая фраза' }),
+      serverText('delivery-gap-task-quote-label', { point: 'task-1669', quote: 'qa-gl244' }),
+      serverText('delivery-gap-task-rewritten', { point: 'task-1', was: 'a', now: 'b' }),
+    ];
+    for (const line of lines) {
+      const prompt = deliveryNudgePrompt('feature/users', [line]);
+      expect(prompt).toContain('Only the report is missing');
+      expect(prompt).toContain('answer with only the rows named above');
+      expect(prompt).not.toContain('Finish it with the delivery skill');
+    }
+  });
+
+  it('заметки, что живое описание MR уже называет, — счётом, не текстом (g1 F4)', () => {
+    const open = 'not checked: browser-focus — no stand';
+    const named = 'not checked: mobile-layout — no device';
+    const prompt = deliveryNudgePrompt('feature/users', [notes], [open, named], new Set(), [named]);
+    expect(prompt).toContain(`- ${open}`);
+    expect(prompt).not.toContain(named);
+    expect(prompt).toContain('1 more note is already named in the live MR description');
+  });
+
+  it('самопроверка: выход 0 — доказательство описания и веток, перечитанный факт — в строку до прогона (g1 F6, F7)', () => {
+    const prompt = deliveryNudgePrompt('feature/users', [notes]);
+    expect(prompt).toContain('do not read them again through the forge');
+    expect(prompt).toContain(
+      'is written into that row first; run the check once, after the last row edit',
+    );
   });
 });

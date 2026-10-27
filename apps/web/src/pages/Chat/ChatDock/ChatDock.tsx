@@ -32,6 +32,7 @@ function DraftComposer({ draft, ...rest }: DraftComposerProps) {
 export function ChatDock({
   focusKey,
   progress,
+  progressChatId,
   isRunning,
   awaiting,
   queued,
@@ -81,6 +82,7 @@ export function ChatDock({
     <>
       {/* План агента и дерево субагентов — read-only, из транскрипта. */}
       <ChatProgressSheet
+        {...(progressChatId ? { chatId: progressChatId } : {})}
         progress={progress}
         isRunning={isRunning}
         {...(awaiting ? { awaiting } : {})}

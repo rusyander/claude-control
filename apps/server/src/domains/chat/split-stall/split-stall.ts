@@ -27,6 +27,13 @@ export const STALL_SILENT_MS = 60 * 60_000;
 /** Как часто сторож смотрит на группы: порог в час не требует чаще. */
 export const STALL_POLL_MS = 5 * 60_000;
 
+/**
+ * Порог нерождённого звена: рождение (сита, запуск CLI) — секунды, а звено,
+ * так и не начавшее ход, само уже не начнётся. Ждать час молчания транскрипта
+ * тут нечего: прошлое звено молчит законно (d9869abf:5, 25.10 — 29 мин простоя).
+ */
+export const STALL_UNBORN_MS = 5 * 60_000;
+
 export type StallStopOutcome = 'stopped' | 'absent' | 'unconfirmed';
 
 export interface SplitStallDeps {
@@ -39,6 +46,11 @@ export interface SplitStallDeps {
   processAlive: (chatIds: readonly string[]) => boolean;
   /** Висит запрос прав человеку: молчание — его, а не группы. */
   waitingOnHuman: (chatIds: readonly string[]) => boolean;
+  /**
+   * Звено группы заведено, не родилось и не идёт (и не ждёт «Продолжить всё»
+   * дерева) — момент его заведения; нет такого — `undefined`.
+   */
+  unbornStage?: (record: SplitPlanRecord, group: SplitPlanGroupRecord) => number | undefined;
   stop: (chatId: string) => StallStopOutcome;
   /** Путь оборванного хода; `undefined` — группа уже не «работает». */
   interrupt: (parentChatId: string, index: number) => { resumed: boolean } | undefined;
@@ -63,6 +75,7 @@ export interface SplitStallDeps {
   log: (message: string, error?: unknown) => void;
   now?: () => number;
   silentMs?: number;
+  unbornMs?: number;
 }
 
 /**
@@ -79,6 +92,7 @@ export function createSplitStallWatch(deps: SplitStallDeps): () => Promise<strin
   /** Журнал уже снят для этого обрыва (повтор после «не снят» не пишет второй). */
   const diagnosed = new Map<string, string | undefined>();
   const limit = deps.silentMs ?? STALL_SILENT_MS;
+  const unbornLimit = deps.unbornMs ?? STALL_UNBORN_MS;
   let busy = false;
 
   interface Stalled {
@@ -106,6 +120,15 @@ export function createSplitStallWatch(deps: SplitStallDeps): () => Promise<strin
         }
         const ids = deps.chatIdsOf(record, group);
         if (ids.length === 0) continue;
+        const unbornAt = group.status === 'started' ? deps.unbornStage?.(record, group) : undefined;
+        if (unbornAt !== undefined) {
+          const idle = now - Math.max(unbornAt, mark.since);
+          if (idle >= unbornLimit && !deps.waitingOnHuman(ids)) {
+            const last = Math.max(unbornAt, deps.lastActivity(ids) ?? 0);
+            found.push({ key, record, group, ids, last, silent: idle });
+          }
+          continue;
+        }
         const last = deps.lastActivity(ids);
         // Транскрипта нет (чужой CLI, сессия не успела начаться) — судить не по чему.
         if (last === undefined) continue;

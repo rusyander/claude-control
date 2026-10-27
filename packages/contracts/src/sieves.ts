@@ -36,5 +36,6 @@
 export * from './sieves/catalog.ts';
 export * from './sieves/report.ts';
 export * from './sieves/judge.ts';
+export * from './sieves/count-claims.ts';
 export * from './sieves/learned.ts';
 export * from './sieves/prompt.ts';

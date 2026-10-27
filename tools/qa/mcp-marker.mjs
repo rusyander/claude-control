@@ -15,6 +15,10 @@ const send = (message) => process.stdout.write(JSON.stringify(message) + '\n');
 // записи по шаблону, а это видно только на именах чтения и записи рядом.
 const toolsAt = process.argv.indexOf('--tools');
 const NAMES = toolsAt > 0 ? process.argv[toolsAt + 1].split(',') : ['marker'];
+// `--instructions <текст>` — указания сервера в ответе `initialize`: CLI кладёт их
+// в каждый запрос (`mcp_instructions`), и набор звена (N8) должен снимать и их.
+const instructionsAt = process.argv.indexOf('--instructions');
+const INSTRUCTIONS = instructionsAt > 0 ? process.argv[instructionsAt + 1] : undefined;
 
 readline.createInterface({ input: process.stdin }).on('line', (line) => {
   if (!line.trim()) return;
@@ -33,6 +37,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         protocolVersion: '2024-11-05',
         capabilities: { tools: {} },
         serverInfo: { name: 't8marker', version: '1.0.0' },
+        ...(INSTRUCTIONS ? { instructions: INSTRUCTIONS } : {}),
       },
     });
     return;

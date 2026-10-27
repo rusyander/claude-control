@@ -411,6 +411,26 @@ describe('ProviderChatService', () => {
     expect(notes).toEqual(['QA workspace: e2e\n\nSwitched off: inbox.']);
   });
 
+  it('снятые поимённо инструменты ребёнка (P-16) доходят до выключателя вместе с именами серверов', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    const seen: unknown[] = [];
+    service.setChildRun(() => ({
+      mcp: {
+        off: [],
+        note: 'Tracker wiki tools are off.',
+        disabledTools: { 'atlassian-x': ['confluence_search'] },
+      },
+    }));
+    service.setMcpOff((_providerId, names, _env, tools) => {
+      seen.push(names, tools);
+      return { AGENTDECK_OFF: JSON.stringify(tools) };
+    });
+    service.send(dir, 'codex', 'wd', { text: 'первый' }, { provider: PROVIDER });
+    const options = run.options as { platformEnv: Record<string, string> };
+    expect(seen).toEqual([[], { 'atlassian-x': ['confluence_search'] }]);
+    expect(options.platformEnv.AGENTDECK_OFF).toBe('{"atlassian-x":["confluence_search"]}');
+  });
+
   /** Ревью B2-F16: окружение ребёнка — необязательное, пока его не задал другой слой. */
   it('окружение ребёнка уходит прогону необязательным; ключ слоя группы — нет', () => {
     createChat(dir, 'codex', { id: 'wd', workdir: dir });
@@ -419,6 +439,30 @@ describe('ProviderChatService', () => {
     service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
     const options = run.options as { optionalEnvKeys?: string[] };
     expect(options.optionalEnvKeys).toEqual(['AGENTDECK_BRIEF_OUTPUT']);
+  });
+
+  /** P-30: стадия звена, доставка впереди и tests-cli панели — обязательные: ход уходит в свой запуск. */
+  it('ключи звена ребёнка уходят прогону обязательными, прочее окружение ребёнка — нет', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setChildRun(() => ({
+      env: {
+        AGENTDECK_BRIEF_OUTPUT: '1',
+        AGENTDECK_GROUP_STAGE: 'review',
+        AGENTDECK_GROUP_DELIVER_AHEAD: '1',
+        AGENTDECK_TESTS_CLI: '/panel/tools/tests-cli.mjs',
+      },
+    }));
+    service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+    const options = run.options as {
+      optionalEnvKeys?: string[];
+      platformEnv: Record<string, string>;
+    };
+    expect(options.optionalEnvKeys).toEqual(['AGENTDECK_BRIEF_OUTPUT']);
+    expect(options.platformEnv).toMatchObject({
+      AGENTDECK_GROUP_STAGE: 'review',
+      AGENTDECK_GROUP_DELIVER_AHEAD: '1',
+      AGENTDECK_TESTS_CLI: '/panel/tools/tests-cli.mjs',
+    });
   });
 
   /** Ревью B2-F15: запуск ребёнка не главнее разговора. */

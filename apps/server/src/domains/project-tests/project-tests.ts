@@ -64,8 +64,10 @@ export {
   buildReport,
   evidenceOf,
   flakyCases,
+  readBaseRuns,
   readRun,
   readRuns,
+  writeBaseRun,
   writeRun,
 } from './runs-store/runs-store.ts';
 export { diffRuns, diffWithPrevious, failedCases } from './compare/compare.ts';

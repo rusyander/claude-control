@@ -2,8 +2,11 @@ import type { GroupWatch, GroupSignal, GroupWatchRecord } from '@agentdeck/contr
 import type { SplitPlanGroupRecord } from '../../../../../lib/app-store/app-store.types.ts';
 import type { RunWatchFeed } from '../../../ChatRunRegistry/ChatRunRegistry.types.ts';
 import type { LearnedDurations } from '../check-signature.ts';
+import type { LimitRunRecord } from '../../../limit-journal/limit-journal.ts';
 import type { LimitPoint } from '../rules.ts';
 import type { WatchEvent, WatchNode, WatchState } from '../watch.types.ts';
+import type { LedgerSource } from './ledger-feed.ts';
+import type { RestartFeed } from './restart-rules.ts';
 
 export interface ResumeSeed {
   lastCallAt: number;
@@ -36,6 +39,13 @@ export interface ChatSignalStore {
   /** Записать в память; на диск — `saveChat` сторожа. `undefined` — стереть. */
   set: (chatId: string, record: GroupWatchRecord | undefined) => void;
   all: () => Record<string, unknown>;
+}
+
+/** Ждущий D-n, который решает только человек (R45): номер, инструмент, когда спросили. */
+export interface DeferredStuck {
+  id: string;
+  tool: string;
+  at: number;
 }
 
 /** Живость группы по всем её ключам — для R22 (группа стоит без хода). */
@@ -87,6 +97,22 @@ export interface GroupWatcherDeps {
   ) => GroupLive;
   /** Когда группа последний раз писала (переписка её звеньев) — затравка тишины R22 после перезапуска. */
   groupSeenAt?: (parentChatId: string, group: SplitPlanGroupRecord) => number | undefined;
+  /**
+   * Самый ранний ждущий D-n группы, который панель сама разрешить не смогла
+   * (`not-auto-approved`) — R45; нет — R45 молчит.
+   */
+  deferredStuck?: (parentChatId: string, groupIndex: number) => DeferredStuck | undefined;
+  /** Группа ждёт решения человека по любому D-n — R43 о её паузе молчит. */
+  deferredWaiting?: (parentChatId: string, groupIndex: number) => boolean;
+  /** Перезапуски сервера панели (журнал и состояние dev-watch) — R38, R39; нет — молчат. */
+  restartFeed?: () => RestartFeed;
+  /**
+   * Файл правленых файлов групп (R38): перезапуск, который вызвала правка, гасит процесс
+   * со всей памятью сторожа — новый процесс читает правки отсюда. Нет — только ждущий.
+   */
+  editsFile?: string;
+  /** Журнал проверок (verify-ledger) — R40, R41; нет — молчат. */
+  ledger?: LedgerSource;
   /** Все разделения (живые записи): закрыть активные сигналы, за которыми сессии нет. */
   plans?: () => Record<string, { groups: readonly SplitPlanGroupRecord[] }>;
   /** Что знает панель о звене сейчас: идёт ли группа, вопрос человеку, очередь. */
@@ -103,6 +129,13 @@ export interface GroupWatcherDeps {
   canonical?: (chatId: string) => string;
   /** Замеры окна всех прогонов аккаунта (журнал лимита) — к живым замерам потока для R9. */
   limitSamples?: () => readonly LimitPoint[];
+  /** Прогоны аккаунта из журнала лимита — тяжёлый прогон группы (R42); нет — R42 молчит. */
+  limitRuns?: () => readonly LimitRunRecord[];
+  /**
+   * Источники панели для охвата (`coverageOf`): журнал проверок поставлен, сервер под
+   * dev-watch. Нет — по наличию `ledger` и `restartFeed` (проверки без окружения).
+   */
+  panelSources?: () => { ledger: boolean; devWatch: boolean };
   /** Сигнал «внимание»/«тревога» поднят впервые — уведомить (каналы решают сами). */
   notify?: (signal: GroupSignal, target: WatchTarget) => void;
   panelRoot?: string;
@@ -136,7 +169,9 @@ export interface TranscriptHint {
  */
 export type GroupWatchFeed =
   | Exclude<RunWatchFeed, { kind: 'start' }>
-  | (Extract<RunWatchFeed, { kind: 'start' }> & { provider?: string; local?: boolean });
+  | (Extract<RunWatchFeed, { kind: 'start' }> & { provider?: string; local?: boolean })
+  /** Строка потока хода чужого CLI без переписки (Gemini CLI) — читатель провайдера (`foreign-stream`). */
+  | { kind: 'foreign'; sessionId?: string; row: unknown };
 
 export interface Session {
   state: WatchState;
@@ -158,4 +193,8 @@ export interface Session {
   /** Ход начат и не кончен: чужой CLI идёт мимо реестра, живость его группы (R22) — отсюда. */
   turnOpen?: boolean;
   readMain?: (row: unknown) => WatchEvent[];
+  /** Читатель переписки-документа (Continue): весь документ → ещё не отданные события. */
+  readDoc?: (doc: unknown, now: number) => WatchEvent[];
+  /** Читатель строк потока хода (Gemini CLI): модель хода он помнит со строки `init`. */
+  readStream?: (row: unknown) => WatchEvent[];
 }

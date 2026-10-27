@@ -1,0 +1,127 @@
+{
+  "title": {
+    "ru": "Дерево субагентов в чате: ход каждого справа, остановка одного субагента, скиллы, хуки и MCP каждого агента, счёт агентов на карточке группы",
+    "en": "Subagent tree in the chat: each one's turn on the right, stopping a single subagent, skills, hooks and MCP of every agent, agent counts on the group card"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "«Кому раздана работа» стала деревом: субагент, запущенный субагентом, вложен под ним, ветка сворачивается. У каждого узла — модель, число вызовов, расход токенов, время и последнее действие. По дереву ходят стрелки, Home и End.",
+        "en": "«Who got the work» became a tree: a subagent launched by a subagent sits under it, and a branch folds. Each node shows the model, the number of calls, tokens spent, time and the last action. Arrow keys, Home and End walk the tree."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["tree-before.png", "tree-after.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Щелчок или Enter на узле открывает ход субагента в правой колонке чата: задание, с которым его запустили, и шаги по порядку, без права вмешаться. Escape закрывает колонку и возвращает фокус на узел.",
+        "en": "A click or Enter on a node opens the subagent's turn in the chat's right column: the task it was started with and its steps in order, read-only. Escape closes the column and returns focus to the node."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "У идущего субагента — «Остановить»: CLI получает просьбу остановить только его, главный ход продолжается. CLI подтверждает приём, а не саму остановку, поэтому строка пишет «остановка запрошена», а остановленный субагент потом помечен «остановлен», а не «упал».",
+        "en": "A running subagent has «Stop»: the CLI is asked to stop that one only, and the main turn goes on. The CLI confirms receipt, not the stop itself, so the row reads «stop requested», and a stopped subagent is later marked «stopped», not «failed»."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка группы показывает, сколько её агентов идёт и сколько закончено, и ярлык на каждого: щелчок открывает его ход.",
+        "en": "A group card shows how many of its agents are running and how many are done, with a chip for each: a click opens its turn."
+      },
+      "area": { "ru": "Группы", "en": "Groups" },
+      "images": ["group-card-before.png", "group-card-after.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Под строкой главного агента и под каждым узлом дерева — значки того, что у агента сработало: скиллы по именам, серверы MCP, число хуков и отдельно число отказов хуков. У агента без срабатываний значков нет.",
+        "en": "Under the main agent's line and under every tree node, chips show what fired for that agent: skills by name, MCP servers, the number of hooks and, separately, the number of hook refusals. An agent with nothing fired has no chips."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["extensions-chips.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Щелчок по значкам открывает окно «Скиллы, хуки и MCP»: слева главный агент и все субагенты, справа у выбранного — срабатывания по времени, у каждого итог («прошло», «ошибка», «отказ» с причиной, «в контекст», «идёт») и длительность, короче секунды — в миллисекундах.",
+        "en": "A click on the chips opens the «Skills, hooks and MCP» window: the main agent and every subagent on the left, and for the selected one its runs in time order on the right, each with its outcome («passed», «error», «denied» with the reason, «into context», «running») and duration, under a second in milliseconds."
+      },
+      "how": {
+        "ru": "Срабатывания берутся из транскриптов агента и субагентов: вызовы Skill и инструментов mcp__ до их результата, записи хуков CLI; у большого транскрипта читается его последняя часть, и окно говорит об этом прямо.",
+        "en": "Runs come from the transcripts of the agent and its subagents: Skill and mcp__ tool calls up to their result, and the CLI's hook records; for a large transcript its last part is read, and the window says so."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["extensions-window.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка группы несёт строку значков всей группы с тем же окном, открытым на её главном агенте. Полоса плана над полем ввода появляется и тогда, когда главный агент вызвал скилл или MCP; одни хуки её не открывают — они срабатывают в каждом разговоре.",
+        "en": "A group card carries a line of chips for the whole group with the same window, opened on its main agent. The plan strip above the input also appears when the main agent called a skill or MCP; hooks alone do not open it, since they fire in every conversation."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Список субагентов больше не теряет вложенных субагентов и тех, чей запуск остался в непрочитанной середине длинного транскрипта: они строятся по файлам самих субагентов.",
+        "en": "The subagent list no longer loses nested subagents or those whose launch sits in the unread middle of a long transcript: they are built from the subagents' own files."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    }
+  ],
+  "images": [
+    {
+      "file": "tree-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Плоский список, вложенный субагент не виден",
+        "en": "A flat list, the nested subagent is missing"
+      }
+    },
+    {
+      "file": "tree-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Дерево с метриками и «Остановить»",
+        "en": "The tree with metrics and «Stop»"
+      }
+    },
+    {
+      "file": "group-card-before.png",
+      "role": "before",
+      "caption": { "ru": "Карточка группы без агентов", "en": "A group card without agents" }
+    },
+    {
+      "file": "group-card-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Счёт агентов и ярлык на каждого",
+        "en": "Agent counts and a chip for each"
+      }
+    },
+    {
+      "file": "extensions-chips.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Значки скиллов, MCP и хуков у главного агента и узлов",
+        "en": "Skill, MCP and hook chips on the main agent and the nodes"
+      }
+    },
+    {
+      "file": "extensions-window.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Окно «Скиллы, хуки и MCP»: срабатывания агента по времени",
+        "en": "The «Skills, hooks and MCP» window: an agent's runs in time order"
+      }
+    }
+  ]
+}

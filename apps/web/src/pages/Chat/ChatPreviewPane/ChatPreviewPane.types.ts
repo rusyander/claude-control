@@ -1,4 +1,5 @@
 import type { Artifact, MediaDeck, MediaImage } from '@agentdeck/contracts';
+import type { AgentPaneTarget } from '@entities/AgentTree';
 
 export interface ChatPreviewPaneProps {
   chatId: string;
@@ -15,6 +16,13 @@ export interface ChatPreviewPaneProps {
    * предпросмотра, открытого раньше.
    */
   deck?: MediaDeck;
+  /**
+   * Ход субагента, открытый деревом агентов. Слабее картинки и колоды (их
+   * только что попросили), сильнее артефакта: узел щёлкнули позже.
+   */
+  agent?: AgentPaneTarget;
+  /** Закрыть ход субагента — у него своё закрытие: фокус возвращается узлу. */
+  onCloseAgent?: () => void;
   /** Текущая ширина панели в пикселях — её же тянет ручка слева. */
   width: number;
   onResize: (width: number) => void;

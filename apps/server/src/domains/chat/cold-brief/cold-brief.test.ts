@@ -7,12 +7,14 @@ import {
   BRIEF_LAST_ANSWER_CHARS,
   BRIEF_NOTEBOOK_CHARS,
   BRIEF_NOTEBOOK_WHOLE,
+  changedFacts,
   coldBriefFacts,
   interruptedStretch,
   lastAnswer,
 } from './cold-brief.ts';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
 import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
+import { REVIEW_FINDINGS, writeReviewFindings } from '../review-findings/review-findings.ts';
 
 /**
  * Вводная нового разговора вместо остывшего собирается панелью (директива L4):
@@ -73,8 +75,12 @@ describe('coldBriefFacts', () => {
     );
     // База — origin, а не начало истории: коммит источника в список не попал.
     expect(facts).not.toMatch(/[0-9a-f]+ base\n/);
-    expect(facts).toContain('b.txt');
-    expect(facts).toMatch(/## Uncommitted \(git status --short\)\n M a\.txt/);
+    // Правка от базы и незакоммиченное — одна строка: код статуса слева, пусто — закоммичен.
+    expect(facts).toMatch(/\n {3}b\.txt \+1 -0\n/);
+    expect(facts).toMatch(/\n M a\.txt \+1 -0\n/);
+    expect(facts).toMatch(
+      /## Uncommitted, not in the list above \(git status --short\)\n\?\? \.agent\//,
+    );
     expect(facts).toContain('Итог стадии: одно замечание осталось.');
     expect(facts).not.toContain('Первый ответ.');
     expect(facts).toContain(`Previous transcript: ${transcript}`);
@@ -92,10 +98,118 @@ describe('coldBriefFacts', () => {
     const facts = coldBriefFacts(copy, transcript, 'split/fix');
     expect(facts).toMatch(/## Commits on split\/next since split\/fix\n[0-9a-f]+ next: own fix/);
     expect(facts).not.toContain('group: first fix');
-    expect(facts).toMatch(/## Changed vs split\/fix \(git diff --stat\)\n c\.txt/);
+    expect(facts).toMatch(
+      /## Changed vs split\/fix \(working tree vs base[^\n]*\n1 files[^\n]*\n {3}c\.txt/,
+    );
     expect(facts).not.toMatch(/ b\.txt/);
     // Ветки предшественника в копии нет — база прежняя, origin.
     expect(coldBriefFacts(copy, transcript, 'split/gone')).toContain('since origin/HEAD');
+  });
+
+  // g8 GOR-1063, 26.10: копия посреди rebase — «Changed vs» (2,5k) и «Uncommitted» (3,2k)
+  // перечисляли одни и те же 86 путей. Слепок того случая: 86 страниц ru/en, правки в индексе
+  // поверх коммитов, одна MM, одна « M» поверх закоммиченной, переименование, бинарный,
+  // неотслеживаемый.
+  it('путь в обоих списках печатается один раз, с кодом статуса; ничего не теряется', () => {
+    dir = mkdtempSync(join(tmpdir(), 'cold-brief-'));
+    const origin = join(dir, 'origin');
+    mkdirSync(origin);
+    git(origin, 'init', '-q', '-b', 'main');
+    git(origin, 'config', 'user.email', 't@example.com');
+    git(origin, 'config', 'user.name', 't');
+    const pages = ['en', 'ru'].flatMap((lang) =>
+      Array.from(
+        { length: 43 },
+        (_, i) => `docs-ui/content/${lang}/s${String(i).padStart(2, '0')}/page.mdx`,
+      ),
+    );
+    for (const page of pages) {
+      mkdirSync(join(origin, page, '..'), { recursive: true });
+      writeFileSync(join(origin, page), 'base\n');
+    }
+    writeFileSync(join(origin, 'aa-old.mdx'), 'renamed body one\nrenamed body two\n');
+    writeFileSync(join(origin, 'aa-logo.bin'), Buffer.from([0, 1, 2, 3]));
+    git(origin, 'add', '.');
+    git(origin, 'commit', '-q', '-m', 'base');
+    const copy = join(dir, 'copy');
+    git(dir, 'clone', '-q', origin, copy);
+    git(copy, 'config', 'user.email', 't@example.com');
+    git(copy, 'config', 'user.name', 't');
+    git(copy, 'checkout', '-q', '-b', 'split/fix');
+    // Закоммичено группой: три страницы и новый файл.
+    for (const page of pages.slice(0, 3)) writeFileSync(join(copy, page), 'base\ncommitted\n');
+    writeFileSync(join(copy, 'docs-ui/committed-only.mdx'), 'new\n');
+    git(copy, 'add', '.');
+    git(copy, 'commit', '-q', '-m', 'group: first pages');
+    // Не закоммичено: остальные страницы в индексе, s05 ещё и в дереве (MM), s00 — в дереве ( M).
+    for (const page of pages.slice(3)) writeFileSync(join(copy, page), 'base\nstaged\n');
+    git(copy, 'add', '.');
+    writeFileSync(join(copy, pages[5]!), 'base\nstaged\nworking\n');
+    writeFileSync(join(copy, pages[0]!), 'base\ncommitted\nworking\n');
+    git(copy, 'mv', 'aa-old.mdx', 'aa-new.mdx');
+    writeFileSync(join(copy, 'aa-logo.bin'), Buffer.from([0, 9, 9, 3]));
+    git(copy, 'add', 'aa-logo.bin');
+    writeFileSync(join(copy, 'draft.mdx'), 'untracked\n');
+    const transcript = join(dir, 's.jsonl');
+    writeFileSync(transcript, answer('итог'));
+
+    const facts = coldBriefFacts(copy, transcript);
+    const times = (text: string) => facts.split(text).length - 1;
+    // Каждый путь — не больше одного раза (раньше первые 40 шли в обоих списках).
+    for (const page of pages) expect(times(page), page).toBeLessThanOrEqual(1);
+    expect(times('docs-ui/content/en/s05/page.mdx')).toBe(1);
+    expect(facts).toContain('\nMM docs-ui/content/en/s05/page.mdx +2 -0\n');
+    expect(facts).toContain('\n M docs-ui/content/en/s00/page.mdx +2 -0\n');
+    expect(facts).toContain('\nM  docs-ui/content/en/s03/page.mdx +1 -0\n');
+    expect(facts).toContain('\n   docs-ui/committed-only.mdx +1 -0\n');
+    // Переименование и бинарный видны, со своим кодом.
+    expect(facts).toContain('\nR  aa-old.mdx -> aa-new.mdx +0 -0\n');
+    expect(facts).toContain('\nM  aa-logo.bin bin\n');
+    // Счёт целиком: 86 страниц + новый файл + бинарный + переименованный; строки — 84 страницы
+    // по +1, две (s00, s05) по +2, новый файл +1.
+    expect(facts).toContain('\n89 files, +89 -0; 86 of them uncommitted\n');
+    expect(facts).toMatch(/\n…\(49 more files, \d+ of them uncommitted\)\n/);
+    // Только в статусе — своим списком; общий незакоммиченный список не повторяется.
+    expect(facts).toContain(
+      '## Uncommitted, not in the list above (git status --short)\n?? draft.mdx',
+    );
+    expect(facts).not.toContain('## Uncommitted (git status --short)');
+  });
+
+  // Сырые строки — ровно как их печатает git 2.x с `-z` (сверено на живом репозитории).
+  it('changedFacts: git status не ответил — пустая колонка не выдаётся за «закоммичен»', () => {
+    const numstat = '2\t0\ta.mdx\u0000-\t-\tb.bin\u00000\t0\t\u0000old.mdx\u0000new.mdx\u0000';
+    const status = 'MM a.mdx\u0000 M b.bin\u0000R  new.mdx\u0000old.mdx\u0000?? un.txt\u0000';
+    expect(changedFacts('origin/HEAD', numstat, status)).toEqual([
+      '## Changed vs origin/HEAD (working tree vs base, git diff --numstat; left column = git ' +
+        'status --short code, blank = committed and clean)',
+      '3 files, +2 -0; 3 of them uncommitted',
+      'MM a.mdx +2 -0',
+      ' M b.bin bin',
+      'R  old.mdx -> new.mdx +0 -0',
+      '## Uncommitted, not in the list above (git status --short)',
+      '?? un.txt',
+    ]);
+    const blind = changedFacts('origin/HEAD', numstat, undefined);
+    expect(blind[0]).toContain('git status did not answer');
+    expect(blind[1]).toBe('3 files, +2 -0');
+    // Откуда переименован — из самого numstat, не только из статуса.
+    expect(blind).toContain('   old.mdx -> new.mdx +0 -0');
+    expect(blind).not.toContain('## Uncommitted (git status --short)');
+  });
+
+  it('дерево чисто — «clean»; нет базы — незакоммиченное прежним списком', () => {
+    const { copy, transcript } = copyWithWork();
+    git(copy, 'stash', '-q', '-u');
+    const clean = coldBriefFacts(copy, transcript);
+    expect(clean).toContain('## Uncommitted (git status --short)\nclean');
+    expect(clean).toMatch(/\n {3}b\.txt \+1 -0\n/);
+    // Без origin базы нет: раздела «Changed vs» нет, статус — своим списком.
+    git(copy, 'stash', 'pop', '-q');
+    git(copy, 'remote', 'remove', 'origin');
+    const alone = coldBriefFacts(copy, transcript);
+    expect(alone).not.toContain('## Changed vs');
+    expect(alone).toMatch(/## Uncommitted \(git status --short\)\n M a\.txt\n\?\? \.agent\//);
   });
 
   // F-06: панель сама ведёт блокнот группы и тикеты в `.agent/run/` — именно там
@@ -112,6 +226,22 @@ describe('coldBriefFacts', () => {
       facts.indexOf(`## Notebook ${rel}`),
     );
     expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  // Аудит g9 27.10 (R7): номера находок ревью — в вводной оглавлением, текст — в файле.
+  it('находки ревью едут оглавлением R-n со ссылкой на файл, а не телом карточек', () => {
+    const { copy, transcript } = copyWithWork();
+    const cards = [1, 2, 3, 4].map(
+      (n) => `🔴 src/f${n}.ts:${n} — defect ${n}\n${'why '.repeat(120)}`,
+    );
+    writeReviewFindings(copy, { kind: 'fix', findings: cards, at: '2026-10-27T12:00:00Z' });
+    const facts = coldBriefFacts(copy, transcript);
+    const section = facts.slice(facts.indexOf(`## Notebook ${REVIEW_FINDINGS}`));
+    expect(section).toContain('## R-1 · 🔴 src/f1.ts:1 — defect 1');
+    expect(section).toContain('## R-4 · 🔴 src/f4.ts:4 — defect 4');
+    expect(section).toContain(`index only`);
+    expect(section).toContain(`Read ${REVIEW_FINDINGS}`);
+    expect(facts).not.toContain('why why why');
   });
 
   it('длинные заметки и ответ обрезаны с пометкой; не репозиторий и нет заметок — разделов нет', () => {

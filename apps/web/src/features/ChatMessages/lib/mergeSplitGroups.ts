@@ -1,4 +1,5 @@
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
+import { groupWatchCoverageOf } from '@agentdeck/contracts/group-watch';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
 import type { GroupControlAction } from '../ui/GroupControl.types';
 import { acceptanceOf } from './groupAcceptance';
@@ -114,6 +115,10 @@ export function mergeSplitGroups(
           : {}),
         // Пауза одной группы (журнал 81a) — метка строки и кнопка «Продолжить».
         ...(group.status === 'paused' ? { isPaused: true } : {}),
+        // Паузу поставил сторож групп на конце хода (F1): метка называет правило.
+        ...(group.status === 'paused' && group.pausedBy === 'watch'
+          ? { pausedByWatch: group.pausedRule ?? '' }
+          : {}),
         ...controlOf(group, split, true),
         // Ручная приёмка доставленной группы (TK-accepted).
         ...acceptanceOf(group, split, found.row.isRunning),
@@ -134,6 +139,7 @@ export function mergeSplitGroups(
         ...(queued ? { mergeOrder: queued } : {}),
         // Сигналы сторожа — и у идущего звена: ради него они и заведены.
         ...(group.watchSignals?.length ? { watchSignals: group.watchSignals } : {}),
+        ...watchCoverageOf(group.watchCoverage),
         // Разрешённое по строке «с отметкой» — и у идущего звена: это то, что
         // прошло без человека прямо сейчас.
         ...(group.autoNotices?.length
@@ -258,7 +264,14 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
     // Сигналы сторожа — и у группы без строки чата: её чат до списка ещё не
     // доехал, а тревога «группа молчит» как раз про неё (F-69).
     ...(group.watchSignals?.length ? { watchSignals: group.watchSignals } : {}),
+    ...watchCoverageOf(group.watchCoverage),
   };
+}
+
+/** Охват сторожа с сервера другой версии: неизвестный источник — без фишки. */
+function watchCoverageOf(value: unknown): Pick<ChildStageGroup, 'watchCoverage'> {
+  const coverage = groupWatchCoverageOf(value);
+  return coverage ? { watchCoverage: coverage } : {};
 }
 
 /**

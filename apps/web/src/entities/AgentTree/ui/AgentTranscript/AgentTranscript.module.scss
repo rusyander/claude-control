@@ -1,0 +1,189 @@
+// Правая колонка чата — та же рамка, что у предпросмотра артефакта: столбец
+// один, и содержимое меняется, а не место.
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+}
+
+.header {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.heading {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-height: 0;
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.note {
+  margin: 0;
+}
+
+.prompt {
+  font-size: var(--font-size-body-sm);
+
+  summary {
+    color: var(--color-fg-subtle);
+    font-size: var(--font-size-caption);
+    cursor: pointer;
+  }
+}
+
+.promptText {
+  margin: var(--spacing-3xs) 0 0;
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.stepsHead {
+  margin-top: var(--spacing-2xs);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  min-width: 0;
+}
+
+.text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thinking {
+  margin: 0;
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+// Вызов — карточкой с полосой слева: ход читается как лента вызовов, а реплики
+// между ними — обычным текстом.
+.tool {
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+}
+
+.toolError {
+  border-left-color: var(--color-danger);
+}
+
+.call {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+  font-size: var(--font-size-body-sm);
+}
+
+.toolName {
+  font-weight: var(--font-weight-medium);
+}
+
+.summary {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+  word-break: break-all;
+}
+
+.badgeRunning,
+.badgeError {
+  padding: 0 var(--spacing-3xs);
+  border-radius: 4px;
+  font-size: var(--font-size-caption);
+}
+
+.badgeRunning {
+  color: var(--color-warning);
+  background: var(--color-warning-subtle);
+}
+
+.badgeError {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.result {
+  max-height: 160px;
+  margin: var(--spacing-3xs) 0 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-fg-muted);
+  scrollbar-width: thin;
+}
+
+// Время, длительность и размер результата вызова — одной приглушённой строкой.
+.meta,
+.turn {
+  margin: var(--spacing-3xs) 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.turn {
+  margin: 0 0 var(--spacing-3xs);
+}
+
+.clock {
+  color: var(--color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+// Причина отказа хука — текстом, а не в окне результата: её читают целиком.
+.denial {
+  margin: var(--spacing-3xs) 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--color-danger);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.totals {
+  margin: 0;
+}
+
+.paging {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+}

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProcessRow } from '../../lib/kill-tree.mjs';
+import type { PrintedPid } from './printed-pids.ts';
 
 /**
  * Чей процесс гасит группа (D-1, 24.10). Живое дерево от CLI группы (`ownPids`
@@ -233,6 +234,27 @@ export interface OwnerEvidence {
   transcriptDir?: string;
   ran?: typeof ranInCopy;
   platform?: string;
+  /** Номера, которые разговор группы напечатал о своём запуске (`printed-pids.ts`, D-8). */
+  printed?: ReadonlyMap<number, PrintedPid>;
+}
+
+/** Запас на часы записи вызова и печати относительно времени создания процесса. */
+const PRINTED_SLACK_MS = 2_000;
+
+/**
+ * Напечатанный номер — свой (D-8, 25.10): процесса с ним уже нет (гасить нечего),
+ * или он заведён между записью своего запуска и печатью. Заведён вне окна или
+ * время создания неизвестно — номер мог достаться чужому процессу: не доказано.
+ */
+function printedOwn(row: OwnerRow | undefined, printed: PrintedPid | undefined): boolean {
+  if (!printed) return false;
+  if (!row) return true;
+  if (row.created <= 0n) return false;
+  const created = msOfFiletime(row.created);
+  return (
+    created >= printed.notBeforeMs - PRINTED_SLACK_MS &&
+    created <= printed.notAfterMs + PRINTED_SLACK_MS
+  );
 }
 
 /** Номера из `pids`, чьё происхождение от группы доказано (см. шапку модуля). */
@@ -246,6 +268,10 @@ export function provenOwn(
   const own = new Set<number>();
   for (const pid of pids) {
     if (evidence.tree.has(pid) || evidence.marks?.get(pid) === true) {
+      own.add(pid);
+      continue;
+    }
+    if (printedOwn(byPid.get(pid), evidence.printed?.get(pid))) {
       own.add(pid);
       continue;
     }

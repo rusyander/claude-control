@@ -369,7 +369,9 @@ export const localModelsEn: typeof localModelsRu = {
     kitGlobal: 'Yours',
     kitGlobalText:
       'Your skills, hooks and rules — exactly as in normal work. The default when you have a layer of your own. ' +
-      'The local-model discipline block (one subagent at a time, no reviewer fan-out) reaches the agent in this mode too.',
+      'The local-model discipline block (one subagent at a time, no reviewer fan-out) reaches the agent in this mode too. ' +
+      'On top, Claude Code gets only the kit guards your layer lacks (consent for git writes, no merging, ' +
+      'destructive commands, secrets) — no skills or rules.',
     kitOurs: 'Panel kit only',
     kitOursText:
       'The panel’s rules and skills; your personal settings are not loaded. Project files (.claude ' +
@@ -381,7 +383,8 @@ export const localModelsEn: typeof localModelsRu = {
     kitHybridText:
       'Your kit with the panel’s on top. For Claude Code and Codex (Codex gets the rules and ' +
       'skills only); Qwen Code has no way to add a kit for a single run. The default for Claude Code and ' +
-      'Codex while you have no layer of your own: no skills, commands, subagents, CLAUDE.md or AGENTS.md.',
+      'Codex while you have no layer of your own: no skills, commands, subagents, CLAUDE.md or AGENTS.md. ' +
+      'A kit guard with a twin in your layer yields to it — one call never gets two answers.',
 
     runtimeTitle: 'Where the model server comes from',
     runtimeText:

@@ -3,10 +3,10 @@ import type { usageLimitsRu } from './ru.ts';
 /** English texts of the subscription usage limits in the sidebar; typed against the Russian module. */
 export const usageLimitsEn: typeof usageLimitsRu = {
   title: 'Plan usage limits',
-  session: 'Session (5 h)',
+  session: 'Session',
   weekly: 'Week',
   weeklyModel: 'Week · {{model}}',
-  reset: 'resets {{time}}',
+  reset: 'resets in {{until}}',
   resetUnknown: 'reset not given',
   aria: '{{label}}: {{percent}} used, {{reset}}',
   tooltipUsed: '{{label}}: {{percent}} used',

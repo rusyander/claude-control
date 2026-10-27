@@ -94,6 +94,17 @@ export function hasWorkSince(projectDir: string, since?: string): boolean {
 }
 
 /**
+ * Голова копии полным sha — коммит, с которого группа начинает работу (`ChatLink.startSha`,
+ * владелец 26.10: ревью группы — дифф от её начала, а не вся ветка против основной).
+ * Синхронно: зовётся при записи связи, до старта прогона. Не репозиторий, пустая
+ * история, git не ответил — `undefined`, и ревью идёт прежним путём.
+ */
+export function readHeadSha(projectDir: string): string | undefined {
+  const sha = gitSync(projectDir, ['rev-parse', '--verify', '--quiet', 'HEAD'])?.trim();
+  return sha && /^[0-9a-f]{40,64}$/.test(sha) ? sha : undefined;
+}
+
+/**
  * Каталог пригоден для операции записи — иначе GitError с причиной. Живёт
  * здесь, а не рядом с операциями: копии (`worktrees.ts`) начинаются с той же
  * проверки, и второй её экземпляр разошёлся бы с этим при первой же правке.

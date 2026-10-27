@@ -1402,3 +1402,85 @@ describe('planForeignStage — контекст звеньев (F2, парите
     }
   });
 });
+
+/**
+ * «Ревью после работы» у чужого CLI (R3(d), 26.10) — тот же флаг, что у Claude: снят
+ * в шапку при запуске; выключенный ведёт работу в доставку с причиной.
+ */
+describe('planForeignStage — «Ревью после работы» выключено (R3(d))', () => {
+  const OFF: ProviderChatCascade = { ...WORK, reviewAfterWork: false };
+  const settings = { taskSplitInitiative: false, handoffInitiative: false };
+  const planned = (cascade: ProviderChatCascade, extra: { deliver?: boolean } = {}) => {
+    let noted = 0;
+    const plan = planForeignStage({
+      cascade,
+      ok: true,
+      text: 'готово',
+      task: 'Переименуй foo в bar',
+      hasWork: () => true,
+      noteReviewOff: () => (noted += 1),
+      ...extra,
+    });
+    return { plan, noted };
+  };
+
+  it('выключено — доставка с причиной на модели работы, звена ревью нет', () => {
+    const { plan, noted } = planned(OFF, { deliver: true });
+
+    expect(plan?.stage).toBe('deliver');
+    expect(plan?.model).toBe('gpt-5.3-codex-spark');
+    expect(plan?.prompt).toContain(
+      'the panel skipped its review: the human turned «review after work» off for this project',
+    );
+    expect(noted).toBe(1);
+  });
+
+  it('включено — ревью настройкой CLI, как раньше; без доставки при выключенном — конец', () => {
+    const on = planned(WORK, { deliver: true });
+    expect(on.plan?.stage).toBe('review');
+    expect(on.noted).toBe(0);
+
+    const ended = planned(OFF);
+    expect(ended.plan).toBeUndefined();
+    expect(ended.noted).toBe(1);
+  });
+
+  it('понижённая работа без правок по-прежнему поднимается на потолок, флаг едет дальше', () => {
+    let noted = 0;
+    const raised = planForeignStage({
+      cascade: OFF,
+      ok: true,
+      text: 'правок нет',
+      task: 'Переименуй foo в bar',
+      hasWork: () => false,
+      deliver: true,
+      noteReviewOff: () => (noted += 1),
+    });
+
+    expect(raised).toMatchObject({ stage: 'work', raised: true });
+    expect(raised?.model).toBeUndefined();
+    expect(raised?.cascade).toMatchObject({ stage: 'work', reviewAfterWork: false });
+    expect(noted).toBe(0);
+  });
+
+  it('флаг едет с плана на работу; планка сдачи работы не обещает ревью, но обещает подъём', () => {
+    const work = planForeignStage({
+      cascade: { ...PLAN, reviewAfterWork: false },
+      ok: true,
+      text: planBlock('1. Прочитать src/foo.ts'),
+      task: 'задание плана',
+      hasWork: () => true,
+      link: PLAN_LINK,
+    }) as ForeignStagePlan;
+
+    expect(work.cascade).toMatchObject({ stage: 'work', reviewAfterWork: false });
+    const prefix = foreignStagePrefix(work, settings);
+    expect(prefix).toContain('The panel will not start a review of this work');
+    expect(prefix).toContain(
+      'the panel re-runs the task on the model the CLI itself is configured with',
+    );
+    expect(foreignStagePrefix({ ...work, cascade: WORK }, settings)).toContain(
+      'the panel itself starts a review of your diff',
+    );
+  });
+});

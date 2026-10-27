@@ -62,6 +62,14 @@ class Parser extends WordReader {
   private readonly braces: ('fn' | 'group')[] = [];
   /** Номер текущей цепочки `&&` (`Segment.chain`): новый на каждом ином разрыве. */
   private chain = nextChain();
+  /** `Segment.andChain`: как `chain`, но `)` подоболочки её не рвёт. */
+  private andChain = nextChain();
+  /**
+   * Открытые `if`, `then` и `do`: звено в теле `then`/`do` (и в условии `elif`
+   * после него) оболочка может пропустить (`Segment.body`). `fi` снимает все
+   * `then` своего `if`, `done` — свой `do`.
+   */
+  private readonly branches: ('if' | 'then' | 'do')[] = [];
 
   /** Список команд до своей `)` (`closing`) или до конца; `inherited` — вход снаружи из трубы. */
   list(closing: boolean, inherited: boolean): void {
@@ -81,9 +89,14 @@ class Parser extends WordReader {
     const cut = (piped: boolean, chained = false): void => {
       if (segment.words.length > 0 || segment.redirects.length > 0) {
         segment.chain = this.chain;
+        segment.andChain = this.andChain;
+        if (this.branches.some((open) => open !== 'if')) segment.body = true;
         this.steps.push(segment);
       }
-      if (!chained || negated) this.chain = nextChain();
+      if (!chained || negated) {
+        this.chain = nextChain();
+        this.andChain = nextChain();
+      }
       negated = false;
       segment = blank(piped || inherited);
     };
@@ -123,6 +136,7 @@ class Parser extends WordReader {
       } else if (ch === '|' && next === '|') {
         cut(false);
         endPipeline();
+        segment.after = 'or';
         this.pos += 2;
       } else if (ch === '|') {
         cut(true);
@@ -132,6 +146,7 @@ class Parser extends WordReader {
       } else if (ch === '&' && next === '&') {
         cut(false, true);
         endPipeline();
+        segment.after = 'and';
         this.pos += 2;
       } else if (ch === '&' && next === '>') {
         this.redirect(segment, '&');
@@ -167,7 +182,9 @@ class Parser extends WordReader {
         // её `)` рвёт цепочку, и звено после подоболочки начинает новую.
         this.pos += 1;
         this.steps.push(ENTER);
+        const outer = this.andChain;
         this.list(true, segment.piped);
+        this.andChain = outer;
         this.steps.push(LEAVE);
       } else if ((ch === '<' || ch === '>') && next === '(') {
         // `<(…)`, `>(…)`: команда внутри исполнится, а слово — путь к её выводу.
@@ -200,6 +217,7 @@ class Parser extends WordReader {
             continue;
           }
           if (token.text === '!') negated = true;
+          this.branch(token.text);
           if (KEYWORDS.has(token.text)) continue;
         }
         segment.words.push(wordOf(token));
@@ -213,6 +231,16 @@ class Parser extends WordReader {
 
   finish(): void {
     if (this.pending.length > 0 || this.braces.includes('fn')) fail();
+  }
+
+  /** Служебное слово ветвления в начале звена: открывает или закрывает тело (`branches`). */
+  private branch(keyword: string): void {
+    const open = this.branches;
+    if (keyword === 'if' || keyword === 'then' || keyword === 'do') open.push(keyword);
+    else if (keyword === 'fi') {
+      while (open.at(-1) === 'then') open.pop();
+      if (open.at(-1) === 'if') open.pop();
+    } else if (keyword === 'done' && open.at(-1) === 'do') open.pop();
   }
 
   /** `{` и `}` в начале звена: закрытие тела функции возвращает обход наружу — вслепую. */

@@ -1,25 +1,33 @@
-import type { GroupSignal, GroupWatchRule } from '@agentdeck/contracts/group-watch';
+import type {
+  GroupSignal,
+  GroupWatchCoverage,
+  GroupWatchCoverageSummary,
+  GroupWatchRule,
+} from '@agentdeck/contracts/group-watch';
 import type { SplitPlanGroupRecord } from '../../../../../lib/app-store/app-store.types.ts';
+import { readJsonFile, writeJsonFile } from '../../../../../lib/safe-io/safe-io.ts';
 import { windowWeight } from '../../../../analytics/token-audit/window-weight.ts';
 import { awaitsAnswer } from '../../../group-questions/group-wait.ts';
 import { GroupLedgers, groupKeyOf } from '../group-ledgers.ts';
 import { createWatchState, quietCauses, reduce } from '../reduce.ts';
 import { editIntentOf, repeats } from '../reduce-autonomy.ts';
 import { freshCause, groupRedo } from '../rules-autonomy.ts';
+import { escalateBurn } from '../rules-embed.ts';
 import {
   FANOUT_BURN_SHARE,
   GROUP_LEVEL,
   SESSION_RULES,
-  accountProjection,
   evaluate,
   groupBurn,
   groupGates,
   subBurnShare,
   type LimitPoint,
 } from '../rules.ts';
+import { maskCommand } from '../check-signature.ts';
 import { streamWatchEvents } from '../stream-events.ts';
 import type { ColdCacheRule, WatchContext, WatchEvent, WatchNode } from '../watch.types.ts';
 import { foreignColdRule } from '../../foreign/foreign-cache.ts';
+import { foreignStreamReader } from '../../foreign/foreign-stream.ts';
 import type {
   GroupWatchFeed,
   GroupWatcherDeps,
@@ -27,8 +35,13 @@ import type {
   WatchTarget,
 } from './group-watcher.types.ts';
 import { correlateGroups } from './correlate.ts';
+import { coverageOf, coverageSummary, providerOfParent, type PanelSources } from './coverage.ts';
 import { sweepGroups, type NudgeSnap, type SeenMark } from './group-sweep.ts';
+import { commandCheck } from './ledger-checks.ts';
+import { editedFileOf, type EditedFile } from './restart-rules.ts';
 import { ResumeSeeds } from './seeds.ts';
+import { accountWindow, finishedRuns, isHeavyRun, type FinishedRun } from './window-rules.ts';
+import { wasteStep } from './run-summary.ts';
 import { SessionTranscripts } from './session-transcripts.ts';
 import { SignalRecorder } from './signal-recorder.ts';
 import { IDLE_DROP_MS, TERMINAL, WATCH_TICK_MS } from './timing.ts';
@@ -89,6 +102,31 @@ export class GroupWatcher {
     this.bornAt = this.now();
     this.signals = new SignalRecorder(deps, this.bornAt);
     this.files = new SessionTranscripts(deps);
+    this.restoreEdits();
+  }
+
+  /** Правки групп, записанные прошлым процессом (R38: перезапуск из-за них уже случился). */
+  private restoreEdits(): void {
+    const file = this.deps.editsFile;
+    if (!file) return;
+    try {
+      const saved = readJsonFile<{ groups?: Record<string, EditedFile[]> }>(file, {});
+      if (saved.groups && typeof saved.groups === 'object')
+        this.ledgers.restoreEditedFiles(saved.groups, this.bornAt);
+    } catch (error) {
+      this.deps.log?.('[group-watch] edits restore failed', error);
+    }
+  }
+
+  /** Правки групп — на диск сразу: перезапуск, который они вызовут, памяти не оставит. */
+  private saveEdits(): void {
+    const file = this.deps.editsFile;
+    if (!file) return;
+    try {
+      writeJsonFile(file, { groups: this.ledgers.editedFilesSnapshot() }, { preserveForm: false });
+    } catch (error) {
+      this.deps.log?.('[group-watch] edits save failed', error);
+    }
   }
 
   start(): void {
@@ -269,7 +307,15 @@ export class GroupWatcher {
         fresh && session.target.scope !== 'chat' ? this.freshPrior(chatId, session, now) : {};
       this.apply(
         session,
-        [{ kind: 'start', t: now, ...(fresh ? { fresh: true as const } : {}), ...prior }],
+        [
+          {
+            kind: 'start',
+            t: now,
+            ...(fresh ? { fresh: true as const } : {}),
+            ...prior,
+            ...(feed.promptChars !== undefined ? { chars: feed.promptChars } : {}),
+          },
+        ],
         now,
       );
       return;
@@ -277,6 +323,13 @@ export class GroupWatcher {
     if (feed.kind === 'finish') {
       session.turnOpen = false;
       this.apply(session, [{ kind: 'end', t: now }], now);
+      return;
+    }
+    if (feed.kind === 'foreign') {
+      if (!session.provider) return;
+      session.readStream ??= foreignStreamReader(session.provider);
+      const events = session.readStream?.(feed.row) ?? [];
+      if (events.length > 0) this.applyStream(session, events, now);
       return;
     }
     // Остаток сверки — расход субагентов, ещё не дочитанный хвостом: дочитать
@@ -291,9 +344,14 @@ export class GroupWatcher {
         (event) => !(event.kind === 'call' && event.sidechain && session.tailCalls > 0),
       ),
     ];
-    if (events.length === 0) return;
-    // Текст и размышления идут кусками десятки раз в секунду: только «жива», без
-    // оценки правил — R1 закроется на ближайшем тике.
+    if (events.length > 0) this.applyStream(session, events, now);
+  }
+
+  /**
+   * События потока хода. Текст и размышления идут кусками десятки раз в секунду:
+   * только «жива», без оценки правил — R1 закроется на ближайшем тике.
+   */
+  private applyStream(session: Session, events: WatchEvent[], now: number): void {
     if (events.every((event) => event.kind === 'activity')) {
       const ctx = this.context(session);
       for (const event of events) reduce(session.state, event, ctx);
@@ -370,10 +428,32 @@ export class GroupWatcher {
     const groupKey = groupKeyOf(session.target.parentChatId, session.target.groupIndex);
     // Одиночный чат (F-78): R8 и R21 у него не считаются — их списки никто бы не прочёл.
     const grouped = session.target.scope !== 'chat';
+    let editsNoted = false;
     for (const event of events) {
       const heavyBefore = session.state.heavyChecks.at(-1);
+      const editBefore = session.state.treeEditAt;
       if (grouped && event.kind === 'tool') this.noteRedo(session, groupKey, event, ctx);
+      // Правленый файл — в список группы (R38): перезапуск панели, ждущий его, — из-за неё.
+      const edited = grouped ? editedFileOf(event, ctx) : undefined;
+      if (edited) {
+        this.ledgers.noteEditedFile(groupKey, edited);
+        editsNoted = true;
+      }
+      if (grouped) this.noteLedgerCheck(groupKey, event, ctx);
       reduce(session.state, event, ctx);
+      // Шаг впустую — вес вызова разговора, который его сделал, в потери группы (R46).
+      const waste = grouped ? wasteStep(session.state, event) : undefined;
+      const wastedCall = waste ? session.state.calls.at(-1) : undefined;
+      if (waste && wastedCall)
+        this.ledgers.noteWaste(groupKey, {
+          t: wastedCall.t,
+          weight: wastedCall.weight,
+          kind: waste,
+        });
+      // Правка дерева любым звеном — граница прохода гейтов группы (R21).
+      const editAfter = session.state.treeEditAt;
+      if (grouped && editAfter !== undefined && editAfter !== editBefore)
+        this.ledgers.noteTreeEdit(groupKey, editAfter);
       // Коммит сессии — в список группы (R35): другой её разговор не должен его повторять.
       if (grouped && session.state.commitFacts.length > 0) {
         const conversation = this.conversationOf(session);
@@ -382,7 +462,7 @@ export class GroupWatcher {
         }
       }
       // Последний вызов самого разговора — затравка нового разговора группы (R34).
-      if (grouped && event.kind === 'call' && !event.sidechain) {
+      if (grouped && event.kind === 'call' && !event.sidechain && !event.turnTotal) {
         const ctxTokens = event.input + event.cacheRead + event.cacheWrite;
         const stage = session.node.stage ?? session.target.stage;
         if (ctxTokens > 0) {
@@ -398,7 +478,11 @@ export class GroupWatcher {
       // Тяжёлая проверка — в счёт группы (R21): гейты звеньев идут в разных разговорах.
       const heavy = session.state.heavyChecks.at(-1);
       if (grouped && heavy && heavy !== heavyBefore)
-        this.ledgers.noteHeavy(groupKey, { ...heavy, chatId: session.target.chatId });
+        this.ledgers.noteHeavy(groupKey, {
+          ...heavy,
+          chatId: session.target.chatId,
+          pass: Math.max(heavy.editAt ?? 0, this.ledgers.passOf(groupKey, heavy.at)),
+        });
       // Расход группы — все вызовы: звена, его субагентов и остаток сверки. Субагентом
       // помечен только вызов субагента: остаток сверки — расход без хозяина (R8 его видит,
       // а доля веера в нём — нет).
@@ -414,11 +498,36 @@ export class GroupWatcher {
           t: event.t,
           utilization: event.utilization,
           resetsAt: event.resetsAt,
+          ...(event.week ? { week: true as const } : {}),
         });
       }
     }
+    if (editsNoted) this.saveEdits();
     if (session.target.scope !== 'chat') this.markSeen(groupKey, session);
     this.judge(session, ctx, now);
+  }
+
+  /**
+   * Проверка, которую журнал проверок обязан записать (R41): начало — по вызову Bash на
+   * переднем плане, конец — по ответу. Фоновый прогон длительности не меряет: не судим.
+   */
+  private noteLedgerCheck(groupKey: string, event: WatchEvent, ctx: WatchContext): void {
+    const ledger = this.deps.ledger;
+    if (!ledger) return;
+    if (event.kind === 'toolResult') {
+      this.ledgers.closeCheckRun(event.id, event.t, !event.denied);
+      return;
+    }
+    if (event.kind !== 'tool' || event.name !== 'Bash' || !ctx.cwd) return;
+    if (event.input.run_in_background === true || !event.id) return;
+    const command = typeof event.input.command === 'string' ? event.input.command : '';
+    const check = command ? commandCheck(command, ctx.cwd, ledger.scriptsOf) : undefined;
+    if (!check) return;
+    this.ledgers.openCheckRun(groupKey, event.id, {
+      start: event.t,
+      check,
+      command: maskCommand(command),
+    });
   }
 
   /**
@@ -501,6 +610,8 @@ export class GroupWatcher {
           (signal) => signal.rule === 'R13' && !signal.clearedAt && signal.chatId !== target.chatId,
         )) &&
       subBurnShare(points, ctx.settings, now) >= FANOUT_BURN_SHARE;
+    // Два круга в одном ходе (R4/R11/R21/R24) — новее из них тревога (BURN).
+    escalateBurn(gates ? [...hits, gates] : hits, session.state.turnAt);
     this.signals.record(target, ctx.settings, now, [
       { hits, merge: { rules: SESSION_RULES } },
       { hits: burn && !fanout ? [burn] : [], merge: { rules: R8_ONLY, group: true } },
@@ -519,7 +630,55 @@ export class GroupWatcher {
       groupIndex: target.groupIndex,
     };
     const hits = evaluate(session.state, node, ctx, now, 'chat');
+    escalateBurn(hits, session.state.turnAt);
     this.signals.record(target, ctx.settings, now, [{ hits, merge: { rules: SESSION_RULES } }]);
+  }
+
+  /**
+   * Охват живой группы (чип на карточке): чем сторож её видит и каких источников нет.
+   * Кончившаяся или неизвестная группа — `undefined`: строка о ней ничего не скажет.
+   */
+  coverageOf(parentChatId: string, groupIndex: number): GroupWatchCoverage | undefined {
+    const group = this.deps.group(parentChatId, groupIndex);
+    if (!group || TERMINAL.has(group.status)) return undefined;
+    const sessions = [...this.sessions.values()].filter(
+      (session) =>
+        session.target.scope !== 'chat' &&
+        session.target.parentChatId === parentChatId &&
+        session.target.groupIndex === groupIndex,
+    );
+    return coverageOf({
+      enabled: this.deps.settings().enabled,
+      provider: providerOfParent(parentChatId),
+      sessions,
+      panel: this.panelSources(),
+    });
+  }
+
+  /** Строка настроек: охват всех живых групп всех разделений и пробелы панели. */
+  coverageSummary(): GroupWatchCoverageSummary {
+    const list: GroupWatchCoverage[] = [];
+    for (const [parent, plan] of Object.entries(this.deps.plans?.() ?? {})) {
+      for (const group of plan.groups) {
+        const one = this.coverageOf(parent, group.index);
+        if (one) list.push(one);
+      }
+    }
+    return coverageSummary(list, this.panelSources(), this.deps.settings().enabled);
+  }
+
+  private panelSources(): PanelSources {
+    const panel = this.deps.panelSources?.() ?? {
+      ledger: Boolean(this.deps.ledger),
+      devWatch: Boolean(this.deps.restartFeed),
+    };
+    let limitJournal = false;
+    try {
+      limitJournal = (this.deps.limitRuns?.().length ?? 0) > 0;
+    } catch (error) {
+      this.deps.log?.('[group-watch] limit runs failed', error);
+    }
+    return { ...panel, limitJournal };
   }
 
   /** Тик: хвост субагентов, время в правилах, прогноз окна, забытые сессии, отложенная запись. */
@@ -563,6 +722,7 @@ export class GroupWatcher {
         watchedKeys.set(key, keys);
       }
       const groupLive = this.deps.groupLive;
+      const runs = this.runsByGroup(now);
       const swept = sweepGroups({
         plans,
         ...(groupLive
@@ -575,6 +735,17 @@ export class GroupWatcher {
             }
           : {}),
         ...(this.deps.groupSeenAt ? { seenAt: this.deps.groupSeenAt } : {}),
+        ...(this.deps.deferredStuck ? { deferredStuck: this.deps.deferredStuck } : {}),
+        ...(this.deps.deferredWaiting ? { deferredWaiting: this.deps.deferredWaiting } : {}),
+        ...(this.deps.restartFeed ? { restarts: this.deps.restartFeed() } : {}),
+        editedFilesOf: (key: string) => this.ledgers.editedFilesOf(key),
+        ...(this.deps.ledger ? { ledger: this.deps.ledger.read() } : {}),
+        checkRunsOf: (key: string) => this.ledgers.checkRunsOf(key),
+        heavyRunsOf: (key: string) =>
+          (runs.get(key) ?? []).filter((run) => isHeavyRun(run, settings)),
+        finishedRunsOf: (key: string) => runs.get(key) ?? [],
+        burnOf: (key: string) => this.ledgers.burnOf(key),
+        wasteOf: (key: string) => this.ledgers.wasteOf(key),
         lastSeen: this.lastSeen,
         nudgeSnap: this.nudgeSnap,
         settings,
@@ -610,6 +781,31 @@ export class GroupWatcher {
     } catch (error) {
       this.deps.log?.('[group-watch] group sweep failed', error);
     }
+  }
+
+  /**
+   * Законченные прогоны (R42 — тяжёлые из них, R46 — все) по группам: прогон относится к
+   * группе по ключу чата или сессии через связи дерева — и временный `new-…` ключ старта
+   * стадии тоже. Прогон без связи не относится никуда; у одиночного чата ключ свой (номер
+   * группы `CHAT_SCOPE_INDEX`), и обход групп его не читает. Сбой чтения журнала — пустой
+   * список, тик идёт дальше.
+   */
+  private runsByGroup(now: number): Map<string, FinishedRun[]> {
+    const out = new Map<string, FinishedRun[]>();
+    if (!this.deps.limitRuns) return out;
+    let runs: FinishedRun[] = [];
+    try {
+      runs = finishedRuns(this.deps.limitRuns(), now);
+    } catch (error) {
+      this.deps.log?.('[group-watch] limit runs failed', error);
+    }
+    for (const run of runs) {
+      const target = this.deps.resolve(run.chatId, run.sessionId);
+      if (!target) continue;
+      const key = groupKeyOf(target.parentChatId, target.groupIndex);
+      out.set(key, [...(out.get(key) ?? []), run]);
+    }
+    return out;
   }
 
   private sweep(now: number): void {
@@ -675,7 +871,7 @@ export class GroupWatcher {
     } catch (error) {
       this.deps.log?.('[group-watch] limit journal failed', error);
     }
-    const hit = accountProjection(samples, settings, now);
+    const hit = accountWindow(samples, settings, now);
     const groups = new Map<string, { target: WatchTarget; paused: boolean }>();
     for (const session of this.sessions.values()) {
       // Одиночный чат — не группа: прогноз окна аккаунта идёт на карточки групп.

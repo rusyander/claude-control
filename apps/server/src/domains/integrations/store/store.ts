@@ -4,6 +4,7 @@ import type {
   IntegrationId,
   IntegrationStatus,
   IntegrationsSettings,
+  TelegramLastSend,
   TmsKind,
   TmsSettings,
 } from '@agentdeck/contracts';
@@ -18,6 +19,7 @@ import {
 } from '../../../lib/provider-keys/provider-keys.ts';
 import { IntegrationError, invalidField } from '../errors.ts';
 import { readHealth } from '../health.ts';
+import { readLastSend } from '../../notify/telegram-delivery.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 
 /**
@@ -150,7 +152,14 @@ export function describeIntegration(
     checkedAt: health?.checkedAt,
     account: health?.account,
     deployment: health?.deployment,
+    ...(id === 'telegram' ? lastSendOf(appDataDir) : {}),
   };
+}
+
+/** Итог последней отправки уведомления — только у карточки Telegram. */
+function lastSendOf(appDataDir: string): { lastSend?: TelegramLastSend } {
+  const lastSend = readLastSend(appDataDir);
+  return lastSend ? { lastSend } : {};
 }
 
 /** Все карточки — то, чем отвечает `GET /api/integrations`. */

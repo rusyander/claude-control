@@ -272,6 +272,30 @@ describe('ProviderChatService', () => {
     expect(starts.map((feed) => feed.kind === 'start' && feed.local)).toEqual([true, undefined]);
   });
 
+  it('watch listener: строки потока хода — только у звена группы, с его разговором', () => {
+    createChat(dir, 'qwen', { id: 'wd', workdir: dir });
+    const rows: ForeignWatchFeed[] = [];
+    service.setWatchListener((feed) => {
+      if (feed.kind === 'row') rows.push(feed);
+    });
+    const single = send('одиночный');
+    expect(single.options?.onStreamRow).toBeUndefined();
+
+    createChat(dir, 'qwen', { id: 'wd2', workdir: dir });
+    service.setChildRun(() => ({ group: true }));
+    const child = send('звено', 'wd2');
+    child.options?.onStreamRow?.({ type: 'tool_use', tool_id: 't1' });
+    expect(rows).toEqual([
+      {
+        kind: 'row',
+        providerId: 'qwen',
+        chatId: 'wd2',
+        group: true,
+        row: { type: 'tool_use', tool_id: 't1' },
+      },
+    ]);
+  });
+
   it('watch listener упал — ход всё равно отправлен', () => {
     createChat(dir, 'qwen', { id: 'wd', workdir: dir });
     service.setWatchListener(() => {

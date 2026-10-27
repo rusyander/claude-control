@@ -7,6 +7,7 @@ import {
 } from '@agentdeck/contracts/chat-handoff';
 import { cascadeSystemPrompt, type CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
+import { OWNER_BRIEF } from '../owner-brief/owner-brief.ts';
 import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
 
 /**
@@ -294,6 +295,10 @@ const groupSwaps = (): readonly (readonly [string, string])[] => [
  * (проверено на CLI 2.1.286 стабом модели), так что она правит каждое сжатие,
  * автоматическое и `/compact`; без неё навык доставки перечитывался целиком
  * после каждого.
+ *
+ * Хвост — путь к файлу слов владельца (живая группа 26.10): резюме сжатия их не
+ * удержало, и группа 2,5 минуты искала просьбу и номера `owner-N` в своём
+ * транскрипте. Системная дописка сжатие переживает, поэтому путь стоит здесь.
  */
 export const GROUP_ECONOMY_PROMPT =
   'Every call re-reads the whole context, so keep it lean: batch independent reads and ' +
@@ -311,7 +316,8 @@ export const GROUP_ECONOMY_PROMPT =
   'When the conversation is ' +
   'compacted, the summary keeps the stage ledger (done, current, next), decisions with their ' +
   'reasons, exact paths and commands, stand access, the notebook path, open failures and a ' +
-  'short extract of the current skill step.';
+  "short extract of the current skill step. Owner's request verbatim, reported rows, stage " +
+  `sieves: read ${OWNER_BRIEF} (if present), not the transcript.`;
 
 /**
  * Та же строка экономии для групп чужих CLI: у них нет инструмента с именем `Edit`

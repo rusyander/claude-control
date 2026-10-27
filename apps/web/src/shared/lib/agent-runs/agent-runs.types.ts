@@ -439,6 +439,9 @@ export type ChatEvent =
        * 'groupsLimited' — группы ждут сброса лимита подписки (журнал 89);
        * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
        * 'mrWatchInfra' — CI упал на инфраструктуре: панель повторила задания сама / второе падение (E3);
+       * 'mrWatchRed' — красный конвейер после «готово» передан группе, а ход кончился без правки:
+       *   группа ждёт человека (N3);
+       * 'mrWatchGreen' — красный конвейер ждавшей человека группы позеленел: доставку сверяет панель (F2);
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
@@ -457,6 +460,7 @@ export type ChatEvent =
        *   той же сессией, а не чистой (E1, 20.10).
        * 'coldResume' — продолжение группы после паузы дольше срока кэша с окном от 85k: ход
        *   пошёл новым разговором, а не перезаписью остывшего кэша (рычаг экономии, 21.10).
+       * 'reviewSkipped' — ревью работы не заведено: с коммита начала своих изменений нет (26.10).
        */
       code:
         | 'adopted'
@@ -474,6 +478,8 @@ export type ChatEvent =
         | 'groupsLimited'
         | 'mrWatchLimit'
         | 'mrWatchInfra'
+        | 'mrWatchRed'
+        | 'mrWatchGreen'
         | 'defaultDrift'
         | 'deliveryUnchecked'
         | 'pathStep'
@@ -486,7 +492,8 @@ export type ChatEvent =
         | 'eventsTrimmed'
         | 'backgroundAsk'
         | 'groupSameSession'
-        | 'coldResume';
+        | 'coldResume'
+        | 'reviewSkipped';
       text: string;
       /**
        * Код самой строки — отдельно от `code`, который называет повод. Есть не

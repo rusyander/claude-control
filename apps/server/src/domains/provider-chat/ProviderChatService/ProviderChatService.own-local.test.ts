@@ -221,6 +221,10 @@ describe('ProviderChatService own local endpoint (Qwen Code on its own local ser
       service.setWatchListener((feed) => {
         if (!feed.group) return;
         const chatKey = foreignChatKey(feed.providerId, feed.chatId);
+        if (feed.kind === 'row') {
+          watcher.onFeed(chatKey, { kind: 'foreign', sessionId: chatKey, row: feed.row });
+          return;
+        }
         const sessionId = feed.sessionId ?? chatKey;
         watcher.onFeed(
           chatKey,

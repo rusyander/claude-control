@@ -5,8 +5,21 @@ import type {
   SplitPlanRecord,
 } from '../../../lib/app-store/app-store.types.ts';
 import type { MrReview, MrReviewThread } from '../../integrations/mr-review/mr-review.ts';
+import { deliveryCheckCommand, PANEL_TESTS_CLI } from '../delivery-self-check.ts';
+import {
+  TASK_TICKETS,
+  TASK_TICKETS_STANDING,
+  type RecheckTickets,
+} from '../task-tickets/task-tickets.ts';
 import { SplitConveyor, type DeliveryVerdict } from '../split-conveyor/split-conveyor.ts';
-import { recheckDeliveredMr, type RecheckScope } from './split-recheck.ts';
+import {
+  CARRIED_UNCHECKED_LINE,
+  OWN_OPEN_LINE,
+  SIEVE_DELTA_LINE,
+  UNCHANGED_HEAD_LINE,
+  recheckDeliveredMr,
+  type RecheckScope,
+} from './split-recheck.ts';
 
 /**
  * «Продолжить» недоделанной группы и «Перепроверить MR» доставленной
@@ -72,8 +85,12 @@ function build(
     verdict?: DeliveryVerdict;
     /** Охват копии (`MrRecheckDeps.scope`): значение, сбой или не задан. */
     scope?: RecheckScope | Error;
+    /** Задачи трекера, перечитанные в копию (`MrRecheckDeps.tickets`): значение, сбой или не задан. */
+    tickets?: RecheckTickets | Error;
     /** Новый разговор перепроверки (`SplitConveyorDeps.recheck`) и его ответ. */
     fresh?: 'sent' | 'queued' | 'refused';
+    /** Лог задания у форджа (`MrRecheckDeps.jobLog`, P8): id → текст или сбой. */
+    jobLog?: Record<string, string | Error>;
   } = {},
 ) {
   const records = new Map<string, SplitPlanRecord>();
@@ -119,7 +136,7 @@ function build(
     now: () => new Date(NOW),
   });
   const reads: string[] = [];
-  const recheck = () =>
+  const recheck = (note?: string) =>
     recheckDeliveredMr(
       {
         store,
@@ -129,6 +146,15 @@ function build(
           return options.review;
         },
         recheck: (parent, index, prompt) => conveyor.recheckDelivered(parent, index, prompt),
+        ...(options.jobLog
+          ? {
+              jobLog: async (_url: string, id: string) => {
+                const found = options.jobLog?.[id];
+                if (found instanceof Error) throw found;
+                return found;
+              },
+            }
+          : {}),
         ...(options.scope
           ? {
               scope: async () => {
@@ -137,10 +163,19 @@ function build(
               },
             }
           : {}),
+        ...(options.tickets
+          ? {
+              tickets: async () => {
+                if (options.tickets instanceof Error) throw options.tickets;
+                return options.tickets;
+              },
+            }
+          : {}),
         log: (message) => void logs.push(message),
       },
       'parent',
       0,
+      note,
     );
   const group = (index = 0) => records.get('parent')!.groups[index]!;
   const link = (index = 0): ChatLink => ({
@@ -155,6 +190,13 @@ function build(
 }
 
 const codeOf = (error: unknown) => (error as { messageCode?: string }).messageCode;
+
+/** Строка следа задач: слово перепроверки его несёт, её ход им отчитывается. */
+const TASK_ROW = {
+  id: 'task-1',
+  status: 'pass',
+  evidence: 'src/ui/Menu.tsx:42 — pnpm test → 12 passed',
+} as const;
 
 describe('«Перепроверить MR» доставленной группы', () => {
   it('задание: конфликты по форджу, ВСЕ ждущие ветки (и переданные), красный конвейер, готовность задач', async () => {
@@ -191,16 +233,45 @@ describe('«Перепроверить MR» доставленной групп�
     expect(prompt).toContain('recheck its delivered MR');
     expect(prompt).toContain('The forge reports conflicts with the target branch.');
     // Владелец 23.10: rebase и повторный гейт — только при настоящем конфликте.
-    expect(prompt).toContain(
-      'Only on a real conflict (`git merge-tree --write-tree` without `--quiet`',
-    );
-    expect(prompt).toContain(
-      'no conflict — leave the base as it is and do not re-run the full checks',
+    expect(prompt).toContain('Only on a real conflict (rc=1 or a CONFLICT line)');
+    expect(prompt).toContain('Nothing changed — do not re-run the full checks.');
+    expect(prompt).toContain('no conflict — leave the base as it is');
+    // g0 26.10: «merge or rebase» вёл к `git merge`, который git-guard запрещает, а строки сит,
+    // сданные до rebase, судья доставки признал устаревшими — лишний отказ и лишний круг.
+    expect(prompt).toContain('rebase the branch onto the target and resolve it there');
+    expect(prompt).toContain('`git merge` is refused by git-guard');
+    expect(prompt).toContain('report them again on the new HEAD');
+    expect(prompt).not.toContain('merge or rebase');
+    // g0 26.10 повторная перепроверка: «trial merge on a scratch branch» звал тот же `git merge`.
+    expect(prompt).toContain('cleanly (git merge-tree --write-tree).');
+    expect(prompt).not.toContain('trial merge');
+    // Самопроверка до ответа — той же командой, что у звена доставки, путём к CLI панели.
+    expect(prompt).toContain(`Last, before you answer: run \`${deliveryCheckCommand()}\``);
+    expect(prompt.indexOf('Last, before you answer')).toBeLessThan(
+      prompt.indexOf('Nothing found — change nothing'),
     );
     expect(prompt).toContain(`${MR}#note_17928`);
     expect(prompt).toContain(`${MR}#note_18001`);
     expect(prompt).toContain('#7763');
-    expect(prompt).toContain('4. Completeness.');
+    expect(prompt).toContain('4. Completeness — the group finishes its own gaps');
+    expect(prompt).toContain('Task trace: first list every point of your tasks');
+    // Владелец 27.10 (!1101, !1103): свои открытые находки — пробел этого MR, а не заметка.
+    expect(prompt).toContain(`   ${OWN_OPEN_LINE}`);
+    expect(prompt.indexOf(OWN_OPEN_LINE)).toBeLessThan(prompt.indexOf('Last, before you answer'));
+    // Аудит g9 27.10 (R7): номера своих находок — из файла панели, не из старых разговоров.
+    expect(OWN_OPEN_LINE).toContain(
+      'keeps your review findings in .agent/run/review-findings.agent.md when the file exists ' +
+        '(R-n — the cards of the fix stage, V-n — open after verification)',
+    );
+    // Аудит g1 27.10, F1: перенесённое «не проверено» проверяется заново; F9: шлются только изменённые строки сит.
+    expect(prompt).toContain(`   ${CARRIED_UNCHECKED_LINE}`);
+    expect(prompt.indexOf(CARRIED_UNCHECKED_LINE)).toBeLessThan(
+      prompt.indexOf('Last, before you answer'),
+    );
+    expect(prompt).toContain(`\n${SIEVE_DELTA_LINE}\n`);
+    expect(prompt.indexOf('Last, before you answer')).toBeLessThan(
+      prompt.indexOf(SIEVE_DELTA_LINE),
+    );
     expect(prompt).toContain('Nothing found — change nothing');
     // Отметка: идёт перепроверка, слово у сессии. Прежнюю зелёную снимает старт
     // хода (`onChainResumed`), а не нажатие: не дошло слово — она на месте.
@@ -209,6 +280,59 @@ describe('«Перепроверить MR» доставленной групп�
     expect(t.group().recheckedAt).toBe('2026-10-04T08:00:00.000Z');
     // Переданное помечено: наблюдатель второй раз d2 не пошлёт.
     expect(t.group().mrWatch?.relayed).toEqual(['d1:17928', 'd2:18001']);
+  });
+
+  // P8 (g5 25.10): «Read the logs of the failed jobs» без строк лога — группа шла за логом
+  // сама, и страж форджа такое чтение отбивал. Тот же хвост, что у наблюдателя MR.
+  it('P8: красный конвейер — хвост лога упавших заданий в задании, сбой чтения не мешает', async () => {
+    const trace = [
+      '\u001b[32;1m$ pnpm lint\u001b[0;m',
+      'section_start:1:step_script',
+      ...Array.from({ length: 60 }, (_, i) => `строка ${i}`),
+      'ERROR: Job failed: exit code 1',
+    ].join('\n');
+    const t = build({
+      review: {
+        state: 'open',
+        threads: [],
+        pipeline: {
+          id: '7763',
+          status: 'failed',
+          failedJobs: [
+            { id: '51', name: 'lint-frontend', reason: 'script_failure' },
+            { id: '52', name: 'docs-gate', reason: 'script_failure' },
+          ],
+        },
+      },
+      jobLog: { '51': trace, '52': new Error('403') },
+    });
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain('   Tail of the log of lint-frontend (job 51) (the last 40 lines');
+    // N1: лог первым, локальный прогон ничего не доказывает — как у наблюдателя MR.
+    expect(prompt).toContain("   Read the failed job's log FIRST");
+    expect(prompt).toContain('   No log reachable');
+    expect(prompt).toContain('   ERROR: Job failed: exit code 1');
+    expect(prompt).not.toContain('строка 19\n');
+    expect(prompt).not.toContain('section_start');
+    expect(prompt).not.toContain('Tail of the log of docs-gate');
+    expect(t.logs).toContain('mr watch: job log 52 read failed');
+    // Конвейер не красный — логов не читаем (сбой чтения попал бы в журнал) и хвоста нет.
+    const green = build({
+      review: {
+        state: 'open',
+        threads: [],
+        pipeline: {
+          id: '1',
+          status: 'success',
+          failedJobs: [{ id: '51', name: 'lint-frontend', reason: 'script_failure' }],
+        },
+      },
+      jobLog: { '51': new Error('не должен читаться') },
+    });
+    await green.recheck();
+    expect(green.resumed[0]!.prompt).not.toContain('Tail of the log');
+    expect(green.logs).not.toContain('mr watch: job log 51 read failed');
   });
 
   it('MR влит или закрыт — отказ с кодом, группе ничего не ушло', async () => {
@@ -254,6 +378,69 @@ describe('«Перепроверить MR» доставленной групп�
     expect(t.group().recheckRequestedAt).toBeUndefined();
     expect(t.group().recheckedAt).toBe('2026-10-04T08:00:00.000Z');
     expect(t.group().mrWatch?.relayed).toBeUndefined();
+    // След задач группа не получила — доставка строк task-N с неё не спросит.
+    expect(t.group().taskTrace).toBeUndefined();
+  });
+
+  // Живой аудит 26.10: группы сдавали «готово», отдав пункты соседям, которые их не держали.
+  it('полнота: свои отданные пункты, переданное соседями, заметки и соседи — списками; след задач включён', async () => {
+    const plan = record([
+      {
+        mr: MR,
+        doneAt: '2026-10-05T10:00:00.000Z',
+        sieveRows: [{ id: 'task-2', status: 'n/a', evidence: 'вне скоупа, потом' }],
+      },
+      {
+        mr: `${MR.replace('810', '811')}`,
+        mrClosed: 'merged',
+        sieveRows: [
+          {
+            id: 'task-1',
+            status: 'n/a',
+            evidence: 'other group: group 1 — web/src/pages/users/A.tsx',
+          },
+        ],
+      },
+    ]);
+    plan.proposal.groups[0]!.owns = ['web/src/pages/users/**'];
+    plan.proposal.groups[0]!.notes = 'Мержится после группы 2.';
+    plan.proposal.groups[1]!.owns = ['docs/api/**'];
+    plan.proposal.groups[1]!.notes = 'Группа 1 добавит ссылку на страницу ролей.';
+    const t = build({ record: plan, review: { state: 'open', threads: [] } });
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain('Your deferred points the panel cannot confirm');
+    expect(prompt).toContain(
+      '- пункт task-2 отдан мимо группы, но владелец не назван: вне скоупа, потом',
+    );
+    expect(prompt).toContain(
+      '- Group 2 «Группа 1», task-1: other group: group 1 — web/src/pages/users/A.tsx',
+    );
+    expect(prompt).toContain('- Group 2 «Группа 1»: Группа 1 добавит ссылку на страницу ролей.');
+    expect(prompt).toContain('- Мержится после группы 2.');
+    expect(prompt).toContain('- Group 2 «Группа 1»: done, MR');
+    expect(prompt).toContain('(merged); owns docs/api/**');
+    expect(t.group().taskTrace).toBe(true);
+    // Ход перепроверки оставил прежнее «вне скоупа» — не готово, пробел называет пункт.
+    t.conveyor.onChainResumed(t.link());
+    t.conveyor.onChainEnded(t.link(), { status: 'done' });
+    await t.flush();
+    expect(t.group().status).not.toBe('done');
+    expect(t.group().deliveryMissing).toEqual([
+      expect.stringContaining('пункт task-2 отдан мимо группы, но владелец не назван'),
+    ]);
+  });
+
+  it('ход перепроверки без единой строки task-N — не готово: «нет отчёта по пунктам задач»', async () => {
+    const t = build({ review: { state: 'open', threads: [] } });
+    await t.recheck();
+    t.conveyor.onChainResumed(t.link());
+    t.conveyor.onChainEnded(t.link(), { status: 'done' });
+    await t.flush();
+    expect(t.group().status).not.toBe('done');
+    expect(t.group().deliveryMissing).toEqual([
+      expect.stringContaining('нет отчёта по пунктам задач группы'),
+    ]);
   });
 
   it('перепроверять нечего: копия убрана, группа не доставлена, план отменён, MR чужой', async () => {
@@ -284,7 +471,7 @@ describe('«Перепроверить MR» доставленной групп�
     expect(t.group().status).toBe('started');
     expect(t.group().recheckRequestedAt).toBe(NOW);
 
-    t.conveyor.onChainEnded(t.link(), { status: 'done' });
+    t.conveyor.onChainEnded(t.link(), { status: 'done', sieveRows: [TASK_ROW] });
     await t.flush();
 
     expect(t.group().status).toBe('done');
@@ -389,17 +576,15 @@ describe('«Перепроверить MR»: охват и новый разго
     outside: Array.from({ length: outside }, (_, index) => `svc/o${index}.go`),
   });
 
-  it('охват списком: файлы MR, файлы мимо него, длинные списки — головой и «+N more»', async () => {
+  it('охват: длинный — счётом и командой, без списка; файлы мимо него — головой и «+N more»', async () => {
     const t = build({ scope: scope(45, 23) });
     await t.recheck();
     const prompt = t.resumed[0]!.prompt;
     expect(prompt).toContain(
       'changes against origin/main count (git diff --name-only origin/main...HEAD)',
     );
-    expect(prompt).toContain('In scope (45):');
-    expect(prompt).toContain('   - web/f39.tsx');
-    expect(prompt).not.toContain('   - web/f40.tsx');
-    expect(prompt).toContain('   - +5 more');
+    expect(prompt).toContain('In scope: 45 files — that command lists them.');
+    expect(prompt).not.toContain('   - web/f0.tsx');
     expect(prompt).toContain('not part of this MR (23):');
     expect(prompt).toContain('   - svc/o19.go');
     expect(prompt).not.toContain('   - svc/o20.go');
@@ -407,16 +592,37 @@ describe('«Перепроверить MR»: охват и новый разго
     expect(prompt).toContain('never git add -A, git add . or commit -a');
   });
 
-  it('ровно на границе: 40 — целиком, 41 — сорок и «+1 more»', async () => {
-    const full = build({ scope: scope(40, 20) });
+  it('ровно на границе: 20 — списком целиком, 21 — счётом', async () => {
+    const full = build({ scope: scope(20, 20) });
     await full.recheck();
     expect(full.resumed[0]!.prompt).not.toMatch(/\+\d+ more/);
-    expect(full.resumed[0]!.prompt).toContain('   - web/f39.tsx');
-    const over = build({ scope: scope(41, 21) });
+    expect(full.resumed[0]!.prompt).toContain('In scope (20):');
+    expect(full.resumed[0]!.prompt).toContain('   - web/f19.tsx');
+    const over = build({ scope: scope(21, 21) });
     await over.recheck();
     const prompt = over.resumed[0]!.prompt;
-    expect(prompt.match(/ {3}- \+1 more/g)).toHaveLength(2);
-    expect(prompt).not.toContain('   - web/f40.tsx');
+    expect(prompt).toContain('In scope: 21 files');
+    expect(prompt).not.toContain('   - web/f0.tsx');
+    expect(prompt.match(/ {3}- \+1 more/g)).toHaveLength(1);
+  });
+
+  it('правки — первыми, проверки и пуш — раз после последней; проба конфликта — одной командой', async () => {
+    const t = build({ scope: scope(2, 0) });
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain(
+      'One probe: `git merge-tree --write-tree origin/main HEAD > .agent/tmp/merge-tree.txt; echo rc=$?;',
+    );
+    expect(prompt).toContain('This step runs no checks.');
+    expect(prompt).not.toContain('then run the checks again');
+    const order = prompt.indexOf('Make every code change of this recheck first');
+    expect(order).toBeGreaterThan(prompt.indexOf('1. Conflicts.'));
+    expect(prompt).toContain('run the checks of the scope ONCE and push ONCE');
+    expect(prompt).toContain('no hand-run go test / pytest / vitest of the same zone before it');
+    // Как сдать «стенда нет» — в самой вводной, до самопроверки (аудит g5 27.10, M1).
+    const waiver = prompt.indexOf('is recorded as blocked, not left unrun');
+    expect(waiver).toBeGreaterThan(prompt.indexOf('4. Completeness'));
+    expect(waiver).toBeLessThan(prompt.indexOf('Last, before you answer'));
   });
 
   it('пустой охват — «none», мимо охвата нет — строки о нём нет', async () => {
@@ -459,5 +665,123 @@ describe('«Перепроверить MR»: охват и новый разго
     expect(t.group().recheckRequestedAt).toBeUndefined();
     expect(t.group().recheckSentAt).toBeUndefined();
     expect(t.group().recheckedAt).toBe('old');
+  });
+});
+
+/**
+ * Аудит g0 26.10. F3: «прочесть каждый тикет целиком» стоило девять чтений через MCP, и
+ * группа не прочла ни одного — панель перечитывает задачи в копию и делит их на
+ * изменённые после доставки и прежние. F5: гейт проекта блок «Тесты» не пишет, и после
+ * rebase кейсы оказывались непрогнанными только на круге доставки.
+ */
+describe('«Перепроверить MR»: задачи трекера и блок «Тесты» после rebase (g0 F3/F5)', () => {
+  const tickets: RecheckTickets = {
+    at: '2026-10-26T15:30:00.000Z',
+    since: '2026-10-26T15:00:00.000Z',
+    changed: [{ key: 'PROJ-7', updatedAt: '2026-10-26T18:09:25.123+0300' }],
+    unchanged: ['PROJ-100', 'PROJ-8'],
+    unread: ['PROJ-9 — 403'],
+  };
+
+  it('задачи перечитаны — шаг полноты называет файл и делит задачи; «прочтите каждый тикет» нет', async () => {
+    const t = build({ tickets });
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain(
+      `The panel re-read the tracker tickets of your tasks at 2026-10-26T15:30:00.000Z into \`${TASK_TICKETS}\``,
+    );
+    expect(prompt).toContain('do not call the tracker for them');
+    expect(prompt).toContain(
+      'Updated in the tracker since the last delivery (2026-10-26T15:00:00.000Z) — derive their ' +
+        'points anew from their sections (Grep `^## <KEY>`, then Read that range; never the whole ' +
+        'file): PROJ-7 (updated 2026-10-26T18:09:25.123+0300).',
+    );
+    // Аудит g1 27.10, F2: с кодом сверять, только если HEAD сдвинулся после доставки.
+    // Аудит g9 27.10, R6: в файле у них указатель, полный текст — в соседнем файле.
+    expect(prompt).toContain(
+      'their points stand as reported; the file holds only a pointer line for each (full text in ' +
+        `\`${TASK_TICKETS_STANDING}\`, only to quote a point again): PROJ-100, PROJ-8. ${UNCHANGED_HEAD_LINE}`,
+    );
+    expect(prompt).not.toContain('re-check each against the code');
+    // g8 26.10: «прочтите файл целиком» при неизменных задачах — 44 KB, отказы и 32k в окно.
+    expect(prompt).not.toContain('read that file');
+    expect(prompt).toContain('Not in the file — read these in the tracker: PROJ-9 — 403.');
+    expect(prompt).not.toContain('Read every tracker ticket your tasks link, in full.');
+    // Строки задач — внутри шага полноты, до следа задач.
+    expect(prompt.indexOf('4. Completeness')).toBeLessThan(prompt.indexOf('The panel re-read'));
+    expect(prompt.indexOf('The panel re-read')).toBeLessThan(prompt.indexOf('Task trace:'));
+  });
+
+  /**
+   * Аудит g5 27.10 (H1): «пункты прежних задач стоят как сданы» при 7 строках на 37 пунктов —
+   * PDF из комментариев владельца не назвал никто. Непокрытые пункты — в задании дословно,
+   * до предела; хвост — счётом.
+   */
+  it('прежние задачи с непокрытыми пунктами — пункты дословно с ключом, сверх 24 — счётом', async () => {
+    const points = Array.from({ length: 26 }, (_, i) => `Пункт ${i + 1} задачи`);
+    const t = build({
+      tickets: {
+        ...tickets,
+        owed: [
+          { key: 'PROJ-5', points: ['Нужен PDF «Отчёт для дизайна»'] },
+          { key: 'PROJ-6', points },
+        ],
+      },
+    });
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain(
+      'but no reported task-N row quotes these points of theirs — do each in this branch now',
+    );
+    expect(prompt).toContain('   - PROJ-5: «Нужен PDF «Отчёт для дизайна»»');
+    expect(prompt).toContain('   - PROJ-6: «Пункт 23 задачи»');
+    expect(prompt).not.toContain('«Пункт 24 задачи»');
+    expect(prompt).toContain('   - +3 more — in those sections');
+  });
+
+  it('заметка человека — в задании дословно, построчно, до проверок; пустая — блока нет', async () => {
+    const t = build({ tickets });
+    await t.recheck('  Нужен PDF «Отчёт для дизайна».\nИ кнопка экспорта в шапке  ');
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain('The human added a note to this recheck, quoted verbatim below.');
+    expect(prompt).toContain(
+      '   > Нужен PDF «Отчёт для дизайна».\n   > И кнопка экспорта в шапке\n',
+    );
+    expect(prompt.indexOf('The human added a note')).toBeLessThan(
+      prompt.indexOf('4. Completeness'),
+    );
+
+    const blank = build({ tickets });
+    await blank.recheck('   ');
+    expect(blank.resumed[0]!.prompt).not.toContain('The human added a note');
+  });
+
+  it('трекер не задан или не ответил — прежняя строка «прочтите каждый тикет», сбой в журнале, слово уходит', async () => {
+    const none = build();
+    await none.recheck();
+    expect(none.resumed[0]!.prompt).toContain(
+      'Read every tracker ticket your tasks link, in full.',
+    );
+    expect(none.resumed[0]!.prompt).not.toContain('The panel re-read');
+
+    const broken = build({ tickets: new Error('jira down') });
+    await broken.recheck();
+    expect(broken.resumed).toHaveLength(1);
+    expect(broken.resumed[0]!.prompt).toContain('Read every tracker ticket your tasks link');
+    expect(broken.logs).toContain('mr recheck: tracker tickets unreadable');
+  });
+
+  it('прогон непрогнанных кейсов блока «Тесты» — один, в проходе после последней правки, путём к CLI панели', async () => {
+    const t = build();
+    await t.recheck();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain(
+      `The touched-zone test run is \`node "${PANEL_TESTS_CLI}" run --project . --stale\`, once, in that pass`,
+    );
+    expect(prompt).toContain('cite its run id in the sieve rows');
+    // Строка — сразу за правилом «правки первыми», до замечаний ревьюера.
+    const run = prompt.indexOf('The touched-zone test run');
+    expect(run).toBeGreaterThan(prompt.indexOf('Make every code change of this recheck first'));
+    expect(run).toBeLessThan(prompt.indexOf('2. Reviewer comments.'));
   });
 });

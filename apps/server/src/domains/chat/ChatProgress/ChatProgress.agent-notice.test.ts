@@ -60,6 +60,8 @@ describe('buildProgress — итог фонового субагента из у
       user(5, notice('toolu_zzz', 'completed')),
     ]);
     expect(progress.agents.map((item) => item.status)).toEqual(['failed', 'failed', 'running']);
+    // Снятый «Остановить» (`killed`, замер 2.1.310) отличим от упавшего: дерево пишет «остановлен».
+    expect(progress.agents.map((item) => item.stopped)).toEqual([undefined, true, undefined]);
   });
 
   // Живой прогон 08.10: итог посреди хода CLI пишет вставкой `queued_command`, не репликой.

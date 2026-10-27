@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
-import type {
-  SplitTicketBundle,
-  SplitTicketCluster,
-  TicketArea,
-  TicketProblemDetail,
-  TicketSeverity,
+import {
+  sideLabels,
+  ticketSide,
+  type SplitTicketBundle,
+  type SplitTicketCluster,
+  type TicketArea,
+  type TicketProblemDetail,
+  type TicketSeverity,
+  type TicketSide,
 } from '@agentdeck/contracts/split-ticket-batch';
 
 /**
@@ -30,6 +33,24 @@ const LABELS = {
     foundBy: 'Нашли группы',
     sameAs: 'То же другими словами',
     severity: (value: string) => `Серьёзность: ${value} (приоритета с таким именем в Jira нет)`,
+    priority: (value: string, name: string) => `Серьёзность: ${value} → приоритет Jira «${name}»`,
+    side: 'Сторона',
+    sides: {
+      frontend: 'FRONTEND — фронтенд',
+      backend: 'BACKEND — бэкенд',
+      fullstack: 'FULLSTACK — фронтенд и бэкенд',
+      other: 'ДРУГОЕ — не фронтенд и не бэкенд',
+    },
+    context: 'Контекст',
+    provenance: (groups: string) => `Группы разделения нашли это вне своих задач: ${groups}.`,
+    fix: 'Что сделать',
+    fixOne: (title: string) => `Устранить дефект «${title}»; место и доказательства — ниже.`,
+    fixMany: (count: number) =>
+      `Устранить дефекты из раздела «Дефекты» (${count} шт.); у каждого своё место и доказательства.`,
+    acceptance: 'Критерии приёмки',
+    gone: (title: string) => `«${title}» больше не воспроизводится`,
+    code: 'Где в коде',
+    defects: 'Дефекты',
     again: 'Группы разделения снова нашли то, о чём эта задача; копию панель не завела:',
     task:
       'Исправь отдельной задачей дефекты, которые группы разделения нашли вне своих задач ' +
@@ -47,6 +68,24 @@ const LABELS = {
     foundBy: 'Found by groups',
     sameAs: 'Same defect in other words',
     severity: (value: string) => `Severity: ${value} (Jira has no priority with this name)`,
+    priority: (value: string, name: string) => `Severity: ${value} → Jira priority «${name}»`,
+    side: 'Side',
+    sides: {
+      frontend: 'FRONTEND',
+      backend: 'BACKEND',
+      fullstack: 'FULLSTACK — frontend and backend',
+      other: 'OTHER — neither frontend nor backend',
+    },
+    context: 'Context',
+    provenance: (groups: string) => `Split groups found this outside their own tasks: ${groups}.`,
+    fix: 'What to do',
+    fixOne: (title: string) => `Fix the defect «${title}»; place and evidence are below.`,
+    fixMany: (count: number) =>
+      `Fix the defects listed under «Defects» (${count}); each has its own place and evidence.`,
+    acceptance: 'Acceptance criteria',
+    gone: (title: string) => `«${title}» no longer reproduces`,
+    code: 'Where in the code',
+    defects: 'Defects',
     again: 'The split groups found this again; the panel did not file a copy:',
     task:
       'Fix, as a separate task, the defects the split groups found outside their own tasks ' +
@@ -61,9 +100,10 @@ const LABELS = {
 export type ProblemDetails = ReadonlyMap<string, TicketProblemDetail>;
 
 /**
- * Отпечаток находки в тексте задачи: по нему следующий «Опубликовать» узнаёт
- * открытую задачу про ту же находку, даже если её название с тех пор правили.
- * Хэш, а не сам ключ: ключ — название и место, в трекере он лишний шум.
+ * Отпечаток находки: по нему следующий «Опубликовать» узнаёт открытую задачу
+ * про ту же находку, даже если её название с тех пор правили. Живёт в памяти
+ * панели (`prints.ts`), в трекер не пишется (владелец 26.10.2026: хэш-подобных
+ * id в Jira нет никогда).
  */
 export const FINGERPRINT_PREFIX = 'agentdeck-fp:';
 
@@ -71,11 +111,10 @@ export function fingerprintOf(key: string): string {
   return createHash('sha1').update(key).digest('hex').slice(0, 12);
 }
 
-export function fingerprintLine(keys: readonly string[]): string {
-  return `${FINGERPRINT_PREFIX} ${[...new Set(keys.map(fingerprintOf))].join(' ')}`;
-}
-
-/** Отпечатки, записанные в тексте задачи (описание или комментарий). */
+/**
+ * Отпечатки из строки `agentdeck-fp:` задач, заведённых до 26.10.2026, —
+ * только чтение для сверки; новой такой строки панель не пишет.
+ */
 export function fingerprintsIn(text: string): Set<string> {
   const found = new Set<string>();
   for (const line of text.matchAll(/agentdeck-fp:\s*([0-9a-f ]+)/g)) {
@@ -125,50 +164,116 @@ export function problemSections(
     .join('\n\n');
 }
 
-const keysOf = (clusters: readonly SplitTicketCluster[]): string[] =>
-  clusters.flatMap((cluster) => cluster.tickets.map((ticket) => ticket.key));
-
 export interface ComposedIssue {
   summary: string;
   clusters: readonly SplitTicketCluster[];
   details: ProblemDetails;
+  fix?: string;
+  acceptance?: readonly string[];
 }
 
-/**
- * Описание новой задачи: введение модели (если есть), разделы дефектов,
- * серьёзность без подходящего приоритета и строка отпечатков находок.
- */
-export function issueDescription(
-  issue: ComposedIssue,
-  lang: TicketLang,
-  unmappedSeverity?: TicketSeverity,
-): string {
+/** Что о задаче видно сразу, первой строкой описания: сторона и срочность. */
+export interface IssueMeta {
+  side: TicketSide;
+  severity: TicketSeverity;
+  /** Приоритет Jira, на который легла серьёзность; нет — «приоритета с таким именем нет». */
+  priority?: string;
+}
+
+/** Шапка описания: «Сторона: FRONTEND» и серьёзность с приоритетом. */
+export function issueHeader(meta: IssueMeta, lang: TicketLang): string {
+  const label = LABELS[lang];
   return [
-    issue.summary,
-    problemSections(issue.clusters, issue.details, lang),
-    unmappedSeverity ? LABELS[lang].severity(unmappedSeverity) : '',
-    fingerprintLine(keysOf(issue.clusters)),
+    `${label.side}: ${label.sides[meta.side]}`,
+    meta.priority ? label.priority(meta.severity, meta.priority) : label.severity(meta.severity),
+  ].join('\n');
+}
+
+/** «Где в коде»: каждое место находок задачи один раз, повторы тоже. */
+function codePlaces(clusters: readonly SplitTicketCluster[]): string[] {
+  const places = clusters.flatMap((cluster) =>
+    cluster.tickets.map((ticket) => ticket.where.trim()),
+  );
+  return [...new Set(places.filter(Boolean))];
+}
+
+/** Критерии приёмки: модели, иначе по дефекту — ожидаемое модели или «не воспроизводится». */
+function acceptanceOf(issue: ComposedIssue, lang: TicketLang): string[] {
+  if (issue.acceptance && issue.acceptance.length > 0) return [...issue.acceptance];
+  return issue.clusters.flatMap((cluster) => {
+    const title = cluster.tickets[0]?.title;
+    if (!title) return [];
+    const expected = issue.details.get(cluster.id)?.expected;
+    return [expected ? `«${title}»: ${expected}` : LABELS[lang].gone(title)];
+  });
+}
+
+const bullets = (items: readonly string[]): string => items.map((item) => `- ${item}`).join('\n');
+
+/**
+ * Описание новой задачи (владелец 25.10.2026): шапка (сторона, серьёзность и
+ * приоритет), контекст, что сделать, критерии приёмки, где в коде, разделы
+ * дефектов. Чего модель не дала, сервер пишет из самих находок — пустого
+ * раздела в задаче нет. Отпечатков находок в тексте нет: они в памяти панели.
+ */
+export function issueDescription(issue: ComposedIssue, lang: TicketLang, meta?: IssueMeta): string {
+  const label = LABELS[lang];
+  const groups = [
+    ...new Set(issue.clusters.flatMap((cluster) => cluster.tickets.flatMap((t) => t.groups))),
+  ];
+  const head = issue.clusters[0]?.tickets[0]?.title ?? '';
+  const fix =
+    issue.fix ||
+    (issue.clusters.length > 1 ? label.fixMany(issue.clusters.length) : label.fixOne(head));
+  const places = codePlaces(issue.clusters);
+  return [
+    meta ? issueHeader(meta, lang) : '',
+    `${label.context}: ${issue.summary || label.provenance(groups.join(', '))}`,
+    `${label.fix}: ${fix}`,
+    `${label.acceptance}:\n${bullets(acceptanceOf(issue, lang))}`,
+    places.length > 0 ? `${label.code}:\n${bullets(places)}` : '',
+    `${label.defects}:\n${problemSections(issue.clusters, issue.details, lang)}`,
   ]
     .filter(Boolean)
     .join('\n\n');
 }
 
-/** Комментарий в уже открытую задачу про то же: те же разделы и отпечатки новых находок. */
+/** Комментарий в уже открытую задачу про то же: те же разделы новых находок. */
 export function commentBody(issue: ComposedIssue, lang: TicketLang): string {
-  return [
-    LABELS[lang].again,
-    problemSections(issue.clusters, issue.details, lang),
-    fingerprintLine(keysOf(issue.clusters)),
-  ].join('\n\n');
+  return [LABELS[lang].again, problemSections(issue.clusters, issue.details, lang)].join('\n\n');
 }
 
-/** Метки задачи: области и общая метка панели. */
-export function issueLabels(
-  area: readonly TicketArea[],
-  base: string,
-  unmappedSeverity?: TicketSeverity,
-): string[] {
-  return [...area, base, ...(unmappedSeverity ? [`severity-${unmappedSeverity}`] : [])];
+/**
+ * Метки задачи: сторона первой (её видно в списке Jira), области модели, общая
+ * метка панели и серьёзность без подходящего приоритета. Внутренних машинных
+ * меток (хэш родителя, id чата, короткий sha) здесь нет (владелец 26.10.2026):
+ * им место только в наших инструментах, не в трекере.
+ */
+export function issueLabels(input: {
+  side: TicketSide;
+  area: readonly TicketArea[];
+  base: string;
+  unmappedSeverity?: TicketSeverity;
+}): string[] {
+  return [
+    ...new Set([
+      ...sideLabels(input.side),
+      ...input.area,
+      input.base,
+      ...(input.unmappedSeverity ? [`severity-${input.unmappedSeverity}`] : []),
+    ]),
+  ];
+}
+
+/** Сторона задачи по местам её находок и области модели. */
+export function draftSide(
+  clusters: readonly SplitTicketCluster[],
+  area: readonly string[],
+): TicketSide {
+  return ticketSide(
+    clusters.flatMap((cluster) => cluster.tickets.map((ticket) => ticket.where)),
+    area,
+  );
 }
 
 /**

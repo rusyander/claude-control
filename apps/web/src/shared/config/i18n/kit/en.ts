@@ -18,7 +18,7 @@ export const kitEn: typeof kitRu = {
     },
     hint: {
       global:
-        'The agent works with what is in this CLI’s own settings folder (~/.claude, ~/.qwen, ~/.codex), as without the panel.',
+        'The agent works with what is in this CLI’s own settings folder (~/.claude, ~/.qwen, ~/.codex), as without the panel. Claude Code also gets only the kit guards your layer lacks.',
       hybrid:
         'Your skills, hooks and rules plus the panel kit. On a name clash yours wins unless chosen otherwise below.',
       ours: 'Panel kit only: your personal settings, rules and hooks are not loaded. Your sign-in stays.',

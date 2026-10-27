@@ -9,6 +9,8 @@ export interface ChatDockProps {
   focusKey?: string;
   /** План агента и дерево субагентов — read-only, из транскрипта. */
   progress?: ChatProgress;
+  /** Разговор этого прогресса: адрес хода субагента и его остановки. */
+  progressChatId?: string;
   isRunning: boolean;
   /** Ход кончился вопросом человеку — панель прогресса говорит это первым. */
   awaiting?: boolean;

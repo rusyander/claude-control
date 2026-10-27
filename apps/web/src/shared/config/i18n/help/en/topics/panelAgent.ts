@@ -421,15 +421,17 @@ export const panelAgentEn: typeof panelAgentRu = {
       'button under the agent’s answer. «Work here», the chat’s group and autonomy, stopping the ' +
       'agent in a chat, pausing and resuming a split group or the whole tree, releasing a group ' +
       'and answering a triage question — change. Resuming a group paused while still queued puts it back ' +
-      'in the queue rather than starting it. Cancelling the plan, removing a group, cleaning up copies, ' +
+      'in the queue rather than starting it. «Continue» on a group that stopped unfinished (a failure, ' +
+      'delivery retries used up, a turn without a review verdict) is a change too: the agent hands it ' +
+      'what is left in its own copy and conversation. Cancelling the plan, removing a group, cleaning up copies, ' +
       'permission and branch-gate decisions, auto-approve and starting past the parallel-group ' +
       'limit stay yours. ' +
       'Chat modes (stage auto-continue, the session chain, the permission mode and file ' +
-      'edits), the chat’s model picking, chat spend this session, lowered runs and branch ' +
+      'edits), the chat’s model picking and review after work, chat spend this session, lowered runs and branch ' +
       'overlaps of split groups are reads; overlaps are recomputed as when the hub opens the ' +
       'check: the result is saved and a new overlap is named once in the parent chat. “Close stage” is ' +
       'dangerous: the request goes to the chat’s agent in the same session. Turning on picking ' +
-      'the model per task, accepting a delivered group, “Mark done” on a stopped or stuck one (its ' +
+      'the model per task, switching «Review after work» on or off for a project, accepting a delivered group, “Mark done” on a stopped or stuck one (its ' +
       'waiters start; the agent never marks a running group) and “Resume” of interrupted groups are ' +
       'changes; “Start now” and relaunching groups stay with you.',
     secAnalyticsPortability: 'Analytics and transfer',

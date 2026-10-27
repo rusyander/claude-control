@@ -5,6 +5,7 @@ import {
   type GroupWatchRule,
 } from '@agentdeck/contracts/group-watch';
 import { modelFactor, write1hPart } from '../../../analytics/token-audit/window-weight.ts';
+import { contextGrowth, EMBED_RULES, longBackground, slowCall } from './rules-embed.ts';
 import { INCIDENT_RULES } from './rules-incidents.ts';
 import { orphanPorts, R34 } from './rules-autonomy.ts';
 import {
@@ -59,10 +60,23 @@ function waitingOnTool(state: WatchState, now: number, stallMs: number): boolean
 
 /**
  * Правила группы и плана, не одной сессии: R22 — группа стоит без хода, R23 — одна
- * беда в нескольких группах плана, R28 — напоминания о доставке не двигают её.
+ * беда в нескольких группах плана, R28 — напоминания о доставке не двигают её, R45 —
+ * D-n, которое панель сама не разрешила, держит группу, R46 — итог её законченного прогона.
  * Их тела — у сторожа (полоса L2): здесь они только объявлены.
  */
-export const GROUP_LEVEL: ReadonlySet<GroupWatchRule> = new Set(['R22', 'R23', 'R28']);
+export const GROUP_LEVEL: ReadonlySet<GroupWatchRule> = new Set([
+  'R22',
+  'R23',
+  'R28',
+  'R38',
+  'R39',
+  'R40',
+  'R41',
+  'R42',
+  'R43',
+  'R45',
+  'R46',
+]);
 
 /**
  * Правила не одной сессии: R8 — расход всей группы (звенья, ревью, доставка,
@@ -141,11 +155,63 @@ function pausedActivity(state: WatchState, node: WatchNode): RuleHit | undefined
   };
 }
 
-const RULES: Record<
-  Exclude<GroupWatchRule, 'R8' | 'R9' | 'R20' | 'R21' | 'R22' | 'R23' | 'R28' | 'R35' | 'R36'>,
-  Rule
-> = {
+/** R16 «открыт долго»: вызов на переднем плане идёт дольше `longCallMinutes`. */
+function longOpenCall(
+  state: WatchState,
+  node: WatchNode,
+  ctx: WatchContext,
+  now: number,
+): Omit<RuleHit, 'rule' | 'severity'> | undefined {
+  // Ждёт очередь — это R17; ждёт человека — R1b; группа стоит — задержки нет (как у R1).
+  if (!node.running || node.paused || node.heavyWait || openAsk(state, node)) return undefined;
+  const longMs = ctx.settings.longCallMinutes * 60_000;
+  const open = Object.values(state.openTools)
+    .filter((tool) => {
+      if (tool.background || SPAWN_TOOLS.has(tool.name) || tool.name === 'AskUserQuestion') {
+        return false;
+      }
+      const elapsed = now - tool.startedAt;
+      // Срок вышел — молчание уже не законно, это R1; опыт очереди говорит «так долго и идёт» — не диво.
+      const inTimeout = tool.timeoutMs === undefined || tool.startedAt + tool.timeoutMs > now;
+      return (
+        elapsed >= longMs && inTimeout && !(tool.expectMs !== undefined && tool.expectMs >= elapsed)
+      );
+    })
+    .sort((a, b) => a.startedAt - b.startedAt)[0];
+  if (!open) return undefined;
+  return {
+    numbers: { openMin: minutes(now - open.startedAt) },
+    params: { call: clip(open.label ?? open.name), ...(open.print ? { sig: open.print } : {}) },
+    since: open.startedAt,
+  };
+}
+
+/**
+ * Правила, чьи тела не здесь: R8/R9/R21/R35 — по спискам сторожа, R20/R36 — пауза,
+ * R22/R23/R28 — группа и план, R38–R43/R45 — журналы панели вне сессии (`group-sweep`).
+ */
+type ElsewhereRule =
+  | 'R8'
+  | 'R9'
+  | 'R20'
+  | 'R21'
+  | 'R22'
+  | 'R23'
+  | 'R28'
+  | 'R35'
+  | 'R36'
+  | 'R38'
+  | 'R39'
+  | 'R40'
+  | 'R41'
+  | 'R42'
+  | 'R43'
+  | 'R45'
+  | 'R46';
+
+const RULES: Record<Exclude<GroupWatchRule, ElsewhereRule>, Rule> = {
   ...INCIDENT_RULES,
+  ...EMBED_RULES,
   R34,
 
   R1(state, node, ctx, now) {
@@ -331,30 +397,13 @@ const RULES: Record<
   },
 
   R16(state, node, ctx, now) {
-    // Ждёт очередь — это R17; ждёт человека — R1b; группа стоит — задержки нет (как у R1).
-    if (!node.running || node.paused || node.heavyWait || openAsk(state, node)) return undefined;
-    const longMs = ctx.settings.longCallMinutes * 60_000;
-    const open = Object.values(state.openTools)
-      .filter((tool) => {
-        if (tool.background || SPAWN_TOOLS.has(tool.name) || tool.name === 'AskUserQuestion') {
-          return false;
-        }
-        const elapsed = now - tool.startedAt;
-        // Срок вышел — молчание уже не законно, это R1; опыт очереди говорит «так долго и идёт» — не диво.
-        const inTimeout = tool.timeoutMs === undefined || tool.startedAt + tool.timeoutMs > now;
-        return (
-          elapsed >= longMs &&
-          inTimeout &&
-          !(tool.expectMs !== undefined && tool.expectMs >= elapsed)
-        );
-      })
-      .sort((a, b) => a.startedAt - b.startedAt)[0];
-    if (!open) return undefined;
-    return {
-      numbers: { openMin: minutes(now - open.startedAt) },
-      params: { call: clip(open.label ?? open.name), ...(open.print ? { sig: open.print } : {}) },
-      since: open.startedAt,
-    };
+    // Порядок видов: открытый вызов идёт долго → фон открыт долго → вызов шёл долго.
+    // «Шёл долго» — событие прошлого: человеку важнее то, что тянется сейчас.
+    return (
+      longOpenCall(state, node, ctx, now) ??
+      (node.paused ? undefined : longBackground(state, ctx, now)) ??
+      slowCall(state, now)
+    );
   },
 
   R17(_state, node, ctx, now) {
@@ -383,9 +432,12 @@ const RULES: Record<
   R19(state, _node, ctx, now) {
     const at = state.firstCallAt;
     const first = state.firstCtx;
-    if (at === undefined || first === undefined || now - at > EVENT_HOLD_MS) return undefined;
+    // Тяжёлый старт — свежая беда, полчаса; рост посреди сессии — пока окно не сжалось.
+    if (at === undefined || first === undefined || now - at > EVENT_HOLD_MS) {
+      return contextGrowth(state, ctx);
+    }
     // `!(a >= b)`, а не `a < b`: битое число (NaN из кривого потока) — не тяжёлый старт.
-    if (!(first >= ctx.settings.firstContextTokens)) return undefined;
+    if (!(first >= ctx.settings.firstContextTokens)) return contextGrowth(state, ctx);
     return { numbers: { firstK: Math.round(first / 1000) }, since: at };
   },
 };
@@ -459,6 +511,36 @@ export const BURN_CLEAR_SHARE = 0.85;
 /** Тяжёлая проверка группы (R21): из какого разговора. */
 export interface GatePoint extends HeavyCheck {
   chatId: string;
+  /**
+   * Последняя правка дерева во ВСЕЙ группе до начала проверки: звено ревью само не
+   * правит, но гоняет гейт по дереву, которое правила работа. Нет — `editAt` сессии.
+   */
+  pass?: number;
+}
+
+/**
+ * Проходы гейтов: проверки между двумя правками дерева — один проход (после rebase гейт
+ * идёт двумя командами, `check_frontend` и `check_frontend_tests`, это всё ещё один
+ * проход, #g5:388 27.10). Та же команда второй раз без правки — уже новый проход:
+ * повтор на том же дереве — тоже круг.
+ */
+function gatePasses(window: readonly GatePoint[]): GatePoint[][] {
+  const passes: GatePoint[][] = [];
+  let key: number | undefined;
+  let labels = new Set<string>();
+  for (const point of window) {
+    const pass = point.pass ?? point.editAt ?? 0;
+    const current = passes.at(-1);
+    if (!current || pass !== key || labels.has(point.label)) {
+      passes.push([point]);
+      key = pass;
+      labels = new Set([point.label]);
+      continue;
+    }
+    current.push(point);
+    labels.add(point.label);
+  }
+  return passes;
 }
 
 /** Окно R21: тяжёлые проверки группы за последние 6 часов — дольше группа не живёт одним заходом. */
@@ -470,6 +552,7 @@ export const GATE_WINDOW_MS = 6 * 60 * 60_000;
  * сбрасывает его счёт, а разговоры у звеньев разные. 23.10 группа прогнала полный
  * гейт пять раз за 1 ч 45 мин (73 мин гейтов), правило одного гейта в конце держит
  * только сессию, не группу. Держится полчаса после последней проверки.
+ * Считает ПРОХОДЫ (`gatePasses`), а не команды: один проход двумя командами — не круг.
  */
 export function groupGates(
   points: readonly GatePoint[],
@@ -480,13 +563,14 @@ export function groupGates(
     .filter((point) => point.endedAt <= now && now - point.endedAt <= GATE_WINDOW_MS)
     .sort((a, b) => a.endedAt - b.endedAt);
   const last = window.at(-1);
-  const nth = window[settings.gateRepeats - 1];
+  const passes = gatePasses(window);
+  const nth = passes[settings.gateRepeats - 1]?.[0];
   if (!last || !nth || now - last.endedAt > EVENT_HOLD_MS) return undefined;
   const total = window.reduce((sum, point) => sum + point.minutes, 0);
   return {
     rule: 'R21',
     severity: GROUP_WATCH_SEVERITY.R21,
-    numbers: { gates: window.length, totalMin: Math.round(total) },
+    numbers: { gates: passes.length, totalMin: Math.round(total) },
     params: { command: clip(last.label) },
     since: nth.endedAt,
   };
@@ -544,11 +628,15 @@ export function groupBurn(
   };
 }
 
-/** Замер пятичасового окна: доля 0…1, сброс — секунды эпохи. */
+/** Шаг замера окна: доля приходит целыми процентами. */
+const UTILIZATION_STEP = 0.01;
+
+/** Замер окна: доля 0…1, сброс — секунды эпохи; `week` — недельное окно, без него — пятичасовое. */
 export interface LimitPoint {
   t: number;
   utilization: number;
   resetsAt: number;
+  week?: true;
 }
 
 /**
@@ -561,14 +649,17 @@ export function accountProjection(
   settings: GroupWatch,
   now: number,
 ): RuleHit | undefined {
-  const sorted = samples.filter((point) => point.t <= now).sort((a, b) => a.t - b.t);
+  // Недельное окно — свой прогноз (`weekProjection`): сброс у него другой.
+  const sorted = samples.filter((point) => !point.week && point.t <= now).sort((a, b) => a.t - b.t);
   const latest = sorted.at(-1);
   if (!latest) return undefined;
   const from = now - settings.projectionMinutes * 60_000;
   const points = sorted.filter((point) => point.t >= from && point.resetsAt === latest.resetsAt);
   const first = points[0];
   if (!first || latest.t - first.t < 5 * 60_000) return undefined;
-  const slope = (latest.utilization - first.utilization) / (latest.t - first.t);
+  // Замер приходит целыми процентами: одна ступень за 8 минут — ±36 пунктов прогноза на 276 минут
+  // (27.10: «113 % к сбросу» при 5 % в начале окна). Наклон — по нижней границе, минус ступень.
+  const slope = (latest.utilization - first.utilization - UTILIZATION_STEP) / (latest.t - first.t);
   if (slope <= 0) return undefined;
   const resetMs = latest.resetsAt * 1000;
   const projected = latest.utilization + slope * Math.max(0, resetMs - latest.t);

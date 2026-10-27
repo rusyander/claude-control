@@ -1,4 +1,5 @@
 import { object, string, array, boolean, number, literal, union, type infer as Infer } from 'zod';
+import { agentExtensionSummarySchema } from './agent-tree.ts';
 
 /**
  * Чат поверх Claude Code. Приложение не хранит переписку само: источник правды —
@@ -180,6 +181,13 @@ export const chatSummarySchema = object({
    */
   pinnedAt: string().optional(),
   /**
+   * Ветка правки своей реплики (`--fork-session`): разговор, от которого она
+   * ответвилась. Транскрипт ветки несёт всю историю исходного и то же название,
+   * и без метки в списке стояли два одинаковых чата (Telegram 26.10). Группы,
+   * закрепление и связи остаются у исходного. `title` — когда исходный в списке.
+   */
+  forkOf: object({ id: string(), title: string().optional() }).optional(),
+  /**
    * Звено разделения, снятое перезапуском групп: прогон остановлен, группа
    * заведена заново другим чатом. Связь с родителем помнится (`parentId`), чтобы
    * разговор оставался в дереве, а не всплывал корнем, — но группой он больше не
@@ -269,6 +277,33 @@ export const messageUsageSchema = object({
 
 export type MessageUsage = Infer<typeof messageUsageSchema>;
 
+/**
+ * Срабатывание хука в ходе — для «следа хода» под ответом. В ленте хуков нет:
+ * CLI пишет их в транскрипт служебными вставками, и сервер кладёт их на шаг
+ * модели, в котором они случились. Пишется только то, что записал CLI: хук,
+ * отработавший молча, следа в транскрипте не оставляет.
+ */
+export const hookTraceSchema = object({
+  /** Событие: `PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`… */
+  event: string(),
+  /** Имя от CLI вместе с уточнением: `PostToolUse:Bash`, `SessionStart:startup`. */
+  hookName: string(),
+  /**
+   * Имя команды хука — файл без пути и расширения. Нет — CLI записал только
+   * добавленный контекст, без команды, которая его дала.
+   */
+  name: string().optional(),
+  durationMs: number().optional(),
+  /** Код выхода — только ненулевой. */
+  exitCode: number().optional(),
+  /** Хук остановил действие или ход (ошибка, вернувшаяся модели). */
+  blocked: boolean().optional(),
+  /** Начало текста, который хук добавил в контекст модели, с маской секретов. */
+  context: string().optional(),
+});
+
+export type HookTrace = Infer<typeof hookTraceSchema>;
+
 export const chatMessageSchema = object({
   id: string(),
   role: union([literal('user'), literal('assistant')]),
@@ -298,6 +333,13 @@ export const chatMessageSchema = object({
    * ответ шёл мимо контура.
    */
   contextSummarized: boolean().optional(),
+  /** Хуки, сработавшие на этом шаге модели (`hookTraceSchema`). */
+  hooks: array(hookTraceSchema).optional(),
+  /**
+   * Реплика человека, отданная модели ПОСРЕДИ хода (`queued_command` у CLI):
+   * ход она не делит — след хода собирается через неё.
+   */
+  midTurn: boolean().optional(),
 });
 
 export type ChatMessage = Infer<typeof chatMessageSchema>;
@@ -442,6 +484,36 @@ export const progressAgentSchema = object({
    * говорила только «работает»).
    */
   activity: progressActiveToolSchema.optional(),
+  /**
+   * Id субагента у CLI (`subagents/agent-<id>.jsonl`, он же `task_id` для
+   * `stop_task`): адрес его хода и кнопки «Остановить». Нет файла — нет и id.
+   */
+  agentId: string().optional(),
+  /** `id` узла, запустившего этого субагента; нет — запустил главный агент. */
+  parentId: string().optional(),
+  /** Модель субагента — по его ответам (`message.model`) или по meta. */
+  model: string().optional(),
+  /** Сколько вызовов инструментов сделал субагент. */
+  toolCalls: number().optional(),
+  /** Расход субагента: каждый ответ модели — один раз, по его `message.id`. */
+  tokens: object({
+    input: number(),
+    output: number(),
+    cacheRead: number(),
+    cacheCreation: number(),
+  }).optional(),
+  /** Последнее действие субагента одной строкой: вызов с аргументом или реплика. */
+  lastAction: string().optional(),
+  /** Когда закончил (ISO) — последняя запись законченного субагента. */
+  endedAt: string().optional(),
+  /**
+   * Остановлен по просьбе (`TaskStop` агента или «Остановить» в панели): CLI
+   * пишет итог `<status>killed</status>`. `status` при этом `failed` — итога
+   * работы нет, но это решение, а не падение.
+   */
+  stopped: boolean().optional(),
+  /** Скиллы, хуки и MCP субагента по его транскрипту — сводка по именам. */
+  extensions: array(agentExtensionSummarySchema).optional(),
 });
 
 export type ProgressAgent = Infer<typeof progressAgentSchema>;
@@ -516,6 +588,14 @@ export const chatProgressSchema = object({
    * процессом, а не с ходом; нет процесса — числящийся идущим фон оборван.
    */
   processAlive: boolean().optional(),
+  /**
+   * Субагента можно остановить: у разговора есть живой процесс CLI, которому
+   * панель пишет в stdin (`control_request` `stop_task`). Нет — «Остановить» не
+   * показывается: кнопке без пути до процесса нечего делать.
+   */
+  canStopAgents: boolean().optional(),
+  /** Скиллы, хуки и MCP главного агента — сводка по именам. */
+  extensions: array(agentExtensionSummarySchema).optional(),
 });
 
 export type ChatProgress = Infer<typeof chatProgressSchema>;

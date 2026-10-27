@@ -48,6 +48,13 @@ export const panelTextsGapsEn = {
     'The next chat runs of this project (and its copies) pick the model for the kind of work themselves',
   'value-model-cascade-off':
     'The next chat runs of this project (and its copies) use the model you chose',
+  'journal-set-review-after-work': 'Review after work',
+  'summary-set-review-after-work-on': 'Turn on review after work in project “{{name}}”',
+  'summary-set-review-after-work-off': 'Turn off review after work in project “{{name}}”',
+  'value-review-after-work-on':
+    'Groups of this project’s next splits (and its copies’) get a ceiling review after their work',
+  'value-review-after-work-off':
+    'Groups of this project’s next splits (and its copies’) go straight to delivery after their work, with no review',
   'journal-split-accept-group': 'Accepting a split group',
   'summary-split-accept': 'Accept the delivered group “{{group}}” of chat “{{chat}}”’s split',
   'summary-split-unaccept':

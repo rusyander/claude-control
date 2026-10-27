@@ -319,6 +319,80 @@ describe('dev-сторож как процесс', () => {
     expect(journal).toMatch(/перезапуск: .*part\.ts/);
   }, 120_000);
 
+  // Группа d9869abf:5, 25.10: занятость сверялась только до пробы сборки, а ход,
+  // начатый за секунды пробы, перезапуск обрывал на рождении.
+  it('ход, начатый во время пробы, перезапуск тоже ждёт', async () => {
+    root = mkdtempSync(join(tmpdir(), 'dev-watch-probe-race-'));
+    const serverDir = join(root, 'apps', 'server');
+    const lib = join(serverDir, 'src', 'lib');
+    mkdirSync(lib, { recursive: true });
+    mkdirSync(join(root, 'packages', 'contracts', 'src'), { recursive: true });
+    copyFileSync(DEV_WATCH, join(lib, 'dev-watch.mjs'));
+    copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
+    copyFileSync(BRAND, join(lib, 'brand.mjs'));
+    copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
+    writeFileSync(
+      join(serverDir, 'src', 'index.ts'),
+      `import { appendFileSync } from 'node:fs';\nimport { part } from './lib/part.ts';\nappendFileSync(process.env.PIDS_FILE as string, \`\${process.pid} \${part}\\n\`);\nsetInterval(() => {}, 1000);\n`,
+    );
+    const config = join(root, 'config');
+    const { appDataDirOf } = (await import(BRAND.href)) as {
+      appDataDirOf: (configRoot: string) => string;
+    };
+    const appData = appDataDirOf(config);
+    mkdirSync(appData, { recursive: true });
+    const runsFile = join(appData, 'runs.json');
+    writeFileSync(runsFile, '[]');
+    const pidsFile = join(root, 'pids.txt');
+    const markFile = join(root, 'probe.mark');
+    let log = '';
+    watch = spawn(process.execPath, [join(lib, 'dev-watch.mjs')], {
+      cwd: serverDir,
+      env: {
+        ...process.env,
+        AGENTDECK_DEV_QUIET_MS: '300',
+        CLAUDE_CONFIG_DIR: config,
+        AGENTDECK_DEV_DEFER_POLL_MS: '200',
+        PIDS_FILE: pidsFile,
+        MARK_FILE: markFile,
+      },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      windowsHide: true,
+    });
+    watch.stdout?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    watch.stderr?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    const launches = (): string[] => {
+      if (!existsSync(pidsFile)) return [];
+      const rows = readFileSync(pidsFile, 'utf8').split(/\r?\n/).filter(Boolean);
+      for (const row of rows) recorded.add(Number(row.split(' ')[0]));
+      return rows;
+    };
+    await until(() => launches()[0], 30_000, `первый запуск\n${log}`);
+
+    // v2 при загрузке отмечается и спит: проба идёт секунды, как живая.
+    writeFileSync(
+      join(lib, 'part.ts'),
+      "import { appendFileSync } from 'node:fs';\nappendFileSync(process.env.MARK_FILE as string, 'p');\nawait new Promise((done) => setTimeout(done, 2500));\nexport const part: string = 'v2';\n",
+    );
+    await until(() => (existsSync(markFile) ? true : undefined), 30_000, `проба\n${log}`);
+    // Ход начался посреди пробы: запись журнала живая, процесс — сам тест.
+    writeFileSync(runsFile, JSON.stringify([{ key: 'k', pid: process.pid }]));
+    const stateFile = join(appData, 'dev-restart.json');
+    const state = await until(
+      () => (existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : undefined),
+      30_000,
+      `состояние ожидания\n${log}`,
+    );
+    expect(state).toMatchObject({ waitingFor: 'runs', runs: ['k'] });
+    await pause(2_000);
+    expect(launches()).toHaveLength(1);
+
+    writeFileSync(runsFile, '[]');
+    const second = await until(() => launches()[1], 60_000, `перезапуск после хода\n${log}`);
+    expect(second.split(' ')[1]).toBe('v2');
+  }, 120_000);
+
   // 24.10: живой ход — и ход группы разделения — ждут без предела (предел D1 21.10
   // рвал поток хода посреди шага); перезапуск — когда ход кончился.
   it('правка ждёт живой ход группы и после предела, перезапускает, когда ход кончился', async () => {

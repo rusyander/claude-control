@@ -49,6 +49,29 @@ const PLAN = [
   '- РЕШЕНИЕ-Г: старое имя оставить алиасом',
 ].join('\n');
 
+/**
+ * План по шаблону проекта: свои разделы 0–6, критерии — §3 (g5 25.10: такой план в 28 тыс.
+ * знаков шёл целиком в каждое звено после работы — разрез искал критерии только под №5).
+ */
+const PROJECT_PLAN = [
+  '# План: списки пользователей',
+  '## 0. Что выяснено на этапе плана (не искать заново)',
+  block('ВЫЯСНЕНО', 40),
+  '## 1. Подходы и выбор',
+  block('ВЫБОР', 15),
+  '## 2. Шаги',
+  '3. Сверить критерии приёмки после шага 2',
+  block('ШАГ-П', 80),
+  '## 3. Критерии приёмки',
+  '- КРИТЕРИЙ-П: поиск ограничен 255 символами',
+  '## 4. Уровень проверки (назван до первой правки)',
+  '- ПРОВЕРКА-П: vitest по затронутым файлам',
+  '## 5. Не трогать',
+  '- ГРАНИЦА-П: миграции',
+  '## 6. Открытые вопросы (рекомендация)',
+  '- РЕШЕНИЕ-П: нет',
+].join('\n');
+
 const OWNER = ownerRequestBlock(['Переименуй foo в bar везде, проверки — живьём на стенде.'])!;
 /** Задание группы так, как его кладёт разделение (`ChatSplit`: без строки старшинства). */
 const GROUP_TASK = [OWNER, '1. Переименуй foo в bar', SKILL_ROUTE_LINE].join('\n\n');
@@ -147,6 +170,14 @@ describe('planSections: разрез плана перед §5 (L2.1)', () => {
     expect(planSections(sign)?.tail.startsWith('§5 Критерии приёмки')).toBe(true);
   });
 
+  it('план по шаблону проекта (разделы 0–6, критерии — §3) режется перед критериями', () => {
+    const sections = planSections(PROJECT_PLAN);
+    expect(sections).toBeDefined();
+    expect(sections!.tail.startsWith('## 3. Критерии приёмки')).toBe(true);
+    expect(`${sections!.head}\n${sections!.tail}`).toBe(PROJECT_PLAN);
+    expect([sections!.first, sections!.criteria, sections!.steps]).toEqual([0, 3, 2]);
+  });
+
   it('сомнительное — целым планом: нет разделов, голая нумерация, сбитый порядок, короткое начало', () => {
     expect(planSections('1. Найти foo\n2. Заменить на bar')).toBeUndefined();
     expect(planSections(PLAN.replace(/^## /gm, ''))).toBeUndefined();
@@ -169,6 +200,49 @@ describe('звенья после работы: план, хвост ревью,
       expect(prompt, name).toContain('read its §4 only if a step is unclear');
       expect(prompt, name).not.toContain('АНАЛИЗ 0');
       expect(prompt, name).not.toContain('ШАГ 0');
+    }
+  });
+
+  it('план по шаблону проекта: §3–§6 текстом, §0–§2 — путём, ссылка называет его §2', () => {
+    const verify = stage(
+      { stage: 'fix', fixFindings: [FINDING], planSummary: PROJECT_PLAN },
+      'Поправил b.ts.',
+    );
+    const prompt = verify?.prompt ?? '';
+    for (const part of ['КРИТЕРИЙ-П', 'ПРОВЕРКА-П', 'ГРАНИЦА-П', 'РЕШЕНИЕ-П']) {
+      expect(prompt).toContain(part);
+    }
+    expect(prompt).toContain('Group plan from §3 on');
+    expect(prompt).toContain(
+      `(§0–§2: analysis, references, approaches, steps) is in the plan file ${PLAN_PATH}`,
+    );
+    expect(prompt).toContain('read its §2 only if a step is unclear');
+    expect(prompt).not.toContain('ВЫЯСНЕНО 0');
+    expect(prompt).not.toContain('ШАГ-П 0');
+  });
+
+  // g5 25.10 (BRIEF): проверка и доставка несли план целиком, с «## 2. Шаги» — 28 тыс. знаков.
+  it('план по шаблону проекта: ни одно звено после работы не везёт «## 2. Шаги» текстом', () => {
+    const plan = { planSummary: PROJECT_PLAN };
+    const all = {
+      review: stage(plan, 'Сделал: переименовал в 12 файлах.'),
+      fix: stage(
+        { ...plan, stage: 'review', model: 'claude-opus-5', lowered: false, workModel: 'sonnet' },
+        reviewText([FINDING]),
+      ),
+      verify: stage({ ...plan, stage: 'fix', fixFindings: [FINDING] }, 'Поправил b.ts.'),
+      deliver: stage(
+        { ...plan, stage: 'review', fixFindings: [FINDING], model: 'claude-opus-5' },
+        reviewText([]),
+      ),
+    };
+    for (const [name, staged] of Object.entries(all)) {
+      const prompt = staged?.prompt ?? '';
+      expect(prompt, name).toContain('КРИТЕРИЙ-П');
+      expect(prompt, name).toContain('РЕШЕНИЕ-П');
+      expect(prompt, name).not.toContain('## 2. Шаги');
+      expect(prompt, name).not.toContain('ШАГ-П 0');
+      expect(prompt, name).toContain(`plan file ${PLAN_PATH}`);
     }
   });
 

@@ -46,14 +46,17 @@ const RUN_OWNED = ['status', 'statusId', 'note', 'muted', 'muteReason', 'archive
 /** Атрибут кейса с id, под которым агент просил его завести. */
 const AGENT_ID = 'agent-id';
 
+/** Кейс от агента: при правке по id название можно не называть — останется прежнее. */
+export type AgentCaseInput = Omit<ProjectTestCaseInput, 'title'> & { title?: string };
+
 /** Завести или обновить кейс от имени агента чата. */
 export function agentUpsertCase(
   root: string,
   groupId: string,
-  input: ProjectTestCaseInput,
+  input: AgentCaseInput,
   now: string,
 ): AgentCaseWrite {
-  const clean: ProjectTestCaseInput = { ...input };
+  const clean: AgentCaseInput = { ...input };
   for (const key of RUN_OWNED) delete clean[key];
   createGroup(root, groupId);
   const cases = clean.id ? readGroup(root, groupId).cases : [];
@@ -66,6 +69,9 @@ export function agentUpsertCase(
     clean.id = existing.id;
     clean.attributes = { ...existing.attributes, ...clean.attributes };
   }
+  // Правка по id — только названные поля, прочие хранилище берёт из кейса; название тоже
+  // (g1 26.10: `{"id":…,"tags":[…]}` отбит «нужно название», метки ушли скриптом в 5 ходов).
+  if (existing && clean.title === undefined) clean.title = existing.title;
   if (existing?.source === 'human') {
     // Кейс человека — предложением: библиотеку меняет его приёмка.
     const runId = `chat-edit-${existing.id}-${Date.parse(now).toString(36)}`.slice(0, 64);
@@ -105,7 +111,8 @@ export function agentUpsertCase(
           ),
       )?.id
     : undefined;
-  const testCase = upsertCase(root, groupId, clean, now, 'agent');
+  // Без названия сюда доходит только новый кейс — хранилище отказывает ему с кодом.
+  const testCase = upsertCase(root, groupId, clean as ProjectTestCaseInput, now, 'agent');
   return {
     kind: 'saved',
     testCase,

@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { REVIEW_BLOCK_LANG } from '@agentdeck/contracts/model-cascade';
+import { BUILTIN_SIEVES, judgeSieves } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
 import type { ChainOutcome } from '../../chat/split-conveyor/split-conveyor.ts';
 import { createForeignStagePlanner, type ForeignStagePlannerDeps } from './cascade.ts';
+import { REVIEW_FINDINGS } from '../../chat/review-findings/review-findings.ts';
 import { appendMessage, createChat, readChat, readChatCascade } from '../store/store.ts';
 import type { ProviderChatCascade } from '../store/store.ts';
 import type { ProviderChatService } from '../ProviderChatService/ProviderChatService.ts';
@@ -146,6 +148,30 @@ describe('чужой CLI: звено доставки группы', () => {
     expect(deliveries()).toHaveLength(1);
   });
 
+  // Аудит g9 27.10 (R7), паритет с Claude: находки — файлом в копии с номерами.
+  it('находки ревью ложатся файлом в копию: R-n у правок, V-n у открытого после проверки', () => {
+    const textOf = (index: number): string =>
+      (send.mock.calls[index]?.[3] as { text: string }).text;
+    chat('review', REVIEW, 'review');
+    planner()(finish('review', reviewBlock(['a.ts:1 — забыт await', 'b.ts:2 — off by one'])));
+    expect(textOf(0)).toContain(`The panel keeps this list in ${REVIEW_FINDINGS} as R-1…R-2`);
+    expect(readFileSync(join(dir, REVIEW_FINDINGS), 'utf8')).toContain(
+      '## R-2 · b.ts:2 — off by one',
+    );
+
+    const fixChat = send.mock.calls[0]?.[2] as string;
+    send.mockClear();
+    planner()(finish(fixChat, 'Исправил.'));
+    const verifyChat = send.mock.calls[0]?.[2] as string;
+    send.mockClear();
+    planner()(finish(verifyChat, reviewBlock(['b.ts:2 — off by one'])));
+    expect(deliveries()).toHaveLength(1);
+    expect(textOf(0)).toContain(`The panel keeps this list in ${REVIEW_FINDINGS} as V-1,`);
+    const file = readFileSync(join(dir, REVIEW_FINDINGS), 'utf8');
+    expect(file).toContain('## R-1 · a.ts:1 — забыт await');
+    expect(file).toContain('## V-1 · b.ts:2 — off by one');
+  });
+
   it('чистое ревью группы с доставкой тоже заводит доставку', () => {
     chat('review', REVIEW, 'review');
 
@@ -208,8 +234,12 @@ describe('чужой CLI: звено доставки группы', () => {
     const [delivery] = deliveries();
     expect(delivery).toBeDefined();
     const deliverPrompt = (send.mock.calls[1]?.[3] as { text: string }).text;
-    expect(deliverPrompt).toContain('Open after verification');
+    expect(deliverPrompt).toContain('under a heading in the language of the MR');
+    expect(deliverPrompt).not.toContain('Open after verification');
+    expect(deliverPrompt).not.toContain('Do not fix them in this stage');
     expect(deliverPrompt).toContain('1. a.ts:1 — await всё ещё забыт');
+    // Проверка доставки до MR — и у чужого CLI: задание собирает панель (P5).
+    expect(deliverPrompt).toMatch(/tests-cli\.mjs" delivery --project \. --answer/);
     expect(reviews()).toHaveLength(1);
   });
 
@@ -222,7 +252,7 @@ describe('чужой CLI: звено доставки группы', () => {
     expect(delivery).toBeDefined();
     const deliverPrompt = (send.mock.calls[0]?.[3] as { text: string }).text;
     expect(deliverPrompt).toContain('the review fixes were NOT verified');
-    expect(deliverPrompt).not.toContain('Open after verification');
+    expect(deliverPrompt).not.toContain('stay open after verification');
   });
 
   it('проход проверки уже заведён — второго нет, и доставку правки не заводят', () => {
@@ -314,6 +344,38 @@ describe('чужой CLI: звено доставки группы', () => {
     ]);
   });
 
+  // P-18 (I-41): строка сит чужого CLI со скобочной записью путей доезжает до связи
+  // доставки нетронутой и снимает у судьи сит каждый раскрытый путь — тот же
+  // `judgeSieves`, что у Claude; проверку сдачи по связи панель гонит одна на всех.
+  it('скобочная запись путей в отчёте чужого CLI снимает каждый раскрытый путь (P-18)', async () => {
+    chat('fix', FIX, 'fix');
+    links['codex:fix'] = { ...LINK };
+    const evidence = 'файлы docs/{ru,en,uz}/api/chats.mdx: регенерация docs:api из контракта';
+    const text = [
+      'Поправил.',
+      '```agentdeck:sieves',
+      JSON.stringify({ sieves: [{ id: 'foreign-removals', status: 'pass', evidence }] }),
+      '```',
+    ].join('\n');
+
+    await planner(true, async () => 'SIEVES-PARAGRAPH')(finish('fix', text));
+
+    const [id] = deliveries();
+    const rows = links[`codex:${id}`]?.sieveRows ?? [];
+    expect(rows.map((row) => row.evidence)).toEqual([evidence]);
+    const judge = (removed: string[]) =>
+      judgeSieves({
+        applicable: BUILTIN_SIEVES.filter((sieve) => sieve.id === 'foreign-removals'),
+        mechanics: { foreignRemovals: removed },
+        rows,
+      });
+    expect(judge(['docs/en/api/chats.mdx', 'docs/ru/api/chats.mdx'])).toEqual([]);
+    // Скобки не снимают того, чего не называют (одноимённые: по одному имени файла не снять).
+    expect(
+      judge(['docs/en/api/chats.mdx', 'docs/kk/api/chats.mdx']).map((gap) => gap.params),
+    ).toEqual([{ files: 'docs/kk/api/chats.mdx' }]);
+  });
+
   // Ревью сит, 28.09: без доставки отчёт сит никто не судит — абзац обещал бы ложь.
   it('без доставки абзаца сит нет: его отчёт никто не проверил бы', () => {
     // Работа на пониженной модели заводит ревью — звено, которому сита положены.
@@ -328,5 +390,22 @@ describe('чужой CLI: звено доставки группы', () => {
     expect(send).toHaveBeenCalled();
     expect(asked).toEqual([]);
     expect(JSON.stringify(send.mock.calls)).not.toContain('SIEVES-PARAGRAPH');
+  });
+
+  // Telegram R3(d), 26.10: «Ревью после работы» выключено — шапка несёт флаг с запуска.
+  it('«Ревью после работы» выключено — доставка без ревью, строка причины в ленте', () => {
+    chat('work', { ...FIX, stage: 'work', reviewAfterWork: false }, 'work');
+
+    planner()(finish('work', 'Сделал.'));
+
+    const [id] = deliveries();
+    expect(id).toBeDefined();
+    expect(send).toHaveBeenCalledTimes(1);
+    const prompt = (send.mock.calls[0]?.[3] as { text: string }).text;
+    expect(prompt).toContain('«review after work» off for this project');
+    const notices = readChat(dir, 'codex', 'work')?.messages.filter((m) => m.role === 'notice');
+    expect(notices?.map((m) => m.content)).toEqual([
+      expect.stringContaining('«Ревью после работы»'),
+    ]);
   });
 });

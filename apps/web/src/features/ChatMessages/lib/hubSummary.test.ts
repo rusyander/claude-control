@@ -34,6 +34,10 @@ describe('hubBucket: строки без чата — в свои корзины
     expect(counts).toMatchObject({ deferred: 1, ask: 0, done: 0 });
   });
 
+  it('N3: красный MR без правки — «ждёт вас», а не «готово»', () => {
+    expect(hubBucket(row({ chatId: 'c', waitingFor: 'mr-red', status: 'awaiting' }))).toBe('ask');
+  });
+
   it('счётчики сводки — по тем же корзинам', () => {
     const { counts } = summarizeHub(
       [row({ pending: 'setup' }), row({ pending: 'interrupted' }), row({ pending: 'paused' })],

@@ -59,6 +59,48 @@ const REMOTE_RUNNERS = new Map<string, RegExp | undefined>([
   ['vagrant', /^ssh$/],
 ]);
 
+/** Группы подкоманд перед самой подкомандой: `docker container rm`, `docker compose exec`. */
+const SUBCOMMAND_GROUPS = new Set([
+  'builder',
+  'buildx',
+  'compose',
+  'config',
+  'container',
+  'context',
+  'image',
+  'manifest',
+  'network',
+  'node',
+  'plugin',
+  'secret',
+  'service',
+  'stack',
+  'swarm',
+  'system',
+  'trust',
+  'volume',
+]);
+
+/**
+ * Номера слов-подкоманд у `docker`/`kubectl`: первое слово не-ключ и, если оно
+ * группа (`container`), следующее. Подкоманда — не команда оболочки: `rm` в
+ * `docker rm -f "$CID"` удаляет контейнер, `exec` в `docker exec "$CID" go test` —
+ * не встроенный `exec` с программой из переменной. 25.10 обе формы (контейнер в
+ * переменной) уходили человеку картой D-3. Значение глобального ключа (`-H x rm`)
+ * считается первым словом — тогда `rm` судится как прежде: строже, не мягче.
+ */
+function subcommandWords(name: string, words: Word[]): Set<number> {
+  const skip = new Set<number>();
+  if (REMOTE_RUNNERS.get(name) === undefined) return skip;
+  for (let k = 1; k < words.length && k <= 3; k += 1) {
+    const text = (words[k] as Word).text;
+    if (text.startsWith('-')) continue;
+    skip.add(k);
+    if (!SUBCOMMAND_GROUPS.has(text)) break;
+  }
+  return skip;
+}
+
 /**
  * Обёртка исполнит команду не в каталоге звена: на другом хосте (`ssh host git
  * reset --hard`), в контейнере (`docker exec c …`), в каталоге своего ключа
@@ -117,7 +159,9 @@ export function foreignVerdict(
   judges: Judges,
 ): SegmentVerdict {
   const elsewhere = runsElsewhere(name, words);
+  const subcommand = subcommandWords(name, words);
   for (let k = 1; k < words.length - 1; k += 1) {
+    if (subcommand.has(k)) continue;
     const rest = words.slice(k);
     if (!consequential(rest)) continue;
     if (probe((sub) => judges.command(rest, sub), walk, false, elsewhere)) return DANGER;

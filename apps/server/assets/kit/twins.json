@@ -1,0 +1,984 @@
+{
+  "$comment": "Ledger of tools/kit-twins.mjs: kit copies vs their originals in the owner's ~/.claude. Edit one side of a pair -> port it to the other -> node tools/kit-twins.mjs --accept <key>. Never accept without porting.",
+  "roots": [
+    {
+      "id": "hooks-lib",
+      "kit": "agentdeck-kit/hooks/lib",
+      "global": "hooks/lib",
+      "pattern": "^(?!(?:context-budget|doc-hygiene-autoclean|postcompact-clear-advisor|precompact-checkpoint|project-onboard-check).mjs$).+.mjs$",
+      "strict": true,
+      "portWhy": "De-branded port: the kit copy drops the owner's company, tracker and forge names and personal paths, resolves its paths from the kit root (kit-paths.mjs) and reads every calling CLI's input shape (normalize); the guarded behaviour is the same.",
+      "kitOnlyWhy": "Kit plumbing or a behaviour the personal layer gets from settings.json or CLAUDE.md instead of a module.",
+      "globalOnlyWhy": "Owner-specific (the company tracker/forge, personal audits of ~/.claude): not shipped to other machines."
+    },
+    {
+      "id": "hooks-top",
+      "kit": "agentdeck-kit/hooks/lib",
+      "global": "hooks",
+      "pattern": "^(?:context-budget|doc-hygiene-autoclean|postcompact-clear-advisor|precompact-checkpoint|project-onboard-check).mjs$",
+      "strict": true,
+      "portWhy": "The personal layer runs these as standalone hook scripts (hooks/<name>.mjs, one settings.json entry each); the kit runs the same behaviour as a module of its event dispatcher (lib/run.mjs). Ported, not copied: kit paths, every CLI's input shape.",
+      "kitOnlyWhy": "",
+      "globalOnlyWhy": ""
+    },
+    {
+      "id": "rules",
+      "kit": "agentdeck-kit/skills/situational-rules/references",
+      "global": "hooks/rules",
+      "pattern": "^[^/]+\\.md$",
+      "strict": true,
+      "portWhy": "De-branded port of the situational rule card: company names, personal paths and the owner's dated decisions removed; the rule itself is the same.",
+      "kitOnlyWhy": "A rule card only the kit delivers (the personal layer states it in CLAUDE.md).",
+      "globalOnlyWhy": "A rule card about the owner's own projects or setup: not shipped.",
+      "rename": {
+        "forge-protocol.md": "mcp-protocol.md"
+      },
+      "globalPrivate": {
+        "pattern": "^[^/]+-(frontend|backend).md$",
+        "why": "Rule cards of the owner's own company projects (<project>-frontend.md / -backend.md): never shipped, never named here."
+      }
+    },
+    {
+      "id": "tools",
+      "kit": "agentdeck-kit/tools",
+      "global": "tools",
+      "pattern": "^[^/]+\\.mjs$",
+      "strict": false,
+      "portWhy": "De-branded port of the helper the kit's skills and hooks call; same behaviour, kit paths.",
+      "kitOnlyWhy": "",
+      "globalOnlyWhy": ""
+    },
+    {
+      "id": "skills",
+      "kit": "agentdeck-kit/skills",
+      "global": "skills",
+      "pattern": "^[^/]+/SKILL\\.md$",
+      "strict": false,
+      "portWhy": "De-branded port of the skill (kit namespace agentdeck-kit:, kit tool paths, no company specifics).",
+      "kitOnlyWhy": "",
+      "globalOnlyWhy": ""
+    },
+    {
+      "id": "watch-skills",
+      "kit": "agentdeck-kit/skills",
+      "global": "skills",
+      "pattern": "^(?:watchdog|agentdeck-watchdog)/(?:scripts|references)/.+$",
+      "strict": true,
+      "portWhy": "The group-watch skills ship with the kit: scripts byte-equal to the personal copy (each resolves its layer at run time — where.mjs, panel.mjs), references ported to kit paths and neutral wording.",
+      "kitOnlyWhy": "",
+      "globalOnlyWhy": ""
+    }
+  ],
+  "pairs": {
+    "hooks-lib:agent-doc-location.mjs": {
+      "same": false,
+      "kit": "95eb79fe22e7c42f",
+      "global": "6f6f1eb87ce79fcc"
+    },
+    "hooks-lib:agent-doc.mjs": {
+      "same": false,
+      "kit": "9a1fb21c14534e4c",
+      "global": "0cfbc850168821f1"
+    },
+    "hooks-lib:agent-prompt-guard.mjs": {
+      "same": false,
+      "kit": "6d1f37a917589b5d",
+      "global": "24635be419cb8867"
+    },
+    "hooks-lib:autonomous-pick.mjs": {
+      "same": true,
+      "kit": "3667fbe1f72f4d33",
+      "global": "3667fbe1f72f4d33"
+    },
+    "hooks-lib:bash-read-cap.mjs": {
+      "same": false,
+      "kit": "cab07954b01a8457",
+      "global": "5aa8001c78bc4469"
+    },
+    "hooks-lib:batch-nudge.mjs": {
+      "same": false,
+      "kit": "4f4c57a892e9ec56",
+      "global": "3959c9fba803701e"
+    },
+    "hooks-lib:bg-wait-guard.mjs": {
+      "same": false,
+      "kit": "56aed681eee38f42",
+      "global": "8494ae47656d735c"
+    },
+    "hooks-lib:check-cost.mjs": {
+      "same": false,
+      "kit": "735119758a3ff87d",
+      "global": "1a16e7fef2abaddf"
+    },
+    "hooks-lib:cmd-duration.mjs": {
+      "same": false,
+      "kit": "90017c65cbc20876",
+      "global": "e56cba9a805464f2"
+    },
+    "hooks-lib:consent.mjs": {
+      "same": false,
+      "kit": "496e9842eaed905e",
+      "global": "700479efedc05291"
+    },
+    "hooks-lib:context-watch.mjs": {
+      "same": false,
+      "kit": "39b12f7556469760",
+      "global": "79c73a22ea62d3b8"
+    },
+    "hooks-lib:destructive-guard.mjs": {
+      "same": false,
+      "kit": "852656f38b3c3e71",
+      "global": "a5654c5bf580b459"
+    },
+    "hooks-lib:dispatch.mjs": {
+      "same": false,
+      "kit": "51c758ea6fea4f2f",
+      "global": "7f654a05f1213c9d"
+    },
+    "hooks-lib:doc-bloat-guard.mjs": {
+      "same": false,
+      "kit": "5c6f115ede231d56",
+      "global": "da6069ded901d18c"
+    },
+    "hooks-lib:doc-daily-review.mjs": {
+      "same": false,
+      "kit": "0890aa67b9d0c9ba",
+      "global": "5d958f3a6533eb62"
+    },
+    "hooks-lib:doc-policy.mjs": {
+      "same": false,
+      "kit": "1959afabdd1c6ee5",
+      "global": "ef16800fc97a122e"
+    },
+    "hooks-lib:doc-size-guard.mjs": {
+      "same": false,
+      "kit": "bd3fa5dcb0ad122c",
+      "global": "c110c2182d5e9a73"
+    },
+    "hooks-lib:forge-merge-guard.mjs": {
+      "same": true,
+      "kit": "5c16a5b39f6cf27e",
+      "global": "5c16a5b39f6cf27e"
+    },
+    "hooks-lib:format-on-edit.mjs": {
+      "same": false,
+      "kit": "d38c96f02c16b6a0",
+      "global": "ebe46d76b7faba77"
+    },
+    "hooks-lib:gate-at-end.mjs": {
+      "same": false,
+      "kit": "9a714fbb086ba5be",
+      "global": "84e1ff255c1b4eb6"
+    },
+    "hooks-lib:git-guard.mjs": {
+      "same": false,
+      "kit": "7b6dc944528a2613",
+      "global": "90a3d3d5af46b677"
+    },
+    "hooks-lib:import-weight-guard.mjs": {
+      "same": false,
+      "kit": "9b2fb1ac5808071f",
+      "global": "23b7f3d80bc08411"
+    },
+    "hooks-lib:inline-edit-guard.mjs": {
+      "same": false,
+      "kit": "4a579b19eefdf97c",
+      "global": "806d6a3d51c7a6ab"
+    },
+    "hooks-lib:language-guard.mjs": {
+      "same": false,
+      "kit": "d0f73fb89915950e",
+      "global": "56c24a322bd1677c"
+    },
+    "hooks-lib:mcp-shape-guard.mjs": {
+      "same": true,
+      "kit": "59b747e867c66709",
+      "global": "59b747e867c66709"
+    },
+    "hooks-lib:mr-echo-trim.mjs": {
+      "same": false,
+      "kit": "a65b62edbb107203",
+      "global": "e98f2f0843767568"
+    },
+    "hooks-lib:node-tmp-hint.mjs": {
+      "same": true,
+      "kit": "c1f86faea2c9555c",
+      "global": "c1f86faea2c9555c"
+    },
+    "hooks-lib:nvm-use-guard.mjs": {
+      "same": true,
+      "kit": "3f2f35300dfd8394",
+      "global": "3f2f35300dfd8394"
+    },
+    "hooks-lib:pipeline-watch-guard.mjs": {
+      "same": false,
+      "kit": "335f25c29c05fd99",
+      "global": "065e5e79c8d8b10f"
+    },
+    "hooks-lib:prompt/docs-order-hint.mjs": {
+      "same": false,
+      "kit": "56d99c2ee41e2dd2",
+      "global": "45bbd1fab77e1467"
+    },
+    "hooks-lib:prompt/figma-hint.mjs": {
+      "same": false,
+      "kit": "228f0c9ab99e4162",
+      "global": "8eccb4ea07b54768"
+    },
+    "hooks-lib:prompt/gate-defer-hint.mjs": {
+      "same": false,
+      "kit": "9eae6105afd275f8",
+      "global": "2aff8accb67a0241"
+    },
+    "hooks-lib:prompt/record-prompt.mjs": {
+      "same": false,
+      "kit": "dbfe3e5c4f3ff781",
+      "global": "203106dc70fc2d5d"
+    },
+    "hooks-lib:prompt/skill-hint.mjs": {
+      "same": false,
+      "kit": "2f5a3cf75c526b90",
+      "global": "8c96303dada10ec9"
+    },
+    "hooks-lib:prompt/verify-hard-hint.mjs": {
+      "same": false,
+      "kit": "d88c58dec9334f7f",
+      "global": "26faefc125e430e8"
+    },
+    "hooks-lib:push-sieves-scan.mjs": {
+      "same": false,
+      "kit": "6588e0f6046c1c4f",
+      "global": "fa11bd0a0fe837d4"
+    },
+    "hooks-lib:push-sieves.mjs": {
+      "same": false,
+      "kit": "a07870d2fbfdf99d",
+      "global": "e8ea6c8a4b4f2c8b"
+    },
+    "hooks-lib:read-discipline.mjs": {
+      "same": false,
+      "kit": "1b5a1105cc460a0e",
+      "global": "55cc0fdaf5a4fc33"
+    },
+    "hooks-lib:reply-language.mjs": {
+      "same": false,
+      "kit": "05432ad684bbb712",
+      "global": "521a9464ad54d81f"
+    },
+    "hooks-lib:review-publish-guard.mjs": {
+      "same": false,
+      "kit": "460f82beffd31bdc",
+      "global": "57d7ba44ed018830"
+    },
+    "hooks-lib:review-report.mjs": {
+      "same": false,
+      "kit": "9d3c21c88086b4d4",
+      "global": "7f16c6fadf79541e"
+    },
+    "hooks-lib:review-spawn.mjs": {
+      "same": false,
+      "kit": "cc27c30efd5302ef",
+      "global": "597821ab26fe0028"
+    },
+    "hooks-lib:rule-injector.mjs": {
+      "same": false,
+      "kit": "ffe8d926a2092efe",
+      "global": "e52ea256518fb821"
+    },
+    "hooks-lib:scratch-zone.mjs": {
+      "same": false,
+      "kit": "f44ce048634d26c7",
+      "global": "07e20fdac7780820"
+    },
+    "hooks-lib:search-discipline.mjs": {
+      "same": false,
+      "kit": "e5983a445503fbc7",
+      "global": "d36bba7c97d5a166"
+    },
+    "hooks-lib:secret-guard.mjs": {
+      "same": false,
+      "kit": "4e452634587b73a4",
+      "global": "08c31e77493b2717"
+    },
+    "hooks-lib:shell-text.mjs": {
+      "same": false,
+      "kit": "26619aea6cc4a536",
+      "global": "7ae221ffaddb2bdd"
+    },
+    "hooks-lib:spawn-cost-guard.mjs": {
+      "same": false,
+      "kit": "07a2851134a3c244",
+      "global": "1fca5c2b01b216f7"
+    },
+    "hooks-lib:spawn-grant.mjs": {
+      "same": false,
+      "kit": "5a2d440ce3fc87eb",
+      "global": "36d46524534207cf"
+    },
+    "hooks-lib:split-worktree.mjs": {
+      "same": false,
+      "kit": "98db45451b8e9539",
+      "global": "b823f861dfcc94bb"
+    },
+    "hooks-lib:task-ledger.mjs": {
+      "same": false,
+      "kit": "dcc1a22c70bca792",
+      "global": "d12b0d66aeddc26e"
+    },
+    "hooks-lib:ticket-run.mjs": {
+      "same": false,
+      "kit": "26e58d83727ec77d",
+      "global": "0654fbb6db8d04b4"
+    },
+    "hooks-lib:todo-throttle.mjs": {
+      "same": false,
+      "kit": "3ef1e7c65b5c91da",
+      "global": "251d6e76a4b21387"
+    },
+    "hooks-lib:transcript.mjs": {
+      "same": false,
+      "kit": "cf20d100ee230421",
+      "global": "02ccdcf6dd02c8b5"
+    },
+    "hooks-lib:verify-at-stop.mjs": {
+      "same": false,
+      "kit": "338d6d6df16b703f",
+      "global": "dba227379882f10b"
+    },
+    "hooks-lib:verify-throttle.mjs": {
+      "same": false,
+      "kit": "f80560903c4329c9",
+      "global": "76e7b25bfeeca087"
+    },
+    "hooks-lib:watch-keepalive.mjs": {
+      "same": false,
+      "kit": "cd0504f87ed0ab58",
+      "global": "f791b9e6fb52f6c2"
+    },
+    "hooks-top:context-budget.mjs": {
+      "same": false,
+      "kit": "5847bad1420f8756",
+      "global": "9586afa1e27765c4"
+    },
+    "hooks-top:doc-hygiene-autoclean.mjs": {
+      "same": false,
+      "kit": "382311d6c651f254",
+      "global": "dc228affd392da5c"
+    },
+    "hooks-top:postcompact-clear-advisor.mjs": {
+      "same": false,
+      "kit": "97f2d26716d25bcf",
+      "global": "f80f207864725077"
+    },
+    "hooks-top:precompact-checkpoint.mjs": {
+      "same": false,
+      "kit": "5b6c58b019eab7dc",
+      "global": "b46a8abc2357c3d5"
+    },
+    "hooks-top:project-onboard-check.mjs": {
+      "same": false,
+      "kit": "cc0222d880c95ffe",
+      "global": "e6970999e338a1fe"
+    },
+    "rules:config-work.md": {
+      "same": false,
+      "kit": "ac9fc3c891f77542",
+      "global": "a79aa0ed67734bbe"
+    },
+    "rules:doc-classification.md": {
+      "same": false,
+      "kit": "1934b53ef63c0504",
+      "global": "2f77be92c59cced0"
+    },
+    "rules:docker-shared.md": {
+      "same": false,
+      "kit": "a918aca5a703bb84",
+      "global": "e2c6e7b335e04ad3"
+    },
+    "rules:forge-protocol.md": {
+      "same": false,
+      "kit": "e37dc7b2f5a09c9a",
+      "global": "cdd03c98eaf2e187"
+    },
+    "rules:git-writes.md": {
+      "same": false,
+      "kit": "ef80452c28f4dda0",
+      "global": "c4c477e0c8df4065"
+    },
+    "rules:hook-authoring.md": {
+      "same": false,
+      "kit": "230fc9e9801e5d49",
+      "global": "f33e9d537754d911"
+    },
+    "rules:live-check.md": {
+      "same": false,
+      "kit": "65fddf363db4aa47",
+      "global": "b23e3e637b3b0885"
+    },
+    "rules:local-models.md": {
+      "same": false,
+      "kit": "04064d4559eb61f0",
+      "global": "edf507f7450cad9e"
+    },
+    "rules:pdf-layout.md": {
+      "same": false,
+      "kit": "7a50dac849bf3ecf",
+      "global": "3d0f0a5fbb04bf62"
+    },
+    "rules:published-text.md": {
+      "same": false,
+      "kit": "44c6634c5047a1c5",
+      "global": "11907bf3a12d3213"
+    },
+    "rules:review-depth.md": {
+      "same": false,
+      "kit": "7e7264ca3490202b",
+      "global": "efa462766deb06af"
+    },
+    "rules:task-ledger.md": {
+      "same": false,
+      "kit": "d1f6137e79ad8d99",
+      "global": "5ab4deaa9325473e"
+    },
+    "rules:verification-depth.md": {
+      "same": false,
+      "kit": "eb2acb2f953654fa",
+      "global": "c9eb97e4417d0a24"
+    },
+    "rules:visible-fix-shots.md": {
+      "same": false,
+      "kit": "0353808f9c4643a3",
+      "global": "f2fae42e65e8ec94"
+    },
+    "skills:a11y-audit/SKILL.md": {
+      "same": false,
+      "kit": "cbbc5637ad3227f5",
+      "global": "56bb845df7fbdc96"
+    },
+    "skills:agentdeck-watchdog/SKILL.md": {
+      "same": false,
+      "kit": "28cfeac1183111c7",
+      "global": "c4651238290a088d"
+    },
+    "skills:api-contract-sync/SKILL.md": {
+      "same": false,
+      "kit": "753640fd9f3dcab2",
+      "global": "f07e0636f16f789a"
+    },
+    "skills:batch-runner/SKILL.md": {
+      "same": false,
+      "kit": "78391292ad5d31fd",
+      "global": "3d0ff3c2ff53846f"
+    },
+    "skills:bug-regression-test/SKILL.md": {
+      "same": false,
+      "kit": "e608ca3bed3add8c",
+      "global": "5795870ca0f0ceea"
+    },
+    "skills:changelog-builder/SKILL.md": {
+      "same": false,
+      "kit": "f544cd6d25d495e0",
+      "global": "78f819a7313a1f57"
+    },
+    "skills:config-draft/SKILL.md": {
+      "same": false,
+      "kit": "48b13d89acf79985",
+      "global": "8dbeb0e30fdefdc4"
+    },
+    "skills:deep-review/SKILL.md": {
+      "same": false,
+      "kit": "e791cb36c5b4ddde",
+      "global": "d3e89dec880fcb3c"
+    },
+    "skills:dependency-risk-review/SKILL.md": {
+      "same": false,
+      "kit": "6177eeb429c1a43b",
+      "global": "0f5dea09f1b146e4"
+    },
+    "skills:deps-upgrade/SKILL.md": {
+      "same": false,
+      "kit": "4c86fe365a28b88c",
+      "global": "8d53a1adf3f793ba"
+    },
+    "skills:doc-hygiene/SKILL.md": {
+      "same": false,
+      "kit": "cd9271d90bb03b24",
+      "global": "5b9c52fb970db9ca"
+    },
+    "skills:docs-triage/SKILL.md": {
+      "same": false,
+      "kit": "b9fb224c01947ada",
+      "global": "4691b8eae86d8604"
+    },
+    "skills:drawio-architect/SKILL.md": {
+      "same": false,
+      "kit": "040a658d0e906f75",
+      "global": "8fe627062574b578"
+    },
+    "skills:figma-parity/SKILL.md": {
+      "same": false,
+      "kit": "bccb715a93a43ec9",
+      "global": "cdffd5cc20686b90"
+    },
+    "skills:frontend-architecture/SKILL.md": {
+      "same": false,
+      "kit": "9bb88dd25d082222",
+      "global": "ce65ada4ed7b984a"
+    },
+    "skills:human-docs/SKILL.md": {
+      "same": false,
+      "kit": "7f2a4299b4db6fb4",
+      "global": "5f4a2b3538fe8a44"
+    },
+    "skills:i18n-audit/SKILL.md": {
+      "same": false,
+      "kit": "25fb8bce03ddb00d",
+      "global": "4f3151f415017d14"
+    },
+    "skills:log-forensics/SKILL.md": {
+      "same": false,
+      "kit": "bc15cb89a65fec10",
+      "global": "3130fb3326667933"
+    },
+    "skills:mr-visual-report/SKILL.md": {
+      "same": false,
+      "kit": "9e307d62430c8c32",
+      "global": "b9a7cc394234791e"
+    },
+    "skills:perf-audit/SKILL.md": {
+      "same": false,
+      "kit": "587a7ecc8896984a",
+      "global": "8ab8f53d35874380"
+    },
+    "skills:playwright-e2e-tests/SKILL.md": {
+      "same": false,
+      "kit": "ec9beab0950212a2",
+      "global": "9456e40aa0babe26"
+    },
+    "skills:prepare-mr/SKILL.md": {
+      "same": false,
+      "kit": "9740dfdadb0c0e55",
+      "global": "f85a05bab5938981"
+    },
+    "skills:project-audit/SKILL.md": {
+      "same": false,
+      "kit": "125dc1451261f63a",
+      "global": "7389f5b76e1eff0a"
+    },
+    "skills:project-onboard/SKILL.md": {
+      "same": false,
+      "kit": "085223bc3822386e",
+      "global": "fec0b9d0a05e9f66"
+    },
+    "skills:prototype/SKILL.md": {
+      "same": false,
+      "kit": "bdd36b0b09b04535",
+      "global": "2094aa3204e93736"
+    },
+    "skills:refactor-code-health/SKILL.md": {
+      "same": false,
+      "kit": "81781b2e9846e51c",
+      "global": "8a7a82c0e46ea29d"
+    },
+    "skills:requirements-grilling/SKILL.md": {
+      "same": false,
+      "kit": "64316574e0d5f7e4",
+      "global": "7c4467ba9f223aec"
+    },
+    "skills:resolving-merge-conflicts/SKILL.md": {
+      "same": false,
+      "kit": "59683c1c4f7d126b",
+      "global": "5dbefc19300ca0d8"
+    },
+    "skills:skill-authoring/SKILL.md": {
+      "same": false,
+      "kit": "8b964355bc295495",
+      "global": "742eafe06750153b"
+    },
+    "skills:skill-map/SKILL.md": {
+      "same": false,
+      "kit": "c6f12a493858cce0",
+      "global": "de2c6f75b747311d"
+    },
+    "skills:stand-doctor/SKILL.md": {
+      "same": false,
+      "kit": "4a2cad2732052ab1",
+      "global": "e15df8b8def33533"
+    },
+    "skills:storybook-stories/SKILL.md": {
+      "same": false,
+      "kit": "ce40cee1bf2f5ae7",
+      "global": "a12ad35950de1f12"
+    },
+    "skills:style-conformance-review/SKILL.md": {
+      "same": false,
+      "kit": "cf1d9fbe931bfc88",
+      "global": "33c846b380c14778"
+    },
+    "skills:task-spec-builder/SKILL.md": {
+      "same": false,
+      "kit": "0d35be965653eae5",
+      "global": "324cdb2552172afc"
+    },
+    "skills:ticket-delivery-2/SKILL.md": {
+      "same": false,
+      "kit": "0fb8f9759af015da",
+      "global": "49020561607313c4"
+    },
+    "skills:ticket-delivery/SKILL.md": {
+      "same": false,
+      "kit": "1c27037fd4450992",
+      "global": "e6338bdea61787f5"
+    },
+    "skills:token-economy/SKILL.md": {
+      "same": false,
+      "kit": "be8e720c77e8856e",
+      "global": "26267cf8df58f715"
+    },
+    "skills:unit-integration-tests/SKILL.md": {
+      "same": false,
+      "kit": "221c7b1e88324a6f",
+      "global": "df4aa7a3a4755b58"
+    },
+    "skills:watchdog/SKILL.md": {
+      "same": false,
+      "kit": "bcab59d14184b3f3",
+      "global": "8ad21a0fd45ee8e1"
+    },
+    "tools:acceptance.mjs": {
+      "same": false,
+      "kit": "915a40e2105ba006",
+      "global": "daf084cf19050860"
+    },
+    "tools:affected.mjs": {
+      "same": false,
+      "kit": "b54b168894adf604",
+      "global": "c958794193c81307"
+    },
+    "tools:agents-md-choice.mjs": {
+      "same": false,
+      "kit": "5a772867c398d9f0",
+      "global": "440a6b81bdadf427"
+    },
+    "tools:doc-policy-set.mjs": {
+      "same": false,
+      "kit": "7b28bb43dad827d6",
+      "global": "2e6783c8bd3a3ea6"
+    },
+    "tools:docs-validate.mjs": {
+      "same": false,
+      "kit": "f25f240a9b020f23",
+      "global": "0320d5947e6840f6"
+    },
+    "tools:fe-arch-check.mjs": {
+      "same": false,
+      "kit": "7905b3a26af4b56b",
+      "global": "e219016c05541923"
+    },
+    "tools:gate-run.mjs": {
+      "same": false,
+      "kit": "d63b7a397d8287a6",
+      "global": "6178d347939f0c41"
+    },
+    "tools:i18n-keydiff.mjs": {
+      "same": false,
+      "kit": "1a5b6ca17da343bc",
+      "global": "501cf16a943419f5"
+    },
+    "tools:mustfail-graph-reporter.mjs": {
+      "same": false,
+      "kit": "f989c0f481db7cc3",
+      "global": "b6aae079190c4739"
+    },
+    "tools:mustfail.mjs": {
+      "same": false,
+      "kit": "5bdf0b99bb7af7c6",
+      "global": "7088525ed8aefcac"
+    },
+    "tools:node-need-brief.mjs": {
+      "same": false,
+      "kit": "2ec196be97146e7c",
+      "global": "54c66db8f30c6e16"
+    },
+    "tools:pdf-blank-check.mjs": {
+      "same": false,
+      "kit": "e5b8e8b08070e14d",
+      "global": "d897e3a6e7f6b161"
+    },
+    "tools:probe.mjs": {
+      "same": true,
+      "kit": "500180ea2dcc8642",
+      "global": "500180ea2dcc8642"
+    },
+    "tools:review-eval.mjs": {
+      "same": false,
+      "kit": "2437f8518503acd1",
+      "global": "78972b85b7e7a65f"
+    },
+    "tools:review-harness.mjs": {
+      "same": false,
+      "kit": "385f52ea9423a949",
+      "global": "2d6eeab1483f18fd"
+    },
+    "tools:review-harvest.mjs": {
+      "same": false,
+      "kit": "879674f305554c51",
+      "global": "4180d65459b56344"
+    },
+    "tools:review-plan.mjs": {
+      "same": false,
+      "kit": "a95a5a81ff4efb5e",
+      "global": "5bd3f2c646905b37"
+    },
+    "tools:review-position.mjs": {
+      "same": false,
+      "kit": "4521a4cd81b9b8d9",
+      "global": "e627f62d9d712139"
+    },
+    "tools:review-score.mjs": {
+      "same": false,
+      "kit": "ca13c3db5e2d1770",
+      "global": "f76c7abd63e6eff0"
+    },
+    "tools:review-sweep.mjs": {
+      "same": false,
+      "kit": "3896330c3404616f",
+      "global": "725097baf364718f"
+    },
+    "tools:review-sync-brief.mjs": {
+      "same": false,
+      "kit": "887570da37f1cd4f",
+      "global": "9afda1b852177563"
+    },
+    "tools:review-sync.mjs": {
+      "same": false,
+      "kit": "5ddf179ea3bf5776",
+      "global": "1ec7f8b5dfb6d68a"
+    },
+    "tools:risk-tier.mjs": {
+      "same": false,
+      "kit": "f8ddc735b0bbc4ae",
+      "global": "4073ada96ac8fe25"
+    },
+    "tools:ticket-ledger.mjs": {
+      "same": false,
+      "kit": "9a404d78d92dece7",
+      "global": "a179bf4d578c33f6"
+    },
+    "tools:ticket-preflight.mjs": {
+      "same": false,
+      "kit": "29748a79b5eea61e",
+      "global": "52e60eb26f7cc07d"
+    },
+    "tools:wait-for.mjs": {
+      "same": true,
+      "kit": "4c8852b0c2584365",
+      "global": "4c8852b0c2584365"
+    },
+    "watch-skills:agentdeck-watchdog/references/classes.md": {
+      "same": false,
+      "kit": "35c1a8cad3e194df",
+      "global": "bc905b137c6d6225"
+    },
+    "watch-skills:agentdeck-watchdog/references/loop.md": {
+      "same": false,
+      "kit": "d2ea2bb0769a4a35",
+      "global": "abcf9595edfeaca6"
+    },
+    "watch-skills:agentdeck-watchdog/references/misses.md": {
+      "same": false,
+      "kit": "c298f2e563c251b9",
+      "global": "c813f380065f1b19"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/group-control.mjs": {
+      "same": true,
+      "kit": "a840e6b916f88e1e",
+      "global": "a840e6b916f88e1e"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/common.mjs": {
+      "same": true,
+      "kit": "0e6203990baa4772",
+      "global": "0e6203990baa4772"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/deferred.mjs": {
+      "same": true,
+      "kit": "58f42f1adaa5f936",
+      "global": "58f42f1adaa5f936"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/fold.mjs": {
+      "same": true,
+      "kit": "b92cc28ea78b2f17",
+      "global": "b92cc28ea78b2f17"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/legend.mjs": {
+      "same": true,
+      "kit": "0c1c7d411567c9e9",
+      "global": "0c1c7d411567c9e9"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/panel.mjs": {
+      "same": true,
+      "kit": "bb945ee43ffd070e",
+      "global": "bb945ee43ffd070e"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/pauses.mjs": {
+      "same": true,
+      "kit": "b7d8b35df0ae6ec2",
+      "global": "b7d8b35df0ae6ec2"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/restarts.mjs": {
+      "same": true,
+      "kit": "536bcb673156908f",
+      "global": "536bcb673156908f"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/rule-texts.mjs": {
+      "same": true,
+      "kit": "d846efad9cfd75ff",
+      "global": "d846efad9cfd75ff"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/lib/window.mjs": {
+      "same": true,
+      "kit": "b5b646ac79deba9a",
+      "global": "b5b646ac79deba9a"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/rule-texts.json": {
+      "same": true,
+      "kit": "2b17500a114d91bc",
+      "global": "2b17500a114d91bc"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/rule-texts.mjs": {
+      "same": true,
+      "kit": "96b67bb828a1ce4b",
+      "global": "96b67bb828a1ce4b"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/selftest-groups.mjs": {
+      "same": true,
+      "kit": "4d1abca6744df751",
+      "global": "4d1abca6744df751"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/selftest-stage-audit.mjs": {
+      "same": true,
+      "kit": "661482de2f3e8da7",
+      "global": "661482de2f3e8da7"
+    },
+    "watch-skills:agentdeck-watchdog/scripts/watch-groups.mjs": {
+      "same": true,
+      "kit": "1fb389ec527a3793",
+      "global": "1fb389ec527a3793"
+    },
+    "watch-skills:watchdog/references/flags.md": {
+      "same": false,
+      "kit": "8a05c085ce8bb815",
+      "global": "cd5b3c85b951ffbb"
+    },
+    "watch-skills:watchdog/references/ledger.md": {
+      "same": false,
+      "kit": "a0f449af29c6f368",
+      "global": "9e76ccaf8ca4f65c"
+    },
+    "watch-skills:watchdog/references/levers.md": {
+      "same": false,
+      "kit": "1b5b990709a417fa",
+      "global": "0b81239042cba321"
+    },
+    "watch-skills:watchdog/scripts/lib/core.mjs": {
+      "same": true,
+      "kit": "1f58429aa08361cf",
+      "global": "1f58429aa08361cf"
+    },
+    "watch-skills:watchdog/scripts/lib/foreign.mjs": {
+      "same": true,
+      "kit": "db039ee58031b825",
+      "global": "db039ee58031b825"
+    },
+    "watch-skills:watchdog/scripts/lib/keepalive.mjs": {
+      "same": true,
+      "kit": "1e5683d3f6e5ea54",
+      "global": "1e5683d3f6e5ea54"
+    },
+    "watch-skills:watchdog/scripts/lib/run.mjs": {
+      "same": true,
+      "kit": "49a7c6256e28e348",
+      "global": "49a7c6256e28e348"
+    },
+    "watch-skills:watchdog/scripts/lib/where.mjs": {
+      "same": true,
+      "kit": "0cddde9bb9e0964c",
+      "global": "0cddde9bb9e0964c"
+    },
+    "watch-skills:watchdog/scripts/selftest-foreign.mjs": {
+      "same": true,
+      "kit": "838ce8790991142b",
+      "global": "838ce8790991142b"
+    },
+    "watch-skills:watchdog/scripts/selftest.mjs": {
+      "same": true,
+      "kit": "2689de1c0a21ec1e",
+      "global": "2689de1c0a21ec1e"
+    },
+    "watch-skills:watchdog/scripts/show.mjs": {
+      "same": true,
+      "kit": "7adc32ce2af9281a",
+      "global": "7adc32ce2af9281a"
+    },
+    "watch-skills:watchdog/scripts/watch.mjs": {
+      "same": true,
+      "kit": "fc258a963e571373",
+      "global": "fc258a963e571373"
+    }
+  },
+  "kitOnly": {
+    "hooks-lib:forge-toolset-guard.mjs": "Split groups only (AGENTDECK_SPLIT_CHILD=1): the panel launches them, the personal layer never does.",
+    "hooks-lib:items.mjs": "Kit plumbing: the manifest that lets the panel switch each guard off; the personal layer wires dispatchers in settings.json.",
+    "hooks-lib:kit-paths.mjs": "Kit plumbing: paths of a kit copied per run into the panel data dir, and which CLI is calling.",
+    "hooks-lib:local-discipline.mjs": "Local-model runs only (AGENTDECK_KIT_VARIANT=local), which the panel launches.",
+    "hooks-lib:mr-description-gate.mjs": "Panel group runs only (AGENTDECK_GROUP_STAGE): it judges a re-post against the panel's delivery check, which only a group runs.",
+    "hooks-lib:notebook-at-stop.mjs": "Panel group runs only (AGENTDECK_GROUP_STAGE): the notebook it guards is the one the panel seeds into the group's copy.",
+    "hooks-lib:own-copy-guard.mjs": "Split groups only (AGENTDECK_SPLIT_CHILD=1): each group works in its own copy the panel made.",
+    "hooks-lib:run.mjs": "Kit plumbing: the one dispatcher per event; the personal layer has its own *-dispatch.mjs scripts."
+  },
+  "globalOnly": {
+    "hooks-lib:hooks-audit.mjs": "Audits the personal settings.json hook wiring; the kit is composed by the panel and checked by its tests.",
+    "hooks-lib:jira-readback.mjs": "Owner's company tracker (Jira wiki markup read-back): not shipped.",
+    "hooks-lib:listing-churn-guard.mjs": "Guards edits of the owner's own skills/agents listing in ~/.claude; panel runs edit skills through the panel API.",
+    "hooks-lib:mr-probe.mjs": "Probe for undraft-guard against the owner's company GitLab: not shipped.",
+    "hooks-lib:prompt-input.mjs": "Reader for the personal standalone UserPromptSubmit hooks; the kit parses input in lib/run.mjs.",
+    "hooks-lib:ready-for-test-gate.mjs": "Owner's company ticket workflow (Ready for test): not shipped.",
+    "hooks-lib:ready-for-test-probe.mjs": "Probe for ready-for-test-gate (company Jira/GitLab): not shipped.",
+    "hooks-lib:skill-usage.mjs": "Personal skill-usage ledger; the panel reads skill use from transcripts.",
+    "hooks-lib:tracker-id-guard.mjs": "Owner's company tracker labels: not shipped.",
+    "hooks-lib:undraft-guard.mjs": "Owner's company MR ledger and draft workflow: not shipped."
+  },
+  "wiring": [
+    {
+      "module": "autonomous-pick",
+      "tools": [
+        "AskUserQuestion"
+      ],
+      "apply": "node ~/.claude/tools/apply-autonomous-pick.mjs --apply"
+    },
+    {
+      "module": "forge-merge-guard",
+      "tools": [
+        "Bash",
+        "PowerShell",
+        "mcp__gitlab__merge_merge_request"
+      ],
+      "apply": "add the forge MCP tools (mcp__.*(gitlab|github).*) to the settings.json PreToolUse matcher of pre-tool-dispatch.mjs"
+    },
+    {
+      "module": "mcp-shape-guard",
+      "tools": [
+        "mcp__gitlab__mr_discussions"
+      ],
+      "apply": "add the forge MCP tools (mcp__.*(gitlab|github).*) to the settings.json PreToolUse matcher of pre-tool-dispatch.mjs"
+    },
+    {
+      "module": "nvm-use-guard",
+      "tools": [
+        "Bash",
+        "PowerShell"
+      ],
+      "apply": "add Bash|PowerShell to the settings.json PreToolUse matcher of pre-tool-dispatch.mjs"
+    }
+  ]
+}

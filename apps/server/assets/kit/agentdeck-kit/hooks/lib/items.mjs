@@ -20,13 +20,13 @@
 //
 // Input arrives in whatever shape the calling CLI uses; `normalize` (kit-paths.mjs) turns it into
 // Claude's, and a Codex `apply_patch` over N files becomes N calls judged one by one.
-import { createHash } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   ASKLESS,
   KIT_ROOT,
+  callKey,
   cliOf,
   isHandInstalled,
   logSessionEvent,
@@ -43,15 +43,21 @@ export const HOOKS_DIR = join(KIT_ROOT, 'hooks');
 /** Run order per event. A name absent from disk (switched off in the panel) is skipped. */
 export const MANIFEST = {
   pre: [
+    // Judges only AskUserQuestion, which no other item looks at; first so its answer is never cut short.
+    'autonomous-pick',
     'git-guard',
+    'forge-merge-guard',
+    'mcp-shape-guard',
     'destructive-consent',
     'secret-guard',
+    'nvm-use-guard',
     'bg-wait-guard',
     'inline-edit-guard',
     'import-weight-guard',
     'agent-doc-location',
     'review-report-guard',
     'language-guard',
+    'task-ledger',
     'agent-prompt-guard',
     'spawn-cost-guard',
     'local-discipline',
@@ -66,14 +72,17 @@ export const MANIFEST = {
     // After every read guard: any other refusal outranks a batching one.
     'batch-nudge',
     'review-publish-guard',
+    'mr-description-gate',
     'pipeline-watch-guard',
+    'forge-toolset-guard',
+    'own-copy-guard',
     // Last on purpose: the only item that may touch the network (one `git fetch` before a publish),
     // so every cheaper refusal — git-guard's consent above all — gets to refuse first.
     'push-sieves',
     // After every verdict: it stamps the start of a call that will run, so nothing may refuse after it.
     'cmd-duration',
   ],
-  rules: ['batch-nudge', 'rule-injector'],
+  rules: ['batch-nudge', 'node-tmp-hint', 'bg-wait-guard', 'rule-injector'],
   'post-edit': ['format-on-edit', 'doc-bloat-guard', 'doc-daily-review'],
   'post-any': [
     'context-watch',
@@ -81,11 +90,22 @@ export const MANIFEST = {
     'cmd-duration',
     'batch-nudge',
     'mr-echo-trim',
+    'watch-keepalive',
   ],
   'post-fail': ['cmd-duration'],
   // verify-at-stop first: its block makes the model run the gate and write the summary again, and
   // that summary is what reply-language judges — the other order costs a possible third turn.
-  stop: ['verify-at-stop', 'review-report-guard', 'reply-language'],
+  // notebook-at-stop after verify-at-stop: a check owed outranks a note owed, and one block per Stop.
+  // task-ledger after them: the ledger lines are written before a report or summary is redone; it bounds
+  // itself by its own feedback record, so an earlier gate's block cannot hide it.
+  stop: [
+    'verify-at-stop',
+    'notebook-at-stop',
+    'task-ledger',
+    'review-report-guard',
+    'reply-language',
+    'watch-keepalive',
+  ],
   prompt: ['figma-hint', 'verify-hard-hint', 'gate-defer-hint', 'docs-order-hint', 'skill-hint'],
   session: [
     'context-budget',
@@ -93,6 +113,8 @@ export const MANIFEST = {
     'doc-hygiene-autoclean',
     'review-sync-brief',
     'node-need-brief',
+    // Split child after a compaction only (compactCards); silent everywhere else.
+    'rule-injector',
   ],
   precompact: ['rule-injector', 'precompact-checkpoint'],
   postcompact: ['clear-advisor'],
@@ -115,8 +137,11 @@ export const TOOLS = {
   EDIT: /^(Write|Edit|NotebookEdit)$/,
   SPAWN: /^(Agent|Task|SendMessage|Workflow)$/,
   CTX: /^(Read|Grep|Glob|TodoWrite|Bash|PowerShell)$/,
+  ASK: /^AskUserQuestion$/,
   /** A forge or tracker MCP server under any configured name, the panel's bridge included. */
   FORGE: /^mcp__[^_]*(?:gitlab|github|atlassian|jira|confluence)[^_]*__/i,
+  /** The same code-forge servers in opencode's `<server>_<tool>` form. */
+  FORGE_OPENCODE: /^[\w-]*(?:gitlab|github)[\w-]*_/i,
 };
 
 const BASH_EDIT = new RegExp(`${TOOLS.BASH.source}|${TOOLS.EDIT.source}`);
@@ -129,15 +154,24 @@ const BASH_EDIT = new RegExp(`${TOOLS.BASH.source}|${TOOLS.EDIT.source}`);
  * imported.
  */
 export const PRE_TOOLS = {
+  'autonomous-pick': TOOLS.ASK,
   'git-guard': TOOLS.BASH,
+  'forge-merge-guard': new RegExp(
+    `${TOOLS.BASH.source}|${TOOLS.FORGE.source}|${TOOLS.FORGE_OPENCODE.source}`,
+    'i',
+  ),
+  // Same pattern as lib/mcp-shape-guard.mjs WRAPPED (Claude and opencode tool-name forms).
+  'mcp-shape-guard': /^(?:mcp__[^_]*gitlab[^_]*__|[\w-]*gitlab[\w-]*_)mr_discussions$/i,
   'destructive-consent': TOOLS.BASH,
   'secret-guard': BASH_EDIT,
+  'nvm-use-guard': TOOLS.BASH,
   'bg-wait-guard': TOOLS.BASH,
   'inline-edit-guard': TOOLS.BASH,
   'import-weight-guard': TOOLS.EDIT,
   'agent-doc-location': TOOLS.EDIT,
   'review-report-guard': TOOLS.EDIT,
   'language-guard': TOOLS.EDIT,
+  'task-ledger': TOOLS.EDIT,
   'agent-prompt-guard': TOOLS.SPAWN,
   'spawn-cost-guard': TOOLS.SPAWN,
   'local-discipline': /^(Bash|PowerShell|Agent|Task)$/,
@@ -154,7 +188,14 @@ export const PRE_TOOLS = {
     `${TOOLS.BASH.source}|${TOOLS.EDIT.source}|${TOOLS.FORGE.source}`,
     'i',
   ),
+  'mr-description-gate': new RegExp(
+    `${TOOLS.BASH.source}|${TOOLS.FORGE.source}|${TOOLS.FORGE_OPENCODE.source}`,
+    'i',
+  ),
   'pipeline-watch-guard': new RegExp(`${TOOLS.BASH.source}|${TOOLS.FORGE.source}`, 'i'),
+  // Same pattern as lib/forge-toolset-guard.mjs DISCOVER (Claude and opencode tool-name forms).
+  'forge-toolset-guard': /^(?:mcp__[^_]*gitlab[^_]*__|[\w-]*gitlab[\w-]*_)discover_tools$/i,
+  'own-copy-guard': TOOLS.BASH,
   'push-sieves': TOOLS.BASH,
   'cmd-duration': TOOLS.BASH,
 };
@@ -253,13 +294,8 @@ export const REPEAT_ESCAPE = new Set([
   'search-discipline',
   'batch-nudge',
   'cmd-duration',
+  'task-ledger',
 ]);
-
-const callKey = (call) =>
-  createHash('sha1')
-    .update(`${call?.tool_name ?? ''}|${JSON.stringify(call?.tool_input ?? {})}`)
-    .digest('hex')
-    .slice(0, 16);
 
 /**
  * The item whose escapable refusal this identical call repeats, from the session log — the same rule
@@ -280,6 +316,25 @@ export function repeatedRefusal(events, call, window = 40) {
   return null;
 }
 
+/** rule-injector's `cardDenies`, loaded only for a push-sieves call; anything that throws = not certain. */
+async function cardCertain(call) {
+  try {
+    return (await import('./rule-injector.mjs')).cardDenies(call) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** gate-at-end's engine-refusal judge, loaded only for a shell call; false on any failure. */
+async function engineRefused(call) {
+  if (!/^(Bash|PowerShell)$/.test(String(call?.tool_name ?? ''))) return false;
+  try {
+    return (await import('./gate-at-end.mjs')).engineRefusedCall(call) === true;
+  } catch {
+    return false;
+  }
+}
+
 /** PreToolUse: first deny wins, otherwise the first ask; silence → situational rules may ride in. */
 async function runPre(input, only) {
   const calls = normalize(input);
@@ -294,15 +349,27 @@ async function runPre(input, only) {
   let ask = null;
   let deny = null;
   let denied = null;
+  // The rules phase below runs the card gate; only where it runs may a sieve wait for it (cardDenies).
+  const cardPhase =
+    !only && !isHandInstalled(cliOf(input)) && !TOOLS.SPAWN.test(String(calls[0]?.tool_name ?? ''));
+  /** Calls whose push-sieves waited for a card refusal — run after all if none came. */
+  const deferred = [];
   for (const call of calls) {
     const tool = String(call?.tool_name ?? '');
     const escaped = logged ? repeatedRefusal(events, call) : null;
     for (const item of items) {
       if (item.tools && !item.tools.test(tool)) continue;
-      if (item.name === escaped) continue;
+      // An item may withdraw the escape for this call (gate-at-end in a delivery stage: a reason, not a repeat).
+      if (item.name === escaped && item.module?.repeatEscapes?.(call) !== false) continue;
       // cmd-duration stamps the start of a call that will run; a consent ask the user may decline
       // would leave a stamp that later reads as a cap kill.
-      if (item.name === 'cmd-duration' && ask) continue;
+      if (item.name === 'cmd-duration' && (ask || deferred.includes(call))) continue;
+      // A consent ask skips the rules phase, so the sieves run with it; otherwise a certain card refusal
+      // makes their `git fetch` + blame wasted work (g8 26.10).
+      if (item.name === 'push-sieves' && cardPhase && !ask && (await cardCertain(call))) {
+        deferred.push(call);
+        continue;
+      }
       const v = attempt(item.run, call);
       if (!v) continue;
       if (v.decision === 'deny') {
@@ -333,15 +400,17 @@ async function runPre(input, only) {
   }
   const sieves = items.find((i) => i.name === 'push-sieves')?.module;
   const note = sieves?.takeNote ? attempt(sieves.takeNote) : null;
-  let verdict = deny ?? ask;
   // Codex has no "ask" for a hook: an ask becomes a deny whose reason tells the model to get the
   // user's yes in chat first — the consent gate then opens on that answer (kit session log).
   const cli = cliOf(input);
-  if (verdict?.decision === 'ask' && ASKLESS.has(cli))
-    verdict = {
-      decision: 'deny',
-      reason: `Needs the user's yes first — ask in chat, naming this exact call, then repeat it after they agree. ${verdict.reason}`,
-    };
+  const consent = (v) =>
+    v?.decision === 'ask' && ASKLESS.has(cli)
+      ? {
+          decision: 'deny',
+          reason: `Needs the user's yes first — ask in chat, naming this exact call, then repeat it after they agree. ${v.reason}`,
+        }
+      : v;
+  const verdict = consent(deny ?? ask);
   if (verdict && TOP_LEVEL_BLOCK.has(cli))
     return void write({ decision: 'block', reason: cap(withRoot(verdict.reason), CAP.pre) });
   if (verdict) {
@@ -380,15 +449,43 @@ async function runPre(input, only) {
     }
     if (all.length) rules = all.join('\n\n');
   }
-  const context = [note, rules].filter(Boolean).join('\n\n');
-  if (gate && TOP_LEVEL_BLOCK.has(cli))
-    return void write({ decision: 'block', reason: cap(withRoot(gate), CAP.pre) });
-  if (gate)
+  // Sieves that waited for a card refusal which did not come (a parallel call of the batch took it, or
+  // the gate threw): they run now, and the rules stamped above ride with their refusal.
+  let late = null;
+  if (!gate && deferred.length) {
+    const sieve = items.find((i) => i.name === 'push-sieves');
+    for (const call of deferred) {
+      const v = sieve ? attempt(sieve.run, call) : null;
+      if (v?.decision === 'deny') {
+        late = v;
+        break;
+      }
+      late ??= v;
+    }
+    const timer = items.find((i) => i.name === 'cmd-duration');
+    if (!late && timer) for (const call of deferred) attempt(timer.run, call);
+  }
+  const lateNote =
+    late?.decision !== 'deny' && deferred.length && !gate && sieves?.takeNote
+      ? attempt(sieves.takeNote)
+      : null;
+  const context = [note, lateNote, rules].filter(Boolean).join('\n\n');
+  const refusal = gate ? { decision: 'deny', reason: gate } : consent(late);
+  // A top-level block has no context field: the rule text the card gate attached (the whole file that
+  // lifts the gate) rides in the reason, at the rule ceiling, or the gate would lift on nothing.
+  if (refusal && TOP_LEVEL_BLOCK.has(cli))
+    return void write({
+      decision: 'block',
+      reason: context
+        ? cap(withRoot(`${refusal.reason}\n\n${context}`), ceiling)
+        : cap(withRoot(refusal.reason), CAP.pre),
+    });
+  if (refusal)
     return void write({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: cap(withRoot(gate), CAP.pre),
+        permissionDecision: refusal.decision,
+        permissionDecisionReason: cap(withRoot(refusal.reason), CAP.pre),
         ...(context ? { additionalContext: cap(withRoot(context), ceiling) } : {}),
       },
     });
@@ -410,6 +507,15 @@ const HUMAN_SESSION = new Set([
   'review-sync-brief',
 ]);
 
+// The SessionStart block's cap. A split child's compaction carries the rule text pre-sent by compactCards
+// (g9 review F3): 9000 there, under the CLI's 10k hook-output cut; 4000 everywhere else.
+const SESSION_MAX = 4000;
+const SESSION_COMPACT_MAX = 9000;
+const sessionMax = (input) =>
+  process.env.AGENTDECK_SPLIT_CHILD === '1' && input?.source === 'compact'
+    ? SESSION_COMPACT_MAX
+    : SESSION_MAX;
+
 // `rewrite` collects a post item's `{updatedMCPToolOutput}` (mr-echo-trim) — an output, never text.
 async function runText(event, input, only, prompt, rewrite = null) {
   const calls = event.startsWith('post-') ? normalize(input) : [input];
@@ -419,7 +525,12 @@ async function runText(event, input, only, prompt, rewrite = null) {
     if (group && HUMAN_SESSION.has(item.name)) continue;
     for (const call of calls) {
       if (item.tools && !item.tools.test(String(call?.tool_name ?? ''))) continue;
-      const msg = attempt(item.run, call, prompt);
+      // A session item sees the room the earlier ones left (`kit_room`): the cap clips the joined block,
+      // and a clipped rule reads as the whole one. 300 = `<kit>` widening + joints.
+      const used = out.reduce((n, s) => n + s.length + 2, 0);
+      const arg =
+        event === 'session' ? { ...call, kit_room: sessionMax(input) - used - 300 } : call;
+      const msg = attempt(item.run, arg, prompt);
       if (msg && typeof msg === 'object') {
         if (rewrite && msg.updatedMCPToolOutput != null)
           rewrite.output ??= msg.updatedMCPToolOutput;
@@ -476,10 +587,29 @@ export async function runEvent(event, raw, only = null) {
     attempt(recordPrompt, input, prompt);
   }
 
+  // A post event fires only for a call the CLI actually ran: on CLIs whose transcript the kit cannot read
+  // this `ran` is the only proof that a call let through at PreToolUse was not refused afterwards (P-20).
+  // A shell run the Node engine check stopped ran no check: its `ran` says so, and gate-at-end does not
+  // count it as a gate run (P-31 — Claude's side reads the same from the transcript).
+  if (event.startsWith('post-') && !only && cli !== 'claude')
+    for (const call of normalize(input))
+      logSessionEvent(input, {
+        kind: 'ran',
+        tool: String(call?.tool_name ?? ''),
+        key: callKey(call),
+        ...((await engineRefused(call)) ? { engine: true } : {}),
+      });
+
   const rewrite = {};
   const text = await runText(event, input, only, prompt, rewrite);
-  // Only Claude documents a PostToolUse output rewrite; elsewhere the output stays whole.
-  if (event.startsWith('post-') && rewrite.output != null && cli === 'claude')
+  // Only Claude documents a PostToolUse output rewrite; OpenCode's plugin shim applies the same field to
+  // the MCP result object it holds (P-15). Elsewhere the output stays whole: Codex 0.155 ignores the
+  // field, Qwen 0.24 and Gemini can only add context or swap the result for an error.
+  if (
+    event.startsWith('post-') &&
+    rewrite.output != null &&
+    (cli === 'claude' || cli === 'opencode')
+  )
     return write({
       hookSpecificOutput: {
         hookEventName: 'PostToolUse',
@@ -490,7 +620,7 @@ export async function runEvent(event, raw, only = null) {
   if (!text) return;
   // PreCompact output is plain text: its JSON shape is not the same on every CLI build.
   if (event === 'precompact') return void process.stdout.write(text);
-  const max = event.startsWith('post-') ? CAP.post : 4000;
+  const max = event.startsWith('post-') ? CAP.post : sessionMax(input);
   // Goose runs these events for observation only and Kimi fires them and forgets: text reaches no
   // model there, so nothing is printed. Gemini takes it under its own event name.
   if (cli === 'goose' || cli === 'kimi') return;

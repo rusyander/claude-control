@@ -8,7 +8,13 @@ import {
   whereFiles,
 } from './split-ticket-text.ts';
 
-export { nearDuplicate, titleOverlap, whereFiles } from './split-ticket-text.ts';
+export {
+  nearDuplicate,
+  searchWords,
+  similarTitle,
+  titleOverlap,
+  whereFiles,
+} from './split-ticket-text.ts';
 
 /**
  * «Разобрать…» в хабе (владелец 24.10.2026): предложенные группами тикеты разом.
@@ -34,6 +40,93 @@ export type TicketSeverity = (typeof TICKET_SEVERITIES)[number];
 
 /** Метка каждой задачи, заведённой из хаба: по ней их находят в трекере. */
 export const TICKET_BATCH_LABEL = 'agentdeck-proposal';
+
+/**
+ * Сторона работы (владелец 25.10.2026): фронт это или бэк, видно в самой Jira —
+ * меткой и строкой описания. Не подходит ни то, ни другое — «other»; и то, и
+ * другое — «fullstack».
+ */
+export const TICKET_SIDES = ['frontend', 'backend', 'fullstack', 'other'] as const;
+export type TicketSide = (typeof TICKET_SIDES)[number];
+
+/** Расширения, которые однозначно называют сторону. */
+const FRONT_EXT = new Set(['tsx', 'jsx', 'vue', 'svelte', 'css', 'scss', 'sass', 'less', 'html']);
+const BACK_EXT = new Set(['go', 'py', 'java', 'kt', 'rb', 'rs', 'sql', 'php', 'cs', 'proto']);
+/**
+ * Слова каталогов. `api` нет нарочно: `src/api/client.ts` у фронта встречается
+ * не реже, чем у сервера, а серверный `api/` почти всегда уже выдало расширение.
+ */
+const FRONT_DIRS = new Set([
+  'web',
+  'frontend',
+  'front',
+  'ui',
+  'client',
+  'mobile',
+  'components',
+  'pages',
+  'widgets',
+  'features',
+]);
+const BACK_DIRS = new Set([
+  'server',
+  'backend',
+  'back',
+  'migrations',
+  'services',
+  'internal',
+  'cmd',
+]);
+
+/** Сторона одного пути: расширение, иначе первый каталог от корня, чьё слово её называет. */
+function pathSide(path: string): 'frontend' | 'backend' | undefined {
+  const parts = path.split('/');
+  const name = parts.pop() ?? '';
+  const ext = name.includes('.') ? (name.split('.').pop() ?? '') : '';
+  if (FRONT_EXT.has(ext)) return 'frontend';
+  if (BACK_EXT.has(ext)) return 'backend';
+  for (const segment of parts) {
+    for (const word of segment.split(/[-_.]/)) {
+      if (FRONT_DIRS.has(word)) return 'frontend';
+      if (BACK_DIRS.has(word)) return 'backend';
+    }
+  }
+  return undefined;
+}
+
+/** Пути, которые называет «где»: слова со слэшем или расширением, без `:строки`. */
+function wherePaths(where: string): string[] {
+  return where
+    .replace(/\\/g, '/')
+    .toLowerCase()
+    .split(/[\s,;()«»"'`]+/)
+    .map((word) => word.replace(/:\d+(:\d+)?$/, '').replace(/^\.\//, ''))
+    .filter((word) => word.includes('/') || /\.[a-z][a-z0-9]{0,7}$/.test(word));
+}
+
+/**
+ * Сторона задачи: пути её находок плюс область, которую назвала модель.
+ * Доводы складываются: фронтовый файл и серверная область — «fullstack».
+ */
+export function ticketSide(wheres: readonly string[], area: readonly string[] = []): TicketSide {
+  const sides = new Set<string>();
+  for (const where of wheres) {
+    for (const path of wherePaths(where)) {
+      const side = pathSide(path);
+      if (side) sides.add(side);
+    }
+  }
+  for (const item of area) if (item === 'frontend' || item === 'backend') sides.add(item);
+  if (sides.has('frontend') && sides.has('backend')) return 'fullstack';
+  if (sides.has('frontend')) return 'frontend';
+  if (sides.has('backend')) return 'backend';
+  return 'other';
+}
+
+/** Метки стороны: «fullstack» несёт и обе стороны — фильтр `labels = frontend` его тоже найдёт. */
+export function sideLabels(side: TicketSide): string[] {
+  return side === 'fullstack' ? ['frontend', 'backend', 'fullstack'] : [side];
+}
 
 /** Открытая находка: ещё не заведена и не взята в чат; с группами, которые на неё наткнулись. */
 export interface OpenSplitTicket {
@@ -229,8 +322,20 @@ export type TicketProblemDetail = Infer<typeof problemDetailSchema>;
 
 export const ticketBatchIssueSchema = object({
   title: string().trim().min(1).max(200),
-  /** Короткое введение над разделами дефектов; разделы собирает сервер. */
+  /** Короткое введение над разделами дефектов («Контекст»); разделы собирает сервер. */
   summary: string().trim().max(1500).default(''),
+  /** «Что сделать» — изменение, а не симптом; пусто — сервер пишет своё. */
+  fix: string().trim().max(1500).default(''),
+  /** Критерии приёмки — проверяемые итоги; кривой пункт выпадает один. */
+  acceptance: array(unknown())
+    .max(20)
+    .default([])
+    .transform((list) =>
+      list
+        .flatMap((item) => (typeof item === 'string' ? [item.trim().slice(0, 300)] : []))
+        .filter(Boolean)
+        .slice(0, 8),
+    ),
   /** Подробности по дефектам (`C…`); кривая запись выпадает одна, не роняя задачу. */
   problems: array(unknown())
     .max(50)
@@ -276,6 +381,49 @@ export interface SplitTicketTarget {
   params?: Record<string, string | number>;
 }
 
+/**
+ * Почему открытая задача Jira похожа на дефект: отпечаток находки в её тексте
+ * (панель её уже заводила), близкое название в последних открытых или похожее
+ * название, найденное поиском Jira по всему проекту.
+ */
+export type SplitTicketDuplicateReason = 'fingerprint' | 'title' | 'similar';
+
+/** Дефект (склейка находок) и открытая задача Jira, которая, похоже, про то же. */
+export interface SplitTicketDuplicate {
+  /** Ключи находок дефекта; первая — та, по которой окно шлёт решение. */
+  proposals: string[];
+  /** Название дефекта — первая находка склейки. */
+  title: string;
+  issue: { key: string; summary: string; url: string };
+  reason: SplitTicketDuplicateReason;
+}
+
+/** Ответ проверки на повторы перед публикацией; поиск не удался — пусто и код причины. */
+export interface SplitTicketDuplicates {
+  duplicates: SplitTicketDuplicate[];
+  /** Поиск Jira не удался: повторы не проверены, публикация сверит сама. */
+  failed?: true;
+  message?: string;
+  messageCode?: string;
+  params?: Record<string, string | number>;
+}
+
+/**
+ * Решение человека по похожей задаче: `link` — находки уходят комментарием в
+ * неё и отмечаются её ключом; `skip` — не заводить и не комментировать, находки
+ * остаются открытыми; `create` — это другой дефект, завести новую задачу.
+ */
+export const SPLIT_TICKET_DUPLICATE_CHOICES = ['link', 'skip', 'create'] as const;
+export type SplitTicketDuplicateChoice = (typeof SPLIT_TICKET_DUPLICATE_CHOICES)[number];
+
+export interface SplitTicketDuplicateDecision {
+  /** Любая находка дефекта — сервер находит её склейку сам. */
+  proposal: string;
+  choice: SplitTicketDuplicateChoice;
+  /** Задача Jira, к которой относится решение (для `link` — куда комментировать). */
+  issueKey?: string;
+}
+
 /** Тело «Опубликовать в Jira». */
 export interface SplitTicketPublishBody {
   projectKey: string;
@@ -284,6 +432,8 @@ export interface SplitTicketPublishBody {
   lang?: 'ru' | 'en';
   /** Повторить только упавшие задачи прошлой публикации (без нового прохода модели). */
   retryFailed?: boolean;
+  /** Решения по похожим задачам из проверки на повторы; нет — сервер сверяет сам. */
+  duplicates?: SplitTicketDuplicateDecision[];
 }
 
 /** Заведённая (или найденная заведённой) задача. */
@@ -302,6 +452,23 @@ export interface SplitTicketPublishedIssue {
   commented?: boolean;
   /** Дефекты задачи: название и повторы, сведённые в него, — что именно склеено. */
   defects: { title: string; duplicates: string[] }[];
+  /** Сторона работы новой задачи — её метка и строка описания. */
+  side?: TicketSide;
+  /** Приоритет, с которым задача заведена; нет — Jira поставила свой по умолчанию. */
+  priority?: string;
+  /**
+   * Исполнитель, которого Jira назначила САМА (исполнитель проекта по
+   * умолчанию): панель исполнителя не шлёт никогда, окно об этом предупреждает.
+   */
+  assignee?: string;
+}
+
+/** Дефект, который человек решил не заводить: похожая задача уже открыта. */
+export interface SplitTicketSkipped {
+  title: string;
+  proposals: string[];
+  key?: string;
+  url?: string;
 }
 
 /** Задача, которую завести не вышло: причина и находки — они остаются открытыми. */
@@ -316,6 +483,8 @@ export interface SplitTicketPublishFailure {
 export interface SplitTicketPublished {
   issues: SplitTicketPublishedIssue[];
   failed: SplitTicketPublishFailure[];
+  /** Пропущенные по решению человека (похожая задача уже открыта). */
+  skipped?: SplitTicketSkipped[];
   /** `model` — задачи свела модель; `fallback` — модель недоступна, по склейке на задачу. */
   mode: 'model' | 'fallback';
 }

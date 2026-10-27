@@ -4,17 +4,17 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { mcpServerApi } from '@entities/McpServer';
-import { useConnectAtlassianMcp, useTestTelegram, useTestWebhook } from '@entities/Integration';
+import { useConnectAtlassianMcp, useTestWebhook } from '@entities/Integration';
 import type { TelegramEvent } from '@agentdeck/contracts';
 import type { IntegrationCardExtrasProps } from './IntegrationCardExtras.types';
 import styles from './IntegrationCardExtras.module.scss';
 import { toggleEvent } from '../../model/toggleEvent';
 import { MCP_NAME } from './IntegrationCardExtras.constants';
-import { TelegramAnswers } from '../TelegramAnswers/TelegramAnswers';
 
 /**
- * То, что есть только у части коннекторов: подписка на события (Telegram и
- * вебхук), отправка пробного сообщения и регистрация собственного MCP-сервера.
+ * То, что есть только у части коннекторов: подписка на события и пробное
+ * событие вебхука, регистрация собственного MCP-сервера. У Telegram своя
+ * карточка (`TelegramCard`).
  *
  * Вынесено из карточки, чтобы её общая часть оставалась общей: как только
  * особенности расползаются по веткам в одном компоненте, карточки
@@ -30,7 +30,6 @@ export function IntegrationCardExtras({
   allEvents,
 }: IntegrationCardExtrasProps) {
   const { t } = useTranslation();
-  const testTelegram = useTestTelegram();
   const testWebhook = useTestWebhook();
   const connectMcp = useConnectAtlassianMcp();
   const servers = mcpServerApi.useList();
@@ -51,29 +50,6 @@ export function IntegrationCardExtras({
       ))}
     </Stack>
   );
-
-  if (id === 'telegram') {
-    return (
-      <Stack gap="var(--spacing-2xs)">
-        <Typography variant="caption" color="subtle">
-          {t('integrations.telegram.eventsTitle')}
-        </Typography>
-        {eventPicker}
-        <Stack direction="row" gap="var(--spacing-xs)">
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={<Icon name="send" size={18} />}
-            onClick={() => testTelegram.mutate()}
-            isLoading={testTelegram.isPending}
-          >
-            {t('integrations.telegram.test')}
-          </Button>
-        </Stack>
-        <TelegramAnswers />
-      </Stack>
-    );
-  }
 
   if (id === 'webhook') {
     return (

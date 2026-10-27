@@ -139,7 +139,14 @@ export type ChatEvent =
       errorKind?: 'exit' | 'no-tool' | 'network' | 'size' | 'other';
       /** Голова ошибки под маской — повтор той же ошибки (R24). */
       errorHead?: string;
+      /** Вызов ушёл в фон: id задачи (фоновый Bash) или субагента — сторожу (R16, фон долго). */
+      bgTaskId?: string;
     }
+  /**
+   * Фоновая задача кончилась (`<task-notification>` строкой `user`) — ВНУТРЕННЕЕ событие
+   * сторожа (R16, фон долго), в ленту не идёт.
+   */
+  | { kind: 'bgDone'; taskId: string; status?: string }
   /**
    * CLI повторяет запрос к модели после сбоя (`system/api_retry`, CLI 2.1.309):
    * ВНУТРЕННЕЕ событие сторожа (R30 «сервис не отвечает»), в ленту не идёт.
@@ -158,6 +165,12 @@ export type ChatEvent =
    * (R3 «шторм сжатий»), в ленту не уходит. `preTokens` — окно до сжатия.
    */
   | { kind: 'compact'; trigger?: string; preTokens?: number }
+  /**
+   * Хук Stop отбил конец хода (`user` «Stop hook feedback:…», CLI 2.1.310) — ВНУТРЕННЕЕ
+   * событие реестра, в ленту не идёт. По первому такому реестр запоминает итог звена:
+   * ответ на замечание хука — хвост, а не итог (g5 25.10, P1).
+   */
+  | { kind: 'stopFeedback' }
   /**
    * Вопрос `AskUserQuestion` закрыт автономией чата: за человека взят вариант с
    * «(Recommended)». Узнаётся по результату вызова (`auto-pick.ts`), лента
@@ -215,6 +228,9 @@ export type ChatEvent =
        * 'groupsLimited' — группы ждут сброса лимита подписки (журнал 89);
        * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
        * 'mrWatchInfra' — CI упал на инфраструктуре: панель повторила задания сама / второе падение (E3);
+       * 'mrWatchRed' — красный конвейер после «готово» передан группе, а ход кончился без правки:
+       *   группа ждёт человека (N3);
+       * 'mrWatchGreen' — красный конвейер ждавшей человека группы позеленел: доставку сверяет панель (F2);
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
@@ -233,6 +249,7 @@ export type ChatEvent =
        *   той же сессией, а не чистой (E1, 20.10).
        * 'coldResume' — продолжение группы после паузы дольше срока кэша с окном от 85k: ход
        *   пошёл новым разговором, а не перезаписью остывшего кэша (рычаг экономии, 21.10).
+       * 'reviewSkipped' — ревью работы не заведено: с коммита начала своих изменений нет (26.10).
        */
       code:
         | 'adopted'
@@ -250,6 +267,8 @@ export type ChatEvent =
         | 'groupsLimited'
         | 'mrWatchLimit'
         | 'mrWatchInfra'
+        | 'mrWatchRed'
+        | 'mrWatchGreen'
         | 'defaultDrift'
         | 'deliveryUnchecked'
         | 'pathStep'
@@ -262,7 +281,8 @@ export type ChatEvent =
         | 'eventsTrimmed'
         | 'backgroundAsk'
         | 'groupSameSession'
-        | 'coldResume';
+        | 'coldResume'
+        | 'reviewSkipped';
       text: string;
       /**
        * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод
@@ -348,12 +368,17 @@ export type ChatEvent =
     };
 
 /**
- * Внутреннее событие прогона (`compact`, `toolResult`, `apiRetry`): нужно реестру и
+ * Внутреннее событие прогона (`compact`, `toolResult`, `apiRetry`, `bgDone`): нужно реестру и
  * сторожу групп, а клиенту — нет. Всякий, кто шлёт поток `ChatRun` наружу мимо реестра
  * (песочница), отсекает их этим же признаком, чтобы список не разъезжался.
  */
 export function isInternalChatEvent(event: ChatEvent): boolean {
-  return event.kind === 'compact' || event.kind === 'toolResult' || event.kind === 'apiRetry';
+  return (
+    event.kind === 'compact' ||
+    event.kind === 'toolResult' ||
+    event.kind === 'apiRetry' ||
+    event.kind === 'bgDone'
+  );
 }
 
 /** Счётчики расхода в том виде, в каком их пишет CLI (и модель). */

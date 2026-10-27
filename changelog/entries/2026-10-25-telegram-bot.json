@@ -1,0 +1,200 @@
+{
+  "title": {
+    "ru": "Telegram подключается командой /start, пишет имя чата и суть, а бот отвечает на /status и /waiting",
+    "en": "Telegram connects with /start, names the chat and the essence, and the bot answers /status and /waiting"
+  },
+  "items": [
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Карточка Telegram стала короткой. Пока бот не подключён, на ней два шага: «Бот» — токен и «Проверить», «Вы» — «Подключить» и /start. Подключённая показывает выключатель, состояние одним словом («работает · @бот» или «ошибка» с причиной словами), «Вы: имя (@ник)» и «Когда звать» тремя группами: агент ждёт тебя, если не ответил в панели за N минут (кнопки ответа — всегда, отдельной галочки нет), агент закончил после долгой работы, что-то сломалось (упал, красные тесты, группа зависла или пошла по кругу). Одно «Сохранить» записывает и уведомления, и ответы; если половина не записалась, карточка говорит какая. Выключатель гасит всё, включая опрос ответов. Редкое — ваш id вручную, токены, бюджет контура с пояснением, «Переподключить бота», последняя отправка — в свёрнутом «Дополнительно», подробности — в справке по «?».",
+        "en": "The Telegram card got short. Until the bot is connected it shows two steps: «Bot» — the token and Check, «You» — Connect and /start. A connected card shows the switch, the state in one word («working · @bot» or «error» with the reason in plain words), «You: name (@nick)» and «When to call» as three groups: the agent waits for you if not answered in the panel within N minutes (answer buttons always, no separate checkbox), the agent finished after long work, something broke (a failure, red tests, a group stuck or going in circles). One Save writes both notifications and answers; if half of it did not save, the card says which. The switch turns everything off, answers polling included. Rare things — your id by hand, tokens, the contour budget with a plain hint, «Reconnect the bot», the last send — sit in the collapsed Advanced, details in the help behind «?»."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      },
+      "images": ["telegram-card-setup.png", "telegram-card-after.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "На карточке Telegram появилась кнопка «Подключить»: панель пять минут ждёт /start в личном чате с ботом по ссылке с одноразовым кодом окна, показывает имя и id того, кто его прислал, и спрашивает «это вы?». Только подтверждение записывает вас в карточку, включает уведомления и ответы, а бот пишет «Подключено к AgentDeck» на языке панели. /start без кода окна или с чужим кодом, из группы или вне окна ничего не меняет и окно не занимает. Id по-прежнему можно вписать вручную.",
+        "en": "The Telegram card has a Connect button: for five minutes the panel waits for /start in the private chat with the bot through a link with a one-time window code, shows the name and id of whoever sent it and asks «is this you?». Only the confirmation writes you into the card, turns notifications and answers on, and the bot writes «Connected to AgentDeck» in the panel's language. /start without the window code or with another one, from a group or outside the window changes nothing and does not take the window. The id can still be typed in by hand."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Сообщения Telegram читаются с одного взгляда. Первая строка жирным — вид, проект за меткой папки и сессия: «❓ ВОПРОС · 📁 shop · Аудит проекта», «🔐 РАЗРЕШЕНИЕ · …», «⏳ ОТЛОЖЕНО D-3 · …», «✅ ГОТОВО · …», «🛑 ОШИБКА · …», «🧪 ТЕСТЫ · …», «⚠️ ТРЕВОГА · …»; чужой CLI, VS Code и терминал — между проектом и сессией: «📁 shop · Codex · Аудит проекта»; проект в скобках в конце сливался с сессией, похожей на вопрос. Вторая строка — суть, ровно один раз: текст вопроса (до 300 знаков), описание или сама команда, «шёл 12 мин», «Агент упал», «5 из 120 упали», что случилось с группой. Варианты списком — только когда у них есть описания, иначе хватает кнопок. Команда, «почему решаете вы», группа и код правила свёрнуты в цитату, последней строкой — ссылка «Открыть чат →» на этот чат в панели (127.0.0.1). Хэштегов нет, «внимание» сторожа в Telegram не уходит. Секреты под маской до обрезки, а разметку, которую Telegram не разобрал, бот повторяет простым текстом.",
+        "en": "Telegram messages read at a glance. The first line, in bold, is the kind, the project after a folder mark and the session: «❓ ВОПРОС · 📁 shop · Аудит проекта», «🔐 РАЗРЕШЕНИЕ · …», «⏳ ОТЛОЖЕНО D-3 · …», «✅ ГОТОВО · …», «🛑 ОШИБКА · …», «🧪 ТЕСТЫ · …», «⚠️ ТРЕВОГА · …»; another CLI, VS Code and the terminal go between the project and the session: «📁 shop · Codex · Аудит проекта»; a project in trailing parentheses merged with a session title that looked like a question. The second line is the essence, exactly once: the question text (up to 300 characters), the description or the command itself, «шёл 12 мин», «Агент упал», «5 из 120 упали», what happened to the group. Options come as a list only when they have descriptions; otherwise the buttons are enough. The command, «why you decide», the group and the rule code are folded into a quote, and the last line is an «Открыть чат →» link to this chat in the panel (127.0.0.1). No hashtags, and a watch «attention» does not go to Telegram. Secrets are masked before cutting, and markup Telegram could not parse is resent as plain text."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Бот отвечает владельцу на команды: /status — сколько разговоров идёт (проект, имя чата, минуты), сколько ждёт ответа и загрузка лимитов подписки; /waiting — присылает всё, что ждёт ответа, сразу, с кнопками; /help — список команд. Меню команд бот получает сам.",
+        "en": "The bot answers the owner's commands: /status — how many conversations are running (project, chat name, minutes), how many wait for an answer and the subscription load; /waiting — sends everything that waits for an answer now, with buttons; /help — the command list. The bot gets its command menu by itself."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Бот один: ответы из Telegram слушают бот карточки, и поле отдельного токена появляется, только если этого бота уже слушает агент или отдельный токен уже сохранён. Пока ответы включены и слушают, «Нужно разрешение» и «Агент задал вопрос» приходят одним сообщением с кнопками, без второго уведомления.",
+        "en": "One bot: answers from Telegram listen to the card's bot, and the separate token field shows only when the agent already listens to that bot or a separate token is already saved. While answers are on and listening, «Permission needed» and «Agent asked a question» arrive as one message with buttons, without a second notification."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "«Закончил» в Telegram приходит только после долгой работы: вместо галочки «Прогон завершён» на карточке строка «Агент закончил — если работал дольше N мин» (по умолчанию 5). Порог касается и чатов панели, и сессий из терминала и VS Code — о конце их хода панель узнаёт от хука пересылки. Сообщение называет проект, имя чата и сколько шла работа.",
+        "en": "«Finished» reaches Telegram only after long work: instead of the «Run finished» checkbox the card has the line «The agent finished — if it worked longer than N min» (5 by default). The threshold covers both panel chats and sessions from a terminal or VS Code — the panel learns their turn ended from the relay hook. The message names the project, the chat name and how long the work took."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ответы из Telegram, включённые раньше, чем у карточки появился токен бота, стояли в «нет токена» до перезапуска панели: вопросы не приходили. Теперь сохранённый, сменённый или забытый токен карточки перезапускает опрос сам.",
+        "en": "Answers from Telegram turned on before the card had a bot token stayed in «no token» until the panel restarted, so questions never came. Now a saved, changed or forgotten card token restarts the polling by itself."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Уведомление или правку, которые Telegram отбил перегрузкой (429), панель повторяет через столько секунд, сколько он попросил (до двух минут), а сообщения в один чат не обгоняют друг друга; при обрыве сети — повтор через 2 секунды. На карточке видна последняя отправка: когда и дошла ли, а если нет — ответ Telegram. Подробность опроса ответов, например «не удалось написать владельцу», видна в любом состоянии и снимается первой удачной отправкой. Выключили ответы мимо карточки — опрос останавливается сам; без сети опрос запускается всё реже, до раза в минуту.",
+        "en": "A notification or an edit Telegram refused for overload (429) is retried after as many seconds as it asked (up to two minutes), and messages to one chat do not overtake each other; after a dropped network — in 2 seconds. The card shows the last send: when, and whether it arrived, and if not, Telegram's answer. The answers polling detail, such as «could not write to the owner», shows in any state and clears on the first good send. Answers switched off past the card stop the polling by themselves; without a network the polling start is retried less and less often, up to once a minute."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Интеграции»: подключение по /start с кодом окна, формат сообщений, ответы reply и картинки, сворачивание отвеченного, две минуты тишины после запуска и сна, честное условие «Закончил» для VS Code, команды бота; кадры карточки Telegram пересняты.",
+        "en": "The Integrations help: connecting with /start and a window code, the message format, reply answers and pictures, collapsing what is answered, two quiet minutes after start and sleep, the honest «finished» condition for VS Code, bot commands; the Telegram card frames are re-shot."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Отвеченное в Telegram больше не висит с кнопками и не удаляется: как только в сообщении ответили на всё — в Telegram, в панели или оно стало неактуальным, — оно сразу сворачивается в одну строку итога без кнопок и подробностей: «✅ Разрешено 15:54 · git push · 📁 shop · Аудит проекта», «💻 Отвечено в панели · …», «⌛ Уже не актуально · …». Команда /clear убирает всё, что бот писал, и команды владельца моложе 48 часов, кроме ждущих ответа, и говорит, сколько убрала и сколько ждёт; старше 48 часов Telegram удалять не даёт.",
+        "en": "What is answered in Telegram no longer hangs with buttons and is not deleted: as soon as everything in a message is answered — in Telegram, in the panel or by going stale — it collapses at once into one outcome line without buttons and details: «✅ Разрешено 15:54 · git push · 📁 shop · Аудит проекта», «💻 Отвечено в панели · …», «⌛ Уже не актуально · …». The /clear command removes everything the bot wrote and the owner's commands younger than 48 hours, except what waits for an answer, and says how many it removed and how many still wait; Telegram does not delete anything older than 48 hours."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ответ ответом (reply) на любое сообщение бота о чате — вопрос, разрешение, «Готово», «Ошибка», «Тесты» — уходит в этот чат, а бот подтверждает одной строкой «✉️ Отправлено в «чат»». Reply на открытый вопрос — ответ на него, на закрытый — обычное сообщение в чат; не понять, в какой чат, — одна строка объяснения. Фото и картинки-файлы (и PDF, до 20 МБ вместе) уходят вложениями вместе с подписью, альбом — одной отправкой: «📎 Отправлено: 2 картинки + текст»; в сессию из VS Code — только текст, и бот так и говорит. Раньше «Свой ответ» с фото и подписью пропадал молча. Просьба «Свой ответ» стала короче.",
+        "en": "A reply to any bot message about a chat — a question, a permission, Done, Error, Tests — goes into that chat, and the bot confirms in one line «✉️ Отправлено в «чат»». A reply to an open question answers it, to a closed one it is a normal message to the chat; when the chat is unclear — one line of explanation. Photos and image files (and PDF, up to 20 MB together) go as attachments with the caption, an album as one send: «📎 Отправлено: 2 картинки + текст»; a VS Code session gets text only, and the bot says so. Before, a «Свой ответ» with a photo and a caption was dropped silently. The «Свой ответ» prompt got shorter."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Нажатие на вопрос, который уже закрыли в панели, больше не уходит в разговор лишним сообщением: перед отправкой бот сверяется со списком ждущего и отвечает «уже не актуально». После запуска панели и после сна компьютера две минуты ничего не уходит в Telegram — накопленное не сыплется пачкой. «Закончил» у сессий из VS Code и терминала считает время от вашей реплики, даже когда вывод хода больше полумегабайта; имена чатов в /status — под маской секретов.",
+        "en": "A press on a question already closed in the panel no longer goes into the conversation as an extra message: before sending, the bot checks the waiting list and answers «уже не актуально». After the panel starts and after the computer wakes, nothing goes to Telegram for two minutes — what piled up does not pour out at once. «Finished» for VS Code and terminal sessions counts from your message even when the turn's output is over half a megabyte; chat names in /status are masked for secrets."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вопрос сессии из VS Code или терминала, который хук панели не держит, больше не отвечается из Telegram продолжением чата в панели: раньше нажатие заводило копию этой сессии и отправляло ответ новым сообщением, а вопрос в VS Code так и висел. Теперь такой вопрос приходит тем же видом, но без кнопок и со строкой «Ответь в VS Code — отсюда ответ туда не дойдёт», а ответ ответом (reply) ничего не отправляет. Чья сессия, видно по самому транскрипту, а не по тому, идёт ли в ней ход. Возьмёт хук вопрос позже — кнопки появятся в том же сообщении, второго не будет. Хук ищет вопрос свежей сессии в транскрипте до 10 секунд вместо одной.",
+        "en": "A question from a VS Code or terminal session that the panel hook does not hold is no longer answered from Telegram by continuing the chat in the panel: a press used to start a copy of that session and send the answer as a new message, while the question in VS Code kept waiting. Such a question now comes in the same shape without buttons, with the line “Ответь в VS Code — отсюда ответ туда не дойдёт”, and a reply to it sends nothing. Whose session it is comes from the transcript itself, not from whether a turn is running. Once the hook takes the question, buttons appear in the same message; there is no second one. The hook now looks for a fresh session's question in the transcript for up to 10 seconds instead of one."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отложенный вопрос D-n из обычного чата панели (в том числе от вызова субагента) приходил в Telegram без имени сессии — первая строка была только видом и проектом. Теперь имя берётся по самому чату, а у группы без своего имени — у родительского чата: «⏳ ОТЛОЖЕНО D-2 · 📁 shop · Починить вход».",
+        "en": "A deferred D-n from an ordinary panel chat (a subagent's call included) came to Telegram without the session name — the first line held only the kind and the project. The name now comes from the chat itself, and for a group without its own name from the parent chat: «⏳ ОТЛОЖЕНО D-2 · 📁 shop · Починить вход»."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правка и «Забыть» карточек Telegram и вебхука по HTTP — только человеку из окна панели: процесс модели не перенаправит уведомления себе и не сотрёт ключ. Агент панели меняет их, как и раньше, карточкой с вашим подтверждением.",
+        "en": "Editing and forgetting the Telegram and webhook cards over HTTP is for the human in the panel window only: a model process cannot redirect notifications to itself or erase the key. The panel agent changes them as before, through a card you confirm."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "telegram-card-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: чат и токен вписываются вручную, события — шестью галочками",
+        "en": "Before: the chat and the token typed in by hand, events as six checkboxes"
+      }
+    },
+    {
+      "file": "telegram-card-setup.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: два шага до подключения, «это вы?» после /start",
+        "en": "After: two steps to connect, «is this you?» after /start"
+      }
+    },
+    {
+      "file": "telegram-card-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: подключённая карточка — состояние, «Вы», три группы, одно «Сохранить»",
+        "en": "After: the connected card — state, «You», three groups, one Save"
+      }
+    }
+  ]
+}

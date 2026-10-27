@@ -19,7 +19,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { slash, gitTimeoutMs, entryLock, panelLocked } = require('./checks.cjs');
+// Дом журнала решает checks.cjs: там же он ищет реестр дома, а значит, по тому же правилу.
+const { slash, gitTimeoutMs, panelLocked, homeDir } = require('./checks.cjs');
 
 const VERSION = 1;
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -160,18 +161,6 @@ function canonical(value) {
     return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
   }
   return JSON.stringify(value ?? null);
-}
-
-/** Без переменной — каталог, где лежит сама копия preload (`<home>/bin/<ver>/`): одна лента на всех. */
-function homeDir(env = process.env) {
-  // Под замком входа (F-30) дом — тот, что поставила панель: свежий дом из команды модели
-  // не хранил бы ни зелёного для повтора, ни ключа подписи — то же выключение журнала.
-  const lock = entryLock();
-  if (lock) return lock.home;
-  if (env.AGENTDECK_VERIFY_LEDGER_HOME) return env.AGENTDECK_VERIFY_LEDGER_HOME;
-  if (path.basename(path.dirname(__dirname)) === 'bin')
-    return path.dirname(path.dirname(__dirname));
-  return path.join(os.homedir(), '.agentdeck', 'verify-ledger');
 }
 
 /**

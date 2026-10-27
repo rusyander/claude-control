@@ -271,6 +271,11 @@ describe('холодная атака 23.10 — человеку', () => {
     ['R-04', 'sudo --chdir=/c/Users git reset --hard'],
     ['R-04', 'ssh host git reset --hard'],
     ['R-04', 'docker exec c git reset --hard'],
+    // D-3: пропуск подкоманды docker не прячет то, что исполнится в контейнере.
+    ['R-04', 'docker exec "$CID" git reset --hard'],
+    ['R-04', 'docker exec "$CID" rm -rf /src'],
+    ['R-04', 'docker container exec "$CID" git clean -fdx'],
+    ['R-04', 'docker -H tcp://h rm -rf /c/Users'],
     ['R-04', 'wsl --cd /x git reset --hard'],
     // R-05: `-EncodedCommand` любым однозначным началом, через `/`, не первым ключом.
     ['R-05', 'powershell -enco ZwBpAHQA'],
@@ -309,6 +314,17 @@ describe('холодная атака 23.10 — человеку', () => {
     'docker exec c ls',
     // Корпус 23.10: `docker rm` — контейнер, а не файл; `{}` в сценарии — чтение.
     'docker rm -f stand-pg stand-redis',
+    // D-3 25.10: контейнер в переменной — подкоманда docker не встроенный `exec` и не файловый `rm`.
+    'docker exec "$CID" go test ./internal/store -v 2>&1 | tail -20',
+    'docker rm -f "$CID" >/dev/null',
+    'docker container rm -f "$CID"',
+    [
+      'export MSYS_NO_PATHCONV=1',
+      'CID=$(docker create --label claude.ephemeral=1 -u 1000:1000 -e HOME=/tmp -w /src/inst-config golang:1.25 sleep 600 2>&1 | tail -1)',
+      'for d in inst-config shared; do docker cp "$d" "$CID:/src/$d" 2>&1 | tail -1; done',
+      'docker start "$CID" >/dev/null; docker exec -u 0 "$CID" chown -R 1000:1000 /src 2>&1 | tail -1',
+      'docker exec "$CID" go test ./internal/store -run \'TestA|TestB\' -v 2>&1 | tail -20; docker rm -f "$CID" >/dev/null',
+    ].join('\n'),
     'find utils -type f | xargs -I{} sh -c \'echo "== {}"; cat {}\'',
   ])('ближайшая безопасная форма — само: %s', (command) => {
     expect(kind(command)).not.toBe('danger');

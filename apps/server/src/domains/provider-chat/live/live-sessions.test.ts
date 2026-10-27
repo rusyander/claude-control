@@ -26,10 +26,13 @@ const fixture = (name: string): string =>
 
 /** Живые подделки: каталог теста удаляем только после их выхода (см. `afterEach`). */
 const children = new Set<ChildProcess>();
+/** Все запущенные подделки по порядку — и вышедшие (P-27). */
+const spawned: ChildProcess[] = [];
 
 function spawnInto(file: string): LiveTurnOptions['spawnImpl'] {
   return ((_command: string, args: string[], options: object) => {
     const child = spawn(process.execPath, [fixture(file), ...args], options);
+    spawned.push(child);
     children.add(child);
     child.once('exit', () => children.delete(child));
     return child;
@@ -160,6 +163,30 @@ describe.each(CLIS)('$name: сессия между ходами разгово�
     expect(result).toMatchObject({ kind: 'done', session: id(1), resumed: false });
     expect(disk().sessions[id(1)]?.prompts).toEqual([FULL]);
     expect(disk().deleted).toEqual([]);
+  });
+
+  /**
+   * P-27: слово D-n Claude ждёт фоновых агентов живого процесса между ходами
+   * (`liveAgentsOf`). У чужого CLI ждать нечего — процесс гаснет с концом хода и
+   * при сохранённой сессии; пока ход идёт, слово держит `isRunning`.
+   */
+  it('ход с session: процесс CLI гаснет к концу хода — фону между ходами жить негде (P-27)', async () => {
+    const from = spawned.length;
+    const result = await turn({ session: {} });
+    expect(result.kind).toBe('done');
+    const mine = spawned.slice(from);
+    expect(mine.length).toBeGreaterThan(0);
+    const gone = await Promise.all(
+      mine.map(
+        (child) =>
+          new Promise<boolean>((resolve) => {
+            if (child.exitCode !== null || child.signalCode !== null) return resolve(true);
+            child.once('exit', () => resolve(true));
+            setTimeout(() => resolve(false), 1_500).unref();
+          }),
+      ),
+    );
+    expect(gone.every(Boolean), `${cli.name}: процесс пережил ход`).toBe(true);
   });
 
   it('следующий ход продолжает сессию другим процессом и шлёт только новое', async () => {

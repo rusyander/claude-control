@@ -11,7 +11,7 @@ import type {
   SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
 import type { CodedFields, CodedList } from '@agentdeck/contracts/server-messages';
-import type { GroupSignal } from '@agentdeck/contracts/group-watch';
+import type { GroupSignal, GroupWatchCoverage } from '@agentdeck/contracts/group-watch';
 import type { GroupControlState } from './GroupControl.types';
 import type { GroupAcceptanceState } from './GroupAcceptance.types';
 import type { GroupRecheckState } from './GroupRecheck.types';
@@ -88,6 +88,8 @@ export interface ChildStageGroup {
   retiredAccepted?: boolean;
   /** Дерево стоит на паузе — группа остановлена и ждёт «Продолжить всё». */
   isPaused?: boolean;
+  /** Паузу поставил сторож групп (F1) по сигналу этого правила; снимает только человек. */
+  pausedByWatch?: string;
   /**
    * Чата ещё нет: чего группа ждёт. `pending` — итога разбора, `waiting` —
    * конца предшественников (`waitsFor`), `held` — ответа человека (`hold`).
@@ -173,6 +175,8 @@ export interface ChildStageGroup {
   autoNotices?: GroupAutoNoticesState;
   /** Сигналы сторожа группы (фаза 2, W): новые первыми, закрытые — с `clearedAt`. */
   watchSignals?: GroupSignal[];
+  /** Охват сторожа живой группы: чем он её видит и каких источников нет. */
+  watchCoverage?: GroupWatchCoverage;
   /**
    * Ручная приёмка доставленной группы (TK-accepted): есть у группы, которую
    * конвейер закрыл «готово», или у уже принятой. `acceptedAt` — когда приняли.

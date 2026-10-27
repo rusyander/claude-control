@@ -224,6 +224,7 @@ const cascadeInput = { project: projectRef, copy: copyRef };
 
 interface CascadeView {
   enabled: boolean;
+  reviewAfterWork: boolean;
   project: string;
 }
 
@@ -233,8 +234,9 @@ const readModelCascade = definePanelAction({
   risk: 'read',
   description:
     'Whether «Подбирать модель под задачу» is on for a project: its chats (and chats in its ' +
-    'working copies) pick the model per kind of work instead of the chosen one. The switch is ' +
-    'remembered per project.',
+    'working copies) pick the model per kind of work instead of the chosen one. Also ' +
+    '`reviewAfterWork` — «Ревью после работы»: whether a split group gets a ceiling review ' +
+    'after its work. Both switches are remembered per project.',
   input: z.object(cascadeInput),
   route: async (input, inject) => {
     const target = await resolveTarget(inject, input);
@@ -242,7 +244,7 @@ const readModelCascade = definePanelAction({
   },
   shape: (_input, body) => {
     const view = body as CascadeView;
-    return { enabled: view.enabled, project: view.project };
+    return { enabled: view.enabled, reviewAfterWork: view.reviewAfterWork, project: view.project };
   },
   summary: 'journal-read-model-cascade',
 });
@@ -297,6 +299,63 @@ const setModelCascade = definePanelAction({
   shape: (_input, body) => {
     const view = body as CascadeView;
     return { enabled: view.enabled, project: view.project };
+  },
+  page: (input) => pageFor(input),
+});
+
+// Второй тумблер того же правила проекта — отдельным действием, а не полем
+// set_model_cascade: у карточки один переключатель, своё название в журнале и
+// свой отказ «уже так», а маршрут PUT пишет только названное поле.
+const setReviewAfterWork = definePanelAction({
+  name: 'set_review_after_work',
+  section: 'chat',
+  risk: 'change',
+  title: 'journal-set-review-after-work',
+  description:
+    'Turn «Ревью после работы» on or off for a project — the switch in the chat menu under ' +
+    'model picking. Off: a split group’s work goes straight to delivery with no ceiling review. ' +
+    'Captured when a split starts — running groups keep theirs. Needs the human’s confirmation.',
+  input: z.object({
+    ...cascadeInput,
+    enabled: z.boolean().describe('true = review after work, false = straight to delivery'),
+  }),
+  route: async (input, inject) => {
+    const target = await resolveTarget(inject, input);
+    return {
+      method: 'PUT',
+      url: '/api/chat/cascade',
+      body: { path: target.dir, reviewAfterWork: input.enabled },
+    };
+  },
+  fingerprint: async (input, inject) => {
+    const target = await resolveTarget(inject, input);
+    return fingerprintOf(await cascadeOf(inject, target.dir));
+  },
+  preview: async (input, inject) => {
+    const target = await resolveTarget(inject, input);
+    const current = await cascadeOf(inject, target.dir);
+    if (current.reviewAfterWork === input.enabled) {
+      throw new Error(
+        `Nothing would change: review after work is already ${input.enabled ? 'on' : 'off'} for this project.`,
+      );
+    }
+    return {
+      ...summaryText(
+        input.enabled ? 'summary-set-review-after-work-on' : 'summary-set-review-after-work-off',
+        { name: target.project.name },
+      ),
+      fields: [
+        dataField('label-project', targetLabel(target)),
+        textField(
+          'label-what-happens',
+          input.enabled ? 'value-review-after-work-on' : 'value-review-after-work-off',
+        ),
+      ],
+    };
+  },
+  shape: (_input, body) => {
+    const view = body as CascadeView;
+    return { reviewAfterWork: view.reviewAfterWork, project: view.project };
   },
   page: (input) => pageFor(input),
 });
@@ -584,6 +643,7 @@ export const GAPS_CHAT_ACTIONS: readonly AnyPanelAction[] = [
   requestChatHandoff,
   readModelCascade,
   setModelCascade,
+  setReviewAfterWork,
   listLoweredRuns,
   readSplitOverlap,
   splitAcceptGroup,

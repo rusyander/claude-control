@@ -8,6 +8,11 @@ import type {
   ProviderChatTransport,
 } from '@agentdeck/contracts';
 import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
+import { TESTS_CLI_ENV } from '@agentdeck/contracts/chat-group-settings';
+import {
+  GROUP_DELIVER_AHEAD_ENV,
+  GROUP_STAGE_ENV,
+} from '../../chat/group-profile/group-profile.ts';
 import {
   ProviderChatRun,
   type ProviderChatRunLike,
@@ -52,6 +57,8 @@ export type ShellJudge = (call: {
   title?: string;
   /** pid процесса CLI хода — корень дерева для суда погашения группы (P-06). */
   pid?: number;
+  /** id сессии CLI хода — журнал сессии набора для улики своих временных файлов (P-26, D-10). */
+  session?: string;
   shell: LiveShellCall;
 }) => Promise<LiveShellJudgement>;
 import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
@@ -105,6 +112,17 @@ export interface SupervisorRunContext {
 
 /** Надзиратель одного прогона — ровно то, что принимает `ProviderChatRun`. */
 export type SupervisorSetup = NonNullable<ProviderChatRunOptions['supervisor']>;
+
+/**
+ * Ключи окружения ребёнка разделения, которые ход ОБЯЗАН получить (P-30): стадия звена,
+ * доставка впереди и путь к tests-cli панели. Остальное окружение ребёнка (места очереди,
+ * короткий вывод, метка группы) — настройка прогона, общий сервер обходится без неё (B2-F16).
+ */
+const CHILD_BINDING_ENV: ReadonlySet<string> = new Set([
+  GROUP_STAGE_ENV,
+  GROUP_DELIVER_AHEAD_ENV,
+  TESTS_CLI_ENV,
+]);
 
 /** Сколько держать завершённый прогон — окно на переподключение вкладки. */
 const GRACE_MS = 60_000;
@@ -289,13 +307,16 @@ export interface GroupRunActivation {
  */
 export interface ChildRun {
   env?: Record<string, string>;
-  mcp?: { off: string[]; note: string };
+  /** `disabledTools` — сервер → имена снятых инструментов (вики трекера у Codex, P-16). */
+  mcp?: { off: string[]; note: string; disabledTools?: Record<string, string[]> };
   /** Группа разделения (не разбор): у неё без человека выключены и фоновые вызовы CLI (6.3). */
   group?: boolean;
   /** Рычаги экономии группы, закреплённые на первом старте разговора (`setEconomyRun`). */
   economy?: GroupEconomy;
   /** Окно сжатия группы — читается на ходу, у всех CLI одним рычагом (2.1, 6.2). */
   compactWindow?: number;
+  /** Что за звеном (P-39, `childStageNote`): ревью и доставка впереди — к системной строке. */
+  note?: string;
 }
 
 /** Группы к старту ответа: слой на прогон вместо тумблера каталогов Claude. */
@@ -615,13 +636,15 @@ export class ProviderChatService {
   /**
    * Выключатель серверов MCP чужому CLI (6.1): у Codex — ключ запуска, у Qwen
    * Code — слой настроек поверх выбранного файла. `undefined` — у этого CLI
-   * выключателя нет: серверы остаются, строки о снятых нет.
+   * выключателя нет: серверы остаются, строки о снятых нет. `tools` — снятые
+   * поимённо инструменты (сервер → имена), их берёт только выключатель Codex.
    */
   setMcpOff(
     resolve: (
       providerId: string,
       names: readonly string[],
       env: NodeJS.ProcessEnv,
+      tools?: Readonly<Record<string, readonly string[]>>,
     ) => Record<string, string> | undefined,
   ): void {
     this.mcpOffOf = resolve;
@@ -631,15 +654,16 @@ export class ProviderChatService {
     providerId: string,
     names: readonly string[],
     env: NodeJS.ProcessEnv,
+    tools?: Readonly<Record<string, readonly string[]>>,
   ) => Record<string, string> | undefined;
 
   private mcpOffEnv(
     providerId: string,
-    names: readonly string[],
+    mcp: NonNullable<ChildRun['mcp']>,
     env: Record<string, string>,
   ): Record<string, string> | undefined {
     try {
-      return this.mcpOffOf?.(providerId, names, { ...process.env, ...env });
+      return this.mcpOffOf?.(providerId, mcp.off, { ...process.env, ...env }, mcp.disabledTools);
     } catch {
       // Лёгкий набор не главнее разговора: осечка — полный набор, без строки.
       return undefined;
@@ -772,7 +796,8 @@ export class ProviderChatService {
 
   /**
    * Старт и конец хода — сторожу групп, тем же слушателем, что у реестра Claude
-   * (`setWatchListener`), но без потока событий. Ошибка слушателя ходу не мешает.
+   * (`setWatchListener`); поток событий — только строками потока хода у CLI без
+   * переписки (Gemini CLI). Ошибка слушателя ходу не мешает.
    */
   setWatchListener(listener: (feed: ForeignWatchFeed) => void): void {
     this.onWatch = listener;
@@ -943,7 +968,7 @@ export class ProviderChatService {
       ask: (request) => this.askHuman(chatId, live, request, chat.workdir),
       ...(shellJudge
         ? {
-            judge: (shell: LiveShellCall, pid?: number) =>
+            judge: (shell: LiveShellCall, pid?: number, session?: string) =>
               shellJudge({
                 providerId,
                 chatId,
@@ -951,6 +976,7 @@ export class ProviderChatService {
                 allowEdits: chat.allowEdits === true,
                 ...(chat.title ? { title: chat.title } : {}),
                 ...(pid ? { pid } : {}),
+                ...(session ? { session } : {}),
                 shell,
               }),
             onRefusal: (reason: string, shell: LiveShellCall) =>
@@ -975,8 +1001,13 @@ export class ProviderChatService {
     };
     // Окружение ребёнка — настройка прогона, а не условие хода: OpenCode, Kimi и Goose
     // с одним им остаются на общем или живом сервере, как до него (ревью B2-F16).
+    // Кроме ключей звена (`CHILD_BINDING_ENV`): без них `gate-at-end` набора не знает
+    // звена и доставки впереди, а `tests-cli delivery` — tests-cli панели (P-30), и
+    // общий сервер, поднятый с окружением панели, их не несёт — ход уходит в свой запуск.
     const layered = { ...route.env, ...route.kit?.env, ...groupEnv };
-    const childOnly = Object.keys(child?.env ?? {}).filter((key) => !(key in layered));
+    const childOnly = Object.keys(child?.env ?? {}).filter(
+      (key) => !(key in layered) && !CHILD_BINDING_ENV.has(key),
+    );
     // Окно локальной модели ложится слоем настроек ДО строки о каталоге: та читает файл,
     // выбранный здесь, и дописывает свой слой поверх.
     // Ход на локальной модели: локальный контур (окно сервера в маршруте) или, мимо
@@ -994,7 +1025,7 @@ export class ProviderChatService {
       Object.assign(runEnv, this.localLimitsEnv(providerId, route.localLimits, runEnv));
     }
     // Снятые серверы — тоже поверх выбранного файла настроек, до строки о каталоге.
-    const mcpOff = child?.mcp ? this.mcpOffEnv(providerId, child.mcp.off, runEnv) : undefined;
+    const mcpOff = child?.mcp ? this.mcpOffEnv(providerId, child.mcp, runEnv) : undefined;
     if (mcpOff) Object.assign(runEnv, mcpOff);
     // Без лишних фоновых вызовов модели — тоже поверх, до строки о каталоге.
     const quiet = this.quietRunEnv(providerId, child?.group === true, runEnv);
@@ -1025,6 +1056,8 @@ export class ProviderChatService {
     const current = [
       this.workspaceNote(chat.workdir, child?.group === true),
       mcpOff ? child?.mcp?.note : undefined,
+      // Звенья впереди (P-39) — той же системной строкой, одной на разговор.
+      child?.note,
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -1144,6 +1177,13 @@ export class ProviderChatService {
           ...(effort ? { effort } : {}),
           permission,
           ...(journalInput ? { onInput: journalInput } : {}),
+          // Поток хода — сторожу, только у звена группы: одиночный чат сторож не судит.
+          ...(live.watch.group
+            ? {
+                onStreamRow: (row: Record<string, unknown>) =>
+                  this.watchFeed({ kind: 'row', providerId, chatId, group: true, row }),
+              }
+            : {}),
         },
         (event) => {
           if (event.type === 'delta') {
@@ -1307,6 +1347,35 @@ export class ProviderChatService {
           ask: pending.view,
         });
       }
+    }
+    return out;
+  }
+
+  /** Идущие ходы чужих CLI — строки `/status` бота Telegram: папка, имя, начало. */
+  runningChats(): {
+    chatId: string;
+    providerId: string;
+    startedAt: number;
+    workdir?: string;
+    title?: string;
+  }[] {
+    const out: {
+      chatId: string;
+      providerId: string;
+      startedAt: number;
+      workdir?: string;
+      title?: string;
+    }[] = [];
+    for (const [chatId, live] of this.runs) {
+      if (!live.isRunning) continue;
+      const chat = readChat(live.appDataDir, live.providerId, chatId);
+      out.push({
+        chatId,
+        providerId: live.providerId,
+        startedAt: live.startedAt,
+        ...(chat?.workdir ? { workdir: chat.workdir } : {}),
+        ...(chat?.title ? { title: chat.title } : {}),
+      });
     }
     return out;
   }
@@ -1619,6 +1688,10 @@ export class ProviderChatService {
           kind: event.type === 'done' ? 'done' : 'error',
           chatId: foreignChatKey(live.providerId, chatId),
           ...(workdir ? { projectPath: workdir } : {}),
+          ...(event.type === 'error' && typeof event.error === 'string'
+            ? { errorText: event.error }
+            : {}),
+          durationMs: Math.max(0, Date.now() - live.startedAt),
         });
       } catch {
         // Уведомление — не часть хода: его сбой не должен задеть очередь.

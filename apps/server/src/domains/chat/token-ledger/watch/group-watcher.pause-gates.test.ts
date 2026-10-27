@@ -56,8 +56,14 @@ function setup(settings: Partial<GroupWatch> = {}) {
     event: (chatId: string, event: ChatEvent, sessionId: string) =>
       watcher.onFeed(chatId, { kind: 'event', event, sessionId }),
     signals: () => group.watch?.signals ?? [],
+    // «Шёл долго» (R16, сведение) — у каждого гейта дольше двух минут без опыта очереди: здесь
+    // проверяются правила группы и паузы, его ряд — в `embed-rules.test.ts`.
     active: () =>
-      (group.watch?.signals ?? []).filter((signal) => !signal.clearedAt).map((s) => s.rule),
+      (group.watch?.signals ?? [])
+        .filter(
+          (signal) => !signal.clearedAt && !signal.textKey.startsWith('groupWatch.rule.R16slow'),
+        )
+        .map((s) => s.rule),
   };
 }
 

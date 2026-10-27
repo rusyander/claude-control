@@ -32,11 +32,14 @@ export function WorktreeMirrorSettings({ path, disabled }: WorktreeMirrorSetting
   const dirty = draft !== undefined;
 
   const onSave = (): void => {
+    const sent = draft;
     save.mutate(
       { path, include: fromLines(include), exclude: fromLines(exclude), bootstrap },
       {
         onSuccess: () => {
-          setDraft(undefined);
+          // Сбрасываем только отправленный черновик: допечатанное, пока запрос
+          // был в пути, — новая правка, и ответ старого сохранения её не стирает.
+          setDraft((current) => (current === sent ? undefined : current));
           toast.success(t('git.worktrees.mirrorSaved'));
         },
         onError: (error) => toast.error(toErrorMessage(error)),

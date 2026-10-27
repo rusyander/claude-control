@@ -39,6 +39,20 @@ describe('применимость сит по путям', () => {
     expect([...touchKinds(['packages/contracts/src/chat.ts'])]).toContain('contract');
   });
 
+  // 26.10: правка README/CHANGELOG/AGENTS.md требовала запроса к стенду (contract-by-request).
+  it.each([
+    ['README.md', false],
+    ['AGENTS.md', false],
+    ['CHANGELOG.md', false],
+    ['packages/lib/README.md', false],
+    ['notes/rapid-capitalization.md', false],
+    ['src/content/docs/en/models/limits.mdx', true],
+    ['packages/sdk/api-reference.md', true],
+    ['guides/openapi.md', true],
+  ])('док %s — контракт: %s', (path, contract) => {
+    expect(touchKinds([path]).has('contract')).toBe(contract);
+  });
+
   // Ф3: папка `tests/`/`qa/` не делает код тестом, `api/`/`services/` — бэкендом.
   const kindsTable: [string, string[], boolean][] = [
     ['apps/mobile/src/entities/tests/model.ts', ['code'], false],
@@ -86,8 +100,8 @@ describe('применимость сит по путям', () => {
     const ids = applicableSieves(['README.md']).map((sieve) => sieve.id);
     // Механика панели идёт на любой дифф: секреты, lockfile, остатки отладки,
     // лишнее в git и новые переменные ищутся везде, где что-то добавлено.
+    // README — не контракт API (26.10), запрос к стенду от него не требуется.
     expect(ids).toEqual([
-      'contract-by-request',
       'merge-tree',
       'foreign-removals',
       'lockfile-sync',
@@ -152,8 +166,9 @@ describe('блок отчёта о ситах', () => {
         { id: 'b', status: 'n/a', evidence: 'no ui' },
       ],
     );
+    // Сменивший статус ряд помнит прежний (N4, 25.10): по нему судья ловит fail → pass без нового доказательства.
     expect(merged).toEqual([
-      { id: 'a', status: 'pass', evidence: 'green now' },
+      { id: 'a', status: 'pass', evidence: 'green now', was: { status: 'fail', evidence: 'red' } },
       { id: 'b', status: 'n/a', evidence: 'no ui' },
     ]);
   });
@@ -192,7 +207,51 @@ describe('блок отчёта о ситах', () => {
     expect(mergeSieveRows([fresh], [old])).toEqual([fresh]);
     expect(mergeSieveRows([old], [fresh])).toEqual([fresh]);
     const unstamped = { id: 'a', status: 'fail' as const, evidence: 'no stamp' };
-    expect(mergeSieveRows([fresh], [unstamped])).toEqual([unstamped]);
+    expect(mergeSieveRows([fresh], [unstamped])).toEqual([
+      { ...unstamped, was: { status: 'pass', evidence: 'today' } },
+    ]);
+  });
+
+  // g0 26.10 (F3): строку task-1285 через 13 минут без коммита переписали другими словами,
+  // и доставка этого не видела — прежнее доказательство не сохранялось.
+  describe('переписанное доказательство строки следа задач (rewrote, g0 F3)', () => {
+    const first = {
+      id: 'task-1',
+      status: 'pass' as const,
+      evidence: 'PROJ-1 «пункт» — src/a.ts:1',
+      at: '2026-10-26T15:00:00Z',
+    };
+    const second = {
+      ...first,
+      evidence: 'PROJ-1 «пункт» — по описанию MR',
+      at: '2026-10-26T15:13:00Z',
+    };
+
+    it('тот же статус, другие слова — прежнее доказательство со штампом едет со строкой', () => {
+      expect(mergeSieveRows([first], [second])).toEqual([
+        { ...second, rewrote: { evidence: first.evidence, at: first.at } },
+      ]);
+    });
+
+    it('тот же снимок слит повторно — метка цела; повтор строки более поздним ответом её снимает', () => {
+      const marked = mergeSieveRows([first], [second]);
+      expect(mergeSieveRows(marked, [second])[0]?.rewrote).toEqual({
+        evidence: first.evidence,
+        at: first.at,
+      });
+      const repeated = { ...second, at: '2026-10-26T15:30:00Z' };
+      expect(mergeSieveRows(marked, [repeated])).toEqual([repeated]);
+    });
+
+    it('не task-строка, смена статуса — метки нет (смену статуса судит was)', () => {
+      const sieve = { ...first, id: 'browser-focus' };
+      expect(mergeSieveRows([sieve], [{ ...second, id: 'browser-focus' }])[0]?.rewrote).toBe(
+        undefined,
+      );
+      const flipped = mergeSieveRows([first], [{ ...second, status: 'fail' as const }])[0];
+      expect(flipped?.rewrote).toBeUndefined();
+      expect(flipped?.was).toEqual({ status: 'pass', evidence: first.evidence });
+    });
   });
 });
 
@@ -276,6 +335,78 @@ describe('судья сит перед «доставлено»', () => {
     ).toEqual([]);
   });
 
+  // Группа #0 23.10 (!1071): строка назвала `content/{ru,en,uz}/api/chats.mdx` — судья
+  // искал путь буквально, одноимённые en/ru не снимались, доставка ушла на круг.
+  describe('пути в скобочной записи названы, как написанные полностью', () => {
+    it('чужие «−»: строка группы #0 со скобками снимает en и ru', () => {
+      const gaps = judgeSieves({
+        applicable: byId('foreign-removals'),
+        mechanics: {
+          foreignRemovals: [
+            'contracts/openapi/inst-api.v0.1.yaml',
+            'inst-docs-ui/content/en/api/chats.mdx',
+            'inst-docs-ui/content/ru/api/chats.mdx',
+          ],
+        },
+        rows: [
+          {
+            id: 'foreign-removals',
+            status: 'pass',
+            evidence:
+              'файлы: contracts/openapi/inst-api.v0.1.yaml (replace_message_id, GOR-1577), ' +
+              'inst-docs-ui/content/{ru,en,uz}/api/chats.mdx (регенерация docs:api из контракта)',
+          },
+        ],
+      });
+      expect(gaps).toEqual([]);
+    });
+
+    it('скобки не снимают то, чего не называют', () => {
+      const gaps = judgeSieves({
+        applicable: byId('foreign-removals'),
+        mechanics: { foreignRemovals: ['docs/en/a.mdx', 'docs/ru/a.mdx'] },
+        rows: [
+          { id: 'foreign-removals', status: 'pass', evidence: 'docs/{en,uz}/a.mdx: regenerated' },
+        ],
+      });
+      expect(gaps.map((gap) => gap.params)).toEqual([{ files: 'docs/ru/a.mdx' }]);
+    });
+
+    it('потребители: скобочная запись называет каждый файл', () => {
+      expect(
+        judgeSieves({
+          applicable: byId('consumers-repo-wide'),
+          mechanics: {
+            consumers: [{ token: 'fooBar', files: ['e2e/en/x.spec.ts', 'e2e/ru/x.spec.ts'] }],
+          },
+          rows: [
+            {
+              id: 'consumers-repo-wide',
+              status: 'pass',
+              evidence: 'git grep fooBar; e2e/{en,ru}/x.spec.ts updated',
+            },
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    it('разрушающая миграция: скобочная запись называет каждый файл', () => {
+      expect(
+        judgeSieves({
+          applicable: byId('migration-safety'),
+          mechanics: { destructive: ['db/m/001_drop.sql', 'db/m/002_drop.sql'] },
+          rows: [
+            {
+              id: 'migration-safety',
+              status: 'pass',
+              evidence: 'db/m/{001,002}_drop.sql: tables empty since v3, backup taken',
+            },
+          ],
+        }),
+      ).toEqual([]);
+    });
+  });
+
   it('потребители: срабатывание вытесняет «несдано», снимается названием файлов', () => {
     const mechanics = { consumers: [{ token: 'fooBar', files: ['e2e/x.spec.ts'] }] };
     const flagged = judgeSieves({
@@ -316,7 +447,11 @@ describe('судья сит перед «доставлено»', () => {
     expect(flagged).toEqual([
       {
         code: 'sieve-gap-live-na',
-        params: { sieve: 'boundary-negative', files: 'apps/web/src/a.tsx' },
+        params: {
+          sieve: 'boundary-negative',
+          files: 'apps/web/src/a.tsx',
+          tags: 'live, stand, route, browser, e2e',
+        },
       },
     ]);
     // Дифф из одних доков: контракт применим, n/a с причиной — принят.
@@ -335,6 +470,24 @@ describe('судья сит перед «доставлено»', () => {
         mechanics: { behaviour: ['svc/main.go'] },
       }),
     ).toEqual([]);
+  });
+
+  // g8 26.10: линтер сборки — не контракт и не бэкенд, а n/a контракта по запросу из-за него
+  // отбивался; файл бэкенда в том же диффе держит по-прежнему.
+  it('живая проверка n/a: держат только файлы поведения вида самого сита', () => {
+    const judge = (behaviour: string[]) =>
+      judgeSieves({
+        applicable: byId('contract-by-request'),
+        rows: [{ id: 'contract-by-request', status: 'n/a', evidence: 'docs page wording only' }],
+        mechanics: { behaviour },
+      });
+    expect(judge(['scripts/lint-docs.mjs'])).toEqual([]);
+    expect(judge(['scripts/lint-docs.mjs', 'svc/handler.go'])).toEqual([
+      {
+        code: 'sieve-gap-live-na',
+        params: { sieve: 'contract-by-request', files: 'svc/handler.go', tags: expect.any(String) },
+      },
+    ]);
   });
 
   it('liveNaIds: только живые сита, сданные n/a', () => {

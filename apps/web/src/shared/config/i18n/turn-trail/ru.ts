@@ -1,0 +1,35 @@
+/**
+ * След хода под ответом в ленте чата: скиллы, агенты, скрипты, хуки. Подключён
+ * в `../ru.ts` ключом `turnTrail`.
+ */
+export const turnTrailRu = {
+  label: 'След хода',
+  skills_one: '{{count}} скилл',
+  skills_few: '{{count}} скилла',
+  skills_many: '{{count}} скиллов',
+  skills_other: '{{count}} скилла',
+  agents_one: '{{count}} агент',
+  agents_few: '{{count}} агента',
+  agents_many: '{{count}} агентов',
+  agents_other: '{{count}} агента',
+  scripts_one: '{{count}} скрипт',
+  scripts_few: '{{count}} скрипта',
+  scripts_many: '{{count}} скриптов',
+  scripts_other: '{{count}} скрипта',
+  hooks: 'хуки {{count}}',
+  hooksWithContext_one: 'хуки {{total}}, из них {{count}} добавил контекст',
+  hooksWithContext_few: 'хуки {{total}}, из них {{count}} добавили контекст',
+  hooksWithContext_many: 'хуки {{total}}, из них {{count}} добавили контекст',
+  hooksWithContext_other: 'хуки {{total}}, из них {{count}} добавили контекст',
+  seconds: '{{value}} с',
+  rowSkills: 'Скиллы',
+  rowAgents: 'Агенты',
+  rowScripts: 'Скрипты',
+  rowHooks: 'Хуки',
+  contextAdded_one: 'добавил контекст',
+  contextAdded_few: 'добавили контекст',
+  contextAdded_many: 'добавили контекст',
+  contextAdded_other: 'добавили контекст',
+  failedExit: '✗ код {{code}}',
+  failedBlocked: '✗ остановил',
+};

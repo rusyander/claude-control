@@ -16,10 +16,12 @@ import {
   sinceLastCompact,
   toolEvents,
   resultFor,
+  wasBlocked,
   wasJustRefused,
   deny,
   currentUserPrompt,
   inSubagent,
+  ownTranscript,
 } from './transcript.mjs';
 
 const MIN_EDITS_AFTER_GREEN = 4;
@@ -54,9 +56,12 @@ const USER_ASKED =
 export default function verifyThrottle(input) {
   const tool = input?.tool_name;
   if (tool !== 'Bash' && tool !== 'PowerShell') return null;
-  // The parent's green run is not the child's: a subagent checking its own edit is judged against
-  // the parent's transcript and would be told the check "already passed" — see inSubagent().
-  if (inSubagent(input)) return null;
+  // A subagent is judged against its OWN transcript (`ownTranscript`): the parent's green run is not
+  // the child's, but the child re-running its own identical check is (g5 25.10: a review lane re-ran
+  // the same `go test`, only the pipe changed). When the child's file cannot be found the harness
+  // handed only the parent's history — skip then, never judge the child by it.
+  const transcript = ownTranscript(input);
+  if (inSubagent(input) && !/[\\/]subagents[\\/]/.test(transcript)) return null;
   const command = String(input.tool_input?.command || '');
   if (!command.trim()) return null;
 
@@ -66,7 +71,7 @@ export default function verifyThrottle(input) {
   // A batched gate is gate-at-end's to judge (once, at the end of the whole task).
   if (verifySegments.length >= 2) return null;
 
-  const records = sinceLastCompact(readTail(input.transcript_path));
+  const records = sinceLastCompact(readTail(transcript));
   const events = toolEvents(records);
 
   const key = normalise(command);
@@ -90,7 +95,7 @@ export default function verifyThrottle(input) {
 
   const res = resultFor(events.slice(prevIndex), prev.id);
   if (!res) return null; // no recorded outcome — do not guess
-  if (res.body && res.body.includes('[ctx-guard]')) return null; // that one was refused, not run
+  if (wasBlocked(res.body)) return null; // that one was refused (by any hook or the classifier), not run
   const edits = countEdits(events.slice(prevIndex));
   if (looksFailed(res)) {
     if (edits > 0) return null; // red → fixing loop, stay out of the way

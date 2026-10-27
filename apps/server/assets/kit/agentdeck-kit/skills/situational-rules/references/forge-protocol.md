@@ -18,12 +18,15 @@ Routes, in order of preference:
 3. New tracker issue: always ask, arrive with a ready proposal (title, description, type). Assignee and
    status follow the project's convention; unknown → ask once.
 4. Merging is forbidden always, even on a direct ask — the user merges. Branches: may create, ask the
-   name each time. Commits: one at a time, confirm each. Review replies are writes (confirm).
+   name each time. Commits: one at a time, confirm each. Review replies are writes (confirm). GitLab MCP:
+   Draft on/off = title prefix `Draft: ` in `update_merge_request`; its `draft` field is not forwarded
+   (400 «at least one parameter»).
 5. Tracker deletion is forbidden outright; status moves and backlog reshuffles only on an explicit ask.
 6. 401/403 → no silent retry; name which login or connection failed and where it is renewed (Settings →
    Integrations for the bridge, `glab auth login` / `gh auth login` for the forge).
 7. A tool that "does not exist" → list the server's tools before saying so; some servers expose whole
-   categories (pipelines, job logs, wiki) only after activation. Reading a job log is a read: free —
+   categories (merge-request thread replies, pipelines, job logs, MR screenshot upload, wiki) only after
+   activation. Reading a job log is a read: free —
    a red job is diagnosed from its trace, never statically.
 8. Pipelines are NOT watched unless the user asked in THIS task: no polling loop, no `sleep` between
    reads, no background watcher. A read is a snapshot: `created`/`pending`/`running` is reported as that
@@ -34,3 +37,8 @@ Routes, in order of preference:
    macro the draft lacked; broken → fix it in the same turn.
 10. Anything attached to a tracker issue (link, comment, description) points at the MR/PR, never the
     branch: the branch is deleted on merge and its URL rots.
+11. GitLab MCP `mr_discussions` args: `project_id`, `merge_request_iid` (strings), `per_page` ≤100
+    (default 20), `page`. Returns `{"items":[…],"pagination":…}` — jmespath starts at `items` (a bare
+    `[?…]` is null). Open threads: ``items[?notes[0].resolved==`false`].{id:id,last:notes[-1].author.username}``.
+    Reply: activate the `merge_requests` category, then `create_merge_request_discussion_note`
+    (discussion_id = thread id).

@@ -23,7 +23,8 @@ export function buildSettings({
 }: BuildSettingsInput): Record<string, unknown> {
   const result: Record<string, unknown> = { enabled };
   for (const field of INTEGRATION_FIELDS[id]) {
-    result[field.key] = (draft[field.key] ?? '').trim();
+    const value = (draft[field.key] ?? '').trim();
+    result[field.key] = field.kind === 'minutes' ? Number(value || field.fallback || 0) : value;
   }
   if (id === 'telegram' || id === 'webhook') result.events = events ?? [];
   return result;

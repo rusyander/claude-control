@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { splitTicketKey } from '@agentdeck/contracts/split-tickets';
@@ -20,6 +20,7 @@ import { atlassianTicketTracker } from '../../domains/chat/split-ticket-tracker.
 import { writeLink } from '../../domains/integrations/links.ts';
 import { writeSettings, writeToken } from '../../domains/integrations/store/store.ts';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
+import { fingerprintOf } from '../../domains/chat/split-ticket-batch/compose.ts';
 import {
   capabilityRefusal,
   ROUTE_LEDGER,
@@ -52,6 +53,16 @@ const BUTTON = {
 };
 const PARENT = '/api/chat/split/parent-1';
 
+/**
+ * Хэш-подобные токены текста: 7+ шестнадцатеричных знаков подряд, отдельным
+ * словом или частью через дефис, с цифрой и буквой a–f (слова и даты — мимо).
+ */
+function machineIds(text: string): string[] {
+  return [...text.matchAll(/(?<![0-9a-z])[0-9a-f]{7,}(?![0-9a-z])/gi)]
+    .map((match) => match[0])
+    .filter((token) => /\d/.test(token) && /[a-f]/i.test(token));
+}
+
 describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
   let root: string;
   let appData: string;
@@ -64,6 +75,12 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
   let modelReply: string;
   /** Открытые задачи проекта, которые вернёт поиск Jira. */
   let openIssues: { key: string; fields: { summary: string; description?: string } }[];
+  /** Ответ поиска по похожим (JQL с `summary ~` / `text ~`). */
+  let similarIssues: { key: string; fields: { summary: string; description?: string } }[];
+  /** Jira отвергает поле приоритета (экран заведения без него): 400 `errors.priority`. */
+  let rejectPriority: boolean;
+  /** Исполнитель проекта по умолчанию, которого Jira ставит сама. */
+  let defaultAssignee: string | undefined;
 
   const group = (index: number): SplitPlanRecord['groups'][number] => ({
     index,
@@ -115,13 +132,29 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
       await new Promise((done) => setTimeout(done, 5));
       const path = new URL(String(url)).pathname;
       if (init.method === 'POST' && path.endsWith('/rest/api/2/issue')) {
-        const sent = JSON.parse(String(init.body)) as { fields: { summary: string } };
+        const sent = JSON.parse(String(init.body)) as {
+          fields: { summary: string; priority?: unknown };
+        };
+        if (rejectPriority && sent.fields.priority) {
+          return new Response(
+            JSON.stringify({
+              errorMessages: [],
+              errors: {
+                priority: "Field 'priority' cannot be set. It is not on the appropriate screen.",
+              },
+            }),
+            { status: 400 },
+          );
+        }
         if (failSummary && sent.fields.summary === failSummary) {
           return new Response(JSON.stringify({ errorMessages: ['Jira упала'] }), { status: 500 });
         }
         return new Response(JSON.stringify({ key: `PROJ-${next++}` }), { status: 201 });
       }
-      if (path.endsWith('/rest/api/2/search')) return Response.json({ issues: openIssues });
+      if (path.endsWith('/rest/api/2/search')) {
+        const jql = new URL(String(url)).searchParams.get('jql') ?? '';
+        return Response.json({ issues: / ~ "/.test(jql) ? similarIssues : openIssues });
+      }
       if (init.method === 'POST' && /\/rest\/api\/2\/issue\/[^/]+\/comment$/.test(path)) {
         return new Response(JSON.stringify({ id: '1' }), { status: 201 });
       }
@@ -140,7 +173,14 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
         return Response.json([{ name: 'Highest' }, { name: 'High' }, { name: 'Low' }]);
       }
       const key = decodeURIComponent(path.split('/').pop() ?? '');
-      return Response.json({ key, fields: { summary: 'x', status: { name: 'Open' } } });
+      return Response.json({
+        key,
+        fields: {
+          summary: 'x',
+          status: { name: 'Open' },
+          ...(defaultAssignee ? { assignee: { displayName: defaultAssignee } } : {}),
+        },
+      });
     });
   }
 
@@ -160,6 +200,7 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
               labels?: string[];
               priority?: { name: string };
               issuetype: { name: string };
+              assignee?: unknown;
             };
           },
       );
@@ -197,6 +238,9 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
     started = [];
     modelReply = '';
     openIssues = [];
+    similarIssues = [];
+    rejectPriority = false;
+    defaultAssignee = undefined;
     const ctx = {
       location: { paths: { root, appData, mcpConfig: join(root, '.claude.json') } },
       store,
@@ -266,8 +310,19 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
     expect(sent.map((issue) => issue.fields.project.key)).toEqual(['PROJ', 'PROJ']);
     expect(sent.map((issue) => issue.fields.issuetype.name)).toEqual(['Bug', 'Bug']);
     expect(sent.map((issue) => issue.fields.priority?.name)).toEqual(['High', 'Low']);
+    // Только словесные метки: машинной метки разделения в Jira нет (владелец 26.10.2026).
     expect(sent[0]?.fields.labels).toEqual(['frontend', 'agentdeck-proposal']);
-    expect(sent[0]?.fields.description).toContain('Описание модели');
+    // Исполнителя панель не ставит никогда: поля нет в теле вовсе.
+    for (const issue of sent) expect(Object.keys(issue.fields)).not.toContain('assignee');
+    expect(sent[0]?.fields.description.split('\n\n')[0]).toBe(
+      'Сторона: FRONTEND — фронтенд\nСерьёзность: high → приоритет Jira «High»',
+    );
+    expect(sent[0]?.fields.description).toContain('Контекст: Описание модели');
+    expect(body.issues.map((issue) => [issue.side, issue.priority])).toEqual([
+      ['frontend', 'High'],
+      ['frontend', 'Low'],
+    ]);
+    expect(body.issues.some((issue) => issue.assignee)).toBe(false);
     // Ключ задачи — у экспорта в ОБЕИХ группах, у кнопки — в первой.
     const exportKey = body.issues.find((issue) =>
       issue.proposals.includes(splitTicketKey(EXPORT)),
@@ -308,7 +363,8 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
     const comment = calls.find((call) => call.url.endsWith('/rest/api/2/issue/PROJ-9/comment'));
     const text = (JSON.parse(String(comment?.init.body)) as { body: string }).body;
     expect(text).toContain('1. Падает экспорт отчёта\nГде: apps/web/src/export.ts:42');
-    expect(text).toContain('agentdeck-fp:');
+    // Отпечаток находки в комментарий не уходит (владелец 26.10.2026): он в памяти панели.
+    expect(text).not.toContain('agentdeck-fp');
     // Заведена только кнопка; экспорт ушёл комментарием и отмечен ключом открытой задачи.
     expect(creates().map((issue) => issue.fields.summary)).toEqual(['Задача 2']);
     expect(body.issues).toEqual([
@@ -321,6 +377,73 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
       .getSplitPlan('parent-1')
       ?.groups.map((item) => item.tickets?.map((ticket) => ticket.filed?.commented ?? false));
     expect(commented).toEqual([[true, false], [true]]);
+  });
+
+  it('вторая публикация тех же находок узнаёт задачи по памяти панели, хотя их переименовали', async () => {
+    const first = await publish();
+    expect(first.statusCode).toBe(200);
+    const filed = first.json<SplitTicketPublished>().issues.map((issue) => issue.key);
+    expect(filed).toEqual(['PROJ-1', 'PROJ-2']);
+    // Память на диске, в каталоге данных панели: задача → отпечатки её находок.
+    const memory = JSON.parse(
+      readFileSync(join(appData, 'split-ticket-prints.json'), 'utf8'),
+    ) as Record<string, string[]>;
+    expect(Object.keys(memory).sort()).toEqual(['PROJ-1', 'PROJ-2']);
+    // Те же находки снова (новое разделение), задачи в Jira переименованы, в тексте отпечатков нет.
+    store.setSplitPlan({ ...store.getSplitPlan('parent-1')!, groups: [group(0), group(1)] });
+    openIssues = filed.map((key) => ({
+      key,
+      fields: { summary: `Переименовано человеком ${key}`, description: 'текст без отпечатка' },
+    }));
+    calls = [];
+
+    const second = await publish();
+
+    expect(second.statusCode).toBe(200);
+    expect(creates()).toEqual([]);
+    const commented = calls
+      .filter((call) => call.url.endsWith('/comment'))
+      .map((call) => new URL(call.url).pathname.split('/').at(-2));
+    expect(commented.sort()).toEqual(['PROJ-1', 'PROJ-2']);
+    expect(second.json<SplitTicketPublished>().issues.every((issue) => !issue.created)).toBe(true);
+  });
+
+  it('в Jira не уходит ни одного внутреннего машинного id: метки, название, описание, комментарий', async () => {
+    // Владелец 26.10.2026: хэш-метки (`agentdeck-split-<hex>`), id чатов и короткие
+    // sha живут только в наших инструментах. Проверяется то, что ушло по сети,
+    // без исключений: отпечатки находок тоже остаются в памяти панели.
+    openIssues = [
+      { key: 'PROJ-9', fields: { summary: 'Падает экспорт отчётов', description: 'от человека' } },
+    ];
+
+    const response = await publish();
+
+    expect(response.statusCode).toBe(200);
+    const sent = creates();
+    expect(sent.length).toBeGreaterThan(0);
+    const commentBodies = calls
+      .filter((call) => call.url.endsWith('/comment'))
+      .map((call) => (JSON.parse(String(call.init.body)) as { body: string }).body);
+    expect(commentBodies.length).toBeGreaterThan(0);
+    const published = [
+      ...sent.flatMap((issue) => issue.fields.labels ?? []),
+      ...sent.map((issue) => issue.fields.summary),
+      ...[...sent.map((issue) => issue.fields.description), ...commentBodies].flatMap((text) =>
+        text.split('\n'),
+      ),
+    ];
+    expect(published.filter((text) => text.includes('agentdeck-fp'))).toEqual([]);
+    expect(
+      published.filter((text) => text.includes('agentdeck-split-') || machineIds(text).length > 0),
+    ).toEqual([]);
+    // Сама проверка краснеет на том, что ловит: прежняя метка и короткий sha.
+    expect(machineIds('agentdeck-split-357fa91c')).toEqual(['357fa91c']);
+    expect(machineIds('коммит 3bb94ad, чат 0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b')).toEqual([
+      '3bb94ad',
+      '0f1e2d3c',
+      '0c1d2e3f4a5b',
+    ]);
+    expect(machineIds('agentdeck-proposal frontend 2026-10-26 Medium')).toEqual([]);
   });
 
   it('упавшая задача остаётся открытой; «Повторить упавшие» заводит ровно её без модели', async () => {
@@ -449,9 +572,145 @@ describe('POST /api/chat/split/:parent/tickets/{target,publish,take}', () => {
     expect(calls).toEqual([]);
   });
 
-  it('агенту панели все три ручки закрыты: кнопки человека', () => {
+  it('Jira отвергла поле приоритета — та же задача заводится второй раз без него, не теряется', async () => {
+    rejectPriority = true;
+
+    const response = await publish();
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<SplitTicketPublished>();
+    expect(body.failed).toEqual([]);
+    expect(body.issues.map((issue) => [issue.key, issue.priority])).toEqual([
+      ['PROJ-1', undefined],
+      ['PROJ-2', undefined],
+    ]);
+    const posted = calls
+      .filter(
+        (call) =>
+          call.init.method === 'POST' && new URL(call.url).pathname.endsWith('/rest/api/2/issue'),
+      )
+      .map(
+        (call) => (JSON.parse(String(call.init.body)) as { fields: { priority?: unknown } }).fields,
+      );
+    expect(posted.map((fields) => Boolean(fields.priority))).toEqual([true, false, true, false]);
+    // Серьёзность не пропала: меткой и строкой описания.
+    const second = posted[1] as { labels?: string[]; description?: string };
+    expect(second.labels).toContain('severity-high');
+    expect(second.description).toContain('Серьёзность: high');
+  });
+
+  it('Jira сама назначила исполнителя проекта — итог называет его', async () => {
+    defaultAssignee = 'Руководитель проекта';
+
+    const response = await publish();
+
+    const body = response.json<SplitTicketPublished>();
+    expect(body.issues.map((issue) => issue.assignee)).toEqual([
+      'Руководитель проекта',
+      'Руководитель проекта',
+    ]);
+    for (const issue of creates()) expect(Object.keys(issue.fields)).not.toContain('assignee');
+  });
+
+  it('проверка на повторы: только чтение, похожая открытая задача видна до публикации', async () => {
+    similarIssues = [{ key: 'PROJ-5', fields: { summary: 'Кнопка «Сохранить» зависает' } }];
+    openIssues = [{ key: 'PROJ-9', fields: { summary: 'Падает экспорт отчётов' } }];
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `${PARENT}/tickets/duplicates?project=PROJ`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      duplicates: [
+        expect.objectContaining({
+          proposals: [splitTicketKey(EXPORT)],
+          title: EXPORT.title,
+          reason: 'title',
+          issue: expect.objectContaining({
+            key: 'PROJ-9',
+            url: 'https://jira.example.com/browse/PROJ-9',
+          }),
+        }),
+        expect.objectContaining({
+          proposals: [splitTicketKey(BUTTON)],
+          title: BUTTON.title,
+          reason: 'similar',
+          issue: expect.objectContaining({ key: 'PROJ-5' }),
+        }),
+      ],
+    });
+    expect(calls.every((call) => (call.init.method ?? 'GET') === 'GET')).toBe(true);
+    const jqls = calls
+      .filter((call) => new URL(call.url).pathname.endsWith('/search'))
+      .map((call) => new URL(call.url).searchParams.get('jql'));
+    expect(jqls).toEqual([
+      'project = "PROJ" AND statusCategory != Done ORDER BY updated DESC',
+      expect.stringMatching(
+        /^project = "PROJ" AND statusCategory != Done AND \(summary ~ "[^"]+" OR text ~ "[0-9a-f]{6,40}"\)$/,
+      ),
+    ]);
+  });
+
+  it('проверка на повторы по памяти панели: ключ задачи уходит в поиск, чужие и кривые ключи — нет', async () => {
+    const print = fingerprintOf(splitTicketKey(BUTTON));
+    writeFileSync(
+      join(appData, 'split-ticket-prints.json'),
+      JSON.stringify({
+        'PROJ-31': [print],
+        'OTHER-4': [print],
+        'PROJ-1) OR (project = SECRET': [print],
+      }),
+    );
+    // Задачу переименовали, отпечатка в тексте нет: узнать её можно только по памяти.
+    similarIssues = [{ key: 'PROJ-31', fields: { summary: 'Совсем другое название' } }];
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `${PARENT}/tickets/duplicates?project=PROJ`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const found = response.json<{
+      duplicates: { title: string; reason: string; issue: { key: string } }[];
+    }>().duplicates;
+    expect(found.find((item) => item.title === BUTTON.title)).toMatchObject({
+      reason: 'fingerprint',
+      issue: { key: 'PROJ-31' },
+    });
+    const jqls = calls
+      .filter((call) => new URL(call.url).pathname.endsWith('/search'))
+      .map((call) => new URL(call.url).searchParams.get('jql') ?? '');
+    const buttonSearch = jqls.find((jql) => jql.includes(print));
+    expect(buttonSearch).toContain('key in (PROJ-31)');
+    expect(jqls.some((jql) => jql.includes('OTHER-4') || jql.includes('SECRET'))).toBe(false);
+  });
+
+  it('решения человека: «пропустить» не пишет ничего, «связать» — комментарий в выбранную', async () => {
+    const response = await publish({
+      duplicates: [
+        { proposal: splitTicketKey(EXPORT), choice: 'link', issueKey: 'PROJ-9' },
+        { proposal: splitTicketKey(BUTTON), choice: 'skip', issueKey: 'PROJ-5' },
+        { proposal: 'мусор', choice: 'delete' },
+      ],
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<SplitTicketPublished>();
+    expect(creates()).toEqual([]);
+    expect(asks).toEqual([]);
+    const commented = calls.filter((call) => call.url.endsWith('/comment')).map((call) => call.url);
+    expect(commented).toEqual(['https://jira.example.com/rest/api/2/issue/PROJ-9/comment']);
+    expect(body.skipped).toEqual([expect.objectContaining({ title: BUTTON.title, key: 'PROJ-5' })]);
+    // Пропущенная кнопка осталась открытой — её можно опубликовать позже.
+    expect(marksOnDisk()).toEqual([['PROJ-9', null], ['PROJ-9']]);
+  });
+
+  it('агенту панели все ручки закрыты: кнопки человека', () => {
     for (const [method, url] of [
       ['GET', `${PARENT}/tickets/target`],
+      ['GET', `${PARENT}/tickets/duplicates`],
       ['POST', `${PARENT}/tickets/publish`],
       ['POST', `${PARENT}/tickets/take`],
     ] as const) {

@@ -1,6 +1,7 @@
+import { blockLang } from '@agentdeck/contracts/brand';
 import { describe, expect, it } from 'vitest';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
-import { ownerCoverageGaps, ownerTraceUnparsed } from './owner-coverage.ts';
+import { ownerCoverageGaps, ownerTraceUnparsed, taskCoverageGaps } from './owner-coverage.ts';
 
 /** U2: доставка судит строки `owner-N` так же строго, как строки сит. */
 describe('ownerCoverageGaps', () => {
@@ -33,6 +34,61 @@ describe('ownerCoverageGaps', () => {
         evidence: 'тест не дописан, нет стенда',
       }),
       serverText('delivery-gap-owner-no-evidence', { point: 'owner-3' }),
+    ]);
+  });
+});
+
+/** След задач (26.10): строки `task-N` судятся как пункты владельца, своими текстами. */
+describe('taskCoverageGaps', () => {
+  it('следа задач группе не давали — судить нечего', () => {
+    expect(taskCoverageGaps([], false)).toEqual([]);
+  });
+
+  it('след дан, а строк task-N нет (одни owner-N) — пробел «не отчитано»', () => {
+    const gaps = taskCoverageGaps(
+      [{ id: 'owner-1', status: 'pass', evidence: 'src/a.ts:3 — npm test → ok' }],
+      true,
+    );
+    expect(gaps).toEqual([
+      serverText('delivery-gap-task-unreported', { lang: blockLang('sieves') }),
+    ]);
+  });
+
+  it('«fail» и метка без доказательства — пробелы задач; заметка судьи и «n/a» — нет', () => {
+    const gaps = taskCoverageGaps(
+      [
+        { id: 'task-1', status: 'pass', evidence: 'src/a.ts:3 — npm test → ok' },
+        { id: 'task-2', status: 'fail', evidence: 'фильтр по роли не сделан' },
+        { id: 'task-3', status: 'pass', evidence: 'ok' },
+        { id: 'task-4', status: 'fail', evidence: 'не проверено: нет стенда' },
+        { id: 'task-5', status: 'n/a', evidence: 'does not apply: тикет без UI' },
+        { id: 'owner-1', status: 'fail', evidence: 'чужой пункт, судится не здесь' },
+      ],
+      true,
+      ['task-4'],
+    );
+    expect(gaps).toEqual([
+      serverText('delivery-gap-task-failed', {
+        point: 'task-2',
+        evidence: 'фильтр по роли не сделан',
+      }),
+      serverText('delivery-gap-task-no-evidence', { point: 'task-3' }),
+    ]);
+  });
+
+  it('пометка судьи не принята — пробел называет причину', () => {
+    const gaps = taskCoverageGaps(
+      [{ id: 'task-1', status: 'fail', evidence: 'не из-за ветки: падает на main' }],
+      true,
+      [],
+      { 'task-1': 'на main не падает' },
+    );
+    expect(gaps).toEqual([
+      serverText('delivery-gap-task-note-rejected', {
+        point: 'task-1',
+        evidence: 'не из-за ветки: падает на main',
+        why: 'на main не падает',
+      }),
     ]);
   });
 });

@@ -61,6 +61,11 @@ sweep stays in the folder, never in the MR. A later fix (review, live run) re-sh
 whose code it touched. Nothing is uploaded before §8; each file is uploaded once there, and the
 README keeps `file → URL` for every MR edit.
 
+BEFORE comes from your own copy before the first edit — never from the user's main checkout or another
+worktree. Missed it → the base commit unpacked inside your copy (`git archive $(git merge-base HEAD
+origin/<target>) | tar -x -C .agent/tmp/base`, local packages built there, dev server on another
+port). A blank shot of your own is retired with `mv` into `.agent/archive/`, never `rm`.
+
 ## §5 Fix
 
 The package's own idiom wins. i18n strings land in every locale at once. Docs ship inside the

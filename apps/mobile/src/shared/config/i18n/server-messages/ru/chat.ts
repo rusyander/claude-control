@@ -177,6 +177,7 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'split-continue-nothing': 'Продолжать нечего: группа не остановилась недоделанной',
   'split-recheck-nothing':
     'Перепроверять нечего: у группы нет доставленного MR или её копия убрана',
+  'split-recheck-note-invalid': 'Заметка к перепроверке — текст не длиннее {{max}} знаков',
   'split-recheck-merged': 'MR уже влит — перепроверять нечего',
   'split-recheck-closed': 'MR закрыт — перепроверять нечего',
   'split-tasks-jira-off': 'Jira не подключена — переводить задачи некуда',
@@ -196,5 +197,7 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'branch-stop-unconfirmed':
     'Копия {{path}} заведена, но процесс агента не остановлен: панель не смогла проверить, что номер всё ещё его, и не тронула его. Разговор остался в основной копии, агент ждёт у той же карточки.',
   'chat-pin-invalid': 'Нужно поле pinned: true или false',
+  'agent-id-invalid': 'Неверный id субагента',
+  'agent-not-found': 'Субагент не найден',
   'chat-pin-child': 'Чат группы закрепляется вместе со своим родителем',
 };

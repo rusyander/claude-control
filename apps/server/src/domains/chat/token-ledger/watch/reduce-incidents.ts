@@ -1,6 +1,6 @@
 import { blockLangPattern } from '@agentdeck/contracts/brand';
 import { commandSteps, gitVerb, maskCommand } from './check-signature.ts';
-import { bypassesDenial, opSubject } from './op-subject.ts';
+import { bypassesDenial, namesCheckout, opSubject } from './op-subject.ts';
 import { bound, capped, MAP_CAP, str } from './reduce-util.ts';
 import {
   bare,
@@ -17,6 +17,7 @@ import type { OpenTool, PendingOp, WatchContext, WatchEvent, WatchState } from '
 
 export {
   killTargets,
+  loopText,
   outsideWrites,
   ownPortsOf,
   sleepInLoopBody,
@@ -34,6 +35,8 @@ type ToolEvent = Extract<WatchEvent, { kind: 'tool' }>;
 type ResultEvent = Extract<WatchEvent, { kind: 'toolResult' }>;
 
 const MINUTE_MS = 60_000;
+/** Подпись одобрения в комментарии команды — то, чего просит отказ сита пуша (`push-sieves`). */
+const SIEVE_ACK = /(^|\s)#\s*sieve-ack:/m;
 /**
  * Публикация из звена (R6): пуш и создание MR — работа звена доставки. Шаг
  * должен НАЧИНАТЬСЯ с команды: `echo "git push"` или `grep 'gh pr create'` —
@@ -178,6 +181,10 @@ export function noteToolIncidents(state: WatchState, event: ToolEvent, ctx: Watc
               op: guarded,
               text: opText(event.name, input),
               subject: opSubject(event.name, input, guarded),
+              ...(command && SIEVE_ACK.test(command) ? { acked: true as const } : {}),
+              ...(guarded === 'push' && command && namesCheckout(command)
+                ? { named: true as const }
+                : {}),
             },
           }
         : {}),
@@ -292,6 +299,8 @@ function settlePending(state: WatchState, event: ResultEvent, ctx: WatchContext)
         op: guarded.op,
         text: guarded.text,
         subject: guarded.subject,
+        ...(event.denied ? { guard: event.denied } : {}),
+        ...(guarded.named ? { named: true as const } : {}),
       });
     }
     return;
@@ -307,9 +316,17 @@ function settlePending(state: WatchState, event: ResultEvent, ctx: WatchContext)
   const span = ctx.settings.bypassMinutes * MINUTE_MS;
   // Отбитое то же действие ДРУГОЙ командой: повтор той же (с подписью одобрения в комментарии) — не обход;
   // исправленный повтор — другой предмет (цель названа, `-d` вместо `-D`, описание MR поправлено), не обход (F-56).
+  // Отказ сита пуша просит повторить с `# sieve-ack:` — повтор с ним одобрен, даже если
+  // команда вокруг другая (g3 25.10: в повтор добавили счёт файлов — тревога «обход»).
+  // Пуш без названного чекаута, повторённый с `git -C` — запрошенное стражем исправление.
+  // Отказ карточки правила велит прочитать правило и повторить вызов по нему: исправленный повтор —
+  // ровно запрошенное (g8 26.10: текст коммита без пересказа процесса читался «обходом»).
   const denial = state.deniedOps.findLast(
     (denied) =>
       denied.text !== guarded.text &&
+      denied.guard !== 'rule-card' &&
+      !(denied.guard === 'push-sieves' && guarded.acked) &&
+      !(denied.op === 'push' && !denied.named && guarded.named) &&
       bypassesDenial(denied, guarded) &&
       pending.at - denied.at <= span &&
       pending.at >= denied.at,

@@ -126,6 +126,7 @@ export function ChatLimitsSections() {
             { title: tr('undoWorktree'), text: tr('undoWorktreeText') },
             { title: tr('undoHandoff'), text: tr('undoHandoffText') },
             { title: tr('undoCascade'), text: tr('undoCascadeText') },
+            { title: tr('undoReview'), text: tr('undoReviewText') },
             { title: tr('undoChat'), text: tr('undoChatText') },
           ]}
         />

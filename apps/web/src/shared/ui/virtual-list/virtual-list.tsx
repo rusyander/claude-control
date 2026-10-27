@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { scrollDecision } from './virtual-list.lib';
 import styles from './virtual-list.module.scss';
@@ -47,6 +47,19 @@ export function VirtualList<TItem>({
     return item === undefined ? 0 : rowHeight(item, index);
   };
 
+  // Высоты строк — по ключу строки, а не по её номеру. TanStack пересчитывает
+  // раскладку, только когда меняется число строк или эта функция: строки,
+  // переставленные при том же числе (чат закончил ход и ушёл из «Сейчас
+  // работают», чат закрепили), иначе получали высоты прежних соседей — дыра
+  // под одной строкой и обрезанная другая.
+  const getItemKey = useCallback(
+    (index: number): string | number => {
+      const item = items[index];
+      return item === undefined ? index : getKey(item, index);
+    },
+    [items, getKey],
+  );
+
   const isVirtual = items.length >= threshold;
 
   // Режим страницы: найти прокрутку раздела и держать отступ списка от её начала.
@@ -78,6 +91,7 @@ export function VirtualList<TItem>({
     count: items.length,
     getScrollElement: () => (ownScroll ? scrollRef.current : pageScroller),
     estimateSize: sizeOf,
+    getItemKey,
     scrollMargin: ownScroll ? 0 : scrollMargin,
     // Небольшой запас сверху и снизу: строки успевают отрисоваться
     // до того, как попадут в кадр при быстрой прокрутке.

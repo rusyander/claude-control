@@ -43,7 +43,8 @@ export function GroupHead({ group }: { group: ChildStageGroup }) {
               styles.chip,
               (group.waitingFor === 'question' ||
                 group.waitingFor === 'decision' ||
-                group.waitingFor === 'human-op') &&
+                group.waitingFor === 'human-op' ||
+                group.waitingFor === 'mr-red') &&
                 styles.chipAsk,
             )}
             data-hub-waiting={group.waitingFor}
@@ -51,9 +52,22 @@ export function GroupHead({ group }: { group: ChildStageGroup }) {
             {t(`chat.cascade.hub.waitingFor.${group.waitingFor}`)}
           </Typography>
         )}
-        {group.isPaused && (
+        {group.isPaused && group.pausedByWatch === undefined && (
           <Typography variant="caption" color="subtle" as="span" className={styles.chip}>
             {t('chat.cascade.tree.paused')}
+          </Typography>
+        )}
+        {/* Пауза сторожа (F1): чья пауза и по какому правилу — снимает её только человек. */}
+        {group.isPaused && group.pausedByWatch !== undefined && (
+          <Typography
+            variant="caption"
+            color="subtle"
+            as="span"
+            className={styles.chip}
+            title={t('groupWatch.pausedChipHint')}
+            data-hub-paused-by="watch"
+          >
+            {t('groupWatch.pausedChip', { rule: group.pausedByWatch || '—' })}
           </Typography>
         )}
         {/* Принято человеком (TK-accepted) — отметка его приёмки, не панели. */}

@@ -180,7 +180,7 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
 }
 
 /** Текст уведомления CLI из вставки `queued_command`; слова человека — не оно. */
-function taskNoticeOf(record: TranscriptRecord): string | undefined {
+export function taskNoticeOf(record: TranscriptRecord): string | undefined {
   const attachment = record.attachment;
   if (record.type !== 'attachment' || attachment?.type !== 'queued_command') return undefined;
   if (attachment.commandMode !== 'task-notification') return undefined;
@@ -552,7 +552,7 @@ function shellStatus(status: string | undefined): ProgressShell['status'] {
 }
 
 /** Чем вызван инструмент — одной строкой: команда, путь, шаблон или описание. */
-function toolSummary(input: Record<string, unknown>): string {
+export function toolSummary(input: Record<string, unknown>): string {
   for (const key of ['description', 'command', 'file_path', 'pattern', 'path', 'url', 'prompt']) {
     const value = input[key];
     if (typeof value === 'string' && value.trim()) return firstLine(value);
@@ -560,7 +560,7 @@ function toolSummary(input: Record<string, unknown>): string {
   return '';
 }
 
-function applyToolUse(
+export function applyToolUse(
   block: TranscriptBlock,
   agents: Map<string, ProgressAgent>,
   setTasks: (tasks: ProgressTask[]) => void,
@@ -605,7 +605,7 @@ function applyToolUse(
  * такую ветку готовой значило бы соврать — она остаётся работающей, а расписка
  * в панель не попадает.
  */
-function applyToolResult(block: TranscriptBlock, agents: Map<string, ProgressAgent>): void {
+export function applyToolResult(block: TranscriptBlock, agents: Map<string, ProgressAgent>): void {
   const id = block.tool_use_id;
   if (!id) return;
   const agent = agents.get(id);
@@ -632,7 +632,7 @@ const TASK_NOTICE = /<task-notification>([\s\S]*?)<\/task-notification>/g;
  * (claude 2.1.282, замер 28.09). Без этого субагент оставался «работающим»
  * навсегда. Уведомлений в реплике бывает несколько — закрываем каждое своё.
  */
-function applyAgentNotices(text: string, agents: Map<string, ProgressAgent>): void {
+export function applyAgentNotices(text: string, agents: Map<string, ProgressAgent>): void {
   if (!text.includes('<task-notification>')) return;
   for (const [, body = ''] of text.matchAll(TASK_NOTICE)) {
     const id = /<tool-use-id>([^<]+)<\/tool-use-id>/.exec(body)?.[1]?.trim();
@@ -643,6 +643,9 @@ function applyAgentNotices(text: string, agents: Map<string, ProgressAgent>): vo
     agents.set(id, {
       ...agent,
       status: status === 'completed' ? 'done' : 'failed',
+      // `killed` — остановлен по просьбе (TaskStop, «Остановить» панели; замер
+      // claude 2.1.310): итога нет, но это решение, а не падение.
+      ...(status === 'killed' ? { stopped: true } : {}),
       ...(agent.result || !summary ? {} : { result: summary }),
     });
   }
@@ -668,7 +671,7 @@ function publicResult(text: string): string {
 }
 
 /** Текст результата: CLI отдаёт его то строкой, то списком блоков. */
-function resultText(block: TranscriptBlock): string {
+export function resultText(block: TranscriptBlock): string {
   if (typeof block.content === 'string') return block.content.trim();
   if (Array.isArray(block.content)) {
     return block.content
@@ -693,6 +696,6 @@ function isTask(task: ProgressTask | undefined): task is ProgressTask {
   return task !== undefined;
 }
 
-function firstLine(text: string): string {
+export function firstLine(text: string): string {
   return text.split('\n')[0]?.trim().slice(0, 200) ?? '';
 }

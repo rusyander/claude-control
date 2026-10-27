@@ -216,6 +216,8 @@ describe('ledger gate against the live route table', () => {
     for (const key of [
       'PUT /api/integrations/telegram/answers',
       'POST /api/integrations/telegram/answers/restart',
+      'POST /api/integrations/telegram/connect',
+      'POST /api/integrations/telegram/connect/confirm',
       'POST /api/settings/import',
       'POST /api/chat/split/:parent/review-decision',
     ]) {
@@ -258,8 +260,17 @@ describe('ledger gate against the live route table', () => {
       const results = [
         await call('PUT', '/api/integrations/telegram/answers', { enabled: true, ownerId: 12345 }),
         await call('POST', '/api/integrations/telegram/answers/restart', {}),
+        // Подключение по /start: процесс модели не назначает владельцем себя.
+        await call('POST', '/api/integrations/telegram/connect', {}),
+        await call('POST', '/api/integrations/telegram/connect/confirm', {}),
         await call('POST', '/api/settings/import', { settings: { chatAutoMode: true } }),
         await call('POST', '/api/chat/split/p1/review-decision', { decision: 'approve' }),
+        // Куда уходят уведомления (бот и чат Telegram, адрес вебхука) — решает
+        // человек: процесс модели не перенаправит их себе и не сотрёт ключ.
+        await call('PUT', '/api/integrations/telegram', { settings: { chatId: '666' } }),
+        await call('DELETE', '/api/integrations/telegram', {}),
+        await call('PUT', '/api/integrations/webhook', { settings: { url: 'http://evil' } }),
+        await call('DELETE', '/api/integrations/webhook', {}),
       ];
       // 403 — процесс теста не браузер; 503 — ОС не ответила (тоже отказ, не пропуск).
       for (const result of results) {
@@ -271,6 +282,21 @@ describe('ledger gate against the live route table', () => {
     }
     const after = existsSync(answers) ? readFileSync(answers, 'utf8') : undefined;
     expect(after).toBe(before);
+    // Остальные карточки ворот не несут: Jira правит и процесс по своему ключу.
+    const jira = await call('PUT', '/api/integrations/jira', { settings: {} });
+    expect(jira.code ?? '').not.toMatch(/^decision_/);
+  }, 60_000);
+
+  it('«Продолжить» группу — действие агента (владелец 25.10): процесс вне браузера доходит до маршрута', async () => {
+    setPanelDirs(() => ({ config: process.cwd(), data: appData }));
+    try {
+      const result = await call('POST', '/api/chat/split/p1/continue-group', { index: 0 });
+      // Плана p1 нет — ответ самого маршрута, а не отказ ворот человека.
+      expect(result.code ?? '').not.toMatch(/^decision_/);
+      expect(result.status).not.toBe(403);
+    } finally {
+      setPanelDirs(standDirs);
+    }
   }, 60_000);
 
   it('throwaway-stand seam: both dirs in OS temp let the panel line through; one real dir or a junction out does not', async () => {

@@ -1,5 +1,5 @@
 /**
- * Кадры путеводителя «Чат»: четыре сценария одной съёмкой.
+ * Кадры путеводителя «Чат»: пять сценариев одной съёмкой.
  *
  * `basics` — путь ОДНОГО разговора: пустой чат проекта, вопрос с вложением,
  * живой ответ с шагами и расходом, запрос прав, вопрос агента, пульт git,
@@ -14,6 +14,9 @@
  *
  * `deferred` — вызовы, которые решает только человек: плашка «Ждёт решения»,
  * раздел D-n в сводке групп и карточка прав, ставшая записью D-n.
+ *
+ * `agents` — план агента: дерево субагентов, значки скиллов, хуков и MCP и окно
+ * с их хронологией; транскрипт настоящий, а не подменённый (см. `chat-agents.mjs`).
  *
  * Разделены они не по объёму, а по входу: человек, который никогда не делит
  * задачи, второй сценарий не откроет вовсе, а первый читает подряд с первого
@@ -39,6 +42,7 @@ import { shootBasics } from './chat-basics.mjs';
 import { shootSplit } from './chat-split.mjs';
 import { shootAutonomy } from './chat-autonomy.mjs';
 import { shootDeferred } from './chat-deferred.mjs';
+import { shootAgents } from './chat-agents.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5193);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8901);
@@ -142,6 +146,13 @@ try {
       console.log('\nсценарий deferred');
       await shootDeferred(browser, WEB, deferred);
       deferred.finish();
+    }
+
+    if (!only || only === 'agents') {
+      const agents = openScenario('chat', 'agents');
+      console.log('\nсценарий agents');
+      await shootAgents(browser, WEB, agents, home);
+      agents.finish();
     }
   } finally {
     await browser.close();

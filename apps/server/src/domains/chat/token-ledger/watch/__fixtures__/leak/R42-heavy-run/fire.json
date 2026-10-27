@@ -1,0 +1,119 @@
+[
+  {
+    "id": "r-a",
+    "chatId": "chat-solo",
+    "startedAt": 1793006400000,
+    "endedAt": 1793008200000,
+    "tokens": 200000,
+    "samples": [
+      {
+        "at": 1793007000000,
+        "fiveHour": {
+          "utilization": 0.38,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.3,
+          "resetsAt": 1793347200
+        }
+      },
+      {
+        "at": 1793008200000,
+        "fiveHour": {
+          "utilization": 0.4,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.3,
+          "resetsAt": 1793347200
+        }
+      }
+    ]
+  },
+  {
+    "id": "r-b",
+    "chatId": "child-3",
+    "startedAt": 1793008500000,
+    "endedAt": 1793010000000,
+    "tokens": 1200000,
+    "samples": [
+      {
+        "at": 1793008800000,
+        "fiveHour": {
+          "utilization": 0.41,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.3,
+          "resetsAt": 1793347200
+        }
+      },
+      {
+        "at": 1793010000000,
+        "fiveHour": {
+          "utilization": 0.48,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.32,
+          "resetsAt": 1793347200
+        }
+      }
+    ],
+    "sessionId": "s3"
+  },
+  {
+    "id": "r-c",
+    "chatId": "new-7f3a",
+    "startedAt": 1793010060000,
+    "endedAt": 1793011200000,
+    "tokens": 3400000,
+    "samples": [
+      {
+        "at": 1793010600000,
+        "fiveHour": {
+          "utilization": 0.49,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.32,
+          "resetsAt": 1793347200
+        }
+      },
+      {
+        "at": 1793011200000,
+        "fiveHour": {
+          "utilization": 0.5,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.32,
+          "resetsAt": 1793347200
+        }
+      }
+    ],
+    "sessionId": "s3-next"
+  },
+  {
+    "id": "r-d",
+    "chatId": "child-3",
+    "startedAt": 1793011260000,
+    "endedAt": 1793011440000,
+    "tokens": 5000000,
+    "samples": [
+      {
+        "at": 1793011440000,
+        "fiveHour": {
+          "utilization": 0.5,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.32,
+          "resetsAt": 1793347200
+        }
+      }
+    ],
+    "sessionId": "s3-next",
+    "open": true
+  }
+]

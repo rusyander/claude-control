@@ -18,6 +18,9 @@ import {
 import { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import type { ChatEvent } from '../../domains/chat/chat-events.ts';
 import { groupRunProfile } from '../../domains/chat/group-profile/group-profile.ts';
+import { MAIN_SYNC_DENIED } from '../../domains/chat/main-sync/main-sync.ts';
+import { writeRun } from '../../domains/project-tests/runs-store/runs-store.ts';
+import type { ProjectTestRunRecord } from '@agentdeck/contracts';
 import { writeSettings, writeToken } from '../../domains/integrations/store/store.ts';
 import { answerCodexApproval } from '../../domains/provider-chat/live/codex-app-server.ts';
 import { decidePermission } from '../../domains/provider-chat/live/permission.ts';
@@ -35,6 +38,7 @@ import type { ShellJudge } from '../../domains/provider-chat/ProviderChatService
 import { deferredAsksOf } from '../../routes/chat/deferred-routes/deferred-store.ts';
 import { registerChatRunRoutes } from '../../routes/chat/run-routes/run-routes.ts';
 import { wireForeignShellJudge } from './foreign-shell-judge-wiring.ts';
+import { rejudgeGroupAsk, staleFolderOfAsk } from '../deferred-wiring/rejudge.ts';
 
 /**
  * Паритет правил оболочки: одна команда — один ответ у Claude и у каждого чужого
@@ -237,6 +241,7 @@ describe('паритет правил оболочки: Claude и чужие CLI
   };
 
   let asked = 0;
+  let lastClaudeMessage = '';
   /** Ответ НАСТОЯЩЕГО маршрута прав Claude. */
   const claude = async (chatId: string, command: string, toolName: string): Promise<Outcome> => {
     asked += 1;
@@ -255,6 +260,7 @@ describe('паритет правил оболочки: Claude и чужие CLI
     void pending.then((res) => {
       const body = res.json<{ behavior: string; message?: string }>();
       settled = { behavior: body.behavior, message: body.message ?? '' };
+      lastClaudeMessage = settled.message;
     });
     const deadline = Date.now() + 10_000;
     while (!settled && !hasCard() && Date.now() < deadline) {
@@ -600,6 +606,155 @@ describe('паритет правил оболочки: Claude и чужие CLI
     expect(await foreign(wire, FOREIGN_GROUP, copyB, restore)).toBe('deny');
   });
 
+  /**
+   * Догон на целевую (P-17, I-40): пропускается ровно при НАСТОЯЩЕМ конфликте с
+   * вершиной сервера. git 2.55 `merge-tree --quiet` выходит с 0 и при конфликте —
+   * так g0 25.10 получал отказ, хотя конфликт был. Сервер здесь — голый репозиторий
+   * `origin`: `serverConflicts` сверяет его вершину, не `origin/*` копии.
+   */
+  it(
+    'догон на main: без конфликта — отказ, при конфликте — сам, у каждого провода как у Claude (P-17)',
+    { timeout: 120_000 },
+    async () => {
+      const project = join(root, 'repo');
+      const remote = join(root, 'origin.git');
+      const g = (cwd: string, ...args: string[]): void => {
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+          cwd,
+          stdio: 'ignore',
+        });
+      };
+      const commit = (cwd: string, file: string, text: string, message: string): void => {
+        writeFileSync(join(cwd, file), text);
+        g(cwd, 'add', file);
+        g(cwd, 'commit', '-qm', message);
+      };
+      g(root, 'init', '-q', '--bare', '-b', 'main', remote);
+      g(project, 'remote', 'add', 'origin', remote);
+      // Свой файл у каждой ветки, у main — третий: конфликта нет.
+      commit(copyA, 'a-own.txt', 'a\n', 'feature a');
+      commit(copyB, 'b-own.txt', 'b\n', 'feature b');
+      commit(project, 'main-only.txt', 'm\n', 'main moved');
+      g(project, 'push', '-q', 'origin', 'main');
+      g(project, 'fetch', '-q', 'origin');
+      const sync = 'git rebase origin/main';
+      for (const wire of WIRES) {
+        const want = await reference(GROUP, sync, wire.tools);
+        const got = await foreign(wire, FOREIGN_GROUP, copyB, sync);
+        expect(`${wire.name}: без конфликта → ${got}`).toBe(
+          `${wire.name}: без конфликта → ${want}`,
+        );
+        expect(got).toBe('deny');
+        expect(lastForeignMessage).toBe(MAIN_SYNC_DENIED);
+      }
+      // Один файл, разное содержимое у main и у обеих веток: настоящий конфликт.
+      commit(copyA, 'shared.txt', 'ours a\n', 'feature a shared');
+      commit(copyB, 'shared.txt', 'ours b\n', 'feature b shared');
+      commit(project, 'shared.txt', 'theirs\n', 'main shared');
+      g(project, 'push', '-q', 'origin', 'main');
+      g(project, 'fetch', '-q', 'origin');
+      for (const wire of WIRES) {
+        const want = await reference(GROUP, sync, wire.tools);
+        const got = await foreign(wire, FOREIGN_GROUP, copyB, sync);
+        expect(`${wire.name}: конфликт → ${got}`).toBe(`${wire.name}: конфликт → ${want}`);
+        expect(got).toBe('allow');
+      }
+    },
+  );
+
+  /**
+   * #g0:111 (25.10): после своего перебазирования g0 клал чистый main рядом, чтобы
+   * прогнать на нём красные тесты, и получал MAIN_SYNC_DENIED. HEAD уже содержит
+   * `origin/main` — выгрузка ничего ветке не несёт; целевая ушла вперёд — снова догон.
+   */
+  it(
+    'дерево целевой рядом: HEAD её содержит — само, ушла вперёд — отказ, у каждого провода как у Claude (#g0:111)',
+    { timeout: 120_000 },
+    async () => {
+      const project = join(root, 'repo');
+      const remote = join(root, 'origin.git');
+      const g = (cwd: string, ...args: string[]): void => {
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+          cwd,
+          stdio: 'ignore',
+        });
+      };
+      const commit = (cwd: string, file: string, text: string, message: string): void => {
+        writeFileSync(join(cwd, file), text);
+        g(cwd, 'add', file);
+        g(cwd, 'commit', '-qm', message);
+      };
+      g(root, 'init', '-q', '--bare', '-b', 'main', remote);
+      g(project, 'remote', 'add', 'origin', remote);
+      g(project, 'push', '-q', 'origin', 'main');
+      g(project, 'fetch', '-q', 'origin');
+      commit(copyA, 'a-own.txt', 'a\n', 'feature a');
+      commit(copyB, 'b-own.txt', 'b\n', 'feature b');
+      // Форма, одинаковая для оболочек: в PowerShell `>/dev/null` — запись в файл вне копии.
+      const tree = 'git worktree add --detach .agent/tmp/main-wt origin/main';
+      // Вызов g0 целиком (Bash): дерево рядом, тесты в нём.
+      const live =
+        `${tree} >/dev/null 2>&1; cd .agent/tmp/main-wt/api && ` +
+        'GOFLAGS=-mod=mod go test ./internal/ws 2>&1 | grep -E "^(--- FAIL|FAIL|ok)"';
+      for (const wire of WIRES) {
+        const want = await reference(GROUP, tree, wire.tools);
+        const got = await foreign(wire, FOREIGN_GROUP, copyB, tree);
+        expect(`${wire.name}: в HEAD → ${got}`).toBe(`${wire.name}: в HEAD → ${want}`);
+        expect(got).toBe('allow');
+      }
+      expect(await claude(GROUP, live, 'Bash')).toBe('allow');
+      commit(project, 'main-only.txt', 'm\n', 'main moved');
+      g(project, 'push', '-q', 'origin', 'main');
+      g(project, 'fetch', '-q', 'origin');
+      // F-09: отказ дереву целевой называет разрешённый путь — `run --base` с красными
+      // кейсами копии из её последнего прогона; записей нет — образец вместо списка.
+      writeRun(copyB, {
+        id: 'run-red',
+        mode: 'import',
+        actor: 'ci',
+        status: 'done',
+        startedAt: '2026-10-25T13:50:00.000Z',
+        results: [
+          {
+            pointId: 'p1',
+            groupId: 'suites-inst-api',
+            caseId: 'suites-inst-api-007',
+            status: 'failed',
+          },
+          {
+            pointId: 'p2',
+            groupId: 'suites-inst-api',
+            caseId: 'suites-inst-api-014',
+            status: 'failed',
+          },
+          {
+            pointId: 'p3',
+            groupId: 'suites-inst-api',
+            caseId: 'suites-inst-api-001',
+            status: 'passed',
+          },
+        ],
+        summary: { total: 3, passed: 1, failed: 2, blocked: 0, skipped: 0, unknown: 0 },
+      } as ProjectTestRunRecord);
+      const sanctioned = (cases: string) =>
+        new RegExp(
+          `^${MAIN_SYNC_DENIED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} .*\`node "[^"]+tests-cli\\.mjs" run --project \\. --case ${cases} --base\``,
+        );
+      for (const wire of WIRES) {
+        const want = await reference(GROUP, tree, wire.tools);
+        expect(lastClaudeMessage).toMatch(sanctioned('<group:case,group:case>'));
+        const got = await foreign(wire, FOREIGN_GROUP, copyB, tree);
+        expect(`${wire.name}: впереди → ${got}`).toBe(`${wire.name}: впереди → ${want}`);
+        expect(got).toBe('deny');
+        expect(lastForeignMessage).toMatch(
+          sanctioned('suites-inst-api:suites-inst-api-007,suites-inst-api:suites-inst-api-014'),
+        );
+      }
+      expect(await claude(GROUP, live, 'Bash')).toBe('deny');
+      expect(lastClaudeMessage).toMatch(sanctioned('<group:case,group:case>'));
+    },
+  );
+
   it('Stop-Process инструментом PowerShell у Claude судится как kill у Bash, не D-n (Q2)', async () => {
     const bash = await reference(GROUP, `kill ${process.pid}`, ['Bash']);
     const ps = await reference(GROUP, `Stop-Process -Id ${process.pid} -Force`, ['PowerShell']);
@@ -626,60 +781,66 @@ describe('паритет правил оболочки: Claude и чужие CLI
    * Состояние MR знает только фордж — заглушка GitLab на свободном порту; читает
    * его та же функция маршрута (`withMrState`), что у Claude.
    */
-  it('MR ветки: черновик — перезапись сама, на ревью — отказ у обоих', async () => {
-    let draft = true;
-    const forge = createServer((req, res) => {
-      const iid = /\/merge_requests\/(\d+)/.exec(req.url ?? '')?.[1];
-      if (!iid) {
-        res.writeHead(404).end('{}');
-        return;
-      }
-      res.writeHead(200, { 'content-type': 'application/json' }).end(
-        JSON.stringify({
-          iid: Number(iid),
-          title: 'Группа',
-          state: 'opened',
-          draft,
-          source_branch: iid === '1' ? 'feature/a' : 'feature/b',
-          target_branch: 'main',
-          web_url: `${site}/team/repo/-/merge_requests/${iid}`,
-        }),
-      );
-    });
-    await new Promise<void>((done) => forge.listen(0, '127.0.0.1', done));
-    const site = `http://127.0.0.1:${(forge.address() as AddressInfo).port}`;
-    try {
-      const plan = store.getSplitPlan('parent') as SplitPlanRecord;
-      store.setSplitPlan({
-        ...plan,
-        groups: plan.groups.map((group) => ({
-          ...group,
-          mr: `${site}/team/repo/-/merge_requests/${group.index + 1}`,
-        })),
-      } as SplitPlanRecord);
-      writeSettings(store, 'gitlab', { enabled: true, baseUrl: site, repo: '' });
-      writeToken(join(root, 'agentdeck'), 'gitlab', 'stub-key');
-      const lease = 'git push --force-with-lease origin HEAD';
-      for (const [state, expected] of [
-        [true, 'allow'],
-        [false, 'deny'],
-      ] as const) {
-        draft = state;
-        for (const wire of WIRES) {
-          const want = await reference(GROUP, lease, wire.tools);
-          const got = await foreign(wire, FOREIGN_GROUP, copyB, lease);
-          expect(`${wire.name}: draft=${state} → ${got}`).toBe(
-            `${wire.name}: draft=${state} → ${want}`,
-          );
+  // Два состояния MR × каждый провод × два суда с настоящим git: 13 с в одиночку, под нагрузкой
+  // зоны — за 20 с по умолчанию (27.10), как у соседей с git — свой предел.
+  it(
+    'MR ветки: черновик — перезапись сама, на ревью — отказ у обоих',
+    { timeout: 120_000 },
+    async () => {
+      let draft = true;
+      const forge = createServer((req, res) => {
+        const iid = /\/merge_requests\/(\d+)/.exec(req.url ?? '')?.[1];
+        if (!iid) {
+          res.writeHead(404).end('{}');
+          return;
         }
-        expect(await reference(GROUP, lease, ['Bash'])).toBe(expected);
+        res.writeHead(200, { 'content-type': 'application/json' }).end(
+          JSON.stringify({
+            iid: Number(iid),
+            title: 'Группа',
+            state: 'opened',
+            draft,
+            source_branch: iid === '1' ? 'feature/a' : 'feature/b',
+            target_branch: 'main',
+            web_url: `${site}/team/repo/-/merge_requests/${iid}`,
+          }),
+        );
+      });
+      await new Promise<void>((done) => forge.listen(0, '127.0.0.1', done));
+      const site = `http://127.0.0.1:${(forge.address() as AddressInfo).port}`;
+      try {
+        const plan = store.getSplitPlan('parent') as SplitPlanRecord;
+        store.setSplitPlan({
+          ...plan,
+          groups: plan.groups.map((group) => ({
+            ...group,
+            mr: `${site}/team/repo/-/merge_requests/${group.index + 1}`,
+          })),
+        } as SplitPlanRecord);
+        writeSettings(store, 'gitlab', { enabled: true, baseUrl: site, repo: '' });
+        writeToken(join(root, 'agentdeck'), 'gitlab', 'stub-key');
+        const lease = 'git push --force-with-lease origin HEAD';
+        for (const [state, expected] of [
+          [true, 'allow'],
+          [false, 'deny'],
+        ] as const) {
+          draft = state;
+          for (const wire of WIRES) {
+            const want = await reference(GROUP, lease, wire.tools);
+            const got = await foreign(wire, FOREIGN_GROUP, copyB, lease);
+            expect(`${wire.name}: draft=${state} → ${got}`).toBe(
+              `${wire.name}: draft=${state} → ${want}`,
+            );
+          }
+          expect(await reference(GROUP, lease, ['Bash'])).toBe(expected);
+        }
+        expect(lastForeignMessage).toContain('rewriting the branch');
+      } finally {
+        forge.closeAllConnections();
+        await new Promise<void>((done) => forge.close(() => done()));
       }
-      expect(lastForeignMessage).toContain('rewriting the branch');
-    } finally {
-      forge.closeAllConnections();
-      await new Promise<void>((done) => forge.close(() => done()));
-    }
-  });
+    },
+  );
 
   it('строка cmd (оболочка не названа): `rd /s` — человеку, `rm -rf` судят чтения', async () => {
     const qwenWin = WIRES.find((wire) => wire.name === 'qwen win32 (оболочка не названа)')!;
@@ -706,6 +867,211 @@ describe('паритет правил оболочки: Claude и чужие CLI
         await reference(GROUP, 'rm -rf dist', wire.tools),
       );
       expect(await foreign(wire, FOREIGN_GROUP, copyB, 'dir /s')).toBe('allow');
+    }
+  });
+
+  /**
+   * P-26: точка соединения `cmd //c mklink //J` (D-7/D-12) — у чужого CLI тот же
+   * суд, что у Claude: ссылка в своей копии на каталог копии — сама, ссылка вне
+   * копии — человеку. Пути абсолютные: корень оболочки у обоих судей свой.
+   */
+  it('mklink //J (P-26): своя ссылка — сама, ссылка вне копии — человеку, у всех проводов', async () => {
+    const slash = (path: string): string => path.replace(/\\/g, '/');
+    const own = (copy: string): string =>
+      `cmd //c mklink //J "${slash(join(copy, '.agent', 'tmp', 'nm'))}" "${slash(join(copy, 'node_modules'))}"`;
+    const outside = (copy: string): string =>
+      `cmd //c mklink //J "${slash(join(root, 'elsewhere', 'nm'))}" "${slash(join(copy, 'node_modules'))}"`;
+    // Не вырождено: у Claude чтение Bash даёт и «само», и D-n.
+    expect(await reference(GROUP, own(copyA), ['Bash'])).toBe('allow');
+    expect(await reference(GROUP, outside(copyA), ['Bash'])).toBe('deferred');
+    for (const wire of WIRES) {
+      for (const [label, make] of [
+        ['own', own],
+        ['outside', outside],
+      ] as const) {
+        const want = await reference(GROUP, make(copyA), wire.tools);
+        const got = await foreign(wire, FOREIGN_GROUP, copyB, make(copyB));
+        expect(`${wire.name}: ${label} → ${got}`).toBe(`${wire.name}: ${label} → ${want}`);
+      }
+    }
+  });
+
+  /**
+   * P-26 (F7/D-5): D-n чужого CLI ждёт, а папки, куда шёл `cd`, уже нет — обход
+   * и пересуд отказывают агенту, как записи Claude. Транскрипта Claude у чужого
+   * CLI нет: каталог оболочки, от которого судили вживую, едет в самой записи.
+   */
+  it('D-n чужого CLI: папка `cd` убрана — обход и пересуд отказывают (P-26)', async () => {
+    const shellCwd = join(copyB, '.agent', 'tmp', 'rev');
+    const clone = join(shellCwd, 'clone');
+    const far = join(root, 'elsewhere', 'clone');
+    mkdirSync(clone, { recursive: true });
+    mkdirSync(far, { recursive: true });
+    const projectsDir = join(root, 'projects');
+    mkdirSync(projectsDir, { recursive: true });
+    const ask = async (command: string) => {
+      const verdict = await judge({
+        providerId: 'qwen',
+        chatId: FOREIGN_GROUP,
+        workdir: copyB,
+        allowEdits: true,
+        shell: { command, shell: 'bash', cwd: shellCwd },
+      });
+      const id = deferredIdOf(verdict.behavior === 'deny' ? (verdict.message ?? '') : '');
+      expect(id, `${command}: не D-n`).toBeDefined();
+      return deferredAsksOf(ctx).get(id!)!;
+    };
+    const relative = await ask('cd clone && psql -c "drop table users"');
+    const absolute = await ask(`cd "${far.replace(/\\/g, '/')}" && psql -c "drop table users"`);
+    // Папки на месте — запись по-прежнему человеку.
+    expect(staleFolderOfAsk(relative, { source: store, projectsDir })).toBeUndefined();
+    rmSync(clone, { recursive: true, force: true });
+    rmSync(far, { recursive: true, force: true });
+    for (const [record, gone] of [
+      [relative, clone],
+      [absolute, far],
+    ] as const) {
+      const swept = staleFolderOfAsk(record, { source: store, projectsDir });
+      expect(swept?.behavior).toBe('deny');
+      const norm = (text: string | undefined) => (text ?? '').replace(/\\/g, '/').toLowerCase();
+      expect(norm(swept?.message)).toContain(norm(gone));
+      const rejudged = await rejudgeGroupAsk(record, {
+        source: store,
+        projectsDir,
+        guardedPatterns: () => [],
+        allowedTools: () => new Set(),
+        guarded: () => false,
+      });
+      expect(rejudged?.behavior).toBe('deny');
+      expect(norm(rejudged?.message)).toContain(norm(gone));
+    }
+    expect(relative.shellCwd).toBe(shellCwd);
+  });
+
+  /**
+   * P-26 (D-10/D-11): группа сняла копию `cp f /tmp/x.bak` и убирает её `rm /tmp/x.bak` — у Claude
+   * улика своего — транскрипт (`run-routes.group-cwd-kill` «D-10»: своё — само, чужое — D-n). У Codex и
+   * Qwen Code транскрипта Claude нет; улика — журнал сессии набора (`call` PreToolUse + `ran`
+   * PostToolUse), сессия — id, что провод несёт в просьбе (`threadId` Codex) или транспорт открыл до
+   * хода (поток Codex, сессия qwen serve). Состояние набора — временный `AGENTDECK_KIT_STATE`.
+   */
+  it('D-10: уборка своей копии в `/tmp` у Codex и Qwen Code — сама; без своего `cp` — D-n (P-26)', async () => {
+    saved.AGENTDECK_KIT_STATE = process.env.AGENTDECK_KIT_STATE;
+    process.env.AGENTDECK_KIT_STATE = join(root, 'kit-state');
+    const sessions = join(root, 'kit-state', 'sessions');
+    mkdirSync(sessions, { recursive: true });
+    const stem = `fp${process.pid}${Math.random().toString(36).slice(2, 8)}`;
+    const own = join(tmpdir(), `${stem}-c.bak`);
+    const other = join(tmpdir(), `${stem}-f.bak`);
+    const late = join(tmpdir(), `${stem}-l.bak`);
+    // Журнал набора: `cp` пропущен и исполнен; второй `cp` пропущен, но не исполнен (нет `ran`).
+    const kitLog = (session: string, atMs: number) =>
+      writeFileSync(
+        join(sessions, `${session}.jsonl`),
+        `${[
+          {
+            ts: atMs - 5_000,
+            kind: 'call',
+            tool: 'Bash',
+            key: 'k1',
+            cmd: `cp package.json /tmp/${stem}-c.bak`,
+          },
+          { ts: atMs + 5_000, kind: 'ran', tool: 'Bash', key: 'k1' },
+          // Пропущен в ту же секунду, что файл записан: окно записи накрыло бы его, будь вызов исполнен.
+          {
+            ts: atMs,
+            kind: 'call',
+            tool: 'Bash',
+            key: 'k2',
+            cmd: `cp package.json /tmp/${stem}-l.bak`,
+          },
+        ]
+          .map((event) => JSON.stringify(event))
+          .join('\n')}\n`,
+      );
+    /** Судья через провод CLI: `session` — то, что провод/транспорт отдали просьбе. */
+    const judged = async (
+      providerId: 'codex' | 'qwen',
+      command: string,
+      wire: { threadId?: string; thread?: string; session?: string },
+    ): Promise<Outcome> => {
+      let verdict: LiveShellJudgement | undefined;
+      const policy: LivePermissionPolicy = {
+        allowEdits: true,
+        ask: async () => 'deny',
+        judge: async (shell, pid, session) => {
+          verdict = await judge({
+            providerId,
+            chatId: FOREIGN_GROUP,
+            workdir: copyB,
+            allowEdits: true,
+            ...(pid ? { pid } : {}),
+            ...(session ? { session } : {}),
+            shell,
+          });
+          return verdict;
+        },
+      };
+      if (providerId === 'codex') {
+        await answerCodexApproval(
+          {
+            jsonrpc: '2.0',
+            id: 9,
+            method: 'item/commandExecution/requestApproval',
+            params: {
+              command: `/bin/bash -lc ${shQuote(command)}`,
+              cwd: copyB,
+              itemId: 'i9',
+              ...(wire.threadId ? { threadId: wire.threadId } : {}),
+            },
+          } as never,
+          policy,
+          undefined,
+          wire.thread,
+        );
+      } else {
+        const shell = qwenShellAsk(
+          { _meta: { toolName: 'run_shell_command' }, rawInput: { command }, kind: 'execute' },
+          'linux',
+        );
+        await decidePermission(policy, {
+          cli: 'qwen',
+          requestId: 'r9',
+          tool: 'execute',
+          ...(shell ? { shell } : {}),
+          ...(wire.session ? { session: wire.session } : {}),
+        });
+      }
+      expect(verdict).toBeDefined();
+      if (verdict?.behavior === 'allow') return 'allow';
+      return classify('deny', verdict?.behavior === 'deny' ? (verdict.message ?? '') : '');
+    };
+    try {
+      for (const path of [own, other, late]) writeFileSync(path, 'backup');
+      const atMs = Date.now();
+      // Codex: id сессии хука — поток; Qwen Code: `config.getSessionId()` (регистр не важен, ACP).
+      kitLog('019a-codex-thread-p26', atMs);
+      kitLog('5f0c-qwen-session-p26', atMs);
+      const cases = [
+        ['codex', { threadId: '019a-codex-thread-p26' }],
+        ['codex', { thread: '019a-codex-thread-p26' }],
+        ['qwen', { session: '5F0C-QWEN-SESSION-P26' }],
+      ] as const;
+      for (const [providerId, wire] of cases) {
+        const label = `${providerId} ${JSON.stringify(wire)}`;
+        expect(await judged(providerId, `rm /tmp/${stem}-c.bak`, wire), label).toBe('allow');
+        expect(await judged(providerId, `rm /tmp/${stem}-*.bak`, wire), label).toBe('deferred');
+        expect(await judged(providerId, `rm /tmp/${stem}-f.bak`, wire), label).toBe('deferred');
+        // `cp` без `ran` — не исполнен: улики нет.
+        expect(await judged(providerId, `rm /tmp/${stem}-l.bak`, wire), label).toBe('deferred');
+      }
+      // Сессия не названа или чужая — улики нет, как без транскрипта у Claude.
+      expect(await judged('qwen', `rm /tmp/${stem}-c.bak`, {})).toBe('deferred');
+      expect(await judged('codex', `rm /tmp/${stem}-c.bak`, { threadId: 'other-thread' })).toBe(
+        'deferred',
+      );
+    } finally {
+      for (const path of [own, other, late]) rmSync(path, { force: true });
     }
   });
 

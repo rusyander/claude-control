@@ -81,6 +81,76 @@ function parseNumstat(text) {
 /** Новый файл больше этого — в списке, но без тела: читать его ревьюер будет сам. */
 const NEW_FILE_MAX = 256 * 1024;
 
+/** Потолок одного Read в токенах: CLI берёт его из этой переменной, без неё — 25 000. */
+const READ_CAP_ENV = 'CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS';
+const READ_CAP_DEFAULT = 25_000;
+/** Доля потолка на кусок карты чтения: оценка ниже завышена, запас — на её промах. */
+const READ_CAP_SHARE = 0.85;
+
+/**
+ * Во сколько токенов строка обойдётся в Read, с запасом вверх. Подогнано по трём
+ * отказам Read на пакете 198 КБ (группа #5 25.10, потолок 10 000): 29 090 знаков —
+ * 11 567 токенов, 28 252 — 11 338, 50 710 — 19 295; оценка выше факта на 4–9 %.
+ * Латиница дешевле кириллицы; номер строки, который Read ставит впереди, — тоже цена.
+ */
+function lineTokens(line) {
+  let ascii = 0;
+  let other = 0;
+  for (const ch of line) {
+    if (ch.charCodeAt(0) < 128) ascii += 1;
+    else other += 1;
+  }
+  return ascii / 2.6 + other / 1.2 + 2;
+}
+
+/**
+ * Куски по одному Read: каждый в бюджете, режем по началу файла диффа, если до
+ * него набралась хотя бы половина бюджета. Строка длиннее бюджета — свой кусок.
+ * Ответ — номера строк с единицы, включительно.
+ */
+function readChunks(lines, budget) {
+  const out = [];
+  let from = 0;
+  let used = 0;
+  let fileAt = -1;
+  let usedBeforeFile = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const cost = lineTokens(lines[i]);
+    if (i > from && used + cost > budget) {
+      const atFile = fileAt > from && usedBeforeFile >= budget / 2;
+      const cut = atFile ? fileAt : i;
+      out.push({ from: from + 1, to: cut });
+      used = atFile ? used - usedBeforeFile : 0;
+      from = cut;
+      fileAt = -1;
+    }
+    if (lines[i].startsWith('diff --git ') && i > from) {
+      fileAt = i;
+      usedBeforeFile = used;
+    }
+    used += cost;
+  }
+  if (from < lines.length) out.push({ from: from + 1, to: lines.length });
+  return out;
+}
+
+/** Строки каждого файла в диффе пакета: от его `diff --git` до начала следующего. */
+function fileLines(lines, files) {
+  const starts = [];
+  lines.forEach((line, at) => {
+    if (line.startsWith('diff --git ')) starts.push(at);
+  });
+  const fenceEnd = lines.length - 1; // последняя строка пакета — ограда диффа
+  const ranges = new Map();
+  for (const file of files) {
+    const at = starts.find((s) => lines[s].endsWith(` b/${file.path}`));
+    if (at === undefined) continue;
+    const next = starts.find((s) => s > at) ?? fenceEnd;
+    ranges.set(file.path, { from: at + 1, to: next });
+  }
+  return ranges;
+}
+
 /**
  * Неотслеживаемый файл как дифф «новый файл». Git сам его не покажет, а
  * `git add -N` поменял бы индекс копии; двоичный и слишком большой — без тела.
@@ -117,7 +187,7 @@ function newFile(root, path) {
 }
 
 /** Собрать пакет; ответ — путь файла и сводка или текст отказа. */
-export function buildReviewPack({ cwd, base, plan, out, now = new Date() }) {
+export function buildReviewPack({ cwd, base, plan, out, now = new Date(), readCap }) {
   const top = git(cwd, ['rev-parse', '--show-toplevel']);
   if (!top.ok) return { error: 'review-pack: not a git repository' };
   const root = top.out.trim();
@@ -167,35 +237,68 @@ export function buildReviewPack({ cwd, base, plan, out, now = new Date() }) {
   const added = files.reduce((sum, file) => sum + file.added, 0);
   const deleted = files.reduce((sum, file) => sum + file.deleted, 0);
 
-  const text = [
-    '# Review package',
-    '',
-    `Branch \`${branch}\` at ${head}; base \`${ref}\`, common ancestor ${point.slice(0, 9)}. ` +
-      `Built ${now.toISOString()}. The diff is from the common ancestor to the working copy ` +
-      '(uncommitted changes included). Read this file once: it already holds the whole diff.',
-    '',
-    '## Commits',
-    '',
-    commits || '(none — the change is uncommitted)',
-    '',
-    `## Changed files (${files.length}, +${added} −${deleted})`,
-    '',
-    ...files.map(
-      (file) =>
-        `- ${file.shown} ${file.binary ? '(binary)' : `+${file.added} −${file.deleted}`}` +
-        (file.untracked ? ' (new, untracked)' : '') +
-        (file.skipped ? ` — ${file.skipped}, read it directly` : '') +
-        (LOCKFILES.has(basename(file.path)) ? ' — lockfile, diff omitted' : ''),
-    ),
-    ...(planText ? ['', '## Plan', '', planText] : []),
-    '',
-    '## Diff',
-    '',
-    `${fence}diff`,
-    diff,
-    fence,
-    '',
-  ].join('\n');
+  // Пакет больше потолка одного Read (198 КБ при потолке 10 000 токенов, группа #5 25.10):
+  // ревьюеры гадали границы кусков — три отказа Read и чтение в обход потолка. Карта
+  // чтения даёт куски под потолок, у каждого файла — его строки. Номера строк зависят от
+  // длины самой карты, поэтому сборка повторяется, пока карта не совпадёт с текстом.
+  const cap = Number(readCap ?? process.env[READ_CAP_ENV]) || READ_CAP_DEFAULT;
+  const budget = Math.floor(cap * READ_CAP_SHARE);
+  const assemble = (ranges, chunks) =>
+    [
+      '# Review package',
+      '',
+      `Branch \`${branch}\` at ${head}; base \`${ref}\`, common ancestor ${point.slice(0, 9)}. ` +
+        `Built ${now.toISOString()}. The diff is from the common ancestor to the working copy ` +
+        '(uncommitted changes included). Read this file once, chunk by chunk from «Reading map»: ' +
+        'it already holds the whole diff; a file’s own lines are next to it in «Changed files».',
+      '',
+      '## Reading map',
+      '',
+      `One Read per chunk, offset and limit as written — each fits under the Read cap (${cap} tokens).`,
+      ...chunks.map(
+        (chunk) =>
+          `- offset=${chunk.from} limit=${chunk.to - chunk.from + 1} (lines ${chunk.from}–${chunk.to})`,
+      ),
+      '',
+      '## Commits',
+      '',
+      commits || '(none — the change is uncommitted)',
+      '',
+      `## Changed files (${files.length}, +${added} −${deleted})`,
+      '',
+      ...files.map((file) => {
+        const at = ranges.get(file.path);
+        return (
+          `- ${file.shown} ${file.binary ? '(binary)' : `+${file.added} −${file.deleted}`}` +
+          (file.untracked ? ' (new, untracked)' : '') +
+          (file.skipped ? ` — ${file.skipped}, read it directly` : '') +
+          (LOCKFILES.has(basename(file.path)) ? ' — lockfile, diff omitted' : '') +
+          (at ? ` · lines ${at.from}–${at.to}` : '')
+        );
+      }),
+      ...(planText ? ['', '## Plan', '', planText] : []),
+      '',
+      '## Diff',
+      '',
+      `${fence}diff`,
+      diff,
+      fence,
+      '',
+    ].join('\n');
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  let ranges = new Map();
+  let chunks = [];
+  let text = assemble(ranges, chunks);
+  for (let pass = 0; pass < 6; pass += 1) {
+    // Текст кончается переводом строки: пустой хвост split — не строка файла.
+    const lines = text.replace(/\n$/, '').split('\n');
+    const nextRanges = fileLines(lines, files);
+    const nextChunks = readChunks(lines, budget);
+    if (same([...nextRanges], [...ranges]) && same(nextChunks, chunks)) break;
+    ranges = nextRanges;
+    chunks = nextChunks;
+    text = assemble(ranges, chunks);
+  }
 
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, text, 'utf8');

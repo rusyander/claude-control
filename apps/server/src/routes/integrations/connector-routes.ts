@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodType } from 'zod';
 import type { IntegrationId, IntegrationsSettings } from '@agentdeck/contracts';
 import { parseBody } from '../../lib/request-body.ts';
@@ -19,6 +19,17 @@ import {
 } from '../../domains/integrations/store/store.ts';
 import { appDataOf, fail, type IntegrationsDeps } from './shared.ts';
 import { attachTextCodes } from '../../lib/server-texts/server-texts.ts';
+import { humanOnly } from '../chat/human-only/human-only.ts';
+import { humanOnlyDepsFor } from '../chat/human-only/human-only-deps.ts';
+
+/**
+ * Карточки, которые решают, КУДА панель шлёт события: бот и чат Telegram, адрес
+ * вебхука. Правка и «забыть» — только человеку по HTTP: процесс модели иначе
+ * перенаправил бы уведомления себе (или стёр ключ) тем же путём, что закрыт у
+ * ответов и подключения по /start. Агент панели правит их карточкой с
+ * подтверждением человека (`app.inject`, ворота его не видят — у него нет сокета).
+ */
+const DELIVERY_INTEGRATIONS: ReadonlySet<string> = new Set(['telegram', 'webhook']);
 
 /**
  * Карточки интеграций: показать, сохранить, проверить связь, забыть.
@@ -34,6 +45,14 @@ export function registerIntegrationConnectorRoutes(
   deps: IntegrationsDeps,
 ): void {
   const store = (): typeof deps.ctx.store => deps.ctx.store;
+  const humanGate = humanOnly(humanOnlyDepsFor());
+  /** Ворота только у карточек доставки; остальные пропускаются как были. */
+  const deliveryGate = async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> => {
+    if (DELIVERY_INTEGRATIONS.has(request.params.id)) await humanGate(request, reply);
+  };
 
   const discoverDeps = (): DiscoverDeps => {
     const paths = deps.ctx.location.paths;
@@ -87,30 +106,34 @@ export function registerIntegrationConnectorRoutes(
    * Сохранить карточку. Токен необязателен: пустая строка СТИРАЕТ сохранённый —
    * это осознанное «выкинуть ключ», а не пустое сохранение формы.
    */
-  app.put<{ Params: { id: string }; Body: unknown }>('/api/integrations/:id', (request, reply) => {
-    const id = request.params.id;
-    if (!isIntegrationId(id)) {
-      return reply.code(404).send({
-        code: 'integration_not_found',
-        message: `Интеграции «${id}» не существует.`,
-        messageCode: 'integration-not-found',
-        params: { id },
-      });
-    }
+  app.put<{ Params: { id: string }; Body: unknown }>(
+    '/api/integrations/:id',
+    { preHandler: deliveryGate },
+    (request, reply) => {
+      const id = request.params.id;
+      if (!isIntegrationId(id)) {
+        return reply.code(404).send({
+          code: 'integration_not_found',
+          message: `Интеграции «${id}» не существует.`,
+          messageCode: 'integration-not-found',
+          params: { id },
+        });
+      }
 
-    const body = request.body as { settings?: unknown; token?: unknown } | undefined;
-    const schema: ZodType<unknown> = integrationSettingsSchemas[id];
-    const settings = parseBody(schema, body?.settings, reply);
-    if (settings === undefined) return reply;
+      const body = request.body as { settings?: unknown; token?: unknown } | undefined;
+      const schema: ZodType<unknown> = integrationSettingsSchemas[id];
+      const settings = parseBody(schema, body?.settings, reply);
+      if (settings === undefined) return reply;
 
-    try {
-      writeSettings(store(), id, settings as IntegrationsSettings[IntegrationId]);
-      if (typeof body?.token === 'string') writeToken(appDataOf(deps), id, body.token.trim());
-      return attachTextCodes(describeIntegration(store(), appDataOf(deps), id));
-    } catch (error) {
-      return fail(reply, error);
-    }
-  });
+      try {
+        writeSettings(store(), id, settings as IntegrationsSettings[IntegrationId]);
+        if (typeof body?.token === 'string') writeToken(appDataOf(deps), id, body.token.trim());
+        return attachTextCodes(describeIntegration(store(), appDataOf(deps), id));
+      } catch (error) {
+        return fail(reply, error);
+      }
+    },
+  );
 
   /**
    * Живая проверка. Никогда не отвечает отказом: неудача — это состояние
@@ -130,16 +153,20 @@ export function registerIntegrationConnectorRoutes(
   });
 
   /** Забыть: токен стирается, карточка гасится. Адрес и почта остаются. */
-  app.delete<{ Params: { id: string } }>('/api/integrations/:id', (request, reply) => {
-    const id = request.params.id;
-    if (!isIntegrationId(id)) {
-      return reply.code(404).send({
-        code: 'integration_not_found',
-        message: `Интеграции «${id}» не существует.`,
-        messageCode: 'integration-not-found',
-        params: { id },
-      });
-    }
-    return forgetIntegration(store(), appDataOf(deps), id);
-  });
+  app.delete<{ Params: { id: string } }>(
+    '/api/integrations/:id',
+    { preHandler: deliveryGate },
+    (request, reply) => {
+      const id = request.params.id;
+      if (!isIntegrationId(id)) {
+        return reply.code(404).send({
+          code: 'integration_not_found',
+          message: `Интеграции «${id}» не существует.`,
+          messageCode: 'integration-not-found',
+          params: { id },
+        });
+      }
+      return forgetIntegration(store(), appDataOf(deps), id);
+    },
+  );
 }

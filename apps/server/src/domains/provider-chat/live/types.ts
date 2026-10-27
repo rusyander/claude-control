@@ -68,6 +68,11 @@ export interface LivePermissionAsk {
   readonly shell?: LiveShellCall;
   /** pid процесса CLI этого хода — корень живого дерева для суда погашения группы. */
   readonly pid?: number;
+  /**
+   * id сессии самого CLI, открытой ДО хода (поток Codex app-server, сессия qwen serve) — тот же
+   * `session_id`, что получает хук набора: по нему судья находит журнал сессии набора (P-26, D-10).
+   */
+  readonly session?: string;
 }
 
 /**
@@ -97,7 +102,11 @@ export interface LivePermissionPolicy {
    * Судья команд оболочки (P-01..P-05): та же граница, что у брокера Claude.
    * Есть он и в просьбе есть `shell` — решает он раньше переключателя.
    */
-  readonly judge?: (shell: LiveShellCall, pid?: number) => Promise<LiveShellJudgement>;
+  readonly judge?: (
+    shell: LiveShellCall,
+    pid?: number,
+    session?: string,
+  ) => Promise<LiveShellJudgement>;
   /**
    * Отказ судьи с причиной — модели и человеку (best effort: CLI без канала
    * причину не увидит). Ответ CLI ждёт его конца: Codex кладёт вставку в

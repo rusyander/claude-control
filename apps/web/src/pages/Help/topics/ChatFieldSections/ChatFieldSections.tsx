@@ -5,7 +5,7 @@ import { HelpSection, FieldTable, Callout } from '../../ui';
 
 /**
  * Таблицы полей и состояний документа «Чат»: поле ввода, цветные точки, расход,
- * режим правок и возобновление сессии.
+ * след хода, режим правок и возобновление сессии.
  *
  * Стоят они ПОСЛЕ снимков и до ограничений: человек, прошедший путь по кадрам,
  * возвращается сюда за одним значением — что означает жёлтая точка, откуда
@@ -57,6 +57,17 @@ export function ChatFieldSections() {
             { name: tr('spendSession'), description: tr('spendSessionText'), isMono: false },
             { name: tr('spendLimit'), description: tr('spendLimitText'), isMono: false },
             { name: tr('spendStep'), description: tr('spendStepText'), isMono: false },
+          ]}
+        />
+      </HelpSection>
+
+      <HelpSection title={tr('trailTitle')} caption={tr('trailCaption')}>
+        <FieldTable
+          nameHeader={t('help.common.fieldName')}
+          descriptionHeader={t('help.common.fieldPurpose')}
+          rows={[
+            { name: tr('trailRun'), description: tr('trailRunText'), isMono: false },
+            { name: tr('trailHooks'), description: tr('trailHooksText'), isMono: false },
           ]}
         />
       </HelpSection>

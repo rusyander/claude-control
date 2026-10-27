@@ -1,4 +1,5 @@
 import type { IntegrationId } from '@agentdeck/contracts';
+import { TELEGRAM_DONE_AFTER_MINUTES } from '@agentdeck/contracts';
 import type { IntegrationField } from './draft.types';
 
 /** Поля каждого коннектора в том порядке, в каком их заполняют. */
@@ -25,7 +26,11 @@ export const INTEGRATION_FIELDS: Record<IntegrationId, readonly IntegrationField
   confluence: ATLASSIAN_FIELDS,
   gitlab: FORGE_FIELDS,
   github: FORGE_FIELDS,
-  telegram: [{ key: 'chatId', kind: 'text', isRequired: true }],
+  telegram: [
+    { key: 'chatId', kind: 'text', isRequired: true },
+    // «Закончил» — только после долгой работы; 0 — не сообщать.
+    { key: 'doneAfterMinutes', kind: 'minutes', fallback: String(TELEGRAM_DONE_AFTER_MINUTES) },
+  ],
   zephyr: TMS_FIELDS,
   xray: TMS_FIELDS,
   testit: [{ key: 'baseUrl', kind: 'text', isRequired: true }, ...TMS_FIELDS],

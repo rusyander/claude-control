@@ -970,6 +970,10 @@ export const serverTextTemplates = {
     ru: 'Бот {{account}} на связи.',
     en: 'The bot {{account}} is reachable.',
   },
+  'telegram-connect-no-candidate': {
+    ru: 'Подтверждать некого: окно закрыто или /start ещё не пришёл.',
+    en: 'Nobody to confirm: the window is closed or /start has not arrived yet.',
+  },
   'integration-check-tms-ok': {
     ru: '{{detail}} — связь есть.',
     en: '{{detail}} — the connection works.',
@@ -1184,6 +1188,10 @@ export const serverTextTemplates = {
     ru: 'в .mcp.json копии нет серверов оригинала: {{names}}',
     en: 'the copy .mcp.json lacks the original servers: {{names}}',
   },
+  'worktree-copy-gap-hooks': {
+    ru: 'в settings.local.json копии не прописаны хуки оригинала: {{names}}',
+    en: 'the copy settings.local.json lacks the original hooks: {{names}}',
+  },
   'worktree-copy-gap-access': {
     ru: 'нет записи доступа — агент спросит про доверие и MCP',
     en: 'no access entry — the agent will ask about trust and MCP',
@@ -1270,6 +1278,14 @@ export const serverTextTemplates = {
     ru: 'Группа продолжает ту же сессию: окно {{tokens}}k из {{window}}k до сжатия — чистая сессия перечитала бы всё, что уже в нём.',
     en: 'The group continues in the same session: context {{tokens}}k of the {{window}}k compaction window — a fresh session would re-read everything already in it.',
   },
+  'review-skipped-notice': {
+    ru: 'Ревью не заводилось: с коммита {{from}} своих изменений у работы нет — ни новых коммитов, ни разрешённых конфликтов в слияниях, ни отличий после rebase.',
+    en: 'No review was started: since commit {{from}} the work has no changes of its own — no new commits, no conflict resolutions in merges, no differences after a rebase.',
+  },
+  'review-off-notice': {
+    ru: 'Ревью не заводилось: в этом проекте выключено «Ревью после работы» — работа идёт сразу в доставку.',
+    en: 'No review was started: «Review after work» is off for this project — the work goes straight to delivery.',
+  },
   'split-limit-wait-notice': {
     ru: 'Группы разделения упёрлись в лимит подписки и ждут его сброса до {{until}}: продолжатся сами, очередь до сброса не стартует.',
     en: 'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
@@ -1298,6 +1314,14 @@ export const serverTextTemplates = {
     ru: 'Группа «{{group}}»: после повтора конвейер MR {{mr}} снова упал на инфраструктуре CI — {{jobs}}. Больше панель не повторяет и группу не будит: посмотрите раннер.',
     en: 'Group «{{group}}»: after the retry the MR {{mr}} pipeline failed on CI infrastructure again — {{jobs}}. The panel retries no more and does not wake the group: check the runner.',
   },
+  'split-mr-watch-red-unfixed-notice': {
+    ru: 'Группа «{{group}}»: конвейер MR {{mr}} (#{{pipeline}}) красный, а ход кончился без правки — голова ветки та же. Панель не ставит группе «готово» и ждёт вас. Ответ группы: {{answer}}',
+    en: "Group «{{group}}»: the MR {{mr}} pipeline (#{{pipeline}}) is red and the turn ended without a fix — the branch head did not move. The panel does not mark the group done and waits for you. The group's answer: {{answer}}",
+  },
+  'split-mr-watch-green-notice': {
+    ru: 'Группа «{{group}}»: конвейер MR {{mr}} (#{{pipeline}}) позеленел, пока группа ждала вас из-за красного. Панель сама сверяет доставку: всё на месте — группа «готово», есть пробелы — получит напоминание.',
+    en: 'Group «{{group}}»: the MR {{mr}} pipeline (#{{pipeline}}) turned green while the group waited for you over the red one. The panel checks the delivery itself: nothing missing — the group is done; gaps — it gets a reminder.',
+  },
   'chat-conversation-lost-notice': {
     ru: 'Прежний разговор группы продолжить нельзя: его файла ({{lost}}) на диске нет. Ход пошёл новым разговором в той же копии — ветка, MR и задачи переданы ему вводной.',
     en: "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
@@ -1305,6 +1329,10 @@ export const serverTextTemplates = {
   'chat-cold-resume-notice': {
     ru: 'Группа простояла дольше срока кэша, её разговор остыл, а окно уже {{tokens}} тыс. токенов: продолжать его — заново записать всё окно. Ход пошёл новым разговором в той же копии; вводную панель собрала из файлов — заметки группы, git, последний ответ. Прежний разговор ({{previous}}) остаётся на диске: вернуть ход в него — кнопкой «Продолжить старый разговор», пока новый идёт. Выключается в настройках: «Группы», экономия групп.',
     en: "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk: to move the turn back into it, press «Continue the old conversation» while the new one runs. Switch off in settings: Groups, group economy.",
+  },
+  'chat-mr-relay-fresh-notice': {
+    ru: 'Слово панели доставленной группе (конвейер или обсуждения MR) пошло новым разговором в той же копии: окно прежнего уже {{tokens}} тыс. токенов, и каждый запрос хода перечитывал бы всю доставку. Вводную панель собрала из файлов — ветка, MR, задачи, заметки группы, git, последний ответ. Прежний разговор ({{previous}}) остаётся на диске: вернуть ход в него — кнопкой «Продолжить старый разговор», пока новый идёт. Выключается в настройках: «Группы», экономия групп.',
+    en: "The panel's word to a delivered group (MR pipeline or discussions) went on as a new conversation in the same copy: the previous window is already {{tokens}}k tokens, and every request of the turn would re-read the whole delivery. The panel built the brief from files — branch, MR, tasks, the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk: to move the turn back into it, press «Continue the old conversation» while the new one runs. Switch off in settings: Groups, group economy.",
   },
   'split-default-drift-notice': {
     ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — при доставке группа сверит конфликт и сделает rebase, только если он настоящий.',
@@ -1431,13 +1459,21 @@ export const serverTextTemplates = {
     ru: 'ветка {{branch}} не отправлена на удалённый (или отстаёт от HEAD копии)',
     en: 'branch {{branch}} is not pushed to the remote (or lags behind the copy HEAD)',
   },
+  'delivery-gap-remote-ahead': {
+    ru: 'ветка {{branch}} на удалённом впереди копии — туда дописаны коммиты не из копии: {{commits}}. Подтяните их одной командой `git pull --ff-only origin {{branch}}` (не merge, не reset, не rebase), проверьте, не откатили ли они ваши правки, и в том же круге сдайте заново строки сит, которые новый коммит откроет',
+    en: 'branch {{branch}} on the remote is ahead of the copy — commits not made in the copy were added there: {{commits}}. Bring them in with one `git pull --ff-only origin {{branch}}` (not merge, reset or rebase), check they did not revert your changes, and in the same round report again the sieve rows the new commit reopens',
+  },
+  'delivery-gap-foreign-revert': {
+    ru: 'коммит {{commit}} на ветке сделан не группой и убрал строки, которые группа добавила, — их нет и в HEAD: {{files}}. Если файл генерируется, правьте его источник и перегенерируйте; затем закрепите файл своим коммитом (или верните строки)',
+    en: 'commit {{commit}} on the branch was not made by the group and removed lines the group added — they are not in HEAD either: {{files}}. If the file is generated, fix its source and regenerate; then settle the file with a commit of your own (or restore the lines)',
+  },
   'delivery-gap-no-mr': {
     ru: 'нет MR, чья голова — HEAD копии (ветка {{branch}}) — отправьте ветку и откройте MR или обновите свой',
     en: 'no MR whose head is the copy HEAD (branch {{branch}}) — push the branch and open the MR, or update yours',
   },
   'delivery-gap-review-unfinished': {
-    ru: 'ревью работы не закончено: вердикта ревьюера нет',
-    en: 'the work review is not finished: there is no reviewer verdict',
+    ru: 'ревью работы не закончено: вердикта ревьюера нет — последний ответ этапа ревью заканчивается блоком ```agentdeck:review``` с {"findings":[…]} ([] — замечаний нет)',
+    en: 'the work review is not finished: there is no reviewer verdict — the final answer of the review stage ends with an ```agentdeck:review``` block {"findings":[…]} ([] = approved)',
   },
   'delivery-gap-fix-missing': {
     ru: 'замечания ревью ({{count}}) не исправлены: звено правок после ревью не проходило',
@@ -1455,6 +1491,70 @@ export const serverTextTemplates = {
     ru: 'пункт задания владельца {{point}} отмечен без доказательства: нужен файл:строка, команда и строка её вывода или причина',
     en: 'owner’s point {{point}} is marked without evidence: file:line, the command and a line of its output, or the reason, are needed',
   },
+  'delivery-gap-task-unreported': {
+    ru: 'нет отчёта по пунктам задач группы: нужны строки task-1, task-2, … в блоке {{lang}} — каждый критерий приёмки, пункт, пример и хвост задачи и тикетов, на которые она ссылается: {"sieves":[{"id":"task-1","status":"pass|fail|n/a","evidence":"КЛЮЧ «пункт слово в слово из тикета или задания» — файл:строка или команда и строка её вывода"}]}',
+    en: 'the points of the group’s tasks are not reported: rows task-1, task-2, … are needed in a {{lang}} block — each acceptance criterion, listed item, example and tail of the task and of the tickets it links: {"sieves":[{"id":"task-1","status":"pass|fail|n/a","evidence":"KEY «the point, copied word for word from the ticket or task» — file:line, or the command and a line of its output"}]}',
+  },
+  'delivery-gap-task-failed': {
+    ru: 'пункт задач группы {{point}} не выполнен: {{evidence}}',
+    en: 'task point {{point}} is not done: {{evidence}}',
+  },
+  'delivery-gap-task-no-evidence': {
+    ru: 'пункт задач группы {{point}} отмечен без доказательства: нужен файл:строка или команда и строка её вывода',
+    en: 'task point {{point}} is marked without evidence: file:line, or the command and a line of its output, is needed',
+  },
+  'delivery-gap-task-flip': {
+    ru: 'пункт задач группы {{point}}: строка стала pass без нового доказательства — {{why}}',
+    en: 'task point {{point}}: the row turned pass with no new proof — {{why}}',
+  },
+  'delivery-gap-task-unsourced': {
+    ru: 'пункт задач группы {{point}} сдан pass без источника: процитируйте в «…» слово в слово сам пункт — из тикета (файл .agent/run/tickets.md или трекер, с ключом задачи), из задания группы или строку описания MR («MR description: …») — и затем доказательство: файл:строка или команда и строка её вывода',
+    en: 'task point {{point}} is pass with no source: quote the point itself word for word in «…» — from the ticket (the file .agent/run/tickets.md or the tracker, with the ticket key), from the group’s task, or a line of the MR description («MR description: …») — then the proof: file:line, or the command and a line of its output',
+  },
+  'delivery-gap-task-quote-unfound': {
+    ru: 'пункт задач группы {{point}}: цитаты «{{quote}}» нет ни в тикетах (.agent/run/tickets.md), ни в задании группы, ни в описании MR — процитируйте пункт слово в слово оттуда, откуда он взят; задача, которой нет в файле, — с её ключом',
+    en: 'task point {{point}}: the quote «{{quote}}» is in none of the tickets (.agent/run/tickets.md), the group’s task or the MR description — quote the point word for word from where it comes; a ticket missing from the file — with its key',
+  },
+  'delivery-gap-task-quote-label': {
+    ru: 'пункт задач группы {{point}}: «{{quote}}» — метка (имя инструмента, кнопки, файла), а не пункт: в цитате меньше трёх слов. Процитируйте сам пункт задачи слово в слово — фразу из раздела её тикета, задания группы или описания MR',
+    en: 'task point {{point}}: «{{quote}}» is a label (a tool, button or file name), not the point: the quote has fewer than three words. Quote the point itself word for word — a phrase from its ticket section, the group’s task or the MR description',
+  },
+  'delivery-gap-task-point-unmapped': {
+    ru: 'задача {{key}}: пунктов тикета без строки task-N, которая их цитирует, — {{count}}: {{points}}. На каждый — строка task-N с цитатой пункта в «…» и ключом задачи: pass с доказательством, если сделан; fail с причиной, если не сделан (и он назван в описании MR); n/a с причиной, если это не требование. Полный текст — раздел ## {{key}} файла .agent/run/tickets.md',
+    en: 'ticket {{key}}: points of the ticket that no task-N row quotes — {{count}}: {{points}}. For each, a task-N row quoting the point in «…» with the ticket key: pass with the proof if done; fail with the reason if not done (and named in the MR description); n/a with the reason if it is no requirement. Full text — the ## {{key}} section of .agent/run/tickets.md',
+  },
+  'delivery-gap-task-rewritten': {
+    ru: 'пункт задач группы {{point}}: доказательство переписано без нового коммита — было «{{was}}», стало «{{now}}»; верно только одно. Прежнее уже сдано: если верно оно, уберите эту строку из ответа — панель хранит прежнюю, и пробел снимется в этом же ходе. Если верно новое — сверьте его с тикетом и кодом; та же строка, повторённая следующим ответом, снимает этот пробел',
+    en: 'task point {{point}}: the evidence was rewritten with no new commit — it was «{{was}}», now «{{now}}»; only one can be true. The earlier one is already reported: if it holds, drop this row from your answer — the panel keeps the earlier one, and the gap closes in this same turn. If the new one is true, check it against the ticket and the code; the same row repeated in a later answer closes this gap',
+  },
+  'delivery-gap-task-note-rejected': {
+    ru: 'пункт задач группы {{point}} не выполнен: {{evidence}} — пометка не принята: {{why}}',
+    en: 'task point {{point}} is not done: {{evidence}} — the mark is not accepted: {{why}}',
+  },
+  'delivery-gap-defer-unowned': {
+    ru: 'пункт {{point}} отдан мимо группы, но владелец не назван: {{evidence}} — сделайте его в этой ветке или назовите владельца: «other group: group N «название» — файл или папка из её списка» или «tracker: КЛЮЧ» заведённой задачи; пункт не из задач группы — «does not apply: почему»',
+    en: 'point {{point}} is handed off with no owner named: {{evidence}} — do it in this branch, or name the owner: "other group: group N «title» — a file or folder from its owned list" or "tracker: KEY" of a filed ticket; a point outside the group’s tasks — "does not apply: why"',
+  },
+  'delivery-gap-defer-self': {
+    ru: 'пункт {{point}} отдан группе {{group}}, а это ваша группа — сделайте его в этой ветке',
+    en: 'point {{point}} is handed to group {{group}}, which is your own group — do it in this branch',
+  },
+  'delivery-gap-defer-closed': {
+    ru: 'пункт {{point}} отдан группе {{group}} «{{title}}», но её работа закрыта без доставки (убрана или упала) — его никто не сделает: сделайте его в этой ветке или назовите заведённую задачу трекера',
+    en: 'point {{point}} is handed to group {{group}} «{{title}}», but that group closed without delivering (dropped or failed) — nobody will do it: do it in this branch, or name a filed tracker ticket',
+  },
+  'delivery-gap-defer-no-path': {
+    ru: 'пункт {{point}} отдан группе {{group}} «{{title}}» без пути — назовите файл или папку из её списка ({{owns}}), иначе отданное не проверить; нет такого пути — пункт ваш',
+    en: 'point {{point}} is handed to group {{group}} «{{title}}» without a path — name a file or folder from its owned list ({{owns}}), or the hand-off cannot be checked; no such path — the point is yours',
+  },
+  'delivery-gap-defer-not-owned': {
+    ru: 'пункт {{point}} отдан группе {{group}} «{{title}}», но {{paths}} нет в её списке ({{owns}}) — его никто не сделает: сделайте его в этой ветке или назовите группу, в чьём списке этот путь, или заведённую задачу трекера',
+    en: 'point {{point}} is handed to group {{group}} «{{title}}», but {{paths}} is not in its owned list ({{owns}}) — nobody will do it: do it in this branch, or name the group whose list holds that path, or a filed tracker ticket',
+  },
+  'delivery-gap-defer-merged': {
+    ru: 'пункт {{point}} ждал слияния группы {{group}} «{{title}}» — её MR уже влит: пункт теперь ваш, сделайте его в этой ветке',
+    en: 'point {{point}} waited for group {{group}} «{{title}}» to merge — its MR is merged now: the point is yours, do it in this branch',
+  },
   'delivery-gap-mr-description': {
     ru: 'у MR {{mr}} пустое описание — опишите в нём, что изменено, зачем и как проверено',
     en: 'MR {{mr}} has an empty description — describe what changed, why, and how it was checked',
@@ -1463,6 +1563,18 @@ export const serverTextTemplates = {
     ru: 'описание MR {{mr}}: не названы заметки доставки ({{items}}) — впишите каждую в описание: что не проверено или красное не из-за ветки и почему',
     en: 'MR {{mr}} description: the delivery notes ({{items}}) are not named — add each to the description: what was not checked or is red not because of the branch, and why',
   },
+  'delivery-gap-mr-unhomed': {
+    ru: 'описание MR {{mr}}: оставлено «отдельно» без ключа задачи, которая это возьмёт ({{items}}) — впишите ключ задачи (PROJ-123), исправьте в этой ветке или спросите человека',
+    en: 'MR {{mr}} description: left «separately» with no key of the task that takes it ({{items}}) — add the task key (PROJ-123), fix it in this branch, or ask the human',
+  },
+  'delivery-gap-mr-checks': {
+    ru: 'описание MR {{mr}}: нет раздела проверок на финальном дереве — добавьте заголовок «Проверки»: какие проверки проекта прошли на итоговом коммите и с каким результатом',
+    en: 'MR {{mr}} description: no section with the checks on the final tree — add a «Checks» heading: which project checks ran on the final commit and with what result',
+  },
+  'delivery-gap-mr-shots': {
+    ru: 'описание MR {{mr}}: ветка меняет интерфейс ({{files}}), а в описании нет снимков до/после — приложите их или напишите строку «Скриншоты: нет — причина»',
+    en: 'MR {{mr}} description: the branch changes the UI ({{files}}) but the description has no before/after shots — attach them or write a line «Screenshots: none — reason»',
+  },
   'delivery-gap-mr-na-reason': {
     ru: 'в описании MR {{mr}} нет причины n/a живой проверки ({{sieves}}) — впишите в описание id сита и почему оно не применимо',
     en: 'the description of MR {{mr}} does not give the n/a reason of the live check ({{sieves}}) — add the sieve id and why it does not apply',
@@ -1470,6 +1582,18 @@ export const serverTextTemplates = {
   'delivery-gap-review-threads': {
     ru: 'MR {{mr}}: ветки ревьюера без ответа ({{count}}) — на каждую правка в ветке и ответ в той же ветке обсуждения, или ответ, почему не меняете: {{threads}}',
     en: 'MR {{mr}}: reviewer threads with no answer ({{count}}) — for each, a fix in the branch and a reply in the same discussion thread, or a reply why you do not change it: {{threads}}',
+  },
+  'delivery-gap-tracker-comment': {
+    ru: 'в задачах {{keys}} нет комментария со ссылкой на MR {{mr}} — напишите в каждую, что сделано и как проверить, со ссылкой на MR',
+    en: 'tickets {{keys}} have no comment linking MR {{mr}} — write in each what was done and how to check it, with the MR link',
+  },
+  'delivery-note-tickets-skipped': {
+    ru: 'задачи {{keys}} не названы ни в одном коммите ветки — их работа в этом MR не доставлена: не переводите их и не пишите в них «сделано»',
+    en: 'tickets {{keys}} are named in no commit of the branch — their work is not delivered by this MR: do not move them and do not write «done» in them',
+  },
+  'delivery-note-tracker-unread': {
+    ru: 'комментарии задач {{keys}} не прочитаны: трекер не ответил, ссылку на MR в них панель не проверила',
+    en: 'the comments of tickets {{keys}} were not read: the tracker did not answer, the panel did not check them for the MR link',
   },
   'delivery-gap-no-copy': { ru: 'нет копии группы', en: 'the group has no copy' },
   'sieve-gap-conflicts': {
@@ -1533,8 +1657,36 @@ export const serverTextTemplates = {
     en: 'sieve {{sieve}}: the branch changed the code this sieve covers after the row was reported ({{files}}) — check again on the final commit and report the row again',
   },
   'sieve-gap-no-run': {
-    ru: 'сито {{sieve}}: в проекте есть блок «Тесты» — запишите живую проверку прогоном (tests-cli run или tests-cli record) и укажите его в доказательстве как run:<id>',
-    en: 'sieve {{sieve}}: the project has a Tests section — record the live check as a run (tests-cli run or tests-cli record) and cite it in the evidence as run:<id>',
+    ru: 'сито {{sieve}}: живая проверка не подтверждена прогоном — проверьте на стенде с этой веткой (или тестом маршрута через настоящий маршрут) кейсом блока «Тесты» с меткой из: {{tags}}, прогоните его блоком «Тесты» (`tests-cli run`) и укажите прогон в доказательстве как run:<id>; засчитывается только прогон, исполненный блоком «Тесты», кейса с меткой не от группы — прогон, записанный вручную, метка, которую группа поставила своему кейсу, юнит- и сервисный тест не в счёт; не запустить здесь — статус fail и доказательство «not checked: <причина>»',
+    en: 'sieve {{sieve}}: the live check is not backed by a run — check it against a stand running this branch (or with the route test through the real route) as a Tests-section case tagged one of: {{tags}}, run it through the Tests block (`tests-cli run`) and cite the run in the evidence as run:<id>; only a run the Tests block executed (`tests-cli run`) of a case tagged by someone else counts — a run recorded by hand, a tag the group set on its own case and a unit or service test do not; cannot run it here — status fail with evidence "not checked: <reason>"',
+  },
+  'sieve-gap-no-run-cite': {
+    ru: 'сито {{sieve}}: прогон {{run}} из истории блока «Тесты» уже подходит — укажите его в доказательстве как run:{{run}}, прогонять заново не нужно',
+    en: 'sieve {{sieve}}: run {{run}} in the Tests history already fits — cite it in the evidence as run:{{run}}; no rerun is needed',
+  },
+  'sieve-gap-run-not-live': {
+    ru: 'сито {{sieve}}: в прогоне {{run}} нет живой проверки — ни один прошедший кейс не помечен ({{tags}}), а юнит- или сервисный тест её не доказывает; не засчитываются и прогон, записанный вручную, и метка, которую группа поставила своему кейсу, — только прогон, исполненный блоком «Тесты» (`tests-cli run`), кейса с меткой не от группы; дифф только из `tools/` и `scripts/` доказывает и исполненный прогон кейса, чьи codePaths называют эти файлы; проверьте на стенде с этой веткой или тестом маршрута через настоящий маршрут кейсом с такой меткой, не запустить здесь — статус fail и доказательство «not checked: <причина>»',
+    en: 'sieve {{sieve}}: run {{run}} holds no live check — no passed case in it is tagged ({{tags}}), and a unit or service test does not prove it; a run recorded by hand and a tag the group set on its own case do not count either — only a run the Tests block executed (`tests-cli run`) of a case tagged by someone else; a diff of only `tools/` and `scripts/` files is also proved by an executed run of a case whose codePaths name those files; check against a stand running this branch or with the route test through the real route as a case with such a tag, or — if it cannot run here — status fail with evidence "not checked: <reason>"',
+  },
+  'sieve-gap-flip': {
+    ru: 'сито {{sieve}}: строка стала pass без нового доказательства — {{why}}',
+    en: 'sieve {{sieve}}: the row turned pass with no new proof — {{why}}',
+  },
+  'delivery-gap-owner-flip': {
+    ru: 'пункт задания владельца {{point}}: строка стала pass без нового доказательства — {{why}}',
+    en: 'owner’s point {{point}}: the row turned pass with no new proof — {{why}}',
+  },
+  'sieve-flip-mark': {
+    ru: 'метки «not checked:» и «not caused by the branch:» ставятся только у fail — сдайте строку fail с этой меткой',
+    en: 'the marks "not checked:" and "not caused by the branch:" belong to a fail row only — report the row as fail with that mark',
+  },
+  'sieve-flip-red': {
+    ru: 'прошлым кругом строка была fail, а доказательство и сейчас говорит «красный» или «не проверено» — почините и сошлитесь на новый прогон или оставьте fail с меткой',
+    en: 'it was fail last round and the evidence still says red or not checked — fix the cause and cite a new run, or keep it fail with a mark',
+  },
+  'sieve-flip-same': {
+    ru: 'прошлым кругом строка была fail с тем же доказательством («{{was}}»), нового прогона нет — почините и сошлитесь на новый прогон или оставьте fail с меткой',
+    en: 'it was fail last round with the same evidence («{{was}}») and no new run is cited — fix the cause and cite a new run, or keep it fail with a mark',
   },
   'sieve-gap-run-missing': {
     ru: 'сито {{sieve}}: прогона {{run}} нет в истории блока «Тесты» копии или он не закончен — запишите прогон и укажите его номер',
@@ -1553,8 +1705,20 @@ export const serverTextTemplates = {
     en: 'sieve {{sieve}}: run {{run}} is older than the change to the code this sieve covers ({{files}}) — run it again on the final commit',
   },
   'sieve-gap-live-na': {
-    ru: 'сито {{sieve}}: живую проверку нельзя сдать n/a — дифф меняет поведение ({{files}}); проверьте вживую на последнем коммите и сдайте pass с доказательством, а не вышло — fail с причиной',
-    en: 'sieve {{sieve}}: a live check cannot be reported n/a — the diff changes behaviour ({{files}}); check it live on the final commit and report pass with evidence, or fail with the reason if it could not run',
+    ru: 'сито {{sieve}}: живую проверку нельзя сдать n/a — дифф меняет поведение ({{files}}); проверьте вживую на последнем коммите и сдайте pass со ссылкой run:<id> записанного прогона блока «Тесты», где прошёл кейс с одной из меток: {{tags}}, а не вышло — fail с причиной',
+    en: 'sieve {{sieve}}: a live check cannot be reported n/a — the diff changes behaviour ({{files}}); check it live on the final commit and report pass citing run:<id> of a recorded Tests-section run where a case tagged one of: {{tags}} passed, or fail with the reason if it could not run',
+  },
+  'sieve-gap-count-no-cite': {
+    ru: 'сито {{sieve}}: доказательство называет счёт тестов блока «Тесты» («{{claim}}»), но не ссылается на прогон — укажите run:<id> прогона, который его напечатал (последний записанный — run:{{run}}: прошло {{passed}}, упало {{failed}})',
+    en: 'sieve {{sieve}}: the evidence quotes a Tests-section test count («{{claim}}») but cites no run — cite run:<id> of the run that printed it (the latest recorded is run:{{run}}: {{passed}} passed, {{failed}} failed)',
+  },
+  'sieve-gap-count-no-run': {
+    ru: 'сито {{sieve}}: доказательство называет счёт тестов блока «Тесты» («{{claim}}»), а прогона в истории копии нет — запишите прогон (tests-cli run) и сошлитесь на него как run:<id>',
+    en: 'sieve {{sieve}}: the evidence quotes a Tests-section test count («{{claim}}») but the copy has no recorded run — record one (tests-cli run) and cite it as run:<id>',
+  },
+  'sieve-gap-count-mismatch': {
+    ru: 'сито {{sieve}}: счёт в доказательстве («{{claim}}») не сходится с прогоном run:{{run}} — в нём прошло {{passed}}, упало {{failed}}; перепишите счёт по выводу прогона, а упавшее почините или назовите в строке',
+    en: 'sieve {{sieve}}: the count in the evidence («{{claim}}») does not match run:{{run}} — it has {{passed}} passed, {{failed}} failed; rewrite the count from the run output, and fix what failed or name it in the row',
   },
   'tests-gap-no-run': {
     ru: 'блок «Тесты» копии: после старта группы не записано ни одного прогона — прогоните кейсы по изменённым файлам ({{cases}}) и запишите прогон: {{command}}',
@@ -1565,24 +1729,24 @@ export const serverTextTemplates = {
     en: 'Tests block of the copy: since the group started there is only a word-only record (tests-cli record), which does not close an automated case — run the cases for the changed files ({{cases}}) with: {{command}}',
   },
   'tests-gap-stale': {
-    ru: 'блок «Тесты» копии: прогон {{run}} записан раньше последней правки ({{files}}) — прогоните кейсы заново и запишите прогон: {{command}}',
-    en: 'Tests block of the copy: run {{run}} was recorded before the latest change ({{files}}) — run the cases again and record the run: {{command}}',
+    ru: 'блок «Тесты» копии: прогон {{run}} записан раньше последней правки — прогоните кейсы заново и запишите прогон: {{command}} (правка под кейсами: {{files}})',
+    en: 'Tests block of the copy: run {{run}} was recorded before the latest change — run the cases again and record the run: {{command}} (changed under the cases: {{files}})',
   },
   'tests-gap-unrun': {
     ru: 'блок «Тесты» копии: кейсы по изменённым файлам не прогнаны после старта группы: {{cases}} — запишите прогон: {{command}}',
     en: 'Tests block of the copy: cases for the changed files were not run since the group started: {{cases}} — record a run: {{command}}',
   },
   'tests-gap-failed': {
-    ru: 'блок «Тесты» копии: красные кейсы в прогонах группы: {{cases}} — почините и прогоните снова',
-    en: 'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again',
+    ru: 'блок «Тесты» копии: красные кейсы в прогонах группы: {{cases}} — почините и прогоните снова; красные и без ветки — докажите прогоном на развилке с основной: {{command}}',
+    en: 'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again; red without the branch too — prove it with a run on the fork point with main: {{command}}',
   },
   'tests-gap-uncovered': {
     ru: 'блок «Тесты» копии: изменённые файлы не покрыты ни одним кейсом ({{files}}) — заведите кейс с codePaths на них',
     en: 'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
   },
   'tests-note-red-baseline': {
-    ru: 'блок «Тесты» копии: красные и до старта группы, дифф их не задел: {{cases}} — не из-за ветки, группу не держат; назовите их в описании MR',
-    en: 'Tests block of the copy: red already before the group started and untouched by the diff: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
+    ru: 'блок «Тесты» копии: красные и без ветки — до старта группы или на развилке с основной: {{cases}} — не из-за ветки, группу не держат; назовите их в описании MR',
+    en: 'Tests block of the copy: red without the branch too — before the group started or on the fork point with main: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
   },
   'tests-note-red-environment': {
     ru: 'блок «Тесты» копии: не выполнились (blocked) или красные от окружения (таймаут, сеть, стенд, платформа) там, где дифф их не задел: {{cases}} — не из-за ветки, группу не держат; назовите их в описании MR',
@@ -1599,6 +1763,42 @@ export const serverTextTemplates = {
   'sieve-note-run-red': {
     ru: 'прогон {{run}}: красные не из-за ветки (были красными до старта группы или упали от окружения, дифф их не задел): {{cases}} — группу не держат; назовите их в описании MR',
     en: 'run {{run}}: red not caused by the branch (red before the group started or failed on the environment, untouched by the diff): {{cases}} — they do not hold the group; name them in the MR description',
+  },
+  'sieve-gap-note-rejected': {
+    ru: 'сито {{sieve}} не пройдено: {{evidence}} — пометка не принята: {{why}}',
+    en: 'sieve {{sieve}} failed: {{evidence}} — the mark is not accepted: {{why}}',
+  },
+  'delivery-gap-owner-note-rejected': {
+    ru: 'пункт задания владельца {{point}} не выполнен: {{evidence}} — пометка не принята: {{why}}',
+    en: 'owner’s point {{point}} is not done: {{evidence}} — the mark is not accepted: {{why}}',
+  },
+  'note-rejected-run-green': {
+    ru: 'в прогоне {{run}} нет красного, он не показывает красное не из-за ветки; если строка теперь проходит, сдайте строку pass с этим прогоном в доказательстве, иначе сошлитесь на прогон, где кейс красный',
+    en: 'run {{run}} has no red, so it cannot show a red not caused by the branch; if the row passes now, report it pass with that run as evidence, otherwise cite the run where the case is red',
+  },
+  'note-rejected-run-missing': {
+    ru: 'прогона {{run}} нет в истории блока «Тесты» копии — сошлитесь на записанный прогон, где кейс красный',
+    en: 'run {{run}} is not in the Tests history of the copy — cite a recorded run where the case is red',
+  },
+  'note-rejected-run-ours': {
+    ru: 'в прогоне {{run}} красные кейсы {{cases}} покрывают код, который ветка меняла, — это красное могла дать ветка: почините его или оставьте fail',
+    en: 'in run {{run}} the red cases {{cases}} cover code the branch changed, so the branch may have caused them — fix them or keep the fail',
+  },
+  'note-rejected-cite-required': {
+    ru: 'у сита безопасности и данных слов мало — сошлитесь на красное на основной: run:<id> или `<команда>` → `<строка вывода>`',
+    en: 'a security or data sieve needs more than words — cite the red on the target branch: run:<id> or `<command>` → `<output line>`',
+  },
+  'note-rejected-not-baseline': {
+    ru: 'прогоны {{runs}} не показывают красного, бывшего до старта группы, — у сита безопасности и данных сошлитесь на прогон с красным на основной',
+    en: 'runs {{runs}} show no red that was there before the group started — for a security or data sieve, cite a run with the red on the target branch',
+  },
+  'note-rejected-not-live': {
+    ru: '«not checked» снимает только живую проверку (стенд, браузер, сеть), а это сито запускается здесь — прогоните его; красное не из-за ветки сдайте «not caused by the branch: <почему>»',
+    en: '«not checked» clears only a live check (stand, browser, network), and this sieve runs here — run it; a red not caused by the branch is reported «not caused by the branch: <why>»',
+  },
+  'note-rejected-no-reason': {
+    ru: 'после пометки нет причины — допишите, почему',
+    en: 'the mark has no reason after it — add why',
   },
   'assistant-route-refused': {
     ru: 'Помощник не запущен: {{reason}}',

@@ -89,6 +89,9 @@ export const AgentdeckKit = async ({ directory }) => ({
       throw new Error(String(h.permissionDecisionReason || 'agentdeck kit: refused'));
   },
   'tool.execute.after': async (input, output) => {
+    // An MCP tool's `output` is the server's own result `{content:[…]}` (no `output` string): OpenCode
+    // builds the model's text from `content` AFTER this hook (1.18.35), so that is what is sent and cut.
+    const mcp = output && typeof output.output !== 'string' && Array.isArray(output.content);
     const res = await dispatch('post-any', {
       hook_event_name: 'PostToolUse',
       session_id: input?.sessionID,
@@ -96,8 +99,13 @@ export const AgentdeckKit = async ({ directory }) => ({
       tool_name: input?.tool,
       tool_input: input?.args ?? {},
       tool_use_id: input?.callID,
-      tool_response: output?.output,
+      tool_response: mcp
+        ? { content: output.content, isError: output.isError === true }
+        : output?.output,
     });
+    // `updatedMCPToolOutput` (mr-echo-trim): the same shape back, its MR echo cut (P-15).
+    const updated = res?.hookSpecificOutput?.updatedMCPToolOutput;
+    if (mcp && Array.isArray(updated?.content)) output.content = updated.content;
     const text = res?.hookSpecificOutput?.additionalContext;
     if (text && output && typeof output.output === 'string') output.output += `\n\n${text}`;
   },

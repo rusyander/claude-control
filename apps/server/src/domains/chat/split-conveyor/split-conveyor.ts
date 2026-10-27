@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   applySplitPlan,
   scanSplitPlanBlocks,
@@ -21,6 +23,8 @@ import {
   type SplitGroupCleaned,
   type SplitGroupKeepWarm,
   type SplitGroupRechecked,
+  type SplitGroupResumed,
+  type SplitGroupWait,
   type SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
 import {
@@ -50,9 +54,16 @@ import type { MrReviewThread } from '../../integrations/mr-review/mr-review.ts';
 import { noteRelayed, REVIEW_REPLY_LINES } from '../mr-watch/review-threads.ts';
 import { normalizePath } from '../../project-runner/targets.ts';
 import { localizeText, matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
-import { ownerCoverageGaps } from '../owner-coverage/owner-coverage.ts';
+import { deferralGaps } from '../handoff-coverage/handoff-coverage.ts';
+import { NOTE_MARKS_HINT } from '../delivery-self-check.ts';
+import { ownerCoverageGaps, taskCoverageGaps } from '../owner-coverage/owner-coverage.ts';
 import { hasOwnerRequest } from '@agentdeck/contracts/quality-floor';
-import { groupSignalsOf, type GroupSignal } from '@agentdeck/contracts/group-watch';
+import {
+  groupSignalsOf,
+  type GroupSignal,
+  type GroupWatchCoverage,
+} from '@agentdeck/contracts/group-watch';
+import { groupScopeOf, type GroupScope } from '@agentdeck/contracts/model-cascade';
 import {
   deliveryIncompleteText,
   deliveryMissingCodesOf,
@@ -62,6 +73,7 @@ import { groupIdentityLine } from '../panel-preamble.ts';
 import { trackerKeys } from '../tracker-keys.ts';
 import { SplitTicketMarks, type TicketFiling } from '../split-ticket-batch/ticket-marks.ts';
 import { groupTaskKeys } from '../split-tasks/split-tasks.ts';
+import { acceptedMrOf } from '../../project-git/delivery-facts/accepted-mr.ts';
 import {
   continuable,
   continuePrompt,
@@ -103,6 +115,8 @@ export interface SplitConveyorStore {
    * конвейер их не пишет, и его запись после `await` их не сотрёт.
    */
   watchSignals?(parentChatId: string, groupIndex: number): unknown;
+  /** Охват сторожа живой группы (чип карточки) — у сторожа, только для вида. */
+  watchCoverage?(parentChatId: string, groupIndex: number): GroupWatchCoverage | undefined;
   /**
    * Счёт пингов тёплого кэша группы — свой файл учёта пингов, только для вида:
    * проводка пинга не пишет запись плана и не гоняется с конвейером за неё.
@@ -280,6 +294,15 @@ export interface DeliveryVerdict {
    * проверено», красное не из-за ветки. Группу не держат — карточке и MR.
    */
   notes?: string[];
+  /**
+   * Заметки, которые живое описание MR уже называет по каждому их id (g1 26.10, F4: 53 %
+   * напоминания было заметками, что описание уже держало). Напоминание их не повторяет.
+   */
+  notesNamed?: string[];
+  /** Id строк и кейсов этих заметок: пункт владельца среди них — не «не выполнен». */
+  noted?: string[];
+  /** Метки строк, которые судья сит не принял: id → причина, её называет пробел пункта. */
+  rejected?: Record<string, string>;
   /** HEAD копии на этой проверке: по нему видно, двигалась ли группа между напоминаниями. */
   head?: string;
 }
@@ -297,6 +320,11 @@ export interface SplitDeliveryDeps {
    * родителя (Д7): занятая группа получит его после своего хода.
    */
   nudge: (group: SplitPlanGroupRecord, prompt: string) => 'sent' | 'queued' | 'refused';
+  /**
+   * Ветка-источник MR у форджа; фордж не подключён или не ответил — `undefined`.
+   * Нужна принятой вручную группе без записанного MR (`linkAcceptedMr`).
+   */
+  branchOfMr?: (url: string) => Promise<string | undefined>;
   schedule?: (run: () => void, ms: number) => unknown;
   /** Стадия разговора группы сейчас (`stageOf` её связи); не знать — `undefined`. */
   stage?: (group: SplitPlanGroupRecord) => string | undefined;
@@ -426,6 +454,22 @@ function probeable(group: SplitPlanGroupRecord): boolean {
   return code !== undefined && VERIFY_FAIL_CODES.has(code);
 }
 
+/**
+ * Стоит (пауза, ждёт сброса лимита) со списком недоделанного: продолжение
+ * понесёт его — он должен быть свежим. Обрыв продолжается сразу и говорит
+ * «проверка до остановки», «Продолжить» сданной — список её последней сверки.
+ */
+function stoppedWithGaps(group: SplitPlanGroupRecord): boolean {
+  const stopped =
+    group.status === 'paused' || (group.status === 'awaiting' && group.waitingFor === 'limit');
+  return stopped && (group.deliveryMissing?.length ?? 0) > 0;
+}
+
+/** Та же остановка: сверка, начатая до продолжения, не пишет в следующую. */
+function stopKey(group: SplitPlanGroupRecord): string {
+  return [group.status, group.waitingFor, group.pausedAt ?? group.limitUntil].join('|');
+}
+
 /** Состояние круга доставки группы — снимается, когда доставка найдена. */
 const DELIVERY_STATE_FIELDS = [
   'deliveryMissing',
@@ -502,6 +546,12 @@ function watchSignalsView(watch: unknown): { watchSignals?: GroupSignal[] } {
   return signals.length > 0 ? { watchSignals: signals } : {};
 }
 
+function watchCoverageView(coverage: GroupWatchCoverage | undefined): {
+  watchCoverage?: GroupWatchCoverage;
+} {
+  return coverage ? { watchCoverage: coverage } : {};
+}
+
 /** Разбор разделения заведён и ещё не кончился — группы ждут его блока. */
 function triagePending(record: SplitPlanRecord): boolean {
   return Boolean(record.triageChatId && !record.triage);
@@ -540,8 +590,25 @@ const REPORT_ONLY_GAPS: ReadonlySet<string> = new Set([
   'sieve-gap-no-run',
   'sieve-gap-run-missing',
   'sieve-gap-run-stale',
+  'sieve-gap-no-run-cite',
+  'sieve-gap-run-not-live',
+  'sieve-gap-flip',
+  // Счёт без ссылки на прогон (F-12): правится строкой, коммит не нужен.
+  'sieve-gap-count-no-cite',
+  'sieve-gap-count-no-run',
   'delivery-gap-owner-unreported',
   'delivery-gap-owner-no-evidence',
+  'delivery-gap-owner-flip',
+  // Строки следа задач правятся тем же блоком сит, что пункты владельца: на чистом
+  // доставленном дереве «commit, push, open an MR» (g1 26.10, #g1:150) звало в доставку
+  // целиком ради трёх строк отчёта. `task-failed` — пункт не сделан, это код.
+  'delivery-gap-task-unreported',
+  'delivery-gap-task-no-evidence',
+  'delivery-gap-task-flip',
+  'delivery-gap-task-unsourced',
+  'delivery-gap-task-quote-unfound',
+  'delivery-gap-task-quote-label',
+  'delivery-gap-task-rewritten',
   'tests-gap-no-run',
   'tests-gap-word-only',
   'tests-gap-stale',
@@ -589,6 +656,35 @@ const TESTS_SELF_CHECK_LINE =
   'in place of `run …` (`gaps --project .`) prints exactly the Tests-block lines this check will ' +
   'print, from the same code, for the branch as it is now. Close every line it prints in this ' +
   'turn; it exits 0 when nothing is left.';
+/**
+ * Пробелы, которые группа сверяет сама до ответа командой `tests-cli delivery` (N1, 25.10):
+ * описание MR, строки сит и пункты владельца. Раньше она узнавала их следующим кругом —
+ * круг стоил 427k токенов, и строка «описание MR не называет …» приходила трижды.
+ */
+const SELF_CHECKED_GAPS = (code: string): boolean =>
+  code.startsWith('delivery-gap-mr-') ||
+  code.startsWith('delivery-gap-owner-') ||
+  // След задач и отданные пункты (26.10) сверяет тот же `deliveryGapLines` с записью плана.
+  code.startsWith('delivery-gap-task-') ||
+  code.startsWith('delivery-gap-defer-') ||
+  (code.startsWith('sieve-gap-') && !INTEGRATION_GAPS.has(code));
+/** Корень репозитория панели: отсюда `tools/tests-cli.mjs` (этот файл — шесть уровней ниже). */
+const PANEL_REPO = fileURLToPath(new URL('../../../../../../', import.meta.url)).replace(
+  /[\\/]+$/,
+  '',
+);
+const DELIVERY_SELF_CHECK_LINE =
+  'Delivery: before you answer, re-check the MR description, the sieve rows, the owner ' +
+  'items and the task points yourself — post the MR description to the MR once, save your sieves block to a ' +
+  `file, then run \`node "${join(PANEL_REPO, 'tools', 'tests-cli.mjs')}" delivery --project . ` +
+  '--answer <file with your sieves block>`: it reads the live MR description and reviewer ' +
+  'threads through the panel, so no description file is needed (--mr-description <file> ' +
+  'only checks a draft before posting; a description already posted that must change goes ' +
+  'through it first — post the new text after the check passes). It prints the same lines this check prints, from ' +
+  'the same code; close every line in this turn — it exits 0 when nothing is left. Its exit 0 ' +
+  'is the proof for the MR description and the threads: do not read them again through the ' +
+  'forge. A fact you re-read that a row cites (pipeline, threads, sha) is written into that ' +
+  'row first; run the check once, after the last row edit.';
 /** Пробелы «ветка не на удалённом / MR нет» — их снимает push и открытие MR. */
 const PUSH_GAPS: ReadonlySet<string> = new Set(['delivery-gap-not-pushed', 'delivery-gap-no-mr']);
 /**
@@ -655,21 +751,6 @@ function hasSieveRowGap(missing: readonly string[]): boolean {
 const SIEVE_REPORT_HINT = `${SIEVE_REPORT_LINE} — one row for every sieve line above.`;
 
 /**
- * Как сдать то, что группу держать не должно (решение владельца 23.10): та же
- * пара меток, что в задании сит (`NOTE_MARKS_LINE`), — промпт и панель
- * согласны, и группа не крутится на «стенда нет».
- */
-const NOTE_MARKS_HINT =
-  'A live check you cannot run here (no stand with this branch, no browser, no network) is not ' +
-  'a blocker: report its row as fail with evidence starting "not checked: <reason>". A red ' +
-  'check or case not caused by the branch (red on the target branch too, platform-only, a ' +
-  'timeout in code the diff does not touch) — evidence starting "not caused by the branch: ' +
-  '<why>". A Tests-block case that cannot run here (no stand, no browser) is recorded as ' +
-  'blocked, not left unrun: an automated one through its run command (the run records it ' +
-  'blocked), a manual one with `tests-cli record <group>:<case>=blocked --note "<why>"`. The ' +
-  'panel records all of these as notes; name each in the MR description.';
-
-/**
  * Правила круга доставки, которые не меняются от круга к кругу: id → полный текст и
  * короткое имя. Полным текстом — один раз на разговор (группа 1, 25.10: десять
  * напоминаний в одном разговоре несли по ~2,2k знаков тех же правил); дальше
@@ -679,6 +760,11 @@ const DELIVERY_POLICY = {
   'tests-self-check': {
     text: () => TESTS_SELF_CHECK_LINE,
     short: 'close every Tests-block line `tests-cli gaps --project .` prints',
+  },
+  'delivery-self-check': {
+    text: () => DELIVERY_SELF_CHECK_LINE,
+    short:
+      'post the MR description once, then close every line `tests-cli delivery --project . --answer <file>` prints',
   },
   'sieve-report': {
     text: () => SIEVE_REPORT_HINT,
@@ -717,7 +803,14 @@ type DeliveryPolicyId = keyof typeof DELIVERY_POLICY;
 /** Правила, которые несёт напоминание с этими пробелами, — по порядку текста. */
 export function deliveryPolicyIds(missing: readonly string[]): DeliveryPolicyId[] {
   const ids: DeliveryPolicyId[] = [];
-  if (hasGap(missing, TESTS_GAPS)) ids.push('tests-self-check');
+  const selfChecked = missing.some((line) => {
+    const code = matchText(line)?.messageCode;
+    return code !== undefined && SELF_CHECKED_GAPS(code);
+  });
+  // `tests-cli delivery` печатает и строки блока «Тесты»: при нём строка про `gaps` — второй
+  // способ той же сверки (g1 26.10: оба правила в одном напоминании, +~430 знаков).
+  if (hasGap(missing, TESTS_GAPS) && !selfChecked) ids.push('tests-self-check');
+  if (selfChecked) ids.push('delivery-self-check');
   if (hasSieveRowGap(missing)) ids.push('sieve-report');
   if (reportOnlyGaps(missing)) return [...ids, 'note-marks'];
   if (hasGap(missing, INTEGRATION_GAPS)) ids.push('integration');
@@ -731,6 +824,49 @@ export function deliveryPolicyIds(missing: readonly string[]): DeliveryPolicyId[
  * строкой: шесть сит на один путь были шестью строками по ~530 знаков (группа 1, 25.10).
  */
 function foldStaleSieveLines(lines: readonly string[]): string[] {
+  return foldSameRowLines(lines, foldStaleByFiles(lines));
+}
+
+/** Параметр, которым строка пробела про одну строку отчёта отличается от соседних. */
+const ROW_ID_PARAMS = ['point', 'sieve'] as const;
+
+/**
+ * Пробелы одного кода, что разнятся только номером пункта или сита, — одной строкой:
+ * наставление полным текстом один раз, остальные номера списком. Семь пунктов «pass без
+ * источника» были семью строками по ~640 знаков (аудит g0, F5, 27.10).
+ */
+function foldSameRowLines(
+  raw: readonly string[],
+  shown: readonly (string | undefined)[],
+): string[] {
+  const keyOf = (line: string): { key: string; id: string } | undefined => {
+    const matched = matchText(line);
+    if (!matched || matched.messageCode === 'sieve-gap-stale') return undefined;
+    const params = matched.params ?? {};
+    const name = ROW_ID_PARAMS.find((param) => typeof params[param] === 'string');
+    if (!name) return undefined;
+    const rest = Object.entries(params).filter(([param]) => param !== name);
+    return { key: JSON.stringify([matched.messageCode, name, rest]), id: params[name] as string };
+  };
+  const keys = raw.map(keyOf);
+  const ids = new Map<string, string[]>();
+  for (const found of keys) {
+    if (found) ids.set(found.key, [...(ids.get(found.key) ?? []), found.id]);
+  }
+  const done = new Set<string>();
+  return shown.flatMap((line, index) => {
+    if (line === undefined) return [];
+    const found = keys[index];
+    const group = found ? ids.get(found.key) : undefined;
+    if (!found || !group || group.length < 2) return [line];
+    if (done.has(found.key)) return [];
+    done.add(found.key);
+    return [`${line} — the same holds for ${group.slice(1).join(', ')}`];
+  });
+}
+
+/** Строки как их видит модель, по одной на строку `lines` (свёрнутое сито — `undefined`). */
+function foldStaleByFiles(lines: readonly string[]): (string | undefined)[] {
   const byFiles = new Map<string, string[]>();
   for (const line of lines) {
     const matched = matchText(line);
@@ -741,20 +877,20 @@ function foldStaleSieveLines(lines: readonly string[]): string[] {
     byFiles.set(files, [...(byFiles.get(files) ?? []), sieve]);
   }
   const done = new Set<string>();
-  return lines.flatMap((line) => {
+  return lines.map((line) => {
     const matched = matchText(line);
     const files = matched?.params?.files;
     const sieves = typeof files === 'string' ? byFiles.get(files) : undefined;
     if (matched?.messageCode !== 'sieve-gap-stale' || !sieves || sieves.length < 2) {
-      return [`- ${localizeText(line, 'en')}`];
+      return `- ${localizeText(line, 'en')}`;
     }
-    if (done.has(files as string)) return [];
+    if (done.has(files as string)) return undefined;
     done.add(files as string);
-    return [
+    return (
       `- sieves ${sieves.join(', ')}: the branch changed the code these sieves cover after ` +
-        `their rows were reported (${files as string}) — check again on the final commit and ` +
-        'report each row again',
-    ];
+      `their rows were reported (${files as string}) — check again on the final commit and ` +
+      'report each row again'
+    );
   });
 }
 
@@ -768,6 +904,7 @@ export function deliveryNudgePrompt(
   missing: readonly string[],
   notes: readonly string[] = [],
   given: ReadonlySet<string> = new Set(),
+  named: readonly string[] = [],
 ): string {
   const lines = [
     "The panel checked the group's delivery against git — it is not finished. Missing:",
@@ -775,13 +912,23 @@ export function deliveryNudgePrompt(
     ...foldStaleSieveLines(missing),
     '',
   ];
-  if (notes.length > 0) {
+  // Заметки, которые живое описание MR уже называет, — одной строкой со счётом (F4, g1 26.10):
+  // их повтор был половиной напоминания, и группа перечитывала MR, чтобы это подтвердить.
+  const unnamed = notes.filter((line) => !named.includes(line));
+  if (unnamed.length > 0) {
     lines.push(
       'Notes — they do not hold the group, but the MR description must name each:',
-      ...notes.map((line) => `- ${localizeText(line, 'en')}`),
-      '',
+      ...unnamed.map((line) => `- ${localizeText(line, 'en')}`),
     );
   }
+  const already = notes.length - unnamed.length;
+  if (already > 0) {
+    lines.push(
+      `${already} more note${already === 1 ? ' is' : 's are'} already named in the live MR ` +
+        'description (checked by the panel) — keep them there, nothing to do.',
+    );
+  }
+  if (notes.length > 0) lines.push('');
   const ids = deliveryPolicyIds(missing);
   const repeated = ids.filter((id) => given.has(id));
   const policy = (id: DeliveryPolicyId): string[] =>
@@ -795,14 +942,19 @@ export function deliveryNudgePrompt(
       : [];
   const spaced = (id: DeliveryPolicyId): string[] =>
     policy(id).length > 0 ? [...policy(id), ''] : [];
-  lines.push(...spaced('tests-self-check'), ...spaced('sieve-report'));
+  lines.push(
+    ...spaced('tests-self-check'),
+    ...spaced('delivery-self-check'),
+    ...spaced('sieve-report'),
+  );
   if (reportOnlyGaps(missing)) {
     return [
       ...lines,
       `Git is in order: the branch ${branch} and its MR are delivered. Only the report is ` +
         'missing — run what a line above names (the exact command it gives) and answer with ' +
-        'the missing rows. Do not commit, push, rebase or touch the MR for this: nothing in ' +
-        'the code changes.',
+        'only the rows named above: the panel keeps every row already reported by its id, so ' +
+        'unchanged rows are not sent again. Do not commit, push, rebase or touch the MR for ' +
+        'this: nothing in the code changes.',
       ...policy('note-marks'),
       ...stillHolds,
     ].join('\n');
@@ -938,9 +1090,27 @@ type PendingDelivery = Pick<SplitPlanGroupRecord, 'deliveryMissing' | 'deliveryN
  * видела. С пробелами продолжение — то же напоминание.
  */
 function pendingDeliveryLines(branch: string, pending: PendingDelivery | undefined): string[] {
-  if (!pending?.deliveryMissing?.length) return [];
-  return [deliveryNudgePrompt(branch, pending.deliveryMissing, pending.deliveryNotes ?? [])];
+  const gaps = (pending?.deliveryMissing ?? []).filter((line) => {
+    const code = matchText(line)?.messageCode;
+    return code === undefined || !PANEL_STATUS_GAPS.has(code);
+  });
+  if (gaps.length === 0) return [];
+  return [deliveryNudgePrompt(branch, gaps, pending?.deliveryNotes ?? [])];
 }
+
+/**
+ * Пункты о самой панели — почему она перестала напоминать, когда повторит. Это
+ * человеку на карточку; группе они не пробел, а «нужен человек» / «продолжите
+ * словом» в её же продолжении сбивали бы её с работы.
+ */
+const PANEL_STATUS_GAPS: ReadonlySet<string> = new Set([
+  'split-delivery-stalled',
+  'split-delivery-nudge-cap',
+  'split-delivery-escalation-stalled',
+  'split-delivery-retry',
+  'split-delivery-retry-cap',
+  'split-delivery-busy',
+]);
 
 const CLOSE_PENDING_LINE = 'Then close what the last delivery check before this stop found:';
 
@@ -1043,11 +1213,22 @@ export function pauseResumePrompt(
   branch: string,
   killed: readonly string[] = [],
   pending?: PendingDelivery,
+  note?: string,
 ): string {
   const gaps = pendingDeliveryLines(branch, pending);
+  // N2 (g5 25.10): паузу ставил наблюдатель, а продолжение звало его «человеком»
+  // и не называло ни причины, ни первого шага — «продолжи» значило перезапустить
+  // убитую 20-минутную проверку. Причина и первый шаг — словами того, кто снял паузу.
+  const [because, first] = (note ?? '')
+    .split(/\bDo first:/i)
+    .map((part) => part.replace(/\s+/g, ' ').trim());
   return [
-    'The human paused the group and is now resuming it. The turn that was running before the ' +
+    'The group was paused and is now resumed. The turn that was running before the ' +
       'pause was stopped: whatever was not written to files may be lost.',
+    ...(because ? [`Paused because: ${because}`] : []),
+    ...(first ? [`Do first: ${first}`] : []),
+    'A check the pause interrupted is re-decided, not re-run by default: run it again only ' +
+      'if the work still needs its result.',
     ...(killed.length > 0
       ? [
           'The pause also killed these background commands; restart the ones the work still ' +
@@ -1090,6 +1271,17 @@ const ALL_GROUP_STATUSES: readonly SplitPlanGroupRecord['status'][] = [
 function seated(group: SplitPlanGroupRecord): boolean {
   return Boolean(group.startedAt || group.chatId || group.path);
 }
+
+/**
+ * Ожидания, которые снимает только человек. Пауза их не отменяет: продолжение
+ * без ответа пустило бы группу дальше мимо вопроса или красного MR.
+ */
+const HUMAN_WAITS: ReadonlySet<SplitGroupWait> = new Set<SplitGroupWait>([
+  'question',
+  'decision',
+  'human-op',
+  'mr-red',
+]);
 
 /** Предел таймера Node (~24.8 суток): дальше `setTimeout` срабатывает сразу. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
@@ -1172,6 +1364,8 @@ function absorb(record: SplitPlanRecord, result: TaskSplitResult, at: string): v
     // Решение «До MR» пишется и «нет»: без него шапка чата группы брала бы
     // настройку проекта, а та с планом расходится (живой прогон 25.09, O2).
     group.deliver = chat.deliver === true;
+    // Задание несло след задач (`buildGroupPrompt`) — доставка его судит.
+    if (chat.taskTrace) group.taskTrace = true;
     if (chat.reviewStand) group.stand = chat.reviewStand;
     if (group.status === 'done' || group.status === 'failed') continue;
     group.status = chat.started ? 'started' : 'failed';
@@ -1579,6 +1773,23 @@ export class SplitConveyor {
   }
 
   /**
+   * Конец хода продолжит ТУ ЖЕ сессию с попрошенным сервером (`resumeWithMcp`) —
+   * то же условие, что в `onChainEnded`. Планировщик звеньев спрашивает это до
+   * заведения следующего звена (N8): правки и проверка идут без MCP, и просьба
+   * правок иначе уходила бы в проверку, а сервер не доезжал бы никому. Разбор,
+   * план и ревью по ссылке своим путём конца хода не идут — для них «нет».
+   */
+  resumesWithMcp(link: ChatLink, outcome: ChainOutcome): boolean {
+    if (!this.deps.resume || outcome.status !== 'done' || outcome.mr || link.review) return false;
+    if (link.stage === 'triage' || link.stage === 'plan') return false;
+    const record = this.deps.store.get(link.parentChatId);
+    const group = record && this.groupOf(record, link, ['started', 'awaiting', 'background']);
+    if (!group?.chatId || !group.path) return false;
+    const known = new Set(group.mcpExtra ?? []);
+    return (outcome.mcpRequests ?? []).some((name) => !known.has(name));
+  }
+
+  /**
    * Новые серверы из просьбы группы — в `mcpExtra`; возвращает новые. Уже
    * подключённый сервер новым не считается: иначе агент, попросивший имя,
    * которого нет в настройках, ходил бы по кругу продолжений.
@@ -1711,7 +1922,10 @@ export class SplitConveyor {
   ): void {
     this.apply(group, outcome);
     this.deps.store.set(record);
-    if (group.limitUntil) this.noteLimit(record, group.limitUntil);
+    if (group.limitUntil) {
+      this.noteLimit(record, group.limitUntil);
+      this.refreshAfterStop(record, group);
+    }
     // Лимит на исходе (аудит 25.09, L63): только заметка родителю — очередь
     // не держит (решение владельца 29.09, см. `limitHorizons`).
     else if (outcome.limitWarningUntil) this.noteLimit(record, outcome.limitWarningUntil, true);
@@ -1862,6 +2076,91 @@ export class SplitConveyor {
   private deliveryPending(parentChatId: string, index: number): SplitPlanGroupRecord | undefined {
     const group = this.deps.store.get(parentChatId)?.groups[index];
     return group?.status === 'awaiting' && group.waitingFor === 'delivery' ? group : undefined;
+  }
+
+  /**
+   * N3 (g5 25.10, MR !1101): наблюдатель передал группе красный конвейер, а ход
+   * кончился без правки — голова та же, что при передаче. Тот же конвейер второй
+   * раз не судится, и «готово» оставило бы красный MR висеть молча: заметка
+   * человеку с ответом группы и ожидание человека. Отметка передачи съедается
+   * любым «готово», двинулась группа или нет. Голова при передаче неизвестна —
+   * судит «были ли коммиты после передачи».
+   */
+  private redLeftUnfixed(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    outcome: ChainOutcome,
+    verdict: DeliveryVerdict,
+  ): boolean {
+    const relay = group.mrWatch?.redRelay;
+    if (group.mrWatch) delete group.mrWatch.redRelay;
+    if (verdict.mr && verdict.head) {
+      group.mrWatch ??= { cycle: '', checks: 0 };
+      group.mrWatch.head = verdict.head;
+    }
+    if (!relay) return false;
+    const unfixed = relay.head
+      ? relay.head === verdict.head
+      : group.path && this.deps.hasWork
+        ? !this.deps.hasWork(group.path, relay.at)
+        : false;
+    if (!unfixed) return false;
+    const mr = verdict.mr ?? group.mr ?? '';
+    const params = {
+      group: group.title,
+      mr,
+      pipeline: relay.pipeline,
+      answer: (outcome.tail ?? '').replace(/\s+/g, ' ').trim().slice(0, 400),
+    };
+    this.deps.notify?.(record.parentChatId, {
+      kind: 'notice',
+      code: 'mrWatchRed',
+      text: serverText('split-mr-watch-red-unfixed-notice', params),
+      textCode: 'split-mr-watch-red-unfixed-notice',
+      textParams: params,
+    });
+    // Начало ожидания — наблюдателю MR (g1 26.10, F2): по нему он смотрит конвейер дальше.
+    group.mrWatch ??= { cycle: '', checks: 0 };
+    group.mrWatch.redSince = this.now().toISOString();
+    this.settle(record, group, {
+      ...withoutMr(outcome),
+      status: 'awaiting',
+      waitingFor: 'mr-red',
+      ...(mr ? { mr } : {}),
+    });
+    return true;
+  }
+
+  /**
+   * Конвейер MR группы, ждущей человека из-за красного (`mr-red`), позеленел (g1 26.10, F2:
+   * повторённое задание прошло в 20:07, а группа до 21:15 числилась «ждёт красный MR»).
+   * Ход группы не нужен: панель сама сверяет доставку — чисто → «готово», пробелы →
+   * напоминание, как после хода. Взгляд на конвейер записан: круг «готово» его не судит.
+   * `false` — группа уже не ждёт красного.
+   */
+  pipelineGreen(parentChatId: string, index: number, pipelineId: string): boolean {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    if (!record || !group || group.status !== 'awaiting' || group.waitingFor !== 'mr-red') {
+      return false;
+    }
+    group.mrWatch ??= { cycle: '', checks: 0 };
+    group.mrWatch.pipeline = { id: pipelineId, status: 'success' };
+    delete group.mrWatch.redSince;
+    delete group.mrWatch.redRelay;
+    const mr = group.mr ?? '';
+    const params = { group: group.title, mr, pipeline: pipelineId };
+    this.deps.notify?.(record.parentChatId, {
+      kind: 'notice',
+      code: 'mrWatchGreen',
+      text: serverText('split-mr-watch-green-notice', params),
+      textCode: 'split-mr-watch-green-notice',
+      textParams: params,
+    });
+    this.apply(group, { status: 'awaiting', waitingFor: 'delivery' });
+    this.deps.store.set(record);
+    this.verifyDelivery(parentChatId, index, { status: 'done', ...(mr ? { mr } : {}) });
+    return true;
   }
 
   private onDeliveryFacts(
@@ -2023,14 +2322,7 @@ export class SplitConveyor {
     // Готовность по следам звеньев — вместе с фактами git (аудит 25.09, L110).
     // След требований (U2): пункт слов владельца без отчёта или с «fail» держит
     // группу так же, как незапушенная ветка, — досдаёт его напоминание.
-    verdict = {
-      ...verdict,
-      missing: [
-        ...verdict.missing,
-        ...stageTraceGaps(group.stageTrace),
-        ...ownerCoverageGaps(group.sieveRows, hasOwnerRequest(record.proposal.shared)),
-      ],
-    };
+    verdict = { ...verdict, missing: deliveryGapLines(verdict, group, record) };
     // Сработавшее сито — блокер, пойманный до MR: в счёт панели раз на группу
     // и класс, сколько бы напоминаний ни понадобилось.
     const fresh = (verdict.sieveClasses ?? []).filter(
@@ -2071,6 +2363,7 @@ export class SplitConveyor {
           textParams: params,
         });
       }
+      if (this.redLeftUnfixed(record, group, outcome, verdict)) return;
       this.settle(record, group, {
         ...withoutMr(outcome),
         status: 'done',
@@ -2367,11 +2660,7 @@ export class SplitConveyor {
         const fresh = this.deps.store.get(parentChatId);
         const same = fresh?.groups[index];
         if (!fresh || !same || !probeable(same) || verdict.failed || verdict.unreachable) return;
-        const gaps = [
-          ...verdict.missing,
-          ...stageTraceGaps(same.stageTrace),
-          ...ownerCoverageGaps(same.sieveRows, hasOwnerRequest(fresh.proposal.shared)),
-        ];
+        const gaps = deliveryGapLines(verdict, same, fresh);
         if (gaps.length > 0) return;
         this.deps.log(`split conveyor: group «${same.title}» found delivered on a probe`);
         for (const field of DELIVERY_STATE_FIELDS) delete same[field];
@@ -2398,7 +2687,13 @@ export class SplitConveyor {
     const prompt = this.withIdentity(
       record,
       group,
-      deliveryNudgePrompt(group.branch, verdict.missing, verdict.notes),
+      deliveryNudgePrompt(
+        group.branch,
+        verdict.missing,
+        verdict.notes,
+        undefined,
+        verdict.notesNamed,
+      ),
     );
     // Тот же разговор уже получил правила круга полным текстом — напоминание их
     // только называет. Новый разговор доставки (`fresh`) — всегда полным текстом.
@@ -2410,7 +2705,13 @@ export class SplitConveyor {
       ? this.withIdentity(
           record,
           group,
-          deliveryNudgePrompt(group.branch, verdict.missing, verdict.notes, given),
+          deliveryNudgePrompt(
+            group.branch,
+            verdict.missing,
+            verdict.notes,
+            given,
+            verdict.notesNamed,
+          ),
         )
       : prompt;
     const fresh = (): FreshDelivery | undefined =>
@@ -2441,7 +2742,10 @@ export class SplitConveyor {
       deliveryEscalationPrompt({
         branch: group.branch,
         missing: verdict.missing,
-        ...(verdict.notes?.length ? { notes: verdict.notes } : {}),
+        // Заметки, что живое описание MR уже называет, разбору не нужны (F4).
+        ...(verdict.notes?.some((line) => !verdict.notesNamed?.includes(line))
+          ? { notes: verdict.notes.filter((line) => !verdict.notesNamed?.includes(line)) }
+          : {}),
         history: group.deliveryHistory ?? [],
         reason: stalled ? 'stalled' : 'cap',
         nudges,
@@ -2498,6 +2802,11 @@ export class SplitConveyor {
           this.probeDelivery(record.parentChatId, group.index);
           continue;
         }
+        // Сверка после остановки умерла с прежним процессом — её список заново.
+        if (stoppedWithGaps(group)) {
+          this.refreshStoppedGaps(record.parentChatId, group.index);
+          continue;
+        }
         if (group.status === 'awaiting' && group.waitingFor === 'delivery') {
           this.verifyDelivery(record.parentChatId, group.index, {
             status: 'done',
@@ -2521,6 +2830,17 @@ export class SplitConveyor {
         ? record.groups.find((item) => item.index === link.groupIndex)
         : undefined) ?? record.groups.find((item) => link.branch && item.branch === link.branch);
     return group ? this.identity(record, group) || undefined : undefined;
+  }
+
+  /**
+   * Границы группы связи по плану разделения (аудит g8 26.10, N2): что `owns`
+   * разбора отдал ей и что — другим группам. Правки по ним решают, где baseline
+   * допустим, — не по диффу ветки. Нет плана, группы или границ — ничего.
+   */
+  scopeOf(link: ChatLink): GroupScope | undefined {
+    const group = this.groupOfLink(link);
+    const record = link.parentChatId ? this.deps.store.get(link.parentChatId) : undefined;
+    return group && record ? groupScopeOf(record.proposal.groups, group.index) : undefined;
   }
 
   /**
@@ -3008,6 +3328,7 @@ export class SplitConveyor {
         'recheckRunning',
         'continueQueuedAt',
         'recheckedAt',
+        'taskTrace',
         'mrClosed',
         'droppedAt',
         'tickets',
@@ -3139,12 +3460,16 @@ export class SplitConveyor {
         ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
         ...this.groupTokenView(record, group),
         ...watchSignalsView(this.deps.store.watchSignals?.(record.parentChatId, group.index)),
+        ...watchCoverageView(this.deps.store.watchCoverage?.(record.parentChatId, group.index)),
         ...(group.reviewClose ? { reviewClose: group.reviewClose } : {}),
         ...(group.deliver !== undefined ? { deliver: group.deliver } : {}),
         ...(group.interruptedAt ? { interruptedAt: group.interruptedAt } : {}),
         ...(group.interruptResumes ? { interruptResumes: group.interruptResumes } : {}),
         ...(group.cleaned ? { cleaned: group.cleaned } : {}),
         ...(group.pausedAt ? { pausedAt: group.pausedAt } : {}),
+        // Кто поставил паузу — только у стоящей: после «Продолжить» поле остаётся в записи.
+        ...(group.status === 'paused' && group.pausedBy ? { pausedBy: group.pausedBy } : {}),
+        ...(group.status === 'paused' && group.pausedRule ? { pausedRule: group.pausedRule } : {}),
         ...(seated(group) ? { seated: true } : {}),
         ...(group.limitUntil ? { limitUntil: group.limitUntil } : {}),
         ...(group.parked ? { parkedAt: group.parked.at } : {}),
@@ -3513,11 +3838,17 @@ export class SplitConveyor {
     recheck: boolean,
   ): 'sent' | 'queued' | 'refused' {
     if (!this.deps.resume || !group.chatId || !group.path) return 'refused';
+    let traced: boolean | undefined;
     if (recheck) {
       const record = this.deps.store.get(parentChatId);
       const own = record?.groups[group.index];
       if (record && own) {
         own.recheckSentAt = this.now().toISOString();
+        // Слово перепроверки несёт след задач (`taskCoverageLine`): доставка после
+        // него требует строки `task-N`. Ставится здесь, а не при нажатии: ждущее
+        // места слово ещё не у группы, и чужой ход до него судится по-старому.
+        traced = own.taskTrace;
+        own.taskTrace = true;
         this.deps.store.set(record);
       }
     }
@@ -3532,6 +3863,7 @@ export class SplitConveyor {
       const own = record?.groups[group.index];
       if (record && own) {
         dropRecheck(own);
+        if (!traced) delete own.taskTrace;
         this.deps.store.set(record);
       }
     }
@@ -3610,6 +3942,7 @@ export class SplitConveyor {
       branch: group.branch,
       deliver: group.deliver === true,
       ...(group.error ? { error: group.error } : {}),
+      gaps: pendingDeliveryLines(group.branch, group),
     });
     const outcome = this.deps.resume
       ? this.deps.resume(group, this.withIdentity(record, group, prompt))
@@ -3721,6 +4054,24 @@ export class SplitConveyor {
     return true;
   }
 
+  /**
+   * Пауза сторожа на безопасной точке (F1, 27.10): ход звена кончился, следующее
+   * звено вот-вот заведётся — его и не заводим. Только у идущей группы без живого
+   * фона: фон — открытая работа, а группа, что ждёт (`awaiting`), и так стоит.
+   * Процесс не останавливается — хода уже нет. Снимает паузу только человек.
+   */
+  pauseByWatch(link: ChatLink, rule: string): boolean {
+    const record = this.deps.store.get(link.parentChatId);
+    const group = record && this.groupOf(record, link, ['started']);
+    if (!record || !group) return false;
+    if (group.chatId && (this.deps.backgroundTasks?.(group.chatId) ?? []).length > 0) return false;
+    this.hold(record, group, { by: 'watch', rule });
+    this.deps.log(
+      `split conveyor: group ${group.index} of ${record.parentChatId} paused by the watch (${rule})`,
+    );
+    return true;
+  }
+
   /** Группа на паузе — повтор упавшего хода её не продолжает. */
   isPaused(link: ChatLink): boolean {
     const record = this.deps.store.get(link.parentChatId);
@@ -3740,9 +4091,15 @@ export class SplitConveyor {
    *
    * Три вида паузы — три продолжения: из очереди — назад в очередь (`queued`,
    * стартует, как дойдёт черёд); во время подготовки копии — старт прогона в
-   * этой копии; с разговором — той же сессией.
+   * этой копии; с разговором — той же сессией. Пауза посреди ожидания человека
+   * возвращает группу к нему (`restored`): хода нет, ответа всё так же ждут.
    */
-  resumePaused(parentChatId: string, index: number, force = false): 'sent' | 'queued' {
+  resumePaused(
+    parentChatId: string,
+    index: number,
+    force = false,
+    note?: string,
+  ): SplitGroupResumed['outcome'] {
     const record = this.deps.store.get(parentChatId);
     const group = record?.groups[index];
     if (!record || !group || group.status !== 'paused') {
@@ -3751,11 +4108,28 @@ export class SplitConveyor {
     if (!seated(group)) {
       group.status = 'pending';
       delete group.pausedAt;
+      delete group.pausedWait;
       this.deps.store.set(record);
       void this.launchNext(record).catch((error) => {
         this.deps.log('split conveyor: launch after unpause failed', error);
       });
       return 'queued';
+    }
+    if (group.pausedWait) {
+      const wait = group.pausedWait;
+      delete group.pausedWait;
+      // Убитые паузой фоновые команды агенту надо назвать — тогда продолжение
+      // словом, и ожидание он заявит заново сам.
+      if (group.chatId && !group.pausedTasks?.length) {
+        group.status = 'awaiting';
+        group.waitingFor = wait;
+        delete group.pausedAt;
+        this.deps.store.set(record);
+        // Ожидание красного MR снова смотрит наблюдатель (F2): на паузе его проверки молчат.
+        if (wait === 'mr-red') this.deps.watchOverlap?.(parentChatId);
+        return 'restored';
+      }
+      this.deps.store.set(record);
     }
     if (!force) this.admitLimit(record);
     if (!group.chatId && this.inFlight.has(`${parentChatId}:${index}`)) {
@@ -3783,7 +4157,7 @@ export class SplitConveyor {
     const prompt = this.withIdentity(
       record,
       group,
-      pauseResumePrompt(group.branch, group.pausedTasks, group),
+      pauseResumePrompt(group.branch, group.pausedTasks, group, note),
     );
     if (group.pausedTasks) {
       delete group.pausedTasks;
@@ -3878,6 +4252,49 @@ export class SplitConveyor {
     void this.launchNext(record).catch((error) => {
       this.deps.log('split conveyor: launch after manual done failed', error);
     });
+  }
+
+  /**
+   * Принятая человеком группа без записанного MR получает MR из своего ответа, когда
+   * фордж подтверждает, что это MR её ветки (`accepted-mr.ts`). Без этого хаб не
+   * показывал MR, а слежка за слиянием его не видела (g2/g6 плана d9869abf, 19.10).
+   * Повтор безвреден: записанный MR не трогается.
+   */
+  async linkAcceptedMr(parentChatId: string, index: number): Promise<string | undefined> {
+    const branchOfMr = this.deps.delivery?.branchOfMr;
+    const record = this.deps.store.get(parentChatId);
+    const at = record?.groups.findIndex((item) => item.index === index) ?? -1;
+    const group = record?.groups[at];
+    if (!branchOfMr || !record || !group || group.mr || !group.acceptedAt) return undefined;
+    const mr = await acceptedMrOf(
+      {
+        ...(group.tail ? { tail: group.tail } : {}),
+        branch: group.branch,
+        claimed: claimedBranches(record, at),
+        taken: record.groups.flatMap((item, i) => (i !== at && item.mr ? [item.mr] : [])),
+      },
+      branchOfMr,
+    );
+    // Пока шёл запрос к форджу, запись могла смениться: пишем в свежую.
+    const fresh = mr ? this.deps.store.get(parentChatId) : undefined;
+    const target = fresh?.groups.find((item) => item.index === index);
+    if (!fresh || !target || target.mr || !target.acceptedAt) return undefined;
+    target.mr = mr as string;
+    this.deps.store.set(fresh);
+    this.deps.log(`split conveyor: accepted group «${target.title}» linked to ${mr}`);
+    return mr;
+  }
+
+  /** При старте панели: принятые раньше группы без MR (до 26.10) — той же проверкой. */
+  recoverAcceptedMrs(): void {
+    for (const record of Object.values(this.deps.store.all())) {
+      for (const group of record.groups) {
+        if (group.status !== 'done' || !group.acceptedAt || group.mr || !group.tail) continue;
+        void this.linkAcceptedMr(record.parentChatId, group.index).catch((error) => {
+          this.deps.log('split conveyor: linking accepted MR failed', error);
+        });
+      }
+    }
   }
 
   dropGroup(parentChatId: string, index: number): void {
@@ -3975,12 +4392,22 @@ export class SplitConveyor {
   }
 
   /** Пауза: запись и место в очереди (без остановки прогона — это дело маршрута). */
-  private hold(record: SplitPlanRecord, group: SplitPlanGroupRecord): void {
+  private hold(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    by: { by: 'human' } | { by: 'watch'; rule: string } = { by: 'human' },
+  ): void {
+    group.pausedBy = by.by;
+    if (by.by === 'watch') group.pausedRule = by.rule;
+    else delete group.pausedRule;
     // Пауза зовётся ДО остановки процесса (кнопка хаба и «Стоп» в чате), поэтому
     // фон ещё жив и его можно назвать.
     const killed = group.chatId ? (this.deps.backgroundTasks?.(group.chatId) ?? []) : [];
     if (killed.length > 0) group.pausedTasks = killed.slice(0, MAX_PAUSED_TASKS);
     else delete group.pausedTasks;
+    if (group.status === 'awaiting' && group.waitingFor && HUMAN_WAITS.has(group.waitingFor)) {
+      group.pausedWait = group.waitingFor;
+    } else delete group.pausedWait;
     group.status = 'paused';
     group.pausedAt = this.now().toISOString();
     delete group.waitingFor;
@@ -3989,6 +4416,47 @@ export class SplitConveyor {
     delete group.parked;
     delete group.interruptedAt;
     this.deps.store.set(record);
+    // Процесс останавливают после записи паузы — сверка ждёт, пока он ляжет.
+    this.refreshAfterStop(record, group);
+  }
+
+  private refreshAfterStop(record: SplitPlanRecord, group: SplitPlanGroupRecord): void {
+    if (!stoppedWithGaps(group)) return;
+    const { parentChatId } = record;
+    const { index } = group;
+    const schedule = this.deps.delivery?.schedule ?? setTimeout;
+    schedule(() => this.refreshStoppedGaps(parentChatId, index), DELIVERY_SETTLE_MS);
+  }
+
+  /**
+   * Список недоделанного остановленной группы — сверкой ПОСЛЕ остановки (g3
+   * 25.10, #g3:138): пауза и лимит ловят группу посреди хода, и продолжение
+   * несло пробелы проверки до неё — уже закрытые, и группа гоняла гейт заново.
+   * Статус не трогает. Удалённый молчит или копия не прочлась — прежний список.
+   */
+  private refreshStoppedGaps(parentChatId: string, index: number): void {
+    const delivery = this.deps.delivery;
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    if (!delivery || !record || !group || !stoppedWithGaps(group)) return;
+    const key = stopKey(group);
+    void delivery
+      .facts(group, group.mr, copyRootOf(record), claimedBranches(record, index))
+      .then((verdict) => {
+        const fresh = this.deps.store.get(parentChatId);
+        const same = fresh?.groups[index];
+        if (!fresh || !same || !stoppedWithGaps(same) || stopKey(same) !== key) return;
+        if (verdict.failed || verdict.unreachable) return;
+        const gaps = deliveryGapLines(verdict, same, fresh);
+        if (gaps.length > 0) same.deliveryMissing = gaps;
+        else delete same.deliveryMissing;
+        if (verdict.notes?.length) same.deliveryNotes = verdict.notes;
+        else delete same.deliveryNotes;
+        this.deps.store.set(fresh);
+      })
+      .catch((error: unknown) => {
+        this.deps.log('split conveyor: paused group delivery refresh failed', error);
+      });
   }
 
   /** Есть ли место для работы сейчас: лимит подписки, потом потолок. */
@@ -4285,6 +4753,37 @@ export function traceStage(
  * дошло до вердикта, а вердикт с замечаниями прошёл звено правок. Ревью не
  * было вовсе (работа шла на потолке) — следам проверять нечего.
  */
+/**
+ * Все строки «не хватает» доставки группы: факты (`delivery.facts`), следы звеньев
+ * и пункты владельца. Одна функция на конвейер и на `tests-cli delivery` (N1, 25.10):
+ * группа видит у себя ровно то, что панель напишет после её хода.
+ */
+export function deliveryGapLines(
+  verdict: Pick<DeliveryVerdict, 'missing' | 'noted' | 'rejected'>,
+  group: Pick<SplitPlanGroupRecord, 'index' | 'stageTrace' | 'sieveRows' | 'taskTrace'>,
+  record: Pick<SplitPlanRecord, 'proposal' | 'groups'>,
+): string[] {
+  return [
+    ...verdict.missing,
+    ...stageTraceGaps(group.stageTrace),
+    ...ownerCoverageGaps(
+      group.sieveRows,
+      hasOwnerRequest(record.proposal.shared),
+      verdict.noted,
+      verdict.rejected,
+    ),
+    // След задач и владельцы отданных пунктов (аудит 26.10): «n/a: группа 6» без
+    // пути из списка группы 6 — пробел той же группы, а не «готово».
+    ...taskCoverageGaps(group.sieveRows, group.taskTrace === true, verdict.noted, verdict.rejected),
+    ...deferralGaps(record, group.index, group.sieveRows),
+  ];
+}
+
+/** Строки пробелов так, как их читает модель в напоминании (`deliveryNudgePrompt`). */
+export function deliveryModelLines(missing: readonly string[]): string[] {
+  return foldStaleSieveLines(missing);
+}
+
 export function stageTraceGaps(trace: readonly SplitStageTraceEntry[] | undefined): string[] {
   if (!trace) return [];
   let review = -1;

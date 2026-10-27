@@ -1,0 +1,56 @@
+{
+  "title": {
+    "ru": "Группа сверяет всю доставку сама до ответа, живые сита доказывает только живой прогон",
+    "en": "A group checks its whole delivery itself before answering, live sieves are proved by a live run only"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Команда `tests-cli delivery --answer <файл с блоком сит> --mr-description <файл с описанием MR>` печатает в копии группы те же строки, что панель напишет после хода: описание MR, строки сит, пункты задания и блок «Тесты». Напоминание доставки называет её, когда не хватает описания MR, сит или пунктов задания, — раньше группа узнавала о таком пробеле только следующим кругом.",
+        "en": "The command `tests-cli delivery --answer <file with the sieves block> --mr-description <file with the MR description>` prints in the group copy the same lines the panel writes after the turn: MR description, sieve rows, owner’s points and the Tests block. The delivery reminder names it when the MR description, sieves or owner’s points are missing — a group used to learn about such a gap only on the next round."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`tests-cli delivery` проверяет и задачи трекера группы: в каждой сделанной задаче должен быть комментарий со ссылкой на MR. Комментарии читает панель своим ключом трекера, тем же кодом, что после хода; трекер у панели не подключён — задачи не проверяются, как и у самой панели. Раньше этот пробел группа узнавала только следующим кругом.",
+        "en": "`tests-cli delivery` also checks the group’s tracker tickets: every delivered ticket needs a comment linking the MR. The panel reads the comments with its own tracker key, by the same code it runs after the turn; with no tracker connected to the panel the tickets are not checked, as in the panel itself. A group used to learn about this gap only on the next round."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ссылка на MR в комментарии задачи Jira Server засчитывается и тогда, когда вики-разметка экранировала знаки адреса («merge\\_requests»); адрес MR сверяется целиком — комментарий со ссылкой на MR 8270 больше не засчитывается как ссылка на MR 827.",
+        "en": "A link to the MR in a Jira Server ticket comment counts also when the wiki markup escaped the address characters (“merge\\_requests”); the MR address is matched whole — a comment linking MR 8270 no longer counts as a link to MR 827."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Живое сито (браузер, граничный ввод, стенд, миграция) доказывает только прогон, где прошёл кейс с живой меткой — live, stand, route, browser, e2e или db. Прогон одних юнит-тестов отклоняется с причиной.",
+        "en": "A live sieve (browser, boundary input, stand, migration) is proved only by a run where a case with a live tag passed — live, stand, route, browser, e2e or db. A run of unit tests alone is refused with the reason."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Прогон, названный в доказательстве свободно («в прогоне 3f2a9c1e»), засчитывается, если он есть в истории блока «Тесты»; если номер не назван, а подходящий прогон есть, напоминание называет его вместо «прогона нет».",
+        "en": "A run named loosely in the evidence (“in run 3f2a9c1e”) counts when it is in the Tests history; when no number is named while a fitting run exists, the reminder names it instead of “no run”."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Строка сита или пункта задания, сменившая fail на pass с тем же доказательством или со словами «красный», «не проверено», больше не засчитывается: нужен новый прогон или прежний fail с пометкой. Pass с пометкой «not checked:» тоже не засчитывается — пометка бывает только у fail.",
+        "en": "A sieve or owner’s point row that turned from fail to pass with the same evidence or with “red”, “not checked” in it no longer counts: it needs a new run, or the earlier fail with a mark. A pass marked “not checked:” does not count either — the mark belongs to a fail row only."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    }
+  ]
+}

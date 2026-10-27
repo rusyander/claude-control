@@ -13,7 +13,7 @@ import {
   resultFor,
   wasJustRefused,
   deny,
-  isRefusal,
+  wasBlocked,
   currentUserPrompt,
   inSubagent,
 } from './transcript.mjs';
@@ -55,7 +55,7 @@ export default function todoThrottle(input) {
     if (e.kind !== 'use') continue;
     if (e.name === 'TodoWrite') {
       const res = resultFor(events.slice(i), e.id);
-      if (res && isRefusal(res.body)) continue; // refused, never landed
+      if (res && wasBlocked(res.body)) continue; // refused (by any hook), never landed
       prev = e;
       break;
     }

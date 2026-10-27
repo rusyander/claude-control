@@ -33,6 +33,13 @@ function mechanicsLines(mechanics: SieveMechanics | undefined): string[] {
         'foreign-removals row with why the removal is intended.',
     );
   }
+  if (mechanics.foreignAcked?.length) {
+    // Пуш уже спросил о них (`# sieve-ack:`), строки с тех пор те же — второй раз не спрашиваем.
+    lines.push(
+      `Removed lines your push already acknowledged (\`# sieve-ack:\`, unchanged since): ` +
+        `${list(mechanics.foreignAcked)} — no foreign-removals row is needed for them.`,
+    );
+  }
   if (mechanics.conflicts?.length) {
     lines.push(
       `Merging with fresh main conflicts in: ${list(mechanics.conflicts)} — rebase onto ` +
@@ -139,8 +146,19 @@ export function sievePromptBlock(input: {
         'check there (tests-cli run; a manual case via tests-cli record … --note "<how you ' +
         'checked>" — record refuses automated cases) and cite ' +
         'it in the evidence as run:<id> — the id tests-cli prints. The panel opens that run: it ' +
-        'must exist, have no failed or blocked case, and be newer than the last change to the ' +
-        'code the sieve covers.',
+        'must exist, have no failed or blocked case, be newer than the last change to the ' +
+        'code the sieve covers, and hold a passed case tagged as a live check (live, stand, ' +
+        'route — browser/e2e for UI, db for migrations): a unit or service test does not prove ' +
+        'a live check. A live check you cannot run here is status fail with evidence ' +
+        '"not checked: <reason>", never pass.',
+    );
+  }
+  if (input.testsBlock && own.length > 0) {
+    // F-12 (аудит g0 25.10): «2117 passed» при прогоне «1 failed, 2117 passed» прошло как есть.
+    lines.push(
+      'A test count you quote from the Tests section (tests-cli … N passed / N failed) cites ' +
+        'its run as run:<id>; the panel compares the numbers with that run, and a failed test ' +
+        'left out of the count is a mismatch.',
     );
   }
   if (own.length > 0) {

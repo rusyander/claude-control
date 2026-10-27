@@ -1,0 +1,70 @@
+import type { telegramCardRu } from './ru.ts';
+
+/** English texts of the Telegram card; typed against the Russian module. */
+export const telegramCardEn: typeof telegramCardRu = {
+  master: 'Telegram is on',
+  help: 'How it works',
+  state: {
+    notConnected: 'not connected',
+    off: 'off',
+    ok: 'working',
+    okBot: 'working · {{bot}}',
+    error: 'error: {{reason}}',
+  },
+  reason: {
+    send: 'not delivered — {{text}}',
+    answers: {
+      off: 'answers are off',
+      polling: 'could not write to you',
+      'no-token': 'no bot token',
+      'owner-missing': 'your Telegram id is unknown',
+      'same-bot': 'the agent already listens to this bot — a separate bot is needed',
+      webhook: 'the bot has a webhook',
+      conflict: 'someone else listens to the bot',
+      unauthorized: 'Telegram did not accept the token',
+      error: 'Telegram does not answer',
+    },
+  },
+  setup: {
+    bot: '1. Bot',
+    token: 'Bot token',
+    tokenHint: 'Get it from @BotFather with /newbot.',
+    tokenSaved: 'Token saved: {{mask}}',
+    check: 'Check',
+    you: '2. You',
+    youHint: 'Press Connect and send /start to the bot.',
+  },
+  you: 'You:',
+  reconnect: 'Reconnect',
+  idOnly: 'id {{id}}',
+  when: 'When to call',
+  waits:
+    'The agent waits for you — a question or a permission · if not answered in the panel within',
+  finished: 'The agent finished — if it worked longer than',
+  broken: 'Something broke — the agent failed, tests are red, a group got stuck or went in circles',
+  minutes: 'min',
+  minutesAria: 'Minutes',
+  minutesError: 'Minutes: a whole number from 0 to 1440',
+  test: 'Send a test message',
+  save: 'Save',
+  saved: 'Saved',
+  failed: {
+    notify: 'Not saved: {{error}}',
+    answers: 'Notifications are saved, answers with buttons are not: {{error}}',
+  },
+  advanced: {
+    title: 'Advanced',
+    chatId: 'You — where to write',
+    chatIdHint: 'Your numeric Telegram id, or a @channel to write to a channel.',
+    ownerId: 'You — whose button answers to take',
+    ownerIdHint: 'Your numeric Telegram id; usually the same as above.',
+    budget: 'Contour budget running out',
+    budgetHint:
+      'The contour is the panel gateway to models. We write when spending nears the limit you set for it.',
+    token: 'Replace the bot token',
+    forget: 'Forget key',
+    checkNow: 'Check connection',
+    restart: 'Reconnect the bot',
+    answersState: 'Answers: {{state}}',
+  },
+};

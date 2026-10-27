@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   bundleSplitTickets,
   clusterSplitTickets,
@@ -8,9 +11,10 @@ import {
 } from '@agentdeck/contracts/split-ticket-batch';
 import { splitTicketKey, type SplitTicketView } from '@agentdeck/contracts/split-tickets';
 import type { SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts';
-import { commentBody, fingerprintLine, fingerprintOf, issueDescription } from './compose.ts';
+import { commentBody, FINGERPRINT_PREFIX, fingerprintOf, issueDescription } from './compose.ts';
 import { splitByExisting, type OpenTrackerIssue } from './existing.ts';
 import { draftsFromReply, fallbackDraft } from './prepare.ts';
+import { fileTicketPrints, PRINTS_FILE } from './prints.ts';
 import { publishTickets, type BatchIssueInput, type BatchTracker } from './publish.ts';
 import { SplitTicketMarks } from './ticket-marks.ts';
 
@@ -195,8 +199,16 @@ describe('model output on bundles; description is the server’s sections', () =
 
     const text = issueDescription(drafts![0]!, 'en');
     expect(text.split('\n\n')).toEqual([
-      'Export is unreliable.',
+      'Context: Export is unreliable.',
+      'What to do: Fix the defects listed under «Defects» (2); each has its own place and evidence.',
       [
+        'Acceptance criteria:',
+        '- «Export ignores the date filter»: rows in range',
+        '- «Export leaks file handles» no longer reproduces',
+      ].join('\n'),
+      'Where in the code:\n- src/export.ts:10\n- src/export.ts:88',
+      [
+        'Defects:',
         '1. Export ignores the date filter',
         'Where: src/export.ts:10',
         'Evidence: why',
@@ -210,8 +222,9 @@ describe('model output on bundles; description is the server’s sections', () =
         'Evidence: why',
         'Found by groups: G',
       ].join('\n'),
-      fingerprintLine(drafts![0]!.clusters.flatMap((c) => c.tickets.map((t) => t.key))),
     ]);
+    // Отпечатков в тексте задачи нет (владелец 26.10.2026): они в памяти панели.
+    expect(text).not.toContain(FINGERPRINT_PREFIX);
     // Модель не сказала «на деле» — строки нет, а не пустая или выдуманная.
     expect(text).not.toContain('Actual:');
   });
@@ -224,6 +237,17 @@ describe('model output on bundles; description is the server’s sections', () =
   });
 });
 
+/** Временный каталог данных панели на проверку: память отпечатков — настоящий файл. */
+const dirs: string[] = [];
+const panelPrints = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ticket-prints-'));
+  dirs.push(dir);
+  return { prints: fileTicketPrints(() => dir), file: join(dir, PRINTS_FILE) };
+};
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 describe('splitByExisting — open tracker tickets get a comment, never a copy', () => {
   const draftOf = (...tickets: OpenSplitTicket[]) =>
     fallbackDraft(bundleSplitTickets(clusterSplitTickets(tickets))[0]!, 'en');
@@ -233,14 +257,31 @@ describe('splitByExisting — open tracker tickets get a comment, never a copy',
     description,
   });
 
-  it('fingerprint in an open issue matches even when its summary was rewritten', () => {
+  it('fingerprint in panel memory matches a renamed issue whose text carries no print', () => {
     const a = row('Go tests fail on Windows', 'server/go_test.go:12');
-    const split = splitByExisting(draftOf(a), [
-      issue('PROJ-3', 'Something unrelated'),
-      issue('PROJ-7', 'CI on Windows: renamed by a human', `text\n\n${fingerprintLine([a.key])}`),
-    ]);
+    const { prints } = panelPrints();
+    prints.remember('PROJ-7', [a.key]);
+    const split = splitByExisting(
+      draftOf(a),
+      [
+        issue('PROJ-3', 'Something unrelated'),
+        issue('PROJ-7', 'CI on Windows: renamed by a human'),
+      ],
+      new Set(),
+      prints,
+    );
     expect(split.comments.map((match) => match.issue.key)).toEqual(['PROJ-7']);
     expect(split.rest).toBeUndefined();
+  });
+
+  it('legacy `agentdeck-fp:` line of an issue filed before 26.10.2026 still matches (read only)', () => {
+    const a = row('Go tests fail on Windows', 'server/go_test.go:12');
+    const legacy = `text\n\n${FINGERPRINT_PREFIX} ${fingerprintOf(a.key)}`;
+    const split = splitByExisting(draftOf(a), [
+      issue('PROJ-3', 'Something unrelated'),
+      issue('PROJ-7', 'CI on Windows: renamed by a human', legacy),
+    ]);
+    expect(split.comments.map((match) => match.issue.key)).toEqual(['PROJ-7']);
   });
 
   it('a human-filed issue with near-duplicate summary matches', () => {
@@ -319,7 +360,7 @@ describe('publishTickets — search first, then comment or create', () => {
       },
       create: async (input) => {
         created.push(input);
-        return `PROJ-${100 + created.length}`;
+        return { key: `PROJ-${100 + created.length}` };
       },
       comment: async (key, body) => {
         comments.push({ key, body });
@@ -329,17 +370,18 @@ describe('publishTickets — search first, then comment or create', () => {
     return { api, created, comments, searches: () => searches };
   }
 
-  it('open issue matched → comment with sections + fingerprints, marks filed with its key; the rest is created', async () => {
+  it('open issue matched → comment with sections (no prints), marks filed with its key; the rest is created', async () => {
     const records = store([
       [view('Go tests fail on Windows', 'server/go_test.go:12'), view('Help link 404', 'web')],
       [view('Windows: go tests failing', 'ci.yml')],
     ]);
     const marks = new SplitTicketMarks(records);
+    const { prints, file } = panelPrints();
     const { api, created, comments } = tracker([
       { key: 'PROJ-7', summary: 'Go tests fail on Windows', description: '' },
     ]);
     const result = await publishTickets(
-      { marks, record: () => records.get(), tracker: api },
+      { marks, record: () => records.get(), tracker: api, prints },
       { parentChatId: 'p', projectKey: 'PROJ', issueType: 'Bug', lang: 'en' },
     );
 
@@ -348,12 +390,20 @@ describe('publishTickets — search first, then comment or create', () => {
     expect(comments[0]?.body).toContain(
       'Same defect in other words: «Windows: go tests failing» (ci.yml)',
     );
-    expect(comments[0]?.body).toContain(
-      fingerprintOf(
-        splitTicketKey({ title: 'Go tests fail on Windows', where: 'server/go_test.go:12' }),
-      ),
+    const goPrint = fingerprintOf(
+      splitTicketKey({ title: 'Go tests fail on Windows', where: 'server/go_test.go:12' }),
     );
+    expect(comments[0]?.body).not.toContain(goPrint);
+    expect(comments[0]?.body).not.toContain(FINGERPRINT_PREFIX);
     expect(created.map((issue) => issue.summary)).toEqual(['Help link 404']);
+    expect(created[0]?.description).not.toContain(FINGERPRINT_PREFIX);
+    // Память панели — на диске: комментированная задача и заведённая, у каждой свои отпечатки.
+    const onDisk = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string[]>;
+    expect(Object.keys(onDisk).sort()).toEqual(['PROJ-101', 'PROJ-7']);
+    expect(onDisk['PROJ-7']).toContain(goPrint);
+    expect(onDisk['PROJ-101']).toEqual([
+      fingerprintOf(splitTicketKey({ title: 'Help link 404', where: 'web' })),
+    ]);
     expect(result.issues).toEqual([
       expect.objectContaining({
         key: 'PROJ-7',
@@ -385,22 +435,17 @@ describe('publishTickets — search first, then comment or create', () => {
     expect(retry.issues.map((issue) => issue.key)).toEqual(['PROJ-101']);
   });
 
-  it('the issue just created is open for the rest of the same publish', () => {
-    const description = issueDescription(
-      {
-        summary: '',
-        clusters: clusterSplitTickets([row('A defect', 'a.ts')]),
-        details: new Map(),
-      },
-      'en',
-    );
-    const again = commentBody(
-      { summary: '', clusters: clusterSplitTickets([row('A defect', 'a.ts')]), details: new Map() },
-      'en',
-    );
-    // Один и тот же отпечаток в описании и комментарии — сверка узнаёт оба.
+  it('neither the description nor the comment carries a print; the panel memory does', () => {
+    const clusters = clusterSplitTickets([row('A defect', 'a.ts')]);
+    const description = issueDescription({ summary: '', clusters, details: new Map() }, 'en');
+    const again = commentBody({ summary: '', clusters, details: new Map() }, 'en');
     const print = fingerprintOf(splitTicketKey({ title: 'A defect', where: 'a.ts' }));
-    expect(description).toContain(print);
-    expect(again).toContain(print);
+    expect(description).not.toContain(print);
+    expect(again).not.toContain(print);
+    const { prints } = panelPrints();
+    prints.remember('PROJ-1', [splitTicketKey({ title: 'A defect', where: 'a.ts' })]);
+    expect([...prints.of('PROJ-1')]).toEqual([print]);
+    expect(prints.issuesWith([print])).toEqual(['PROJ-1']);
+    expect(prints.issuesWith(['0123456789ab'])).toEqual([]);
   });
 });

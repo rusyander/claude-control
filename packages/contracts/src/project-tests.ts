@@ -520,6 +520,19 @@ export interface ProjectTestPointResult {
    * признак нестабильного теста, а в статусе он неотличим от честного зелёного.
    */
   flakyAttempts?: number;
+  /**
+   * Упавшие тесты отчёта, что легли на этот кейс (имя и classname, как в отчёте), —
+   * пока их не больше `RED_TESTS_LIMIT` (import-results сервера). По ним `tests-cli run --base` гоняет на
+   * развилке только красное ветки, а не весь набор: g0 25.10 прогнала 2105 тестов
+   * pytest ради одного красного. Нет поля — красных больше предела или прогон старый.
+   */
+  failedTests?: ProjectTestFailedTest[];
+}
+
+/** Упавший тест отчёта: `name` и `owner` (classname JUnit) — как их записал раннер. */
+export interface ProjectTestFailedTest {
+  name: string;
+  owner?: string;
 }
 
 /** Задуманный проход, который остался без результата. */
@@ -664,8 +677,21 @@ export interface ProjectTestRunRecord {
    * `codePaths`) — прежнее правило по времени.
    */
   stamps?: Record<string, string>;
+  /**
+   * Отпечаток всего дерева на старте прогона (`treeFingerprint` памяти проверок:
+   * коммит, правки, неотслеживаемое). Зелёный результат автотеста на том же дереве
+   * засчитывается и кейсу другой группы с тем же `automation` (T2, g5 25.10): один
+   * и тот же пакет гонялся четырежды ради «прогона на каждый id кейса».
+   */
+  tree?: string;
   results: ProjectTestPointResult[];
   summary: ProjectTestRunSummary;
+  /**
+   * Счёт тестов отчёта (testcase JUnit, а не кейсы: кейс-набор несёт их сотни). По нему
+   * судья сит сверяет «2117 passed» строки с прогоном, на который она сослалась (аудит
+   * g0 25.10, F-12). Нет поля — прогон не из отчёта или запись старше.
+   */
+  tests?: ProjectTestRunTally;
   /**
    * Сколько проходов было задумано. Больше `summary.total` — часть брошена
    * непройденной, и история называет её числом, а не теряет. Пусто — прогон
@@ -691,6 +717,13 @@ export interface ProjectTestRunRecord {
   generate?: ProjectTestGenerateStamp;
   /** След отправки в тест-менеджмент; по нему повторная отправка не плодит ран. */
   tms?: ProjectTestRunTms;
+}
+
+/** Тесты отчёта прогона по исходу — весь отчёт, те же числа, что в итоге `tests-cli run`. */
+export interface ProjectTestRunTally {
+  passed: number;
+  failed: number;
+  skipped: number;
 }
 
 /**

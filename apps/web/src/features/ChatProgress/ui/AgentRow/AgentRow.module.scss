@@ -1,5 +1,96 @@
 .agent {
+  // Отступ строк под шапкой: до текста после точки статуса. В дереве перед
+  // точкой ещё стрелка раскрытия — отступ растёт на её ширину.
+  --agent-indent: calc(var(--spacing-sm) + 2px);
+
   padding: var(--spacing-3xs) 0;
+}
+
+// Узел дерева: фокус и выбор видны на всей строке, а не на тексте.
+.node {
+  --agent-indent: calc(18px + var(--spacing-2xs) + var(--spacing-sm) + 2px);
+
+  border-radius: 6px;
+  outline-offset: -2px;
+
+  &:focus-visible {
+    background: var(--color-surface);
+  }
+}
+
+.selected {
+  background: var(--color-accent-subtle);
+
+  &:focus-visible {
+    background: var(--color-accent-subtle);
+  }
+}
+
+// Стрелка и точка стоят слева, текст переносится в своей коробке. В узкой колонке
+// (справа открыт ход субагента) состояние уходит на следующую строку под имя
+// агента, а не под стрелку; описание не сжимается в ноль и не вылезает за край.
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+  padding: 0 var(--spacing-3xs);
+}
+
+// Стрелка и точка — по центру первой строки текста, а не всей перенесённой шапки.
+.lead {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  height: calc(var(--font-size-body-sm) * var(--line-height-normal));
+}
+
+.headText {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--spacing-2xs);
+  min-width: 0;
+}
+
+.kind {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.openable {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface);
+    border-radius: 6px;
+  }
+}
+
+.twisty,
+.twistySpace {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.twisty {
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-fg);
+    background: var(--color-bg);
+  }
 }
 
 .agentText {
@@ -10,9 +101,30 @@
   text-overflow: ellipsis;
 }
 
+.status {
+  min-width: 0;
+}
+
+// Кнопка не раздувает строку узла: высота строки — по тексту.
+.stop {
+  flex-shrink: 0;
+  margin: -4px 0 -4px auto;
+}
+
+.metrics {
+  margin-left: var(--agent-indent);
+  font-variant-numeric: tabular-nums;
+}
+
 .activity {
   min-width: 0;
-  margin-left: calc(var(--spacing-sm) + 2px);
+  margin-left: var(--agent-indent);
+}
+
+// Скиллы, хуки и MCP — под метриками, тем же отступом.
+.extensions {
+  margin-left: var(--agent-indent);
+  align-self: flex-start;
 }
 
 .activityText {
@@ -31,8 +143,13 @@
   background: var(--color-warning-subtle);
 }
 
+.stopNote {
+  margin-left: var(--agent-indent);
+  color: var(--color-fg-muted);
+}
+
 .result {
-  margin-left: calc(var(--spacing-sm) + 2px);
+  margin-left: var(--agent-indent);
   font-size: var(--font-size-caption);
 
   summary {
@@ -50,4 +167,20 @@
   word-break: break-word;
   color: var(--color-fg-muted);
   scrollbar-width: thin;
+}
+
+// Корень дерева — направляющая ветки главного агента, как была у списка.
+.treeRoot {
+  margin: 0;
+  padding: 0 0 0 var(--spacing-sm);
+  border-left: 1px solid var(--color-border);
+  list-style: none;
+}
+
+// Ветка вложенных — с направляющей, как ветка главного агента в панели.
+.group {
+  margin: var(--spacing-3xs) 0 0 calc(9px + var(--spacing-3xs));
+  padding: 0 0 0 var(--spacing-xs);
+  border-left: 1px solid var(--color-border);
+  list-style: none;
 }

@@ -96,14 +96,53 @@ function bashSubject(command: string, op: string): string {
 }
 
 /**
+ * Догон слиянием (`merge`, `pull` без `--rebase`) или перезаписью ветки (`rebase`,
+ * `pull --rebase`, `checkout -B`, `switch -C`). Продолжение начатого — не догон.
+ */
+function syncSubject(command: string): string {
+  for (const raw of commandSteps(command)) {
+    const git = gitVerb(bare(raw));
+    if (!git || /--(?:continue|abort|skip|quit)\b/.test(git.rest)) continue;
+    const rest = ` ${git.rest} `;
+    if (git.verb === 'merge' || (git.verb === 'pull' && !/\s(?:--rebase\S*|-r)\s/.test(rest)))
+      return 'sync:merge';
+    if (
+      git.verb === 'rebase' ||
+      git.verb === 'pull' ||
+      (git.verb === 'checkout' && /\s-B\s/.test(rest)) ||
+      (git.verb === 'switch' && /\s-C\s/.test(rest))
+    )
+      return 'sync:rebase';
+  }
+  return 'sync';
+}
+
+/**
  * Предмет действия: у догона целевой ветки — само действие (запрещён догон, не его
- * запись), у MR — путь (инструмент MCP или CLI форжа), у прочих — цель и сила.
+ * запись) и его способ, у MR — путь (инструмент MCP или CLI форжа), у прочих — цель и сила.
  */
 export function opSubject(name: string, input: Record<string, unknown>, op: string): string {
-  if (op === 'sync') return 'sync';
+  if (op === 'sync') return name === 'Bash' ? syncSubject(str(input.command) ?? '') : 'sync';
   // MR признан `protectedOp`: инструмент MCP — по имени, CLI форжа — шагом Bash.
   if (op === 'mr') return name === 'Bash' ? 'cli' : `mcp:${name}`;
   return name === 'Bash' ? bashSubject(str(input.command) ?? '', op) : name;
+}
+
+/**
+ * Пуш назвал свой чекаут глобальным ключом git (`-C путь`, `--git-dir`, `--work-tree`).
+ * Страж отправки отбивает пуш, чей каталог не проследить (`cd X; git push`), и просит
+ * `git -C X push`; такой повтор — исправление, а не обход (g8 26.10: R25 «тревога» через
+ * минуту после отказа на ровно запрошенный повтор).
+ */
+export function namesCheckout(command: string): boolean {
+  for (const raw of commandSteps(command)) {
+    const step = bare(raw);
+    const git = gitVerb(step);
+    if (git?.verb !== 'push') continue;
+    const globals = step.slice(0, step.length - git.rest.length);
+    return /\s(?:-C\s|--git-dir|--work-tree)/.test(globals);
+  }
+  return false;
 }
 
 /** Сила действия по возрастанию: понижение — исправление, повышение — нажим. */
@@ -129,6 +168,10 @@ export function bypassesDenial(
 ): boolean {
   if (denied.op !== retry.op) return false;
   if (retry.op === 'mr') return denied.subject !== retry.subject;
+  // git-guard отбивает слияние всегда, а путь конфликта — rebase, который судит брокер
+  // (g0 26.10: `git merge origin/main` отбит, rebase с конфликтами — R25 «тревога»).
+  if (retry.op === 'sync')
+    return !(denied.subject === 'sync:merge' && retry.subject === 'sync:rebase');
   const was = forceAndTarget(denied.subject);
   const now = forceAndTarget(retry.subject);
   if (was && now) return was.target === now.target && now.rank >= was.rank;

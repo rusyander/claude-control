@@ -16,6 +16,8 @@ import {
   parseReviewFindings,
   reviewDepthGaps,
   plannedRunCount,
+  deliverStagePrompt,
+  reviewSkipReason,
   reviewStagePrompt,
   scanReviewBlocks,
   REVIEW_BLOCK_LANG,
@@ -645,5 +647,94 @@ describe('тексты звеньев', () => {
   it('источники правил названы и для чужих CLI', () => {
     expect(loweredWorkPrompt('mechanical')).toContain("the CLI's own instruction files");
     expect(deliveryPreamble({ branch: 'fix/login' })).toContain("the CLI's own instruction files");
+  });
+});
+
+/**
+ * Охват ревью группы от её коммита начала (владелец 26.10, замечание 4): задание ревью
+ * называет охват командами git, найденное вне охвата идёт отдельным списком и правкам
+ * не уходит, доставка называет его в MR и причину пропуска ревью.
+ */
+describe('охват ревью группы (startSha)', () => {
+  const block = (body: string): string => ['Итог.', '```agentdeck:review', body, '```'].join('\n');
+  const scope = (
+    commits: { sha: string; subject: string; type: 'commit' | 'merge' | 'clean-merge' }[],
+    dirty = false,
+  ) => ({ kind: 'commits' as const, from: 'abcdef123456', commits, dirty });
+
+  it('«preExisting» блока — отдельным списком, «findings» его не содержат', () => {
+    const scan = scanReviewBlocks(
+      block('{"findings":["🟡 1. новое a.ts:1-2"],"preExisting":["🟡 2. давнее b.ts:3-4"]}'),
+    );
+    expect(scan.findings).toEqual(['🟡 1. новое a.ts:1-2']);
+    expect(scan.preExisting).toEqual(['🟡 2. давнее b.ts:3-4']);
+    expect(scanReviewBlocks(block('{"findings":[]}'))).not.toHaveProperty('preExisting');
+    // Мусор в списке не становится карточкой.
+    expect(scanReviewBlocks(block('{"findings":[],"preExisting":[1,""]}'))).not.toHaveProperty(
+      'preExisting',
+    );
+  });
+
+  it('коммиты без слияний — `git diff <start>..HEAD`; слияние — `--remerge-diff`, не diff', () => {
+    const plain = reviewStagePrompt({
+      task: 't',
+      delta: scope([{ sha: 'aaa111aaa111', subject: 'group: fix', type: 'commit' }]),
+    });
+    expect(plain).toContain('This group started at commit abcdef123456');
+    expect(plain).toContain('together they are `git diff abcdef123456..HEAD`');
+    expect(plain).toContain('- aaa111aaa111 group: fix');
+    expect(plain).not.toContain('once and in full');
+    expect(plain).toContain('"preExisting"');
+    expect(plain).not.toContain('Uncommitted changes');
+
+    const merge = reviewStagePrompt({
+      task: 't',
+      delta: scope([
+        { sha: 'bbb222bbb222', subject: 'Merge main', type: 'merge' },
+        { sha: 'ccc333ccc333', subject: 'Merge again', type: 'clean-merge' },
+      ]),
+    });
+    expect(merge).toContain('git show --remerge-diff <sha>');
+    expect(merge).toContain('do not use it');
+    expect(merge).not.toContain('together they are');
+    expect(merge).toContain(
+      '- bbb222bbb222 Merge main (merge: review its conflict resolutions only)',
+    );
+    expect(merge).toContain('(merge without conflict resolutions: nothing of the group to review)');
+
+    const dirty = reviewStagePrompt({ task: 't', delta: scope([], true) });
+    expect(dirty).toContain('`git diff HEAD`');
+    expect(dirty).not.toContain('Commits of this group:');
+  });
+
+  it('правки — только сделанное с начала; доставка — «было до группы» и причина пропуска', () => {
+    const fix = fixStagePrompt(['x'], { startSha: 'abcdef1234567890' });
+    expect(fix).toContain('This group started at commit abcdef123456: fix only what the group');
+    expect(fixStagePrompt(['x'])).not.toContain('This group started at commit');
+
+    const deliver = deliverStagePrompt({
+      after: 'work',
+      context: {},
+      reviewSkipped: reviewSkipReason({
+        kind: 'none',
+        from: 'abcdef123456',
+        published: false,
+        group: true,
+      }),
+      preExisting: ['🟡 1. давнее b.ts:3-4'],
+      startSha: 'abcdef1234567890',
+    });
+    expect(deliver).toContain(
+      'the panel skipped its review: this group made no changes of its own since its start commit abcdef123456',
+    );
+    expect(deliver).toContain('pre-existing, NOT fixed by this group');
+    expect(deliver).toContain('1. 🟡 1. давнее b.ts:3-4');
+    expect(deliver).toContain('`git log --first-parent abcdef123456..HEAD`');
+    const plain = deliverStagePrompt({ after: 'work', context: {} });
+    expect(plain).toContain('it has no separate review');
+    expect(plain).not.toContain('pre-existing');
+    expect(reviewSkipReason({ kind: 'none', from: 'abcdef123456', published: false })).toContain(
+      'already published at abcdef123456',
+    );
   });
 });

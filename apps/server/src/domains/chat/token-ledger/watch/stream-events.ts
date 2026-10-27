@@ -51,6 +51,16 @@ export function streamWatchEvents(event: ChatEvent, t: number, stage?: string): 
           ...(event.isError ? { isError: true as const } : {}),
           ...(event.errorKind ? { errorKind: event.errorKind } : {}),
           ...(event.errorHead !== undefined ? { errorHead: event.errorHead } : {}),
+          ...(event.bgTaskId ? { bgTaskId: event.bgTaskId } : {}),
+        },
+      ];
+    case 'bgDone':
+      return [
+        {
+          kind: 'bgDone',
+          t,
+          taskId: event.taskId,
+          ...(event.status ? { status: event.status } : {}),
         },
       ];
     case 'apiRetry':
@@ -66,6 +76,17 @@ export function streamWatchEvents(event: ChatEvent, t: number, stage?: string): 
       const out: WatchEvent[] = [];
       if (window) {
         out.push({ kind: 'limit', t, utilization: window.utilization, resetsAt: window.resetsAt });
+      }
+      // Недельное окно — свои уровни и прогноз R9; исчерпание судит только `rejected`.
+      const week = event.sample?.sevenDay;
+      if (week) {
+        out.push({
+          kind: 'limit',
+          t,
+          utilization: week.utilization,
+          resetsAt: week.resetsAt,
+          week: true,
+        });
       }
       if (event.status === 'rejected') {
         out.push({ kind: 'limit', t, rejected: true, resetsAt: event.resetsAt });

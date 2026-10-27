@@ -36,6 +36,17 @@
             "timeout": 20000
           }
         ]
+      },
+      {
+        "matcher": "^run_shell_command$",
+        "hooks": [
+          {
+            "name": "agentdeck-kit-post-any",
+            "type": "command",
+            "command": "node \"${extensionPath}/hooks/lib/run.mjs\" post-any --cli=gemini",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "AfterAgent": [

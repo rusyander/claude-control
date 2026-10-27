@@ -44,6 +44,13 @@ export interface TurnGateInput {
    * запись ручного и красный по-прежнему держат ход.
    */
   deferRuns?: boolean;
+  /**
+   * Ключи `группа:кейс`, чьё красное доставка группы считает не её (`redNotFromBranch`:
+   * было до старта группы слово в слово или от окружения) — ход ими не держится
+   * (g3 25.10: набор inst-config, красный тем же «✗ 2 · TestUnreadable…», что на
+   * основной 20.10, дважды остановил конец хода, а доставка его же писала заметкой).
+   */
+  redExempt?: ReadonlySet<string>;
   /** `node "<…>/tests-cli.mjs"` — как агенту его вызвать. */
   cli: string;
   root: string;
@@ -277,11 +284,17 @@ export function judgeTurn(input: TurnGateInput): string[] {
   const red = [...new Set([...anyResult.keys(), ...executedInTurn.keys()])].filter(
     (key) =>
       redOf(statusOf(anyResult, key), statusOf(executedInTurn, key)) !== undefined &&
-      !byKey.get(key)?.muted,
+      !byKey.get(key)?.muted &&
+      !input.redExempt?.has(key),
   );
   if (red.length > 0) {
+    // Ход группы: красное «не её» снимается прогоном на развилке с основной — команда
+    // тут же, иначе группа писала «на main не перепроверить» и ход стоял (#g0:110).
+    const base = input.deferRuns
+      ? ` Red without the branch too → prove it on the fork point with main: ${input.cli} run ${project} --case ${red.join(',')} --base`
+      : '';
     gaps.push(
-      `Tests block: red this turn (${named(red)}) — fix and run again; a red test is never weakened to pass.`,
+      `Tests block: red this turn (${named(red)}) — fix and run again; a red test is never weakened to pass.${base}`,
     );
   }
   // Группе прогон не требуется (он у доставки), но ход и так держат — точная

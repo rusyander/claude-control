@@ -73,6 +73,11 @@ export interface ProviderChatCascade {
    * `review`, и по этому полю она отличается от ревью работы.
    */
   fixFindings?: string[];
+  /**
+   * «Ревью после работы» выключено в проекте (R3(d), 26.10): снято при запуске, как у
+   * связи Claude (`ChatLink.reviewAfterWork`). Нет поля — ревью после работы есть.
+   */
+  reviewAfterWork?: false;
 }
 
 /** Запись файла: шапка разговора либо одна реплика. */

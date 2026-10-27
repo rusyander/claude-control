@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { retryMergeRequestJob } from '../forge.ts';
+import { readMergeRequestJobLog, retryMergeRequestJob } from '../forge.ts';
 import { isBotName, readMergeRequestReview } from './mr-review.ts';
 
 /**
@@ -214,6 +214,31 @@ describe('retryMergeRequestJob', () => {
     );
     await expect(retryMergeRequestJob('https://example.com/x', 'T', '51')).resolves.toBe(false);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('readMergeRequestJobLog (P8)', () => {
+  it('GitLab: GET лога задания текстом, в проект MR', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', (url: string) => {
+      calls.push(String(url));
+      return Promise.resolve(
+        /jobs\/51\/trace$/.test(String(url))
+          ? new Response('line 1\nERROR: Job failed: exit code 1\n', { status: 200 })
+          : new Response('{}', { status: 404 }),
+      );
+    });
+    await expect(readMergeRequestJobLog(MR, 'T', '51')).resolves.toContain('ERROR: Job failed');
+    expect(calls).toEqual(['https://git.acme.local/api/v4/projects/team%2Fapp/jobs/51/trace']);
+  });
+
+  it('GitHub — лога нет, в сеть не ходим; отказ форджа бросается', async () => {
+    const calls = stubApi([]);
+    await expect(readMergeRequestJobLog('https://github.com/o/r/pull/3', 'T', '51')).resolves.toBe(
+      undefined,
+    );
+    expect(calls).toEqual([]);
+    await expect(readMergeRequestJobLog(MR, 'T', '52')).rejects.toThrow();
   });
 });
 

@@ -12,6 +12,7 @@ import {
 } from '../integrations/atlassian/jira.ts';
 import { listIssueTypes, listPriorities } from '../integrations/atlassian/jira-meta.ts';
 import { trimUrl, type AtlassianAccess } from '../integrations/atlassian/client.ts';
+import type { SimilarQuery } from './split-ticket-batch/duplicates.ts';
 import type { OpenTrackerIssue } from './split-ticket-batch/existing.ts';
 import type { OneTicketTracker } from './split-ticket-batch/file-one.ts';
 import { isConnected, readIntegrations } from '../integrations/store/store.ts';
@@ -37,21 +38,61 @@ export interface SplitTicketTracker extends OneTicketTracker {
 const OPEN_ISSUES_LIMIT = 100;
 
 /** Открытые задачи проекта для сверки — одна выборка у «Завести» строки и у публикации разом. */
+/** Ключ проекта Jira — латиница, цифры и `_`; иное в JQL не подставляем. */
+const PROJECT_KEY = /^[A-Za-z][A-Za-z0-9_]*$/;
+
+const toOpen = (issue: { key: string; summary: string; description?: string }) => ({
+  key: issue.key,
+  summary: issue.summary,
+  description: issue.description ?? '',
+});
+
 async function searchOpenIssues(
   access: AtlassianAccess,
   projectKey: string,
 ): Promise<OpenTrackerIssue[]> {
-  // Ключ проекта Jira — латиница, цифры и `_`; иное в JQL не подставляем.
-  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(projectKey)) return [];
+  if (!PROJECT_KEY.test(projectKey)) return [];
   const found = await searchIssues(access, {
     jql: `project = "${projectKey}" AND statusCategory != Done ORDER BY updated DESC`,
     limit: OPEN_ISSUES_LIMIT,
   });
-  return found.map((issue) => ({
-    key: issue.key,
-    summary: issue.summary,
-    description: issue.description ?? '',
-  }));
+  return found.map(toOpen);
+}
+
+/** Сколько похожих задач читает поиск одного дефекта: решает потом сверка по названию. */
+const SIMILAR_LIMIT = 20;
+
+/**
+ * Похожие открытые задачи по ВСЕМУ проекту (проверка на повторы, 25.10.2026):
+ * слова названия в `summary`, отпечаток находки в тексте старой задачи или ключ
+ * задачи, за которой панель помнит отпечаток. Слова — только буквы и цифры
+ * (`searchWords`), отпечатки — hex, ключи — PROJ-123: в JQL ничего чужого не попадёт.
+ * Порядка нет нарочно — полнотекстовый поиск Jira ставит ближе более похожие.
+ */
+async function searchSimilarIssues(
+  access: AtlassianAccess,
+  projectKey: string,
+  query: SimilarQuery,
+): Promise<OpenTrackerIssue[]> {
+  if (!PROJECT_KEY.test(projectKey)) return [];
+  const words = query.words.filter((word) => /^[\p{L}\p{N}]+$/u.test(word));
+  const prints = query.prints.filter((print) => /^[0-9a-f]{6,40}$/.test(print));
+  // Ключи задач из памяти панели — только вида PROJ-123 и только этого проекта.
+  const keys = query.keys
+    .filter((key) => /^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(key) && key.startsWith(`${projectKey}-`))
+    .slice(0, 50);
+  const clauses = [
+    ...(words.length > 0 ? [`summary ~ "${words.join(' ')}"`] : []),
+    // Чтение старых задач, где отпечаток ещё стоит в тексте; новые его не несут.
+    ...prints.map((print) => `text ~ "${print}"`),
+    ...(keys.length > 0 ? [`key in (${keys.join(', ')})`] : []),
+  ];
+  if (clauses.length === 0) return [];
+  const found = await searchIssues(access, {
+    jql: `project = "${projectKey}" AND statusCategory != Done AND (${clauses.join(' OR ')})`,
+    limit: SIMILAR_LIMIT,
+  });
+  return found.map(toOpen);
 }
 
 /**
@@ -77,8 +118,18 @@ export function atlassianTicketTracker(
     },
     searchOpen: (projectKey) => searchOpenIssues(access(), projectKey),
     comment: (key, body) => commentIssue(access(), key, body),
-    create: async (projectKey, summary, description) =>
-      (await createIssue(access(), { projectKey, summary, description })).key,
+    priorities: () => listPriorities(access()),
+    // Исполнителя нет в теле никогда (владелец 25.10.2026) — `createIssue` его и не умеет.
+    create: async (issue) =>
+      (
+        await createIssue(access(), {
+          projectKey: issue.projectKey,
+          summary: issue.summary,
+          description: issue.description,
+          labels: issue.labels,
+          ...(issue.priority ? { priority: issue.priority } : {}),
+        })
+      ).key,
   };
 }
 
@@ -104,18 +155,21 @@ export function atlassianBatchTracker(
     issueTypes: (projectKey) => listIssueTypes(access(), projectKey),
     priorities: () => listPriorities(access()),
     searchOpen: (projectKey) => searchOpenIssues(access(), projectKey),
+    searchSimilar: (projectKey, query) => searchSimilarIssues(access(), projectKey, query),
     comment: (key, body) => commentIssue(access(), key, body),
-    create: async (input) =>
-      (
-        await createIssue(access(), {
-          projectKey: input.projectKey,
-          summary: input.summary,
-          description: input.description,
-          issueType: input.issueType,
-          labels: input.labels,
-          ...(input.priority ? { priority: input.priority } : {}),
-        })
-      ).key,
+    // Исполнителя нет в теле никогда; назначила Jira сама (исполнитель проекта по
+    // умолчанию) — его имя уходит в итог, окно предупредит человека.
+    create: async (input) => {
+      const created = await createIssue(access(), {
+        projectKey: input.projectKey,
+        summary: input.summary,
+        description: input.description,
+        issueType: input.issueType,
+        labels: input.labels,
+        ...(input.priority ? { priority: input.priority } : {}),
+      });
+      return { key: created.key, ...(created.assignee ? { assignee: created.assignee } : {}) };
+    },
     issueUrl: (key) => `${site()}/browse/${encodeURIComponent(key)}`,
   };
 }

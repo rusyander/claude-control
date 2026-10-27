@@ -61,7 +61,13 @@ describe('ProviderChatRun: assistant.parseStdout', () => {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  const run = async (provider: ConfigProvider, chunks: string[], code = 0, stderr = '') => {
+  const run = async (
+    provider: ConfigProvider,
+    chunks: string[],
+    code = 0,
+    stderr = '',
+    extra: Partial<Parameters<ProviderChatRun['start']>[0]> = {},
+  ) => {
     const events: ProviderChatRunEvent[] = [];
     await new ProviderChatRun().start(
       {
@@ -71,6 +77,7 @@ describe('ProviderChatRun: assistant.parseStdout', () => {
         appDataDir: dir,
         detect: () => true,
         spawnImpl: fakeSpawn(chunks, code, stderr),
+        ...extra,
       } as Parameters<ProviderChatRun['start']>[0],
       (event) => events.push(event),
     );
@@ -125,6 +132,27 @@ describe('ProviderChatRun: assistant.parseStdout', () => {
 
   it('CLI сказал «ход удался», потом упал на выходе — ответ цел, не ошибка', async () => {
     const events = await run(getProvider('gemini'), [stream], CRASH, ASSERT);
+    expect(events.at(-1)).toMatchObject({ type: 'done', reply: 'AFTER_TOOL' });
+  });
+
+  it('строки потока — слушателю хода (сторожу групп) все и целиком, ответ тот же', async () => {
+    const rows: unknown[] = [];
+    // Труба режет поток посреди строки: слушатель получает строку только целой.
+    const cut = Math.floor(stream.length / 2);
+    const events = await run(
+      getProvider('gemini'),
+      [stream.slice(0, cut), stream.slice(cut)],
+      CRASH,
+      ASSERT,
+      {
+        onStreamRow: (row) => {
+          rows.push(row);
+          throw new Error('сбой слушателя ответу не мешает');
+        },
+      },
+    );
+    const lines = stream.split('\n').filter((line) => line.trim().startsWith('{'));
+    expect(rows).toEqual(lines.map((line) => JSON.parse(line)));
     expect(events.at(-1)).toMatchObject({ type: 'done', reply: 'AFTER_TOOL' });
   });
 

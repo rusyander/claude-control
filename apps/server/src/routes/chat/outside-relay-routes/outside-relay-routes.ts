@@ -61,6 +61,8 @@ export function registerOutsideRelayRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
   relay: OutsideRelay,
+  /** Ход сессии вне панели кончился (`Stop` без сообщений) — для «Закончил» в Telegram. */
+  turnEnded?: (sessionId: string) => void,
 ): void {
   // Настройки не читаются — хуков для телефона всё равно что нет: карточка
   // покажет команду, а не пропадёт вместе с ответом 500.
@@ -152,11 +154,23 @@ export function registerOutsideRelayRoutes(
     return { id: relay.queue(parsed.data.sessionId, parsed.data.text).id };
   });
 
-  app.post<{ Body: { sessionId?: unknown } }>('/api/outside/messages/take', (req, reply) => {
-    const sessionId = req.body?.sessionId;
-    if (typeof sessionId !== 'string' || !sessionId) {
-      return reply.code(400).send({ error: 'sessionId' });
-    }
-    return { texts: relay.takeMessages(sessionId) };
-  });
+  app.post<{ Body: { sessionId?: unknown; event?: unknown } }>(
+    '/api/outside/messages/take',
+    (req, reply) => {
+      const sessionId = req.body?.sessionId;
+      if (typeof sessionId !== 'string' || !sessionId) {
+        return reply.code(400).send({ error: 'sessionId' });
+      }
+      const texts = relay.takeMessages(sessionId);
+      // Сообщение в очереди продолжает ход — он не кончился.
+      if (req.body?.event === 'Stop' && texts.length === 0) {
+        try {
+          turnEnded?.(sessionId);
+        } catch {
+          // Уведомление — не часть ответа хуку: шаг сессии не ждёт и не падает.
+        }
+      }
+      return { texts };
+    },
+  );
 }

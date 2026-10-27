@@ -49,7 +49,8 @@ export type ColdPlan =
 
 /**
  * Старт и конец хода чужого CLI — сторожу групп (`setWatchListener`). Потока
- * событий у чужого CLI сторожу нет: события он берёт из переписки CLI сам.
+ * событий реестра у чужого CLI нет: события сторож берёт из переписки CLI сам, а
+ * у CLI без переписки (Gemini CLI) — из строк потока хода (`row`).
  * `sessionId` — сессия CLI, если она известна: на старте — продолжаемая, на
  * конце — та, в которой ход прошёл.
  */
@@ -67,4 +68,15 @@ export type ForeignWatchFeed =
        */
       local?: boolean;
     }
-  | { kind: 'finish'; providerId: string; chatId: string; sessionId?: string; group: boolean };
+  | { kind: 'finish'; providerId: string; chatId: string; sessionId?: string; group: boolean }
+  /**
+   * Строка потока JSON хода (Gemini CLI: файла переписки у хода `-p` нет) — сторож
+   * разбирает её своим читателем. Шлётся только у звена группы.
+   */
+  | {
+      kind: 'row';
+      providerId: string;
+      chatId: string;
+      group: true;
+      row: Record<string, unknown>;
+    };

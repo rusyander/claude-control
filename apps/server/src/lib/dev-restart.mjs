@@ -46,6 +46,34 @@ export function appendDevLog(appData, line) {
   }
 }
 
+/**
+ * Поток ошибок сервера (`console.warn`/`error`): keepalive берёт у сторожа лишь
+ * первые 20 строк, stdout выбрасывает — предупреждения панели не оседали нигде
+ * (журнал 26.10, #g8:30: вызов группы шёл 131 с, а чем была занята панель — не
+ * восстановить).
+ */
+export const SERVER_LOG = 'server.log';
+const SERVER_LOG_MAX = 2 * 1024 * 1024;
+
+/** Кусок потока ошибок сервера — построчно, с отметкой времени; больше предела — в `.1`. */
+export function appendServerLog(appData, chunk) {
+  const lines = String(chunk)
+    .split(/\r?\n/)
+    .filter((line) => line.trim());
+  if (lines.length === 0) return;
+  try {
+    mkdirSync(appData, { recursive: true });
+    const file = join(appData, SERVER_LOG);
+    if (existsSync(file) && statSync(file).size > SERVER_LOG_MAX) {
+      renameSync(file, `${file}.1`);
+    }
+    const stamp = new Date().toISOString();
+    appendFileSync(file, lines.map((line) => `${stamp} ${line}\n`).join(''));
+  } catch {
+    // Каталог только для чтения — строки остаются в потоке ошибок сторожа.
+  }
+}
+
 function pidAlive(pid) {
   try {
     process.kill(pid, 0);

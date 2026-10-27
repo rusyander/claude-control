@@ -6,6 +6,7 @@ export {
   splitTicketBatchKeys,
   takeSplitTicketsMutation,
   usePublishSplitTickets,
+  useSplitTicketDuplicates,
   useSplitTicketTarget,
   useTakeSplitTickets,
 } from './api/SplitTicketBatchApi';

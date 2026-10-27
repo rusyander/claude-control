@@ -62,6 +62,14 @@ describe('звено доставки (журнал 59a, 61b)', () => {
     expect(prompt).toContain('AskUserQuestion');
   });
 
+  // g5 25.10 (MR !1101): правка экрана ушла без снимков и без слова почему.
+  it('MR без снимков видимой правки называет это и причину — и в звене, и в преамбуле', () => {
+    const line = 'shipped without them, the description says so and why';
+    expect(prompt).toContain('before/after shots in the MR description');
+    expect(prompt).toContain(line);
+    expect(deliveryPreamble({ branch: 'fix-PROJ-7' })).toContain(line);
+  });
+
   it('группа без звена доставки (работа на потолке) тоже сверяет конфликт до пуша', () => {
     const preamble = deliveryPreamble({ branch: 'fix-PROJ-7' });
 
@@ -79,6 +87,28 @@ describe('звено доставки (журнал 59a, 61b)', () => {
     // Ложное «прошлые звенья гнали только узкие» снято: звено доставки — единственный полный прогон.
     expect(prompt).not.toContain('the earlier stages ran only narrow ones');
     expect(prompt).toContain("it is the group's one full run");
+  });
+
+  // g9 26.10 (F3): полный гейт 5 раз за доставку (~45 мин) — правки шли после него, отказ
+  // сторожа повтора снимался тем же вызовом. Задание звена: узкие, пока правишь; полный — один.
+  it('звено доставки: узкие проверки между правками, полный прогон — один, после последней правки', () => {
+    expect(prompt).toContain('it starts after the last edit');
+    expect(prompt).toContain(
+      "check narrowly — the touched files' own tests, the touched package's type-check and lint",
+    );
+    expect(prompt).toContain(
+      're-run only the red checks plus the narrow checks of what the fix touched',
+    );
+    expect(prompt).toContain('a refused repeat of the full run is never retried unchanged');
+    // Порядок: узкие названы до пуша, внутри шага 6.
+    expect(prompt.indexOf('check narrowly')).toBeLessThan(prompt.indexOf('git push -u origin'));
+  });
+
+  // T3 (g5 25.10): `tests-cli run --health` пишет кейс лёгшего стенда заблокированным,
+  // но группа о флаге не знает, пока задание доставки его не назовёт.
+  it('e2e/live кейсы блока «Тесты» — с --health стенда: лёгший стенд = blocked, не failed', () => {
+    expect(prompt).toContain('`tests-cli run … --health <stand url>`');
+    expect(prompt).toContain('recorded blocked, not failed');
   });
 
   // Владелец 23.10: один полный гейт на группу, в доставке. Замер 23.10 — звенья
@@ -293,7 +323,36 @@ describe('напоминание о доставке, когда не хвата
       'commit the work, push the branch b',
     );
     expect(reportOnlyGaps([unreported, 'нет MR'])).toBe(false);
-    expect(reportOnlyGaps([serverText('tests-gap-failed', { cases: 'auth-001' })])).toBe(false);
+    expect(
+      reportOnlyGaps([
+        serverText('tests-gap-failed', { cases: 'auth-001', command: 'run --base' }),
+      ]),
+    ).toBe(false);
     expect(reportOnlyGaps([])).toBe(false);
+  });
+});
+
+describe('журнал задачи и конец стадии (g8 F6/F9/F11, g9 F10, 26.10)', () => {
+  const deliver = deliverStagePrompt({ branch: 'fix-PROJ-7', after: 'fix' });
+
+  it('журнал в копии: проверки шага 6 — один прогон через gate-run, строки — в свой момент', () => {
+    const step6 = deliver.split('\n').find((line) => line.startsWith('6. ')) ?? '';
+    expect(step6).toContain('gate-run --ticket <keys> "<name>=<command>"');
+    expect(step6).toContain('checks run by hand first make the same full run twice');
+    expect(step6).toContain('08-mr when the MR is created');
+    expect(step6).toContain('11-pipeline at the one read of the pipeline');
+    expect(step6).toContain('the ledger refuses a burst of rows as a backfill');
+  });
+
+  it('оставленное на потом в MR — с ключом задачи, иначе починка или вопрос', () => {
+    const step7 = deliver.split('\n').find((line) => line.startsWith('7. ')) ?? '';
+    expect(step7).toContain('names the tracker key of the task that takes it');
+    expect(step7).toContain('«separately» without a key is a lost item');
+  });
+
+  it('правки кончаются с концом списка, не с первым коммитом', () => {
+    const fix = fixStagePrompt(['🟡 F-01 a.ts:1', '🟡 F-02 b.ts:2']);
+    expect(fix).toContain('The stage ends only when every point of the list is closed');
+    expect(fix).toContain('A commit is not the end');
   });
 });

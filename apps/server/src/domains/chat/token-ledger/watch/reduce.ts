@@ -18,10 +18,18 @@ import {
   noteToolIncidents,
   noteTurnEnd,
   noteTurnStart,
+  loopText,
   quietIncidents,
   sleepInLoopBody,
 } from './reduce-incidents.ts';
 import { absolutePath, bound, capped, normPath, str, under } from './reduce-util.ts';
+import {
+  noteBgDone,
+  noteBgStop,
+  noteEmbedEnd,
+  noteEmbedResult,
+  noteEmbedStart,
+} from './reduce-embed.ts';
 import {
   closeFresh,
   editIntentOf,
@@ -32,7 +40,6 @@ import {
   noteGitWork,
   noteModelSwitch,
 } from './reduce-autonomy.ts';
-import type { LearnedDurations } from './check-signature.ts';
 import {
   COLD_RESUME_MARGIN_TOKENS,
   FRESH_BASE_TOKENS,
@@ -139,6 +146,9 @@ export function quietCauses(state: WatchState): void {
   delete state.rejectedResetsAt;
   delete state.firstCallAt;
   state.freshRewrites = [];
+  delete state.slowCalls;
+  delete state.briefs;
+  delete state.admissions;
   quietIncidents(state);
 }
 
@@ -154,25 +164,31 @@ function panelPath(path: string, ctx: WatchContext): boolean {
   return under(target, root) && !(own && under(target, own));
 }
 
-/** CLI блока «Тесты» панели: его запускают из любого проекта, так велит подсказка самой панели. */
-const TESTS_CLI = 'tools/tests-cli.mjs';
-const RUNS_NODE = /(?:^|[\s;&|(])node(?:\.exe)?\s/;
+/**
+ * Инструменты панели, которые звену велит запускать сама панель: CLI блока «Тесты»
+ * (подсказка блока) и пакет ревью (`reviewPackCommand` в задании стадии ревью).
+ */
+const PANEL_TOOLS = ['tools/tests-cli.mjs', 'tools/review-pack.mjs'];
+// Кавычка перед `node` — тоже запуск: `T="node <панель>/tools/tests-cli.mjs"; $T run` (#g5:400 27.10).
+const RUNS_NODE = /(?:^|[\s;&|("'])node(?:\.exe)?\s/;
 
 /**
- * Запуск CLI тестов панели из копии — работа звена, а не чтение исходников
- * панели (вырезка карточки 22: `node "$T" list` при `T=<панель>/tools/tests-cli.mjs`).
+ * Запуск такого инструмента из копии — работа звена, а не чтение исходников
+ * панели (вырезка карточки 22: `node "$T" list` при `T=<панель>/tools/tests-cli.mjs`;
+ * d9869abf:8 — `node <панель>/tools/review-pack.mjs` по заданию ревью).
  * Чтение того же файла (`grep`, `sed` без `node`) по-прежнему R7.
  */
-function runsPanelTestsCli(token: string, command: string, ctx: WatchContext): boolean {
+function runsPanelTool(token: string, command: string, ctx: WatchContext): boolean {
   if (!ctx.panelRoot || !RUNS_NODE.test(command)) return false;
-  return absolutePath(token, ctx) === `${normPath(ctx.panelRoot)}/${TESTS_CLI}`;
+  const target = absolutePath(token, ctx);
+  return PANEL_TOOLS.some((tool) => target === `${normPath(ctx.panelRoot!)}/${tool}`);
 }
 
 /** Путь к файлам панели в команде — чтение или поиск по ним (`cd <корень> && grep …` тоже). */
 function panelInCommand(command: string, ctx: WatchContext): string | undefined {
   if (!ctx.panelRoot) return undefined;
   for (const token of command.split(/[\s"'`=;|&()<>]+/)) {
-    if (panelPath(token, ctx) && !runsPanelTestsCli(token, command, ctx)) return token;
+    if (panelPath(token, ctx) && !runsPanelTool(token, command, ctx)) return token;
   }
   return undefined;
 }
@@ -182,7 +198,8 @@ export function isSleepPoll(command: string): boolean {
   return (
     LOOP.test(command) &&
     SLEEP.test(command) &&
-    POLLS_OUTPUT.test(command) &&
+    // Опрос — в самом цикле: чтение вывода до или после него опросом цикл не делает.
+    POLLS_OUTPUT.test(loopText(command)) &&
     sleepInLoopBody(command)
   );
 }
@@ -196,14 +213,35 @@ function noteTreeChange(state: WatchState, t: number): void {
   state.reads = {};
   state.errors = {};
   state.lastEditAt = t;
+  state.treeEditAt = t;
+}
+
+/** Заметки и отчёты: их правка проверяемого кода не меняет. */
+const NOTES_PATH = /\.(?:md|txt)$|(?:^|\/)\.agent\//i;
+
+/**
+ * Правка только заметок: `*.md`, `*.txt`, `.agent/**` или файл вне своей копии. Прогон
+ * проверки после неё — тот же прогон по тому же дереву: g1 26.10 прогнал `delivery`
+ * четыре раза, правя между ними лишь ответ в `.agent/`, и R4 молчал — каждая правка
+ * сбрасывала счёт.
+ */
+function notesOnly(path: string, ctx: WatchContext): boolean {
+  const target = absolutePath(path, ctx);
+  if (!target) return NOTES_PATH.test(normPath(path));
+  if (NOTES_PATH.test(target)) return true;
+  return ctx.cwd ? !under(target, normPath(ctx.cwd)) : false;
 }
 
 /** Правка файла (свой Edit или субагента): проверки устарели, чтения этого файла — тоже. */
-function noteEdit(state: WatchState, t: number, path: string | undefined): void {
-  state.checks = {};
-  // Правка между падениями — уже другая попытка (R24).
-  state.errors = {};
+function noteEdit(state: WatchState, t: number, path: string | undefined, ctx: WatchContext): void {
   state.lastEditAt = t;
+  // Правка заметок проверки не устаревает и падение не чинит: счёт R4 и R24 идёт дальше.
+  if (!path || !notesOnly(path, ctx)) {
+    state.checks = {};
+    // Правка между падениями — уже другая попытка (R24).
+    state.errors = {};
+    state.treeEditAt = t;
+  }
   if (!path) return;
   const key = normPath(path);
   for (const read of Object.keys(state.reads)) {
@@ -225,14 +263,20 @@ export function reduce(state: WatchState, event: WatchEvent, ctx: WatchContext):
         state.fresh = true;
         delete state.firstCtx;
         delete state.firstCallAt;
+        delete state.growthBase;
       }
       noteFreshStart(state, event, ctx);
+      noteEmbedStart(state, event, ctx);
       break;
     case 'end':
       state.endedAt = event.t;
       closeFresh(state);
       state.openTools = {};
       noteTurnEnd(state);
+      noteEmbedEnd(state, event.t);
+      break;
+    case 'bgDone':
+      noteBgDone(state, event.taskId);
       break;
     case 'say':
       noteSay(state, event.text);
@@ -244,12 +288,13 @@ export function reduce(state: WatchState, event: WatchEvent, ctx: WatchContext):
       onCall(state, event, ctx);
       break;
     case 'tool':
-      if (event.sidechain) onSidechainTool(state, event);
-      else onTool(state, event, ctx.learned);
+      if (event.sidechain) onSidechainTool(state, event, ctx);
+      else onTool(state, event, ctx);
       noteToolIncidents(state, event, ctx);
       noteGitWork(state, event, ctx);
       noteEditIntent(state, editIntentOf(event, ctx));
       noteAction(state, event.t, actionLabel(event));
+      noteBgStop(state, event);
       // Копия группы — вместе с её субагентами: их чтение панели — тоже R7.
       notePanelRead(state, event, ctx);
       break;
@@ -262,6 +307,8 @@ export function reduce(state: WatchState, event: WatchEvent, ctx: WatchContext):
       // Сжатие меняет начало разговора: следующий вызов кэш не читает и без паузы —
       // падение чтения после него не след остывания (R2 у чужого CLI).
       delete state.lastCacheRead;
+      // Рост окна (R19) считается заново от первого вызова после сжатия — ручного тоже.
+      delete state.growthBase;
       break;
     case 'limit':
       // Замер загрузки окна — дело всего аккаунта (R9 у сторожа), здесь — только исчерпание.
@@ -289,7 +336,8 @@ function onCall(
     if (!event.remainder) noteSubBurn(state, event.t, windowWeight(event, event.model));
     return;
   }
-  const ctxTokens = event.input + event.cacheRead + event.cacheWrite;
+  // Итог хода — сумма запросов, не окно: в кольцо идёт с окном 0, окно разговора по нему не судится.
+  const ctxTokens = event.turnTotal ? 0 : event.input + event.cacheRead + event.cacheWrite;
   const cw1h = write1hPart(event.cacheWrite, event.cacheWrite1h);
   const prevCall = state.calls.at(-1);
   noteFreshCall(state, event);
@@ -330,6 +378,7 @@ function onCall(
     state.firstCtx = ctxTokens;
     if (state.fresh) state.firstCallAt = event.t;
   }
+  state.growthBase ??= ctxTokens;
   state.fresh = false;
   state.awaitingFirstCall = false;
   state.lastCallAt = event.t;
@@ -412,8 +461,9 @@ function noteForeignCold(
 function onTool(
   state: WatchState,
   event: Extract<WatchEvent, { kind: 'tool' }>,
-  learned: LearnedDurations | undefined,
+  ctx: WatchContext,
 ): void {
+  const learned = ctx.learned;
   const input = event.input;
   const timeout = typeof input.timeout === 'number' ? input.timeout : undefined;
   const question = askText(input);
@@ -434,13 +484,16 @@ function onTool(
     ...(expect !== undefined ? { expectMs: expect } : {}),
     ...(signature || fullGate ? { check: true } : {}),
     ...(fullGate ? { fullGate: true } : {}),
+    ...((signature || fullGate) && state.treeEditAt !== undefined
+      ? { editAt: state.treeEditAt }
+      : {}),
     ...(event.stage ? { stage: event.stage } : {}),
     sig: inputSig(event.name, input),
     ...(print ? { print } : {}),
   };
 
   if (EDIT_TOOLS.has(event.name)) {
-    noteEdit(state, event.t, str(input.file_path) ?? str(input.notebook_path));
+    noteEdit(state, event.t, str(input.file_path) ?? str(input.notebook_path), ctx);
     return;
   }
 
@@ -491,10 +544,29 @@ function onTool(
       lastAt: event.t,
       command: maskCommand(command),
     });
+    const open = state.openTools[event.id];
+    if (open) {
+      open.checkSig = signature;
+      if (check.runs > 0) open.checkPrevAt = check.lastAt;
+    }
     check.runs += 1;
     check.lastAt = event.t;
     bound(state.checks);
   }
+}
+
+/**
+ * Отбитая стражем или правом проверка не шла (P7, g5 25.10: три отказа `gate-at-end` на
+ * одной команде R4 называл «тремя прогонами»). Счёт со старта вызова снимается обратно;
+ * правка дерева между стартом и ответом уже сбросила записи — снимать нечего.
+ */
+function uncountRefusedCheck(state: WatchState, tool: OpenTool): void {
+  const sig = tool.checkSig;
+  const check = sig ? state.checks[sig] : undefined;
+  if (!sig || !check) return;
+  check.runs -= 1;
+  if (check.runs <= 0) delete state.checks[sig];
+  else if (tool.checkPrevAt !== undefined) check.lastAt = tool.checkPrevAt;
 }
 
 /**
@@ -503,9 +575,13 @@ function onTool(
  * `noteToolIncidents`), а правка файлов меняет дерево, общее со звеном: прежние
  * проверки и чтения звена устарели.
  */
-function onSidechainTool(state: WatchState, event: Extract<WatchEvent, { kind: 'tool' }>): void {
+function onSidechainTool(
+  state: WatchState,
+  event: Extract<WatchEvent, { kind: 'tool' }>,
+  ctx: WatchContext,
+): void {
   if (EDIT_TOOLS.has(event.name)) {
-    noteEdit(state, event.t, str(event.input.file_path) ?? str(event.input.notebook_path));
+    noteEdit(state, event.t, str(event.input.file_path) ?? str(event.input.notebook_path), ctx);
     return;
   }
   if (event.name === 'Bash' && changesTree(str(event.input.command) ?? '')) {
@@ -586,7 +662,9 @@ function onToolResult(
   if (event.denied && tool.name !== 'AskUserQuestion' && !firstDeferral(state, tool, event)) {
     capped(state.denials, { at: event.t, guard: event.denied });
   }
+  if (event.denied) uncountRefusedCheck(state, tool);
   noteHeavyCheck(state, tool, event, ctx);
+  noteEmbedResult(state, tool, event, ctx);
 }
 
 const DEFERRED_CALLS_CAP = 200;
@@ -604,7 +682,10 @@ function firstDeferral(
   tool: OpenTool,
   event: Extract<WatchEvent, { kind: 'toolResult' }>,
 ): boolean {
-  if (event.denied !== 'deferred') return false;
+  // Отказ карточки правила — тот же род: он доставляет правило и велит повторить вызов, первый раз
+  // это не стена (g8 26.10: из шести отказов R18 один был карточкой). Тот же вызов в ту же карточку
+  // снова — уже стена.
+  if (event.denied !== 'deferred' && event.denied !== 'rule-card') return false;
   const key = `${tool.name}|${tool.print ?? tool.sig ?? tool.label ?? ''}`;
   const seen = (state.deferredCalls ??= []);
   if (seen.includes(key)) return false;
@@ -639,6 +720,7 @@ function noteHeavyCheck(
     minutes: ranMs / MINUTE_MS,
     label: tool.label ?? tool.name,
     ...(tool.stage ? { stage: tool.stage } : {}),
+    ...(tool.editAt !== undefined ? { editAt: tool.editAt } : {}),
   });
 }
 

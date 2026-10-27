@@ -168,7 +168,7 @@ describe('model output is data (draftsFromReply)', () => {
       'en',
     );
     expect(seen).toContain('"id":"C1"');
-    expect(seen).toContain('write title, summary and problems in English');
+    expect(seen).toContain('write title, summary, fix, acceptance and problems in English');
     expect(seen).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz0123456789');
   });
 });
@@ -187,7 +187,7 @@ describe('priorityFor (severity → Jira priority by name)', () => {
       clusters: clusterSplitTickets(open(['A', 'a.ts:1'])),
       details: new Map(),
     };
-    const text = issueDescription(issue, 'en', 'low');
+    const text = issueDescription(issue, 'en', { side: 'other', severity: 'low' });
     expect(text).toContain('Severity: low (Jira has no priority with this name)');
     expect(text).toContain('1. A\nWhere: a.ts:1\nEvidence: why\nFound by groups: G');
   });
@@ -203,7 +203,7 @@ describe('SplitTicketMarks + publishTickets', () => {
         await new Promise((done) => setTimeout(done, 5));
         if (fail(input)) throw Object.assign(new Error('Jira 500'), { messageCode: 'nope' });
         created.push(input);
-        return `PROJ-${next++}`;
+        return { key: `PROJ-${next++}` };
       },
       searchOpen: async () => [],
       comment: async () => {
@@ -247,7 +247,9 @@ describe('SplitTicketMarks + publishTickets', () => {
       ['PROJ-1', 'PROJ-2'],
       ['PROJ-1', 'PROJ-1'],
     ]);
-    expect(created[0]?.labels).toEqual(['agentdeck-proposal']);
+    // Ни модели, ни серьёзности — всё равно сторона и приоритет «средний» (25.10.2026).
+    expect(created[0]?.labels).toEqual(['other', 'agentdeck-proposal']);
+    expect(created[0]?.priority).toBe('Medium');
   });
 
   it('single «File» racing the batch on the same proposal: one issue, the batch reuses its key', async () => {
@@ -255,14 +257,19 @@ describe('SplitTicketMarks + publishTickets', () => {
     const marks = new SplitTicketMarks(store);
     const { api, created } = tracker();
     const key = splitTicketKey({ title: 'A', where: 'a.ts:1' });
-    const single = marks.fileKeys('p', [key], () =>
-      api.create({
-        projectKey: 'PROJ',
-        summary: 'single',
-        description: '',
-        issueType: 'Bug',
-        labels: [],
-      }),
+    const single = marks.fileKeys(
+      'p',
+      [key],
+      async () =>
+        (
+          await api.create({
+            projectKey: 'PROJ',
+            summary: 'single',
+            description: '',
+            issueType: 'Bug',
+            labels: [],
+          })
+        ).key,
     );
     const batch = publishTickets(
       { marks, record: () => store.get(), tracker: api },
@@ -311,7 +318,10 @@ describe('SplitTicketMarks + publishTickets', () => {
     expect(retry.issues.map((issue) => issue.title)).toEqual(['B issue']);
     expect(retry.failed).toEqual([]);
     expect(created.map((issue) => issue.summary)).toEqual(['A issue', 'B issue']);
-    expect(created[1]).toMatchObject({ priority: 'Low', labels: ['agentdeck-proposal'] });
+    expect(created[1]).toMatchObject({
+      priority: 'Low',
+      labels: ['other', 'agentdeck-proposal'],
+    });
   });
 
   it('a key not in the record is refused before any tracker call', async () => {
@@ -319,14 +329,19 @@ describe('SplitTicketMarks + publishTickets', () => {
     const marks = new SplitTicketMarks(store);
     const { api, created } = tracker();
     await expect(
-      marks.fileKeys('p', ['invented|key'], () =>
-        api.create({
-          projectKey: 'P',
-          summary: 's',
-          description: '',
-          issueType: 'Bug',
-          labels: [],
-        }),
+      marks.fileKeys(
+        'p',
+        ['invented|key'],
+        async () =>
+          (
+            await api.create({
+              projectKey: 'P',
+              summary: 's',
+              description: '',
+              issueType: 'Bug',
+              labels: [],
+            })
+          ).key,
       ),
     ).rejects.toMatchObject({ messageCode: 'split-ticket-missing' });
     expect(created).toEqual([]);

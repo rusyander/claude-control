@@ -1,4 +1,12 @@
-import { boolean, number, object, string, enum as zodEnum, type infer as Infer } from 'zod';
+import {
+  boolean,
+  number,
+  object,
+  string,
+  enum as zodEnum,
+  type infer as Infer,
+  type input,
+} from 'zod';
 
 /**
  * Ответы из Telegram: вопрос панели, который ждёт человека дольше
@@ -24,8 +32,15 @@ export const telegramAnswersSettingsSchema = object({
   ownerId: string()
     .regex(/^(\d{1,20})?$/)
     .default(''),
+  /**
+   * Как владелец назвался при подключении по /start: «Анна (@anna)». Только для
+   * карточки («Кому пишет»); id сменили руками — имя стирается, чужим оно не станет.
+   */
+  ownerName: string().max(200).default(''),
 });
 export type TelegramAnswersSettings = Infer<typeof telegramAnswersSettingsSchema>;
+/** То же до умолчаний: поля, которых нет, схема дополнит. */
+export type TelegramAnswersSettingsInput = input<typeof telegramAnswersSettingsSchema>;
 
 /**
  * Что прислала форма. Токен — только когда его тронули: пустая строка стирает
@@ -99,4 +114,67 @@ export interface TelegramAnswersView {
   status: TelegramAnswersStatus;
   /** Сколько вопросов сейчас ждёт ответа в Telegram. */
   open: number;
+}
+
+/**
+ * Подключение бота командой /start: панель на пять минут открывает окно и ждёт
+ * `/start` в личном чате с ботом. Пришедший — только кандидат: id в настройки
+ * ложится после того, как человек в панели подтвердит «это я».
+ *
+ * - `idle` — окно не открыто;
+ * - `waiting` — ждём `/start` до `expiresAt`;
+ * - `candidate` — пришёл `/start`, ждёт подтверждения в панели;
+ * - `expired` — пять минут прошли без `/start`;
+ * - `confirmed` — подтверждено: чат уведомлений и владелец ответов записаны;
+ * - `failed` — окно не открылось или опрос оборвался (`reason`).
+ */
+export const TELEGRAM_CONNECT_STATES = [
+  'idle',
+  'waiting',
+  'candidate',
+  'expired',
+  'confirmed',
+  'failed',
+] as const;
+export type TelegramConnectState = (typeof TELEGRAM_CONNECT_STATES)[number];
+
+/**
+ * Почему окно не открылось:
+ * - `no-token` — в карточке Telegram нет токена бота;
+ * - `same-bot` — этого бота слушает агент (MCP или канал): второй слушатель
+ *   отнимал бы у него сообщения;
+ * - `unauthorized` — Telegram не принял токен;
+ * - `webhook` — у бота стоит вебхук, опрос невозможен;
+ * - `conflict` — бота уже слушает кто-то другой (409);
+ * - `network` — сеть или сервис не ответили.
+ */
+export const TELEGRAM_CONNECT_REASONS = [
+  'no-token',
+  'same-bot',
+  'unauthorized',
+  'webhook',
+  'conflict',
+  'network',
+] as const;
+export type TelegramConnectReason = (typeof TELEGRAM_CONNECT_REASONS)[number];
+
+/** Кто прислал `/start`: имя, ник и числовой id (он же id личного чата). */
+export interface TelegramConnectCandidate {
+  id: string;
+  firstName: string;
+  username?: string;
+}
+
+/** Ответ маршрутов `/api/integrations/telegram/connect*`. */
+export interface TelegramConnectView {
+  state: TelegramConnectState;
+  /** Ник бота без `@`. */
+  bot?: string;
+  /** `https://t.me/<бот>` — куда человеку нажать «Start». */
+  link?: string;
+  expiresAt?: string;
+  candidate?: TelegramConnectCandidate;
+  reason?: TelegramConnectReason;
+  /** Подробность Telegram — без токена. */
+  detail?: string;
 }

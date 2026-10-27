@@ -5,10 +5,10 @@
  */
 export const usageLimitsRu = {
   title: 'Лимиты подписки',
-  session: 'Сессия (5 ч)',
+  session: 'Сессия',
   weekly: 'Неделя',
   weeklyModel: 'Неделя · {{model}}',
-  reset: 'сброс {{time}}',
+  reset: 'сброс через {{until}}',
   resetUnknown: 'сброс не назван',
   aria: '{{label}}: использовано {{percent}}, {{reset}}',
   tooltipUsed: '{{label}}: использовано {{percent}}',

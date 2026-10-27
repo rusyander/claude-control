@@ -1,6 +1,7 @@
 import { nearDuplicate, type SplitTicketCluster } from '@agentdeck/contracts/split-ticket-batch';
-import { fingerprintOf, fingerprintsIn } from './compose.ts';
+import { fingerprintOf } from './compose.ts';
 import type { TicketDraft } from './prepare.ts';
+import { NO_PRINTS, printsOf, type OpenTrackerIssue, type TicketPrints } from './prints.ts';
 
 /**
  * Сверка с открытыми задачами трекера ДО заведения (ревизия 3): про то, что уже
@@ -9,20 +10,17 @@ import type { TicketDraft } from './prepare.ts';
  * Сверка по дефекту, а не по задаче целиком: в задаче из трёх дефектов
  * открытым может оказаться один — он уходит комментарием, два других заводятся.
  * Признаки, по убыванию силы:
- * - отпечаток находки (`agentdeck-fp:` в описании или комментарии) — её уже
- *   заводили или комментировали, пусть из другого разделения;
+ * - отпечаток находки — её уже заводили или комментировали, пусть из другого
+ *   разделения: память панели (`prints.ts`), у задач до 26.10.2026 — ещё и
+ *   строка `agentdeck-fp:` в описании (только чтение);
  * - название находки близко к названию задачи (`nearDuplicate`) — задачу
  *   завёл человек или другой инструмент.
  * Название, которое придумала модель, сверяется только у задачи из одного
  * дефекта: общее название связки слишком размыто, чтобы склеить по нему чужую задачу.
  */
 
-/** Открытая задача трекера — то, что сверке нужно знать. */
-export interface OpenTrackerIssue {
-  key: string;
-  summary: string;
-  description: string;
-}
+// Тип живёт в `prints.ts`: отпечатки читают задачу, а сверка — отпечатки; обратный импорт был циклом.
+export type { OpenTrackerIssue } from './prints.ts';
 
 /** Дефекты задачи, которые уходят комментарием в открытую задачу. */
 export interface ExistingMatch {
@@ -49,19 +47,27 @@ function clusterMatch(
   );
 }
 
+/**
+ * `exempt` — ключи находок, про которые человек сказал «это другой дефект,
+ * завести» (проверка на повторы, 25.10.2026): их склейки не сверяются вовсе.
+ */
 export function splitByExisting(
   draft: TicketDraft,
   open: readonly OpenTrackerIssue[],
+  exempt: ReadonlySet<string> = new Set(),
+  memory: TicketPrints = NO_PRINTS,
 ): SplitByExisting {
   if (open.length === 0) return { comments: [], rest: draft };
-  const prints = open.map((issue) => fingerprintsIn(issue.description));
+  const prints = open.map((issue) => printsOf(issue, memory));
   const single = draft.clusters.length === 1;
   const byKey = new Map<string, ExistingMatch>();
   const kept: SplitTicketCluster[] = [];
   for (const cluster of draft.clusters) {
-    const issue =
-      clusterMatch(cluster, open, prints) ??
-      (single ? open.find((item) => nearDuplicate(draft.title, item.summary)) : undefined);
+    const free = cluster.tickets.some((ticket) => exempt.has(ticket.key));
+    const issue = free
+      ? undefined
+      : (clusterMatch(cluster, open, prints) ??
+        (single ? open.find((item) => nearDuplicate(draft.title, item.summary)) : undefined));
     if (!issue) {
       kept.push(cluster);
       continue;

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -32,7 +32,7 @@ const SPAWN = 'Do X. [return-format] deliverable to .agent/tmp/x.md [no-subagent
 
 type Out = { raw: string; json: Record<string, unknown> | null };
 
-function run(event: string, payload: object, cli?: string): Out {
+function run(event: string, payload: object, cli?: string, env: Record<string, string> = {}): Out {
   const res = spawnSync(process.execPath, [DISPATCH, event, ...(cli ? [`--cli=${cli}`] : [])], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
@@ -42,6 +42,7 @@ function run(event: string, payload: object, cli?: string): Out {
       AGENTDECK_KIT_CLI: '',
       AGENTDECK_HEAVY_QUEUE_DIR: '',
       AGENTDECK_KIT_STATE: STATE,
+      ...env,
     },
     timeout: 20_000,
   });
@@ -412,4 +413,704 @@ describe('опознание CLI не трогает Claude, Qwen и Codex', () 
     expect(cliOf(odd)).toBe('goose');
     expect((await lib()).normalize(odd)[0]!.tool_name).toBe('constructor');
   });
+});
+
+/**
+ * P-19 (25.10, группа #0): mustfail одного файла (`--files`, секунды) отказывался как «известный
+ * долгий гейт, больше 10 мин». Совет cmd-duration у каждого диалекта — свой (фон Claude/Kimi
+ * `run_in_background`, Qwen/Gemini `is_background`, у OpenCode фона нет — совет по таймауту), а
+ * список известных гейтов один: `lib/cmd-duration.mjs`. Codex и Goose совета не получают вовсе
+ * (ни флага фона, ни таймаута в мс) — сюда не входят.
+ */
+describe('cmd-duration по диалектам: mustfail --files — не известный долгий гейт (P-19)', () => {
+  const WHOLE = 'node tools/mustfail.mjs --base HEAD --cmd "npx vitest run a.test.ts"';
+  // Узкие формы: файлы с правкой, один плановый мутант, план мутантов нового теста.
+  const NARROW = [
+    'node tools/mustfail.mjs --base HEAD --files src/a.ts --cmd "npx vitest run a.test.ts"',
+    'node tools/mustfail.mjs --mutate src/a.ts:12 --cmd "npx vitest run a.test.ts"',
+    'node tools/mustfail.mjs --mutants plan.json --cmd "npx vitest run a.test.ts"',
+  ];
+  const DIALECTS: {
+    cli: string;
+    call: (session: string, command: string) => object;
+    hint: RegExp;
+  }[] = [
+    {
+      cli: 'claude',
+      call: (session, command) => ({
+        hook_event_name: 'PreToolUse',
+        session_id: session,
+        cwd: PROJECT,
+        tool_name: 'Bash',
+        tool_input: { command },
+      }),
+      hint: /run_in_background/,
+    },
+    {
+      cli: 'qwen',
+      call: (session, command) => ({
+        hook_event_name: 'PreToolUse',
+        session_id: session,
+        cwd: PROJECT,
+        tool_name: 'run_shell_command',
+        tool_input: { command },
+      }),
+      hint: /is_background/,
+    },
+    {
+      cli: 'gemini',
+      call: (session, command) => ({
+        hook_event_name: 'BeforeTool',
+        session_id: session,
+        cwd: PROJECT,
+        transcript_path: '',
+        tool_name: 'run_shell_command',
+        tool_input: { command },
+      }),
+      hint: /is_background/,
+    },
+    {
+      cli: 'kimi',
+      call: (session, command) => ({
+        hook_event_name: 'PreToolUse',
+        session_id: session,
+        cwd: PROJECT,
+        tool_name: 'Shell',
+        tool_input: { command, timeout: 60 },
+        tool_call_id: `k-${session}`,
+      }),
+      hint: /run_in_background/,
+    },
+    {
+      cli: 'opencode',
+      call: (session, command) => ({
+        hook_event_name: 'PreToolUse',
+        session_id: session,
+        cwd: PROJECT,
+        tool_name: 'bash',
+        tool_input: { command },
+        tool_use_id: `call-${session}`,
+      }),
+      hint: /Pass timeout/,
+    },
+  ];
+
+  for (const { cli, call, hint } of DIALECTS) {
+    it(`${cli}: весь дифф — известный гейт с советом своего CLI, --files — тишина`, () => {
+      const whole = run('pre', call(`p19-${cli}-whole`, WHOLE), cli).raw;
+      expect(whole).toMatch(/cmd-duration: this command is a known long gate/);
+      expect(whole).toMatch(hint);
+      NARROW.forEach((command, index) => {
+        expect(run('pre', call(`p19-${cli}-narrow-${index}`, command), cli).raw).not.toMatch(
+          /cmd-duration/,
+        );
+      });
+    });
+  }
+});
+
+/**
+ * P-21 (25.10, группа #5): `git merge-tree … --quiet` на git 2.55 отвечает кодом 0 на настоящий
+ * конфликт — группа читала «конфликта нет» и теряла ходы. Отказ с верной командой живёт в одном
+ * `lib/git-guard.mjs`; у каждого CLI свой вход оболочки и своя форма отказа, проверяется, что
+ * каждый диалект набора доходит до него, а сверка без `--quiet` проходит.
+ */
+const shell =
+  (tool: string, extra: Record<string, unknown> = {}) =>
+  (s: string, c: string, cwd = PROJECT) => ({
+    hook_event_name: 'PreToolUse',
+    session_id: s,
+    cwd,
+    tool_name: tool,
+    tool_input: { command: c },
+    ...extra,
+  });
+/** Вызов оболочки в родной форме каждого CLI набора (P-21..P-23). */
+const SHELLS: { cli: string; call: (s: string, c: string, cwd?: string) => object }[] = [
+  { cli: 'claude', call: shell('Bash') },
+  { cli: 'qwen', call: shell('run_shell_command') },
+  {
+    cli: 'gemini',
+    call: (s, c, cwd) => ({
+      ...shell('run_shell_command')(s, c, cwd),
+      hook_event_name: 'BeforeTool',
+    }),
+  },
+  { cli: 'kimi', call: (s, c, cwd) => ({ ...shell('Shell')(s, c, cwd), tool_call_id: `k-${s}` }) },
+  {
+    cli: 'opencode',
+    call: (s, c, cwd) => ({ ...shell('bash')(s, c, cwd), tool_use_id: `call-${s}` }),
+  },
+  { cli: 'codex', call: (s, c, cwd) => ({ ...shell('Bash')(s, c, cwd), turn_id: `t-${s}` }) },
+  {
+    cli: 'goose',
+    call: (s, c, cwd = PROJECT) => ({
+      session_id: s,
+      event: 'PreToolUse',
+      matcher_context: 'shell',
+      tool_name: 'shell',
+      tool_input: { command: c },
+      working_dir: cwd,
+      tool_call_id: `g-${s}`,
+    }),
+  },
+];
+// Отказ Claude-формы (Claude, Qwen, Kimi, OpenCode, Codex) или верхнего уровня (Gemini, Goose).
+const refusal = (out: Out) => denied(out) ?? blocked(out);
+
+describe('git-guard по диалектам: merge-tree --quiet отклонён с верной командой (P-21)', () => {
+  const QUIET = 'git merge-tree --write-tree --quiet origin/main HEAD';
+  const RIGHT = 'git merge-tree --write-tree --name-only origin/main HEAD > .agent/tmp/mt.txt';
+
+  for (const { cli, call } of SHELLS) {
+    it(`${cli}: --quiet — отказ с --name-only, без --quiet — пропуск`, () => {
+      const reason = refusal(run('pre', call(`p21-${cli}-quiet`, QUIET), cli));
+      expect(reason).toMatch(/git-guard\(merge-tree\)/);
+      expect(reason).toMatch(/--name-only/);
+      expect(refusal(run('pre', call(`p21-${cli}-right`, RIGHT), cli))).toBeUndefined();
+    });
+  }
+});
+
+/**
+ * P-22 (25.10, группа #5 #112): правка черновика python-heredoc'ом после `cd $S/…` отказывалась —
+ * `$S` из той же команды не раскрывался, файл черновика читался файлом проекта. Судья один,
+ * `lib/inline-edit-guard.mjs`; проверяется, что каждый диалект набора до него доходит.
+ */
+describe('inline-edit-guard по диалектам: cd $S/… раскрывает переменную той же команды (P-22)', () => {
+  const py = `python - <<'EOF'\nopen('handlers.go','w').write('x')\nEOF`;
+  const SCRATCH = `W=${PROJECT}; S=$W/.agent/tmp/r/scratch; cd $S/inst-auth; ${py}`;
+  const SOURCE = `W=${PROJECT}; S=$W/src; cd $S; ${py}`;
+
+  for (const { cli, call } of SHELLS) {
+    it(`${cli}: черновик через $S — пропуск, src через $S — отказ`, () => {
+      expect(refusal(run('pre', call(`p22-${cli}-scratch`, SCRATCH), cli))).toBeUndefined();
+      expect(refusal(run('pre', call(`p22-${cli}-src`, SOURCE), cli))).toMatch(
+        /inline code writing a file/,
+      );
+    });
+  }
+});
+
+/**
+ * P-23 (25.10, группа #5): `P=…; cat -n $P/a $P/b` печатал файлы мимо потолка чтения — 3 из 6
+ * сохранённых выгрузок назвали файлы через переменную. Потолок один, `lib/bash-read-cap.mjs`;
+ * проверяется, что каждый диалект набора до него доходит в звене группы.
+ */
+describe('bash-read-cap по диалектам: путь через переменную той же команды считается (P-23)', () => {
+  const cap = join(dir, 'p23');
+  mkdirSync(cap, { recursive: true });
+  const body = Array.from({ length: 250 }, (_, i) => `export const v${i} = '${'x'.repeat(60)}';\n`);
+  writeFileSync(join(cap, 'a.ts'), body.join(''));
+  writeFileSync(join(cap, 'b.ts'), body.join(''));
+  const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
+  const capped = (out: Out) => /bash-read-cap/.test(refusal(out) ?? '');
+
+  for (const { cli, call } of SHELLS) {
+    it(`${cli}: $P/a $P/b и цикл по $P — потолок, неизвестная переменная — нет`, () => {
+      const at = (tag: string, command: string) =>
+        capped(run('pre', call(`p23-${cli}-${tag}`, command, cap), cli, CHILD));
+      expect(at('cat', 'P=.; cat -n $P/a.ts $P/b.ts')).toBe(true);
+      expect(at('for', 'P=.; for f in $P/a.ts $P/b.ts; do cat "$f"; done')).toBe(true);
+      expect(at('unset', 'cat $UNSET/a.ts $UNSET/b.ts')).toBe(false);
+    });
+  }
+});
+
+/**
+ * P-40 (26.10, аудит g1): `cat f &>/dev/null` считался печатью файла — `&>` / `&>>` уводят и stdout,
+ * потолок чтения такой вызов не касается. Судья один, `lib/bash-read-cap.mjs` `redirected`;
+ * проверяется, что каждый диалект набора до него доходит в звене группы (шаблон P-23).
+ */
+describe('bash-read-cap по диалектам: вывод, уведённый &> / &>>, — не печать (P-40)', () => {
+  const cap = join(dir, 'p40');
+  mkdirSync(cap, { recursive: true });
+  const body = Array.from({ length: 250 }, (_, i) => `export const v${i} = '${'x'.repeat(60)}';\n`);
+  writeFileSync(join(cap, 'a.ts'), body.join(''));
+  writeFileSync(join(cap, 'b.ts'), body.join(''));
+  const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
+  const capped = (out: Out) => /bash-read-cap/.test(refusal(out) ?? '');
+
+  for (const { cli, call } of SHELLS) {
+    it(`${cli}: &>/dev/null и &>>лог — пропуск, тот же cat в вывод — потолок`, () => {
+      const at = (tag: string, command: string) =>
+        capped(run('pre', call(`p40-${cli}-${tag}`, command, cap), cli, CHILD));
+      expect(at('print', 'cat -n a.ts b.ts')).toBe(true);
+      expect(at('null', 'cat -n a.ts b.ts &>/dev/null')).toBe(false);
+      expect(at('append', 'cat -n a.ts b.ts &>> .agent/tmp/out.log')).toBe(false);
+    });
+  }
+});
+
+/**
+ * P-20 (25.10): стенограмму чужого CLI кит не читает, и гейт, пропущенный китом на PreToolUse, а
+ * потом отказанный (человеком, правилами самого CLI, чужим хуком), читался исполненным: следующий
+ * гейт получал «nothing was edited since» — правки кит тоже не видел. Теперь исполнение подтверждает
+ * `ran` из post-хука, правки считаются по журналу сессии кита.
+ */
+describe('gate-at-end у чужих CLI: запуск без post-хука не исполнен, правки — из журнала (P-20)', () => {
+  const GATE = 'pnpm type-check && pnpm lint && pnpm test';
+  type Shape = { cli: string; tool: string; bg?: string; goose?: boolean; extra?: object };
+  const SHAPES: Shape[] = [
+    { cli: 'qwen', tool: 'run_shell_command', bg: 'is_background' },
+    { cli: 'codex', tool: 'Bash', extra: { turn_id: 't' } },
+    { cli: 'opencode', tool: 'bash' },
+    { cli: 'kimi', tool: 'Shell', bg: 'run_in_background' },
+    { cli: 'goose', tool: 'shell', goose: true },
+    { cli: 'gemini', tool: 'run_shell_command', bg: 'is_background' },
+  ];
+  const at = (s: Shape, session: string, event: 'PreToolUse' | 'PostToolUse', id: string) => {
+    const tool_input = { command: GATE, ...(s.bg ? { [s.bg]: true } : {}) };
+    return s.goose
+      ? {
+          session_id: session,
+          event,
+          tool_name: s.tool,
+          tool_input,
+          working_dir: PROJECT,
+          tool_call_id: id,
+        }
+      : {
+          // Gemini зовёт те же события BeforeTool/AfterTool.
+          hook_event_name:
+            s.cli === 'gemini' ? (event === 'PreToolUse' ? 'BeforeTool' : 'AfterTool') : event,
+          session_id: session,
+          cwd: PROJECT,
+          tool_name: s.tool,
+          tool_input,
+          tool_use_id: id,
+          ...s.extra,
+        };
+  };
+  const gateDeny = (out: Out) => /gate-at-end/.test(refusal(out) ?? '');
+
+  for (const s of SHAPES) {
+    it(`${s.cli}: отказанный после кита гейт не считается, исполненный (post) — считается`, () => {
+      const session = `p20-${s.cli}`;
+      expect(gateDeny(run('pre', at(s, session, 'PreToolUse', 'g1'), s.cli))).toBe(false);
+      // g1 так и не исполнен — post не пришёл; следующий гейт не «уже был».
+      expect(gateDeny(run('pre', at(s, session, 'PreToolUse', 'g2'), s.cli))).toBe(false);
+      run('post-any', at(s, session, 'PostToolUse', 'g2'), s.cli);
+      // g2 исполнен, правок после него нет — отказ «nothing was edited since».
+      expect(refusal(run('pre', at(s, session, 'PreToolUse', 'g3'), s.cli))).toMatch(
+        /nothing was edited since the full gate/,
+      );
+    });
+  }
+
+  it('qwen: правка после исполненного гейта видна — отказ follow-up с числом правок', () => {
+    const q = SHAPES[0]!;
+    const session = 'p20-qwen-edit';
+    expect(gateDeny(run('pre', at(q, session, 'PreToolUse', 'g1'), 'qwen'))).toBe(false);
+    run('post-any', at(q, session, 'PostToolUse', 'g1'), 'qwen');
+    const edit = {
+      hook_event_name: 'PreToolUse',
+      session_id: session,
+      cwd: PROJECT,
+      tool_name: 'replace',
+      tool_input: { file_path: `${PROJECT}/src/a.ts`, old_string: 'a', new_string: 'b' },
+    };
+    expect(refusal(run('pre', edit, 'qwen'))).toBeUndefined();
+    expect(refusal(run('pre', at(q, session, 'PreToolUse', 'g2'), 'qwen'))).toMatch(
+      /already ran at .*1 edit\(s\) since/,
+    );
+  });
+});
+
+describe('post-хук оболочки у каждого варианта набора — источник `ran` (P-20)', () => {
+  const read = (p: string) => readFileSync(join(KIT, '..', 'variants', p), 'utf8');
+  type Entry = { matcher?: string; hooks: { command: string }[] };
+  const postShell = (entries: Entry[] | undefined, tool: string) =>
+    (entries ?? []).some(
+      (e) =>
+        new RegExp(e.matcher === '*' ? '.*' : (e.matcher ?? '.*')).test(tool) &&
+        e.hooks.some((h) => /run\.mjs" post-any/.test(h.command)),
+    );
+
+  it('Qwen (hooks.json набора), Codex, Gemini, Goose: PostToolUse/AfterTool ловит оболочку', () => {
+    const own = JSON.parse(readFileSync(join(KIT, 'hooks', 'hooks.json'), 'utf8'));
+    expect(postShell(own.hooks.PostToolUse, 'run_shell_command')).toBe(true);
+    const codex = JSON.parse(read('codex/hooks/hooks.codex.json'));
+    expect(postShell(codex.hooks.PostToolUse, 'Bash')).toBe(true);
+    const gemini = JSON.parse(read('gemini/hooks/hooks.json'));
+    expect(postShell(gemini.hooks.AfterTool, 'run_shell_command')).toBe(true);
+    const goose = JSON.parse(read('goose/hooks/hooks.json'));
+    expect(postShell(goose.hooks.PostToolUse, 'shell')).toBe(true);
+  });
+
+  it('Kimi: [[hooks]] PostToolUse по Shell; OpenCode: tool.execute.after зовёт post-any', () => {
+    const kimi = read('kimi/hooks.toml');
+    expect(kimi).toMatch(/event = "PostToolUse"\nmatcher = "\^Shell\$"\ncommand = "[^\n]*post-any/);
+    const opencode = read('opencode/plugins/agentdeck-kit.js');
+    expect(opencode).toMatch(/'tool\.execute\.after'[\s\S]*?dispatch\('post-any'/);
+  });
+});
+
+/**
+ * P-29 (26.10, K B2): три правки судей гейта набора — `node --check` только разбирает файл (не гейт и не
+ * долгий гейт cmd-duration), gate-run — гейт только словом команды (присваивание пути и `cat` — нет), а
+ * переписанный вызов гейт-скрипта (`timeout 900`, env, `./`, кавычки, `cd <тот же каталог> &&`) — тот же
+ * гейт. Судьи одни, `lib/gate-at-end.mjs` и `lib/cmd-duration.mjs`; у чужого CLI история гейтов — журнал
+ * сессии набора (`ran` из post-хука, P-20), и проверяется, что каждый диалект доходит до тех же судей.
+ */
+describe('судьи гейта 26.10 по диалектам: node --check, gate-run словом команды, переписанный гейт (P-29)', () => {
+  const RUNNER = 'C:/work/x/tools/gate-run.mjs';
+  const RUN = `node ${RUNNER} --ticket PROJ-1 "lint=npm run lint"`;
+  const NAMED = [`K=${RUNNER}`, `cat ${RUNNER}`, `node --check ${RUNNER} && echo syntax-ok`];
+  const GATE = 'node scripts/check_frontend_tests.mjs > .agent/tmp/t1.log 2>&1';
+  const reworded = (project: string) => [
+    'timeout 900 node scripts/check_frontend_tests.mjs > .agent/tmp/t2.log 2>&1',
+    'CI=1 FORCE_COLOR=0 node ./scripts/check_frontend_tests.mjs > .agent/tmp/t3.log 2>&1',
+    `cd ${project} && node "scripts/check_frontend_tests.mjs" > .agent/tmp/t4.log 2>&1`,
+    'cd inst-admin-ui && node ../scripts/check_frontend_tests.mjs > ../t5.log 2>&1',
+  ];
+  // `run`: поля запуска гейта — фон, где он есть; OpenCode фона не знает, ему — таймаут в 600 с.
+  type Shape = { cli: string; tool: string; run: object; goose?: boolean; extra?: object };
+  const SHAPES: Shape[] = [
+    { cli: 'qwen', tool: 'run_shell_command', run: { is_background: true } },
+    { cli: 'codex', tool: 'Bash', run: {}, extra: { turn_id: 't' } },
+    { cli: 'opencode', tool: 'bash', run: { timeout: 600_000 } },
+    { cli: 'kimi', tool: 'Shell', run: { run_in_background: true } },
+    { cli: 'goose', tool: 'shell', run: {}, goose: true },
+    { cli: 'gemini', tool: 'run_shell_command', run: { is_background: true } },
+  ];
+  /** Свой каталог на диалект: длительность, выученная cmd-duration у одного, не судит другой. */
+  const projectOf = (s: Shape) => `C:/work/proj-p29-${s.cli}`;
+  const at = (
+    s: Shape,
+    session: string,
+    event: 'PreToolUse' | 'PostToolUse',
+    id: string,
+    command: string,
+    extra: object,
+  ) => {
+    const tool_input = { command, ...extra };
+    return s.goose
+      ? {
+          session_id: session,
+          event,
+          tool_name: s.tool,
+          tool_input,
+          working_dir: projectOf(s),
+          tool_call_id: id,
+        }
+      : {
+          hook_event_name:
+            s.cli === 'gemini' ? (event === 'PreToolUse' ? 'BeforeTool' : 'AfterTool') : event,
+          session_id: session,
+          cwd: projectOf(s),
+          tool_name: s.tool,
+          tool_input,
+          tool_use_id: id,
+          ...s.extra,
+        };
+  };
+  const NOTHING = /nothing was edited since the full gate/;
+
+  for (const s of SHAPES) {
+    it(`${s.cli}: названный runner и node --check — не гейт; запуск словом команды и переписанный гейт — тот же`, () => {
+      const pre = (session: string, id: string, command: string, extra = s.run) =>
+        run('pre', at(s, session, 'PreToolUse', id, command, extra), s.cli);
+      const ran = (session: string, id: string, command: string, extra = s.run) =>
+        run('post-any', at(s, session, 'PostToolUse', id, command, extra), s.cli);
+
+      // Названные формы — простым вызовом, без фона и таймаута: будь они гейтом, долгим гейтом
+      // cmd-duration или гейтом журнала, был бы отказ здесь или на повторе.
+      const named = `p29-${s.cli}-named`;
+      NAMED.forEach((command, i) => {
+        const out = pre(named, `n${i}`, command, {});
+        expect(refusal(out), command).toBeUndefined();
+        expect(out.raw, command).not.toMatch(/cmd-duration/);
+        ran(named, `n${i}`, command, {});
+        expect(refusal(pre(named, `m${i}`, command, {})), command).toBeUndefined();
+        ran(named, `m${i}`, command, {});
+      });
+      // Названные формы исполнены, но гейтом не записаны: первый запуск — первый.
+      expect(refusal(pre(named, 'g1', RUN))).toBeUndefined();
+      ran(named, 'g1', RUN);
+      // gate-run словом команды — гейт: тот же запуск без правок — «nothing was edited since».
+      expect(refusal(pre(named, 'g2', RUN))).toMatch(NOTHING);
+
+      const reword = `p29-${s.cli}-reword`;
+      expect(refusal(pre(reword, 'g1', GATE))).toBeUndefined();
+      ran(reword, 'g1', GATE);
+      reworded(projectOf(s)).forEach((command, i) => {
+        expect(refusal(pre(reword, `r${i}`, command)), command).toMatch(NOTHING);
+      });
+    });
+  }
+});
+
+/**
+ * P-29, rule-injector (g9 review F3): после сжатия группе Claude окно правила приходит ТЕКСТОМ на
+ * SessionStart:compact — отказа карточки и повторного чтения нет. Поколение вызовов набор брал из
+ * стенограммы Claude; стенограмму Qwen и Codex он не читает, и у их групп первая правка после каждого
+ * сжатия была отказом карточки. Теперь поколение — из журнала сессии набора (вызовы PreToolUse,
+ * метки сжатия PreCompact). Вручную ставящиеся CLI (Gemini, Goose, Kimi, OpenCode) правил на PreToolUse не
+ * получают вовсе (`isHandInstalled`) — отказа карточки, который надо было бы снять, у них нет.
+ */
+describe('rule-injector по диалектам: окно правила текстом после сжатия, отказа карточки нет (P-29)', () => {
+  const RULE_FILE = join(KIT, 'skills', 'situational-rules', 'references', 'visible-fix-shots.md');
+  const FULL = readFileSync(RULE_FILE, 'utf8')
+    .trim()
+    .split('<kit>')
+    .join(KIT.split('\\').join('/'));
+  // Копия вне временного каталога: правка во временном — черновик, правило о UI её не касается.
+  const copy = mkdtempSync(join(process.cwd(), 'node_modules', '.kit-p29-rules-'));
+  mkdirSync(join(copy, '.git'), { recursive: true });
+  afterAll(() => rmSync(copy, { recursive: true, force: true }));
+  const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
+  const UI = join(copy, 'inst-admin-ui/src/pages/users/CreateRolePage/index.tsx')
+    .split('\\')
+    .join('/');
+  // Стенограмма в формате самого CLI: записей Claude в ней нет.
+  const foreignTranscript = (cli: string) => {
+    const path = join(dir, `p29-${cli}-transcript.jsonl`);
+    writeFileSync(
+      path,
+      `${JSON.stringify({ type: 'user', message: { role: 'user', parts: [{ text: 'do' }] } })}\n`,
+    );
+    return path;
+  };
+  const DIALECTS: { cli: string; edit: (session: string, tp: string) => object }[] = [
+    {
+      cli: 'qwen',
+      edit: (session, tp) => ({
+        hook_event_name: 'PreToolUse',
+        session_id: session,
+        transcript_path: tp,
+        cwd: copy,
+        tool_name: 'replace',
+        tool_input: { file_path: UI, old_string: 'a', new_string: 'b' },
+      }),
+    },
+    {
+      cli: 'codex',
+      edit: (session, tp) => ({
+        hook_event_name: 'PreToolUse',
+        session_id: session,
+        transcript_path: tp,
+        cwd: copy,
+        turn_id: `t-${session}`,
+        tool_name: 'apply_patch',
+        tool_input: {
+          command: `*** Begin Patch\n*** Update File: ${UI}\n@@\n-a\n+b\n*** End Patch`,
+        },
+      }),
+    },
+  ];
+  const ctxOf = (out: Out) =>
+    String(
+      (out.json?.hookSpecificOutput as Record<string, unknown> | undefined)?.additionalContext ??
+        '',
+    );
+
+  for (const { cli, edit } of DIALECTS) {
+    it(`${cli}: правило целиком → сжатие → старт с текстом окна → правка проходит`, () => {
+      const session = `p29-rules-${cli}`;
+      const tp = foreignTranscript(cli);
+      const first = run('pre', edit(session, tp), cli, CHILD);
+      expect(refusal(first)).toBeUndefined();
+      expect(ctxOf(first)).toContain(FULL);
+      run(
+        'precompact',
+        { hook_event_name: 'PreCompact', session_id: session, transcript_path: tp, cwd: copy },
+        cli,
+        CHILD,
+      );
+      const start = run(
+        'session',
+        {
+          hook_event_name: 'SessionStart',
+          source: 'compact',
+          session_id: session,
+          transcript_path: tp,
+          cwd: copy,
+        },
+        cli,
+        CHILD,
+      );
+      expect(ctxOf(start)).toContain('rule text after compaction');
+      expect(ctxOf(start)).toContain(FULL);
+      const next = run('pre', edit(session, tp), cli, CHILD);
+      expect(refusal(next)).toBeUndefined();
+      // Текст уже в окне: правка не тянет правило второй раз.
+      expect(ctxOf(next)).not.toContain(FULL);
+    });
+  }
+
+  it('второе сжатие берёт только своё поколение: правки UI до первого сжатия окна не возвращают', () => {
+    const session = 'twice-p29-qwen';
+    const tp = foreignTranscript('qwen-twice');
+    const q = DIALECTS[0]!;
+    const base = { session_id: session, transcript_path: tp, cwd: copy };
+    const compact = () => {
+      run('precompact', { ...base, hook_event_name: 'PreCompact' }, 'qwen', CHILD);
+      return ctxOf(
+        run(
+          'session',
+          { ...base, hook_event_name: 'SessionStart', source: 'compact' },
+          'qwen',
+          CHILD,
+        ),
+      );
+    };
+    expect(ctxOf(run('pre', q.edit(session, tp), 'qwen', CHILD))).toContain(FULL);
+    expect(compact()).toContain('rule text after compaction');
+    // Второе поколение: только чтение состояния git, ни одной правки UI.
+    run(
+      'pre',
+      {
+        ...base,
+        hook_event_name: 'PreToolUse',
+        tool_name: 'run_shell_command',
+        tool_input: { command: 'git status' },
+      },
+      'qwen',
+      CHILD,
+    );
+    // Метка первого сжатия отрезает его правку: этому поколению правило не было нужно.
+    expect(compact()).not.toContain('after compaction');
+  });
+
+  it('без PreCompact штамп правила жив: на старте пересылать нечего, следующая правка не отказана', () => {
+    const session = 'nomark-p29-qwen';
+    const tp = foreignTranscript('qwen-nomark');
+    const q = DIALECTS[0]!;
+    expect(ctxOf(run('pre', q.edit(session, tp), 'qwen', CHILD))).toContain(FULL);
+    // PreCompact не дошёл (событие не пришло): метки нет и штамп правила не снят.
+    const start = run(
+      'session',
+      {
+        hook_event_name: 'SessionStart',
+        source: 'compact',
+        session_id: session,
+        transcript_path: tp,
+        cwd: copy,
+      },
+      'qwen',
+      CHILD,
+    );
+    // Штамп не снят — правило по-прежнему «в окне»: ни текста, ни карточки, ни отказа.
+    expect(ctxOf(start)).not.toContain('after compaction');
+    expect(refusal(run('pre', q.edit(session, tp), 'qwen', CHILD))).toBeUndefined();
+  });
+});
+
+/**
+ * P-31 (gor-1063 #90): гейт, которому отказала проверка движка Node (`npm error code EBADENGINE`, «Гейт рассчитан
+ * на Node 22…, запущен на v24»), ни одной проверки не прогнал — это не прогон гейта, и повтор на нужном Node без
+ * правок не «nothing was edited since». У Claude набор читает это из стенограммы; у чужого CLI — из того, что
+ * видит его post-хук: тело ответа (под любым ключом диалекта — читатель обходит все поля, кроме входа вызова) и
+ * хвосты логов перенаправления. Фоновый запуск отказа в теле ещё не несёт — его лог перечитывается на следующем
+ * гейте. Судья один, `lib/gate-at-end.mjs`; `ran` с отметкой пишет диспетчер (`items.mjs`).
+ */
+describe('gate-at-end по диалектам: отказ движка Node — не прогон гейта (P-31)', () => {
+  const GATE = 'pnpm type-check && pnpm lint && pnpm test';
+  const REFUSED = 'npm error code EBADENGINE\nnpm error engine Unsupported engine';
+  type Shape = { cli: string; tool: string; run: object; goose?: boolean; extra?: object };
+  // `body` — поле ответа в форме диалекта; ключ читателю не важен, он обходит все.
+  const SHAPES: (Shape & { body: (text: string) => object })[] = [
+    {
+      cli: 'qwen',
+      tool: 'run_shell_command',
+      run: { is_background: true },
+      body: (t) => ({ tool_response: { llmContent: t, returnDisplay: t } }),
+    },
+    {
+      cli: 'codex',
+      tool: 'Bash',
+      run: {},
+      extra: { turn_id: 't' },
+      body: (t) => ({ tool_response: t }),
+    },
+    {
+      cli: 'opencode',
+      tool: 'bash',
+      run: { timeout: 600_000 },
+      body: (t) => ({ tool_response: t }),
+    },
+    {
+      cli: 'kimi',
+      tool: 'Shell',
+      run: { run_in_background: true },
+      body: (t) => ({ tool_output: t }),
+    },
+    { cli: 'goose', tool: 'shell', run: {}, goose: true, body: (t) => ({ tool_response: t }) },
+    {
+      cli: 'gemini',
+      tool: 'run_shell_command',
+      run: { is_background: true },
+      body: (t) => ({ tool_response: { llmContent: t, returnDisplay: t } }),
+    },
+  ];
+  const projectOf = (s: Shape) => `C:/work/proj-p31-${s.cli}`;
+  const at = (
+    s: Shape,
+    session: string,
+    event: 'PreToolUse' | 'PostToolUse',
+    id: string,
+    command: string,
+    more: object = {},
+  ) => {
+    const tool_input = { command, ...s.run };
+    return s.goose
+      ? {
+          session_id: session,
+          event,
+          tool_name: s.tool,
+          tool_input,
+          working_dir: projectOf(s),
+          tool_call_id: id,
+          ...more,
+        }
+      : {
+          hook_event_name:
+            s.cli === 'gemini' ? (event === 'PreToolUse' ? 'BeforeTool' : 'AfterTool') : event,
+          session_id: session,
+          cwd: projectOf(s),
+          tool_name: s.tool,
+          tool_input,
+          tool_use_id: id,
+          ...s.extra,
+          ...more,
+        };
+  };
+  const NOTHING = /nothing was edited since the full gate/;
+
+  for (const s of SHAPES) {
+    it(`${s.cli}: отказ движка в теле ответа и в логе фона — не прогон; настоящий прогон — прогон`, () => {
+      const pre = (session: string, id: string, command: string) =>
+        run('pre', at(s, session, 'PreToolUse', id, command), s.cli);
+      const ran = (session: string, id: string, command: string, text: string) =>
+        run('post-any', at(s, session, 'PostToolUse', id, command, s.body(text)), s.cli);
+
+      // Тело ответа: движок отказал — повтор без правок проходит.
+      const body = `p31-${s.cli}-body`;
+      expect(refusal(pre(body, 'g1', GATE))).toBeUndefined();
+      ran(body, 'g1', GATE, REFUSED);
+      expect(refusal(pre(body, 'g2', GATE))).toBeUndefined();
+      // На нужном Node гейт прошёл — он и есть прогон: следующий без правок отказан.
+      ran(body, 'g2', GATE, '✓ 412 tests passed');
+      expect(refusal(pre(body, 'g3', GATE))).toMatch(NOTHING);
+
+      // Лог перенаправления: тело фонового старта пустое, отказ движка лёг в лог позже.
+      const log = join(dir, `p31-${s.cli}.log`).replace(/\\/g, '/');
+      const logged = `${GATE} > ${log} 2>&1`;
+      const bg = `p31-${s.cli}-log`;
+      writeFileSync(log, '');
+      expect(refusal(pre(bg, 'g1', logged))).toBeUndefined();
+      ran(bg, 'g1', logged, 'Command started in background');
+      writeFileSync(
+        log,
+        '> check\nГейт рассчитан на Node 22.x, запущен на v24.11.0 — переключите Node.\n',
+      );
+      expect(refusal(pre(bg, 'g2', logged))).toBeUndefined();
+      // `>` обнуляет лог при старте оболочки — до post-хука фонового запуска.
+      writeFileSync(log, '');
+      ran(bg, 'g2', logged, 'Command started in background');
+      writeFileSync(log, 'Tests  412 passed (412)\n');
+      expect(refusal(pre(bg, 'g3', logged))).toMatch(NOTHING);
+    });
+  }
 });

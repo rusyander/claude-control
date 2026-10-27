@@ -10,6 +10,17 @@ export interface ProfileMcpEntry {
 /** Зачем сервер группе — по этому решается, едет ли он в её прогон. */
 export type McpRole = 'tracker' | 'forge' | 'design' | 'messenger' | 'other';
 
+/** Чем звено ходит в MCP: стадия цепочки, а проход проверки правок — своим видом. */
+export type StageMcpKind = CascadeStage | 'verify';
+
+/** Лёгкий набор чужого CLI: снятые серверы, строка группе, снятые поимённо инструменты. */
+export interface ForeignGroupMcp {
+  off: string[];
+  note?: string;
+  /** Сервер → имена инструментов, которые снять (вики трекера); нет — снимать нечего. */
+  disabledTools?: Record<string, string[]>;
+}
+
 export interface GroupProfileInput {
   /** Серверы из файлов настроек: личные и проектный `.mcp.json`, только включённые. */
   entries: readonly ProfileMcpEntry[];
@@ -26,6 +37,11 @@ export interface GroupProfileInput {
    * профиль группы целиком, как до разбивки по звеньям.
    */
   stage?: CascadeStage;
+  /**
+   * Прогон звена `review` — проход ПРОВЕРКИ правок (U6, связь несёт `fixFindings`):
+   * у него свой набор MCP (`STAGE_MCP_ROLES.verify`), а навыки и запреты — ревью.
+   */
+  verify?: boolean;
   /**
    * Окно автосжатия группы в токенах (2.1, рычаг A/B): `CLAUDE_CODE_AUTO_COMPACT_WINDOW`
    * прогона. Нет — CLI решает сам, как до плана.
@@ -91,7 +107,7 @@ export interface SkillScopeInput {
 }
 
 /** Почему сервер не поехал — строка для группы и для тестов. */
-export type DropReason = 'messenger' | 'no-design-link' | 'duplicate-tracker';
+export type DropReason = 'messenger' | 'no-design-link' | 'duplicate-tracker' | 'stage-idle';
 
 export interface GroupProfile {
   kept: ProfileMcpEntry[];

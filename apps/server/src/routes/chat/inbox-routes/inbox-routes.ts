@@ -75,6 +75,7 @@ export function registerChatInboxRoutes(
       // разговором. Ветка правки синонима не пишет — её исходник остаётся своим.
       replaced: (sessionId) => ctx.store.canonicalChatKey(sessionId) !== sessionId,
       liveOutside: (chatId) => !ownSessions.has(chatId) && liveByTail(readTail(chatId), now),
+      clientOf: (chatId) => readTail(chatId)?.client,
       groupTitle: (chatId) => links[chatId]?.title,
       now,
     });

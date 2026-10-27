@@ -3,17 +3,93 @@ import {
   AUTONOMOUS_PICK_MARKER,
   autonomousPickMessage,
   parseAutonomousPickMessage,
-  pickRecommended,
 } from '@agentdeck/contracts/chat-group-settings';
 import type { ChatBlock } from '@agentdeck/contracts';
 import {
   attachAutoPicks,
   autoPickResults,
   picksFor,
+  recommendedPicks,
   rememberAsks,
   toolResultText,
   type AskSeen,
 } from './auto-pick.ts';
+
+const ask = (...questions: { question?: unknown; header?: string; options?: unknown }[]) => ({
+  questions,
+});
+
+describe('recommendedPicks — что автономия выбирает сама', () => {
+  it('«(Recommended)» в подписи, в любом месте списка', () => {
+    expect(
+      recommendedPicks(
+        ask({ question: 'Q', options: [{ label: 'A' }, { label: 'B (Recommended)' }] }),
+      ),
+    ).toEqual([{ question: 'Q', label: 'B (Recommended)', critical: false }]);
+  });
+
+  it('рекомендация по-русски и в описании', () => {
+    expect(
+      recommendedPicks(
+        ask(
+          { question: 'Q1', options: [{ label: 'A' }, { label: 'B (рекомендую)' }] },
+          {
+            question: 'Q2',
+            header: 'critical',
+            options: [{ label: 'X' }, { label: 'Y', description: 'Recommended: smaller diff' }],
+          },
+        ),
+      ),
+    ).toEqual([
+      { question: 'Q1', label: 'B (рекомендую)', critical: false },
+      { question: 'Q2', label: 'Y', critical: true },
+    ]);
+  });
+
+  it('без рекомендации хоть у одного вопроса — весь вызов человеку', () => {
+    expect(
+      recommendedPicks(
+        ask(
+          { question: 'Q1', options: [{ label: 'A (Recommended)' }] },
+          { question: 'Q2', options: [{ label: 'A' }, { label: 'B' }] },
+        ),
+      ),
+    ).toBeNull();
+  });
+
+  it('отрицание — не рекомендация', () => {
+    expect(
+      recommendedPicks(
+        ask({ question: 'Q', options: [{ label: 'A', description: "we don't recommend this" }] }),
+      ),
+    ).toBeNull();
+  });
+
+  it('рекомендованный вариант зовёт человека или утверждает сделанное им — человеку', () => {
+    for (const label of [
+      'Я войду сам (Recommended)',
+      'Session refreshed — continue (Recommended)',
+    ]) {
+      expect(
+        recommendedPicks(
+          ask({ question: 'Q', options: [{ label }, { label: 'Skip live check' }] }),
+        ),
+      ).toBeNull();
+    }
+  });
+
+  it('мусор на входе — null, не исключение', () => {
+    for (const input of [
+      null,
+      undefined,
+      {},
+      { questions: [] },
+      ask({ options: [] }),
+      ask(null as never),
+    ])
+      expect(recommendedPicks(input)).toBeNull();
+  });
+});
 import { translate } from '../ChatRunner/ChatRunner.ts';
 
 /**
@@ -123,7 +199,7 @@ describe('отказ автовыбора разбирается обратно 
   };
 
   it('вопрос с переводом строки, кавычками и стрелкой — тот же выбор', () => {
-    const picks = pickRecommended(tricky)!;
+    const picks = recommendedPicks(tricky)!;
     expect(parseAutonomousPickMessage(autonomousPickMessage(picks))).toEqual(
       picks.map(({ question, label }) => ({ question, label })),
     );

@@ -79,7 +79,9 @@ data write (DB stays `SELECT`/`EXPLAIN`/schema). **No ticket means no standing g
 `.agent/tickets/<KEY>.agent.md` via `node <kit>/tools/ticket-ledger.mjs`: `init` in §1, one `add`
 per stage as its last act, `check` before §14; the MR text and the QA comment are copied FROM it.
 After a compaction or `/clear` read it first and resume at the first stage in the run order with no
-line. Commands, statuses, slug, late rows: stages.md §Ledger.
+line. A resume brief that already states git status, log and HEAD is not re-checked: the only delta
+since it is the remote — `git fetch` + `git rev-parse origin/<branch>`. Commands, statuses, slug, late
+rows: stages.md §Ledger.
 
 ## 1. Read the task, classify by CODE, claim it
 
@@ -128,7 +130,9 @@ stage"`. `mustfail` ONCE, per the table. Then commit locally (review.md).
 Per the table; the verdict is the printed acceptance table on the head sha, shown red once (live-run.md).
 A bug found here → fixed, narrow checks, only the touched rows retested.
 **Gate:** the table printed with zero failures, ≥1 negative row, the variation and walked rows the
-tier owes; the `10-live` note names sha, own PIDs/ports, created entities.
+tier owes; the `10-live` note names sha, own PIDs/ports, created entities. Every negative probe tried
+is reported with its input and rc, not only the one that went red; one that should have been refused
+and passed is a finding — fixed, or a «stays open» item of the MR naming the gap.
 
 ## 7. AFTER shots — same walk as §10
 
@@ -159,7 +163,10 @@ packages' checks, `push --force-with-lease`. No conflict → nothing, however fa
 
 The review move and the QA comment from the ledger, read back, gated on §9 + §10 only. Human threads
 only when the MR pre-existed or one arrived (review.md). **Everything past review still asks.**
-**Gate:** MR out of draft; tracker shows review and the read-back QA comment.
+Moved = only a key a commit of `base..HEAD` names AND whose live assignee (read now, never from
+`tickets.md`) is me; a skipped or someone else's key stays, named in the report («all group keys» is not
+«all delivered» — a group once moved a skipped ticket assigned to another person).
+**Gate:** MR out of draft; tracker shows review and the read-back QA comment on every moved key.
 
 ## 13. Cleanup — same turn, nothing left running
 

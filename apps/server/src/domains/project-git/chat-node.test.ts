@@ -37,6 +37,7 @@ function deps(over: Partial<ChatNodeDeps> = {}): ChatNodeDeps & { calls: number 
       },
     ],
     exists: () => false,
+    realpath: (path) => path,
     now: () => state.clock,
     get calls() {
       return state.calls;
@@ -99,6 +100,27 @@ describe('chat-node: Node проекта первым в PATH чата', () => {
     expect(chatNodeDirs(project('22'), ENV, join(ROOT, 'bin', 'claude.exe'), own)).toEqual([
       NODE22,
     ]);
+  });
+
+  it('первый claude по PATH — узел nvm-windows, ведущий в выбранную версию: она первой (g8 26.10)', () => {
+    // PATH сервера: `C:\Program Files\nodejs` (24) раньше узла `C:\nvm4w\nodejs` → v22.23.2, в
+    // узле свои claude и node. Отказ «рядом с CLI свой Node» оставлял группу на 24.
+    const junction = join(ROOT, 'nvm4w', 'nodejs');
+    const env = { PATH: [join(ROOT, 'pf', 'nodejs'), junction, '/usr/bin'].join(delimiter) };
+    const files = new Set([
+      join(NODE22, 'claude.cmd'),
+      join(junction, 'claude.cmd'),
+      join(junction, 'node.exe'),
+    ]);
+    const linked = deps({
+      exists: (p) => files.has(p),
+      realpath: (p) => (p === junction ? NODE22 : p),
+    });
+    expect(chatNodeDirs(project('22.22.2'), env, 'claude', linked)).toEqual([NODE22]);
+    resetChatNodeCache();
+    // Узел ведёт в другую версию — его Node снова дал бы не ту: подмены нет.
+    const other = deps({ exists: (p) => files.has(p), realpath: (p) => p });
+    expect(chatNodeDirs(project('22.22.2'), env, 'claude', other)).toBeUndefined();
   });
 
   it('версия по умолчанию спрашивается раз на PATH, совпадение по каталогу живёт минуту', () => {

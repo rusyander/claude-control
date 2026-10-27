@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
 import {
@@ -14,6 +15,7 @@ import type { RunOptions } from '../../../domains/chat/ChatRunner/ChatRunner.ts'
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
 import { branchGateContext } from '../../../domains/chat/ChatBranchGate/ChatBranchGate.ts';
+import { childrenBrief } from '../../../domains/chat/children-brief/children-brief.ts';
 import { registerChatRunRoutes } from './run-routes.ts';
 
 /**
@@ -394,28 +396,44 @@ describe('маршруты чата: ворота ветки', () => {
       git(repo, 'checkout', 'main');
       git(repo, 'branch', '-D', 'mr-feature');
       registry.setBranchGateContextResolver((keys) =>
-        branchGateContext(
-          keys.includes(SESSION)
-            ? {
-                parentChatId: SESSION,
-                order: [0],
-                groups: [
-                  {
-                    index: 0,
-                    title: 'Шапка',
-                    branch: 'mr-feature',
-                    after: [],
-                    status: 'started',
-                    chatId: 'child-1',
-                  },
-                ],
-              }
-            : undefined,
-          (chatId) =>
-            chatId === 'child-1' ? { branch: 'mr-feature', remote: 'origin' } : undefined,
+        branchGateContext(keys.includes(SESSION) ? handedPlan : undefined, (chatId) =>
+          chatId === 'child-1' ? { branch: 'mr-feature', remote: 'origin' } : undefined,
         ),
       );
     };
+    const handedPlan: SplitPlanView = {
+      parentChatId: SESSION,
+      order: [0],
+      groups: [
+        {
+          index: 0,
+          title: 'Шапка',
+          branch: 'mr-feature',
+          after: [],
+          status: 'started',
+          chatId: 'child-1',
+        },
+      ],
+    };
+
+    // Telegram 26.10 (R1): ход родителя начинается сводкой детей, и имя ветки
+    // собиралось из неё — `agent/agentdeck-children-the-work-of-this-conv-…`.
+    // Сводку ставит реестр, как в bootstrap; имя обязано прийти из слов человека.
+    it('имя ветки — из слов человека, а не из сводки детей перед ними', async () => {
+      handToChildren();
+      registry.setChildrenBriefResolver((keys) =>
+        keys.includes(SESSION) ? childrenBrief(handedPlan) : undefined,
+      );
+      startRun();
+      const pending = askPermission();
+
+      const gate = await waitForGate();
+      expect(registry.describe(CHAT)?.options.prompt).toContain('<agentdeck-children>');
+      expect((gate as { branch: string }).branch).toBe('agent/pochini-perenos-sredy-techat');
+
+      session.decidePermission(CHAT, 'tool-1', { behavior: 'deny', message: 'конец теста' });
+      await pending;
+    });
 
     it('карточка называет группы и ветку MR, от которой встанет копия', async () => {
       handToChildren();

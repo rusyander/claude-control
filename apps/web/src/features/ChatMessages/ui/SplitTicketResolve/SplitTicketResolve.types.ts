@@ -1,6 +1,8 @@
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type {
   SplitTicketBundle,
+  SplitTicketDuplicateChoice,
+  SplitTicketDuplicates,
   SplitTicketPublished,
   SplitTicketTarget,
 } from '@agentdeck/contracts/split-ticket-batch';
@@ -37,6 +39,23 @@ export interface SplitTicketResolveBodyProps {
   result?: SplitTicketPublished;
   /** Текст отказа последнего действия (публикация или «Решить здесь»). */
   error?: string;
+  /** Проверка на повторы в Jira; нет — блока нет (Jira не выбрана). */
+  duplicates?: DuplicatesState;
+  /** Решение человека по каждой похожей задаче — по первой находке дефекта. */
+  choices?: Readonly<Record<string, SplitTicketDuplicateChoice>>;
+  onChoice?: (proposal: string, choice: SplitTicketDuplicateChoice) => void;
+}
+
+/** Что окно знает о похожих открытых задачах Jira. */
+export type DuplicatesState =
+  | { state: 'loading' }
+  | { state: 'error'; message: string }
+  | { state: 'ready'; data: SplitTicketDuplicates };
+
+export interface SplitTicketDuplicatesProps {
+  duplicates: DuplicatesState;
+  choices: Readonly<Record<string, SplitTicketDuplicateChoice>>;
+  onChoice: (proposal: string, choice: SplitTicketDuplicateChoice) => void;
 }
 
 export interface SplitTicketResolveActionsProps {

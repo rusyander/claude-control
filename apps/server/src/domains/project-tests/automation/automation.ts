@@ -63,7 +63,14 @@ export function writeAutomation(
     const refusal = new ProjectTestsError(parsed.error ?? 'Команда прогона не годится.');
     throw codedIf(refusal, parsed.messageCode, parsed.params);
   }
-  writeJson(root, AUTOMATION_FILE, { version: 1, ...parsed.automation });
+  // Окружение наборов (`env`, `suite-env`) окно настроек не показывает и не шлёт:
+  // сохранение команды из окна стирало бы рецепт, который проект записал руками.
+  const env = (readJson(root, AUTOMATION_FILE).data as { env?: unknown } | undefined)?.env;
+  writeJson(root, AUTOMATION_FILE, {
+    version: 1,
+    ...parsed.automation,
+    ...(env !== undefined ? { env } : {}),
+  });
   return parsed.automation;
 }
 

@@ -263,6 +263,39 @@ describe('translate — разбор потока CLI', () => {
     );
   });
 
+  // R16 «фон долго»: id фоновой задачи — из итога вызова, её конец — из уведомления CLI.
+  it('вызов ушёл в фон → toolResult с bgTaskId; уведомление о конце → bgDone со статусом', () => {
+    const launched = translate(
+      raw({
+        type: 'user',
+        message: { content: [{ type: 'tool_result', tool_use_id: 'b1', content: 'started' }] },
+        tool_use_result: { backgroundTaskId: 'bgx41' },
+      }),
+    );
+    expect(launched).toEqual([
+      expect.objectContaining({ kind: 'toolResult', toolUseId: 'b1', bgTaskId: 'bgx41' }),
+    ]);
+    const done = translate(
+      raw({
+        type: 'user',
+        message: {
+          content:
+            '<task-notification>\n<task-id>bgx41</task-id>\n<status>completed</status>\n</task-notification>',
+        },
+      }),
+    );
+    expect(done).toEqual([{ kind: 'bgDone', taskId: 'bgx41', status: 'completed' }]);
+    // Обычный субагент несёт agentId, но кончается своим ответом — не фон.
+    const sync = translate(
+      raw({
+        type: 'user',
+        message: { content: [{ type: 'tool_result', tool_use_id: 'a1', content: 'done' }] },
+        tool_use_result: { agentId: 'ag1', status: 'completed' },
+      }),
+    );
+    expect(sync[0]).not.toHaveProperty('bgTaskId');
+  });
+
   it('единственный tool_use возвращается одним элементом массива', () => {
     const events = translate(
       raw({

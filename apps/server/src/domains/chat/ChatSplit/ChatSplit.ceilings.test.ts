@@ -90,8 +90,16 @@ describe('потолок задания группы', () => {
      * 6400 — 20.10: +~120 знаков «полные проверки один раз» и «основную — только
      * при конфликте». Окупается замером 19.10: каждая группа гнала полный гейт
      * трижды на MR (13–20 мин прогон) и тратила ход на отказ брокера в rebase.
+     * 6600 — 26.10: +~575 знаков следа задач (`taskCoverageLine`). Окупается живым
+     * аудитом 26.10: десять групп одного разделения сдали «готово» без части пунктов
+     * тикетов (g9 отдала D1/D14/D15/D20 группе, у которой не было ни одного файла той
+     * админки) — каждую дочищал человек.
+     * 6700 — 26.10 (g0 F3): +~105 знаков — строка `task-N` цитирует пункт слово в слово, и
+     * доставка сверяет цитату с тикетом, заданием и описанием MR. Окупается тем же аудитом:
+     * строку task-1285 группа выдумала («правка с тестами» там, где кода не было), и без
+     * цитаты доставка не могла этого увидеть.
      */
-    it(`доставляющая группа в копии, ${name}: не длиннее 6400 знаков`, async () => {
+    it(`доставляющая группа в копии, ${name}: не длиннее 6700 знаков`, async () => {
       const prompt = await firstPrompt(options);
       expect(prompt).toContain('PROJ-1');
       expect(prompt).toContain('npm run qa:shot');
@@ -100,7 +108,40 @@ describe('потолок задания группы', () => {
       expect(prompt).not.toContain('review-pack.mjs');
       expect(prompt).toContain('no full project gate, no push, no MR');
       expect(prompt).toContain('<agentdeck:ticket>');
-      expect(panelText(prompt).length).toBeLessThanOrEqual(6400);
+      expect(prompt).toContain('Task trace: first list every point of your tasks');
+      expect(panelText(prompt).length).toBeLessThanOrEqual(6700);
     });
   }
+});
+
+/** След задач (26.10): метку `taskTrace` ставит тот, кто собрал задание, — по строке в нём. */
+describe('след задач в задании группы', () => {
+  async function launched(deliver: boolean) {
+    const prompts: string[] = [];
+    const result = await splitTasks({
+      projectPath: repo,
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      claimBranch: () => undefined,
+      deliver,
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+    return { chat: result.chats[0], prompt: prompts[0] ?? '' };
+  }
+
+  it('с доставкой — строка следа в задании и метка у чата', async () => {
+    const { chat, prompt } = await launched(true);
+    expect(prompt).toContain('Task trace: first list every point of your tasks');
+    expect(chat?.taskTrace).toBe(true);
+  });
+
+  it('без доставки — ни строки, ни метки: судить нечего', async () => {
+    const { chat, prompt } = await launched(false);
+    expect(prompt).not.toContain('Task trace:');
+    expect(chat?.taskTrace).toBeUndefined();
+  });
 });

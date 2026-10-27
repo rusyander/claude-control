@@ -18,6 +18,24 @@ describe('group ledgers', () => {
     expect(ledgers.burnOf(groupKeyOf('parent', 2))).toEqual([]);
   });
 
+  it('keeps one waste point per call, a refusal over a repeat, two hours, cleared when quiet', () => {
+    const ledgers = new GroupLedgers();
+    const key = groupKeyOf('parent', 1);
+    ledgers.noteWaste(key, { t: T0, weight: 5, kind: 'repeat' });
+    ledgers.noteWaste(key, { t: T0, weight: 5, kind: 'repeat' });
+    // Повторная проверка, отбитая стражем, не шла — тот же вызов становится отказом.
+    ledgers.noteWaste(key, { t: T0, weight: 5, kind: 'denied' });
+    ledgers.noteWaste(key, { t: T0 + MIN, weight: 7, kind: 'repeat' });
+    expect(ledgers.wasteOf(key)).toEqual([
+      { t: T0, weight: 5, kind: 'denied' },
+      { t: T0 + MIN, weight: 7, kind: 'repeat' },
+    ]);
+    ledgers.prune(T0 + 120 * MIN + 1);
+    expect(ledgers.wasteOf(key)).toEqual([{ t: T0 + MIN, weight: 7, kind: 'repeat' }]);
+    ledgers.quiet(key);
+    expect(ledgers.wasteOf(key)).toEqual([]);
+  });
+
   it('keeps the account limit samples under their own cap and a three-hour span', () => {
     const ledgers = new GroupLedgers();
     for (let n = 0; n < 1_005; n++) ledgers.noteLimit({ t: T0 + n, utilization: 0.1, resetsAt: 1 });

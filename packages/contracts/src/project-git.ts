@@ -310,8 +310,11 @@ export interface WorktreeCopyAccess {
  * есть, агента в копию не пускают.
  */
 export interface WorktreeCopyGap {
-  kind: 'file' | 'link' | 'access' | 'mcp';
+  kind: 'file' | 'link' | 'access' | 'mcp' | 'hooks';
   path: string;
-  /** `mcp`: серверы оригинала, которых нет в `.mcp.json` копии. */
+  /**
+   * `mcp`: серверы оригинала, которых нет в `.mcp.json` копии;
+   * `hooks`: хуки оригинала, не прописанные в `settings.local.json` копии.
+   */
   names?: string[];
 }

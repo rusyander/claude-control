@@ -68,6 +68,42 @@ const LOCAL_CLAUDE_ENV = { CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1' };
  * На маршруте со своим пределом (локальная модель) и набор, и группа прижаты к
  * нему: действует меньшее из трёх (`ChatRunRegistry/route-caps.ts`).
  */
+/**
+ * Стражи набора, которые Claude получает в ЛЮБОМ режиме, — элемент → имя его
+ * двойника в `<claudeDir>/hooks/lib/`. Поведение «чтение свободно, запись в git
+ * и на хостинг — с согласия, слияние — только человеку, удаление и секреты — под
+ * охраной, Node машины `nvm use` не переключают, CI не ждут, рекомендованный
+ * ответ в автономном чате выбирается сам»
+ * держат брокер панели и эти хуки; брокер есть не всегда (полный доступ), а
+ * хуки при «Только ваши» не подключались вовсе. Машина со своим `~/.claude`,
+ * но без этих стражей, получала в автономном прогоне git-записи без согласия.
+ *
+ * Есть двойник в слое человека — страж набора уступает ему (два ответа на один
+ * вызов спорили бы): так владелец со своим слоем видит то же, что и прежде.
+ * Выключенный на странице набора страж не едет нигде.
+ */
+export const GUARD_TWINS: Readonly<Record<string, string>> = {
+  'hooks/autonomous-pick.mjs': 'autonomous-pick',
+  'hooks/git-guard.mjs': 'git-guard',
+  'hooks/forge-merge-guard.mjs': 'forge-merge-guard',
+  'hooks/destructive-consent.mjs': 'destructive-guard',
+  'hooks/guard-destructive.mjs': 'destructive-guard',
+  'hooks/secret-guard.mjs': 'secret-guard',
+  // `nvm use` на Windows удаляет общую ссылку NVM_SYMLINK, и без прав администратора
+  // Node пропадает у всей машины, панели тоже, — та же порча окружения, что удаление.
+  'hooks/nvm-use-guard.mjs': 'nvm-use-guard',
+  'hooks/pipeline-watch-guard.mjs': 'pipeline-watch-guard',
+};
+
+/** Набор-страховка режима «Только ваши»: одни стражи `PreToolUse`, без навыков и правил. */
+export const GUARD_HOOKS = {
+  events: ['PreToolUse'],
+  // Инструменты, которые судят стражи `GUARD_TWINS` (тест сверяет с их `PRE_TOOLS`):
+  // `Read` и прочие чтения сюда не входят — им страж не нужен, а запуск node стоит.
+  preMatcher:
+    'Bash|PowerShell|Write|Edit|NotebookEdit|AskUserQuestion|mcp__.*(gitlab|github|atlassian|jira|confluence).*',
+} as const;
+
 export const OURS_CLAUDE_CAPS = {
   BASH_MAX_OUTPUT_LENGTH: '8000',
   CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS: '10000',
@@ -436,13 +472,27 @@ export class KitService {
     this.writeState({ ...state, modes: { ...state.modes, [provider]: mode } });
   }
 
+  /** Страж набора, у которого в слое человека есть двойник (`GUARD_TWINS`). */
+  private guardYields(id: string): boolean {
+    const twin = GUARD_TWINS[id];
+    return (
+      twin !== undefined && existsSync(join(this.deps.claudeDir(), 'hooks', 'lib', `${twin}.mjs`))
+    );
+  }
+
   /** Собранный каталог плагина под режим; `global` — набора нет. */
   composed(mode: Exclude<KitMode, 'global'>): string {
     const state = this.readState();
+    // «Оба набора»: одноимённое у человека побеждает, страж — своему двойнику
+    // (`GUARD_TWINS`), иначе на один вызов отвечали бы двое.
     const yielded =
       mode === 'hybrid'
         ? this.files()
-            .filter((file) => this.userTwin(file) && (state.winners[file.id] ?? 'user') === 'user')
+            .filter(
+              (file) =>
+                (this.userTwin(file) && (state.winners[file.id] ?? 'user') === 'user') ||
+                this.guardYields(file.id),
+            )
             .map((file) => file.id)
         : [];
     return composeKit({
@@ -451,6 +501,34 @@ export class KitService {
       disabled: state.disabled,
       yielded,
       target: join(this.root, 'effective', mode, 'agentdeck-kit'),
+    });
+  }
+
+  /**
+   * Режим «Только ваши» у Claude: стражи набора, которых нет в слое человека
+   * (`GUARD_TWINS`), — и больше ничего. Все уступили или выключены — `null`:
+   * прогон идёт, как шёл, без флага.
+   */
+  guardsOverlay(): string | null {
+    const state = this.readState();
+    const files = this.files();
+    const active = files.filter(
+      (file) =>
+        GUARD_TWINS[file.id] !== undefined &&
+        !state.disabled.includes(file.id) &&
+        !this.guardYields(file.id),
+    );
+    if (active.length === 0) return null;
+    const keep = new Set(active.map((file) => file.id));
+    // `hooks.json` — служебный файл набора, а не страж: он нужен, иначе ни один хук не встанет.
+    keep.add('hooks/hooks.json');
+    return composeKit({
+      builtinDir: this.builtin,
+      mineDir: this.mineDir,
+      disabled: state.disabled,
+      yielded: files.filter((file) => !keep.has(file.id)).map((file) => file.id),
+      target: join(this.root, 'effective', 'guards', 'agentdeck-kit'),
+      hooksOnly: GUARD_HOOKS,
     });
   }
 
@@ -487,7 +565,10 @@ export class KitService {
       // ревьюера на видеокарте, обслуживающей один запрос. Поэтому на локальном
       // прогоне Claude блок едет и здесь — единственное, что набор даёт при «глобальных».
       const append = input.provider === 'claude' && input.local ? this.localDiscipline() : '';
-      return append ? { args: [], env: {}, append } : { args: [], env: {} };
+      // Стражи, которых нет в слое человека, едут и сюда (`GUARD_TWINS`).
+      const guards = input.provider === 'claude' ? this.guardsOverlay() : null;
+      const args = guards ? ['--plugin-dir', guards] : [];
+      return append ? { args, env: {}, append } : { args, env: {} };
     }
     if (input.provider === 'claude') {
       const args = ['--plugin-dir', this.composed(mode)];

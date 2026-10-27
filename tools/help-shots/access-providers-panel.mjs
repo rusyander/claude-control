@@ -97,6 +97,9 @@ try {
     CLAUDE_CONFIG_DIR: CONFIG_DIR,
     PORT: String(PANEL_PORT),
     WEB_PORT: String(WEB_PORT),
+    // Bot API Telegram — тот же выдуманный верх на петле: проверка и
+    // подключение по /start идут к нему, настоящий Telegram стенд не трогает.
+    AGENTDECK_TELEGRAM_API: UPSTREAM,
     // Домашний каталог виден в путях, которые панель показывает целиком:
     // скрипт гейта, файл чужого CLI, каталог резервных копий.
     HOME: HOME_DIR,

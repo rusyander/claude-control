@@ -1,0 +1,25 @@
+{
+  "title": {
+    "ru": "Сборку APK можно отменить кнопкой",
+    "en": "An APK build can be cancelled with a button"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В Настройках → «Телефон» пока идёт сборка APK, рядом с «Собрать APK» есть кнопка «Отменить сборку». Она снимает сборщик вместе с демоном Gradle, бейдж показывает «отменена», а в выводе остаётся строка об отмене. Промежуточные файлы уберёт следующая сборка или pnpm mobile:clean. Если сборка кончилась до нажатия, карточка сразу показывает её итог без ошибки.",
+        "en": "In Settings → “Phone”, while an APK build runs, a “Cancel build” button sits next to “Build APK”. It stops the builder together with the Gradle daemon, the badge shows “cancelled” and the output keeps a line about the cancellation. The next build or pnpm mobile:clean removes the intermediate files. If the build finished before the click, the card shows its result at once, without an error."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" },
+      "images": ["apk-cancel.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сборка APK на Windows после прерванной больше не занимает новую букву диска: подстановки subst, оставшиеся на её же копию, снимаются перед сборкой.",
+        "en": "On Windows an APK build after an interrupted one no longer takes a new drive letter: subst mappings left pointing at its own copy are removed before the build."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    }
+  ]
+}

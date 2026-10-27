@@ -193,6 +193,28 @@ describe('группа и автономность чата — маршруты
     expect(await ask(ROOT, { questions: [{ question: 'Что?', options: [{ label: 'А' }] }] })).toBe(
       QUESTION_DENIED,
     );
+    // Рекомендация по-русски и в описании — тоже рекомендация (как у группы «по плану»).
+    const described = await ask(ROOT, {
+      questions: [
+        {
+          question: 'Куда?',
+          options: [{ label: 'Влево' }, { label: 'Вправо', description: 'рекомендую — короче' }],
+        },
+      ],
+    });
+    expect(described).toContain(AUTONOMOUS_PICK_MARKER);
+    expect(described).toContain('"Вправо"');
+    // Рекомендованный вариант «для человека» — не выбор, а ложь от его имени: человеку.
+    expect(
+      await ask(ROOT, {
+        questions: [
+          {
+            question: 'Сессия?',
+            options: [{ label: 'Я войду сам (Recommended)' }, { label: 'MR без проверки' }],
+          },
+        ],
+      }),
+    ).toBe(QUESTION_DENIED);
     run.end();
   });
 

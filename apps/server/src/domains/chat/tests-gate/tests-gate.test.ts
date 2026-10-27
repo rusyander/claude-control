@@ -211,6 +211,29 @@ describe('вердикт группы из блока «Тесты»', () => {
     expect(verdict.verdict).toMatchObject({ cases: 1, passed: 0, runId: 'r1' });
   });
 
+  // g8 26.10: пробел называл весь дифф ветки до команды, вывод обрезался на «…(+101)», и
+  // группа гоняла доставку ещё раз ради самой команды.
+  it('«прогон старше правки» называет только файлы под путями кейсов, и команда — раньше списка', () => {
+    const stale = (cases: ProjectTestCase[], paths: string[]) =>
+      judgeTests({
+        groups: groups(cases),
+        runs: [run('r1', '2026-09-30T10:30:00.000Z', [[cases[0]?.id ?? '', 'passed']])],
+        paths,
+        startedAt: STARTED,
+        changedAt: '2026-09-30T11:00:00.000Z',
+        command: COMMAND,
+      }).missing[0] ?? '';
+    const branch = ['web/page.tsx', 'src/auth/login.ts', 'src/billing/pay.ts', 'docs/a.md'];
+    const text = stale([login], branch);
+    expect(text).toContain('src/auth/login.ts');
+    expect(text).not.toContain('src/billing/pay.ts');
+    expect(text).not.toContain('web/page.tsx');
+    expect(text.indexOf(COMMAND)).toBeLessThan(text.indexOf('src/auth/login.ts'));
+    // Кейс задет зоной, а не путём, — своих файлов нет, и список остаётся целым.
+    const byArea = testCase('auth-009', { area: 'billing' });
+    expect(stale([byArea], branch)).toContain('web/page.tsx');
+  });
+
   it('Ф23: прогон после последней правки — засчитан', () => {
     const verdict = judgeTests({
       groups: groups([login]),

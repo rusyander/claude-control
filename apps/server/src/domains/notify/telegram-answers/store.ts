@@ -3,10 +3,11 @@ import { join } from 'node:path';
 import {
   telegramAnswersSettingsSchema,
   type TelegramAnswersSettings,
+  type TelegramAnswersSettingsInput,
 } from '@agentdeck/contracts/telegram-answers';
 import { readJsonFile, writeJsonFile } from '../../../lib/safe-io/safe-io.ts';
 import { newSecret } from './callback-data.ts';
-import type { AnswersFile, SentMessage } from './telegram-answers.types.ts';
+import type { AnswersFile, PendingDelete, SentMessage } from './telegram-answers.types.ts';
 
 /**
  * Память ответов из Telegram — один файл в каталоге данных панели: настройка,
@@ -82,6 +83,11 @@ export class AnswersStore {
       messages: Array.isArray(raw?.messages) ? (raw!.messages as SentMessage[]) : [],
       sent: raw?.sent && typeof raw.sent === 'object' ? { ...raw.sent } : {},
       ...(typeof raw?.lastSentAt === 'number' ? { lastSentAt: raw.lastSentAt } : {}),
+      // Очередь удалений прежнего «Убирать отвеченное» не исполняется: отвеченное
+      // теперь сворачивается, а не исчезает. Остаётся только ответ на /clear.
+      deletes: Array.isArray(raw?.deletes)
+        ? (raw!.deletes as PendingDelete[]).filter((entry) => entry.force)
+        : [],
     };
     // Ключ подписи заводится один раз и сразу ложится на диск: иначе кнопки
     // сообщения, отправленного до перезапуска, перестали бы сходиться.
@@ -112,8 +118,9 @@ export class AnswersStore {
     return { ...this.data.settings };
   }
 
-  setSettings(settings: TelegramAnswersSettings): void {
-    this.data.settings = { ...settings };
+  /** Поля, которых нет, дополняются умолчаниями схемы. */
+  setSettings(settings: TelegramAnswersSettingsInput): void {
+    this.data.settings = telegramAnswersSettingsSchema.parse(settings);
     this.save();
   }
 
@@ -159,6 +166,42 @@ export class AnswersStore {
 
   get lastSentAt(): number | undefined {
     return this.data.lastSentAt;
+  }
+
+  // ── удаление ответа на /clear ──────────────────────────────────────────────────
+
+  pendingDeletes(): PendingDelete[] {
+    return [...(this.data.deletes ?? [])];
+  }
+
+  scheduleDelete(entry: PendingDelete): void {
+    const list = (this.data.deletes ??= []);
+    if (
+      list.some((known) => known.chatId === entry.chatId && known.messageId === entry.messageId)
+    ) {
+      return;
+    }
+    list.push(entry);
+    this.save();
+  }
+
+  /** Созревшие удаления — из очереди сразу: удаляется один раз, без повтора. */
+  takeDueDeletes(now: number): PendingDelete[] {
+    const list = this.data.deletes ?? [];
+    const due = list.filter((entry) => entry.at <= now);
+    if (due.length === 0) return [];
+    this.data.deletes = list.filter((entry) => entry.at > now);
+    this.save();
+    return due;
+  }
+
+  /** Снять из очереди то, что уже удалено (/clear). */
+  dropDeletes(chatId: string, messageIds: readonly number[]): void {
+    const gone = new Set(messageIds);
+    this.data.deletes = (this.data.deletes ?? []).filter(
+      (entry) => !(entry.chatId === chatId && gone.has(entry.messageId)),
+    );
+    this.save();
   }
 
   /** Сколько ожиданий ждёт ответа в Telegram прямо сейчас. */

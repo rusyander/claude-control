@@ -1,5 +1,6 @@
 import type { InboxQuestion } from '@agentdeck/contracts/chat-inbox';
-import type { AskTarget, ApplyOutcome } from './telegram-answers.types.ts';
+import type { ChatFile } from './replies.ts';
+import type { AskTarget, ApplyOutcome, ChatRoute } from './telegram-answers.types.ts';
 
 /**
  * Ответ из Telegram уходит ТЕМ ЖЕ маршрутом панели, что и нажатие в окне или на
@@ -23,7 +24,13 @@ export type Inject = (request: InjectRequest) => Promise<InjectReply>;
 export type Answer =
   | { kind: 'decision'; behavior: 'allow' | 'deny' }
   | { kind: 'branch'; choice: 'here' | 'stop' }
-  | { kind: 'questions'; questions: readonly InboxQuestion[]; picks: readonly string[][] };
+  | {
+      kind: 'questions';
+      questions: readonly InboxQuestion[];
+      picks: readonly string[][];
+      /** Картинки из ответа владельца; уходят только в чат панели. */
+      files?: readonly ChatFile[];
+    };
 
 /** Параметры прошлого хода разговора — ответ на вопрос продолжает его с ними же. */
 export interface RunParams {
@@ -162,25 +169,75 @@ export async function applyAnswer(
       if (outcome.ok && parseBody(reply.body).changed === false) return { ok: false, gone: true };
       return outcome;
     }
+    case 'outsideQuestion':
+      // Отвечают там, где сессия идёт: ход панели завёл бы её копию.
+      return { ok: false, detail: 'вопрос сессии вне панели: ответ отсюда не доходит' };
     case 'question': {
       if (answer.kind !== 'questions') return { ok: false, detail: 'не то решение' };
-      return sendAnswer(target, answerText(answer.questions, answer.picks), deps);
+      return postToChat(
+        target,
+        answerText(answer.questions, answer.picks),
+        answer.files ?? [],
+        deps,
+      );
     }
   }
 }
 
 /**
- * Ответ на вопрос — следующим сообщением в разговор, как с телефона: идёт ход —
- * словом посреди хода (или в очередь до его конца), не идёт — новым ходом с
- * прежними моделью, усилием и правами. Новый ход отвечает потоком до самого
- * конца, поэтому ждём недолго: молчание маршрута — ход начался.
+ * Ответ владельца ответом (reply) на сообщение бота — следующим сообщением в
+ * тот же чат: панельный — тем же путём, что ответ на вопрос (с картинками);
+ * сессия вне панели (VS Code) — очередью `/api/outside/messages`, только текст.
  */
-async function sendAnswer(
-  target: Extract<AskTarget, { kind: 'question' }>,
+export async function sendChatText(
+  route: ChatRoute,
   text: string,
+  files: readonly ChatFile[],
   deps: ApplyDeps,
 ): Promise<ApplyOutcome> {
-  if (!text.trim()) return { ok: false, detail: 'пустой ответ' };
+  if (route.outside) {
+    if (!text.trim() || !route.sessionId) return { ok: false, detail: 'пустой ответ' };
+    const reply = await deps.inject({
+      method: 'POST',
+      url: '/api/outside/messages',
+      payload: { sessionId: route.sessionId, text },
+    });
+    return outcomeOf(reply, []);
+  }
+  if (!route.projectPath) return { ok: false, detail: 'не знаю папку проекта' };
+  return postToChat(
+    {
+      chatId: route.chatId,
+      projectPath: route.projectPath,
+      ...(route.runKey ? { runKey: route.runKey } : {}),
+      ...(route.sessionId ? { sessionId: route.sessionId } : {}),
+    },
+    text,
+    files,
+    deps,
+  );
+}
+
+interface ChatAddress {
+  chatId: string;
+  projectPath: string;
+  runKey?: string;
+  sessionId?: string;
+}
+
+/**
+ * Следующее сообщение в разговор, как с телефона: идёт ход — словом посреди хода
+ * (или в очередь до его конца), не идёт — новым ходом с прежними моделью,
+ * усилием и правами. Новый ход отвечает потоком до самого конца, поэтому ждём
+ * недолго: молчание маршрута — ход начался.
+ */
+async function postToChat(
+  target: ChatAddress,
+  text: string,
+  files: readonly ChatFile[],
+  deps: ApplyDeps,
+): Promise<ApplyOutcome> {
+  if (!text.trim() && files.length === 0) return { ok: false, detail: 'пустой ответ' };
   const keys = [target.runKey, target.chatId, target.sessionId].filter((key): key is string =>
     Boolean(key),
   );
@@ -191,6 +248,7 @@ async function sendAnswer(
     prompt: text,
     ...(target.sessionId ? { sessionId: target.sessionId } : {}),
     projectPath: target.projectPath,
+    ...(files.length > 0 ? { files: files.map(({ name, base64 }) => ({ name, base64 })) } : {}),
     steer: true,
     queueIfBusy: true,
     clientId: deps.clientId,

@@ -174,19 +174,44 @@ function clipDescription(text: string): string {
   return `${(word > CODEX_SKILL_DESCRIPTION_MAX / 2 ? cut.slice(0, word) : cut).trimEnd()}…`;
 }
 
+/**
+ * Путь один раз в заголовке, когда у каждого навыка он `<root>/<имя>/SKILL.md`. Путь в строке —
+ * около 100 знаков из ~260 (в JSON обратная косая удваивается): при 47 навыках набор съел запас
+ * в 2000 знаков до предела командной строки (27.10.2026), и каждый новый навык стоил бы ещё 100.
+ * Шаблон идёт с примером, чтобы слабая локальная модель не собирала путь наугад.
+ */
+function sharedRoot(
+  skills: readonly CodexSkillLine[],
+  root: string | undefined,
+): string | undefined {
+  if (!root) return undefined;
+  return skills.every((skill) => skill.path === join(root, skill.name, 'SKILL.md'))
+    ? root
+    : undefined;
+}
+
+const rootedPath = (root: string, example: CodexSkillLine): string =>
+  `${join(root, '<name>', 'SKILL.md')} (e.g. ${example.path})`;
+
 export function codexSkillIndex(
   skills: readonly CodexSkillLine[],
   heading = 'agentdeck kit skills',
   /** Резать длинные описания: только локальному прогону, где место в строке на счету; обычный набор и слои групп — как были. */
   clip = false,
+  /** Каталог навыков: путь пишется один раз в заголовке (`sharedRoot`); без него — в каждой строке. */
+  root?: string,
 ): string {
   if (skills.length === 0) return '';
+  const shared = sharedRoot(skills, root);
+  const describeSkill = (skill: CodexSkillLine) =>
+    `- ${skill.name} — ${clip ? clipDescription(skill.description) : skill.description}`;
   return [
     `## ${heading}`,
-    'When a task matches one of these, read that SKILL.md first and follow it.',
-    ...skills.map(
-      (skill) =>
-        `- ${skill.name} — ${clip ? clipDescription(skill.description) : skill.description} (${skill.path})`,
+    shared
+      ? `When a task matches one of these, read its SKILL.md first and follow it: ${rootedPath(shared, skills[0] as CodexSkillLine)}.`
+      : 'When a task matches one of these, read that SKILL.md first and follow it.',
+    ...skills.map((skill) =>
+      shared ? describeSkill(skill) : `${describeSkill(skill)} (${skill.path})`,
     ),
   ].join('\n');
 }
@@ -195,12 +220,16 @@ export function codexSkillIndex(
 export function codexSkillNames(
   skills: readonly CodexSkillLine[],
   heading = 'agentdeck kit skills',
+  root?: string,
 ): string {
   if (skills.length === 0) return '';
+  const shared = sharedRoot(skills, root);
   return [
     `## ${heading}`,
-    'Names only (the full list did not fit). Before a task, open the SKILL.md whose name fits it and follow it.',
-    ...skills.map((skill) => `- ${skill.name} (${skill.path})`),
+    shared
+      ? `Names only (the full list did not fit). Before a task, open the SKILL.md of the name that fits it and follow it: ${rootedPath(shared, skills[0] as CodexSkillLine)}.`
+      : 'Names only (the full list did not fit). Before a task, open the SKILL.md whose name fits it and follow it.',
+    ...skills.map((skill) => (shared ? `- ${skill.name}` : `- ${skill.name} (${skill.path})`)),
   ].join('\n');
 }
 
@@ -246,9 +275,9 @@ export function buildCodexOverlay(input: {
   // (ревью W10, 18.10.2026). Правила не режутся никогда — отказ остаётся, когда не
   // помещаются они сами даже с одними именами навыков.
   const tiers = [
-    codexSkillIndex(skills, undefined, input.local),
-    codexSkillIndex(skills, undefined, true),
-    codexSkillNames(skills),
+    codexSkillIndex(skills, undefined, input.local, skillsDir),
+    codexSkillIndex(skills, undefined, true, skillsDir),
+    codexSkillNames(skills, undefined, skillsDir),
   ].map((index) => join2(own, kitRules, index));
   const exec =
     tiers.find((text) => argLength(text) <= CODEX_KIT_ARG_LIMIT) ?? (tiers.at(-1) as string);
@@ -365,18 +394,42 @@ function tomlKey(name: string): string {
   return /^[A-Za-z0-9_-]+$/.test(name) ? name : JSON.stringify(name);
 }
 
-/** `-c mcp_servers.<имя>.enabled=false` на каждое имя; битое значение — ничего. */
+/**
+ * `-c mcp_servers.<имя>.enabled=false` на каждое снятое имя и
+ * `-c mcp_servers.<имя>.disabled_tools=[…]` на каждый сервер со снятыми поимённо
+ * инструментами (вики трекера, P-16; Codex сверяет имя точно, шаблонов не знает).
+ * Значение — `{off, disabledTools}` или прежний массив имён; битое — ничего.
+ * Снятому целиком серверу список инструментов не нужен.
+ */
 function mcpOffArgs(raw: string): string[] {
-  let names: unknown;
+  let value: unknown;
   try {
-    names = JSON.parse(raw);
+    value = JSON.parse(raw);
   } catch {
     return [];
   }
-  if (!Array.isArray(names)) return [];
-  return names
-    .filter((name): name is string => typeof name === 'string' && name.length > 0)
-    .flatMap((name) => ['-c', `mcp_servers.${tomlKey(name)}.enabled=false`]);
+  const record = isRecord(value) ? value : undefined;
+  const off = strings(Array.isArray(value) ? value : record?.off);
+  const tools = isRecord(record?.disabledTools) ? record.disabledTools : {};
+  return [
+    ...off.flatMap((name) => ['-c', `mcp_servers.${tomlKey(name)}.enabled=false`]),
+    ...Object.entries(tools).flatMap(([server, names]) => {
+      const list = strings(names);
+      if (!server || off.includes(server) || list.length === 0) return [];
+      const toml = `[${list.map((name) => JSON.stringify(name)).join(',')}]`;
+      return ['-c', `mcp_servers.${tomlKey(server)}.disabled_tools=${toml}`];
+    }),
+  ];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Непустые строки массива; не массив — пусто. */
+function strings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
 }
 
 function withOverlays(

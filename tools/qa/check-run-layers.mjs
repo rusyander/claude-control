@@ -831,6 +831,8 @@ ${MARK.ancestor}
       extra: input.extra ?? [],
       skills: { user: [...GROUP_SKILLS], group: [], plugins: [] },
       stage,
+      // Проход проверки правок (N8) — звено ревью со своим набором MCP.
+      ...(input.verify ? { verify: true } : {}),
       ...(ahead ? { ahead } : {}),
     });
     const runs = new ChatRunRegistry();
@@ -1117,6 +1119,107 @@ ${MARK.ancestor}
     stub.close();
     removeDir(kitData);
     finish();
+  }
+
+  // `--stage-mcp` (N8, живая группа g8 26.10): правки и проверка правок шли со всеми
+  // серверами проекта — 196 имён MCP и 8,3 тыс. знаков указаний в каждом ходе при нуле
+  // вызовов. Набор звена считает НАСТОЯЩИЙ `groupRunProfile` по таблице
+  // `STAGE_MCP_ROLES`; тело запроса настоящего CLI — доказательство: в правках и
+  // проверке нет ни одного имени и ни строки указаний серверов, в доставке трекер и
+  // хранилище кода на месте. Контроли: работа и ревью видят все три сервера; правки,
+  // попросившие сервер блоком `mcp`, получают его.
+  // Без флага режима случай идёт и в полном прогоне: кейс блока «Тесты» запускает
+  // скрипт без аргументов (`junit-run.mjs`), и иначе набор звена им не проверялся бы.
+  const ONLY_MODES = [
+    '--group-base',
+    '--group-kit',
+    '--group-card',
+    '--group-wiki',
+    '--shared-prefix',
+    '--group-stage',
+  ];
+  const stageMcpOnly = process.argv.includes('--stage-mcp');
+  if (stageMcpOnly || !ONLY_MODES.some((flag) => process.argv.includes(flag))) {
+    const server = (id, tools) => ({
+      id,
+      config: {
+        command: process.execPath,
+        args: [MCP_SERVER, '--tools', tools.join(','), '--instructions', `T8INSTR-${id}`],
+      },
+    });
+    const entries = [
+      server('t8-gitlab', ['list_merge_requests']),
+      server('t8-atlassian', ['jira_get_issue']),
+      server('t8-platform', ['platform_probe']),
+    ];
+    const ids = entries.map((entry) => entry.id);
+    // Как у настоящей группы: поиск инструментов включён, MCP — отложенными именами.
+    const base = { entries, tasksText: 'PROJ-1', env: { ENABLE_TOOL_SEARCH: 'true' } };
+    const seen = (measured) => {
+      const all = JSON.stringify(measured?.body ?? {});
+      return {
+        tools: ids.filter((id) => new RegExp(`mcp__${id}__`).test(all)),
+        instructions: ids.filter((id) => all.includes(`T8INSTR-${id}`)),
+        // Имена MCP в перечне инструментов и в списке отложенных (строка на имя) —
+        // любого сервера, не только трёх своих.
+        anyMcp: [
+          ...new Set([
+            ...(measured?.body?.tools ?? [])
+              .map((tool) => tool?.name ?? '')
+              .filter((name) => name.startsWith('mcp__')),
+            ...(all.match(/(?<=\\n)mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+(?=\\n)/g) ?? []),
+          ]),
+        ],
+        chars: all.length,
+      };
+    };
+    const cases = [
+      ['работа', 'work', {}, ids],
+      ['ревью', 'review', {}, ids],
+      ['правки', 'fix', {}, []],
+      ['проверка правок', 'review', { verify: true }, []],
+      ['доставка', 'deliver', {}, ['t8-gitlab', 't8-atlassian']],
+      ['правки с просьбой mcp', 'fix', { extra: ['t8-platform'] }, ['t8-platform']],
+    ];
+    // `--dump <каталог>` — тела запросов звеньев, чтобы прочесть, откуда имя.
+    const dump = process.argv.includes('--dump')
+      ? process.argv[process.argv.indexOf('--dump') + 1]
+      : undefined;
+    for (const [index, [name, stage, patch, want]] of cases.entries()) {
+      const measured = await runStage(stage, undefined, { ...base, ...patch });
+      check(Boolean(measured), `набор MCP, ${name}: запрос записан`);
+      if (!measured) continue;
+      if (dump) {
+        mkdirSync(dump, { recursive: true });
+        writeFileSync(
+          join(dump, `stage-mcp-${index}.json`),
+          JSON.stringify(measured.body, null, 1),
+        );
+      }
+      const got = seen(measured);
+      console.log(
+        `     ${name}: имена MCP ${got.anyMcp.join(', ') || '—'}; указания ${got.instructions.join(', ') || '—'}; тело ${got.chars} знаков`,
+      );
+      check(
+        got.tools.join() === want.join(),
+        `набор MCP, ${name}: инструменты серверов в запросе ровно ${want.join(', ') || 'никаких'} (есть: ${got.tools.join(', ') || '—'})`,
+      );
+      if (want.length === 0) {
+        check(
+          got.anyMcp.length === 0,
+          `набор MCP, ${name}: ни одного имени MCP в перечне и списке отложенных (есть: ${got.anyMcp.join(', ') || '—'})`,
+        );
+      }
+      check(
+        got.instructions.join() === want.join(),
+        `набор MCP, ${name}: указания серверов в запросе ровно ${want.join(', ') || 'никаких'} (есть: ${got.instructions.join(', ') || '—'})`,
+      );
+    }
+    if (stageMcpOnly) {
+      stub.close();
+      removeDir(kitData);
+      finish();
+    }
   }
 
   // `--shared-prefix` (X1) — две копии одной группы подряд, проводка панели

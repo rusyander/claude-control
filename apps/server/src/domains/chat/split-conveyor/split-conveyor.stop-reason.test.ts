@@ -367,6 +367,15 @@ describe('пробел блока «Тесты» — группа сверяет
     expect(deliveryNudgePrompt('feature/users', [unrun])).toContain('`gaps --project .`');
     expect(deliveryNudgePrompt('feature/users', [NO_MR])).not.toContain('gaps --project');
   });
+
+  it('при самопроверке доставки строки про `gaps` нет: `delivery` печатает и блок «Тесты»', () => {
+    // g1 26.10: напоминание несло оба правила — второй способ той же сверки, ~430 знаков.
+    const unrun = serverText('tests-gap-unrun', { cases: 'suites:001', command: 'tests-cli run' });
+    const stale = serverText('sieve-gap-stale', { sieve: 'browser-focus', files: 'src/a.tsx' });
+    const prompt = deliveryNudgePrompt('feature/users', [unrun, stale]);
+    expect(prompt).toContain('delivery --project .');
+    expect(prompt).not.toContain('gaps --project');
+  });
 });
 
 describe('ветки ревьюера без ответа держат доставку', () => {

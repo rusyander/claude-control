@@ -258,8 +258,14 @@ export interface ProviderAssistant {
    * на прогон и отдаёт свежий разборщик: у потокового формата есть состояние
    * (недочитанная строка). Не задан — stdout и есть ответ, как было.
    */
-  parseStdout?: () => ProviderStdoutParser;
+  parseStdout?: (onRow?: ProviderStreamRowListener) => ProviderStdoutParser;
 }
+
+/**
+ * Строка потока JSON, разобранная парсером stdout (`parseStdout`), — сторожу групп:
+ * у CLI без файла переписки (Gemini CLI) поток — единственный след хода.
+ */
+export type ProviderStreamRowListener = (row: Record<string, unknown>) => void;
 
 /**
  * Разборщик stdout одного прогона. `push` получает очередной декодированный кусок

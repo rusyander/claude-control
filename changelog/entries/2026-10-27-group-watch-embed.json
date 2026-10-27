@@ -1,0 +1,130 @@
+{
+  "title": {
+    "ru": "Сторож групп ставит группу на паузу по выбору, показывает охват и видит перезапуски, журнал проверок, окно лимитов и Continue",
+    "en": "The group watch pauses a group on opt-in, shows its coverage and sees restarts, the verify ledger, the limit window and Continue"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Переключатель «Ставить группу на паузу на конце хода» в карточке «Сторож групп разделения», по умолчанию выключен. Когда горит правило траты по кругу (R4, R8, R11, R12, R21, R24, R41, R42), следующее звено не запускается и группа встаёт на паузу. Работа посреди хода не обрывается, а если человеку есть что решить, паузы нет. Снимает паузу только человек кнопкой «Продолжить». В строке группы вместо «на паузе» стоит «пауза сторожа» с номером правила.",
+        "en": "A «Pause the group at the end of a turn» toggle in the «Split-group watch» card, off by default. While a looping-spend rule fires (R4, R8, R11, R12, R21, R24, R41, R42), the next link does not start and the group pauses. Work in the middle of a turn is not cut, and there is no pause while a human decision is waiting. Only a human lifts the pause, with «Resume». The group row shows «watch pause» with the rule number instead of «paused»."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "R43 напоминает о группе, которая стоит на паузе, хотя человеку решать нечего: пора продолжить или закрыть. После паузы сторожа напоминание приходит вчетверо раньше обычного порога. Пока группа ждёт решения человека, напоминания нет.",
+        "en": "R43 reminds of a group left paused while there is nothing for a human to decide: time to resume or close it. After a watch pause the reminder comes four times sooner than the usual threshold. While the group waits for a human decision, there is no reminder."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Охват сторожа: строка «Охват сейчас» в карточке называет, сколько живых групп сторож читает по потоку, по файлу разговора и только по тексту, и каких источников не хватает. В карточке группы фишка охвата появляется, только когда сторож видит группу не полностью.",
+        "en": "Watch coverage: the «Coverage now» line in the card names how many live groups the watch reads from the stream, from the conversation file and from text only, and which sources are missing. A group card shows a coverage chip only when the watch sees the group partly."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Новые правила-заметки. R38 — перезапуск сервера панели ждёт правок группы и остановит все живые прогоны; заметка называет, сколько минут он уже ждёт, а после перезапуска ещё полчаса говорит, что он случился из-за правок группы, сколько ждал и сколько других живых групп задел. R39 — сервер панели перезапускается слишком часто. R40 — журнал проверок в копии группы работает не так, как обещает: повтор проверки на дереве, которое журнал держит зелёным, журнал выключен или пишет без повторов. R41 — проверка прошла мимо журнала, и повторить её нельзя. R42 — прогон группы сдвинул окно лимитов на 5 % сессии или 2 % недели либо потратил 3 млн токенов. R9 называет пройденный уровень окна сессии и недели.",
+        "en": "New note rules. R38 — a panel server restart waits on the group’s edits and will stop every live run; the note names how many minutes it has already waited, and for half an hour after the restart it says the restart came from the group’s edits, how long it waited and how many other live groups it touched. R39 — the panel server restarts too often. R40 — the verify ledger in the group’s copy does not work as promised: a check re-run on a tree the ledger holds green, the ledger off, or recording without replays. R41 — a check ran past the ledger and can never be replayed. R42 — a group run moved the limit window by 5 % of the session or 2 % of the week, or spent 3 M tokens. R9 names the level the session and week windows have passed."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Расход по кругу в одном ходе (сразу несколько правил R4, R11, R21, R24) сводится в один сигнал. R4 больше не считает правки одних заметок. R16 отдельно называет вызов, который уже кончился, но шёл дольше порога, и фоновую задачу, о конце которой нет вести.",
+        "en": "Looping spend within one turn (several of R4, R11, R21, R24 at once) collapses into one signal. R4 no longer counts edits of notes only. R16 names separately a call that has ended but ran past the threshold, and a background task with no word of its end."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Группы Continue сторож читает по документу сессии, который `cn` пишет на каждый ход: вызовы, отказы, ошибки с кодом выхода и сработавшие сроки считаются так же, как у Claude.",
+        "en": "The watch reads Continue groups from the session document `cn` writes for each turn: calls, refusals, errors with an exit code and timeouts count the same way as for Claude."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В приложении на телефоне под строкой чата одной строкой виден активный сигнал сторожа — «внимание» или «тревога».",
+        "en": "The phone app shows an active watch signal, «attention» or «alarm», as one line under the chat row."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "R46 «итог прогона» — заметка о каждом законченном прогоне группы: токены, минуты, сдвиг окон лимитов и доля, ушедшая впустую. Доля считается по весу вызовов и делится на повторы (проверка без правки, перечитывание, тот же сбой, опрос сном), отказы стражей и переделку: прогон после напоминания о доставке — переделка целиком.",
+        "en": "R46 «run summary» — a note on every finished group run: tokens, minutes, the limit window shift and the share wasted. The share is weighted by calls and split into repeats (a check with no edit, a re-read, the same failure, a sleep poll), guard refusals and rework: a run after a delivery reminder is rework in full."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "R19 замечает и окно разговора, выросшее посреди сессии: больше чем на 100 тыс. токенов над первым запросом (порог в карточке сторожа; после сжатия счёт идёт от первого вызова за ним). R28 замечает доставку, которую переделывают круг за кругом: каждый новый круг находит новое недостающее.",
+        "en": "R19 also notes a conversation window grown mid-session: more than 100K tokens over the first request (threshold in the watch card; after a compaction the count starts from the first call after it). R28 notes delivery redone round after round: every new round finds something new missing."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож видит группы Gemini CLI: читает строки потока хода, из которых панель собирает ответ, — вызовы, отказы хука и политики, инструмент вне набора, ошибки и расход хода. Охват таких групп — «поток» вместо «только текст». Окна одного запроса Gemini не называет, поэтому правила окна и кэша (R19, R2, R34) у этих групп молчат, а расход хода идёт в счёт группы.",
+        "en": "The watch sees Gemini CLI groups: it reads the turn stream rows the panel builds the answer from — calls, hook and policy refusals, a tool outside the set, errors and the turn’s spend. Coverage of such groups is «stream» instead of «text only». Gemini reports no window of a single request, so the window and cache rules (R19, R2, R34) stay silent for these groups, while the turn’s spend counts toward the group."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сторож видит группы OpenCode: читает базу сессий CLI только на чтение, включая записи, ещё лежащие в журнале базы. Каждый запрос модели — свой вызов с окном, субагент — отдельная сессия, отказы человека, правил и плагина считаются так же, как у Claude. Охват таких групп — «транскрипт» вместо «только текст»; без модуля node:sqlite в Node охват остаётся «только текст».",
+        "en": "The watch sees OpenCode groups: it reads the CLI’s session database read-only, including rows still sitting in the database journal. Every model request is its own call with its window, a subagent is a separate session, and denials by a person, a rule or a plugin count the same as for Claude. Coverage of such groups is «transcript» instead of «text only»; without the node:sqlite module in Node it stays «text only»."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Журнал задач ведётся сам: принятая задача сразу записывается строкой в TASKS.md, законченные задачи, подзадачи и их пункты отмечаются [x], подробности уходят в PROGRESS.md. Страж в конце хода сверяет журнал с тем, что было сделано в сессии, и один раз останавливает ход, если запись отстала; в рабочих копиях и копиях групп журнал живёт в .agent/TASKS.md и в MR не попадает.",
+        "en": "The task ledger keeps itself: an accepted task becomes a TASKS.md line at once, finished tasks, subtasks and their items are marked [x], details go to PROGRESS.md. A guard at the end of a turn checks the ledger against what the session did and stops the turn once when the record lags; in worktrees and group copies the ledger lives in .agent/TASKS.md and stays out of the MR."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Codex в одиночном запуске получает путь к SKILL.md один раз в заголовке списка навыков — шаблоном каталога с примером, а не в каждой строке. Список набора стал короче на 4,7 тыс. знаков из 22,5 тыс., и новые навыки больше не съедают запас до предела командной строки.",
+        "en": "In a one-off launch Codex gets the path to SKILL.md once in the skill list heading — a folder template with an example — instead of on every line. The kit list is 4.7 k characters shorter out of 22.5 k, and new skills no longer eat the headroom below the command line limit."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Чат» описывает паузу сторожа, R38–R43, R46, рост окна, новые круги доставки, уровни окна, строку на телефоне, чтение Continue, Gemini CLI и OpenCode и охват.",
+        "en": "The «Chat» help covers the watch pause, R38–R43, R46, window growth, new delivery rounds, window levels, the phone line, Continue, Gemini CLI and OpenCode reading and coverage."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ],
+  "images": [
+    {
+      "file": "watch-card.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Карточка сторожа: переключатель паузы и строка охвата",
+        "en": "The watch card: the pause toggle and the coverage line"
+      }
+    }
+  ]
+}

@@ -24,6 +24,7 @@ import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
 import { ownerTraceUnparsed } from '../owner-coverage/owner-coverage.ts';
 import { COLD_RESUME_INTRO } from '../split-continue.ts';
 import { withStageTask } from '../cold-continuation/cold-continuation.ts';
+import { writeReviewFindings } from '../review-findings/review-findings.ts';
 
 /**
  * Ревью запроса на слияние по ссылке (Т7): замечания в связь, решение — человеку.
@@ -839,11 +840,20 @@ export class SplitReview {
       const fixTask = groupTask?.includes(review.url)
         ? groupTask
         : [groupTask, `Merge request under review: ${review.url}`].filter(Boolean).join('\n\n');
+      // Карточки с номерами R-n — файлом в копии (R7), как у правок группы.
+      const findingsFile = review.path
+        ? writeReviewFindings(review.path, {
+            kind: 'fix',
+            findings,
+            ...(review.branch ? { branch: review.branch } : {}),
+          })
+        : undefined;
       const outcome = this.deps.start({
         chatId: fixChatId,
         prompt: fixStagePrompt(findings, {
           ...(review.branch ? { branch: review.branch } : {}),
           context: { task: fixTask, ...(review.branch ? { branch: review.branch } : {}) },
+          ...(findingsFile ? { findingsFile } : {}),
         }),
         cwd: review.path ?? '',
         ...(link.model ? { model: link.model } : {}),

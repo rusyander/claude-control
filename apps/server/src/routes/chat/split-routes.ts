@@ -47,6 +47,7 @@ import {
 } from '../../domains/chat/split-tasks/split-tasks.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
 import { fileOneTicket } from '../../domains/chat/split-ticket-batch/file-one.ts';
+import { fileTicketPrints } from '../../domains/chat/split-ticket-batch/prints.ts';
 import { fail } from '../integrations/shared.ts';
 import type { PendingAsks } from '../../domains/chat/pending-asks/pending-asks.ts';
 
@@ -81,7 +82,11 @@ export function registerChatSplitRoutes(
     /** Решения по ревью MR (Т7); нет — карточка решения отвечает 404. */
     review?: SplitReview;
     /** «Перепроверить MR» доставленной группы; нет — кнопка отвечает 404. */
-    recheckMr?: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
+    recheckMr?: (
+      parentChatId: string,
+      index: number,
+      note?: string,
+    ) => Promise<SplitGroupRechecked>;
     /** Трекер для тикетов групп (L277); по умолчанию — Jira из интеграций. */
     tracker?: SplitTicketTracker;
     /** Задачи групп в трекере (G4); по умолчанию — Jira из интеграций. */
@@ -587,7 +592,11 @@ export function registerChatSplitRoutes(
         request.params.parent,
         key,
         (ticket, projectKey, groups) =>
-          fileOneTicket(tracker, { key, ticket, groups, projectKey, description, lang }),
+          fileOneTicket(
+            tracker,
+            { key, ticket, groups, projectKey, description, lang },
+            fileTicketPrints(() => ctx.location.paths.appData),
+          ),
       );
     } catch (error) {
       if (error instanceof IntegrationError) return fail(reply, error);

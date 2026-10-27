@@ -137,6 +137,23 @@ describe('dev-сторож сервера', () => {
     expect(splitSetupRunning({}, now)).toBe(false);
     expect(splitSetupRunning(null, now)).toBe(false);
   });
+
+  // Группа d9869abf:5, 25.10: связь доставки заведена в 16:59:34, сервер
+  // перезапущен в 16:59:39 — разговор этапа так и не начался.
+  it('рождение этапа группы — тоже идущая работа', () => {
+    const now = Date.parse('2026-10-25T16:59:39.000Z');
+    const links = (key: string, link: Record<string, unknown>) => ({ chatLinks: { [key]: link } });
+    const birth = { stagePrompt: 'доставка', createdAt: '2026-10-25T16:59:34.285Z', groupIndex: 5 };
+    expect(splitSetupRunning(links('new-1792947574290', birth), now)).toBe(true);
+    // Разговор начат — связь уже под ключом сессии, решает журнал ходов.
+    expect(splitSetupRunning(links('5f1c', birth), now)).toBe(false);
+    expect(splitSetupRunning(links('new-1', { createdAt: birth.createdAt }), now)).toBe(false);
+    expect(
+      splitSetupRunning(links('new-1', { ...birth, retiredAt: '2026-10-25T16:59:35.000Z' }), now),
+    ).toBe(false);
+    // Застрявшее рождение (сервер уже перезапущен) не держит перезапуски.
+    expect(splitSetupRunning(links('new-1', birth), now + 3 * 60_000)).toBe(false);
+  });
 });
 
 // 25.10: пауза в 300 мс давала перезапуск на каждое сохранение агента (897 за 23.10). Время подделано,

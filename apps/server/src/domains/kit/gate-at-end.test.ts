@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { builtinKitDir } from './service.ts';
 
@@ -33,6 +34,19 @@ const result = (id: string, content: string) => ({
   type: 'user',
   timestamp: at(-59_000),
   message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content }] },
+});
+// Вызов, который CLI не исполнил: отказ чужого хука (без метки [ctx-guard]) и классификатора.
+const RULE_CARD =
+  'PreToolUse:Bash hook error: rule-card: this call needs a rule this session got only as a card — the card is not the rule.';
+const CLASSIFIER =
+  'Permission for this action was denied by the Claude Code auto mode classifier. Reason: [Self-Modification].';
+const blockedBy = (id: string, content: string) => ({
+  type: 'user',
+  timestamp: at(-59_000),
+  message: {
+    role: 'user',
+    content: [{ type: 'tool_result', tool_use_id: id, content, is_error: true }],
+  },
 });
 const edit = () => {
   const id = `e${++n}`;
@@ -91,6 +105,18 @@ describe('gate-at-end: полный гейт один раз в конце вс�
     expect(pre({ command: GATE }, [prompt('сделай')])).toBe('deny');
   });
 
+  it('гейт, отклонённый другим хуком или классификатором, не исполнялся — повтор в фоне проходит', () => {
+    for (const body of [RULE_CARD, CLASSIFIER]) {
+      const id = `blk${++n}`;
+      const records = [
+        prompt('сделай'),
+        use('Bash', { command: GATE, run_in_background: true }, id),
+        blockedBy(id, body),
+      ];
+      expect(pre({ command: GATE, run_in_background: true }, records), body).toBeUndefined();
+    }
+  });
+
   it('линт тестового файла — не гейт: .test. в имени файла не запуск тестов', () => {
     const command = 'npx eslint src/a.ts src/a.test.ts && echo OK';
     expect(pre({ command }, [prompt('сделай')])).toBeUndefined();
@@ -147,6 +173,74 @@ describe('gate-at-end: полный гейт один раз в конце вс�
     expect(pre({ command: pair }, history)).toBeUndefined();
     // Слово из пути — не вид проверки: `…/project-tests/lint` остаётся одним прогоном тестов.
     expect(pre({ command: 'npx vitest run src/project-tests/lint' }, history)).toBeUndefined();
+    // g5 25.10: пакет верхнего уровня монорепо — без косой черты; его type-check и есть узкая
+    // форма из текста отказа. `cd ..` и линт всего каталога узкими не становятся.
+    const pkg = 'cd inst-admin-ui && npm run type-check > ../t.log 2>&1; npx eslint $F';
+    expect(pre({ command: pkg }, [prompt('сделай')])).toBeUndefined();
+    const up = 'cd .. && npm run type-check && npx eslint $F';
+    expect(pre({ command: up }, [prompt('сделай')])).toBe('deny');
+    const whole = 'cd inst-admin-ui && npm run type-check && npx eslint .';
+    expect(pre({ command: whole }, [prompt('сделай')])).toBe('deny');
+  });
+
+  it('g9: абсолютный cd в пакет копии и сборка одного пакета — узкие, корень копии — нет', async () => {
+    // g9 25.10, #g9:52 и #g9:41: из корня копии `cd C:/…/inst-admin-ui && npx tsc -p tsconfig.app.json`
+    // и `cd shared-ui && … && npm run build` отклонялись как полный гейт на этапе работы.
+    const gate = (await import(
+      pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'gate-at-end.mjs')).href
+    )) as { isFullGate(command: string, cwd?: string): boolean };
+    const copy = 'C:\\work\\acme-worktrees\\feat-PROJ-55-rbac-ui';
+    const g52 =
+      'cd C:/work/acme-worktrees/feat-PROJ-55-rbac-ui/inst-admin-ui && npx tsc -p tsconfig.app.json --noEmit > ../.agent/tmp-tsc.log 2>&1; echo tsc=$?; grep -c "error TS" ../.agent/tmp-tsc.log; npx vitest run src/pages/knowledge-bases src/features/kb-access-config > ../.agent/tmp-kb.log 2>&1; grep -E "Test Files|FAIL" ../.agent/tmp-kb.log | head -20';
+    const g41 =
+      'cd shared-ui && npx vitest run src/components/GuardrailForm/GuardrailForm.test.tsx > ../.agent/tmp-vitest.log 2>&1; echo exit=$?; grep -E "Test Files|Tests" ../.agent/tmp-vitest.log | head -5; npm run build > ../.agent/tmp-build.log 2>&1; echo build=$?; tail -3 ../.agent/tmp-build.log';
+    expect(gate.isFullGate(g52, copy)).toBe(false);
+    expect(gate.isFullGate(g52.replace('C:/work', '/c/work'), copy)).toBe(false);
+    expect(gate.isFullGate(g41, copy)).toBe(false);
+    // Корень копии, папка вне неё, сборка без cd — по-прежнему целиком.
+    const root = g52.replace('/inst-admin-ui', '');
+    expect(gate.isFullGate(root, copy)).toBe(true);
+    expect(gate.isFullGate(g52.replace('feat-PROJ-55-rbac-ui', 'other'), copy)).toBe(true);
+    expect(gate.isFullGate(g52, undefined)).toBe(true);
+    expect(gate.isFullGate(g41.replace('cd shared-ui && ', ''), copy)).toBe(true);
+    // Тот же путь через диспетчер: копия во временном каталоге, отказа нет, у корня — отказ.
+    const home = join(dir, 'copy-g9');
+    mkdirSync(join(home, 'inst-admin-ui'), { recursive: true });
+    const slash = home.replace(/\\/g, '/');
+    const viaCli = (command: string) =>
+      decision(
+        run('pre', {
+          hook_event_name: 'PreToolUse',
+          tool_name: 'Bash',
+          tool_input: { command },
+          cwd: home,
+          transcript_path: transcript([prompt('сделай')]),
+        }),
+      );
+    const local = g52.replace('C:/work/acme-worktrees/feat-PROJ-55-rbac-ui', slash);
+    expect(viaCli(local)).toBeUndefined();
+    expect(viaCli(local.replace('/inst-admin-ui', ''))).toBe('deny');
+    expect(viaCli(g41)).toBeUndefined();
+  });
+
+  it('g8: shell уже стоит в пакете монорепо — type-check без cd узкий, в корне копии — нет', async () => {
+    // g8 26.10 #g8:115: shell в `<копия>/inst-docs-ui`, `npm run type-check` без cd отклонён как
+    // полный гейт, хотя текст отказа называет именно его.
+    const gate = (await import(
+      pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'gate-at-end.mjs')).href
+    )) as { isFullGate(command: string, cwd?: string): boolean };
+    const copy = join(dir, 'copy-g8');
+    const pkg = join(copy, 'inst-docs-ui');
+    mkdirSync(join(copy, '.git'), { recursive: true });
+    mkdirSync(join(pkg, 'src'), { recursive: true });
+    writeFileSync(join(pkg, 'package.json'), '{}', 'utf8');
+    const g115 =
+      'npx vitest run scripts/check_content.test.ts > ../.agent/tmp/vt.log 2>&1; echo vt=$?; npm run type-check > ../.agent/tmp/tc.log 2>&1; echo tc=$?; npx eslint scripts/check_content.mjs > ../.agent/tmp/es.log 2>&1';
+    expect(gate.isFullGate(g115, pkg)).toBe(false);
+    // Корень копии, папка без своего манифеста, cd в той же команде — по-прежнему целиком.
+    expect(gate.isFullGate(g115, copy)).toBe(true);
+    expect(gate.isFullGate(g115, join(pkg, 'src'))).toBe(true);
+    expect(gate.isFullGate(`cd .. && ${g115}`, pkg)).toBe(true);
   });
 
   it('гейт, вынесенный в .sh-скрипт, — тоже полный гейт', () => {
@@ -219,6 +313,33 @@ describe('gate-at-end: полный гейт один раз в конце вс�
       ];
       expect(pre({ command: masked, run_in_background: true }, history), root).toBeUndefined();
     }
+  });
+
+  it('«fe=1» за замаскированным кодом на переднем плане — красный, «fe=0» — зелёный', () => {
+    // `> log; echo fe=$?; tail` завершается кодом tail (0): гейт, упавший на старой Node за 3 с,
+    // читался зелёным, и его повтор на нужной Node отклонялся как «ничего не правилось» (g0 26.10).
+    const fe = `${GATE} > tmp-fe.log 2>&1; echo fe=$?; tail -5 tmp-fe.log`;
+    const env = { AGENTDECK_HEAVY_QUEUE_DIR: dir };
+    const history = (id: string, body: string) => [
+      prompt('сделай'),
+      use('Bash', { command: fe }, id),
+      result(id, body),
+      prompt('почини'),
+      ...edit(),
+    ];
+    const red = 'fe=1\nГейт рассчитан на Node 22, запущен на v24.13.0.';
+    expect(pre({ command: fe }, history('fe1', red), env)).toBeUndefined();
+    expect(pre({ command: fe }, history('fe2', 'fe=0\nOK   inst-chat-ui'), env)).toBe('deny');
+    // Код, сохранённый в переменную и напечатанный позже, — тот же вердикт гейта.
+    const rc = `${GATE} > tmp-fe.log 2>&1; rc=$?; tail -5 tmp-fe.log; echo "rc: $rc"`;
+    const viaVar = [
+      prompt('сделай'),
+      use('Bash', { command: rc }, 'fe3'),
+      result('fe3', 'x\nrc: 2'),
+      prompt('почини'),
+      ...edit(),
+    ];
+    expect(pre({ command: rc }, viaVar, env)).toBeUndefined();
   });
 
   it('sleep с чтением вывода фоновой задачи — отказ; короткий sleep — тишина', () => {
@@ -447,6 +568,22 @@ describe('gate-at-end: группа гоняет полный гейт один 
     expect(gate(cwd, 'd2', transcript([prompt('доставь')]), deliver).decision).toBeUndefined();
     // Настоящий индекс копии не тронут.
     expect(git(cwd, 'status', '--porcelain')).toBe('?? b.ts');
+  });
+
+  // g3 25.10: rule-card отклонил гейт доставки, а журнал копии уже записал его как прогон — повтор
+  // получил «уже шёл на этом дереве — red» со ссылкой на вызов, который не исполнялся.
+  it('гейт, отклонённый другим хуком, — не прогон: повтор на том же дереве проходит', () => {
+    const cwd = repo();
+    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
+    const path = transcript([prompt('доставь')]);
+    expect(gate(cwd, 'b1', path, deliver).decision).toBeUndefined();
+    writeFileSync(
+      path,
+      [prompt('доставь'), use('Bash', { command: GATE }, 'b1'), blockedBy('b1', RULE_CARD)]
+        .map((r) => JSON.stringify(r))
+        .join('\n') + '\n',
+    );
+    expect(gate(cwd, 'b2', path, deliver)).toEqual({ decision: undefined, reason: '' });
   });
 
   it('гейт на том же дереве ещё идёт в фоне другой стадии — отказ «ещё идёт»', () => {
@@ -879,5 +1016,59 @@ describe('gate-at-end: группа гоняет полный гейт один 
     expect(gate(plain, 'd6', transcript(fixed), { AGENTDECK_GROUP_STAGE: 'fix' }).decision).toBe(
       undefined,
     );
+  });
+
+  // g8 26.10, доставка: проверка движка отказала гейту на Node 24 за 3 с, единственной правкой после была
+  // заметка `.agent/run/notebook.agent.md` — и повтор на Node 22 получил «красный, код правился».
+  it('отказ движка — не прогон гейта; правка в .agent/ — не правка кода', () => {
+    const plain = mkdtempSync(join(dir, 'engine-'));
+    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
+    const note = (path: string) => {
+      const id = `e${++n}`;
+      return [use('Edit', { file_path: path }, id), result(id, 'ok')];
+    };
+    const ran = (body: string, command = GATE) => {
+      const id = `g${++n}`;
+      return [prompt('доставь'), use('Bash', { command }, id), result(id, body)];
+    };
+    const refusal = 'Exit code 1\nГейт рассчитан на Node 22, запущен на v24.13.0.';
+    const notebook = note('C:/copy/.agent/run/notebook.agent.md');
+    expect(gate(plain, 'v1', transcript([...ran(refusal), ...notebook]), deliver).decision).toBe(
+      undefined,
+    );
+    // После отказа правился код — узкой проверки не нужно: гейт ещё ни разу не прогнал ни одной проверки.
+    for (const body of [refusal, 'npm error code EBADENGINE', 'ERR_PNPM_UNSUPPORTED_ENGINE'])
+      expect(gate(plain, `v${++n}`, transcript([...ran(body), ...edit()]), deliver).decision).toBe(
+        undefined,
+      );
+    // Отказ в логе фонового запуска за замаскированным кодом — тоже не прогон.
+    mkdirSync(join(plain, '.agent', 'tmp'), { recursive: true });
+    writeFileSync(join(plain, '.agent', 'tmp', 'g1.log'), `${refusal}\n`, 'utf8');
+    const masked = `${GATE} > .agent/tmp/g1.log 2>&1; echo EXIT=$?`;
+    const bg = [
+      prompt('доставь'),
+      use('Bash', { command: masked, run_in_background: true }, 'b90'),
+      result('b90', 'Command running in background with ID: b90. Output is being written to: x'),
+      {
+        type: 'user',
+        timestamp: at(-50_000),
+        message: {
+          role: 'user',
+          content:
+            '<task-notification><task-id>b90</task-id><status>completed</status><summary>exit code 0</summary></task-notification>',
+        },
+      },
+      ...edit(),
+    ];
+    expect(gate(plain, 'v2', transcript(bg), deliver, masked).decision).toBeUndefined();
+    // Настоящий красный гейт: предупреждение npm о движке его не отменяет, заметка в .agent/ правкой кода
+    // не считается — повтор без правки кода по-прежнему отклоняется как «ничего не правилось».
+    const red = ran('npm WARN EBADENGINE Unsupported engine\nExit code 1\n✖ 3 problems (3 errors)');
+    expect(gate(plain, 'v3', transcript([...red, ...edit()]), deliver).reason).toContain(
+      'pass narrowly on the fixed code',
+    );
+    const onlyNote = gate(plain, 'v4', transcript([...red, ...notebook]), deliver);
+    expect(onlyNote.decision).toBe('deny');
+    expect(onlyNote.reason).toContain('nothing was edited since');
   });
 });

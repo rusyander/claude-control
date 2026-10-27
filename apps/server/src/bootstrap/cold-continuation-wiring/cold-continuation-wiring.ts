@@ -3,6 +3,7 @@ import {
   coldResumeNotice,
   continuationIntro,
   decideContinuation,
+  relayIntro,
 } from '../../domains/chat/cold-continuation/cold-continuation.ts';
 import { withoutGroupIdentity } from '../../domains/chat/panel-preamble.ts';
 import {
@@ -51,13 +52,19 @@ export function wireColdContinuation(
     // Группа ждала сброса лимита (§L8): ждали до `resetsAt`, кэш остыл при
     // любом простое. Отметка ещё стоит — снимает её старт этого же хода.
     const waitedLimit = group?.status === 'awaiting' && group.waitingFor === 'limit';
+    // Слово доставленной группе (наблюдатель MR, перепроверка, отложенное слово):
+    // до старта этого хода группа «готово» — решает только окно (N4, g5 25.10).
+    // Только слово панели (`origin: 'groups'`, запуск стадий): реплика человека в
+    // чат группы может опираться на прежний разговор — её решает обычное правило.
+    const relay = group?.status === 'done' && meta.origin === 'groups';
     const warmedAt = deps.warmedAt?.(options.sessionId);
     const decided = decideContinuation({
       dir: deps.projectsDir(),
       sessionId: options.sessionId,
       cwd: options.cwd,
       economy: deps.store.getSettings().groupEconomy,
-      intro: continuationIntro(link, plan),
+      intro: relay ? relayIntro(link, plan) : continuationIntro(link, plan),
+      ...(relay ? { relay } : {}),
       ...(group?.base ? { base: group.base } : {}),
       afterLimit: Boolean(meta.afterLimit) || waitedLimit,
       ...(warmedAt !== undefined ? { warmedAt } : {}),
@@ -76,7 +83,7 @@ export function wireColdContinuation(
     return {
       options: { ...fresh, prompt: `${decided.brief}\n\n${prompt}` },
       meta: freshMeta,
-      notice: coldResumeNotice(decided.previous, decided.contextTokens),
+      notice: coldResumeNotice(decided.previous, decided.contextTokens, decided.reason),
     };
   });
 }

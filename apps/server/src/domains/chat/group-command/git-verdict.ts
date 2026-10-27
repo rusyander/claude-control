@@ -13,6 +13,8 @@ import {
   deletes,
   noteDestroys,
   noteDiscard,
+  noteGitAbove,
+  noteGitSubcommand,
   ownsBranch,
   runsProgram,
   safeConfigPair,
@@ -28,10 +30,12 @@ import {
   remoteReads,
 } from './git-reads.ts';
 import { noteCloneTarget } from './git-clone.ts';
+import { gitWritesOutside } from './git-output.ts';
 import { fetchVerdict, forgesTracking, pushVerdict } from './git-refspecs.ts';
 
 export { foreignRepoReads, gitSegmentDestroys } from './git-reads.ts';
 import { resolveFrom } from './paths.ts';
+import { holdsReviewLinks } from './review-scratch.ts';
 import type { Word } from './shell-parse.ts';
 import {
   DANGER,
@@ -289,12 +293,23 @@ export function gitVerdict(words: Word[], walk: Walk): SegmentVerdict {
   const { index, cwd } = global;
   const sub = words[index]?.text;
   if (sub === undefined) return OTHER;
+  noteGitSubcommand(sub);
   const args = words.slice(index + 1);
   // Программа, которую назвала команда, — человеку где угодно, пробный репозиторий тоже.
   if (runsProgram(sub, args)) return DANGER;
+  // Файл, который пишет сам git по ключу (`archive -o`, `diff --output`), — суд
+  // места записи, как у `tar -x -C` (D-9, 25.10): вне копии и временного — человеку.
+  if (gitWritesOutside(sub, args, walk, cwd)) return DANGER;
   if (sub === 'clone') noteCloneTarget(args, walk, cwd);
   const inCopy = walk.inCopy(cwd);
-  if (!inCopy && walk.inScratch(cwd)) {
+  // Каталог git над копией (`cd ..; git -C ..` из подпапки, D-4 25.10) — промах
+  // пути. От угаданного корня оболочки — отдельно (D-6): настоящий каталог мог
+  // быть глубже, отказ просит назвать копию, а не говорит «ты над копией».
+  if (cwd && walk.holdsCopy(cwd)) noteGitAbove(cwd, !global.anchored && walk.place().guessed);
+  // `git clean` в клоне рецензента, пока его `node_modules` — ссылка в настоящую
+  // копию: `-x` пошёл бы по ней (D-5 26.10, `review-scratch.ts`) — не пробный.
+  const linked = sub === 'clean' && cwd !== undefined && holdsReviewLinks(cwd);
+  if (!inCopy && !linked && walk.inScratch(cwd)) {
     const scratch = scratchVerdict(sub, args);
     if (scratch) return scratch;
   }

@@ -1,0 +1,33 @@
+[
+  {
+    "id": "w-a",
+    "chatId": "child-3",
+    "startedAt": 1793008800000,
+    "endedAt": 1793011200000,
+    "tokens": 300000,
+    "samples": [
+      {
+        "at": 1793008800000,
+        "fiveHour": {
+          "utilization": 0.82,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.91,
+          "resetsAt": 1793347200
+        }
+      },
+      {
+        "at": 1793011200000,
+        "fiveHour": {
+          "utilization": 0.82,
+          "resetsAt": 1793026800
+        },
+        "sevenDay": {
+          "utilization": 0.91,
+          "resetsAt": 1793347200
+        }
+      }
+    ]
+  }
+]

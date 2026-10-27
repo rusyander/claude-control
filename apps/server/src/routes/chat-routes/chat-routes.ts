@@ -6,6 +6,7 @@ import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRun
 import type { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import { registerChatTranscriptRoutes } from '../chat/transcript-routes/transcript-routes.ts';
 import { registerChatBrowseRoutes } from '../chat/browse-routes.ts';
+import { registerSubagentRoutes } from '../chat/subagent-routes/subagent-routes.ts';
 import { registerChatRunRoutes } from '../chat/run-routes/run-routes.ts';
 import { registerChatArtifactRoutes } from '../chat/artifact-routes.ts';
 import { registerChatCliRoutes } from '../chat/cli-routes/cli-routes.ts';
@@ -54,6 +55,8 @@ export function registerChatRoutes(
   assignedOf?: (chatId: string) => { model: string; effort: string } | undefined,
   /** Разговор группы на паузе — досылку без человека не принимает. */
   heldOf?: (chatId: string) => boolean,
+  /** Ход сессии вне панели кончился — «Закончил» в Telegram после долгой работы. */
+  outsideTurnEnded?: (sessionId: string) => void,
 ): void {
   registerChatTranscriptRoutes(
     app,
@@ -61,7 +64,10 @@ export function registerChatRoutes(
     (chatId) => registry.isProcessAlive(chatId),
     awaitsYou,
     assignedOf,
+    (chatId) => registry.canStopSubagents(chatId),
   );
+  // Ход субагента и его остановка — узел дерева агентов (`subagent-routes.ts`).
+  registerSubagentRoutes(app, ctx, registry);
   registerChatBrowseRoutes(app, ctx);
   registerChatRunRoutes(app, ctx, registry, session, assignedOf, heldOf);
   registerChatArtifactRoutes(app, ctx);
@@ -75,7 +81,7 @@ export function registerChatRoutes(
     flagDir: join(dirname(apiTokenPath()), 'outside-queue'),
   });
   registerChatInboxRoutes(app, ctx, registry, session, relay);
-  registerOutsideRelayRoutes(app, ctx, relay);
+  registerOutsideRelayRoutes(app, ctx, relay, outsideTurnEnded);
   // Отложенные вопросы D-n: список и решение человека (`deferred-routes.ts`).
   registerDeferredRoutes(app, ctx, registry);
 }

@@ -18,10 +18,12 @@ import {
   groupAutoApproveFor,
   groupDecision,
   groupDiscards,
+  groupGitAimRefusal,
   groupKillRefusal,
   groupPushRefusal,
   recordGroupAutoNotice,
   syncDanger,
+  withForeignOwnTemp,
   withProcessFacts,
   withWorktree,
   type GroupAutoApprove,
@@ -30,7 +32,7 @@ import { gitDestroys, guardUncommitted } from '../group-tree-state.ts';
 import {
   conflictsWith,
   isSoleSync,
-  MAIN_SYNC_DENIED,
+  mainSyncDenied,
   MAIN_SYNC_UNKNOWN,
   movesHistory,
   resolvedSyncText,
@@ -158,6 +160,8 @@ function deferred(
     input,
     guard: final.guard,
     cwd: call.workdir ?? call.cwd ?? '',
+    // Обход убранных папок судит `cd` от него же (P-26): транскрипта Claude нет.
+    ...(final.group?.shellCwd ? { shellCwd: final.group.shellCwd } : {}),
     ...(call.title ? { title: call.title } : {}),
   });
 }
@@ -190,13 +194,16 @@ async function groupReading(
   const guard = deps.guardHit(cwd, toolName, input);
   const placed = await withWorktree(linked, cwd, request);
   const shellCwd = shellCwdOf(call, placed.worktree);
-  // Корень своего дерева — процесс CLI хода (его pid едет с просьбой, P-06);
-  // сироту группы узнаёт метка группы в окружении CLI (`runtime.ts` `setChildRun`).
-  const found = await withProcessFacts(
+  // Свои временные файлы прошлых вызовов — из журнала сессии набора (P-26, D-10), как
+  // `withOwnTemp` маршрута Claude берёт их из транскрипта; читается только у удаления временного.
+  const owned = withForeignOwnTemp(
     shellCwd ? { ...placed, shellCwd } : placed,
     request,
-    call.pid ? [call.pid] : [],
+    call.session,
   );
+  // Корень своего дерева — процесс CLI хода (его pid едет с просьбой, P-06);
+  // сироту группы узнаёт метка группы в окружении CLI (`runtime.ts` `setChildRun`).
+  const found = await withProcessFacts(owned, request, call.pid ? [call.pid] : []);
   const stated = await deps.bridge.withMrState(found, toolName, input);
   const kept = !guard
     ? await guardUncommitted(stated.worktree, call.command, groupDiscards(stated, request))
@@ -214,6 +221,9 @@ async function groupReading(
   // не D-n (D-1, 24.10, решение владельца), как у маршрута Claude.
   const killRefusal = !guard ? groupKillRefusal(group, request) : undefined;
   if (killRefusal) return { level: 'deny', toolName, message: killRefusal };
+  // git в каталоге над копией — промах пути, отказ с причиной (D-4 25.10), как у маршрута Claude.
+  const aimRefusal = !guard ? groupGitAimRefusal(group, request) : undefined;
+  if (aimRefusal) return { level: 'deny', toolName, message: aimRefusal };
   if (sendsPack(publishTextOf(toolName, input) ?? '')) {
     return { level: 'deny', toolName, message: SEND_PACK_DENIED };
   }
@@ -232,7 +242,8 @@ async function groupReading(
     (await syncUnderway(cwd ?? '', group.base));
   if (syncRef && cwd && !resolving) {
     const conflict = await conflictsWith(cwd, syncRef, group.base);
-    if (conflict === false) return { level: 'deny', toolName, message: MAIN_SYNC_DENIED };
+    if (conflict === false)
+      return { level: 'deny', toolName, message: mainSyncDenied(syncCommand, cwd) };
     if (conflict === undefined) return { level: 'deny', toolName, message: MAIN_SYNC_UNKNOWN };
     if (isSoleSync(syncCommand) && !syncDanger(group, call.command, toolName)) {
       return { level: 'notify', toolName, group };

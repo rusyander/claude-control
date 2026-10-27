@@ -9,8 +9,10 @@
 //
 //   node <kit>/tools/mustfail.mjs --cmd "npm run test:ci" [--base origin/main] [--files a,b]
 //   node <kit>/tools/mustfail.mjs --cmd "..." --quick     # one run, all files reverted at once
-//   node <kit>/tools/mustfail.mjs --cmd "npx vitest related {file} --run"   # narrowed per file
+//   node <kit>/tools/mustfail.mjs --cmd "npx vitest related {file} --run"   # narrowed per file (own sibling test first)
 //   node <kit>/tools/mustfail.mjs --cmd "..." --mutants plan.json            # new tests, old code
+//   node <kit>/tools/mustfail.mjs --cmd "npx vitest run {spec}" --mutants plan.json   # each mutant: its own test file
+//     (plan field `spec` = the mutant's test file; unset → the one test file listed in --cmd that names `test`)
 //   node <kit>/tools/mustfail.mjs --cmd "..." --mutate src/x.ts --find "a >= b" --replace "a > b" [--test "name"]
 //
 // {file} (relative to --cwd) and {abs} in --cmd make every run about ONE file: its own baseline, its
@@ -69,7 +71,9 @@ if (has('help') || argv.includes('-h')) {
   console.log(
     `${head.join('\n')}\n\nFlags: --cmd (required) --base <rev> --cwd <dir> --files a,b --max <n, default 6> --quick --mutants <plan.json> --mutate/--find/--replace [--test] --timeout <ms per run> --recover\n` +
       `Vitest «related {file}» → graph mode (2 runs + tie-breaks, no --max cap): --trust-green (gate just green, skip baseline) ` +
-      `--budget <min, default 8> --no-graph (old per-file runs). Verdicts are memoised per tree; --fresh ignores the memo.`,
+      `--budget <min, default 8> --no-graph (old per-file runs). A file with its own sibling test (<name>.test.<ext>) is judged by it first, ` +
+      `the graph walks only the rest (--no-sibling: graph only). A check that runs no test at all stops at once (exit 2). ` +
+      `Verdicts are memoised per tree; --fresh ignores the memo.`,
   );
   process.exit(0);
 }
@@ -320,10 +324,17 @@ async function runMutants() {
   };
   let plan;
   if (flag('mutants')) {
+    // Relative to --cwd, then to the shell's cwd: `--cwd pkg --mutants .agent/tmp/m.json` failed ENOENT with
+    // the plan at the repo root the shell stood in (the redirect on the same line resolved there). A plan
+    // found nowhere names every path tried, so the retry needs no guess.
+    const tried = [...new Set([resolve(CWD, flag('mutants')), resolve(flag('mutants'))])];
+    const at = tried.find((p) => existsSync(p)) ?? tried[0];
     try {
-      plan = JSON.parse(readFileSync(resolve(CWD, flag('mutants')), 'utf8'));
+      plan = JSON.parse(readFileSync(at, 'utf8'));
     } catch (e) {
-      console.error(`mustfail: cannot read the mutant plan — ${e.message}`);
+      const where =
+        e.code === 'ENOENT' ? `no such file — tried ${tried.join(' and ')}` : `${at}: ${e.message}`;
+      console.error(`mustfail: cannot read the mutant plan — ${where}`);
       return 2;
     }
     if (!Array.isArray(plan)) plan = [plan];
@@ -333,8 +344,63 @@ async function runMutants() {
       return 2;
     }
   } else {
-    plan = [{ file: raw('mutate'), find: raw('find'), replace: raw('replace'), test: raw('test') }];
+    plan = [
+      {
+        file: raw('mutate'),
+        find: raw('find'),
+        replace: raw('replace'),
+        test: raw('test'),
+        spec: raw('spec'),
+      },
+    ];
   }
+
+  // Narrowing: `--cmd "npm run test:ci -- <15 files>"` ran all 15 test files for each of 21 mutants — 923 s.
+  // The proof a mutant asks for is a failure of its NAMED test, and that test lives in one file; a kill
+  // anywhere else is RED·wrong, not proof. So each mutant runs only its own test file: the plan's `spec`,
+  // else the one test file listed in --cmd whose source contains the `test` name. It fills {spec} in --cmd,
+  // or takes the place of the test files --cmd lists. Nothing to narrow by → the whole --cmd, as before.
+  const IS_SPEC = /\.(?:test|spec)\.[cm]?[jt]sx?$|_test\.py$|(?:^|[\\/])test_[^\\/]+\.py$/i;
+  const unquote = (t) => t.replace(/^(["'])(.*)\1$/, '$2');
+  const SLOT = CMD.includes('{spec}');
+  const listed = CMD.split(/\s+/)
+    .map(unquote)
+    .filter((t) => IS_SPEC.test(t));
+  /** `cmd` run against `spec` only: {spec} filled, or the listed test files collapsed into it. */
+  const narrowTo = (cmd, spec) => {
+    const shown = /\s/.test(spec) ? `"${spec}"` : spec;
+    if (SLOT) return cmd.replaceAll('{spec}', shown);
+    let placed = false;
+    return cmd
+      .split(/(\s+)/)
+      .map((part) => {
+        if (!part.trim() || !IS_SPEC.test(unquote(part))) return part;
+        if (placed) return null;
+        placed = true;
+        return shown;
+      })
+      .reduce(
+        (acc, part, i, all) =>
+          part === null || (all[i + 1] === null && !part.trim()) ? acc : acc + part,
+        '',
+      );
+  };
+  /** The mutant's own test file and where it came from ('plan' | 'test'), or null = run the whole --cmd. */
+  const specOf = (m) => {
+    if (typeof m.spec === 'string' && m.spec)
+      return { spec: m.spec.replaceAll('\\', '/'), how: 'plan' };
+    if (typeof m.test !== 'string' || !m.test.trim() || !listed.length) return null;
+    // A FAIL line reads «file > describe > it»; the source holds only the last title literally.
+    const needle = m.test.split(' > ').pop().trim();
+    const hits = listed.filter((f) => {
+      try {
+        return readFileSync(resolve(CWD, f), 'utf8').includes(needle);
+      } catch {
+        return false;
+      }
+    });
+    return hits.length === 1 ? { spec: hits[0], how: 'test' } : null;
+  };
 
   // Every mutant is checked before the first run: a stale or ambiguous `find` is a plan bug, and
   // discovering it after ten suite runs wastes all of them.
@@ -383,11 +449,22 @@ async function runMutants() {
       );
     else if (nth != null && !(nth >= 1 && nth <= at.length))
       problems.push(`${tag}: nth ${m.nth} outside 1..${at.length}`);
+    const own = typeof m.spec === 'string' || m.spec == null ? specOf(m) : null;
+    if (m.spec != null && (typeof m.spec !== 'string' || !m.spec))
+      problems.push(`${tag}: spec must be a non-empty string`);
+    else if (own?.how === 'plan' && !existsSync(resolve(CWD, own.spec)))
+      problems.push(`${tag}: spec ${own.spec} not found`);
+    else if (own?.how === 'plan' && !SLOT && !listed.length)
+      problems.push(
+        `${tag}: spec set, but --cmd has no {spec} and lists no test file to put it in place of — add {spec}`,
+      );
+    else if (SLOT && !own)
+      problems.push(`${tag}: --cmd has {spec} — set "spec" (the mutant's test file)`);
     if (problems.length) return null;
     const k = at[(nth ?? 1) - 1];
     const mutated = Buffer.from(text.slice(0, k) + replace + text.slice(k + find.length), 'utf8');
     const identity = Buffer.from(text.slice(0, k) + find + text.slice(k + find.length), 'utf8');
-    return { ...m, full, before, mutated, identity, line: lineOf(k) };
+    return { ...m, full, before, mutated, identity, line: lineOf(k), narrow: own };
   });
   if (problems.length) {
     console.error(`mustfail: the mutant plan cannot run:\n  ${problems.join('\n  ')}`);
@@ -395,10 +472,11 @@ async function runMutants() {
   }
 
   const templated = /\{file\}|\{abs\}/.test(CMD);
-  const cmdFor = (m) =>
+  const wholeFor = (m) =>
     templated
       ? CMD.replaceAll('{file}', m.file.replaceAll('\\', '/')).replaceAll('{abs}', m.full)
       : CMD;
+  const cmdFor = (m) => (m.narrow ? narrowTo(wholeFor(m), m.narrow.spec) : wholeFor(m));
   let spentMs = 0;
   const exec = async (cmd, timeout) => {
     const r = await execTree(cmd, timeout);
@@ -407,12 +485,37 @@ async function runMutants() {
   };
 
   process.stdout.write(`mustfail · mutants · ${muts.length} · ${CMD}\n`);
+  const narrowed = muts.filter((m) => m.narrow).length;
+  if (narrowed)
+    process.stdout.write(
+      `· own test file: ${narrowed} of ${muts.length} (the rest run the whole --cmd)\n`,
+    );
+  if (narrowed < muts.length && listed.length > 1)
+    process.stdout.write(
+      `· ${muts.length - narrowed} mutant(s) run all ${listed.length} test files of --cmd: give them "spec" — each run becomes one file\n`,
+    );
   // Baseline per distinct command: every mutant is judged against a run that was green untouched.
   const slowest = new Map();
-  for (const cmd of new Set(muts.map(cmdFor))) {
+  const queue = [...new Set(muts.map(cmdFor))];
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cmd = queue[qi];
     const t0 = Date.now();
     const r = await exec(cmd);
     slowest.set(cmd, Date.now() - t0);
+    // A file the tool picked by test name may not stand alone (shared setup in a sibling): those mutants go
+    // back to the whole --cmd instead of stopping the run. A `spec` the plan named red by itself is the plan's call.
+    const picked =
+      r.status !== 0 ? muts.filter((m) => m.narrow?.how === 'test' && cmdFor(m) === cmd) : [];
+    if (picked.length) {
+      process.stdout.write(
+        `· ${picked[0].narrow.spec} is red on its own before any mutation — its mutants run the whole --cmd\n`,
+      );
+      for (const m of picked) {
+        m.narrow = null;
+        if (!slowest.has(cmdFor(m)) && !queue.includes(cmdFor(m))) queue.push(cmdFor(m));
+      }
+      continue;
+    }
     if (r.status !== 0) {
       console.error(
         `\nmustfail: the check is ALREADY RED before any mutation — fix it first, a red check proves nothing.\n${r.out.split('\n').slice(-12).join('\n')}`,
@@ -507,7 +610,10 @@ async function runMutants() {
           'the check hung on the mutant — caught, but weaker than an assert',
         ];
       else if (r.status === 0)
-        [verdict, note] = ['GREEN', 'mutant survived — no test catches this behaviour'];
+        [verdict, note] = [
+          'GREEN',
+          `mutant survived${m.narrow ? ` in ${m.narrow.spec}` : ''} — no test catches this behaviour`,
+        ];
       else if (named) [verdict, note] = ['RED', `killed by the named test: ${named.slice(0, 90)}`];
       else if (BUILD_RED.test(r.out))
         [verdict, note] = [
@@ -757,6 +863,56 @@ const cmdForMany = (paths) =>
   );
 let spent = 0;
 
+/**
+ * The check exited 0 without running a single test (g9 25.10: `--cmd "npx vitest run {file}"` on source files,
+ * under a config with passWithNoTests — «green» baseline, every file then «NOT covered», 13 s for a false
+ * verdict, then the slow graph run). Nothing is reverted yet: stop with the command that does run tests.
+ */
+function stopNoTests(out) {
+  try {
+    restore();
+  } catch {
+    /* called before the first save (the restore state is not set up yet): nothing to put back */
+  }
+  const tail = String(out || '')
+    .split('\n')
+    .filter(Boolean)
+    .slice(-6)
+    .join('\n');
+  console.error(
+    `\nmustfail: the check ran NO test at all and exited 0 — a green run without a test proves nothing, and every revert would read «NOT covered». ` +
+      'With {file} that means it names the source file, not its test (a runner config with passWithNoTests turns «no test files» into exit 0). ' +
+      'Use --cmd "npx vitest related {file} --run" (jest: "npx jest --findRelatedTests {file}"): a file with its own sibling test (<name>.test.<ext>) ' +
+      `is judged by that test first, the import graph walks only the rest.\n${tail}`,
+  );
+  process.exit(2);
+}
+// A related-tests command already asks the runner for the file's tests: «none» there is a real answer
+// (the file has no test — NO-BASE row), not a wrong --cmd.
+const RELATED_CMD = /\brelated\s+\{file\}|--findRelatedTests\b/.test(CMD);
+const noTests = (r) =>
+  !RELATED_CMD && r.status === 0 && NO_TESTS.test(`${r.stdout ?? r.out ?? ''}${r.stderr ?? ''}`);
+
+/** The file's own test beside it (`x.tsx` → `x.test.tsx`, `__tests__/x.test.ts`), relative to the top; null if none. */
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/i;
+function siblingTest(path) {
+  const m = /^(.*?)([^/]+)\.([cm]?[jt]sx?|vue|svelte)$/i.exec(path);
+  if (!m || TEST_FILE.test(path)) return null;
+  const [, dir, name, ext] = m;
+  const exts = [
+    ...new Set(
+      [ext, 'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'mts', 'cts'].filter((e) =>
+        /^[cm]?[jt]sx?$/i.test(e),
+      ),
+    ),
+  ];
+  for (const kind of ['test', 'spec'])
+    for (const e of exts)
+      for (const cand of [`${dir}${name}.${kind}.${e}`, `${dir}__tests__/${name}.${kind}.${e}`])
+        if (existsSync(join(root, cand))) return cand;
+  return null;
+}
+
 const run = (path = null, command = null) => {
   const started = Date.now();
   const r = spawnSync(command ?? (path && TEMPLATED ? cmdFor(path) : CMD), {
@@ -787,6 +943,7 @@ if (baseline.status !== 0) {
   );
   process.exit(2);
 }
+if (!TEMPLATED && files.length && noTests(baseline)) stopNoTests(baseline.stdout);
 
 // ---- mutation ------------------------------------------------------------------------------------
 /** @type {Map<string, {full: string, before: Buffer|null, backup: string}>} */
@@ -914,34 +1071,99 @@ async function graphMode() {
     'RED·symbol': 'the import of a vanished symbol failed, not a behaviour check',
   };
 
-  let graph = null;
-  const baseFailed = new Set();
-  if (!TRUST_GREEN) {
-    const { r, g } = await graphRun('baseline with graph', files);
-    if (!g || r.timedOut) {
-      process.stdout.write(`${(r.out || '').split('\n').slice(-15).join('\n')}\n`);
-      return unchecked(files, 'the baseline produced no graph — rerun with --no-graph');
-    }
-    for (const t of g.tests) if (t.failed) baseFailed.add(t.file);
-    graph = g.related;
-  }
-
-  const reverted = [];
-  for (const f of files) {
-    save(f);
-    if (revert(f) === 'new')
-      rows.push([f, 'SKIP', 'new file — reverting it breaks the build, not a coverage signal']);
-    else reverted.push(f);
-  }
   const putBack = (f) => {
     const { full, before } = saved.get(f);
     if (before === null) {
       if (existsSync(full)) unlinkSync(full);
     } else writeFileSync(full, before);
   };
-  if (!reverted.length) return files.forEach(putBack);
+
+  // Own sibling test first (g9 25.10: the graph walk took 105 s + 102 s for 2 files whose 6 test files run
+  // directly in ~10 s). Revert one file, run only its `<name>.test.<ext>`: red = covered, proven without the
+  // graph. Green proves nothing yet (another test may cover it) — that file goes on to the graph with the rest.
+  // More files than --max with a sibling: the graph's flat two runs are cheaper than a run per file.
+  const directMs = [];
+  let targets = files;
+  const direct = has('no-sibling')
+    ? []
+    : files.map((f) => [f, siblingTest(f)]).filter(([, t]) => t);
+  if (direct.length && direct.length <= MAX) {
+    // Relative like {file}: an absolute path from git's long root misses a runner started under an 8.3 short cwd.
+    const viaTests = (list) =>
+      CMD.replace(
+        /\brelated\s+\{file\}/,
+        list.map((t) => `"${posix.relative(PREFIX || '.', t)}"`).join(' '),
+      );
+    let usable = true;
+    if (!TRUST_GREEN) {
+      const b = await execTree(
+        viaTests(direct.map(([, t]) => t)),
+        Math.max(left(), 60_000),
+        unlockedLedgerEnv(),
+      );
+      spent += b.ms;
+      usable = !b.timedOut && b.status === 0 && !NO_TESTS.test(b.out);
+      process.stdout.write(
+        `· own sibling tests: ${direct.length} file(s), baseline ${usable ? 'green' : 'not green — the graph decides'} (${Math.round(b.ms / 1000)} s)\n`,
+      );
+    }
+    const proven = new Set();
+    for (const [i, [f, t]] of (usable ? direct : []).entries()) {
+      if (left() < 30_000) break;
+      save(f);
+      if (revert(f) === 'new') {
+        putBack(f);
+        continue;
+      }
+      const own = await execTree(viaTests([t]), left(), unlockedLedgerEnv());
+      putBack(f);
+      spent += own.ms;
+      directMs.push(own.ms);
+      if (!own.timedOut && own.status !== 0) {
+        const kind = redKind([own.out]);
+        rows.push([f, kind, `${RED_NOTE[kind]} (own test ${t})`]);
+        proven.add(f);
+      }
+      process.stdout.write(
+        `[${i + 1}/${direct.length}] ${f} → ${proven.has(f) ? rows.at(-1)[1] : 'own test green — the graph decides'} (${Math.round(own.ms / 1000)} s)\n`,
+      );
+    }
+    targets = files.filter((f) => !proven.has(f));
+    if (!targets.length) return;
+  }
+  const slowGraph = (ms) => {
+    const one = directMs.length
+      ? [...directMs].sort((a, b) => a - b)[Math.floor(directMs.length / 2)]
+      : 0;
+    if (one && ms > 10 * one)
+      process.stdout.write(
+        `· graph walk ${Math.round(ms / 1000)} s against ≈${Math.round(one / 1000)} s for a direct run of an own test (>10×): a test beside the file, or test files named in --cmd, is cheaper\n`,
+      );
+  };
+
+  let graph = null;
+  const baseFailed = new Set();
+  if (!TRUST_GREEN) {
+    const { r, g } = await graphRun('baseline with graph', targets);
+    slowGraph(r.ms);
+    if (!g || r.timedOut) {
+      process.stdout.write(`${(r.out || '').split('\n').slice(-15).join('\n')}\n`);
+      return unchecked(targets, 'the baseline produced no graph — rerun with --no-graph');
+    }
+    for (const t of g.tests) if (t.failed) baseFailed.add(t.file);
+    graph = g.related;
+  }
+
+  const reverted = [];
+  for (const f of targets) {
+    save(f);
+    if (revert(f) === 'new')
+      rows.push([f, 'SKIP', 'new file — reverting it breaks the build, not a coverage signal']);
+    else reverted.push(f);
+  }
+  if (!reverted.length) return targets.forEach(putBack);
   const { r, g } = await graphRun('all files reverted at once', reverted);
-  files.forEach(putBack);
+  targets.forEach(putBack);
   if (!g || r.timedOut) {
     process.stdout.write(`${(r.out || '').split('\n').slice(-15).join('\n')}\n`);
     return unchecked(reverted, 'the reverted run produced no graph or was cut by budget');
@@ -1058,12 +1280,15 @@ try {
     // One baseline for all narrowed runs, where the runner allows it (see MULTI_FILE).
     let unionGreen = false;
     if (TEMPLATED && list.length > 1 && MULTI_FILE.test(CMD)) {
-      unionGreen = run(null, cmdForMany(list)).status === 0;
+      const union = run(null, cmdForMany(list));
+      if (noTests(union)) stopNoTests(union.stdout);
+      unionGreen = union.status === 0;
       process.stdout.write(
         `· one baseline over ${list.length} files: ${unionGreen ? 'green — no per-file baselines needed' : 'red — every file gets its own'} (${Math.round(spent / 1000)} s)\n`,
       );
     }
     const todo = nothingCovered ? [] : list;
+    let narrowRuns = 0;
     const startedAt = Date.now();
     todo.forEach((path, i) => {
       const before = rows.length;
@@ -1082,6 +1307,14 @@ try {
       save(path);
       if (TEMPLATED && !unionGreen) {
         const own = run(path);
+        // The first narrowed run without a test = a wrong --cmd: stop before spending a run per file on it.
+        if (noTests(own)) {
+          if (!narrowRuns) stopNoTests(own.stdout);
+          rows.push([path, 'NO-BASE', 'the narrowed check ran no test at all']);
+          exitCode = 1;
+          return;
+        }
+        narrowRuns += 1;
         if (own.status !== 0) {
           rows.push([
             path,

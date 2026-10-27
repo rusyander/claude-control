@@ -28,6 +28,7 @@ import { TriageCard } from '../TriageCard/TriageCard';
 import { PlanCard } from '../PlanCard/PlanCard';
 import { MediaFeedCard } from '../MediaFeedCard/MediaFeedCard';
 import { MediaRequestText } from '../MediaRequestText/MediaRequestText';
+import { TurnTrail } from '../TurnTrail/TurnTrail';
 import type { MessageBubbleProps } from '../ChatMessages.types';
 import styles from './MessageBubble.module.scss';
 import { TASK_NOTICE_LABEL } from './MessageBubble.constants';
@@ -39,6 +40,7 @@ import { TASK_NOTICE_LABEL } from './MessageBubble.constants';
  */
 export function MessageBubble({
   message,
+  trail,
   onEdit,
   onPickOption,
   isLast,
@@ -411,6 +413,7 @@ export function MessageBubble({
         {/* Контур сжал историю перед этим ответом (`context-managed`): без
             подписи ответ читается как ответ модели, видевшей весь разговор. */}
         {!isUser && message.contextSummarized && <ContextSummarizedNote scope="answer" />}
+        {!isUser && <TurnTrail trail={trail} />}
       </div>
     </div>
   );

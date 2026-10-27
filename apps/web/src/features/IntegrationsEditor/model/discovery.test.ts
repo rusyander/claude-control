@@ -39,6 +39,10 @@ describe('isIntegrationSet', () => {
     };
     expect(isIntegrationSet('telegram', enabled, undefined)).toBe(true);
 
+    // Значение по умолчанию (порог «Закончил») — не заведённая настройка: пустая
+    // карточка Telegram не должна вставать в список сама.
+    expect(isIntegrationSet('telegram', DEFAULT_INTEGRATIONS, undefined)).toBe(false);
+
     const status = { id: 'github', hasToken: true } as Parameters<typeof isIntegrationSet>[2];
     expect(isIntegrationSet('github', DEFAULT_INTEGRATIONS, status)).toBe(true);
   });

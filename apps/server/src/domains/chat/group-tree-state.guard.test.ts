@@ -131,3 +131,18 @@ describe('guardUncommitted: что снимок не удержит', () => {
     expect(gitDiscards('git checkout -m other', scope)).toContain('switch');
   });
 });
+
+// g9 26.10 (F12): общий отказ без файлов звено повторило тем же вызовом через 6 с.
+describe('отказ смены ветки на грязном дереве', () => {
+  it('называет незакоммиченные файлы и что повтор без коммита откажут снова', async () => {
+    const dir = repo();
+    writeFileSync(join(dir, 'a.txt'), 'edited\n');
+    writeFileSync(join(dir, 'notes.tmp'), 'x\n');
+    const result = await guardUncommitted(dir, 'git checkout main', ['switch']);
+    expect(result).toHaveProperty('deny');
+    const deny = 'deny' in result ? result.deny : '';
+    expect(deny).toContain('switching branches is refused');
+    expect(deny).toContain('Uncommitted now: a.txt, notes.tmp.');
+    expect(deny).toContain('The same command is refused again while `git status` shows them');
+  });
+});

@@ -11,11 +11,24 @@ import {
   getUpdates,
   getWebhookInfo,
   sendMessage,
+  setMyCommands,
 } from './bot-api.ts';
+import {
+  ALREADY_CONNECTED,
+  BOT_COMMANDS,
+  HELP_TEXT,
+  NOTHING_WAITING,
+  parseCommand,
+  statusText,
+  type LimitShares,
+  type RunningChat,
+} from './commands.ts';
 import { newNonce, parseCallback, signCallback, verifyCallback } from './callback-data.ts';
 import {
-  customPromptText,
-  itemText,
+  CUSTOM_PROMPT_TEXT,
+  cardOf,
+  readOnlyLine,
+  sentItemOf,
   keyboardOf,
   messageText,
   OUTCOME,
@@ -23,12 +36,32 @@ import {
   TOAST,
 } from './compose.ts';
 import type { AnswersStore } from './store.ts';
+import { CLEAR_REPLY_TTL_MS, clearChat, clearReplyText, flushDeletes } from './cleanup.ts';
+import {
+  AlbumBuffer,
+  EMPTY_REPLY,
+  OUTSIDE_MEDIA_NOTE,
+  OUTSIDE_MEDIA_ONLY,
+  UNMAPPED_REPLY,
+  downloadMedia,
+  mediaOf,
+  sendFailed,
+  sentAck,
+  sentParts,
+  skipNotes,
+  type ChatFile,
+  type MediaRef,
+} from './replies.ts';
+import type { SentLog } from './sent-log.ts';
+import { sleep } from './sleep.ts';
+import type { ReplyMarkup } from './telegram-answers.types.ts';
 import type {
   ApplyOutcome,
   AskTarget,
   BotMessage,
   BotUpdate,
   ButtonAction,
+  ChatRoute,
   PendingAskItem,
   SentItem,
   SentMessage,
@@ -50,6 +83,10 @@ import type {
  * Принимаются только нажатия и ответы владельца: и чат, и отправитель обязаны
  * совпасть с его id. Остальное молча отбрасывается — в журнал попадает только
  * сам факт, без содержимого.
+ *
+ * Ответ владельца ответом (reply) на любое сообщение бота о чате уходит в этот
+ * чат текстом и картинками (`replies.ts`); не понять, в какой, — одна строка
+ * объяснения, а не тишина.
  */
 
 export interface AnswersServiceDeps {
@@ -58,12 +95,39 @@ export interface AnswersServiceDeps {
   token: () => string | undefined;
   /** Номера ботов, которых слушает агент (`same-bot.ts`). */
   agentBotIds: () => Set<string>;
+  /** Включена ли карточка Telegram целиком; выключена — опрос стоит. Не задано — да. */
+  active?: () => boolean;
   /** Что сейчас ждёт человека (`collect.ts`). */
   collect: () => Promise<PendingAskItem[]>;
   /** Применить ответ маршрутом панели (`apply.ts`). */
   apply: (target: AskTarget, answer: Answer, clientId: string) => Promise<ApplyOutcome>;
+  /** Сообщение владельца в чат панели или сессию вне её (`sendChatText`). */
+  sendToChat?: (
+    route: ChatRoute,
+    text: string,
+    files: readonly ChatFile[],
+    clientId: string,
+  ) => Promise<ApplyOutcome>;
   /** Почему ожидание пропало из сводки. */
   vanished: (target: AskTarget) => Vanished;
+  /**
+   * Обновление сначала предлагается окну подключения (`connect.ts`): `/start`
+   * в открытое окно забирает оно, а не разбор владельца.
+   */
+  intercept?: (update: BotUpdate) => boolean;
+  /** Идущие разговоры — для `/status`. */
+  running?: () => Promise<RunningChat[]>;
+  /** Загрузка окон подписки — для `/status`; неизвестна — строки нет. */
+  limits?: () => Promise<LimitShares | undefined>;
+  /** Что бот писал и какие команды слал владелец — для /clear (`sent-log.ts`). */
+  sentLog?: SentLog;
+  /** Сколько собирать сообщения одного альбома с последнего пришедшего (мс). */
+  albumWaitMs?: number;
+  /**
+   * Тишина после старта панели и после сна машины: накопившееся за ночь не
+   * сыплется пачкой, пока человек, может быть, уже сидит за панелью (мс).
+   */
+  sendGraceMs?: number;
   log: (message: string) => void;
   now?: () => number;
   /** Как часто сверять ожидания (мс). */
@@ -80,6 +144,10 @@ export interface AnswersServiceDeps {
 
 const BACKOFF_MIN_MS = 5_000;
 const BACKOFF_MAX_MS = 60_000;
+/** Две минуты тишины после старта и сна (решение владельца 25.10.2026, B7). */
+export const SEND_GRACE_MS = 2 * 60_000;
+/** Сверка не шла дольше этого — машина спала: таймер в сне не тикает. */
+const WAKE_GAP_MS = 60_000;
 
 export class TelegramAnswersService {
   private readonly deps: AnswersServiceDeps;
@@ -89,13 +157,21 @@ export class TelegramAnswersService {
   private scanTimer: ReturnType<typeof setInterval> | undefined;
   private startedAt = 0;
   private nextSendAt = 0;
+  /** До этого момента новое не отправляется (`sendGraceMs`). */
+  private quietUntil = 0;
+  private lastScanAt = 0;
+  private bootBackoff = BACKOFF_MIN_MS;
+  /** Картинки ответа на вопрос из нескольких шагов — до отправки последнего шага. */
+  private readonly answerFiles = new Map<string, ChatFile[]>();
   private chain: Promise<unknown> = Promise.resolve();
   private generation = 0;
   private token: string | undefined;
+  private readonly albums: AlbumBuffer;
 
   constructor(deps: AnswersServiceDeps) {
     this.deps = deps;
     this.now = deps.now ?? Date.now;
+    this.albums = new AlbumBuffer(deps.albumWaitMs ?? 1_500);
   }
 
   status(): TelegramAnswersStatus {
@@ -104,6 +180,25 @@ export class TelegramAnswersService {
 
   openCount(): number {
     return this.deps.store.openItems();
+  }
+
+  /** Слушает ли опрос этот токен прямо сейчас — второй слушатель получил бы 409. */
+  listensTo(token: string): boolean {
+    return Boolean(this.abort) && this.token === token;
+  }
+
+  /**
+   * Права и вопросы доставляет этот опрос: включён, слушает и пишет владельцу
+   * без отказов. Тогда уведомление Telegram о них молчит — иначе пришло бы два
+   * сообщения, и одно из них без кнопок.
+   */
+  covers(): boolean {
+    return (
+      this.deps.store.settings.enabled &&
+      this.deps.active?.() !== false &&
+      this.state.state === 'polling' &&
+      !this.state.detail
+    );
   }
 
   private setState(state: TelegramAnswersState, extra: Omit<TelegramAnswersStatus, 'state'> = {}) {
@@ -137,6 +232,7 @@ export class TelegramAnswersService {
     this.stop();
     const generation = this.generation;
     this.state = { state: 'off' };
+    this.bootBackoff = BACKOFF_MIN_MS;
     await this.boot(generation);
     return this.status();
   }
@@ -145,7 +241,7 @@ export class TelegramAnswersService {
     const settings = this.deps.store.settings;
     // Настройка сброшена потерей файла — человек видит причину, а не просто «выключено».
     const lost = this.deps.store.lost;
-    if (!settings.enabled) {
+    if (!settings.enabled || this.deps.active?.() === false) {
       return this.setState('off', lost ? { detail: `файл ответов был повреждён: ${lost}` } : {});
     }
     const token = this.deps.token();
@@ -164,8 +260,12 @@ export class TelegramAnswersService {
         return this.setState('unauthorized', { detail: me.description });
       }
       this.setState('error', { detail: me.description });
-      return this.retryBoot(generation, BACKOFF_MIN_MS);
+      // Сеть легла надолго — повтор всё реже, до минуты, а не каждые 5 с.
+      const delay = this.bootBackoff;
+      this.bootBackoff = Math.min(delay * 2, BACKOFF_MAX_MS);
+      return this.retryBoot(generation, delay);
     }
+    this.bootBackoff = BACKOFF_MIN_MS;
     const bot = me.result.username ? `@${me.result.username}` : undefined;
     const hook = await getWebhookInfo(token);
     if (generation !== this.generation) return;
@@ -179,15 +279,29 @@ export class TelegramAnswersService {
     }
     this.token = token;
     this.startedAt = this.now();
+    this.lastScanAt = this.startedAt;
+    this.quietUntil = this.startedAt + (this.deps.sendGraceMs ?? SEND_GRACE_MS);
     this.setState('polling', bot ? { bot } : {});
     this.abort = new AbortController();
     void this.pollLoop(generation, token, this.abort.signal);
+    void this.publishCommands(token);
     this.scanTimer = setInterval(() => {
       void this.serial(() => this.scan(generation)).catch((error: unknown) =>
         this.deps.log(`telegram-answers: scan failed: ${errorText(error)}`),
       );
     }, this.deps.scanMs ?? 5_000);
     this.scanTimer.unref?.();
+  }
+
+  /** Меню команд бота: по-английски для всех и по-русски для русского Telegram. */
+  private async publishCommands(token: string): Promise<void> {
+    for (const [language, commands] of [
+      [undefined, BOT_COMMANDS.en],
+      ['ru', BOT_COMMANDS.ru],
+    ] as const) {
+      const done = await setMyCommands(token, commands, language);
+      if (!done.ok) this.deps.log(`telegram-answers: setMyCommands failed (${done.status})`);
+    }
   }
 
   private retryBoot(generation: number, ms: number): void {
@@ -247,19 +361,37 @@ export class TelegramAnswersService {
   /** Один проход: закрыть пропавшие ожидания, отправить созревшие. Открыт для тестов. */
   async scan(generation = this.generation): Promise<void> {
     if (generation !== this.generation || this.state.state !== 'polling' || !this.token) return;
+    // Выключили не через PUT ответов (главный выключатель карточки, файл) — опрос
+    // стоит с ближайшего прохода, а не до перезапуска панели.
+    if (!this.deps.store.settings.enabled || this.deps.active?.() === false) {
+      this.stop();
+      this.setState('off');
+      return;
+    }
     const token = this.token;
+    this.noticeWake();
+    await flushDeletes(this.cleanupContext(token));
     const items = await this.deps.collect();
     const now = this.now();
-    const live = new Set(items.map((item) => item.key));
+    const live = new Map(items.map((item) => [item.key, item]));
+    let dirty = false;
     for (const message of this.deps.store.open()) {
       let changed = false;
       for (const item of message.items) {
         if (item.state !== 'open') continue;
-        if (live.has(item.key)) {
-          delete item.missingSince;
+        const fresh = live.get(item.key);
+        if (fresh) {
+          if (item.missingSince !== undefined) {
+            delete item.missingSince;
+            dirty = true;
+          }
+          if (retarget(item, fresh)) changed = true;
           continue;
         }
-        item.missingSince ??= now;
+        if (item.missingSince === undefined) {
+          item.missingSince = now;
+          dirty = true;
+        }
         const settle = this.deps.confirmMissingMs ?? 15_000;
         const grace = this.deps.startupGraceMs ?? 45_000;
         if (now - item.missingSince < settle || now - this.startedAt < grace) continue;
@@ -268,7 +400,8 @@ export class TelegramAnswersService {
       }
       if (changed) await this.render(token, message);
     }
-    this.deps.store.save();
+    // Проход без перемен файл не пишет: сверка идёт каждые 5 с.
+    if (dirty) this.deps.store.save();
 
     const afterMs = this.deps.store.settings.afterMinutes * 60_000;
     const ready = items.filter(
@@ -276,10 +409,25 @@ export class TelegramAnswersService {
         !this.deps.store.wasSent(item.key) &&
         (item.immediate || now - Date.parse(item.askedAt) >= afterMs),
     );
-    if (ready.length === 0 || now < this.nextSendAt) return;
+    if (ready.length === 0 || now < this.nextSendAt || now < this.quietUntil) return;
     const lastSentAt = this.deps.store.lastSentAt;
     if (lastSentAt && now - lastSentAt < (this.deps.coalesceMs ?? 60_000)) return;
     await this.send(token, ready.slice(0, this.deps.maxItems ?? 8));
+  }
+
+  /**
+   * Сверки долго не было — машина спала (таймеры во сне не идут). После
+   * пробуждения та же тишина, что после старта: человек мог открыть крышку,
+   * чтобы ответить в панели.
+   */
+  private noticeWake(): void {
+    const now = this.now();
+    const gap = Math.max(WAKE_GAP_MS, 3 * (this.deps.scanMs ?? 5_000));
+    if (now - this.lastScanAt > gap) {
+      this.quietUntil = now + (this.deps.sendGraceMs ?? SEND_GRACE_MS);
+      this.startedAt = now;
+    }
+    this.lastScanAt = now;
   }
 
   private closeVanished(item: SentItem, now: number): void {
@@ -294,7 +442,7 @@ export class TelegramAnswersService {
           : OUTCOME.stale(now);
   }
 
-  private async send(token: string, items: PendingAskItem[]): Promise<void> {
+  private async send(token: string, items: PendingAskItem[]): Promise<boolean> {
     const ownerId = this.deps.store.settings.ownerId;
     const message: SentMessage = {
       sid: this.deps.store.nextSid(),
@@ -302,18 +450,11 @@ export class TelegramAnswersService {
       messageId: 0,
       nonce: newNonce(),
       sentAt: new Date(this.now()).toISOString(),
-      items: items.map((item) => ({
-        key: item.key,
-        target: item.target,
-        openId: item.openId,
-        text: itemText(item),
-        ...(item.questions?.length ? { questions: item.questions, step: 0, picks: [] } : {}),
-        state: 'open' as const,
-      })),
+      items: items.map(sentItemOf),
       actions: {},
       nextAction: 0,
     };
-    await this.deliver(token, message);
+    return this.deliver(token, message);
   }
 
   /** Отправить новое сообщение и записать его. */
@@ -336,14 +477,48 @@ export class TelegramAnswersService {
       return false;
     }
     message.messageId = sent.result.message_id;
+    // Прошло — прежняя подробность «не удалось написать» больше не правда.
+    if (this.state.detail) this.setState('polling');
     this.deps.store.add(message, this.now());
+    this.remember(message.chatId, message.messageId, 'bot');
     return true;
   }
 
-  /** Переписать сообщение по его состоянию; закрытое теряет кнопки. */
+  private cleanupContext(token: string) {
+    return {
+      token,
+      store: this.deps.store,
+      sentLog: this.deps.sentLog,
+      now: this.now(),
+      log: this.deps.log,
+    };
+  }
+
+  private remember(chatId: string, messageId: number, kind: 'bot' | 'owner'): void {
+    this.deps.sentLog?.record({ chatId, messageId, at: this.now(), kind });
+  }
+
+  /** Сообщение от бота с записью для /clear. */
+  private async say(
+    token: string,
+    chatId: string,
+    text: string,
+    markup?: ReplyMarkup,
+    replyTo?: number,
+  ) {
+    const sent = await sendMessage(token, chatId, text, markup, replyTo);
+    if (sent.ok) this.remember(chatId, sent.result.message_id, 'bot');
+    return sent;
+  }
+
+  /**
+   * Переписать сообщение по его состоянию. Отвечено всё — оно сразу
+   * сворачивается в строки итога без кнопок и подробностей (`messageText`):
+   * ничего не удаляется, /clear убирает руками.
+   */
   private async render(token: string, message: SentMessage): Promise<void> {
     const open = message.items.some((item) => item.state === 'open');
-    if (!open) message.closedAt ??= new Date(this.now()).toISOString();
+    if (!open && !message.closedAt) message.closedAt = new Date(this.now()).toISOString();
     const sign = (n: number) => signCallback(this.deps.store.secret, message.sid, n, message.nonce);
     const keyboard = open ? keyboardOf(message, sign) : [];
     const edited = await editMessageText(
@@ -370,6 +545,7 @@ export class TelegramAnswersService {
   async handleUpdate(update: BotUpdate): Promise<void> {
     const token = this.token;
     if (!token) return;
+    if (this.deps.intercept?.(update)) return;
     if (update.callback_query) return this.handlePress(token, update.callback_query);
     if (update.message) return this.handleReply(token, update.message);
   }
@@ -420,10 +596,10 @@ export class TelegramAnswersService {
       case 'done':
         return this.pick(token, message, item, action, toast, clientId);
       case 'custom': {
-        const prompt = await sendMessage(
+        const prompt = await this.say(
           token,
           message.chatId,
-          customPromptText(item),
+          CUSTOM_PROMPT_TEXT,
           { force_reply: true, input_field_placeholder: 'Свой ответ', selective: true },
           message.messageId,
         );
@@ -515,17 +691,18 @@ export class TelegramAnswersService {
   ): Promise<void> {
     const questions = item.questions ?? [];
     const step = item.step ?? 0;
-    delete item.customPrompt;
     if (step + 1 < questions.length) {
       item.step = step + 1;
       await this.render(token, message);
       await toast(TOAST.next);
       return;
     }
+    const files = this.answerFiles.get(item.key) ?? [];
     await this.finish(token, message, item, toast, clientId, {
       kind: 'questions',
       questions,
       picks: item.picks ?? [],
+      ...(files.length > 0 ? { files } : {}),
     });
   }
 
@@ -538,9 +715,21 @@ export class TelegramAnswersService {
     clientId: string,
     answer: Answer,
   ): Promise<void> {
+    // Вопрос панели уходит словом в разговор: маршрут сам не знает, ждёт ли
+    // вопрос ответа, и устаревшее нажатие стало бы лишним сообщением агенту.
+    // Сверка по живому списку — до отправки.
+    if (item.target.kind === 'question' && !(await this.stillOpen(item))) {
+      item.state = 'done';
+      item.outcome = OUTCOME.stale(this.now());
+      this.answerFiles.delete(item.key);
+      await this.render(token, message);
+      await toast(TOAST.stale);
+      return;
+    }
     const outcome = await this.deps.apply(item.target, answer, clientId);
     const now = this.now();
     if (outcome.ok) {
+      this.answerFiles.delete(item.key);
       item.state = 'done';
       item.outcome = outcomeLine(answer, now);
       await this.render(token, message);
@@ -558,26 +747,263 @@ export class TelegramAnswersService {
     await toast(TOAST.failed);
   }
 
-  /** Свой ответ — ответом (reply) на сообщение «напишите ответ». */
+  /** Ожидание ещё в живом списке; список не получен — не открыто (не шлём вслепую). */
+  private async stillOpen(item: SentItem): Promise<boolean> {
+    try {
+      return (await this.deps.collect()).some((live) => live.key === item.key);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Сообщение владельца. Команда — команда. Ответ (reply) на сообщение бота:
+   * на открытый вопрос — ответ на него, на всё остальное о чате — сообщение в
+   * этот чат. Альбом собирается целиком (`AlbumBuffer`) и уходит одной отправкой.
+   */
   private async handleReply(token: string, reply: BotMessage): Promise<void> {
     if (!this.isOwner(reply.chat.id, reply.from?.id)) {
       this.deps.log('telegram-answers: message from a non-owner ignored');
       return;
     }
-    const to = reply.reply_to_message?.message_id;
-    const text = reply.text?.trim();
-    if (!to || !text) return;
-    for (const message of this.deps.store.open()) {
-      const index = message.items.findIndex(
-        (item) => item.state === 'open' && item.customPrompt === to,
-      );
-      if (index < 0) continue;
-      const item = message.items[index]!;
-      const picks = (item.picks ??= []);
-      picks[item.step ?? 0] = [text];
-      const silent = () => Promise.resolve();
-      await this.advance(token, message, item, silent, `tg-${message.sid}-r${reply.message_id}`);
+    const command = parseCommand(reply.text);
+    if (command && command !== 'other') {
+      this.remember(String(reply.chat.id), reply.message_id, 'owner');
+      return this.command(token, command);
+    }
+    const group = reply.media_group_id;
+    if (group) {
+      this.albums.add(group, reply, (messages) => {
+        void this.serial(() => this.routeReply(token, messages)).catch((error: unknown) =>
+          this.deps.log(`telegram-answers: album failed: ${errorText(error)}`),
+        );
+      });
       return;
+    }
+    return this.routeReply(token, [reply]);
+  }
+
+  /** Куда ответ (reply) владельца: открытый вопрос, чат или никуда (объяснение). */
+  private async routeReply(token: string, messages: readonly BotMessage[]): Promise<void> {
+    const ownerId = this.deps.store.settings.ownerId;
+    const text = messages.map((one) => (one.text ?? one.caption)?.trim()).find(Boolean) ?? '';
+    const refs: MediaRef[] = [];
+    let wrongType = 0;
+    for (const one of messages) {
+      const media = mediaOf(one);
+      refs.push(...media.refs);
+      wrongType += media.wrongType;
+    }
+    const to = messages.map((one) => one.reply_to_message?.message_id).find(Boolean);
+    if (!to) {
+      await this.say(token, ownerId, HELP_TEXT);
+      return;
+    }
+    const clientId = `tg-r${messages[0]!.message_id}`;
+    const question = this.openQuestionFor(to);
+    // Вопрос только для чтения: ни ответом, ни сообщением в чат — ход панели
+    // завёл бы копию чужой сессии. Объясняем, где ответить.
+    if (question?.item.target.kind === 'outsideQuestion') {
+      await this.say(token, ownerId, readOnlyLine(question.item.target.client));
+      return;
+    }
+    if (question) {
+      return this.answerByReply(token, question, text, refs, wrongType, clientId);
+    }
+    const route = this.routeFor(to);
+    if (!route) {
+      await this.say(token, ownerId, UNMAPPED_REPLY);
+      return;
+    }
+    if (route.outside) {
+      const notes = refs.length + wrongType > 0 ? [OUTSIDE_MEDIA_NOTE] : [];
+      if (!text) {
+        await this.say(token, ownerId, notes.length ? OUTSIDE_MEDIA_ONLY : EMPTY_REPLY);
+        return;
+      }
+      return this.toChat(token, route, text, [], [], notes, clientId);
+    }
+    const { files, kinds, skips } = await downloadMedia(token, refs, this.now());
+    const notes = skipNotes({ ...skips, wrongType: skips.wrongType + wrongType });
+    if (!text && files.length === 0) {
+      await this.say(token, ownerId, [EMPTY_REPLY, ...notes].join(' · '));
+      return;
+    }
+    return this.toChat(token, route, text, files, kinds, notes, clientId);
+  }
+
+  private async toChat(
+    token: string,
+    route: ChatRoute,
+    text: string,
+    files: readonly ChatFile[],
+    kinds: readonly MediaRef['kind'][],
+    notes: readonly string[],
+    clientId: string,
+  ): Promise<void> {
+    const ownerId = this.deps.store.settings.ownerId;
+    const sent: ApplyOutcome = this.deps.sendToChat
+      ? await this.deps.sendToChat(route, text, files, clientId)
+      : { ok: false, detail: 'нет маршрута' };
+    if (!sent.ok) {
+      this.deps.log(`telegram-answers: reply refused: ${sent.gone ? 'gone' : sent.detail}`);
+      await this.say(token, ownerId, sendFailed(route));
+      return;
+    }
+    await this.say(token, ownerId, sentAck(route, kinds, Boolean(text), notes));
+  }
+
+  /**
+   * Ответ на открытый вопрос: текст — выбор шага, картинки — с ответом в чат
+   * панели. Вопрос сессии вне панели картинок не принимает — так и сказано.
+   */
+  private async answerByReply(
+    token: string,
+    found: { message: SentMessage; item: SentItem },
+    text: string,
+    refs: readonly MediaRef[],
+    wrongType: number,
+    clientId: string,
+  ): Promise<void> {
+    const { message, item } = found;
+    const ownerId = this.deps.store.settings.ownerId;
+    const panel = item.target.kind === 'question';
+    let notes: string[] = [];
+    let kinds: MediaRef['kind'][] = [];
+    if (refs.length + wrongType > 0 && !panel) notes = [OUTSIDE_MEDIA_NOTE];
+    if (refs.length + wrongType > 0 && panel) {
+      const got = await downloadMedia(token, refs, this.now());
+      notes = skipNotes({ ...got.skips, wrongType: got.skips.wrongType + wrongType });
+      kinds = got.kinds;
+      if (got.files.length) {
+        this.answerFiles.set(item.key, [...(this.answerFiles.get(item.key) ?? []), ...got.files]);
+      }
+    }
+    if (!text && kinds.length === 0) {
+      await this.say(token, ownerId, [EMPTY_REPLY, ...notes].join(' · '));
+      return;
+    }
+    const picks = (item.picks ??= []);
+    picks[item.step ?? 0] = text ? [text] : [];
+    const silent = () => Promise.resolve();
+    await this.advance(token, message, item, silent, `${clientId}-${message.sid}`);
+    // Без вложений итог виден в самом сообщении; с ними — строкой, что ушло.
+    if (kinds.length > 0 || notes.length > 0) {
+      const head = kinds.length
+        ? `📎 Отправлено: ${sentParts(kinds, Boolean(text))}`
+        : '✉️ Ответ отправлен';
+      await this.say(token, ownerId, [head, ...notes].join(' · '));
+    }
+  }
+
+  /** Открытый вопрос, на сообщение которого (или на «Свой ответ» к нему) ответили. */
+  private openQuestionFor(to: number): { message: SentMessage; item: SentItem } | undefined {
+    for (const message of this.deps.store.open()) {
+      for (const item of message.items) {
+        if (item.state !== 'open' || !item.questions?.length) continue;
+        if (item.customPrompt === to || message.messageId === to) return { message, item };
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Чат, о котором сообщение бота: запись ожидания (открытого или закрытого,
+   * включая его «Свой ответ») или запись уведомления в журнале отправленного.
+   */
+  private routeFor(to: number): ChatRoute | undefined {
+    for (const message of this.deps.store.messages()) {
+      const hit =
+        message.messageId === to
+          ? message.items.find((item) => item.chat)
+          : message.items.find((item) => item.customPrompt === to && item.chat);
+      if (hit?.chat) return hit.chat;
+    }
+    return this.deps.sentLog?.find(this.deps.store.settings.ownerId, to, this.now())?.route;
+  }
+
+  // ── команды владельца ─────────────────────────────────────────────────────
+
+  private async command(token: string, command: 'status' | 'waiting' | 'help' | 'start' | 'clear') {
+    const chatId = this.deps.store.settings.ownerId;
+    switch (command) {
+      case 'status':
+        await this.say(token, chatId, await this.statusLine());
+        return;
+      case 'waiting':
+        await this.sendWaiting(token);
+        return;
+      case 'start':
+        await this.say(token, chatId, ALREADY_CONNECTED);
+        return;
+      case 'clear':
+        await this.clear(token, chatId);
+        return;
+      default:
+        await this.say(token, chatId, HELP_TEXT);
+    }
+  }
+
+  /** /clear: убрать известное, ждущее оставить; ответ сам уходит через 30 с. */
+  private async clear(token: string, chatId: string): Promise<void> {
+    const deleted = await clearChat(this.cleanupContext(token), chatId);
+    const reply = await this.say(
+      token,
+      chatId,
+      clearReplyText(deleted, this.deps.store.openItems()),
+    );
+    if (!reply.ok) return;
+    this.deps.store.scheduleDelete({
+      chatId,
+      messageId: reply.result.message_id,
+      at: this.now() + CLEAR_REPLY_TTL_MS,
+      sentAt: this.now(),
+      force: true,
+    });
+  }
+
+  private async statusLine(): Promise<string> {
+    const [running, waiting, limits] = await Promise.all([
+      this.deps.running?.().catch(() => []) ?? Promise.resolve([]),
+      this.deps.collect().then(
+        (items) => items.length,
+        () => 0,
+      ),
+      this.deps.limits?.().catch(() => undefined) ?? Promise.resolve(undefined),
+    ]);
+    return statusText({ running, waiting, ...(limits ? { limits } : {}), now: this.now() });
+  }
+
+  /**
+   * `/waiting`: всё, что ждёт, — сейчас, не дожидаясь `afterMinutes`. Ожидание,
+   * уже висящее в прежнем сообщении, там закрывается строкой «ниже» и уходит в
+   * новое: две живые кнопки на одно ожидание путали бы, какая из них настоящая.
+   */
+  private async sendWaiting(token: string): Promise<void> {
+    const items = await this.deps.collect();
+    if (items.length === 0) {
+      await this.say(token, this.deps.store.settings.ownerId, NOTHING_WAITING);
+      return;
+    }
+    const keys = new Set(items.map((item) => item.key));
+    // Сначала новое, потом закрыть прежнее: не дошло новое — прежние кнопки живы,
+    // и ожидание не остаётся вовсе без кнопок.
+    const previous = [...this.deps.store.open()];
+    const size = this.deps.maxItems ?? 8;
+    let delivered = true;
+    for (let at = 0; at < items.length; at += size) {
+      delivered = (await this.send(token, items.slice(at, at + size))) && delivered;
+    }
+    if (!delivered) return;
+    for (const message of previous) {
+      let moved = false;
+      for (const item of message.items) {
+        if (item.state !== 'open' || !keys.has(item.key)) continue;
+        item.state = 'done';
+        item.outcome = OUTCOME.expanded();
+        moved = true;
+      }
+      if (moved) await this.render(token, message);
     }
   }
 }
@@ -592,7 +1018,22 @@ function outcomeLine(answer: Answer, at: number): string {
     answer.questions.length <= 1
       ? (answer.picks[0] ?? []).join(', ')
       : answer.picks.map((chosen) => chosen.join(', ')).join(' / ');
-  return OUTCOME.answer(text, at);
+  // Ответ одними картинками: в строке итога — что ушло, а не пустое «Ответ:».
+  const files = answer.files?.length ?? 0;
+  return OUTCOME.answer(text.trim() || `📎 ${files > 1 ? 'картинки' : 'картинка'}`, at);
+}
+
+/**
+ * Тот же вызов сменил способ ответа: хук взял вопрос сессии вне панели — кнопки
+ * появляются в том же сообщении; отпустил, а вопрос висит — уходят. Второго
+ * сообщения на одно ожидание нет. `true` — сообщение надо переписать.
+ */
+function retarget(item: SentItem, fresh: PendingAskItem): boolean {
+  if (fresh.target.kind === item.target.kind) return false;
+  item.target = fresh.target;
+  item.card = cardOf(fresh);
+  if (fresh.chat) item.chat = fresh.chat;
+  return true;
 }
 
 function linksOf(message: SentMessage): string[] {
@@ -601,18 +1042,4 @@ function linksOf(message: SentMessage): string[] {
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
 }

@@ -6,11 +6,14 @@ import {
   bundleSplitTickets,
   clusterSplitTickets,
   openSplitTickets,
+  type SplitTicketDuplicateChoice,
+  type SplitTicketDuplicateDecision,
   type SplitTicketPublished,
 } from '@agentdeck/contracts/split-ticket-batch';
 import {
   chatTreeKeys,
   usePublishSplitTickets,
+  useSplitTicketDuplicates,
   useSplitTicketTarget,
   useTakeSplitTickets,
 } from '@entities/ChatTree';
@@ -18,7 +21,12 @@ import { SETTINGS_ROUTE } from '@shared/config/routes';
 import { toast } from '@shared/lib/toast';
 import { Button } from '@shared/ui/button';
 import { Modal } from '@shared/ui/modal';
-import type { SplitTicketResolveProps, TargetState } from './SplitTicketResolve.types';
+import type {
+  DuplicatesState,
+  SplitTicketResolveProps,
+  TargetState,
+} from './SplitTicketResolve.types';
+import { duplicateDecisions } from './SplitTicketDuplicates';
 import { SplitTicketResolveBody } from './SplitTicketResolveBody';
 import { SplitTicketResolveActions } from './SplitTicketResolveActions';
 import { readLastProject, writeLastProject } from './lastProject';
@@ -48,6 +56,10 @@ export function SplitTicketResolve({
   const [pickedType, setPickedType] = useState('');
   const [result, setResult] = useState<SplitTicketPublished>();
   const [error, setError] = useState<string>();
+  const [choices, setChoices] = useState<Record<string, SplitTicketDuplicateChoice>>({});
+  // Решения первой публикации: «Повторить упавшие» шлёт их же — проверка к
+  // тому времени уже не идёт, а «завести всё равно» не должно стать комментарием.
+  const [sent, setSent] = useState<SplitTicketDuplicateDecision[]>([]);
   const [last] = useState(readLastProject);
   const target = useSplitTicketTarget({ parentChatId, project: picked, last }, open && !result);
   const publish = usePublishSplitTickets();
@@ -55,13 +67,24 @@ export function SplitTicketResolve({
   const base = 'chat.cascade.hub.tickets.resolve';
   const lang = i18n.language.startsWith('en') ? 'en' : 'ru';
 
+  const data = target.data;
+  const project = picked || data?.projectKey || '';
+  const canSearch = open && !result && Boolean(data?.connected) && !data?.messageCode;
+  // Хук — до раннего выхода: порядок хуков не зависит от числа открытых.
+  const similar = useSplitTicketDuplicates({ parentChatId, project }, canSearch);
+
   const clusters = clusterSplitTickets(openSplitTickets(groups));
   if (clusters.length === 0 && !open) return null;
 
-  const data = target.data;
-  const project = picked || data?.projectKey || '';
   const types = data?.issueTypes ?? [];
   const issueType = types.includes(pickedType) ? pickedType : (data?.issueType ?? '');
+  const duplicatesState = ((): DuplicatesState | undefined => {
+    if (!canSearch || !project) return undefined;
+    if (similar.data) return { state: 'ready', data: similar.data };
+    if (similar.isError) return { state: 'error', message: toErrorMessage(similar.error) };
+    return { state: 'loading' };
+  })();
+  const decisions = duplicateDecisions(similar.data?.duplicates ?? [], choices);
   const targetState = ((): TargetState => {
     if (data) return { state: 'ready', data };
     if (target.isError) return { state: 'error', message: toErrorMessage(target.error) };
@@ -74,6 +97,8 @@ export function SplitTicketResolve({
       return t(`${base}.noTarget`);
     }
     if (clusters.length === 0) return t(`${base}.nothingOpen`);
+    // Публикация до ответа проверки прошла бы без решений человека.
+    if (duplicatesState?.state === 'loading') return t(`${base}.dupCheckingShort`);
     return undefined;
   })();
 
@@ -83,6 +108,8 @@ export function SplitTicketResolve({
     setError(undefined);
     setPicked('');
     setPickedType('');
+    setChoices({});
+    setSent([]);
     publish.reset();
     take.reset();
   };
@@ -92,8 +119,17 @@ export function SplitTicketResolve({
     if (publish.isPending || !project) return;
     setError(undefined);
     writeLastProject(project);
+    const chosen = retryFailed ? sent : decisions;
+    if (!retryFailed) setSent(decisions);
     publish.mutate(
-      { parentChatId, projectKey: project, issueType: issueType || 'Bug', lang, retryFailed },
+      {
+        parentChatId,
+        projectKey: project,
+        issueType: issueType || 'Bug',
+        lang,
+        retryFailed,
+        ...(chosen.length > 0 ? { duplicates: chosen } : {}),
+      },
       {
         onSuccess: (published) => {
           setResult(published);
@@ -167,10 +203,16 @@ export function SplitTicketResolve({
           onProject={(key) => {
             setPicked(key);
             setPickedType('');
+            setChoices({});
           }}
           onIssueType={setPickedType}
           {...(result ? { result } : {})}
           {...(error ? { error } : {})}
+          {...(duplicatesState ? { duplicates: duplicatesState } : {})}
+          choices={choices}
+          onChoice={(proposal, choice) =>
+            setChoices((current) => ({ ...current, [proposal]: choice }))
+          }
         />
       </Modal>
     </>

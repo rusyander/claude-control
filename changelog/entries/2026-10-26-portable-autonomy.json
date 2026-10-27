@@ -1,0 +1,51 @@
+{
+  "title": {
+    "ru": "Прогон через панель ведёт себя одинаково на любой машине: автовыбор, согласие на git-запись и запрет слияния",
+    "en": "A run through the panel behaves the same on any machine: auto-pick, git-write consent and the merge ban"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Слияние MR и PR запрещено при любом доступе: gh pr merge, glab mr merge и accept, PUT на …/merge в REST и инструменты слияния MCP хостинга кода получают отказ. Раньше при полном доступе их не останавливало ничего.",
+        "en": "Merging MRs and PRs is refused under any access: gh pr merge, glab mr merge and accept, a REST PUT on …/merge and the merge tools of a code-hosting MCP are denied. Before, nothing stopped them under full access."
+      },
+      "area": { "ru": "Набор панели", "en": "Panel kit" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Автовыбор узнаёт рекомендацию и по-русски, и в описании варианта, не путает её с отрицанием и не выбирает за человека вариант, которого без него не выполнить («Я войду сам») — такой вопрос ждёт ответа.",
+        "en": "Auto-pick recognises a recommendation in Russian and in an option's description too, does not mistake a negation for it, and never picks for the human an option only the human can carry out («I'll sign in myself») — such a question waits for an answer."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Прогон с полным доступом, где вопрос агента не проходит через панель, делает тот же автовыбор: его выполняет хук набора autonomous-pick.",
+        "en": "A run with full access, where the agent's question never passes through the panel, makes the same auto-pick: the kit's autonomous-pick hook does it."
+      },
+      "area": { "ru": "Набор панели", "en": "Panel kit" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "В режиме набора «Только ваши» Claude Code получает стражи набора, которых нет в вашем слое: согласие на git-запись, запрет слияния, разрушительные команды, секреты, ожидание пайплайна и автовыбор. Страж с двойником в вашем слое уступает ему, файлы в ~/.claude не меняются.",
+        "en": "In the «Yours only» kit mode Claude Code gets the kit guards your layer lacks: git-write consent, the merge ban, destructive commands, secrets, pipeline waiting and auto-pick. A guard with a twin in your layer yields to it; files in ~/.claude do not change."
+      },
+      "how": {
+        "ru": "Только эти стражи собираются отдельным набором на прогон и подключаются флагом --plugin-dir, с хуками одного события PreToolUse.",
+        "en": "Only these guards are assembled into a separate per-run kit and attached with --plugin-dir, with hooks of the PreToolUse event alone."
+      },
+      "area": { "ru": "Набор панели", "en": "Panel kit" }
+    },
+    {
+      "kind": "internal",
+      "text": {
+        "ru": "Сверка двойников набора и личного слоя (pnpm kit:twins, реестр apps/server/assets/kit/twins.json): правка одной копии хука, карточки правил, инструмента или навыка без переноса во вторую краснеет в тестах.",
+        "en": "Twin check of the kit and the personal layer (pnpm kit:twins, ledger apps/server/assets/kit/twins.json): editing one copy of a hook, rule card, tool or skill without porting it to the other turns the tests red."
+      }
+    }
+  ]
+}

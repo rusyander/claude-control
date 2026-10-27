@@ -138,7 +138,11 @@ describe('перепроверка MR — отметку ставит тольк
     t.conveyor.onChainEnded(t.link(1), { status: 'done' });
     await t.flush();
     expect(t.resumed.at(-1)?.prompt).toContain(RECHECK);
-    t.conveyor.onChainEnded(t.link(0), { status: 'done' });
+    // Слово перепроверки несло след задач — её ход отчитывается строками task-N.
+    t.conveyor.onChainEnded(t.link(0), {
+      status: 'done',
+      sieveRows: [{ id: 'task-1', status: 'pass', evidence: 'src/a.ts:3 — pnpm test → 12 passed' }],
+    });
     await t.flush();
     expect(t.group().recheckedAt).toBe(NOW);
     expect(t.group().recheckRequestedAt).toBeUndefined();

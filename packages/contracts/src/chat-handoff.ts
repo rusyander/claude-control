@@ -4,7 +4,7 @@
 import { continuationEnvironment, type TaskSplitReviewDecision } from './task-split.ts';
 import type { CodedFields, CodedList } from './server-messages';
 import type { SplitHumanStepView, SplitTicketView } from './split-tickets';
-import type { GroupSignal } from './group-watch';
+import type { GroupSignal, GroupWatchCoverage } from './group-watch';
 import { blockLang, blockLangPattern } from './brand.ts';
 import { ANSWER_LANGUAGE_LINE } from './model-cascade.ts';
 import type { ReviewDepthGap, ReviewTier } from './model-cascade.ts';
@@ -1032,6 +1032,8 @@ export interface SplitPlanView {
        * закрытые (`clearedAt`) остаются свёрнутыми строками.
        */
       watchSignals?: GroupSignal[];
+      /** Чем сторож видит живую группу и каких источников нет; кончилась — нет. */
+      watchCoverage?: GroupWatchCoverage;
       /**
        * Группа доводит работу до MR — решение, принятое при разделении. Шапка
        * чата группы показывает его, а не настройку проекта по пути копии: они
@@ -1044,6 +1046,10 @@ export interface SplitPlanView {
       interruptResumes?: number;
       /** Когда человек поставил группу на паузу (`paused`, журнал 81). */
       pausedAt?: string;
+      /** Кто поставил паузу: человек или сторож групп (F1); только у группы на паузе. */
+      pausedBy?: 'human' | 'watch';
+      /** Правило сторожа, по сигналу которого он поставил паузу. */
+      pausedRule?: string;
       /**
        * Группа держит место под потолком (заведена: старт, копия или чат). Пауза
        * без места — пауза из очереди: «Продолжить» вернёт её в очередь. Решает
@@ -1173,10 +1179,13 @@ export interface SplitGroupPaused {
   unconfirmed: number;
 }
 
-/** Итог «Продолжить» группы на паузе: `queued` — слово уйдёт после текущего хода. */
+/**
+ * Итог «Продолжить» группы на паузе: `queued` — слово уйдёт после текущего хода;
+ * `restored` — пауза пришлась на ожидание человека, группа снова ждёт его, слова нет.
+ */
 export interface SplitGroupResumed {
   index: number;
-  outcome: 'sent' | 'queued';
+  outcome: 'sent' | 'queued' | 'restored';
 }
 
 /** Итог «Продолжить» недоделанной группы: `queued` — слово уйдёт после текущего хода. */
@@ -1194,6 +1203,12 @@ export interface SplitGroupRechecked {
   outcome: 'sent' | 'queued';
   requestedAt: string;
 }
+
+/**
+ * Предел заметки человека к «Перепроверить MR» (аудит g5 27.10, H1): поле хаба и отказ
+ * маршрута `split-recheck-note-invalid` держат одно число. Длиннее — уже задача, не заметка.
+ */
+export const RECHECK_NOTE_MAX = 4000;
 
 /**
  * Что можно сделать с задачами групп в Jira (G4): задачи (ключ + группа) и
@@ -1283,7 +1298,12 @@ export type SplitGroupWait =
    * (`deferred-asks.ts`): законное ожидание решения человека — не вопрос, на
    * который панель отвечает за него, и не тишина для сторожа.
    */
-  | 'human-op';
+  | 'human-op'
+  /**
+   * Наблюдатель MR передал группе красный конвейер, а ход кончился без правки и
+   * отправки (N3): MR красный, починить или снять заметкой решает человек.
+   */
+  | 'mr-red';
 
 export interface ChatTreeView {
   root: string;

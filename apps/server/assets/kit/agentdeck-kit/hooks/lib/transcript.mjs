@@ -208,6 +208,19 @@ export function isRefusal(body) {
   return head.startsWith(GUARD_MARK) || head.startsWith('[doc-size-guard]');
 }
 
+// The CLI never ran the call: any PreToolUse deny (another hook's carries no marker — `rule-card: …`),
+// the auto-mode classifier, the user's rejection. Prefix tests, same reason as isRefusal.
+const NOT_RUN =
+  /^(?:PreToolUse:[^\s:]+ hook error:|Permission for this action was denied|The user doesn't want to proceed with this tool use)/;
+
+/**
+ * Did the CLI block this call before it ran? The question "did that earlier call execute?" asks this,
+ * never isRefusal: g3 25.10 a full gate rule-card refused read as a red gate on that tree, its retry refused.
+ */
+export function wasBlocked(body) {
+  return isRefusal(body) || NOT_RUN.test(String(body || '').trimStart());
+}
+
 /**
  * The continuation prompt injected after a compaction is NOT the user speaking — it embeds a
  * summary of the whole prior conversation, so any phrase can appear in it by accident. Treating
@@ -219,8 +232,9 @@ export function isRefusal(body) {
 // Also harness-written, all found as "user speech" in the 23.09.2026 replay of retained denials: a
 // Stop hook's block reason, a message relayed from another session, the interrupt marker, local
 // command output. Counted as the user replying, any of them re-opened the consent gate's door B.
+// A relayed message also arrives bare (`<agent-message from=…>`) or as "…sent a message while you were working:".
 const HARNESS_TURN =
-  /^\s*(?:Stop hook feedback:|Another Claude session sent a message:|\[Request interrupted by user|<local-command-(?:caveat|stdout|stderr)>)/i;
+  /^\s*(?:Stop hook feedback:|Another Claude session sent a message\b[^:\n]*:|<agent-message\b|\[Request interrupted by user|<local-command-(?:caveat|stdout|stderr)>)/i;
 
 export function isSyntheticPrompt(text) {
   const t = String(text || '');

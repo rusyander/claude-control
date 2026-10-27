@@ -1,0 +1,68 @@
+{
+  "title": {
+    "ru": "Карточка «Первая правка» называет файл и предлагает понятную ветку, ветка правки реплики подписана в списке",
+    "en": "The «First edit» card names the file and suggests a readable branch, a branch made by editing a message is labelled in the list"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Имя ветки на карточке «Первая правка — где работаем?» строится из слов человека. Раньше у разговора, чья работа отдана группам, в имя попадала служебная сводка панели: agent/agentdeck-children-the-work-of-this-conv-….",
+        "en": "The branch name on the «First edit — where do we work?» card is built from the person's words. In a conversation whose work was handed to groups, the panel's service summary used to reach the name: agent/agentdeck-children-the-work-of-this-conv-…."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["branch-gate-before.png", "branch-gate-after.png"]
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "На карточке указан файл, который агент собирался править, а «?» открывает справку чата. Раньше карточка показывала только каталог, и было непонятно, о какой правке вопрос.",
+        "en": "The card shows the file the agent was about to edit, and «?» opens the chat help. It used to show only the directory, so it was unclear which edit the question was about."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ветка, созданная правкой своего сообщения, подписана в списке чатов «ветка от «<название>»» в панели и на телефоне. У неё та же история и то же название, что у исходного разговора, поэтому раньше в списке стояли два одинаковых чата.",
+        "en": "A branch made by editing your own message is labelled «branch of “<title>”» in the chat list, in the panel and on the phone. It has the same history and title as the original conversation, so the list used to show two identical chats."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Перед отправкой правленого сообщения панель спрашивает «Отправить в новой ветке?». Если очистить поле, пометка ветки снимается, и следующее сообщение уходит в тот же разговор. Раньше пометка сохранялась после очистки поля, и обычное сообщение без предупреждения создавало новый разговор.",
+        "en": "Before an edited message is sent, the panel asks «Send as a new branch?». Clearing the field drops the branch mark, so the next message goes into the same conversation. The mark used to survive a cleared field, and an ordinary message silently created a new conversation."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["fork-confirm.png"]
+    }
+  ],
+  "images": [
+    {
+      "file": "branch-gate-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Имя ветки из служебной сводки, файла правки нет",
+        "en": "Branch name from the service summary, no edited file"
+      }
+    },
+    {
+      "file": "branch-gate-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Имя из слов человека, файл правки и «?» в справку",
+        "en": "Name from the person's words, the edited file and «?» to help"
+      }
+    },
+    {
+      "file": "fork-confirm.png",
+      "role": "after",
+      "caption": {
+        "ru": "Вопрос перед отправкой ветки",
+        "en": "The question before a branch is sent"
+      }
+    }
+  ]
+}

@@ -15,6 +15,9 @@ export function summarizeProgress(
   );
   const agentViews = agents.map((agent) => agentView(agent, isRunning, progress?.processAlive));
   const activeTool = isRunning ? progress?.activeTool : undefined;
+  // Скилл или MCP главного агента — повод показать панель; хуки одни — нет:
+  // они срабатывают на старте каждой сессии, и полоса стояла бы в любом чате.
+  const extensionsUsed = (progress?.extensions ?? []).some((row) => row.kind !== 'hook');
 
   return {
     total: tasks.length,
@@ -27,6 +30,11 @@ export function summarizeProgress(
     shellsRunning: shells.filter((status) => status === 'running').length,
     // Остановленное агентом (`killed`) — не обрыв: это его уборка за собой.
     shellsLost: shells.filter(isLostShell).length,
-    hasAnything: tasks.length > 0 || agents.length > 0 || shells.length > 0 || Boolean(activeTool),
+    hasAnything:
+      tasks.length > 0 ||
+      agents.length > 0 ||
+      shells.length > 0 ||
+      Boolean(activeTool) ||
+      extensionsUsed,
   };
 }

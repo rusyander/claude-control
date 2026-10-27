@@ -28,7 +28,7 @@ const signal = (over: Partial<GroupSignal>): GroupSignal => ({
   ...over,
 });
 
-function render(signals: GroupSignal[] | undefined): string {
+function render(signals: GroupSignal[] | undefined, watchCoverage?: unknown): string {
   const split: SplitPlanView = {
     parentChatId: 'parent',
     order: [0],
@@ -41,6 +41,7 @@ function render(signals: GroupSignal[] | undefined): string {
         status: 'started',
         chatId: 'c0',
         ...(signals ? { watchSignals: signals } : {}),
+        ...(watchCoverage ? { watchCoverage } : {}),
       },
     ],
   } as SplitPlanView;
@@ -219,12 +220,342 @@ describe('сигналы сторожа в хабе', () => {
     expect(html).not.toContain('groupWatch.');
     for (const text of [
       'Группа на паузе, а сессия действует — вызовов: 15, началось через 4 мин после паузы',
-      'Тяжёлые проверки по кругу в группе — прогонов: 5, всего 73 мин',
+      'Тяжёлые проверки по кругу в группе — проходов: 5, всего 73 мин',
       'вызов: git worktree remove ../.agent/tmp/combocheck',
       'команда: node scripts/check_frontend_tests.mjs',
     ]) {
       expect(html).toContain(text);
     }
+  });
+
+  it('перенесённые правила (R16 три вида, R37, R44, R45) — свои строки, подстановки без пустых мест', () => {
+    const html = render([
+      signal({
+        id: 's',
+        rule: 'R16',
+        severity: 'info',
+        numbers: { ranMin: 3, calls: 1 },
+        params: { call: 'python -m pytest' },
+        textKey: 'groupWatch.rule.R16slow',
+      }),
+      signal({
+        id: 'se',
+        rule: 'R16',
+        severity: 'info',
+        numbers: { ranMin: 4, expectMin: 2, calls: 2 },
+        textKey: 'groupWatch.rule.R16slowExpect',
+      }),
+      signal({
+        id: 'bg',
+        rule: 'R16',
+        severity: 'info',
+        numbers: { openMin: 12 },
+        textKey: 'groupWatch.rule.R16bg',
+      }),
+      signal({
+        id: '37',
+        rule: 'R37',
+        severity: 'info',
+        numbers: { charsK: 19, limitK: 15 },
+        textKey: 'groupWatch.rule.R37',
+      }),
+      signal({
+        id: '44',
+        rule: 'R44',
+        severity: 'info',
+        numbers: {},
+        params: { phrase: 'not checked', excerpt: 'Three sieves were not checked' },
+        textKey: 'groupWatch.rule.R44',
+      }),
+      signal({
+        id: '45',
+        rule: 'R45',
+        severity: 'info',
+        numbers: { waitMin: 25 },
+        params: { id: 'D-3', tool: 'Bash' },
+        textKey: 'groupWatch.rule.R45',
+      }),
+    ]);
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('groupWatch.');
+    for (const text of [
+      'Вызов шёл 3 мин — дольше порога (медленных вызовов за полчаса: 1)',
+      'Вызов шёл 4 мин, обычно — 2 мин (медленных вызовов за полчаса: 2)',
+      'Фоновая задача открыта 12 мин: ни вести о конце, ни остановки',
+      'Вводная хода — 19 тыс. знаков при пороге 15 тыс.',
+      'Итог хода признаёт пропуск',
+      'слова: not checked',
+      'из итога: Three sieves were not checked',
+      'Решение ждёт человека 25 мин: панель не разрешила его сама',
+      'решение: D-3',
+      'инструмент: Bash',
+    ]) {
+      expect(html).toContain(text);
+    }
+  });
+
+  it('итог прогона (R46 четыре вида), рост окна (R19) и новые круги доставки (R28) — свои строки', () => {
+    const waste = { wastePct: 40, reworkPct: 0, repeatPct: 30, deniedPct: 10 };
+    const html = render([
+      signal({
+        id: '46',
+        rule: 'R46',
+        severity: 'info',
+        numbers: { mTokens: 2.3, runMin: 10, fivePct: 12, weekPct: 3, ...waste },
+        textKey: 'groupWatch.rule.R46',
+      }),
+      signal({
+        id: '46t',
+        rule: 'R46',
+        severity: 'info',
+        numbers: { mTokens: 1.1, runMin: 7, ...waste },
+        textKey: 'groupWatch.rule.R46tokens',
+      }),
+      signal({
+        id: '46b',
+        rule: 'R46',
+        severity: 'info',
+        numbers: { mTokens: 0.8, runMin: 4, fivePct: 2, weekPct: 1 },
+        textKey: 'groupWatch.rule.R46Bare',
+      }),
+      signal({
+        id: '46tb',
+        rule: 'R46',
+        severity: 'info',
+        numbers: { mTokens: 0.4, runMin: 2 },
+        textKey: 'groupWatch.rule.R46tokensBare',
+      }),
+      signal({
+        id: '19g',
+        rule: 'R19',
+        severity: 'info',
+        numbers: { growK: 120, nowK: 170, firstK: 50 },
+        textKey: 'groupWatch.rule.R19grow',
+      }),
+      signal({
+        id: '28r',
+        rule: 'R28',
+        severity: 'info',
+        numbers: { nudges: 3, fresh: 2 },
+        params: { missing: 'MR, sieves' },
+        textKey: 'groupWatch.rule.R28rounds',
+      }),
+    ]);
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('groupWatch.');
+    for (const text of [
+      'Итог прогона: 2.3 млн токенов за 10 мин, пятичасовое окно +12 %, недельное +3 %; впустую 40 % (переделка 0 %, повторы 30 %, отказы 10 %)',
+      'Итог прогона: 1.1 млн токенов за 7 мин, окна не мерились; впустую 40 %',
+      'Итог прогона: 0.8 млн токенов за 4 мин, пятичасовое окно +2 %, недельное +1 %; вызовов прогона сторож не видел',
+      'Итог прогона: 0.4 млн токенов за 2 мин, окна не мерились; вызовов прогона сторож не видел',
+      'Окно сессии выросло на 120 тыс. токенов: при первом запросе (после сжатия — первом за ним) 50 тыс., сейчас 170 тыс.',
+      'Напоминаний о доставке: 3, и последний круг нашёл новое недостающее (2)',
+      'не хватает: MR, sieves',
+    ]) {
+      expect(html).toContain(text);
+    }
+  });
+
+  it('журналы панели (R38, R39, R40 пять видов, R41) — свои строки, подстановки без пустых мест', () => {
+    const html = render([
+      signal({
+        id: '38',
+        rule: 'R38',
+        severity: 'info',
+        numbers: { files: 1, waiting: 4 },
+        params: { path: '/work/panel/apps/server/src/a.ts' },
+        textKey: 'groupWatch.rule.R38',
+      }),
+      signal({
+        id: '38w',
+        rule: 'R38',
+        severity: 'info',
+        numbers: { files: 2, waiting: 3, waitMin: 7 },
+        params: { path: '/work/panel/apps/server/src/b.ts' },
+        textKey: 'groupWatch.rule.R38wait',
+      }),
+      signal({
+        id: '38d',
+        rule: 'R38',
+        severity: 'info',
+        numbers: { files: 1, waitMin: 12, others: 2 },
+        params: { path: '/work/panel/apps/server/src/c.ts' },
+        textKey: 'groupWatch.rule.R38done',
+      }),
+      signal({
+        id: '39',
+        rule: 'R39',
+        severity: 'info',
+        numbers: { restarts: 5 },
+        textKey: 'groupWatch.rule.R39',
+      }),
+      signal({
+        id: '40r',
+        rule: 'R40',
+        severity: 'info',
+        numbers: { findings: 2 },
+        params: { check: 'vitest', key: '77fdd16df100' },
+        textKey: 'groupWatch.rule.R40replay',
+      }),
+      signal({
+        id: '40o',
+        rule: 'R40',
+        severity: 'info',
+        numbers: { findings: 1 },
+        params: { check: 'tsc', reason: 'registry unreadable' },
+        textKey: 'groupWatch.rule.R40off',
+      }),
+      signal({
+        id: '40m',
+        rule: 'R40',
+        severity: 'info',
+        numbers: { findings: 1 },
+        params: { check: 'eslint' },
+        textKey: 'groupWatch.rule.R40mismatch',
+      }),
+      signal({
+        id: '40x',
+        rule: 'R40',
+        severity: 'info',
+        numbers: { findings: 1, exit: 1, recordedExit: 0 },
+        params: { check: 'vitest' },
+        textKey: 'groupWatch.rule.R40mismatchExit',
+      }),
+      signal({
+        id: '40d',
+        rule: 'R40',
+        severity: 'info',
+        numbers: { findings: 1 },
+        params: { check: 'vitest', mode: 'shadow' },
+        textKey: 'groupWatch.rule.R40mode',
+      }),
+      signal({
+        id: '41',
+        rule: 'R41',
+        severity: 'info',
+        numbers: { runs: 2, ranSec: 40 },
+        params: { check: 'vitest', command: 'npx vitest run src/app.test.ts' },
+        textKey: 'groupWatch.rule.R41',
+      }),
+    ]);
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('groupWatch.');
+    for (const text of [
+      'Перезапуск сервера панели ждёт правок этой группы: её файлов в нём 1 из 4',
+      'файл: /work/panel/apps/server/src/a.ts',
+      'Перезапуск сервера панели ждёт правок этой группы 7 мин: её файлов в нём 2 из 3 — пока он ждёт, панель работает на старом коде',
+      'Сервер панели перезапустился из-за правок этой группы (её файлов: 1), перед этим ждал конца ходов 12 мин; живых групп, кроме этой, в ту минуту: 2',
+      'файл: /work/panel/apps/server/src/c.ts',
+      'Сервер панели перезапускался 5 раз за час',
+      'повтор не сработал (находок за полчаса: 2)',
+      'проверка: vitest',
+      'ключ журнала: 77fdd16df100',
+      'Журнал проверок выключен для копии группы',
+      'причина: registry unreadable',
+      'такому повтору верить нельзя',
+      'записан выход 0, настоящий — 1',
+      'режим: shadow',
+      'в режиме без повторов',
+      'Проверка шла 40 с мимо журнала проверок',
+      '(таких за полчаса: 2)',
+      'команда: npx vitest run src/app.test.ts',
+    ]) {
+      expect(html).toContain(text);
+    }
+  });
+
+  it('окно подписки (R9 уровень, уровень недели, прогноз недели) и тяжёлый прогон (R42 два вида)', () => {
+    const html = render([
+      signal({
+        id: '9l',
+        rule: 'R9',
+        severity: 'info',
+        numbers: { nowPct: 91, levelPct: 90, resetMin: 42 },
+        textKey: 'groupWatch.rule.R9level',
+      }),
+      signal({
+        id: '9lw',
+        rule: 'R9',
+        severity: 'info',
+        numbers: { nowPct: 96, levelPct: 95, resetHours: 30 },
+        textKey: 'groupWatch.rule.R9levelWeek',
+      }),
+      signal({
+        id: '9w',
+        rule: 'R9',
+        severity: 'info',
+        numbers: { projectedPct: 118, nowPct: 61, resetHours: 50 },
+        textKey: 'groupWatch.rule.R9week',
+      }),
+      signal({
+        id: '42',
+        rule: 'R42',
+        severity: 'info',
+        numbers: { runs: 2, mTokens: 3.4, runMin: 19, fivePct: 6, weekPct: 1 },
+        textKey: 'groupWatch.rule.R42',
+      }),
+      signal({
+        id: '42t',
+        rule: 'R42',
+        severity: 'info',
+        numbers: { runs: 1, mTokens: 12.5, runMin: 44 },
+        textKey: 'groupWatch.rule.R42tokens',
+      }),
+    ]);
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('groupWatch.');
+    for (const text of [
+      'Пятичасовое окно уже на 91 %: пройден уровень 90 %, сброс через 42 мин',
+      'Недельное окно уже на 96 %: пройден уровень 95 %, сброс через 30 ч',
+      'Недельное окно к сбросу заполнится на 118 % (сейчас 61 %, сброс через 50 ч)',
+      'пятичасовое на 6 %, недельное на 1 %, токенов 3.4 млн за 19 мин (тяжёлых за полчаса: 2)',
+      'Прогон группы съел 12.5 млн токенов за 44 мин, окно за это время не мерилось',
+    ]) {
+      expect(html).toContain(text);
+    }
+  });
+
+  it('пауза стоит (R43 два вида, F1): пауза человека и пауза сторожа с правилом', () => {
+    const html = render([
+      signal({
+        id: '43',
+        rule: 'R43',
+        severity: 'info',
+        numbers: { pausedMin: 64 },
+        textKey: 'groupWatch.rule.R43',
+      }),
+      signal({
+        id: '43w',
+        rule: 'R43',
+        severity: 'info',
+        numbers: { pausedMin: 16 },
+        params: { rule: 'R4' },
+        textKey: 'groupWatch.rule.R43watch',
+      }),
+    ]);
+    expect(html).not.toContain('{{');
+    expect(html).not.toContain('groupWatch.');
+    for (const text of [
+      'Группа стоит на паузе 64 мин, а человеку решать нечего',
+      'Сторож поставил группу на паузу 16 мин назад и сам её не снимет',
+      'по правилу: R4',
+    ]) {
+      expect(html).toContain(text);
+    }
+  });
+
+  it('охват сторожа: неполный — фишкой с пробелами и подсказкой; полный и неизвестный — без фишки', () => {
+    const textOnly = render(undefined, { by: 'text-only', gaps: ['devWatch', 'transcript'] });
+    expect(textOnly).toContain('data-watch-coverage="text-only"');
+    expect(textOnly).toContain('Сторож: только текст ответа · нет dev-watch, переписки CLI');
+    expect(textOnly).toContain('правила вызовов молчат');
+    expect(textOnly).toContain('R38 и R39 молчат');
+    const transcript = render(undefined, { by: 'transcript', gaps: [] });
+    expect(transcript).toContain('Сторож: транскрипт<');
+    expect(render(undefined, { by: 'stream', gaps: [] })).not.toContain('data-watch-coverage');
+    expect(render(undefined, { by: 'telepathy', gaps: [] })).not.toContain('data-watch-coverage');
+    const full = render(undefined, { by: 'stream', gaps: ['limitJournal'] });
+    expect(full).toContain('Сторож: живой поток · нет журнала лимита');
   });
 
   it('одни сведения — спокойная фишка, не выделение «ждёт вас»', () => {

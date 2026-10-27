@@ -53,6 +53,8 @@ export const groupWatchSchema = object({
   denialMinutes: number().int().min(1).max(240).default(15),
   /** R19: первый запрос сессии несёт контекст больше стольких токенов. */
   firstContextTokens: number().int().min(10_000).max(1_000_000).default(90_000),
+  /** R19: окно сессии выросло над её первым запросом на столько токенов (сжатие сбрасывает). */
+  contextGrowthTokens: number().int().min(10_000).max(1_000_000).default(100_000),
   /**
    * R21: тяжёлых проверок (полный гейт, весь набор тестов) в одной группе за шесть часов —
    * столько и больше. Правило владельца — один полный гейт на группу, в конце.
@@ -101,6 +103,28 @@ export const groupWatchSchema = object({
   redoFiles: number().int().min(1).max(20).default(2),
   /** R1b и R27: вопрос ждёт ответа дольше стольких минут — «внимание» становится тревогой. */
   askAlertMinutes: number().int().min(15).max(1_440).default(60),
+  /** R16: вызов уже кончился, но шёл дольше стольких секунд (и вдвое дольше опыта очереди). */
+  slowSeconds: number().int().min(30).max(3_600).default(120),
+  /** R16: фоновая задача или фоновый субагент открыты дольше стольких минут. */
+  bgLongMinutes: number().int().min(1).max(240).default(10),
+  /** R37: вводная хода группы длиннее стольких знаков. */
+  briefChars: number().int().min(2_000).max(500_000).default(15_000),
+  /** R39: перезапусков сервера панели за час, пока идёт группа, — столько и больше. */
+  restartStorm: number().int().min(2).max(50).default(3),
+  /** R42: прогон сдвинул пятичасовое окно на столько процентов… */
+  heavyRunPercent: number().int().min(1).max(100).default(5),
+  /** R42: …или недельное — на столько… */
+  heavyRunWeekPercent: number().int().min(1).max(100).default(2),
+  /** R42: …или съел столько токенов. */
+  heavyRunTokens: number().int().min(100_000).max(100_000_000).default(3_000_000),
+  /** R43: группа на паузе, и человеку ничего не ждёт, дольше стольких минут (пауза сторожа — четверть). */
+  unresumedMinutes: number().int().min(5).max(1_440).default(60),
+  /**
+   * Пауза сторожа (решение владельца F1, по умолчанию выключена): правило траты ставит группу на
+   * паузу в ближайшей безопасной точке — конец хода, ничего не открыто, человеку ничего не ждёт.
+   * Сам не продолжает никогда; запись помнит, кто поставил паузу и по какому правилу.
+   */
+  autoPause: boolean().default(false),
   /** Повтор сигнала в Telegram и вебхук по тому же ключу (правило и чат, группа или аккаунт) — не чаще, минуты. */
   cooldownMinutes: number().int().min(1).max(1_440).default(30),
 });
@@ -137,6 +161,7 @@ export const groupWatchPatchSchema = object({
   denialRepeats: groupWatchSchema.shape.denialRepeats.removeDefault(),
   denialMinutes: groupWatchSchema.shape.denialMinutes.removeDefault(),
   firstContextTokens: groupWatchSchema.shape.firstContextTokens.removeDefault(),
+  contextGrowthTokens: groupWatchSchema.shape.contextGrowthTokens.removeDefault(),
   gateRepeats: groupWatchSchema.shape.gateRepeats.removeDefault(),
   heavyCheckMinutes: groupWatchSchema.shape.heavyCheckMinutes.removeDefault(),
   singleChats: groupWatchSchema.shape.singleChats.removeDefault(),
@@ -156,6 +181,15 @@ export const groupWatchPatchSchema = object({
   freshRewriteTokens: groupWatchSchema.shape.freshRewriteTokens.removeDefault(),
   redoFiles: groupWatchSchema.shape.redoFiles.removeDefault(),
   askAlertMinutes: groupWatchSchema.shape.askAlertMinutes.removeDefault(),
+  slowSeconds: groupWatchSchema.shape.slowSeconds.removeDefault(),
+  bgLongMinutes: groupWatchSchema.shape.bgLongMinutes.removeDefault(),
+  briefChars: groupWatchSchema.shape.briefChars.removeDefault(),
+  restartStorm: groupWatchSchema.shape.restartStorm.removeDefault(),
+  heavyRunPercent: groupWatchSchema.shape.heavyRunPercent.removeDefault(),
+  heavyRunWeekPercent: groupWatchSchema.shape.heavyRunWeekPercent.removeDefault(),
+  heavyRunTokens: groupWatchSchema.shape.heavyRunTokens.removeDefault(),
+  unresumedMinutes: groupWatchSchema.shape.unresumedMinutes.removeDefault(),
+  autoPause: groupWatchSchema.shape.autoPause.removeDefault(),
   cooldownMinutes: groupWatchSchema.shape.cooldownMinutes.removeDefault(),
 }).partial();
 
@@ -211,7 +245,11 @@ export function groupWatchWithDefaults(value: Partial<GroupWatch> | undefined): 
  * текстом, напоминания доставки впустую, несуществующий инструмент, сбои связи,
  * правки вне копии, поток служебных вставок, вердикт ревью без блока. R34–R36 — пробелы
  * автономии 24.10: новый разговор поверх тёплого, переделка закоммиченного, процесс,
- * переживший паузу.
+ * переживший паузу. R37–R45 — флаги внешнего сторожа, перенесённые 27.10: длинная вводная,
+ * перезапуск сервера правкой группы и их шторм, журнал проверок (повтор пропущен, прогон без
+ * записи), тяжёлый прогон по окну подписки, пауза без продолжения, признание пропуска в
+ * итоговом тексте, отложенное человеку, что судья мог одобрить сам. R46 — итог каждого
+ * законченного прогона группы с долей, ушедшей впустую (повторы, отказы, переделка доставки).
  */
 export const GROUP_WATCH_RULES = [
   'R1',
@@ -251,6 +289,16 @@ export const GROUP_WATCH_RULES = [
   'R34',
   'R35',
   'R36',
+  'R37',
+  'R38',
+  'R39',
+  'R40',
+  'R41',
+  'R42',
+  'R43',
+  'R44',
+  'R45',
+  'R46',
 ] as const;
 export type GroupWatchRule = (typeof GROUP_WATCH_RULES)[number];
 
@@ -300,6 +348,19 @@ export const GROUP_WATCH_SEVERITY: Readonly<Record<GroupWatchRule, GroupSignalSe
   R34: 'info',
   R35: 'warn',
   R36: 'warn',
+  // Правила внешнего сторожа, перенесённые 27.10 (F5): все начинают «сведением», без Telegram.
+  // Поднять до «внимания» — отдельная правка после недели данных на хабе: перенос 1:1 нёс бы
+  // в Telegram и шум внешнего сторожа (ложные GAP, перезапуски, BGLONG после остановки).
+  R37: 'info',
+  R38: 'info',
+  R39: 'info',
+  R40: 'info',
+  R41: 'info',
+  R42: 'info',
+  R43: 'info',
+  R44: 'info',
+  R45: 'info',
+  R46: 'info',
 };
 
 /**
@@ -375,6 +436,12 @@ export function groupSignalsOf(watch: unknown): GroupSignal[] {
  */
 export interface ChatWatchSignalsResponse {
   signals: Record<string, GroupSignal[]>;
+  /**
+   * Активные сигналы групп разделения — под настоящим ключом чата группы и под ключом
+   * родителя (строка телефона, F7): у телефона нет карточки группы, строка чата — его
+   * место. Нет поля — сервер старше, строк групп нет.
+   */
+  groups?: Record<string, GroupSignal[]>;
 }
 
 /**
@@ -383,12 +450,89 @@ export interface ChatWatchSignalsResponse {
  * роняет строку чатов.
  */
 export function chatWatchSignalsOf(value: unknown): ChatWatchSignalsResponse {
-  const raw = (value as { signals?: unknown } | null | undefined)?.signals;
-  const signals: Record<string, GroupSignal[]> = {};
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { signals };
+  const body = value as { signals?: unknown; groups?: unknown } | null | undefined;
+  const signals = activeByChat(body?.signals);
+  const groups = activeByChat(body?.groups);
+  return Object.keys(groups).length > 0 ? { signals, groups } : { signals };
+}
+
+function activeByChat(raw: unknown): Record<string, GroupSignal[]> {
+  const out: Record<string, GroupSignal[]> = {};
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return out;
   for (const [chatId, list] of Object.entries(raw)) {
     const active = groupSignalsOf({ signals: list }).filter((signal) => !signal.clearedAt);
-    if (active.length > 0) signals[chatId] = active;
+    if (active.length > 0) out[chatId] = active;
   }
-  return { signals };
+  return out;
+}
+
+/**
+ * Чем сторож видит группу: живым потоком прогона (Claude), транскриптом (прогон
+ * подхвачен без потока, Codex, Qwen Code), только текстом ответа (чужой CLI без
+ * разбора переписки — правила вызовов молчат) или никак (сторож выключен).
+ */
+export const GROUP_WATCH_SOURCES = ['stream', 'transcript', 'text-only', 'blind'] as const;
+export type GroupWatchSource = (typeof GROUP_WATCH_SOURCES)[number];
+
+/**
+ * Каких источников нет, и какие правила из-за этого молчат: журнал проверок (R40, R41),
+ * dev-watch (сервер под `pnpm start` — R38, R39), журнал лимита (R9 по замерам, R42),
+ * переписка чужого CLI (правила вызовов).
+ */
+export const GROUP_WATCH_GAPS = ['ledger', 'devWatch', 'limitJournal', 'transcript'] as const;
+export type GroupWatchGap = (typeof GROUP_WATCH_GAPS)[number];
+
+/** Охват сторожа у живой группы — на её виде в дереве (`watchCoverage`). */
+export interface GroupWatchCoverage {
+  by: GroupWatchSource;
+  gaps: GroupWatchGap[];
+}
+
+const SOURCES = new Set<unknown>(GROUP_WATCH_SOURCES);
+const GAPS = new Set<unknown>(GROUP_WATCH_GAPS);
+
+/**
+ * Охват из ответа сервера: неизвестный источник — охвата нет (строки не будет),
+ * неизвестный пробел пропускается поштучно — сервер новее клиента не роняет карточку.
+ */
+export function groupWatchCoverageOf(value: unknown): GroupWatchCoverage | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const raw = value as { by?: unknown; gaps?: unknown };
+  if (!SOURCES.has(raw.by)) return undefined;
+  const gaps = Array.isArray(raw.gaps)
+    ? raw.gaps.filter((gap): gap is GroupWatchGap => GAPS.has(gap))
+    : [];
+  return { by: raw.by as GroupWatchSource, gaps: [...new Set(gaps)] };
+}
+
+/**
+ * Ответ `GET /api/group-watch/coverage` для строки настроек: сколько живых групп
+ * каким источником видно и каких источников нет у панели целиком.
+ */
+export interface GroupWatchCoverageSummary {
+  groups: Record<GroupWatchSource, number>;
+  gaps: GroupWatchGap[];
+}
+
+export function groupWatchCoverageSummaryOf(value: unknown): GroupWatchCoverageSummary {
+  const raw = (typeof value === 'object' && value !== null ? value : {}) as {
+    groups?: unknown;
+    gaps?: unknown;
+  };
+  const counts = (
+    typeof raw.groups === 'object' && raw.groups !== null ? raw.groups : {}
+  ) as Record<string, unknown>;
+  const groups = Object.fromEntries(
+    GROUP_WATCH_SOURCES.map((source) => {
+      const count = counts[source];
+      return [
+        source,
+        typeof count === 'number' && Number.isInteger(count) && count > 0 ? count : 0,
+      ];
+    }),
+  ) as Record<GroupWatchSource, number>;
+  const gaps = Array.isArray(raw.gaps)
+    ? raw.gaps.filter((gap): gap is GroupWatchGap => GAPS.has(gap))
+    : [];
+  return { groups, gaps: [...new Set(gaps)] };
 }

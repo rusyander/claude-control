@@ -57,12 +57,12 @@ const CHECK_KINDS = new Set(['types', 'lint', 'test']);
  * The single check kind a whole-project command runs, else null. Judged per segment: the narrowing
  * must sit on the segment that runs the check, or `cd apps/server && npx vitest run` passes as narrow.
  */
-export function wholeProjectCheck(command) {
-  if (isFullGate(command)) return null; // gate-at-end's business
+export function wholeProjectCheck(command, cwd) {
+  if (isFullGate(command, cwd)) return null; // gate-at-end's business
   const text = withoutNamedScripts(command);
   const kinds = new Set([...gateKinds(text)].filter((k) => CHECK_KINDS.has(k)));
   if (kinds.size !== 1) return null;
-  return allNarrow(text) ? null : [...kinds][0];
+  return allNarrow(text, cwd) ? null : [...kinds][0];
 }
 
 /** Known quick here (learned median under SLOW_S), or not known and not a lint → let it run. */
@@ -141,7 +141,7 @@ export default function checkCost(input) {
   const tool = input?.tool_name;
   if (tool !== 'Bash' && tool !== 'PowerShell') return null;
   const command = String(input.tool_input?.command ?? '');
-  const kind = wholeProjectCheck(command);
+  const kind = wholeProjectCheck(command, input.cwd);
   if (!kind || quickEnough(kind, input.cwd, command)) return null;
   let records = [];
   let events = [];

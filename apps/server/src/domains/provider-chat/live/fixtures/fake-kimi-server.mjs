@@ -22,6 +22,9 @@ const mode = process.env.FAKE_MODE ?? 'ok';
 const holdMs = Number(process.env.HOLD_MS ?? 400);
 const answerMs = Number(process.env.ANSWER_MS ?? 50);
 const replyDelayMs = Number(process.env.REPLY_DELAY_MS ?? 0);
+// Запрос хода доходит до сессии через ACCEPT_DELAY_MS: окно, в котором сессия
+// уже заведена, а реплики в ней ещё нет (остановка посреди отправки, P-24).
+const acceptDelayMs = Number(process.env.ACCEPT_DELAY_MS ?? 0);
 if (mode === 'no-server') process.exit(2);
 
 const args = process.argv.slice(2);
@@ -107,6 +110,11 @@ createServer(async (req, res) => {
   }
   if (req.method === 'POST' && path === `/api/v1/sessions/${current}/prompts`) {
     const { content, model } = await body(req);
+    if (acceptDelayMs > 0) {
+      await wait(acceptDelayMs);
+      // Клиент ушёл, не дождавшись: до сессии реплика так и не дошла.
+      if (res.destroyed || req.socket?.destroyed) return;
+    }
     if (model !== 'stub') return fail(res, 40001, 'model required');
     const prompt = { prompt_id: `p${++prompts}`, text: content[0].text };
     change((state) => state.sessions[current]?.prompts.push(prompt.text));

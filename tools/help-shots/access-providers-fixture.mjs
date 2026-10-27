@@ -262,6 +262,59 @@ export function maskedScenario(scenario) {
  * Модель отвечает ЭХОМ: прокси защиты данных подставляет в ответ настоящие
  * значения вместо меток, и без эха эту подстановку нечем было бы показать.
  */
+/**
+ * Один `/start` на стенд — с кодом окна из ссылки карточки: без кода окно его
+ * не принимает. Код сюда передаёт сценарий кадра (`sendTelegramStart`), и окно
+ * получает `/start` ближайшим опросом.
+ */
+let telegramStart = true;
+let telegramStartCode = '';
+
+/** Код окна из ссылки `t.me/<бот>?start=<код>` — верх пришлёт `/start <код>`. */
+export function sendTelegramStart(code) {
+  telegramStartCode = code;
+}
+
+function telegramStub(method, body, send) {
+  const ok = (result) => send(200, { ok: true, result });
+  const input = body ? JSON.parse(body) : {};
+  switch (method) {
+    case 'getMe':
+      return ok({
+        id: 7000000001,
+        is_bot: true,
+        first_name: 'QA release',
+        username: 'qa_release_bot',
+      });
+    case 'getWebhookInfo':
+      return ok({ url: '' });
+    case 'getUpdates': {
+      if (input.offset === -1) return ok([]);
+      if (telegramStart && telegramStartCode) {
+        telegramStart = false;
+        return ok([
+          {
+            update_id: 501,
+            message: {
+              message_id: 1,
+              date: Math.floor(Date.now() / 1000),
+              text: `/start ${telegramStartCode}`,
+              chat: { id: 100200300, type: 'private' },
+              from: { id: 100200300, first_name: 'Анна', username: 'anna_qa' },
+            },
+          },
+        ]);
+      }
+      const hold = Math.min(Number(input.timeout ?? 0), 2) * 1000;
+      return void setTimeout(() => ok([]), hold);
+    }
+    case 'sendMessage':
+      return ok({ message_id: 2, chat: { id: Number(input.chat_id) || 0 } });
+    default:
+      return ok(true);
+  }
+}
+
 export function fakeUpstream(port) {
   const server = createServer((request, response) => {
     const path = (request.url ?? '/').split('?')[0];
@@ -317,6 +370,12 @@ export function fakeUpstream(port) {
       if (path === '/rest/api/2/myself') {
         return send(200, { name: 'Отдел контроля качества' });
       }
+
+      // Bot API Telegram (`AGENTDECK_TELEGRAM_API` стенда): имя бота для проверки
+      // и один `/start` из личного чата для окна подключения. Длинный опрос
+      // держится две секунды — как настоящий, без пустых ответов вплотную.
+      const bot = /^\/bot[^/]+\/(\w+)$/.exec(path);
+      if (bot) return telegramStub(bot[1], body, send);
 
       if (path === '/api/v4/user') {
         return send(200, { username: 'qa-release-bot' });

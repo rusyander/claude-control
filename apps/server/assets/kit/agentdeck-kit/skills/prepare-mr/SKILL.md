@@ -81,7 +81,10 @@ blocker → its row lands there with the fix; those rows run beside the table, s
 Gate: a row per sieve, `pass` / `fail` / `n-a`, each with evidence — `n-a` names the absent kind or
 the reason. Live sieves (contract-by-request, browser-focus, boundary-negative, migration-safety,
 branch-backend-stand) take `n-a` only on a diff with no behaviour file (product code, UI or backend),
-and that row's id and reason go into the MR description. Evidence from an older HEAD than the last
+and that row's id and reason go into the MR description. A negative sieve's evidence lists EVERY probe
+tried with its input and rc, not just the one that went red: a probe that should have been refused
+and passed is a finding — fixed, or an MR «stays open» item naming the gap (g8 26.10: two misses were
+swapped for a third that went red, one never reported). Evidence from an older HEAD than the last
 edit → re-run that sieve. `fail` → fix, re-run step 1 for the touched subproject, then every sieve
 whose evidence predates the fix. A LIVE sieve that cannot run here (no stand, no browser, no
 network) is a NOTE, not a blocker: row `fail`, evidence starting `not checked: <reason>`. Any other
@@ -96,6 +99,10 @@ outside its copy); a force-push beyond the delivery's lease; a DB migration, DDL
 Everything else (a live check that cannot run, a red that predates the branch, a missing MR, a stale
 stand session, a conflict) the group resolves itself or waives with the reason as a note in the MR
 description. Outside a split group the session's own rules stand (git writes per-op approved).
+A split group's self-check (`tests-cli delivery`) exiting 0 is the evidence for the MR description
+and reviewer threads — quote its MR line, never re-read them through the forge. A fact re-read
+before that (pipeline, threads, sha) that a sieve row cites updates the row in the same step; the
+self-check runs once, after the last row edit (g1 26.10: a stale row cost a third run).
 
 ## 4. Readiness checklist
 

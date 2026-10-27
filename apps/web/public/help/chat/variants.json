@@ -1,6 +1,72 @@
 {
   "topic": "chat",
   "frames": {
+    "agents/01-tree": {
+      "light-ru": {
+        "file": "01-tree.png",
+        "width": 880,
+        "height": 449
+      },
+      "light-en": {
+        "file": "01-tree.en.png",
+        "width": 880,
+        "height": 449
+      },
+      "dark-ru": {
+        "file": "01-tree.dark.png",
+        "width": 880,
+        "height": 449
+      },
+      "dark-en": {
+        "file": "01-tree.dark.en.png",
+        "width": 880,
+        "height": 449
+      }
+    },
+    "agents/02-extensions": {
+      "light-ru": {
+        "file": "02-extensions.png",
+        "width": 928,
+        "height": 768
+      },
+      "light-en": {
+        "file": "02-extensions.en.png",
+        "width": 928,
+        "height": 768
+      },
+      "dark-ru": {
+        "file": "02-extensions.dark.png",
+        "width": 928,
+        "height": 768
+      },
+      "dark-en": {
+        "file": "02-extensions.dark.en.png",
+        "width": 928,
+        "height": 768
+      }
+    },
+    "agents/03-group": {
+      "light-ru": {
+        "file": "03-group.png",
+        "width": 790,
+        "height": 244
+      },
+      "light-en": {
+        "file": "03-group.en.png",
+        "width": 790,
+        "height": 244
+      },
+      "dark-ru": {
+        "file": "03-group.dark.png",
+        "width": 790,
+        "height": 244
+      },
+      "dark-en": {
+        "file": "03-group.dark.en.png",
+        "width": 790,
+        "height": 244
+      }
+    },
     "autonomy/01-escalation": {
       "light-ru": {
         "file": "01-escalation.png",

@@ -13,6 +13,12 @@ export const groupWatchEn: typeof groupWatchRu = {
     R7: 'The copy reads the panel’s own files — reads: {{reads}}',
     R8: 'The group spends a lot: {{perHour}} window units per hour',
     R9: 'The five-hour window will be {{projectedPct}} % full at reset (now {{nowPct}} %, reset in {{resetMin}} min)',
+    R9level:
+      'The five-hour window is already at {{nowPct}} %: the {{levelPct}} % level is passed, reset in {{resetMin}} min',
+    R9levelWeek:
+      'The weekly window is already at {{nowPct}} %: the {{levelPct}} % level is passed, reset in {{resetHours}} h',
+    R9week:
+      'The weekly window will be {{projectedPct}} % full at reset (now {{nowPct}} %, reset in {{resetHours}} h)',
     R10: 'Subscription limit hit, reset in {{resetMin}} min',
     R11: 'The agent waits in a sleep-and-check loop — rounds: {{polls}}',
     R12: 'One file reread with no edit — reads: {{reads}}',
@@ -20,11 +26,19 @@ export const groupWatchEn: typeof groupWatchRu = {
     R14: 'A tool returned a huge result: {{charsK}}K chars into the window (such results: {{results}})',
     R15: 'A call was cut off by its own {{timeoutMin}} min timeout (such calls: {{timeouts}})',
     R16: 'A call has been open for {{openMin}} min, still inside its timeout',
+    R16slow:
+      'A call ran {{ranMin}} min — longer than the threshold (slow calls in half an hour: {{calls}})',
+    R16slowExpect:
+      'A call ran {{ranMin}} min, usually {{expectMin}} min (slow calls in half an hour: {{calls}})',
+    R16bg: 'A background task has been open for {{openMin}} min: no word of its end, no stop',
     R17: 'Waiting in the heavy-step queue for {{waitMin}} min, {{ahead}} ahead',
     R18: 'Guards keep refusing — denials: {{denials}} within {{spanMin}} min',
     R19: 'Heavy first request of the session: {{firstK}}K tokens in the window',
+    /** R19, the window grew mid-session above the first request; compaction closes it. */
+    R19grow:
+      'The session window grew by {{growK}}K tokens: {{firstK}}K at the first request (after a compaction, the first one after it), {{nowK}}K now — every call carries it again',
     R20: 'The group is paused, yet a session acts: {{tools}} calls, starting {{afterMin}} min after the pause',
-    R21: 'Heavy checks in a loop: {{gates}} runs across the group, {{totalMin}} min in total',
+    R21: 'Heavy checks in a loop: {{gates}} passes across the group, {{totalMin}} min in total',
     R22: 'The group has stood for {{idleMin}} min: no turn, no question, no queue — it will not continue by itself',
     R23: 'The same command gets stuck in {{groups}} groups within {{spanMin}} min — the cause is shared, not in a group',
     R24: 'The same call fails with the same error, no edits in between — failures: {{fails}}',
@@ -32,6 +46,9 @@ export const groupWatchEn: typeof groupWatchRu = {
     R26: 'The agent stops processes it did not start itself — calls: {{kills}}',
     R27: 'The turn ended with a question in the text, without a card — waiting for an answer for {{waitMin}} min',
     R28: 'Delivery reminders: {{nudges}}, yet the same things are still missing',
+    /** R28, the last round found missing items the previous one did not have. */
+    R28rounds:
+      'Delivery reminders: {{nudges}}, and the last round found {{fresh}} new missing items — delivery is being redone round after round',
     R29: 'A tool that does not exist in the session was called — calls: {{calls}}',
     R30: 'An external service does not answer: {{failures}} failures within {{spanMin}} min',
     R31: 'Edits outside its own copy — actions: {{writes}}',
@@ -40,6 +57,41 @@ export const groupWatchEn: typeof groupWatchRu = {
     R34: 'A new conversation started over a warm one: {{writeK}}K tokens of a {{prevK}}K window written again, loss ≈ {{lostW}} window units',
     R35: 'A new conversation redoes work already committed in this stage — files: {{files}}',
     R36: 'The group is paused, yet a server its session started still listens — ports: {{ports}}',
+    R37: 'The turn brief is {{charsK}}K chars against a {{limitK}}K threshold: every turn carries it in the window again',
+    R38: 'A panel server restart waits on this group’s edits: {{files}} of its {{waiting}} files are the group’s — the restart will stop every live run',
+    /** R38, the restart waits for turns to end and the watch knows for how long. */
+    R38wait:
+      'A panel server restart has waited {{waitMin}} min on this group’s edits: {{files}} of its {{waiting}} files are the group’s — while it waits the panel runs old code, and the restart will stop every live run',
+    /** R38, the restart already happened because of the group’s edits (within half an hour). */
+    R38done:
+      'The panel server restarted because of this group’s edits ({{files}} of its files), after waiting {{waitMin}} min for turns to end; other live groups at that minute: {{others}}',
+    R39: 'The panel server restarted {{restarts}} times in an hour: every restart breaks live runs — find what writes into its tree',
+    R40: 'The verify ledger in the group’s copy does not work as promised (findings in half an hour: {{findings}})',
+    R40replay:
+      'A check re-ran on a tree the verify ledger already holds green: the replay did not happen (findings in half an hour: {{findings}})',
+    R40off:
+      'The verify ledger is off for the group’s copy: its checks are neither recorded nor replayed',
+    R40mismatch:
+      'A replay from the verify ledger would differ from the real run: such a replay cannot be trusted',
+    R40mismatchExit:
+      'A replay from the verify ledger would differ from the real run: recorded exit {{recordedExit}}, real exit {{exit}}',
+    R40mode: 'The verify ledger in the group’s copy runs without replays: checks are only recorded',
+    R41: 'A check ran {{ranSec}} s past the verify ledger: not one event from the copy, it can never be replayed (such runs in half an hour: {{runs}})',
+    R42: 'A group run moved the windows: five-hour by {{fivePct}} %, weekly by {{weekPct}} %, {{mTokens}} M tokens in {{runMin}} min (heavy runs in half an hour: {{runs}})',
+    R42tokens:
+      'A group run used {{mTokens}} M tokens in {{runMin}} min, the window was not measured meanwhile (heavy runs in half an hour: {{runs}})',
+    R43: 'The group has been paused for {{pausedMin}} min with nothing for a person to decide — time to continue or close it',
+    R43watch:
+      'The watch paused the group {{pausedMin}} min ago and will not lift the pause itself — check the signal and continue',
+    R44: 'The turn summary admits a skip: part of the work is called unverified, temporary or a workaround',
+    R45: 'A decision has waited for a person for {{waitMin}} min: the panel did not grant it itself',
+    R46: 'Run summary: {{mTokens}} M tokens in {{runMin}} min, five-hour window +{{fivePct}} %, weekly +{{weekPct}} %; wasted {{wastePct}} % (rework {{reworkPct}} %, repeats {{repeatPct}} %, refusals {{deniedPct}} %)',
+    R46tokens:
+      'Run summary: {{mTokens}} M tokens in {{runMin}} min, windows not measured; wasted {{wastePct}} % (rework {{reworkPct}} %, repeats {{repeatPct}} %, refusals {{deniedPct}} %)',
+    R46Bare:
+      'Run summary: {{mTokens}} M tokens in {{runMin}} min, five-hour window +{{fivePct}} %, weekly +{{weekPct}} %; the watch did not see the run’s calls',
+    R46tokensBare:
+      'Run summary: {{mTokens}} M tokens in {{runMin}} min, windows not measured; the watch did not see the run’s calls',
   },
   param: {
     command: 'command: {{value}}',
@@ -59,6 +111,14 @@ export const groupWatchEn: typeof groupWatchRu = {
     missing: 'missing: {{value}}',
     cause: 'reason: {{value}}',
     port: 'port: {{value}}',
+    phrase: 'words: {{value}}',
+    excerpt: 'from the summary: {{value}}',
+    id: 'decision: {{value}}',
+    check: 'check: {{value}}',
+    key: 'ledger key: {{value}}',
+    reason: 'reason: {{value}}',
+    mode: 'mode: {{value}}',
+    rule: 'by rule: {{value}}',
   },
   opValue: {
     push: 'push',
@@ -112,7 +172,41 @@ export const groupWatchEn: typeof groupWatchRu = {
   summary_few: 'signals: {{count}}',
   summary_many: 'signals: {{count}}',
   summary_other: 'signals: {{count}}',
+  pausedChip: 'watch pause: {{rule}}',
+  pausedChipHint:
+    'The watch paused the group at the end of a turn on a rule signal — the next link did not start. Only a person lifts the pause: “Continue”.',
   summaryHint: 'Active group-watch signals — details in the group cards',
+  coverage: {
+    by: {
+      stream: 'live stream',
+      transcript: 'transcript',
+      'text-only': 'reply text only',
+      blind: 'not watching',
+    },
+    gap: {
+      ledger: 'verify ledger',
+      devWatch: 'dev-watch',
+      limitJournal: 'limit journal',
+      transcript: 'CLI transcript',
+    },
+    gapHint: {
+      ledger: 'without the verify ledger R40 and R41 stay silent',
+      devWatch: 'the server was not started by dev-watch — R38 and R39 stay silent',
+      limitJournal: 'the limit journal is empty — sampled R9 and R42 stay silent',
+      transcript: 'the watcher does not parse this CLI transcript — tool-call rules stay silent',
+    },
+    chip: 'Watcher: {{by}}',
+    chipGaps: 'Watcher: {{by}} · missing {{gaps}}',
+    chipHint:
+      'How the watcher sees the group. Without a source the rules that read it stay silent — silence here does not mean all is well.',
+    settingsTitle: 'Coverage now',
+    settingsGroups:
+      'Live groups: stream — {{stream}}, transcript — {{transcript}}, text only — {{textOnly}}.',
+    settingsNoGroups: 'No live groups right now.',
+    settingsBlind: 'The watcher is off — it does not see the live groups ({{count}}).',
+    settingsGaps: 'Missing {{gaps}}: {{hints}}.',
+    settingsFull: 'All sources are in place.',
+  },
   chat: {
     island: 'Chat watch',
     islandHint:
@@ -131,6 +225,9 @@ export const groupWatchEn: typeof groupWatchRu = {
     singleChats: 'Watch single chats too',
     singleChatsHint:
       'Chats started in the panel without a group: the rules that fit a single conversation. A signal shows as a chip on the chat row and an island above its feed; only an alarm goes to Telegram and the webhook.',
+    autoPause: 'Pause the group at the end of a turn',
+    autoPauseHint:
+      'A waste-in-a-loop rule is on (R4, R8, R11, R12, R21, R24, R41, R42) — the next link does not start and the group pauses. Only at the end of a turn: work mid-turn is never cut. Something for a person to decide — no pause. Only a person lifts the pause, with “Continue”; R43 reminds of one still standing.',
     thresholdsOff:
       'The watch is off — the thresholds below do nothing; change them after turning it on.',
     thresholdsOffKeepWarm:
@@ -141,8 +238,10 @@ export const groupWatchEn: typeof groupWatchRu = {
       '“Attention” and “alarm” signals go to Telegram and the webhook wherever the “Group watch signal” event is ticked in integrations: the rule, its numbers and the project folder name. The same signal repeats no more often than the quiet period below.',
     defaultValue: '{{value}} (default)',
     unit: {
+      seconds: '{{value}} s',
       minutes: '{{value}} min',
       tokens: '{{value}}K tokens',
+      mtokens: '{{value}}M tokens',
       times_one: '{{value}} time',
       times_few: '{{value}} times',
       times_many: '{{value}} times',
@@ -182,11 +281,15 @@ export const groupWatchEn: typeof groupWatchRu = {
       bigResultChars: 'A single tool result larger than (R14)',
       persistedChars: 'A reread saved output larger than (R14)',
       longCallMinutes: 'A call open longer than (R16)',
+      slowSeconds: 'A finished call ran longer than (R16)',
+      bgLongMinutes: 'A background task open longer than (R16)',
+      briefChars: 'A group turn brief longer than (R37)',
       queueWaitMinutes: 'Waiting for the heavy-step queue (R17)',
       denialRepeats: 'Guard denials in a row (R18)',
       denialMinutes: 'Denial counting window (R18)',
       firstContextTokens: 'First request of a session heavier than (R19)',
-      gateRepeats: 'Heavy checks across the group (R21)',
+      contextGrowthTokens: 'Session window grew above its first request by (R19)',
+      gateRepeats: 'Heavy-check passes across the group (R21)',
       heavyCheckMinutes: 'A check is heavy when it runs longer than (R21)',
       askAlertMinutes: 'An unanswered question turns into an alarm after (R1b, R27)',
       silentStopMinutes: 'A group stands with no turn (R22)',
@@ -204,6 +307,11 @@ export const groupWatchEn: typeof groupWatchRu = {
       insertMinutes: 'Insert counting window (R32)',
       freshRewriteTokens: 'A new conversation over a warm one rewrote more than (R34)',
       redoFiles: 'Committed files redone (R35)',
+      restartStorm: 'Panel server restarts per hour while a group runs (R39)',
+      heavyRunPercent: 'A run moved the five-hour window by (R42)',
+      heavyRunWeekPercent: 'A run moved the weekly window by (R42)',
+      heavyRunTokens: 'A run used more tokens than (R42)',
+      unresumedMinutes: 'Paused with nothing waiting on a person longer than (R43)',
       cooldownMinutes: 'Repeat to Telegram and the webhook no more often than',
     },
   },

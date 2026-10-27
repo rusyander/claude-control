@@ -494,6 +494,7 @@ const stopChatRun = definePanelAction({
 const SPLIT_MODES = [
   'pause_group',
   'resume_group',
+  'continue_group',
   'release_group',
   'answer_group',
   'pause_all',
@@ -506,7 +507,8 @@ const splitControlInput = z.object({
   mode: z
     .enum(SPLIT_MODES)
     .describe(
-      'pause_group / resume_group — one group; release_group — start a group waiting for its ' +
+      'pause_group / resume_group — one group; continue_group — a group that stopped unfinished ' +
+        '(failed, delivery retry pending, turn without a review verdict); release_group — start a group waiting for its ' +
         'predecessors now; answer_group — the human’s answer to a group’s triage question; ' +
         'pause_all / resume_all — every run of the whole tree',
     ),
@@ -580,6 +582,7 @@ async function splitTarget(input: SplitControlInput, inject: InjectRoute): Promi
 const MODE_ROUTE: Record<SplitMode, string> = {
   pause_group: 'pause',
   resume_group: 'resume-paused',
+  continue_group: 'continue-group',
   release_group: 'release',
   answer_group: 'hold',
   pause_all: 'pause',
@@ -589,6 +592,7 @@ const MODE_ROUTE: Record<SplitMode, string> = {
 const MODE_SUMMARY = {
   pause_group: 'summary-split-pause',
   resume_group: 'summary-split-resume',
+  continue_group: 'summary-split-continue',
   release_group: 'summary-split-release',
   answer_group: 'summary-split-answer',
   pause_all: 'summary-tree-pause',
@@ -598,6 +602,7 @@ const MODE_SUMMARY = {
 const MODE_EFFECT = {
   pause_group: 'value-split-pause-effect',
   resume_group: 'value-split-resume-effect',
+  continue_group: 'value-split-continue-effect',
   release_group: 'value-split-release-effect',
   answer_group: 'value-split-answer-effect',
   pause_all: 'value-tree-pause-effect',
@@ -631,7 +636,8 @@ const splitControl = definePanelAction({
   risk: 'change',
   title: 'journal-split-control',
   description:
-    'Control a running split, as its hub does: pause / resume one group, release a group ' +
+    'Control a running split, as its hub does: pause / resume one group, continue a group that ' +
+    'stopped unfinished, release a group ' +
     'waiting for its predecessors, pass the human’s answer to a group’s triage question, or ' +
     'pause / resume the whole tree. Resume never forces past the parallel limit: a refusal ' +
     'about the limit means ask the human. Applying, cancelling a split and cleaning copies stay ' +

@@ -54,6 +54,8 @@ import {
 import {
   projectCascadeEntries as readCascadeEntries,
   setProjectCascade as writeProjectCascade,
+  projectReviewEntries as readReviewEntries,
+  setProjectReviewAfterWork as writeReviewAfterWork,
 } from './cascade.ts';
 import {
   isTestsAutoAccept as readTestsAutoAccept,
@@ -77,6 +79,7 @@ import {
   setTreePause as writeTreePause,
 } from './tree-pause.ts';
 import { getChatPins as readChatPins, setChatPin as writeChatPin } from './chat-pins.ts';
+import { getChatForks as readChatForks, recordChatFork } from './chat-forks.ts';
 import {
   findSplitPlanByTriage as readSplitPlanByTriage,
   getSplitPlan as readSplitPlan,
@@ -252,6 +255,7 @@ import {
 const MACHINE_LOCAL_KEYS = [
   'chatGroupSettings',
   'chatKeyAliases',
+  'chatForks',
   'chatEscalations',
   'secretBackupVerifier',
   'permissionPlaces',
@@ -733,6 +737,16 @@ export class AppStore {
     this.persist();
   }
 
+  /** Где выключено «Ревью после работы»; сопоставление с рабочей папкой — в домене. */
+  getProjectReviewEntries(): Array<[string, boolean]> {
+    return readReviewEntries(this.state);
+  }
+
+  setProjectReviewAfterWork(path: string, enabled: boolean): void {
+    writeReviewAfterWork(this.state, path, enabled);
+    this.persist();
+  }
+
   /** Принимать ли черновики генерации тестов этого проекта без просмотра. */
   isTestsAutoAccept(path: string): boolean {
     return readTestsAutoAccept(this.state, path);
@@ -799,7 +813,10 @@ export class AppStore {
     // Группа и автономность, выбранные до первого хода, едут за разговором;
     // ветке правки достаётся их копия (F-111).
     const aliased = aliasChatSession(this.state, chatId, sessionId, from);
-    if (linked || moved || aliased) this.persist();
+    // Ветка правки помнит, от кого ответвилась: в списке она подписана, иначе
+    // два разговора с одной историей и одним названием не различить.
+    const forked = from !== undefined && recordChatFork(this.state, sessionId, from);
+    if (linked || moved || aliased || forked) this.persist();
   }
 
   // --- Группа и автономность чата, заметки главному чату дерева ---
@@ -871,6 +888,11 @@ export class AppStore {
     const changed = writeChatPin(this.state, chatId, pinned, new Date().toISOString());
     if (changed) this.persist();
     return changed;
+  }
+
+  /** Ветки правки реплики: сессия ветки → исходный разговор (`chat-forks.ts`). */
+  getChatForks(): Record<string, string> {
+    return readChatForks(this.state);
   }
 
   // --- Конвейер уровней разделения (Т1): родитель → разбор, ожидания, группы.

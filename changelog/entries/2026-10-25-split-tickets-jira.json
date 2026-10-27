@@ -1,0 +1,48 @@
+{
+  "title": {
+    "ru": "Задачи разделения в Jira: сторона и приоритет у каждой, без исполнителя, похожие открытые задачи — на ваше решение",
+    "en": "Split tickets in Jira: a side and a priority on each, no assignee, similar open issues left to your decision"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Каждая задача, которую заводит «Опубликовать в Jira» или «Завести», начинается строкой стороны — FRONTEND, BACKEND или FULLSTACK — и несёт такую же метку. Сторона берётся из путей находок и области, которую назвала модель.",
+        "en": "Every issue filed by «Publish to Jira» or «File» starts with a side line — FRONTEND, BACKEND or FULLSTACK — and carries the same label. The side comes from the findings' paths and the area the model named."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Приоритет ставится у каждой задачи: по серьёзности, а без неё — средний, и только с именем из списка приоритетов вашей Jira. Если Jira не принимает поле приоритета, задача заводится без него, а серьёзность уходит меткой и строкой описания.",
+        "en": "Every issue gets a priority: from the severity, medium without one, and only under a name from your Jira's priority list. If Jira refuses the priority field, the issue is filed without it and the severity goes as a label and a description line."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Перед публикацией окно «Разобрать…» ищет в выбранном проекте Jira похожие открытые задачи и показывает каждую ссылкой с выбором: связать (комментарий в неё), пропустить или завести новую. Поиск только читает.",
+        "en": "Before publishing, the «Resolve…» dialog searches the chosen Jira project for similar open issues and shows each as a link with a choice: link (a comment into it), skip, or file a new one. The search only reads."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Описание задачи собрано по разделам: контекст, что сделать, критерии приёмки, где в коде и раздел на каждый дефект.",
+        "en": "The issue description is built in sections: context, what to do, acceptance criteria, where in the code and a section per defect."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Исполнитель не ставится никогда. Если Jira назначила исполнителя проекта сама, итог публикации предупреждает об этом.",
+        "en": "An assignee is never set. If Jira assigned the project's default assignee on its own, the publish result warns about it."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    }
+  ]
+}

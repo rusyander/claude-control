@@ -9,6 +9,7 @@
   paths. Update it at milestones and before a compaction; read it back after one — never ask the user
   to re-explain.
 - Temporary files go to `.agent/tmp/`; retired files to `.agent/archive/`.
+- Task ledger: a task taken = a `TASKS.md` line, finished = `[x]` (`situational-rules/references/task-ledger.md`).
 
 ## Docs — the audience decides
 
@@ -31,5 +32,6 @@
 ## Before/after shots
 
 A UI-visible fix gets BEFORE shots before the first edit and AFTER shots once the dev server is up —
-start it yourself, under `.agent/screenshots/before-after/<task>/`. A check you cannot run live is
-reported as not done, never passed as done.
+start it yourself, under `.agent/screenshots/before-after/<task>/`, from your own working copy only —
+never the user's main checkout or another worktree. A check you cannot run live is reported as not
+done, never passed as done.

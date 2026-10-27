@@ -23,7 +23,38 @@ describe('draftFrom', () => {
   });
 
   it('флаг включённости в форму не попадает — у него свой переключатель', () => {
-    expect(Object.keys(draftFrom('telegram', DEFAULT_INTEGRATIONS.telegram))).toEqual(['chatId']);
+    expect(Object.keys(draftFrom('telegram', DEFAULT_INTEGRATIONS.telegram))).toEqual([
+      'chatId',
+      'doneAfterMinutes',
+    ]);
+  });
+
+  it('порог «Закончил» у Telegram: не задан — 5 минут, задан — как есть', () => {
+    expect(draftFrom('telegram', DEFAULT_INTEGRATIONS.telegram).doneAfterMinutes).toBe('5');
+    expect(
+      draftFrom('telegram', { ...DEFAULT_INTEGRATIONS.telegram, doneAfterMinutes: 0 })
+        .doneAfterMinutes,
+    ).toBe('0');
+  });
+});
+
+describe('порог «Закончил» в минутах', () => {
+  it('уходит числом; не число или больше суток — поле не заполнено', () => {
+    expect(
+      buildSettings({
+        id: 'telegram',
+        enabled: true,
+        draft: { chatId: '42', doneAfterMinutes: ' 12 ' },
+        events: [],
+      }),
+    ).toEqual({ enabled: true, chatId: '42', doneAfterMinutes: 12, events: [] });
+    expect(missingFields('telegram', { chatId: '42', doneAfterMinutes: '0' })).toEqual([]);
+    expect(missingFields('telegram', { chatId: '42', doneAfterMinutes: 'пять' })).toEqual([
+      'doneAfterMinutes',
+    ]);
+    expect(missingFields('telegram', { chatId: '42', doneAfterMinutes: '1441' })).toEqual([
+      'doneAfterMinutes',
+    ]);
   });
 });
 
@@ -73,10 +104,10 @@ describe('buildSettings', () => {
       buildSettings({
         id: 'telegram',
         enabled: false,
-        draft: { chatId: '@qa' },
+        draft: { chatId: '@qa', doneAfterMinutes: '5' },
         events: ['runDone'],
       }),
-    ).toEqual({ enabled: false, chatId: '@qa', events: ['runDone'] });
+    ).toEqual({ enabled: false, chatId: '@qa', doneAfterMinutes: 5, events: ['runDone'] });
     expect(
       buildSettings({
         id: 'github',

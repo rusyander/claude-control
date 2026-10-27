@@ -23,6 +23,7 @@
  *   node tools/tests-cli.mjs export --group gui --format md --out gui.md
  *   node tools/tests-cli.mjs report --reporter junit --out report.xml
  *   node tools/tests-cli.mjs case --group auth --json '{"title":"…","steps":["…"],"codePaths":["src/auth"]}'
+ *     (группы ещё нет, а другие есть — отказ с похожими; новая заводится с --new-group)
  *   node tools/tests-cli.mjs record auth:auth-001=passed auth:auth-002=failed --note "…"
  *
  * Коды возврата рассчитаны на CI: `report` отвечает 1, если есть провалённые
@@ -51,6 +52,18 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../apps/server/src/lib/brand.mjs';
 import { PROGRESS_MARK } from './qa/vitest-progress-reporter.mjs';
+import { BASE_COPY_ENV, expandCopyPaths } from './tests-cli-base.mjs';
+import {
+  ENVIRONMENT_EXIT,
+  caseCommand,
+  goSumTracked,
+  healthUrls,
+  partSaid,
+  printTree,
+  runParts,
+  runPartsApart,
+  takeGateReports,
+} from './tests-cli-parts.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
@@ -75,7 +88,8 @@ const DEFAULT_RESULTS = [
 const HELP = `Тест-кейсы проекта без панели.
 
   list      группы и кейсы со статусами
-  show      один кейс целиком: show <caseId>
+  show      один кейс целиком: show <группа>:<кейс> или show <кейс>; --history — его исходы
+            по прогонам (новые сверху) и прогоны на развилке
   sync      тесты папки e2e — в кейсы: новые заводятся, знакомым обновляется привязка
   run       прогнать автотесты кейсов и забрать результаты
   import    забрать результаты прогона или кейсы из файла
@@ -85,8 +99,10 @@ const HELP = `Тест-кейсы проекта без панели.
   diff      что изменилось между прогонами: diff <база> <новый>
   plan      собрать план правилом: plan smoke | diff | release | flaky
   case      завести или обновить кейс (агент чата): --group <g> --json '<кейс>' | --file <f.json>
+            группы нет, а другие есть — отказ с похожими; новая группа — --new-group
             кейс человека не переписывается — правка уходит черновиком на приёмку;
-            правка по "id" — кейс целиком: поля, которых нет в JSON, не берутся из прежнего
+            правка по "id" — только названные поля, прочие (и title) остаются как были:
+            метка живой проверки — case --group <g> --json '{"id":"<кейс>","tags":["live"]}'
             Кейс пишется для человека: заголовок — проверяемое поведение, шаг на поведение,
             ожидание шага — что видно (текст на экране, статус или поле ответа, содержимое
             файла, строка отчёта), а не «все проходят» / «работает» (это ловит lint, правило
@@ -97,31 +113,73 @@ const HELP = `Тест-кейсы проекта без панели.
   gaps      пробелы блока «Тесты» перед «доставлено» — тем же кодом, что сверяет панель:
             gaps [--since <ISO начала группы>]; без --since начало берётся из состояния панели
             по пути копии; код 1 — есть пробелы
+  delivery  вся проверка доставки группы до ответа — тем же кодом, что панель после хода:
+            описание MR, строки сит, пункты владельца, блок «Тесты»;
+            delivery --answer <файл с блоком сит> [--mr <ссылка>]; описание MR и ветки
+            ревьюера читает панель (ключ форджа у неё) — описание публикуют один раз, затем
+            проверяют; --mr-description <файл> — проверить черновик до публикации или без
+            панели; код 1 — есть пробелы
   record    записать проверенное вручную (только ручные кейсы, в разделе — «вручную»):
             record <группа>:<кейс>=passed|failed|blocked|skipped …; автокейс — только run
+  case-cmd  своя команда кейса у этой копии — один раз, дальше её берут run, --stale и --base:
+            case-cmd <группа:кейс,…> --cmd "<команда>" [--format f] | case-cmd <…> --clear |
+            case-cmd — список; лежит в .agent/tests/case-commands.json вне git (рецепт машины);
+            --cmd в самой команде run сильнее неё
+  tree      отпечаток дерева (тот же, что у run и import --tree): tree [--out <файл>] — для
+            <имя>.tree рядом с отчётом ворот в .agent/tests/gate-junit/
+
+Окружение набора: поле "env" в .agent/tests/automation.json — каталог от корня ("." — весь
+проект) → { "ПЕРЕМЕННАЯ": "значение" }; кейс под каталогом получает его переменные (узкий
+каталог сильнее), {copy} в значении — корень копии. Кейсы с разным окружением или своей
+командой run гонит частями, каждую своим прогоном. Сборка Go, упавшая на окружении (missing
+go.sum entry при go.sum вне git, go.mod/тулчейн), записывается «заблокирован» с причиной, код 75.
 
 Опции:
-  --project <dir>   каталог проекта (по умолчанию AGENTDECK_TESTS_PROJECT, иначе текущий)
+  --project <dir>   каталог проекта (по умолчанию AGENTDECK_TESTS_PROJECT, иначе текущий); из
+                    подкаталога — ближайший вверх с .agent/tests, не выше корня git
   --group <id>      только эта группа
   --case <g:id,…>   для run: только эти кейсы (группа:кейс через запятую; id без группы —
                     если он один такой в проекте)
-  --format <f>      junit | playwright | allure | csv | xlsx | testrail-csv | testrail | allure-testops | md
+  --format <f>      junit | playwright | allure | csv | xlsx | testrail-csv | testrail | allure-testops | md;
+                    для run --cmd: go-test-json | cargo-test — что команда пишет в {report}
   --file <f>        файл или каталог с отчётом (путь от корня проекта)
-  --dir <d>         для sync: папка e2e (по умолчанию ищется сама)
+  --tree            для import: отчёт снят на текущем дереве — его зелёный засчитается
+                    кейсу другой группы с тем же автотестом (gate-run передаёт сам)
+  --dir <d>        для sync: папка e2e (по умолчанию ищется сама)
   --reporter <r>    text | junit — вид отчёта команд report и diff
   --out <f>         писать результат в файл вместо экрана
   --cmd "<...>"     команда прогона (по умолчанию: кейсы папки e2e — её раннером,
                     кейсы *.test.ts(x), которые своя команда не прогонит (отчёт Go/Cargo
                     или её нет и нет scripts.test), — vitest ближайшего package.json,
+                    спеки и каталоги пакета со своим playwright.config — его Playwright,
                     иначе своя команда из .agent/tests/automation.json,
                     иначе npm test из package.json); {files}/{paths} — файлы кейсов
-                    (нет подстановки — в конец строки), {report} — отчёт JUnit этого прогона
+                    (нет подстановки — в конец строки), {report} — отчёт этого прогона:
+                    JUnit или вывод go test -json / cargo test (\`go test -json ./... > {report}\`;
+                    вид узнаётся сам, явно — --format); {copy} — корень копии (на --base —
+                    исходной: её venv и .agent/tmp в дереве развилки иначе не найти; простой
+                    относительный путь к файлу копии вне git --base раскрывает в неё сам)
   --results <f>     где прогон оставит отчёт (по умолчанию ищется сам)
   --dry             для run: показать, что было бы запущено, и выйти
   --brief | --full  для run: вывод раннера — в журнал, на экран итог и первые строки падений
                     (группе панели — по умолчанию, AGENTDECK_BRIEF_OUTPUT=1) | весь, как есть
   --memo | --fresh  для run: зелёный итог на том же дереве — из памяти, без прогона (группе
                     панели — по умолчанию; e2e по стенду — всегда заново) | прогнать заново
+  --base            для run: прогнать на развилке ветки с основной (временное дерево git) и
+                    записать в .agent/tests/runs-base — довод воротам доставки, что красное
+                    не из-за ветки (снимает только красное с той же подписью); история не трогается;
+                    гоняет только красные тесты последнего прогона ветки, где раннер умеет
+                    выбрать тест (pytest, go test, vitest), иначе кейс целиком; node_modules
+                    пакета копии ложится ссылкой, если зависимости пакета на развилке те же
+  --health [<url>]  для run: стенд, спрошенный до прогона (ответ ниже 500 — жив); не
+                    ответил — прогон не запускается, кейсы ложатся «заблокирован» с причиной
+                    (ворота доставки — заметка об окружении, без прогона на развилке), код 75.
+                    Без адреса — адрес, куда ходит раннер (Playwright: переменная из baseURL,
+                    иначе значение конфига); адрес, куда раннер не ходит, — отказ с обоими
+  --stale           для run: ровно кейсы, которые gaps называет непрогнанными или устаревшими
+                    (тот же расчёт, начало группы — --since или состояние панели); пробелов нет — выход 0.
+                    Отчёт ворот в .agent/tests/gate-junit/<имя>.xml с <имя>.tree того же дерева
+                    (tests-cli tree --out … до ворот) засчитывается без прогона
   --case-timeout <мин>  для run: предел на кейс (по умолчанию 10 мин, иначе
                     AGENTDECK_TESTS_CASE_TIMEOUT); прогон ждёт не дольше предела × число
                     файлов кейсов; у своей команды с timeoutMinutes — его, если флаг не назван. Дольше —
@@ -132,7 +190,10 @@ const HELP = `Тест-кейсы проекта без панели.
   --release <веха>  для plan release: чью веху собирать
   --threshold <ч>   для plan flaky: порог стабильности, доля 0–1 или проценты
   --save            для plan: записать план в проект, а не только показать
-  --json '<кейс>'   для case: кейс JSON-объектом (title, steps, expected, codePaths, automation, id — для правки)
+  --json '<кейс>'   для case: кейс JSON-объектом (title, steps, expected, codePaths, automation,
+                    tags, id — для правки); tags — метки: живую проверку ситам доказывает
+                    прошедший кейс с меткой live / stand / route / browser / e2e / db (какая
+                    нужна — в строке отказа сита)
   --note "<текст>"  для record: что именно проверено (ляжет заметкой на каждый кейс записи)
 `;
 
@@ -150,11 +211,35 @@ async function main() {
     return;
   }
 
-  const project = resolve(options.project ?? (await projectFromEnv()) ?? process.cwd());
+  const project = projectRoot(
+    resolve(options.project ?? (await projectFromEnv()) ?? process.cwd()),
+  );
   if (!existsSync(project)) throw new Error(`Каталог проекта не найден: ${project}`);
 
   if (command === 'list') return await listCases(project, options);
-  if (command === 'show') return await showCase(project, positional[0]);
+  if (command === 'show') return await showCase(project, positional[0], options);
+  if (command === 'run' && options.stale) {
+    if (options.case || options.base)
+      throw new Error('--stale сам выбирает кейсы: без --case и без --base.');
+    let keys = await staleKeys(project, options);
+    // Ворота уже прогнали эти тесты на этом же дереве (F2) — их отчёт, а не второй прогон.
+    if (keys.length > 0 && (await takeGateReports(REPO, project, keys)) > 0)
+      keys = await staleKeys(project, options);
+    if (keys.length === 0) {
+      console.log('Блок «Тесты»: прогонять нечего — пробелов, которые снимает прогон, нет.');
+      return;
+    }
+    console.log(`Кейсы из пробелов gaps (${keys.length}): ${keys.join(',')}`);
+    options.case = keys.join(',');
+  }
+  if (command === 'run' && options.base) {
+    const { runOnBase } = await import('./tests-cli-base.mjs');
+    return await runOnBase(project, {
+      repo: REPO,
+      self: fileURLToPath(import.meta.url),
+      argv: process.argv.slice(2),
+    });
+  }
   if (command === 'run') return await runTests(project, options);
   if (command === 'sync') return await syncFolder(project, options);
   if (command === 'import') return await importFile(project, options);
@@ -167,7 +252,25 @@ async function main() {
   if (command === 'record') return await recordResults(project, options, positional);
   if (command === 'gate') return await turnGate(project, options, positional);
   if (command === 'gaps') return await deliveryGaps(project, options);
+  if (command === 'delivery') {
+    const { deliveryCheck } = await import('./tests-cli-delivery.mjs');
+    return await deliveryCheck(project, options, {
+      repo: REPO,
+      cli: `node "${fileURLToPath(import.meta.url)}"`,
+      slugs: [BRAND_SLUG, LEGACY_BRAND_SLUG],
+    });
+  }
   if (command === 'suites') return await syncSuiteCases(project, options);
+  if (command === 'tree') return await printTree(REPO, project, options);
+  if (command === 'case-cmd')
+    return await caseCommand(
+      REPO,
+      project,
+      options,
+      positional[0] === undefined
+        ? undefined
+        : [...pickedCases(await groupsOf(project, {}), positional[0])],
+    );
   throw new Error(`Неизвестная команда «${command}». Список — node tools/tests-cli.mjs help`);
 }
 
@@ -215,7 +318,15 @@ function parseArgs(argv) {
     'memo',
     'fresh',
     'defer-runs',
+    'base',
+    'stale',
+    'tree',
+    'new-group',
+    'clear',
+    'history',
   ]);
+  // Опция с необязательным значением: `--health` без адреса — адрес, куда ходит раннер.
+  const OPTIONAL_VALUE = new Set(['health']);
   const options = {};
   const positional = [];
   let command;
@@ -228,6 +339,10 @@ function parseArgs(argv) {
         continue;
       }
       const next = argv[index + 1];
+      if (OPTIONAL_VALUE.has(name) && (next === undefined || next.startsWith('--'))) {
+        options[name] = true;
+        continue;
+      }
       // Следующий флаг на месте значения — не значение (Ф17): `--note --x`
       // раньше тихо терял заметку, и запись уходила без неё.
       if (next === undefined || next.startsWith('--')) {
@@ -344,6 +459,32 @@ async function listCases(project, options) {
 async function saveCase(project, options) {
   const group = typeof options.group === 'string' ? options.group : '';
   if (!group) throw new Error("Нужна группа: case --group <id> --json '<кейс>'");
+  // Опечатка в имени группы тихо заводила новую (g8 26.10: `--group delivery` рядом с `groups`):
+  // в проекте, где группы уже есть, новая заводится только явным --new-group.
+  const { listGroupIds } = await domain('group-files');
+  const known = listGroupIds(project);
+  if (known.length > 0 && !known.includes(group) && !options['new-group']) {
+    const wanted = group.toLowerCase();
+    const likeness = (id) => {
+      const name = id.toLowerCase();
+      if (name.includes(wanted) || wanted.includes(name)) return 100;
+      let shared = 0;
+      while (shared < name.length && name[shared] === wanted[shared]) shared += 1;
+      return shared;
+    };
+    const near = known
+      .map((id) => ({ id, score: likeness(id) }))
+      .filter((item) => item.score >= 3)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((item) => item.id);
+    const hint = near.length
+      ? `похожие: ${near.join(', ')}`
+      : `есть: ${known.slice(0, 12).join(', ')}${known.length > 12 ? ', …' : ''}`;
+    throw new Error(
+      `Группы «${group}» в проекте нет (${hint}). Кейс не записан. Новая группа — повторите с --new-group`,
+    );
+  }
   const raw =
     typeof options.json === 'string'
       ? options.json
@@ -419,18 +560,39 @@ async function turnGate(project, options, positional) {
   const touched = casesTouching(paths, groups).cases.map(
     (item) => `${item.groupId}:${item.caseId}`,
   );
-  const gaps = judgeTurn({
-    groups,
-    runs,
-    stamps: currentStamps(project, groups, runs, touched),
-    paths,
-    untracked: untrackedOf(project, paths),
-    since,
-    ...(typeof options['changed-at'] === 'string' ? { changedAt: options['changed-at'] } : {}),
-    ...(options['defer-runs'] ? { deferRuns: true } : {}),
-    cli: `node "${fileURLToPath(import.meta.url)}"`,
-    root: project,
-  });
+  const judge = (redExempt) =>
+    judgeTurn({
+      groups,
+      runs,
+      stamps: currentStamps(project, groups, runs, touched),
+      paths,
+      untracked: untrackedOf(project, paths),
+      since,
+      ...(typeof options['changed-at'] === 'string' ? { changedAt: options['changed-at'] } : {}),
+      ...(options['defer-runs'] ? { deferRuns: true } : {}),
+      ...(redExempt ? { redExempt } : {}),
+      cli: `node "${fileURLToPath(import.meta.url)}"`,
+      root: project,
+    });
+  let gaps = judge();
+  // Ход группы: красное, которое её доставка пишет заметкой (было до старта слово
+  // в слово или от окружения), ход не держит — тем же `redNotFromBranch` по диффу
+  // всей ветки (g3 25.10: набор с красным с основной дважды остановил конец хода).
+  // Дорогая сверка — только когда красное есть.
+  const groupStart = options['defer-runs'] ? groupStartOf(project) : undefined;
+  if (groupStart && gaps.some((gap) => gap.startsWith('Tests block: red this turn'))) {
+    const { testsDeliveryGaps } = await import(
+      pathToFileURL(
+        join(REPO, 'apps', 'server', 'src', 'domains', 'chat', 'tests-gate', 'tests-gate.ts'),
+      ).href
+    );
+    const verdict = await testsDeliveryGaps({
+      cwd: project,
+      startedAt: groupStart,
+      command: `node "${fileURLToPath(import.meta.url)}" run --project .`,
+    });
+    if (verdict.notedKeys?.length) gaps = judge(new Set(verdict.notedKeys));
+  }
   for (const gap of gaps) console.log(gap);
   if (gaps.length > 0) process.exitCode = 1;
 }
@@ -442,6 +604,25 @@ async function turnGate(project, options, positional) {
  * группе хода, перепроверки и нового напоминания (24.10.2026).
  */
 async function deliveryGaps(project, options) {
+  const { since, verdict } = await gapsVerdict(project, options);
+  if (!since)
+    console.log(
+      'Начало группы не найдено (дайте --since <ISO>): сверка берёт все прогоны, панель может назвать больше.',
+    );
+  if (verdict.unchecked) console.log(`Блок не сверен: ${verdict.unchecked}`);
+  for (const line of verdict.missing) console.log(`- ${line}`);
+  for (const line of verdict.notes ?? []) console.log(`заметка (в описание MR): ${line}`);
+  if (verdict.runKeys?.length)
+    console.log(
+      `Прогнать ровно эти кейсы (${verdict.runKeys.length}): node "${fileURLToPath(import.meta.url)}" run --project . --stale` +
+        (typeof options.since === 'string' ? ` --since ${options.since}` : ''),
+    );
+  if (verdict.missing.length > 0) process.exitCode = 1;
+  else console.log('Блок «Тесты»: пробелов перед сдачей нет.');
+}
+
+/** Вердикт `gaps` — один на `gaps` и `run --stale`: тот же `testsDeliveryGaps`, что у панели. */
+async function gapsVerdict(project, options) {
   const since = typeof options.since === 'string' ? options.since : groupStartOf(project);
   const { testsDeliveryGaps } = await import(
     pathToFileURL(
@@ -453,15 +634,15 @@ async function deliveryGaps(project, options) {
     ...(since ? { startedAt: since } : {}),
     command: `node "${fileURLToPath(import.meta.url)}" run --project .`,
   });
-  if (!since)
-    console.log(
-      'Начало группы не найдено (дайте --since <ISO>): сверка берёт все прогоны, панель может назвать больше.',
-    );
-  if (verdict.unchecked) console.log(`Блок не сверен: ${verdict.unchecked}`);
-  for (const line of verdict.missing) console.log(`- ${line}`);
-  for (const line of verdict.notes ?? []) console.log(`заметка (в описание MR): ${line}`);
-  if (verdict.missing.length > 0) process.exitCode = 1;
-  else console.log('Блок «Тесты»: пробелов перед сдачей нет.');
+  return { since, verdict };
+}
+
+/**
+ * `run --stale` (P2, g5 25.10): ровно те кейсы, чьи пробелы `gaps` снимает прогоном — нет
+ * прогона, устарел, не исполнен. Группа писала `node -e`, чтобы выбрать их из вывода.
+ */
+async function staleKeys(project, options) {
+  return (await gapsVerdict(project, options)).verdict.runKeys ?? [];
 }
 
 /** Начало группы разделения, чья копия — `project`: из состояния панели (каталог настроек CLI). */
@@ -562,15 +743,21 @@ async function recordResults(project, options, positional) {
   if (failed + blocked > 0) process.exitCode = 1;
 }
 
-async function showCase(project, caseId) {
-  if (!caseId) throw new Error('Нужен идентификатор кейса: show <caseId>');
+async function showCase(project, caseId, options = {}) {
+  if (!caseId) throw new Error('Нужен идентификатор кейса: show <группа>:<кейс> или show <кейс>');
   const { readGroups } = await domain('store');
   const { stepText } = await import(
     pathToFileURL(join(REPO, 'packages', 'contracts', 'src', 'test-format.ts')).href
   );
+  // `группа:кейс` — форма, которую печатают run, gaps и ворота и требует `run --case`;
+  // show знал только голый id, и скопированное из вывода «в проекте нет» (g0 25.10).
+  const split = caseId.indexOf(':');
+  const groupId = split > 0 ? caseId.slice(0, split) : undefined;
+  const id = split > 0 ? caseId.slice(split + 1) : caseId;
 
   for (const group of readGroups(project)) {
-    const item = group.cases.find((entry) => entry.id === caseId);
+    if (groupId && group.id !== groupId) continue;
+    const item = group.cases.find((entry) => entry.id === id);
     if (!item) continue;
     console.log(`${item.title}\n`);
     console.log(`Группа: ${group.id} (${group.file})`);
@@ -583,7 +770,17 @@ async function showCase(project, caseId) {
       console.log(
         `Автотест: ${item.automation.file}${item.automation.testName ? ` (${item.automation.testName})` : ''}`,
       );
+      // Своя команда копии (F3) — видна там же, где файл: иначе её помнит только блокнот группы.
+      const { readCaseCommands } = await domain('case-commands');
+      const own = readCaseCommands(project).commands[`${group.id}:${item.id}`];
+      if (own)
+        console.log(
+          `Своя команда копии: ${own.cmd}${own.format ? ` (--format ${own.format})` : ''} — tests-cli case-cmd`,
+        );
     }
+    // Метки решают, живая ли проверка для сит (`liveTags`): без них группа читала файл кейса скриптом.
+    if (item.tags?.length) console.log(`Метки: ${item.tags.join(', ')}`);
+    if (item.codePaths?.length) console.log(`Код: ${item.codePaths.join(', ')}`);
     if (item.steps.length > 0) {
       console.log('\nШаги:');
       item.steps.forEach((step, index) => console.log(`  ${index + 1}. ${stepText(step)}`));
@@ -591,9 +788,49 @@ async function showCase(project, caseId) {
     if (item.expected) console.log(`\nОжидание: ${item.expected}`);
     if (item.note) console.log(`Заметка последнего прогона: ${item.note}`);
     if (item.failure) console.log(`Провал: ${failureText(item.failure)}`);
+    if (options.history) await printCaseHistory(project, group.id, item.id);
     return;
   }
   throw new Error(`Кейса «${caseId}» в проекте нет.`);
+}
+
+const HISTORY_RUNS = 50;
+const HISTORY_ROWS = 15;
+
+/**
+ * История кейса по записанным прогонам — тот же расчёт, что карточка кейса в панели
+ * (`case-history`). Аудит g9 27.10 (R8): без неё группа разбирала `.agent/tests/runs/*.json`
+ * скриптом — сначала python3 (заглушка Store), потом `node -e`. Прогоны на развилке
+ * (`run --base`) история кейса не берёт — они отдельным списком: ими ворота доставки
+ * доказывают «красное не из-за ветки».
+ */
+async function printCaseHistory(project, groupId, caseId) {
+  const { readRuns, readBaseRuns } = await domain('runs-store');
+  const { caseHistory } = await domain('case-history');
+  const own = caseHistory(readRuns(project, HISTORY_RUNS), groupId, caseId);
+  const base = caseHistory(readBaseRuns(project), groupId, caseId);
+  const line = (entry) => {
+    const where = [entry.branch, entry.commit?.slice(0, 9)].filter(Boolean).join('@');
+    const why = entry.failure ? failureText(entry.failure, true) : entry.note;
+    return (
+      `  ${STATUS_MARK[entry.status] ?? '.'} ${entry.startedAt} прогон ${entry.runId.slice(0, 8)} ` +
+      `${entry.status}${where ? ` ${where}` : ''}${why ? ` — ${why}` : ''}`
+    );
+  };
+  const shown = own.entries.slice(0, HISTORY_ROWS);
+  console.log(
+    `\nИстория (новые сверху; из последних ${HISTORY_RUNS} прогонов кейс есть в ${own.entries.length}` +
+      `${own.entries.length > shown.length ? `, показаны ${shown.length}` : ''}):`,
+  );
+  if (shown.length === 0) console.log('  кейс не попадал ни в один прогон');
+  shown.forEach((entry) => console.log(line(entry)));
+  if (own.flaky.isFlaky) {
+    console.log(`  нестабилен: ${own.flaky.flips} смен исхода за ${own.flaky.runs} прогонов`);
+  }
+  if (base.entries.length > 0) {
+    console.log('\nПрогоны на развилке (run --base):');
+    base.entries.forEach((entry) => console.log(line(entry)));
+  }
 }
 
 /**
@@ -630,6 +867,21 @@ async function syncFolder(project, options) {
  * Метку ставит панель ребёнку разделения (`ChatRunner`, `BRIEF_OUTPUT_ENV`); имя
  * берётся из контрактов — литерал здесь разошёлся бы с панелью молча (ревью A2-F18).
  */
+/**
+ * Каталог проекта — ближайший вверх, где есть `.agent/tests`, но не выше корня git
+ * (копия в `.claude/worktrees` основной не берёт её кейсы). g0 26.10: после `cd inst-api`
+ * `delivery --project . --answer .agent/tmp/…` искал ответ в `inst-api/.agent/tmp` и упал.
+ * Нигде нет — каталог как сказан (новый проект `case` заводит в нём).
+ */
+function projectRoot(dir) {
+  for (let at = dir; ;) {
+    if (existsSync(join(at, '.agent', 'tests'))) return at;
+    const up = dirname(at);
+    if (existsSync(join(at, '.git')) || up === at) return dir;
+    at = up;
+  }
+}
+
 /**
  * Проект группы Claude без `--project` (X1): панель кладёт его в окружение прогона,
  * а строка о тестах в системном промпте группы идёт без путей — так копии одной
@@ -841,6 +1093,23 @@ async function runTests(project, options) {
     return;
   }
 
+  // Своя команда кейса у копии и окружение набора (F3, M2): разные — частями, каждая своим run.
+  const parts = await runParts(REPO, project, automated, options);
+  if (parts.length > 1)
+    process.exit(
+      runPartsApart(project, parts, {
+        argv: process.argv.slice(2),
+        self: fileURLToPath(import.meta.url),
+      }),
+    );
+  const [part] = parts;
+  if (part.cmd) {
+    options.cmd = part.cmd;
+    if (part.format && typeof options.format !== 'string') options.format = part.format;
+  }
+  const said = partSaid(part);
+  if (said) console.log(`Кейсы несут своё: ${said}`);
+
   const files = [...new Set(automated.map((entry) => entry.item.automation.file))];
   // Без --cmd тесты папки e2e идут той же командой, что у кнопки панели: из
   // каталога её конфига, раннером папки, с отчётом во временный файл. Запуск
@@ -851,8 +1120,21 @@ async function runTests(project, options) {
     ? commandPlan(options.cmd, files, project)
     : ((await e2ePlan(project, files)) ??
       (await vitestPlan(project, files)) ??
+      (await mixedPlan(project, files, !options.group && !picked)) ??
       (await automationPlan(project, files, !options.group && !picked)) ??
       commandPlan(projectTestCommand(project), files, project));
+  if (options.cmd && NATIVE_REPORTS.has(options.format) && !plan.ownReport)
+    throw new Error(
+      `--format ${options.format} у --cmd читает отчёт из {report}: добавьте его в команду ` +
+        `(\`go test -json ./... > {report}\`, \`cargo test > {report} 2>&1\`).`,
+    );
+  if (options.cmd) warnFailFast(project, options.cmd, automated);
+  // Окружение набора — под переменные самого плана: путь отчёта раннера рецептом не перебить.
+  if (Object.keys(part.env).length) {
+    plan.env = { ...part.env, ...plan.env };
+    plan.envKey = part.id;
+  }
+  await narrowToBranchRed(project, plan, automated);
 
   console.log(`Кейсов с автотестом: ${automated.length}, файлов: ${files.length}`);
   console.log(`Команда: ${plan.line}`);
@@ -866,6 +1148,17 @@ async function runTests(project, options) {
     throw error;
   }
   console.log(`Предел: ${cap.shown}`);
+  // Стенд — тот, куда ходит раннер (M3): чужой адрес — отказ до прогона и до записи.
+  let stand;
+  if (options.health) {
+    try {
+      stand = await healthUrls(REPO, plan, options.health, { ...process.env, ...plan.env });
+    } catch (error) {
+      dropTemp(plan.temp);
+      throw error;
+    }
+    console.log(`Стенд: ${stand.said}`);
+  }
   if (options.dry) {
     dropTemp(plan.temp);
     printSkipped(skipped);
@@ -893,6 +1186,18 @@ async function runTests(project, options) {
     project,
     stampInputs(groups, new Set(automated.map(({ group, item }) => `${group}:${item.id}`))),
   );
+  // Отпечаток всего дерева — тоже до прогона (T2, g5 25.10): зелёный автотест на этом
+  // дереве ворота засчитают и кейсу другой группы с тем же automation.
+  const tree = (await domain('check-memo')).treeFingerprint(project);
+  const down = [];
+  for (const url of stand?.urls ?? []) if (!(await standAnswers(url))) down.push(url);
+  if (down.length) {
+    await recordStandDown(project, { plan, automated, picked, options, stamps, down });
+    printSkipped(skipped);
+    dropTemp(plan.temp);
+    memo?.settle(undefined);
+    process.exit(STAND_DOWN_EXIT);
+  }
   const started = Date.now();
   const brief = !options.full && (Boolean(options.brief) || (await briefMarked()));
   const result = await runPlan(plan, brief, cap.ms);
@@ -932,6 +1237,15 @@ async function runTests(project, options) {
     dropTemp(plan.temp);
     memo?.settle(undefined);
     process.exit(TIMEOUT_EXIT);
+  }
+
+  // `--cmd … > {report}` с выводом go test -json / cargo test — сбор своей команды ниже.
+  const native = plan.ownReport && nativeFormatOf(plan.ownReport, options.format);
+  if (native) {
+    const { collectReport, reportTail } = await domain('automation');
+    plan.collect = (since) => collectReport(plan.ownReport, native, since);
+    plan.tail = () => reportTail(plan.ownReport);
+    plan.reportShown = plan.ownReport;
   }
 
   // Своя команда проекта: отчёт может быть каталогом (Gradle, Maven) или родным
@@ -974,14 +1288,34 @@ async function runTests(project, options) {
     console.log(
       `Отчёт ${file} старше этого прогона — команда его не написала. Статусы не тронуты, запись в историю не легла.`,
     );
+    if (process.env[BASE_COPY_ENV])
+      console.log(
+        'Команда шла в дереве развилки: файлов копии вне git (.agent/tmp, venv, .env) там нет — ' +
+          `путь к ним в --cmd пишется через {copy} (здесь ${process.env[BASE_COPY_ENV]}).`,
+      );
     printSkipped(skipped);
     dropTemp(plan.temp);
     process.exit(result.status || 1);
   }
 
-  const content = plan.temp ? readFileSync(path, 'utf8') : undefined;
+  let content = plan.temp ? readFileSync(path, 'utf8') : undefined;
+  // Сборка, упавшая на окружении (M2: missing go.sum entry без рецепта), — «заблокирован»
+  // с причиной, а не красное кейса: код ветки до тестов не дошёл.
+  let environment;
+  if (format === 'junit' && statSync(path).isFile()) {
+    const { blockEnvironmentFailures } = await domain('env-failure');
+    const verdict = blockEnvironmentFailures(
+      content ?? readFileSync(path, 'utf8'),
+      goSumTracked(project),
+    );
+    if (verdict.blocked.length) {
+      content = verdict.content;
+      environment = verdict;
+    }
+  }
   // Цепочка пакетов гасит код провала — красное из самого отчёта, и в историю тоже.
-  const status = plan.failed?.(content) ? 1 : result.status;
+  const failedByReport = plan.failed?.(content) ? 1 : result.status;
+  const status = environment && !environment.red ? ENVIRONMENT_EXIT : failedByReport;
   const { importResults } = await domain('import-results');
   const imported = importResults(project, {
     format,
@@ -993,16 +1327,110 @@ async function runTests(project, options) {
     // ключ набора двух пакетов на весь проект двусмыслен, и его результат терялся.
     ...(options.group || picked ? { groups: [...new Set(automated.map((e) => e.group))] } : {}),
     stamps,
+    ...(tree ? { tree } : {}),
   });
   printImport(
     imported,
     `Импортировано из ${plan.temp ? 'отчёта прогона' : file} (${format})`,
     format === 'junit' ? (content ?? readFileSync(path, 'utf8')) : undefined,
   );
-  memo?.settle(status === 0 && imported.read > 0 ? imported.runId : undefined);
+  if (environment)
+    console.log(
+      `\nПровал окружения, не кода (${environment.blocked.length}) — записан «заблокирован» с причиной: ` +
+        `${environment.blocked.slice(0, 8).join(', ')}${environment.blocked.length > 8 ? ' …' : ''}. ` +
+        'Рецепт окружения набора (GOFLAGS и т. п.) — поле "env" в .agent/tests/automation.json.',
+    );
+  // Кейс, которого отчёт не назвал, не проверен, а не зелёный: 25.10 группа
+  // просила два кейса, своя команда проекта потеряла путь одного, обновился один —
+  // и код 0 читался как «оба прошли».
+  const missing = await missingResults(project, imported.runId, automated);
+  if (missing.length) {
+    console.log(
+      `\nБез результата в этом прогоне (${missing.length}) — команда их не исполнила, кейс не проверен:`,
+    );
+    for (const line of missing) console.log(`    ✗ ${line}`);
+  }
+  const code = status === 0 && missing.length ? 1 : status;
+  memo?.settle(code === 0 && imported.read > 0 ? imported.runId : undefined);
   printSkipped(skipped);
   dropTemp(plan.temp);
-  process.exit(status ?? 0);
+  process.exit(code ?? 0);
+}
+
+/**
+ * Флаг «стоп на первом падении» в `--cmd` у кейса-каталога (g0 25.10, F-03): `pytest -x`
+ * встал на первом красном, набор каталога получил часть тестов, и записать его итогом
+ * всего каталога было нельзя — ход ушёл впустую. Предупреждение до прогона, не отказ.
+ */
+const FAIL_FAST =
+  /(?:^|\s)(-x|--exitfirst|--bail(?:=\S+)?|-{1,2}failfast|--maxfail(?:=|\s+)1)(?=\s|$)/;
+
+function warnFailFast(project, cmd, automated) {
+  const flag = cmd.match(FAIL_FAST)?.[1];
+  if (!flag) return;
+  const isDir = ({ item }) => {
+    const file = item.automation.file;
+    if (file.endsWith('/') || item.automation.suite) return true;
+    try {
+      return statSync(join(project, file)).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  const dirs = automated.filter(isDir).map(({ group, item }) => `${group}:${item.id}`);
+  if (dirs.length === 0) return;
+  console.log(
+    `Внимание: в --cmd флаг «${flag}» — раннер встанет на первом падении, и кейс-каталог ` +
+      `${dirs.slice(0, 5).join(', ')}${dirs.length > 5 ? ` (+${dirs.length - 5})` : ''} получит только ` +
+      'часть своих тестов: итогом всего каталога его не записать. Уберите флаг; «моё ли красное» — ' +
+      '`run --case … --base`, он гоняет на развилке только красные тесты ветки.',
+  );
+}
+
+/**
+ * Дочерний прогон `run --base` (F-03): строка сужается до красных тестов ветки, когда раннер
+ * умеет выбрать тест (`red-filter`); иначе кейсы идут целиком — с причиной в выводе.
+ */
+async function narrowToBranchRed(project, plan, automated) {
+  const { BASE_RED_ENV, narrowToRed } = await domain('red-filter');
+  const file = process.env[BASE_RED_ENV];
+  if (!file) return;
+  // Команде раннера переменная не нужна.
+  delete process.env[BASE_RED_ENV];
+  let reds = {};
+  try {
+    reds = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    // список не прочитан — кейсы идут целиком, как без него
+  }
+  const cases = automated.map(({ group, item }) => ({
+    key: `${group}:${item.id}`,
+    file: item.automation.file,
+    tests: reds[`${group}:${item.id}`],
+  }));
+  const narrowed = narrowToRed(plan.line, cases, (path) => existsSync(join(plan.cwd, path)));
+  if ('reason' in narrowed) {
+    console.log(`На развилке — кейсы целиком: ${narrowed.reason}.`);
+    return;
+  }
+  plan.line = narrowed.line;
+  console.log(
+    `На развилке — только красные тесты ветки (${narrowed.runner}): ${narrowed.tests}. ` +
+      'Подпись красного сверяется без общего счёта, суженный прогон даёт ту же.',
+  );
+}
+
+/** Запрошенные кейсы с автотестом, которых нет в результатах записанного прогона. */
+async function missingResults(project, runId, automated) {
+  const { readRun } = await domain('runs-store');
+  const record = runId ? readRun(project, runId) : undefined;
+  const seen = new Set((record?.results ?? []).map((entry) => `${entry.groupId}:${entry.caseId}`));
+  return automated
+    .filter(({ group, item }) => !seen.has(`${group}:${item.id}`))
+    .map(({ group, item }) => {
+      const { file, testName } = item.automation;
+      return `${group}:${item.id} — ${file}${testName ? ` › ${testName}` : ''}`;
+    });
 }
 
 /**
@@ -1259,6 +1687,51 @@ async function recordTimeout(
   );
 }
 
+/** Код выхода прогона, не начатого без стенда (`--health`), — EX_TEMPFAIL: повторить позже. */
+const STAND_DOWN_EXIT = 75;
+
+/** Стенд отвечает? Любой ответ ниже 500 (401 гейта тоже) — «жив», как у `qa/junit-run.mjs`. */
+async function standAnswers(url) {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    return response.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Стенд не ответил до прогона (T3, g5 25.10): e2e без стенда падали на сетапе («Error
+ * reading storage state from inst/.auth/user.json»), история ложилась красной 15/15, и
+ * доставка требовала прогона на развилке, который упал на своём окружении. Теперь кейсы
+ * ложатся «заблокирован» с причиной — ворота читают это как окружение, а не как дефект
+ * ветки, и прогона на развилке не требуют. `<skipped>` — чтобы чужой инструмент JUnit
+ * тоже не увидел провала.
+ */
+async function recordStandDown(project, { plan, automated, picked, options, stamps, down }) {
+  const reason = `Стенд ${down.join(', ')} не отвечает — прогон не запускался.`;
+  const cases = automated
+    .map(({ item }) => {
+      const name = `[${item.id}] ${String(item.title ?? '').replace(/@/g, '')}`;
+      return `<testcase classname="${xml(item.automation.file)}" name="${xml(name)}" status="blocked"><skipped message="${xml(reason)}"/></testcase>`;
+    })
+    .join('');
+  const { importResults } = await domain('import-results');
+  const imported = importResults(project, {
+    format: 'junit',
+    content:
+      `<?xml version="1.0" encoding="UTF-8"?><testsuites><testsuite name="tests-cli run: stand down" ` +
+      `tests="${automated.length}" skipped="${automated.length}">${cases}</testsuite></testsuites>`,
+    origin: plan.origin,
+    scope: `tests-cli run (стенд ${down.join(', ')} не ответил): ${plan.line}`,
+    exitCode: STAND_DOWN_EXIT,
+    ...(options.group || picked ? { groups: [...new Set(automated.map((e) => e.group))] } : {}),
+    stamps,
+  });
+  console.log(reason);
+  printImport(imported, `Кейсы записаны «заблокирован»: стенд не ответил, прогон не запускался`);
+}
+
 /**
  * Память проверок (9.3): зелёный итог команды на том же дереве отдаётся без
  * прогона. Только группе панели (её метка `AGENTDECK_BRIEF_OUTPUT`) или по
@@ -1280,7 +1753,8 @@ async function checkMemoOf(project, options, plan, files) {
     ? plan.line.replaceAll(plan.temp, '{temp}').replaceAll(plan.temp.replace(/\\/g, '/'), '{temp}')
     : plan.line;
   const key = createHash('sha256')
-    .update(`${stable}\0${plan.cwd}\0${[...files].sort().join('\0')}`)
+    // Окружение набора меняет итог при той же строке — оно в ключе.
+    .update(`${stable}\0${plan.cwd}\0${[...files].sort().join('\0')}\0${plan.envKey ?? ''}`)
     .digest('hex');
   return {
     hit: recall(project, key, fingerprint),
@@ -1304,9 +1778,18 @@ async function checkMemoOf(project, options, plan, files) {
  */
 function commandPlan(command, files, project) {
   const list = files.join(' ');
-  const line = /\{files\}|\{paths\}/.test(command)
-    ? command.replaceAll('{files}', list).replaceAll('{paths}', list)
-    : `${command} ${list}`;
+  // `{copy}` — корень копии; на развилке — исходной, где лежат её файлы вне git (venv).
+  const copy = process.env[BASE_COPY_ENV] || project;
+  let own = command.replaceAll('{copy}', copy);
+  if (copy !== project) {
+    const fork = expandCopyPaths(own, copy, project);
+    if (fork.expanded.length)
+      console.log(`Пути копии вне git — из копии, на развилке их нет: ${fork.expanded.join(', ')}`);
+    own = fork.line;
+  }
+  const line = /\{files\}|\{paths\}/.test(own)
+    ? own.replaceAll('{files}', list).replaceAll('{paths}', list)
+    : `${own} ${list}`;
   if (!line.includes('{report}')) return { line, cwd: project, env: {}, origin: 'ci' };
   const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
   const report = join(temp, 'junit.xml');
@@ -1315,9 +1798,34 @@ function commandPlan(command, files, project) {
     cwd: project,
     env: { AGENTDECK_JUNIT_REPORT: report },
     results: ['junit', report],
+    ownReport: report,
     temp,
     origin: 'ci',
   };
+}
+
+/** Родной вывод, который сбор automation.json сводит в JUnit. */
+const NATIVE_REPORTS = new Set(['go-test-json', 'cargo-test']);
+
+/**
+ * Вид отчёта, который `--cmd` оставил в `{report}`: `--format` назван — он, иначе по
+ * содержимому. Строка JSON с `"Action"` — `go test -json`, строки `test … ... ok` /
+ * `test result:` — `cargo test`; XML и прочее — JUnit, как раньше. Без этого вывод
+ * go -json читался JUnit-ом как ноль тестов, и группа писала свой переводчик (25.10.2026).
+ */
+function nativeFormatOf(report, explicit) {
+  if (explicit && explicit !== true) return NATIVE_REPORTS.has(explicit) ? explicit : undefined;
+  let head;
+  try {
+    // trimStart снимает и BOM.
+    head = readFileSync(report, 'utf8').trimStart();
+  } catch {
+    return undefined;
+  }
+  if (head.startsWith('<')) return undefined;
+  if (/^\{.*"Action"\s*:/m.test(head)) return 'go-test-json';
+  if (/^test (?:.+? \.\.\. (?:ok|FAILED|ignored)|result: )/m.test(head)) return 'cargo-test';
+  return undefined;
 }
 
 /**
@@ -1341,7 +1849,9 @@ async function e2ePlan(project, files) {
   if (command.bin && !installedBin(command.cwd, command.bin)) {
     dropTemp(temp);
     throw new Error(
-      `Раннер автотестов не установлен, а сам он не ставится. Выполните в ${runDirOf(project, command)}: ${command.install}`,
+      process.env[BASE_COPY_ENV]
+        ? `Раннер автотестов не найден в дереве развилки ${command.cwd} (run --base, не копия): ${forkDepsTip()}`
+        : `Раннер автотестов не установлен, а сам он не ставится. Выполните в ${runDirOf(project, command)}: ${command.install}`,
     );
   }
   return {
@@ -1351,6 +1861,17 @@ async function e2ePlan(project, files) {
     results: ['junit', report],
     temp,
     origin: 'e2e',
+    // Адрес стенда для `--health` — из конфига Playwright каталога запуска (M3).
+    ...(folder.framework === 'playwright'
+      ? {
+          playwright: [
+            {
+              cwd: command.cwd,
+              files: files.map((file) => relative(command.cwd, join(project, file))),
+            },
+          ],
+        }
+      : {}),
     // Папка e2e идёт по стенду: его состояние в отпечаток дерева не входит (9.3).
     stand: true,
   };
@@ -1407,17 +1928,141 @@ const VITEST_FILE = /\.test\.[cm]?[jt]sx?$/;
  * знают путь от корня проекта — отчёт переписывается к нему.
  */
 async function vitestPlan(project, files) {
-  // Кейс-набор (`file` — каталог) тоже: внутри JS-пакета, не в корне проекта.
-  const vitestCase = (file) =>
-    VITEST_FILE.test(file) || (file.endsWith('/') && packageRootOf(project, `${file}x`) !== '');
-  if (!files.every(vitestCase)) return undefined;
+  if (!files.every((file) => vitestCaseFile(project, file))) return undefined;
   const { readAutomation } = await domain('automation');
   const { automation } = readAutomation(project);
-  const native = automation?.format && automation.format !== 'junit';
-  if (automation && !native) return undefined;
+  if (automation && !nativeAutomation(automation)) return undefined;
   if (!automation && rootTestScript(project)) return undefined;
+  return await vitestRuns(project, files);
+}
+
+/**
+ * Файл кейса JS-пакета: набор vitest, спек пакета со своим Playwright; кейс-набор
+ * (`file` — каталог) тоже — внутри JS-пакета, не в корне проекта. Раннер выбирает
+ * `packageRunner`.
+ */
+function vitestCaseFile(project, file) {
+  if (VITEST_FILE.test(file)) return true;
+  if (SPEC_FILE.test(file)) return playwrightPackage(join(project, packageRootOf(project, file)));
+  return file.endsWith('/') && packageRootOf(project, `${file}x`) !== '';
+}
+
+/** Спек Playwright по имени: `*.spec.*` у пакета со своим Playwright идёт его раннером. */
+const SPEC_FILE = /\.spec\.[cm]?[jt]sx?$/;
+const PLAYWRIGHT_CONFIG = /^playwright\.config\.[cm]?[jt]s$/;
+const PACKAGE_DEPS = ['dependencies', 'devDependencies', 'optionalDependencies'];
+
+/**
+ * Пакет Playwright: свой `playwright.config.*` у корня пакета или Playwright в
+ * зависимостях без vitest. Спеки такого пакета vitest не прогонит — «vitest не
+ * установлен в QA/auto/frontend», и группа собирала команду Playwright руками
+ * четырьмя `--cmd` (g5, 25.10.2026).
+ */
+function playwrightPackage(cwd) {
+  try {
+    if (readdirSync(cwd).some((name) => PLAYWRIGHT_CONFIG.test(name))) return true;
+  } catch {
+    return false;
+  }
+  const deps = packageDeps(cwd);
+  return (deps.has('@playwright/test') || deps.has('playwright')) && !deps.has('vitest');
+}
+
+function packageDeps(cwd) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
+    return new Set(PACKAGE_DEPS.flatMap((key) => Object.keys(manifest?.[key] ?? {})));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Раннер файла кейса в его пакете: `*.test.*` — vitest, если он есть у пакета; спеки
+ * и каталоги пакета Playwright — Playwright; остальное — vitest, как было.
+ */
+function packageRunner(cwd, file) {
+  if (VITEST_FILE.test(file) && vitestEntry(cwd)) return 'vitest';
+  return playwrightPackage(cwd) ? 'playwright' : 'vitest';
+}
+
+/** Своя команда проекта пишет родной отчёт Go или Cargo — файлы vitest ей не по зубам. */
+function nativeAutomation(automation) {
+  return Boolean(automation?.format) && automation.format !== 'junit';
+}
+
+/**
+ * Смешанный набор: кейсы vitest и кейсы своей команды Go/Cargo одним `run --case`.
+ * Своя команда брала весь набор, `{go-modules}` файлов `*.test.ts` не исполнял, и кейсы
+ * vitest уходили «без результата», а группа гоняла их второй раз (25.10.2026). Теперь
+ * файлы vitest идут своим vitest пакета, остальные — своей командой, одной цепочкой и
+ * одной записью истории со всеми итогами. Звено — в скобках с `|| echo -`, как у
+ * `{go-modules}`: провал одного не обрывает другое, красное — по отчёту.
+ */
+async function mixedPlan(project, files, whole) {
+  const js = files.filter((file) => vitestCaseFile(project, file));
+  if (js.length === 0 || js.length === files.length) return undefined;
+  const { readAutomation } = await domain('automation');
+  const { automation } = readAutomation(project);
+  if (!nativeAutomation(automation)) return undefined;
+  const own = await automationPlan(
+    project,
+    files.filter((file) => !js.includes(file)),
+    whole,
+  );
+  let web;
+  try {
+    web = await vitestRuns(project, js, own.temp);
+  } catch (error) {
+    dropTemp(own.temp);
+    throw error;
+  }
+  // Скобки cmd — не подоболочка: `cd` звена vitest остаётся, своя команда входит в корень сама.
+  const links = [...web.links, `${enterDir(own.cwd)}${own.line}`];
+  let missing = false;
+  return {
+    ...own,
+    line: links.map((link) => `(${link} || echo -)`).join(' && '),
+    playwright: web.playwright,
+    env: { ...web.env, ...own.env },
+    progress: true,
+    reportShown: `${web.reportShown}, ${own.reportShown}`,
+    failed: (content) => missing || /<(failure|error)\b/.test(content),
+    collect: (started, { quiet = false } = {}) => {
+      const fromWeb = web.collect(started, { quiet });
+      const fromOwn = own.collect(started);
+      if (!fromOwn && !quiet)
+        console.log(
+          `Отчёт ${own.reportShown} своей команды этим прогоном не записан — её кейсы не тронуты.`,
+        );
+      missing = web.missed() || !fromOwn;
+      const bodies = [fromWeb, fromOwn].filter(Boolean).map((part) =>
+        part.content
+          .replace(/<\?xml[^>]*\?>/g, '')
+          .replace(/<\/?testsuites\b[^>]*>/g, '')
+          .trim(),
+      );
+      if (bodies.length === 0) return undefined;
+      return {
+        content: `<testsuites>\n${bodies.join('\n')}\n</testsuites>\n`,
+        files: (fromWeb?.files ?? 0) + (fromOwn?.files ?? 0),
+      };
+    },
+  };
+}
+
+/** Вход в каталог звена цепочки: `cd /d` у cmd (иначе диск не сменится), `cd` у sh. */
+function enterDir(dir) {
+  return `${process.platform === 'win32' ? 'cd /d' : 'cd'} ${shellQuote(dir)} && `;
+}
+
+/**
+ * Прогон файлов vitest по их пакетам. `temp` — каталог отчётов чужого плана (смешанный
+ * набор), иначе свой. `links` — звенья цепочки без скобок: смешанный набор дописывает своё.
+ */
+async function vitestRuns(project, files, sharedTemp) {
   // Пути файлов пишет и агент (`automation.file`): та же защита от подстановок оболочки, что у `{files}`.
-  const { shellArg } = await domain('e2e-command');
+  const { shellArg, playwrightFileArg } = await domain('e2e-command');
   const { jsSuiteRunPaths } = await domain('suites');
   // Кейс-набор — файлами, которыми он владеет: каталог корня пакета дал бы весь пакет.
   const owned = files.flatMap((file) =>
@@ -1426,29 +2071,45 @@ async function vitestPlan(project, files) {
       : [file],
   );
 
-  const byPackage = new Map();
+  // Пакет и раннер: у пакета с vitest и Playwright `*.test.*` идут в vitest, спеки — в Playwright.
+  const byRun = new Map();
   for (const file of owned) {
     const dir = packageRootOf(project, file);
-    byPackage.set(dir, [...(byPackage.get(dir) ?? []), dir ? file.slice(dir.length + 1) : file]);
+    const runner = packageRunner(upperDrive(join(project, dir)), file);
+    const key = `${dir}\n${runner}`;
+    const run = byRun.get(key) ?? { dir, runner, files: [] };
+    run.files.push(file);
+    byRun.set(key, run);
   }
-  const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
-  const runs = [...byPackage].sort(([a], [b]) => a.localeCompare(b));
-  const parts = runs.map(([dir, inside], index) => {
+  const temp = sharedTemp ?? mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
+  const runs = [...byRun.values()]
+    .sort((a, b) => a.dir.localeCompare(b.dir) || a.runner.localeCompare(b.runner))
+    .map((run, index) => ({ ...run, report: join(temp, `${run.runner}-${index}.xml`) }));
+  const parts = runs.map(({ dir, runner, files: own, report }) => {
     const cwd = upperDrive(join(project, dir));
-    const bin = vitestEntry(cwd);
+    const bin = runner === 'playwright' ? playwrightEntry(cwd) : vitestEntry(cwd);
     if (!bin) {
-      dropTemp(temp);
+      if (!sharedTemp) dropTemp(temp);
+      const name = runner === 'playwright' ? 'Playwright' : 'vitest';
+      // На развилке `npm install` в копии ничего не меняет (M3, g5 27.10: группа поставила
+      // зависимости копии, «up to date», и снова упала) — назван каталог дерева развилки.
+      if (process.env[BASE_COPY_ENV])
+        throw new Error(
+          `${name} не найден в дереве развилки ${cwd} (run --base, не копия): ${forkDepsTip()}`,
+        );
       throw new Error(
-        `vitest не установлен в ${dir || '.'}, а сам он не ставится. Установите зависимости пакета и повторите.`,
+        runner === 'playwright'
+          ? `Playwright не установлен в ${dir || '.'} (пакет со своим playwright.config), а сам он не ставится. Выполните там npm install и повторите.`
+          : `vitest не установлен в ${dir || '.'}, а сам он не ставится. Установите зависимости пакета и повторите.`,
       );
     }
-    const report = join(temp, `vitest-${index}.xml`);
+    if (runner === 'playwright') return playwrightLink(cwd, bin, own, report, playwrightFileArg);
+    const inside = own.map((file) => (dir ? file.slice(dir.length + 1) : file));
     // Из каталога пакета, а не корня проекта: `--root` не меняет process.cwd, а Babel
     // (react-compiler в vite-плагине) ищет свои плагины от cwd — из корня монорепо без
     // node_modules каждый набор падал на трансформе, «no tests» (widget-app, 20.10.2026).
-    const enter = `${process.platform === 'win32' ? 'cd /d' : 'cd'} ${shellQuote(cwd)} && `;
     return (
-      `${enter}${shellQuote(process.execPath)} ${shellQuote(bin)} run --root ${shellQuote(cwd)} ` +
+      `${enterDir(cwd)}${shellQuote(process.execPath)} ${shellQuote(bin)} run --root ${shellQuote(cwd)} ` +
       `--reporter=default --reporter=junit --reporter=${shellQuote(PROGRESS_REPORTER)} ` +
       `--outputFile.junit=${shellQuote(report)} ${inside.filter(Boolean).map(shellArg).join(' ')}`
     );
@@ -1458,13 +2119,22 @@ async function vitestPlan(project, files) {
   return {
     // Звено в скобках, как у `{go-modules}`: без них cmd пропускал всё после зелёного звена.
     line: chained ? parts.map((part) => `(${part} || echo -)`).join(' && ') : parts[0],
+    links: parts,
+    // Пакеты Playwright и их файлы от корня пакета — адрес стенда для `--health` (M3).
+    playwright: runs
+      .filter(({ runner }) => runner === 'playwright')
+      .map(({ dir, files: own }) => ({
+        cwd: upperDrive(join(project, dir)),
+        files: own.map((file) => (dir ? file.slice(dir.length + 1) : file)),
+      })),
+    missed: () => missing,
     cwd: project,
     env: {},
     temp,
     origin: 'ci',
     // Метки `vitest-progress-reporter` в выводе: `runPlan` по ним видит, кто держит прогон.
     progress: true,
-    reportShown: `${temp}/vitest-*.xml`,
+    reportShown: [...new Set(runs.map((run) => `${temp}/${run.runner}-*.xml`))].join(', '),
     // Цепочка гасит код провала (`|| echo -`): красное — из самого отчёта, и пакет
     // без отчёта (упал до тестов) тоже красный.
     failed: (content) => chained && (missing || /<(failure|error)\b/.test(content)),
@@ -1472,17 +2142,18 @@ async function vitestPlan(project, files) {
     // проваленными, «не тронуты» там было бы неправдой.
     collect: (started, { quiet = false } = {}) => {
       const bodies = [];
-      for (const [index, [dir]] of runs.entries()) {
-        const path = join(temp, `vitest-${index}.xml`);
-        if (!freshSince(path, started)) {
+      for (const { dir, runner, report } of runs) {
+        if (!freshSince(report, started)) {
           if (!quiet)
-            console.log(`Пакет ${dir || '.'}: vitest отчёта не записал — его кейсы не тронуты.`);
+            console.log(`Пакет ${dir || '.'}: ${runner} отчёта не записал — его кейсы не тронуты.`);
           missing = true;
           continue;
         }
-        const xml = readFileSync(path, 'utf8')
+        let xml = readFileSync(report, 'utf8')
           .replace(/<\?xml[^>]*\?>/g, '')
           .replace(/<\/?testsuites\b[^>]*>/g, '');
+        // Playwright пишет имя набора и classname путём от своего конфига через `path.sep`.
+        if (runner === 'playwright') xml = posixSuitePaths(xml);
         bodies.push(dir ? rootRelativeSuites(xml, dir) : xml.trim());
       }
       if (bodies.length === 0) return undefined;
@@ -1501,6 +2172,19 @@ async function vitestPlan(project, files) {
  * «Vitest failed to find the runner», «no tests» (widget-app, 22.10.2026). Держит тест
  * «путь проекта со строчной буквой диска» в tests-cli.integration.test.ts.
  */
+/**
+ * Подсказка ошибки зависимостей на развилке `--base`: дерево — `git worktree` базовой ветки,
+ * `npm install` в копии его не трогает; связаны только node_modules пакетов с тем же
+ * package.json и lock-файлом, что у копии (список — в строке «node_modules копии» выше).
+ */
+function forkDepsTip() {
+  return (
+    'npm install в копии не поможет — дерево развилки своё. node_modules копии связываются ' +
+    'только у пакетов с тем же package.json и lock-файлом (строка «node_modules копии» выше); ' +
+    'у этого пакета они разошлись с базой — его кейсы идут без --base.'
+  );
+}
+
 function upperDrive(path) {
   return process.platform === 'win32'
     ? path.replace(/^[a-z]:/, (drive) => drive.toUpperCase())
@@ -1534,6 +2218,58 @@ function vitestEntry(cwd) {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Входной файл Playwright пакета (`@playwright/test` или `playwright`) — тот же довод,
+ * что у `vitestEntry`: `.bin/playwright.cmd` без `call` не вернулся бы в цепочку.
+ */
+function playwrightEntry(cwd) {
+  for (const name of ['@playwright/test', 'playwright']) {
+    try {
+      const manifest = createRequire(join(cwd, 'package.json')).resolve(`${name}/package.json`);
+      const bin = JSON.parse(readFileSync(manifest, 'utf8')).bin;
+      const entry = typeof bin === 'string' ? bin : bin?.playwright;
+      if (entry) return join(dirname(manifest), entry);
+    } catch {
+      // нет этого пакета — следующий
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Звено Playwright: из каталога пакета (там его конфиг, от него пути отчёта), файлы и
+ * каталоги — регулярками по пути от корня проекта (`playwrightFileArg`). JUnit — в
+ * свой файл звена переменными отчёта; INCLUDE_RETRIES — как у папки e2e, ради карантина.
+ */
+function playwrightLink(cwd, bin, files, report, fileArg) {
+  const env = {
+    PLAYWRIGHT_JUNIT_OUTPUT_FILE: report,
+    PLAYWRIGHT_JUNIT_OUTPUT_NAME: report,
+    PLAYWRIGHT_JUNIT_INCLUDE_RETRIES: '1',
+  };
+  return (
+    `${enterDir(cwd)}${envSet(env)}${shellQuote(process.execPath)} ${shellQuote(bin)} test ` +
+    `${files.map((file) => fileArg(file)).join(' ')} --reporter=list,junit`
+  );
+}
+
+/** Переменные одного звена цепочки: `set "K=V" &&` у cmd, `K='V' ` перед командой у sh. */
+function envSet(vars) {
+  return Object.entries(vars)
+    .map(([key, value]) =>
+      process.platform === 'win32' ? `set "${key}=${value}" && ` : `${key}=${shellQuote(value)} `,
+    )
+    .join('');
+}
+
+/** Имя набора и classname — через `/`: Playwright на Windows пишет их через `\`. */
+function posixSuitePaths(xml) {
+  return xml.replace(
+    /(<testsuite\b[^>]*?\bname="|\bclassname=")([^"]*)"/g,
+    (_all, head, name) => `${head}${name.replace(/\\/g, '/')}"`,
+  );
 }
 
 /** Каталог ближайшего к файлу package.json от корня проекта (`''` — сам корень). */
@@ -1643,8 +2379,12 @@ async function importFile(project, options) {
     // --group — кейсы только этой группы: ключ набора пакета двусмыслен на весь монорепозиторий.
     if (options.group && options.group !== true) await groupsOf(project, options);
     const groups = options.group && options.group !== true ? { groups: [options.group] } : {};
+    // --tree: отчёт снят на ЭТОМ дереве (gate-run передаёт, когда гейт дерево не менял) —
+    // зелёный засчитают и кейсу другой группы с тем же автотестом (`sameTreeGreens`).
+    // Отпечаток берётся сейчас: тот же `treeFingerprint`, что пишет `run`.
+    const tree = options.tree ? (await domain('check-memo')).treeFingerprint(project) : undefined;
     return printImport(
-      importResults(project, { format, file: inside, ...groups }),
+      importResults(project, { format, file: inside, ...groups, ...(tree ? { tree } : {}) }),
       'Результаты приняты',
     );
   }

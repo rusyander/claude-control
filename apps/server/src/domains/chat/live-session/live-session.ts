@@ -1,5 +1,6 @@
 import { rmSync, writeFileSync } from 'node:fs';
 import type { RawEvent } from '../chat-events.ts';
+import { ControlRequests, type ControlReply } from './control-requests.ts';
 import {
   connectRelay,
   relayOpener,
@@ -107,6 +108,8 @@ export class LiveSession {
       }
     | undefined;
   private holdTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Управляющие запросы панели к CLI (остановка субагента) и ответы на них. */
+  private readonly control = new ControlRequests();
   private tasks: BackgroundTask[] = [];
   private waking: RawEvent[] | undefined;
   private closed = false;
@@ -366,7 +369,26 @@ export class LiveSession {
       // Не JSON — предупреждение CLI, шум.
       return;
     }
+    if (this.control.settle(raw as { type?: unknown; response?: unknown })) return;
     this.route(raw);
+  }
+
+  /**
+   * Остановить субагента или фоновую задачу процесса: `stop_task` в stdin, как
+   * у расширения VS Code. `task_id` — id субагента (`agent-<id>.jsonl`). Процесс
+   * закрыт — `unconfirmed` без записи.
+   */
+  stopTask(taskId: string): Promise<ControlReply> {
+    if (this.closed) return Promise.resolve({ outcome: 'unconfirmed' });
+    return this.control.send((line) => this.transport.write(line), {
+      subtype: 'stop_task',
+      task_id: taskId,
+    });
+  }
+
+  /** Процесс жив и слушает stdin — управляющий запрос дойдёт. */
+  get controllable(): boolean {
+    return !this.closed;
   }
 
   private onSynced(info: RelaySynced): void {
@@ -488,6 +510,7 @@ export class LiveSession {
     this.exitCode = code;
     this.waking = undefined;
     this.clearHoldDrain();
+    this.control.failAll();
     for (const waiter of this.syncedWaiters.splice(0)) waiter();
     for (const waiter of this.closedWaiters.splice(0)) waiter();
     const sink = this.sink;

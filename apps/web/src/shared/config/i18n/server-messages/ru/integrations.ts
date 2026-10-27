@@ -88,4 +88,5 @@ export const integrationsRu: Record<IntegrationsMessageCode, string> = {
     'Не найден скрипт переходника tools/mcp/atlassian.mjs — панель запущена не из своего репозитория.',
   'tms-run-cases-not-found':
     '{{system}}: ни один кейс прогона не найден в этом проекте — {{because}}',
+  'telegram-connect-no-candidate': 'Подтверждать некого: окно закрыто или /start ещё не пришёл.',
 };

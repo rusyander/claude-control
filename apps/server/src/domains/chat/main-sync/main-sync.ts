@@ -19,6 +19,8 @@ import {
   type GitRunner,
 } from './conflicts.ts';
 import { syncUnderway } from './sync-underway.ts';
+import { fileURLToPath } from 'node:url';
+import { readRuns } from '../../project-tests/runs-store/runs-store.ts';
 
 /**
  * Оболочки, чей сценарий текстом (`bash -c '…'`) разбор догона читает
@@ -812,13 +814,68 @@ const HISTORY_SUBS =
  * (`git show origin/main:a > a`, `checkout origin/main -- a`, заплатка) — нет.
  */
 export function movesHistory(command: string): boolean {
-  const moves = segments(command).some((segment) => {
+  return segments(command).some(segmentMoves) || wrappedScripts(command).some(movesHistory);
+}
+
+function segmentMoves(segment: string): boolean {
+  const call = gitCall(segment);
+  if (!call) return false;
+  if (HISTORY_SUBS.test(call.sub)) return true;
+  return call.sub === 'checkout' && call.args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a));
+}
+
+/** Переход в другой каталог: git после него работает не в копии. */
+const CHANGES_DIR = /^[({]*(cd|pushd|chdir|set-location|push-location|sl)$/i;
+/** Git не в копии: `-C`, `--git-dir`, `--work-tree`, `GIT_DIR=` перед вызовом. */
+const OTHER_REPO = /(^|\s)(-C|--git-dir(=|\s)|--work-tree(=|\s))|\bGIT_(DIR|WORK_TREE)=/;
+
+/**
+ * Целевые ссылки, что называет выгрузка, исполняемая в самой копии и ссылок не
+ * двигающая; `undefined` — не такая: обёртка оболочки, перенос истории или
+ * `git fetch` (свежая `origin/main` после сверки), git после `cd` или с `-C`.
+ * `worktree add` — дерево рядом, своей ветки не трогает: выгрузка, не перенос.
+ */
+function exportedTargets(command: string, target: string): string[] | undefined {
+  if (wrappedScripts(command).length > 0) return undefined;
+  const refs = new Set([target]);
+  let elsewhere = false;
+  for (const segment of segments(command)) {
+    const list = words(segment);
+    if (CHANGES_DIR.test(list.find((w) => !/^\w+=/.test(w)) ?? '')) elsewhere = true;
     const call = gitCall(segment);
-    if (!call) return false;
-    if (HISTORY_SUBS.test(call.sub)) return true;
-    return call.sub === 'checkout' && call.args.some((a) => /^(-b|-B|--orphan|--detach)$/.test(a));
-  });
-  return moves || wrappedScripts(command).some(movesHistory);
+    if (!call) continue;
+    const named = call.args
+      .flatMap((a) => a.replace(/^-{1,2}[\w-]+=/, '').split(/\.{2,3}/))
+      .map((w) => w.replace(/:.*$/, ''))
+      .filter(isTargetRef);
+    const tree = call.sub === 'worktree' && positionals('worktree', call.args)[0] === 'add';
+    if (segmentMoves(segment) && !tree) return undefined;
+    if (named.length > 0 && (elsewhere || OTHER_REPO.test(segment))) return undefined;
+    for (const ref of named) refs.add(ref);
+  }
+  return [...refs];
+}
+
+/**
+ * Выгрузка того, что HEAD уже содержит, — не догон: принести ветке нечего
+ * (g0 25.10, #g0:111: после своего перебазирования `git worktree add --detach w
+ * origin/main` — чистый main рядом, чтобы прогнать на нём красные тесты, — получал
+ * `MAIN_SYNC_DENIED`). Каждая целевая ссылка команды обязана быть предком HEAD;
+ * перенос истории, `fetch`, `cd`/`-C` в другой репозиторий — догон по-прежнему.
+ */
+export async function exportsHeldContent(
+  cwd: string,
+  command: string,
+  target: string,
+  run: GitRunner = runGit,
+): Promise<boolean> {
+  const refs = exportedTargets(command, target);
+  if (!refs) return false;
+  for (const ref of refs) {
+    const held = await run(cwd, ['merge-base', '--is-ancestor', ref, 'HEAD'], 20_000);
+    if (held.code !== 0) return false;
+  }
+  return true;
 }
 
 /**
@@ -850,6 +907,78 @@ export const MAIN_SYNC_DENIED =
   'same sync; to read it, pipe it (`| head`, `| grep`, `| diff - <file>`). ' +
   'Finish the current step on the current base, push as is, ' +
   'and finish the task (no pipeline waiting). Only a real conflict with the target branch is fixed at once.';
+
+/**
+ * Звено строит дерево или выгрузку целевой ветки: `worktree add … origin/main`,
+ * `checkout`/`switch` на неё, `archive` её. Так группа отвечает себе «моё ли это
+ * красное или main» (g0 25.10, F-09) — а на этот вопрос есть свой путь, `run --base`.
+ */
+export function buildsTargetTree(command: string): boolean {
+  for (const segment of segments(command)) {
+    const call = gitCall(segment);
+    if (!call) continue;
+    const pos = positionals(call.sub, call.args);
+    const refs =
+      call.sub === 'worktree'
+        ? pos[0] === 'add'
+          ? pos.slice(1)
+          : []
+        : ['checkout', 'switch', 'archive'].includes(call.sub)
+          ? pos
+          : [];
+    if (refs.some((ref) => isTargetRef(ref.replace(/:.*$/, '')))) return true;
+  }
+  return false;
+}
+
+/** CLI блока «Тесты» панели (этот файл — шесть уровней ниже корня репозитория). */
+const TESTS_CLI = fileURLToPath(new URL('../../../../../../tools/tests-cli.mjs', import.meta.url));
+/** Длиннее — список кейсов не называется, вместо него — образец. */
+const CASES_SHOWN = 12;
+
+/**
+ * Красные кейсы копии по последнему записанному результату каждого (прогоны новые
+ * первыми, идущий не в счёт); нет записей или красных — пусто.
+ */
+export function copyRedCases(cwd: string): string[] {
+  const seen = new Set<string>();
+  const red: string[] = [];
+  let runs: ReturnType<typeof readRuns>;
+  try {
+    runs = readRuns(cwd, 50);
+  } catch {
+    return [];
+  }
+  for (const run of runs) {
+    if (run.status === 'running') continue;
+    for (const result of run.results) {
+      const key = `${result.groupId}:${result.caseId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (result.status === 'failed' || result.status === 'blocked') red.push(key);
+    }
+  }
+  return red;
+}
+
+/**
+ * Отказ догону без конфликта. Команда строит дерево целевой (F-09: `git worktree add
+ * … origin/main; go test …` — проверить, чьё красное) — к отказу добавлен разрешённый
+ * путь с красными кейсами копии: без него прогон 1 g0 кончился с двумя кейсами без
+ * ответа, и спрашивать пришлось прогону 2.
+ */
+export function mainSyncDenied(command: string, cwd: string): string {
+  if (!buildsTargetTree(command)) return MAIN_SYNC_DENIED;
+  const red = copyRedCases(cwd);
+  const cases =
+    red.length > 0 && red.length <= CASES_SHOWN ? red.join(',') : '<group:case,group:case>';
+  return (
+    `${MAIN_SYNC_DENIED} To answer "is this red mine or the target's", do not build a tree of the ` +
+    `target: run \`node "${TESTS_CLI}" run --project . --case ${cases} --base\` — it runs those ` +
+    'cases on the fork point with the target in a throwaway worktree (only the red tests where the ' +
+    'runner can pick them) and records the verdict the delivery gate reads.'
+  );
+}
 
 /**
  * Конфликт сверить не вышло (ссылки целевой ветки нет локально, старый git):

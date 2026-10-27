@@ -1,7 +1,12 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
-import { cascadeProjectKey, isCascadeEnabled } from '../../domains/model-cascade/model-cascade.ts';
+import type { CascadeRulePatch, CascadeRuleView } from '@agentdeck/contracts/model-cascade';
+import {
+  cascadeProjectKey,
+  isCascadeEnabled,
+  isReviewAfterWork,
+} from '../../domains/model-cascade/model-cascade.ts';
 import {
   readLoweredRuns,
   summarizeLoweredRuns,
@@ -19,16 +24,23 @@ import type { RunInputsResponse } from '@agentdeck/contracts/run-input';
  * снимка.
  */
 export function registerChatCascadeRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  app.get<{ Querystring: { path?: string } }>('/api/chat/cascade', (request) => {
-    const path = String(request.query?.path ?? '').trim();
-    const enabled = isCascadeEnabled(ctx.store.getProjectCascadeEntries(), path);
+  // Оба тумблера правила одной области — проекта (R3(d), 26.10: «Ревью после
+  // работы» рядом с подбором): один маршрут, один ответ.
+  const viewOf = (path: string): CascadeRuleView => ({
+    enabled: isCascadeEnabled(ctx.store.getProjectCascadeEntries(), path),
+    reviewAfterWork: isReviewAfterWork(ctx.store.getProjectReviewEntries(), path),
     // Возвращаем и ключ: клиент показывает тумблер в чате, который может идти в
     // копии ветки, и человеку важно видеть, что правило относится к проекту.
-    return { enabled, project: path ? cascadeProjectKey(resolve(path)) : '' };
+    project: path ? cascadeProjectKey(resolve(path)) : '',
   });
 
-  app.put<{ Body: { path?: string; enabled?: boolean } }>('/api/chat/cascade', (request, reply) => {
-    const path = String(request.body?.path ?? '').trim();
+  app.get<{ Querystring: { path?: string } }>('/api/chat/cascade', (request) =>
+    viewOf(String(request.query?.path ?? '').trim()),
+  );
+
+  app.put<{ Body: Partial<CascadeRulePatch> }>('/api/chat/cascade', (request, reply) => {
+    const body = request.body ?? {};
+    const path = String(body.path ?? '').trim();
     if (!path)
       return reply
         .code(400)
@@ -37,8 +49,13 @@ export function registerChatCascadeRoutes(app: FastifyInstance, ctx: ServerConte
     // Пишем по ключу ПРОЕКТА, а не по рабочей папке: выключено в копии ветки
     // значит выключено в проекте, иначе следующая копия правила не увидит.
     const project = cascadeProjectKey(resolve(path));
-    ctx.store.setProjectCascade(project, request.body?.enabled !== false);
-    return { enabled: request.body?.enabled !== false, project };
+    const review = typeof body.reviewAfterWork === 'boolean' ? body.reviewAfterWork : undefined;
+    if (review !== undefined) ctx.store.setProjectReviewAfterWork(project, review);
+    // Подбор меняется, когда назван, — или когда тело старого вида (`{ path }` без
+    // обоих полей значило «включить»): запись одного ревью подбор не трогает.
+    if (typeof body.enabled === 'boolean' || review === undefined)
+      ctx.store.setProjectCascade(project, body.enabled !== false);
+    return viewOf(project);
   });
 
   /**

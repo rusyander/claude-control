@@ -43,6 +43,29 @@ export function groupTaskKeys(record: SplitPlanRecord, group: SplitPlanGroupReco
 }
 
 /**
+ * Тексты, из которых группа берёт пункты следа задач, кроме файла задач трекера и
+ * описания MR: её задание и бриф, общий контекст плана, заметки всех групп (передачи
+ * этой группе живут в заметках соседей) и строки «n/a» соседей. По ним доставка
+ * сверяет цитаты строк `task-N` (`taskSourceGaps`); лишний текст делает сверку только
+ * мягче, недостающий — дал бы ложный пробел честной строке.
+ */
+export function groupPointTexts(record: SplitPlanRecord, group: SplitPlanGroupRecord): string[] {
+  const own = record.proposal.groups[group.index];
+  return [
+    ...(own?.tasks ?? []),
+    own?.brief ?? '',
+    group.title,
+    record.proposal.shared ?? '',
+    ...record.proposal.groups.map((item) => item.notes ?? ''),
+    ...record.groups
+      .filter((item) => item.index !== group.index)
+      .flatMap((item) => (item.sieveRows ?? []).filter((row) => row.status === 'n/a'))
+      .map((row) => row.evidence),
+    // Запись плана читается из файла стора: поле старой записи может отсутствовать.
+  ].filter((text): text is string => typeof text === 'string' && text.trim().length > 0);
+}
+
+/**
  * Задачи кнопки: `index` — одной группы; без него — всех групп плана и
  * вложенных планов (группа, чей чат сам разделил работу). Ключ, встреченный
  * дважды, — один раз, с первой группой.

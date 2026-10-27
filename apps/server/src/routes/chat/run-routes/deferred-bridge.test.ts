@@ -54,7 +54,10 @@ describe('deferred-bridge › слияние и push в main — шаг влад
   it('инструмент MCP слияния — отказ, создание MR — нет', () => {
     expect(mergesOrPushesMain('mcp__gitlab__merge_merge_request', { iid: 5 })).toBe(true);
     expect(mergesOrPushesMain('mcp__github__merge_pull_request', { number: 5 })).toBe(true);
+    // opencode называет инструмент `<сервер>_<инструмент>`.
+    expect(mergesOrPushesMain('gitlab_merge_merge_request', { iid: 5 })).toBe(true);
     expect(mergesOrPushesMain('mcp__gitlab__create_merge_request', { title: 'x' })).toBe(false);
+    expect(mergesOrPushesMain('gitlab_create_merge_request', { title: 'x' })).toBe(false);
     expect(mergesOrPushesMain('Write', { file_path: 'a', content: 'git push origin main' })).toBe(
       false,
     );

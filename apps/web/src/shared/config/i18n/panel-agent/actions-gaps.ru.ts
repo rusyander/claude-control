@@ -10,6 +10,7 @@ export const panelActionsGapsRu = {
   request_chat_handoff: 'Попросить чат закрыть этап',
   read_model_cascade: 'Подбор модели под задачу',
   set_model_cascade: 'Включить или выключить подбор модели',
+  set_review_after_work: 'Включить или выключить ревью после работы',
   list_lowered_runs: 'Понижённые прогоны',
   read_split_overlap: 'Пересечения веток разделения',
   split_accept_group: 'Принять группу разделения',

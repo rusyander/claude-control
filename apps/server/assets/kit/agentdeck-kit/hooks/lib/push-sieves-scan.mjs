@@ -50,7 +50,8 @@ export function riskReasons(paths) {
   const product = paths.map(slash).filter((p) => !DOT_DIR.test(p) && !TEST_PATH.test(p));
   const reasons = [];
   if (product.some(isData)) reasons.push('data/migration');
-  const sensitive = product.find((p) => SENSITIVE_PATH.test(p));
+  // Code and data only: a docs page `access/policy.mdx` owes no rollback plan.
+  const sensitive = product.find((p) => SENSITIVE_PATH.test(p) && (isProductCode(p) || isData(p)));
   if (sensitive) reasons.push(`sensitive path ${sensitive}`);
   const code = product.filter(isProductCode).length;
   if (code >= LARGE_DIFF_FILES) reasons.push(`${code} code files`);

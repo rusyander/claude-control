@@ -13,7 +13,10 @@ fixes — is in the user's language. **Start from `node <kit>/tools/review-plan.
 rest `⟨fill: …⟩` blanks the guard refuses until filled — one Write, not a refused draft and a
 rewrite. The guard checks the file at Write, and at Stop when a shell
 command wrote it. Refused: a missing `Tier` · `Radius` · `Verified` · `Taken on trust` · `Score`; a
-finding without `Where` / `Axis` / `Status`; a 🔴/🟡 without `Evidence`; T2 with a `Live` line naming
+finding without `Where` / `Axis` / `Status` (a one-line 🟢 carries them inline, §6); a 🔴/🟡 without
+`Evidence`; ≥ 2 lanes with a `Coverage` naming neither found / N̂ ("found 31, estimate ≈52") nor
+"coverage unknown"; a `Ledger` with a bare planned "rounds N" instead of "rounds k of N" (k rounds run
+— fewer than N is a coverage gap); T2 with a `Live` line naming
 fewer than two variation classes and no "not run — <why>"; a T2 🔴/🟡 naming no rung (`L1`…`L4`, or
 `L0 — <why>`); T1/T2 without `Coverage`, without all eight `Passes` keys, without a counted
 `Acceptance` or `Ledger`, or with a `Classes` line short of its six keys; "no blocking findings", LGTM
@@ -33,7 +36,11 @@ at file:line` · `unaffected, because …` · `not checked`), the acceptance mat
 3. **Findings** — the 🔵 security block first, then 🔴 · 🟡 · ❓.
 4. **Out of scope** — what the surrounding code revealed; same format, ids continue.
 5. **Done well** — one or two items, honestly.
-6. **Nits** — every 🟢, compact.
+6. **Nits** — every 🟢, ONE line each, fields inline (the guard reads exactly this; a heading block is
+   accepted too, never needed):
+   `- F-NN 🟢 <thesis> — **Where:** \`file:line\` · **Axis:** <axis> · **Status:** open`.
+A bold field line right under it (`- **Thread:** …`) stays that nit's. Only 🟢: a one-line 🔴/🟡/❓
+is refused — they owe `Evidence` and the card fields below.
 
 ## Skeleton
 
@@ -50,7 +57,7 @@ new parsers (`rg 'Unmarshal|parse'` 0) · registries — role×action 6×9 · de
 `sessions` · claims — detector differential 1125 lines · history — `git log -S'maskAll'` · attacker —
 long input, `%2F`, replay
 **Acceptance:** 14 criteria — met 9 · partly 2 · not met 1 · uncheckable 1 · out of frame 1
-**Ledger:** 461/461 files · lanes 4 · rounds 3 · remainder estimate ≈6 (`review-plan.mjs check`)
+**Ledger:** 461/461 files · lanes 4 · rounds 3 of 3 · remainder estimate ≈6 (`review-plan.mjs check`)
 **Classes:** siblings — `rg 'limit' svc/send.go` 2 → F-01 · parity — 3 calls compared · hang — n/a:
 response holds no one-time data · before gate — `limiter.go:40` · environment — n/a · contract —
 `openapi.yaml:88`
@@ -81,10 +88,9 @@ showing no trigger>". `Classes` answers axis-1 §Six miss classes the same way.
 - **Fix:** `if !info.isBlocked && time.Since(info.firstAt) > p.attemptWindow { … }`
 - **Status:** open
 
-### F-14 🟢 `data` says nothing about the content — `sessions`
+## Nits
 
-- **Where:** `ui/SessionList.tsx:12` · **Status:** open
-- **Axis:** style
+- F-14 🟢 `data` says nothing about the content — `sessions` — **Where:** `ui/SessionList.tsx:12` · **Axis:** style · **Status:** open
 
 ```
 </example>

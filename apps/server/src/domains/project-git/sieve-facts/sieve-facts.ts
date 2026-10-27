@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { isTestPath, type SieveMechanics } from '@agentdeck/contracts/sieves';
 import {
   GIT_MAX_BUFFER,
@@ -298,10 +300,65 @@ async function foreignRemovalsOf(
       subject = log.code === 0 ? log.stdout.trim().slice(0, 80) : '';
       subjects.set(sha, subject);
     }
-    const shown = ranges.slice(0, 3).join(', ') + (ranges.length > 3 ? ', …' : '');
-    blame[path] = `${sha.slice(0, 10)}${subject ? ` «${subject}»` : ''}, lines ${shown}`;
+    // Строки целиком (аудит g0 23.10, F-01): «…» прятал, что именно снято, и группа
+    // искала строку grep'ом лишним ходом.
+    blame[path] =
+      `${sha.slice(0, 10)}${subject ? ` «${subject}»` : ''}, lines ${ranges.join(', ')}`;
   }
   return { files: [...foreign.keys()], blame };
+}
+
+/**
+ * Ключ отпечатков в `.agent/tmp/sieve-acks.json`, который пишет сито пуша кита
+ * (`push-sieves.mjs` rememberAcks): `{"~removed": {"<ветка>": {"<файл>": "<отпечаток>"}}}`.
+ * `~` в имени ветки git запрещён — ключ не встретится с веткой.
+ */
+const ACK_PRINTS = '~removed';
+const ACKS_FILE = join('.agent', 'tmp', 'sieve-acks.json');
+
+/**
+ * Отпечаток удалённых строк файла — sha256 их текста по порядку, первые 16 знаков.
+ * Близнец `removedFingerprint` кита: тот же расчёт по тому же `diff -U0 --no-renames`.
+ */
+export function removedFingerprint(lines: readonly string[]): string {
+  const text = lines.map((line) => line.replace(/\r$/, '')).join('\n');
+  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+}
+
+/**
+ * Файлы «чужих −», которые уже подтвердил пуш ЭТОЙ ветки (`# sieve-ack:` ситу кита),
+ * и чьи удалённые строки с тех пор не изменились. Аудит g0 23.10 (!1071, F-01): те же
+ * шесть файлов кит спросил на пуше, а сито доставки — ещё раз, три хода ≈ 476k.
+ * Отпечатка нет (подтверждение старого кита) или строки другие — спрашивается снова.
+ */
+async function pushAckedOf(
+  cwd: string,
+  files: readonly string[],
+  removed: readonly RemovedHunk[],
+): Promise<string[]> {
+  if (files.length === 0) return [];
+  const [top, head] = await Promise.all([
+    run(cwd, ['rev-parse', '--show-toplevel']),
+    run(cwd, ['symbolic-ref', '--quiet', '--short', 'HEAD']),
+  ]);
+  const root = top.code === 0 ? top.stdout.trim() : '';
+  const branch = head.code === 0 ? head.stdout.trim() : '';
+  if (!root || !branch) return [];
+  let prints: unknown;
+  try {
+    const data = JSON.parse(readFileSync(join(root, ACKS_FILE), 'utf8')) as Record<string, unknown>;
+    prints = (data[ACK_PRINTS] as Record<string, unknown> | undefined)?.[branch];
+  } catch {
+    return [];
+  }
+  if (!prints || typeof prints !== 'object') return [];
+  const acked = prints as Record<string, unknown>;
+  return files.filter((file) => {
+    const want = acked[file];
+    if (typeof want !== 'string') return false;
+    const lines = removed.filter((hunk) => hunk.path === file).flatMap((hunk) => hunk.lines);
+    return removedFingerprint(lines) === want;
+  });
 }
 
 /**
@@ -411,16 +468,24 @@ export async function readSieveFacts(input: {
   if (input.startedAt) {
     // Чужие удаления — про основную, а не про предшественника: правка его строк
     // группой — её работа, а не стёртая чужая. Поэтому дифф от основной.
+    const removed = (base === mainBase ? diff : await zeroDiff(mainBase)).removed;
     const foreign = await foreignRemovalsOf(cwd, {
       mainRef,
       base: mainBase,
       startedAt: input.startedAt,
-      removed: (base === mainBase ? diff : await zeroDiff(mainBase)).removed,
+      removed,
     });
     if (foreign === undefined) unchecked.push('foreign-removals');
     else if (foreign.files.length > 0) {
-      mechanics.foreignRemovals = foreign.files;
-      mechanics.foreignBlame = foreign.blame;
+      const acked = new Set(await pushAckedOf(cwd, foreign.files, removed));
+      const open = foreign.files.filter((file) => !acked.has(file));
+      if (open.length > 0) {
+        mechanics.foreignRemovals = open;
+        mechanics.foreignBlame = Object.fromEntries(
+          open.flatMap((file) => (foreign.blame[file] ? [[file, foreign.blame[file]]] : [])),
+        );
+      }
+      if (acked.size > 0) mechanics.foreignAcked = [...acked];
     }
   }
   const consumers = await consumersOf(cwd, removedTokens(diff));
@@ -463,6 +528,32 @@ export async function touchedFacts(
   const add = (out: string): void => {
     for (const path of out.split('\0')) if (path.trim()) paths.add(path.trim());
   };
+  const { remote, base: mainBase } = await mainForkOf(cwd);
+  const base = (forkedFrom && (await forkedBase(cwd, forkedFrom, mainBase, remote))) || mainBase;
+  const [branch, uncommitted, untracked] = await Promise.all([
+    read(['diff', '--name-only', '-z', base || 'HEAD~1', 'HEAD']),
+    read(['diff', '--name-only', '-z', 'HEAD']),
+    read(['ls-files', '--others', '--exclude-standard', '-z']),
+  ]);
+  add(branch);
+  add(uncommitted);
+  add(untracked);
+  return { paths: [...paths], ...(base ? { base } : {}) };
+}
+
+/**
+ * Развилка HEAD с основной по локальной ссылке, без сети: remote, ссылка основной
+ * (`<remote>/HEAD`, иначе `main`, `master`) и `merge-base`. Пустая `base` — remote или
+ * основной нет. Её же берёт прогон кейсов на развилке (`tests-cli run --base`): красное
+ * там — содержимое, которое ветка получила готовым.
+ */
+export async function mainForkOf(
+  cwd: string,
+): Promise<{ remote?: string; mainRef?: string; base: string }> {
+  const read = async (args: string[]): Promise<string> => {
+    const out = await run(cwd, args, GIT_READ_TIMEOUT_MS);
+    return out.code === 0 ? out.stdout : '';
+  };
   const remote = pickRemote(await read(['remote']));
   const pointer = remote
     ? (await read(['symbolic-ref', '--short', `refs/remotes/${remote}/HEAD`])).trim()
@@ -474,15 +565,6 @@ export async function touchedFacts(
       break;
     }
   }
-  const mainBase = mainRef ? (await read(['merge-base', mainRef, 'HEAD'])).trim() : '';
-  const base = (forkedFrom && (await forkedBase(cwd, forkedFrom, mainBase, remote))) || mainBase;
-  const [branch, uncommitted, untracked] = await Promise.all([
-    read(['diff', '--name-only', '-z', base || 'HEAD~1', 'HEAD']),
-    read(['diff', '--name-only', '-z', 'HEAD']),
-    read(['ls-files', '--others', '--exclude-standard', '-z']),
-  ]);
-  add(branch);
-  add(uncommitted);
-  add(untracked);
-  return { paths: [...paths], ...(base ? { base } : {}) };
+  const base = mainRef ? (await read(['merge-base', mainRef, 'HEAD'])).trim() : '';
+  return { ...(remote ? { remote } : {}), ...(mainRef ? { mainRef } : {}), base };
 }

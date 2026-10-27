@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { splitTicketKey } from '@agentdeck/contracts/split-tickets';
@@ -69,6 +69,8 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
   /** Открытые задачи проекта, которые отдаёт поиск; `searchDown` — поиск падает. */
   let openIssues: { key: string; fields: { summary: string; description?: string } }[];
   let searchDown: boolean;
+  /** Jira отвергает поле приоритета: 400 `errors.priority`. */
+  let rejectPriority: boolean;
 
   /**
    * Трекер отвечает на поиск открытых, комментарий, заведение и чтение заведённой
@@ -89,7 +91,16 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
       if (init.method === 'POST' && /\/rest\/api\/2\/issue\/[^/]+\/comment$/.test(path)) {
         return new Response(JSON.stringify({ id: '1' }), { status: 201 });
       }
+      if (path.endsWith('/rest/api/2/priority')) {
+        return Response.json([{ name: 'High' }, { name: 'Medium' }, { name: 'Low' }]);
+      }
       const created = init.method === 'POST' && path.endsWith('/rest/api/2/issue');
+      if (created && rejectPriority && String(init.body).includes('"priority"')) {
+        return new Response(
+          JSON.stringify({ errorMessages: [], errors: { priority: 'Field cannot be set.' } }),
+          { status: 400 },
+        );
+      }
       const body = created
         ? { key: 'PROJ-7' }
         : { key: 'PROJ-7', fields: { summary: TICKET.title, status: { name: 'Open' } } };
@@ -165,6 +176,7 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
     await app.ready();
     openIssues = [];
     searchDown = false;
+    rejectPriority = false;
     stubJira();
   });
 
@@ -184,12 +196,28 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
     expect(response.json()).toEqual({ key: 'PROJ-7', created: true });
     expect(creates()).toHaveLength(1);
     const sent = JSON.parse(String(creates()[0]?.init.body)) as {
-      fields: { project: { key: string }; summary: string; description: string };
+      fields: {
+        project: { key: string };
+        summary: string;
+        description: string;
+        labels?: string[];
+        priority?: { name: string };
+      };
     };
     expect(sent.fields.project.key).toBe('PROJ');
     expect(sent.fields.summary).toBe(TICKET.title);
-    // Описание хаба и строка отпечатка: следующая сверка узнает задачу и после правки названия.
-    expect(sent.fields.description).toBe(`Описание из хаба\n\nagentdeck-fp: ${fingerprintOf(KEY)}`);
+    // Сторона строкой и меткой, приоритет по умолчанию; исполнителя нет в теле вовсе.
+    // Отпечатка в тексте нет (владелец 26.10.2026): сверка узнаёт задачу по памяти панели.
+    expect(sent.fields.description).toBe(
+      'Сторона: FRONTEND — фронтенд\nСерьёзность: medium → приоритет Jira «Medium»' +
+        '\n\nОписание из хаба',
+    );
+    expect(
+      JSON.parse(readFileSync(join(appData, 'split-ticket-prints.json'), 'utf8')) as unknown,
+    ).toEqual({ 'PROJ-7': [fingerprintOf(KEY)] });
+    expect(sent.fields.labels).toEqual(['frontend', 'agentdeck-proposal']);
+    expect(sent.fields.priority).toEqual({ name: 'Medium' });
+    expect(Object.keys(sent.fields)).not.toContain('assignee');
     // Сверка с открытыми — до заведения, по проекту привязки.
     expect(searches()).toHaveLength(1);
     expect(calls.indexOf(searches()[0]!)).toBeLessThan(calls.indexOf(creates()[0]!));
@@ -204,6 +232,28 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
       ?.groups.map((item) => item.tickets?.[0]?.filed?.key);
     expect(filed).toEqual(['PROJ-7', 'PROJ-7']);
     expect(conveyor.view(['parent-1'])?.groups[1]?.tickets?.[0]?.filed?.key).toBe('PROJ-7');
+  });
+
+  it('Jira отвергла поле приоритета — задача заводится второй раз без него, серьёзность меткой', async () => {
+    writeLink(store, root, undefined, { jiraProjectKey: 'PROJ' });
+    rejectPriority = true;
+
+    const response = await file();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ key: 'PROJ-7', created: true });
+    const bodies = creates().map(
+      (call) =>
+        JSON.parse(String(call.init.body)) as {
+          fields: { priority?: unknown; labels?: string[]; description: string };
+        },
+    );
+    expect(bodies.map((body) => Boolean(body.fields.priority))).toEqual([true, false]);
+    expect(bodies[1]?.fields.labels).toEqual(['frontend', 'agentdeck-proposal', 'severity-medium']);
+    expect(bodies[1]?.fields.description).toContain(
+      'Серьёзность: medium (приоритета с таким именем в Jira нет)',
+    );
+    expect(filedOnDisk()?.map((mark) => mark?.key)).toEqual(['PROJ-7', 'PROJ-7']);
   });
 
   it('повтор и двойной клик второй задачи не заводят', async () => {
@@ -236,7 +286,12 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
     const text = (JSON.parse(String(comments()[0]?.init.body)) as { body: string }).body;
     expect(text).toContain('1. Падает экспорт отчёта');
     expect(text).toContain('Где: apps/web/src/export.ts:42');
-    expect(text).toContain(`agentdeck-fp: ${fingerprintOf(KEY)}`);
+    expect(text).not.toContain('agentdeck-fp');
+    expect(text).not.toContain(fingerprintOf(KEY));
+    // Комментарий тоже ложится в память: следующая сверка узнает задачу и без названия.
+    expect(
+      JSON.parse(readFileSync(join(appData, 'split-ticket-prints.json'), 'utf8')) as unknown,
+    ).toEqual({ 'PROJ-9': [fingerprintOf(KEY)] });
     // Отметка — ключом открытой задачи, у обеих групп, с признаком комментария.
     expect(filedOnDisk()?.map((filed) => [filed?.key, filed?.commented])).toEqual([
       ['PROJ-9', true],
@@ -248,7 +303,27 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
     expect(calls).toHaveLength(before);
   });
 
-  it('название задачи правили, но в ней отпечаток находки — комментарий туда же', async () => {
+  it('название задачи правили, отпечатка в тексте нет — память панели ведёт комментарий туда же', async () => {
+    writeLink(store, root, undefined, { jiraProjectKey: 'PROJ' });
+    writeFileSync(
+      join(appData, 'split-ticket-prints.json'),
+      JSON.stringify({ 'PROJ-12': [fingerprintOf(KEY)] }),
+    );
+    openIssues = [
+      {
+        key: 'PROJ-12',
+        fields: { summary: 'Отчёты: пустой CSV у клиента', description: 'разбор' },
+      },
+    ];
+
+    const response = await file();
+
+    expect(response.json()).toEqual({ key: 'PROJ-12', created: false, commented: true });
+    expect(creates()).toEqual([]);
+    expect(comments()).toHaveLength(1);
+  });
+
+  it('старая задача (до 26.10.2026) со строкой отпечатка в тексте — комментарий туда же', async () => {
     writeLink(store, root, undefined, { jiraProjectKey: 'PROJ' });
     openIssues = [
       {

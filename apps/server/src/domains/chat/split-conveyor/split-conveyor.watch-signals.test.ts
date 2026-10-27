@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { GroupSignal, GroupWatchRecord } from '@agentdeck/contracts/group-watch';
+import type {
+  GroupSignal,
+  GroupWatchCoverage,
+  GroupWatchRecord,
+} from '@agentdeck/contracts/group-watch';
 import type { TaskSplitResult } from '@agentdeck/contracts/task-split';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { RunFinished } from '../ChatRunRegistry/ChatRunRegistry.ts';
@@ -49,7 +53,10 @@ function triageDone(): RunFinished {
   };
 }
 
-function build(duringLaunch: (store: AppStore) => void = () => undefined) {
+function build(
+  duringLaunch: (store: AppStore) => void = () => undefined,
+  watchCoverage?: (parent: string, index: number) => GroupWatchCoverage | undefined,
+) {
   const appData = mkdtempSync(join(tmpdir(), 'conveyor-watch-'));
   dirs.push(appData);
   const store = new AppStore(appData);
@@ -60,6 +67,7 @@ function build(duringLaunch: (store: AppStore) => void = () => undefined) {
       findByTriage: (ids) => store.findSplitPlanByTriage(ids),
       all: () => store.getSplitPlans(),
       watchSignals: (parent, index) => store.getGroupWatchSignals(parent, index),
+      ...(watchCoverage ? { watchCoverage } : {}),
     },
     launch: async (record, groups): Promise<TaskSplitResult> => {
       // Копии заводятся минутами: за это время сторож успевает записать сигнал.
@@ -124,5 +132,22 @@ describe('SplitConveyor и сигналы сторожа', () => {
     expect(conveyor.view(['родитель'])?.groups[0]?.watchSignals).toBeUndefined();
     put({ signals: [null, { rule: 'R1' }, { ...SIGNAL, rule: 'R99' }, SIGNAL] });
     expect(conveyor.view(['родитель'])?.groups[0]?.watchSignals).toEqual([SIGNAL]);
+  });
+
+  it('охват сторожа живой группы — на виде группы; сторож молчит — поля нет', async () => {
+    const asked: string[] = [];
+    let coverage: GroupWatchCoverage | undefined = { by: 'text-only', gaps: ['transcript'] };
+    const { conveyor, start } = build(undefined, (parent, index) => {
+      asked.push(`${parent}#${index}`);
+      return coverage;
+    });
+    await start();
+    expect(conveyor.view(['родитель'])?.groups[0]?.watchCoverage).toEqual({
+      by: 'text-only',
+      gaps: ['transcript'],
+    });
+    expect(asked).toContain('родитель#0');
+    coverage = undefined;
+    expect(conveyor.view(['родитель'])?.groups[0]).not.toHaveProperty('watchCoverage');
   });
 });

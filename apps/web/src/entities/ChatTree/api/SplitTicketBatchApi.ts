@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type {
+  SplitTicketDuplicates,
   SplitTicketPublishBody,
   SplitTicketPublished,
   SplitTicketTaken,
@@ -15,9 +16,16 @@ import { apiClient } from '@shared/api/client';
 
 const base = (parentChatId: string): string => `/chat/split/${encodeURIComponent(parentChatId)}`;
 
+/**
+ * Не под корнем `chat-tree`: его сбрасывают публикация, кнопки групп и событие
+ * сторожа — и открытое окно каждый раз заново читало бы Jira («куда» и поиск
+ * повторов), хотя ни то ни другое от дерева не зависит.
+ */
 export const splitTicketBatchKeys = {
   target: (parentChatId: string, project: string, last: string) =>
-    ['chat-tree', 'split-tickets-target', parentChatId, project, last] as const,
+    ['split-tickets', 'target', parentChatId, project, last] as const,
+  duplicates: (parentChatId: string, project: string) =>
+    ['split-tickets', 'duplicates', parentChatId, project] as const,
 };
 
 export interface SplitTicketTargetInput {
@@ -46,6 +54,34 @@ export function useSplitTicketTarget(input: SplitTicketTargetInput, enabled: boo
     },
     enabled,
     // Интеграцию подключают и отключают мимо окна: открытое заново читает свежее.
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+  });
+}
+
+export interface SplitTicketDuplicatesInput {
+  parentChatId: string;
+  /** Проект Jira, куда уйдёт публикация: повторы ищутся в нём. */
+  project: string;
+}
+
+/**
+ * Проверка на повторы до публикации (владелец 25.10.2026): открытые задачи
+ * Jira, похожие на дефекты окна. Только чтение; решает человек в окне.
+ */
+export function useSplitTicketDuplicates(input: SplitTicketDuplicatesInput, enabled: boolean) {
+  return useQuery({
+    queryKey: splitTicketBatchKeys.duplicates(input.parentChatId, input.project),
+    queryFn: async () => {
+      const { data } = await apiClient.get<SplitTicketDuplicates>(
+        `${base(input.parentChatId)}/tickets/duplicates`,
+        { params: { project: input.project } },
+      );
+      return data;
+    },
+    enabled: enabled && Boolean(input.project),
+    // Задачи в Jira заводят и закрывают мимо окна: открытое заново ищет свежее.
     staleTime: 0,
     gcTime: 0,
     retry: false,

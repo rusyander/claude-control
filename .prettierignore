@@ -15,6 +15,12 @@ apps/mobile/expo-env.d.ts
 # Prettier переформатировал бы отступы примера JSON внутри текста, и модель получила бы
 # не тот пример, который человек видит в панели.
 apps/server/src/domains/prompts/catalog/
+# Реестр двойников набора пишет tools/kit-twins.mjs (--init / --accept) — формат задаёт он.
+apps/server/assets/kit/twins.json
+# Скиллы наблюдения за группами — байт в байт копии личного слоя (~/.claude/skills): их сверяет
+# tools/kit-twins.mjs, а переносят простым копированием. Prettier разошёлся бы с оригиналом на каждой строке.
+apps/server/assets/kit/agentdeck-kit/skills/watchdog/
+apps/server/assets/kit/agentdeck-kit/skills/agentdeck-watchdog/
 # Личные черновики в корне (`.vsc-tmp.mjs` и т. п.) — не код проекта.
 /.*-tmp.mjs
 # Отчёты раннеров тестов — вывод инструмента байт в байт (go test -json — это NDJSON, а не JSON).

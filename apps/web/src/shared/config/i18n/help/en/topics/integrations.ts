@@ -67,7 +67,8 @@ export const integrationsEn: typeof integrationsRu = {
     cardTelegram: 'Telegram',
     cardTelegramText:
       'A message when a run ends, fails, asks for permission, asks a question, or a test ' +
-      'fails. Off by default; sending never delays the work itself.',
+      'fails. Connected in two steps: the bot token and /start in the chat with the bot. ' +
+      'The switch turns everything off; sending never delays the work itself.',
     cardWebhook: 'Webhook',
     cardWebhookText:
       'The same events at an address of your own: one POST with JSON. It covers Slack, ' +
@@ -186,7 +187,8 @@ export const integrationsEn: typeof integrationsRu = {
       'config. The agent gets access to Jira and Confluence only through the separate ' +
       '“Connect Atlassian MCP” button — and then travels through the panel’s proxy, still ' +
       'holding no key. Notifications run the other way: the panel itself POSTs to your ' +
-      'address or messages Telegram, and only the event header goes out.',
+      'address or messages Telegram. The address gets only the event header; Telegram also ' +
+      'gets the chat name and one line of essence, with no code and no paths.',
 
     guide: {
       contextTitle: 'Path: connect Jira, Confluence and GitLab',
@@ -241,31 +243,101 @@ export const integrationsEn: typeof integrationsRu = {
       notifyEventsText:
         'Seven events: run finished, run failed, case failed, agent asks for permission, ' +
         'agent asked a question, contour budget running out and a group watch signal ' +
-        '(“attention” and “alarm”). The list is shared by the webhook and Telegram, but each ' +
+        '(“attention” and “alarm”). This is the webhook list; Telegram gathers the same ' +
+        'events into three groups (step 5), but each ' +
         'card ticks its own — an on-call bot usually wants failures only. The group watch ' +
         'signal is ticked by default in new settings. A Telegram card that got the signals ' +
         'before keeps getting them: the tick is set in its list automatically, once. A ' +
         'webhook saved earlier needs it ticked by hand.',
-      notifyTelegram: '4. Telegram: the bot must be in the chat',
+      notifyTelegram: '4. Telegram: two steps to connect',
       notifyTelegramText:
-        'The chat is set by numeric id or @channel name, the token comes from @BotFather. ' +
-        'The commonest cause of silence is a bot that was never added to the chat: the ' +
-        'panel sends, Telegram refuses, and the refusal shows on the card.',
-      notifyAnswers: '5. Answers from Telegram: buttons instead of the panel',
+        'Until Telegram is connected, the card shows only two steps. “1. Bot” — a token ' +
+        'from @BotFather and Check: the panel saves the token and shows the bot’s name. ' +
+        '“2. You” — Connect: open the link to the bot and press Start. The link carries a ' +
+        'one-time code of this window: /start without it or with another code does not ' +
+        'count and does not take the window. The panel shows the name and id of whoever ' +
+        'sent /start and asks “is this you?” — only the confirmation writes you into the ' +
+        'card, and the bot writes “Connected to AgentDeck”. /start from a group or after ' +
+        'five minutes changes nothing. A bot the agent already listens to cannot be ' +
+        'connected this way: the id goes into Advanced. A message reads at a glance. The ' +
+        'first line, in bold, is the kind, the project after a folder mark and the session ' +
+        '(up to 40 characters): “❓ ВОПРОС · 📁 shop · Аудит проекта”, “❓ ВОПРОС 1/3 · …”, ' +
+        '“🔐 РАЗРЕШЕНИЕ · …”, “⏳ ОТЛОЖЕНО D-3 · …”, “✅ ГОТОВО · …”, “🛑 ОШИБКА · …”, ' +
+        '“🧪 ТЕСТЫ · …”, “⚠️ ТРЕВОГА · …”; another CLI, VS Code and the terminal go between ' +
+        'the project and the session: “📁 shop · Codex · Аудит проекта”, “📁 shop · VS Code ' +
+        '· …”; with no known project there is no mark. The second line is the essence, ' +
+        'exactly once: the question text (up to 300 ' +
+        'characters, then “…полностью в панели”), the description or the command itself (up ' +
+        'to 80 characters), what to decide on a D-n, “шёл 12 мин”, “Агент упал”, “5 из 120 ' +
+        'упали”, what happened to the group. Question options come as a numbered list only ' +
+        'when at least one has a description; otherwise the buttons are enough. The command, ' +
+        '“why you decide”, the group and the rule code are folded into a quote, and the last ' +
+        'line is an “Открыть чат →” link to this chat in the panel (the 127.0.0.1 address of ' +
+        'this computer). No hashtags. A question from a VS Code or terminal session that ' +
+        'the panel hook does not hold comes in the same shape but without buttons, with the ' +
+        'line “Ответь в VS Code — отсюда ответ туда не дойдёт” (“в терминале”, “на ' +
+        'компьютере”): an answer from Telegram would start a copy of that session in the ' +
+        'panel while the question there kept waiting. Once the hook takes the question, ' +
+        'buttons appear in the same message; there is no second one. ' +
+        'Secrets are masked; notifications without buttons carry no code, paths, prompt or ' +
+        'agent answer.',
+      notifyAnswers: '5. Connected Telegram: when to call',
       notifyAnswersText:
-        'The “Answers from Telegram” block on the same card makes the link two-way. An agent ' +
-        'question left unanswered in the panel for the set minutes arrives in a private chat ' +
-        'with “Allow” / “Deny” buttons or answer options; a group question and a deferred D-n go ' +
-        'at once. A press takes the same path as the panel button, and the message is edited ' +
-        'to the outcome. An answer is taken only from your id and only in the private chat with ' +
-        'the bot; a button is signed and works once — a second press is told it was already answered. ' +
-        'If an agent already listens to the card’s bot (an MCP server or a Telegram channel), a ' +
-        'separate bot is needed: one bot can have only one listener, and the block says so ' +
-        'itself. The separate bot’s token is stored encrypted and shown only ' +
-        'as a mask. A D-n opened again under its old number (the same call after it expired) ' +
-        'arrives again as a new message. If the panel’s file of Telegram answers is damaged, ' +
-        'the panel still starts: the damaged file is set aside next to it and the loss goes to ' +
-        'the panel log; the answers setting starts from scratch and is turned on again by hand.',
+        'The connected card is short. The switch: off means nothing goes out and answers ' +
+        'are not listened to. Next to it one word about the link — “working · @bot” or ' +
+        '“error” with the reason in plain words (Telegram rejected the token, not ' +
+        'delivered, the bot has a webhook). “You: name (@nick)” — who is connected; ' +
+        'Reconnect repeats /start. “When to call” — three groups. “The agent waits for you” ' +
+        '— a question or a permission you did not answer in the panel within the set ' +
+        'minutes: it arrives with Allow / Deny or the options, and a press decides it the ' +
+        'same way as the panel button. A group question and a deferred D-n go at once. ' +
+        'After the panel starts and after the computer wakes from sleep nothing goes out ' +
+        'for two minutes: what piled up waits in case you are already answering in the ' +
+        'panel. “The agent finished” — only if work took longer than the set minutes. For ' +
+        'panel chats that is the run time; for terminal and VS Code sessions it counts from ' +
+        'your last message, and the panel learns the turn ended only from its Stop hook in ' +
+        'the Claude Code settings (“Agent on the computer” in the phone app writes it): no ' +
+        'hook, or the panel closed at that moment — no message; a turn continued by a ' +
+        'message from the phone has not ended. “Something broke” — a failed run, red tests, ' +
+        'a group stuck or going in circles (a watch “attention” does not go to Telegram, ' +
+        'only an alarm). One Save writes everything; if half of it did not save, the card ' +
+        'says which half. Buttons and answers are taken only from your id in the private ' +
+        'chat with the bot; a button is signed and works once, and a press on a question ' +
+        'that is gone answers “уже не актуально” and sends nothing to the chat. When ' +
+        'everything in a message is answered, it collapses at once into an outcome line ' +
+        'without buttons: “✅ Разрешено 15:54 · git push · 📁 shop · Аудит проекта”, ' +
+        '“✅ Ответ: Хорошо 15:54 · …”, “⛔ Запрещено 15:54 · …”, “💻 Отвечено в панели · …”, ' +
+        '“⌛ Уже не актуально · …”; nothing is deleted by itself. A reply to any bot message ' +
+        'about a chat — a question, a permission, Done, Error, Tests — goes into that chat ' +
+        'as text, and the bot answers “✉️ Отправлено в «чат»”. A reply to an open question ' +
+        'answers it, to a closed one it is a normal message to the chat; a reply to a ' +
+        'question without buttons sends nothing — the bot reminds you where to answer. A ' +
+        'VS Code or terminal session gets the message through the hook, never as a new ' +
+        'panel run. Photos and image ' +
+        'files (and PDF) up to 20 MB together go with the text as attachments; an album ' +
+        'goes as one send, its caption is the answer text: “📎 Отправлено: 2 картинки + ' +
+        'текст”. A VS Code session takes no pictures — text only, and the bot says so. When ' +
+        'it is unclear which chat a reply is for — one line of explanation, not silence. ' +
+        'The collapsed Advanced holds your id by hand, replacing the token, a separate ' +
+        'answers bot (only if the agent already listens to this one), the contour budget ' +
+        'with a plain hint, “Reconnect the bot”, the last send and the answers state. An ' +
+        'overloaded Telegram (429): the panel waits as long as it asks (up to two minutes) ' +
+        'and retries, and messages to one chat do not overtake each other; a dropped ' +
+        'network gets one retry. A changed token or switching off restarts or stops the ' +
+        'polling by itself.',
+      notifyCommands: '6. Bot commands',
+      notifyCommandsText:
+        'The owner’s commands work in the private chat with the bot: /status — how many ' +
+        'conversations are running (“📁 project · session” with secrets masked, and minutes), how ' +
+        'many wait for you and the subscription load (“session 13% · week 62%” when known); ' +
+        '/waiting — send everything that waits for an answer now, without waiting for the ' +
+        'set minutes (the new message first, then the old one loses its buttons); /clear — ' +
+        'remove everything the bot wrote and your commands younger than 48 hours, except ' +
+        'what waits for an answer (the “🧹 Убрал N” reply vanishes after 30 seconds; older ' +
+        'than 48 hours — chat menu → Clear history); /help — the command list. The bot gets ' +
+        'its command menu by itself when polling starts; messages not from you go ' +
+        'unnoticed. The “Открыть чат →” link points to 127.0.0.1 — it opens on this ' +
+        'computer; the server knows no panel address for the phone.',
     },
 
     notTitle: 'What this tab is not',
@@ -379,9 +451,9 @@ export const integrationsEn: typeof integrationsRu = {
       '03-events':
         'Picking events: a permission request added to the failures — each card ticks its own list',
       '04-telegram':
-        'The Telegram card: chat by @name, a token from @BotFather, a reminder to add the bot to the chat',
+        'Telegram not connected: the Bot step with the token and the You step — /start arrived, the panel asks “is this you?”',
       '05-telegram-answers':
-        'The “Answers from Telegram” block on the card: minutes before sending, your id, a separate bot token and the polling state',
+        'Telegram connected: whether it works, “You: name”, three “When to call” groups and one Save',
     },
   },
 

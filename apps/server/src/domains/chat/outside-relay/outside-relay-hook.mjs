@@ -31,6 +31,16 @@ const WAIT_SLICE_MS = 3000;
 /** Пауза перед повтором, пока панель недоступна (перезапуск). */
 const RETRY_MS = 2000;
 const TAIL_BYTES = 512 * 1024;
+/**
+ * Сколько хук ищет вызов в транскрипте и как часто. Прежней секунды не хватило
+ * свежей сессии VS Code (25.10, e6600235): вопрос не попал в пересылку, и ответ
+ * из Telegram ушёл копией сессии в панели. Хвост тут ни при чём — файл был
+ * меньше `TAIL_BYTES`, у удачной сессии вызов лежал на том же месте; запись о
+ * вызове ложится на диск позже старта хука. Диалог окна открыт всё это время,
+ * так что ожидание CLI не держит.
+ */
+const FIND_MS = 10_000;
+const FIND_EVERY_MS = 200;
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -85,12 +95,14 @@ async function permission(base, token, input) {
   const sessionId = input.session_id;
   const toolName = input.tool_name;
   if (!sessionId || !toolName) return;
-  // Запись о вызове пишется до старта хука; короткий повтор — на случай, если
-  // запись на диск отстала.
-  let toolUseId;
-  for (let attempt = 0; attempt < 5 && !toolUseId; attempt += 1) {
+  // Запись о вызове может лечь на диск позже старта хука, а файла свежей сессии
+  // может ещё не быть: ищем до `FIND_MS`. Ответили в окне раньше — вызов закрыт
+  // результатом, не найдётся, и хук выходит без регистрации.
+  const until = Date.now() + FIND_MS;
+  let toolUseId = findToolUseId(readTail(input.transcript_path), toolName, input.tool_input);
+  while (!toolUseId && Date.now() < until) {
+    await sleep(FIND_EVERY_MS);
     toolUseId = findToolUseId(readTail(input.transcript_path), toolName, input.tool_input);
-    if (!toolUseId) await sleep(200);
   }
   if (!toolUseId) return;
 
@@ -154,7 +166,9 @@ async function messages(base, token, input) {
     token,
     'POST',
     '/api/outside/messages/take',
-    { sessionId: input.session_id },
+    // Событие — серверу: конец хода (`Stop`) без сообщений в очереди — повод
+    // для «Закончил» в Telegram после долгой работы.
+    { sessionId: input.session_id, event: input.hook_event_name },
     2000,
   );
   const output = messagesOutput(input.hook_event_name, taken?.texts ?? []);

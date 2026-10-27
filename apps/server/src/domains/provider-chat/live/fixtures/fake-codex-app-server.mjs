@@ -103,7 +103,8 @@ async function runTurn(prompt) {
               id: 'srv-1',
               method: 'item/commandExecution/requestApproval',
               params: {
-                threadId: 'thr-1',
+                // FAKE_APPROVAL_NO_THREAD — просьба без `threadId`: поток берётся тот, что ход открыл.
+                ...(process.env.FAKE_APPROVAL_NO_THREAD ? {} : { threadId: 'thr-1' }),
                 turnId: 'turn-1',
                 itemId: 'item-1',
                 command: 'Set-Content probe.txt edited',

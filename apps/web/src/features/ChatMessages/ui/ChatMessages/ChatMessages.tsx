@@ -14,6 +14,7 @@ import { branchMarks } from '../../lib/branchMarks';
 import { parseQuestions } from '../../lib/parseQuestions';
 import { streamStepSpend } from '../../lib/streamSpend';
 import { useMessageTimings } from '../../lib/useMessageTimings';
+import { buildTurnTrail, turnTrails } from '../../lib/turnTrail';
 import { useFeedScroll } from '../../lib/useFeedScroll';
 import { MessageBubble } from '../MessageBubble/MessageBubble';
 import { StreamedAnswer } from '../StreamedAnswer/StreamedAnswer';
@@ -30,6 +31,7 @@ import { FeedNotices } from '../FeedNotices/FeedNotices';
 import { FeedErrorCard } from '../FeedErrorCard/FeedErrorCard';
 import { QueuedBubbles } from '../QueuedBubbles/QueuedBubbles';
 import { RunTimer } from '../RunTimer/RunTimer';
+import { TurnTrail } from '../TurnTrail/TurnTrail';
 import type { ChatMessagesProps } from '../ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 import { liveQuestionKey } from '../../lib/liveQuestionKey';
@@ -120,6 +122,10 @@ export function ChatMessages({
 
   /** Где по ленте агент сменил ветку — по записям самого транскрипта. */
   const branches = useMemo(() => branchMarks(messages), [messages]);
+  /** След каждого хода — под последним ответом модели в ходе. */
+  const trails = useMemo(() => turnTrails(messages), [messages]);
+  // Живой ход: скиллы, агенты и скрипты из потока; хуки придут с историей.
+  const liveTrail = useMemo(() => buildTurnTrail(stream.tools), [stream.tools]);
 
   /**
    * Сообщение с вопросом, который ещё ЖДЁТ ответа.
@@ -196,6 +202,7 @@ export function ChatMessages({
           >
             <MessageBubble
               message={message}
+              trail={trails.get(message.id)}
               onEdit={onEdit}
               onPickOption={onPickOption}
               isLast={index === messages.length - 1}
@@ -358,6 +365,8 @@ export function ChatMessages({
                 className={styles.liveTimer}
               />
             )}
+
+            <TurnTrail trail={liveTrail} />
 
             {/* Живой таймер под ответом; шагам стрима время не ставится — при
                 восстановлении события приходят пачкой и дали бы нули. */}

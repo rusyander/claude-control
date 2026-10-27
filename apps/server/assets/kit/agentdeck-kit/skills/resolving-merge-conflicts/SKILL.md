@@ -26,7 +26,10 @@ the MR or issue it names. A hunk resolved from the diff alone is a guess dressed
 - **Keep both** wherever the intents do not actually collide — that is the default outcome. Taking a
   whole side is a decision that needs a reason, not a shortcut.
 - Never invent behaviour that existed on neither side. The merge is not the place to improve the code.
-- Generated artifacts — lockfiles, codegen output, snapshots — are regenerated, never hand-merged.
+- Generated artifacts — lockfiles, codegen output, snapshots, built API specs — are regenerated, never
+  hand-merged. Tell one BEFORE reading its hunks: its generator names it (`git grep -l <basename> --
+'*package.json' '*.mjs' '*.py'`); a large JSON conflict is generated until shown otherwise (live 27.10: 40k
+  chars of a conflicted generated spec read, then its generator run anyway).
 - Two intents that genuinely contradict → stop and ask, quoting both sides and naming the trade-off.
   Guessing here silently discards someone's work.
 

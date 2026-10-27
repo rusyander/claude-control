@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ModelInfo } from '@agentdeck/contracts';
@@ -193,6 +194,21 @@ describe('POST /api/chat/split — чужой провайдер', () => {
     // Потолок чужого CLI — его собственная настройка: ни модели, ни «ниже».
     expect(head?.workModel).toBeUndefined();
     expect(head?.lowered).toBeUndefined();
+    // «Ревью после работы» по умолчанию включено — поля в шапке нет.
+    expect(head?.reviewAfterWork).toBeUndefined();
+  });
+
+  // Telegram R3(d), 26.10: тумблер проекта снимается в шапку при запуске; подбор остаётся.
+  it('«Ревью после работы» выключено — флаг в шапке каждой группы, ступени те же', async () => {
+    store.setProjectReviewAfterWork(project, false);
+    const body = await split();
+
+    expect(body.chats.map((chat) => chat.model)).toEqual(['gpt-5.3-codex-spark', undefined]);
+    for (const item of listChats(appData, 'codex')) {
+      expect(readChatCascade(appData, 'codex', item.id)?.reviewAfterWork).toBe(false);
+    }
+    expect(runs[0]?.systemPrefix).toContain('The panel will not start a review of this work');
+    expect(runs[0]?.systemPrefix).not.toContain('starts a review of your diff');
   });
 
   // Раунд 5: чужие дети получали без чисел группы и без строки эскалации то,
@@ -346,6 +362,40 @@ describe('POST /api/chat/split — чужой провайдер', () => {
     // Родитель — не потомок: своей связи у него нет ни под каким ключом.
     expect(store.getChatLink('родитель')).toBe(undefined);
     expect(store.getChatLink('codex:родитель')).toBe(undefined);
+  });
+
+  // P-37: охват ревью группы чужого CLI меряется от коммита начала (`cascade.ts` читает
+  // `link.startSha`) — связь обязана его нести, как у Claude, иначе ревью шло бы по всей ветке.
+  it('проект — репозиторий: связь группы несёт коммит начала — голову её каталога при запуске', async () => {
+    const git = (cwd: string, ...args: string[]): string =>
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.name=t',
+          '-c',
+          'user.email=t@example.com',
+          '-c',
+          'core.autocrlf=false',
+          ...args,
+        ],
+        { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      ).trim();
+    git(project, 'init', '-q', '-b', 'main');
+    writeFileSync(join(project, 'a.txt'), 'a\n');
+    git(project, 'add', 'a.txt');
+    git(project, 'commit', '-q', '-m', 'base');
+    await split();
+
+    const chats = listChats(appData, 'codex');
+    expect(chats).toHaveLength(2);
+    expect(runs).toHaveLength(2);
+    for (const run of runs) {
+      const head = git(run.workdir ?? '', 'rev-parse', 'HEAD');
+      expect(head).toMatch(/^[0-9a-f]{40}$/);
+      const key = `codex:${run.chatId}`;
+      expect(store.getChatLink(key)?.startSha).toBe(head);
+    }
   });
 
   it('родителя не назвали — связей нет, и разделение работает как раньше', async () => {

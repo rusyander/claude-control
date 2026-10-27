@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { conflictsWith } from '../../chat/main-sync/main-sync.ts';
 import {
   parseZeroContextDiff,
   readSieveFacts,
@@ -232,6 +233,26 @@ describe('механика сит на настоящем git', () => {
     expect(facts.paths).toEqual(['pred.ts']);
     expect(facts.mechanics.foreignRemovals).toBeUndefined();
     expect(facts.unchecked).toBeUndefined();
+  });
+});
+
+describe('сито «интеграция» и страж догона судят конфликт одинаково', () => {
+  // Живой прогон 23.10 (g0 d9869abf): сверка доставки нашла конфликт и велела
+  // rebase, а страж догона (тогда `merge-tree --quiet`: git 2.55 даёт 0 при
+  // конфликте) пять раз отказал «конфликта нет» — группа крутилась между двумя
+  // ответами панели, пока не сдалась. Два чтения одного вопроса — одна правда.
+  it.each([
+    ['конфликт с основной', true],
+    ['основная ушла вперёд без конфликта', false],
+  ])('%s — оба отвечают одно', async (_name, conflicting) => {
+    const { main, work } = repo({ 'a.txt': 'one\ntwo\n', 'b.txt': 'b\n' });
+    commit(work, { 'a.txt': 'ONE-branch\ntwo\n' }, STARTED);
+    landOnMain(main, conflicting ? { 'a.txt': 'ONE-main\ntwo\n' } : { 'b.txt': 'b-main\n' });
+
+    const facts = await readSieveFacts({ cwd: work, startedAt: STARTED });
+    const guard = await conflictsWith(work, 'origin/main');
+    expect((facts.mechanics.conflicts ?? []).length > 0).toBe(conflicting);
+    expect(guard).toBe(conflicting);
   });
 });
 

@@ -4,7 +4,8 @@
 // Sleeping on it is blind waiting billed as wall time (measured: one review lane spent 16 min in five
 // `sleep 120…280; tail <output>` rounds; a session slept 200 s on its own gate). Denied:
 // `sleep`/`Start-Sleep` of 20 s or more whose command then reads a task output or a log. A fixed wait
-// for a server to boot stays allowed — poll the condition instead (`until curl -s …; do sleep 2; done`).
+// for a server to boot stays allowed — wait on the condition instead: the `wait-for.mjs` tool (bounded,
+// exit 1 on timeout). A sleeping loop that probes a server gets that tool as a hint (`probeLoopHint`).
 // Also denied: `sleep` ≥ 60 s then a read of `.agent/tmp/` while an agent this session spawned runs.
 // Subagents are covered too (measured week: 93 sleeps / 206 min in lanes): a lane is not reliably woken by
 // its own background command, so its denial says the other way — run the long check in the FOREGROUND with
@@ -40,6 +41,23 @@ const LOOP = /\b(?:for|while|until)\b/;
 const AWAITS_RUN =
   /[\\/]tasks[\\/][^\s"']+\.output|(?:^|[^a-z0-9])(?:gate|test|check|lint|tsc|type|build|vitest|jest|mustfail|ci)[\w.-]*\.log\b/i;
 const PROBE = /\b(?:curl|wget|nc|Test-NetConnection|Invoke-WebRequest)\b/i;
+const WAIT_FOR = 'node <kit>/tools/wait-for.mjs';
+
+// g9 26.10 (F5): a dev server on one port started and killed 5× in a delivery stage, each start followed by
+// `for i in $(seq 1 60); do curl …; sleep 0.5; done` — a readiness wait (allowed: a probe loop is no blind
+// poll), rebuilt by hand per start and silent when it ran out. A hint, never a verdict: the bounded helper,
+// and one server per stage kept alive.
+/** The wait-for hint for a sleeping loop that probes a server; null otherwise. */
+export function probeLoopHint(input) {
+  if (input?.tool_name !== 'Bash' && input?.tool_name !== 'PowerShell') return null;
+  const bare = bareCommand(String(input?.tool_input?.command ?? ''));
+  if (!SLEEP.test(bare) || !LOOP.test(bare) || !PROBE.test(bare)) return null;
+  return (
+    `[wait-for] a sleep loop polling a server: \`${WAIT_FOR} <port|url> --timeout 60\` waits for it in one ` +
+    'call (any HTTP answer or TCP connect = up) and exits 1 on timeout. Start the dev server ONCE per stage ' +
+    '(run_in_background) and keep it for every check; do not restart it per check.'
+  );
+}
 
 /** Rounds of the loop around a sleep: `seq A B`, `seq B`, `{A..B}`, PowerShell `-lt N`; none = unbounded. */
 function loopRounds(bare) {
@@ -189,7 +207,7 @@ export default function bgWaitGuard(input) {
         `bg-wait-guard: sleeping ${wait} on the output of a background command this split-group run started ` +
           'is blind polling, and repeating the call does not lift it. End the turn saying what is running: ' +
           'the panel holds the next stage while that command lives and wakes this session with its result. ' +
-          'Waiting for a server to come up → poll it (`until curl -s …; do sleep 2; done`).',
+          `Waiting for a server to come up → \`${WAIT_FOR} <port|url> --timeout 60\`.`,
       );
     }
     // Polling this session's own background command has no excuse to repeat: a group repeated the
@@ -207,14 +225,14 @@ export default function bgWaitGuard(input) {
     return deny(
       `bg-wait-guard: sleeping ${wait} then reading an output is blind polling (short sleeps in a loop add up). In a subagent run the long command ` +
         'in the FOREGROUND instead — Bash with timeout up to 600000 ms — and read its output once; over 10 min → ' +
-        'narrow it (one file, --quick) or split it. Waiting for a condition (a server up) → a short poll loop with ' +
+        `narrow it (one file, --quick) or split it. Waiting for a condition (a server up) → \`${WAIT_FOR} <port|url>\` with ` +
         'a timeout. Repeat this exact call if the wait is not on a command you started.',
     );
   }
   return deny(
     `bg-wait-guard: sleeping ${wait} then reading an output is blind polling (short sleeps in a loop add up). A background command wakes you with ` +
       'its completion notification — do other work or end the turn saying what is running. Waiting for a ' +
-      'condition (a server up) → poll it with a short loop and a timeout. Repeat this exact call if the wait ' +
+      `condition (a server up) → \`${WAIT_FOR} <port|url> --timeout 60\` (bounded, exit 1 on timeout). Repeat this exact call if the wait ` +
       'is not on a background command of this session.',
   );
 }

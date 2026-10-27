@@ -184,6 +184,7 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'split-continue-nothing': 'Nothing to continue: the group did not stop unfinished',
   'split-recheck-nothing':
     'Nothing to recheck: the group has no delivered MR or its copy was removed',
+  'split-recheck-note-invalid': 'The recheck note must be text of at most {{max}} characters',
   'split-recheck-merged': 'The MR is already merged — nothing to recheck',
   'split-recheck-closed': 'The MR is closed — nothing to recheck',
   'split-tasks-jira-off': 'Jira is not connected — there is nowhere to move the tasks',
@@ -205,5 +206,7 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'branch-stop-unconfirmed':
     'The copy {{path}} was created, but the agent process was not stopped: the panel could not verify the number still belongs to it and left it alone. The conversation stays in the main copy; the agent waits at the same card.',
   'chat-pin-invalid': 'The pinned field must be true or false',
+  'agent-id-invalid': 'Invalid subagent id',
+  'agent-not-found': 'Subagent not found',
   'chat-pin-child': 'A group chat is pinned together with its parent',
 };

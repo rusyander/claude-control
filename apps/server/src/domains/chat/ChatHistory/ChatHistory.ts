@@ -21,6 +21,7 @@ import {
   streamLines,
 } from '../ChatTranscriptFile/ChatTranscriptFile.ts';
 import { sessionHome } from './sessionHome.ts';
+import { createTurnHooks } from '../hook-trace/hook-trace.ts';
 import {
   branchOf,
   chatTitleText,
@@ -237,6 +238,8 @@ export async function readChatMessages(
   // Расход берём из последней строки хода: все они несут одинаковый.
   let tailId: string | undefined;
   const asks = new Map<string, AskSeen>();
+  // Хуки — служебные строки: садятся на шаг модели для следа хода (`hook-trace`).
+  const hooks = createTurnHooks();
 
   for await (const line of streamLines(path)) {
     const trimmed = line.trim();
@@ -249,6 +252,7 @@ export async function readChatMessages(
       continue;
     }
 
+    if (hooks.take(record, ring)) continue;
     // Автовыбор узнаётся по `tool_result` — строке, которую отсев ниже прячет.
     if (record.type === 'user') attachAutoPicks(asks, record.message?.content);
     if (!isDialogMessage(record)) continue;
@@ -271,16 +275,20 @@ export async function readChatMessages(
 
     tailId = messageId;
     total += 1;
-    ring.push({
-      id: record.uuid ?? String(total - 1),
-      role: record.type === 'user' ? 'user' : 'assistant',
-      blocks,
-      timestamp: record.timestamp ?? '',
-      parentId: record.parentUuid ?? undefined,
-      usage: withGenMs(toUsage(record), messageId, window.genTimes),
-      gitBranch: branchOf(record),
-      ...(summarized ? { contextSummarized: true } : {}),
-    });
+    ring.push(
+      hooks.placed({
+        id: record.uuid ?? String(total - 1),
+        role: record.type === 'user' ? 'user' : 'assistant',
+        blocks,
+        timestamp: record.timestamp ?? '',
+        parentId: record.parentUuid ?? undefined,
+        usage: withGenMs(toUsage(record), messageId, window.genTimes),
+        gitBranch: branchOf(record),
+        ...(summarized ? { contextSummarized: true } : {}),
+        // Слова человека посреди хода (`normalizeRecord`) ход не делят.
+        ...(record.attachment?.type === 'queued_command' ? { midTurn: true } : {}),
+      }),
+    );
 
     // Лишнее с начала выбрасываем сразу, не дожидаясь конца файла.
     if (ring.length > cap) ring.shift();
@@ -413,12 +421,16 @@ export function readLastAssistantTurn(
   // Итог, после которого хук Stop вернул замечание (L7.2): ответ на замечание
   // его не заменяет, а дописывает. Реплика человека начинает ход заново.
   let beforeStop: string[] = [];
+  // Итог до ПЕРВОГО замечания хука Stop в этом ходе человека (P1, g5 25.10): им, а не
+  // ответом на замечание, следующее звено узнаёт исход прошлого.
+  let firstStop: string[] | undefined;
 
   for (const record of readRecords(path, 0)) {
     if (record.isSidechain || record.isCompactSummary) continue;
     if (record.isMeta) {
       if (closing && !calledTool && isStopFeedback(record.message?.content)) {
         beforeStop = [...beforeStop, ...parts];
+        firstStop ??= [...parts];
       }
       continue;
     }
@@ -431,6 +443,7 @@ export function readLastAssistantTurn(
       if (record.type === 'user' && isHumanPrompt(record.message.content)) {
         asked.clear();
         beforeStop = [];
+        firstStop = undefined;
       }
       // Вопрос закрыт автономией — человека он не ждёт.
       for (const pick of autoPickResults(record.message.content)) asked.delete(pick.toolUseId);
@@ -463,12 +476,17 @@ export function readLastAssistantTurn(
   if (!closing || calledTool) return undefined;
   // Хвостом, как копит текст реестр прогонов: разборщикам нужен конец ответа.
   const text = [...beforeStop, ...parts].join('\n').trim().slice(-cap);
-  return text ? { text, ...(asked.size > 0 ? { asked: true } : {}) } : undefined;
+  const summary = firstStop?.join('\n').trim().slice(-cap) ?? '';
+  return text
+    ? { text, ...(summary ? { summary } : {}), ...(asked.size > 0 ? { asked: true } : {}) }
+    : undefined;
 }
 
 /** Закрывающий ход усыновлённого прогона: текст и вопрос инструментом. */
 export interface ClosingTurn {
   text: string;
+  /** Итог до первого замечания хука Stop; нет — хук ход не отбивал. */
+  summary?: string;
   asked?: boolean;
 }
 

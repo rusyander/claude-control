@@ -112,6 +112,18 @@ export function carriedLink(link: ChatLink): ChatLink {
 }
 
 /**
+ * Связь продолжения в чистой сессии (передача окна): та же копия, а у группы
+ * разделения ещё и вводная продолжения, пока разговор не родился (`stagePrompt`).
+ * Пауза через 1,7 с после передачи (d9869abf:9, 26.10) оборвала старт до первого
+ * хода: вводная жила только в памяти прогона, и «Продолжить» вело группу в
+ * закрытый разговор на 216 тыс. окна общим словом.
+ */
+export function continuationLink(link: ChatLink, prompt?: string): ChatLink {
+  const carried = carriedLink(link);
+  return link.groupIndex === undefined || !prompt ? carried : { ...carried, stagePrompt: prompt };
+}
+
+/**
  * Связь НОВОГО звена (доставка, правки, звено чужого CLI) — копия, из которой
  * сняты факты окна прошлого звена (F-110). `stageSince` нужен продолжению той
  * же стадии (D6): без него работа прошлой сессии звена не попадала в `hasWork`.
@@ -222,6 +234,36 @@ export function unbornResumeTarget(
     chatId: target[0],
     clearReviewed: link.stage === 'review' && Boolean(target[1].reviewedAt),
   };
+}
+
+/**
+ * Нерождённое звено правок или доставки, заведённое ПОСЛЕ текущего чата группы
+ * (группа d9869abf:5, 25.10): связь доставки записана, перезапуск панели оборвал
+ * её до первого хода, а чат группы так и остался ревью — «Продолжить» слало
+ * слово в сессию ревью, и доставка не начиналась никогда. Новейшее — первым.
+ */
+export function unbornStageOf(
+  links: Record<string, ChatLink>,
+  chatId: string,
+): [string, ChatLink] | undefined {
+  const current = links[chatId];
+  if (!current || current.groupIndex === undefined) return undefined;
+  const after = current.createdAt ?? '';
+  const unborn = Object.entries(links)
+    .filter(
+      ([key, link]) =>
+        key.startsWith('new-') &&
+        key !== chatId &&
+        link.parentChatId === current.parentChatId &&
+        link.groupIndex === current.groupIndex &&
+        (link.stage === 'fix' || link.stage === 'deliver') &&
+        typeof link.stagePrompt === 'string' &&
+        !link.retiredAt &&
+        (link.createdAt ?? '') > after &&
+        conversationKeys(links, key).every((other) => other.startsWith('new-')),
+    )
+    .sort(([, a], [, b]) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  return unborn[0];
 }
 
 /** Самые старые связи вытесняются: файл состояния не должен расти без края. */

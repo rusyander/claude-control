@@ -163,7 +163,7 @@ describe('collect', () => {
     expect(question.questions).toHaveLength(2);
     expect(question.target).toMatchObject({ kind: 'question', runKey: 'run-1' });
     expect(relay.immediate).toBe(true);
-    expect(itemText(relay)).toContain('👥 Группа 2 «Тесты» · стадия «ревью»');
+    expect(itemText(relay)).toContain('группа 2 «Тесты» · стадия «ревью»');
     expect(deferred).toMatchObject({ immediate: true, reason: 'пуш' });
   });
 });
@@ -211,7 +211,7 @@ describe('compose', () => {
       keyboardOf(question, sign)
         .flat()
         .map((button) => button.text),
-    ).toEqual(['A', 'B', '✍️ Свой ответ']);
+    ).toEqual(['1. A', '2. B', '✍️ Свой ответ']);
     // Тот же кнопке — тот же номер: правка сообщения не сдвигает соседей.
     const first = keyboardOf(question, sign).flat()[1]!.callback_data;
     expect(keyboardOf(question, sign).flat()[1]!.callback_data).toBe(first);
@@ -241,8 +241,8 @@ describe('compose', () => {
       .map((button) => button.text);
     expect(labels).toEqual(['1 · ✅ Разрешить', '1 · ⛔ Запретить', '2 · ❓ Ответить']);
     const text = messageText(many, [panelLink('s1', '8888')]);
-    expect(text).toContain('Ждут ответа: 2');
-    expect(text).toContain('Открыть в панели: http://localhost:8888/chat?id=s1');
+    expect(text).toContain('<b>Ждут ответа: 2</b>');
+    expect(text).toContain('<a href="http://127.0.0.1:8888/chat?id=s1">Открыть чат →</a>');
   });
 });
 
@@ -418,11 +418,13 @@ describe('TelegramAnswersService', () => {
 
   function make(over: Partial<AnswersServiceDeps> & { items?: PendingAskItem[] } = {}) {
     const store = new AnswersStore();
-    store.setSettings({ enabled: true, afterMinutes: 3, ownerId: OWNER });
+    store.setSettings({ enabled: true, afterMinutes: 3, ownerId: OWNER, ownerName: '' });
     const items = over.items ?? [permissionItem()];
     const apply = vi.fn(async () => ({ ok: true as const }));
     service = new TelegramAnswersService({
       store,
+      // Тишина после старта (B7) проверяется отдельно, в telegram-batch.test.ts.
+      sendGraceMs: 0,
       token: () => TOKEN,
       agentBotIds: () => new Set(),
       collect: async () => items,
@@ -474,7 +476,9 @@ describe('TelegramAnswersService', () => {
     await svc.scan();
     const sent = bot.calls.find((call) => call.method === 'sendMessage')!;
     expect(sent.body.chat_id).toBe(OWNER);
-    expect(String(sent.body.text)).toContain('📁 shop · 💬 Починить вход · Claude Code');
+    expect(String(sent.body.text)).toContain('<b>🔐 РАЗРЕШЕНИЕ · 📁 shop · Починить вход</b>');
+    expect(String(sent.body.text)).toContain('<b><code>git push</code></b>');
+    expect(sent.body.parse_mode).toBe('HTML');
     const keyboard = (sent.body.reply_markup as { inline_keyboard: { callback_data: string }[][] })
       .inline_keyboard;
     const allow = keyboard[0]![0]!.callback_data;
@@ -508,7 +512,9 @@ describe('TelegramAnswersService', () => {
       expect.stringMatching(/^tg-/),
     ]);
     const edit = bot.calls.filter((call) => call.method === 'editMessageText').pop()!;
-    expect(String(edit.body.text)).toMatch(/✅ Разрешено · \d\d:\d\d/);
+    expect(String(edit.body.text)).toMatch(
+      /^✅ Разрешено \d\d:\d\d · git push · 📁 shop · Починить вход$/,
+    );
     expect(edit.body.reply_markup).toEqual({ inline_keyboard: [] });
 
     // Повтор нажатия — «уже отвечено», второго применения нет.
@@ -583,7 +589,9 @@ describe('TelegramAnswersService', () => {
     items.length = 0;
     await svc.scan();
     const edit = bot.calls.filter((call) => call.method === 'editMessageText').pop()!;
-    expect(String(edit.body.text)).toMatch(/💻 Отвечено в панели · \d\d:\d\d/);
+    expect(String(edit.body.text)).toMatch(
+      /^💻 Отвечено в панели \d\d:\d\d · git push · 📁 shop · Починить вход$/,
+    );
     expect(edit.body.reply_markup).toEqual({ inline_keyboard: [] });
   });
 
@@ -624,7 +632,7 @@ describe('TelegramAnswersService', () => {
       },
     });
     await svc.handleUpdate(
-      press(keyboardOfLast().find((button) => button.text === 'B')!.callback_data),
+      press(keyboardOfLast().find((button) => button.text === '2. B')!.callback_data),
     );
     expect(apply).not.toHaveBeenCalled();
     await svc.handleUpdate(

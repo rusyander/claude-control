@@ -15,4 +15,10 @@ export interface TicketSeedResult {
   written: boolean;
   read: number;
   failed: number;
+  /** Время чтения в шапке файла; файла нет — не задано. */
+  at?: string;
+  /** Что вышло по каждой прочитанной задаче: время обновления в трекере или причина. */
+  tickets?: ({ key: string; updatedAt?: string } | { key: string; reason: string })[];
+  /** Ключи сверх предела — названы в файле, но не прочитаны. */
+  skipped?: string[];
 }

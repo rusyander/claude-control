@@ -789,6 +789,8 @@ export class ProjectTestRunRegistry {
         kind: status === 'error' ? 'error' : 'done',
         chatId: entry.view.sessionId ?? entry.view.id,
         projectPath,
+        // Сколько шёл прогон: «Закончил» в Telegram — только после долгой работы.
+        durationMs: Math.max(0, Date.now() - Date.parse(entry.view.startedAt)),
       });
     }
   }

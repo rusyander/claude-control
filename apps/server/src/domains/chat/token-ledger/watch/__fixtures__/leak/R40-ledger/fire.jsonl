@@ -1,0 +1,7 @@
+{"at":1793005200000,"check":"vitest","repo":"C:\\work\\app","kind":"miss","key":"k1","reason":"no-record","mode":"on"}
+{"at":1793005204000,"check":"vitest","repo":"C:\\work\\app","kind":"record","key":"k1","exit":0,"ms":4100}
+{"at":1793006400000,"check":"vitest","repo":"C:\\work\\app","kind":"miss","key":"k1","reason":"no-record","mode":"on"}
+{"at":1793006405000,"check":"vitest","repo":"C:\\work\\app","kind":"record","key":"k1","exit":0,"ms":4300}
+{"at":1793006460000,"check":"vitest","repo":"C:\\work\\app","kind":"off","key":"k2","reason":"registry unreadable"}
+{"at":1793006520000,"check":"vitest","repo":"C:\\work\\app","kind":"mismatch","key":"k3","exit":1,"recordedExit":0}
+{"at":1793006580000,"check":"vitest","repo":"C:\\work\\app","kind":"would-skip","key":"k4","mode":"shadow","savedMs":3000}

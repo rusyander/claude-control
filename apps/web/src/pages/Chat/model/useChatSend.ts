@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ChatMessage } from '@agentdeck/contracts';
@@ -7,6 +7,7 @@ import type { DraftBox } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { SUPPORTED_UPLOAD_EXTENSIONS } from '../lib/uploads';
 import { planSend } from '../lib/send';
+import { createForkAsk, watchForkDraft } from '../lib/forkDraft';
 import type { ChatSendFile } from '../ChatPage.types';
 
 export interface ChatSendInput {
@@ -39,6 +40,8 @@ export interface ChatSendApi {
   send: (files: ChatSendFile[]) => Promise<boolean>;
   /** Ответ выбранным вариантом на вопрос агента. */
   answerQuestion: (answer: string) => void;
+  /** Окно «отправить веткой?»: отправка после правки реплики ждёт ответа в нём. */
+  forkConfirm: { isOpen: boolean; answer: (ok: boolean) => void };
 }
 
 /**
@@ -70,6 +73,23 @@ export function useChatSend({
     forkNextRef.current = true;
     draft.set(text);
   };
+  // Очистил поле или ушёл в другой разговор — раздумал править: иначе следующее
+  // обычное сообщение молча уходило веткой, и в списке вставал второй чат с тем
+  // же названием (Telegram 26.10, R2).
+  useEffect(
+    () =>
+      watchForkDraft(draft, () => {
+        forkNextRef.current = false;
+      }),
+    [draft],
+  );
+  useEffect(() => {
+    forkNextRef.current = false;
+  }, [activeChatId]);
+  // Ветка — отдельный разговор с той же историей и тем же названием: заводить
+  // его молча нельзя, отправка ждёт «да» в окне.
+  const [isForkAskOpen, setForkAskOpen] = useState(false);
+  const [forkAsk] = useState(() => createForkAsk(setForkAskOpen));
 
   /** Текст отказа — по структурному коду сервера, а не по разбору сообщения. */
   const notSentText = (outcome: Extract<SendOutcome, { ok: false }>): string => {
@@ -91,7 +111,11 @@ export function useChatSend({
   // Показываем реплику сразу (pending), продолжаем существующую сессию.
   // Возвращает, ПРИНЯЛ ли сервер сообщение: отказ обязан быть виден и не должен
   // ничего стоить — ни текста в поле, ни оптимистичного пузыря в ленте.
-  const dispatch = async (prompt: string, files: ChatSendFile[]): Promise<boolean> => {
+  const dispatch = async (
+    prompt: string,
+    files: ChatSendFile[],
+    asFork = false,
+  ): Promise<boolean> => {
     let id = chatId;
     if (!id) {
       id = `new-${Date.now()}`;
@@ -112,9 +136,9 @@ export function useChatSend({
     const resumeSession = activeChatId ?? sessionId;
     // Правка своего сообщения ветвит разговор: отправка после «изменить» уходит
     // в форк сессии, а исходный разговор остаётся нетронутым. Форк осмыслен
-    // только при существующей сессии.
-    const fork = forkNextRef.current && Boolean(resumeSession);
-    forkNextRef.current = false;
+    // только при существующей сессии. Решает отправка из поля (`send`): ответ
+    // вариантом и «Продолжить» — не правка реплики и ветку не заводят.
+    const fork = asFork && Boolean(resumeSession);
 
     const outcome = await agentRuns.start({
       chatId: id,
@@ -185,9 +209,14 @@ export function useChatSend({
     // Поле пустеет сразу, а не после ответа сервера (~0,3 с, отправленный текст
     // висел в поле на глазах); отказ возвращает набранное, если человек за это
     // время не начал писать новое.
+    // Ветка — только с «да» человека. Пометку снимаем до очистки поля (её снял
+    // бы и сторож пустого поля); отказ сервера возвращает её в `dispatch`.
+    const fork = forkNextRef.current && Boolean(activeChatId ?? sessionId);
+    if (fork && !(await forkAsk.ask())) return false;
+    forkNextRef.current = false;
     const typed = draft.get();
     draft.set('');
-    const accepted = await dispatch(plan.prompt, files);
+    const accepted = await dispatch(plan.prompt, files, fork);
     if (!accepted && draft.get() === '') draft.set(typed);
     return accepted;
   };
@@ -215,5 +244,11 @@ export function useChatSend({
     void dispatch(prompt, []);
   };
 
-  return { editMessage, dispatch, send, answerQuestion };
+  return {
+    editMessage,
+    dispatch,
+    send,
+    answerQuestion,
+    forkConfirm: { isOpen: isForkAskOpen, answer: forkAsk.answer },
+  };
 }

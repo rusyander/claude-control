@@ -1,4 +1,5 @@
 import { existsSync, statSync } from 'node:fs';
+import type { InboxClient } from '@agentdeck/contracts/chat-inbox';
 import type { Record } from '../ChatRecords/ChatRecords.ts';
 import { findTranscript, readTailRecords } from '../ChatTranscriptFile/ChatTranscriptFile.ts';
 import { autoPickResults } from '../auto-pick/auto-pick.ts';
@@ -120,11 +121,36 @@ function interrupted(content: unknown): boolean {
   );
 }
 
+/** Клиенты CLI по полю `entrypoint` записи транскрипта. */
+const CLIENTS: { readonly [entrypoint: string]: InboxClient } = {
+  'sdk-cli': 'panel',
+  'claude-vscode': 'vscode',
+  cli: 'terminal',
+};
+
+/**
+ * Кто ведёт сессию: поле `entrypoint`, которое CLI пишет в каждую запись
+ * (`claude -p` панели — `sdk-cli`, VS Code — `claude-vscode`, терминал — `cli`).
+ * Решает последняя запись: сессию VS Code, однажды продолженную панелью, снова
+ * ведёт VS Code, как только там написали. Записи субагентов не голосуют.
+ */
+export function clientIn(records: readonly Record[]): InboxClient | undefined {
+  let client: InboxClient | undefined;
+  for (const record of records) {
+    const entrypoint = (record as { entrypoint?: unknown }).entrypoint;
+    if (record.isSidechain || typeof entrypoint !== 'string' || !entrypoint) continue;
+    client = CLIENTS[entrypoint] ?? 'other';
+  }
+  return client;
+}
+
 /** Что сводке нужно из хвоста транскрипта. */
 export interface TranscriptTail {
   asked: AskedCall | undefined;
   turnOpen: boolean;
   mtimeMs: number;
+  /** Кто ведёт сессию; нет — записи без `entrypoint`. */
+  client?: InboxClient;
 }
 
 /** Ход вне панели: открыт и файл двигался недавно. */
@@ -167,10 +193,12 @@ export function createTranscriptTailReader(
         return known.value;
       }
       const records = readTailRecords(path, ASK_TAIL_BYTES);
+      const client = clientIn(records);
       const value: TranscriptTail = {
         asked: lastAskedIn(records),
         turnOpen: turnOpenIn(records),
         mtimeMs: stats.mtimeMs,
+        ...(client ? { client } : {}),
       };
       cache.delete(chatId);
       cache.set(chatId, { path, mtimeMs: stats.mtimeMs, size: stats.size, value });

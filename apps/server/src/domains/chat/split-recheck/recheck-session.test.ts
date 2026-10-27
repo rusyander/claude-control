@@ -130,6 +130,28 @@ describe('вводная нового разговора перепроверк�
     expect(brief.split(OWNER_PRECEDENCE_LINE).length - 1).toBe(1);
   });
 
+  it('блокнот фактов в копии назван: прочесть до проверок, дописать найденное (g0 26.10)', () => {
+    const withNotebook = recheckFreshBrief({
+      previous: 'old-session',
+      group: group(),
+      tasks: [],
+      progress: true,
+      notebook: true,
+    });
+    expect(withNotebook).toContain(
+      'Found facts: .agent/run/notebook.agent.md in the copy — commands, environment recipes',
+    );
+    expect(withNotebook).toContain('Read it before running any check');
+    const without = recheckFreshBrief({
+      previous: 'old-session',
+      group: group(),
+      tasks: [],
+      progress: true,
+      notebook: false,
+    });
+    expect(without).not.toContain('notebook.agent.md');
+  });
+
   it('связи без задания — задачи из предложения списком', () => {
     const brief = recheckFreshBrief({
       previous: 'old-session',
@@ -165,6 +187,35 @@ describe('охват перепроверки по копии', () => {
 });
 
 describe('слово перепроверки — новым разговором', () => {
+  // Владелец 27.10: перепроверки g5/g9 шли целиком на Sonnet — связь звена доставки несёт
+  // дешёвую модель «Доставки на Sonnet», а перепроверка — работа по существу.
+  it('модель и глубина — работы группы, не дешёвой доставки', () => {
+    const deliver = link({
+      stage: 'deliver',
+      model: 'sonnet',
+      effort: 'high',
+      workModel: 'claude-opus-5-5',
+      workEffort: 'xhigh',
+    });
+    const h = harness({ links: { 'old-session': deliver } });
+    expect(h.send(record(), group(), 'Перепроверь MR')).toBe('sent');
+    expect(h.starts[0]).toMatchObject({ model: 'claude-opus-5-5', effort: 'xhigh' });
+    expect(h.links[`new-${NOW}-recheck1`]).toMatchObject({
+      model: 'claude-opus-5-5',
+      effort: 'xhigh',
+      workModel: 'claude-opus-5-5',
+    });
+  });
+
+  it('модель работы без своей глубины — без глубины доставки', () => {
+    const deliver = link({ stage: 'deliver', model: 'sonnet', effort: 'high', workModel: 'opus' });
+    const h = harness({ links: { 'old-session': deliver } });
+    expect(h.send(record(), group(), 'Перепроверь MR')).toBe('sent');
+    expect(h.starts[0]?.model).toBe('opus');
+    expect(h.starts[0]).not.toHaveProperty('effort');
+    expect(h.links[`new-${NOW}-recheck1`]).not.toHaveProperty('effort');
+  });
+
   it('связь нового ключа — копия прежней с новым разговором; старт без resume, вводная + слово', () => {
     const h = harness();
     expect(h.send(record(), group(), 'Перепроверь MR')).toBe('sent');
@@ -193,6 +244,44 @@ describe('слово перепроверки — новым разговоро�
     expect(start.prompt.endsWith('\n\nПерепроверь MR')).toBe(true);
     expect(start.prompt).toContain('- PROJ-1 кнопка');
     expect(h.resumed).toEqual([]);
+  });
+
+  it('блокнот в копии есть — строка о нём во вводной нового разговора', () => {
+    const h = harness();
+    const seen: string[] = [];
+    h.deps.notebook = (cwd) => {
+      seen.push(cwd);
+      return true;
+    };
+    h.send(record(), group(), 'Перепроверь MR');
+    expect(seen).toEqual(['C:/wt/front']);
+    expect(h.starts[0]!.prompt).toContain('Found facts: .agent/run/notebook.agent.md');
+  });
+
+  // Владелец 26.10: перепроверка — новая работа на готовом MR, и её ревью читает только
+  // сделанное с её начала. Коммит начала — голова копии сейчас, а не начало прежнего круга.
+  it('коммит начала — голова копии сейчас; прежнее начало и «было до группы» не едут', () => {
+    const h = harness({
+      links: {
+        'old-session': link({ startSha: 'a'.repeat(40), preExisting: ['🟡 1. давнее'] }),
+      },
+    });
+    const seen: string[] = [];
+    h.deps.headSha = (cwd) => {
+      seen.push(cwd);
+      return 'b'.repeat(40);
+    };
+    h.send(record(), group(), 'Перепроверь MR');
+    const fresh = h.links[`new-${NOW}-recheck1`];
+    expect(seen).toEqual(['C:/wt/front']);
+    expect(fresh?.startSha).toBe('b'.repeat(40));
+    expect(fresh).not.toHaveProperty('preExisting');
+    // Голову не прочесть — поля нет: ревью прежним путём, а не от чужого начала.
+    const blind = harness({ links: { 'old-session': link({ startSha: 'a'.repeat(40) }) } });
+    blind.deps.headSha = () => undefined;
+    blind.send(record(), group(), 'Перепроверь MR');
+    expect(blind.links[`new-${NOW}-recheck1`]).not.toHaveProperty('startSha');
+    expect(blind.links['old-session']?.startSha).toBe('a'.repeat(40));
   });
 
   it('нет связи или копии — прежний путь', () => {

@@ -7,6 +7,9 @@
 // input, in the transcript). Kept: id, iid, url, branches, state, sha, merge status, timestamps, and the
 // description's length; `get_merge_request` still returns the whole MR. An error result is never cut.
 const MR_WRITE = /^mcp__.+__(update_merge_request|create_merge_request)$/;
+// OpenCode names an MCP tool `<server>_<tool>` (1.18.35: `Z1(server)+"_"+Z1(tool)`), no `mcp__`; its
+// built-ins never end so. Its plugin shim is the one rewrite seam outside Claude (P-15).
+const OPENCODE_MR_WRITE = /^[A-Za-z0-9_-]+_(update_merge_request|create_merge_request)$/;
 export const ECHO_MIN = 1500;
 const KEEP = [
   'id',
@@ -77,6 +80,9 @@ function trimShape(response) {
 
 /** @returns the replacement output for `updatedMCPToolOutput`, or null. */
 export default function mrEchoTrim(input) {
-  if (!splitChild() || !MR_WRITE.test(String(input?.tool_name ?? ''))) return null;
+  const tool = String(input?.tool_name ?? '');
+  const write =
+    MR_WRITE.test(tool) || (input?.agentdeck_cli === 'opencode' && OPENCODE_MR_WRITE.test(tool));
+  if (!splitChild() || !write) return null;
   return trimShape(input?.tool_response);
 }

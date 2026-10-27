@@ -101,6 +101,7 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'worktree-copy-gap-files': 'missing files: {{files}}',
   'worktree-copy-gap-links': 'missing links: {{links}}',
   'worktree-copy-gap-mcp': 'the copy .mcp.json lacks the original servers: {{names}}',
+  'worktree-copy-gap-hooks': 'the copy settings.local.json lacks the original hooks: {{names}}',
   'worktree-copy-gap-access': 'no access entry — the agent will ask about trust and MCP',
   'worktree-mirror-moved': 'Local layer: {{count}} copied',
   'worktree-mirror-linked': 'by link: {{paths}}',
@@ -137,6 +138,10 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Path step “{{step}}” did not pass its check: {{note}}. The chain waits for an answer in this chat.',
   'group-same-session-notice':
     'The group continues in the same session: context {{tokens}}k of the {{window}}k compaction window — a fresh session would re-read everything already in it.',
+  'review-skipped-notice':
+    'No review was started: since commit {{from}} the work has no changes of its own — no new commits, no conflict resolutions in merges, no differences after a rebase.',
+  'review-off-notice':
+    'No review was started: «Review after work» is off for this project — the work goes straight to delivery.',
   'split-limit-wait-notice':
     'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
   'split-limit-warning-notice':
@@ -149,10 +154,16 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Group «{{group}}»: the MR {{mr}} pipeline failed on CI infrastructure, not on the code — {{jobs}}. The panel retried those jobs once by itself and did not wake the group.',
   'split-mr-watch-infra-again-notice':
     'Group «{{group}}»: after the retry the MR {{mr}} pipeline failed on CI infrastructure again — {{jobs}}. The panel retries no more and does not wake the group: check the runner.',
+  'split-mr-watch-red-unfixed-notice':
+    "Group «{{group}}»: the MR {{mr}} pipeline (#{{pipeline}}) is red and the turn ended without a fix — the branch head did not move. The panel does not mark the group done and waits for you. The group's answer: {{answer}}",
+  'split-mr-watch-green-notice':
+    'Group «{{group}}»: the MR {{mr}} pipeline (#{{pipeline}}) turned green while the group waited for you over the red one. The panel checks the delivery itself: nothing missing — the group is done; gaps — it gets a reminder.',
   'chat-conversation-lost-notice':
     "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
   'chat-cold-resume-notice':
     "The group stood idle past its cache lifetime, its conversation went cold, and the window is already {{tokens}}k tokens: continuing it means writing the whole window again. The turn went on as a new conversation in the same copy; the panel built the brief from files — the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk: to move the turn back into it, press «Continue the old conversation» while the new one runs. Switch off in settings: Groups, group economy.",
+  'chat-mr-relay-fresh-notice':
+    "The panel's word to a delivered group (MR pipeline or discussions) went on as a new conversation in the same copy: the previous window is already {{tokens}}k tokens, and every request of the turn would re-read the whole delivery. The panel built the brief from files — branch, MR, tasks, the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk: to move the turn back into it, press «Continue the old conversation» while the new one runs. Switch off in settings: Groups, group economy.",
   'split-default-drift-notice':
     'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — at delivery the group checks for a conflict and rebases only on a real one.',
   'chat-autonomy-deferred-notice':
@@ -186,9 +197,14 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'delivery-gap-dirty-more': 'uncommitted changes: {{files}} and {{more}} more',
   'delivery-gap-not-pushed':
     'branch {{branch}} is not pushed to the remote (or lags behind the copy HEAD)',
+  'delivery-gap-remote-ahead':
+    'branch {{branch}} on the remote is ahead of the copy — commits not made in the copy were added there: {{commits}}. Bring them in with one `git pull --ff-only origin {{branch}}` (not merge, reset or rebase), check they did not revert your changes, and in the same round report again the sieve rows the new commit reopens',
+  'delivery-gap-foreign-revert':
+    'commit {{commit}} on the branch was not made by the group and removed lines the group added — they are not in HEAD either: {{files}}. If the file is generated, fix its source and regenerate; then settle the file with a commit of your own (or restore the lines)',
   'delivery-gap-no-mr':
     'no MR whose head is the copy HEAD (branch {{branch}}) — push the branch and open the MR, or update yours',
-  'delivery-gap-review-unfinished': 'the work review is not finished: there is no reviewer verdict',
+  'delivery-gap-review-unfinished':
+    'the work review is not finished: there is no reviewer verdict — the final answer of the review stage ends with an ```agentdeck:review``` block {"findings":[…]} ([] = approved)',
   'delivery-gap-fix-missing':
     'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
   'delivery-gap-owner-unreported':
@@ -196,6 +212,36 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'delivery-gap-owner-failed': 'owner’s point {{point}} is not done: {{evidence}}',
   'delivery-gap-owner-no-evidence':
     'owner’s point {{point}} is marked without evidence: file:line, the command and a line of its output, or the reason, are needed',
+  'delivery-gap-task-unreported':
+    'the points of the group’s tasks are not reported: rows task-1, task-2, … are needed in a {{lang}} block — each acceptance criterion, listed item, example and tail of the task and of the tickets it links: {"sieves":[{"id":"task-1","status":"pass|fail|n/a","evidence":"KEY «the point, copied word for word from the ticket or task» — file:line, or the command and a line of its output"}]}',
+  'delivery-gap-task-failed': 'task point {{point}} is not done: {{evidence}}',
+  'delivery-gap-task-no-evidence':
+    'task point {{point}} is marked without evidence: file:line, or the command and a line of its output, is needed',
+  'delivery-gap-task-flip': 'task point {{point}}: the row turned pass with no new proof — {{why}}',
+  'delivery-gap-task-unsourced':
+    'task point {{point}} is pass with no source: quote the point itself word for word in «…» — from the ticket (the file .agent/run/tickets.md or the tracker, with the ticket key), from the group’s task, or a line of the MR description («MR description: …») — then the proof: file:line, or the command and a line of its output',
+  'delivery-gap-task-quote-unfound':
+    'task point {{point}}: the quote «{{quote}}» is in none of the tickets (.agent/run/tickets.md), the group’s task or the MR description — quote the point word for word from where it comes; a ticket missing from the file — with its key',
+  'delivery-gap-task-quote-label':
+    'task point {{point}}: «{{quote}}» is a label (a tool, button or file name), not the point: the quote has fewer than three words. Quote the point itself word for word — a phrase from its ticket section, the group’s task or the MR description',
+  'delivery-gap-task-point-unmapped':
+    'ticket {{key}}: points of the ticket that no task-N row quotes — {{count}}: {{points}}. For each, a task-N row quoting the point in «…» with the ticket key: pass with the proof if done; fail with the reason if not done (and named in the MR description); n/a with the reason if it is no requirement. Full text — the ## {{key}} section of .agent/run/tickets.md',
+  'delivery-gap-task-rewritten':
+    'task point {{point}}: the evidence was rewritten with no new commit — it was «{{was}}», now «{{now}}»; only one can be true. The earlier one is already reported: if it holds, drop this row from your answer — the panel keeps the earlier one, and the gap closes in this same turn. If the new one is true, check it against the ticket and the code; the same row repeated in a later answer closes this gap',
+  'delivery-gap-task-note-rejected':
+    'task point {{point}} is not done: {{evidence}} — the mark is not accepted: {{why}}',
+  'delivery-gap-defer-unowned':
+    'point {{point}} is handed off with no owner named: {{evidence}} — do it in this branch, or name the owner: "other group: group N «title» — a file or folder from its owned list" or "tracker: KEY" of a filed ticket; a point outside the group’s tasks — "does not apply: why"',
+  'delivery-gap-defer-self':
+    'point {{point}} is handed to group {{group}}, which is your own group — do it in this branch',
+  'delivery-gap-defer-closed':
+    'point {{point}} is handed to group {{group}} «{{title}}», but that group closed without delivering (dropped or failed) — nobody will do it: do it in this branch, or name a filed tracker ticket',
+  'delivery-gap-defer-no-path':
+    'point {{point}} is handed to group {{group}} «{{title}}» without a path — name a file or folder from its owned list ({{owns}}), or the hand-off cannot be checked; no such path — the point is yours',
+  'delivery-gap-defer-not-owned':
+    'point {{point}} is handed to group {{group}} «{{title}}», but {{paths}} is not in its owned list ({{owns}}) — nobody will do it: do it in this branch, or name the group whose list holds that path, or a filed tracker ticket',
+  'delivery-gap-defer-merged':
+    'point {{point}} waited for group {{group}} «{{title}}» to merge — its MR is merged now: the point is yours, do it in this branch',
   'delivery-gap-mr-description':
     'MR {{mr}} has an empty description — describe what changed, why, and how it was checked',
   'delivery-gap-mr-na-reason':
@@ -232,7 +278,20 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'sieve-gap-stale':
     'sieve {{sieve}}: the branch changed the code this sieve covers after the row was reported ({{files}}) — check again on the final commit and report the row again',
   'sieve-gap-no-run':
-    'sieve {{sieve}}: the project has a Tests section — record the live check as a run (tests-cli run or tests-cli record) and cite it in the evidence as run:<id>',
+    'sieve {{sieve}}: the live check is not backed by a run — check it against a stand running this branch (or with the route test through the real route) as a Tests-section case tagged one of: {{tags}}, run it through the Tests block (`tests-cli run`) and cite the run in the evidence as run:<id>; only a run the Tests block executed (`tests-cli run`) of a case tagged by someone else counts — a run recorded by hand, a tag the group set on its own case and a unit or service test do not; cannot run it here — status fail with evidence "not checked: <reason>"',
+  'sieve-gap-no-run-cite':
+    'sieve {{sieve}}: run {{run}} in the Tests history already fits — cite it in the evidence as run:{{run}}; no rerun is needed',
+  'sieve-gap-run-not-live':
+    'sieve {{sieve}}: run {{run}} holds no live check — no passed case in it is tagged ({{tags}}), and a unit or service test does not prove it; a run recorded by hand and a tag the group set on its own case do not count either — only a run the Tests block executed (`tests-cli run`) of a case tagged by someone else; a diff of only `tools/` and `scripts/` files is also proved by an executed run of a case whose codePaths name those files; check against a stand running this branch or with the route test through the real route as a case with such a tag, or — if it cannot run here — status fail with evidence "not checked: <reason>"',
+  'sieve-gap-flip': 'sieve {{sieve}}: the row turned pass with no new proof — {{why}}',
+  'delivery-gap-owner-flip':
+    'owner’s point {{point}}: the row turned pass with no new proof — {{why}}',
+  'sieve-flip-mark':
+    'the marks "not checked:" and "not caused by the branch:" belong to a fail row only — report the row as fail with that mark',
+  'sieve-flip-red':
+    'it was fail last round and the evidence still says red or not checked — fix the cause and cite a new run, or keep it fail with a mark',
+  'sieve-flip-same':
+    'it was fail last round with the same evidence («{{was}}») and no new run is cited — fix the cause and cite a new run, or keep it fail with a mark',
   'sieve-gap-run-missing':
     'sieve {{sieve}}: run {{run}} is not in the Tests history of the copy or did not finish — record the run and cite its id',
   'sieve-gap-run-empty':
@@ -242,21 +301,27 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'sieve-gap-run-stale':
     'sieve {{sieve}}: run {{run}} is older than the change to the code this sieve covers ({{files}}) — run it again on the final commit',
   'sieve-gap-live-na':
-    'sieve {{sieve}}: a live check cannot be reported n/a — the diff changes behaviour ({{files}}); check it live on the final commit and report pass with evidence, or fail with the reason if it could not run',
+    'sieve {{sieve}}: a live check cannot be reported n/a — the diff changes behaviour ({{files}}); check it live on the final commit and report pass citing run:<id> of a recorded Tests-section run where a case tagged one of: {{tags}} passed, or fail with the reason if it could not run',
+  'sieve-gap-count-no-cite':
+    'sieve {{sieve}}: the evidence quotes a Tests-section test count («{{claim}}») but cites no run — cite run:<id> of the run that printed it (the latest recorded is run:{{run}}: {{passed}} passed, {{failed}} failed)',
+  'sieve-gap-count-no-run':
+    'sieve {{sieve}}: the evidence quotes a Tests-section test count («{{claim}}») but the copy has no recorded run — record one (tests-cli run) and cite it as run:<id>',
+  'sieve-gap-count-mismatch':
+    'sieve {{sieve}}: the count in the evidence («{{claim}}») does not match run:{{run}} — it has {{passed}} passed, {{failed}} failed; rewrite the count from the run output, and fix what failed or name it in the row',
   'tests-gap-no-run':
     'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
   'tests-gap-word-only':
     'Tests block of the copy: since the group started there is only a word-only record (tests-cli record), which does not close an automated case — run the cases for the changed files ({{cases}}) with: {{command}}',
   'tests-gap-stale':
-    'Tests block of the copy: run {{run}} was recorded before the latest change ({{files}}) — run the cases again and record the run: {{command}}',
+    'Tests block of the copy: run {{run}} was recorded before the latest change — run the cases again and record the run: {{command}} (changed under the cases: {{files}})',
   'tests-gap-unrun':
     'Tests block of the copy: cases for the changed files were not run since the group started: {{cases}} — record a run: {{command}}',
   'tests-gap-failed':
-    'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again',
+    'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again; red without the branch too — prove it with a run on the fork point with main: {{command}}',
   'tests-gap-uncovered':
     'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
   'tests-note-red-baseline':
-    'Tests block of the copy: red already before the group started and untouched by the diff: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
+    'Tests block of the copy: red without the branch too — before the group started or on the fork point with main: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
   'tests-note-red-environment':
     'Tests block of the copy: could not run (blocked), or red from the environment (timeout, network, stand, platform) where the diff does not touch them: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
   'sieve-note-unchecked':
@@ -265,10 +330,39 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'sieve {{sieve}}: red not caused by the branch: {{reason}} — does not hold the group; name it in the MR description',
   'sieve-note-run-red':
     'run {{run}}: red not caused by the branch (red before the group started or failed on the environment, untouched by the diff): {{cases}} — they do not hold the group; name them in the MR description',
+  'sieve-gap-note-rejected':
+    'sieve {{sieve}} failed: {{evidence}} — the mark is not accepted: {{why}}',
+  'delivery-gap-owner-note-rejected':
+    'owner’s point {{point}} is not done: {{evidence}} — the mark is not accepted: {{why}}',
+  'note-rejected-run-green':
+    'run {{run}} has no red, so it cannot show a red not caused by the branch; if the row passes now, report it pass with that run as evidence, otherwise cite the run where the case is red',
+  'note-rejected-run-missing':
+    'run {{run}} is not in the Tests history of the copy — cite a recorded run where the case is red',
+  'note-rejected-run-ours':
+    'in run {{run}} the red cases {{cases}} cover code the branch changed, so the branch may have caused them — fix them or keep the fail',
+  'note-rejected-cite-required':
+    'a security or data sieve needs more than words — cite the red on the target branch: run:<id> or `<command>` → `<output line>`',
+  'note-rejected-not-baseline':
+    'runs {{runs}} show no red that was there before the group started — for a security or data sieve, cite a run with the red on the target branch',
+  'note-rejected-not-live':
+    '«not checked» clears only a live check (stand, browser, network), and this sieve runs here — run it; a red not caused by the branch is reported «not caused by the branch: <why>»',
+  'note-rejected-no-reason': 'the mark has no reason after it — add why',
   'delivery-gap-mr-notes':
     'MR {{mr}} description: the delivery notes ({{items}}) are not named — add each to the description: what was not checked or is red not because of the branch, and why',
+  'delivery-gap-mr-unhomed':
+    'MR {{mr}} description: left «separately» with no key of the task that takes it ({{items}}) — add the task key (PROJ-123), fix it in this branch, or ask the human',
+  'delivery-gap-mr-checks':
+    'MR {{mr}} description: no section with the checks on the final tree — add a «Checks» heading: which project checks ran on the final commit and with what result',
+  'delivery-gap-mr-shots':
+    'MR {{mr}} description: the branch changes the UI ({{files}}) but the description has no before/after shots — attach them or write a line «Screenshots: none — reason»',
   'delivery-gap-review-threads':
     'MR {{mr}}: reviewer threads with no answer ({{count}}) — for each, a fix in the branch and a reply in the same discussion thread, or a reply why you do not change it: {{threads}}',
+  'delivery-gap-tracker-comment':
+    'tickets {{keys}} have no comment linking MR {{mr}} — write in each what was done and how to check it, with the MR link',
+  'delivery-note-tickets-skipped':
+    'tickets {{keys}} are named in no commit of the branch — their work is not delivered by this MR: do not move them and do not write «done» in them',
+  'delivery-note-tracker-unread':
+    'the comments of tickets {{keys}} were not read: the tracker did not answer, the panel did not check them for the MR link',
   'split-delivery-stalled':
     'reminder {{nudges}} changed nothing: the same branch head and the same gaps — see what holds the group and continue it with a word',
   'split-delivery-nudge-cap':

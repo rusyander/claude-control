@@ -7,6 +7,7 @@ import {
   ownerRequestBlock,
   reviewPublishGranted,
   splitOwnerRequest,
+  taskCoverageLine,
   withOwnerRequest,
 } from '@agentdeck/contracts/quality-floor';
 import {
@@ -126,6 +127,11 @@ describe('блок слов владельца', () => {
     expect(block).not.toMatch(/They define the work/);
     expect(ownerCoverageLine()).toMatch(/another group of this split .*"n\/a"/);
     expect(ownerCoverageLine()).not.toMatch(/before the first edit/);
+  });
+
+  it('пункт, сделанный самим разделением, отдаётся своей формой — только в следе требований', () => {
+    expect(ownerCoverageLine()).toContain('"n/a" with "split stage: <what it did>"');
+    expect(taskCoverageLine()).not.toContain('split stage');
   });
 
   it('блок со старой шапкой из записи конвейера разбирается как прежде', () => {

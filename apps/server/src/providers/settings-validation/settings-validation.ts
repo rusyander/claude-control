@@ -353,6 +353,7 @@ export const integrationSettingsSchemas = {
     enabled: boolean(),
     chatId: string(),
     events: array(zodEnum(NOTIFY_EVENTS)),
+    doneAfterMinutes: number().int().min(0).max(1440).optional(),
   }),
   zephyr: tmsSystem(false),
   xray: tmsSystem(false),

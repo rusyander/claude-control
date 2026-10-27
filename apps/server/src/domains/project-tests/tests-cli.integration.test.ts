@@ -23,7 +23,7 @@ import {
   upsertCase,
   writeGroup,
 } from './store/store.ts';
-import { readRuns, writeRun } from './runs-store/runs-store.ts';
+import { readRuns, writeBaseRun, writeRun } from './runs-store/runs-store.ts';
 import { syncE2eFolder } from './e2e-sync/e2e-sync.ts';
 import { installFakeRunners, markRunnerInstalled } from './__fixtures__/fake-runners.ts';
 import { playwrightFileArg } from './e2e-command/e2e-command.ts';
@@ -113,6 +113,45 @@ describe('tests-cli', () => {
 
     const show = cli(project, 'show', 'gui-001');
     expect(show.out).toMatch(/Провал: шаг 1 · ожидалось: видна форма · получилось: белый экран/);
+    // Форма из вывода run/gaps — `группа:кейс` (g0 25.10: «в проекте нет»).
+    expect(cli(project, 'show', 'gui:gui-001').out).toMatch(/Провал: шаг 1 · ожидалось/);
+    expect(cli(project, 'show', 'other:gui-001').out).toContain(
+      'Кейса «other:gui-001» в проекте нет',
+    );
+  });
+
+  /**
+   * Аудит g9 27.10 (R8): историю кейса группа собирала скриптом по `runs/*.json` —
+   * python3 (заглушка Store), потом `node -e`. `show --history` печатает её сама,
+   * прогоны на развилке — отдельно: история кейса их не берёт.
+   */
+  it('show --history — исходы кейса по прогонам, новые сверху, и прогоны на развилке', () => {
+    run('aaaaaaaa-1', '2026-09-20T10:00:00.000Z', 'passed');
+    run('bbbbbbbb-2', '2026-09-21T10:00:00.000Z', 'failed');
+    writeBaseRun(project, {
+      id: 'ffffffff-base',
+      mode: 'automate',
+      actor: 'agent',
+      status: 'done',
+      startedAt: '2026-09-21T11:00:00.000Z',
+      finishedAt: '2026-09-21T11:00:00.000Z',
+      branch: 'main',
+      results: [{ pointId: 'gui|gui-001', groupId: 'gui', caseId: 'gui-001', status: 'failed' }],
+      summary: { total: 1, passed: 0, failed: 1, skipped: 0, blocked: 0 },
+    });
+
+    const out = cli(project, 'show', 'gui:gui-001', '--history').out;
+    const history = out.slice(out.indexOf('История'));
+    expect(history).toMatch(/кейс есть в 2\)/);
+    expect(history.indexOf('прогон bbbbbbbb failed')).toBeGreaterThan(-1);
+    expect(history.indexOf('прогон bbbbbbbb failed')).toBeLessThan(
+      history.indexOf('прогон aaaaaaaa passed'),
+    );
+    expect(history).toMatch(
+      /Прогоны на развилке \(run --base\):\n {2}X \S+ прогон ffffffff failed main/,
+    );
+    // Без флага — карточка как раньше, истории нет.
+    expect(cli(project, 'show', 'gui:gui-001').out).not.toContain('История');
   });
 
   /** Панель сравнивает прогон с ближайшим прошлым сама; терминал требовал два id. */
@@ -502,6 +541,125 @@ writeFileSync(out, '<testsuites><testsuite name="qa">' +
   });
 
   /**
+   * Живой прогон группы 25.10.2026: `--cmd "docker run … go test -json ./... > {report}"`
+   * читался JUnit-ом — «прочитано: 0», кейс «без результата»; группа писала свой
+   * переводчик go -json → JUnit. Родной вывод в `{report}` сводит тот же сбор, что у
+   * automation.json.
+   */
+  describe('--cmd с родным выводом в {report}', () => {
+    /** Раннер, пишущий в `--out=<путь>` то, что лежит в `native.txt`, и падающий, как go test. */
+    const NATIVE = `import { readFileSync, writeFileSync } from 'node:fs';
+const out = process.argv.find((arg) => arg.startsWith('--out=')).slice(6);
+writeFileSync(out, readFileSync('native.txt', 'utf8'));
+process.exit(1);
+`;
+    const go = (event: Record<string, unknown>) =>
+      JSON.stringify({ Time: '2026-10-25T12:30:00Z', Package: 'example.com/qa', ...event });
+    const GO_JSON = [
+      'go: downloading example.com/dep v1.0.0',
+      go({ Action: 'start' }),
+      go({ Action: 'run', Test: 'TestOpen/[qa-001]' }),
+      go({ Action: 'pass', Test: 'TestOpen/[qa-001]', Elapsed: 0.01 }),
+      go({ Action: 'run', Test: 'TestSearch/[qa-002]' }),
+      go({ Action: 'output', Test: 'TestSearch/[qa-002]', Output: '    search_test.go:9: нет\n' }),
+      go({ Action: 'fail', Test: 'TestSearch/[qa-002]', Elapsed: 0.01 }),
+      go({ Action: 'fail', Elapsed: 0.02 }),
+    ].join('\n');
+    const status = (id: string) =>
+      readGroups(project)
+        .flatMap((group) => group.cases)
+        .find((item) => item.id === id)?.status;
+
+    beforeEach(() => {
+      writeFileSync(join(project, 'native.mjs'), NATIVE);
+    });
+
+    it('вывод go test -json узнаётся сам: статусы на кейсах, запись с одним провалом', () => {
+      writeFileSync(join(project, 'native.txt'), `${GO_JSON}\n`);
+      const result = cli(
+        project,
+        'run',
+        '--group',
+        'qa',
+        '--cmd',
+        'node native.mjs --out={report}',
+      );
+      expect(result.code).toBe(1);
+      expect(status('qa-001')).toBe('passed');
+      expect(status('qa-002')).toBe('failed');
+      expect(readRuns(project)[0]).toMatchObject({
+        origin: 'ci',
+        summary: { passed: 1, failed: 1 },
+      });
+    });
+
+    it('вывод cargo test узнаётся сам', () => {
+      writeFileSync(
+        join(project, 'native.txt'),
+        [
+          '     Running unittests src/lib.rs (target/debug/deps/qa-1)',
+          'running 2 tests',
+          'test qa::[qa-001] ... ok',
+          'test qa::[qa-002] ... FAILED',
+          '',
+          'test result: FAILED. 1 passed; 1 failed; 0 ignored',
+          '',
+        ].join('\n'),
+      );
+      const result = cli(
+        project,
+        'run',
+        '--group',
+        'qa',
+        '--cmd',
+        'node native.mjs --out={report}',
+      );
+      expect(result.code).toBe(1);
+      expect(status('qa-001')).toBe('passed');
+      expect(status('qa-002')).toBe('failed');
+    });
+
+    // Вывод без единого теста по содержимому не узнать — его читает только явный --format.
+    it('--format cargo-test: сборка упала до тестов — в записи провал «(build)», код 1', () => {
+      writeFileSync(
+        join(project, 'native.txt'),
+        'error[E0425]: cannot find value `x` in this scope\nerror: could not compile `qa`\n',
+      );
+      const result = cli(
+        project,
+        'run',
+        '--group',
+        'qa',
+        '--format',
+        'cargo-test',
+        '--cmd',
+        'node native.mjs --out={report}',
+      );
+      expect(result.code).toBe(1);
+      expect(result.out).toContain('итог отчёта: упало 1 / прошло 0');
+      expect(result.out).toContain('(build)');
+    });
+
+    it('--format go-test-json без {report} в команде — отказ до прогона, назван {report}', () => {
+      writeFileSync(join(project, 'native.txt'), `${GO_JSON}\n`);
+      const result = cli(
+        project,
+        'run',
+        '--group',
+        'qa',
+        '--format',
+        'go-test-json',
+        '--cmd',
+        'node native.mjs --out=x.json',
+      );
+      expect(result.code).toBe(1);
+      expect(result.out).toContain('{report}');
+      expect(existsSync(join(project, 'x.json'))).toBe(false);
+      expect(readRuns(project)).toHaveLength(0);
+    });
+  });
+
+  /**
    * Память проверок (9.3) отвечает на тот же прогон того же дерева. Путь
    * отчёта в строке — свежий временный каталог: ключ с ним не совпадал ни разу.
    */
@@ -509,13 +667,15 @@ writeFileSync(out, '<testsuites><testsuite name="qa">' +
     writeFileSync(join(project, 'green.mjs'), GREEN);
     automation({ version: 1, command: 'node green.mjs {files} --out={report}' });
     commitAll();
-    expect(cli(project, 'run', '--memo').code).toBe(0);
-    const again = cli(project, 'run', '--memo');
+    // Только группа qa: GREEN пишет её два кейса, а ot-001 без результата — уже код 1.
+    const run = (...args: string[]) => cli(project, 'run', '--group', 'qa', '--memo', ...args);
+    expect(run().code).toBe(0);
+    const again = run();
     expect(again.code).toBe(0);
     expect(again.out).toContain('Без изменений с зелёного прогона');
-    const viaCmd = cli(project, 'run', '--memo', '--cmd', 'node green.mjs --out={report}');
+    const viaCmd = run('--cmd', 'node green.mjs --out={report}');
     expect(viaCmd.out).not.toContain('Без изменений');
-    expect(cli(project, 'run', '--memo', '--cmd', 'node green.mjs --out={report}').out).toContain(
+    expect(run('--cmd', 'node green.mjs --out={report}').out).toContain(
       'Без изменений с зелёного прогона',
     );
   });
@@ -852,6 +1012,130 @@ describe('tests-cli run: кейсы vitest мимо своей команды Go
     expect(result.out).not.toContain('чужой набор');
     expect(result.code).toBe(0);
     expect(status('root-001')).toBe('passed');
+  }, 150_000);
+
+  /**
+   * Живой прогон группы 25.10.2026: `run --case` над двумя кейсами vitest и двумя Go
+   * отдал весь набор своей команде (`go test -C … -json`), кейсы vitest вышли «без
+   * результата», и группа гоняла их второй раз. Своя команда здесь — подставной `go`
+   * (родной вывод go test -json), vitest — настоящий.
+   */
+  it('смешанный набор --case: файлы vitest — своим vitest, остальные — своей командой, одна запись', () => {
+    const go = (event: Record<string, unknown>) =>
+      JSON.stringify({ Time: '2026-10-25T12:30:00Z', Package: 'example.com/api/svc', ...event });
+    writeFileSync(
+      join(project, 'fake-go.mjs'),
+      `import { writeFileSync } from 'node:fs';\n` +
+        `writeFileSync('go-argv.json', JSON.stringify(process.argv.slice(2)));\n` +
+        `console.log(${JSON.stringify(
+          [
+            go({ Action: 'run', Test: 'TestSvc/[mix-002]' }),
+            go({ Action: 'pass', Test: 'TestSvc/[mix-002]', Elapsed: 0.01 }),
+            go({ Action: 'pass', Elapsed: 0.02 }),
+          ].join('\n'),
+        )});\n`,
+    );
+    mkdirSync(join(project, 'api', 'svc'), { recursive: true });
+    writeFileSync(join(project, 'api', 'svc', 'svc_test.go'), 'package svc\n');
+    writeFileSync(
+      join(project, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({
+        version: 1,
+        command: 'node fake-go.mjs {paths} > {report}',
+        format: 'go-test-json',
+      }),
+    );
+    writeGroup(project, {
+      ...createGroup(project, 'mix', 'mix'),
+      cases: [
+        {
+          id: 'mix-001',
+          title: 'админка считает',
+          automation: {
+            status: 'automated',
+            file: 'admin/src/admin.test.ts',
+            testName: 'a > считает',
+          },
+        },
+        {
+          id: 'mix-002',
+          title: 'сервис отвечает',
+          automation: { status: 'automated', file: 'api/svc/svc_test.go', testName: 'TestSvc' },
+        },
+      ].flatMap((raw, index) => parseCase(raw, index) ?? []),
+    });
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'run', '--case', 'mix-001,mix-002', '--project', project],
+      { encoding: 'utf8', timeout: 120_000 },
+    );
+    const out = `${result.stdout}${result.stderr}`;
+    expect(out).toMatch(
+      /Команда: \(.*vitest.* run --root .*admin.* \|\| echo -\) && \(.*node fake-go\.mjs api\/svc\/svc_test\.go > .* \|\| echo -\)/,
+    );
+    expect(out).not.toContain('Без результата');
+    expect(JSON.parse(readFileSync(join(project, 'go-argv.json'), 'utf8'))).toEqual([
+      'api/svc/svc_test.go',
+    ]);
+    expect(result.status).toBe(0);
+    expect(status('mix-001')).toBe('passed');
+    expect(status('mix-002')).toBe('passed');
+    expect(readRuns(project)).toHaveLength(1);
+    expect(readRuns(project)[0]).toMatchObject({ exitCode: 0, summary: { passed: 2 } });
+  }, 150_000);
+
+  it('смешанный набор: провал звена vitest — код 1 и красный кейс, своя команда всё равно прошла', () => {
+    writeFileSync(
+      join(project, 'fake-go.mjs'),
+      `console.log(${JSON.stringify(
+        JSON.stringify({
+          Time: '2026-10-25T12:30:00Z',
+          Package: 'p',
+          Action: 'run',
+          Test: 'TestSvc/[mix-002]',
+        }) +
+          '\n' +
+          JSON.stringify({
+            Time: '2026-10-25T12:30:00Z',
+            Package: 'p',
+            Action: 'pass',
+            Test: 'TestSvc/[mix-002]',
+          }),
+      )});\n`,
+    );
+    mkdirSync(join(project, 'api', 'svc'), { recursive: true });
+    writeFileSync(
+      join(project, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({
+        version: 1,
+        command: 'node fake-go.mjs {paths} > {report}',
+        format: 'go-test-json',
+      }),
+    );
+    writeGroup(project, {
+      ...createGroup(project, 'mix', 'mix'),
+      cases: [
+        {
+          id: 'mix-001',
+          title: 'чат падает',
+          automation: {
+            status: 'automated',
+            file: 'chat/src/chat.test.ts',
+            testName: 'b > падает',
+          },
+        },
+        {
+          id: 'mix-002',
+          title: 'сервис отвечает',
+          automation: { status: 'automated', file: 'api/svc/svc_test.go', testName: 'TestSvc' },
+        },
+      ].flatMap((raw, index) => parseCase(raw, index) ?? []),
+    });
+    const result = run('mix');
+    expect(result.code).toBe(1);
+    expect(status('mix-001')).toBe('failed');
+    expect(status('mix-002')).toBe('passed');
+    expect(readRuns(project)[0]).toMatchObject({ exitCode: 1, summary: { passed: 1, failed: 1 } });
   }, 150_000);
 
   it('своя команда JUnit — по-прежнему она, даже для файлов vitest', () => {

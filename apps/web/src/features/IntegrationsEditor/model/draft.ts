@@ -11,7 +11,9 @@ export function draftFrom<T extends IntegrationId>(
   const draft: IntegrationDraft = {};
   for (const field of INTEGRATION_FIELDS[id]) {
     const value = source[field.key];
-    draft[field.key] = typeof value === 'string' ? value : '';
+    if (typeof value === 'string') draft[field.key] = value;
+    else if (typeof value === 'number') draft[field.key] = String(value);
+    else draft[field.key] = field.fallback ?? '';
   }
   return draft;
 }

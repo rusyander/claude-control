@@ -140,13 +140,19 @@ describe('context-watch: пороги по окну', () => {
 
   // E1: продолжение и следующую стадию группы ведёт панель — совет «/clear»
   // заставлял группу просить чистую сессию, которая перечитывала всё заново.
-  it('группа разделения: просьба обновить PROGRESS.md остаётся, совета «/clear» нет', () => {
+  // N8 (g5 25.10): обычная просьба про PROGRESS.md в группе вставлялась и не
+  // исполнялась — окно ведёт панель, состояние копии живёт в её блокноте.
+  it('N8: группа разделения — обычной просьбы нет, у границы сжатия — блокнот копии, без PROGRESS.md и «/clear»', () => {
     delete process.env.AGENTDECK_KIT_VARIANT;
+    delete process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
     expect(run(160_000)).toContain('/clear');
     process.env.AGENTDECK_SPLIT_CHILD = '1';
-    const message = run(160_000) ?? '';
-    expect(message).toContain('.agent/PROGRESS.md');
-    expect(message).not.toContain('/clear');
+    expect(run(160_000)).toBeNull();
+    const mark = watch.limitsFor(process.env as Record<string, string>).urgent;
+    const urgent = run(mark + 1_000) ?? '';
+    expect(urgent).toContain('.agent/run/notebook.agent.md');
+    expect(urgent).not.toContain('PROGRESS.md');
+    expect(urgent).not.toContain('/clear');
   });
 });
 

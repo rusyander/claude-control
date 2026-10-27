@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
 import { POWERSHELL_ONLY_ASK, withPowerShellTwins } from '../auto-approve/powershell-twins.ts';
@@ -20,6 +22,8 @@ import {
   statusRunProfile,
   type ProfileMcpEntry,
 } from './group-profile.ts';
+import { WIKI_TOOL_NAMES } from './wiki-tools.ts';
+import { PUBLISH_BEFORE_DELIVERY_DENIED } from './delivery-publish.ts';
 
 /**
  * Лёгкий профиль запуска группы (1.2). Набор серверов — как у владельца на
@@ -156,15 +160,63 @@ describe('foreignGroupMcp (6.1)', () => {
     const only = ENTRIES.filter((entry) => ['atlassian-work', 'sentry'].includes(entry.id));
     expect(foreignGroupMcp({ entries: only, tasksText: '', extra: [] })).toEqual({ off: [] });
   });
+
+  it('выключатель без поимённого снятия (Qwen) — вики трекера не трогается и строка о ней молчит', () => {
+    const mcp = foreignGroupMcp({ entries: ENTRIES, tasksText: 'PROJ-2', extra: [] });
+    expect(mcp.disabledTools).toBeUndefined();
+    expect(mcp.note).not.toContain('wiki');
+  });
+});
+
+describe('foreignGroupMcp: вики трекера поимённо (P-16, Codex)', () => {
+  const only = ENTRIES.filter((entry) => ['atlassian-work', 'sentry'].includes(entry.id));
+
+  it('задачи о вики молчат — имена confluence_* сервера трекера и строка о них', () => {
+    const mcp = foreignGroupMcp({ entries: ENTRIES, tasksText: 'PROJ-2 ручка', extra: [] }, true);
+    expect(Object.keys(mcp.disabledTools ?? {})).toEqual(['atlassian-work']);
+    expect(mcp.disabledTools?.['atlassian-work']).toEqual([...WIKI_TOOL_NAMES]);
+    expect(mcp.note).toContain('Tracker wiki tools (confluence_*) are off');
+    expect(mcp.note).toContain('Switched off to save the context of every call');
+  });
+
+  it('снимать серверы нечего, вики есть — пустой `off`, строка только о вики', () => {
+    const mcp = foreignGroupMcp({ entries: only, tasksText: 'PROJ-2', extra: [] }, true);
+    expect(mcp.off).toEqual([]);
+    expect(mcp.note).toMatch(/^Tracker wiki tools/);
+    expect(mcp.disabledTools?.['atlassian-work']).toContain('confluence_search');
+  });
+
+  it('задача называет вики или группа её попросила — имена на месте, строки нет', () => {
+    for (const [tasksText, extra] of [
+      ['обновить страницу в Confluence', []],
+      ['PROJ-2', ['confluence']],
+    ] as const) {
+      const mcp = foreignGroupMcp({ entries: only, tasksText, extra }, true);
+      expect(mcp, tasksText).toEqual({ off: [] });
+    }
+  });
+
+  it('список покрывает каждое имя вики моста трекера панели (`tools/mcp/atlassian.mjs`)', () => {
+    const bridge = readFileSync(
+      fileURLToPath(new URL('../../../../../../tools/mcp/atlassian.mjs', import.meta.url)),
+      'utf8',
+    );
+    const names = [...new Set(bridge.match(/'confluence_[a-z_]+'/g) ?? [])].map((name) =>
+      name.slice(1, -1),
+    );
+    expect(names.length).toBeGreaterThan(0);
+    expect(names.filter((name) => !WIKI_TOOL_NAMES.includes(name))).toEqual([]);
+  });
 });
 
 /** Потолок Bash группы (3.1) — в каждых настройках флага её прогона. */
 const CEILING = { env: { BASH_MAX_TIMEOUT_MS: '1800000' } };
 /** Трекер и хранилище кода из `ENTRIES` — правилом `ask` (журнал 19.10). */
-/** Запрет слияния MR — во всех звеньях группы (F-13): слияние запрещено всегда. */
+/** Запрет слияния и одобрения MR — во всех звеньях группы (F-13, I-70). */
 const MERGE_RULES = ['atlassian-work', 'gitlab-work'].flatMap((server) => [
   `mcp__${server}__merge_merge_request`,
   `mcp__${server}__merge_pull_request`,
+  `mcp__${server}__approve_merge_request`,
 ]);
 
 /** Правила оболочки группы — для Bash и для инструмента PowerShell (I-04). */
@@ -219,6 +271,7 @@ describe('groupRunProfile', () => {
       deny: [
         'mcp__gitlab_work__merge_merge_request',
         'mcp__gitlab_work__merge_pull_request',
+        'mcp__gitlab_work__approve_merge_request',
         ...CLI_HELP_AGENT_DENY,
       ],
     });
@@ -706,7 +759,9 @@ describe('groupRunProfile — слияние MR закрыто в каждом �
       const { settings } = groupRunProfile({
         entries: ENTRIES,
         tasksText: '',
-        extra: [],
+        // Правки идут без MCP (N8): серверы наружу у них — только попрошенные блоком `mcp`,
+        // и слияние закрыто и тогда.
+        extra: stage === 'fix' ? ['gitlab-work', 'atlassian-work'] : [],
         ...(stage ? { stage } : {}),
       });
       const deny = (settings.permissions as { deny?: string[] }).deny ?? [];
@@ -773,6 +828,23 @@ describe('groupRunProfile — работа следующих звеньев з�
     expect(groupRunProfile({ entries: [], tasksText: '', extra: [] }).env).not.toHaveProperty(
       'AGENTDECK_GROUP_STAGE',
     );
+  });
+
+  // Telegram 26.10 R3c: рабочее звено подняло D-1 на пуш, который доставка делает сама.
+  it('за звеном доставка — заметка: пуш и MR не решение человека, D-n на них не поднимать', () => {
+    const note = (ahead?: { deliver?: boolean }) =>
+      groupRunProfile({
+        entries: [],
+        tasksText: '',
+        extra: [],
+        stage: 'work',
+        ...(ahead ? { ahead } : {}),
+      }).note;
+    expect(note({ deliver: true })).toContain(
+      'push and MR are no decision for the human, so never raise or wait on a D-n for them',
+    );
+    expect(note()).not.toContain('D-n');
+    expect(PUBLISH_BEFORE_DELIVERY_DENIED).toContain('never raise or wait on a D-n for it');
   });
 
   it('за звеном доставка — пуш, MR через CLI форджа и через MCP наружу; коммит и прочая запись открыты', () => {

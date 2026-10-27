@@ -4,14 +4,20 @@ import {
   bundleSplitTickets,
   clusterSplitTickets,
   openSplitTickets,
+  SPLIT_TICKET_DUPLICATE_CHOICES,
+  type SplitTicketDuplicateChoice,
+  type SplitTicketDuplicateDecision,
+  type SplitTicketDuplicates,
   type SplitTicketTaken,
 } from '@agentdeck/contracts/split-ticket-batch';
+import { findDuplicates } from '../../domains/chat/split-ticket-batch/duplicates.ts';
 import type { ServerContext } from '../../context.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
 import type { SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import { takePrompt, type TicketLang } from '../../domains/chat/split-ticket-batch/compose.ts';
 import type { TicketAsk } from '../../domains/chat/split-ticket-batch/prepare.ts';
+import { fileTicketPrints } from '../../domains/chat/split-ticket-batch/prints.ts';
 import { publishTickets } from '../../domains/chat/split-ticket-batch/publish.ts';
 import {
   ticketTarget,
@@ -46,6 +52,21 @@ const langOf = (value: unknown): TicketLang => (value === 'en' ? 'en' : 'ru');
 const text = (value: unknown, max = 200): string =>
   typeof value === 'string' ? value.trim().slice(0, max) : '';
 
+const isChoice = (value: unknown): value is SplitTicketDuplicateChoice =>
+  (SPLIT_TICKET_DUPLICATE_CHOICES as readonly unknown[]).includes(value);
+
+/** Решения по похожим задачам из тела — данными: кривое решение выпадает одно. */
+function decisionsOf(value: unknown): SplitTicketDuplicateDecision[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 200).flatMap((item: unknown) => {
+    const raw = (item ?? {}) as Record<string, unknown>;
+    const proposal = text(raw.proposal, 700);
+    if (!proposal || !isChoice(raw.choice)) return [];
+    const issueKey = text(raw.issueKey, 50);
+    return [{ proposal, choice: raw.choice, ...(issueKey ? { issueKey } : {}) }];
+  });
+}
+
 function conveyorOff(reply: FastifyReply): FastifyReply {
   return reply
     .code(404)
@@ -63,6 +84,8 @@ export function registerSplitTicketBatchRoutes(
       () => ctx.store,
       () => ctx.location.paths.appData,
     );
+  // Отпечатки находок — в каталоге данных панели, не в Jira (владелец 26.10.2026).
+  const prints = fileTicketPrints(() => ctx.location.paths.appData);
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
   const missing = (reply: FastifyReply) =>
     reply
@@ -83,13 +106,53 @@ export function registerSplitTicketBatchRoutes(
   );
 
   /**
+   * Проверка на повторы перед публикацией (владелец 25.10.2026): открытые
+   * задачи Jira, похожие на дефекты окна, — человек решает, связать, пропустить
+   * или завести. Только чтение; поиск не удался — пусто и код причины, а
+   * публикация всё равно сверит сама.
+   */
+  app.get<{ Params: { parent: string }; Querystring: { project?: string } }>(
+    '/api/chat/split/:parent/tickets/duplicates',
+    async (request, reply) => {
+      const record = ctx.store.getSplitPlan(request.params.parent);
+      if (!record) return missing(reply);
+      const projectKey = text(request.query.project, 50);
+      if (!projectKey || !tracker.connected()) {
+        const empty: SplitTicketDuplicates = { duplicates: [] };
+        return empty;
+      }
+      try {
+        const clusters = clusterSplitTickets(openSplitTickets(record.groups));
+        const body: SplitTicketDuplicates = {
+          duplicates: await findDuplicates(tracker, projectKey, clusters, prints),
+        };
+        return body;
+      } catch (error) {
+        const body: SplitTicketDuplicates = {
+          duplicates: [],
+          failed: true,
+          message: error instanceof Error ? error.message : String(error),
+          ...codeOf(error),
+        };
+        return body;
+      }
+    },
+  );
+
+  /**
    * «Опубликовать в Jira»: клик — согласие человека. Модель сводит открытые
    * находки в задачи, сервер заводит их по одной; двойной клик и вторая
    * вкладка ждут первую публикацию и второй раз находку не заводят.
    */
   app.post<{
     Params: { parent: string };
-    Body: { projectKey?: unknown; issueType?: unknown; lang?: unknown; retryFailed?: unknown };
+    Body: {
+      projectKey?: unknown;
+      issueType?: unknown;
+      lang?: unknown;
+      retryFailed?: unknown;
+      duplicates?: unknown;
+    };
   }>('/api/chat/split/:parent/tickets/publish', async (request, reply) => {
     if (!deps.conveyor) return conveyorOff(reply);
     const conveyor = deps.conveyor;
@@ -116,6 +179,7 @@ export function registerSplitTicketBatchRoutes(
           marks: conveyor.ticketMarks,
           record: (parent) => ctx.store.getSplitPlan(parent),
           tracker,
+          prints,
           ...(deps.ticketAsk ? { ask: deps.ticketAsk } : {}),
         },
         {
@@ -124,6 +188,7 @@ export function registerSplitTicketBatchRoutes(
           issueType: text(request.body?.issueType, 100) || 'Bug',
           lang: langOf(request.body?.lang),
           retryFailed: request.body?.retryFailed === true,
+          duplicates: decisionsOf(request.body?.duplicates),
         },
       );
     } catch (error) {

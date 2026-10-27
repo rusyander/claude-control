@@ -8,6 +8,7 @@ import type { MediaRevision } from '@entities/Media';
 import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 import type { ChildStageGroup } from './ChildStages.types';
 import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
+import type { TurnTrail } from '../lib/turnTrail.types';
 import type { BranchGateCardProps, PendingBranchGate } from './BranchGateCard.types';
 import type { ChildBranch } from './TaskSplitCard.types';
 import type { ChildQuestion } from './ChildQuestion.types';
@@ -242,6 +243,8 @@ export interface ChatMessagesProps {
 
 export interface MessageBubbleProps {
   message: ChatMessage;
+  /** След хода — только у последнего ответа модели в ходе (`turnTrails`). */
+  trail?: TurnTrail;
   onEdit: (text: string) => void;
   /** Ответить выбранным вариантом вопроса из истории. */
   onPickOption?: (answer: string) => void;

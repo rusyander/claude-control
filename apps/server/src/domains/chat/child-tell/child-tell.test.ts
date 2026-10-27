@@ -232,3 +232,53 @@ describe('ChildTells (Д7)', () => {
     expect(notices).toEqual([]);
   });
 });
+
+describe('ChildTells › разговор с фоновыми агентами (F1, d9869abf)', () => {
+  function holding() {
+    const holds = new Set<string>(['sess-2']);
+    const starts: Parameters<TellStart>[0][] = [];
+    const tells = new ChildTells({
+      split: () => SPLIT,
+      aliasesOf: (chatId) => ALIASES[chatId] ?? [chatId],
+      settingsOf: () => ({}),
+      start: (input) => {
+        starts.push(input);
+        return { started: true };
+      },
+      notify: () => undefined,
+      log: () => undefined,
+      defer: (run) => run(),
+      holdsAgents: (aliases) => aliases.some((key) => holds.has(key)),
+    });
+    return { tells, starts, holds };
+  }
+
+  it('слово панели ждёт конца агентов: «в очереди», процесс не трогается', () => {
+    const { tells, starts } = holding();
+    expect(
+      tells.send({ chatId: 'new-2', prompt: 'D-8 refused', cwd: '/c/t', title: 'Тесты' }),
+    ).toBe('queued');
+    expect(starts).toEqual([]);
+  });
+
+  it('пробуждение CLI, пока агенты идут, слово не отдаёт; без агентов — отдаёт', () => {
+    const { tells, starts, holds } = holding();
+    tells.send({ chatId: 'new-2', prompt: 'D-8 refused', cwd: '/c/t', title: 'Тесты' });
+    tells.childFinished(['sess-2']);
+    expect(starts).toEqual([]);
+    holds.clear();
+    tells.childFinished(['sess-2']);
+    expect(starts.map((start) => start.prompt)).toEqual(['D-8 refused']);
+  });
+
+  it('агенты кончились без пробуждения — слово уходит обходом, один раз', () => {
+    const { tells, starts, holds } = holding();
+    tells.send({ chatId: 'new-2', prompt: 'D-8 refused', cwd: '/c/t', title: 'Тесты' });
+    tells.sweep();
+    expect(starts).toEqual([]);
+    holds.clear();
+    tells.sweep();
+    tells.sweep();
+    expect(starts.map((start) => start.chatId)).toEqual(['sess-2']);
+  });
+});

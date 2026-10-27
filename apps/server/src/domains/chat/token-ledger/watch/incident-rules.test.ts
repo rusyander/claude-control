@@ -240,6 +240,39 @@ describe('R25 отбитое действие выполнено другим п
     expect(hit(events('R25-denied-bypass/near-miss.jsonl'), 'R25')).toBeUndefined();
   });
 
+  // g3 25.10: отказ сита пуша попросил `# sieve-ack`, группа повторила с ним и добавила шаг
+  // счёта файлов — команда другая, но это ровно то, чего отказ просил.
+  describe('повтор с `# sieve-ack` после отказа сита пуша', () => {
+    const T = Date.parse('2026-10-25T10:52:05Z');
+    const PUSH = 'git commit -q -m "x"; git push origin HEAD 2>&1 | tail -3';
+    const retry = `git commit -q -m "x"; git diff --name-only origin/main...HEAD | grep -c api; ${PUSH.split('; ')[1]}`;
+    const pair = (guard: string, command: string): WatchEvent[] => [
+      { kind: 'tool', t: T, id: 'd1', name: 'Bash', input: { command: PUSH } },
+      { kind: 'toolResult', t: T + 1000, id: 'd1', chars: 900, denied: guard },
+      { kind: 'tool', t: T + 8000, id: 'r1', name: 'Bash', input: { command } },
+      { kind: 'toolResult', t: T + 20_000, id: 'r1', chars: 300 },
+    ];
+
+    it('команда вокруг другая, подпись есть — одобренный повтор, тишина', () => {
+      expect(
+        hit(pair('push-sieves', `${retry} # sieve-ack: @.agent/tmp/sieve-ack.txt`), 'R25'),
+      ).toBeUndefined();
+    });
+
+    it('без подписи или после отказа другого стража — обход, как раньше', () => {
+      expect(hit(pair('push-sieves', retry), 'R25')).toMatchObject({ severity: 'alert' });
+      expect(
+        hit(pair('git-guard', `${retry} # sieve-ack: @.agent/tmp/sieve-ack.txt`), 'R25'),
+      ).toMatchObject({ severity: 'alert' });
+    });
+
+    // g8 26.10: карточка правила отбила пуш с пересказом процесса в коммите, повтор с исправленным
+    // текстом — ровно то, что она велела.
+    it('исправленный повтор после отказа карточки правила — не обход', () => {
+      expect(hit(pair('rule-card', retry), 'R25')).toBeUndefined();
+    });
+  });
+
   /**
    * F-56: страж отбил действие и назвал, как надо, — исправленный повтор (цель названа,
    * `-d` вместо `-D`, описание MR поправлено) делает другое действие, не обходит отказ.
@@ -274,6 +307,23 @@ describe('R25 отбитое действие выполнено другим п
       // RF-BGCD-10: исправление — только понижение силы или другая ветка назначения.
       ['--force → без силы', sh('git push -f origin feat/x'), sh('git push origin feat/x')],
       ['другая ветка назначения', sh('git push origin main'), sh('git push origin HEAD:feat/x')],
+      // g8 26.10: страж отправки не проследил каталог `cd X;` и попросил `git -C X push`.
+      [
+        'чекаут назван через git -C',
+        sh('cd /c/work/copy; git push -u origin feat/x 2>&1 | tail -5'),
+        sh('git -C C:/work/copy push -u origin feat/x 2>&1 | tail -5'),
+      ],
+      // g0 26.10: слияние git-guard не пропускает никогда, путь конфликта — rebase.
+      [
+        'слияние отбито → rebase',
+        sh('git merge origin/main --no-commit --no-ff 2>&1 | tail -5'),
+        sh('git rebase origin/main 2>&1 | tail -20'),
+      ],
+      [
+        'pull отбит → pull --rebase',
+        sh('git pull origin main'),
+        sh('git pull --rebase origin main'),
+      ],
     ])('%s — тишина', (_name, denied, retry) => {
       expect(hit(pair(denied, retry), 'R25')).toBeUndefined();
     });
@@ -291,6 +341,12 @@ describe('R25 отбитое действие выполнено другим п
       ],
       ['MR через CLI после отказа MCP', mcp('Что изменилось'), sh('glab mr create --fill')],
       ['догон другой командой', sh('git rebase origin/main'), sh('git merge origin/main')],
+      ['rebase → тот же rebase иначе записан', sh('git rebase origin/main'), sh('git pull -r')],
+      [
+        'слияние → то же слияние через pull',
+        sh('git merge origin/main'),
+        sh('git pull origin main'),
+      ],
       // RF-BGCD-10: сила добавлена — не исправление, а нажим; адрес вместо имени — та же цель.
       ['+main после отказа', sh('git push origin main'), sh('git push origin +main')],
       ['-f после отказа', sh('git push origin main'), sh('git push -f origin main')],
@@ -306,6 +362,17 @@ describe('R25 отбитое действие выполнено другим п
       ],
       ['--repo=origin', sh('git push origin main'), sh('git push --repo=origin main')],
       ['-d → -D', sh('git branch -d feat/old'), sh('git branch -D feat/old')],
+      // Назван был и раньше — иначе записанный повтор того же пуша, как прежде.
+      [
+        'git -C → cd X;',
+        sh('git -C C:/work/copy push -u origin feat/x'),
+        sh('cd C:/work/copy && git push -u origin feat/x 2>&1 | tail -3'),
+      ],
+      [
+        'git -C, другой хвост',
+        sh('git -C C:/work/copy push origin feat/x'),
+        sh('git -C C:/work/copy push origin feat/x 2>&1 | tail -3'),
+      ],
       [
         'worktree remove → --force',
         sh('git worktree remove ../g1'),
@@ -347,6 +414,24 @@ describe('R26 остановка чужих процессов', () => {
         : event,
     );
     expect(judge(poll).map((one) => one.rule)).toContain('R11');
+  });
+
+  it('готовность сервера в цикле — не опрос R11, даже если `| tail` стоит в другом шаге команды', () => {
+    // g1 26.10: `tail -4` у tests-cli до цикла делал опросом ожидание своего vite (R11 ×2).
+    const ready =
+      'node "/work/panel/tools/tests-cli.mjs" case --project . --file c.json 2>&1 | tail -4; ' +
+      'for i in $(seq 1 60); do curl -sf -m5 http://localhost:5284/src/main.tsx >/dev/null && ' +
+      'echo vite-ready && break; sleep 0.5; done';
+    const swap = (command: string) =>
+      events('R26-foreign-kill/fire.jsonl').map((event) =>
+        event.kind === 'tool' && /taskkill/.test(String(event.input.command))
+          ? { ...event, input: { command } }
+          : event,
+      );
+    expect(judge(swap(ready)).map((one) => one.rule)).not.toContain('R11');
+    // Контроль: чтение вывода в заголовке или теле цикла — опрос.
+    const tailed = 'while ! grep -q ready vite.log; do sleep 1; done';
+    expect(judge(swap(tailed)).map((one) => one.rule)).toContain('R11');
   });
 
   it('`pkill -f "vite.js --port 5284"` своего vite — тишина; без его запуска в вырезке — чужой', () => {

@@ -4,10 +4,12 @@ import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
 import { POWERSHELL_ONLY_ASK, withPowerShellTwins } from '../auto-approve/powershell-twins.ts';
 import { MAIN_SYNC_ASK } from '../main-sync/main-sync.ts';
 import { BASH_MAX_TIMEOUT_ENV, bashCeilingMs } from './bash-ceiling.ts';
+import { WIKI_TOOL_NAMES } from './wiki-tools.ts';
 
 export { bashCeilingsAt } from './bash-ceiling.ts';
 import type {
   DropReason,
+  ForeignGroupMcp,
   GroupProfile,
   GroupProfileInput,
   GroupRunProfile,
@@ -15,6 +17,7 @@ import type {
   ProfileMcpEntry,
   ServerSetRunProfile,
   SkillScopeInput,
+  StageMcpKind,
 } from './group-profile.types.ts';
 
 export type * from './group-profile.types.ts';
@@ -82,10 +85,41 @@ function isPanelBridge(entry: ProfileMcpEntry): boolean {
   return /tools[\\/]mcp[\\/]/.test(signature(entry));
 }
 
+/**
+ * Роли серверов, с которыми идёт звено (N8, g8 26.10): правки и проверка правок
+ * несли 196 имён отложенных MCP-инструментов и 8,3 тыс. знаков указаний серверов в
+ * каждом ходе при нуле вызовов — их задание чинит и перепроверяет код по готовым
+ * карточкам замечаний (команда, повтор, чтение строк), трекер и MR в нём не нужны.
+ * Доставка публикует: трекер и хранилище кода, без макетов и неизвестных серверов.
+ * Работа, план, разбор и ревью — как до разбивки: задача часто приходит ключом
+ * трекера, ревью сверяет её с тикетом и читает MR, неизвестный сервер человек мог
+ * поставить именно для работы. Мессенджер не едет никуда; макеты — только при
+ * макете в задачах. Понадобился снятый сервер — блок `mcp` (`groupProfileNote`),
+ * он сильнее таблицы. `push` — отправка правок в чужой MR кликом человека (связь
+ * `stageOf` пока читает работой, строка — чтобы таблица была полной).
+ */
+export const STAGE_MCP_ROLES: Record<StageMcpKind, readonly McpRole[]> = {
+  triage: ['tracker', 'forge', 'design', 'other'],
+  plan: ['tracker', 'forge', 'design', 'other'],
+  work: ['tracker', 'forge', 'design', 'other'],
+  review: ['tracker', 'forge', 'design', 'other'],
+  verify: [],
+  fix: [],
+  deliver: ['tracker', 'forge'],
+  push: ['tracker', 'forge'],
+};
+
+/** Вид звена для MCP: проход проверки правок — `verify`; связь без звена — работа. */
+export function stageMcpKind(input: Pick<GroupProfileInput, 'stage' | 'verify'>): StageMcpKind {
+  if (input.stage === 'review' && input.verify) return 'verify';
+  return input.stage ?? 'work';
+}
+
 export function groupMcpProfile(input: GroupProfileInput): GroupProfile {
   // Имя модель пишет по памяти: «Figma» при сервере `figma` — та же просьба (ревью A1-F15).
   const extra = new Set(input.extra.map((name) => name.toLowerCase()));
   const design = needsDesign(input.tasksText);
+  const roles = new Set(STAGE_MCP_ROLES[stageMcpKind(input)]);
   const trackers = input.entries.filter((entry) => mcpRole(entry) === 'tracker');
   const fullTracker = trackers.some((entry) => !isPanelBridge(entry));
   const kept: ProfileMcpEntry[] = [];
@@ -95,11 +129,13 @@ export function groupMcpProfile(input: GroupProfileInput): GroupProfile {
     const reason: DropReason | undefined =
       role === 'messenger'
         ? 'messenger'
-        : role === 'design' && !design
-          ? 'no-design-link'
-          : role === 'tracker' && fullTracker && isPanelBridge(entry)
-            ? 'duplicate-tracker'
-            : undefined;
+        : !roles.has(role)
+          ? 'stage-idle'
+          : role === 'design' && !design
+            ? 'no-design-link'
+            : role === 'tracker' && fullTracker && isPanelBridge(entry)
+              ? 'duplicate-tracker'
+              : undefined;
     if (reason && !extra.has(entry.id.toLowerCase())) dropped.push({ id: entry.id, reason });
     else kept.push(entry);
   }
@@ -132,12 +168,23 @@ export function groupProfileNote(profile: GroupProfile, connectors: boolean): st
  * что у Claude, над серверами конфига этого CLI. Снятые уходят его выключателем
  * (`mcp_servers.<имя>.enabled=false` у Codex, `mcp.excluded` у Qwen), строка — в
  * системную; подключений claude.ai у них нет, о них строка молчит. Снимать
- * нечего — ни имён, ни строки.
+ * нечего — ни имён, ни строки. `perTool` — выключатель CLI снимает и отдельные
+ * инструменты (Codex `disabled_tools`): тогда снимается и вики трекера (P-16), как
+ * `wikiDeny` у Claude, поимённо (`WIKI_TOOL_NAMES`).
  */
-export function foreignGroupMcp(input: GroupProfileInput): { off: string[]; note?: string } {
+export function foreignGroupMcp(input: GroupProfileInput, perTool = false): ForeignGroupMcp {
   const profile = groupMcpProfile(input);
-  if (profile.dropped.length === 0) return { off: [] };
-  return { off: profile.dropped.map((item) => item.id), note: groupProfileNote(profile, true) };
+  const off = profile.dropped.map((item) => item.id);
+  // Строка о снятой вики без самого снятия звала бы группу просить то, что у неё есть.
+  const wiki = perTool ? wikiServers(profile.kept, input.tasksText, input.extra) : [];
+  const notes = [
+    ...(off.length > 0 ? [groupProfileNote(profile, true)] : []),
+    ...(wiki.length > 0 ? [WIKI_NOTE] : []),
+  ];
+  if (notes.length === 0) return { off };
+  if (wiki.length === 0) return { off, note: notes.join('\n') };
+  const disabledTools = Object.fromEntries(wiki.map((entry) => [entry.id, [...WIKI_TOOL_NAMES]]));
+  return { off, note: notes.join('\n'), disabledTools };
 }
 
 /**
@@ -451,8 +498,11 @@ export const DELIVERY_BASH_DENY: readonly string[] = [
 /** Инструменты MCP хранилища кода, которыми открывают MR / PR. */
 const FORGE_OPEN_TOOLS = ['create_merge_request', 'create_pull_request'];
 
-/** Инструменты MCP хранилища кода, которыми сливают MR / PR. */
-const FORGE_MERGE_TOOLS = ['merge_merge_request', 'merge_pull_request'];
+/**
+ * Инструменты MCP хранилища кода, которыми сливают MR / PR или одобряют его:
+ * одобрить свой MR — дело рецензента, доставке группы оно не нужно (I-70, 26.10).
+ */
+const FORGE_MERGE_TOOLS = ['merge_merge_request', 'merge_pull_request', 'approve_merge_request'];
 
 /** MCP-инструменты серверов наружу с этими именами — в форме правила CLI. */
 function outwardTools(kept: readonly ProfileMcpEntry[], tools: readonly string[]): string[] {
@@ -464,7 +514,7 @@ function outwardTools(kept: readonly ProfileMcpEntry[], tools: readonly string[]
 /**
  * Слияние MR — в каждом звене группы под `deny` (F-13): слияние запрещено
  * политикой владельца всегда, а держалось только на `ask` брокера, то есть на
- * одной карточке, которую человек мог подтвердить по ошибке.
+ * одной карточке, которую человек мог подтвердить по ошибке. Одобрение — там же.
  */
 export function mergeDeny(kept: readonly ProfileMcpEntry[]): string[] {
   return outwardTools(kept, FORGE_MERGE_TOOLS);
@@ -492,12 +542,21 @@ export function wikiDeny(
   tasksText: string,
   extra: readonly string[],
 ): string[] {
+  return wikiServers(kept, tasksText, extra).map(
+    (entry) => `mcp__${cliServerName(entry.id)}__${WIKI_EXTRA}_*`,
+  );
+}
+
+/** Серверы трекера с вики, у которых её снять: задачи о вики молчат и группа её не просила. */
+function wikiServers(
+  kept: readonly ProfileMcpEntry[],
+  tasksText: string,
+  extra: readonly string[],
+): ProfileMcpEntry[] {
   if (needsWiki(tasksText) || extra.some((name) => name.toLowerCase() === WIKI_EXTRA)) return [];
-  return kept
-    .filter(
-      (entry) => mcpRole(entry) === 'tracker' && /atlassian|confluence/.test(signature(entry)),
-    )
-    .map((entry) => `mcp__${cliServerName(entry.id)}__${WIKI_EXTRA}_*`);
+  return kept.filter(
+    (entry) => mcpRole(entry) === 'tracker' && /atlassian|confluence/.test(signature(entry)),
+  );
 }
 
 const WIKI_NOTE = `Tracker wiki tools (${WIKI_EXTRA}_*) are off: the tasks never name the wiki; need a page → the mcp block, server: ${WIKI_EXTRA}.`;
@@ -551,13 +610,28 @@ function skillsWithAhead(input: GroupProfileInput): Record<string, unknown> {
   };
 }
 
-function aheadNote(ahead: GroupProfileInput['ahead']): string | undefined {
+/**
+ * Строка «что за звеном» — системной строке звена. `reviewer: 'cli'` — группа чужого
+ * CLI (P-39): потолка у неё нет, ревью идёт настройкой CLI в новой сессии, и обещать
+ * «модель сильнее прочтёт» нельзя (`code-map-foreign-chat`, инвариант).
+ */
+export function aheadNote(
+  ahead: GroupProfileInput['ahead'],
+  reviewer: 'ceiling' | 'cli' = 'ceiling',
+): string | undefined {
+  const reviewWho =
+    reviewer === 'cli'
+      ? 'a review stage in a fresh session of this CLI reads this work'
+      : 'a review stage on the ceiling model reads this work';
   const parts = [
-    ...(ahead?.review
-      ? ['a review stage on the ceiling model reads this work — do not run a review pass here']
-      : []),
+    ...(ahead?.review ? [`${reviewWho} — do not run a review pass here`] : []),
+    // Пуш и MR — не решение человека: рабочее звено подняло лишнюю D-1 на пуш, который
+    // доставка делает и так (Telegram 26.10, R3c).
     ...(ahead?.deliver
-      ? ['a delivery stage pushes the branch and opens the MR — commit, but do not push or open it']
+      ? [
+          'a delivery stage pushes the branch and opens the MR — commit, but do not push or open it; ' +
+            'push and MR are no decision for the human, so never raise or wait on a D-n for them',
+        ]
       : []),
   ];
   return parts.length > 0 ? `Later stages of this chain: ${parts.join('; ')}.` : undefined;

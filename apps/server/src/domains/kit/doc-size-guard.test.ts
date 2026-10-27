@@ -61,3 +61,37 @@ describe('doc-size-guard: окна чтения в отказе', () => {
     expect(guard(read(big, { offset: 1, limit: 400 }))).toBeNull();
   });
 });
+
+// Бриф полосы ревью — и есть её задача: заглушка спавна велит прочесть его одним Read, а отказ на
+// 31 КБ стоил измеренному ревью 6 ошибок на 66 чтениях. Исключение — только это имя и место.
+describe('doc-size-guard: бриф полосы ревью читается целиком', () => {
+  const at = (rel: string): string => {
+    const f = join(dir, ...rel.split('/'));
+    mkdirSync(join(f, '..'), { recursive: true });
+    writeFileSync(f, rows(500));
+    return f;
+  };
+
+  it('lane-*prompt.md в review-<slug>/plan/ и в review-<slug>/ — целиком, с любым слэшем', () => {
+    const inPlan = at('.agent/tmp/review-g9/plan/lane-A1-r1.prompt.md');
+    const inRoot = at('.agent/tmp/review-g9/lane-B2-r3-prompt.md');
+    for (const f of [inPlan, inRoot, inPlan.replace(/\\/g, '/'), inRoot.replace(/\\/g, '/')])
+      expect(guard(read(f))).toBeNull();
+  });
+
+  // Бриф перезапуска `lane-A-prompt-r2.md` получал отказ: «prompt» в середине имени — всё тот же бриф.
+  it('бриф с prompt в середине имени (перезапуск) — тоже целиком', () => {
+    expect(guard(read(at('.agent/tmp/review-x/lane-A-prompt-r2.md')))).toBeNull();
+    expect(guard(read(at('.agent/tmp/review-x/plan/lane-B1.prompt.v2.md')))).toBeNull();
+  });
+
+  it.each([
+    ['отчёт полосы, не бриф', '.agent/tmp/review-g9/lane-A1.md'],
+    ['plan.md рядом с брифами', '.agent/tmp/review-g9/plan/plan.md'],
+    ['бриф вне review-<slug>/', '.agent/tmp/other/lane-A1-r1.prompt.md'],
+    ['бриф на два уровня глубже', '.agent/tmp/review-g9/plan/x/lane-A1-r1.prompt.md'],
+    ['бриф вне .agent/tmp', 'docs/review-g9/plan/lane-A1-r1.prompt.md'],
+  ])('%s — по-прежнему отказ', (_name, rel) => {
+    expect(guard(read(at(rel)))?.decision).toBe('deny');
+  });
+});

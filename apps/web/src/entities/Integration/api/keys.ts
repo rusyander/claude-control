@@ -18,6 +18,7 @@ export const integrationKeys = {
   discover: [ROOT, 'discover'],
   links: (path: string | undefined) => [ROOT, 'links', path ?? ''],
   telegramAnswers: [ROOT, 'telegram', 'answers'],
+  telegramConnect: [ROOT, 'telegram', 'connect'],
   jiraProjects: [ROOT, 'jira', 'projects'],
   jiraSearch: (query: string) => [ROOT, 'jira', 'search', query],
   confluenceSearch: (query: string) => [ROOT, 'confluence', 'search', query],

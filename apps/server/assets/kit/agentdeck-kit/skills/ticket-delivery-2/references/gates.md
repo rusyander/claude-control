@@ -20,6 +20,10 @@ or CI files move; human overrides live in `.agent/affected.json` (`alwaysFull`, 
 no derivable command is FULL plus a hint naming the override. The review (§9) and the live run (§10)
 follow the same map: the zones it names are the radius. **T3 runs `--full`** — a scoped verdict is a
 proof about dependents, and T3 is exactly where that proof is not trusted.
+**Tests block on** (`.agent/tests/` exists): a test gate carries `{junit}` —
+`"test=npx vitest run --reporter=default --reporter=junit --outputFile.junit={junit}"` — and gate-run
+imports that report into the block (CLI from `--tests-cli`, `AGENTDECK_TESTS_CLI` or the kit's own
+checkout). The gate's own run is the record; a second `tests-cli run` of the same suite is a repeat.
 
 ```bash
 node <kit>/tools/gate-run.mjs --affected --ticket PROJ-777 "lint=npm run lint" "test=npm run test:ci"

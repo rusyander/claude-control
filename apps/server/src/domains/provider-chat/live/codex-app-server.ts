@@ -89,10 +89,14 @@ export async function answerCodexApproval(
   policy: LivePermissionPolicy | undefined,
   /** pid процесса `codex app-server` — корень дерева для суда погашения (P-06). */
   pid?: number,
+  /** Поток хода (`thread/start`/`thread/resume`) — `session_id` хука набора (P-26). */
+  thread?: string,
 ): Promise<unknown> {
   const params = (message.params ?? {}) as Record<string, unknown>;
   const text = (value: unknown): string | undefined =>
     typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  // Поток из самой просьбы (`threadId`), иначе тот, что ход открыл.
+  const session = text(params.threadId) ?? thread;
   const ask = (tool: string, title: string | undefined, shell?: LiveShellCall) =>
     decidePermission(policy, {
       cli: 'codex',
@@ -101,6 +105,7 @@ export async function answerCodexApproval(
       ...(title ? { title } : {}),
       ...(shell ? { shell } : {}),
       ...(pid ? { pid } : {}),
+      ...(session ? { session } : {}),
     });
   switch (message.method) {
     case 'item/commandExecution/requestApproval': {
@@ -275,13 +280,14 @@ export class CodexAppServerTurn implements LiveTurn {
           // Вопрос сервера о разрешении — по политике хода (ответ асинхронный:
           // поток уведомлений не ждёт человека). Прочие вопросы — отказ.
           onRequest: (message) => {
-            void answerCodexApproval(message, options.permission, child.pid).then((result) =>
-              rpc.respond(
-                message.id,
-                result === undefined
-                  ? { error: { code: -32601, message: 'not supported by agentdeck' } }
-                  : { result },
-              ),
+            void answerCodexApproval(message, options.permission, child.pid, this.threadId).then(
+              (result) =>
+                rpc.respond(
+                  message.id,
+                  result === undefined
+                    ? { error: { code: -32601, message: 'not supported by agentdeck' } }
+                    : { result },
+                ),
             );
           },
         },

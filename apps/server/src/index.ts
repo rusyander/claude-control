@@ -7,6 +7,7 @@ import { registerAccessGate } from './lib/access-gate/access-gate.ts';
 import { createConfigWatcher } from './lib/config-watcher/config-watcher.ts';
 import { appStateDomains } from './lib/app-state-events/app-state-events.ts';
 import { registerEmptyBodyGuard } from './lib/empty-body.ts';
+import { expandPathVars } from './lib/path-vars/path-vars.ts';
 import { registerCodedErrors } from './lib/server-text/server-text.ts';
 import { detectProviders } from './providers/detect/detect.ts';
 import { autostartProjects } from './domains/project-runner/project-runner.ts';
@@ -37,6 +38,8 @@ const ALLOWED_ORIGINS = allowedOrigins(WEB_PORT);
 // До первого запуска чего-либо: панель, перезапущенная агентом группы, не
 // передаёт его метки ребёнка ни одному своему прогону.
 forgetInheritedChildMarks(process.env);
+// Тоже до первого запуска: `%NVM_SYMLINK%` буквальным текстом в PATH оставлял чаты на чужом Node.
+expandPathVars(process.env);
 
 const ctx = new ServerContext();
 // Журнал идёт через перехват фонового наблюдателя: в stdout всё как раньше, а

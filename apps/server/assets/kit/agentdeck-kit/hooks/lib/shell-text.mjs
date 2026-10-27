@@ -67,13 +67,45 @@ const heredocOwner = (line, m) =>
 const CODE_FLAG = /^(?:-[A-Za-z]*[ceEpr]|--(?:eval|print)=?)$/;
 const AWK = /^(?:awk|gawk|mawk)$/;
 
+// `code: 'strings'`: spawning interpreter code is shell text only inside its string literals — a redirect
+// the spawned shell performs is spelled in a string (`execSync('cat a > b.ts')`, or a `const c = '…'` it
+// runs). Outside them `=>`, `->` in a log line, `a > b` are the language's own operators; the 'spawn' mode
+// kept them and inline-edit-guard read `e=>e.page+'|'` as a write to `e.page+`.
+// `escaped`: the code sits inside a double-quoted shell word, so `\"` is its quote, `\\` its backslash.
+function codeStrings(body, escaped) {
+  // The code as its interpreter receives it: one logical char per shell escape pair, with its source span.
+  const chars = [];
+  for (let i = 0; i < body.length; i++) {
+    const pair = escaped && body[i] === '\\' && /["\\$`]/.test(body[i + 1] ?? '');
+    chars.push({ ch: pair ? body[i + 1] : body[i], at: i, width: pair ? 2 : 1 });
+    if (pair) i++;
+  }
+  const keep = new Array(body.length).fill(false);
+  const mark = (c) => {
+    for (let k = c.at; k < c.at + c.width; k++) keep[k] = true;
+  };
+  let quote = '';
+  for (let n = 0; n < chars.length; n++) {
+    const c = chars[n];
+    if (!quote) {
+      if (c.ch === "'" || c.ch === '"' || c.ch === '`') quote = c.ch;
+    } else if (c.ch === '\\') {
+      mark(c);
+      if (chars[n + 1]) mark(chars[++n]);
+    } else if (c.ch === quote) quote = '';
+    else mark(c);
+  }
+  return body.replace(/[^\n]/g, (c, at) => (keep[at] ? c : ' '));
+}
+
 function runsString(words, body, quote, code) {
   if (quote === '"' && /\$\(|`/.test(body)) return true;
   const names = words.map(progName);
   if (names.some((n) => SHELLS.test(n))) return true;
   if (!names.some((n) => INTERPRETERS.test(n))) return false;
   const codeArg = names.some((n) => AWK.test(n)) || CODE_FLAG.test(words.at(-1) ?? '');
-  return codeArg && (code === 'keep' || SPAWN.test(body));
+  if (!codeArg || !(code === 'keep' || SPAWN.test(body))) return false;
+  return code === 'strings' ? 'code' : true;
 }
 
 /** Shell text with data-only quoted strings blanked; same length as the input. */
@@ -93,9 +125,10 @@ function blankDataStrings(text, code) {
       let j = i + 1;
       while (j < text.length && text[j] !== ch) j += ch === '"' && text[j] === '\\' ? 2 : 1;
       const body = text.slice(i + 1, j);
-      out += runsString(cur ? [...words, cur] : words, body, ch, code)
-        ? text.slice(i, j + 1)
-        : ch + blankWord(body) + (j < text.length ? ch : '');
+      const runs = runsString(cur ? [...words, cur] : words, body, ch, code);
+      const close = j < text.length ? ch : '';
+      if (runs === 'code') out += ch + codeStrings(body, ch === '"') + close;
+      else out += runs ? text.slice(i, j + 1) : ch + blankWord(body) + close;
       i = j + 1;
       continue;
     }
@@ -154,7 +187,10 @@ export function executedText(raw, { code = 'keep' } = {}) {
     while (j < lines.length && lines[j].trim() !== m[2]) j++;
     const body = lines.slice(i + 1, j).join('\n');
     parts.push(blankDataStrings(shell.join('\n'), code));
-    if (j > i + 1) parts.push(code === 'keep' || SPAWN.test(body) ? body : blank(body));
+    if (j > i + 1) {
+      const spawns = code === 'keep' || SPAWN.test(body);
+      parts.push(!spawns ? blank(body) : code === 'strings' ? codeStrings(body, false) : body);
+    }
     shell = j < lines.length ? [lines[j]] : [];
     i = j;
   }

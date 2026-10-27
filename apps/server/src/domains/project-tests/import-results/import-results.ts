@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
+  ProjectTestFailedTest,
   ProjectTestGroup,
   ProjectTestImportResult,
   ProjectTestPointResult,
   ProjectTestRunRecord,
+  ProjectTestRunTally,
   ProjectTestStatus,
 } from '@agentdeck/contracts';
 import { pointId, summarize, toStatus } from '@agentdeck/contracts/test-format';
@@ -103,6 +105,8 @@ export interface ImportResultsInput {
    * закрыли бы правку, которой прогон не видел.
    */
   stamps?: ReadonlyMap<string, string>;
+  /** Отпечаток дерева на старте прогона (`treeFingerprint`) — в запись как есть. */
+  tree?: string;
 }
 
 /** Насколько результат «хуже»: при двух результатах на кейс побеждает худший. */
@@ -185,6 +189,9 @@ function junitCase(
 
   let status: ProjectTestStatus = 'passed';
   if (failure) status = 'failed';
+  // `status="blocked"` с `<skipped message>` (стенд не ответил, `tests-cli run --health`):
+  // чужие инструменты JUnit видят пропуск, мы — «заблокирован» с причиной, не «пропущен».
+  else if (skipped && toStatus(attributes.status) === 'blocked') status = 'blocked';
   else if (skipped) status = 'skipped';
   else if (attributes.status) status = toStatus(attributes.status) as ProjectTestStatus;
 
@@ -453,7 +460,7 @@ export function parseAllure(contents: string[]): ImportedTestResult[] {
  */
 export function importResults(root: string, input: ImportResultsInput): ProjectTestImportResult {
   const runId = randomUUID();
-  const { result, points, now, apply } = prepareResultsForRun(root, input, runId);
+  const { result, points, now, apply, tests } = prepareResultsForRun(root, input, runId);
   const record: ProjectTestRunRecord = {
     id: runId,
     mode: 'import',
@@ -467,8 +474,10 @@ export function importResults(root: string, input: ImportResultsInput): ProjectT
     startedAt: now,
     finishedAt: now,
     ...stampsOf(input.stamps, points),
+    ...(input.tree ? { tree: input.tree } : {}),
     results: points,
     summary: summarize(points),
+    tests,
   };
   writeRun(root, record);
   return { ...result, matched: apply() };
@@ -483,6 +492,8 @@ export interface PreparedRunResults {
   apply: () => number;
   /** Результаты без кейса целиком (по одному на имя) — из них заводятся кейсы. */
   unmatchedResults: ImportedTestResult[];
+  /** Счёт тестов отчёта для записи прогона (`ProjectTestRunRecord.tests`). */
+  tests: ProjectTestRunTally;
 }
 
 /**
@@ -519,20 +530,41 @@ export function prepareResultsForRun(
 
   const scope = input.groups?.length ? new Set(input.groups) : undefined;
   const library = readGroups(root);
-  const index = buildIndex(library.filter((group) => !scope || scope.has(group.id)));
+  const seen = new Map<string, boolean>();
+  const exists = (path: string): boolean => {
+    let known = seen.get(path);
+    if (known === undefined) {
+      known = existsSync(join(root, path));
+      seen.set(path, known);
+    }
+    return known;
+  };
+  const index = buildIndex(
+    library.filter((group) => !scope || scope.has(group.id)),
+    exists,
+  );
   // Один файл тестов несёт кейсы нескольких групп, а прогон берёт только просимые: тест кейса
   // чужой группы — не «без кейса» и не повод завести дубликат (25.10: «без кейса 2» в зелёном прогоне).
-  const elsewhere = scope ? buildIndex(library) : undefined;
+  const elsewhere = scope ? buildIndex(library, exists) : undefined;
   const matched = new Map<string, { ref: CaseRef; result: ImportedTestResult }>();
   // Счёт тестов кейса-набора: «упало 3 из 40» — первое, что спрашивают о каталоге.
   const tally = new Map<string, SuiteTally>();
+  // Упавшие тесты кейса — для `run --base`, что гоняет на развилке только их.
+  const reds = new Map<string, ProjectTestFailedTest[]>();
   const unmatched: string[] = [];
   const unmatchedResults: ImportedTestResult[] = [];
+  // Счёт тестов, а не кейсов (F-12): «2117 passed» строки сита сверяют с ним.
+  const tests: ProjectTestRunTally = { passed: 0, failed: 0, skipped: 0 };
 
   for (const result of parsed) {
+    // Весь отчёт, как его итог печатает `tests-cli run` («упало 0 / прошло 21»): группа
+    // переписывает в строку сита именно эти числа, и тест чужой группы в них тоже есть.
+    if (result.status === 'passed') tests.passed += 1;
+    else if (result.status === 'skipped') tests.skipped += 1;
+    else if (result.status === 'failed' || result.status === 'blocked') tests.failed += 1;
     const ref = matchCase(result, index);
+    if (!ref && elsewhere && matchCase(result, elsewhere)) continue;
     if (!ref) {
-      if (elsewhere && matchCase(result, elsewhere)) continue;
       if (result.name && !unmatched.includes(result.name)) {
         unmatched.push(result.name);
         unmatchedResults.push(result);
@@ -540,6 +572,11 @@ export function prepareResultsForRun(
       continue;
     }
     const key = `${ref.groupId}/${ref.caseId}`;
+    if (result.status === 'failed') {
+      const list = reds.get(key) ?? [];
+      list.push({ name: result.name, ...(result.owner ? { owner: result.owner } : {}) });
+      reds.set(key, list);
+    }
     if (ref.suite) {
       const count = tally.get(key) ?? { total: 0, failed: 0, skipped: 0 };
       count.total += 1;
@@ -573,6 +610,7 @@ export function prepareResultsForRun(
     finishedAt: now,
     durationMs: result.durationMs,
     flakyAttempts: result.flakyAttempts,
+    ...failedTestsOf(result.status, reds.get(key)),
   }));
 
   const patches: CaseResultPatch[] = points.map((point) => ({
@@ -598,7 +636,23 @@ export function prepareResultsForRun(
     now,
     apply: () => applyResults(root, patches, now),
     unmatchedResults,
+    tests,
   };
+}
+
+/**
+ * Больше упавших тестов на кейс — `failedTests` не пишется, и прогон развилки
+ * (`run --base`) идёт кейсом целиком: длинный список — уже не «пара красных», а
+ * строка команды из сотни node id длиннее, чем терпит cmd.
+ */
+export const RED_TESTS_LIMIT = 40;
+
+function failedTestsOf(
+  status: ProjectTestStatus,
+  reds: readonly ProjectTestFailedTest[] | undefined,
+): { failedTests?: ProjectTestFailedTest[] } {
+  if (status !== 'failed' || !reds?.length || reds.length > RED_TESTS_LIMIT) return {};
+  return { failedTests: [...reds] };
 }
 
 /**
@@ -675,15 +729,24 @@ interface CaseIndex {
   byTitle: Map<string, CaseRef>;
   /** Ключ набора → кейс; `null` — ключ у двух кейсов, и гадать между ними нельзя. */
   bySuite: Map<string, CaseRef | null>;
+  /** Каталоги кейсов-наборов (от корня проекта) — для `suiteByFile`. */
+  suiteDirs: { ref: CaseRef; dir: string }[];
+  /** testName кейсов как пути describe — для `describeMatch`; `file` — файл кейса. */
+  describes: { key: string; ref: CaseRef; file?: string }[];
+  /** Есть ли файл (путь от корня проекта); нет — сверки по файлу не будет. */
+  exists?: (path: string) => boolean;
 }
 
-function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
+function buildIndex(groups: ProjectTestGroup[], exists?: (path: string) => boolean): CaseIndex {
   const index: CaseIndex = {
     byExternalId: new Map(),
     byTestName: new Map(),
     byId: new Map(),
     byTitle: new Map(),
     bySuite: new Map(),
+    suiteDirs: [],
+    describes: [],
+    ...(exists ? { exists } : {}),
   };
   for (const group of groups) {
     if (group.error) continue;
@@ -696,7 +759,16 @@ function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
       if (item.automation?.externalId) {
         remember(index.byExternalId, item.automation.externalId, ref);
       }
-      if (item.automation?.testName) remember(index.byTestName, item.automation.testName, ref);
+      const testName = item.automation?.testName;
+      if (testName) {
+        remember(index.byTestName, testName, ref);
+        const file = item.automation?.file?.trim();
+        index.describes.push({
+          key: normalize(testName),
+          ref: { ...ref, suite: true },
+          ...(file ? { file: filePath(file) } : {}),
+        });
+      }
       const suite = item.automation?.suite?.trim();
       if (suite) {
         // Набор JS (ключ — путь от корня пакета, без точек) узнаётся и по каталогу
@@ -708,6 +780,10 @@ function buildIndex(groups: ProjectTestGroup[]): CaseIndex {
         for (const key of keys) {
           const known = index.bySuite.get(key);
           index.bySuite.set(key, known === undefined ? { ...ref, suite: true } : null);
+        }
+        // Путь кейса пишет и агент: каталог вне проекта файлом не сверяется.
+        if (dir && dir !== '.' && !dir.split('/').includes('..') && !/^([a-z]:|\/)/i.test(dir)) {
+          index.suiteDirs.push({ ref: { ...ref, suite: true }, dir });
         }
       }
     }
@@ -746,6 +822,8 @@ function matchCase(result: ImportedTestResult, index: CaseIndex): CaseRef | unde
       if (hit) return hit;
     }
   }
+  const nested = describeMatch(result, names, index);
+  if (nested) return nested;
   const loose = result.owner ? [...names, result.owner] : names;
   if (result.owner) {
     const hit = index.byTestName.get(normalize(result.owner));
@@ -759,11 +837,42 @@ function matchCase(result: ImportedTestResult, index: CaseIndex): CaseRef | unde
     if (hit === null) break;
     if (hit) return hit;
   }
+  // Ошибка сбора pytest пишет модуль в имя при пустом classname: файл каталога не
+  // собрался — набор красный, а не «прошло 1953» без этого файла.
+  const byFile = suiteByFile(result.owner || result.name, index);
+  if (byFile) return byFile;
   for (const name of loose) {
     const hit = index.byTitle.get(normalize(name));
     if (hit) return hit;
   }
   return undefined;
+}
+
+/**
+ * Набор pytest по файлу теста (#g0:105, 25.10). pytest ≥ 8.1 считает classname от
+ * ближайшего pyproject.toml даже без раздела pytest, а ключ набора — от корня проекта
+ * или от папки с разделом pytest: `tests.test_x` модуля mod-llmbox не равен ключу
+ * `mod-llmbox.tests`, а `tests` у пяти модулей общий. Хвост каталога набора —
+ * начало classname, следующая часть — файл теста прямо в этом каталоге
+ * (`mod-llmbox/tests/test_x.py`); набор владеет только своими файлами, как и по ключу.
+ * Подходят два набора — догадка, её не делаем.
+ */
+function suiteByFile(owner: string, index: CaseIndex): CaseRef | undefined {
+  const { exists } = index;
+  if (!exists || !owner || owner.includes('/')) return undefined;
+  const parts = owner.split('.').filter(Boolean);
+  const hits = new Set<CaseRef>();
+  for (const { ref, dir } of index.suiteDirs) {
+    const segments = dir.split('/').filter(Boolean);
+    for (let size = Math.min(segments.length, parts.length - 1); size >= 1; size -= 1) {
+      if (segments.slice(-size).join('.') !== parts.slice(0, size).join('.')) continue;
+      if (exists(`${dir}/${parts[size]}.py`)) {
+        hits.add(ref);
+        break;
+      }
+    }
+  }
+  return hits.size === 1 ? [...hits][0] : undefined;
 }
 
 /**
@@ -785,6 +894,47 @@ function dottedSuffixMatch(result: ImportedTestResult, index: CaseIndex): CaseRe
     if (wanted.some((name) => key.endsWith(`.${name}`) || name.endsWith(`.${key}`))) hits.add(ref);
   }
   return hits.size === 1 ? [...hits][0] : undefined;
+}
+
+/**
+ * testName кейса — путь describe: он покрывает каждый тест под собой (`a > b` →
+ * `a > b > it`), как обещают подсказки группе и `junit-run.mjs`; худший из них —
+ * результат кейса, счёт — как у набора. Только тесты файла кейса; из вложенных путей
+ * побеждает длинный, два кейса на один путь — догадка, её не делаем (g9 27.10:
+ * кейс `getLockReason` остался «без результата», хотя оба его теста прошли).
+ */
+function describeMatch(
+  result: ImportedTestResult,
+  names: readonly string[],
+  index: CaseIndex,
+): CaseRef | undefined {
+  const keys = names.map(normalize);
+  const owner = result.owner ? filePath(result.owner) : '';
+  let best: CaseRef[] = [];
+  let size = 0;
+  for (const entry of index.describes) {
+    if (entry.key.length < size) continue;
+    if (entry.file && !(owner && sameFile(entry.file, owner))) continue;
+    if (!keys.some((name) => name.startsWith(`${entry.key} > `))) continue;
+    if (entry.key.length > size) {
+      size = entry.key.length;
+      best = [];
+    }
+    if (!best.some((ref) => ref.groupId === entry.ref.groupId && ref.caseId === entry.ref.caseId)) {
+      best.push(entry.ref);
+    }
+  }
+  return best.length === 1 ? best[0] : undefined;
+}
+
+/** Путь файла для сравнения: прямые слеши, без `./` и регистра. */
+function filePath(value: string): string {
+  return value.trim().replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
+}
+
+/** Один файл: пути от разных корней (пакет и проект) сходятся хвостом по границе папки. */
+function sameFile(a: string, b: string): boolean {
+  return a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
 }
 
 /** Написания одного имени, по которым стоит попробовать сопоставление. */

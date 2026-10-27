@@ -14,7 +14,8 @@ import { LEGACY_BRAND_NAME } from '../../lib/brand.mjs';
  * идти, целиком в адресе, который ввёл человек.
  *
  * НАРУЖУ УХОДИТ РОВНО ЗАГОЛОВОК: вид события, его текст и имя папки проекта —
- * та же граница, что у Telegram и у push (`domains/remote-notify.ts`). Ни
+ * та же граница, что у push (`domains/remote-notify.ts`); Telegram с 25.10.2026
+ * получает ещё имя чата и суть (`telegram-text.ts`), вебхуку это не обещано. Ни
  * промпта, ни ответа агента, ни путей внутри проекта: приёмник — чужой сервер,
  * и это решает всё.
  *
@@ -39,7 +40,7 @@ export interface WebhookDeps {
   onError?: (error: unknown) => void;
 }
 
-/** Тело события: то же, что читает человек в Telegram, плюс машинные поля. */
+/** Тело события: строка события и папки проекта плюс машинные поля. */
 export function composeWebhook(notice: TelegramNotice): WebhookPayload {
   return {
     event: noticeEvent(notice),

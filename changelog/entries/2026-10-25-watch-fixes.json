@@ -1,0 +1,1111 @@
+{
+  "title": {
+    "ru": "«Продолжить» сдавшуюся группу жмёт и агент, сдача не теряет недоделанное",
+    "en": "An agent can also press «Continue» on a group that gave up, delivery keeps what is left undone"
+  },
+  "items": [
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "«Продолжить» группу, остановившуюся недоделанной, теперь действие агента, как пауза и продолжение с паузы: агент панели и наблюдатель групп нажимают его сами, без окна человека.",
+        "en": "«Continue» on a group that stopped unfinished is now an agent action, like pause and resume: the panel agent and the group watcher press it themselves, with no human window."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Продолжить» передаёт группе весь список недоделанного и правило «не проверено», а не первые 300 знаков причины.",
+        "en": "«Continue» hands the group the whole list of what is left and the «not checked» rule, not the first 300 characters of the cause."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сито чужих удалений понимает пути со скобками `{ru,en}`: удалённые файлы, названные так в отчёте, больше не считаются неназванными.",
+        "en": "The foreign-removals sieve understands brace paths `{ru,en}`: removed files named that way in the report no longer count as unnamed."
+      },
+      "area": {
+        "ru": "Сита",
+        "en": "Sieves"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Команды docker с контейнером в переменной (`docker exec \"$CID\" go test`, `docker rm -f \"$CID\"`) группа выполняет сама: подкоманда docker больше не принимается за команду оболочки. То, что исполнится внутри контейнера, по-прежнему судится — удаление и git уходят человеку.",
+        "en": "Docker commands with the container in a variable (`docker exec \"$CID\" go test`, `docker rm -f \"$CID\"`) run without the human: a docker subcommand is no longer taken for a shell command. What runs inside the container is still judged — deletion and git go to the human."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "При старте панель заново судит ждущие решения групп без git: вызов, который правила уже разрешают, выполняется сам и уходит из списка «Ждёт решения».",
+        "en": "On start the panel re-judges waiting group decisions without git: a call the rules now allow runs by itself and leaves the «Awaiting decision» list."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`tests run` называет запрошенные кейсы, по которым отчёт не пришёл, и завершается с кодом 1, а не зелёным.",
+        "en": "`tests run` names requested cases the report has no result for and exits with code 1 instead of green."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Прогон, остановленный «Стопом» или паузой группы, записывается в журнал лимита целиком: доля окна учитывает токены после последнего замера, а запись посреди хода больше не выглядит законченным прогоном.",
+        "en": "A run stopped by «Stop» or a group pause is written to the limit journal in full: the window share counts the tokens after the last sample, and a mid-run record no longer looks like a finished run."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сервер разработки не перезапускается на файл, который проверка поломкой временно испортила, и не перезапускается, когда файл вернулся к прежнему виду.",
+        "en": "The dev server no longer restarts on a file a mutation check has broken for a moment, nor when the file is back as it was."
+      },
+      "area": {
+        "ru": "Разработка",
+        "en": "Development"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пункт задания с пометкой «не проверено» или «не из-за ветки» — заметка в описании MR, а не пробел «пункт не выполнен»: раньше одна и та же строка была и тем, и другим, и доставка вставала.",
+        "en": "A task item marked «not checked» or «not caused by the branch» is a note in the MR description, not an «item not done» gap: the same row used to be both, and delivery stopped."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Задетый набор тестов, красный слово в слово как до старта группы, — красное не из-за ветки: оно не держит ни доставку, ни конец хода группы.",
+        "en": "A touched test suite that is red word for word as before the group started counts as a red not caused by the branch and holds neither delivery nor the end of the group's turn."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Коммит, поменявший только комментарии в коде, больше не старит сданные строки сит; директива линтера или сборки в комментарии по-прежнему старит.",
+        "en": "A commit that changes only code comments no longer ages the submitted sieve rows; a linter or build directive in a comment still does."
+      },
+      "area": {
+        "ru": "Сита",
+        "en": "Sieves"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Повтор пуша с подписью `# sieve-ack` после отказа сита пуша больше не поднимает тревогу «отбитое действие выполнено другим путём», даже если команда вокруг пуша поменялась: подпись — ровно то, о чём просил отказ. Подпись после отказа другого стража по-прежнему тревога.",
+        "en": "A push retried with the `# sieve-ack` signature after a push-sieve refusal no longer raises the «refused action done another way» alert, even if the command around the push changed: the signature is exactly what the refusal asked for. A signature after another guard's refusal is still an alert."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Перед «готово» группа перечитывает только нерешённые обсуждения MR, а не выгружает все: на MR с двадцатью ветками это десятки тысяч знаков контекста.",
+        "en": "Before «done» a group re-reads only the unresolved MR discussions instead of dumping all of them: on an MR with twenty threads that is tens of thousands of characters of context."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вызов, который отклонил другой страж или классификатор авто-режима, больше не считается исполненным: повтор полного гейта не получает «на этом дереве гейт уже был красным», повтор проверки — «упала, правок не было», тот же список задач — «уже записан».",
+        "en": "A call another guard or the auto-mode classifier refused no longer counts as executed: a repeated full gate is not told «the gate already ran red on this tree», a repeated check is not told «failed, nothing edited», the same task list is not told «already recorded»."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пометку «не проверено» или «не из-за ветки», которую панель не приняла, напоминание доставки называет с причиной и тем, что сделать: ссылка на зелёный прогон, на прогон, где красное задела ветка, на прогон, которого нет, «не проверено» у проверки, которая запускается и здесь. Раньше строка звучала как «пункт не выполнен» с той же пометкой, и группа пересказывала то же доказательство.",
+        "en": "A «not checked» or «not caused by the branch» mark the panel did not accept is named in the delivery reminder with the reason and what to do: a link to a green run, to a run whose red the branch touched, to a run that does not exist, «not checked» on a check that runs here too. The line used to read «item not done» with the same mark, and the group repeated the same evidence."
+      },
+      "area": {
+        "ru": "Сита",
+        "en": "Sieves"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа на паузе или на лимите подписки продолжает со списком недоделанного из сверки после остановки, а не из проверки до неё: закрытое за последний ход больше не возвращается в продолжение.",
+        "en": "A group stopped by a pause or the subscription limit continues with the list of what is left from a check after the stop, not from the one before it: what the last turn closed no longer comes back in the continuation."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "`tests run --cmd` читает из `{report}` и вывод `go test -json` или `cargo test` (`go test -json ./... > {report}`): вид узнаётся по содержимому, явно — `--format go-test-json` или `cargo-test`. Раньше такой отчёт читался как JUnit с нулём тестов, и для Go в контейнере приходилось писать свой переводчик.",
+        "en": "`tests run --cmd` also reads `go test -json` or `cargo test` output from `{report}` (`go test -json ./... > {report}`): the kind is told from the content, explicitly with `--format go-test-json` or `cargo-test`. Such a report used to be read as JUnit with zero tests, and Go in a container needed a hand-written converter."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`tests run` над смешанным набором — кейсы vitest рядом с кейсами Go или Cargo — делит его: файлы vitest идут vitest своих пакетов, остальные — своей командой проекта, одной цепочкой и одной записью истории. Раньше своя команда брала весь набор, кейсы vitest выходили «без результата», и их гоняли вторым прогоном.",
+        "en": "`tests run` over a mixed set — vitest cases beside Go or Cargo ones — splits it: vitest files go to the vitest of their packages, the rest to the project command, in one chain and one history record. The project command used to take the whole set, the vitest cases came back «no result», and they needed a second run."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Команда группы, которая выгружает то, что ветка уже содержит (`git worktree add --detach w origin/main` после своего rebase — чистая основная рядом, чтобы прогнать на ней красные тесты), больше не считается догоном основной и не получает отказ. Перенос истории, `fetch` и команды в другом репозитории по-прежнему — догон.",
+        "en": "A group command that checks out what the branch already holds (`git worktree add --detach w origin/main` after its own rebase — a clean main beside it to run red tests on) no longer counts as catching up with main and is not refused. Moving history, `fetch` and commands in another repository still count as catching up."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Результаты pytest 8.1+ ложатся на свои кейсы-наборы, когда корень — обычный `pyproject.toml` и в отчёте classname `tests.x` без пути пакета: набор находится по файлу теста в его каталоге, только если такой файл один. Ошибка сбора тоже ложится на набор по имени.",
+        "en": "pytest 8.1+ results land on their suite cases when the root is a plain `pyproject.toml` and the report's classname is `tests.x` without the package path: the suite is found by the test file in its directory, only when there is exactly one such file. A collection error lands on its suite by name too."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "`tests run --base` прогоняет кейсы на развилке ветки с основной — во временном дереве git — и пишет итог в `.agent/tests/runs-base`, а не в историю. Красное ветки с той же первой строкой падения, что на развилке, ворота доставки и конца хода группы пишут заметкой «не из-за ветки» и не держат; напоминание о красном называет эту команду. Раньше кейс, красный от окружения, но без прогона до старта группы, держал её без конца: доказать, что красное не её, было нечем.",
+        "en": "`tests run --base` runs cases on the fork point of the branch with main — in a temporary git tree — and writes the result into `.agent/tests/runs-base`, not into the history. A branch red with the same first failure line as on the fork point becomes a «not caused by the branch» note at the group's delivery and turn-end gates instead of holding them; the red reminder names this command. A case red from the environment but with no run before the group started used to hold the group forever: there was nothing to prove the red was not its own."
+      },
+      "how": {
+        "ru": "Довод действует, пока развилка та же: после rebase на новую основную прогон повторяют. Зависимостей копии (node_modules, venv) во временном дереве нет, поэтому красное там с другой подписью кейс не снимает и прогон до старта группы не заслоняет. Файлы go.sum, go.work и go.work.sum, которых нет в git, дерево берёт из копии — без них Go-проект с go.sum в .gitignore не собирался на развилке вовсе. Вывод прогона называет по каждому кейсу, снимут ли его ворота.",
+        "en": "The evidence holds while the fork point stays: after a rebase onto a newer main the run is repeated. The copy's dependencies (node_modules, venv) are not in the temporary tree, so a red there with a different signature neither clears the case nor hides the run from before the group started. go.sum, go.work and go.work.sum files that git does not hold come from the copy — without them a Go project with go.sum in .gitignore did not build on the fork point at all. The run's output says for each case whether the gates will clear it."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`tests show` находит кейс и в форме `группа:кейс`, которую печатают `run`, `gaps` и ворота доставки: скопированный из их вывода идентификатор раньше давал «Кейса … в проекте нет».",
+        "en": "`tests show` finds a case in the `group:case` form that `run`, `gaps` and the delivery gates print: an id copied from their output used to give «case … not in the project»."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Страж git отклоняет `git merge-tree --write-tree --quiet` как проверку конфликта: с `--quiet` команда выходит с кодом 0 и при настоящем конфликте, и группа принимала ветку за чистую. Без `--quiet` код 1 и строки CONFLICT на виду.",
+        "en": "The git guard refuses `git merge-tree --write-tree --quiet` as a conflict check: with `--quiet` the command exits 0 even on a real conflict, and the group took the branch for clean. Without `--quiet` the exit code is 1 and the CONFLICT lines show."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Пакет ревью несёт карту чтения: куски строк подряд под потолок Read (берётся из `CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS`) и строки каждого файла. Ревьюер читает большой пакет без отказов Read и без кусков наугад.",
+        "en": "The review package carries a reading map: consecutive line chunks under the Read cap (taken from `CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS`) and the lines of each file. A reviewer reads a large package with no Read refusals and no guessed slices."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Звено группы, которое панель завела, а оно так и не начало ход (процесс закрылся при рождении), больше не стоит час до сторожа: через пять минут без хода сторож заводит его заново.",
+        "en": "A group stage the panel started that never began its turn (the process closed at birth) no longer stands an hour waiting for the watchdog: after five minutes without a turn the watchdog starts it again."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Страж «полный гейт — в конце» больше не отклоняет проверку типов в подкаталоге пакета (`cd <пакет> && npm run type-check`): узкая проверка одного пакета — не полный прогон.",
+        "en": "The «full gate at the end» guard no longer refuses a type check inside a package folder (`cd <package> && npm run type-check`): a narrow check of one package is not a full run."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Карточка правила, уже открытая в разговоре, не приходит заново при правке соседнего файла той же области: правило доставляется один раз на разговор.",
+        "en": "A rule card already open in a conversation does not arrive again when a neighbouring file of the same area is edited: the rule is delivered once per conversation."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Задания звеньев после работы снова несут из плана группы только раздел критериев и дальше, а шаги — ссылкой: раздел критериев узнаётся по заголовку под любым номером. Раньше план без «§5» уходил в каждое задание целиком — до 24 тыс. знаков лишнего на звено.",
+        "en": "Post-work stage briefs again carry only the criteria section of the group plan and what follows, with the steps by reference: the criteria section is found by its title under any number. Before, a plan without «§5» went into every brief whole — up to 24k extra characters per stage."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Доставка группы кладёт снимки до/после видимой правки в описание MR, а если их нет — пишет там это и причину. Ревьюер отличает «нечего снимать» от «не снимали».",
+        "en": "Group delivery puts before/after shots of a visible change into the MR description, and without them says so there and why. A reviewer tells «nothing to shoot» from «not shot»."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Если хук Stop отбил конец хода, следующее звено группы получает исходом прошлого итоговую сводку, а не ответ на замечание хука. Раньше звено доставки видело только этот ответ и восстанавливало сделанное по git.",
+        "en": "When a Stop hook blocks the end of a turn, the next group stage gets the closing summary as the previous outcome, not the reply to the hook. Before, the delivery stage saw only that reply and rebuilt what was done from git."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Задание правок по ревью перечисляет места замечаний — файлы и строки из карточек — и просит читать эти диапазоны, а не файлы целиком: ревью их уже прочло.",
+        "en": "The review-fix brief lists where the findings point — files and lines from the cards — and asks to read those ranges, not whole files: the review has read them already."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Доставка чинит мелкие замечания, оставшиеся открытыми после проверки, если они в файлах группы: комментарий, литерал, одна строка. Остальное перечисляется в MR под заголовком на языке MR, а не под английским в русском описании.",
+        "en": "Delivery fixes small findings left open after verification when they lie in the group's files: a comment, a literal, one line. The rest is listed in the MR under a heading in the MR's language, not an English one in a Russian description."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Звено доставки само запускает проверку доставки панели по черновику описания MR и блоку сит до создания MR. Пробелы закрываются до публикации, лишнего круга после «готово» нет.",
+        "en": "The delivery stage runs the panel's delivery check on the MR description draft and the sieves block before creating the MR. Gaps close before publishing, with no extra round after «done»."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Когда конвейер MR красный, продолжение группы после «готово» и задание «Перепроверить MR» приносят последние строки лога упавших заданий GitLab: до двух заданий, до 40 строк каждое, без цветовых кодов. Группа начинает с причины, а не с поиска лога.",
+        "en": "When the MR pipeline is red, the group's continuation after «done» and the «Recheck MR» brief carry the last lines of the failed GitLab jobs' logs: up to two jobs, up to 40 lines each, without colour codes. The group starts from the cause, not from looking for the log."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сторож групп больше не поднимает «повтор проверки» на вызовы, которые отклонил страж: считаются только проверки, которые действительно выполнились.",
+        "en": "The group watch no longer raises «repeated check» for calls a guard refused: only checks that actually ran are counted."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка доставки, запущенная до звена доставки, не называет пробелами пуш и MR — их делает само звено доставки; в звене доставки они по-прежнему пробелы.",
+        "en": "A delivery check run before the delivery stage no longer lists push and MR as gaps — the delivery stage makes them; inside that stage they are still gaps."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка доставки читает разделы описания MR: нет раздела проверок — пробел; правка интерфейса без снимков до/после и без причины их отсутствия — пробел.",
+        "en": "The delivery check reads the MR description sections: no checks section is a gap; a UI change without before/after shots and without a reason for their absence is a gap."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Зелёный прогон автотеста на том же дереве засчитывается каждому кейсу с тем же файлом и именем теста, в любой группе: `gaps` больше не требует гонять тот же пакет второй раз. `tests run --stale` прогоняет ровно кейсы, которые `gaps` называет непрогнанными или устаревшими.",
+        "en": "A green run of an automated test on the same tree counts for every case with the same file and test name, in any group: `gaps` no longer asks to run the same package a second time. `tests run --stale` runs exactly the cases `gaps` names as not run or stale."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Кейсы спеков и каталогов пакета со своим Playwright (`playwright.config.*` или Playwright в зависимостях без vitest) `tests run` гонит Playwright этого пакета с отчётом JUnit, а не vitest: раньше прогон обрывался на «vitest не установлен».",
+        "en": "Cases of specs and folders of a package with its own Playwright (`playwright.config.*`, or Playwright among its dependencies without vitest) are run by `tests run` with that package's Playwright and a JUnit report, not vitest: the run used to stop at «vitest is not installed»."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "`tests run --health <адрес>` спрашивает стенд до прогона: не ответил — команда не запускается, кейсы ложатся «заблокирован» с причиной (код 75). Ворота доставки читают это как окружение и прогона на развилке не требуют. Задание доставки велит группам гнать e2e- и живые кейсы с этим флагом.",
+        "en": "`tests run --health <url>` asks the stand before the run: no answer — the command does not start, the cases are recorded as «blocked» with the reason (exit code 75). The delivery gate reads that as environment and does not ask for a fork-point run. The delivery brief tells groups to run e2e and live cases with this flag."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пробел доставки «вердикта ревьюера нет» называет, чем он снимается: последний ответ этапа ревью заканчивается блоком ```agentdeck:review``` {\"findings\":[…]}, пустой список — одобрено.",
+        "en": "The «no reviewer verdict» delivery gap names its remedy: the final answer of the review stage ends with an ```agentdeck:review``` block {\"findings\":[…]}, an empty list means approved."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка одного пакета копии больше не принимается за полный гейт: `cd <копия>/<пакет>` абсолютным путём и `npm run build` внутри пакета считаются узкими, как type-check пакета. Корень копии и папка вне её остаются целыми.",
+        "en": "A check of one package of a copy is no longer taken for a full gate: an absolute `cd <copy>/<package>` and `npm run build` inside a package count as narrow, like the package's type-check. The copy root and a folder outside it stay whole."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Соседний гейт проекта (`check_frontend_tests` после `check_frontend`) и гейт, прерванный концом сессии, больше не отклоняются как повтор без правок.",
+        "en": "A sibling project gate (`check_frontend_tests` after `check_frontend`) and a gate cut short by the end of a session are no longer refused as a repeat with no edits."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Субагент судится по своему журналу: повтор своей зелёной проверки отклоняется, а вывод чтения файлов выше порога сохранения оболочки (8k) отправляется в Read, а не печатается превью с повторным чтением.",
+        "en": "A subagent is judged by its own transcript: re-running its own green check is refused, and file reads printing above the shell persist threshold (8k) are sent to Read instead of a preview plus a second read."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Heredoc длиннее 6000 знаков, пишущий файл, отклоняется до запуска с отсылкой к Write/Edit: такие команды оболочка обрывает «unexpected EOF», оставляя файл недописанным.",
+        "en": "A heredoc over 6000 characters that writes a file is refused before it runs and sent to Write/Edit: the shell cuts such commands with «unexpected EOF», leaving the file half written."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Правила о способе проверки (verification-depth, live-check) приходят карточкой без отказа, прогон проверки карточку не получает, а карточку другого правила снимает чтение раздела, относящегося к правимому файлу, целиком.",
+        "en": "Rules about how a check is done (verification-depth, live-check) arrive as a card without a refusal, a check run gets no card, and another rule's card is lifted by reading the whole section that covers the edited file."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Задачи и комментарии, которые панель пишет в Jira («Опубликовать в Jira» и «Завести» у строки), больше не несут хэш-метку разделения, строку «labels = …» и строку отпечатков agentdeck-fp: внутренние машинные идентификаторы (хэш разделения, отпечатки находок, id чата) читателю задачи ничего не говорят и остаются только в панели. Отпечатки панель помнит сама, при каждой задаче, которую завела или прокомментировала: повтор узнаётся и после того, как задачу переименовали, а строку отпечатков в старых задачах сверка по-прежнему читает. Словесные метки — сторона и agentdeck-proposal — на месте.",
+        "en": "Issues and comments the panel writes to Jira («Publish to Jira» and a row's «File») no longer carry the split hash label, the «labels = …» line or the agentdeck-fp fingerprint line: internal machine ids (the split hash, finding fingerprints, a chat id) mean nothing to the issue's reader and stay inside the panel. The panel remembers the fingerprints itself, beside every issue it filed or commented on: a repeat is recognised even after the issue was renamed, and the fingerprint line of older issues is still read. Word labels — the side and agentdeck-proposal — remain."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Слово о красном конвейере после «готово» называет номер упавшего задания и велит первым делом прочесть его лог; локальный прогон починку не доказывает, а если лога не достать — сказать об этом сразу. Раньше группа по двадцать минут гоняла CI у себя вместо одного чтения лога.",
+        "en": "The red-pipeline word after «done» names the failed job id and tells the group to read its log first; a local run proves no fix, and an unreachable log is said at once. The group used to run CI locally for twenty minutes instead of reading one log."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "«Продолжить» с паузы принимает заметку: причину паузы и первый шаг группа получает в промпте продолжения отдельными строками, а уже решённые проверки не перезапускает.",
+        "en": "«Resume» from a pause takes a note: the group gets the pause reason and the first step as separate lines of the resume prompt and does not re-run checks already decided."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Если после слова о красном MR группа закончила ход без правки, она не помечается «готово»: группа ждёт человека с пометкой «MR красный, правки нет», а в чат приходит заметка.",
+        "en": "When a group ends its turn after the red-MR word without a fix, it is no longer marked «done»: it waits for the human tagged «MR red, no fix», with a notice in the chat."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Слово наблюдателя MR доставленной группе с большим окном (от 60 тыс. токенов) начинает новый разговор с короткой вводной, а не продолжает всё окно доставки. Реплика человека в чат такой группы по-прежнему продолжает прежний разговор.",
+        "en": "The MR watcher word to a delivered group with a large window (60k tokens and up) starts a fresh conversation with a short brief instead of resuming the whole delivery window. A human reply in that group chat still resumes the earlier conversation."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Хук forge-toolset-guard: в группе разделения discover_tools форджа включает только категории доставки — merge_requests и pipelines. Остальные категории отклоняются: каждая включённая категория пересылалась бы в каждом следующем запросе хода.",
+        "en": "Hook forge-toolset-guard: in a split group the forge discover_tools activates only the delivery categories, merge_requests and pipelines. Other categories are refused: each activated one would be re-sent on every later request of the turn."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "context-watch в группе разделения больше не шлёт обычную просьбу обновить PROGRESS.md (окно ведёт панель), а у границы сжатия просит записать состояние в блокнот копии.",
+        "en": "context-watch in a split group no longer sends the regular «refresh PROGRESS.md» nudge (the panel manages the window); near compaction it asks to write the state into the copy notebook."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Продолжение группы в чистой сессии, оборванное паузой до первого хода, после снятия паузы стартует своей вводной (что сделано и что дальше), а не общим «продолжи, где остановился» в прошлой сессии: вводная хранится в связи разговора, пока он не родился.",
+        "en": "A group continuation in a clean session, cut by a pause before its first turn, now starts with its own brief (what is done and what is next) after the pause is lifted, not with a generic «continue where you left off» in the previous session: the brief is kept in the conversation link until it is born."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сторож групп больше не сообщает «копия читает файлы панели», когда группа запускает пакет ревью панели — его велит собрать сама стадия ревью. Чтение исходника этого пакета по-прежнему сигнал.",
+        "en": "The group watcher no longer reports «the copy reads the panel's own files» when a group runs the panel's review pack — the review stage itself asks for it. Reading that pack's source is still a signal."
+      },
+      "area": {
+        "ru": "Сторож групп",
+        "en": "Group watcher"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Потолок чтения целых файлов в звене группы считает и `cat файл | head -N`, `| tail -N`, `| sed -n 'a,bp'`: такой конвейер печатает в окно столько строк, сколько пропустит последний шаг, и раньше проходил как «вывод идёт дальше». Счёт — по настоящим строкам файла; `| grep`, `| wc` и другие получатели по-прежнему не считаются.",
+        "en": "The whole-file read cap in a group lane now also counts `cat file | head -N`, `| tail -N`, `| sed -n 'a,bp'`: such a pipeline prints to the window as many lines as its last stage lets through, and it used to pass as «output goes on». The count uses the file's real lines; `| grep`, `| wc` and other targets are still not counted."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вводная нового разговора группы больше не перечисляет одни и те же файлы дважды: изменённое от базы и незакоммиченное идут одним списком, код статуса — рядом со строкой файла, неотслеживаемые — своим коротким списком. У копии посреди rebase раздел git стал вдвое короче (4,4 тыс. символов → 2,3 тыс.); счётчики строк, переименования и бинарные файлы остаются видны, пути — полные.",
+        "en": "A group's new-conversation brief no longer lists the same files twice: changes against the base and uncommitted changes come as one list, with the status code beside each file line and untracked files in their own short list. For a copy mid-rebase the git part became half as long (4.4k chars → 2.3k); line counts, renames and binary files stay visible, paths are full."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка «полный гейт только в доставке» больше не отказывает звену, чей shell уже стоит в пакете монорепо: `npm run type-check` там без `cd` — проверка одного пакета, ровно та узкая форма, которую называет сам текст отказа. Из корня копии, из папки без своего манифеста и с `cd` в той же команде решение прежнее.",
+        "en": "The «full gate only at delivery» check no longer refuses a lane whose shell already stands in a monorepo package: `npm run type-check` there without `cd` checks one package, the very narrow form the refusal text names. From the copy root, from a folder with no manifest of its own, and with a `cd` in the same command, the decision is unchanged."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "На Windows вызов node, который называет `/tmp/…` внутри своего кода (`node -e`, `-p`, here-doc), получает подсказку до запуска: Git Bash переводит `/tmp` только целым аргументом, а node.exe ищет такой путь в корне текущего диска и падает с «файл не найден». Подсказка советует `\"$(cygpath -m /tmp)/файл\"` или передать путь аргументом; это контекст, не отказ, и команды одной оболочки, перенаправления и путь целым аргументом её не вызывают.",
+        "en": "On Windows a node call that names `/tmp/…` inside its own code (`node -e`, `-p`, a here-doc) gets a hint before it runs: Git Bash translates `/tmp` only as a whole argument, and node.exe looks such a path up at the root of the current drive and fails with «file not found». The hint suggests `\"$(cygpath -m /tmp)/file\"` or passing the path as an argument; it is context, not a refusal, and shell-only commands, redirects and a path given as a whole argument do not trigger it."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Потолок чтения файлов оболочкой в звене группы: из `a || b` судится большая ветка, а не сумма двух (печатается одна из них); цель перенаправления (`2>/dev/null`, `2> err.log`) больше не считается файлом; в тексте отказа пути подписаны так, как их видит каталог команды, — `.agent/PROGRESS.md` и `../.agent/PROGRESS.md` больше не сливаются в одну подпись. `cat <файл` теперь считается чтением этого файла. `head -c N` и `tail -c N` считаются по N байтам: раньше `-c 3000` читался как 3000 строк, и короткий срез большого файла отказывался как чтение целиком.",
+        "en": "The shell file-read cap in a group lane: of `a || b` the larger branch is judged, not the sum of both (only one of them prints); a redirect target (`2>/dev/null`, `2> err.log`) is no longer counted as a file; the refusal labels paths as the command directory sees them, so `.agent/PROGRESS.md` and `../.agent/PROGRESS.md` no longer collapse into one label. `cat <file` now counts as a read of that file. `head -c N` and `tail -c N` count N bytes: `-c 3000` used to be read as 3000 lines, so a short slice of a big file was refused as a whole-file read."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отчёт ревью: мелочь 🟢 можно записать одной строкой с полями в ней — `- F-NN 🟢 <тезис> — **Где:** `файл:строка` · **Ось:** … · **Статус:** open`. Описание формы отчёта велело писать мелочи компактно, а страж читал только заголовки находок: отчёт по описанию отклонялся с «в файле 0 мелочей» и переписывался заново (около минуты и трёх тысяч знаков). Теперь такие строки считаются в «Итоге», а 🔴, 🟡 и ❓ по-прежнему пишутся блоком с доказательством.",
+        "en": "Review report: a 🟢 nit may be written as one line with its fields inline — `- F-NN 🟢 <thesis> — **Where:** `file:line` · **Axis:** … · **Status:** open`. The report-shape description asked for compact nits while the guard read only finding headings, so a report written to the description was refused with «the file has 0 nits» and rewritten (about a minute and three thousand characters). Such lines now count in the summary; 🔴, 🟡 and ❓ stay blocks with evidence."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отчёт ревью больше не может приписать себе раунды, которых не было: строка журнала пишет «раундов k из N» (прошло из запланированных), голое число плана страж отклоняет, а прошедших меньше плана — неполное покрытие, и «блокирующих нет» без оговорки не проходит. Отчёт по двум и более полосам несёт оценку покрытия — «найдено …, оценка ≈…» — или прямо говорит «покрытие неизвестно».",
+        "en": "A review report can no longer claim rounds that never ran: the ledger line reads «rounds k of N» (run of planned), the guard refuses a bare planned number, and fewer rounds than planned count as incomplete coverage, so «no blocking findings» without a qualifier does not pass. A report over two or more lanes carries a coverage estimate — «found …, estimate ≈…» — or says «coverage unknown» outright."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Ревью группы с доставкой больше не собирает пакет ревью панели, когда ревью ведёт навык deep-review: навык сам режет дифф окнами под лимит чтения, а второй файл с тем же диффом (на замере — 241 тысяча знаков) ревьюеры читали зря, шестью вызовами. Пакет панели остаётся запасным путём для ревью без этого навыка.",
+        "en": "A delivering group review no longer builds the panel review package when the deep-review skill runs the review: the skill cuts the diff into read-sized windows itself, and a second file with the same diff (241 thousand characters in the measured run) cost the reviewers six wasted calls. The panel package stays the fallback for a review without that skill."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Рецензент, проверяющий находку в пробном клоне плана ревью, больше не упирается в отказ: клон признаётся по метке плана, поэтому откат файла, уборка и удаление пробы в нём проходят без вопроса и у стража команд, и у суда группы. Без метки, с битой меткой, по ссылке из клона наружу и для самого клона, пока в нём живы ссылки плана на настоящую копию, всё по-прежнему уходит человеку; переход в каталог, который не назван (пустая переменная, голый cd, cd -), больше не засчитывается как временный. Каталог после «cd X;» засчитывается, только если переход точно удался: X есть на диске и переход не стоит в ветке «||», после «&&» или в теле «if» — иначе удаление или откат после неудавшегося перехода судились бы в X, а исполнялись в прежнем каталоге; после «cd X &&» X засчитывается, как и раньше.",
+        "en": "A reviewer checking a finding in the review plan's scratch clone no longer hits a refusal: the clone is recognised by the plan's mark, so reverting a file, cleaning up and deleting a probe there pass without a question both at the command guard and at the group judge. Without the mark, with a broken mark, through a link leading out of the clone, and for the clone itself while the plan's links into the real copy are alive, everything still goes to the human; a change into an unnamed directory (empty variable, bare cd, cd -) no longer counts as temporary. The directory after «cd X;» counts only when the change surely succeeded: X exists on disk and the change is not in an «||» branch, after «&&» or in an «if» body — otherwise a delete or revert after a failed change was judged in X but ran in the previous directory; after «cd X &&» X counts as before."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "План ревью режет дифф по оценке токенов, а не только по строкам: кусок — до 25 тысяч токенов, раунд полосы — до 50 тысяч. Раньше пять кусков прозы в одном раунде занимали около 95 тысяч токенов, и полоса сжимала контекст посреди ревью. Окна пакета оцениваются с запасом и больше не упираются в лимит Read.",
+        "en": "The review plan cuts the diff by estimated tokens, not by lines alone: a chunk holds up to 25 thousand tokens, a lane round up to 50 thousand. Previously five prose chunks in one round took about 95 thousand tokens and the lane compacted its context mid-review. Pack windows are estimated with a margin and no longer hit the Read limit."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Файл данных в ревью (эталон, lock-файл, JSON-массив записей) — один кусок у одной полосы, со сводкой по ключам: что добавлено, удалено и изменено. Полосы больше не читают его сырой дифф и не сверяют те же множества вручную.",
+        "en": "A data file under review (a baseline, a lockfile, a JSON record array) is one chunk owned by one lane, with a key-level summary of what was added, removed and changed. Lanes no longer read its raw diff or recompute the same set difference by hand."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка покрытия ревью считает раунды, которые действительно прошли, по заголовку отчёта полосы («# Lane A r1 — …»), и выдаёт повторный запуск для каждого запланированного, но не запущенного раунда. Раньше журнал писал число раундов из плана.",
+        "en": "The review coverage check counts the rounds that actually ran, by each lane report's header («# Lane A r1 — …»), and issues a rerun for every planned round that never ran. Previously the ledger printed the planned round count."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Промпт полосы ревью укладывается в 20 КБ и передаётся целиком: тексты задач в нём сокращены до описаний и последнего вердикта QA, полный файл назван путём. Отчёт полоса пишет одним Write и дополняет через Edit, без heredoc; несколько записанных прогонов проверок названы базой, которую полоса не перезапускает.",
+        "en": "A review lane prompt fits in 20 KB and is passed whole: ticket texts in it are cut to descriptions and the latest QA verdict, with the full file named by path. The lane writes its report with one Write and extends it with Edit, without a heredoc; several recorded check runs are named as the baseline the lane does not re-run."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "План ревью хранит уровень проверки (`plan --risk`), а команда `review-plan status` показывает продолжающей сессии уровень, полосы, прошедшие раунды и следующий шаг. Уровень больше не вычисляется заново после паузы.",
+        "en": "The review plan stores the verification tier (`plan --risk`), and `review-plan status` shows a continuing session the tier, lanes, rounds run and the next step. The tier is no longer recomputed after a pause."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "После сжатия разговора группа больше не ищет просьбу владельца в своей переписке: панель кладёт дословные слова владельца, уже сданные строки отчёта по пунктам и сита текущего звена в рабочую папку копии и переписывает этот файл на старте группы и каждого звена, а правила группы называют путь к нему. Раньше после сжатия группа тратила несколько минут на поиск этих сведений по журналу разговора. Так же работают группы Codex и Qwen Code.",
+        "en": "After a conversation is compacted, a group no longer searches its own history for the owner's request: the panel puts the owner's words verbatim, the requirement rows already reported and the current stage's sieves into the copy's working folder, rewrites that file at the group start and at every stage start, and the group rules name its path. Before, a group spent several minutes digging these out of the conversation log after a compaction. Codex and Qwen Code groups work the same way."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правки и проверка группы разделения знают её границы по плану: задание называет пути, отданные другим группам, и новая запись в списке исключений допустима только для них — замечание на страницах самой группы правится, а не откладывается в исключения. Раньше правки судили «своё» по изменениям ветки и откладывали в исключения находки на собственных страницах, и доставка переделывала их заново. Правки теперь сдают раздел уже доказанного (мутант и убивший его тест, запись журнала проверок), и проверка этих прогонов не повторяет, читает изменения по сводке и кускам по каждому замечанию и не заводит клон без нужды; длинный список замечаний правки разбирают точечным поиском по файлу, а не чтением большими окнами. Так же работают группы Codex и Qwen Code.",
+        "en": "Fixes and verification of a split group know its scope from the plan: the task names the paths given to other groups, and a new exception-list entry is allowed only for those — a finding on the group's own pages is fixed instead of being parked as an exception. Before, fixes judged what was theirs by the branch changes and parked findings on their own pages as exceptions, and delivery had to redo them. Fixes now hand over a section of what is already proven (a mutant and the test that killed it, a verify-ledger record), and verification does not repeat those runs, reads the changes by a summary plus hunks per finding and does not make a clone without need; a long list of findings is worked through by targeted searches in a file instead of reading it in large windows. Codex and Qwen Code groups work the same way."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Набор больше не принимает только читающий `node -e` за правку файлов пакета: в коде, который запускает процессы (`execSync`, `spawn`), командой оболочки считаются только его строки, а цель перенаправления должна быть похожа на путь. Стрелка `e=>e.page+…` и строка `'->'` в выводе называли несуществующие файлы, и карточка правила пакета отказывала чтению — два лишних хода и около 14 тысяч знаков правила на весь остаток разговора. Настоящая запись через запускаемую команду (`execSync('cat a > b.ts')`) по-прежнему судится как правка.",
+        "en": "The kit no longer takes a read-only `node -e` for an edit of package files: in code that starts processes (`execSync`, `spawn`) only its strings count as shell commands, and a redirect target must look like a path. An arrow `e=>e.page+…` and a `'->'` string in the output named files that do not exist, and the package rule card refused the read — two wasted turns and about 14 thousand characters of rule for the rest of the conversation. A real write through a spawned command (`execSync('cat a > b.ts')`) is still judged as an edit."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`mustfail --mutants` ищет план сначала от `--cwd`, затем от каталога, где запущена команда; не найденный нигде план называет оба испробованных пути. Раньше план из корня репозитория при `--cwd` пакета падал с «файл не найден», и повтор с `../` стоил хода.",
+        "en": "`mustfail --mutants` looks for the plan relative to `--cwd` first, then to the directory the command runs in; a plan found nowhere names both paths tried. A plan at the repository root with `--cwd` set to a package used to fail with «file not found», and the retry with `../` cost a turn."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Повтор чтения неизменного файла внутри цепочки команд (`grep …; cat PROGRESS.md`) теперь отклоняется так же, как повторный Read, с советом убрать это звено: сразу после сжатия один и тот же файл читался дважды за четыре секунды. Граница сжатия, выход повтором той же команды, вывод, ушедший в файл, и конвейер (`cat f | grep`) работают как прежде. В наборе страж повторного чтения теперь видит и чтение через Bash.",
+        "en": "Re-reading an unchanged file inside a command chain (`grep …; cat PROGRESS.md`) is now refused like a repeated Read, with advice to drop that part: right after a compaction the same file was read twice in four seconds. The compaction boundary, the escape by repeating the same command, output that went to a file, and pipes (`cat f | grep`) work as before. In the kit the re-read guard now sees Bash reads too."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Обычный коммит группы в своей копии из подпапки больше не уходит человеку. Запрос прав иногда приходил раньше, чем записывался сам вызов, каталог оболочки оставался неизвестен, и `git -C ..` считался от корня копии — как git над копией. Теперь панель недолго ждёт запись вызова; если каталог так и не известен, агент получает отказ с объяснением, от чего считался путь, а не карточку человеку. Точка соединения `cmd /c mklink /J` внутри своей копии на каталог той же копии считается своей работой; ссылка или цель вне копии, как и удаление через такую ссылку, по-прежнему ждут человека. Уже ждущие решения такого вида снимаются сами при перезапуске панели.",
+        "en": "A group's ordinary commit in its own copy from a subfolder no longer goes to the human. The permission request sometimes arrived before the call itself was recorded, the shell directory stayed unknown, and `git -C ..` was counted from the copy root, as git above the copy. The panel now waits briefly for the call record; if the directory is still unknown, the agent gets a refusal explaining what the path was counted from instead of a human card. A `cmd /c mklink /J` junction inside the own copy pointing at a folder of the same copy counts as the group's own work; a link or target outside the copy, and deletion through such a link, still wait for the human. Pending decisions of this kind clear themselves when the panel restarts."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Журнал проверок повторяет и проверки проекта, описанные вне самого проекта: реестр проверок можно держать в каталоге журнала, по блоку на репозиторий, и его находит каждая копия этого репозитория. Раньше проверка проекта узнавалась только по реестру внутри проекта, и в проекте без такого реестра проверка содержимого документации шла заново на неизменном дереве — около 8 с на каждом прогоне стадии. Реестр проекта по-прежнему главнее на том же id, а правка любого файла, который читает проверка, в том числе в соседнем пакете, ведёт к новому прогону.",
+        "en": "The verify ledger now also replays project checks described outside the project itself: the check registry can live in the ledger's own folder, one block per repository, and every copy of that repository finds it. A project check used to be recognised only through a registry inside the project, so in a project without one the documentation content check ran again on an unchanged tree — about 8 s on every stage run. A project's own registry still wins on the same id, and an edit to any file the check reads, including one in a neighbouring package, leads to a fresh run."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Звено группы получает только те MCP-серверы, которые нужны его виду. Раньше правки и проверка правок запускались со всеми серверами проекта: в живой группе это почти двести имён инструментов и больше восьми тысяч знаков указаний в каждом ходе при нуле вызовов. Теперь набор задаёт одна таблица по виду звена: разбор, план, работа и ревью получают трекер, хранилище кода, макеты и прочие серверы; доставка — трекер и хранилище кода; правки и проверка правок — ни одного. Мессенджеры не подключаются никому, макеты — только при ссылке на макет в задачах. Сервер, который группа попросила блоком mcp, подключается в любом звене, а просьба из правок продолжает ту же сессию с этим сервером до того, как заведётся проверка. Та же таблица действует и в группах Codex, Qwen Code и OpenCode: их звенья снимают серверы выключателем своего CLI.",
+        "en": "A group stage gets only the MCP servers its kind needs. Fix and fix-verification stages used to start with every server of the project: in a live group that was almost two hundred tool names and over eight thousand characters of server instructions on every turn, with zero calls. One table keyed by stage kind now sets the list: triage, plan, work and review get the tracker, the code host, design and other servers; delivery gets the tracker and the code host; fix and fix verification get none. Messengers load for no stage, and design loads only when the tasks link a design. A server the group asked for with the mcp block loads in any stage, and a request made during a fix resumes the same session with that server before verification starts. The same table applies to Codex, Qwen Code and OpenCode groups: their stages switch servers off through their CLI's own switch."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Уборка группой своих снимков и черновиков в рабочих папках `.agent/` своей копии больше не ждёт человека; удаление самой папки, шаблон выше файла и выход из копии через `..` или ссылку по-прежнему ждут его. Свой dev-сервер группа может погасить по номеру, который сама увидела в `netstat` для порта своего запуска или в эхе `$!`, даже если процесса уже нет; номер, который разговор не печатал или который занят позже другим процессом, получает отказ с причиной. Распаковка дерева своего коммита (`git archive <коммит> | tar -x -C .agent/tmp/…`) и запуск проверки из него проходят сами, если в дереве коммита нет ссылок. Распаковка вне копии, как и файл, который git пишет по ключу (`archive -o`, `diff --output`, `format-patch -o`, `bundle create`) вне копии и временной папки, теперь всегда ждут человека. При перезапуске панели ждущий вызов судится от каталога, где была группа в момент вызова, даже если с тех пор транскрипт сильно вырос.",
+        "en": "A group cleaning up its own shots and drafts in the `.agent/` work folders of its copy no longer waits for the human; deleting the folder itself, a glob above the file, and leaving the copy through `..` or a link still wait. A group may stop its own dev server by a number it printed itself (`netstat` for the port it launched on, or an echo of `$!`), even when the process is already gone; a number the conversation never printed, or one taken later by another process, gets a refusal with the reason. Unpacking the tree of the copy's own commit (`git archive <commit> | tar -x -C .agent/tmp/…`) and running a check from it pass on their own when the commit tree holds no links. Unpacking outside the copy, and a file git writes by an option (`archive -o`, `diff --output`, `format-patch -o`, `bundle create`) outside the copy and the temp folder, now always wait for the human. On panel restart a pending call is judged from the directory the group was in at the time of the call, even when the transcript has grown a lot since."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Отказ «живую проверку нельзя сдать n/a» сразу называет, чем её сдать: ссылкой run:<id> на записанный прогон блока «Тесты», где прошёл кейс с одной из меток этого сита. Раньше отказ говорил только «проверьте вживую», и группа искала в коде панели, что считается живой проверкой.",
+        "en": "The «a live check cannot be reported n/a» refusal now names how to clear it: run:<id> of a recorded Tests-section run where a case with one of this sieve's tags passed. Before, it only said «check it live», and a group searched the panel's code for what counts as live."
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сигнал «отбитое действие сделано другим путём» больше не поднимает тревогу, когда группа повторила отбитый пуш ровно так, как просил страж отправки: назвала каталог копии через `git -C`. Раньше такой исправленный повтор считался обходом отказа. Повтор того же пуша без названного каталога или с другим хвостом команды по-прежнему считается обходом.",
+        "en": "The «a refused action was done another way» signal no longer raises an alert when a group repeats a refused push exactly the way the push guard asked: naming the copy's checkout with `git -C`. Before, that corrected retry counted as a bypass. Repeating the same push without the named checkout, or with a different tail, still counts as a bypass."
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа запускает сервер разработки, сборку и скрипт снимков только из своей копии: тот же запуск в основной копии человека или в копии другой группы (`npm --prefix <другое дерево> run dev`, `cd <другое дерево> && pnpm build`, `npx vite`) получает отказ с путём своей копии. Раньше снимки «до» снимались с основной копии, где исходники уже не совпадали с собранными пакетами, — оба снимка выходили пустыми, а кэш сборщика ложился в чужое дерево. Правило снимков теперь говорит, откуда брать «до», если первая правка уже сделана: базовый коммит, развёрнутый внутри своей копии; свои пустые снимки переносятся в архив, а не удаляются.",
+        "en": "A group runs a dev server, a build or a shot script only from its own copy: the same launch in the user's main checkout or in another group's copy (`npm --prefix <other tree> run dev`, `cd <other tree> && pnpm build`, `npx vite`) is refused with the path of its own copy. Before, BEFORE shots were taken from the main checkout, whose sources no longer matched its built packages — both shots came out blank, and the bundler cache landed in a foreign tree. The shots rule now says where BEFORE comes from once the first edit has landed: the base commit unpacked inside the own copy; blank shots of its own are moved to the archive, not deleted."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Страж чтения оболочкой в звене группы больше не отказывает циклам, в которых файл берёт не читатель: `grep -o … $f | head -3`, `git cat-file -p …:$f > $f`, `echo \"$f $(tail -1 лог)\"`. Раньше такой цикл считался чтением целых файлов (59 и 54 тысячи знаков в живой группе), хотя в окно не попадало ни одного файла. Цикл с `cat`, `head`, `tail` или `sed -n` над самим файлом, в том числе в подоболочке, считается, как прежде.",
+        "en": "The shell read guard in a group stage no longer refuses loops where the file goes to something other than a reader: `grep -o … $f | head -3`, `git cat-file -p …:$f > $f`, `echo \"$f $(tail -1 log)\"`. Before, such a loop counted as reading whole files (59k and 54k chars in a live group) though no file reached the window. A loop with `cat`, `head`, `tail` or `sed -n` over the file itself, a subshell included, counts as before."
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверки в стадии работы группы идут уже, быстрее и без лишних повторов. Весь набор тестов пакета, запущенный руками (`npm --prefix <пакет> run test:ci -- src`, `npx vitest run` без файлов), получает отказ так же, как полный гейт: весь набор и так пройдёт один раз в доставке, а в живой группе ручной прогон занял 350 с. Запуск `npm --prefix <пакет> exec -- vitest` и `npx --prefix <пакет> vitest` получает отказ с верной формой `cd <пакет> && npx vitest run <файлы>`: такой запуск стартует не в пакете, его настройки тестов не загружаются, и наборы падали при загрузке дважды подряд. Узкие составные команды (тесты одного файла с выводом в журнал, сборка или проверка типов одного пакета через `--prefix`) больше не считаются полным гейтом. Проверка «откат должен ломать тест» сначала гоняет собственный тест рядом с файлом и обходит граф импортов только для остальных: в живой группе обход графа шёл 105 с на файлы, чьи тесты напрямую проходят примерно за 10 с. Если проверка не запустила ни одного теста (команда указывала исходный файл вместо теста, а настройка `passWithNoTests` давала код 0), она сразу останавливается и называет верную команду. Раньше каждый файл получал ложный вердикт «не покрыт».",
+        "en": "Checks in a group's work stage run narrower and faster, and repeat less. A package's whole test suite run by hand (`npm --prefix <pkg> run test:ci -- src`, `npx vitest run` with no files) is refused the same way as the full gate: the whole suite runs once in delivery anyway, and in a live group the manual run took 350 s. `npm --prefix <pkg> exec -- vitest` and `npx --prefix <pkg> vitest` are refused with the right form, `cd <pkg> && npx vitest run <files>`: such a launch starts outside the package, its test settings are not loaded, and the suites failed to load twice in a row. Narrow compound commands (one file's tests with the output sent to a log, a build or type check of one package through `--prefix`) no longer count as the full gate. The «a revert must break a test» check first runs the file's own test beside it and walks the import graph only for the rest: in a live group the graph walk took 105 s for files whose tests pass in about 10 s when run directly. When the check runs no test at all (the command named the source file instead of its test, and the `passWithNoTests` setting made that exit 0), it stops at once and names the right command. Before, every file got a false «not covered» verdict."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Карточка правила в звене группы отказывает только первому вызову пачки: параллельные вызовы той же пачки проходят с пометкой, что правило названо в отказе соседа. Раньше каждый вызов пачки получал свой отказ, и модель повторяла всю пачку. После сжатия разговора правило, которое уже ждало чтения, приходит текстом один раз и больше не повторяется карточкой рядом. Правило о размещении документов (doc-classification) срабатывает только на новый документ: правка уже лежащего файла, рабочий файл в `.agent/tmp/` и заметка во временном каталоге проходят без него. Сводка повторов правил за неделю не считает прогоны тестов, которые раньше давали почти все её «повторы».",
+        "en": "A rule card in a group stage refuses only the first call of a batch: parallel calls of the same batch pass with a note that the sibling's refusal names the rule. Before, every call of the batch got its own refusal and the model re-sent the whole batch. After a conversation compaction a rule that was already waiting to be read arrives as text once and is no longer repeated as a card beside it. The document placement rule (doc-classification) fires only for a new document: an edit of an existing file, a working file under `.agent/tmp/` and a note in the temp folder pass without it. The weekly rule-repeat summary no longer counts test runs, which made up almost all of its «repeats»."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа сама решает запросы, которые раньше ждали человека. Удаление своего временного файла в `/tmp` разрешается, когда его записал прошлый удавшийся вызов того же агента или субагента и файл с тех пор не переписан: например, уборка резервной копии `cp f /tmp/x.bak` после возврата файла, в том числе шаблоном `rm /tmp/x-*.bak`, если своё каждое совпадение. Ссылка каталога строкой `cmd //c \"mklink /J a b\"` в кавычках судится так же, как без кавычек. Вызовы субагентов ищутся в их собственных файлах разговора: раньше каждый их запрос прав ждал 1,3 с, а пути судились от угаданного корня копии. При старте панели ждущий запрос, чья папка за время ожидания исчезла, получает отказ с причиной (исполнять нечего, шаг повторяется, если ещё нужен); раньше такая карточка висела у человека бессрочно. Повторный суд при старте учитывает рабочую папку CLI, как живой маршрут.",
+        "en": "A group now decides by itself requests that used to wait for a human. Deleting its own temp file in `/tmp` is allowed when an earlier successful call of the same agent or subagent wrote it and the file has not been rewritten since: for example, cleaning up a backup `cp f /tmp/x.bak` after the file is restored, including by pattern `rm /tmp/x-*.bak` when every match is its own. A directory link written as a quoted `cmd //c \"mklink /J a b\"` string is judged the same as the unquoted one. Subagent calls are looked up in the subagents' own conversation files: before, each of their permission requests waited 1.3 s and paths were judged from a guessed copy root. On panel start a waiting request whose folder disappeared while it waited is refused with the reason (nothing to run, redo the step if still needed); before, such a card stayed with the human indefinitely. The start-up rejudge takes the CLI's working folder into account, as the live route does."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Стадия доставки группы больше не гоняет полный гейт по кругу: отказ повторного гейта там снимает не голый повтор того же вызова, а повтор с причиной `# gate-reason: <что изменилось>` из трёх и более слов, так же и у Codex и Qwen. Вызов, который человек разрешил разово через панель, проходит без отказа карточки правила; строка разрешения в выводе инструмента разрешением не считается. Ожидание сервера — один вызов `tools/wait-for.mjs <порт|адрес>` с пределом времени и кодом 1 по таймауту; цикл `curl; sleep` получает на него подсказку. Рекурсивный `grep` по чужому репозиторию целиком и по пути Git Bash вида `/c/…` с node_modules внутри получает отказ с узкой формой, а не обходит дерево минутами.",
+        "en": "A group delivery stage no longer runs the full gate in a loop: a repeated-gate refusal there is lifted not by a bare repeat of the same call but by a repeat with a `# gate-reason: <what changed>` of three or more words, on Codex and Qwen too. A call the human allowed once through the panel passes without a rule-card refusal; the grant line inside a tool output does not count as a grant. Waiting for a server is one call, `tools/wait-for.mjs <port|address>`, bounded, exit 1 on timeout; a `curl; sleep` loop gets a hint pointing at it. A recursive `grep` over a whole foreign repository, or over a Git Bash `/c/…` path with node_modules inside, is refused with the scoped form instead of walking the tree for minutes."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сужение прогона до красных тестов ветки больше не ломает команду go с каталогом модуля: в строке `go test -C <модуль> ./...` флаг `-run` встаёт после `-C <модуль>`, как требует go. Раньше go отвечал «-C flag must be first flag», и проверка красных тестов на развилке у проекта из нескольких go-модулей не проходила.",
+        "en": "Narrowing a run to the branch's red tests no longer breaks a go command with a module folder: in `go test -C <module> ./...` the `-run` flag goes after `-C <module>`, as go requires. Before, go answered «-C flag must be first flag», and the red-test check at the fork point failed for a project of several go modules."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка доставки группы называет все пробелы описания MR за один прогон: неназванное n/a живой проверки больше не прячет неназванную заметку доставки, и описание не приходится переписывать вторым кругом. Файл описания, переданный через `--mr-description`, сверяется с живым MR: если в MR есть картинки, которых нет в файле, проверка называет их, чтобы перезапись из файла не убрала снимки из MR. Задание звена доставки велит узкие проверки тронутых файлов, пока идут правки, и один полный прогон после последней правки; отказанный повтор полного прогона не повторяется без изменений.",
+        "en": "The group delivery check names every MR-description gap in one run: an unnamed n/a of a live check no longer hides an unnamed delivery note, so the description is not rewritten in a second round. A description file passed via `--mr-description` is checked against the live MR: images the MR shows but the file lacks are named, so a rewrite from the file does not remove the shots from the MR. The delivery stage brief asks for narrow checks of the touched files while editing and one full run after the last edit; a refused repeat of the full run is not retried unchanged."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Решение по D-n больше не обрывает фоновых субагентов разговора: слово об исходе ждёт их конца и уходит одним сообщением, процесс посреди их работы не перезапускается.",
+        "en": "A D-n decision no longer cuts off the background subagents of the conversation: the outcome word waits for them to finish and goes as one message, the process is not restarted mid-work."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Слово об исходе D-n говорит о черновике MR только стадии, которая ведёт MR: ревью при доставке впереди слышит «доделайте стадию и назовите в отчёте». Слово, ждавшее в очереди, получает текущий разговор группы, а не закончившуюся стадию.",
+        "en": "The D-n outcome word speaks of the MR draft only to the stage that owns the MR: a review with delivery ahead hears «finish the stage and name it in your report». A word that waited in the queue goes to the group’s current conversation, not to the stage that has ended."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ждущий D-n закончившейся стадии или убранного каталога панель закрывает сама с причиной, а не держит в «Ждёт решения».",
+        "en": "A waiting D-n of a stage that has ended, or of a folder that is gone, is closed by the panel with the reason instead of staying in «Awaiting decision»."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Живое сито не снимают ручная запись прогона («passed» без исполнения) и кейс с живой меткой, заведённый агентом после старта группы.",
+        "en": "A live sieve is not cleared by a hand-written run record («passed» with no execution) or by a live-tagged case the agent created after the group started."
+      },
+      "area": {
+        "ru": "Сита",
+        "en": "Sieves"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пункт задачи task-N с меткой «не проверено» или «не из-за ветки» — заметка доставки, как у пункта владельца, а не «не выполнен».",
+        "en": "A task point task-N marked «not checked» or «not caused by the branch» is a delivery note, like an owner point, not «not done»."
+      },
+      "area": {
+        "ru": "Сита",
+        "en": "Sieves"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Проверка доставки требует в каждой сделанной задаче трекера комментарий со ссылкой на MR. Задачу, не названную ни в одном коммите ветки, она помечает заметкой: такую задачу не переводят и не отмечают сделанной.",
+        "en": "The delivery check requires a comment linking the MR in every delivered tracker ticket. A ticket named in no commit of the branch gets a note: it is not moved and not marked done."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "После сжатия разговора группа сразу получает текст тех разделов правил, которые были нужны её правкам, и первая правка проходит без повторного чтения правила; раньше каждое сжатие начиналось с отказа карточки и чтения того же правила на 5–16 тыс. знаков. Отказ «полный гейт уже прогнан» узнаёт тот же скрипт гейта в любом написании — с `timeout`, переменными окружения, `./`, в кавычках, через `cd` в ту же папку или из пакета через `../scripts/…`. Чтение своих заметок `cat .agent/PROGRESS.md` в начале нового разговора получает отказ, который говорит, что эти заметки уже лежат во вводной панели вверху разговора, а не отправляет читать их второй раз.",
+        "en": "After a conversation is compacted the group gets the text of the rule sections its edits needed right away, and the first edit passes without re-reading the rule; before, every compaction started with a rule-card refusal and a 5–16k-char read of the same rule. The «full gate already ran» refusal recognises the same gate script however it is written — with `timeout`, environment variables, `./`, quoted, through `cd` into the same folder or from a package via `../scripts/…`. Reading its own notes with `cat .agent/PROGRESS.md` at the start of a new conversation is refused with a note that these notes are already in the panel brief at the top of the conversation, instead of being sent to read them a second time."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Отчёт доставки называет каждую негативную пробу с её входом и кодом возврата, а не только ту, что дала отказ: проба, которая должна была получить отказ и прошла, — находка, её исправляют или выносят в список «остаётся открытым» описания MR.",
+        "en": "The delivery report names every negative probe with its input and exit code, not only the one that was refused: a probe that should have been refused and passed is a finding, fixed or listed under «stays open» in the MR description."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа, которую человек принял сам кнопкой «Отметить готовой», получает свой MR из последнего ответа, когда фордж подтверждает, что MR — из её ветки; хаб показывает его, а слежка за слиянием видит. Принятые раньше группы без записанного MR досвязываются при старте панели.",
+        "en": "A group the human accepted by hand with «Mark done» gets its MR from its last answer once the forge confirms the MR comes from its branch; the hub shows it and merge tracking sees it. Groups accepted earlier with no recorded MR are linked when the panel starts."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Коммит бота CI в ветке группы больше не сбивает доставку: удалённый впереди копии — пробел с этим коммитом и «git pull --ff-only» вместо «ветка не отправлена»; pull и rebase своей ветки с удалённого не получают отказ «конфликтов с целевой нет»; коммит не группы, убравший её строки из итогового дерева, — пробел доставки с коммитом и файлами, и MR не уходит в ревью с откатом.",
+        "en": "A CI bot commit on the group branch no longer derails delivery: a remote ahead of the copy is a gap naming that commit and «git pull --ff-only» instead of «branch not pushed»; pulling or rebasing the group's own branch from the remote is not refused as «no conflicts with the target»; a commit not made by the group that removed its lines from the final tree is a delivery gap naming the commit and files, so the MR does not go to review with a revert."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вводная нового разговора группы показывает, где ветка сейчас на удалённом (прочитано у самого удалённого), и называет чужие коммиты там; копия трекера и заметки-ловушки длиннее 1500 знаков идут оглавлением с путём к файлу, а список правок на чистом дереве — 10 файлов вместо 40.",
+        "en": "The brief of a group's new conversation shows where the branch is on the remote now (read from the remote itself) and names foreign commits there; the tracker copy and gotcha notes past 1,500 characters come as an index with the file path, and the change list on a clean tree is 10 files instead of 40."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Задание доставки велит при журнале задачи в копии прогнать проверки один раз через gate-run и писать каждую строку журнала в момент её шага; пункт MR, оставленный на потом, называет ключ задачи, которая его возьмёт, а сверка доставки держит «отдельно» без ключа пробелом. Задание правок кончается с концом списка, а не с первым коммитом.",
+        "en": "The delivery task says to run the checks once through gate-run when the copy has a ticket ledger and to write each ledger row the moment its step happens; an MR item left for later names the key of the task that takes it, and the delivery check holds «separately» without a key as a gap. The fixes task ends with the end of the list, not with the first commit."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка доставки `tests-cli delivery --answer` принимает файл, который весь — тело блока сит (`{\"sieves\":[…]}`), а не только ответ с блоком. Отказ смены ветки на грязном дереве называет незакоммиченные файлы и предупреждает, что тот же вызов без коммита откажут снова.",
+        "en": "The delivery check `tests-cli delivery --answer` takes a file that is just the sieves block body (`{\"sieves\":[…]}`), not only an answer with the block. The branch-switch refusal on a dirty tree names the uncommitted files and warns that the same call is refused again without a commit."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    }
+  ]
+}

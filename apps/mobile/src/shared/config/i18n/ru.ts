@@ -8,6 +8,7 @@ import { foreignChatRu } from './foreign-chat/ru.ts';
 import { projectsRu } from './projects/ru.ts';
 import { computersRu } from './computers/ru.ts';
 import { signingRu } from './signing/ru.ts';
+import { groupWatchRu } from './group-watch/ru.ts';
 
 /**
  * Русский словарь — источник истины. Английский типизирован по нему, поэтому
@@ -305,12 +306,17 @@ export const ru = {
     nothing: 'Ничего не нашлось',
     sandbox: 'песочница',
     messages: (count: number) => `${count} сообщ.`,
+    // Ветка правки своей реплики: то же название, что у исходного разговора.
+    forkOf: (title: string) => `ветка от «${title}»`,
+    forkOfUnknown: 'ветка другого разговора',
   },
 
   // Вкладка «Проекты» и экран проекта — отдельным модулем (`projects/`).
   projects: projectsRu,
   computers: computersRu,
   signing: signingRu,
+  // Сторож групп: копия панельного словаря файл в файл (check-mobile-contracts), строка списка чатов.
+  groupWatch: groupWatchRu,
 
   git: {
     title: 'Git',
@@ -354,6 +360,8 @@ export const ru = {
       link: (path: string) => `не связан общий каталог ${path}`,
       access: (path: string) => `нет записи ${path} в .claude.json`,
       mcp: (path: string, names: string) => `в ${path} копии нет серверов оригинала: ${names}`,
+      hooks: (path: string, names: string) =>
+        `в ${path} копии не прописаны хуки оригинала: ${names}`,
     },
     bootstrapRunning: (command: string) => `установка идёт: ${command}`,
     bootstrapFailed: (command: string) => `установка не удалась: ${command}`,

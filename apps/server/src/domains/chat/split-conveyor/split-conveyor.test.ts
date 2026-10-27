@@ -1384,6 +1384,41 @@ describe('SplitConveyor: ветка и задачи группы', () => {
   });
 });
 
+// Аудит g8 26.10 (N2): правки судили «своё» по диффу ветки и завели baseline на
+// своих же страницах. Границы — из плана разделения, как их записал разбор.
+describe('SplitConveyor: границы группы для звеньев правок и проверки', () => {
+  it('своё и чужое — из owns разбора; чужая связь и план без owns — ничего', async () => {
+    const { conveyor, begin, link, wait } = build();
+    await begin();
+    expect(conveyor.scopeOf(link(0))).toBeUndefined();
+
+    conveyor.onTriageFinished(
+      finished(
+        block({
+          groups: [
+            { index: 1, owns: ['src/login.tsx', ' src/shared.ts '] },
+            { index: 2, owns: ['src/header.tsx', 'src/shared.ts'] },
+            { index: 3, owns: ['src/header.tsx', 'tests/form.test.ts'] },
+          ],
+        }),
+      ),
+      ['new-1-triage'],
+    );
+    await wait();
+
+    expect(conveyor.scopeOf(link(0))).toEqual({
+      own: ['src/login.tsx', 'src/shared.ts'],
+      // Общий с собой путь — не чужой: на нём baseline тоже нельзя.
+      others: ['src/header.tsx', 'tests/form.test.ts'],
+    });
+    expect(conveyor.scopeOf({ ...link(0), branch: 'feature/header' })).toEqual({
+      own: ['src/header.tsx', 'src/shared.ts'],
+      others: ['src/login.tsx', 'tests/form.test.ts'],
+    });
+    expect(conveyor.scopeOf({ ...link(0), parentChatId: 'чужой' })).toBeUndefined();
+  });
+});
+
 // Живой прогон 25.09 (O2, третий): план без «До MR» не писал решение вовсе, и
 // шапка чата группы брала настройку проекта — «вкл», хотя группа шла без MR.
 describe('решение «До MR» группы в пульте', () => {

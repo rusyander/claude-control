@@ -25,6 +25,7 @@ export const GAP_KEY = {
   link: 'git.worktrees.copyGapLink',
   access: 'git.worktrees.copyGapAccess',
   mcp: 'git.worktrees.copyGapMcp',
+  hooks: 'git.worktrees.copyGapHooks',
 } as const;
 
 export const ACCESS_KEY = {

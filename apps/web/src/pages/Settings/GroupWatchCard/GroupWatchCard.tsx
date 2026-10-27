@@ -5,12 +5,16 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { SelectField } from '@shared/ui/select-field';
+import { useGroupWatchCoverage } from '@entities/ChatGroupSettings';
 import { SettingToggleRow } from '../SettingToggleRow/SettingToggleRow';
 import type { SettingsTabProps } from '../SettingsTabs.types';
+import { GroupWatchCoverageLine } from './GroupWatchCoverageLine';
 
 type Unit =
+  | 'seconds'
   | 'minutes'
   | 'tokens'
+  | 'mtokens'
   | 'times'
   | 'perHour'
   | 'percent'
@@ -20,9 +24,9 @@ type Unit =
   | 'groups'
   | 'files';
 
-/** Единицы, которые показываются в тысячах: токены и знаки. */
-const IN_THOUSANDS: ReadonlySet<Unit> = new Set(['tokens', 'kchars']);
-type Threshold = Exclude<keyof GroupWatch, 'enabled' | 'singleChats'>;
+/** Делитель показа: токены и знаки — в тысячах, токены прогона — в миллионах. */
+const SCALE: Partial<Record<Unit, number>> = { tokens: 1000, kchars: 1000, mtokens: 1_000_000 };
+type Threshold = Exclude<keyof GroupWatch, 'enabled' | 'singleChats' | 'autoPause'>;
 
 /**
  * Порог → единица и несколько осмысленных значений. Набор вместо свободного
@@ -48,10 +52,14 @@ const THRESHOLDS: ReadonlyArray<readonly [Threshold, Unit, readonly number[]]> =
   ['bigResultChars', 'kchars', [10_000, 20_000, 40_000]],
   ['persistedChars', 'kchars', [4_000, 8_000, 16_000]],
   ['longCallMinutes', 'minutes', [8, 12, 20, 30]],
+  ['slowSeconds', 'seconds', [60, 120, 300, 600]],
+  ['bgLongMinutes', 'minutes', [5, 10, 20, 30]],
+  ['briefChars', 'kchars', [8_000, 15_000, 30_000, 60_000]],
   ['queueWaitMinutes', 'minutes', [5, 10, 20]],
   ['denialRepeats', 'times', [3, 5, 8]],
   ['denialMinutes', 'minutes', [10, 15, 30]],
   ['firstContextTokens', 'tokens', [70_000, 90_000, 120_000]],
+  ['contextGrowthTokens', 'tokens', [60_000, 100_000, 150_000]],
   ['gateRepeats', 'times', [2, 3, 5]],
   ['heavyCheckMinutes', 'minutes', [3, 5, 10]],
   ['silentStopMinutes', 'minutes', [10, 20, 30, 60]],
@@ -69,6 +77,11 @@ const THRESHOLDS: ReadonlyArray<readonly [Threshold, Unit, readonly number[]]> =
   ['insertMinutes', 'minutes', [10, 15, 30]],
   ['freshRewriteTokens', 'tokens', [30_000, 50_000, 100_000]],
   ['redoFiles', 'files', [1, 2, 3, 5]],
+  ['restartStorm', 'times', [2, 3, 5, 8]],
+  ['heavyRunPercent', 'percent', [3, 5, 10, 20]],
+  ['heavyRunWeekPercent', 'percent', [1, 2, 5]],
+  ['heavyRunTokens', 'mtokens', [1_000_000, 3_000_000, 5_000_000, 10_000_000]],
+  ['unresumedMinutes', 'minutes', [30, 60, 120, 240]],
   ['cooldownMinutes', 'minutes', [15, 30, 60, 120]],
 ];
 
@@ -80,6 +93,7 @@ export function GroupWatchCard({ settings, patch }: SettingsTabProps) {
   const { t, i18n } = useTranslation();
   // Старые настройки без поля — те же значения, что сервер подставит сам.
   const watch = { ...GROUP_WATCH_DEFAULTS, ...settings.groupWatch };
+  const coverage = useGroupWatchCoverage();
   // Только изменённый ключ: сервер сливает его с сохранённым.
   const patchWatch = (next: Partial<GroupWatch>): void => patch({ groupWatch: next });
   // Окно остывшего кэша читает и пинг тёплого кэша — при выключенном стороже тоже.
@@ -90,7 +104,7 @@ export function GroupWatchCard({ settings, patch }: SettingsTabProps) {
   const options = (key: Threshold, unit: Unit, values: readonly number[]) => {
     const all = values.includes(watch[key]) ? values : [...values, watch[key]];
     return all.map((value) => {
-      const shown = IN_THOUSANDS.has(unit) ? value / 1000 : value;
+      const shown = value / (SCALE[unit] ?? 1);
       // `count` выбирает форму «раз/раза», «запуск/запусков»; у единиц без форм он ни на что не влияет.
       const text = t(`groupWatch.settings.unit.${unit}`, {
         value: shown.toLocaleString(i18n.language),
@@ -129,6 +143,16 @@ export function GroupWatchCard({ settings, patch }: SettingsTabProps) {
           disabled={!watch.enabled}
           onChange={(singleChats) => patchWatch({ singleChats })}
         />
+        {/* Пауза сторожа (F1): по желанию, выключена по умолчанию; снимает её только человек. */}
+        <SettingToggleRow
+          label={t('groupWatch.settings.autoPause')}
+          hint={t('groupWatch.settings.autoPauseHint')}
+          checked={watch.autoPause}
+          disabled={!watch.enabled}
+          onChange={(autoPause) => patchWatch({ autoPause })}
+        />
+        {/* Охват: где тишина сторожа значит «нечего читать», а не «всё хорошо». */}
+        <GroupWatchCoverageLine summary={coverage.data} enabled={watch.enabled} />
         {/* Подписка на сигналы — событием `groupSignal` у Telegram и вебхука, не своим выключателем. */}
         <Typography variant="body-sm" color="subtle">
           {t('groupWatch.settings.delivery')}

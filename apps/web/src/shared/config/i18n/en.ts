@@ -23,8 +23,11 @@ import { presetsEn } from './presets/en.ts';
 import { localModelsEn } from './local-models/en.ts';
 import { kitEn } from './kit/en.ts';
 import { telegramAnswersEn } from './telegram-answers/en.ts';
+import { telegramCardEn } from './telegram-card/en.ts';
 import { deferredAsksEn } from './deferred-asks/en.ts';
 import { phoneSigningEn } from './phone-signing/en.ts';
+import { turnTrailEn } from './turn-trail/en.ts';
+import { agentTreeEn } from './agent-tree/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
@@ -48,11 +51,14 @@ export const en: TranslationSchema = {
   watcher: watcherEn,
   mascot: mascotEn,
   telegramAnswers: telegramAnswersEn,
+  telegramCard: telegramCardEn,
   groupWatch: groupWatchEn,
   usageLimits: usageLimitsEn,
   devRestart: devRestartEn,
   deferredAsks: deferredAsksEn,
   phoneSigning: phoneSigningEn,
+  turnTrail: turnTrailEn,
+  agentTree: agentTreeEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
   /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/en.ts`. */
@@ -1236,6 +1242,7 @@ export const en: TranslationSchema = {
           interrupted: 'interrupted',
           limit: 'subscription limit',
           'human-op': 'awaiting decision: D-n',
+          'mr-red': 'MR red, no fix',
         },
         failed: 'did not start: {{message}}',
         stopped: 'stopped: {{message}}',
@@ -1365,6 +1372,7 @@ export const en: TranslationSchema = {
           dropped: 'Group removed',
           resumed: 'Group resumed',
           resumeQueued: 'The resume goes out after the group’s current turn',
+          resumeRestored: 'Pause lifted — the group is waiting for your answer again',
           started: 'Group started',
           limitUntil: 'waits for the limit until {{time}}',
           consent: '{{reason}}. Go anyway?',
@@ -1439,6 +1447,14 @@ export const en: TranslationSchema = {
           merged: 'The MR is already merged — the group is finished',
           closed: 'The MR is closed — nothing to recheck',
           failed: 'Failed: {{message}}',
+          note: 'Note',
+          noteHint:
+            'Add your own note to the recheck — for example, a review remark that is not in the MR',
+          noteLabel: 'Note for the group',
+          notePlaceholder: 'What to check or finish — the group gets the text verbatim',
+          noteFieldHint:
+            'Every request in the note is a point of the recheck: the group does it in the branch or answers why not',
+          noteTooLong: 'At most {{max}} characters',
         },
         received: {
           button: 'What the agent got',
@@ -1548,7 +1564,7 @@ export const en: TranslationSchema = {
               '{{count}} issues to file — before the model pass and the check against open Jira issues.',
             bundleFiles: 'one issue — shared file {{files}}',
             explain:
-              '«Publish to Jira» — duplicates merge into one defect, defects of one file into one issue with a section each (what, where, evidence, expected and actual); the model adds titles, area and severity. Before filing, the panel searches open issues of the Jira project: what is already open gets a comment, not a copy. This click is the consent. «Resolve here» — a new chat in this project with the task of fixing every open proposal; they get marked «taken into a chat».',
+              '«Publish to Jira» — duplicates merge into one defect, defects of one file into one issue with a section each (what, where, evidence, expected and actual); the model adds titles, context, what to do, acceptance criteria, side and severity. Every issue gets a side label (frontend, backend or both), a Jira priority from the severity (medium without one), a shared label of this split and no assignee. Similar open Jira issues are listed above: you decide to link (a comment into it), skip, or file a new one. This click is the consent. «Resolve here» — a new chat in this project with the task of fixing every open proposal; they get marked «taken into a chat».',
             site: 'Jira: {{site}}',
             project: 'Project',
             projectFrom: {
@@ -1568,7 +1584,7 @@ export const en: TranslationSchema = {
             connect: 'Connect Jira',
             publish: 'Publish to Jira',
             publishHint:
-              'The model groups the proposals into issues and the panel files them right away — there is no separate confirmation',
+              'The model groups the proposals into issues and the panel files them right away with your decisions on similar issues — there is no separate confirmation',
             take: 'Resolve here',
             takeHint: 'A new chat in this project with a task built from every open proposal',
             created_one: '{{count}} issue filed',
@@ -1587,7 +1603,7 @@ export const en: TranslationSchema = {
             failed_many: '{{count}} issues were not filed — their proposals stay open',
             failed_other: '{{count}} issues were not filed — their proposals stay open',
             fallback:
-              'The model is unavailable: issues were built without it — duplicates together, defects of one file in one issue; no area or severity.',
+              'The model is unavailable: issues were built without it — duplicates together, defects of one file in one issue; the side comes from the paths, the priority is medium.',
             retry: 'Retry failed',
             close: 'Close',
             takenToast_one: 'Chat started: {{count}} proposal',
@@ -1596,6 +1612,41 @@ export const en: TranslationSchema = {
             takenToast_other: 'Chat started: {{count}} proposals',
             publishFailed: 'Could not publish: {{message}}',
             takeFailed: 'The chat did not start: {{message}}',
+            bundleSide: 'side by paths: {{side}}',
+            side: {
+              frontend: 'FRONTEND',
+              backend: 'BACKEND',
+              fullstack: 'FULLSTACK (frontend and backend)',
+              other: 'not determined',
+            },
+            dupChecking: 'Searching Jira for similar open issues…',
+            dupCheckingShort: 'The duplicate check in Jira is running',
+            dupFailed:
+              'Could not check Jira for duplicates: {{message}}. Publishing still matches titles and fingerprints on its own.',
+            dupNone: 'No similar open issues in Jira.',
+            dupTitle_one: '{{count}} similar open issue in Jira — decide what to do with it',
+            dupTitle_few: '{{count}} similar open issues in Jira — decide for each',
+            dupTitle_many: '{{count}} similar open issues in Jira — decide for each',
+            dupTitle_other: '{{count}} similar open issues in Jira — decide for each',
+            dupReason: {
+              fingerprint: 'the same finding (the panel already filed or commented on it here)',
+              title: 'almost the same title',
+              similar: 'a similar title',
+            },
+            dupChoiceLabel: 'What to do',
+            dupChoice: {
+              link: 'Link — comment into {{key}}',
+              skip: 'Skip — do not file now',
+              create: 'It is different — file a new issue',
+            },
+            meta: '{{side}} · priority «{{priority}}»',
+            metaNoPriority: '{{side}} · Jira default priority',
+            assignee:
+              'Jira assigned someone on its own: {{name}}. The panel never sets an assignee — remove it in Jira if unwanted.',
+            skipped_one: 'Skipped by your decision: {{count}} — the proposal stays open',
+            skipped_few: 'Skipped by your decision: {{count}} — the proposals stay open',
+            skipped_many: 'Skipped by your decision: {{count}} — the proposals stay open',
+            skipped_other: 'Skipped by your decision: {{count}} — the proposals stay open',
           },
         },
         humanSteps: {
@@ -1805,6 +1856,7 @@ export const en: TranslationSchema = {
         done: 'done',
         failed: 'failed',
         lost: 'lost: the conversation process closed',
+        stopped: 'stopped',
       },
       agentBackground: 'in background',
       agentQuiet: 'last wrote {{ago}} ago',
@@ -1895,6 +1947,7 @@ export const en: TranslationSchema = {
         '“Hand to a group” declines the edit here, and the agent forwards it to the right group in its chat.',
       base: 'The copy will branch from the groups’ MR branch: {{base}}',
       handOff: 'Hand to a group',
+      target: 'File to edit',
     },
     permissionFromChild: 'Requested by “{{title}}”',
     permissionLost:
@@ -2041,6 +2094,16 @@ export const en: TranslationSchema = {
     },
     copyMessage: 'Copy message',
     editMessage: 'Edit and send as a new branch',
+    fork: {
+      of: 'branch of “{{title}}”',
+      ofUnknown: 'branch of another conversation',
+      confirmTitle: 'Send as a new branch?',
+      confirmText:
+        'This makes a separate conversation: same history, same title, marked “branch of …” in ' +
+        'the list. Groups, the pin and links stay with the original conversation. ' +
+        'To write into this conversation instead, clear the field.',
+      confirm: 'Send as a branch',
+    },
     usage: {
       title: 'Step spend',
       badgeLabel: 'Step spend: {{total}} tokens, details on hover',
@@ -2127,6 +2190,11 @@ export const en: TranslationSchema = {
         'The panel gives each split group a model that fits its kind of work — never above the ' +
         'one you picked; work on a weaker model gets a higher bar: project checks run, result ' +
         'matched against the task. Off — every child runs on the model you picked',
+      reviewAfterWork: 'Review after work (this project)',
+      reviewAfterWorkHint:
+        'After a group finishes its work the panel starts a review on the model you picked. ' +
+        'Off — no review: a group with delivery goes straight to it and the chat feed names the ' +
+        'reason; model matching stays. Applies to groups started after the switch',
       externalWrite: 'Writes to external services',
       externalWriteHint: 'MR comments and threads, Jira tickets, wiki pages — over MCP',
       gitWrite: 'Commits, branches, plain push',
@@ -4797,8 +4865,10 @@ export const en: TranslationSchema = {
       state_building: 'building',
       state_succeeded: 'built',
       state_failed: 'build failed',
+      state_cancelled: 'cancelled',
       build: 'Build APK',
       rebuild: 'Update APK',
+      cancel: 'Cancel build',
       buildingSince: 'Running since {{time}}',
       finishedAt: 'Finished {{time}}',
       unavailable:
@@ -6934,7 +7004,7 @@ export const en: TranslationSchema = {
       confluence: { baseUrl: 'Site URL', email: 'Email', deployment: 'Deployment' },
       gitlab: { baseUrl: 'Installation URL', repo: 'Repository' },
       github: { baseUrl: 'Installation URL', repo: 'Repository' },
-      telegram: { chatId: 'Chat' },
+      telegram: { chatId: 'Chat', doneAfterMinutes: '«Finished» when work took longer than, min' },
       zephyr: { projectKey: 'Project', groupId: 'Test group' },
       xray: { projectKey: 'Project', groupId: 'Test group' },
       testit: { baseUrl: 'Installation URL', projectKey: 'Project', groupId: 'Test group' },
@@ -6960,7 +7030,11 @@ export const en: TranslationSchema = {
         baseUrl: 'GitHub Enterprise — the installation URL. Empty = github.com.',
         repo: 'owner/repo. Empty — derived from the checked project origin.',
       },
-      telegram: { chatId: 'A numeric chat id or a @channel name.' },
+      telegram: {
+        chatId: 'A numeric chat id or a @channel name.',
+        doneAfterMinutes:
+          'Panel chats and sessions from a terminal or VS Code. 0 means no finish messages.',
+      },
       zephyr: {
         projectKey: 'Key of the Jira project holding cases and cycles.',
         groupId: 'Which panel group to sync with. Empty — the panel asks at exchange time.',
@@ -7240,6 +7314,8 @@ export const en: TranslationSchema = {
         'shared directory {{path}} is not linked (skills and hooks come as a link to the original)',
       copyGapAccess: 'no access entry {{path}} in .claude.json',
       copyGapMcp: '{{path}} of the copy lacks the original servers: {{names}}',
+      copyGapHooks:
+        '{{path}} of the copy does not register the original hooks: {{names}} — their scripts are linked, but they never fire',
       copyAccessOk: 'access: the copy has an entry in .claude.json',
       copyAccessMissing: 'access: the copy has no entry in .claude.json',
       copyAccessUnknown: 'access: not checked — the original has no entry either',

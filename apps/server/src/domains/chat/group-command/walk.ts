@@ -1,9 +1,12 @@
+import { statSync } from 'node:fs';
 import type { KillTargets } from './kill.ts';
 import type { CodeRule } from './risky.ts';
 import type { Word } from './shell-parse.ts';
 import { checkedOut, DETACHED } from './branch.ts';
 import { portMarkPorts, portQueryPorts } from './port-query.ts';
-import { canonical, escapesBase, real, resolveFrom, within } from './paths.ts';
+import { ownTempTarget } from './own-temp.ts';
+import { canonical, escapesBase, real, resolveFrom, tempOnDisk, within } from './paths.ts';
+import { inReviewScratch, mainCopyOf } from './review-scratch.ts';
 import { ShellState } from './shell-state.ts';
 
 export { isProtectedBranch } from './branch.ts';
@@ -52,6 +55,12 @@ export interface GroupCommandScope {
    * `functionVerdict`). Нет — имя судится, как написано.
    */
   functions?: Readonly<Record<string, string>>;
+  /**
+   * Временные файлы вне копии, что записал прошлый вызов этого разговора
+   * (D-10/D-11, 26.10, `own-temp-evidence.ts`) — пути на диске. Удаление их —
+   * уборка своего; нет списка — своё в `/tmp` только свежий `mktemp` (F-77).
+   */
+  ownTemp?: ReadonlySet<string>;
 }
 
 /** `$(git branch --show-current)` и родственные — имя текущей ветки. */
@@ -93,6 +102,15 @@ export function steersGit(name: string): boolean {
  */
 export function isAbsolute(path: string): boolean {
   return /^([a-zA-Z]:|[\\/])/.test(path);
+}
+
+/** Каталог есть на диске сейчас: `cd` в него удастся. */
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 export type SegmentVerdict =
@@ -137,6 +155,8 @@ export class Walk extends ShellState {
   readonly expanding = new Set<string>();
   private readonly roots: string[];
   private readonly scratchpad: string | undefined;
+  /** Копия группы, как её передали (`scope.worktree`). */
+  private readonly worktree: string | undefined;
   /**
    * Ветка копии сейчас: сначала — по git, после `checkout` в команде — та, что
    * выбрана. Ветка — состояние репозитория, а не оболочки: подоболочка её не прячет.
@@ -151,6 +171,11 @@ export class Walk extends ShellState {
   private detachedFrom: string | undefined;
   private readonly own: string | undefined;
   private readonly deferred: Deferred[] = [];
+  private readonly ownTemp: ReadonlySet<string> | undefined;
+  /** Временные пути вне копии, что пишет эта команда (`tempWritesOf`), — на диске. */
+  readonly tempWrites: string[] = [];
+  /** Каталоги, куда команда уходит `cd` (`cdTargetsOf`), — как их судит обход. */
+  readonly cdTargets: string[] = [];
 
   /**
    * Значение переменной, которой в этой команде присвоили `$!`, — фоновый
@@ -182,6 +207,8 @@ export class Walk extends ShellState {
     this.aliases = scope.aliases;
     this.functions = scope.functions;
     this.scratchpad = scope.scratchpad ? canonical(scope.scratchpad) : undefined;
+    this.worktree = worktree;
+    this.ownTemp = scope.ownTemp;
   }
 
   /**
@@ -212,6 +239,28 @@ export class Walk extends ShellState {
 
   /** `cd`: абсолютный путь — каталог известен точно, относительный — от прежнего. */
   override changeDir(dir: Word | undefined): void {
+    const before = this.cwd;
+    this.moveDir(dir);
+    if (this.cwd === undefined || this.cwd === before) return;
+    this.cdTargets.push(this.cwd);
+    // Неудавшийся `cd X; rm -rf *` удаляет в ПРЕЖНЕМ каталоге: X — каталог
+    // звена, только если `cd` точно исполнился и удался. В ветке `||` или в
+    // теле `if` он мог не исполниться — каталог неизвестен. После `&&` или
+    // когда X нет на диске — X верен лишь дальше по той же цепочке `&&`.
+    // Подъём `..` есть всегда; свежий `mktemp -d` создан этой командой.
+    const there =
+      /^\.\.?(?:\/\.\.?)*\/?$/.test(dir?.text ?? '') ||
+      this.isFresh(this.cwd) ||
+      isDirectory(this.cwd);
+    const chain = this.link.andChain;
+    if (this.link.body || this.link.after === 'or') this.cwd = undefined;
+    else if (this.link.after !== 'and' && there) this.cdChain = undefined;
+    else if (chain !== undefined) this.cdChain = chain;
+    else this.cwd = undefined;
+    if (this.cwd === undefined) this.anchored = false;
+  }
+
+  private moveDir(dir: Word | undefined): void {
     if (!dir || dir.dynamic || dir.text === '-' || this.blinded) {
       this.cwd = undefined;
       return;
@@ -237,7 +286,8 @@ export class Walk extends ShellState {
     if (!dir) return run();
     this.enter();
     try {
-      this.changeDir(this.expand(dir));
+      // Обёртка без каталога не запускает команду вовсе: неудавшийся переход не страшен.
+      this.moveDir(this.expand(dir));
       return run();
     } finally {
       this.leave();
@@ -347,11 +397,63 @@ export class Walk extends ShellState {
     return this.variants(path).some((variant) => this.roots.includes(variant));
   }
 
+  /** Каталог над копией: копия лежит внутри него, а сам он — не в копии. */
+  holdsCopy(path: string): boolean {
+    if (this.inCopy(path)) return false;
+    return this.variants(path).some((variant) => this.roots.some((root) => within(root, variant)));
+  }
+
+  /**
+   * Копия группы и её основная копия под обоими написаниями — то, чего клон
+   * рецензента не задевает. `undefined` — копия неизвестна или основную не
+   * прочесть: клоном рецензента тогда не считается ничто. Читается раз за обход.
+   */
+  private reviewFence(): readonly string[] | undefined {
+    if (this.fence !== null) return this.fence;
+    const worktree = this.worktree;
+    const main = worktree === undefined ? null : mainCopyOf(worktree);
+    const mains = main ? [canonical(main), real(main)] : [];
+    this.fence =
+      worktree === undefined || main === null
+        ? undefined
+        : [...this.roots, ...mains.filter((entry): entry is string => Boolean(entry))];
+    return this.fence;
+  }
+
+  private fence: readonly string[] | undefined | null = null;
+
+  /** Внутри клона `review-plan.mjs plan` по его метке (D-5 26.10, `review-scratch.ts`). */
+  inReviewScratch(path: string, follow = true, aboveLinks = false): boolean {
+    if (this.links.crosses(path, follow)) return false;
+    return inReviewScratch(path, this.reviewFence(), follow, aboveLinks);
+  }
+
+  /**
+   * Пробный репозиторий: ещё и клон рецензента по метке — git там не задевает
+   * копию. Каталог над ссылками плана — тоже: git по ним не ходит (кроме
+   * `clean`, его судит `git-verdict.ts` через `holdsReviewLinks`).
+   */
+  override inScratch(path: string | undefined): boolean {
+    if (super.inScratch(path)) return true;
+    return path !== undefined && this.inReviewScratch(path, true, true);
+  }
+
   /** Своя рабочая папка CLI этой сессии (`scope.scratchpad`) или внутри неё. */
   inOwnScratchpad(path: string, follow = true): boolean {
     if (this.scratchpad === undefined || !within(path, this.scratchpad)) return false;
     // Ссылка внутри неё, заведённая раньше, ведёт наружу (RF-BGCD-04).
     return !escapesBase(path, this.scratchpad, follow);
+  }
+
+  /** Запись временного пути вне копии (`> /tmp/x`, `cp f /tmp/x.bak`) — в учёт `tempWrites`. */
+  noteTempWrite(text: string): void {
+    const disk = tempOnDisk(text);
+    if (disk) this.tempWrites.push(disk.path);
+  }
+
+  /** Удаляемый временный путь — свой файл прошлого вызова разговора (`scope.ownTemp`, D-10). */
+  inOwnTemp(text: string): boolean {
+    return !this.links.any && ownTempTarget(text, this.ownTemp);
   }
 
   /** Корень копии, под которым лежит путь (в том написании, в каком совпал). */

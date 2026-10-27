@@ -40,10 +40,11 @@ default and the only verified one. No database — **source of truth = Claude Co
   `clean-mobile-build.mjs` (Gradle native intermediates in
   `node_modules/*/android/{build,.cxx}`, ~10 GB per release build, plus that mirror; the build sweeps them,
   `--keep-build` opts out, `--dry` measures), `make-mobile-icons.mjs` (one SVG mark → every icon/splash size),
-  `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record|gaps` — the QA workspace
-  of a project without the panel; CI exit codes: `report` 1 on a failure outside quarantine, `diff` 1 on NEW
-  failures only, `lint` 1 only with `--fail-on`, `gaps` 1 on any Tests-block delivery gap — same code as the
-  panel's delivery check), `docs/` — PDF guides: `shots-{chat,tests}-guide.mjs` shoot a
+  `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record|gaps|delivery` — the QA
+  workspace of a project without the panel; CI exit codes: `report` 1 on a failure outside quarantine, `diff` 1 on NEW
+  failures only, `lint` 1 only with `--fail-on`, `gaps` 1 on any Tests-block delivery gap, `delivery` 1 on any gap of
+  the whole delivery check (MR description, sieves, owner points, Tests block) — same code as the panel's delivery
+  check), `docs/` — PDF guides: `shots-{chat,tests}-guide.mjs` shoot a
   fully stubbed panel, `build-guide.mjs` prints through Chromium (`build-*-guide.mjs` = source, out, footer) →
   `docs/{CHAT,TESTS}-GUIDE.ru.pdf`; sources and frames in `.agent/{chat,tests}-guide/`, OUT of git (a fresh
   clone re-shoots against a running stand). `PAGES=<dir>` rasterises page by page — every page is looked at

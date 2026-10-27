@@ -1,4 +1,5 @@
 import { git } from '../project-git/exec/exec.ts';
+import { parseDirtyPaths } from '../project-git/read.ts';
 import { groupCommandVerdict } from './group-command/group-command.ts';
 import type { GitDiscard } from './group-command/git-guards.ts';
 import { collectGitEffects } from './group-command/git-guards.ts';
@@ -26,6 +27,23 @@ export const SWITCH_REFUSAL =
   'current edits on this branch first (a wip commit is fine), then switch. After the commit the ' +
   'old state stays in the history and the reflog. If you meant to restore files rather than ' +
   'switch, put the paths after `--` (git checkout <options> -- <paths>).';
+
+const SWITCH_PATHS_SHOWN = 5;
+
+/**
+ * Отказ смены ветки с тем, что держит дерево грязным (g9 26.10, F12): общий текст без
+ * файлов звено доставки повторило тем же вызовом через шесть секунд — второй отказ.
+ */
+export function switchRefusal(status: string): string {
+  const paths = parseDirtyPaths(status);
+  if (paths.length === 0) return SWITCH_REFUSAL;
+  const shown = paths.slice(0, SWITCH_PATHS_SHOWN).join(', ');
+  const more = paths.length > SWITCH_PATHS_SHOWN ? ` +${paths.length - SWITCH_PATHS_SHOWN}` : '';
+  return (
+    `${SWITCH_REFUSAL} Uncommitted now: ${shown}${more}. The same command is refused again ` +
+    'while `git status` shows them — commit (or drop a stray temp file) before repeating it.'
+  );
+}
 
 // Неслитый индекс снимок держит (`git-snapshot.ts`, журнал 24.10 D31/D32):
 // разрешение конфликта затиранием (`checkout --ours`, `restore`) идёт само.
@@ -155,7 +173,7 @@ export async function guardUncommitted(
   const status = await io.status(worktree);
   if (status === undefined) return { tree: 'unknown' };
   if (status.replace(/\0/g, '').trim() === '') return { tree: { dirty: false } };
-  if (discards.includes('switch')) return { deny: SWITCH_REFUSAL };
+  if (discards.includes('switch')) return { deny: switchRefusal(status) };
   const snapshot = await io.snapshot(worktree, command);
   if (!snapshot) return { deny: SNAPSHOT_REFUSAL };
   return { tree: { dirty: true, backup: snapshot.ref } };

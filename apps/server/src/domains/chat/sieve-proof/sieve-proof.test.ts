@@ -9,6 +9,9 @@ import {
   type SieveDef,
   type SieveReportRow,
 } from '@agentdeck/contracts/sieves';
+import type { ProjectTestCase, ProjectTestRunRecord } from '@agentdeck/contracts';
+import { writeRun } from '../../project-tests/runs-store/runs-store.ts';
+import { writeGroup } from '../../project-tests/store/store.ts';
 import { sieveProofFacts } from './sieve-proof.ts';
 
 /**
@@ -99,6 +102,22 @@ describe('свежесть строк по содержимому файлов (
       { code: 'sieve-gap-stale', params: { sieve: 'browser-focus', files: 'src/Page.tsx' } },
     ]);
   });
+
+  // g3 25.10: коммит «комментарий возвращён над своей функцией» снял шесть строк разом.
+  it('правка одних комментариев — строки свежие; директива или код рядом — устарела', async () => {
+    const { dir, git, put, commit } = repo();
+    put('src/Page.tsx', '// renders the page\nexport const Page = () => "page";\n\n// end\n');
+    commit('comment moved', '2026-10-01T12:00:00Z');
+    expect((await factsOf(dir, git)).changedAfterRow).toEqual({});
+
+    put('src/Page.tsx', '// eslint-disable-next-line\nexport const Page = () => "page";\n');
+    commit('directive', '2026-10-01T13:00:00Z');
+    expect((await factsOf(dir, git)).changedAfterRow?.['browser-focus']).toEqual(['src/Page.tsx']);
+
+    put('src/Page.tsx', '// renders\nexport const Page = () => "other"; // why\n');
+    commit('code with a trailing comment', '2026-10-01T14:00:00Z');
+    expect((await factsOf(dir, git)).changedAfterRow?.['browser-focus']).toEqual(['src/Page.tsx']);
+  });
 });
 
 describe('снятие механики привязано к содержимому файла (Ф5)', () => {
@@ -119,5 +138,56 @@ describe('снятие механики привязано к содержимо
     expect(await judge()).toEqual([
       { code: 'sieve-gap-stale', params: { sieve: 'secrets', files: 'src/config.ts' } },
     ]);
+  });
+});
+
+describe('исполненный прогон несёт файлы своих кейсов (строка 98)', () => {
+  it('прошедшие кейсы прогона блока — их codePaths; ручная запись и красный кейс — нет', async () => {
+    const { dir } = repo();
+    const item = (id: string, codePaths: string[]): ProjectTestCase =>
+      ({
+        id,
+        title: id,
+        steps: [],
+        expected: '',
+        source: 'agent',
+        codePaths,
+      }) as unknown as ProjectTestCase;
+    writeGroup(dir, {
+      id: 'tools',
+      title: 'Tools',
+      file: 'tools.tests.json',
+      cases: [item('tools-001', ['tools/lint-locales']), item('tools-002', ['tools/other'])],
+    });
+    const record = (id: string, attested: boolean): ProjectTestRunRecord =>
+      ({
+        id,
+        mode: attested ? 'manual' : 'import',
+        actor: 'agent',
+        status: 'done',
+        startedAt: AT,
+        finishedAt: AT,
+        ...(attested ? { attested: true } : {}),
+        results: [
+          { pointId: 'tools-001', groupId: 'tools', caseId: 'tools-001', status: 'passed' },
+          { pointId: 'tools-002', groupId: 'tools', caseId: 'tools-002', status: 'failed' },
+        ],
+      }) as unknown as ProjectTestRunRecord;
+    writeRun(dir, record('run-exec', false));
+    writeRun(dir, record('run-word', true));
+    const facts = await sieveProofFacts({
+      cwd: dir,
+      rows: [
+        {
+          id: 'boundary-negative',
+          status: 'pass',
+          evidence: 'empty input → exit 2 run:run-exec run:run-word',
+          at: AT,
+        },
+      ],
+      branchPaths: BRANCH,
+    });
+    expect(facts.runs?.['run-exec']?.executedPaths).toEqual(['tools/lint-locales']);
+    expect(facts.runs?.['run-word']?.executedPaths).toEqual([]);
   });
 });

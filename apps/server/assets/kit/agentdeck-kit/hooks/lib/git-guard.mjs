@@ -251,6 +251,7 @@ export default function gitGuard(input) {
   const raw = input?.tool_input?.command;
   const command = executedText(raw, { code: 'spawn' });
   if (!command) return null;
+  if (MERGE_TREE_QUIET.test(command)) return deny(MERGE_TREE_QUIET_WHY);
   // Same length as `command`: an index into one is an index into the other, quotes left readable.
   const original = commandText(raw);
   const matches = [...command.matchAll(new RegExp(MUTATING_GIT.source, 'g'))];
@@ -283,6 +284,17 @@ function safeCall(text, at, cwd) {
     return null;
   }
 }
+
+// `merge-tree --quiet` answers a conflict check with exit 0 on a real content conflict (git 2.55.0.windows.3,
+// reproduced 25.10 on a shared clone: b50c7eaac × 33640a9a1 → 0 with --quiet, 1 and 5 CONFLICT lines without).
+// A group read «no conflict», then spent 3 turns finding out (g0 23.10, g5 25.10). Not a consent question —
+// the flag's answer is wrong, so it is refused with the call that answers right.
+const MERGE_TREE_QUIET = /\bgit\b[^\n|;&]*\smerge-tree\b[^\n|;&]*\s--quiet(?=\s|$)/m;
+const MERGE_TREE_QUIET_WHY =
+  'git-guard(merge-tree) `--quiet` lies here: exit 0 on a real content conflict (git 2.55, reproduced on this ' +
+  'store). Run `git merge-tree --write-tree --name-only <ours> <theirs> > <file>; echo rc=$?` — rc 1 = conflict, ' +
+  'the CONFLICT lines name the files. Piped (`… | head`)? Read `echo rc=${PIPESTATUS[0]}` — `$?` after a ' +
+  'pipe is the code of its last stage (head), 0 while the conflict stands.';
 
 // A trailer LINE, not a mention: «docs: explain why Co-Authored-By trailers are stripped» is a message.
 const TRAILER =

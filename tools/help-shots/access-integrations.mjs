@@ -23,12 +23,20 @@
  * так она ловит кадр, переснятый не на стенде, а на живой системе заказчика.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { openSection, openSettingsTab, card, shotCard } from './access-providers-fixture.mjs';
+import {
+  openSection,
+  openSettingsTab,
+  card,
+  shotCard,
+  sendTelegramStart,
+} from './access-providers-fixture.mjs';
 
 /** Выдуманные секреты: собираются из кусков, чтобы в файле не лежала строка вида ключа. */
 const JIRA_TOKEN = ['atl', 'demo', '5c1f7b9e42a0'].join('_');
 const FORGE_TOKEN = ['glpat', 'demo', '7d3c81ba60f4'].join('-');
 const HOOK_SECRET = ['whsec', 'demo', 'a92e5f0c7b13'].join('_');
+/** Бот карточки Telegram — не тот, что у MCP-сервера стенда (`8123`): иначе «бот агента». */
+const TELEGRAM_TOKEN = ['7000000001', 'AAdemoTelegramReleaseBot00000000'].join(':');
 
 const JIRA = card('Jira');
 const FORGE = card('GitLab');
@@ -41,10 +49,6 @@ const TMS = { enabled: false, baseUrl: '', projectKey: '', groupId: '' };
 /** Подписка по умолчанию (`app-settings.ts`): снимок показывает те галочки, что увидит человек. */
 const DEFAULT_EVENTS = ['runError', 'testFailed', 'budget', 'groupSignal'];
 const TELEGRAM = card('Telegram');
-/** Блок «Ответы из Telegram» внутри карточки: своего атрибута у него нет, ищется по заголовку. */
-const TELEGRAM_ANSWERS =
-  `${TELEGRAM} >> xpath=.//span[normalize-space(text())="Ответы из Telegram" or ` +
-  `normalize-space(text())="Answers from Telegram"]/ancestor::div[contains(@class,"block")][1]`;
 
 export async function shootAtlassian(browser, web, scenario, { panel, upstream }) {
   const page = await browser.newPage({ viewport: { width: 1400, height: 1300 } });
@@ -225,22 +229,50 @@ export async function shootNotify(browser, web, scenario, { panel, upstream }) {
     await page.waitForTimeout(2500);
     await shotCard(scenario, page, '03-events', WEBHOOK);
 
-    // ── 04. Telegram ─────────────────────────────────────────────────────────
-    // Карточка заполнена, но НЕ проверена: проверка Telegram уходит к серверам
-    // Telegram, а стенд справки наружу не ходит. Что она отвечает, разобрано в
-    // тексте раздела.
+    // ── 04. Telegram: два шага до подключения ───────────────────────────────
+    // Токен и «Проверить» (верх на петле отвечает за Bot API: имя бота), затем
+    // «Подключить» — верх присылает один /start с кодом окна из личного чата. Кадр — на «это
+    // вы?»: до подтверждения в настройках ничего не записано.
+    await page.locator(TELEGRAM).locator('input[type="password"]').first().fill(TELEGRAM_TOKEN);
     await page
       .locator(TELEGRAM)
-      .getByLabel(/^(Чат|Chat)$/)
+      .getByRole('button', { name: /^(Проверить|Check)$/ })
       .first()
-      .fill('@qa_release_bot');
+      .click();
+    await page.waitForTimeout(2500);
+    await toastsGone(page);
+    await page
+      .locator(TELEGRAM)
+      .getByRole('button', { name: /^(Подключить|Connect)$/ })
+      .first()
+      .click();
+    // Ссылка окна несёт его код: верх пришлёт /start именно с ним.
+    const link = await page
+      .locator(TELEGRAM)
+      .locator('a[href^="https://t.me/"]')
+      .first()
+      .getAttribute('href', { timeout: 20_000 });
+    sendTelegramStart(new URL(link ?? 'https://t.me/x').searchParams.get('start') ?? '');
+    await page
+      .locator(TELEGRAM)
+      .locator('[data-telegram-connect="candidate"]')
+      .first()
+      .waitFor({ timeout: 20_000 });
     await page.waitForTimeout(600);
     await shotUnderTabs(scenario, page, '04-telegram', TELEGRAM);
 
-    // ── 05. Ответы из Telegram ───────────────────────────────────────────────
-    // Блок на той же карточке. Стенд наружу не ходит, поэтому блок выключен и
-    // честно говорит, чего не хватает; что он делает включённым — в тексте шага.
-    await shotUnderTabs(scenario, page, '05-telegram-answers', TELEGRAM_ANSWERS, 12);
+    // ── 05. Telegram подключён ───────────────────────────────────────────────
+    // «Да, это я»: карточка становится короткой — работает ли, кому пишет,
+    // «Когда звать» тремя группами и одно «Сохранить».
+    await page
+      .locator(TELEGRAM)
+      .getByRole('button', { name: /^(Да, это я|Yes, it is me)$/ })
+      .first()
+      .click();
+    await page.locator('[data-telegram-card="connected"]').first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(2500);
+    await toastsGone(page);
+    await shotUnderTabs(scenario, page, '05-telegram-answers', TELEGRAM);
   } finally {
     await page.close();
   }

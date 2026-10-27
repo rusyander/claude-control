@@ -369,6 +369,22 @@ describe('маршруты продолжения в чистой сессии',
       });
       // Продолжение — другой разговор: с ключом закрытого дерево склеило бы их (Д11).
       expect(link?.conversation).toBeUndefined();
+      // Не группа — вводную до рождения хранить незачем.
+      expect(link?.stagePrompt).toBeUndefined();
+    });
+
+    it('продолжение группы хранит вводную в связи до рождения разговора (d9869abf:9)', async () => {
+      store.setChatLink('sess-1', { ...store.getChatLink('sess-1')!, groupIndex: 2 });
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/chat/handoff',
+        payload: { projectPath: project, chatId: 'sess-1', proposal: PROPOSAL },
+      });
+
+      const link = store.getChatLink(started[0]?.chatId ?? '');
+      expect(started[0]?.prompt).toContain(PROPOSAL.next);
+      expect(link?.stagePrompt).toBe(started[0]?.prompt);
     });
 
     it('у обычного разговора наследовать нечего — связи не заводим', async () => {
@@ -402,6 +418,8 @@ describe('планировщик продолжения', () => {
     // Связь переносит владелец планировщика (`bootstrap/runtime/runtime.ts`); здесь она
     // подменена картой, чтобы проверить сам перенос, а не хранилище.
     const links = new Map<string, { model?: string }>();
+    // Какую вводную планировщик отдал связи продолжения (её хранит группа до рождения).
+    const carried = new Map<string, string | undefined>();
     registry.setHandoffPlanner(
       createHandoffPlanner({
         runs: registry,
@@ -410,13 +428,14 @@ describe('планировщик продолжения', () => {
         selfBaseUrl: 'http://127.0.0.1:5178',
         contextLimit: () => contextLimit,
         stat: () => mtime,
-        carryLink: (from, to) => {
+        carryLink: (from, to, prompt) => {
+          carried.set(to, prompt);
           const link = from.map((key) => links.get(key)).find(Boolean);
           if (link) links.set(to, link);
         },
       }),
     );
-    return { chains, registry, links };
+    return { chains, registry, links, carried };
   }
 
   /** Прогон, который перед завершением сообщает размер окна. */
@@ -637,6 +656,28 @@ ${block(PROPOSAL)}`,
     // но СЛЕДУЮЩЕЕ сообщение человека придёт уже без модели — и без этой записи
     // уехало бы на дефолте посреди работы.
     expect(links.get(next ?? '')).toEqual({ model: 'sonnet' });
+  });
+
+  it('связь продолжения получает ту же вводную, с которой стартовал прогон (d9869abf:9)', async () => {
+    const { chains, registry, links, carried } = build(
+      `Готово.\n\n${block(PROPOSAL)}`,
+      Date.now() + 10_000,
+    );
+    chains.setAuto(['чат-1'], true);
+    links.set('чат-1', { model: 'sonnet' });
+
+    registry.start(
+      'чат-1',
+      { prompt: 'работай', cwd: 'C:/work/проект' },
+      { projectPath: 'C:/work/проект' },
+    );
+    await new Promise((done) => setTimeout(done, 20));
+
+    const next = [...carried.keys()].find((id) => id.startsWith('new-')) ?? '';
+    const prompt = registry.describe(next)?.options.prompt;
+    expect(prompt).toContain(PROPOSAL.next);
+    // Пауза до первого хода оборвёт прогон — вводная должна жить в связи, а не только в нём.
+    expect(carried.get(next)).toBe(prompt);
   });
 
   it('несвежий файл-опора: продолжения нет, причина уходит в ленту', async () => {

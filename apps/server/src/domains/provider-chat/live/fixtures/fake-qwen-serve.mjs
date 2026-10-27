@@ -81,7 +81,9 @@ createServer(async (req, res) => {
     if (!load().sessions[resuming[1]]) return reply(res, 404, { code: 'session_not_found' });
     current = resuming[1];
     resumed = true;
-    mcpReady = true;
+    // MCP_ON_RESUME: и поднятая сессия ждёт MCP нового процесса (окно P-24).
+    if (process.env.MCP_ON_RESUME) void wait(mcpMs).then(() => (mcpReady = true));
+    else mcpReady = true;
     approvalMode = resumeBody.approvalMode ?? 'auto';
     change((state) =>
       state.log.push(`resume ${current} cwd=${resumeBody.cwd} mode=${approvalMode}`),

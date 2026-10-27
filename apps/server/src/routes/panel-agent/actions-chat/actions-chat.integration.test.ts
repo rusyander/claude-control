@@ -691,6 +691,32 @@ describe('panel-agent actions: chats', () => {
       expect(group(2)?.status).toBe('started');
     });
 
+    it('«Продолжить» сдавшуюся группу агент жмёт сам (владелец 25.10); работающую — отказ', async () => {
+      const busy = await decided('split_control', {
+        chat: ids.parent,
+        mode: 'continue_group',
+        group: 0,
+      });
+      expect(busy.card?.preview.summaryCode).toBe('summary-split-continue');
+      expect(busy.result.outcome).toBe('failed');
+      expect(group(0)?.status).toBe('started');
+
+      const plan = store.getSplitPlan(ids.parent);
+      const gaveUp = plan?.groups[0];
+      if (!plan || !gaveUp) throw new Error('нет группы');
+      gaveUp.status = 'failed';
+      gaveUp.error = 'повторы доставки исчерпаны';
+      store.setSplitPlan(plan);
+      const proceed = await decided('split_control', {
+        chat: ids.parent,
+        mode: 'continue_group',
+        group: 0,
+      });
+      expect(proceed.result.outcome).toBe('done');
+      // Конвейер отдал группу её же разговору — статус сменит старт прогона.
+      expect(resumed).toEqual([0]);
+    });
+
     it('продолжение паузы из очереди честно говорит: группа вернётся в очередь', async () => {
       const plan = store.getSplitPlan(ids.parent);
       const queued = plan?.groups[2];

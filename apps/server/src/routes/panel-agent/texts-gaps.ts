@@ -35,6 +35,11 @@ export type GapsTextCode =
   | 'summary-set-model-cascade-off'
   | 'value-model-cascade-on'
   | 'value-model-cascade-off'
+  | 'journal-set-review-after-work'
+  | 'summary-set-review-after-work-on'
+  | 'summary-set-review-after-work-off'
+  | 'value-review-after-work-on'
+  | 'value-review-after-work-off'
   | 'journal-split-accept-group'
   | 'summary-split-accept'
   | 'summary-split-unaccept'
@@ -101,6 +106,13 @@ export const GAPS_TEXTS_RU: {
     'Следующие прогоны чатов этого проекта (и его копий) сами выбирают модель под род работы',
   'value-model-cascade-off':
     'Следующие прогоны чатов этого проекта (и его копий) идут на выбранной вами модели',
+  'journal-set-review-after-work': 'Ревью после работы',
+  'summary-set-review-after-work-on': 'Включить ревью после работы в проекте «{{name}}»',
+  'summary-set-review-after-work-off': 'Выключить ревью после работы в проекте «{{name}}»',
+  'value-review-after-work-on':
+    'Группы следующих разделений этого проекта (и его копий) после работы получают ревью на потолке',
+  'value-review-after-work-off':
+    'Группы следующих разделений этого проекта (и его копий) после работы идут сразу в доставку, без ревью',
   'journal-split-accept-group': 'Приёмка группы разделения',
   'summary-split-accept': 'Принять доставленную группу «{{group}}» разделения чата «{{chat}}»',
   'summary-split-unaccept':

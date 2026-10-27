@@ -43,6 +43,7 @@ describe('разделение: пауза, продолжение, запуск
   let conveyor: SplitConveyor;
   let app: FastifyInstance;
   let resumed: { index: number; prompt: string }[];
+  let notes: (string | undefined)[];
   let ctx: ServerContext;
   const PARENT = 'родитель';
 
@@ -50,6 +51,7 @@ describe('разделение: пауза, продолжение, запуск
     root = mkdtempSync(join(tmpdir(), 'cc-split-control-'));
     mkdirSync(join(root, 'agentdeck'), { recursive: true });
     resumed = [];
+    notes = [];
     registry = new ChatRunRegistry((): RunLike => {
       let finish = (): void => undefined;
       return {
@@ -126,8 +128,9 @@ describe('разделение: пауза, продолжение, запуск
       providerChats: new ProviderChatService(),
       session,
       conveyor,
-      recheckMr: (parent, index) =>
-        recheckDeliveredMr(
+      recheckMr: (parent, index, note) => {
+        notes.push(note);
+        return recheckDeliveredMr(
           {
             store: {
               get: (key) => store.getSplitPlan(key),
@@ -139,7 +142,9 @@ describe('разделение: пауза, продолжение, запуск
           },
           parent,
           index,
-        ),
+          note,
+        );
+      },
     });
     // Пауза держит досылку без человека — тем же вопросом, что в runtime.
     registerChatRunRoutes(app, ctx, registry, session, undefined, pausedGroupOf(store, conveyor));
@@ -201,6 +206,19 @@ describe('разделение: пауза, продолжение, запуск
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ index: 0, outcome: 'sent' });
     expect(resumed[0]?.index).toBe(0);
+  });
+
+  it('N2: заметка «Продолжить» доходит до промпта группы — причина и первый шаг', async () => {
+    await post('pause', { index: 0 });
+    await settle();
+
+    const res = await post('resume-paused', {
+      index: 0,
+      note: 'guard fix applied. Do first: read the job log',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(resumed[0]?.prompt).toContain('Paused because: guard fix applied.');
+    expect(resumed[0]?.prompt).toContain('Do first: read the job log');
   });
 
   it('группа из очереди: пауза держит её, «Продолжить» — назад в очередь', async () => {
@@ -417,5 +435,27 @@ describe('разделение: пауза, продолжение, запуск
       expect(refused.statusCode).toBe(409);
       expect(refused.json()).toMatchObject({ messageCode: code });
     }
+  });
+
+  /**
+   * Заметка к «Перепроверить MR» (аудит g5 27.10, H1): ревью владельца шло в чате наблюдателя,
+   * не в форже, — заданию её было негде взять. Строка до `RECHECK_NOTE_MAX` уходит обрезанной
+   * по краям; не строка и длиннее — 400 до всякой работы.
+   */
+  it('заметка к перепроверке: строка доходит до перепроверки, не строка и длиннее предела — 400', async () => {
+    for (const note of [42, 'щ'.repeat(4001)]) {
+      const bad = await post('recheck', { index: 0, note });
+      expect(bad.statusCode).toBe(400);
+      expect(bad.json()).toMatchObject({
+        messageCode: 'split-recheck-note-invalid',
+        messageParams: { max: '4000' },
+      });
+    }
+    expect(notes).toEqual([]);
+
+    await post('recheck', { index: 0, note: `  ${'щ'.repeat(4000)}  ` });
+    await post('recheck', { index: 0, note: '   ' });
+    await post('recheck', { index: 0 });
+    expect(notes).toEqual(['щ'.repeat(4000), undefined, undefined]);
   });
 });

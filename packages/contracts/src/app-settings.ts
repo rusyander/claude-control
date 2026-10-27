@@ -112,6 +112,8 @@ export const telegramSettingsSchema = object({
     // Сигналы сторожа групп — «внимание» и «тревога», не каждое событие.
     'groupSignal',
   ]),
+  // «Закончил» после долгой работы; не задано — порог по умолчанию (`integrations.ts`).
+  doneAfterMinutes: number().int().min(0).max(1440).optional(),
 });
 
 export const tmsSystemSettingsSchema = object({

@@ -1,5 +1,6 @@
 export {
   useBuildMobileApk,
+  useCancelMobileApk,
   useInstallMobileApk,
   useMobileApk,
   useOutsideRelay,

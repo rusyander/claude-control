@@ -448,7 +448,7 @@ describe('mrDescriptionGap', () => {
 
   it('пустое описание — пробел с адресом MR, заполненное — нет', async () => {
     expect(await mrDescriptionGap(MR, async () => ({ description: '  \n' }))).toEqual({
-      missing: expect.stringContaining(MR),
+      missing: [expect.stringContaining(MR)],
     });
     expect(await mrDescriptionGap(MR, async () => ({ description: 'Что и зачем.' }))).toEqual({});
   });
@@ -468,15 +468,80 @@ describe('mrDescriptionGap', () => {
     const read = async () => ({ description: 'Что и зачем. browser-focus: n/a — только README.' });
     expect(await mrDescriptionGap(MR, read, ['browser-focus'])).toEqual({});
     const gap = await mrDescriptionGap(MR, read, ['browser-focus', 'contract-by-request']);
-    expect(gap.missing).toContain('contract-by-request');
-    expect(gap.missing).not.toContain('browser-focus,');
+    expect(gap.missing?.join('\n')).toContain('contract-by-request');
+    expect(gap.missing?.join('\n')).not.toContain('browser-focus,');
     // Имя внутри другого слова не в счёт.
     expect(
       (
         await mrDescriptionGap(MR, async () => ({ description: 'xbrowser-focus2' }), [
           'browser-focus',
         ])
-      ).missing,
+      ).missing?.join('\n'),
     ).toContain('browser-focus');
+  });
+
+  // g9 26.10 (F9): причина n/a живой проверки прятала заметки доставки — группа узнавала их
+  // следующим кругом (~8 прогонов сверки, 5 правок описания MR). Все пробелы — за один проход.
+  it('n/a живой проверки и заметки доставки не названы — обе строки за один проход', async () => {
+    const gap = await mrDescriptionGap(
+      MR,
+      async () => ({ description: 'Что и зачем.' }),
+      ['browser-focus'],
+      ['project-checks'],
+      { checks: true },
+    );
+    const lines = [gap.missing ?? [], gap.sections ?? []].flat();
+    expect(lines).toEqual([
+      expect.stringContaining('browser-focus'),
+      expect.stringContaining('project-checks'),
+      expect.stringContaining('нет раздела проверок'),
+    ]);
+  });
+
+  // P6 (g5 25.10): правка MR потеряла раздел «Проверки на финальном дереве», и сверка
+  // доставки промолчала; о снимках правки интерфейса она не спрашивала вовсе.
+  describe('разделы описания доставки группы', () => {
+    const gap = (description: string, uiFiles: string[] = []) =>
+      mrDescriptionGap(MR, async () => ({ description }), [], [], { checks: true, uiFiles });
+    const CHECKS = '## Проверки на финальном дереве 6a0acce27\n- check_frontend — OK\n';
+
+    it('нет раздела проверок — пробел; заголовок, жирная строка или «Проверки:» — есть', async () => {
+      expect((await gap('Что и зачем.\n')).sections).toEqual([
+        expect.stringContaining('нет раздела проверок'),
+      ]);
+      expect((await gap(`Что и зачем.\n\n${CHECKS}`)).sections).toBeUndefined();
+      expect((await gap('Что.\n\n**How it was checked**\n- tsc ok\n')).sections).toBeUndefined();
+      expect(
+        (await gap('Что.\n\nПроверки: type-check, lint — зелёные.\n')).sections,
+      ).toBeUndefined();
+      // Заголовок «Открыто после проверки» и «Не проверено» — не раздел проверок.
+      expect(
+        (await gap('Что.\n\n## Открыто после проверки\n- F1\n\n## Не проверено\n- e2e\n')).sections,
+      ).toHaveLength(1);
+      // Слово в тексте, а не в заголовке, раздела не делает.
+      expect((await gap('Что. Проверено вручную, тесты зелёные.\n')).sections).toHaveLength(1);
+    });
+
+    it('правка интерфейса: снимки или «Скриншоты: нет — причина»; без интерфейса — не спрашивается', async () => {
+      const ui = ['src/Page.tsx', 'src/a.css'];
+      const [line] = (await gap(CHECKS, ui)).sections ?? [];
+      expect(line).toContain('src/Page.tsx, src/a.css');
+      expect(line).toContain('«Скриншоты: нет — причина»');
+      expect((await gap(`${CHECKS}\n![до](/uploads/a/before.png)\n`, ui)).sections).toBeUndefined();
+      expect((await gap(`${CHECKS}\n<img src="x/after.webp">\n`, ui)).sections).toBeUndefined();
+      expect(
+        (await gap(`${CHECKS}\nСкриншоты: нет — стенда с этой веткой нет\n`, ui)).sections,
+      ).toBeUndefined();
+      expect(
+        (await gap(`${CHECKS}\n**Screenshots:** none - no stand\n`, ui)).sections,
+      ).toBeUndefined();
+      // «нет» без причины — не ответ.
+      expect((await gap(`${CHECKS}\nСкриншоты: нет\n`, ui)).sections).toHaveLength(1);
+      expect((await gap(CHECKS, [])).sections).toBeUndefined();
+    });
+
+    it('без требований — прежнее поведение: заполненное описание пробелов не даёт', async () => {
+      expect(await mrDescriptionGap(MR, async () => ({ description: 'Что.' }))).toEqual({});
+    });
   });
 });

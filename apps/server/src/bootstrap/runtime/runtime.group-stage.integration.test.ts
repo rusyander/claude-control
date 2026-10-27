@@ -11,6 +11,7 @@ import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.ty
 import { registerChatRoutes } from '../../routes/chat-routes/chat-routes.ts';
 import { removeWhenFree } from '../../lib/remove-when-free.ts';
 import { CLI_HELP_AGENT_DENY } from '../../domains/chat/group-profile/group-profile.ts';
+import { SPLIT_MCP_TAG } from '@agentdeck/contracts/split-tickets';
 import { createRuntime, type Runtime } from './runtime.ts';
 
 /**
@@ -62,6 +63,8 @@ describe('звено группы получает свой профиль за�
   let runtime: Runtime;
   let app: FastifyInstance;
   let started: RunOptions[];
+  /** Ответы прогонов по порядку; кончились — «Готово.». */
+  let answers: string[];
 
   beforeEach(async () => {
     root = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-rt-stage-')));
@@ -107,10 +110,11 @@ describe('звено группы получает свой профиль за�
     } as unknown as ServerContext;
     runtime = createRuntime(ctx, 'http://127.0.0.1:1');
     started = [];
+    answers = [];
     const fake = (): RunLike => ({
       start: async (options, onEvent) => {
         started.push(options);
-        onEvent({ kind: 'text', text: 'Готово.' });
+        onEvent({ kind: 'text', text: answers.shift() ?? 'Готово.' });
         onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: 'sess' });
       },
       stop: () => undefined,
@@ -163,6 +167,7 @@ describe('звено группы получает свой профиль за�
   const MERGE_ONLY = [
     'mcp__gitlab-work__merge_merge_request',
     'mcp__gitlab-work__merge_pull_request',
+    'mcp__gitlab-work__approve_merge_request',
     ...CLI_HELP_AGENT_DENY,
   ];
 
@@ -179,6 +184,76 @@ describe('звено группы получает свой профиль за�
     expect(settings.permissions?.deny).toEqual(MERGE_ONLY);
     expect(settings.skillOverrides?.['deep-review']).toBeUndefined();
     expect(settings.skillOverrides?.['prepare-mr']).toBeUndefined();
+  });
+
+  /**
+   * N8 (g8 26.10): правки и проверка правок шли со всеми серверами проекта — 196
+   * имён MCP в каждом ходе при нуле вызовов. Набор — по виду звена связи; проход
+   * проверки — звено ревью со списком правок.
+   */
+  describe('набор MCP — по виду звена связи (N8)', () => {
+    async function mcpOf(patch: Partial<ChatLink>): Promise<string[] | undefined> {
+      store.setChatLink(CHILD, { ...LINK, ...patch });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/send',
+        payload: { chatId: CHILD, prompt: 'Продолжай', projectPath: project },
+      });
+      expect(response.statusCode).toBe(200);
+      await new Promise((done) => setTimeout(done, 50));
+      const run = started.find((item) => item.permissionPrompt?.runId === CHILD);
+      expect(run?.platformArgs ?? []).toContain('--strict-mcp-config');
+      return run?.platformMcp?.ids;
+    }
+
+    it('правки и проверка правок — без серверов; ревью и доставка — с хранилищем кода', async () => {
+      expect(await mcpOf({ stage: 'fix', fixFindings: ['🟡 F-1'] })).toEqual([]);
+      started.length = 0;
+      expect(await mcpOf({ stage: 'review', fixFindings: ['🟡 F-1'] })).toEqual([]);
+      started.length = 0;
+      expect(await mcpOf({ stage: 'review' })).toEqual(['gitlab-work']);
+      started.length = 0;
+      expect(await mcpOf({ stage: 'deliver' })).toEqual(['gitlab-work']);
+    });
+
+    it('правки попросили сервер блоком mcp — та же сессия продолжает с ним, проверка — после', async () => {
+      store.setSplitPlan({
+        ...SPLIT,
+        projectPath: project,
+        groups: [{ ...SPLIT.groups[0]!, chatId: CHILD, path: project }],
+      });
+      answers = [
+        `Нужен MR.\n<${SPLIT_MCP_TAG}>\nserver: gitlab-work\nwhy: обсуждение MR\n</${SPLIT_MCP_TAG}>`,
+      ];
+      store.setChatLink(CHILD, {
+        ...LINK,
+        stage: 'fix',
+        fixFindings: ['🟡 F-1 src/a.ts:3 — подпись'],
+        lowered: true,
+        model: 'sonnet',
+        ceilingModel: 'opus',
+        task: 'PROJ-1',
+        groupTask: 'PROJ-1',
+      });
+      // Ответ маршрута — поток хода этого чата, и продолжение в нём держит поток
+      // открытым: старты прогонов читаются, ответ маршрута не ждётся.
+      void app.inject({
+        method: 'POST',
+        url: '/api/chat/send',
+        payload: { chatId: CHILD, prompt: 'Правки', projectPath: project },
+      });
+      for (let i = 0; i < 40 && started.length < 3; i += 1) {
+        await new Promise((done) => setTimeout(done, 50));
+      }
+      const prompts = started.map((run) => run.prompt);
+      // Ход правок без серверов → продолжение той же сессии с сервером → проверка.
+      expect(started[0]?.platformMcp?.ids).toEqual([]);
+      expect(prompts[1]).toContain(
+        'The panel connected the MCP server(s) you asked for: gitlab-work',
+      );
+      expect(started[1]?.platformMcp?.ids).toEqual(['gitlab-work']);
+      expect(prompts[2]).toContain('VERIFYING those fixes');
+    });
   });
 
   /**

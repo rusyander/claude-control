@@ -1,4 +1,4 @@
-import type { ProviderStdoutParser } from '../types/assistant.ts';
+import type { ProviderStdoutParser, ProviderStreamRowListener } from '../types/assistant.ts';
 
 /**
  * Разбор stdout `gemini -o stream-json -p …` (Gemini CLI 0.62.0, снято живым
@@ -17,8 +17,12 @@ import type { ProviderStdoutParser } from '../types/assistant.ts';
  * отличить от сбоя, и человек видел вместо ответа предупреждения CLI. Событие
  * `result` со `status: "success"` — слово самого CLI, что ход кончился удачно:
  * `settled()` говорит запуску, что ненулевой код после него — сбой выхода.
+ *
+ * `onRow` получает каждую разобранную строку потока — сторожу групп: файла
+ * переписки у хода `-p` сторож не читает, вызовы и расход он видит отсюда.
+ * Ошибка слушателя ответу не мешает.
  */
-export function createGeminiStreamParser(): ProviderStdoutParser {
+export function createGeminiStreamParser(onRow?: ProviderStreamRowListener): ProviderStdoutParser {
   let pending = '';
   let said = false;
   let afterTool = false;
@@ -32,6 +36,13 @@ export function createGeminiStreamParser(): ProviderStdoutParser {
       event = JSON.parse(raw) as typeof event;
     } catch {
       return '';
+    }
+    if (onRow && event && typeof event === 'object' && !Array.isArray(event)) {
+      try {
+        onRow(event as Record<string, unknown>);
+      } catch {
+        // Сторож не главнее ответа.
+      }
     }
     if (event.type === 'result') {
       succeeded = event.status === 'success';

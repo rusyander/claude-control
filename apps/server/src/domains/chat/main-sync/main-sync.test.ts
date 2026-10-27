@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import {
   conflictsBetween,
   conflictsWith,
+  exportsHeldContent,
   isHiddenSync,
   isMainSyncRequest,
   isSoleSync,
@@ -607,6 +608,64 @@ describe('conflictsWith — целевая ветка по серверу, не 
     expect(await isHiddenSync(copy, run(copy, 'rev-parse', 'fake'), 'main')).toBe(false);
     run(copy, 'fetch', '-q', '.', '+fake:refs/remotes/origin/main');
     expect(await isHiddenSync(copy, tip, 'main')).toBe(true);
+  });
+});
+
+/**
+ * #g0:111 (25.10): после своего перебазирования группа клала чистый main рядом
+ * (`git worktree add --detach w origin/main`), чтобы прогнать на нём красные
+ * тесты, и получала MAIN_SYNC_DENIED. Выгрузка того, что HEAD уже содержит, — не догон.
+ */
+describe('exportsHeldContent — выгрузка того, что HEAD уже содержит', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'sync-held-'));
+  const copy = path.join(root, 'copy');
+  const run = (cwd: string, ...args: string[]) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }).trim();
+  const commit = (file: string, text: string, message: string) => {
+    writeFileSync(path.join(copy, file), text);
+    run(copy, 'add', '.');
+    run(copy, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', message);
+  };
+  run(root, 'init', '-q', '-b', 'main', copy);
+  commit('a.txt', 'one\n', 'base');
+  run(copy, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+  run(copy, 'checkout', '-qb', 'side');
+  commit('s.txt', 'side\n', 'release only');
+  run(copy, 'update-ref', 'refs/remotes/origin/release', 'HEAD');
+  run(copy, 'checkout', '-qb', 'feat', 'main');
+  commit('b.txt', 'feat\n', 'feat');
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it.each([
+    'git worktree add --detach .agent/tmp/main-wt origin/main >/dev/null 2>&1; cd .agent/tmp/main-wt && go test ./...',
+    'git diff origin/main > p.diff',
+    'git show origin/main:a.txt > a.txt',
+    'git checkout origin/main -- .',
+  ])('HEAD уже содержит целевую — не догон: %s', async (command) => {
+    expect(await exportsHeldContent(copy, command, 'origin/main')).toBe(true);
+  });
+
+  it.each([
+    'git fetch origin && git worktree add --detach w origin/main',
+    'cd ../other && git worktree add --detach w origin/main',
+    'git -C ../other worktree add --detach w origin/main',
+    "bash -c 'git worktree add --detach w origin/main'",
+    'git rebase origin/main',
+    'git worktree add --detach w origin/main; git diff origin/release > p',
+  ])(
+    'перенос, fetch, чужой репозиторий или вторая целевая не в HEAD — догон: %s',
+    async (command) => {
+      expect(await exportsHeldContent(copy, command, 'origin/main')).toBe(false);
+    },
+  );
+
+  it('целевая ушла вперёд — та же выгрузка снова догон', async () => {
+    run(copy, 'checkout', '-q', 'main');
+    commit('c.txt', 'main\n', 'main moved');
+    run(copy, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    run(copy, 'checkout', '-q', 'feat');
+    const command = 'git worktree add --detach w origin/main';
+    expect(await exportsHeldContent(copy, command, 'origin/main')).toBe(false);
   });
 });
 

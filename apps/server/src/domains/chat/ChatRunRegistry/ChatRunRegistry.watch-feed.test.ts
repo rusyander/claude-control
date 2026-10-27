@@ -157,6 +157,35 @@ describe('ChatRunRegistry → сторож групп', () => {
     expect(journal.at(-1)?.samples).toHaveLength(2);
   });
 
+  it('запись посреди прогона помечена open, запись конца — без пометки', async () => {
+    let emit: ((event: ChatEvent) => void) | undefined;
+    class Capturing extends FakeRun {
+      override start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
+        emit = onEvent;
+        return super.start(options, onEvent);
+      }
+    }
+    const registry = new ChatRunRegistry(() => new Capturing());
+    const journal: Array<{ id: string; open?: true }> = [];
+    registry.setLimitJournal((record) => journal.push(record));
+    registry.start('child-6', { prompt: 'задача', cwd: '/work' }, { origin: 'chat' });
+    emit?.({
+      kind: 'limit',
+      resetsAt: 2_000_000_000,
+      type: 'five_hour',
+      status: 'allowed',
+      sample: { at: Date.now(), fiveHour: { utilization: 0.2, resetsAt: 2_000_000_000 } },
+    });
+    // Наблюдатель групп читал такую запись как конец прогона: «63k за 20 с».
+    expect(journal.map((record) => record.open)).toEqual([true]);
+    // «Стоп» (и пауза группы) кончают прогон мимо `finish` — конец пишет сама остановка.
+    registry.stop('child-6');
+    await settle();
+    expect(journal).toHaveLength(2);
+    expect(journal[1]?.id).toBe(journal[0]?.id);
+    expect(journal[1]).not.toHaveProperty('open');
+  });
+
   it('«Стоп» идущего прогона кормит сторожу конец хода', () => {
     const registry = new ChatRunRegistry(() => new FakeRun());
     const feeds = watched(registry);

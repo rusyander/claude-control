@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
-import type {
-  SplitGroupContinued,
-  SplitGroupPaused,
-  SplitGroupRechecked,
-  SplitGroupResumed,
-  SplitPlanCancelled,
+import {
+  RECHECK_NOTE_MAX,
+  type SplitGroupContinued,
+  type SplitGroupPaused,
+  type SplitGroupRechecked,
+  type SplitGroupResumed,
+  type SplitPlanCancelled,
 } from '@agentdeck/contracts/chat-handoff';
 import type { ServerContext } from '../../context.ts';
 import type { StopOutcome } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
@@ -54,7 +55,11 @@ export function registerSplitControlRoutes(
     /** Записанные вопросы деревьев: отмена плана снимает вопросы его групп. */
     asks?: Pick<PendingAsks, 'forget'>;
     /** «Перепроверить MR» доставленной группы (`split-recheck.ts`). */
-    recheckMr?: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
+    recheckMr?: (
+      parentChatId: string,
+      index: number,
+      note?: string,
+    ) => Promise<SplitGroupRechecked>;
     /** Добор процессов копии по пути (`path-sweep.ts`); номера снятых. */
     sweepCopy?: (path: string) => Promise<number[]>;
   },
@@ -141,24 +146,26 @@ export function registerSplitControlRoutes(
     },
   );
 
-  app.post<{ Params: { parent: string }; Body: { index?: number; force?: boolean } }>(
-    '/api/chat/split/:parent/resume-paused',
-    (request, reply) => {
-      const found = target(reply, request.body?.index);
-      if (!found) return reply;
-      try {
-        const outcome = found.conveyor.resumePaused(
-          request.params.parent,
-          found.index,
-          request.body?.force === true,
-        );
-        const body: SplitGroupResumed = { index: found.index, outcome };
-        return body;
-      } catch (error) {
-        return refuse(reply, error);
-      }
-    },
-  );
+  app.post<{
+    Params: { parent: string };
+    Body: { index?: number; force?: boolean; note?: string };
+  }>('/api/chat/split/:parent/resume-paused', (request, reply) => {
+    const found = target(reply, request.body?.index);
+    if (!found) return reply;
+    try {
+      const outcome = found.conveyor.resumePaused(
+        request.params.parent,
+        found.index,
+        request.body?.force === true,
+        // Почему стояла и что сделать первым — словами снявшего паузу (N2).
+        typeof request.body?.note === 'string' ? request.body.note.slice(0, 600) : undefined,
+      );
+      const body: SplitGroupResumed = { index: found.index, outcome };
+      return body;
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
 
   app.post<{ Params: { parent: string }; Body: { index?: number; force?: boolean } }>(
     '/api/chat/split/:parent/start-now',
@@ -251,9 +258,21 @@ export function registerSplitControlRoutes(
 
   // «Перепроверить MR» доставленной группы: конфликты, замечания, конвейер,
   // готовность задач — группа правит найденное и доставляет заново.
-  app.post<{ Params: { parent: string }; Body: { index?: number } }>(
+  app.post<{ Params: { parent: string }; Body: { index?: number; note?: unknown } }>(
     '/api/chat/split/:parent/recheck',
     async (request, reply) => {
+      // Заметка человека к нажатию (аудит g5 27.10, H1) — строка не длиннее `RECHECK_NOTE_MAX`.
+      const note = request.body?.note;
+      if (
+        note !== undefined &&
+        (typeof note !== 'string' || note.trim().length > RECHECK_NOTE_MAX)
+      ) {
+        return reply.code(400).send({
+          message: `Заметка к перепроверке — текст не длиннее ${RECHECK_NOTE_MAX} знаков`,
+          messageCode: 'split-recheck-note-invalid',
+          messageParams: { max: String(RECHECK_NOTE_MAX) },
+        });
+      }
       const found = target(reply, request.body?.index);
       if (!found) return reply;
       if (!deps.recheckMr) {
@@ -262,7 +281,8 @@ export function registerSplitControlRoutes(
           .send({ message: 'Конвейер уровней выключен', messageCode: 'split-conveyor-off' });
       }
       try {
-        return await deps.recheckMr(request.params.parent, found.index);
+        const text = note?.trim();
+        return await deps.recheckMr(request.params.parent, found.index, text || undefined);
       } catch (error) {
         return refuse(reply, error);
       }
@@ -278,7 +298,7 @@ export function registerSplitControlRoutes(
       const found = target(reply, request.body?.index);
       if (!found) return reply;
       try {
-        return acceptSplitGroup(
+        const accepted = acceptSplitGroup(
           {
             get: (parent) => ctx.store.getSplitPlan(parent),
             set: (record) => ctx.store.setSplitPlan(record),
@@ -291,6 +311,14 @@ export function registerSplitControlRoutes(
           undefined,
           (record) => found.conveyor.afterMarkedDone(record),
         );
+        // Принятая без записанного MR — MR из её ответа, если фордж подтвердит ветку:
+        // ответ человеку не ждёт форджа, хаб увидит MR следующим снимком.
+        if (accepted.acceptedAt) {
+          void found.conveyor
+            .linkAcceptedMr(request.params.parent, found.index)
+            .catch((error) => request.log.warn(error));
+        }
+        return accepted;
       } catch (error) {
         return refuse(reply, error);
       }

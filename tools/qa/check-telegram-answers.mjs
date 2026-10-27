@@ -22,6 +22,11 @@
  *   - бот тот же, что у канала Telegram агента, — статус `same-bot` с
  *     «для ответов из Telegram нужен отдельный бот», опроса нет;
  *   - маршрута, принимающего ответ локально, нет;
+ *   - подключение по /start (бот карточки): окно ждёт, /start из группы и
+ *     /start без кода окна — не кандидат, личный /start с кодом — кандидат, до подтверждения настройки не тронуты,
+ *     подтверждение пишет чат уведомлений и владельца ответов, бот здоровается;
+ *   - /status нового владельца — сообщение «Работают… Ждут тебя…», чужой
+ *     /status — тишина; меню команд бот получает при старте опроса;
  *   - токен бота не встречается ни в журнале панели, ни в ответах API, ни в
  *     файлах её дома (хранилище ключей шифрует).
  *
@@ -35,6 +40,9 @@ import { freePort, runOnStand, wait } from './throwaway-stand.mjs';
 const OWNER = 424242;
 const STRANGER = 999001;
 const TOKEN = '7000001:QA_answers_token_secret_ABCDEFGH';
+/** Бот карточки Telegram — его слушает окно подключения по /start. */
+const NOTIFY_TOKEN = '7000002:QA_notify_token_secret_ABCDEFGH';
+const CONNECTED = 555777;
 const CHAT = 'qa-tg-chat';
 const SESSION = '5e551000-0000-4000-8000-0000000000a7';
 const COMMANDS = ['rm -rf build', 'rm -rf dist'];
@@ -155,7 +163,12 @@ const tg = createServer((req, res) => {
     const match = /^\/bot([^/]+)\/(\w+)/.exec(req.url ?? '');
     const method = match?.[2] ?? '';
     const tokenSeen = match?.[1] ?? '';
-    bot.calls.push({ method, body, tokenOk: tokenSeen === TOKEN, at: Date.now() });
+    bot.calls.push({
+      method,
+      body,
+      tokenOk: tokenSeen === TOKEN || tokenSeen === NOTIFY_TOKEN,
+      at: Date.now(),
+    });
     const send = (status, payload) => {
       res.writeHead(status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(payload));
@@ -174,9 +187,20 @@ const tg = createServer((req, res) => {
             description: 'Conflict: terminated by other getUpdates request',
           });
         }
+        // Очередь у каждого бота своя, и, как у Telegram, `offset` подтверждает:
+        // всё раньше него из очереди уходит, `-1` оставляет только последнее.
         const offset = Number(body.offset ?? 0);
+        const own = (update) => update.token === tokenSeen;
+        if (offset === -1) {
+          const last = bot.updates.filter(own).at(-1);
+          bot.updates = bot.updates.filter((update) => !own(update) || update === last);
+          return ok(last ? [last.update] : []);
+        }
+        if (offset > 0) {
+          bot.updates = bot.updates.filter((u) => !own(u) || u.update.update_id >= offset);
+        }
         for (let i = 0; i < 8; i += 1) {
-          const ready = bot.updates.filter((update) => update.update_id >= offset);
+          const ready = bot.updates.filter(own).map((u) => u.update);
           if (ready.length > 0) return ok(ready);
           await wait(100);
         }
@@ -191,6 +215,9 @@ const tg = createServer((req, res) => {
       case 'editMessageText':
       case 'answerCallbackQuery':
       case 'deleteWebhook':
+      case 'setMyCommands':
+      case 'deleteMessage':
+      case 'deleteMessages':
         return ok(true);
       default:
         return send(404, { ok: false, error_code: 404, description: 'Not Found' });
@@ -200,15 +227,33 @@ const tg = createServer((req, res) => {
 await new Promise((done) => tg.listen(tgPort, '127.0.0.1', done));
 
 const callsOf = (method) => bot.calls.filter((call) => call.method === method);
+/** Сообщение в личный чат бота: `/start`, `/status`… */
+const say = (text, { from = OWNER, chat = from, type = 'private', token = TOKEN } = {}) =>
+  bot.updates.push({
+    token,
+    update: {
+      update_id: bot.nextUpdateId++,
+      message: {
+        message_id: bot.nextUpdateId,
+        date: Math.floor(Date.now() / 1000),
+        text,
+        chat: { id: chat, type },
+        from: { id: from, is_bot: false, first_name: 'Анна', username: 'anna_qa' },
+      },
+    },
+  });
 const press = (data, messageId, { from = OWNER, chat = OWNER } = {}) => {
   const id = `cb-${bot.nextUpdateId}`;
   bot.updates.push({
-    update_id: bot.nextUpdateId++,
-    callback_query: {
-      id,
-      from: { id: from, is_bot: false, first_name: 'Q' },
-      message: { message_id: messageId, chat: { id: chat, type: 'private' } },
-      data,
+    token: TOKEN,
+    update: {
+      update_id: bot.nextUpdateId++,
+      callback_query: {
+        id,
+        from: { id: from, is_bot: false, first_name: 'Q' },
+        message: { message_id: messageId, chat: { id: chat, type: 'private' } },
+        data,
+      },
     },
   });
   return id;
@@ -246,7 +291,11 @@ try {
       label: 'tg-answers',
       web: false,
       fakeCli: { claude: FAKE_CLAUDE },
-      env: { AGENTDECK_TELEGRAM_API: `http://127.0.0.1:${tgPort}` },
+      env: {
+        AGENTDECK_TELEGRAM_API: `http://127.0.0.1:${tgPort}`,
+        // Две минуты тишины после старта панели (B7) стенду ждать незачем.
+        AGENTDECK_TELEGRAM_SEND_GRACE_MS: '0',
+      },
       seed: ({ root }) => mkdirSync(join(root, 'qa-tg-app'), { recursive: true }),
     },
     async (stand, check) => {
@@ -304,6 +353,12 @@ try {
       };
 
       // ── настройка ────────────────────────────────────────────────────
+      // Главный выключатель карточки Telegram: выключена — ответы не слушают.
+      const cardOn = await api('/integrations/telegram', {
+        method: 'PUT',
+        body: { settings: { enabled: true, chatId: String(OWNER), events: ['runError'] } },
+      });
+      check('карточка Telegram включена', cardOn.status === 200, cardOn.text.slice(0, 300));
       const saved = await api('/integrations/telegram/answers', {
         method: 'PUT',
         body: { enabled: true, afterMinutes: 0, ownerId: String(OWNER), token: TOKEN },
@@ -423,13 +478,18 @@ try {
       const closed = await until(() =>
         callsOf('editMessageText').find(
           (call) =>
-            call.body.text?.includes('⛔ Запрещено') &&
+            call.body.text?.includes('Запрещено') &&
             (call.body.reply_markup?.inline_keyboard ?? []).length === 0,
         ),
       );
+      // Отвечено всё — сообщение свёрнуто: строка итога на ожидание, без разметки и кнопок.
+      const lines = closed?.body.text.split('\n') ?? [];
       check(
-        'закрытое сообщение — оба итога, кнопок нет',
-        Boolean(closed) && closed.body.text.includes('✅ Разрешено'),
+        'закрытое сообщение свёрнуто: две строки итога, без подробностей и кнопок',
+        lines.length === 2 &&
+          /^✅ Разрешено \d\d:\d\d · .+ \(.+\)$/.test(lines[0]) &&
+          /^⛔ Запрещено \d\d:\d\d · .+ \(.+\)$/.test(lines[1]) &&
+          !closed.body.text.includes('<'),
         JSON.stringify(callsOf('editMessageText').at(-1)?.body ?? {}),
       );
 
@@ -501,11 +561,133 @@ try {
       );
       rmSync(join(channel, '.env'), { force: true });
 
+      // ── подключение по /start ────────────────────────────────────────
+      // Опрос ответов стоит (same-bot выше), окно слушает бота карточки само.
+      const card = await api('/integrations/telegram', {
+        method: 'PUT',
+        body: {
+          settings: { enabled: false, chatId: '', events: ['runError', 'question'] },
+          token: NOTIFY_TOKEN,
+        },
+      });
+      check('токен бота карточки сохранён', card.status === 200, card.text.slice(0, 300));
+      const opened = await api('/integrations/telegram/connect', { method: 'POST', body: {} });
+      const code = /^https:\/\/t\.me\/qa_answers_bot\?start=([A-Za-z0-9_-]{16})$/.exec(
+        opened.body?.link ?? '',
+      )?.[1];
+      check(
+        'окно подключения: ждём /start, ссылка на бота с кодом окна',
+        opened.body?.state === 'waiting' && Boolean(code),
+        JSON.stringify(opened.body),
+      );
+      say(`/start ${code}`, { from: STRANGER, chat: -100500, type: 'group', token: NOTIFY_TOKEN });
+      // Посторонний в личном чате без кода окна: окно не занято.
+      say('/start', { from: STRANGER, token: NOTIFY_TOKEN });
+      say('/start wrongcode', { from: STRANGER, token: NOTIFY_TOKEN });
+      await wait(2_000);
+      check(
+        '/start из группы и /start без кода окна — не кандидат',
+        (await api('/integrations/telegram/connect')).body?.state === 'waiting',
+      );
+      say(`/start ${code}`, { from: CONNECTED, token: NOTIFY_TOKEN });
+      const candidate = await until(async () => {
+        const current = (await api('/integrations/telegram/connect')).body;
+        return current?.state === 'candidate' ? current : undefined;
+      }, 15_000);
+      const settingsBefore = (await api('/settings')).body?.integrations?.telegram;
+      check(
+        'личный /start — кандидат с id; настройки до подтверждения не тронуты',
+        candidate?.candidate?.id === String(CONNECTED) && settingsBefore?.chatId === '',
+        JSON.stringify({ candidate, settingsBefore }),
+      );
+      const confirmed = await api('/integrations/telegram/connect/confirm', {
+        method: 'POST',
+        body: {},
+      });
+      const telegramAfter = (await api('/settings')).body?.integrations?.telegram;
+      const answersAfter = await view();
+      const greeting = await until(() =>
+        callsOf('sendMessage').find((call) => call.body.chat_id === String(CONNECTED)),
+      );
+      // Разобранный окном /start подтверждён: ни один бот не отвечает на него второй раз.
+      await wait(2_000);
+      const twice = callsOf('sendMessage').filter(
+        (call) =>
+          call.body.chat_id === String(CONNECTED) &&
+          String(call.body.text ?? '').includes('Уже подключено'),
+      );
+      check(
+        'подтверждение: чат уведомлений и владелец ответов записаны, оба включены, бот поздоровался',
+        confirmed.status === 200 &&
+          telegramAfter?.chatId === String(CONNECTED) &&
+          telegramAfter?.enabled === true &&
+          answersAfter?.settings?.ownerId === String(CONNECTED) &&
+          answersAfter?.settings?.enabled === true &&
+          String(greeting?.body?.text ?? '').startsWith('✅ Подключено к AgentDeck') &&
+          twice.length === 0,
+        JSON.stringify({
+          confirmed: confirmed.body,
+          telegramAfter,
+          answers: answersAfter?.settings,
+        }),
+      );
+
+      // ── команды владельца ────────────────────────────────────────────
+      const polling = await until(async () => {
+        const current = await view();
+        return current?.status?.state === 'polling' ? current : undefined;
+      }, 10_000);
+      check('после подтверждения опрос ответов слушает', Boolean(polling), JSON.stringify(polling));
+      check(
+        'меню команд бот получил: /status, /waiting, /clear, /help',
+        callsOf('setMyCommands').some(
+          (call) =>
+            (call.body.commands ?? []).map((one) => one.command).join(',') ===
+            'status,waiting,clear,help',
+        ),
+      );
+      const toStranger = () =>
+        callsOf('sendMessage').filter((call) => call.body.chat_id === String(STRANGER));
+      say('/status', { from: STRANGER });
+      say('/status', { from: CONNECTED });
+      const status = await until(() =>
+        callsOf('sendMessage').find(
+          (call) =>
+            call.body.chat_id === String(CONNECTED) &&
+            String(call.body.text ?? '').startsWith('⚙️ Работают:'),
+        ),
+      );
+      check(
+        '/status владельца — «Работают… Ждут тебя…»; чужой /status — тишина',
+        String(status?.body?.text ?? '').includes('⏳ Ждут тебя:') && toStranger().length === 0,
+        JSON.stringify({ status: status?.body?.text, stranger: toStranger().length }),
+      );
+
+      // ── /clear ───────────────────────────────────────────────────────
+      say('/clear', { from: CONNECTED });
+      const cleared = await until(() =>
+        callsOf('sendMessage').find(
+          (call) =>
+            call.body.chat_id === String(CONNECTED) &&
+            String(call.body.text ?? '').startsWith('🧹 Убрал'),
+        ),
+      );
+      const batch = callsOf('deleteMessages').at(-1);
+      check(
+        '/clear владельца — сообщения бота и команды удалены пачкой, ответ «🧹 Убрал N»',
+        Boolean(cleared) &&
+          batch?.body?.chat_id === String(CONNECTED) &&
+          (batch?.body?.message_ids ?? []).length > 0,
+        JSON.stringify({ reply: cleared?.body?.text, batch: batch?.body }),
+      );
+
       // ── токен нигде ──────────────────────────────────────────────────
       const secret = TOKEN.split(':')[1];
+      const notifySecret = NOTIFY_TOKEN.split(':')[1];
       const leakedFiles = filesUnder(stand.root, [stand.bin]).filter((file) => {
         try {
-          return readFileSync(file, 'utf8').includes(secret);
+          const text = readFileSync(file, 'utf8');
+          return text.includes(secret) || text.includes(notifySecret);
         } catch {
           return false;
         }

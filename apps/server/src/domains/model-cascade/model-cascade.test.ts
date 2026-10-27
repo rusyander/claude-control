@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { ModelInfo } from '@agentdeck/contracts';
-import { cascadeProjectKey, expandAssignedModel, isCascadeEnabled } from './model-cascade.ts';
+import {
+  cascadeProjectKey,
+  expandAssignedModel,
+  isCascadeEnabled,
+  isReviewAfterWork,
+} from './model-cascade.ts';
 
 /**
  * Правило подбора моделей и его проектная область. Проверяем ровно то, из-за
@@ -48,6 +53,18 @@ describe('isCascadeEnabled', () => {
 
     expect(isCascadeEnabled(entries, PROJECT)).toBe(true);
     expect(isCascadeEnabled(entries, 'C:/work/another')).toBe(false);
+  });
+});
+
+/** «Ревью после работы» (R3(d), 26.10): та же проектная область, умолчание — включено. */
+describe('isReviewAfterWork', () => {
+  it('умолчание — включено; выключенное в проекте действует и в копии ветки', () => {
+    const entries: Array<[string, boolean]> = [[cascadeProjectKey(PROJECT), false]];
+
+    expect(isReviewAfterWork([], COPY)).toBe(true);
+    expect(isReviewAfterWork(entries, PROJECT)).toBe(false);
+    expect(isReviewAfterWork(entries, COPY)).toBe(false);
+    expect(isReviewAfterWork(entries, 'C:/work/other')).toBe(true);
   });
 });
 

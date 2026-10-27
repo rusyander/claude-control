@@ -78,6 +78,13 @@ export interface SieveDef {
    * истории и сверяет с кодом ветки, — а не словами.
    */
   proof?: 'run';
+  /**
+   * Чем живая проверка отличается от юнит-теста (g3 25.10: contract-by-request снят
+   * прогоном `go test ./internal/service`): прогон-доказательство засчитывается, только
+   * если в нём прошёл кейс с одной из этих меток (`tags` кейса блока «Тесты»). Сито без
+   * `proof:'run'` с метками судит так же каждый прогон, на который строка сослалась.
+   */
+  liveTags?: readonly string[];
   /** Применимо только на высоком риске (`riskTier`), а не по видам путей. */
   risk?: 'high';
   /** Задание модели (английский, как все задания звеньев). */
@@ -91,6 +98,7 @@ export const BUILTIN_SIEVES: readonly SieveDef[] = [
     stage: 'review',
     when: ['contract', 'backend'],
     proof: 'run',
+    liveTags: ['live', 'stand', 'route'],
     text:
       'Second entry, from the contract, not from the diff: list every claim that docs, API ' +
       'contracts, OpenAPI/proto/schema files, README or help make about the changed behaviour ' +
@@ -141,6 +149,7 @@ export const BUILTIN_SIEVES: readonly SieveDef[] = [
     stage: 'deliver',
     when: ['ui'],
     proof: 'run',
+    liveTags: ['live', 'browser', 'e2e'],
     text:
       'UI changed: run a browser test (Playwright or the project e2e) over the changed screens — ' +
       'Tab order, visible focus, Escape/Enter, and layout at a narrow and a wide width. A unit ' +
@@ -151,6 +160,7 @@ export const BUILTIN_SIEVES: readonly SieveDef[] = [
     class: 'isolation',
     stage: 'deliver',
     when: ['backend'],
+    liveTags: ['live', 'stand'],
     text:
       'Backend changed: live checks run against a stand whose backend is built from THIS branch, ' +
       'not from main or a shared dev stand. Evidence: which process/port and the commit it runs.',
@@ -161,6 +171,7 @@ export const BUILTIN_SIEVES: readonly SieveDef[] = [
     stage: 'deliver',
     when: ['code'],
     proof: 'run',
+    liveTags: ['live', 'stand', 'route', 'browser', 'e2e'],
     text:
       'In the live run add one negative at a type or limit boundary of the changed input (empty, ' +
       'max+1, wrong type, missing field) and check the refusal is the documented one. Evidence: ' +
@@ -261,6 +272,7 @@ export const BUILTIN_SIEVES: readonly SieveDef[] = [
     stage: 'review',
     when: ['data'],
     proof: 'run',
+    liveTags: ['live', 'stand', 'db'],
     text:
       'Schema or data migration changed: it stays compatible with the code still running ' +
       '(expand → migrate → contract; nothing the old code reads is renamed or dropped in the same ' +
@@ -292,6 +304,12 @@ const DOC_EXT = /\.(md|mdx|rst|adoc)$/i;
 const CONTRACT_NAME = /(^|\/)[^/]*(openapi|swagger)[^/]*\.(ya?ml|json)$/i;
 const CONTRACT_EXT = /\.(proto|graphql|gql)$/i;
 const CONTRACT_DIR = /(^|\/)(contracts?|docs?|api-docs)\//i;
+/**
+ * Док — контракт, только когда описывает API: лежит в каталоге доков/контрактов
+ * или назван по API. README, CHANGELOG, AGENTS.md и заметки — не контракт: запросу
+ * к стенду в них нечего проверить, а сито требовало его от любой правки `.md` (26.10).
+ */
+const API_DOC_PATH = /(^|[/_.-])(api|openapi|swagger|reference|spec|schema)s?([/_.-]|$)/i;
 /**
  * Тест — по ИМЕНИ файла (Ф3): `*.test.*`, `*.spec.*`, `*.stories.*`, `*.cy.*`,
  * `*_test.go`, `test_*.py`, `*_spec.rb`, `FooTest.java`. Папка сама файл тестом
@@ -337,7 +355,7 @@ export function touchKinds(paths: readonly string[]): Set<TouchKind> {
     if (
       CONTRACT_NAME.test(path) ||
       CONTRACT_EXT.test(path) ||
-      (DOC_EXT.test(path) && !test) ||
+      (DOC_EXT.test(path) && !test && (CONTRACT_DIR.test(path) || API_DOC_PATH.test(path))) ||
       (CONTRACT_DIR.test(path) && !test && (CODE_EXT.test(path) || /\.(ya?ml|json)$/i.test(path)))
     ) {
       kinds.add('contract');
@@ -380,7 +398,12 @@ export function riskTier(paths: readonly string[]): RiskAssessment {
   const product = paths
     .map((path) => path.replace(/\\/g, '/'))
     .filter((path) => !DOT_DIR.test(path) && !isTestByPath(path));
-  const sensitive = product.find((path) => SENSITIVE_PATH.test(path));
+  // Только код и данные: страница доков `access/policy.mdx` отката не требует.
+  const sensitive = product.find((path) => {
+    if (!SENSITIVE_PATH.test(path)) return false;
+    const own = touchKinds([path]);
+    return own.has('code') || own.has('data');
+  });
   if (sensitive) reasons.push(`sensitive: ${sensitive}`);
   const code = product.filter((path) => touchKinds([path]).has('code')).length;
   if (code >= LARGE_DIFF_FILES) reasons.push(`size: ${code}`);

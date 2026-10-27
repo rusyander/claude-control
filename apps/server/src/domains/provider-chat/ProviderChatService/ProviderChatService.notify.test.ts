@@ -119,10 +119,11 @@ describe('ProviderChatService: уведомления о конце хода', (
   const expo = (): Sent | undefined => sent.find((item) => item.url.includes('exp.host'));
   const bot = (): Sent | undefined => sent.find((item) => item.url.includes('api.telegram.org'));
 
-  it('законченный ответ — «Работа закончена» в push и в Telegram', async () => {
+  it('законченный ответ — «Работа закончена» в push; короткий ход Telegram не будит (порог 5 мин)', async () => {
     send(fakeSpawn({ chunks: [geminiOut('Готово')] }));
 
-    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const project = basename(workdir);
     expect(expo()?.body).toEqual([
       expect.objectContaining({
@@ -133,12 +134,8 @@ describe('ProviderChatService: уведомления о конце хода', (
         data: { kind: 'done', chatId: 'gemini:chat', projectPath: workdir },
       }),
     ]);
-    expect(bot()?.body).toEqual({
-      chat_id: '42',
-      text: `✅ Работа закончена — ${project}`,
-      disable_web_page_preview: true,
-    });
-    // Наружу уходит только заголовок: ни вопроса, ни ответа в теле нет.
+    // «Закончил» в Telegram — только после долгой работы (решение владельца 25.10.2026).
+    expect(bot()).toBeUndefined();
     expect(JSON.stringify(sent)).not.toContain('Готово');
     expect(JSON.stringify(sent)).not.toContain('Почини сборку');
   });
@@ -149,7 +146,9 @@ describe('ProviderChatService: уведомления о конце хода', (
     await vi.waitFor(() => expect(sent).toHaveLength(2));
     expect(expo()?.body).toEqual([expect.objectContaining({ title: 'Прогон упал' })]);
     expect(bot()?.body).toEqual(
-      expect.objectContaining({ text: `⛔ Прогон упал — ${basename(workdir)}` }),
+      expect.objectContaining({
+        text: expect.stringContaining('<b>Агент упал</b>'),
+      }),
     );
     expect(JSON.stringify(sent)).not.toContain('не найдена модель');
   });

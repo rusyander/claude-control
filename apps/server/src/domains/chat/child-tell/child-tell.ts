@@ -81,6 +81,14 @@ export interface ChildTellDeps {
    * конвейер шлёт по статусу группы, а «Продолжить» с паузы идёт как раз этим путём.
    */
   held?: (chatId: string) => boolean;
+  /**
+   * Разговор кончил ход, а его процесс держит фоновых субагентов (оркестратор ревью
+   * с полосами): «ход кончился» — ещё не «свободен». Продолжение с другой подписью
+   * закрыло бы процесс вместе с агентами (split d9869abf, F1: одно слово панели
+   * убило шесть полос). Слово ждёт их конца — пробуждения CLI (`childFinished`)
+   * или обхода (`sweep`).
+   */
+  holdsAgents?: (aliases: readonly string[]) => boolean;
 }
 
 interface Pending {
@@ -106,6 +114,8 @@ interface Pending {
    * — сказать уже нечего: слово не уходит.
    */
   render?: () => string | undefined;
+  /** Ждёт конца фоновых агентов разговора — его повторяет обход (`sweep`). */
+  heldForAgents?: boolean;
 }
 
 type Delivery = 'sent' | 'queued' | 'refused';
@@ -192,6 +202,28 @@ export class ChildTells {
     return this.deliver(message);
   }
 
+  /**
+   * Слова, ждавшие конца фоновых агентов: агенты кончились, а пробуждения CLI
+   * не было (процесс закрыт, итог агента не будит разговор) — слово уходит сейчас.
+   * Всё ещё держит — остаётся в очереди. Зовёт таймер панели.
+   */
+  sweep(): void {
+    const ready = this.queue.filter(
+      (pending) =>
+        pending.heldForAgents &&
+        !this.deps.held?.(pending.chatId) &&
+        !this.deps.holdsAgents?.(this.deps.aliasesOf(pending.chatId)),
+    );
+    for (const pending of ready) {
+      const at = this.queue.indexOf(pending);
+      if (at < 0) continue;
+      this.queue.splice(at, 1);
+      if (this.deliver(pending) === 'refused') {
+        this.deps.log('child tell: held message refused', pending.chatId);
+      }
+    }
+  }
+
   private deliver(pending: Pending): Delivery {
     const aliases = this.deps.aliasesOf(pending.chatId);
     // Продолжается НАСТОЯЩАЯ сессия: под временным ключом CLI разговор не хранит.
@@ -201,6 +233,12 @@ export class ChildTells {
       this.queue.push(pending);
       return 'queued';
     }
+    if (this.deps.holdsAgents?.(aliases)) {
+      pending.heldForAgents = true;
+      this.queue.push(pending);
+      return 'queued';
+    }
+    delete pending.heldForAgents;
     const prompt = pending.render ? pending.render() : pending.prompt;
     // Всё, о чём было слово, уже сказано другим словом — доставлять нечего.
     if (prompt === undefined) return 'sent';

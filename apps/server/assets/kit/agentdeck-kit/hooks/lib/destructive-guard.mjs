@@ -34,7 +34,7 @@ import { inScratchZone } from './scratch-zone.mjs';
 import path from 'node:path';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 
 // A resolved target path inside one of these is agent litter.
 const AGENT_ZONE =
@@ -246,6 +246,10 @@ const CD = /(?:^|[\s;&|(])(?:cd|pushd)\s+((?:"(?:[^"\\]|\\.)*"|'[^']*'|[^\s;&|()
 const TEMP_VAR = /^(?:TEMP|TMP|TMPDIR)$/;
 const PWD = /\$\(pwd\)|\$\{?PWD\}?(?!\w)/g;
 
+// `cd` with no directory (home), `cd -` (the previous one), `popd` (the stacked one): the shell
+// lands somewhere the text does not name.
+const CD_LOST = /(?:^|[\s;&|(])(?:(?:cd|pushd)(?=[ \t]*(?:$|[\n;&|)]))|popd\b)/g;
+
 /** Variables the command itself defines before `at`: name → possible values. */
 export function variables(text, at) {
   const vars = new Map();
@@ -255,6 +259,22 @@ export function variables(text, at) {
     vars.set(m[1], [m[2].startsWith('$(') ? m[2] : shellWords(m[2]).join(' ')]);
   }
   for (const m of before.matchAll(FOR_LIST)) vars.set(m[1], shellWords(m[2]));
+  return vars;
+}
+
+/**
+ * `variables` as the shell at `at` sees them: an assignment inside a closed subshell
+ * (`(C=x); rm -rf "$C"`) never reaches the rest, so it stays an unknown `$C`.
+ */
+function liveVariables(text, at) {
+  const closed = closedSubshells(text.slice(0, at));
+  const gone = new Set();
+  for (const m of text.slice(0, at).matchAll(ASSIGN)) {
+    if (closed.some(([a, b]) => m.index >= a && m.index < b)) gone.add(m[1]);
+    else gone.delete(m[1]);
+  }
+  const vars = variables(text, at);
+  for (const name of gone) vars.delete(name);
   return vars;
 }
 
@@ -279,16 +299,99 @@ function place(target, base) {
   return path.posix.normalize(full);
 }
 
-function baseDir(text, at, vars, input) {
+/**
+ * The shell's directory at `at`: the last `cd` outside closed subshells, its variables as assigned
+ * BEFORE that `cd` (`cd "$C"; C=/tmp/x` went to the old `$C`). A move the text does not name leaves
+ * `$CD` — never a literal path, so no zone test passes on it.
+ */
+function baseDir(text, at, input) {
   let base = String(input?.cwd ?? '');
-  const closed = closedSubshells(text.slice(0, at));
-  for (const m of text.slice(0, at).matchAll(CD)) {
+  const head = text.slice(0, at);
+  const closed = closedSubshells(head);
+  const moves = [
+    ...[...head.matchAll(CD)].map((m) => ({ m, lost: false })),
+    ...[...head.matchAll(CD_LOST)].map((m) => ({ m, lost: true })),
+  ].sort((a, b) => a.m.index - b.m.index);
+  for (const { m, lost } of moves) {
     // CD's prefix group may consume the `(` itself, hence >=.
     if (closed.some(([a, b]) => m.index >= a && m.index < b)) continue;
-    const dir = expand(shellWords(m[1]).join(' '), vars)[0].replace(PWD, base);
-    base = ANCHORED.test(dir.replace(/\\/g, '/')) ? dir : place(dir, base);
+    const word = lost ? '' : shellWords(m[1]).join(' ');
+    if (lost || word === '-') {
+      base = '$CD';
+      continue;
+    }
+    const dir = expand(word, liveVariables(text, m.index))[0].replace(PWD, base);
+    const next = ANCHORED.test(dir.replace(/\\/g, '/')) ? dir : place(dir, base);
+    // Not surely there: either directory is possible, so neither is named.
+    if (next !== base) base = cdLands(head, closed, m, next) ? next : '$CD';
   }
   return base;
+}
+
+/** Quoted text and closed subshells blanked, same length: only the shell's own operators remain. */
+function operatorsOnly(text, closed) {
+  let out = '';
+  let quote = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === '\\' && quote === '"') {
+        out += '__';
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = '';
+      out += '_';
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += '_';
+    } else out += ch;
+  }
+  for (const [a, b] of closed) out = out.slice(0, a) + '_'.repeat(b - a + 1) + out.slice(b + 1);
+  return out;
+}
+
+// Keywords that open a branch the shell may skip: a `cd` in their body may never run.
+const BODY_KEYWORD = /(?:^|[;\n&|(){}])\s*(then|do|else|elif|fi|done)(?=[\s;]|$)/g;
+// Anything that ends an `&&` chain: `;`, a line break, `||`, a pipe, a background `&`.
+const CHAIN_BREAK = /[;\n|&]/;
+
+/**
+ * The `cd` at `m` surely took the shell to `dir` by `at` (end of `head`). A failed `cd X; rm -rf *`
+ * deletes in the OLD directory, so X counts only when the delete runs after the cd succeeded (the
+ * same `&&` chain), or X exists now and the cd itself surely ran: not in an `||` branch, not after
+ * an `&&` whose chain ended, not in an `if`/loop body.
+ */
+function cdLands(head, closed, m, dir) {
+  const flat = operatorsOnly(head, closed);
+  const start = m.index + m[0].search(/cd|pushd/);
+  const lead = flat.slice(0, start).replace(/(?:\s|[{(!]|\b(?:if|while|until)\b)+$/, '');
+  if (/(?:\|\||\b(?:then|do|else|elif))$/.test(lead)) return false;
+  let depth = 0;
+  for (const k of lead.matchAll(BODY_KEYWORD)) {
+    if (/^(?:then|do)$/.test(k[1])) depth++;
+    else if (/^(?:fi|done)$/.test(k[1])) depth--;
+  }
+  if (depth > 0) return false;
+  const mid = flat.slice(m.index + m[0].length).replace(/&&|[<>]&|&>/g, '  ');
+  if (!CHAIN_BREAK.test(mid)) return true;
+  return !lead.endsWith('&&') && isDir(dir);
+}
+
+const ENV_DIR = /^\$\{?(TEMP|TMP|TMPDIR|HOME|USERPROFILE|LOCALAPPDATA)\}?(?=[\\/]|$)/i;
+
+/** `dir` is an existing directory now; an unknown variable never is. */
+function isDir(dir) {
+  const named = dir.replace(
+    ENV_DIR,
+    (_s, name) => process.env[name.toUpperCase()] ?? (/^T/i.test(name) ? tmpdir() : ''),
+  );
+  if (!named || /[$`%]/.test(named)) return false;
+  try {
+    return statSync(nativePath(named)).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /** `( … )` / `$( … )` spans that close before the delete: a `cd` inside one never reaches it. */
@@ -303,8 +406,8 @@ function closedSubshells(text) {
 }
 
 function resolveTargets(text, at, words, input) {
-  const vars = variables(text, at);
-  const base = baseDir(text, at, vars, input);
+  const vars = liveVariables(text, at);
+  const base = baseDir(text, at, input);
   return words.flatMap((w) => expand(w, vars)).map((t) => place(t.replace(PWD, base), base));
 }
 
@@ -437,11 +540,21 @@ function inScratchClone(command, original, re, input) {
       .filter(({ simple }) => new RegExp(re.source, re.flags.replace('g', '')).test(simple));
     return (
       calls.length > 0 &&
-      calls.every(({ m }) => inScratchZone(gitCall(original, m.index, input?.cwd)?.dir, input))
+      calls.every(({ m }) => inScratchZone(scratchGitDir(original, m.index, input), input))
     );
   } catch {
     return false;
   }
+}
+
+/**
+ * Where a git call runs, resolved like a delete target: the variables the command assigned and the
+ * last `cd` (`C=<clone>; cd "$C" && …; git checkout -- f`, live 26.10), then `git -C`. An unknown
+ * value stays a `$` word, which no zone accepts.
+ */
+function scratchGitDir(original, at, input) {
+  const base = baseDir(original, at, input);
+  return gitCall(original.slice(at), 0, base)?.dir;
 }
 
 const WRITE_TOOLS = /^(?:Write|NotebookEdit)$/;

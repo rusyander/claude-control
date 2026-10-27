@@ -101,8 +101,11 @@ export function noteRelayed(
  * (журнал 104b), на каждое — правка или ответ в той же ветке.
  */
 export const REVIEW_REPLY_LINES: readonly string[] = [
-  'First re-read ALL MR discussions in full, not only the ones listed: new ones may have ' +
-    'arrived while you were not working.',
+  // g3 25.10: «все обсуждения целиком» на MR из 20 веток — 84 тыс. знаков в файл и четыре
+  // node -e по нему; панель сама судит только нерешённые, их и читать.
+  'First re-read EVERY unresolved MR discussion in full, not only the ones listed: new ones ' +
+    'may have arrived while you were not working. Resolved threads are done — filter the forge ' +
+    'read to unresolved ones instead of dumping every discussion of the MR.',
   'For each comment — fix it in the branch and reply in the same discussion thread with what ' +
     'was done, or reply why you do not change it. The reviewer resolves the thread, not you. ' +
     'Write the replies in the language of the discussion.',

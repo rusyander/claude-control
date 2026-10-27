@@ -1,0 +1,24 @@
+{
+  "title": {
+    "ru": "Список чатов больше не накладывает и не обрезает строки при перестановке",
+    "en": "The chat list no longer overlaps or clips rows when they reorder"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В списке чатов строки больше не накладываются и не обрезаются, когда чат заканчивает ход, его закрепляют или открепляют. Раньше при перестановке без изменения числа строк строки брали высоту прежних соседей: под «Ещё N» оставалась пустая дыра, а соседняя строка выходила обрезанной. То же касалось других длинных списков панели: каталога плагинов и прав.",
+        "en": "In the chat list, rows no longer overlap or get clipped when a chat finishes a turn or is pinned or unpinned. Before, a reorder that kept the number of rows made rows inherit the height of their former neighbours: an empty gap was left under “More N” and the neighbouring row came out clipped. The same applied to other long lists of the panel: the plugin catalog and permissions."
+      },
+      "how": {
+        "ru": "Высоту строки список теперь привязывает к самой строке, а не к её месту в списке, поэтому при перестановке высоты пересчитываются.",
+        "en": "The list now ties a row’s height to the row itself rather than to its position, so heights are recomputed on a reorder."
+      },
+      "area": {
+        "ru": "Чаты",
+        "en": "Chats"
+      },
+      "images": ["stale-rows-before.png", "stale-rows-after.png"]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 /**
  * Сторож групп разделения (фаза 2, W) на одноразовой панели — весь путь:
  * поток прогона группы → реестр → сторож → запись группы → API дерева →
- * карточка в хабе, и сигнал в Telegram.
+ * карточка в хабе, и что «внимание» в Telegram не уходит.
  *
  * Подменены только внешние края: модель (фальшивый `claude` на PATH проигрывает
  * записанный поток stream-json) и сервер Telegram (заглушка по
@@ -15,13 +15,13 @@
  * `rules.test.ts`); 2 здесь ставится ЯВНО, чтобы ход был короче. Ожидается:
  *   - на записи группы активны R3 (шторм сжатий), R4 (проверка по кругу),
  *     R5 (ревью в работе) с числами;
- *   - в Telegram ушли ровно три сообщения «внимание» — по одному на правило, с
- *     проектом (сигнал сторожа — событие подписки `groupSignal`);
+ *   - в Telegram не ушло ничего: все три — «внимание», а туда идёт только
+ *     «тревога» (решение владельца 25.10.2026; подписка `groupSignal` стоит);
  *   - в хабе родителя у карточки группы остров сигналов и фишка «3» в сводке.
  * Ход 2: правка файла → R4 закрыт (clearedAt), R3 и R5 держатся.
  * Свежая группа: чат второй группы заведён под временным ключом `new-…`, как
  * его заводит разделение; первый ход рождает сессию. Сигнал R5 этого хода
- * живёт под настоящим id разговора, а не под `new-…`, и уходит в Telegram один;
+ * живёт под настоящим id разговора, а не под `new-…`; «внимание» в Telegram не уходит;
  * окно её первого запроса 110k — R19 (сведения; продолжение без R19 держит
  * `group-watcher.test.ts`: у хода 1 здесь нет расхода, строка была бы зелёной всегда).
  * Пустой список событий: подписку снимают, новые сигналы встают на запись
@@ -32,7 +32,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { freePort, runOnStand, wait } from './throwaway-stand.mjs';
@@ -335,29 +335,17 @@ try {
         JSON.stringify(r5),
       );
 
-      // Telegram: «внимание» уходит, отправка асинхронная — подождать.
-      for (let t = 0; t < 10_000 && telegram.length < 3; t += 250) await wait(250);
-      // Отправка асинхронна: лишняя (повтор без задержки) пришла бы чуть позже.
-      await wait(2_000);
-      const texts = telegram.map((one) => String(one.body?.text ?? ''));
-      const perRule = (rule) => texts.filter((text) => text.includes(` ${rule} `)).length;
+      // Telegram: «внимание» туда не уходит — только «тревога» (решение владельца
+      // 25.10.2026); отправка асинхронна, лишняя пришла бы чуть позже.
+      await wait(3_000);
       check(
-        'в Telegram ушли ровно три сообщения — R3, R4 и R5 по одному, адресату и через бота заглушки',
-        telegram.length === 3 &&
-          ['R3', 'R4', 'R5'].every((rule) => perRule(rule) === 1) &&
-          telegram.every(
-            (one) =>
-              one.body?.chat_id === '@qa-watch' && one.path.startsWith('/bot123:qa/sendMessage'),
-          ),
-        JSON.stringify(telegram).slice(0, 600),
+        '«внимание» R3, R4 и R5 в Telegram не ушло — туда идёт только тревога',
+        [r3, r4, r5].every((one) => one?.severity === 'warn') && telegram.length === 0,
+        JSON.stringify({
+          severities: [r3, r4, r5].map((one) => one?.severity),
+          telegram: telegram.map((one) => String(one.body?.text ?? '')),
+        }).slice(0, 600),
       );
-      check(
-        'текст сигнала называет проект',
-        texts.length > 0 && texts.every((text) => text.includes(basename(copy))),
-        texts.join(' | '),
-      );
-      const r4Text = texts.find((text) => text.includes(' R4 ')) ?? '';
-      console.log(`     Telegram R4: ${r4Text}`);
 
       // ------------------------------------------------------------------ хаб
       /** Хаб родителя в браузере: список чатов подменён, дерево с сигналами — настоящее. */
@@ -560,13 +548,12 @@ try {
         r19?.numbers?.firstK === 110 && r19.severity === 'info' && r19.chatId === FRESH,
         JSON.stringify(r19 ?? fresh.map((one) => one.rule)),
       );
-      for (let t = 0; t < 10_000 && telegram.length < freshSent + 1; t += 250) await wait(250);
-      await wait(2_000);
+      await wait(3_000);
       const freshTexts = telegram.slice(freshSent).map((one) => String(one.body?.text ?? ''));
       check(
-        'в Telegram ушло ровно одно сообщение — R5 свежей группы',
-        freshTexts.length === 1 && freshTexts[0].includes(' R5 '),
-        freshTexts.join(' | '),
+        '«внимание» R5 свежей группы в Telegram не ушло',
+        r5Fresh?.severity === 'warn' && freshTexts.length === 0,
+        JSON.stringify({ severity: r5Fresh?.severity, freshTexts }),
       );
 
       // ----------------------------------------------- пустой список событий

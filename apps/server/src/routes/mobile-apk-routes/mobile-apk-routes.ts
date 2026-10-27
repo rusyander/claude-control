@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   APK_FILE,
   apkStatus,
+  cancelApkBuild,
   installApk,
   startApkBuild,
   type ApkPaths,
@@ -24,6 +25,12 @@ export function registerMobileApkRoutes(app: FastifyInstance): void {
 
   app.post('/api/mobile/apk/build', async (_req, reply) => {
     if (!startApkBuild(paths())) return reply.code(409).send({ error: 'busy' });
+    return apkStatus(paths());
+  });
+
+  app.post('/api/mobile/apk/cancel', async (_req, reply) => {
+    // Сборка успела кончиться между опросом и нажатием — отменять нечего.
+    if (!cancelApkBuild(paths())) return reply.code(409).send({ error: 'idle' });
     return apkStatus(paths());
   });
 

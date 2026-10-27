@@ -32,6 +32,8 @@ export declare const DEV_RESTART_STATE: string;
 export declare const DEV_RESTART_REQUEST: string;
 export declare const DEV_WATCH_LOG: string;
 export declare function appendDevLog(appData: string, line: string): void;
+export declare const SERVER_LOG: string;
+export declare function appendServerLog(appData: string, chunk: string | Uint8Array): void;
 
 export declare function writeRestartState(appData: string, state: DevRestartFileState): void;
 export declare function clearRestartState(appData: string): void;

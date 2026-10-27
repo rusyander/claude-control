@@ -79,6 +79,7 @@ export {
   parseDirtyPaths,
   readBranchFiles,
   readCurrentBranch,
+  readHeadSha,
   readMergeTarget,
   readProjectGit,
   readTargetMoved,

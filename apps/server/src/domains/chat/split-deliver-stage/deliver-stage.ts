@@ -13,6 +13,7 @@ import type {
 } from '../../../lib/app-store/app-store.types.ts';
 import { carriedStageLink, conversationKeys } from '../../../lib/app-store/chat-links.ts';
 import type { FreshDeliveryMode } from '../split-conveyor/split-conveyor.ts';
+import { deliveryCheckCommand } from '../delivery-self-check.ts';
 
 /**
  * Новый разговор группы стадией ДОСТАВКИ — по слову конвейера, а не по концу
@@ -198,6 +199,7 @@ export function createDeliverStageSession(
         after: 'review',
         branch: group.branch,
         ...(foreign ? { foreign } : {}),
+        deliveryCheck: deliveryCheckCommand(),
       }),
       prompt,
     ].join('\n\n');

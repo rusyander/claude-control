@@ -1,6 +1,7 @@
 import type { TaskSplitResult } from '@agentdeck/contracts/task-split';
 import type { ChatLink, SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts';
 import type { RunFinished } from '../ChatRunRegistry/ChatRunRegistry.ts';
+import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
 import { missingDelivery } from '../../project-git/delivery-facts/delivery-facts.ts';
 import { chainOutcomeOf } from '../chain-outcome/chain-outcome.ts';
 import {
@@ -36,7 +37,8 @@ function triageDone(): RunFinished {
 }
 
 export interface Word {
-  via: 'nudge' | FreshDeliveryMode;
+  /** `continue` — слово «Продолжить» сданной группе (`continueGroup`). */
+  via: 'nudge' | 'continue' | FreshDeliveryMode;
   prompt: string;
   /** Напоминание: звено доставки ещё впереди — ходу закрыты пуш и MR (`aheadDeny`). */
   deliverAhead?: boolean;
@@ -57,6 +59,8 @@ export function harness(
   const stageOfChat = { value: options.stage ?? 'work' };
   const records = new Map<string, SplitPlanRecord>();
   const words: Word[] = [];
+  /** Заметки в ленту родителя (`deps.notify`). */
+  const notices: ChatEvent[] = [];
   const timers: { run: () => void; ms: number }[] = [];
   const freshQueue = Array.isArray(options.fresh) ? [...options.fresh] : undefined;
   const nextFresh = (): 'sent' | 'refused' | 'busy' => {
@@ -122,7 +126,15 @@ export function harness(
     startTriage: () => ({ chatId: 'triage', started: true, deferred: false }),
     watchOverlap: () => undefined,
     delivery,
-    ...(options.resume ? { resume: () => options.resume ?? 'refused' } : {}),
+    ...(options.resume
+      ? {
+          resume: (_group, prompt) => {
+            words.push({ via: 'continue', prompt });
+            return options.resume ?? 'refused';
+          },
+        }
+      : {}),
+    notify: (_parent, event) => void notices.push(event),
     log: () => undefined,
     now: () => new Date(2026, 9, 23, 12, 0, (tick += 1)),
   });
@@ -158,5 +170,5 @@ export function harness(
     timers.shift()?.run();
     await settle();
   };
-  return { conveyor, start, round, fire, timers, group, words, stageOfChat, records };
+  return { conveyor, start, round, fire, timers, group, words, stageOfChat, records, notices };
 }

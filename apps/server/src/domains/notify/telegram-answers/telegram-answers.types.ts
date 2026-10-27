@@ -1,4 +1,4 @@
-import type { InboxLaunch, InboxQuestion } from '@agentdeck/contracts/chat-inbox';
+import type { InboxClient, InboxLaunch, InboxQuestion } from '@agentdeck/contracts/chat-inbox';
 import type {
   TelegramAnswersSettings,
   TelegramAnswersStatus,
@@ -7,7 +7,14 @@ import type {
 /** Итог вызова Bot API: значение, а не исключение — опросу нужен код. */
 export type BotCall<T> =
   | { ok: true; status: number; result: T }
-  | { ok: false; status: number; description: string; aborted?: boolean };
+  | {
+      ok: false;
+      status: number;
+      description: string;
+      aborted?: boolean;
+      /** 429: сколько секунд Telegram просит подождать (`parameters.retry_after`). */
+      retryAfter?: number;
+    };
 
 export interface InlineButton {
   text: string;
@@ -21,6 +28,8 @@ export type ReplyMarkup =
 export interface BotUser {
   id: number;
   is_bot?: boolean;
+  first_name?: string;
+  username?: string;
 }
 export interface BotChat {
   id: number;
@@ -30,9 +39,28 @@ export interface SentBotMessage {
   message_id: number;
   chat: BotChat;
 }
+export interface BotPhotoSize {
+  file_id: string;
+  file_size?: number;
+}
+export interface BotDocument {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
 export interface BotMessage extends SentBotMessage {
   from?: BotUser;
+  /** Когда отправлено, секунды эпохи. */
+  date?: number;
   text?: string;
+  /** Подпись к фото или файлу: у альбома она живёт на одном из сообщений. */
+  caption?: string;
+  /** Общий номер сообщений одного альбома. */
+  media_group_id?: string;
+  /** Размеры одного фото, от меньшего к большему. */
+  photo?: BotPhotoSize[];
+  document?: BotDocument;
   reply_to_message?: { message_id: number };
 }
 export interface BotUpdate {
@@ -51,7 +79,11 @@ export interface AskSourceInfo {
   project: string;
   chatTitle: string;
   cli: string;
+  /** CLI не основной (не Claude Code): тогда его имя пишется в строке «где». */
+  otherCli?: boolean;
   app: 'agentdeck' | 'outside';
+  /** Кто ведёт сессию (`entrypoint` транскрипта): VS Code и терминал подписаны в первой строке. */
+  client?: InboxClient;
   background?: boolean;
   group?: { index: number; title?: string; stage?: string; parentTitle?: string };
 }
@@ -72,6 +104,12 @@ export type AskTarget =
       runKey?: string;
     }
   | { kind: 'relayQuestion'; toolUseId: string }
+  /**
+   * Вопрос сессии, которую панель не ведёт (VS Code, терминал), а хук панели не
+   * держит. Только для чтения: продолжение чата панелью (`--resume`) завело бы
+   * копию чужой сессии, а диалог там остался бы висеть.
+   */
+  | { kind: 'outsideQuestion'; chatId: string; client?: InboxClient }
   | { kind: 'foreign'; chatId: string; askId: string }
   | { kind: 'deferred'; id: string };
 
@@ -87,22 +125,76 @@ export interface PendingAskItem {
   /** Группа или отложенный D-n: не ждать `afterMinutes`, уходит сразу. */
   immediate: boolean;
   toolName?: string;
+  /**
+   * Что агент хочет сделать — словами: `description` вызова Bash, «Изменить
+   * файл app.ts», «Открыть example.com», «gitlab: create_issue» или имя инструмента.
+   */
+  description?: string;
   /** Что именно спрошено — уже под маской секретов. */
   summary?: string;
   launch?: InboxLaunch;
   questions?: InboxQuestion[];
   /** Причина D-n — почему решает человек. */
   reason?: string;
+  /** Чат, куда отвечать текстом (reply на сообщение бота). */
+  chat?: ChatRoute;
+}
+
+/**
+ * Карточка ожидания для сообщения — данные, а не готовый текст: разметка
+ * собирается при каждой отправке и правке (`compose.ts`), а строка вопроса
+ * меняется по шагу вызова. Тексты — уже под маской секретов, без экранирования.
+ */
+export interface ItemCard {
+  kind: 'question' | 'permission' | 'decision';
+  /** Имя папки проекта — в первой строке за меткой «📁», сразу после вида. */
+  project: string;
+  /** Имя сессии (чата) — последним в первой строке; нет у записей старше формата 25.10. */
+  session?: string;
+  /** Чужой CLI, «VS Code» или «Терминал» — между проектом и сессией. */
+  via?: string;
+  /** Вопрос только для чтения: где на него ответить («Ответь в VS Code — …»). */
+  readOnly?: string;
+  /** Группа, стадия, «из фона» — в свёрнутой цитате. */
+  group?: string;
+  /** Суть: что нужно (у вопроса берётся из самого вопроса). */
+  title?: string;
+  /** Суть — сама команда (нет своего описания): моноширинно. */
+  titleIsCode?: boolean;
+  /** Номер отложенного решения D-n — виден в первой строке. */
+  deferredId?: string;
+  /** Прежняя строка «где» — только у старых записей. */
+  where?: string;
+  /** Подробности в свёрнутой цитате: почему решаете вы и команда. */
+  reason?: string;
+  code?: string;
+}
+
+/**
+ * Чат, куда уходит ответ на сообщение бота (reply): ключ чата панели, сессия,
+ * проект; `outside` — сессия терминала или VS Code (сообщение — через хук).
+ */
+export interface ChatRoute {
+  chatId: string;
+  sessionId?: string;
+  runKey?: string;
+  projectPath?: string;
+  title?: string;
+  outside?: boolean;
 }
 
 /** Ожидание в отправленном сообщении. */
 export interface SentItem {
+  /** Куда ушёл бы ответ-reply на это ожидание. */
+  chat?: ChatRoute;
   key: string;
   target: AskTarget;
   /** Что открыть в панели (`/chat?id=`); пусто — раздел чата без разговора. */
   openId: string;
-  /** Текст ожидания, как его увидел человек при отправке. */
+  /** Текст ожидания, как его увидел человек при отправке (простой — у старых записей). */
   text: string;
+  /** Карточка для разметки HTML; нет — запись старше разметки, `text` уходит как есть. */
+  card?: ItemCard;
   questions?: InboxQuestion[];
   state: 'open' | 'done';
   /** Строка итога: «✅ Разрешено · 19:52». */
@@ -154,7 +246,23 @@ export interface AnswersFile {
   messages: SentMessage[];
   /** Уже отправленные ожидания: ключ → когда. Повторно не уходят. */
   sent: Record<string, string>;
+  /** Отложенное удаление ответа на /clear: переживает перезапуск. */
+  deletes?: PendingDelete[];
   lastSentAt?: number;
+}
+
+/** Сообщение, которое бот удалит в момент `at` (мс), если оно моложе 48 часов. */
+export interface PendingDelete {
+  chatId: string;
+  messageId: number;
+  at: number;
+  /** Когда сообщение отправлено, мс: старше 48 часов Telegram удалять не даёт. */
+  sentAt: number;
+  /**
+   * Ответ на /clear. Записи без отметки остались от прежнего «Убирать
+   * отвеченное» и при чтении файла отбрасываются (`store.ts`).
+   */
+  force?: boolean;
 }
 
 /** Почему ожидание пропало из сводки, пока висело в Telegram. */

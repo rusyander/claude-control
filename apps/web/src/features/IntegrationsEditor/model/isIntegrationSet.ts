@@ -1,5 +1,6 @@
 import type { IntegrationId, IntegrationStatus, IntegrationsSettings } from '@agentdeck/contracts';
 import { draftFrom } from './draft';
+import { INTEGRATION_FIELDS } from './draft.constants';
 
 /**
  * Заведена ли интеграция — по ней карточка стоит в списке без «Добавить».
@@ -17,5 +18,9 @@ export function isIntegrationSet(
 ): boolean {
   const saved = settings[id];
   if (saved.enabled || status?.hasToken) return true;
-  return Object.values(draftFrom(id, saved as never)).some((value) => value.trim() !== '');
+  // Поле со значением по умолчанию (порог минут) — не настройка человека.
+  const draft = draftFrom(id, saved as never);
+  return INTEGRATION_FIELDS[id].some(
+    (field) => (draft[field.key] ?? '').trim() !== (field.fallback ?? ''),
+  );
 }

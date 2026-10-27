@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ChatInbox } from '@agentdeck/contracts/chat-inbox';
 import type { DeferredAskState } from '@agentdeck/contracts/deferred-asks';
@@ -11,10 +12,18 @@ import type { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts'
 import type { DeferredAsks } from '../../domains/chat/deferred-asks/deferred-asks.ts';
 import type { ProviderChatService } from '../../domains/provider-chat/ProviderChatService/ProviderChatService.ts';
 import { readToken } from '../../domains/integrations/store/store.ts';
-import { applyAnswer, type Inject } from '../../domains/notify/telegram-answers/apply.ts';
+import {
+  applyAnswer,
+  sendChatText,
+  type Inject,
+} from '../../domains/notify/telegram-answers/apply.ts';
 import { collectPendingAsks } from '../../domains/notify/telegram-answers/collect.ts';
 import { agentBotIds } from '../../domains/notify/telegram-answers/same-bot.ts';
+import { limitSharesOf } from '../../domains/notify/telegram-answers/commands.ts';
+import { ConnectWindow } from '../../domains/notify/telegram-answers/connect.ts';
+import { SentLog } from '../../domains/notify/telegram-answers/sent-log.ts';
 import { TelegramAnswersService } from '../../domains/notify/telegram-answers/service.ts';
+import type { TelegramAnswersCover } from '../../domains/notify/telegram.ts';
 import { AnswersStore } from '../../domains/notify/telegram-answers/store.ts';
 import type {
   AskTarget,
@@ -30,6 +39,7 @@ import {
 import { parseBody } from '../../lib/request-body.ts';
 import { getProvider } from '../../providers/registry.ts';
 import { deferredAsksOf } from '../chat/deferred-routes/deferred-store.ts';
+import { registerTelegramConnectRoutes } from './telegram-connect-routes.ts';
 
 /**
  * Ответы из Telegram: настройка (`GET`/`PUT`), перезапуск опроса и сам опрос,
@@ -64,6 +74,10 @@ export interface TelegramAnswersRouteDeps {
   registry: ChatRunRegistry;
   session: ChatSession;
   providerChats: ProviderChatService;
+  /** Куда опрос подставляет «права и вопросы доставляю я» (уведомления молчат). */
+  cover?: TelegramAnswersCover;
+  /** Имя чата по ключу прогона — для `/status`. */
+  chatTitle?: (chatId: string) => string | undefined;
 }
 
 export function registerTelegramAnswersRoutes(
@@ -132,21 +146,62 @@ export function registerTelegramAnswersRoutes(
     }
   };
 
-  const service = new TelegramAnswersService({
+  const agentBots = (): Set<string> => {
+    const paths = ctx.location.paths;
+    return agentBotIds(
+      {
+        mcpConfig: paths.mcpConfig,
+        settings: paths.settings,
+        settingsLocal: paths.settingsLocal,
+        secretsEnv: paths.secretsEnv,
+        configRoot: paths.root,
+      },
+      ctx.store.getProjects().map((project) => project.path),
+    );
+  };
+
+  // Окно подключения по /start: бот карточки Telegram. Сервис ниже объявлен
+  // позже, поэтому окно спрашивает его через замыкание.
+  const connect = new ConnectWindow({
+    token: notifyToken,
+    agentBotIds: agentBots,
+    serviceListens: (token) => service.listensTo(token),
+    log: (message) => app.log.info(message),
+  });
+
+  /** Ответ из Telegram идёт маршрутами панели с параметрами прошлого хода. */
+  const applyDeps = (clientId: string) => ({
+    inject,
+    clientId,
+    runParams: (keys: readonly string[]) => {
+      const latest = deps.registry.latestRunOf(keys);
+      if (!latest) return undefined;
+      const { model, effort, permissionMode } = latest.options;
+      return {
+        ...(model ? { model } : {}),
+        ...(effort ? { effort } : {}),
+        ...(permissionMode ? { permissionMode } : {}),
+      };
+    },
+  });
+
+  // Номера сообщений бота и команд владельца — для /clear; тот же файл пишет
+  // отправитель уведомлений (рантайм).
+  const sentLog = new SentLog(appData());
+
+  const service: TelegramAnswersService = new TelegramAnswersService({
     store: store(),
+    sentLog,
     token: () => dedicatedToken() ?? notifyToken(),
-    agentBotIds: () => {
-      const paths = ctx.location.paths;
-      return agentBotIds(
-        {
-          mcpConfig: paths.mcpConfig,
-          settings: paths.settings,
-          settingsLocal: paths.settingsLocal,
-          secretsEnv: paths.secretsEnv,
-          configRoot: paths.root,
-        },
-        ctx.store.getProjects().map((project) => project.path),
-      );
+    agentBotIds: agentBots,
+    // Главный выключатель карточки Telegram гасит и ответы: «выключено» значит
+    // «ничего не шлём и не слушаем».
+    active: () => ctx.store.getSettings().integrations.telegram.enabled,
+    intercept: (update) => connect.offer(update),
+    running: async () => runningChats(),
+    limits: async () => {
+      const reply = await inject({ method: 'GET', url: '/api/usage-limits' });
+      return reply.statusCode === 200 ? limitSharesOf(JSON.parse(reply.body)) : undefined;
     },
     collect: async () => {
       const reply = await inject({ method: 'GET', url: '/api/chat/inbox' });
@@ -156,6 +211,8 @@ export function registerTelegramAnswersRoutes(
         inbox,
         foreign: deps.providerChats.pendingAsks(),
         defaultCli: getProvider('claude').name,
+        titleOf: (chatId) => titled(chatId).title,
+        parentOf: (chatId) => ctx.store.getChatLink(chatId)?.parentChatId,
         cliName: (id) => {
           try {
             return getProvider(id).name;
@@ -165,23 +222,48 @@ export function registerTelegramAnswersRoutes(
         },
       });
     },
-    apply: (target, answer, clientId) =>
-      applyAnswer(target, answer, {
-        inject,
-        clientId,
-        runParams: (keys) => {
-          const latest = deps.registry.latestRunOf(keys);
-          if (!latest) return undefined;
-          const { model, effort, permissionMode } = latest.options;
-          return {
-            ...(model ? { model } : {}),
-            ...(effort ? { effort } : {}),
-            ...(permissionMode ? { permissionMode } : {}),
-          };
-        },
-      }),
+    apply: (target, answer, clientId) => applyAnswer(target, answer, applyDeps(clientId)),
+    sendToChat: (route, text, files, clientId) =>
+      sendChatText(route, text, files, applyDeps(clientId)),
+    ...sendGrace(),
     vanished,
     log: (message) => app.log.info(message),
+  });
+
+  /** Идущие разговоры панели и чужих CLI — строки `/status`. */
+  const runningChats = () => {
+    const own = deps.registry
+      .active()
+      .filter((run) => run.status === 'running')
+      .map((run) => ({
+        project: run.projectPath ? basename(run.projectPath) : '',
+        ...titled(run.chatId),
+        startedAt: run.startedAt,
+      }));
+    const foreign = deps.providerChats.runningChats().map((chat) => ({
+      project: chat.workdir ? basename(chat.workdir) : '',
+      ...(chat.title ? { title: chat.title } : {}),
+      startedAt: chat.startedAt,
+    }));
+    return [...own, ...foreign];
+  };
+  const titled = (chatId: string): { title?: string } => {
+    try {
+      const title = deps.chatTitle?.(chatId);
+      return title ? { title } : {};
+    } catch {
+      return {};
+    }
+  };
+
+  if (deps.cover) deps.cover.covers = () => service.covers();
+
+  registerTelegramConnectRoutes(app, ctx, {
+    connect,
+    service,
+    answers: answersStore,
+    notifyToken,
+    sentLog,
   });
 
   const view = (): TelegramAnswersView => {
@@ -214,10 +296,13 @@ export function registerTelegramAnswersRoutes(
     else if (body.token) setStoredKey(appData(), ANSWERS_TOKEN_ID, body.token);
     const answers = store();
     const current = answers.settings;
+    const ownerId = body.ownerId ?? current.ownerId;
     answers.setSettings({
       enabled: body.enabled ?? current.enabled,
       afterMinutes: body.afterMinutes ?? current.afterMinutes,
-      ownerId: body.ownerId ?? current.ownerId,
+      ownerId,
+      // Имя из подтверждения /start — только своему id.
+      ownerName: ownerId === current.ownerId ? current.ownerName : '',
     });
     await service.restart();
     return view();
@@ -240,5 +325,37 @@ export function registerTelegramAnswersRoutes(
         ),
       );
   });
-  app.addHook('onClose', async () => service.stop());
+  // Бот карточки Telegram — бот ответов по умолчанию. Его токен сохранили,
+  // сменили или забыли — опрос перезапускается: иначе он так и стоял бы в «нет
+  // токена» или слушал прежнего бота до перезапуска панели (живой прогон 25.10).
+  app.addHook('onResponse', async (request, reply) => {
+    if (reply.statusCode >= 300 || request.routeOptions.url !== '/api/integrations/:id') return;
+    if (request.method !== 'PUT' && request.method !== 'DELETE') return;
+    if ((request.params as { id?: string }).id !== 'telegram') return;
+    if (!store().settings.enabled) return;
+    void service
+      .restart()
+      .catch((error: unknown) =>
+        app.log.warn(
+          { err: error instanceof Error ? error.message : String(error) },
+          'telegram answers',
+        ),
+      );
+  });
+
+  app.addHook('onClose', async () => {
+    service.stop();
+    connect.cancel();
+  });
+}
+
+/**
+ * Тишина после старта и сна — две минуты; стенды QA и кадров справки задают её
+ * переменной `AGENTDECK_TELEGRAM_SEND_GRACE_MS`, чтобы не ждать.
+ */
+function sendGrace(): { sendGraceMs?: number } {
+  const raw = Number(process.env.AGENTDECK_TELEGRAM_SEND_GRACE_MS);
+  return Number.isFinite(raw) && raw >= 0 && process.env.AGENTDECK_TELEGRAM_SEND_GRACE_MS
+    ? { sendGraceMs: raw }
+    : {};
 }

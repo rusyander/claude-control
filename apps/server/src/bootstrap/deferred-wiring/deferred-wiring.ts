@@ -19,6 +19,8 @@ import {
   setDeferredResumer,
   type DeferredResumeOutcome,
 } from '../../routes/chat/deferred-routes/deferred-store.ts';
+import { stageOf } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
+import { groupDeliverAhead } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import type { PanelDecision } from './rejudge.ts';
 
 /** Через сколько после старта панели продолжать разрешённое: реестр успевает подхватить прогоны. */
@@ -33,6 +35,12 @@ export interface DeferredWiringDeps {
     describe(chatId: string): RunSnapshot | undefined;
     describeIdle(chatId: string): RunSnapshot | undefined;
     start(chatId: string, options: RunOptions, meta: RunMeta): boolean;
+    /**
+     * Фоновые субагенты живого процесса разговора между ходами: продолжение с
+     * другой подписью закрыло бы процесс вместе с ними (F1, d9869abf), поэтому
+     * слово ждёт их конца, как ждёт конца идущего хода.
+     */
+    liveAgentsOf?(chatId: string): number;
   };
   /**
    * Слово группе её текущим разговором (`runtime.ts` `resumeGroup`): идущий ход
@@ -56,6 +64,11 @@ export interface DeferredWiringDeps {
    * (D-1). `undefined` — по-прежнему человеку. Нет — записи ждут как есть.
    */
   rejudge?: (record: DeferredAskRecord) => Promise<PanelDecision | undefined>;
+  /**
+   * Ждущая запись группы, исполнять которую негде (`rejudge.ts` `staleFolderOfAsk`):
+   * каталог или папка `cd` пропали. Судится каждую минуту, не только при старте (F7).
+   */
+  staleFolder?: (record: DeferredAskRecord) => PanelDecision | undefined;
   setTimer?: (run: () => void, ms: number) => void;
   /** Повторный обход (по умолчанию каждую минуту) — для проверок он задаётся. */
   setInterval?: (run: () => void, ms: number) => void;
@@ -126,7 +139,11 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
 
   const resumeChat = (record: DeferredAskRecord): DeferredResumeOutcome => {
     const keys = record.scope.kind === 'chat' ? record.scope.chatKeys : record.runKeys;
-    if (keys.some((key) => runs.isRunning(key))) {
+    // «Ход кончился» — ещё не «свободен»: процесс с фоновыми агентами ждёт их
+    // конца, его пробуждение (`finished`) и продолжит (F1).
+    const busy = (key: string): boolean =>
+      runs.isRunning(key) || (runs.liveAgentsOf?.(key) ?? 0) > 0;
+    if (keys.some(busy)) {
       parked.set(record.id, [...keys]);
       return 'parked';
     }
@@ -163,6 +180,27 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
   const removed = (scope: Extract<DeferredScope, { kind: 'group' }>): boolean =>
     Boolean(ctx.store.getSplitPlan(scope.parentChatId)?.cancelledAt || groupOf(scope)?.droppedAt);
 
+  /** Стадия разговора по его ключам — первая найденная связь. */
+  const stageOfKeys = (keys: readonly string[]): string | undefined => {
+    for (const key of keys) {
+      const link = ctx.store.getChatLink(key);
+      if (link) return stageOf(link);
+    }
+    return undefined;
+  };
+
+  /**
+   * Своя ли у группы сейчас MR: её ведёт звено доставки, а без звена доставки —
+   * сама цепочка. Ревью отчётом и работа до доставки MR не держат, и слово «снимите
+   * черновик, доведите доставку» вело оркестратор ревью к чужой работе (F1, d9869abf).
+   */
+  const ownsMr = (scope: Extract<DeferredScope, { kind: 'group' }>): boolean => {
+    const group = groupOf(scope);
+    if (!group) return true;
+    if (group.chatId && stageOfKeys([group.chatId]) === 'deliver') return true;
+    return !groupDeliverAhead(group);
+  };
+
   /**
    * Что сказать группе сейчас: все несказанные исходы её записей. Одни
    * истечения при ещё ждущей записи — молчание: группа и так стоит на ней, а
@@ -179,7 +217,7 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
       (items.length > 0 && waiting.length === 0);
     if (!speaks) return undefined;
     return {
-      text: outcomesPrompt(items, waiting),
+      text: outcomesPrompt(items, waiting, ownsMr(scope)),
       states: new Map(items.map((record) => [record.id, record.state])),
     };
   };
@@ -194,10 +232,21 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
     const first = compose(scope);
     if (!first) return 'none';
     let rendered: typeof first | undefined;
+    // Разговор, которому слово сказано. Слово могло ждать (конец хода, фоновые
+    // агенты, F1), а группа за это время ушла в следующее звено: будить
+    // закончившееся звено — второй агент в той же копии. Тогда слово говорится
+    // заново — текущему разговору группы.
+    const addressed = group.chatId;
     const render = (): string | undefined => {
       // Слово уходит из очереди: дальше его судьба — доставка или отказ, и
       // повторный обход снова вправе говорить (RF-DL-13).
       queuedGroups.delete(key);
+      if (groupOf(scope)?.chatId !== addressed) {
+        (deps.setTimer ?? ((run, ms) => setTimeout(run, ms).unref?.()))(() => {
+          tellGroup(scope);
+        }, 0);
+        return undefined;
+      }
       rendered = compose(scope);
       return rendered?.text;
     };
@@ -267,17 +316,54 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
   };
 
   /**
+   * Ждущие записи групп, исполнять которые больше некому или негде (F7, split
+   * d9869abf): стадия, спросившая вызов, кончилась (ревью сдало отчёт, а D-9 его
+   * пересборки ждал человека до вечера и держал MR черновиком), или пропала папка.
+   * Отказ — тем же путём, что ответ человека, с пометкой `auto` и причиной агенту.
+   */
+  const closeStale = async (): Promise<void> => {
+    for (const record of asks.all()) {
+      if (record.state !== 'waiting' || record.scope.kind !== 'group') continue;
+      if (removed(record.scope)) continue;
+      const decision = staleStage(record) ?? deps.staleFolder?.(record);
+      if (!decision) continue;
+      await decideDeferred(ctx, record.id, { ...decision, via: 'auto' });
+      console.info(`deferred: ${record.id} closed as stale (${decision.message ?? ''})`);
+    }
+  };
+
+  /** Стадия, где спросили, уже не текущая стадия группы. */
+  const staleStage = (record: DeferredAskRecord): PanelDecision | undefined => {
+    if (record.scope.kind !== 'group') return undefined;
+    const group = groupOf(record.scope);
+    if (!group?.chatId) return undefined;
+    const asked = stageOfKeys(record.runKeys);
+    const now = stageOfKeys([group.chatId]);
+    if (!asked || !now || asked === now) return undefined;
+    return {
+      behavior: 'deny',
+      message:
+        `Nothing ran: the ${asked} stage that asked for it has ended (the work is now in the ` +
+        `${now} stage). Redo the step in this stage if it is still needed.`,
+    };
+  };
+
+  /**
    * Повторный обход: исход, который некуда было сказать (пауза группы, разговор
    * не в реестре, занятый старт, отказ очереди), иначе ждал перезапуска панели —
    * человек разрешил, а группа узнавала об этом только после рестарта (D-L05).
    */
   const everyMinute = deps.setInterval ?? ((run, ms) => setInterval(run, ms).unref?.());
   everyMinute(() => {
-    try {
-      driveAll();
-    } catch {
-      // Сбой обхода не роняет сервер: следующий обход через минуту.
-    }
+    void closeStale()
+      .catch(() => undefined)
+      .then(() => {
+        try {
+          driveAll();
+        } catch {
+          // Сбой обхода не роняет сервер: следующий обход через минуту.
+        }
+      });
   }, REDRIVE_EVERY_MS);
 
   return {
@@ -295,6 +381,7 @@ export function wireDeferredAsks(deps: DeferredWiringDeps): DeferredWiring {
     },
     async reDrive() {
       if (deps.rejudge) await rejudgeWaiting(deps.rejudge);
+      await closeStale().catch(() => undefined);
       driveAll();
     },
   };

@@ -1,3 +1,4 @@
+import { bgNoticesOf, bgTaskIdOf } from './bg-tasks.ts';
 import { errorHeadOf, toolOutcome } from './tool-outcome.ts';
 import type { WatchEvent } from './watch.types.ts';
 
@@ -124,6 +125,7 @@ export function createTranscriptReader(options: { sidechain?: boolean } = {}) {
               denialKind: record.toolDenialKind,
             }
           : {};
+      const bgTaskId = blocks.length === 1 ? bgTaskIdOf(record.toolUseResult) : undefined;
       const results = blocks.flatMap((block): WatchEvent[] => {
         const part = obj(block);
         if (typeof part?.tool_use_id !== 'string') return [];
@@ -135,13 +137,23 @@ export function createTranscriptReader(options: { sidechain?: boolean } = {}) {
             id: part.tool_use_id,
             chars: textChars(part.content),
             ...outcome,
+            ...(bgTaskId ? { bgTaskId } : {}),
           },
         ];
       });
       if (results.length > 0) return results;
+      // Конец фоновой задачи (R16): запись закрыта. Уведомление будит CLI новым ходом, как и
+      // раньше, но вводной не считается — его длина не про бриф (R37).
+      const done = bgNoticesOf(content).map((notice): WatchEvent => ({
+        kind: 'bgDone',
+        t,
+        ...notice,
+      }));
       // Реплика человека или панели начинает ход; служебные строки CLI — нет.
-      if (sidechain || record.isMeta === true || record.isCompactSummary === true) return [];
-      return textChars(content) > 0 ? [{ kind: 'start', t }] : [];
+      if (sidechain || record.isMeta === true || record.isCompactSummary === true) return done;
+      const chars = textChars(content);
+      if (chars === 0) return done;
+      return [...done, { kind: 'start', t, ...(done.length === 0 ? { chars } : {}) }];
     }
     return [];
   };

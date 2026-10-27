@@ -477,7 +477,7 @@ export class E2eRunRegistry {
       return;
     }
     try {
-      const { result, points, apply, unmatchedResults } = prepareResultsForRun(
+      const { result, points, apply, unmatchedResults, tests } = prepareResultsForRun(
         root,
         { format: 'junit', content: collected.content, environmentId, now: at },
         runId,
@@ -489,6 +489,7 @@ export class E2eRunRegistry {
         ...stampsOf(live.stamps, points),
         results: points,
         summary,
+        tests,
       });
       // Статусы — ПОСЛЕ записи прогона: иначе сбой записи оставил бы кейсы со
       // ссылкой на прогон, которого нет в истории.

@@ -161,6 +161,31 @@ const ACCEPT_LINE = field('Acceptance');
 const JOURNAL_LINE = field('Ledger');
 const JOURNAL_COUNT = /(\d+)\s*\/\s*(\d+)/;
 const JOURNAL_NONE = /no lanes\s*[—–-]\s*\S/i;
+/**
+ * Rounds as `check` counts them: "rounds k of N", k = rounds that ran, N = planned. A real ledger once
+ * printed the PLANNED 2 while one round ran — a bare "rounds N" claims what nobody checked.
+ */
+const JOURNAL_ROUNDS = /rounds\s*(\d+)(?:\s*of\s*(\d+))?/i;
+/** "lanes 2" on the Ledger / Coverage line. */
+const LANES = /lanes\s*(\d+)/i;
+/**
+ * The stopping estimate of lanes.md (found / N̂, Chapman or k-lane), or its honest "unknown" (m ≤ 2).
+ * A two-lane report once carried neither, so "found everything" and "found half" read the same.
+ */
+const ESTIMATE =
+  /found\s*\d+[^·;\n]*?(?:estimate|N̂)\s*[≈~=]?\s*\d+|N̂\s*[≈~=]?\s*\d+|coverage\s+unknown/i;
+/**
+ * A 🟢 on ONE line, fields inline — report-shape §6 "compact". A report written that way was refused
+ * "Summary says 🟢 15, the file has 0" and rewritten as heading blocks (~3k more chars, ~60 s).
+ * Only 🟢: a 🔴/🟡/❓ owes Evidence and the card fields, so it stays a heading block.
+ */
+const NIT_ITEM = /^\s*[-*]\s+\**(F-\d+)\**[\s·—:-]*(\S*🟢\S*)\s*(.*)$/u;
+const NIT_FORM =
+  '- F-NN 🟢 <thesis> — **Where:** `file:line` · **Axis:** <axis> · **Status:** open';
+const INLINE_WHERE = /\*\*Where:\*\*\s*([^*\n]*)/i;
+const INLINE_AXIS = /\*\*Axis:\*\*\s*([^·*\n]*[^·*\s])/i;
+/** Lines that stay with a one-line 🟢: a bold field review-sync adds (`- **Thread:**`) or an indented continuation. */
+const NIT_TAIL = /^\s*[-*]\s+\*\*[^*\n]+:\*\*|^[ \t]+\S/;
 /** A T2 🔴/🟡 names its proof rung: L1–L4 executed, or "L0 — <why nothing ran>". */
 const RUNG_RUN = /\bL[1-4]\b/;
 const RUNG_L0_WHY = /\bL0\s*[—–-]\s*\S/;
@@ -208,6 +233,42 @@ export function parseReport(text) {
       findings.push(current);
       inWhere = false;
       return;
+    }
+    const n = line.match(NIT_ITEM);
+    if (n && !/[🔴🟡❓]/u.test(n[2])) {
+      if (current) current.end = i;
+      const where = line.match(INLINE_WHERE)?.[1]?.trim() ?? '';
+      const st = STATUS_SHAPES.map((re) => line.match(re)).find(Boolean);
+      current = {
+        id: n[1],
+        marks: n[2],
+        severity: '🟢',
+        thesis: n[3].replace(/\s*[—–-]?\s*\*\*(?:Where|Axis|Status):\*\*.*$/i, '').trim(),
+        start: i,
+        end: lines.length,
+        status: st ? st[1].toLowerCase() : null,
+        statusAt: st ? i : -1,
+        thread: false,
+        threadUrl: null,
+        axis: line.match(INLINE_AXIS)?.[1]?.trim().toLowerCase() ?? null,
+        where: Boolean(where),
+        whereEnd: where ? i : -1,
+        evidence: false,
+        locs: [...where.matchAll(LOC)].map((m) => ({
+          file: m[1],
+          from: +m[2],
+          to: +(m[3] ?? m[2]),
+        })),
+        rung: false,
+        compact: true,
+      };
+      findings.push(current);
+      inWhere = false;
+      return;
+    }
+    if (current?.compact && !NIT_TAIL.test(line)) {
+      current.end = i; // a one-line 🟢 ends at the first line that is not its tail
+      current = null;
     }
     if (/^#{1,2}\s/.test(line) && current) {
       current.end = i; // a section heading closes the finding above it
@@ -316,31 +377,35 @@ export function shapeProblems(text, parsed = parseReport(text)) {
   const ranges = [
     ...src.matchAll(/^\s*(?:#{2,4}|[-*])\s+\**(F-\d+\s*(?:\.\.\.?|…|–)\s*F-\d+)/gm),
   ].map((m) => m[1]);
-  const items = [...src.matchAll(/^\s*[-*]\s+\**(F-\d+)\**[\s·—:-]*(?:🔴|🟡|🟢|❓)/gmu)].map(
+  const items = [...src.matchAll(/^\s*[-*]\s+\**(F-\d+)\**[\s·—:-]*(?:🔴|🟡|❓)/gmu)].map(
     (m) => m[1],
   );
   if (items.length)
     out.push(
-      `${items.join(', ')} — written as a list item, read as no finding: each is a heading "### F-NN <severity> <thesis>" with its Where/Axis/Status lines`,
+      `${items.join(', ')} — written as a list item, read as no finding: each 🔴/🟡/❓ is a heading "### F-NN <severity> <thesis>" with its Where/Axis/Status lines (only a 🟢 may be one line: "${NIT_FORM}")`,
     );
+  const nits = parsed.findings.filter((f) => f.compact && (!f.where || !f.axis || !f.status));
+  if (nits.length)
+    out.push(`${names(nits)} — a one-line 🟢 carries its fields inline: "${NIT_FORM}"`);
   if (ranges.length)
     out.push(
       `"${ranges.join('", "')}" — a range is no finding: each finding is its own block (heading + fields), or the minor ones go to "What was checked"`,
     );
+  const blocks = parsed.findings.filter((f) => !f.compact);
   flag(
-    parsed.findings.filter((f) => !f.where),
+    blocks.filter((f) => !f.where),
     'Where',
   );
   flag(
-    parsed.findings.filter((f) => !f.axis),
+    blocks.filter((f) => !f.axis),
     'Axis',
   );
   flag(
-    parsed.findings.filter((f) => !f.status),
+    blocks.filter((f) => !f.status),
     'Status',
   );
   flag(
-    parsed.findings.filter((f) => !f.evidence && (f.severity === '🔴' || f.severity === '🟡')),
+    blocks.filter((f) => !f.evidence && (f.severity === '🔴' || f.severity === '🟡')),
     'Evidence',
   );
   // A pass that dropped nothing is either a perfect pass or a pass that never verified; the skill
@@ -395,12 +460,28 @@ export function shapeProblems(text, parsed = parseReport(text)) {
     const journal = JOURNAL_LINE.exec(src)?.[1];
     if (!journal || !(JOURNAL_COUNT.test(journal) || JOURNAL_NONE.test(journal)))
       out.push(
-        `${tier} owes a "**Ledger:**" line — \`review-plan.mjs check\` output "<files with a row>/<planned> files", or "no lanes — <why>" (lanes.md)`,
+        `${tier} owes a "**Ledger:**" line — \`review-plan.mjs check\` output "<files with a row>/<planned> files · lanes L · rounds k of N", or "no lanes — <why>" (lanes.md)`,
+      );
+    const rounds = journal && !JOURNAL_NONE.test(journal) ? JOURNAL_ROUNDS.exec(journal) : null;
+    if (rounds && !rounds[2])
+      out.push(
+        `"Ledger" says "rounds ${rounds[1]}" — that is the plan's count, not what ran: "rounds k of N", k = rounds actually spawned (\`review-plan.mjs check\` prints it)`,
       );
     const accept = ACCEPT_LINE.exec(src)?.[1];
     if (!accept || !/\d|no frame/i.test(accept))
       out.push(
         `${tier} owes an "**Acceptance:**" line — criteria counted by verdict (met · partly · not met · uncheckable · out of frame), or "no frame — <what was searched>" (axis-2 §g)`,
+      );
+  }
+  {
+    const coverage = COVERAGE_LINE.exec(src)?.[1] ?? '';
+    const lanes = Math.max(
+      0,
+      ...[JOURNAL_LINE.exec(src)?.[1], coverage].map((t) => +(LANES.exec(t ?? '')?.[1] ?? 0)),
+    );
+    if (lanes >= 2 && !ESTIMATE.test(coverage))
+      out.push(
+        `${lanes} lanes owe a coverage estimate on "Coverage": "found <found>, estimate ≈<N̂>" (found / N̂, \`review-plan.mjs estimate\`), or "coverage unknown" when m ≤ 2 (lanes.md §Stopping estimate)`,
       );
   }
   if (tier === 'T2') {
@@ -421,10 +502,12 @@ export function shapeProblems(text, parsed = parseReport(text)) {
   return out;
 }
 
-/** The lane ledger counts fewer files with a row than were planned. */
+/** The lane ledger counts fewer files with a row than were planned, or fewer rounds run than planned. */
 function journalShort(src) {
-  const m = JOURNAL_COUNT.exec(JOURNAL_LINE.exec(src)?.[1] ?? '');
-  return Boolean(m && +m[1] < +m[2]);
+  const journal = JOURNAL_LINE.exec(src)?.[1] ?? '';
+  const m = JOURNAL_COUNT.exec(journal);
+  const r = JOURNAL_ROUNDS.exec(journal);
+  return Boolean((m && +m[1] < +m[2]) || (r?.[2] && +r[1] < +r[2]));
 }
 
 /** Lines claiming the change clean while the coverage ledger names a gap. */

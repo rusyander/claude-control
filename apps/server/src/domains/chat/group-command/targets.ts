@@ -1,4 +1,5 @@
 import { DEFAULT_INCLUDE, listed } from '../../project-git/mirror-local.ts';
+import { inAgentWork } from './agent-zone.ts';
 import { GLOB, segmentMatches } from './glob.ts';
 import {
   escapesBase,
@@ -123,7 +124,8 @@ function writableTemp(word: Word, walk: Walk): boolean {
 }
 
 /**
- * Вне копии: своё — только свежий `mktemp` и своя рабочая папка CLI (F-77).
+ * Вне копии: своё — только свежий `mktemp`, своя рабочая папка CLI (F-77) и
+ * клон рецензента по метке `review-plan.mjs` (D-5 26.10, `review-scratch.ts`).
  * Ссылка, заведённая там раньше и ведущая наружу, своим не делает (RF-BGCD-04).
  */
 function outsideKind(
@@ -134,12 +136,18 @@ function outsideKind(
   follow: boolean,
 ): TargetKind {
   const through = follow || place.write === true;
-  if (walk.isFresh(path, through) || walk.inOwnScratchpad(path, through)) {
+  if (
+    walk.isFresh(path, through) ||
+    walk.inOwnScratchpad(path, through) ||
+    walk.inReviewScratch(path, through)
+  ) {
     return 'temp';
   }
   const pad = place.write ? scratchpadRoot(path) : undefined;
   if (pad !== undefined && !escapesBase(path, pad, true)) return 'temp';
   if (place.write && isTempOutside(path) && !leavesTemp(path)) return 'temp';
+  // Свой файл прошлого вызова (`cp f /tmp/x.bak` раньше, D-10) — уборка своего.
+  if (!place.write && walk.inOwnTemp(target.text)) return 'temp';
   return !place.anchored && !isAbsolute(target.text) && climbedToTemp(path, walk)
     ? 'temp'
     : 'protected';
@@ -147,10 +155,16 @@ function outsideKind(
 
 export function targetKind(word: Word, walk: Walk, place: Place): TargetKind {
   // `$TMPDIR/…`, `%TEMP%\…` — временное по записи, до раскрытия переменных.
-  if (place.write && writableTemp(word, walk)) return 'temp';
+  if (place.write && writableTemp(word, walk)) {
+    walk.noteTempWrite(word.text);
+    return 'temp';
+  }
   const target = walk.expand(word);
   if (target.dynamic || /^:/.test(target.text)) return 'protected';
-  if (place.write && writableTemp(target, walk)) return 'temp';
+  if (place.write && writableTemp(target, walk)) {
+    walk.noteTempWrite(target.text);
+    return 'temp';
+  }
   // Каталог неизвестен — абсолютный путь всё равно назван точно.
   const cwd = place.cwd ?? (isAbsolute(target.text) ? '/' : undefined);
   if (!cwd) return 'protected';
@@ -172,6 +186,8 @@ export function targetKind(word: Word, walk: Walk, place: Place): TargetKind {
   const ignored = walk.ignored;
   if (!ignored) return 'protected';
   if (parts.some((part) => part === '*' || part === '**')) return 'protected';
+  // Рабочие папки агента `.agent/<папка>/…` — его же выход, не локальный слой (D-8).
+  if (inAgentWork(parts) && !secretNamed(parts, walk.dotglob)) return 'own';
   if (listed(rel, LOCAL_LAYER) || listed(`${rel}/_`, LOCAL_LAYER)) return 'protected';
   const layer = parts.some(
     (part) =>

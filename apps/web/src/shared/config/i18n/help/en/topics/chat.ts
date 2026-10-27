@@ -44,7 +44,40 @@ export const chatEn: typeof chatRu = {
       '(done, in progress) and the tree of subagents it handed work to, together ' +
       'with what each one returned. When a turn ended with a question to you, the strip ' +
       'leads with “Waiting for your answer”. A background command the agent stopped itself ' +
-      '(cleaning up a dev server) reads “stopped by the agent”, not “lost”',
+      '(cleaning up a dev server) reads “stopped by the agent”, not “lost”. Subagents form ' +
+      'a tree: one launched by a subagent sits under it, and the arrow folds the branch. ' +
+      'Each node shows the model, the number of calls, tokens spent, time and the last ' +
+      'action. A click or Enter opens the subagent’s turn on the right: the task it was ' +
+      'started with and its steps in order — read-only, Escape closes it and returns to the ' +
+      'node. Arrow keys walk the tree: up and down move between neighbours, left folds or ' +
+      'goes to the parent, right unfolds or steps into the first child. A running subagent has “Stop”: the panel asks the ' +
+      'CLI to stop that one subagent and leaves the main turn alone; the CLI confirms it ' +
+      'got the request, not that the subagent stopped, so the row reads “stop requested”, ' +
+      'and later “stopped”. Chips under the main agent’s line and under each node show ' +
+      'which skills and MCP servers it called, how many hooks fired for it and how many of ' +
+      'them refused (“hooks 3”, “denied 1”); an agent with nothing fired has no chips. A ' +
+      'click on the chips opens the “Skills, hooks and MCP” window: the main agent and every ' +
+      'subagent on the left, and for the selected one its skills, MCP calls and hooks in time ' +
+      'order on the right, each with its outcome (“passed”, “error”, “denied” with the reason, ' +
+      '“into context”, “running”) and duration; Escape closes the window and returns to the ' +
+      'chips. The strip above the input also appears when the main agent called a skill or ' +
+      'MCP, while hooks alone do not open it — they fire in every conversation. A group card ' +
+      'shows how many of its agents are running and how many are done, a chip for each (a ' +
+      'click opens its turn) and a line of chips for the whole group with the same window. ' +
+      'The “Agent history · N” button opens every session of the conversation, newest first — ' +
+      'for a group, each of its links with its stage: the main agent and the subagents of each ' +
+      'session. The main agent is a button just like a subagent: on the right, its turn read ' +
+      'from the whole file, in windows of 200 steps (“Show earlier”, “Later”, “To the latest”) with ' +
+      'an exact “Steps a–b of M”. Each call shows its time, duration, full result size, an ' +
+      'error or a hook denial with its reason; the first step of an answer shows that answer’s ' +
+      'token spend and model. A line under each agent lists anomalies: hook denials, errors, ' +
+      'repeated reads of one file (the hint names the files) and results longer than 10,000 ' +
+      'characters; zero counts are hidden. Next to the button — who is working now: “now: 1 ' +
+      'agent · 2 subagents”, or a muted “nobody is working”. The main agent counts while its ' +
+      'turn is open and its process is alive or its file was written in the last 15 minutes; a ' +
+      'subagent with no result that has been silent for over 15 minutes counts as cut off. The ' +
+      'panel counts all of this itself from the transcript files, no model is called; while ' +
+      'someone is working the number refreshes every 5 seconds',
     canChatDots:
       'Tell conversations apart by the dots in the chat list: a project can hold ' +
       'several agents, and it is visible which one is waiting for an answer',
@@ -63,7 +96,10 @@ export const chatEn: typeof chatRu = {
     canContinue: 'Continue any past conversation, including ones started in the terminal',
     canFork:
       'Branch the conversation: editing your own message goes off as a new branch ' +
-      'instead of appending to the same one',
+      'instead of appending to the same one. Before sending, the panel asks “Send as a new ' +
+      'branch?”; clear the field and the mark is dropped, so the message goes into the same ' +
+      'conversation. In the list the branch is labelled “branch of …” with the original’s title ' +
+      'in place of the project: it keeps the same title, while groups, the pin and links stay with the original',
     canRetry: 'Repeat a failed request with one button, without retyping it',
     canSpend: 'See what a run cost — in tokens or in money, your choice',
     canAnswerButtons: 'Answer an agent question by clicking an option',
@@ -309,6 +345,14 @@ export const chatEn: typeof chatRu = {
       'The "pick the model for the task" toggle in the conversation menu is a ' +
       'project rule. Off, it restores the old behaviour: every child runs on the ' +
       'model you chose.',
+    undoReview: 'Turn off the review after work',
+    undoReviewText:
+      'The "review after work" toggle in the conversation menu, under model routing, is a project ' +
+      "rule too, on by default. Off, it drops the ceiling review after a group's work: the work goes " +
+      'straight to delivery and the group feed names the reason. Model routing, raising lowered work ' +
+      'with no changes to the ceiling, verification of fixes and delivery stay. The setting is ' +
+      'captured when a split starts, so switching it does not change groups already running. It ' +
+      'applies to groups of other CLIs as well.',
     undoChat: 'Delete a conversation',
     undoChatText:
       'Not from the panel, and deliberately so: the transcript belongs to Claude ' +
@@ -420,6 +464,23 @@ export const chatEn: typeof chatRu = {
         'The header panel says "3 active agents", each row telling where it works ' +
         'and in what state (waiting for an answer versus working), the project one ' +
         'showing 111.3k tok and claude-opus-5. Stop all kills them in one press.',
+      bTree: 'Look into the plan of the agent and its subagents',
+      bTreeText:
+        'The “The agent’s plan” strip above the input: “Subagents: 5” and the red chip ' +
+        '“Subagent lost: 1”. The “Main agent” line carries chips for what fired for the agent ' +
+        'itself — the reports-plan skill and “hooks 1”. Below, under “Work handed out”, the ' +
+        'subagents form a tree: the test check sits under the one that launched it. The ' +
+        'report build carries reports-build, tracker (an MCP server), “hooks 3” and a red ' +
+        '“denied 1”; nothing fired for the module scouting, so it has no chips.',
+      bExtensions: 'See what fired for an agent',
+      bExtensionsText:
+        'A click on the build’s chips opens the “Skills, hooks and MCP” window. On the left, ' +
+        'the main agent and every subagent with a count such as “skills 1 · MCP 1 · hooks 3 · ' +
+        'hook denials 1”; on the right, three sections in time order for the selected one: ' +
+        'the reports-build skill “passed” in 30s, the MCP call tracker/get_issue in 30s, and ' +
+        'among the hooks git-guard “denied” with its reason, gate-at-end “passed” in 85 ms and ' +
+        'context-watch “into context” with what it added for the agent. Escape closes the ' +
+        'window and returns focus to the chips.',
       bHandoff: 'Continue a closed stage in a clean session',
       bHandoffText:
         'The "stage closed — continue in a clean session" card with the counter ' +
@@ -461,6 +522,13 @@ export const chatEn: typeof chatRu = {
         'labelled columns in the “Sessions” and “Warming” rows. The summary above the ' +
         'cards shows the cache-warming result over all groups: “cache warming: saved ≈ …” ' +
         'or “overpaid ≈ …”. Until branches are compared it says so.',
+      sGroupExt: 'See what fired across the whole group',
+      sGroupExtText:
+        'Under the chips of its agents (“Agents: 0 running · 5 finished”) the group card ' +
+        'carries a line of chips for the whole group: the reports-plan and reports-build ' +
+        'skills, the tracker server, “hooks 4” and “denied 1”. A click opens the same ' +
+        '“Skills, hooks and MCP” window, straight on the group’s main agent, with it and five ' +
+        'subagents listed on the left.',
       sAsk: 'Answer the children without visiting them',
       sAskText:
         'A group’s permission request stands in the card of the group that stopped: ' +
@@ -915,7 +983,10 @@ export const chatEn: typeof chatRu = {
       'apart someone else’s merge request). The directory appears next to the ' +
       'project: <project>-worktrees/<branch>. A finished copy opens as a tab at once. The chat ' +
       'offers a copy by itself too: when the agent is about to edit files in the main copy for ' +
-      'the first time, the feed shows a “First edit — where do we work?” card, and “Create the ' +
+      'the first time, the feed shows a “First edit — where do we work?” card with the file the ' +
+      'agent was about to edit and a “?” leading here, to help. The branch name on it is built ' +
+      'from the person’s words — the panel’s service blocks at the start of the message (the ' +
+      'group summary and the like) never reach the name. “Create the ' +
       'copy and continue there” moves the conversation over: the copy opens as its own tab ' +
       'with the conversation in its list, and every later message runs there too, not back ' +
       'in the main copy. Once the copy is removed, the conversation returns to the main ' +
@@ -1019,8 +1090,10 @@ export const chatEn: typeof chatRu = {
       'Before EVERY agent start the copy is checked against the original: are .mcp.json, ' +
       '.claude/settings.json and .claude/settings.local.json, CLAUDE.local.md and .env in ' +
       'place, does the copy’s .mcp.json carry every server of the original (a file reverted ' +
-      'in the copy to its committed version is present but lacks the servers), are the ' +
-      'shared directories linked, is there an access entry. If something is missing the ' +
+      'in the copy to its committed version is present but lacks the servers), does the copy’s ' +
+      '.claude/settings.local.json carry every hook of the original (a hook added to the ' +
+      'original after the copy was made is appended to its entries, the copy’s own entries ' +
+      'stay), are the shared directories linked, is there an access entry. If something is missing the ' +
       'panel first fills it in ITSELF and only then, if that failed, refuses and names the ' +
       'gaps: an agent in an incomplete copy does not crash, it silently does the work with ' +
       'the wrong environment, which is worse than a refusal. A split group passes the same ' +
@@ -1127,12 +1200,19 @@ export const chatEn: typeof chatRu = {
       'only when the group tasks name the wiki or the group asked for it with an mcp block ' +
       '(server: confluence). Messengers, a second connector of the same tracker ' +
       'and the claude.ai connectors (mail, calendar, drive) are off: their tools would ' +
-      'otherwise ride along in every model call. When a switched-off server is needed after ' +
+      'otherwise ride along in every model call. Chain stages narrow the set further: ' +
+      'delivery keeps only the tracker and the code host, while fixes for review findings ' +
+      'and the check of those fixes get no server at all. ' +
+      'When a switched-off server is needed after ' +
       'all, the group agent asks for it with a block at the end of its turn, and the panel ' +
-      'continues the same session with it. A group in Codex and Qwen Code drops the same ' +
-      'servers: Codex gets a switch for each one, Qwen Code an exclusion list in the group ' +
-      'settings layer; the other CLIs cannot switch servers off one by one, so their group ' +
-      'runs with the full set. A group in Qwen Code keeps no Qwen auto-memory: what an ' +
+      'continues the same session with it; when a fix stage asks, the server is connected ' +
+      'before the check starts. A group in Codex, Qwen Code and OpenCode drops the same ' +
+      'servers, stage by stage: Codex gets a switch for each one, ' +
+      'Qwen Code an exclusion list in the group ' +
+      'settings layer, OpenCode deny rules for the server tools; the other CLIs cannot switch servers off one by one, so their group ' +
+      'runs with the full set. Codex (the server’s disabled_tools) and OpenCode drop the tracker ' +
+      'wiki tools by name, by the same rule as Claude; Qwen Code has no per-tool switch, so the ' +
+      'wiki stays there. A group in Qwen Code keeps no Qwen auto-memory: what an ' +
       'unattended run concludes stays out of your memory; and no Qwen conversation in the ' +
       'panel asks for next-reply suggestions — the panel does not show them, and each one ' +
       'is an extra model call. Skills work the same way: delivery and review ' +
@@ -1155,6 +1235,13 @@ export const chatEn: typeof chatRu = {
       'in one call. When the conversation is compacted, the summary keeps the stages, ' +
       'decisions with their reasons, paths and commands, stand access, open failures and an ' +
       'extract of the current skill step, so none of it has to be re-read. ' +
+      "The owner's words verbatim, the rows already reported for the owner's points and the " +
+      "current stage's sieves go into a file in the copy's working folder, rewritten at the " +
+      'group start and at every stage start: after a compaction the group reads that file ' +
+      'instead of searching its own conversation. Review findings are kept the same way: ' +
+      'the findings the fixes were started for are numbered R-1, R-2…, and what the ' +
+      'verification pass left open is numbered V-1, V-2…; the group refers to them by these ' +
+      'numbers in its notes and in the MR description. ' +
       'A test run through tests-cli run in a group prints the verdict, the first ' +
       'failure lines and the path to a log holding the whole output; no check is dropped. ' +
       'A green run is remembered against the content of the project files: the same ' +
@@ -1164,6 +1251,11 @@ export const chatEn: typeof chatRu = {
       'run. A red one is never remembered, and the e2e folder runs against the stand every ' +
       'time. Files git ignores (.env, build output, dependencies) are invisible to the ' +
       'memory: after changing them, run with --fresh. ' +
+      'A gate through the kit’s gate-run whose command carries {junit} puts its JUnit report ' +
+      'into the copy’s Tests block: the group’s process gets the path to the panel’s tests-cli ' +
+      '(AGENTDECK_TESTS_CLI; one set in the panel’s environment wins), so the delivery check ' +
+      'sees the green gate — no need to run the same tests again through tests-cli run. A ' +
+      'report that did not reach the block is named by the gate, and such a gate is not remembered. ' +
       'A status change, an assignment, a field edit or a comment in the tracker answers the group with a ' +
       'short line (key, new status, assignee) instead of the whole issue; reading an issue ' +
       'still returns all of it, and your own hooks keep running alongside. ' +
@@ -1194,7 +1286,10 @@ export const chatEn: typeof chatRu = {
       'the package.json of the root or of a folder such as e2e), a delivering group gets it in ' +
       'its task and takes the before and after shots with it, using the login saved in the ' +
       'main project folder, instead of a script of its own. ' +
-      'Before its review a delivering group builds a review package: one file with the ' +
+      'A group review runs through the deep-review skill: it cuts the diff into read-sized ' +
+      'windows for its reviewers itself, and the panel asks for no second copy of the diff. ' +
+      'Only without that skill does a delivering group build a review package before its ' +
+      'review: one file with the ' +
       'commits, the changed files, the plan and the whole diff of the copy, uncommitted and new ' +
       'files included (lockfiles by name only). Every reviewer gets its path and reads it once ' +
       'instead of running git diff again and again; the number of reviewers and the depth of ' +
@@ -1292,7 +1387,10 @@ export const chatEn: typeof chatRu = {
       'a test by its name or by a test root outside src/ — test/, tests/, spec/, e2e/ folders and a ' +
       'test.* file; a tests/ folder inside src/ is code): docs verified against the stand, removed names and ' +
       'test ids found nowhere in the repository, no conflict with a fresh main, a UI edit ' +
-      'checked in a browser, a wrong value refused with a clear message. The group passes ' +
+      'checked in a browser, a wrong value refused with a clear message. A document ' +
+      '(.md, .mdx, .rst, .adoc) is a contract only when it lies in a docs/, doc/, contract/, ' +
+      'contracts/ or api-docs/ folder or is named after an API (api, openapi, swagger, reference, spec, ' +
+      'schema): README, CHANGELOG, AGENTS.md and notes need no check against the stand. The group passes ' +
       'each sieve with evidence — a command and its output. The task shows exactly the rows ' +
       'and every file the report check will demand — the list is not cut, and a refused row ' +
       'stays open in it. The project’s own checks ' +
@@ -1307,18 +1405,38 @@ export const chatEn: typeof chatRu = {
       'a dependency manifest without its lockfile, new environment variables declared ' +
       'neither in config nor in docs, and destructive statements in migrations. Such a ' +
       'finding is cleared only by a report row that names every file or name — “checked, ' +
-      'all fine” does not pass; a conflict only by a rebase. Consumers of removed names the ' +
+      'all fine” does not pass; a conflict only by a rebase. A removal of foreign lines the ' +
+      'group already acknowledged on push (# sieve-ack:) is not asked again at delivery while ' +
+      'the removed lines of the file stay the same; once others are removed, the file is ' +
+      'asked about again. A Tests-section test count in a row (tests-cli … 2117 passed) ' +
+      'must cite its run as run:<id>, and the panel compares the numbers with it: “2117 ' +
+      'passed” for a run with one failed test does not pass. Consumers of removed names the ' +
       'panel re-checks, and the group still hands in its own search. A row counts for the ' +
       'code it was written on: if the branch changed the code the sieve covers after it (for the project-checks row, tests too), ' +
       'the row is stale and the sieve has to be passed again; this holds for a row that ' +
       'cleared a mechanical finding too. Freshness is judged by what the branch held at the ' +
-      'moment of the row, so a rebase without edits to the covered code does not age it. ' +
+      'moment of the row, so a rebase without edits to the covered code does not age it, ' +
+      'and neither does an edit of code comments alone (a linter or build directive in a ' +
+      'comment is code and does age it). ' +
       'When the copy has a Tests ' +
       'block, live checks (browser, boundary input, a request to the stand, a migration) ' +
       'are proved by a recorded run: the group cites run:<id>, and the panel opens that run ' +
       'in the history itself — it must be finished, have at least one green case and no red ' +
       'one, and be no older than ' +
-      'the last change to the covered code. A live check cannot be reported “not applicable” ' +
+      'the last change to the covered code. Only a passed case with a live tag proves a live ' +
+      'check (live, stand, route; browser or e2e for UI, db for a migration): a run of unit ' +
+      'tests alone is refused with the reason. The run must be one the panel saw executed: a ' +
+      'hand-written record («passed» with no execution) and a live-tagged case the agent ' +
+      'created or edited after the group started prove nothing. The exception is a diff whose ' +
+      'changed code all lies under tools/ or scripts/ (a build linter, a script): such code has ' +
+      'no stand, and running the tool itself is the live check — a run the block executed in ' +
+      'which a case whose codePaths name those files passed (the group’s own case counts too). ' +
+      'One product file in the diff and a live tag is needed again. A run number named loosely (“in run ' +
+      '3f2a9c1e”) counts when that run is in the history; none named while a fitting one ' +
+      'exists — the reminder names its number, no rerun is needed. A row that was fail last ' +
+      'round and is now pass with the same evidence or with “red”, “not checked” in it does ' +
+      'not count: it needs a new run, or the earlier fail with a mark. ' +
+      'A live check cannot be reported “not applicable” ' +
       '(n/a) when the diff changes product code — UI or backend: that is allowed only on a ' +
       'docs-or-contract-only change, and then the reason with the sieve id goes into the MR ' +
       'description — without it “done” does not come either. ' +
@@ -1329,7 +1447,10 @@ export const chatEn: typeof chatRu = {
       'nor a bot’s: the reminder names each with its link, and for each the group fixes the ' +
       'branch and replies in the same discussion thread — or replies why it does not change ' +
       'it; the reviewer resolves the thread. The group’s reply releases the thread, a new ' +
-      'reviewer reply holds it again. When a reviewer ' +
+      'reviewer reply holds it again. With Jira connected, every ticket of the group that a ' +
+      'commit of the branch names needs a comment linking the MR (its address, «!N» or «MR N»): ' +
+      'without it the group is held too; a ticket named in no commit gets a note — the group ' +
+      'neither moves it nor marks it done. When a reviewer ' +
       'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
       'one, with the code area where the blocker was found (from the thread’s file). It ' +
       'reaches group tasks only once you accept it in “Settings” → “Groups” → “Pre-MR ' +
@@ -1347,15 +1468,43 @@ export const chatEn: typeof chatRu = {
       'those files alone keeps the run fresh; any edit in them makes it stale; an older run ' +
       'without a content stamp is judged by the latest change, a commit or a working-tree ' +
       'file, as before. Their latest result must not be red ' +
-      '(quarantine does not hold). No run, a stale run, a touched case not run, a red case, or a diff ' +
+      '(quarantine does not hold); a touched suite red word for word as before the group ' +
+      'started or on the fork point with main (a tests-cli run --base run, the red reminder ' +
+      'names its command) is a red not caused by the branch. No run, a stale run, a touched case not run, a red case, or a diff ' +
       'covered by no case while cases are linked to files — the group gets a reminder with ' +
       'the command that records a run, narrowed to the cases of its changed files (--case), ' +
       'and the group row in the hub reads “Tests block: N of M green”. The list in the ' +
       'reminder is a snapshot of the check, and the diff may have grown since, so before ' +
       'answering the group re-checks it itself: the same command with gaps in place of run ' +
-      'prints exactly the lines the panel will check. A continuation in the middle of ' +
+      'prints exactly the lines the panel will check. A green run of the same automated test ' +
+      '(same file and test name) on the same tree counts for a case of another group too, ' +
+      'and run --stale runs exactly the cases gaps names. The group checks the MR description, ' +
+      'the sieve rows and the owner’s points the same way before answering: tests-cli ' +
+      'delivery --answer <file with the sieves block> prints the lines the panel will write ' +
+      'after the turn, from the same code, the Tests block included — a reminder that needs ' +
+      'it names delivery alone, not gaps as well. The command reads the MR description and the ' +
+      'reviewer threads through the panel — it holds the forge token — so the description is ' +
+      'posted to the MR once and then checked, not written to a file and then posted a second ' +
+      'time; --mr-description <file> checks a draft before posting or when the panel does ' +
+      'not answer. Before the delivery stage (while the group still has it ahead) the check ' +
+      'does not list push and MR as gaps — the delivery stage makes them, and inside it they ' +
+      'are gaps as before. An MR description with no checks section is a gap; a UI change ' +
+      'without before/after shots and without a reason why there are none is a gap too. ' +
+      'A description item left “separately” with no key of the task that takes it is a ' +
+      'gap. A branch on the remote ahead of the copy by a foreign commit (a CI bot) is a ' +
+      'gap naming that commit and “git pull --ff-only”, not “not pushed”; a commit on the ' +
+      'branch not made by the group that removed its lines, missing from the final tree as ' +
+      'well, is a gap naming the commit and files until the group restores the lines or ' +
+      'settles the file with its own commit. --answer also takes a file that is just the ' +
+      'sieves block body ({"sieves":[…]}). ' +
+      'A continuation in the middle of ' +
       'delivery — after a pause or a panel restart — carries its current gaps, not a bare ' +
-      '“continue”. When the branch is ' +
+      '“continue”: 20 seconds after a pause or a stop on the subscription limit, and on a ' +
+      'restart, the panel checks the delivery of the stopped group again instead of taking ' +
+      'the list of the check before the stop. Lines about the panel itself — why it stopped ' +
+      'reminding, when it will retry, that the group’s conversation was busy — stay on the ' +
+      'card: they do not go to the group in its continuation. ' +
+      'When the branch is ' +
       'pushed and the MR is in place and only the report is missing — sieve rows, task ' +
       'points or a recorded run — the reminder says so outright: leave git alone, no ' +
       'commit, no push, no MR edit. No cases in the copy at all — nothing to check with, and it does not ' +
@@ -1400,7 +1549,13 @@ export const chatEn: typeof chatRu = {
       'with a junit report is never narrowed but is replayed when the tests cannot see the ' +
       'edit and the green run left its report. A folder opened through a link (junction) ' +
       'narrows the same way: the changed files reach vitest in their real path form too. A tool launched through a node_modules/.bin link (as npm, yarn and bun install it on Linux and macOS) ' +
-      'is recognised by the package’s real file. The ledger is shared by the main folder and all its copies: a ' +
+      'is recognised by the package’s real file. Besides the common tools, the ledger replays ' +
+      'project checks described in a registry: inside the project (.claude/tools/verify-checks.json) ' +
+      'or, when the project must not be written to, in the ledger folder (verify-checks.json, one ' +
+      'block per repository, found by its common git directory, so every copy sees it). The ' +
+      'project registry wins on the same id. The fingerprint of such a check is the whole tree ' +
+      'plus the registry inputs git does not see: an edit to any file it reads, including one ' +
+      'in a neighbouring package, leads to a fresh run. The ledger is shared by the main folder and all its copies: a ' +
       'green run in one copy counts for any other with the same tree. The last green run ' +
       'for narrowing is each copy’s own, and a new copy’s first run narrows from a ' +
       'neighbour’s. Settings → Groups → Verify ledger shows ' +
@@ -1601,14 +1756,30 @@ export const chatEn: typeof chatRu = {
       'findings and change nothing. The review follows EVERY piece of work, the one ' +
       'that ran at the ceiling itself too: a fresh session reads the diff without ' +
       'the history of writing it, and on the same model that is a second pair of ' +
-      'eyes. If the branch was already on the remote when the work began (the MR ' +
+      'eyes. The exception is the project rule «Review after work» switched off ' +
+      'in the conversation menu: then the work goes straight to delivery and the ' +
+      'group feed names the reason. If the branch was already on the remote when the work began (the MR ' +
       'was sent earlier), the review reads only what the work changed — by git ' +
       'range-diff of the old and new commit series; work that only moved the branch ' +
-      'onto a fresh main with no new edits gets no review at all. ' +
+      'onto a fresh main with no new edits gets no review at all. A split group ' +
+      'remembers the commit it started at (the head of its copy at launch), and its ' +
+      'review reads only what was done since: its own commits, and of a merge ' +
+      'commit only the conflict resolutions, not what main brought in. Nothing of ' +
+      'its own since the start (only a clean merge) → no review, and the feed and ' +
+      'the delivery task state the reason. What the review finds in code the group ' +
+      'did not touch is “pre-existing”: it never goes to the fixes, and delivery ' +
+      'lists it in the MR separately. ' +
       'Findings exist → a third link, FIXES by that list, back on the work ' +
       'model, and after them one VERIFICATION PASS on the reviewer: it re-runs the ' +
       'evidence of every finding on the branch (attempted is not fixed) and reads ' +
-      'the fix diff for new breakage. It starts no second round of fixes: what is ' +
+      'the fix diff for new breakage. In a split group both links get the group ' +
+      'scope from the split plan — the paths the plan gave to other groups: a new ' +
+      'baseline or exception entry is allowed only there, and a finding on the ' +
+      'group’s own pages is fixed. The fixes end their report with a “Proven:” ' +
+      'section (a mutant killed by a named test, a verify-ledger record), and the ' +
+      'pass does not repeat those runs; with more than 15 findings the fixes are ' +
+      'told to open big files by a targeted search per finding. It starts no ' +
+      'second round of fixes: what is ' +
       'still open, delivery writes into the MR description as open, and a pass ' +
       'without a result as “fixes not verified”. No findings → the chain is closed. In the ' +
       'chat list the links are labelled “review” and “fixes”, each with its own ' +
@@ -1752,7 +1923,9 @@ export const chatEn: typeof chatRu = {
       'failing is caught by a watchdog: a working group whose conversation (its subagents ' +
       'included) stays silent for over an hour gets its process stopped and the same ' +
       'session resumed with a request to rerun the interrupted checks, and the parent feed ' +
-      'gets a line “Group … was silent for N min”. A background group with a live process, ' +
+      'gets a line “Group … was silent for N min”. A stage the panel started that has not ' +
+      'begun its turn within five minutes is started again by the watchdog, without waiting ' +
+      'the hour. A background group with a live process, ' +
       'one waiting for your answer to a permission request, and a foreign-CLI group with no ' +
       'conversation on disk are left alone.',
     cascadeDelivery: 'Delivery is checked by git, “accepted” is yours to set',
@@ -1783,7 +1956,12 @@ export const chatEn: typeof chatRu = {
       'through MCP, and see the delivery skills by name only; while review is ahead, ' +
       'review skills and subagents are closed to ' +
       'them — the review at the ceiling would repeat that pass anyway. A link with no ' +
-      'delivery after it may push. The panel does not take the agent’s word for it: when the link ends ' +
+      'delivery after it may push. A link learns what lies ahead from its first turn: ' +
+      'the system line names the review and the delivery with the gate and the MR. For a ' +
+      'foreign-CLI group the review there is a fresh session of the same CLI, and it is ' +
+      'promised only when the panel will schedule it: after work with a model-picking ' +
+      'header, unless “Review after work” is off, and after fixes with a findings list. ' +
+      'The panel does not take the agent’s word for it: when the link ends ' +
       'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
       'MR whose head is the group’s copy, and which branch that MR comes from: while ' +
       'the group has no commits of its own and shares its predecessor’s head, the MR ' +
@@ -1801,10 +1979,15 @@ export const chatEn: typeof chatRu = {
       'stops reminding, and the card reads “Delivery stopped — N items” on a “waits for you” ' +
       'plate: one line says why the panel stopped and what to do — continue the group with a ' +
       'word in its chat, and the agent closes the items. A live check with no stand, a red ' +
-      'not caused by the branch and a case that cannot run here become notes in the MR ' +
+      'not caused by the branch, a case that cannot run here and a task item marked “not ' +
+      'checked” or “not caused by the branch” become notes in the MR ' +
       'description, not a stop; for the security and data sieves (keys in the diff, ' +
       'migrations, destructive statements) “not caused by the branch” ' +
-      'counts only with a run link (run:<id>) or a command with its output. The group calls a ' +
+      'counts only with a run link (run:<id>; a base run, tests-cli run --base, where the same ' +
+      'red was there before the branch, also counts) or a command with its output. A mark the panel ' +
+      'did not accept (a link to a green run or to a run whose red the branch touched, “not ' +
+      'checked” on a check that runs here too) is named in the reminder with the reason and ' +
+      'what to do. The group calls a ' +
       'human only for a merge, a deletion, a branch rewrite beyond a lease, a migration or a ' +
       'database write, and credentials that exist nowhere: a merge gets the refusal “the ' +
       'owner merges”, the rest becomes a D-n item in “Awaiting decision”. While at least one ' +
@@ -1817,7 +2000,10 @@ export const chatEn: typeof chatRu = {
       'sets it by itself. For a group the conveyor did not bring to “done” (stopped, ' +
       'stuck, failed, waiting for you) the same button reads “Mark done”: the group ' +
       'becomes done and accepted, drops to the very bottom marked “done by hand”, and ' +
-      'groups waiting for it start. “Remove mark” returns it to the state it was in. ' +
+      'groups waiting for it start. If the panel never recorded the group’s MR, it takes ' +
+      'the MR link from the group’s last answer, once the forge confirms the MR comes ' +
+      'from the group’s branch, so the hub shows it and merge tracking sees it. ' +
+      '“Remove mark” returns it to the state it was in. ' +
       'While a group has a turn or a background command running there is no button. ' +
       'A finished group says how long ago: “finished · 36 min ago”, older than a day — ' +
       'the date and time. The parent’s feed remembers where you were reading: going to ' +
@@ -1828,16 +2014,33 @@ export const chatEn: typeof chatRu = {
       'the tracker integration, only after you confirm. Before “File” the panel searches ' +
       'the project’s open issues: if an issue about this defect is already open, it gets a ' +
       'comment and no copy is filed (“already open — added as a comment”); if the search ' +
-      'fails, nothing is filed and another “File” tries again. “Resolve…” in the section ' +
+      'fails, nothing is filed and another “File” tries again. An issue filed this way also ' +
+      'starts with the side line, carries its label and the medium priority, and gets no ' +
+      'assignee. “Resolve…” in the section ' +
       'header takes every open ' +
       'proposal at once. The dialog shows how many proposals are open, how many of them ' +
       'are duplicates and how many issues will come out. Duplicates merge into one defect: ' +
       'the same title or place, the same words in another order, a similar symptom in the ' +
       'same file. Different defects of one file are gathered into one issue, each with its ' +
       'own section: where, evidence, steps, expected and actual behaviour, who found it. ' +
-      '“Publish to Jira” checks open issues the same way as “File”; “Retry failed” tries ' +
-      'again. The panel’s model, when available, refines titles, area and severity; ' +
-      'without it the issues are built the same way, only without area and severity. ' +
+      'While the dialog is open, the panel searches the chosen Jira project for similar ' +
+      'open issues — by the finding’s fingerprint, by almost the same and by a similar title — ' +
+      'and shows each as a link with a choice: “Link” (the findings go into it as a comment, ' +
+      'the default), “Skip” (nothing is written, the proposal stays open) or “It is different — ' +
+      'file a new issue”. The search only reads; if it fails, publishing still matches titles ' +
+      'and fingerprints on its own. The panel keeps the fingerprints itself, beside every ' +
+      'issue it filed or commented on — they are never written to Jira, and an issue is still ' +
+      'recognised after someone renamed it. “Publish to Jira” files the issues by those decisions; ' +
+      '“Retry failed” tries again with the same ones. Every Jira issue starts with its side ' +
+      '(FRONTEND, BACKEND or FULLSTACK, from the findings’ paths and the model’s area) and ' +
+      'carries the same label, a priority from the severity taken from your Jira’s priority ' +
+      'list (medium without a severity; if Jira refuses the field, the issue is filed without ' +
+      'it and the severity goes as a label) and no assignee: if Jira assigned one on its own, ' +
+      'the result warns. No internal machine labels (a split hash, a chat id, a short sha) ' +
+      'reach Jira — they stay inside the panel. The description: context, what to do, acceptance criteria, where in the code and a ' +
+      'section per defect. The panel’s model, when available, gives titles, context, what to ' +
+      'do, criteria and severity; without it the issues are built the same way, the side from ' +
+      'the paths, the priority medium. ' +
       '“Resolve here” opens one new project chat with the task of fixing every open ' +
       'proposal and marks them “Taken into a chat”. Steps a group cannot take (a ' +
       'dependency between MRs, access, someone else’s service) collect in “For you to ' +
@@ -1852,21 +2055,75 @@ export const chatEn: typeof chatRu = {
       'review of an owner request whose requirement-trace block is missing or could not be parsed is asked once more, then the report is marked ' +
       'incomplete. A delivered group has “Recheck ' +
       'MR”: the panel reads the MR — conflicts with the target branch, every pending ' +
-      'reviewer comment, a red pipeline — and hands that to a new conversation in ' +
-      'the same copy together with a request to check every task is done; the ' +
-      'previous conversation stays in the group’s path. A recheck usually comes ' +
+      'reviewer comment, a red pipeline with the last lines of the failed jobs’ logs ' +
+      '(GitLab: up to two jobs, 40 lines each; each with its job id, and the first step ' +
+      'the group is told to take is reading that job’s log: a local run proves no fix, and ' +
+      'a log it cannot get is said at once) — and hands that to a new conversation in ' +
+      'the same copy together with a request to check every task is done and a ' +
+      'completeness list: points the group handed to other groups whose owner the panel ' +
+      'could not confirm; what siblings handed to it — as report rows and plan notes; its ' +
+      'own notes about siblings and the merge order; the state, MR and files of every ' +
+      'sibling group. Its own open findings count as gaps of the MR too: a remark of its ' +
+      'own review left as «does not affect behaviour», or an «open after verification» item ' +
+      'of the MR description, is fixed in the same branch; only a point waiting for a human ' +
+      'decision stays open, named as such. The previous conversation stays in the group’s path. ' +
+      'The «Note» button beside it opens a field: up to 4000 characters go into the recheck ' +
+      'task verbatim, and every request in it is a point of the recheck, like a reviewer ' +
+      'comment; this is how something that is not in the MR reaches the group. A ' +
+      'delivering group reports every point of its tasks and of the tickets they link ' +
+      'as a task-N row — without that report «done» is not set. A «pass» row quotes its ' +
+      'point word for word in «…» — from the ticket, the group’s task and brief, the ' +
+      'plan’s shared context, the groups’ notes (hand-overs to this group live in the ' +
+      'neighbours’ notes), the neighbours’ «n/a» rows or the MR ' +
+      'description — and delivery checks the quote against those texts: a row with no ' +
+      'quote, with a quote found in none of them, or with evidence rewritten with no new ' +
+      'commit is a delivery gap. A list item in a ticket’s description or comments that no ' +
+      'task-N row quotes is a gap too, naming the task key and the item; a recheck does not ' +
+      'count such a task as delivered and names those items in its task. A point handed to another ' +
+      'group is accepted only when that group is alive, the named file is in its list and ' +
+      'the merge the point waited for has not happened yet — or when a filed tracker ' +
+      'ticket or an MR outside this split is named. A point of the owner’s request the ' +
+      'split itself did (picking tasks, dividing the groups) is marked with a ' +
+      '«split stage: …» row; a group task point cannot be marked that way. Otherwise the ' +
+      'point stays with the group, and it finishes it ' +
+      'itself. A recheck usually comes ' +
       'hours later, and resuming the old session then re-reads almost its whole ' +
       'context and picks up long-finished threads, so the new one gets the facts ' +
       'instead: branch, copy, MR, the group’s task and the scope — the files the ' +
-      'branch changes against the MR target. Checks run on the scope only; files ' +
+      'branch changes against the MR target. The new conversation runs on the group’s work ' +
+      'model and effort, not the delivery step’s model: a recheck is substantive work, and ' +
+      '“Delivery on Sonnet” does not apply to it. Checks run on the scope only; files ' +
       'outside it are named and never staged, committed or reverted. What is ' +
       'found the group fixes and delivers again, and finding nothing it touches ' +
-      'nothing. The group is mid-turn or runs another CLI — the word goes to its ' +
+      'nothing. A real conflict with the target is resolved by a rebase (git-guard refuses ' +
+      'a merge), after which the group reports its sieve rows again, and before answering ' +
+      'it runs tests-cli delivery itself — the same check the panel makes after the turn. ' +
+      'After a rebase the group runs the not-yet-run cases of the Tests block once, in ' +
+      'the same step (tests-cli run --stale): the delivery check reads only the block, ' +
+      'and the project’s own gate records nothing there. Before the word goes to the ' +
+      'group the panel re-reads its tracker tickets into the copy’s .agent/run/tickets.md ' +
+      'and names which changed since the last delivery: their points the group derives ' +
+      'anew, the rest it checks against the code only. A recheck in a new conversation is a new round: the ' +
+      'group’s start commit moves to the copy’s head at the moment of the word, and the ' +
+      'review of this round reads only what was done since; what the earlier review found ' +
+      'outside the scope stays with the earlier round. ' +
+      'The group is mid-turn or runs another CLI — the word goes to its ' +
       'own conversation as before. The MR could not be read — the agent reads it ' +
       'itself. The group’s ' +
       'conversation file is gone from disk (deleted outside the panel) — the turn ' +
       'runs as a new conversation in the same copy: it is given the branch, the MR ' +
-      'and the group’s tasks, and a note about it appears in the chat. A merged or ' +
+      'and the group’s tasks, and a note about it appears in the chat. ' +
+      'Without the button, after “done” the panel watches the MR itself: a new reviewer ' +
+      'thread or a red pipeline wakes the group with a word carrying the same facts. When ' +
+      'the group’s window is already over 60k tokens, that word starts a new conversation ' +
+      'in the same copy with a short brief of the copy’s facts (branch, MR, tasks) instead ' +
+      'of resuming the whole delivery window; your own reply in the group’s chat still ' +
+      'resumes the earlier conversation. A group that ends its turn after the red-pipeline ' +
+      'word without a fix (same branch head) is not marked “done”: it waits for you tagged ' +
+      '“MR red, no fix”, with a note in the chat. While it waits, the panel keeps looking ' +
+      'at the pipeline on the same schedule: once it turns green (a retried job passed, say) ' +
+      'the panel checks the delivery itself, with no group turn — nothing missing means ' +
+      '“done”, gaps reach the group as a reminder. A merged or ' +
       'closed MR has nothing to recheck: the button says so with a notice, not an ' +
       'error, and the card is marked “MR merged” or “MR closed” at once and moves ' +
       'down. A merged one loses the button; a closed one ' +
@@ -1896,7 +2153,13 @@ export const chatEn: typeof chatRu = {
       'commands (a stand server, a long check); “Resume” names the killed commands to ' +
       'the agent one by one, so it restarts the ones it needs instead of guessing from ' +
       'a cut-off call. This holds between turns too: an agent waiting for a background ' +
-      'task is stopped as well and does not wake up after the pause. Processes started ' +
+      'task is stopped as well and does not wake up after the pause. The panel agent and ' +
+      'the group watcher resume with a note: the pause reason and the first step reach ' +
+      'the group as separate lines, and it does not re-run checks already decided. A group ' +
+      'paused while it waited for you — a question, a review decision, D-n calls or a red MR — ' +
+      'goes back to that same wait on Resume: nothing is sent to it, the answer is still yours. ' +
+      'Only when the pause killed its background commands does Resume send the usual word. ' +
+      'Processes started ' +
       'from the group’s copy (dev server, test chain) are stopped by Pause, Drop and plan ' +
       'cancel by the copy’s path; a stand in the project itself is left alone. A queued ' +
       'group can be paused too — it does not start until you ' +
@@ -1988,14 +2251,30 @@ export const chatEn: typeof chatRu = {
       'where the parser cannot see: through ssh, docker or kubectl exec, sudo -D, pwsh -wd ' +
       'outside the copy, an encoded PowerShell command (-EncodedCommand in any abbreviation); ' +
       'so do curl | sh, a write into the main copy through an interpreter, proxy variables ' +
-      'and PAGER= before git, and core.symlinks=true. env -C into the own copy is judged in ' +
+      'and PAGER= before git, and core.symlinks=true. A docker subcommand is not a shell ' +
+      'command: docker rm -f "$CID" removes a container and docker exec "$CID" go test runs ' +
+      'tests, so both go by themselves, while git or rm inside docker exec still goes to a ' +
+      'human. So does what git itself or an unpack writes outward: git archive -o, git diff ' +
+      '--output, tar -x -C outside the copy and temp. git in a folder ABOVE the copy (cd .. ' +
+      'or -C .. from a subfolder — one climb too many) does not run: the agent gets a refusal ' +
+      'with the reason and a request to name its copy, not a D-n item. The clone a reviewer ' +
+      'builds by the review-plan.mjs mark is a scratch repository, like temp; git clean in it ' +
+      'while its node_modules is a link into the real copy is not. env -C into the own copy is judged in ' +
       'place, like an ordinary command. Deleting inside the copy (rm, git rm) goes by itself ' +
       'when the target is temporary, git-ignored, or something git brings back; a human gets ' +
       'the copy root, .git, the local layer (.agent/, .claude/, .env…), secret-named files ' +
-      'and everything outside the copy, the system’s shared temp directory included. A path ' +
+      'and everything outside the copy, the system’s shared temp directory included. What ' +
+      'lies inside a folder within .agent/ (shots, logs, probes — .agent/screenshots/…) is the ' +
+      'agent’s own output, and deleting it goes by itself; top-level .agent/ files and a whole ' +
+      'folder still go to a human. A temp file outside the copy written by an earlier call of ' +
+      'the same conversation (> /tmp/x.log, cp f /tmp/x.bak) is the group’s own: deleting it ' +
+      'is cleanup. The folder after cd holds only while cd surely ran and succeeded: after || ' +
+      'and inside an if body it is unknown, and after && or when the folder is not on disk it ' +
+      'holds only to the end of the same && chain. A path ' +
       'through a link (symlink, junction) made by the same command or found earlier in a temp ' +
       'directory counts as foreign, and so does a C:name path (relative to the drive’s ' +
-      'current directory). Also by themselves: a worktree inside the own copy (git worktree ' +
+      'current directory); a folder link made by cmd /c mklink /J (or /D) with named paths is ' +
+      'followed by its path. Also by themselves: a worktree inside the own copy (git worktree ' +
       'add and remove in .agent/tmp), git worktree prune when the live list shows it removes ' +
       'only the group’s own, a trial merge in a detached head, comparing through merge-base ' +
       'and merge-tree; removing a worktree outside the own copy and git branch -d / -D go to ' +
@@ -2042,6 +2321,13 @@ export const chatEn: typeof chatRu = {
       'refused with a reason (git fetch first), never let through. No conflict — refused: you ' +
       'update an MR that merely fell behind yourself, when you want to, and the group ' +
       'finishes the task on its own base instead of re-running checks because main moved. A ' +
+      'tree of the target branch next to the copy (`git worktree add … origin/main`, ' +
+      '`git checkout --detach origin/main`) — to check «is this red mine» — gets the same ' +
+      'refusal with a ready command, run --case <red cases of the copy> --base: those cases ' +
+      'run on the fork point with the target in a throwaway tree, and the verdict lands where ' +
+      'the delivery check reads it. When the target branch is already wholly in the copy’s ' +
+      'history (the group rebased onto it itself), its tree next to the copy is not a ' +
+      'catch-up and goes through without a refusal. A ' +
       'conflict — a bare catch-up as one command goes by itself, marked in the parent’s ' +
       'summary, and the group fixes the conflict at once; a catch-up inside a compound ' +
       'command goes through the usual parsing. In the middle of a sync already under way, taking ' +
@@ -2115,9 +2401,17 @@ export const chatEn: typeof chatRu = {
       'human answer) goes on as a new conversation with a brief the panel built from ' +
       'files: the group’s tasks and its stage task, the group’s notebook and tickets, its ' +
       'notes, commits and changes since the branch its copy was cut from, ' +
-      'the last answer. A note up to 8,000 characters travels whole; a longer one travels ' +
+      'where the branch is on the remote now (read from the remote itself: a commit the ' +
+      'copy lacks, say from a CI bot, is named with “git pull --ff-only”), ' +
+      'the last answer. The change list is 10 files when everything is committed, 40 ' +
+      'otherwise. The tracker copy and the gotcha notes past 1,500 characters travel as ' +
+      'an index with the file path. A note up to 8,000 characters travels whole; a longer one travels ' +
       'as its beginning (up to 4,000 characters, cut at a line) with the line number from ' +
-      'which the group reads the rest of the file before acting. A turn cut off mid-work ' +
+      'which the group reads the rest of the file before acting. The commits the notebook ' +
+      'and PROGRESS.md name the panel checks against git: one rewritten after the note ' +
+      '(rebase, amend, reset) marks the note stale, and where it disagrees with the commits ' +
+      'and the last answer, they win; one already pushed is named in a line under the ' +
+      'note. A turn cut off mid-work ' +
       'hands the brief what the agent found out between its calls. A feed ' +
       'line names the size of the previous window, and the previous conversation stays ' +
       'on disk. While the new conversation runs, the line carries a «Continue the old ' +
@@ -2184,7 +2478,8 @@ export const chatEn: typeof chatRu = {
       'names the trouble in numbers: a group silent for over 20 minutes, a question ' +
       'or a permission request waiting for an answer over 15, a cache gone cold after a pause and the window ' +
       'rewritten, two compactions closer than 15 minutes, the same check three times ' +
-      'with no edit between, a review during the work stage, a push or MR before the ' +
+      'with no edit between (a call a guard refused does not count — only a check that ' +
+      'ran does), a review during the work stage, a push or MR before the ' +
       'delivery stage, a copy reading the panel’s own sources, a group’s spend or the ' +
       'five-hour window projection over the threshold, the subscription limit hit, a ' +
       'sleep-poll loop, the same file or chunk of it read three times with no edit. A ' +
@@ -2221,9 +2516,12 @@ export const chatEn: typeof chatRu = {
       'usual time the panel knows from the heavy-step queue — longer than usual with a ' +
       'quarter to spare; a background call does not hold the turn and does not count); a wait in the ' +
       'heavy-step queue over 10 minutes; five refusals by guards and access rules within ' +
-      '15 minutes; the first request of a new conversation heavier than 90K tokens — ' +
-      'only for a conversation started while the panel watches, a resume does not ' +
-      'count. The fan-out, the timeout and the queue wait are “attention”, the other ' +
+      '15 minutes; the first request of a new conversation heavier than 90K tokens (only ' +
+      'for a conversation started while the panel watches, a resume does not count) or ' +
+      'the conversation window grown more than 100K tokens over its first request (the ' +
+      '“Session window grew above its first request by” threshold; after a compaction the ' +
+      'count starts from the first call after it). The fan-out, the timeout and the queue ' +
+      'wait are “attention”, the other ' +
       'four are a “note”: they stay on the card and do not go out. A ' +
       'signal lands as the “Group watch” island on the group’s card (a calm background, a coloured stripe on the left and a label on the row — by the most important signal) in the ' +
       'parent’s hub, and the number of active ones as a chip in the hub summary; ' +
@@ -2234,16 +2532,20 @@ export const chatEn: typeof chatRu = {
       'nothing: it shows the trouble and reports it. Spend is counted for the whole group — all its ' +
       'conversations and subagents together — and the five-hour window projection is ' +
       'one per account: it shows on the card of every running group but goes out as a ' +
-      'single message. One cause, one signal: when subagents carry more than half of the ' +
+      'single message. The window is reported in whole percents, so the projection takes ' +
+      'the lower bound of the slope: a single step in the first minutes of a window raises ' +
+      'no alarm. One cause, one signal: when subagents carry more than half of the ' +
       'group’s spend, the fan-out already names the cause and there is no separate spend ' +
       'signal; spend of the conversation itself stays a spend signal, next to the fan-out ' +
       'too. Likewise a long call does not duplicate the group’s silence, the fan-out does ' +
       'not duplicate a review at the work stage (those are its own subagents), and a polling ' +
       'loop started after a timeout does not duplicate the timeout itself. ' +
-      '“Attention” and “alarm” signals go to Telegram and the webhook ' +
-      'wherever the “Group watch signal” event is ticked in integrations — the rule, the ' +
-      'numbers, the stage and the project folder name, the same signal at most once per ' +
-      '30 minutes. Whoever got signals in Telegram before this event existed had it ticked ' +
+      '“Attention” and “alarm” signals go to the webhook wherever the “Group watch ' +
+      'signal” event is ticked in integrations — the rule, the numbers, the stage and the ' +
+      'project folder name; Telegram gets only an “alarm”, in words (“группа молчит”), ' +
+      'with the project, the chat and the group, the rule and numbers folded into a quote. ' +
+      'The same signal goes at most once per 30 minutes. ' +
+      'Whoever got signals in Telegram before this event existed had it ticked ' +
       'by the panel itself, once, on the update; the webhook is ticked by hand. ' +
       'Thresholds and the watch switch are on the “Split-group watch” card under ' +
       '“Settings” → “Groups”; a threshold change applies at once, without restarting ' +
@@ -2253,6 +2555,9 @@ export const chatEn: typeof chatRu = {
       'the ping decides by it. Codex and Qwen Code groups are read by the watch from their ' +
       'own conversation files, and the “Tokens” section of their card is counted the same ' +
       'way; the subagent rules do not apply to them — these CLIs have no Claude subagents. ' +
+      'Refusals in their files count as they do for Claude — a hook refusal and the panel ' +
+      'judge’s refusal in Qwen Code, a declined command in Codex: five in 15 minutes is a ' +
+      'note, and the same action done another way is a bypass. ' +
       'A cold cache there is judged by their provider’s pause — from 5 minutes for Qwen ' +
       'Code, from 10 for Codex. These CLIs do not report cache writes, so the signal comes ' +
       'only when the cache read dropped after the pause and the full-price input exceeds the ' +
@@ -2272,7 +2577,9 @@ export const chatEn: typeof chatRu = {
       'processes it did not start itself. The turn ended with a question in the text, ' +
       'without a card, and there has been no answer for 10 minutes. Two delivery ' +
       'reminders went nowhere — the same things are still missing — or a reminder went to ' +
-      'the work, review or plan stage while delivery is still ahead. A tool that does not ' +
+      'the work, review or plan stage while delivery is still ahead; and when every new ' +
+      'round finds something new missing — delivery is redone round after round — a ' +
+      '“note” naming what was missing for the first time. A tool that does not ' +
       'exist in the session was called. An external service — the model, an MCP server or ' +
       'the web (search and page fetches) — does not answer: three failures within 15 ' +
       'minutes; a 4xx answer is a refusal, not an outage. Edits outside its own copy. ' +
@@ -2280,13 +2587,58 @@ export const chatEn: typeof chatRu = {
       'verdict is written as text, without a review block — the pipeline will not see ' +
       'it. A signal grows while the trouble lasts: an unanswered question — as a card or ' +
       'as text — is “attention” first and an “alarm” after an hour (the “An unanswered ' +
-      'question turns into an alarm after” threshold); a raised signal goes to Telegram ' +
+      'question turns into an alarm after” threshold); a signal raised to an alarm goes to Telegram ' +
       'and the webhook once more, even inside the quiet period, and is never lowered. ' +
       'The watch also follows single chats started in the panel without a group (the ' +
       '“Watch single chats too” switch, on by default): the rules that fit one ' +
       'conversation apply there — no stages, no plan, no own copy. A signal shows as a ' +
       'chip on the chat row and a “Chat watch” island above its feed; only an alarm goes ' +
-      'out. Groups of the other CLIs are not seen by the watch.',
+      'out. Two different loops in one turn — a check repeated without an edit, polling ' +
+      'with sleep, heavy group checks, failures in a row — mean the turn burns the window ' +
+      'for nothing: the newer of them becomes an alarm at once. The panel’s own journals ' +
+      'count too: a group’s edit holds a pending restart of the panel server (with the ' +
+      'minutes it has already waited: while it waits, the panel runs old code); the server ' +
+      'already restarted because of a group’s edits — for half an hour the note names its ' +
+      'files, the minutes of waiting and how many other live groups were running at that ' +
+      'minute (the watch keeps group edits on disk, a restart does not wipe them); the server ' +
+      'restarted three times in an hour with a live group; the check ledger in the group’s ' +
+      'copy does not work as promised (a green key run again, the ledger off, a result ' +
+      'that disagrees with the record); a group’s check went past the ledger — each one a ' +
+      'note. Subscription window: the five-hour or weekly window reached 80, 90 and 95 % — ' +
+      'a note with the level; the weekly forecast to the reset is above 90 %; a group run ' +
+      'moved the five-hour window by 5 % or the weekly one by 2 %, or ate more than 3 M ' +
+      'tokens — a “heavy run”. Every finished group run gets a “run summary” note: tokens, ' +
+      'minutes, the window shift and the share wasted, weighted by calls — repeats (a ' +
+      'check with no edit, a re-read, the same failure, a sleep poll), guard refusals and ' +
+      'rework: a run after a delivery reminder counts as rework in full. ' +
+      'Watch pause (the “Pause the group at the end of a turn” ' +
+      'switch, off by default): a spending-in-circles rule is burning (R4, R8, R11, R12, ' +
+      'R21, R24, R41, R42) — the next link is not started, the group pauses with a ' +
+      '“watch pause: R4” chip instead of “paused”. Work in the middle of a turn is not cut; ' +
+      'a group where a person has something to decide (D-n waiting) is not stopped; only a ' +
+      'person lifts the pause, with “Resume”. A group paused for more than an hour with ' +
+      'nothing to decide gets a reminder; after a watch pause, four times sooner and with ' +
+      'the rule. On the phone a group chat row carries one line with its most important ' +
+      'signal. Continue groups are read from the `cn` session document — each answer is a ' +
+      'separate run with its own file; denials, errors and timeouts count the same there. ' +
+      'Gemini CLI groups are read from the rows of the turn stream — the same rows the ' +
+      'panel builds the answer from: calls, hook and policy refusals, a tool outside the ' +
+      'set, errors and the turn’s spend. Gemini reports no window of a single request, ' +
+      'only the turn total, so window growth, cold cache and a new conversation over a ' +
+      'warm one (R19, R2, R34) stay silent for these groups; Gemini reports a non-zero ' +
+      'command exit with output as a success — only an exit code without output counts ' +
+      'as a failure. ' +
+      'OpenCode groups are read from the CLI’s session database (opencode.db), read-only, ' +
+      'including the write journal not yet merged into it: every model request is its own ' +
+      'call with its window, a subagent (the task tool) is a child session, and denials by ' +
+      'a person, a rule or a plugin count the same as for Claude. Without the node:sqlite ' +
+      'module in Node the group’s coverage honestly reads “text only”. ' +
+      'Groups of the other CLIs (Goose, Kimi Code, Cursor, Aider) are seen only by the start ' +
+      'and end of a turn: rules that need the transcript stay silent for them. Coverage ' +
+      'shows how a group is seen: when it is incomplete, a chip on the group card names the ' +
+      'missing sources; the watch card in settings counts live groups by source (stream, ' +
+      'transcript, text only) and lists the panel’s gaps (check ledger, dev-watch, limit ' +
+      'journal) with the rules that stay silent without them.',
     cascadeOverlap: 'Branch overlap after the work',
     cascadeOverlapText:
       'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +
@@ -2513,7 +2865,8 @@ export const chatEn: typeof chatRu = {
       'would only read the checkpoint file and say everything is done. The card stays, ' +
       'and the button still continues it. If a Stop hook returned a remark to the agent ' +
       'after its summary, the panel judges the summary together with the reply to the ' +
-      'remark, not the reply alone.',
+      'remark, not the reply alone. The next group stage gets the summary before the ' +
+      'first remark as the previous outcome, not the reply to it.',
     handoffTidy: 'Tidying the working files — half the point',
     handoffTidyText:
       'A clean session reads exactly the checkpoint file (.agent/PROGRESS.md by ' +
@@ -2566,11 +2919,15 @@ export const chatEn: typeof chatRu = {
     autonomyPick: 'An automatic pick instead of a question',
     autonomyPickText:
       'With “Autonomous — pick the recommended option” on (the default), an agent ' +
-      'question with a “(Recommended)” option does not wait for you: that option is ' +
+      'question with a recommended option does not wait for you: that option is ' +
       'taken, and a muted “Auto-pick: …” line stays where the question card would ' +
-      'be. It cannot be clicked — the answer has already gone; if you disagree, tell ' +
+      'be. Recommended means marked “(Recommended)” or “рекомендую” in the label or ' +
+      'the description, with no negation next to it. A run with full access, where ' +
+      'the question never passes through the panel, makes the same pick. ' +
+      'The line cannot be clicked — the answer has already gone; if you disagree, tell ' +
       'the agent in an ordinary message. A question without a recommended option ' +
-      'waits for you as usual — except in a split group under “Group decision ' +
+      'waits for you as usual, and so does an option nobody but you can carry out ' +
+      '(“I’ll sign in myself”, “session refreshed — continue”), even when recommended — except in a split group under “Group decision ' +
       'points: by the plan”, where every question is answered. The switch takes ' +
       'effect from the next turn: the CLI ' +
       'process restarts with the new value.',
@@ -2647,8 +3004,13 @@ export const chatEn: typeof chatRu = {
       'anew; the same call made again after expiry reopens the old number rather than a new ' +
       'one. When a group’s item expires and nothing of the group waits any more, the panel ' +
       'continues the group (unless you paused it): the agent finishes without that call and ' +
-      'names what stays blocked in the MR description. Every continuation after a decision ' +
-      'tells the agent to take the MR out of draft once no item waits. Several outcomes at ' +
+      'names what stays blocked in the MR description. A continuation after a decision ' +
+      'tells the stage that owns the MR to take it out of draft once no item waits; a review ' +
+      'stage with delivery ahead is told to finish its stage and name what stays blocked in ' +
+      'its report. The word goes to the group’s current conversation, and while the ' +
+      'conversation still runs background subagents it waits for them to finish instead of ' +
+      'restarting the process. An item whose stage has already ended, or whose folder is ' +
+      'gone, is refused by the panel itself with the reason. Several outcomes at ' +
       'once (three refusals, three expiries, an allow and a refusal) reach the group as one ' +
       'continuation naming every number. A pause or a panel restart does not lose the word: ' +
       'after “Resume” or once the panel is back up, the group still learns how its D-n ' +
@@ -2986,7 +3348,10 @@ export const chatEn: typeof chatRu = {
       'same rules as a Claude group: its own is a descendant of the CLI process (the panel ' +
       'knows its number for Codex and Qwen) or a process carrying the group mark in its ' +
       'environment; someone else’s or an unnamed one is refused to the agent with the reason, ' +
-      'no D-n item. So that commands reach this boundary, Codex on Linux and macOS asks about every ' +
+      'no D-n item. A Codex or Qwen group also deletes its own copy of a file in the temp ' +
+      'folder itself, as a Claude group does: the panel recognises it by the kit’s session ' +
+      'log, where an earlier finished call of the same session made that copy; a glob delete ' +
+      'or someone else’s file becomes a D-n item. So that commands reach this boundary, Codex on Linux and macOS asks about every ' +
       'command (untrusted) in the same workspace-write sandbox when the switch is on, and ' +
       'Goose is moved to approve. Kimi Code with the switch on still answers «yes» to ' +
       'everything. The position ' +
@@ -3097,6 +3462,27 @@ export const chatEn: typeof chatRu = {
       'In that mode neither the edit toggle nor the rules from the Permissions ' +
       'section apply: the agent does whatever it decides to. Worth pressing when ' +
       'you know exactly what it stalled on.',
+
+    trailTitle: 'Turn trail',
+    trailCaption:
+      'Each agent turn ends with one collapsed line: “1 skill · 2 agents · 3 scripts · ' +
+      'hooks 26, 2 of them added context · 1.4 s”. A click or Enter expands it; a turn ' +
+      'with nothing to show gets no line.',
+    trailRun: 'Skills, agents, scripts',
+    trailRunText:
+      'What the agent ran: skills by name, agents with the task description and model, ' +
+      'scripts with the call description. A script is a file run (node, python, bash and ' +
+      'others with a path, ./x.sh) or a package script (pnpm, npm, yarn, make); plain ' +
+      'commands such as git, grep or ls and MCP calls are not part of the trail. Shown ' +
+      'right away, while the turn is running.',
+    trailHooks: 'Hooks',
+    trailHooksText:
+      'Hooks by event (PostToolUse:Bash, Stop…) with the command name, a ×N count and ' +
+      'the time; a failure carries a red mark with the exit code. “Added context” expands ' +
+      'the start of the text the hook gave the model, with secrets masked. Hooks come ' +
+      'from the Claude Code transcript and appear once the turn is over; a hook that ran ' +
+      'silently is not recorded by the CLI. A message added mid-turn and a background-task ' +
+      'notification do not split the turn.',
 
     spendTitle: 'What it cost',
     spendCaption:
@@ -3316,6 +3702,13 @@ export const chatEn: typeof chatRu = {
       '01-escalation': 'The main chat: a critical card from a group and the button to it',
       '02-auto-pick': 'The group’s feed: an “Auto-pick: …” line in place of the question',
       '03-menu': 'The child’s menu: group and autonomy “from parent”',
+    },
+    agents: {
+      '01-tree':
+        'The agent’s plan: the main agent’s line and the subagent tree with skill, MCP and hook chips',
+      '02-extensions':
+        'The “Skills, hooks and MCP” window: agents on the left, the selected one’s runs in time order',
+      '03-group': 'A group card: chips for its agents and a line of chips for the whole group',
     },
     economy: {
       '01-where':

@@ -76,6 +76,7 @@ export function IntegrationsGuideSections({ tr }: SectionProps) {
               side="panel"
             />
           </GuideStep>
+          <GuideStep title={g('notifyCommands')} text={g('notifyCommandsText')} />
         </GuideSteps>
       </HelpSection>
     </>

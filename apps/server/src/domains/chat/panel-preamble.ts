@@ -19,6 +19,7 @@ import {
   OWNER_MESSAGES_LEFT_OUT,
   OWNER_REQUEST_HEADER,
   SKILL_ROUTE_LINE,
+  taskCoverageLine,
 } from '@agentdeck/contracts/quality-floor';
 import { LEGACY_IDENTITY, LEGACY_LEADING, LEGACY_WHOLE } from './panel-preamble-legacy.ts';
 import { coldResumeBrief, lostConversationBrief } from './split-continue.ts';
@@ -198,7 +199,7 @@ export function withoutPanelPreamble(text: string): string {
  * английской фразой; справка об исходном задании продолжения — тоже: название
  * продолжения — что делать дальше, а не пересказ всей работы. Строка
  * старшинства (любая форма, `isPrecedenceLine`: полная, простая и прежние) и
- * строка навыков (`SKILL_ROUTE_LINE`) — тоже
+ * строка навыков (`SKILL_ROUTE_LINE`) и след задач (`taskCoverageLine`) — тоже
  * хвост панели, и стоят они то отдельным абзацем, то строкой сразу под строкой
  * языка: поэтому отбрасываются построчно, а не абзацами.
  */
@@ -214,7 +215,8 @@ function withoutPanelTail(text: string): string {
         // Любая форма строки старшинства, и прежние тоже: старые задания продолжения
         // несут их дословно (F-124, RF-BGCD-12c).
         !isPrecedenceLine(trimmed) &&
-        trimmed !== SKILL_ROUTE_LINE
+        trimmed !== SKILL_ROUTE_LINE &&
+        trimmed !== taskCoverageLine()
       );
     })
     .join('\n')

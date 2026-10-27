@@ -6,15 +6,21 @@ import {
   bundleSplitTickets,
   clusterSplitTickets,
   openSplitTickets,
-  type SplitTicketPublished,
+  type SplitTicketDuplicateChoice,
+  type SplitTicketDuplicates,
   type SplitTicketTarget,
 } from '@agentdeck/contracts/split-ticket-batch';
 import { i18n } from '@shared/config/i18n';
 import { mergeSplitGroups } from '../../lib/mergeSplitGroups';
 import { ChildStages } from '../ChildStages/ChildStages';
+import { duplicateDecisions } from './SplitTicketDuplicates';
 import { SplitTicketResolveBody } from './SplitTicketResolveBody';
 import { SplitTicketResolveActions } from './SplitTicketResolveActions';
-import type { SplitTicketResolveActionsProps, TargetState } from './SplitTicketResolve.types';
+import type {
+  SplitTicketResolveActionsProps,
+  SplitTicketResolveBodyProps,
+  TargetState,
+} from './SplitTicketResolve.types';
 
 /**
  * «Разобрать…» в хабе (владелец 24.10.2026). Кнопка — в настоящей карточке
@@ -75,7 +81,7 @@ const connected: SplitTicketTarget = {
 
 function body(
   target: TargetState,
-  extra: { result?: SplitTicketPublished; error?: string } = {},
+  extra: Pick<SplitTicketResolveBodyProps, 'result' | 'error' | 'duplicates' | 'choices'> = {},
 ): string {
   // Экспорт нашли обе группы и ещё раз — другими словами по тому же месту;
   // в файле кнопки — второй, другой дефект: одна задача на оба.
@@ -273,6 +279,136 @@ describe('окно «Разобрать…» — тело', () => {
     expect(html.match(/data-resolve-defects/g)).toHaveLength(1);
     expect(html).toContain('Черновик теряется при уходе');
     expect(html).not.toContain('data-resolve-fallback');
+  });
+});
+
+describe('окно «Разобрать…» — сторона, приоритет, исполнитель, повторы в Jira', () => {
+  const r = 'chat.cascade.hub.tickets.resolve';
+  const similar = (
+    duplicates: SplitTicketDuplicates,
+    choices: Record<string, SplitTicketDuplicateChoice> = {},
+  ) =>
+    body(
+      { state: 'ready', data: connected },
+      { duplicates: { state: 'ready', data: duplicates }, choices },
+    );
+  const leak = {
+    proposals: ['падает экспорт|apps/web/src/export.ts:42'],
+    title: 'Падает экспорт',
+    issue: {
+      key: 'PROJ-5',
+      summary: 'Экспорт падает на пустом',
+      url: 'https://tracker.example.com/browse/PROJ-5',
+    },
+    reason: 'title' as const,
+  };
+
+  it('решения в теле публикации: по каждой похожей, с её ключом; не тронутая — «связать»', () => {
+    const other = {
+      ...leak,
+      proposals: ['кнопка|apps/web/src/save.tsx:7'],
+      issue: { ...leak.issue, key: 'PROJ-6' },
+    };
+
+    expect(
+      duplicateDecisions([leak, other], { 'кнопка|apps/web/src/save.tsx:7': 'create' }),
+    ).toEqual([
+      { proposal: leak.proposals[0], choice: 'link', issueKey: 'PROJ-5' },
+      { proposal: 'кнопка|apps/web/src/save.tsx:7', choice: 'create', issueKey: 'PROJ-6' },
+    ]);
+  });
+
+  it('у каждой будущей задачи — сторона по путям', () => {
+    const html = body({ state: 'ready', data: connected });
+
+    expect(html.match(/data-resolve-bundle-side="[a-z]+"/g)).toEqual([
+      'data-resolve-bundle-side="frontend"',
+      'data-resolve-bundle-side="frontend"',
+    ]);
+    expect(html).toContain(i18n.t(`${r}.bundleSide`, { side: i18n.t(`${r}.side.frontend`) }));
+  });
+
+  it('похожая открытая задача: ссылка, почему похожа, выбор; по умолчанию — связать', () => {
+    const html = similar({ duplicates: [leak] });
+
+    expect(html).toContain('data-resolve-similar-list="1"');
+    expect(html).toContain('data-resolve-similar="PROJ-5"');
+    expect(html).toContain('data-resolve-similar-choice="link"');
+    expect(html).toContain('href="https://tracker.example.com/browse/PROJ-5"');
+    expect(html).toContain(i18n.t(`${r}.dupReason.title`));
+    expect(html).toContain(i18n.t(`${r}.dupTitle`, { count: 1 }));
+    for (const choice of ['link', 'skip', 'create'] as const) {
+      expect(html).toContain(i18n.t(`${r}.dupChoice.${choice}`, { key: 'PROJ-5' }));
+    }
+  });
+
+  it('выбор человека виден; нет похожих — так и сказано; поиск упал — публикация сверит сама', () => {
+    expect(similar({ duplicates: [leak] }, { [leak.proposals[0]!]: 'skip' })).toContain(
+      'data-resolve-similar-choice="skip"',
+    );
+    expect(similar({ duplicates: [] })).toContain('data-resolve-similar-none');
+    const failed = similar({ duplicates: [], failed: true, message: 'Jira 503' });
+    expect(failed).toContain('data-resolve-similar-failed');
+    expect(failed).toContain('Jira 503');
+    expect(
+      body({ state: 'ready', data: connected }, { duplicates: { state: 'loading' } }),
+    ).toContain('data-resolve-similar-loading');
+    // Jira не выбрана — блока проверки нет вовсе.
+    expect(body({ state: 'ready', data: connected })).not.toContain('data-resolve-similar');
+  });
+
+  it('итог: сторона и приоритет у заведённой, исполнитель от Jira — предупреждение, пропущенные списком', () => {
+    const html = body(
+      { state: 'ready', data: connected },
+      {
+        result: {
+          mode: 'model',
+          issues: [
+            {
+              key: 'PROJ-11',
+              url: 'https://tracker.example.com/browse/PROJ-11',
+              title: 'Экспорт',
+              proposals: ['a'],
+              created: true,
+              side: 'fullstack',
+              priority: 'High',
+              assignee: 'Руководитель проекта',
+              defects: [{ title: 'Падает экспорт', duplicates: [] }],
+            },
+            {
+              key: 'PROJ-12',
+              url: 'https://tracker.example.com/browse/PROJ-12',
+              title: 'Кнопка',
+              proposals: ['b'],
+              created: true,
+              side: 'backend',
+              defects: [{ title: 'Кнопка не жмётся', duplicates: [] }],
+            },
+          ],
+          failed: [],
+          skipped: [
+            {
+              title: 'Черновик теряется',
+              proposals: ['c'],
+              key: 'PROJ-5',
+              url: 'https://tracker.example.com/browse/PROJ-5',
+            },
+          ],
+        },
+      },
+    );
+
+    expect(html).toContain('data-resolve-meta="fullstack"');
+    expect(html).toContain('data-resolve-priority="High"');
+    expect(html).toContain(
+      i18n.t(`${r}.meta`, { side: i18n.t(`${r}.side.fullstack`), priority: 'High' }),
+    );
+    expect(html).toContain(i18n.t(`${r}.metaNoPriority`, { side: i18n.t(`${r}.side.backend`) }));
+    expect(html.match(/data-resolve-assignee/g)).toHaveLength(1);
+    expect(html).toContain(i18n.t(`${r}.assignee`, { name: 'Руководитель проекта' }));
+    expect(html).toContain('data-resolve-skipped');
+    expect(html).toContain(i18n.t(`${r}.skipped`, { count: 1 }));
+    expect(html).toContain('Черновик теряется');
   });
 });
 

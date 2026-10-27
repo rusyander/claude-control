@@ -1,4 +1,4 @@
-import type { Word } from './shell-parse.ts';
+import type { Segment, Word } from './shell-parse.ts';
 import { LinkLedger } from './links.ts';
 import { canonical, within } from './paths.ts';
 
@@ -53,7 +53,10 @@ export interface Frame {
   dotglob: boolean;
   loops: Map<string, string[]>;
   split: Map<string, Word[]>;
+  cdChain: number | undefined;
 }
+
+export type StepLink = Pick<Segment, 'after' | 'body' | 'andChain'>;
 
 /** Слово — одна переменная целиком: `$T`, `${T}`. */
 const WHOLE_VARIABLE = /^\$(?:([A-Za-z_]\w*)|\{([A-Za-z_]\w*)\})$/;
@@ -147,6 +150,7 @@ export class ShellState {
       dotglob: this.dotglob,
       loops: new Map(this.loops),
       split: new Map(this.split),
+      cdChain: this.cdChain,
     };
   }
 
@@ -193,6 +197,7 @@ export class ShellState {
     this.dotglob = state.dotglob;
     this.loops = state.loops;
     this.split = state.split;
+    this.cdChain = state.cdChain;
   }
 
   /**
@@ -373,12 +378,27 @@ export class ShellState {
   }
 
   /** Цепочка `&&` звена, что судится сейчас (`Segment.chain`). */
-  private chain: number | undefined;
+  protected chain: number | undefined;
   /** Каталоги `git clone` этой команды — с номером цепочки, где клон удался. */
   private readonly clones = new Map<string, number>();
 
-  atChain(chain: number | undefined): void {
+  /** Как звено пристало к прошлому (`Segment.after`), в теле ли оно, его цепочка `&&`. */
+  protected link: StepLink = {};
+  /**
+   * Каталог последнего `cd` верен только в этой цепочке `&&` (`Segment.andChain`):
+   * `cd` мог не удаться (каталога нет) или не исполниться (стоял после `&&`), и
+   * звено после `;` пошло бы в прежнем каталоге (`walk.ts` `changeDir`).
+   */
+  protected cdChain: number | undefined;
+
+  atChain(chain: number | undefined, link: StepLink = {}): void {
     this.chain = chain;
+    this.link = link;
+    if (this.cdChain !== undefined && link.andChain !== this.cdChain) {
+      this.cdChain = undefined;
+      this.cwd = undefined;
+      this.anchored = false;
+    }
   }
 
   /**

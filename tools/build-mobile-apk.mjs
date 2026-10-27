@@ -127,6 +127,19 @@ function freeDriveLetter() {
 const subst = (args) => spawnSync('cmd', ['/c', 'subst', ...args], { stdio: 'ignore' });
 
 /**
+ * Подстановки на свою копию, оставшиеся от снятой сборки: отмена из панели гасит
+ * процесс посреди Gradle, `finally` с `/D` не выполняется, и буква занята до
+ * перезагрузки — после нескольких отмен свободных букв бы не осталось.
+ */
+function releaseStaleDrives(copy) {
+  const listed = spawnSync('cmd', ['/c', 'subst'], { encoding: 'latin1' }).stdout ?? '';
+  for (const line of listed.split(/\r?\n/)) {
+    const match = /^([A-Z]):\\: => (.+)$/i.exec(line.trim());
+    if (match && match[2].toLowerCase() === copy.toLowerCase()) subst([`${match[1]}:`, '/D']);
+  }
+}
+
+/**
  * Зеркало `apps/mobile` в короткую копию. Промежуточная сборка исключена с
  * обеих сторон: из исходника её не тащим, а в копии, оставленной
  * `--keep-build`, `/MIR` её не стирает — пересборка подряд остаётся быстрой.
@@ -187,6 +200,7 @@ if (isWindows) {
     process.exit(1);
   }
 
+  releaseStaleDrives(copy);
   const letter = freeDriveLetter();
   if (!letter) {
     console.error('Нет свободной буквы диска для короткого пути — освободите Y:, X: или W:.');

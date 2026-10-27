@@ -157,4 +157,37 @@ describe('foreign-events', () => {
       input: { url: 'x' },
     });
   });
+
+  it('opencode: патч, поиск и незнакомое имя (оболочка и файлы — на записи сессии)', () => {
+    expect(
+      normalizeToolName('opencode', 'apply_patch', {
+        patchText: '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-x\n+y\n*** End Patch',
+      }),
+    ).toEqual({ name: 'Edit', input: { file_path: 'src/a.ts' } });
+    expect(
+      normalizeToolName('opencode', 'grep', { pattern: 'foo', path: 'src', include: '*.ts' }),
+    ).toEqual({
+      name: 'Grep',
+      input: { pattern: 'foo', path: 'src' },
+    });
+    expect(normalizeToolName('opencode', 'glob', { pattern: '**/*.ts' })).toEqual({
+      name: 'Glob',
+      input: { pattern: '**/*.ts' },
+    });
+    expect(
+      normalizeToolName('opencode', 'multiedit', { filePath: 'C:/w/a.ts', edits: [] }),
+    ).toEqual({
+      name: 'MultiEdit',
+      input: { file_path: 'C:/w/a.ts' },
+    });
+    // Имя свойства прототипа — не инструмент файла.
+    expect(normalizeToolName('opencode', 'toString', { x: 1 })).toEqual({
+      name: 'toString',
+      input: { x: 1 },
+    });
+    expect(normalizeToolName('opencode', 'webfetch', { url: 'x' })).toEqual({
+      name: 'webfetch',
+      input: { url: 'x' },
+    });
+  });
 });

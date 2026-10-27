@@ -23,8 +23,10 @@
  * открытым AskUserQuestion (R1b: «внимание» через минуту, «тревога» через 15);
  * вторая группа `started` без единого прогона 45 мин → R22 why=no-run, после
  * сдвига часов — «тревога».
- * Telegram: «внимание» группы уходит по разу, одиночный чат — только «тревога»
- * (R25, затем R27), рост до «тревоги» шлёт второе сообщение (R1b, R22).
+ * Telegram: туда уходит только «тревога» (решение владельца 25.10.2026) —
+ * словами, с проектом, чатом и группой: R25 и R27 одиночного чата, R1b и R22
+ * групп, когда они выросли до «тревоги»; «внимание» (R31, R1b и R22 до роста)
+ * не уходит.
  *
  * `QA_CHAT_WATCH_SINGLE_OFF=1` — тот же прогон с `groupWatch.singleChats=false`:
  * проверка обязана покраснеть (сигналов чата нет), это её проверка на пустоту.
@@ -33,7 +35,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
@@ -360,7 +362,8 @@ try {
         return false;
       };
       const texts = () => telegram.map((one) => String(one.body?.text ?? ''));
-      const sent = (rule) => texts().filter((text) => text.includes(` ${rule} `));
+      // Код правила стоит в свёрнутой цитате: «<blockquote expandable>R25 · …».
+      const sent = (rule) => texts().filter((text) => new RegExp(`(^|[\\s>])${rule} `).test(text));
       const show = (signal) =>
         signal
           ? JSON.stringify({
@@ -615,47 +618,47 @@ try {
       // Отправка асинхронна: лишняя пришла бы чуть позже.
       await wait(2_500);
       console.log(`     Telegram: ${telegram.length} сообщ.\n       ${texts().join('\n       ')}`);
-      const single = (rule, icon) => sent(rule).length === 1 && sent(rule)[0].startsWith(icon);
+      // Тревога: первая строка — вид, сессия и проект в скобках; что случилось — второй.
+      const ALARM = '<b>⚠️ ТРЕВОГА · ';
+      const single = (rule) => sent(rule).length === 1 && sent(rule)[0].startsWith(ALARM);
       check(
         'одиночный чат: «внимание» наружу не уходит (R24, R26, R29, R30 — 0 сообщений)',
         ['R24', 'R26', 'R29', 'R30'].every((rule) => sent(rule).length === 0),
         texts().join(' | '),
       );
       check(
-        'одиночный чат: R25 «тревога» — одно сообщение ⛔ с заголовком и «после отказа», проект чата',
-        single('R25', '⛔') &&
+        'одиночный чат: R25 «тревога» — одно сообщение словами, «после отказа», проект и чат',
+        single('R25') &&
           sent('R25')[0].includes('отбитое действие сделано другим путём') &&
           sent('R25')[0].includes('мин после отказа') &&
-          sent('R25')[0].endsWith(`— ${SOLO_NAME}`),
+          sent('R25')[0].includes(`(${SOLO_NAME})</b>`),
         sent('R25').join(' | '),
       );
       check(
         'одиночный чат: R27 уходит один раз — когда стал «тревогой»',
-        single('R27', '⛔') && sent('R27')[0].includes('вопрос текстом ждёт ответа'),
+        single('R27') && sent('R27')[0].includes('вопрос текстом ждёт ответа'),
         sent('R27').join(' | '),
       );
       check(
-        'группа: R31 «внимание» — одно сообщение ⚠️ с заголовком и проектом копии',
-        single('R31', '⚠️') &&
-          sent('R31')[0].includes('правки вне своей копии') &&
-          sent('R31')[0].endsWith(`— ${basename(copy)}`),
+        'группа: R31 «внимание» в Telegram не уходит',
+        sent('R31').length === 0,
         sent('R31').join(' | '),
       );
-      const twice = (rule) =>
-        sent(rule).length === 2 && sent(rule)[0].startsWith('⚠️') && sent(rule)[1].startsWith('⛔');
       check(
-        'R1b: рост до «тревоги» — второе сообщение (⚠️, затем ⛔) внутри срока тишины',
-        twice('R1b'),
+        'R1b: в Telegram — только «тревога», одним сообщением, с группой словами',
+        single('R1b') && sent('R1b')[0].includes('группа 1 «'),
         sent('R1b').join(' | '),
       );
       check(
-        'R22: рост до «тревоги» — второе сообщение (⚠️, затем ⛔), заголовок «группа стоит без хода»',
-        twice('R22') && sent('R22').every((text) => text.includes('группа стоит без хода')),
+        'R22: в Telegram — только «тревога» «группа стоит без хода», с группой словами',
+        single('R22') &&
+          sent('R22')[0].includes('группа стоит без хода') &&
+          sent('R22')[0].includes('группа 2 «'),
         sent('R22').join(' | '),
       );
       check(
-        'всего сообщений ровно 7 (R25, R27, R31, R1b×2, R22×2) и все — адресату через бота заглушки',
-        telegram.length === 7 &&
+        'всего сообщений ровно 4 (R25, R27, R1b, R22 — тревоги) и все — адресату через бота заглушки',
+        telegram.length === 4 &&
           telegram.every(
             (one) =>
               one.body?.chat_id === '@qa-chat-watch' &&

@@ -229,5 +229,36 @@ describe(
       );
       expect(gate.status, `${gate.stdout}${gate.stderr}`).toBe(0);
     });
+
+    it('tests-cli run: запрошенный кейс без результата в отчёте назван, код 1 — не зелёный', () => {
+      // Команда пишет отчёт только по tests/other.test.mjs — как своя команда
+      // проекта, потерявшая путь второго файла (группа 25.10: два кейса, один обновлён, код 0).
+      const ran = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'run',
+          '--case',
+          'other:other-001,auth:auth-001',
+          '--cmd',
+          'node tests/write-junit.mjs {report}',
+          '--full',
+          '--fresh',
+          '--project',
+          dir,
+        ],
+        {
+          cwd: dir,
+          encoding: 'utf8',
+          timeout: 60_000,
+          env: { ...process.env, AGENTDECK_BRIEF_OUTPUT: '' },
+        },
+      );
+      const out = `${ran.stdout}${ran.stderr}`;
+      expect(ran.status, out).toBe(1);
+      expect(out).toContain('Без результата в этом прогоне (1)');
+      expect(out).toContain('✗ auth:auth-001 — tests/login.test.mjs');
+      expect(out).not.toContain('✗ other:other-001');
+    });
   },
 );

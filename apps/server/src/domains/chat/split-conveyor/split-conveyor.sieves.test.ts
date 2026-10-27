@@ -23,6 +23,8 @@ const LANG = 'agentdeck:sieves';
 function build(
   verdicts: Awaited<ReturnType<SplitDeliveryDeps['facts']>>[],
   proposal: SplitPlanRecord['proposal'] = PROPOSAL,
+  /** Задание группы несло след задач (`TaskSplitStarted.taskTrace`). */
+  taskTrace = false,
 ) {
   const records = new Map<string, SplitPlanRecord>();
   const nudges: string[] = [];
@@ -68,6 +70,7 @@ function build(
         started: true,
         prompt: '',
         deliver: true,
+        ...(taskTrace ? { taskTrace: true } : {}),
       })),
       failures: [],
     }),
@@ -248,6 +251,43 @@ describe('SplitConveyor: след требований владельца', () =
         `Дописал.\n${row('pass', 'src/login.test.ts:12 — npm test → 1 passed')}\n${MR}`,
       ),
     );
+    await t.settle();
+    expect(t.group()?.status).toBe('done');
+  });
+});
+
+/**
+ * След задач (живой аудит 26.10): задание с доставкой велит отчитаться строкой
+ * `task-N` по каждому пункту задач — запуск ставит метку, доставка её судит.
+ */
+describe('SplitConveyor: след задач', () => {
+  it('задание несло след — ход без строк task-N не готов, напоминание просит их; со строкой — готово', async () => {
+    const t = build([{ missing: [], mr: MR }], PROPOSAL, true);
+    await t.begin();
+    expect(t.group()?.taskTrace).toBe(true);
+    const deliver = t.link('deliver');
+    t.conveyor.onChainResumed(deliver);
+    t.conveyor.onChainEnded(deliver, outcomeOf(deliver, `Готово.\n\n${MR}`));
+    await t.settle();
+    expect(t.group()?.status).not.toBe('done');
+    const unreported = serverText('delivery-gap-task-unreported', { lang: LANG });
+    expect(t.group()?.deliveryMissing).toEqual([unreported]);
+    expect(t.nudges.at(-1)).toContain(localizeText(unreported, 'en'));
+
+    t.conveyor.onChainResumed(deliver);
+    const text = `Досдал.\n\n\`\`\`${LANG}\n{"sieves":[{"id":"task-1","status":"pass","evidence":"src/login.ts:12 — npm test → 4 passed"}]}\n\`\`\`\n\n${MR}`;
+    t.conveyor.onChainEnded(deliver, outcomeOf(deliver, text));
+    await t.settle();
+    expect(t.group()?.status).toBe('done');
+  });
+
+  it('задание следа не несло — строк task-N не спрашивают', async () => {
+    const t = build([{ missing: [], mr: MR }]);
+    await t.begin();
+    expect(t.group()?.taskTrace).toBeUndefined();
+    const deliver = t.link('deliver');
+    t.conveyor.onChainResumed(deliver);
+    t.conveyor.onChainEnded(deliver, outcomeOf(deliver, `Готово.\n\n${MR}`));
     await t.settle();
     expect(t.group()?.status).toBe('done');
   });

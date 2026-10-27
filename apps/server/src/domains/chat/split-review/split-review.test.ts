@@ -1,4 +1,8 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { REVIEW_FINDINGS } from '../review-findings/review-findings.ts';
 import {
   SplitReview,
   reviewNoticeText,
@@ -246,6 +250,26 @@ describe('решение человека', () => {
     const fixLink = links[started[0]?.chatId ?? ''];
     expect(fixLink?.stage).toBe('fix');
     expect(fixLink?.review?.url).toBe(URL);
+  });
+
+  // Аудит g9 27.10 (R7): карточки с номерами R-n — файлом в копии, путь в задании.
+  it('«исправить» кладёт карточки файлом в копию и называет его в задании правок', async () => {
+    const copy = mkdtempSync(join(tmpdir(), 'split-review-'));
+    try {
+      const { review, links, started } = stand();
+      links.c1 = reviewLink({
+        review: { url: URL, branch: 'feature/login', path: copy, findings: ['src/a.ts:10 — x'] },
+      });
+      await review.decide({ chatId: 'c1', decision: 'fix' });
+      expect(started[0]?.prompt).toContain(
+        `The panel keeps this list in ${REVIEW_FINDINGS} as R-1, in the same order`,
+      );
+      const file = readFileSync(join(copy, REVIEW_FINDINGS), 'utf8');
+      expect(file).toContain('branch feature/login; 1 card.');
+      expect(file).toContain('## R-1 · src/a.ts:10 — x');
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
   });
 
   it('правки по ревью знают, что просил человек и какой это MR (F11)', async () => {

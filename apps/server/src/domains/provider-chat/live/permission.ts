@@ -31,7 +31,7 @@ export async function judgePermission(
   const shell = request.shell;
   if (shell && policy?.judge) {
     const verdict = await policy
-      .judge(shell, request.pid)
+      .judge(shell, request.pid, request.session)
       .catch(() => ({ behavior: 'human' as const }));
     if (verdict.behavior === 'allow') return { decision: 'allow' };
     if (verdict.behavior === 'deny') {

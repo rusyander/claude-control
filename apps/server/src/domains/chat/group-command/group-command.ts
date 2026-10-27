@@ -45,9 +45,11 @@ import {
   type SegmentVerdict,
 } from './walk.ts';
 import { unpackPaths } from './extract.ts';
+import { linkFreeUnpack, noteFeed, unpackLeaves } from './unpack-judge.ts';
 import { linkPaths } from './links.ts';
 import { aliasScript, chainsAlias, riskyFunctionBody } from './alias-script.ts';
 import { isMake, makeVerdict } from './make.ts';
+import { mklinkVerdict } from './mklink.ts';
 import { resolveFrom } from './paths.ts';
 import {
   isInterpreter,
@@ -63,6 +65,7 @@ export type { CodeRule } from './risky.ts';
 export type { KillTargets } from './kill.ts';
 export type { GroupCommandVerdict } from './tally.ts';
 export { ignoredFacts } from './targets.ts';
+export { tempDeleteNames } from './own-temp.ts';
 export { isProtectedBranch } from './walk.ts';
 
 /**
@@ -331,7 +334,11 @@ function commandVerdict(
   const words = [named, ...args.map((word) => walk.expand(word))];
   // Ссылки звена встают в учёт после его суда: само звено их ещё не видит.
   const links = linkTargets(linkPaths(name, words), walk);
-  const unpacked = linkTargets(unpackPaths(name, words), walk);
+  const unpackDirs = unpackPaths(name, words);
+  // Распаковка вне копии и временного перезапишет чужое дерево (D-9).
+  if (unpackLeaves(unpackDirs, walk)) return DANGER;
+  // Дерево своего коммита без ссылок — распакованное не ведёт наружу (D-9).
+  const unpacked = linkFreeUnpack(name, words, raw, walk) ? [] : linkTargets(unpackDirs, walk);
   const verdict = namedVerdict(name, words, walk, tally, env);
   for (const link of links) walk.links.note(link);
   for (const root of unpacked) walk.links.noteUnpacked(root);
@@ -373,6 +380,9 @@ function namedVerdict(
   }
   if (name === 'mktemp') return ROUTINE;
   if (isMake(name)) return makeVerdict(words, walk);
+  // `cmd /c mklink /J <ссылка> <цель>` с названными путями — по ним (D-7).
+  const linked = name === 'cmd' ? mklinkVerdict(words, walk) : undefined;
+  if (linked) return linked;
   // Любое слово PowerShell, называющее хранилище git, — человеку (раунд 8).
   const shell = name === 'powershell' || name === 'pwsh';
   if (shell && words.slice(1).some((word) => powershellNamesStorage(word.text, walk))) {
@@ -389,7 +399,9 @@ function namedVerdict(
  */
 function linkTargets(paths: (Word | undefined)[], walk: Walk): (string | undefined)[] {
   const cwd = walk.place().cwd;
-  return paths.map((link) => {
+  return paths.map((raw) => {
+    // Путь из `$(cygpath -w $W/…)` (`cmdMklink`) несёт переменную — раскрыть (D-7).
+    const link = raw && walk.expand(raw);
     const known = link && !link.dynamic && (cwd !== undefined || isAbsolute(link.text));
     return known ? resolveFrom(cwd ?? '/', link.text) : undefined;
   });
@@ -473,14 +485,16 @@ function judge(steps: Step[], walk: Walk, tally: Tally): void {
   // Тела heredoc и печать звеньев раньше по трубе: `cat <<'EOF' | bash` исполнит тело.
   let upstream: string[] = [];
   let previousJudged = true;
-  for (const step of steps) {
+  for (const [index, step] of steps.entries()) {
     if (tally.danger) return;
+    // Что подаётся на вход звена трубы — суду распаковки (`git archive | tar -x`, D-9).
+    noteFeed(steps, index);
     if (step === ENTER) walk.enter();
     else if (step === LEAVE) walk.leave();
     else if (step === BLIND) walk.blind();
     else {
       if (!step.piped) upstream = [];
-      walk.atChain(step.chain);
+      walk.atChain(step.chain, step);
       const fed = upstream;
       // `cat list.txt | sh` и `curl … | bash` исполнят непрочитанное. Строка
       // правил чата «сеть и исполнение» звено за звеном не срабатывает — трубы
@@ -542,6 +556,29 @@ function judgeDeferred(walk: Walk, tally: Tally): void {
 /** Команда инструмента PowerShell называет хранилище git (раунд 8) — как `pwsh -c`. */
 export function powershellToolStorage(command: string, scope: GroupCommandScope): boolean {
   return powershellNamesStorage(command, new Walk(scope));
+}
+
+/** Обход команды целиком — ради того, что он узнал по пути (записи во временное, `cd`). */
+function walked(command: string, scope: GroupCommandScope): Walk | undefined {
+  const steps = parse(command);
+  if (steps === UNPARSED) return undefined;
+  const walk = new Walk(scope);
+  walk.stable = stableNames(command);
+  judge(steps, walk, new Tally());
+  return walk;
+}
+
+/**
+ * Временные пути вне копии, что команда пишет (`> /tmp/x.log`, `cp f /tmp/x.bak`),
+ * — на диске: улика своего файла для уборки позже (D-10, `own-temp-evidence.ts`).
+ */
+export function tempWritesOf(command: string, scope: GroupCommandScope): string[] {
+  return [...new Set(walked(command, scope)?.tempWrites ?? [])];
+}
+
+/** Каталоги, куда команда уходит `cd`, как их судит обход (пересуд устаревшей записи). */
+export function cdTargetsOf(command: string, scope: GroupCommandScope): string[] {
+  return [...new Set(walked(command, scope)?.cdTargets ?? [])];
 }
 
 export function groupCommandVerdict(

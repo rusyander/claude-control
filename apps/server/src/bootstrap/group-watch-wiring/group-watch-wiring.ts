@@ -18,7 +18,10 @@ import { findTranscript } from '../../domains/chat/ChatTranscriptFile/ChatTransc
 import {
   GroupWatcher,
   type ChatSignalStore,
+  type DeferredStuck,
   type GroupLive,
+  type LedgerSource,
+  type RestartFeed,
   type TranscriptHint,
   type WatchSignalStore,
   type WatchTarget,
@@ -28,13 +31,29 @@ import {
   foreignTranscriptKind,
   newestForeignTranscript,
 } from '../../domains/chat/token-ledger/foreign/foreign-transcript.ts';
+import {
+  continueSessionFile,
+  continueSessionsDir,
+  foreignDocumentKind,
+  newestContinueSession,
+} from '../../domains/chat/token-ledger/foreign/foreign-document.ts';
+import {
+  newestOpencodeSession,
+  opencodeDbFile,
+  opencodeSessionRef,
+} from '../../domains/chat/token-ledger/foreign/opencode-db.ts';
 import { foreignHomes } from '../../domains/analytics/scanner/foreign.ts';
 import {
   loadLearnedDurations,
   maskCommand,
   type LearnedDurations,
 } from '../../domains/chat/token-ledger/watch/check-signature.ts';
-import { createFiveHourReader } from '../../domains/chat/limit-journal/limit-journal.ts';
+import {
+  createLimitRunsReader,
+  windowPointsOf,
+  type LimitRunRecord,
+  type WindowPoint,
+} from '../../domains/chat/limit-journal/limit-journal.ts';
 import { heavyQueueWait } from '../../domains/group-progress/heavy-wait.ts';
 import { sessionHoldsLease } from '../../domains/chat/heavy-queue-leases/heavy-queue-leases.ts';
 import { groupDeliverAhead } from '../../domains/chat/split-conveyor/split-conveyor.ts';
@@ -49,6 +68,8 @@ import { createPortProbe } from './port-probe.ts';
 
 /** Корень репозитория панели: отсюда пять уровней вверх. */
 const PANEL_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
+/** Правленые файлы групп для R38 — в каталоге данных панели, рядом с журналом dev-watch. */
+const GROUP_EDITS_FILE = 'group-watch-edits.json';
 /** Опыт очереди перечитывается не чаще раза в пять минут: файл меняется редко. */
 const LEARNED_TTL_MS = 5 * 60_000;
 /** Статусы, при которых группа идёт: молчание звена — повод для R1. */
@@ -69,6 +90,14 @@ export interface GroupWatchWiringDeps {
    * вопросом. Нет — отложенных вопросов сторож не видит.
    */
   deferredWaiting?: (parentChatId: string, groupIndex: number) => boolean;
+  /** Ждущий D-n, который панель сама не разрешила (`not-auto-approved`) — R45. */
+  deferredStuck?: (parentChatId: string, groupIndex: number) => DeferredStuck | undefined;
+  /** Перезапуски сервера панели (журнал dev-watch) — R38, R39. */
+  restartFeed?: () => RestartFeed;
+  /** Журнал проверок (verify-ledger) — R40, R41. */
+  ledger?: LedgerSource;
+  /** Охват сторожа: журнал проверок поставлен, сервер под dev-watch. */
+  panelSources?: () => { ledger: boolean; devWatch: boolean };
   projectsDir: () => string;
   heavyQueueDir: string;
   notify?: (signal: GroupSignal, target: WatchTarget) => void;
@@ -77,6 +106,10 @@ export interface GroupWatchWiringDeps {
   panelRoot?: string;
   /** Каталог данных панели: журнал лимита всех прогонов — замеры окна для R9. */
   appDataDir?: string;
+  /** Каталог сессий Continue (`cn`); нет — `CONTINUE_GLOBAL_DIR` или `~/.continue/sessions`. */
+  continueSessionsDir?: () => string;
+  /** База сессий OpenCode; нет — `<XDG_DATA_HOME | ~/.local/share>/opencode/opencode.db`. */
+  opencodeDb?: () => string;
   /** Домашний каталог для `~/…` в командах (R7); нет — домашний каталог процесса. */
   home?: string;
   /** Свой срок остывания кэша чужого CLI (R2) — для живой проверки; нет — срок провайдера. */
@@ -166,6 +199,25 @@ export function wireGroupWatch(
   };
   const transcript = (sessionId: string, hint?: TranscriptHint): string | undefined => {
     if (!hint) return remembered(sessionId, () => findTranscript(deps.projectsDir(), sessionId));
+    const docKind = foreignDocumentKind(hint.provider);
+    // OpenCode: сессия — запись базы, ссылка `<база>#<id>`. Первый ход — свежая
+    // корневая сессия копии (id CLI ещё не назван); ссылка та же и после смены ключа.
+    if (docKind === 'opencode') {
+      const db = (deps.opencodeDb ?? opencodeDbFile)();
+      if (!sessionId.includes(':')) return opencodeSessionRef(db, sessionId);
+      return hint.cwd && hint.since !== undefined
+        ? newestOpencodeSession(db, hint.cwd, hint.since)
+        : undefined;
+    }
+    // Continue: переписка — документ JSON, каждый ответ — свой запуск `cn -p` и свой файл.
+    // id сессии панели не сообщается: файл хода — свежий документ копии.
+    if (docKind) {
+      const dir = (deps.continueSessionsDir ?? continueSessionsDir)();
+      if (!sessionId.includes(':')) return continueSessionFile(dir, sessionId);
+      return hint.cwd && hint.since !== undefined
+        ? newestContinueSession(dir, hint.cwd, hint.since)
+        : undefined;
+    }
     const kind = foreignTranscriptKind(hint.provider);
     if (!kind || !deps.appDataDir) return undefined;
     const homes = foreignHomes(kind, deps.appDataDir);
@@ -308,6 +360,15 @@ export function wireGroupWatch(
       : {}),
     groupLive,
     groupSeenAt,
+    ...(deps.deferredStuck ? { deferredStuck: deps.deferredStuck } : {}),
+    ...(deps.deferredWaiting ? { deferredWaiting: deps.deferredWaiting } : {}),
+    ...(deps.restartFeed ? { restartFeed: deps.restartFeed } : {}),
+    // R38 после перезапуска: правки групп переживают процесс в каталоге данных.
+    ...(deps.restartFeed && deps.appDataDir
+      ? { editsFile: join(deps.appDataDir, GROUP_EDITS_FILE) }
+      : {}),
+    ...(deps.ledger ? { ledger: deps.ledger } : {}),
+    ...(deps.panelSources ? { panelSources: deps.panelSources } : {}),
     save: (parentChatId) => {
       deps.signals.save();
       // Рассылка — после записи: сбой записи бросает, и вкладкам перечитывать нечего.
@@ -384,7 +445,7 @@ export function wireGroupWatch(
     panelRoot: realPath(deps.panelRoot ?? PANEL_ROOT) ?? deps.panelRoot ?? PANEL_ROOT,
     home: deps.home ?? homedir(),
     realPath,
-    ...(deps.appDataDir ? { limitSamples: createFiveHourReader(deps.appDataDir) } : {}),
+    ...(deps.appDataDir ? limitSources(deps.appDataDir) : {}),
     learned: () => {
       const now = Date.now();
       if (!learned || now - learned.at > LEARNED_TTL_MS) {
@@ -400,4 +461,24 @@ export function wireGroupWatch(
   chatRuns.setWatchListener(watcher.onFeed);
   watcher.start();
   return watcher;
+}
+
+/**
+ * Журнал лимита одним читателем на оба правила: замеры окон (R9) и прогоны (R42).
+ * Замеры пересобираются, только когда читатель отдал новый список — файл изменился.
+ */
+function limitSources(appDataDir: string): {
+  limitSamples: () => readonly WindowPoint[];
+  limitRuns: () => readonly LimitRunRecord[];
+} {
+  const limitRuns = createLimitRunsReader(appDataDir);
+  let memo: { runs: readonly LimitRunRecord[]; points: WindowPoint[] } | undefined;
+  return {
+    limitRuns,
+    limitSamples: () => {
+      const runs = limitRuns();
+      if (memo?.runs !== runs) memo = { runs, points: windowPointsOf(runs) };
+      return memo.points;
+    },
+  };
 }

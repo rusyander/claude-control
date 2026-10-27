@@ -102,6 +102,12 @@ export class QwenServeTurn implements LiveTurn {
   private resumed = false;
   /** Сессию оставить по концу хода: её продолжит следующий ход разговора (E2b). */
   private keep = false;
+  /**
+   * CLI принял реплику хода (`promptId`). Снятый раньше ход (пауза, пока Qwen
+   * ждёт свои MCP) сессию с этой репликой не оставил: её id значил бы для
+   * панели «сессия видела и её», и следующий ход ушёл бы без неё (P-24).
+   */
+  private prompted = false;
 
   /**
    * `graceMs`, `mcpWaitMs` — подмены ожидания подхвата и потолка ожидания MCP для
@@ -193,6 +199,7 @@ export class QwenServeTurn implements LiveTurn {
       });
       const promptId = typeof prompt?.promptId === 'string' ? prompt.promptId : undefined;
       if (!promptId) return this.close({ kind: 'unavailable', why: 'prompt без promptId' });
+      this.prompted = true;
       this.active = true;
       onSteerable?.();
 
@@ -374,6 +381,8 @@ export class QwenServeTurn implements LiveTurn {
       ...(toolCall?.title ? { title: toolCall.title } : {}),
       ...(shell ? { shell } : {}),
       ...(pid ? { pid } : {}),
+      // id сессии qwen serve = `session_id` хука набора (`config.getSessionId()`, P-26).
+      ...(this.sessionId ? { session: this.sessionId } : {}),
     });
     const optionId = pickOption(options, decision);
     // Нет варианта под решение — `cancelled`: для CLI это отказ, «да» не выдумываем.
@@ -492,8 +501,12 @@ export class QwenServeTurn implements LiveTurn {
     this.abort.abort();
     const sessionId = this.sessionId;
     const kept = this.keep && sessionId !== undefined && result.kind === 'done';
+    // Реплики хода сессия не получила — id панели не отдаётся: продолженная
+    // остаётся при прежней отметке, и следующий ход дошлёт ей и эту реплику.
+    // Удалять её незачем, а новую и некому: снятый ход гасит процесс сразу (`stop`).
+    const told = kept && this.prompted;
     if (this.keep && sessionId && !kept) await this.remove(sessionId);
     if (this.child) killChildTree(this.child);
-    return kept ? { ...result, session: sessionId, resumed: this.resumed } : result;
+    return told ? { ...result, session: sessionId, resumed: this.resumed } : result;
   }
 }

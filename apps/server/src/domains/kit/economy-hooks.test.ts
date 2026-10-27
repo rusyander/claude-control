@@ -461,6 +461,26 @@ describe('inline-edit-guard: правка файла встроенным код
     expect(edit(`P=docs; echo x > $P/notes.md`)).toMatch(/Markdown file/);
   });
 
+  it('каталог `cd $S/…` раскрывает переменную той же команды (группа #5 25.10)', () => {
+    // Ревьюер правил копию в черновике python-heredoc'ом после `cd $S/…` — отказ, повтор, лишний ход.
+    const W = 'C:/work/proj';
+    const py = `python - <<'EOF'\nopen('handlers.go','w').write('x')\nEOF`;
+    expect(edit(`W=${W}; S=$W/.agent/tmp/r/scratch; cd $S/inst-auth; ${py}`)).toBeUndefined();
+    expect(edit(`P=.agent/tmp/r; cd $P; echo x > notes.md`)).toBeUndefined();
+    expect(edit(`S=$W/src; cd $S; ${py}`)).toMatch(/inline code writing a file/);
+    expect(edit(`P=docs; cd $P; echo x > notes.md`)).toMatch(/Markdown file/);
+    // Путь в переменной кода (`p='…'` строкой выше `open(p,'w')`): судят каталог и пути от `cd`.
+    const viaVar = (p: string) => `python - <<'EOF'\np='${p}'\nopen(p,'w').write('x')\nEOF`;
+    expect(edit(`S=$W/.agent/tmp/r; cd $S/a; ${viaVar('handlers.go')}`)).toBeUndefined();
+    expect(edit(`S=$W/.agent/tmp/r; cd $S/a; ${viaVar('../../../../src/x.go')}`)).toMatch(
+      /inline code writing a file/,
+    );
+    expect(edit(viaVar('.agent/tmp/x.go'))).toMatch(/inline code writing a file/);
+    // Escape-последовательности строки кода — не пути.
+    const escapes = `python - <<'EOF'\np='h.go'\nold="\\tif x {\\n\\t\\treturn"\nopen(p,'w').write(old)\nEOF`;
+    expect(edit(`S=$W/.agent/tmp/r; cd $S/a; ${escapes}`)).toBeUndefined();
+  });
+
   it('в субагенте повтор ищется в его собственном транскрипте, а не у родителя', () => {
     // CLI отдаёт субагенту transcript_path родителя; отказ лежит в файле самого субагента.
     const command = `sed -i 's/a/b/' src/y.ts`;

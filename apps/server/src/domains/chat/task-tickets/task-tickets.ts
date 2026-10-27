@@ -1,6 +1,10 @@
-import { renameSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { RUN_DIR, ensureRunDir } from '../../../lib/run-dir/run-dir.ts';
+import { TASK_TICKETS_FILE } from '@agentdeck/contracts/quality-floor';
+import type { SieveReportRow } from '@agentdeck/contracts/sieves';
+import type { JiraIssueBrief } from '../../integrations/atlassian/jira.ts';
+import { ensureRunDir } from '../../../lib/run-dir/run-dir.ts';
+import { unmappedPoints, type UnmappedPoints } from '../ticket-points/ticket-points.ts';
 import type { TicketRead, TicketSeedResult, TicketSource } from './task-tickets.types.ts';
 
 /**
@@ -14,8 +18,18 @@ import type { TicketRead, TicketSeedResult, TicketSource } from './task-tickets.
  *
  * Файл — панели, не агента: при каждом старте группы он пишется заново (свежее
  * чтение лучше вчерашнего), а свои находки агент пишет в тетрадь (9.2).
+ * Путь — общий с контрактами: по нему строка следа задач называет файл, а
+ * доставка сверяет цитаты строк `task-N` (тест держит его в `RUN_DIR`).
  */
-export const TASK_TICKETS = `${RUN_DIR}/tickets.md`;
+export const TASK_TICKETS = TASK_TICKETS_FILE;
+
+/**
+ * Полный текст задач, не менявшихся после доставки, — рядом, а не в файле задач (аудит g9
+ * 27.10, R6): задание перепроверки просило не перечитывать их разделы, а группа прочла
+ * весь файл (11k при контексте 201k). В файле задач у них строка-указатель; этот файл —
+ * только чтобы процитировать пункт заново, и его же читает проверка доставки.
+ */
+export const TASK_TICKETS_STANDING = TASK_TICKETS.replace(/\.md$/u, '-unchanged.md');
 
 /** Больше задач в одной группе не бывает по делу; лишние названы, но не прочитаны. */
 const TICKETS_MAX = 8;
@@ -80,11 +94,27 @@ function renderIssue(read: TicketRead): string {
   return [...head, ...body, ...comments, ...files, ...links, ''].join('\n');
 }
 
+function renderPointer(issue: JiraIssueBrief, since: string | undefined): string {
+  return (
+    `## ${issue.key} — ${issue.summary}\n\nNot updated in the tracker since the last delivery` +
+    `${since ? ` (${since})` : ''} — its points stand as reported; do not re-read it. Its full ` +
+    `text, only to quote a point again: \`${TASK_TICKETS_STANDING}\`.\n`
+  );
+}
+
+/** Задачи, у которых в файле задач строка-указатель, а текст — в `TASK_TICKETS_STANDING`. */
+export interface StandingTickets {
+  keys: ReadonlySet<string>;
+  /** Последняя доставка группы — с чем сравнивали. */
+  since?: string;
+}
+
 /** Текст файла: шапка с временем чтения, затем задачи по порядку. */
 export function renderTickets(
   reads: readonly TicketRead[],
   skipped: readonly string[],
   at: string,
+  standing?: StandingTickets,
 ): string {
   const header =
     `# Tracker tasks — read by the panel at ${at}\n\n` +
@@ -94,7 +124,18 @@ export function renderTickets(
   const rest = skipped.length
     ? `\nNot copied (over ${TICKETS_MAX} tasks): ${skipped.join(', ')} — read them in the tracker.\n`
     : '';
-  return [header + rest, ...reads.map(renderIssue)].join('\n');
+  const section = (read: TicketRead): string =>
+    !('reason' in read) && standing?.keys.has(read.key)
+      ? renderPointer(read.issue, standing.since)
+      : renderIssue(read);
+  return [header + rest, ...reads.map(section)].join('\n');
+}
+
+/** Запись через временный файл: агент никогда не прочтёт половину. */
+function writeWhole(dir: string, file: string, text: string): void {
+  const temp = join(dir, `.tickets-${process.pid}-${Date.now()}.tmp`);
+  writeFileSync(temp, text);
+  renameSync(temp, file);
 }
 
 /**
@@ -108,6 +149,8 @@ export async function seedTaskTickets(
   keys: readonly string[],
   source: TicketSource | undefined,
   now: () => Date = () => new Date(),
+  /** Перепроверка: задача не менялась после доставки — в файле задач только указатель. */
+  standing?: { stands: (issue: JiraIssueBrief) => boolean; since?: string },
 ): Promise<TicketSeedResult> {
   if (!keys.length || !source?.connected()) return { written: false, read: 0, failed: 0 };
   const taken = keys.slice(0, TICKETS_MAX);
@@ -122,9 +165,144 @@ export async function seedTaskTickets(
   );
   const failed = reads.filter((item) => 'reason' in item).length;
   const dir = ensureRunDir(cwd);
-  const file = join(cwd, TASK_TICKETS);
-  const temp = join(dir, `.tickets-${process.pid}-${Date.now()}.tmp`);
-  writeFileSync(temp, renderTickets(reads, keys.slice(TICKETS_MAX), now().toISOString()));
-  renameSync(temp, file);
-  return { written: true, read: reads.length - failed, failed };
+  const at = now().toISOString();
+  const stands = reads.filter(
+    (item): item is Extract<TicketRead, { issue: JiraIssueBrief }> =>
+      !('reason' in item) && standing?.stands(item.issue) === true,
+  );
+  const keysStanding = new Set(stands.map((item) => item.key));
+  writeWhole(
+    dir,
+    join(cwd, TASK_TICKETS),
+    renderTickets(reads, keys.slice(TICKETS_MAX), at, {
+      keys: keysStanding,
+      ...(standing?.since ? { since: standing.since } : {}),
+    }),
+  );
+  // Файл прежних задач — только этого чтения: от прошлой перепроверки он не остаётся.
+  const standingFile = join(cwd, TASK_TICKETS_STANDING);
+  if (stands.length > 0) writeWhole(dir, standingFile, renderTickets(stands, [], at));
+  else rmSync(standingFile, { force: true });
+  return {
+    written: true,
+    read: reads.length - failed,
+    failed,
+    at,
+    tickets: reads.map((item) =>
+      'reason' in item
+        ? { key: item.key, reason: item.reason }
+        : { key: item.key, ...(item.issue.updatedAt ? { updatedAt: item.issue.updatedAt } : {}) },
+    ),
+    skipped: keys.slice(TICKETS_MAX),
+  };
+}
+
+const readOptional = (file: string): string | undefined => {
+  try {
+    return readFileSync(file, 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Текст задач, который панель положила в копию, вместе с полным текстом прежних задач
+ * (`TASK_TICKETS_STANDING`) — цитату пункта ищут в обоих; файла задач нет — `undefined`.
+ */
+export function readTaskTickets(cwd: string): string | undefined {
+  const tickets = readOptional(join(cwd, TASK_TICKETS));
+  if (tickets === undefined) return undefined;
+  const standing = readOptional(join(cwd, TASK_TICKETS_STANDING));
+  return standing === undefined ? tickets : `${tickets}\n${standing}`;
+}
+
+/** Задачи группы глазами «Перепроверить MR»: что изменилось в трекере после доставки. */
+export interface RecheckTickets {
+  /** Когда панель перечитала задачи в копию. */
+  at: string;
+  /** С чем сравнивали — последняя доставка группы; нет — изменёнными считаются все. */
+  since?: string;
+  /** Ключи задач, обновлённых в трекере после `since`, — с временем обновления. */
+  changed: { key: string; updatedAt?: string }[];
+  /** Ключи задач без изменений после `since`, у которых каждый пункт покрыт строкой следа. */
+  unchanged: string[];
+  /**
+   * Задачи без изменений после `since`, но с пунктами, которых не цитирует ни одна сданная
+   * строка `task-N` (аудит g5 27.10, H1), — с этими пунктами дословно. В файле задач у них
+   * полный раздел, не указатель.
+   */
+  owed?: UnmappedPoints[];
+  /** Ключи, которых в файле нет: не прочитаны (с причиной) или сверх предела. */
+  unread: string[];
+}
+
+/**
+ * Перечитать задачи группы к «Перепроверить MR» (аудит g0 26.10, F3): задание требовало
+ * «прочесть каждый тикет целиком», девять полных чтений через MCP на перепроверку —
+ * и группа не прочла ни одного. Панель перечитывает их тем же доступом, что при старте
+ * группы (запрос из процесса панели, в контекст группы не ложится), и делит на
+ * изменённые после доставки и прежние: заново раскладывать на пункты нужно только первые.
+ * Трекера нет или ключей нет — `undefined`, и задание просит прочесть трекер, как раньше.
+ */
+export async function recheckTickets(
+  cwd: string,
+  keys: readonly string[],
+  source: TicketSource | undefined,
+  since: string | undefined,
+  now: () => Date = () => new Date(),
+  /**
+   * Сданные строки группы со следом задач (`sieveRows`); заданы — задача «стоит как сдана»,
+   * только когда каждый её пункт цитирует строка `task-N` (аудит g5 27.10, H1). Нет следа —
+   * не задано: судить пункты не по чему.
+   */
+  rows?: readonly SieveReportRow[],
+): Promise<RecheckTickets | undefined> {
+  const bound = since ? Date.parse(since) : Number.NaN;
+  // Время Jira со смещением без двоеточия (`+0300`) Node разбирает сам — тест это держит.
+  // Время не разобрать или доставки не было — сравнить не с чем: задача «изменена».
+  const stands = (updatedAt: string | undefined): boolean => {
+    const updated = updatedAt ? Date.parse(updatedAt) : Number.NaN;
+    return Number.isFinite(bound) && Number.isFinite(updated) && updated <= bound;
+  };
+  const owed = new Map<string, string[]>();
+  const seed = await seedTaskTickets(cwd, keys, source, now, {
+    stands: (issue) => {
+      if (!stands(issue.updatedAt)) return false;
+      if (rows === undefined) return true;
+      const points = unmappedPoints(renderIssue({ key: issue.key, issue }), rows)[0]?.points;
+      if (points?.length) owed.set(issue.key, points);
+      return !points?.length;
+    },
+    ...(since ? { since } : {}),
+  });
+  if (!seed.written || !seed.at) return undefined;
+  const changed: RecheckTickets['changed'] = [];
+  const unchanged: string[] = [];
+  const owedList: UnmappedPoints[] = [];
+  const unread: string[] = [...(seed.skipped ?? []).map((key) => `${key} — over the limit`)];
+  for (const ticket of seed.tickets ?? []) {
+    if ('reason' in ticket) {
+      unread.push(`${ticket.key} — ${ticket.reason}`);
+      continue;
+    }
+    const points = owed.get(ticket.key);
+    if (points) {
+      owedList.push({ key: ticket.key, points });
+    } else if (stands(ticket.updatedAt)) {
+      unchanged.push(ticket.key);
+    } else {
+      changed.push({
+        key: ticket.key,
+        ...(ticket.updatedAt ? { updatedAt: ticket.updatedAt } : {}),
+      });
+    }
+  }
+  return {
+    at: seed.at,
+    ...(since ? { since } : {}),
+    changed,
+    unchanged,
+    ...(owedList.length > 0 ? { owed: owedList } : {}),
+    unread,
+  };
 }

@@ -25,6 +25,7 @@ import {
   type LiveSessionPool,
   type TurnOutcome,
 } from '../live-session/live-session.ts';
+import type { ControlReply } from '../live-session/control-requests.ts';
 import { isRelayLost } from '../live-transport/live-transport.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { ledgerCliMarker, watchCliChild } from '../../../lib/cli-spawn/cli-spawn.ts';
@@ -36,6 +37,7 @@ import { CHILD_DENIED_TOOLS, childAppend } from '../initiative/initiative.ts';
 import { SyntheticGate } from '../synthetic-gate.ts';
 import { autoPickResults, picksFor } from '../auto-pick/auto-pick.ts';
 import { resultText, toolOutcome } from '../token-ledger/watch/tool-outcome.ts';
+import { bgNoticesOf, bgTaskIdOf } from '../token-ledger/watch/bg-tasks.ts';
 import { withChatNode } from '../../project-git/chat-node.ts';
 import { withDenyToolsHook } from './deny-tools.ts';
 import { withChatGitAsk } from '../auto-approve/git-ask.ts';
@@ -43,6 +45,7 @@ import {
   AUTONOMOUS_ENV,
   BRIEF_OUTPUT_ENV,
   SPLIT_CHILD_ENV,
+  TESTS_CLI_ENV,
   TESTS_PROJECT_ENV,
   USER_MEMORY_OFF_ENV,
 } from '@agentdeck/contracts/chat-group-settings';
@@ -135,6 +138,10 @@ function signatureOf(snapshot: unknown): string {
  */
 const HEAVY_SLOTS_ENV = 'AGENTDECK_HEAVY_SLOTS';
 const CHILD_HEAVY_SLOTS = String(Math.max(2, Math.floor(availableParallelism() / 4)));
+/** `tools/tests-cli.mjs` этой панели (файл — шесть уровней ниже корня репозитория). */
+const PANEL_TESTS_CLI = fileURLToPath(
+  new URL('../../../../../../tools/tests-cli.mjs', import.meta.url),
+);
 
 /**
  * Число мест очереди на этой машине: заданное человеком в окружении панели, иначе
@@ -148,14 +155,16 @@ export function heavySlots(base: NodeJS.ProcessEnv): number {
 /**
  * Окружение ребёнка разделения: места очереди тяжёлых шагов, короткий вывод
  * `tests-cli run` (2.2 плана экономии — журнал в файл, в контекст итог) и метка
- * группы, по которой хуки советов «/clear» молчат (E1). Одно на Claude и на
- * чужие CLI (6.1): ребёнок Codex или Qwen гоняет те же проверки той же копии.
- * Заданное человеком в окружении панели число мест не трогаем; `options.env`
- * прогона, идущий позже, сильнее.
+ * группы, по которой хуки советов «/clear» молчат (E1), и путь к tests-cli
+ * панели — по нему `gate-run` кладёт JUnit гейта в блок «Тесты». Одно на Claude
+ * и на чужие CLI (6.1): ребёнок Codex или Qwen гоняет те же проверки той же копии.
+ * Заданное человеком в окружении панели число мест и путь не трогаем;
+ * `options.env` прогона, идущий позже, сильнее.
  */
 export function childRunEnv(base: NodeJS.ProcessEnv): Record<string, string> {
   return {
     ...(base[HEAVY_SLOTS_ENV] ? {} : { [HEAVY_SLOTS_ENV]: CHILD_HEAVY_SLOTS }),
+    ...(base[TESTS_CLI_ENV] ? {} : { [TESTS_CLI_ENV]: PANEL_TESTS_CLI }),
     [BRIEF_OUTPUT_ENV]: '1',
     [SPLIT_CHILD_ENV]: '1',
   };
@@ -175,6 +184,8 @@ export function forgetInheritedChildMarks(env: NodeJS.ProcessEnv): void {
   // Проект группы (X1): унаследованный, он увёл бы tests-cli без `--project`
   // в любом чате панели к копии, из которой её перезапустили.
   delete env[TESTS_PROJECT_ENV];
+  // Путь к tests-cli: унаследованный от копии вёл бы к её checkout, а не к этой панели.
+  delete env[TESTS_CLI_ENV];
 }
 
 export type { ChatEvent, RawEvent, RawUsage } from '../chat-events.ts';
@@ -456,6 +467,20 @@ export class ChatRun {
   steer(prompt: string): boolean {
     if (this.isStopped) return false;
     return this.session?.inject(prompt) ?? false;
+  }
+
+  /**
+   * Остановить субагента хода (см. `LiveSession.stopTask`). Разовый `claude -p`
+   * stdin не слушает — `unconfirmed`, кнопки у него и нет (`controllable`).
+   */
+  stopTask(taskId: string): Promise<ControlReply> {
+    if (this.isStopped || !this.session) return Promise.resolve({ outcome: 'unconfirmed' });
+    return this.session.stopTask(taskId);
+  }
+
+  /** Живая сессия слушает stdin: субагента можно остановить. */
+  get controllable(): boolean {
+    return !this.isStopped && Boolean(this.session?.controllable);
   }
 
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
@@ -1174,6 +1199,14 @@ export function translate(raw: RawEvent): ChatEvent[] {
     // CLI уже не ждёт (`toolResult` в `chat-events.ts`). Содержимое бывает строкой
     // (уведомление между ходами), а живой путь исключений не ловит — процесс падал.
     const content = raw.message?.content;
+    // Замечание хука Stop — строка `user` с текстом, не результат вызова: реестру — где
+    // кончился итог хода до ответа на замечание (P1).
+    if (isStopFeedback(content)) return [...picks, { kind: 'stopFeedback' }];
+    // Фоновая задача кончилась — сторожу (R16, фон долго): иначе она висела бы открытой.
+    const notices: ChatEvent[] = bgNoticesOf(content).map((notice) => ({
+      kind: 'bgDone',
+      ...notice,
+    }));
     const blocks = (Array.isArray(content) ? content : []).filter(
       (block) => block?.type === 'tool_result' && block.tool_use_id,
     );
@@ -1183,15 +1216,22 @@ export function translate(raw: RawEvent): ChatEvent[] {
       summary && typeof summary === 'object'
         ? (summary as { timedOutAfterMs?: unknown }).timedOutAfterMs
         : undefined;
+    const bgTaskId = bgTaskIdOf(summary);
     const results: ChatEvent[] = blocks.map((block) => {
       const id = block.tool_use_id ?? '';
       const outcome = toolOutcome(block, {
         timedOutAfterMs,
         denialKind: nonExecutionKind(raw.tool_result_meta, id),
       });
-      return { kind: 'toolResult', toolUseId: id, chars: resultChars(block.content), ...outcome };
+      return {
+        kind: 'toolResult',
+        toolUseId: id,
+        chars: resultChars(block.content),
+        ...outcome,
+        ...(bgTaskId ? { bgTaskId } : {}),
+      };
     });
-    return [...picks, ...results];
+    return [...picks, ...notices, ...results];
   }
 
   if (raw.type === 'rate_limit_event' && raw.rate_limit_info) {
@@ -1221,6 +1261,21 @@ export function translate(raw: RawEvent): ChatEvent[] {
   }
 
   return [];
+}
+
+/** Текст строки `user` начинается словами CLI о замечании хука Stop. */
+function isStopFeedback(content: unknown): boolean {
+  const text =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content
+            .map((block: { type?: unknown; text?: unknown } | null) =>
+              block?.type === 'text' && typeof block.text === 'string' ? block.text : '',
+            )
+            .join('')
+        : '';
+  return text.trimStart().startsWith('Stop hook feedback');
 }
 
 /** Знаков в ответе вызова: строка целиком или текстовые блоки (картинки не в счёт). */

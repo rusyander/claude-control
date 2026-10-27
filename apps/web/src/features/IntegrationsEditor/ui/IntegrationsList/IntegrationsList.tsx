@@ -13,6 +13,7 @@ import { useSettings } from '@entities/AppConfig';
 import { INTEGRATION_IDS, readIntegrations, useIntegrations } from '@entities/Integration';
 import { isIntegrationSet } from '../../model/isIntegrationSet';
 import { IntegrationCard } from '../IntegrationCard/IntegrationCard';
+import { TelegramCard } from '../TelegramCard/TelegramCard';
 import { DiscoveredIntegrations } from '../DiscoveredIntegrations/DiscoveredIntegrations';
 
 /**
@@ -98,9 +99,15 @@ export function IntegrationsList() {
         />
       )}
 
-      {shown.map((id) => (
-        <IntegrationCard key={id} id={id} status={statusOf(id)} settings={values} />
-      ))}
+      {/* У Telegram своя карточка: два шага до подключения, потом группы
+          «Когда звать» и одно «Сохранить» на уведомления и ответы. */}
+      {shown.map((id) =>
+        id === 'telegram' ? (
+          <TelegramCard key={id} status={statusOf(id)} settings={values} />
+        ) : (
+          <IntegrationCard key={id} id={id} status={statusOf(id)} settings={values} />
+        ),
+      )}
     </Stack>
   );
 }

@@ -1,11 +1,27 @@
 import type { GroupWatch } from '@agentdeck/contracts/group-watch';
 import type { SplitPlanGroupRecord } from '../../../../../lib/app-store/app-store.types.ts';
 import { groupDeliverAhead } from '../../../split-conveyor/split-conveyor.ts';
-import { groupKeyOf } from '../group-ledgers.ts';
+import { groupKeyOf, type WastePoint } from '../group-ledgers.ts';
+import type { BurnPoint } from '../rules.ts';
 import { clip, MINUTE_MS, minutes } from '../rules-util.ts';
 import type { RuleHit } from '../watch.types.ts';
-import type { GroupLive } from './group-watcher.types.ts';
+import type { DeferredStuck, GroupLive } from './group-watcher.types.ts';
+import {
+  ledgerFinding,
+  ledgerGaps,
+  type LedgerCheckRun,
+  type LedgerSnapshot,
+} from './ledger-rules.ts';
+import {
+  restartByGroup,
+  restartStorm,
+  type EditedFile,
+  type RestartFeed,
+} from './restart-rules.ts';
 import { TERMINAL } from './timing.ts';
+import { heavyRunHit, type FinishedRun, type HeavyRun } from './window-rules.ts';
+import { unresumedPause } from './pause-rules.ts';
+import { runSummaryHit } from './run-summary.ts';
 
 /**
  * Правила группы, не сессии (A5): R22 — группа стоит без хода, R28 — напоминания о
@@ -44,6 +60,25 @@ export interface GroupSweepInput {
   live?: (parentChatId: string, group: SplitPlanGroupRecord) => GroupLive;
   /** Затравка тишины после перезапуска: когда группа последний раз писала (транскрипт). */
   seenAt?: (parentChatId: string, group: SplitPlanGroupRecord) => number | undefined;
+  /** Ждущий D-n, который панель сама не разрешила (R45); нет — R45 молчит. */
+  deferredStuck?: (parentChatId: string, groupIndex: number) => DeferredStuck | undefined;
+  /** Группа ждёт решения человека по любому D-n (R43 тогда молчит: человеку есть что решить). */
+  deferredWaiting?: (parentChatId: string, groupIndex: number) => boolean;
+  /** Перезапуски панели (R38, R39); нет — оба молчат. */
+  restarts?: RestartFeed;
+  /** Правленые файлы группы по её ключу (R38). */
+  editedFilesOf?: (groupKey: string) => readonly EditedFile[];
+  /** Журнал проверок (R40, R41); нет — оба молчат. */
+  ledger?: LedgerSnapshot;
+  /** Проверки группы, которые журнал обязан был увидеть (R41). */
+  checkRunsOf?: (groupKey: string) => readonly LedgerCheckRun[];
+  /** Тяжёлые прогоны группы за полчаса по её ключу (R42); нет — R42 молчит. */
+  heavyRunsOf?: (groupKey: string) => readonly HeavyRun[];
+  /** Законченные прогоны группы за полчаса (R46); нет — R46 молчит. */
+  finishedRunsOf?: (groupKey: string) => readonly FinishedRun[];
+  /** Расход группы и её вызовы впустую (доля потерь R46); нет — итог без доли. */
+  burnOf?: (groupKey: string) => readonly BurnPoint[];
+  wasteOf?: (groupKey: string) => readonly WastePoint[];
   lastSeen: Map<string, SeenMark>;
   nudgeSnap: Map<string, NudgeSnap>;
   settings: GroupWatch;
@@ -184,16 +219,66 @@ function idleNudges(
     last.every((round) => round === last[0]);
   // Напоминание ушло в разговор работы или ревью, а доставка впереди: пуш там закрыт.
   const misplaced = PRE_DELIVER.has(group.deliveryNudgeStage ?? '') && groupDeliverAhead(group);
-  if (!stuck && !misplaced) return undefined;
   const lastAt = group.deliveryHistory?.at(-1)?.at;
-  const since = lastAt ? Date.parse(lastAt) : NaN;
+  const since = Number.isFinite(lastAt ? Date.parse(lastAt) : NaN)
+    ? Date.parse(lastAt as string)
+    : input.now;
+  if (!stuck && !misplaced) return newlyMissing(input.settings, nudges, rounds, since);
   const first = group.deliveryMissing?.[0];
   return {
     rule: 'R28',
     severity: 'warn',
     numbers: { nudges },
     ...(first ? { params: { missing: clip(first, 120) } } : {}),
-    since: Number.isFinite(since) ? since : input.now,
+    since,
+  };
+}
+
+/**
+ * R28 «каждый круг — новое» (сведение): напоминаний уже `nudgeRepeats`, а последний круг
+ * нашёл недостающее, которого на прошлом не было, — доставка переделывается по кругу, а
+ * не стоит. Набор, который только сжимается, — движение вперёд, не сигнал; тот же набор —
+ * «внимание» выше.
+ */
+function newlyMissing(
+  settings: GroupWatch,
+  nudges: number,
+  rounds: readonly string[],
+  since: number,
+): RuleHit | undefined {
+  if (nudges < settings.nudgeRepeats || rounds.length < 2) return undefined;
+  const before = new Set((rounds.at(-2) ?? '').split('\n'));
+  const fresh = (rounds.at(-1) ?? '').split('\n').filter((item) => item && !before.has(item));
+  const first = fresh[0];
+  if (!first) return undefined;
+  return {
+    rule: 'R28',
+    severity: 'info',
+    numbers: { nudges, fresh: fresh.length },
+    params: { missing: clip(first, 120) },
+    since,
+    textKey: 'groupWatch.rule.R28rounds',
+  };
+}
+
+/**
+ * R45 — группа ждёт решения по D-n, которое панель сама принять не смогла
+ * (`not-auto-approved`): без человека она не двинется. Ожидания по замыслу —
+ * защита бэкенда, основная копия, строки группы — сюда не попадают: их и так решает человек.
+ */
+function stuckDeferred(
+  input: GroupSweepInput,
+  parentChatId: string,
+  group: SplitPlanGroupRecord,
+): RuleHit | undefined {
+  const stuck = input.deferredStuck?.(parentChatId, group.index);
+  if (!stuck) return undefined;
+  return {
+    rule: 'R45',
+    severity: 'info',
+    numbers: { waitMin: minutes(Math.max(0, input.now - stuck.at)) },
+    params: { id: stuck.id, tool: clip(stuck.tool, 60) },
+    since: stuck.at,
   };
 }
 
@@ -216,6 +301,20 @@ function quietNudges(input: GroupSweepInput, key: string, group: SplitPlanGroupR
 export function sweepGroups(input: GroupSweepInput): GroupSweepHit[] {
   const out: GroupSweepHit[] = [];
   const alive = new Set<string>();
+  // R38: живые группы, шедшие уже тогда, — перезапуск в ту минуту задел и их.
+  const moving: { key: string; startedAt: number }[] = [];
+  for (const [parentChatId, plan] of Object.entries(input.plans)) {
+    for (const group of plan.groups) {
+      if (!MOVING.has(group.status)) continue;
+      const started = group.startedAt ? Date.parse(group.startedAt) : NaN;
+      moving.push({
+        key: groupKeyOf(parentChatId, group.index),
+        startedAt: Number.isFinite(started) ? started : 0,
+      });
+    }
+  }
+  const othersOf = (key: string) => (at: number) =>
+    moving.filter((one) => one.key !== key && one.startedAt <= at).length;
   for (const [parentChatId, plan] of Object.entries(input.plans)) {
     for (const group of plan.groups) {
       if (TERMINAL.has(group.status)) continue;
@@ -226,7 +325,21 @@ export function sweepGroups(input: GroupSweepInput): GroupSweepHit[] {
         input.lastSeen.set(key, { at: input.now });
         const paused = group.status === 'paused';
         if (paused) quietNudges(input, key, group);
-        out.push({ parentChatId, group, hits: [], ...(paused ? { paused } : {}) });
+        // R43: пауза стоит, а человеку решать нечего — напоминание, что её пора снять.
+        const unresumed = paused
+          ? unresumedPause(
+              group,
+              input.settings,
+              input.now,
+              input.deferredWaiting?.(parentChatId, group.index) === true,
+            )
+          : undefined;
+        out.push({
+          parentChatId,
+          group,
+          hits: unresumed ? [unresumed] : [],
+          ...(paused ? { paused } : {}),
+        });
         continue;
       }
       const live = input.live?.(parentChatId, group);
@@ -240,6 +353,18 @@ export function sweepGroups(input: GroupSweepInput): GroupSweepHit[] {
       const hits = [
         silentStop(input, parentChatId, group, live),
         idleNudges(input, parentChatId, group),
+        stuckDeferred(input, parentChatId, group),
+        restartByGroup(input.restarts, input.editedFilesOf?.(key) ?? [], input.now, othersOf(key)),
+        restartStorm(input.restarts, input.settings, input.now),
+        ledgerFinding(input.ledger, group.path, input.now),
+        ledgerGaps(input.ledger, group.path, input.checkRunsOf?.(key) ?? [], input.now),
+        heavyRunHit(input.heavyRunsOf?.(key) ?? []),
+        runSummaryHit({
+          runs: input.finishedRunsOf?.(key) ?? [],
+          burn: input.burnOf?.(key) ?? [],
+          waste: input.wasteOf?.(key) ?? [],
+          group,
+        }),
       ];
       out.push({ parentChatId, group, hits: hits.filter((hit) => hit !== undefined) });
     }

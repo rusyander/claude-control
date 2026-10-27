@@ -29,6 +29,35 @@ export interface ComposeInput {
   yielded: readonly string[];
   /** Готовый каталог плагина. */
   target: string;
+  /**
+   * Сузить `hooks.json` (не задано — как есть): остаются только `events`, а
+   * диспетчер `PreToolUse` слушает `preMatcher`. Набор-страховка режима «Только
+   * ваши» несёт одних стражей `PreToolUse`: диспетчер прочих событий и `Read`
+   * без единого элемента стоили бы запуска node на каждом вызове.
+   */
+  hooksOnly?: { events: readonly string[]; preMatcher: string };
+}
+
+/** Группа `hooks.json` с диспетчером событий набора на `PreToolUse`. */
+const PRE_DISPATCH = /\/hooks\/lib\/run\.mjs"?\s+pre\b/;
+
+type HooksConfig = {
+  hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]>;
+};
+
+function narrowHooks(config: HooksConfig, only: NonNullable<ComposeInput['hooksOnly']>): void {
+  for (const [event, groups] of Object.entries(config.hooks ?? {})) {
+    if (!only.events.includes(event)) {
+      delete config.hooks![event];
+      continue;
+    }
+    if (event !== 'PreToolUse') continue;
+    for (const group of groups) {
+      if ((group.hooks ?? []).some((h) => PRE_DISPATCH.test(h.command ?? ''))) {
+        group.matcher = only.preMatcher;
+      }
+    }
+  }
 }
 
 /**
@@ -47,7 +76,13 @@ function stampOf(input: ComposeInput): string {
       hash.update(`${root}|${rel}|${stat.size}|${stat.mtimeMs}\n`);
     }
   }
-  hash.update(JSON.stringify([[...input.disabled].sort(), [...input.yielded].sort()]));
+  hash.update(
+    JSON.stringify([
+      [...input.disabled].sort(),
+      [...input.yielded].sort(),
+      input.hooksOnly ?? null,
+    ]),
+  );
   return hash.digest('hex');
 }
 
@@ -60,15 +95,20 @@ function drop(target: string, file: KitFile): void {
  * Хук, снятый человеком, должен пропасть и из `hooks.json`: иначе CLI звал бы
  * отсутствующий скрипт и сыпал ошибкой на каждом вызове инструмента.
  */
-function pruneHooksJson(target: string, droppedScripts: readonly string[]): void {
+function pruneHooksJson(
+  target: string,
+  droppedScripts: readonly string[],
+  only?: ComposeInput['hooksOnly'],
+): void {
   const path = join(target, 'hooks', 'hooks.json');
-  if (!droppedScripts.length || !existsSync(path)) return;
-  let config: { hooks?: Record<string, { hooks?: { command?: string }[] }[]> };
+  if ((!droppedScripts.length && !only) || !existsSync(path)) return;
+  let config: HooksConfig;
   try {
-    config = JSON.parse(readFileSync(path, 'utf8')) as typeof config;
+    config = JSON.parse(readFileSync(path, 'utf8')) as HooksConfig;
   } catch {
     return;
   }
+  if (only) narrowHooks(config, only);
   const mentions = (command = ''): boolean =>
     droppedScripts.some((script) => command.includes(`/hooks/${script}`));
   for (const [event, groups] of Object.entries(config.hooks ?? {})) {
@@ -114,6 +154,7 @@ export function composeKit(input: ComposeInput): string {
   pruneHooksJson(
     staging,
     removed.filter((file) => file.kind === 'hook').map((file) => file.name),
+    input.hooksOnly,
   );
   writeFileSync(join(staging, '.stamp'), stamp);
   removeEntry(input.target);

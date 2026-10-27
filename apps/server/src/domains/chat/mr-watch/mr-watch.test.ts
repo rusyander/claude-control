@@ -10,6 +10,7 @@ import {
   MR_WATCH_MIN_GAP_MS,
   MR_WATCH_OFFSETS_MS,
   MrWatch,
+  jobLogTail,
   pendingThreads,
 } from './mr-watch.ts';
 import { SplitConveyor } from '../split-conveyor/split-conveyor.ts';
@@ -90,6 +91,8 @@ function build(
     now?: string;
     /** Ответ форджа на повтор задания; нет — повторять нечем (GitHub, нет токена). */
     retry?: (jobId: string) => Promise<boolean>;
+    /** Лог задания у форджа (P8); нет — читать нечем. */
+    jobLog?: (jobId: string) => Promise<string | undefined>;
   } = {},
 ) {
   const records = new Map<string, SplitPlanRecord>();
@@ -119,7 +122,17 @@ function build(
   const notices: { parent: string; event: ChatEvent }[] = [];
   const retried: string[] = [];
   const retry = options.retry;
+  const jobLog = options.jobLog;
+  const logReads: string[] = [];
   const watch = new MrWatch({
+    ...(jobLog
+      ? {
+          jobLog: (_url: string, jobId: string) => {
+            logReads.push(jobId);
+            return jobLog(jobId);
+          },
+        }
+      : {}),
     ...(retry
       ? {
           retryJob: (_url: string, jobId: string) => {
@@ -149,7 +162,20 @@ function build(
     timer!.run();
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
-  return { watch, conveyor, timers, reads, resumed, group, fire, logs, records, notices, retried };
+  return {
+    watch,
+    conveyor,
+    timers,
+    reads,
+    resumed,
+    group,
+    fire,
+    logs,
+    records,
+    notices,
+    retried,
+    logReads,
+  };
 }
 
 describe('pendingThreads: что считается замечанием группе', () => {
@@ -215,7 +241,7 @@ describe('MrWatch: ветки ревьюера после «готово»', () 
     expect(prompt).toContain(`${MR}#note_17928`);
     expect(prompt).toContain('src/ui/Menu.tsx:42');
     expect(prompt).toContain('attachRef ломает фокус');
-    expect(prompt).toContain('re-read ALL MR discussions');
+    expect(prompt).toContain('re-read EVERY unresolved MR discussion');
     expect(prompt).toContain('Before saying "done" again, re-read the MR discussions once more');
     expect(t.group().mrWatch).toMatchObject({ checks: 1, relayed: ['d1:17928'], resumes: 1 });
     // Тред — блокер, ушедший в MR: группа раскладывает его в сито, а ссылка,
@@ -314,6 +340,100 @@ describe('MrWatch: один взгляд на конвейер', () => {
     expect(t.resumed).toHaveLength(1);
   });
 
+  // P8 (g5 25.10): «Read the logs of the failed jobs» без единой строки лога — группа
+  // полезла в фордж за логом, страж отбил чтение, и она гоняла CI вслепую у себя.
+  it('P8: хвост лога упавших заданий — в продолжении, ≤ 40 строк на задание, ≤ 2 задания', async () => {
+    const ESC = String.fromCharCode(27);
+    const trace = (name: string) =>
+      [
+        `${ESC}[0Ksection_start:1761400000:step_script\r${ESC}[0K${ESC}[36;1mExecuting "step_script"${ESC}[0;m`,
+        ...Array.from({ length: 120 }, (_, i) => `${ESC}[31m${name}-line-${i + 1}${ESC}[0m`),
+        `section_end:1761400100:step_script\r${ESC}[0K`,
+        `${ESC}[31;1mERROR: Job failed: exit code 1${ESC}[0;m`,
+        '',
+      ].join('\n');
+    const failed = review({
+      pipeline: {
+        id: '11893',
+        status: 'failed',
+        failedJobs: [
+          { id: '1', name: 'test-frontend', reason: 'script_failure' },
+          { id: '2', name: 'lint', reason: 'script_failure' },
+          { id: '3', name: 'docs', reason: 'script_failure' },
+        ],
+      },
+    });
+    const names: Record<string, string> = { '1': 'test-frontend', '2': 'lint', '3': 'docs' };
+    const t = build({
+      reviews: [failed],
+      jobLog: async (jobId) => trace(names[jobId] ?? jobId),
+    });
+    t.watch.sync('parent');
+    await t.fire();
+
+    expect(t.resumed).toHaveLength(1);
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain('The MR pipeline failed: #11893');
+    expect(prompt).toContain('test-frontend-line-120');
+    expect(prompt).toContain('lint-line-120');
+    expect(prompt).toContain('ERROR: Job failed: exit code 1');
+    // Хвост, а не весь лог; третье задание не читается; без управляющих кодов терминала.
+    expect(prompt).not.toContain('test-frontend-line-80\n');
+    expect(prompt).toContain('test-frontend-line-82');
+    expect(prompt).not.toContain('docs-line-');
+    expect(t.logReads).toEqual(['1', '2']);
+    expect(prompt).not.toContain(ESC);
+    expect(prompt).not.toContain('section_end:');
+    expect(prompt.length).toBeLessThan(6_000);
+  });
+
+  it('P8: лог не прочёлся — продолжение уходит как раньше, без хвоста', async () => {
+    const failed = review({
+      pipeline: {
+        id: '7763',
+        status: 'failed',
+        failedJobs: [{ id: '1', name: 'test-frontend', reason: 'script_failure' }],
+      },
+    });
+    const t = build({
+      reviews: [failed],
+      jobLog: async () => {
+        throw new Error('403');
+      },
+    });
+    t.watch.sync('parent');
+    await t.fire();
+    expect(t.resumed).toHaveLength(1);
+    expect(t.resumed[0]!.prompt).toContain('Failed jobs: test-frontend (script_failure, job 1).');
+    expect(t.resumed[0]!.prompt).not.toContain('Tail of the log');
+  });
+
+  // N1 + N7 (g5 25.10): группа 20 минут гоняла CI у себя вместо одного чтения лога, а
+  // описание задания искала тремя поисками — CI-конфиг жил не в .gitlab-ci.yml.
+  it('N1: красный — лог первым по номеру задания, локальный прогон ничего не доказывает, лога нет — сказать сразу', async () => {
+    const failed = review({
+      pipeline: {
+        id: '11893',
+        status: 'failed',
+        failedJobs: [{ id: '217476', name: 'test-frontend', reason: 'script_failure' }],
+      },
+    });
+    const t = build({ reviews: [failed], jobLog: async () => 'FAIL src/a.test.tsx\nexit 1' });
+    t.watch.sync('parent');
+    await t.fire();
+    const prompt = t.resumed[0]!.prompt;
+    expect(prompt).toContain("Read the failed job's log FIRST");
+    expect(prompt).toContain('A local re-run proves neither a fix nor');
+    expect(prompt).toMatch(
+      /No log reachable .* report that gap to the human at once and run nothing/,
+    );
+    expect(prompt).toContain('Tail of the log of test-frontend (job 217476)');
+    expect(prompt).toContain('Failed jobs: test-frontend (script_failure, job 217476).');
+    expect(prompt).toContain("`git grep -n 'test-frontend:' -- '*.yml' '*.yaml'`");
+    // Лог — раньше любого другого шага: строка о логе идёт до хвоста и до правил ответа.
+    expect(prompt.indexOf('log FIRST')).toBeLessThan(prompt.indexOf('Tail of the log'));
+  });
+
   describe('E3: CI упал на инфраструктуре — модель не будится', () => {
     const job = (id: string, name: string, reason?: string) => ({
       id,
@@ -378,7 +498,7 @@ describe('MrWatch: один взгляд на конвейер', () => {
       expect(t.retried).toEqual([]);
       expect(t.resumed).toHaveLength(1);
       expect(t.resumed[0]!.prompt).toContain(
-        'Failed jobs: lint-frontend (runner_system_failure), docs-gate (script_failure).',
+        'Failed jobs: lint-frontend (runner_system_failure, job 51), docs-gate (script_failure, job 52).',
       );
     });
 
@@ -415,6 +535,99 @@ describe('MrWatch: один взгляд на конвейер', () => {
       t.watch.sync('parent');
       await t.fire();
       expect(t.resumed).toHaveLength(1);
+    });
+
+    // g1 26.10, конвейер 12035: semgrep-scan 25 минут ждал узел и упал `job_execution_timeout` —
+    // группа получила вводную в 26 тыс. знаков, ход в 426 тыс. токенов и ожидание человека.
+    const stamp = (s: number, stream: string, text: string) =>
+      `2026-10-26T13:${String(30 + Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}.000000Z 00${stream} ${text}`;
+    const podWait = (seconds: number) =>
+      Array.from({ length: seconds / 3 }, (_, i) => [
+        stamp(
+          i * 3,
+          'E',
+          'Waiting for pod gitlab-runner/runner-x to be running, status is Pending',
+        ),
+        stamp(i * 3, 'E', '\tUnschedulable: "0/30 nodes are available: 30 Insufficient cpu."'),
+      ]).flat();
+    const neverStarted = [
+      stamp(
+        0,
+        'O',
+        'section_start:1793021440:prepare_executor\r\u001b[0K\u001b[0K\u001b[36;1mPreparing the "kubernetes" executor\u001b[0;m',
+      ),
+      stamp(1, 'O', 'section_end:1793021441:prepare_executor\r\u001b[0K'),
+      stamp(2, 'O', 'section_start:1793021442:prepare_script\r\u001b[0K'),
+      ...podWait(90),
+      stamp(1500, 'O', 'section_end:1793022943:prepare_script\r\u001b[0K'),
+      stamp(
+        1500,
+        'O',
+        '+WARNING: prepare_script could not run to completion because the timeout was exceeded.',
+      ),
+      stamp(1500, 'O', 'ERROR: Job failed: execution took longer than 25m0s seconds'),
+    ].join('\n');
+
+    it('таймаут, за который скрипт так и не начался (под ждал узел), — машина CI: повторяет панель', async () => {
+      const t = build({
+        reviews: [red(job('219932', 'semgrep-scan', 'job_execution_timeout'))],
+        jobLog: async () => neverStarted,
+        retry: async () => true,
+      });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.resumed).toHaveLength(0);
+      expect(t.retried).toEqual(['219932']);
+      expect(infraNotices(t)[0]!.event).toMatchObject({
+        textCode: 'split-mr-watch-infra-retry-notice',
+        textParams: { jobs: 'semgrep-scan (job_execution_timeout)' },
+      });
+    });
+
+    it('таймаут посреди скрипта (тесты зависли) — дело кода: судит группа, лог читается один раз', async () => {
+      const hung = [
+        stamp(0, 'O', 'section_start:1793021440:prepare_script\r\u001b[0K'),
+        stamp(5, 'O', 'section_start:1793021445:step_script\r\u001b[0K'),
+        stamp(6, 'O', '$ pnpm test'),
+        stamp(1500, 'O', 'ERROR: Job failed: execution took longer than 25m0s seconds'),
+      ].join('\n');
+      const t = build({
+        reviews: [red(job('7', 'test-frontend', 'job_execution_timeout'))],
+        jobLog: async () => hung,
+        retry: async () => true,
+      });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.retried).toEqual([]);
+      expect(t.resumed).toHaveLength(1);
+      expect(t.resumed[0]!.prompt).toContain('$ pnpm test');
+      expect(t.logReads).toEqual(['7']);
+    });
+
+    it('таймаут, а лог не прочёлся — не доказано: судит группа', async () => {
+      const t = build({
+        reviews: [red(job('7', 'semgrep-scan', 'job_execution_timeout'))],
+        jobLog: async () => {
+          throw new Error('403');
+        },
+        retry: async () => true,
+      });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.retried).toEqual([]);
+      expect(t.resumed).toHaveLength(1);
+    });
+
+    it('хвост лога: повторы ожидания раннера свёрнуты в «(×N)», метки разделов с временем убраны', () => {
+      const tail = jobLogTail(neverStarted);
+      expect(tail).toEqual([
+        expect.stringMatching(/Preparing the "kubernetes" executor$/),
+        expect.stringMatching(/Waiting for pod .* status is Pending \(×30\)$/),
+        expect.stringMatching(/Unschedulable: .*Insufficient cpu\." \(×30\)$/),
+        expect.stringMatching(/WARNING: prepare_script could not run/),
+        expect.stringMatching(/ERROR: Job failed: execution took longer than 25m0s/),
+      ]);
+      expect(tail.join('\n').length).toBeLessThan(800);
     });
 
     it('ветки ревьюера и умерший раннер — группа будится ради веток, красного в слове нет', async () => {

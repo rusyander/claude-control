@@ -70,6 +70,10 @@ const PANEL_TEXT_FILES = [
   'texts-gaps.ru.ts',
   'texts-gaps.en.ts',
 ];
+/** Тексты сторожа групп (строка списка чатов телефона, F7): копия панельного словаря, файл в файл. */
+const WEB_GROUP_WATCH = 'apps/web/src/shared/config/i18n/group-watch';
+const MOBILE_GROUP_WATCH = 'apps/mobile/src/shared/config/i18n/group-watch';
+const GROUP_WATCH_FILES = ['ru.ts', 'en.ts'];
 
 /** Список VALUE_MODULES читается из самого конфига — второй копии быть не должно. */
 function readValueModules(metroText) {
@@ -232,16 +236,25 @@ function check() {
   }
 
   // 4. Словари серверных текстов у телефона — копия панельных.
+  // Копии словарей — тоже «разъехавшийся словарь»: подсказка про Metro им не по делу.
   const drift = dictionaryProblems(WEB_DICT, MOBILE_DICT);
-  problems.push(...drift);
-  for (const name of PANEL_TEXT_FILES) {
-    const webFile = join(WEB_PANEL_TEXTS, name);
-    const mobileFile = join(MOBILE_PANEL_TEXTS, name);
-    if (!existsSync(mobileFile)) problems.push(`${mobileFile}: словаря нет, а у панели он есть`);
+  const copies = [
+    ...PANEL_TEXT_FILES.map((name) => [
+      join(WEB_PANEL_TEXTS, name),
+      join(MOBILE_PANEL_TEXTS, name),
+    ]),
+    ...GROUP_WATCH_FILES.map((name) => [
+      join(WEB_GROUP_WATCH, name),
+      join(MOBILE_GROUP_WATCH, name),
+    ]),
+  ];
+  for (const [webFile, mobileFile] of copies) {
+    if (!existsSync(mobileFile)) drift.push(`${mobileFile}: словаря нет, а у панели он есть`);
     else if (readFileSync(webFile, 'utf8') !== readFileSync(mobileFile, 'utf8')) {
-      problems.push(`${mobileFile}: разошёлся с ${webFile} — копия словаря отстала`);
+      drift.push(`${mobileFile}: разошёлся с ${webFile} — копия словаря отстала`);
     }
   }
+  problems.push(...drift);
   console.log(
     `словарей серверных текстов сверено: ${readdirSync(join(WEB_DICT, 'ru')).length} × 2`,
   );

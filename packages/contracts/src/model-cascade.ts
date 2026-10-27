@@ -2,6 +2,7 @@ import { blockLang, blockLangPattern } from './brand.ts';
 import {
   DELIVERY_CHECKS_LINE,
   labelledCut,
+  MR_SHOTS_LINE,
   OWNER_PRECEDENCE_LINE,
   OWNER_PRECEDENCE_PLAIN_LINE,
   OWNER_TEXT_MAX,
@@ -359,18 +360,28 @@ export function loweredWorkPrompt(
      * же прогоне; остаётся ссылка на задание.
      */
     checksInTask?: boolean;
+    /**
+     * Заведёт ли панель подъём работы на потолок (F4), если ход кончится без правок.
+     * Умолчание — как `review`: правкам и ручному вееру подъёма нет. Работа группы с
+     * выключенным «Ревью после работы» (R3(d), 26.10) подъём сохраняет — это часть
+     * дешёвой работы, а не ревью.
+     */
+    raise?: boolean;
   } = {},
 ): string {
   const named = kind ? `"${kind}"` : 'simple work';
   const review = options.review ?? true;
+  const raise = options.raise ?? review;
   const foreign = options.reviewer === 'cli';
   // Подъём заводит конвейер работы (F4, 12.10.2026): ход понижённой работы без
   // единой правки идёт заново на потолке. Правкам и ручному вееру его нет — и
   // обещать его там нельзя: агент рассчитывал бы на продолжение, которого не будет.
-  const stop = review
+  const stop = raise
     ? 'do not improvise: leave the copy unchanged, describe what you hit and end the turn — the ' +
-      `panel re-runs the task on ${foreign ? 'the model the CLI itself is configured with' : 'the ceiling model'}, ` +
-      'and a turn with half-made changes goes to the review as it is. '
+      `panel re-runs the task on ${foreign ? 'the model the CLI itself is configured with' : 'the ceiling model'}` +
+      (review
+        ? ', and a turn with half-made changes goes to the review as it is. '
+        : ', and a turn with half-made changes goes on as it is. ')
     : 'do not improvise: describe what you hit and end the turn — the human reads it and decides ' +
       'how the work continues. ';
   return (
@@ -586,6 +597,11 @@ export interface ReviewScan {
   findings?: string[];
   /** Отчёт о глубине из того же блока, что и `findings`. */
   depth?: ReviewDepth;
+  /**
+   * Найденное вне охвата группы (`PRE_EXISTING_LINE`, владелец 26.10) — из того же блока.
+   * Правкам не уходит никогда: доставка называет его в MR «было до группы, не исправлено».
+   */
+  preExisting?: string[];
   /** Сколько закрытых блоков разобрать не удалось — иначе отказ не виден. */
   rejected: number;
 }
@@ -596,6 +612,17 @@ function depthOf(body: string): ReviewDepth | undefined {
     return parseReviewDepth((JSON.parse(body) as { depth?: unknown }).depth);
   } catch {
     return undefined;
+  }
+}
+
+/** `preExisting` разобранного блока: карточки той же длины, что и замечания. */
+function preExistingOf(body: string): string[] {
+  try {
+    return textList((JSON.parse(body) as { preExisting?: unknown }).preExisting, MAX_FINDINGS).map(
+      (card) => labelledCut(card, MAX_FINDING_CHARS),
+    );
+  } catch {
+    return [];
   }
 }
 
@@ -619,6 +646,7 @@ const REVIEW_OPEN = new RegExp(
 export function scanReviewBlocks(source: string): ReviewScan {
   let findings: string[] | undefined;
   let depth: ReviewDepth | undefined;
+  let preExisting: string[] = [];
   let rejected = 0;
   let rest = source;
   let out = '';
@@ -642,6 +670,7 @@ export function scanReviewBlocks(source: string): ReviewScan {
     if (parsed) {
       findings = parsed;
       depth = depthOf(body);
+      preExisting = preExistingOf(body);
     } else {
       rejected += 1;
       out += rest.slice(open.index + lead, bodyStart + close.index + close[0].length);
@@ -654,6 +683,7 @@ export function scanReviewBlocks(source: string): ReviewScan {
     text: out.replace(/\n{3,}/g, '\n\n').trim(),
     ...(findings ? { findings } : {}),
     ...(depth ? { depth } : {}),
+    ...(preExisting.length > 0 ? { preExisting } : {}),
     rejected,
   };
 }
@@ -779,12 +809,15 @@ export interface StageContext {
 
 /**
  * Раздел плана, с которого начинается то, что звеньям после работы нужно
- * ВСЕГДА: §5 критерии приёмки, дальше уровень проверки, «не трогать», решения.
- * Узнаётся по номеру И по смыслу заголовка: голый номер совпал бы с пунктом
- * шагов §4 («5. Прогнать тесты»).
+ * ВСЕГДА: критерии приёмки, дальше уровень проверки, «не трогать», решения.
+ * Узнаётся по смыслу заголовка раздела (решётка, жирный или §): голый номер
+ * совпал бы с пунктом шагов («5. Прогнать тесты»).
  */
 const CRITERIA_TITLE =
   /acceptance|criteri|definition of done|done when|критери|приёмк|приемк|готовност/i;
+
+/** Раздел шагов в начале плана — на него указывает ссылка «читай, если шаг неясен». */
+const STEPS_TITLE = /\bsteps?\b|шаг/i;
 
 /**
  * Заголовок раздела плана: `## 5. …`, `**5. …**`, `§5 …`. Голая нумерация
@@ -800,16 +833,22 @@ const PLAN_HEADING =
  */
 const PLAN_HEAD_MIN = 2_000;
 
-/** План, разрезанный перед §5: начало (§0–§4) и то, что звено читает всегда. */
+/** План, разрезанный перед разделом критериев: начало и то, что звено читает всегда. */
 export interface PlanSections {
   head: string;
   tail: string;
+  /** Номер первого раздела плана — с него начинается `head`. */
+  first: number;
+  /** Номер раздела критериев — с него начинается `tail`. */
+  criteria: number;
+  /** Номер раздела шагов внутри `head`, если он назван. */
+  steps?: number;
 }
 
 /**
  * Разрез плана перед разделом критериев (L2.1). `undefined` — разреза нет, и
  * звено получает план целиком: заголовки не узнаны, номера идут не по порядку,
- * перед §5 нет ни одного раздела того же вида или начало слишком короткое.
+ * перед критериями нет ни одного раздела того же вида или начало слишком короткое.
  * Всё сомнительное решается в пользу целого плана — потерять раздел хуже, чем
  * переплатить токенами.
  */
@@ -828,19 +867,32 @@ export function planSections(plan: string): PlanSections | undefined {
       title,
     });
   });
-  const criteria = headings.find((head) => head.num === 5 && CRITERIA_TITLE.test(head.title));
+  // Номер раздела критериев любой: звено плана пишет разделы 1–8 (критерии — §5), план по
+  // шаблону проекта — свои (g5 25.10: разделы 0–6, критерии — §3; разреза не было, и 28 тыс.
+  // знаков плана ехали целиком в задании ревью, правок, проверки и доставки).
+  const sameStyleOf = (criteria: (typeof headings)[number]) =>
+    headings.filter((head) => head.style === criteria.style);
+  const criteria = headings.find((candidate) => {
+    if (!CRITERIA_TITLE.test(candidate.title)) return false;
+    const sameStyle = sameStyleOf(candidate);
+    const ordered = sameStyle.every(
+      (head, index) => index === 0 || head.num > (sameStyle[index - 1]?.num ?? -1),
+    );
+    return ordered && sameStyle.some((head) => head.at < candidate.at);
+  });
   if (!criteria) return undefined;
-  const sameStyle = headings.filter((head) => head.style === criteria.style);
-  const ordered = sameStyle.every(
-    (head, index) => index === 0 || head.num > (sameStyle[index - 1]?.num ?? -1),
-  );
-  if (!ordered || !sameStyle.some((head) => head.at < criteria.at && head.num <= 4)) {
-    return undefined;
-  }
+  const before = sameStyleOf(criteria).filter((head) => head.at < criteria.at);
   const head = lines.slice(0, criteria.at).join('\n').trim();
   const tail = lines.slice(criteria.at).join('\n').trim();
   if (head.length < PLAN_HEAD_MIN || !tail) return undefined;
-  return { head, tail };
+  const steps = before.find((section) => STEPS_TITLE.test(section.title))?.num;
+  return {
+    head,
+    tail,
+    first: before[0]?.num ?? 0,
+    criteria: criteria.num,
+    ...(steps === undefined ? {} : { steps }),
+  };
 }
 
 /** Сколько путей артефактов звено видит: список — подсказка, а не опись копии. */
@@ -865,15 +917,18 @@ function stageTaskText(task: string, skillNamed: boolean): string {
     : text;
 }
 
-/** План в контексте звена: разделы с §5 — текстом, начало — ссылкой на файл. */
+/** План в контексте звена: разделы с критериев — текстом, начало — ссылкой на файл. */
 function planLines(plan: string, planFile: string | undefined): string[] {
   const sections = planFile ? planSections(plan) : undefined;
   if (!planFile || !sections) return ['Group plan:', excerpt(plan, PLAN_EXCERPT)];
+  const { first, criteria, steps } = sections;
+  const stepsRef = steps === undefined ? 'its steps' : `its §${steps}`;
   return [
-    'Group plan from §5 on (acceptance criteria, verification level, do-not-touch, decisions):',
+    `Group plan from §${criteria} on (acceptance criteria, verification level, do-not-touch, decisions):`,
     excerpt(sections.tail, PLAN_EXCERPT),
-    `The rest of the plan (§0–§4: analysis, references, approaches, steps) is in the plan file ` +
-      `${planFile} of this copy — the whole plan, verbatim; read its §4 only if a step is unclear.`,
+    `The rest of the plan (§${first}–§${criteria - 1}: analysis, references, approaches, steps) is in ` +
+      `the plan file ${planFile} of this copy — the whole plan, verbatim; read ${stepsRef} only if ` +
+      'a step is unclear.',
   ];
 }
 
@@ -931,7 +986,9 @@ export function stageContextBlock(
     const task = stageTaskText(context.task, Boolean(options.skillNamed));
     lines.push('Group task:', excerpt(task, TASK_EXCERPT));
   }
-  if (context.plan?.trim()) lines.push(...planLines(context.plan, context.planFile));
+  if (context.plan?.trim()) {
+    lines.push(...planLines(context.plan, context.planFile));
+  }
   if (context.previous?.text.trim()) {
     // Хвост, а не начало: итог и вывод звено пишет в конце ответа.
     lines.push(
@@ -984,21 +1041,136 @@ export function stageContextBlock(
  */
 export type ReviewDelta =
   | { kind: 'whole' }
-  | { kind: 'none'; from: string; published: boolean }
-  | { kind: 'delta'; from: string; command: string; changes: string[] };
+  | { kind: 'none'; from: string; published: boolean; group?: boolean }
+  | { kind: 'delta'; from: string; command: string; changes: string[]; group?: boolean }
+  | { kind: 'commits'; from: string; commits: ReviewCommit[]; more?: number; dirty: boolean };
+
+/**
+ * Коммит охвата ревью группы (владелец 26.10, `ChatLink.startSha`): цепочка первых
+ * родителей от коммита начала группы до головы. `merge` — слияние с разрешением
+ * конфликта (`git show --remerge-diff` непуст или не прочитан), `clean-merge` — слияние,
+ * в котором своего у группы нет: пришедшее с другой ветки — не её работа.
+ *
+ * `group` у `none`/`delta` — начало известно по коммиту группы, а не по журналу ссылок
+ * (L7.13): слова задания другие, смысл тот же.
+ */
+export interface ReviewCommit {
+  sha: string;
+  subject: string;
+  type: 'commit' | 'merge' | 'clean-merge';
+}
+
+/** Охват ревью, суженный панелью: дельта опубликованной ветки или коммиты группы. */
+export type ReviewScope = Extract<ReviewDelta, { kind: 'delta' | 'commits' }>;
 
 /** Абзац ревью по дельте: рамка «читай только это» и сама команда. */
 function reviewDeltaLines(delta: Extract<ReviewDelta, { kind: 'delta' }>): string[] {
+  const since = delta.group
+    ? `This group started at commit ${delta.from}, and the branch was rebased since; what was on ` +
+      'it before the group started is not under review. Review ONLY what the group changed: '
+    : `The branch was already published at ${delta.from} when this work began, and the work ` +
+      'delivered then is not under review again. Review ONLY what changed since: ';
   return [
-    `The branch was already published at ${delta.from} when this work began, and the work ` +
-      'delivered then is not under review again. Review ONLY what changed since: ' +
+    since +
       `\`${delta.command}\` shows it — a commit marked \`!\` was changed (by the work or by a ` +
       'rebase conflict), `>` is new, `<` was dropped; `=` is the same patch on a new base and is ' +
-      'not yours to re-read. Read in full only the files these commits touch, and run only the ' +
-      'checks those files feed.',
+      'not yours to re-read. For a `!` commit read its interdiff hunks, not the whole commit. ' +
+      'Read in full only the files these commits touch, and run only the checks those files feed.',
     'Changed commits:',
     ...delta.changes.map((line) => `- ${line}`),
   ];
+}
+
+/**
+ * Абзац ревью по коммитам группы (владелец 26.10): охват — от коммита, с которого группа
+ * началась. Задача «только конфликт» даёт один коммит слияния, новая работа на готовом MR —
+ * только новые коммиты. `git diff <start>..HEAD` годится, только пока слияний нет: после
+ * слияния основной он несёт и всё пришедшее с неё, поэтому слияние читается
+ * `--remerge-diff` — одним разрешением конфликтов.
+ */
+function reviewCommitLines(scope: Extract<ReviewDelta, { kind: 'commits' }>): string[] {
+  const merges = scope.commits.some((commit) => commit.type !== 'commit');
+  const lines = [
+    `This group started at commit ${scope.from}; everything on the branch before it was ` +
+      "there before the group and is NOT under review — not even when the branch's diff " +
+      "against its target shows it. The scope is this group's own changes: the first-parent " +
+      `commits \`git log --first-parent --format="%h %p %s" ${scope.from}..HEAD\`` +
+      (merges
+        ? '. Read a plain commit with `git show <sha>` and a merge commit with ' +
+          '`git show --remerge-diff <sha>` (git older than 2.36: `git show --cc <sha>`) — it ' +
+          'shows only the conflict resolutions the group wrote, never the changes the merged ' +
+          `branch brought; \`git diff ${scope.from}..HEAD\` would carry those too, do not use it.`
+        : ` — together they are \`git diff ${scope.from}..HEAD\`.`),
+    ...(scope.dirty
+      ? ['Uncommitted changes in the copy are in the scope too: `git diff HEAD` and `git status`.']
+      : []),
+    'Read in full only the files the scope touches, follow its symbols to their callers, and ' +
+      'run only the checks those files feed. Never widen the review to the whole branch against ' +
+      'its target (`git diff <target>...HEAD`).',
+  ];
+  if (scope.commits.length > 0) {
+    lines.push(
+      'Commits of this group:',
+      ...scope.commits.map(
+        (commit) =>
+          `- ${commit.sha} ${commit.subject}` +
+          (commit.type === 'merge'
+            ? ' (merge: review its conflict resolutions only)'
+            : commit.type === 'clean-merge'
+              ? ' (merge without conflict resolutions: nothing of the group to review)'
+              : ''),
+      ),
+      ...(scope.more ? [`- … and ${scope.more} more — the command above lists them`] : []),
+    );
+  }
+  return lines;
+}
+
+/**
+ * Найденное вне охвата группы (владелец 26.10): «давно сломано» — не работа группы, и
+ * правки по нему растягивали задачу «только конфликт» на полчаса. Отдельный список блока —
+ * правкам его панель не отдаёт никогда, доставка называет его в MR «было до группы».
+ */
+export const PRE_EXISTING_LINE =
+  'A defect in code the scope did not change is pre-existing, not a finding of this work: put ' +
+  'its card into a separate "preExisting" list of the same JSON block, never into "findings". ' +
+  'The panel reports those as "pre-existing, not fixed" and never sends them to the fix stage. ' +
+  'A point of the task the scope does not do is still a finding.';
+
+/** Чем ревью группы не заведено: охват пуст (английский — строка задания доставки). */
+export function reviewSkipReason(delta: Extract<ReviewDelta, { kind: 'none' }>): string {
+  return delta.group
+    ? `this group made no changes of its own since its start commit ${delta.from} (no commits, ` +
+        'only merges without conflict resolutions, or a rebase with the same patches)'
+    : `the branch was already published at ${delta.from} and its patches are the same after the rebase`;
+}
+
+/**
+ * Чем ревью группы не заведено, когда его выключил человек (Telegram R3(d), 26.10):
+ * тумблер «Ревью после работы» проекта. Английский — строка задания доставки.
+ */
+export const REVIEW_OFF_REASON =
+  'the human turned «review after work» off for this project, so no review runs after the work';
+
+/**
+ * Правило проекта в чате (`GET/PUT /api/chat/cascade`): подбор модели и ревью после
+ * работы. Два тумблера одной области — проекта: выключить ревью, не выключая
+ * дешёвые модели, раньше было нельзя (ревью держалось на потолке подбора).
+ */
+export interface CascadeRuleView {
+  /** Подбор модели под задачу. */
+  enabled: boolean;
+  /** Ревью на потолке после каждой работы группы. Умолчание — включено. */
+  reviewAfterWork: boolean;
+  /** Ключ проекта, к которому относится правило (копия ветки → её репозиторий). */
+  project: string;
+}
+
+/** Запись правила: меняется только названное поле. */
+export interface CascadeRulePatch {
+  path: string;
+  enabled?: boolean;
+  reviewAfterWork?: boolean;
 }
 
 export function reviewStagePrompt(input: {
@@ -1006,9 +1178,9 @@ export function reviewStagePrompt(input: {
   task: string;
   /**
    * Ветка была опубликована до этой работы (L7.13): ревью — только изменённых
-   * патчей, а не всего MR заново.
+   * патчей, а не всего MR заново. `commits` — коммиты группы от её начала (26.10).
    */
-  delta?: Extract<ReviewDelta, { kind: 'delta' }>;
+  delta?: ReviewScope;
   /** Чем работу вели — ревьюеру полезно знать, где искать типичные пропуски. */
   model?: string;
   /** Класс работы, если он был распознан. */
@@ -1037,14 +1209,25 @@ export function reviewStagePrompt(input: {
     `This is a new session: the work was done${by}${where}; you do not have its context — read ` +
       'the code and the diff.',
     '',
-    'Review it with the deep-review skill on this branch, once and in full, in report mode: no fix ' +
-      'loop, nothing written into any MR. The skill plans its own lanes, agent count and rounds; ' +
+    // Охват известен (26.10): «на этой ветке целиком» навык читал как `git diff
+    // <target>...HEAD` — 54 файла MR, где группа добавила один коммит слияния.
+    (input.delta
+      ? 'Review it with the deep-review skill once, on the scope named below and nothing ' +
+        'wider, in report mode: no fix loop, nothing written into any MR. '
+      : 'Review it with the deep-review skill on this branch, once and in full, in report mode: ' +
+        'no fix loop, nothing written into any MR. ') +
+      'The skill plans its own lanes, agent count and rounds; ' +
       'the risk tier is its hint, never a cap. No such skill — do the same yourself: ' +
-      'git status, git diff and git log of this branch, every touched file read in full together ' +
+      (input.delta
+        ? 'git status and the git commands of the scope below, '
+        : 'git status, git diff and git log of this branch, ') +
+      'every touched file read in full together ' +
       'with its callers, tests, docs and locales, and the checks of what changed run — narrow ' +
       'ones only: the full project checks belong to a later stage, never to the review.',
     ...(input.reviewPack ? [input.reviewPack] : []),
-    ...(input.delta ? reviewDeltaLines(input.delta) : []),
+    ...(input.delta?.kind === 'delta' ? reviewDeltaLines(input.delta) : []),
+    ...(input.delta?.kind === 'commits' ? reviewCommitLines(input.delta) : []),
+    ...(input.delta ? [PRE_EXISTING_LINE] : []),
     'Check the work against EVERY point of the task below, one by one: a point not done or done ' +
       'differently is a finding.',
     // U13: план называет критерии приёмки и уровень проверки — ревью сверяет и с
@@ -1078,6 +1261,177 @@ export function reviewStagePrompt(input: {
 }
 
 /**
+ * Границы группы по плану разделения (аудит g8 26.10, N2): правки судили «свою»
+ * страницу по диффу ветки и завели 32 записи baseline как «долг страниц других
+ * групп» — половина лежала на страницах самой группы, и доставка переделывала их
+ * 48 ходами. Мерило — `owns` разбора, а не дифф.
+ */
+export interface GroupScope {
+  /** Что план отдал этой группе. */
+  own: string[];
+  /** Что план отдал ДРУГИМ группам, без путей, общих с этой. */
+  others: string[];
+}
+
+/** Сколько путей каждой стороны абзац называет: граница, а не опись плана. */
+const GROUP_SCOPE_MAX = 40;
+const GROUP_SCOPE_ENTRY_MAX = 200;
+
+/**
+ * Границы группы `index` из групп плана. План без единого `owns` (разбора не
+ * было или он границ не дал) — `undefined`: «чужого нет» там значило бы
+ * «baseline нельзя нигде», а это неизвестно, а не доказано.
+ */
+export function groupScopeOf(
+  groups: readonly { owns?: readonly string[] | undefined }[],
+  index: number,
+): GroupScope | undefined {
+  if (!groups[index] || !groups.some((group) => Array.isArray(group.owns))) return undefined;
+  const clean = (list: readonly string[]): string[] => [
+    ...new Set(list.map((entry) => entry.trim().slice(0, GROUP_SCOPE_ENTRY_MAX)).filter(Boolean)),
+  ];
+  const own = clean(groups[index].owns ?? []);
+  const others = clean(
+    groups.flatMap((group, at) => (at === index ? [] : (group.owns ?? []))),
+  ).filter((entry) => !own.includes(entry));
+  return { own, others };
+}
+
+function scopeList(entries: readonly string[]): string[] {
+  const shown = entries.slice(0, GROUP_SCOPE_MAX).map((entry) => `- ${entry}`);
+  const rest = entries.length - GROUP_SCOPE_MAX;
+  return rest > 0 ? [...shown, `- … and ${rest} more in the split plan`] : shown;
+}
+
+/** Абзац границ в заданиях правок и проверки; границ нет — абзаца нет. */
+function groupScopeLines(scope: GroupScope | undefined, stage: 'fix' | 'verify'): string[] {
+  if (!scope) return [];
+  return [
+    "This group's scope by the split plan — it decides which page or file is yours; your " +
+      'branch diff does not decide it:',
+    ...(scope.own.length > 0 ? ['Yours:', ...scopeList(scope.own)] : []),
+    ...(scope.others.length > 0
+      ? ['Owned by OTHER groups:', ...scopeList(scope.others)]
+      : ['No other group owns a path in the split plan.']),
+    stage === 'fix'
+      ? 'A new baseline, allow-list or known-debt entry (a quote baseline, a lint exception, a ' +
+        'raised count) is allowed ONLY for a finding on a path owned by another group; a finding ' +
+        "anywhere else is this group's own and is fixed in the code or text, never baselined."
+      : 'A baseline, allow-list or known-debt entry the fixes added on a path no other group owns ' +
+        'is a regression finding: such a finding had to be fixed, never baselined.',
+    '',
+  ];
+}
+
+/**
+ * Раздел доказанного в итоге правок (аудит g8 26.10, N9): проверка заново
+ * доказывала в памяти то, что правки уже убили мутантами с названными тестами.
+ * Заголовок — английский литерал при любом языке ответа: по нему панель
+ * вынимает раздел из итога правок (`provenLines`) и кладёт его в задание
+ * проверки отдельным абзацем — хвост итога в контексте звена бывает обрезан.
+ */
+const PROVEN_HEADING =
+  /^\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:Proven|Доказано)\s*:?\s*(?:\*\*)?\s*:?\s*$/i;
+const PROVEN_BULLET = /^\s*(?:[-*•]|\d+[.)])\s+(.+?)\s*$/;
+/** Сколько строк доказанного едет в проверку и сколько знаков в строке. */
+export const PROVEN_MAX = 30;
+const PROVEN_LINE_MAX = 240;
+
+const PROVEN_REPORT_LINE =
+  'End your answer with a section headed exactly `Proven:` (keep that heading in English ' +
+  'whatever the answer language): one bullet per evidence you executed on the final tree — a ' +
+  'mutant you made fail and the test that killed it (file:line → test name), a check the ' +
+  'verify-ledger recorded or replayed (its key or command). The verification pass takes these ' +
+  'as proven and does not repeat them; leave out anything you did not run.';
+
+/** Строки раздела `Proven:` итога правок — последнего такого раздела; нет — пусто. */
+export function provenLines(text: string): string[] {
+  const lines = text.split(/\r?\n/);
+  let start = -1;
+  for (let at = lines.length - 1; at >= 0; at -= 1) {
+    if (PROVEN_HEADING.test(lines[at] ?? '')) {
+      start = at + 1;
+      break;
+    }
+  }
+  if (start < 0) return [];
+  const out: string[] = [];
+  for (const line of lines.slice(start)) {
+    if (!line.trim()) {
+      if (out.length > 0) break;
+      continue;
+    }
+    const bullet = PROVEN_BULLET.exec(line);
+    if (!bullet?.[1]) break;
+    out.push(bullet[1].slice(0, PROVEN_LINE_MAX));
+    if (out.length >= PROVEN_MAX) break;
+  }
+  return out;
+}
+
+/**
+ * Мера проверки (аудит g8 26.10, N9): дифф правок читался целиком дважды (34
+ * тыс. знаков на ~25 ходов), а клон `git worktree add` + удаление стоили 40 с
+ * ради подхода, брошенного через минуту.
+ */
+const VERIFY_ECONOMY_LINE =
+  'Probe at the content level: check what each finding is about on the current tree — the ' +
+  'text, the value, the output it names — not a mechanism a proven run already covered. Read ' +
+  'the diff of the fixes by `git diff --stat` first, then only the hunks of the files each ' +
+  'finding names (`git diff <range> -- <path>`), never the whole diff in one read. Probe ' +
+  'read-only first — a grep, a ranged read, a script that only reads the tree or overlays a ' +
+  'change in memory; a clone or `git worktree add` only when no read-only probe can answer, ' +
+  'and say why.';
+
+/**
+ * Длинный список правок (аудит g8 26.10, N7): 21 замечание по чекеру в 1,6 тыс.
+ * строк читалось окнами по 330 строк, и разговор сжался в 26 с от финиша. Звено
+ * правок по частям машинерия звеньев не заводит — дешевле мера чтения.
+ */
+export const FIX_LONG_LIST = 15;
+
+/**
+ * g9 26.10 (F10): ход правок кончился на первом коммите — 15 из 72 пунктов, — и
+ * панель дважды заводила продолжение с новой вводной. Конец стадии — конец списка.
+ */
+export const FIX_WHOLE_LIST_LINE =
+  'The stage ends only when every point of the list is closed — fixed, answered, or left with ' +
+  'its reason in your answer. A commit is not the end: commit as you go and keep working; never ' +
+  'end the turn with points nobody looked at.';
+
+/**
+ * g8 26.10 (F6, F9): звено доставки прогнало гейты руками, затем ещё раз через
+ * `gate-run`, потому что сторож git требовал строку 06-gates; в конце стоп-сторож
+ * потребовал шесть строк журнала, а журнал отказал им как дописанным задним числом.
+ */
+export const DELIVER_LEDGER_LINE =
+  'A ticket ledger in the copy (`.agent/tickets/<KEY>.md`): run the checks of step 6 once ' +
+  'through the kit\'s `gate-run --ticket <keys> "<name>=<command>" …` — it writes the 06-gates ' +
+  'row from the exit codes it saw; checks run by hand first make the same full run twice. Write ' +
+  'every other row the moment its step happens — 08-mr when the MR is created, 10-live after ' +
+  'the live run, 11-pipeline at the one read of the pipeline, 12-finish at the undraft, ' +
+  '13-cleanup last — never several at the end: the ledger refuses a burst of rows as a backfill.';
+
+/**
+ * g8 26.10 (F11): открытое «сделается отдельно» ушло в комментарий к задаче без
+ * ключа задачи, которая его возьмёт, — пункт потерян.
+ */
+export const DELIVER_OPEN_HOME_LINE =
+  'An item the MR leaves for later names the tracker key of the task that takes it (`PROJ-123`); ' +
+  'with no such task it is fixed here or asked of the human — «separately» without a key is a ' +
+  'lost item.';
+
+function longFixListLines(count: number): string[] {
+  if (count <= FIX_LONG_LIST) return [];
+  return [
+    `This list is long (${count} findings): go finding by finding, and open a big file by a ` +
+      "targeted grep for the finding's symbol, label or line, then a ranged read around the hit " +
+      '— never page through a file in windows of hundreds of lines: a long list read that way ' +
+      'fills the context and compacts before the end.',
+  ];
+}
+
+/**
  * Задание проходу ПРОВЕРКИ правок (U6, deep-review §7): та же стадия ревью, но
  * не новое ревью, а повтор доказательства каждого замечания на ветке после
  * правок. «Попытался» — не «исправил»: замечание закрыто, только когда его же
@@ -1093,9 +1447,14 @@ export function verifyStagePrompt(input: {
   context?: StageContext;
   /** Абзац сит перед MR. */
   sieves?: string;
+  /** Границы группы по плану разделения (N2); нет плана — абзаца нет. */
+  scope?: GroupScope;
+  /** Раздел `Proven:` итога правок (N9, `provenLines`): это не повторяется. */
+  proven?: readonly string[];
 }): string {
   const where = input.branch ? ` on the branch ${input.branch}` : ' in this working copy';
   const context = stageContextBlock(input.context);
+  const proven = (input.proven ?? []).slice(0, PROVEN_MAX);
 
   return [
     `This is a new session: a review of the work${where} found the findings below, and another ` +
@@ -1110,6 +1469,15 @@ export function verifyStagePrompt(input: {
       'code or in the fixes report, not by silence.',
     'Then read the diff of the fixes (the commits or changes made after the review) for ' +
       'regressions they introduced: each one is a finding too.',
+    ...(proven.length > 0
+      ? [
+          'Already proven by the fixes stage (its `Proven:` section) — do not repeat these runs; ' +
+            're-run one only if a file it names changed after the fixes report:',
+          ...proven.map((line) => `- ${line}`),
+        ]
+      : []),
+    VERIFY_ECONOMY_LINE,
+    ...groupScopeLines(input.scope, 'verify'),
     'EDIT NOTHING and write nothing into any MR: your job is to check and name.',
     'The "findings" list of the block holds ONLY what is still not fixed and the regressions of ' +
       'the fixes; everything verified fixed — an empty list, and the answer says which evidence ' +
@@ -1135,6 +1503,72 @@ export function verifyStagePrompt(input: {
  * панель не заводит: за правками идёт ОДИН проход проверки (`verifyStagePrompt`,
  * U6), и его итог правок уже не заводит.
  */
+/** Сколько файлов и диапазонов в одном файле указатель правок называет: указатель, а не опись. */
+export const FINDING_POINTER_FILES = 40;
+const FINDING_POINTER_RANGES = 8;
+
+/**
+ * Место в карточке замечания: путь хотя бы с одним `/` и расширением, двоеточие, строки
+ * (`a/b.ts:12`, `a/b.ts:12-30`, `a/b.ts:12,40`). Голое имя файла без каталога не
+ * берётся: `constants.tsx:104` в карточке рядом с полным путём — сокращение, по
+ * которому файл не открыть.
+ */
+const FINDING_LOCATION =
+  /(?<![\w/\\.:-])((?:[\w@~+.-]+[\\/])+[\w@~+.-]*\.[A-Za-z0-9]+):(\d+(?:\s*[-–]\s*\d+)?(?:\s*,\s*\d+(?:\s*[-–]\s*\d+)?)*)/g;
+
+/**
+ * Указатели правок из разобранного вердикта ревью (g5 25.10, R34): холодная сессия
+ * правок перечитывала целиком файлы, диапазоны которых ревью уже прочло, — 142 тыс.
+ * токенов переписанного окна. Места берутся из самих карточек (`path:start-end`) и
+ * сводятся по файлу; содержимое файлов в задание не встраивается.
+ */
+export function findingPointers(findings: readonly string[]): string[] {
+  const byPath = new Map<string, string[]>();
+  for (const finding of findings) {
+    for (const match of finding.matchAll(FINDING_LOCATION)) {
+      const path = (match[1] ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
+      if (!path || /^[a-z]+:\/\//i.test(path)) continue;
+      const ranges = byPath.get(path) ?? [];
+      if (!byPath.has(path)) {
+        if (byPath.size >= FINDING_POINTER_FILES) continue;
+        byPath.set(path, ranges);
+      }
+      for (const range of (match[2] ?? '').split(',')) {
+        const clean = range.replace(/\s+/g, '').replace('–', '-');
+        if (clean && !ranges.includes(clean) && ranges.length < FINDING_POINTER_RANGES) {
+          ranges.push(clean);
+        }
+      }
+    }
+  }
+  return [...byPath].map(([path, ranges]) => `- ${path}: ${ranges.join(', ')}`);
+}
+
+/** Абзац указателей в задании правок; мест в карточках нет — абзаца нет. */
+function findingPointerLines(findings: readonly string[]): string[] {
+  const pointers = findingPointers(findings);
+  if (pointers.length === 0) return [];
+  return [
+    'Where the findings point (path:lines from the cards above; the review has read these ' +
+      'ranges already): open each with a ranged read around its lines (offset/limit), not the ' +
+      'whole file, and do not re-read code a card already quotes; widen a range only when the ' +
+      'fix needs the code around it. A path that does not open from the copy root is shortened ' +
+      'in its card — it sits next to the full path named before it there.',
+    ...pointers,
+    '',
+  ];
+}
+
+/** Строка о файле находок (R7): номера в нём — те же, что у списка в задании. */
+function findingsFileLine(file: string, prefix: 'R' | 'V', count: number): string {
+  const ids = count > 1 ? `${prefix}-1…${prefix}-${count}` : `${prefix}-1`;
+  return (
+    `The panel keeps this list in ${file} as ${ids}, in the same order: cite a point by that ` +
+    'id in notes, answers and the MR description, and after a compaction read that file ' +
+    'instead of searching old conversations.'
+  );
+}
+
 export function fixStagePrompt(
   findings: string[],
   options: {
@@ -1165,6 +1599,18 @@ export function fixStagePrompt(
      * судим по ревьюеру: `cli` бывает только у чужого провайдера.
      */
     foreign?: boolean;
+    /** Границы группы по плану разделения (N2): baseline — только на чужом. */
+    scope?: GroupScope;
+    /**
+     * Коммит начала группы (`ChatLink.startSha`, владелец 26.10): правки — только в том,
+     * что группа изменила с него; давнее — «было до группы, не исправлено».
+     */
+    startSha?: string;
+    /**
+     * Файл карточек в копии (аудит g9 27.10, R7): панель кладёт их туда с номерами
+     * R-n — после сжатия группа искала свои находки по старому транскрипту.
+     */
+    findingsFile?: string;
   } = {},
 ): string {
   const { branch, reviewer = 'ceiling', deliver = false, verify = false } = options;
@@ -1178,17 +1624,33 @@ export function fixStagePrompt(
     '',
     ...findings.map((finding, index) => `${index + 1}. ${finding}`),
     '',
+    ...(options.findingsFile
+      ? [findingsFileLine(options.findingsFile, 'R', findings.length), '']
+      : []),
+    ...findingPointerLines(findings),
+    ...longFixListLines(findings.length),
+    ...groupScopeLines(options.scope, 'fix'),
     'Fix every 🔴 and 🟡; answer every ❓ (fix it if the answer shows a defect); fix a 🟢 when it ' +
       'lies within the task. Any order, but go through the whole list and say for every point ' +
       'what you did and how you checked it (attempted is not fixed — re-run the evidence the ' +
       'finding names); if you disagree with one, do not stay silent — explain why you left it as ' +
       'it was.',
+    FIX_WHOLE_LIST_LINE,
+    ...(options.startSha
+      ? [
+          `This group started at commit ${options.startSha.slice(0, 12)}: fix only what the group ` +
+            `changed since (\`git log --first-parent ${options.startSha.slice(0, 12)}..HEAD\`). A ` +
+            'finding that turns out to be about code the group did not change is pre-existing: ' +
+            'leave the code as it is and report the point as "pre-existing, not fixed".',
+        ]
+      : []),
     'Do not rework code beyond the list: these are review fixes, not a second pass at the task.',
     ...(verify
       ? [
           'After your turn the panel starts one verification pass: it re-runs the evidence of ' +
             'every finding against the branch, and a point called fixed that is not stays open ' +
             'and is reported as open.',
+          PROVEN_REPORT_LINE,
         ]
       : []),
     ...(deliver
@@ -1245,6 +1707,8 @@ export function deliverStagePrompt(input: {
    * второго круга правок нет, и молча доставить «всё исправлено» нельзя.
    */
   open?: string[];
+  /** Файл, где панель держит `open` как V-n (R7, `findingsFile` правок). */
+  openFile?: string;
   /** Проход проверки не дал блока итога: правки не проверены, и MR говорит это прямо. */
   unverified?: boolean;
   /**
@@ -1259,6 +1723,21 @@ export function deliverStagePrompt(input: {
    * контрактов друг друга не импортируют.
    */
   sieves?: string;
+  /**
+   * Команда проверки доставки панели (`tests-cli delivery`) с путём панели — его знает
+   * сервер, не контракты. Есть — шаг 7 гоняет её по черновику ДО создания MR (g5 25.10:
+   * MR открыт без неё, пробелы пришли после «готово» и стоили 7 минут переделки).
+   */
+  deliveryCheck?: string;
+  /**
+   * Найденное ревью вне охвата группы (`ReviewScan.preExisting`, владелец 26.10): в MR
+   * оно едет списком «было до группы, не исправлено», а не правками.
+   */
+  preExisting?: string[];
+  /** Ревью панель не заводила, и почему (`reviewSkipReason`): охват группы пуст. */
+  reviewSkipped?: string;
+  /** Коммит начала группы: что было на ветке до него — не её, и сверка шага 5 его не трогает. */
+  startSha?: string;
 }): string {
   const branch = input.branch ? `the branch ${input.branch}` : 'the branch of this copy';
   // Шаг 5 сам называет навык доставки проекта (L2.3).
@@ -1276,7 +1755,11 @@ export function deliverStagePrompt(input: {
         ? 'the work of this group was reviewed and the fixes for its findings are done'
         : input.after === 'review'
           ? 'the work of this group was reviewed and the review found nothing'
-          : 'the work of this group is finished; it has no separate review';
+          : input.reviewSkipped
+            ? `the work of this group is finished; the panel skipped its review: ${input.reviewSkipped}`
+            : 'the work of this group is finished; it has no separate review';
+  const preExisting = input.preExisting ?? [];
+  const start = input.startSha?.slice(0, 12);
 
   return [
     `This is a new session: ${before}. Your stage is delivering ${branch} to a ready MR; ` +
@@ -1308,31 +1791,66 @@ export function deliverStagePrompt(input: {
       'rules require for such a change (docs updated with it, tests beside the code, every locale, ' +
       'the API contract first) follows from the task too — keep it. Revert the rest; a step beyond ' +
       'the tasks of the group (a foreign module, a migration, infrastructure) — do not do it, ' +
-      `${ask}.`,
+      `${ask}.` +
+      (start
+        ? ` This group started at commit ${start}: what the branch carried before it is not the ` +
+          "group's — compare and revert only what changed since (`git log --first-parent " +
+          `${start}..HEAD\`).`
+        : ''),
+    // g9 26.10 (F3): звено доставки гнало полный гейт 5 раз (~45 мин) — правки шли после
+    // него, и каждый отказ сторожа повтора снимался тем же вызовом. Узкие — пока правишь,
+    // полный — один, после последней правки.
     `6. Run the project's checks — the ones its rules name (${RULE_SOURCES}), all of them,` +
       " in the order named, frontend and backend alike, ONCE on this final tree: it is the group's" +
-      ' one full run; fix what is red without going beyond the tasks of the group, re-running ' +
-      'only the red ones. Any check still red — no MR.',
+      ' one full run, and it starts after the last edit. While you still edit (steps 4–5, ' +
+      "fixes), check narrowly — the touched files' own tests, the touched package's type-check " +
+      'and lint; a full run started before the last edit is wasted, the next edit needs it ' +
+      'again. Red in the full run: fix it without going beyond the tasks of the group and ' +
+      're-run only the red checks plus the narrow checks of what the fix touched, not the whole ' +
+      'run; a refused repeat of the full run is never retried unchanged. Any check still red — ' +
+      'no MR. ' +
+      // T3 (g5 25.10): без `--health` лёгший стенд записывал e2e-кейсы упавшими.
+      'E2e/live cases of the Tests block: `tests-cli run … --health <stand url>` — a stand ' +
+      'that is down gets them recorded blocked, not failed. ' +
+      DELIVER_LEDGER_LINE,
     `7. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
       `a pushed branch after a conflict rebase — \`git push --force-with-lease origin ${target}\`, and ` +
       "only your own group branch, never the main, a protected or another group's branch; any " +
-      'other push to a branch with an MR in review is a plain `git push`, never forced. Open ' +
-      'the MR by the delivery skill (or update the open one): task keys in the ' +
-      'description, decisions taken without the human listed there too. The tracker stage of the ' +
-      'skill is yours as well.',
+      'other push to a branch with an MR in review is a plain `git push`, never forced. ' +
+      (input.deliveryCheck
+        ? "Before you create or update the MR, run the panel's delivery check on the draft: " +
+          'write the MR description to a file and your sieves block to a file, run ' +
+          `\`${input.deliveryCheck} --answer <sieves file> --mr-description <description file>\` ` +
+          'and close every line it prints except "no MR yet" — the panel runs the same check ' +
+          'after your turn, and a gap it finds then costs a whole extra round. '
+        : '') +
+      'Open the MR by the delivery skill (or update the open one): task keys in the ' +
+      'description, decisions taken without the human listed there too. ' +
+      `${DELIVER_OPEN_HOME_LINE} The tracker stage of the ` +
+      `skill is yours as well. ${MR_SHOTS_LINE}`,
     // Итог по MR без его обсуждений (аудит 25.09, L199): ревьюер оставил тред,
     // группа сказала «готово», а тред так и висел открытым.
-    '8. Before "done" re-read ALL discussions of the MR (threads and reviewer comments): ' +
+    // g3 25.10: дамп всех обсуждений длинного MR — 84 тыс. знаков; решённые ветки читать незачем.
+    '8. Before "done" re-read ALL unresolved discussions of the MR (threads and reviewer ' +
+      'comments; filter the forge read to unresolved ones, resolved threads are done): ' +
       'fix what is unresolved in this branch; list what you did not fix in the answer as ' +
       '"not fixed" with the reason — a thread left silently is not an outcome. Fix every thread ' +
       'first, then one run of the checks on that tree and one push.',
     ...(open.length > 0
       ? [
           '',
-          'The verification pass found these findings NOT fixed. Do not fix them in this stage; ' +
-            'list them in the MR description under "Open after verification", each as it is ' +
-            'written here, and name them in your answer:',
+          // g5 25.10: «не чини» отправило в MR открытыми три мелочи в файлах группы —
+          // найденное в задании чинится в нём же; открытым остаётся только решение человека.
+          'The verification pass found these findings NOT fixed. Before the checks of step 6 ' +
+            '(so its one full run covers them), fix the ones that lie in the files of this group ' +
+            'and are a comment, a literal or a one-line change, and re-run the evidence each ' +
+            'names. The rest stay open: list them in the MR description under a heading in the ' +
+            'language of the MR saying they stay open after verification (a Russian MR gets a ' +
+            'Russian heading, never an English one), each as it is written ' +
+            'here with the reason it stays open — a decision of the human, or more than delivery ' +
+            'may change — and name in your answer which you fixed and which stay open:',
           ...open.map((finding, index) => `${index + 1}. ${finding}`),
+          ...(input.openFile ? [findingsFileLine(input.openFile, 'V', open.length)] : []),
         ]
       : []),
     ...(input.unverified
@@ -1342,9 +1860,22 @@ export function deliverStagePrompt(input: {
             'the review fixes were NOT verified, so nobody reads them as checked.',
         ]
       : []),
+    ...(preExisting.length > 0
+      ? [
+          '',
+          'The review found these defects in code this group did not change: they are ' +
+            'pre-existing, NOT fixed by this group, and stay so — do not fix them. List them in ' +
+            'the MR description under a heading in the language of the MR saying they are ' +
+            'pre-existing and not fixed, each as it is written here:',
+          ...preExisting.map((finding, index) => `${index + 1}. ${finding}`),
+        ]
+      : []),
     ...(input.sieves ? ['', input.sieves] : []),
     '',
-    'Do not change code beyond what delivery needs. Merging the MR and deleting branches are ' +
+    (open.length > 0
+      ? 'Do not change code beyond what delivery needs and the small open findings above. '
+      : 'Do not change code beyond what delivery needs. ') +
+      'Merging the MR and deleting branches are ' +
       'forbidden; force-push without a lease (`--force`) is always forbidden. The last line of ' +
       'the answer is the link to the MR.',
     ANSWER_LANGUAGE_LINE,

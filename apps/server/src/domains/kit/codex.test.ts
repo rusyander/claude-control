@@ -12,6 +12,7 @@ import {
   CodexKitTooLarge,
   buildCodexOverlay,
   codexSkillIndex,
+  codexSkillNames,
   withCodexKit,
   writeCodexOverlay,
 } from './codex.ts';
@@ -64,12 +65,17 @@ describe('buildCodexOverlay', () => {
     expect(buildCodexOverlay({ kitDir, local: true, codexHome }).exec).toContain('RULE-LOCAL');
   });
 
-  it('навыки: у exec — список с описанием и путём, у app-server — только каталог', () => {
+  it('навыки: у exec — список с описанием и путём один раз в заголовке, у app-server — только каталог', () => {
     const overlay = buildCodexOverlay({ kitDir, local: false, codexHome });
     const skillPath = join(kitDir, 'skills', 'verify-by-running', 'SKILL.md');
     expect(overlay.exec).toContain(
-      `- verify-by-running — Run the check before calling work done (${skillPath})`,
+      `follow it: ${join(kitDir, 'skills', '<name>', 'SKILL.md')} (e.g. ${skillPath}).`,
     );
+    expect(overlay.exec).toContain(
+      '\n- verify-by-running — Run the check before calling work done',
+    );
+    // Путь не повторяется в строке навыка: только в примере заголовка.
+    expect(overlay.exec.split(skillPath)).toHaveLength(2);
     expect(overlay.appServer).not.toContain('verify-by-running');
     expect(overlay.skillsDir).toBe(join(kitDir, 'skills'));
   });
@@ -210,8 +216,52 @@ describe('withCodexKit', () => {
     expect(result.env).toEqual({});
   });
 
+  it('вики трекера поимённо (P-16): `{off, disabledTools}` → `disabled_tools=[…]` на сервер, снятому целиком — нет', () => {
+    const result = withCodexKit(
+      ['exec', 'привет'],
+      {
+        [CODEX_MCP_OFF_ENV]: JSON.stringify({
+          off: ['inbox'],
+          disabledTools: {
+            'atlassian-x': ['confluence_search', 'confluence_get_page'],
+            'jira.work': ['confluence_page'],
+            inbox: ['confluence_search'],
+            empty: [],
+          },
+        }),
+      },
+      'exec',
+    );
+    expect(result.args).toEqual([
+      'exec',
+      '-c',
+      'mcp_servers.inbox.enabled=false',
+      '-c',
+      'mcp_servers.atlassian-x.disabled_tools=["confluence_search","confluence_get_page"]',
+      '-c',
+      'mcp_servers."jira.work".disabled_tools=["confluence_page"]',
+      'привет',
+    ]);
+    expect(result.env).toEqual({});
+  });
+
+  it('`{off}` без инструментов — те же ключи, что прежний массив', () => {
+    const result = withCodexKit(
+      ['exec', 'привет'],
+      { [CODEX_MCP_OFF_ENV]: JSON.stringify({ off: ['inbox'], disabledTools: {} }) },
+      'exec',
+    );
+    expect(result.args).toEqual(['exec', '-c', 'mcp_servers.inbox.enabled=false', 'привет']);
+  });
+
   it('битый список выключателей — запуск как был, переменная всё равно убрана', () => {
-    for (const raw of ['не json', '{"inbox":true}', '[1, ""]']) {
+    for (const raw of [
+      'не json',
+      '{"inbox":true}',
+      '[1, ""]',
+      '{"off":"inbox","disabledTools":["x"]}',
+      '{"disabledTools":{"a":"confluence_search","b":[1]}}',
+    ]) {
       const result = withCodexKit(['exec', 'привет'], { [CODEX_MCP_OFF_ENV]: raw }, 'exec');
       expect(result.args).toEqual(['exec', 'привет']);
       expect(result.env).toEqual({});
@@ -319,5 +369,35 @@ describe('список навыков в наложении: длинное оп
     expect(
       codexSkillIndex([{ name: 'big', description: long, path: '/k/big/SKILL.md' }]),
     ).toContain(long);
+  });
+});
+
+describe('список навыков: путь один раз в заголовке только при общем каталоге', () => {
+  const dir = join('k', 'skills');
+  const at = (name: string) => ({
+    name,
+    description: `Use when ${name}`,
+    path: join(dir, name, 'SKILL.md'),
+  });
+
+  it('все навыки в каталоге — строки без пути, в заголовке шаблон и пример; у имён так же', () => {
+    const skills = [at('a'), at('b')];
+    const index = codexSkillIndex(skills, undefined, false, dir);
+    expect(index).toContain(
+      `follow it: ${join(dir, '<name>', 'SKILL.md')} (e.g. ${join(dir, 'a', 'SKILL.md')}).`,
+    );
+    expect(index.split('\n').slice(2)).toEqual(['- a — Use when a', '- b — Use when b']);
+    expect(codexSkillNames(skills, undefined, dir).split('\n').slice(2)).toEqual(['- a', '- b']);
+  });
+
+  it('навык вне каталога — путь снова в каждой строке, иначе модель откроет не тот файл', () => {
+    const elsewhere = join('elsewhere', 'b', 'SKILL.md');
+    const skills = [at('a'), { ...at('b'), path: elsewhere }];
+    const index = codexSkillIndex(skills, undefined, false, dir);
+    expect(index).not.toContain('<name>');
+    expect(index).toContain(`- b — Use when b (${elsewhere})`);
+    expect(codexSkillNames(skills, undefined, dir)).toContain(
+      `- a (${join(dir, 'a', 'SKILL.md')})`,
+    );
   });
 });

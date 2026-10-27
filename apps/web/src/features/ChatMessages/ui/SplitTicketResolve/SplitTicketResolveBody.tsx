@@ -1,92 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import type {
-  SplitTicketCluster,
-  SplitTicketPublished,
-  SplitTicketPublishedIssue,
-} from '@agentdeck/contracts/split-ticket-batch';
+import { ticketSide, type SplitTicketCluster } from '@agentdeck/contracts/split-ticket-batch';
 import { SelectField } from '@shared/ui/select-field';
 import { Typography } from '@shared/ui/typography';
 import type { SplitTicketResolveBodyProps } from './SplitTicketResolve.types';
 import styles from './SplitTicketResolve.module.scss';
+import { SplitTicketDuplicates } from './SplitTicketDuplicates';
+import { SplitTicketPublishResult } from './SplitTicketPublishResult';
 import { messageFromPayload } from '../../../../shared/api/client';
 
-/** Итог публикации: заведённые задачи ссылками, упавшие — с причиной. */
-function PublishResult({ result }: { result: SplitTicketPublished }) {
-  const { t } = useTranslation();
-  const base = 'chat.cascade.hub.tickets.resolve';
-  const issueState = (issue: SplitTicketPublishedIssue): string => {
-    if (issue.commented) return t(`${base}.commented`);
-    if (issue.created) return t(`${base}.merged`, { count: issue.proposals.length });
-    return t(`${base}.existing`);
-  };
-  return (
-    <div className={styles.section} data-resolve-result>
-      {result.mode === 'fallback' && (
-        <Typography variant="caption" color="warning" as="div" data-resolve-fallback>
-          {t(`${base}.fallback`)}
-        </Typography>
-      )}
-      {result.issues.length > 0 && (
-        <>
-          <Typography variant="body-sm" as="div">
-            {t(`${base}.created`, { count: result.issues.length })}
-          </Typography>
-          <ul className={styles.rows}>
-            {result.issues.map((issue) => (
-              <li key={issue.key} className={styles.row} data-resolve-issue={issue.key}>
-                <a href={issue.url} target="_blank" rel="noreferrer" className={styles.key}>
-                  {issue.key}
-                </a>
-                <Typography variant="body-sm" as="span" className={styles.wide}>
-                  {issue.title}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="subtle"
-                  as="span"
-                  {...(issue.commented ? { 'data-resolve-commented': true } : {})}
-                >
-                  {issueState(issue)}
-                </Typography>
-                {(issue.defects.length > 1 ||
-                  issue.defects.some((defect) => defect.duplicates.length > 0)) && (
-                  <div className={styles.defects} data-resolve-defects>
-                    {issue.defects.map((defect) => (
-                      <Typography key={defect.title} variant="caption" color="subtle" as="div">
-                        {defect.duplicates.length > 0
-                          ? `${defect.title} — ${t(`${base}.defectMerged`, { titles: defect.duplicates.join('; ') })}`
-                          : defect.title}
-                      </Typography>
-                    ))}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {result.failed.length > 0 && (
-        <>
-          <Typography variant="body-sm" color="danger" as="div">
-            {t(`${base}.failed`, { count: result.failed.length })}
-          </Typography>
-          <ul className={styles.rows}>
-            {result.failed.map((row) => (
-              <li key={row.proposals.join(' ')} className={styles.row} data-resolve-failed>
-                <Typography variant="body-sm" as="span" className={styles.wide}>
-                  {row.title}
-                </Typography>
-                <Typography variant="caption" color="danger" as="span" className={styles.reason}>
-                  {messageFromPayload(row) ?? row.message}
-                </Typography>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
+/**
+ * Сторона будущей задачи по путям находок — та же эвристика, что у сервера;
+ * область модели при публикации может добавить вторую сторону.
+ */
+const bundleSide = (clusters: readonly SplitTicketCluster[]) =>
+  ticketSide(clusters.flatMap((cluster) => cluster.tickets.map((ticket) => ticket.where)));
 
 /** Один дефект в списке: первая находка и под ней «то же: …» по каждому повтору. */
 function ClusterRows({ cluster }: { cluster: SplitTicketCluster }) {
@@ -206,12 +133,15 @@ export function SplitTicketResolveBody({
   onIssueType,
   result,
   error,
+  duplicates,
+  choices = {},
+  onChoice = () => {},
 }: SplitTicketResolveBodyProps) {
   const { t } = useTranslation();
   const base = 'chat.cascade.hub.tickets.resolve';
   const clusters = bundles.flatMap((bundle) => bundle.clusters);
   const total = clusters.reduce((sum, cluster) => sum + cluster.tickets.length, 0);
-  const duplicates = total - clusters.length;
+  const repeats = total - clusters.length;
   const planned = bundles.length;
 
   return (
@@ -222,13 +152,13 @@ export function SplitTicketResolveBody({
         </Typography>
       )}
       {result ? (
-        <PublishResult result={result} />
+        <SplitTicketPublishResult result={result} />
       ) : (
         <>
           <div className={styles.section}>
             <Typography variant="body-sm" as="div" data-resolve-open={total}>
               {t(`${base}.open`, { count: total })}
-              {duplicates > 0 && ` ${t(`${base}.duplicates`, { count: duplicates })}`}
+              {repeats > 0 && ` ${t(`${base}.duplicates`, { count: repeats })}`}
             </Typography>
             <Typography variant="caption" color="subtle" as="div" data-resolve-planned={planned}>
               {t(`${base}.planned`, { count: planned })}
@@ -240,6 +170,16 @@ export function SplitTicketResolveBody({
                   className={`${styles.item} ${styles.bundle}`}
                   data-resolve-bundle={bundle.clusters.length}
                 >
+                  <Typography
+                    variant="caption"
+                    color="subtle"
+                    as="div"
+                    data-resolve-bundle-side={bundleSide(bundle.clusters)}
+                  >
+                    {t(`${base}.bundleSide`, {
+                      side: t(`${base}.side.${bundleSide(bundle.clusters)}`),
+                    })}
+                  </Typography>
                   {bundle.clusters.length > 1 && (
                     <Typography variant="caption" color="subtle" as="div" truncate>
                       {t(`${base}.bundleFiles`, { files: bundle.files.join(', ') })}
@@ -259,6 +199,9 @@ export function SplitTicketResolveBody({
             onProject={onProject}
             onIssueType={onIssueType}
           />
+          {duplicates && (
+            <SplitTicketDuplicates duplicates={duplicates} choices={choices} onChoice={onChoice} />
+          )}
           <Typography variant="caption" color="subtle" as="div">
             {t(`${base}.explain`)}
           </Typography>

@@ -1,0 +1,62 @@
+// forge-merge-guard — merging an MR/PR is the user's to run, with no door. git-guard already refuses
+// a local `git merge`; the merge of a REVIEWED request went through untouched: `gh pr merge`,
+// `glab mr merge`, the REST call (`PUT …/merge_requests/<n>/merge`, `PUT …/pulls/<n>/merge`) and the
+// forge MCP tools (`merge_merge_request`, `accept_merge_request`, `merge_pull_request`). Under the
+// panel's permission broker those reach a card; under full access nothing stopped them at all.
+//
+// CLI forms are matched outside quotes (a commit message that mentions `gh pr merge` is text, not a
+// call); the REST form keeps its quotes, because the URL usually sits inside them, and needs PUT —
+// `GET …/pulls/<n>/merge` only asks whether it was merged.
+//
+// The SAME file lives in the panel kit (assets/kit/agentdeck-kit/hooks/lib/) and in ~/.claude/hooks/lib/;
+// `tools/kit-twins.mjs` in the agentdeck repo turns the build red when the two drift.
+
+const CLI_MERGE = /(?:^|[\s;&|(])(?:gh\s+pr\s+merge|glab\s+mr\s+(?:merge|accept))\b/;
+const API_MERGE = /\/(?:merge_requests|pulls)\/\d+\/merge(?![\w-])/;
+const PUT = /(?:-X\s*|--request[\s=]+|--method[\s=]+|-Method\s+)['"]?PUT\b/i;
+const API_CLIENT =
+  /\b(?:curl|wget|http|iwr|irm|Invoke-WebRequest|Invoke-RestMethod|gh\s+api|glab\s+api)\b/i;
+// Claude/Qwen form `mcp__<server>__<tool>` and opencode's `<server>_<tool>` (26.10: the opencode form
+// passed untouched).
+const MCP_MERGE =
+  /(?:^|_)(?:merge_merge_request|accept_merge_request|merge_pull_request|merge_pr|merge_mr)$/i;
+
+// A split group never approves its own request (I-70, 26.10): approval is the reviewer's act and
+// delivery needs none. Outside a group the user may ask for one, so the refusal is group-only.
+const MCP_APPROVE = /(?:^|_)approve_merge_request$/i;
+const CLI_APPROVE = /(?:^|[\s;&|(])(?:glab\s+mr\s+approve|gh\s+pr\s+review\b[^;&|\n]*--approve)\b/;
+const API_APPROVE = /\/merge_requests\/\d+\/approve(?![\w-])/;
+const POST = /(?:-X\s*|--request[\s=]+|--method[\s=]+|-Method\s+)['"]?POST\b/i;
+
+const unquoted = (command) => command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, '""');
+
+const refuse = (what) => ({
+  decision: 'deny',
+  reason:
+    `[forge-merge-guard] ${what} merges a request — merging is the user's to run, no consent opens it. ` +
+    'Say the MR/PR is ready (link, state of its checks) and stop.',
+});
+
+const refuseApprove = (what) => ({
+  decision: 'deny',
+  reason:
+    `[forge-merge-guard] ${what} approves a request — a group never approves its own MR/PR, that is the ` +
+    "reviewer's act. Say the MR/PR is ready (link, state of its checks) and go on.",
+});
+
+export default function forgeMergeGuard(input) {
+  const tool = String(input?.tool_name ?? '');
+  const group = process.env.AGENTDECK_SPLIT_CHILD === '1';
+  if (MCP_MERGE.test(tool)) return refuse(`\`${tool}\``);
+  if (group && MCP_APPROVE.test(tool)) return refuseApprove(`\`${tool}\``);
+  if (!/^(?:Bash|PowerShell)$/.test(tool)) return null;
+  const command = String(input?.tool_input?.command ?? '');
+  if (CLI_MERGE.test(unquoted(command))) return refuse('This command');
+  if (API_MERGE.test(command) && PUT.test(command) && API_CLIENT.test(command))
+    return refuse('This API call');
+  if (!group) return null;
+  if (CLI_APPROVE.test(unquoted(command))) return refuseApprove('This command');
+  if (API_APPROVE.test(command) && POST.test(command) && API_CLIENT.test(command))
+    return refuseApprove('This API call');
+  return null;
+}

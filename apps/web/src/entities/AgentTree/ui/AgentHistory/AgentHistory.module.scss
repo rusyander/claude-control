@@ -1,0 +1,200 @@
+// Кнопка «История агентов» — чип рядом со строкой агентов карточки группы.
+.open {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-fg);
+    border-color: var(--color-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus-ring, var(--color-accent));
+    outline-offset: 1px;
+  }
+}
+
+// Окно: сессии слева, шаги выбранного субагента справа — каждая колонка прокручивается сама.
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: var(--spacing-md);
+  height: 100%;
+  min-height: 0;
+
+  @media (max-width: 760px) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.sessions {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--spacing-2xs);
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.sessionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2xs);
+}
+
+.current {
+  padding: 0 var(--spacing-2xs);
+  border-radius: 999px;
+  background: var(--color-accent-subtle);
+  color: var(--color-fg);
+  font-size: var(--font-size-caption);
+}
+
+.main {
+  overflow-wrap: anywhere;
+}
+
+// Строка главного агента — та же кнопка, что у субагента, с полосой слева:
+// у каждой сессии она есть, даже без субагентов.
+.mainButton {
+  margin-left: calc(-1 * var(--spacing-2xs));
+  width: calc(100% + var(--spacing-2xs));
+  border-left: 3px solid var(--color-border-strong);
+}
+
+// Отказы, ошибки, повторные чтения, большие результаты — цветом опасности.
+.anomalies {
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
+}
+
+// «Сейчас работают» рядом с кнопкой истории: никого — приглушённо.
+.liveRow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+}
+
+.live {
+  color: var(--color-fg);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.liveNone {
+  color: var(--color-fg-subtle);
+}
+
+.agentList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--spacing-3xs) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Субагент, запущенный другим субагентом, — ступенькой под родителем.
+.nested {
+  padding-left: var(--spacing-sm);
+}
+
+.agent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--spacing-2xs);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-surface);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus-ring, var(--color-accent));
+    outline-offset: -2px;
+  }
+}
+
+.agentSelected {
+  border-color: var(--color-border);
+  background: var(--color-accent-subtle);
+
+  &:hover:not(:disabled) {
+    background: var(--color-accent-subtle);
+  }
+}
+
+.agentHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+}
+
+.agentName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.result {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pick {
+  margin: auto;
+  max-width: 36ch;
+  text-align: center;
+}

@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -48,7 +48,7 @@ function transcript(records: object[]): string {
   return path;
 }
 
-function run(event: 'pre' | 'stop', payload: object): string {
+function run(event: 'pre' | 'stop', payload: object, env: Record<string, string> = {}): string {
   const out = spawnSync(process.execPath, [DISPATCH, event], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
@@ -57,6 +57,7 @@ function run(event: 'pre' | 'stop', payload: object): string {
       AGENTDECK_KIT_VARIANT: '',
       AGENTDECK_HEAVY_QUEUE_DIR: '',
       AGENTDECK_KIT_STATE: join(dir, 'state'),
+      ...env,
     },
     timeout: 15_000,
   });
@@ -96,6 +97,103 @@ describe('pipeline-watch-guard: пустой ответ — не снимок', 
     expect(
       pre(LP, { project_id: 'g/p', ref: 'main' }, first('[{"id":1,"status":"running"}]')),
     ).toMatch(/already read this turn/);
+  });
+
+  // g3 25.10 12:33 → 12:36: напоминание доставки панели — запись пользователя, счёт хода
+  // обнулялся, и тот же идущий пайплайн читался снова без push между чтениями.
+  it('идущий пайплайн в следующем ходе без push — отказ, после push — проходит', () => {
+    const MRP = 'mcp__gitlab-work__list_merge_request_pipelines';
+    const target = { project_id: 'g/p', merge_request_iid: '9' };
+    const seen = [
+      say('PROJ-7, доведи до конца'),
+      use(MRP, target, 'r1'),
+      result('r1', '[{"id":"11886","status":"running"}]'),
+      say('Сверка доставки: осталось 2 пункта.'),
+    ];
+    expect(pre(MRP, target, seen)).toMatch(/still running earlier/);
+    const pushed = [
+      ...seen,
+      use('Bash', { command: 'git push origin fix/x' }, 'r2'),
+      result('r2', 'ok'),
+      say('дальше'),
+    ];
+    expect(pre(MRP, target, pushed)).toBe('');
+  });
+
+  // g5 25.10 18:49: проверка панели после «готово» написала «pipeline failed: #11893» — чтение
+  // упавших джобов отклонялось как опрос, группа гоняла весь набор тестов вслепую.
+  it('запись пользователя о завершении пайплайна снимает «ещё идёт» только с него', () => {
+    const MRP = 'mcp__gitlab-work__list_merge_request_pipelines';
+    const LJ = 'mcp__gitlab-work__list_pipeline_jobs';
+    const seen = [
+      say('PROJ-7, доведи до конца'),
+      use(MRP, { project_id: 'g/p', merge_request_iid: '9' }, 'f1'),
+      result('f1', '[{"id":"11886","status":"running"}]'),
+    ];
+    const jobs = { project_id: 'g/p', pipeline_id: '11886', scope: 'failed' };
+    expect(
+      pre(LJ, jobs, [...seen, say('The MR pipeline failed: #11886. Failed jobs: test.')]),
+    ).toBe('');
+    expect(pre(LJ, jobs, [...seen, say('The MR pipeline failed: #11899.')])).toMatch(
+      /still running earlier/,
+    );
+  });
+
+  // g5 26.10 19:22Z: список упавших джобов пришёл, оба чтения лога джобы 217476 отклонены как
+  // «второе чтение за ход» — причину падения CI группа так и не узнала.
+  it('после завершённого снимка лог упавшей джобы читается, повтор того же вызова — отказ', () => {
+    const LJ = 'mcp__gitlab-work__list_pipeline_jobs';
+    const LOG = 'mcp__gitlab-work__get_pipeline_job_output';
+    const failed = [
+      say('PROJ-7, доведи до конца'),
+      use(LJ, { project_id: 'g/p', pipeline_id: '11893' }, 'j1'),
+      result('j1', '[{"id":"217476","name":"test-frontend","reason":"script_failure"}]'),
+    ];
+    const log = { project_id: 'g/p', job_id: '217476', offset: 0, limit: 200 };
+    expect(pre(LOG, log, failed)).toBe('');
+    const page = [...failed, use(LOG, log, 'j2'), result('j2', 'FAIL src/a.test.tsx')];
+    expect(pre(LOG, { ...log, offset: 200 }, page)).toBe('');
+    expect(pre(LOG, log, page)).toMatch(/already read this turn/);
+  });
+});
+
+// g3 25.10: отказ rule-card (без метки [ctx-guard]) читался как исполненный вызов — красный прогон,
+// записанный список, чтение в счёт обхода; повтор получал отказ «уже было».
+describe('вызов, отклонённый другим хуком, не исполнялся', () => {
+  const RULE_CARD = (tool: string) =>
+    `PreToolUse:${tool} hook error: rule-card: this call needs a rule this session got only as a card — the card is not the rule.`;
+
+  it('verify-throttle: повтор проверки после отказа — не «упала, правок не было»', () => {
+    const TSC = 'npx tsc --noEmit';
+    const records = [
+      say('сделай'),
+      use('Bash', { command: TSC }, 'vb1'),
+      result('vb1', RULE_CARD('Bash'), true),
+    ];
+    expect(pre('Bash', { command: TSC }, records)).toBe('');
+  });
+
+  it('todo-throttle: отклонённый список не записан — тот же список проходит', () => {
+    const todos = [
+      { content: 'a', status: 'completed', activeForm: 'a' },
+      { content: 'b', status: 'pending', activeForm: 'b' },
+    ];
+    const records = [
+      say('сделай'),
+      use('TodoWrite', { todos }, 'tb1'),
+      result('tb1', RULE_CARD('TodoWrite'), true),
+    ];
+    expect(pre('TodoWrite', { todos }, records)).toBe('');
+  });
+
+  it('search-discipline: отклонённые чтения не идут в счёт обхода', () => {
+    const records: object[] = [say('do it, use agents for the search')];
+    for (let i = 0; i < 13; i += 1)
+      records.push(
+        use('Grep', { pattern: `q${i}` }, `sb${i}`),
+        result(`sb${i}`, RULE_CARD('Grep'), true),
+      );
+    expect(pre('Grep', { pattern: 'newSymbol' }, records)).toBe('');
   });
 });
 
@@ -184,6 +282,24 @@ describe('cmd-duration: одна команда — один ключ, долг�
       'node tools/mustfail.mjs --base HEAD --cmd "npx vitest run x" > .agent/tmp/m.log 2>&1';
     expect(call(mustfail, wtA, { timeout: 600000 })).toMatch(/known long gate.*run_in_background/);
     expect(call('node tools/mustfail.mjs --help 2>&1 | head -30', wtA)).toBe('');
+  });
+
+  // Наблюдение 25.10, группа #0: mustfail одного файла (5 с) отказан как «больше 10 мин».
+  // `--files` — узкая форма, которую требует правило проверки; долгий — только прогон всего диффа.
+  it('mustfail с --files — не известный долгий гейт', () => {
+    const narrow =
+      'node tools/mustfail.mjs --base HEAD --files src/a.ts --cmd "npx vitest run a.test.ts"';
+    expect(call(narrow, wtA)).toBe('');
+  });
+
+  // Тот же день: один задуманный мутант (`--mutate`) — один прогон, отказан так же.
+  it('mustfail с --mutate (один мутант) — не известный долгий гейт', () => {
+    const mutant =
+      'node tools/mustfail.mjs --cmd "npx vitest run a.test.ts" --mutate src/a.ts --find "a" --replace "b"';
+    expect(call(mutant, wtA)).toBe('');
+    const plan =
+      'node tools/mustfail.mjs --cmd "npx vitest run a.test.ts" --mutants .agent/tmp/plan.json';
+    expect(call(plan, wtA)).toBe('');
   });
 });
 
@@ -338,6 +454,20 @@ describe('review-report: один отказ — полный список', () 
   });
 });
 
+describe('push-sieves-scan: чувствительный путь — только у кода и данных', () => {
+  it('страница доков с именем policy не требует отката, код и миграция требуют', async () => {
+    const { riskReasons } = (await import(
+      pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'push-sieves-scan.mjs')).href
+    )) as { riskReasons: (paths: string[]) => string[] };
+    expect(riskReasons(['docs/access/policy.mdx'])).toEqual([]);
+    expect(riskReasons(['src/access/policy.ts'])).toEqual(['sensitive path src/access/policy.ts']);
+    expect(riskReasons(['db/changelog/0042-auth.xml'])).toEqual([
+      'data/migration',
+      'sensitive path db/changelog/0042-auth.xml',
+    ]);
+  });
+});
+
 describe('push-sieves: удаление чужого — выход раньше списка, список в файле', () => {
   const D = {
     d0: '2026-09-01T10:00:00Z',
@@ -403,6 +533,17 @@ describe('push-sieves: удаление чужого — выход раньше
     expect(push('# sieve-ack: @.agent/tmp/sieve-ack.txt\ngit push origin feat')).toBe('');
   });
 
+  // P-18: скобочная запись путей называет каждое раскрытие, как у судьи сит доставки;
+  // скобки, что файла не раскрывают, его не называют.
+  it('скобочная запись в `# sieve-ack:` называет каждое раскрытие (P-18)', () => {
+    const work = world();
+    const push = (command: string) => pre('Bash', { command }, start, work);
+    expect(push('# sieve-ack: {g,h}.txt\ngit push origin feat')).toMatch(
+      /push-sieves\(foreign-removal\)/,
+    );
+    expect(push('# sieve-ack: {e,f}.txt, other.txt\ngit push origin feat')).toBe('');
+  });
+
   // Журнал 24.10 (группа №1, D15…D41): те же намеренные удаления отказывали на каждом
   // пуше ветки; D28: строка списка «путь — причина» не совпадала ни с чем.
   it('подтверждение помнится для ветки, строка «путь — причина» в списке принимается', () => {
@@ -415,7 +556,11 @@ describe('push-sieves: удаление чужого — выход раньше
     );
     expect(push('# sieve-ack: @.agent/tmp/sieve-ack.txt\ngit push origin feat')).toBe('');
     const acks = join(work, '.agent', 'tmp', 'sieve-acks.json');
-    expect(JSON.parse(readFileSync(acks, 'utf8'))).toEqual({ feat: ['f.txt'] });
+    // `~removed` — отпечаток снятых строк, по нему доставка панели не спрашивает снова (F-01).
+    expect(JSON.parse(readFileSync(acks, 'utf8'))).toEqual({
+      feat: ['f.txt'],
+      '~removed': { feat: { 'f.txt': expect.stringMatching(/^[0-9a-f]{16}$/) } },
+    });
     // Следующий пуш той же ветки — без отказа, с одной строкой в контексте.
     const raw = run('pre', {
       hook_event_name: 'PreToolUse',
@@ -434,6 +579,146 @@ describe('push-sieves: удаление чужого — выход раньше
     );
     writeFileSync(acks, '{"other":["f.txt"]}\n');
     expect(push('git push origin feat')).toMatch(/push-sieves\(foreign-removal\)/);
+  });
+
+  // Аудит g0 26.10, F1: подтверждение помнилось по пути файла, и новая строка main, снятая после
+  // перебазирования, проходила молча. F6: отказ называет коммиты main под снятыми строками и
+  // просит `git show` до подтверждения — force-push ушёл раньше, чем агент их прочёл.
+  it('старое подтверждение не покрывает новые снятые строки; отказ называет коммит и git show', () => {
+    const work = world();
+    const push = (command: string) => pre('Bash', { command }, start, work);
+    const first = push('git push origin feat');
+    const sha1 = git(work, ['rev-parse', 'origin/main']).trim().slice(0, 10);
+    expect(first).toContain(`f.txt ← ${sha1} «c»`);
+    expect(first).toContain(`git show ${sha1} -- f.txt`);
+    expect(push('# sieve-ack: f.txt\ngit push origin feat')).toBe('');
+    expect(push('git push origin feat')).toBe('');
+    // Подтверждение старого кита — список без отпечатка: спрашивается снова, как у доставки панели.
+    const acks = join(work, '.agent', 'tmp', 'sieve-acks.json');
+    const stamped = readFileSync(acks, 'utf8');
+    writeFileSync(acks, '{"feat":["f.txt"]}\n');
+    expect(push('git push origin feat')).toMatch(/push-sieves\(foreign-removal\)/);
+    writeFileSync(acks, stamped);
+    // main получил ещё строку; ветка снова переписала файл со старой копии и стёрла и её.
+    const other = join(dirname(work), 'other');
+    writeFileSync(join(other, 'f.txt'), 'one\ntwo\nforeign\nforeign2\n');
+    git(other, ['add', '-A'], '2026-09-14T10:00:00Z');
+    git(other, ['commit', '-qm', 'feat: second line'], '2026-09-14T10:00:00Z');
+    git(other, ['push', '-q', 'origin', 'main']);
+    git(work, ['fetch', '-q', 'origin'], '2026-09-15T10:00:00Z');
+    git(work, ['reset', '-q', '--hard', 'origin/main'], '2026-09-15T10:00:00Z');
+    writeFileSync(join(work, 'f.txt'), 'one\ntwo\nmine\n');
+    save(work, '2026-09-15T10:00:00Z');
+    const again = push('git push origin feat');
+    const sha2 = git(work, ['rev-parse', 'origin/main']).trim().slice(0, 10);
+    expect(again).toMatch(/push-sieves\(foreign-removal\)/);
+    expect(again).toContain(`${sha2} «feat: second line»`);
+    expect(push('# sieve-ack: f.txt\ngit push origin feat')).toBe('');
+    expect(push('git push origin feat')).toBe('');
+  });
+
+  // g8 26.10: сита (git fetch + blame, ~9 с) шли на пуше, который затем отбивала карточка правила,
+  // и снова на его повторе. Карточка откажет наверняка — сита ждут повтора.
+  it('карточка правила наверняка откажет пушу — сита не гоняются; повтор после неё — сита на месте', () => {
+    const work = world();
+    const session = 'kitcardsieve';
+    const rules = join(dir, 'state', 'rules');
+    mkdirSync(rules, { recursive: true });
+    const RULE = join(
+      builtinKitDir(),
+      'skills',
+      'situational-rules',
+      'references',
+      'git-writes.md',
+    );
+    writeFileSync(
+      join(rules, `rule-cards-${session}.json`),
+      JSON.stringify({ 'git-writes': { file: RULE, head: '# Git writes' } }),
+    );
+    const push = () => {
+      const out = run(
+        'pre',
+        {
+          hook_event_name: 'PreToolUse',
+          tool_name: 'Bash',
+          tool_input: { command: 'git push origin feat' },
+          transcript_path: transcript(start),
+          session_id: session,
+          cwd: work,
+        },
+        { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' },
+      );
+      return out
+        ? ((JSON.parse(out) as { hookSpecificOutput?: { permissionDecisionReason?: string } })
+            .hookSpecificOutput?.permissionDecisionReason ?? '')
+        : '';
+    };
+    const first = push();
+    expect(first).toMatch(/^rule-card: .*git-writes/s);
+    expect(first).not.toMatch(/push-sieves/);
+    expect(existsSync(join(work, '.agent', 'tmp', 'sieve-ack.txt'))).toBe(false);
+    // Отказ нёс файл правила целиком и снял карточку: повтор проходит её, и сита отбивают своё.
+    expect(push()).toMatch(/push-sieves\(foreign-removal\)/);
+  });
+
+  // P-33: фаза карточек правил есть у Qwen и Codex (`cardPhase`) — их PreToolUse идёт тем же
+  // `runPre`, и сита так же ждут повтора за карточкой, что наверняка откажет.
+  describe('карточка правила у Qwen и Codex (P-33)', () => {
+    for (const [cli, tool] of [
+      ['qwen', 'run_shell_command'],
+      ['codex', 'Bash'],
+    ] as const) {
+      it(`${cli}: карточка правила наверняка откажет пушу — сита не гоняются; повтор — сита на месте (P-33)`, () => {
+        const work = world();
+        // Ключ карточек — первые 12 знаков сессии (`gateOf`): своя у каждого диалекта.
+        const session = `kcs-${cli}`;
+        const rules = join(dir, 'state', 'rules');
+        mkdirSync(rules, { recursive: true });
+        const RULE = join(
+          builtinKitDir(),
+          'skills',
+          'situational-rules',
+          'references',
+          'git-writes.md',
+        );
+        writeFileSync(
+          join(rules, `rule-cards-${session}.json`),
+          JSON.stringify({ 'git-writes': { file: RULE, head: '# Git writes' } }),
+        );
+        const push = () => {
+          const out = spawnSync(process.execPath, [DISPATCH, 'pre', `--cli=${cli}`], {
+            input: JSON.stringify({
+              hook_event_name: 'PreToolUse',
+              tool_name: tool,
+              tool_input: { command: 'git push origin feat' },
+              transcript_path: transcript(start),
+              session_id: session,
+              cwd: work,
+            }),
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              AGENTDECK_KIT_VARIANT: '',
+              AGENTDECK_KIT_CLI: '',
+              AGENTDECK_HEAVY_QUEUE_DIR: '',
+              AGENTDECK_KIT_STATE: join(dir, 'state'),
+              AGENTDECK_SPLIT_CHILD: '1',
+              AGENTDECK_USER_MEMORY_OFF: '1',
+            },
+            timeout: 15_000,
+          }).stdout.trim();
+          return out
+            ? ((JSON.parse(out) as { hookSpecificOutput?: { permissionDecisionReason?: string } })
+                .hookSpecificOutput?.permissionDecisionReason ?? '')
+            : '';
+        };
+        const first = push();
+        expect(first).toMatch(/^rule-card: .*git-writes/s);
+        expect(first).not.toMatch(/push-sieves/);
+        expect(existsSync(join(work, '.agent', 'tmp', 'sieve-ack.txt'))).toBe(false);
+        expect(push()).toMatch(/push-sieves\(foreign-removal\)/);
+      });
+    }
   });
 });
 
@@ -513,6 +798,35 @@ describe('git-guard: операция — подкоманда git, а не сл
     expect(run('git -c core.editor=true commit -m x')).toMatch(/git-guard\(commit\)/);
     expect(run('/usr/bin/git push origin main')).toMatch(/git-guard\(push\)/);
     expect(run('git status && git push')).toMatch(/git-guard\(push\)/);
+  });
+});
+
+describe('git-guard: `merge-tree --quiet` отвечает «конфликта нет» при конфликте', () => {
+  const run = (command: string) => pre('Bash', { command }, [say('проверь конфликт с main')]);
+
+  it('проверка с --quiet отклоняется и называет вызов, который отвечает верно', () => {
+    const out = run(
+      'git fetch origin main; git merge-tree --write-tree --quiet HEAD origin/main; echo rc=$?',
+    );
+    expect(out).toMatch(/git-guard\(merge-tree\)/);
+    expect(out).toMatch(/--name-only/);
+    // Аудит g5 26.10, L3: `| tail; echo rc=$?` печатал код tail — подсказка называет PIPESTATUS.
+    expect(out).toContain('echo rc=${PIPESTATUS[0]}');
+    expect(run('git -c core.quotePath=false merge-tree --quiet HEAD main')).toMatch(
+      /git-guard\(merge-tree\)/,
+    );
+  });
+
+  it('merge-tree без --quiet и --quiet другой команды проходят', () => {
+    expect(
+      run('git merge-tree --write-tree --name-only HEAD origin/main > mt.txt; echo rc=$?'),
+    ).toBe('');
+    expect(run('git merge-tree --write-tree HEAD main > mt.txt; git diff --quiet; echo $?')).toBe(
+      '',
+    );
+    expect(run('git merge-tree --write-tree --name-only HEAD main | grep --quiet CONFLICT')).toBe(
+      '',
+    );
   });
 });
 

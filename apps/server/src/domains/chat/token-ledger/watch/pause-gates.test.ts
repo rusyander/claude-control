@@ -113,10 +113,12 @@ describe('R21 тяжёлые проверки по кругу', () => {
     const points: GatePoint[] = state.heavyChecks.map((check) => ({ ...check, chatId: 'c1' }));
     const last = points.at(-1)?.endedAt ?? 0;
     const hit = groupGates(points, GROUP_WATCH_DEFAULTS, last + MIN);
+    // Пять гейтов — четыре прохода: `check_frontend` в 06:35 и `check_frontend_tests` в 06:45
+    // шли по одному дереву (правок между нет) — один проход двумя командами.
     expect(hit).toMatchObject({
       rule: 'R21',
       severity: 'warn',
-      numbers: { gates: 5, totalMin: 73 },
+      numbers: { gates: 4, totalMin: 73 },
     });
     expect(hit?.params?.command).toContain('check_frontend_tests');
     expect(

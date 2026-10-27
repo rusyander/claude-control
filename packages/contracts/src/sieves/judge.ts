@@ -5,7 +5,20 @@ import {
   type BuiltinSieveId,
   type SieveDef,
 } from './catalog.ts';
-import { EVIDENCE_MIN, evidenceRunIds, type SieveReportRow } from './report.ts';
+import {
+  citedRunIds,
+  EVIDENCE_MIN,
+  evidenceRunIds,
+  looseRunIds,
+  type SieveReportRow,
+} from './report.ts';
+import {
+  claimsTestsBlock,
+  countClaimOf,
+  countMatches,
+  totalCount,
+  type RunTestCount,
+} from './count-claims.ts';
 
 // ---------------------------------------------------------------- судья
 
@@ -26,6 +39,12 @@ export interface SieveMechanics {
   foreignRemovals?: string[];
   /** Путь из `foreignRemovals` → коммит основной и строки: «sha «тема», lines 40-46». */
   foreignBlame?: Record<string, string>;
+  /**
+   * «Чужие −», уже подтверждённые пушем этой ветки (`# sieve-ack:` сита кита), чьи
+   * удалённые строки с тех пор те же: в `foreignRemovals` их нет, строки отчёта они
+   * не требуют (аудит g0 23.10, F-01).
+   */
+  foreignAcked?: string[];
   /** Удалённое имя/тест-id и файлы вне диффа, где оно ещё встречается. */
   consumers?: { token: string; files: string[] }[];
   /** Манифесты зависимостей, изменённые без своего lockfile. */
@@ -59,8 +78,18 @@ export interface SieveRunFact {
   red: string[];
   /** Зелёных результатов в прогоне; 0 — прогон ничего не проверил (всё пропущено или пусто). */
   passed?: number;
+  /** Метки кейсов, прошедших в прогоне (`tags` кейса, в нижнем регистре): живой ли он (`liveTags`). */
+  tags?: string[];
+  /**
+   * `codePaths` кейсов, прошедших в прогоне, который блок исполнил сам (не ручная запись):
+   * у диффа из одних инструментов (`tools/`, `scripts/`) живой проверкой служит исполнение
+   * самого инструмента — у линтера сборки нет стенда (g8 26.10, решение по строке 98).
+   */
+  executedPaths?: string[];
   /** Пути, изменённые в ветке ПОСЛЕ коммита прогона (коммита нет в ветке — все её пути). */
   changedAfter: string[];
+  /** Счёт тестов прогона (не кейсов) — с ним сверяется «N passed» строки (F-12). */
+  tests?: RunTestCount;
 }
 
 /**
@@ -75,6 +104,12 @@ export interface SieveProofFacts {
   testsBlock?: boolean;
   /** Прогоны, на которые сослались строки, — по id. */
   runs?: Record<string, SieveRunFact>;
+  /**
+   * Последние законченные прогоны истории копии, новые первыми (их факты — в `runs`):
+   * строке без ссылки пробел называет годный из них — «сошлитесь», а не «прогоните
+   * заново» (g3 25.10 прогнала те же кейсы на том же дереве ради номера).
+   */
+  latest?: string[];
 }
 
 /** Пробел сита: код текста сервера и параметры — строку собирает сервер. */
@@ -96,11 +131,17 @@ export interface SieveGap {
     | 'sieve-gap-destructive'
     | 'sieve-gap-stale'
     | 'sieve-gap-no-run'
+    | 'sieve-gap-no-run-cite'
+    | 'sieve-gap-run-not-live'
+    | 'sieve-gap-flip'
     | 'sieve-gap-run-missing'
     | 'sieve-gap-run-empty'
     | 'sieve-gap-run-red'
     | 'sieve-gap-run-stale'
-    | 'sieve-gap-live-na';
+    | 'sieve-gap-live-na'
+    | 'sieve-gap-count-no-cite'
+    | 'sieve-gap-count-no-run'
+    | 'sieve-gap-count-mismatch';
   params: Record<string, string>;
 }
 
@@ -119,9 +160,42 @@ function mentions(text: string, name: string): boolean {
   return false;
 }
 
+const BRACE_GROUP = /\{([^{}\n]*,[^{}\n]*)\}/;
+const BRACE_WORD = /\S*\{[^{}\n]*,[^{}\n]*\}\S*/g;
+/** Предел раскрытий одного слова: дальше не раскрытое остаётся неназванным, не «названным». */
+const BRACE_MAX = 256;
+
+/** Раскрытия слова со скобками, как у оболочки: `a/{x,y}/b` → `a/x/b`, `a/y/b`; несколько групп — по очереди. */
+function braceForms(word: string): string[] {
+  const done: string[] = [];
+  const todo = [word];
+  while (todo.length > 0 && done.length + todo.length <= BRACE_MAX) {
+    const current = todo.shift() as string;
+    const group = BRACE_GROUP.exec(current);
+    if (!group) {
+      done.push(current);
+      continue;
+    }
+    const head = current.slice(0, group.index);
+    const tail = current.slice(group.index + group[0].length);
+    for (const alt of (group[1] as string).split(',')) todo.push(`${head}${alt.trim()}${tail}`);
+  }
+  return done;
+}
+
+/**
+ * Доказательство вместе с раскрытыми скобочными путями: группа #0 23.10 (!1071)
+ * назвала `content/{ru,en,uz}/api/chats.mdx`, судья искал путь буквально, и
+ * одноимённые en/ru не снимались — доставка ушла на круг. Исходный текст остаётся.
+ */
+function withBraces(evidence: string): string {
+  const words = evidence.match(BRACE_WORD) ?? [];
+  return words.length === 0 ? evidence : `${evidence} ${words.flatMap(braceForms).join(' ')}`;
+}
+
 /** Отмеченные, которых доказательство не называет (`files` в исходном виде). */
 function unnamedOf(evidence: string, files: readonly string[]): string[] {
-  const low = evidence.replace(/\\/g, '/').toLowerCase();
+  const low = withBraces(evidence).replace(/\\/g, '/').toLowerCase();
   const paths = files.map((file) => file.replace(/\\/g, '/').toLowerCase());
   const baseOf = (path: string): string => path.split('/').pop() ?? path;
   const bases = paths.map(baseOf);
@@ -235,8 +309,103 @@ function movedSinceRow(
   return changed.filter((path) => flagged.has(key(path)));
 }
 
+/** Метки живой проверки сита через запятую — для текста пробела. */
+function liveTagsOf(sieve: SieveDef): string {
+  return (sieve.liveTags ?? ['live']).join(', ');
+}
+
+/**
+ * Прогоны строки: `run:<id>` всегда, свободная форма (`run 664941c8`, `прогон
+ * 664941c8`) — только найденная в истории копии (`citedRunIds`).
+ */
+function proofRunIds(evidence: string, proof: SieveProofFacts): string[] {
+  return citedRunIds(evidence, (id) => proof.runs?.[id]?.found === true);
+}
+
+/** «Не проверено: …» — метка строки `fail` живого сита (`noteRows` сервера). */
+export const UNCHECKED_MARK = /^\s*(?:not checked|unchecked|не проверено)\s*[:—–-]\s*/i;
+/** «Не из-за ветки: …» — метка строки `fail`, чьё красное не от ветки. */
+export const NOT_BRANCH_MARK =
+  /^\s*(?:not caused by the branch|pre-existing|не из-за ветки|красное не из-за ветки)\s*[:—–-]\s*/i;
+/**
+ * Доказательство само говорит, что проверка красная или не сделана: «красный
+ * только на Windows», «still red», «не проверено». Счёт («0 failed», «red: 0»)
+ * сюда не попадает — только слово о состоянии.
+ */
+const STILL_RED =
+  /\bnot checked\b|\bunchecked\b|не проверен|\b(?:is|still|stays|remains|only)\s+red\b|\bred\s+(?:only|on|in|because|here)\b|красн\p{L}*\s+(?:только|на|в|из-за|до)(?!\p{L})|(?:остаётся|остался|остаются|всё ещё|только)\s+красн/iu;
+
+/** Слова доказательства без меток и ссылок — для сравнения «то же самое». */
+function words(evidence: string): Set<string> {
+  const bare = evidence.replace(UNCHECKED_MARK, '').replace(NOT_BRANCH_MARK, '').toLowerCase();
+  return new Set(bare.match(/[\p{L}\p{N}][\p{L}\p{N}._/-]*/gu) ?? []);
+}
+
+/** Доля общих слов двух доказательств (Жаккар): ≥ 0.8 — по сути тот же текст. */
+function sameSubstance(a: string, b: string): boolean {
+  const left = words(a);
+  const right = words(b);
+  if (left.size === 0 || right.size === 0) return left.size === right.size;
+  let common = 0;
+  for (const word of left) if (right.has(word)) common += 1;
+  return common / (left.size + right.size - common) >= 0.8;
+}
+
+/**
+ * Почему строка `pass` не принята как переворот (g3 25.10, owner-4: fail → pass
+ * с тем же «красный только на Windows … run:ac24faf5»):
+ * - `mark` — `pass` с меткой заметки («not checked:», «not caused by the branch:»):
+ *   метки бывают только у `fail`, и с `pass` заметка молча становилась зачётом;
+ * - `red` — строка перевернулась из `fail`, а доказательство говорит «красный»,
+ *   «не проверено»;
+ * - `same` — перевернулась из `fail` без нового прогона и с тем же по сути текстом.
+ * `undefined` — переворота без доказательства нет.
+ */
+export function flipWithoutProof(row: SieveReportRow): 'mark' | 'red' | 'same' | undefined {
+  if (row.status !== 'pass') return undefined;
+  if (UNCHECKED_MARK.test(row.evidence) || NOT_BRANCH_MARK.test(row.evidence)) return 'mark';
+  if (row.was?.status !== 'fail') return undefined;
+  if (STILL_RED.test(row.evidence)) return 'red';
+  const runsOf = (text: string): string[] => [
+    ...new Set([...evidenceRunIds(text), ...looseRunIds(text)]),
+  ];
+  const before = new Set(runsOf(row.was.evidence));
+  const fresh = runsOf(row.evidence).some((id) => !before.has(id));
+  return !fresh && sameSubstance(row.evidence, row.was.evidence) ? 'same' : undefined;
+}
+
+/** Путь инструмента сборки или разработки — не продукт, стенда у него нет. */
+const TOOLING_PATH = /(?:^|\/)(?:tools|scripts)\//i;
+
+/**
+ * Файлы поведения сита, если все они — инструменты (`TOOLING_PATH`); иначе пусто:
+ * хоть один файл продукта — и живая проверка снова нужна по меткам.
+ */
+function toolingOnly(sieve: SieveDef, mechanics: SieveMechanics | undefined): string[] {
+  const files = touchesSieve(sieve, mechanics?.behaviour ?? []).map((path) =>
+    path.replace(/\\/g, '/'),
+  );
+  return files.length > 0 && files.every((path) => TOOLING_PATH.test(path)) ? files : [];
+}
+
+/** Прошедший исполненный кейс называет хоть один файл инструмента (сам файл или его папку). */
+function toolingExecuted(fact: SieveRunFact, tooling: readonly string[]): boolean {
+  const named = (fact.executedPaths ?? []).map((path) =>
+    path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase(),
+  );
+  return tooling.some((file) => {
+    const path = file.toLowerCase();
+    return named.some((own) => own !== '' && (path === own || path.startsWith(`${own}/`)));
+  });
+}
+
 /** Пробел доказательства прогоном: нет прогона, он красный или старше правки. */
-function runGap(sieve: SieveDef, id: string, fact: SieveRunFact | undefined): SieveGap | undefined {
+function runGap(
+  sieve: SieveDef,
+  id: string,
+  fact: SieveRunFact | undefined,
+  tooling: readonly string[] = [],
+): SieveGap | undefined {
   if (!fact?.found) return { code: 'sieve-gap-run-missing', params: { sieve: sieve.id, run: id } };
   if (fact.red.length > 0) {
     return {
@@ -247,6 +416,15 @@ function runGap(sieve: SieveDef, id: string, fact: SieveRunFact | undefined): Si
   // Ревью PR #1: прогон из одних пропусков или без результатов ничего не проверил.
   if (fact.passed === 0)
     return { code: 'sieve-gap-run-empty', params: { sieve: sieve.id, run: id } };
+  // Живая проверка — не юнит-тест (g3 25.10): прошёл хоть один кейс с живой меткой.
+  const live = sieve.liveTags ?? [];
+  const tagged = (fact.tags ?? []).some((tag) => live.includes(tag));
+  if (live.length > 0 && !tagged && !(tooling.length > 0 && toolingExecuted(fact, tooling))) {
+    return {
+      code: 'sieve-gap-run-not-live',
+      params: { sieve: sieve.id, run: id, tags: live.join(', ') },
+    };
+  }
   const touched = touchesSieve(sieve, fact.changedAfter);
   if (touched.length > 0) {
     return {
@@ -266,22 +444,84 @@ function proofGap(
   sieve: SieveDef,
   row: SieveReportRow,
   proof: SieveProofFacts | undefined,
+  mechanics?: SieveMechanics,
 ): SieveGap | undefined {
   if (!proof) return undefined;
+  const tooling = toolingOnly(sieve, mechanics);
   const touched = touchesSieve(sieve, proof.changedAfterRow?.[sieve.id] ?? []);
   if (touched.length > 0) {
     return { code: 'sieve-gap-stale', params: { sieve: sieve.id, files: named(touched) } };
   }
-  if (sieve.proof !== 'run' || row.status !== 'pass' || !proof.testsBlock) return undefined;
-  const ids = evidenceRunIds(row.evidence);
-  if (ids.length === 0) return { code: 'sieve-gap-no-run', params: { sieve: sieve.id } };
+  const byRun = sieve.proof === 'run';
+  if ((!byRun && !sieve.liveTags) || row.status !== 'pass' || !proof.testsBlock) return undefined;
+  const ids = proofRunIds(row.evidence, proof);
+  // Сито с живыми метками без `proof:'run'` (стенд ветки) доказывается словами, но
+  // прогон, на который оно сослалось, судится как живой.
+  if (ids.length === 0 && !byRun) return undefined;
+  if (ids.length === 0) {
+    const fit = (proof.latest ?? []).find((id) => !runGap(sieve, id, proof.runs?.[id], tooling));
+    return fit
+      ? { code: 'sieve-gap-no-run-cite', params: { sieve: sieve.id, run: fit } }
+      : { code: 'sieve-gap-no-run', params: { sieve: sieve.id, tags: liveTagsOf(sieve) } };
+  }
   let first: SieveGap | undefined;
   for (const id of ids) {
-    const gap = runGap(sieve, id, proof.runs?.[id]);
+    const gap = runGap(sieve, id, proof.runs?.[id], tooling);
     if (!gap) return undefined;
     first ??= gap;
   }
   return first;
+}
+
+/** Счёт прогона для строки пробела: неточный «прошло» не называется числом. */
+function countParams(run: string, count: RunTestCount | undefined): Record<string, string> {
+  return {
+    run,
+    passed: count?.exact ? String(count.passed) : '?',
+    failed: count ? String(count.failed) : '?',
+  };
+}
+
+/**
+ * Счёт тестов строки — тот, что напечатал прогон блока «Тесты» (аудит g0 25.10,
+ * F-12): «tests-cli … 2117 passed» обязан сослаться на прогон, и числа сверяются с
+ * ним — прогон с одним упавшим «2117 passed» без «1 failed» не подтверждает.
+ */
+function countGap(
+  sieve: SieveDef,
+  row: SieveReportRow,
+  proof: SieveProofFacts | undefined,
+): SieveGap | undefined {
+  if (!proof?.testsBlock || row.status !== 'pass') return undefined;
+  const claim = countClaimOf(row.evidence);
+  if (!claim) return undefined;
+  const ids = proofRunIds(row.evidence, proof);
+  if (!claimsTestsBlock(row.evidence, ids)) return undefined;
+  if (ids.length === 0) {
+    const last = proof.latest?.[0];
+    return last
+      ? {
+          code: 'sieve-gap-count-no-cite',
+          params: {
+            sieve: sieve.id,
+            claim: claim.text,
+            ...countParams(last, proof.runs?.[last]?.tests),
+          },
+        }
+      : { code: 'sieve-gap-count-no-run', params: { sieve: sieve.id, claim: claim.text } };
+  }
+  const missing = ids.find((id) => !proof.runs?.[id]?.found);
+  if (missing) return { code: 'sieve-gap-run-missing', params: { sieve: sieve.id, run: missing } };
+  const counts = ids.map((id) => proof.runs?.[id]?.tests);
+  // Прогон без счёта (ручная запись) не сверить — строку держит не он.
+  if (counts.some((count) => !count)) return undefined;
+  const known = counts as RunTestCount[];
+  if (known.some((count) => countMatches(claim, count))) return undefined;
+  if (known.length > 1 && countMatches(claim, totalCount(known))) return undefined;
+  return {
+    code: 'sieve-gap-count-mismatch',
+    params: { sieve: sieve.id, claim: claim.text, ...countParams(ids[0]!, known[0]) },
+  };
 }
 
 /** Дополнительные требования отдельных сит к уже сданной строке. */
@@ -292,11 +532,19 @@ function contentGap(
 ): SieveGap | undefined {
   // Живая проверка (`proof: 'run'`) сдаётся `n/a` только на диффе без файлов
   // поведения (решение владельца 10.10): правка кода «не применимой» не бывает,
-  // а причина на доках/контракте уходит в описание MR (`mrDescriptionGap`).
-  if (sieve.proof === 'run' && row.status === 'n/a' && mechanics.behaviour?.length) {
+  // а причина на доках/контракте уходит в описание MR (`mrDescriptionGap`). Считаются
+  // только файлы поведения вида этого сита: линтер сборки — не контракт и не бэкенд, и
+  // `n/a` контракта по запросу из-за него отбивался (g8 26.10).
+  const behaviour =
+    sieve.proof === 'run' && row.status === 'n/a'
+      ? touchesSieve(sieve, mechanics.behaviour ?? [])
+      : [];
+  if (behaviour.length > 0) {
     return {
       code: 'sieve-gap-live-na',
-      params: { sieve: sieve.id, files: named(mechanics.behaviour) },
+      // Метки — в самом отказе (g8 26.10: без них группа искала в коде панели, что
+      // считается «живым», 7 чтений).
+      params: { sieve: sieve.id, files: named(behaviour), tags: liveTagsOf(sieve) },
     };
   }
   if (sieve.id === 'project-checks' && mechanics.checks?.length) {
@@ -338,11 +586,22 @@ export function rowGap(
   if (row.evidence.length < EVIDENCE_MIN) {
     return { code: 'sieve-gap-no-evidence', params: { sieve: sieve.id } };
   }
+  const flip = flipWithoutProof(row);
+  if (flip) {
+    return {
+      code: 'sieve-gap-flip',
+      params: { sieve: sieve.id, kind: flip, was: row.was?.evidence.slice(0, 300) ?? '' },
+    };
+  }
   if (sieve.id === 'consumers-repo-wide') {
     const gap = consumersGap(mechanics, row);
     if (gap) return gap;
   }
-  return contentGap(sieve, row, mechanics) ?? proofGap(sieve, row, proof);
+  return (
+    contentGap(sieve, row, mechanics) ??
+    proofGap(sieve, row, proof, mechanics) ??
+    countGap(sieve, row, proof)
+  );
 }
 
 /** Потребители удалённого вне диффа, не названные строкой поиска потребителей. */

@@ -6,6 +6,16 @@ import type {
 } from '../../../lib/app-store/app-store.types.ts';
 import { stageOf, stagesAhead } from '../ChatCascadeStages/ChatCascadeStages.ts';
 import { createDeliverStageSession, deliverStageChoice } from './deliver-stage.ts';
+import { existsSync } from 'node:fs';
+import { PANEL_TESTS_CLI } from '../delivery-self-check.ts';
+
+// P5: путь к CLI блока «Тесты» — абсолютный и настоящий: группа работает в чужой копии.
+describe('проверка доставки до MR — команда панели', () => {
+  it('путь к tests-cli.mjs панели существует', () => {
+    expect(existsSync(PANEL_TESTS_CLI)).toBe(true);
+    expect(PANEL_TESTS_CLI.replace(/\\/g, '/')).toMatch(/\/tools\/tests-cli\.mjs$/);
+  });
+});
 
 /**
  * Новый разговор доставки по слову конвейера (решение владельца 23.10): живая
@@ -108,6 +118,8 @@ describe('новый разговор доставки', () => {
     });
     expect(start?.prompt).toContain('NEW delivery conversation');
     expect(start?.prompt).toContain('нет MR — откройте');
+    // g5 25.10 (P5): проверка доставки панели — по черновику, до создания MR.
+    expect(start?.prompt).toMatch(/tests-cli\.mjs" delivery --project \. --answer <sieves file>/);
     expect(start?.fromAliases).toContain('670c98f4-review');
   });
 

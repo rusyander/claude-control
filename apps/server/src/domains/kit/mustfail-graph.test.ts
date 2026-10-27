@@ -44,8 +44,9 @@ const put = (rel: string, body: string) => {
   writeFileSync(join(repo, rel), body);
 };
 const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
-const mustfail = (...extra: string[]) => {
-  const r = spawnSync(process.execPath, [MUSTFAIL, '--base', 'HEAD~1', ...extra, '--cmd', CMD], {
+const mustfail = (...extra: string[]) => mustfailWith(CMD, ...extra);
+const mustfailWith = (cmd: string, ...extra: string[]) => {
+  const r = spawnSync(process.execPath, [MUSTFAIL, '--base', 'HEAD~1', ...extra, '--cmd', cmd], {
     cwd: repo,
     encoding: 'utf8',
     // Замок панели снимает сам mustfail в своих прогонах; здесь — и для своего запуска.
@@ -84,8 +85,9 @@ describe('mustfail набора: режим графа vitest и память в
   git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'feat');
 
   it('два прогона на все файлы: покрытый — RED, тест «для вида» — GREEN, без тестов — NO-BASE', () => {
-    // Репозиторий новый — памяти ещё нет; `--fresh` её бы и не записал.
-    const { status, out } = mustfail();
+    // Репозиторий новый — памяти ещё нет; `--fresh` её бы и не записал. `--no-sibling`: здесь
+    // проверяется сам граф, а у a.js и b.js есть свои тесты рядом — их проверку ведёт отдельный тест ниже.
+    const { status, out } = mustfail('--no-sibling');
 
     expect(out).toContain('· baseline with graph: green');
     expect(out).toContain('· all files reverted at once: red');
@@ -152,5 +154,33 @@ describe('mustfail набора: режим графа vitest и память в
       git('checkout', '-q', 'src/b.js');
       rmSync(dirname(bin), { recursive: true, force: true });
     }
+  }, 120_000);
+
+  it('свой тест рядом решает первым (g9): a.js — RED своим тестом, граф идёт только по b.js и c.js', () => {
+    // g9 25.10: обход графа занял 105 с + 102 с на два файла, чьи тесты прямым прогоном идут ~10 с.
+    const { status, out } = mustfail('--fresh');
+
+    expect(out).toContain('· own sibling tests: 2 file(s), baseline green');
+    expect(out).toMatch(/\| src\/a\.js\s*\| RED .*own test src\/a\.test\.js/);
+    // b.test.js проверяет только тип: свой тест зелёный — решает граф, и он уже без a.js.
+    expect(out).toContain('src/b.js → own test green — the graph decides');
+    expect(out).toContain('· baseline with graph: green, test files 1');
+    expect(verdict(out, 'src/b.js')).toBe('GREEN');
+    expect(verdict(out, 'src/c.js')).toBe('NO-BASE');
+    expect(status).toBe(1);
+    expect(git('status', '--porcelain')).toBe('');
+  }, 120_000);
+
+  it('проверка без единого теста останавливается сразу (g9): `run {file}` по исходникам — exit 2, без GREEN', () => {
+    // g9 25.10: `vitest run {file}` по исходным файлам при passWithNoTests — «зелёная» база без тестов,
+    // каждый файл «НЕ покрыт», ложный вердикт за 13 с.
+    const run = CMD.replace('related {file} --run', 'run {file} --passWithNoTests');
+    const { status, out } = mustfailWith(run, '--fresh');
+
+    expect(status).toBe(2);
+    expect(out).toContain('the check ran NO test at all');
+    expect(out).toContain('vitest related {file} --run');
+    expect(out).not.toMatch(/\| GREEN/);
+    expect(git('status', '--porcelain')).toBe('');
   }, 120_000);
 });

@@ -9,6 +9,7 @@ import type {
 import {
   STALL_POLL_MS,
   STALL_SILENT_MS,
+  STALL_UNBORN_MS,
   createSplitStallWatch,
   transcriptActivity,
   type SplitStallDeps,
@@ -32,9 +33,12 @@ function harness(
     stop?: StallStopOutcome;
     resumed?: boolean;
     diagnose?: SplitStallDeps['diagnose'];
+    /** Звено заведено и не родилось — столько мс назад от старта часов. */
+    unbornAgo?: number;
   } = {},
 ) {
   let now = 1_000_000_000;
+  const unbornAt = options.unbornAgo === undefined ? undefined : now - options.unbornAgo;
   const group = {
     index: 0,
     title: 'Группа А',
@@ -55,6 +59,7 @@ function harness(
     lastActivity: () => activity,
     processAlive: () => options.alive ?? false,
     waitingOnHuman: () => options.pending ?? false,
+    unbornStage: () => unbornAt,
     stop: (chatId) => {
       stops.push(chatId);
       return options.stop ?? 'stopped';
@@ -107,6 +112,27 @@ describe('сторож повисших групп', () => {
     h.advance(STALL_SILENT_MS);
     expect(await h.tick()).toEqual([]);
     expect(h.interrupts).toEqual([0]);
+  });
+
+  // d9869abf:5, 25.10: доставка заведена, перезапуск оборвал её до первого хода;
+  // транскрипт ревью свежий, и час молчания группа простояла бы впустую.
+  it('звено не родилось — обрыв через минуты, а не через час молчания', async () => {
+    const h = harness({ unbornAgo: 0 });
+    expect(await h.tick()).toEqual([]);
+    h.advance(STALL_UNBORN_MS - MIN);
+    h.touch();
+    expect(await h.tick()).toEqual([]);
+    h.advance(2 * MIN);
+    expect(await h.tick()).toEqual(['родитель#0']);
+    expect(h.interrupts).toEqual([0]);
+    expect(h.notices).toEqual([{ minutes: 6, resumed: true }]);
+  });
+
+  it('нерождённое звено при запросе прав человеку не трогается', async () => {
+    const h = harness({ unbornAgo: 0, pending: true });
+    await h.tick();
+    h.advance(3 * STALL_UNBORN_MS);
+    expect(await h.tick()).toEqual([]);
   });
 
   it('транскрипт пишется — не трогает, сколько бы ни шло', async () => {

@@ -1,0 +1,48 @@
+{
+  "title": {
+    "ru": "Наблюдение за группами разделения едет с набором панели",
+    "en": "Watching split groups ships with the panel kit"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Набор панели везёт скиллы наблюдения за группами: следить за группами разделения можно на любой машине с панелью, без личной копии скиллов. Наблюдатель сам находит папку данных панели и токен.",
+        "en": "The panel kit carries the group-watch skills: split groups can be watched on any machine with the panel, with no personal copy of the skills. The watcher finds the panel data folder and the token by itself."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Пока идёт наблюдение за группами, хук набора не даёт закончить ход и отпускает его по команде остановки, по `hold.json`, когда все группы закончены, или после трёх отказов.",
+        "en": "While a group watch runs, a kit hook keeps the turn from ending and releases it on the stop command, on `hold.json`, when every group is done, or after three refusals."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Блокирующий вызов наблюдения больше не получает совет уйти в фон.",
+        "en": "The blocking watch call no longer gets advice to move to the background."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Наблюдатель понимает перепроверку MR как отдельный этап, а в отчёте по окну ставит даты, если окно переходит через полночь.",
+        "en": "The watcher treats an MR recheck as a stage of its own, and its window report carries dates when the window crosses midnight."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "В справке «Набор панели» — как запустить наблюдение за группами на другой машине и что держит ход открытым.",
+        "en": "The «Panel kit» help shows how to start a group watch on another machine and what keeps the turn open."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

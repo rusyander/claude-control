@@ -20,6 +20,8 @@
  * оригинале видна в копии сразу), что отчёт называет `.vault/` за бортом, а
  * дописанный шаблон доносит его повторным зеркалом — но `.venv/` не доносит
  * никакой шаблон, он в закрытом списке сборочных каталогов.
+ * Хук, прописанный в оригинале после создания копии, карточка называет дырой, а
+ * «Добрать» дописывает его в settings.local.json копии, не трогая её разрешений.
  * Бутстрап — фиктивной командой `node -e`:
  * удачная даёт значок «зависимости есть» и лог, провальная — «установка не
  * удалась» с кодом, и ни та ни другая копию не ломает.
@@ -41,6 +43,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -52,8 +55,8 @@ const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 const BRANCH = 'feature/qa-parallel';
 
 const failures = [];
-const check = (ok, what) => {
-  console.log(`${ok ? '✓' : '✕'} ${what}`);
+const check = (ok, what, detail) => {
+  console.log(`${ok ? '✓' : '✕'} ${what}${!ok && detail ? ` — ${detail}` : ''}`);
   if (!ok) failures.push(what);
 };
 
@@ -150,12 +153,32 @@ try {
   // Команда подготовки — до создания копии: она идёт сразу после зеркала.
   const NODE = process.execPath.includes(' ') ? `"${process.execPath}"` : process.execPath;
   const dialog = page.getByRole('dialog');
+  const saveButton = dialog.getByRole('button', { name: 'Сохранить', exact: true });
+  const isMirrorPut = (response) =>
+    response.url().includes('/project-git/mirror-settings') &&
+    response.request().method() === 'PUT';
+  // Неактивна кнопка и пока запрос в пути (спиннер), поэтому «сохранилось» —
+  // это ответ PUT и кнопка без спиннера: черновик сброшен, правок нет.
+  const settled = () =>
+    saveButton.evaluate(
+      (node) =>
+        new Promise((resolve) => {
+          const done = () => node.disabled && !node.querySelector('[class*="spinner"]');
+          if (done()) return resolve(true);
+          const observer = new MutationObserver(() => {
+            if (done()) {
+              observer.disconnect();
+              resolve(true);
+            }
+          });
+          observer.observe(node, { attributes: true, childList: true, subtree: true });
+        }),
+    );
   const saveSettings = async () => {
-    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    // Сохранилось — черновик сброшен, кнопка снова неактивна.
-    await dialog
-      .getByRole('button', { name: 'Сохранить', exact: true, disabled: true })
-      .waitFor({ timeout: 10_000 });
+    const put = page.waitForResponse(isMirrorPut, { timeout: 10_000 });
+    await saveButton.click();
+    await put;
+    await settled();
   };
   await dialog.getByRole('button', { name: 'Настройка копий' }).click();
   const commandField = dialog.getByLabel('Команда после создания копии');
@@ -274,6 +297,52 @@ try {
     'откат lock-файла назван на карточке',
   );
 
+  // Хук, прописанный в оригинале ПОСЛЕ создания копии: скрипт копия видит
+  // ссылкой, а запись в её settings.local.json — нет. Файл копии свежее
+  // оригинала (в нём копились свои разрешения), поэтому перенос «что свежее» его
+  // не трогает. Карточка называет дыру, «Добрать» дописывает одну запись.
+  const copySettings = join(copy, '.claude', 'settings.local.json');
+  const ahead = new Date(Date.now() + 3_600_000);
+  writeFileSync(copySettings, '{"permissions":{"allow":["Bash(npm test)"]}}\n');
+  utimesSync(copySettings, ahead, ahead);
+  writeFileSync(
+    join(repo, '.claude', 'settings.local.json'),
+    `${JSON.stringify({
+      permissions: {},
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash',
+            hooks: [{ type: 'command', command: 'node .claude/hooks/qa-gate-guard.mjs' }],
+          },
+        ],
+      },
+    })}\n`,
+  );
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /main/ }).first().click();
+  await list.waitFor({ timeout: 10_000 });
+  await list.getByTitle(copy).first().waitFor({ timeout: 10_000 });
+  if (process.env.SHOT_DIR) {
+    mkdirSync(process.env.SHOT_DIR, { recursive: true });
+    await list.screenshot({
+      path: join(process.env.SHOT_DIR, `copy-hooks-gap_${process.env.SHOT_TAG ?? 'AFTER'}.png`),
+    });
+  }
+  const hooksGap = list.getByText(/хуки оригинала: PreToolUse: qa-gate-guard\.mjs/);
+  check((await hooksGap.count()) > 0, 'карточка копии называет непрописанный хук оригинала');
+  // Без дыры кнопки нет — прогон записывает провал строкой, а не падает.
+  const repairButton = list.getByRole('button', { name: 'Добрать', exact: true });
+  if (await repairButton.count()) await repairButton.first().click();
+  await hooksGap.waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {});
+  const repaired = JSON.parse(readFileSync(copySettings, 'utf8'));
+  check(
+    JSON.stringify(repaired.hooks ?? {}).includes('qa-gate-guard.mjs') &&
+      (repaired.permissions?.allow ?? []).includes('Bash(npm test)'),
+    '«Добрать» дописал хук в файл копии и оставил её разрешения',
+  );
+  check((await hooksGap.count()) === 0, 'после «Добрать» дыры хуков на карточке нет');
+
   // Провальная команда: значок «не удалась» с кодом, копия на месте.
   await dialog.getByRole('button', { name: 'Настройка копий' }).click();
   await commandField.waitFor({ timeout: 10_000 });
@@ -283,6 +352,26 @@ try {
   await list.getByText('установка не удалась').first().waitFor({ timeout: 30_000 });
   check((await list.getByText('код 3').count()) > 0, 'провал бутстрапа показан с кодом выхода');
   check(existsSync(copy), 'провал бутстрапа копию не трогает');
+  // Правка во время сохранения не теряется: человек допечатал, пока PUT в пути, —
+  // ответ первого сохранения не стирает второй черновик.
+  const slowPut = async (route) => {
+    if (route.request().method() === 'PUT') await new Promise((done) => setTimeout(done, 1500));
+    await route.fallback();
+  };
+  await page.route('**/api/project-git/mirror-settings', slowPut);
+  await commandField.fill('echo first');
+  const firstPut = page.waitForResponse(isMirrorPut, { timeout: 10_000 });
+  await saveButton.click();
+  await commandField.fill('echo second');
+  await firstPut;
+  await page.locator('li[role]', { hasText: 'Настройка копий сохранена' }).last().waitFor();
+  check(
+    (await commandField.inputValue()) === 'echo second' && (await saveButton.isEnabled()),
+    'правка, начатая во время сохранения, не стёрта его ответом',
+    `поле: «${await commandField.inputValue()}», «Сохранить» ${(await saveButton.isEnabled()) ? 'активна' : 'неактивна'}`,
+  );
+  await page.unroute('**/api/project-git/mirror-settings', slowPut);
+
   // Команда хранится по проекту в панели — снимаем, чтобы temp-путь не остался в state.json.
   await commandField.fill('');
   await saveSettings();

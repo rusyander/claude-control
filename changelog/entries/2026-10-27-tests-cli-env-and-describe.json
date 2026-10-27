@@ -1,0 +1,56 @@
+{
+  "title": {
+    "ru": "Блок «Тесты»: окружение наборов, своя команда кейса, отчёт ворот без второго прогона, привязка по пути describe",
+    "en": "Tests block: suite environment, a per-case command, a gate report with no second run, linking by a describe path"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Результат теста привязывается к кейсу, связанному с путём describe: кейс с testName «a > b» получает итог всех тестов под ним в своём файле, худший из них. Раньше такой кейс оставался без результата, хотя прогон был.",
+        "en": "A test result is linked to a case bound to a describe path: a case with testName «a > b» gets the outcome of every test under it in its file, the worst one. Before, such a case stayed without a result although the run happened."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Окружение наборов из `automation.json` (поле `env`) доходит до `run`, `run --stale` и `run --base`; кейсы с разным окружением идут частями, по записи истории на часть. Сборка Go, упавшая на окружении (go.sum, toolchain, прокси модулей), ложится «заблокирован», а не красным.",
+        "en": "The suite environment from `automation.json` (the `env` field) reaches `run`, `run --stale` and `run --base`; cases with different environments run in parts, one history record per part. A Go build that failed on the environment (go.sum, toolchain, module proxy) lands as «blocked», not red."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "`--health` без адреса спрашивает тот стенд, куда ходит раннер, а чужой адрес отклоняется до прогона. `run --base` берёт `node_modules` копии, если зависимости развилки те же.",
+        "en": "`--health` with no address asks the stand the runner goes to, and a foreign address is refused before the run. `run --base` reuses the copy's `node_modules` when the fork's dependencies are the same."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "`run --stale` засчитывает отчёт ворот, снятый на том же дереве (`tests tree` печатает его отпечаток), и не гоняет те же тесты второй раз.",
+        "en": "`run --stale` counts a gate report taken on the same tree (`tests tree` prints its fingerprint) and does not run the same tests a second time."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Своя команда кейса задаётся один раз — `tests case-cmd` — и берётся `run`, `run --stale` и `run --base`; явный `--cmd` важнее.",
+        "en": "A case's own command is set once — `tests case-cmd` — and used by `run`, `run --stale` and `run --base`; an explicit `--cmd` wins."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "`tests show <кейс> --history` печатает исходы кейса по последним прогонам, новые сверху, с веткой, коммитом и причиной провала, а прогоны `run --base` — отдельным блоком. Раньше историю кейса собирали своим скриптом по файлам прогонов.",
+        "en": "`tests show <case> --history` prints the case's outcomes across recent runs, newest first, with branch, commit and failure reason, and the `run --base` runs in a separate block. Before, a case history took a hand-written script over the run files."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    }
+  ]
+}

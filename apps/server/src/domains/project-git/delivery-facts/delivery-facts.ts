@@ -2,6 +2,8 @@ import type { WorktreeMirrorSettings } from '@agentdeck/contracts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { isProtectedBranch } from '../../chat/group-command/branch.ts';
 import { git } from '../exec/exec.ts';
+import { remoteAhead } from './branch-commits.ts';
+import { unhomedItems } from './unhomed.ts';
 import { prepLeftovers } from '../lockfiles.ts';
 import { effectiveSettings, listed } from '../mirror-local.ts';
 import { mergeRequestRef, parseLsRemote } from '../merge-request.ts';
@@ -25,10 +27,10 @@ import { parseDirtyPaths } from '../read.ts';
  */
 
 /** Ключ задачи трекера в имени ветки: `PROJ-1485`, `ABC-12`. */
-const TICKET_KEY = /[A-Z][A-Z0-9]+-\d+/g;
+export const TICKET_KEY = /[A-Z][A-Z0-9]+-\d+/g;
 
 /** Ключ стоит в имени отдельно: не хвост другого ключа и не начало большего номера. */
-function hasKey(name: string, key: string): boolean {
+export function hasKey(name: string, key: string): boolean {
   return new RegExp(`(?<![A-Z0-9])${key}(?!\\d)`).test(name);
 }
 
@@ -92,6 +94,11 @@ export interface DeliveryFacts {
   head?: string;
   /** Ветка на удалённом = HEAD копии. */
   pushed: boolean;
+  /**
+   * Удалённая ветка впереди копии (голова копии — её предок): туда дописал не группа,
+   * а, например, бот CI (g8 26.10, F3). Тогда «не отправлена» — неправда.
+   */
+  remoteAhead?: { commits: string[]; count: number };
   /** MR, чья голова = HEAD копии. */
   mr?: string;
   /** Удалённый не ответил — факты сети неизвестны, а не отрицательны. */
@@ -107,8 +114,16 @@ export interface DeliveryFacts {
  * Чего не хватает до доставки — строками для группы и для хаба. Пусто — доставлено.
  * Строки — шаблоны сервера: их же читает агент в напоминании, а хаб по коду
  * показывает на языке интерфейса.
+ *
+ * `publishLater` — звено до доставки (ревью, правки при доставке впереди): пуш и MR —
+ * работа звена доставки, здесь их не снять, и строка о них гнала группу перепроверять
+ * то, что не может измениться (g5 25.10, check-cannot-change).
  */
-export function missingDelivery(facts: DeliveryFacts, branch: string): string[] {
+export function missingDelivery(
+  facts: DeliveryFacts,
+  branch: string,
+  options: { publishLater?: boolean } = {},
+): string[] {
   if (facts.unreachable) return [];
   const missing: string[] = [];
   if (facts.dirty.length > 0) {
@@ -119,7 +134,17 @@ export function missingDelivery(facts: DeliveryFacts, branch: string): string[] 
         : serverText('delivery-gap-dirty', { files }),
     );
   }
-  if (!facts.pushed) missing.push(serverText('delivery-gap-not-pushed', { branch }));
+  if (options.publishLater) return missing;
+  if (facts.remoteAhead) {
+    const { commits, count } = facts.remoteAhead;
+    missing.push(
+      serverText('delivery-gap-remote-ahead', {
+        branch,
+        commits:
+          commits.join('; ') + (count > commits.length ? ` (+${count - commits.length})` : ''),
+      }),
+    );
+  } else if (!facts.pushed) missing.push(serverText('delivery-gap-not-pushed', { branch }));
   if (!facts.mr) missing.push(serverText('delivery-gap-no-mr', { branch }));
   return missing;
 }
@@ -311,14 +336,26 @@ export async function readDeliveryFacts(input: {
         refs.get('HEAD') !== head))
       ? own
       : undefined;
-  const pushed = refs.get(`refs/heads/${adopted ?? branch}`) === head;
+  const remoteHead = refs.get(`refs/heads/${adopted ?? branch}`);
+  const pushed = remoteHead === head;
+  const ahead =
+    !pushed && remoteHead
+      ? await remoteAhead(cwd, remote, adopted ?? branch, remoteHead, head)
+      : undefined;
   const mr = await pickDeliveredMr(refs, head, base, {
     ...(input.mr ? { hint: input.mr } : {}),
     branch: adopted ?? branch,
     ...(input.branchOfMr ? { branchOfMr: input.branchOfMr } : {}),
     sharedWithBase: await sharesBaseHead(cwd, refs, head, input.forkedFrom, branch),
   });
-  return { dirty, head, pushed, ...(mr ? { mr } : {}), ...(adopted ? { branch: adopted } : {}) };
+  return {
+    dirty,
+    head,
+    pushed,
+    ...(ahead ? { remoteAhead: ahead } : {}),
+    ...(mr ? { mr } : {}),
+    ...(adopted ? { branch: adopted } : {}),
+  };
 }
 
 /**
@@ -347,6 +384,16 @@ async function sharesBaseHead(
 }
 
 /**
+ * Текст называет id сита или кейса отдельным словом: `browser-focus`, но не `xbrowser-focus2`.
+ * Одна мерка для сверки описания MR и для заметок, которые описание уже называет.
+ */
+export function namesId(text: string, id: string): boolean {
+  return new RegExp(`(^|[^\\w-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\w-]|$)`).test(
+    text,
+  );
+}
+
+/**
  * Описание MR — часть готовности (аудит 25.09, L110): MR с пустым описанием
  * «готовым» не считается. Читает фордж-клиент; MR не прочитать (интеграция
  * выключена, нет токена, фордж ответил ошибкой) — проверка пропускается, и
@@ -358,25 +405,105 @@ async function sharesBaseHead(
  * `noted` — заметки доставки (решение владельца 23.10): сито «не проверено» и
  * красное не из-за ветки группу не держат, но ревьюер должен их увидеть —
  * описание называет каждое по id сита или кейса.
+ *
+ * `require` — разделы описания доставки группы (P6, g5 25.10: правка MR потеряла раздел
+ * «Проверки на финальном дереве», и сверка промолчала): `checks` — раздел проверок
+ * итогового дерева; `uiFiles` — задетые файлы интерфейса, тогда нужны снимки до/после
+ * или строка «Скриншоты: нет — причина» (`MR_SHOTS_LINE`). Их пробелы — `sections`,
+ * отдельно от `missing`: каждый — своя строка с кодом, и группа видит все за один круг.
  */
 export async function mrDescriptionGap(
   mr: string,
   read: (url: string) => Promise<{ description?: string } | undefined>,
   liveNa: readonly string[] = [],
   noted: readonly string[] = [],
-): Promise<{ missing?: string; unchecked?: true }> {
+  require: { checks?: boolean; uiFiles?: readonly string[] } = {},
+): Promise<{ missing?: string[]; sections?: string[]; unchecked?: true }> {
   const review = await read(mr).catch(() => undefined);
   if (!review || review.description === undefined) return { unchecked: true };
   const text = review.description.trim();
-  if (!text) return { missing: serverText('delivery-gap-mr-description', { mr }) };
-  const named = (id: string): boolean =>
-    new RegExp(`(^|[^\\w-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\w-]|$)`).test(text);
+  if (!text) return { missing: [serverText('delivery-gap-mr-description', { mr })] };
+  const named = (id: string): boolean => namesId(text, id);
+  const sections = descriptionSections(text, mr, require);
+  // Каждый класс пробела — своей строкой за один проход (g9 26.10, F9): причина n/a
+  // возвращалась первой и прятала заметки, а группа узнавала их следующим кругом.
+  const missing: string[] = [];
   const unnamed = liveNa.filter((id) => !named(id));
-  if (unnamed.length > 0) {
-    return { missing: serverText('delivery-gap-mr-na-reason', { mr, sieves: unnamed.join(', ') }) };
-  }
+  if (unnamed.length > 0)
+    missing.push(serverText('delivery-gap-mr-na-reason', { mr, sieves: unnamed.join(', ') }));
   const silent = [...new Set(noted)].filter((id) => !named(id));
-  return silent.length > 0
-    ? { missing: serverText('delivery-gap-mr-notes', { mr, items: silent.join(', ') }) }
-    : {};
+  if (silent.length > 0)
+    missing.push(serverText('delivery-gap-mr-notes', { mr, items: silent.join(', ') }));
+  const unhomed = unhomedItems(text);
+  if (unhomed.length > 0)
+    missing.push(serverText('delivery-gap-mr-unhomed', { mr, items: unhomed.join('; ') }));
+  return {
+    ...(missing.length > 0 ? { missing } : {}),
+    ...(sections.length > 0 ? { sections } : {}),
+  };
+}
+
+/** Цели картинок описания: `![…](адрес)` и `<img src="адрес">`. */
+const IMAGE_TARGET =
+  /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?[^)]*\)|<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi;
+
+/** Адреса картинок описания в порядке появления, без повторов. */
+export function imageLinks(text: string): string[] {
+  return [
+    ...new Set([...text.matchAll(IMAGE_TARGET)].flatMap((m) => m[1] ?? m[2] ?? []).filter(Boolean)),
+  ];
+}
+
+/**
+ * Картинки живого MR, которых нет в файле описания (g9 26.10, F9): снимки загрузили в
+ * фордж и вписали прямо в MR, файл `mr-description.md` их не знал, и следующая
+ * перезапись описания из файла убрала их на два часа. Сверка черновика до публикации
+ * называет каждую — файл дополняется до того, как перепишет MR.
+ */
+export function droppedImageLinks(published: string, draft: string): string[] {
+  return imageLinks(published).filter((link) => !draft.includes(link));
+}
+
+/** Слово проверок в заголовке: «Проверки», «Как проверено», «Checks», «Gate», «Testing». */
+const CHECKS_WORD = /провер|прогон|гейт|тест|check|gate|verif|test/i;
+/** Заголовки заметок, а не проверок: «Открыто после проверки», «Не проверено». */
+const NOT_CHECKS =
+  /открыт\S*\s+после|open\s+after|не\s*провер|непровер|not\s+(checked|verified)|unverified/i;
+/** Снимок в описании: картинка markdown, `<img>`, ссылка на файл изображения. */
+const SHOT = /!\[[^\]]*\]\([^)]+\)|<img\s|\.(png|jpe?g|gif|webp)(\?\S*)?(\s|\)|$)/im;
+/** «Скриншоты: нет — причина» — снимков нет, причина названа (тире и текст после него). */
+const NO_SHOTS =
+  /^\s*[*_]*\s*(скриншоты|снимки|screenshots|shots)\s*[*_]*\s*:\s*[*_]*\s*(нет|none|no)(?=[\s—–-])[^\S\n]*[—–-]+[^\S\n]*\S/im;
+
+/**
+ * Заголовки описания: строка markdown `#`, строка целиком жирным и метка «Слово:» в начале
+ * строки (до 40 знаков) — так группы и пишут раздел; слово в середине абзаца раздела не делает.
+ */
+function headingsOf(text: string): string[] {
+  const out: string[] = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    const heading =
+      /^#{1,6}\s+(.+)$/.exec(line)?.[1] ??
+      /^(?:\*\*|__)(.+?)(?:\*\*|__):?$/.exec(line)?.[1] ??
+      /^(?:[-*]\s+)?(?:\*\*|__)?([^:*_]{2,40}?)(?:\*\*|__)?\s*:/.exec(line)?.[1];
+    if (heading) out.push(heading);
+  }
+  return out;
+}
+
+function descriptionSections(
+  text: string,
+  mr: string,
+  require: { checks?: boolean; uiFiles?: readonly string[] },
+): string[] {
+  const out: string[] = [];
+  const checks = headingsOf(text).some((h) => CHECKS_WORD.test(h) && !NOT_CHECKS.test(h));
+  if (require.checks && !checks) out.push(serverText('delivery-gap-mr-checks', { mr }));
+  const ui = require.uiFiles ?? [];
+  if (ui.length > 0 && !SHOT.test(text) && !NO_SHOTS.test(text)) {
+    const files = ui.slice(0, 3).join(', ') + (ui.length > 3 ? ` +${ui.length - 3}` : '');
+    out.push(serverText('delivery-gap-mr-shots', { mr, files }));
+  }
+  return out;
 }

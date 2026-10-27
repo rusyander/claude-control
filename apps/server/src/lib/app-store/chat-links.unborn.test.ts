@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ChatLink } from './app-store.types.ts';
 import { AppStore } from './store.ts';
-import { carriedLink, unbornResumeTarget } from './chat-links.ts';
+import { carriedLink, continuationLink, unbornResumeTarget, unbornStageOf } from './chat-links.ts';
 
 const parent = 'parent-1';
 const link = (extra: Omit<Partial<ChatLink>, 'createdAt'> & { createdAt: string }): ChatLink => ({
@@ -106,5 +106,58 @@ describe('stagePrompt — задание звена до рождения раз
 
   it('копия связи на другой разговор его не несёт', () => {
     expect(carriedLink(store.getChatLink('new-fix')!).stagePrompt).toBeUndefined();
+  });
+
+  // d9869abf:9, 26.10: пауза оборвала продолжение в чистой сессии до первого хода.
+  it('продолжение группы несёт свою вводную, обычного разговора и без вводной — нет', () => {
+    const work = store.getChatLink('new-fix')!;
+    expect(continuationLink(work, 'BRIEF').stagePrompt).toBe('BRIEF');
+    expect(continuationLink(work).stagePrompt).toBeUndefined();
+    const { groupIndex: _solo, ...plain } = work;
+    expect(continuationLink(plain, 'BRIEF').stagePrompt).toBeUndefined();
+  });
+});
+
+// Группа d9869abf:5, 25.10: ревью родилось и кончилось, связь доставки заведена
+// со своим заданием, а перезапуск панели оборвал её до первого хода.
+describe('unbornStageOf — звено после текущего чата не родилось', () => {
+  const review = {
+    stage: 'review' as const,
+    createdAt: '2026-10-25T16:49:46Z',
+    conversation: 'new-r',
+  };
+  const born = (): Record<string, ChatLink> => ({
+    'new-r': link(review),
+    'review-sid': link(review),
+    'new-d': link({ stage: 'deliver', createdAt: '2026-10-25T16:59:34Z', stagePrompt: 'Deliver' }),
+  });
+
+  it('доставка без разговора находится по чату ревью и по его сессии', () => {
+    expect(unbornStageOf(born(), 'new-r')?.[0]).toBe('new-d');
+    expect(unbornStageOf(born(), 'review-sid')?.[0]).toBe('new-d');
+  });
+
+  it('родившееся, снятое, чужое и более раннее звено — не оно', () => {
+    const links = born();
+    const d = links['new-d']!;
+    const bornD = { ...d, conversation: 'new-d' };
+    expect(
+      unbornStageOf({ ...links, 'new-d': bornD, 'deliver-sid': bornD }, 'new-r'),
+    ).toBeUndefined();
+    expect(unbornStageOf({ ...links, 'new-d': { ...d, retiredAt: 'x' } }, 'new-r')).toBeUndefined();
+    expect(unbornStageOf({ ...links, 'new-d': { ...d, groupIndex: 2 } }, 'new-r')).toBeUndefined();
+    const { stagePrompt: _task, ...noTask } = d;
+    expect(unbornStageOf({ ...links, 'new-d': noTask }, 'new-r')).toBeUndefined();
+    const early = { ...d, createdAt: '2026-10-25T16:40:00Z' };
+    expect(unbornStageOf({ ...links, 'new-d': early }, 'new-r')).toBeUndefined();
+    expect(
+      unbornStageOf({ ...links, 'new-d': { ...d, stage: 'review' } }, 'new-r'),
+    ).toBeUndefined();
+  });
+
+  it('из двух нерождённых — новейшее', () => {
+    const links = born();
+    links['new-f'] = link({ stage: 'fix', createdAt: '2026-10-25T17:05:00Z', stagePrompt: 'Fix' });
+    expect(unbornStageOf(links, 'new-r')?.[0]).toBe('new-f');
   });
 });

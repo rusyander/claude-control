@@ -59,6 +59,14 @@
     "n": 3,
     "why": "diagnostic about a changelog/entries file, shown to the repo developer on the changelog tab as the invalid-file reason, not a user-facing message"
   },
+  "domains/chat/agent-history/agent-history.exact.fixture.ts": {
+    "n": 12,
+    "why": "test fixture: recorded subagent transcript lines the history reader parses, never shown"
+  },
+  "domains/chat/agent-history/agent-history.fixture.ts": {
+    "n": 13,
+    "why": "test fixture: recorded subagent transcript lines the history reader parses, never shown"
+  },
   "domains/chat/auto-continue/auto-continue.ts": {
     "n": 3,
     "why": "unclassified"
@@ -91,6 +99,10 @@
     "n": 2,
     "why": "unclassified"
   },
+  "domains/chat/handoff-coverage/handoff-coverage.ts": {
+    "n": 6,
+    "why": "regex sources matching Russian plan prose (who split the work), parsing only"
+  },
   "domains/chat/panel-preamble-legacy.ts": {
     "n": 17,
     "why": "matching data: Russian openers of panel preambles in transcripts written before the D-E translation, never shown, never sent"
@@ -112,8 +124,8 @@
     "why": "review outcome the human reads: the MR comment written INTO the forge, the feed notice and reviewNoticeText in a foreign CLI feed (incl. the incomplete-review line, U4), and the free-text postError reasons (forge refusal, review session busy/absent) shown on the card"
   },
   "domains/chat/split-ticket-batch/compose.ts": {
-    "n": 14,
-    "why": "unclassified"
+    "n": 29,
+    "why": "Jira issue body text (ru half of the ru/en LABELS pair picked by the request lang), not a panel message"
   },
   "domains/chat/split-ticket-batch/prepare.ts": {
     "n": 1,
@@ -291,6 +303,10 @@
     "n": 5,
     "why": "media: plan reasons translated client-side by key / nested decode reasons"
   },
+  "domains/mobile-apk/mobile-apk.ts": {
+    "n": 1,
+    "why": "build log line appended to the raw APK build output stream (a log, shown verbatim)"
+  },
   "domains/models/model-source.ts": {
     "n": 3,
     "why": "log line / internal error not shown as text"
@@ -300,8 +316,8 @@
     "why": "stderr log line"
   },
   "domains/notify/telegram-answers/apply.ts": {
-    "n": 8,
-    "why": "Telegram answers: refusal details for the server log, never sent to a panel client (23.10)"
+    "n": 11,
+    "why": "Telegram answers: refusal details for the server log, never sent to a panel client (23.10); +2 reply into a chat: empty reply, unknown project folder (25.10); +1 a read-only question of a session outside the panel (25.10)"
   },
   "domains/notify/telegram-answers/bot-api.ts": {
     "n": 1,
@@ -311,21 +327,45 @@
     "n": 1,
     "why": "Telegram answers: programming-error throw (callback_data over 64 bytes), never reaches a client (23.10)"
   },
+  "domains/notify/telegram-answers/cleanup.ts": {
+    "n": 3,
+    "why": "outbound notification to an external channel (Telegram answers): the /clear reply (25.10)"
+  },
   "domains/notify/telegram-answers/collect.ts": {
     "n": 4,
     "why": "unclassified"
   },
+  "domains/notify/telegram-answers/commands.ts": {
+    "n": 22,
+    "why": "outbound notification to an external channel (Telegram bot): command menu, /status, /waiting, /help replies and the connect greeting (25.10); +2 /clear in the command menu and /help (25.10); -1 /status takes the «📁 проект · сессия» place from compose (25.10)"
+  },
   "domains/notify/telegram-answers/compose.ts": {
-    "n": 49,
-    "why": "outbound notification to an external channel (Telegram answers): ask text, buttons, outcome lines, toasts (23.10)"
+    "n": 55,
+    "why": "outbound notification to an external channel (Telegram answers): ask text, buttons, outcome lines, toasts (23.10); HTML message format 25.10: type lines (ВОПРОС, РАЗРЕШЕНИЕ, РЕШЕНИЕ), «Открыть чат →», «…и ещё N — в панели»; 12б/13б 25.10: «вид · суть» first line, collapsed outcome lines; final layout 25.10: «вид · 📁 проект · сессия», суть второй строкой, без хэштегов; read-only question of a session outside the panel: «Терминал», «Ответь в VS Code / в терминале / на компьютере — отсюда ответ туда не дойдёт» (25.10)"
+  },
+  "domains/notify/telegram-answers/describe.ts": {
+    "n": 2,
+    "why": "outbound notification to an external channel (Telegram answers): human description of a tool call — «Изменить файл», «Открыть» (25.10)"
+  },
+  "domains/notify/telegram-answers/replies.ts": {
+    "n": 16,
+    "why": "outbound notification to an external channel (Telegram bot): one-line acks for owner replies sent into a chat, skipped-attachment notes, unmapped and empty reply explanations (25.10)"
   },
   "domains/notify/telegram-answers/service.ts": {
-    "n": 5,
-    "why": "outbound notification to an external channel (Telegram answers): status details and the ForceReply placeholder (23.10)"
+    "n": 11,
+    "why": "outbound notification to an external channel (Telegram answers): status details and the ForceReply placeholder (23.10); +6 owner replies into a chat (25.10): image-only outcome, «📎 Отправлено» / «✉️ Ответ отправлен» acks, refusal detail"
+  },
+  "domains/notify/telegram-api.ts": {
+    "n": 1,
+    "why": "Telegram: token placeholder that replaces a token in Bot API error details, moved from telegram.ts (25.10)"
+  },
+  "domains/notify/telegram-text.ts": {
+    "n": 14,
+    "why": "outbound notification to an external channel (Telegram): event heads, home chat, essence lines (25.10); +3 long-run «Закончил» span: шёл N мин, N ч MM мин (25.10); HTML format 25.10: type lines ГОТОВО/ОШИБКА/РАЗРЕШЕНИЕ/ВОПРОС/ТЕСТЫ; 12б 25.10: «вид · суть» first line, «шёл N мин» line removed; final layout 25.10: «шёл N мин», «N из M упали», «Упало: N»"
   },
   "domains/notify/telegram.ts": {
-    "n": 79,
-    "why": "outbound notification to an external channel (phone push / Telegram); +26 group watch signal line: rule names, signal numbers in words, stage names (W, 21.10); +7 the rules that reach Telegram among R13-R19 (fan-out R13, timeout R15, queue wait R17): their names and their numbers in words (W2, 22.10); +6 activity on a paused group R20 and heavy checks in a loop R21: names and numbers in words (23.10); +21 watcher rules R22-R33 for groups and single chats: names and numbers in words (23.10); +6 autonomy-gap rules R34-R36 (fresh conversation over a warm one, redo of committed work, own server past a pause): names and numbers in words (24.10)"
+    "n": 82,
+    "why": "outbound notification to an external channel (phone push / Telegram); +26 group watch signal line: rule names, signal numbers in words, stage names (W, 21.10); +7 the rules that reach Telegram among R13-R19 (fan-out R13, timeout R15, queue wait R17): their names and their numbers in words (W2, 22.10); +6 activity on a paused group R20 and heavy checks in a loop R21: names and numbers in words (23.10); +21 watcher rules R22-R33 for groups and single chats: names and numbers in words (23.10); +6 autonomy-gap rules R34-R36 (fresh conversation over a warm one, redo of committed work, own server past a pause): names and numbers in words (24.10); -1 the token placeholder moved to telegram-api.ts (25.10); +4 HTML signal type lines (ТРЕВОГА, ВНИМАНИЕ, БЮДЖЕТ) (25.10)"
   },
   "domains/notify/webhook.ts": {
     "n": 1,
@@ -559,6 +599,10 @@
     "n": 3,
     "why": "refusals of a hand-written automation.json (unknown format, report dir for a native format) and the never-reached fallback; coded ones carry messageCode; no new server messageCodes (owner 12.10)"
   },
+  "domains/project-tests/case-commands/case-commands.ts": {
+    "n": 5,
+    "why": "refusals of a hand-written per-machine case command (empty, multi-line, too long, the command file tracked by git) — the same class as automation.ts; no new server messageCodes (owner 12.10)"
+  },
   "domains/project-tests/defect-status/defect-status.ts": {
     "n": 9,
     "why": "exported document / markdown written for another tool"
@@ -582,6 +626,10 @@
   "domains/project-tests/e2e-scaffold.ts": {
     "n": 1,
     "why": "file content written into the user's project"
+  },
+  "domains/project-tests/env-failure/env-failure.ts": {
+    "n": 1,
+    "why": "report content: the reason written into a JUnit <skipped message> of a case blocked by its environment, read back by the import as run-record data"
   },
   "domains/project-tests/export-cases/export-cases.ts": {
     "n": 61,
@@ -647,6 +695,10 @@
     "n": 10,
     "why": "runName: the run title shown in the chat list (the task itself is English, D-E); REGRESSION_TAGS/regressionTag: the regression tag value in the library language (F-63) — data the human filters by, not a message"
   },
+  "domains/project-tests/red-filter/red-filter.ts": {
+    "n": 11,
+    "why": "reasons printed by the Russian tests-cli (tools/tests-cli-base.mjs) when a base run cannot narrow to red tests; terminal only"
+  },
   "domains/project-tests/release/release.ts": {
     "n": 8,
     "why": "exported document / markdown written for another tool"
@@ -663,6 +715,10 @@
     "n": 1,
     "why": "internal error thrown at the caller when the permission receiver got no port"
   },
+  "domains/project-tests/runner-target/runner-target.ts": {
+    "n": 3,
+    "why": "provenance label beside a runner target URL (which env var is unset, config default) — a note in the run record, no code channel; no new server messageCodes (owner 12.10)"
+  },
   "domains/project-tests/runs/runs.ts": {
     "n": 26,
     "why": "run-log notes: a free-text log of the run, kept as the agent wrote it"
@@ -674,6 +730,10 @@
   "domains/project-tests/store/store.ts": {
     "n": 12,
     "why": "stored defaults of a new library (group descriptions, copy suffix) + strictValue field labels (Тип, Тип ссылки, Приоритет, Готовность, Статус автоматизации)"
+  },
+  "domains/project-tests/suite-env/suite-env.ts": {
+    "n": 5,
+    "why": "refusals of the hand-written «env» block of automation.json (shape, key, variable name, value) — the same class as automation.ts; no new server messageCodes (owner 12.10)"
   },
   "domains/project-tests/suites/describe.ts": {
     "n": 24,
@@ -932,8 +992,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 495,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10); +1 tests-gap-stale, a Tests run recorded before the group's last change (05.10); +1 kit-compose-failed (06.10); +8 assistant-*/watcher-* refusals of the provider route for the panel helpers and the watcher (06.10); +2 gateway-responses-* refusals of the /v1/responses route for Codex (06.10); +6 provider-chat/analytics/groups/plugins/sandbox refusals and assistant-api-base-unknown of the CLI pass B0 (06.10); +22 group-layer-* refusals, feed notice lines and per-CLI toggle answers of the group run layer, batch A (06.10); +1 provider-unknown, now composed by code for the group toggle and delivery routes (06.10); +1 tests-gap-word-only, a word-only Tests record does not close an automated case (09.10); +1 chat-conversation-lost-notice, the group transcript is gone and the turn went on as a new conversation (09.10); +10 panel-agent-* turn errors (stop, extra tools, timeout, no reply, CLI exit, image and Kimi argv refusals) — the agent error frame now carries a code (09.10); +2 delivery-gap-mr-na-reason and sieve-gap-live-na, the n/a rules of the live-check sieve (10.10); +1 assistant-reply-truncated, an API reply cut at max_tokens is refused instead of parsed (10.10); +1 watcher-cli-missing, the active foreign CLI that runs the watcher analysis is not on PATH (X9, 10.10); -4 integration-check-atlassian-confluence-* codes, Confluence is its own integration with its own check (В6, 10.10); +3 delivery-gap-owner-* codes, the requirement trace of the owner's points judged at delivery (U2, 12.10); +2 worktree-copy-gap-mcp and split-group-copy-not-ready, the copy preflight before a group starts (U3, 12.10); +2 split-mr-watch-infra-retry-notice and split-mr-watch-infra-again-notice, a red MR pipeline that died on CI infrastructure is retried by the panel, not handed to the model (E3, 12.10); +1 path-gate-nudge-notice, a path step on another CLI that ended its turn without a check result is asked once to report (12.10); +1 gateway-headers-timeout-local, a long prompt on the local model outlasts the first-byte wait, with the way out (L1b, 13.10); +1 chat-background-ask-notice, a background agent asks for a permission after the turn ended (L6, 15.10); +1 local-stalled, the model server made no progress on a request and the gateway cut it for a retry (L6, 15.10); +2 local-on-demand-backoff and local-on-demand-failed, the capped on-demand start of the model server names the crash cause from its log (L6 review M1, 15.10); +1 tests-lint-vague-case, a case whose expected names nothing observable (15.10); +1 split-group-stalled-notice, a group silent past its limit is stopped and resumed by the panel (19.10); +1 chat-cold-resume-notice, a cold group turn went on as a new conversation with the panel's brief (21.10); +1 delivery-gap-review-threads, reviewer threads left without an answer at delivery (24.10); +1 foreign-shell-denied, a group command the panel refused and the reason the agent got (24.10)"
+    "n": 545,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. +2 delivery-gap-task-point-unmapped and delivery-gap-task-rewritten, a ticket point no task row quotes and a passed row whose proof was rewritten with no new commit (27.10); +1 review-off-notice, a group whose project turned «review after work» off goes to delivery without review and a reason line (R3(d), 26.10); +1 review-skipped-notice, a group with no changes of its own since its start commit gets no review and a reason line (26.10); +9 sieve-gap-note-rejected, delivery-gap-owner-note-rejected and note-rejected-* reasons, a delivery note mark the judge did not accept (25.10); +7 sieve-gap-no-run-cite, sieve-gap-run-not-live, sieve-gap-flip, delivery-gap-owner-flip and sieve-flip-* reasons, live-check proof and fail→pass flips (N2–N4, 25.10). The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10); +1 tests-gap-stale, a Tests run recorded before the group's last change (05.10); +1 kit-compose-failed (06.10); +8 assistant-*/watcher-* refusals of the provider route for the panel helpers and the watcher (06.10); +2 gateway-responses-* refusals of the /v1/responses route for Codex (06.10); +6 provider-chat/analytics/groups/plugins/sandbox refusals and assistant-api-base-unknown of the CLI pass B0 (06.10); +22 group-layer-* refusals, feed notice lines and per-CLI toggle answers of the group run layer, batch A (06.10); +1 provider-unknown, now composed by code for the group toggle and delivery routes (06.10); +1 tests-gap-word-only, a word-only Tests record does not close an automated case (09.10); +1 chat-conversation-lost-notice, the group transcript is gone and the turn went on as a new conversation (09.10); +10 panel-agent-* turn errors (stop, extra tools, timeout, no reply, CLI exit, image and Kimi argv refusals) — the agent error frame now carries a code (09.10); +2 delivery-gap-mr-na-reason and sieve-gap-live-na, the n/a rules of the live-check sieve (10.10); +1 assistant-reply-truncated, an API reply cut at max_tokens is refused instead of parsed (10.10); +1 watcher-cli-missing, the active foreign CLI that runs the watcher analysis is not on PATH (X9, 10.10); -4 integration-check-atlassian-confluence-* codes, Confluence is its own integration with its own check (В6, 10.10); +3 delivery-gap-owner-* codes, the requirement trace of the owner's points judged at delivery (U2, 12.10); +2 worktree-copy-gap-mcp and split-group-copy-not-ready, the copy preflight before a group starts (U3, 12.10); +2 split-mr-watch-infra-retry-notice and split-mr-watch-infra-again-notice, a red MR pipeline that died on CI infrastructure is retried by the panel, not handed to the model (E3, 12.10); +1 path-gate-nudge-notice, a path step on another CLI that ended its turn without a check result is asked once to report (12.10); +1 gateway-headers-timeout-local, a long prompt on the local model outlasts the first-byte wait, with the way out (L1b, 13.10); +1 chat-background-ask-notice, a background agent asks for a permission after the turn ended (L6, 15.10); +1 local-stalled, the model server made no progress on a request and the gateway cut it for a retry (L6, 15.10); +2 local-on-demand-backoff and local-on-demand-failed, the capped on-demand start of the model server names the crash cause from its log (L6 review M1, 15.10); +1 tests-lint-vague-case, a case whose expected names nothing observable (15.10); +1 split-group-stalled-notice, a group silent past its limit is stopped and resumed by the panel (19.10); +1 chat-cold-resume-notice, a cold group turn went on as a new conversation with the panel's brief (21.10); +1 delivery-gap-review-threads, reviewer threads left without an answer at delivery (24.10); +1 foreign-shell-denied, a group command the panel refused and the reason the agent got (24.10); +1 telegram-connect-no-candidate, a connect-by-/start confirm with nobody waiting (25.10)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,
@@ -1020,7 +1080,7 @@
     "why": "diff body placeholder of the preview card the human confirms"
   },
   "routes/panel-agent/actions-gaps-chat/actions-gaps-chat.ts": {
-    "n": 8,
+    "n": 10,
     "why": "model-facing action descriptions quote the Russian UI label the human names («Закрыть этап», «Подбирать модель под задачу», «Пересечения», «Принять», «Снять отметку») so the model maps the human's words to the action; never shown to the human"
   },
   "routes/panel-agent/actions-gaps-settings/actions-gaps-settings.ts": {
@@ -1080,11 +1140,11 @@
     "why": "fallback RU table of U5c panel-agent codes (chat session and files, editor, sandbox, contour agents and embeddings): each line is addressed by PanelTextCode and translated by the window"
   },
   "routes/panel-agent/texts-chat.ts": {
-    "n": 49,
-    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (U1 chat actions); +1 value-split-requeue-effect, +2 value-split-resume-fresh-effect / value-split-pause-queued-effect (29.09)"
+    "n": 51,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (U1 chat actions); +1 value-split-requeue-effect, +2 value-split-resume-fresh-effect / value-split-pause-queued-effect (29.09); +2 summary-split-continue / value-split-continue-effect (25.10, continue_group agent action)"
   },
   "routes/panel-agent/texts-gaps.ts": {
-    "n": 57,
+    "n": 62,
     "why": "fallback RU table of lane-A gap-closing panel-agent codes (chat modes, cascade, split accept/resume, provider check, resource summary, defects, e2e folder): each line is addressed by PanelTextCode and translated by the window"
   },
   "routes/panel-agent/texts-groups-entities.ts": {

@@ -88,6 +88,39 @@ describe('ChatHistory — ответ на замечание хука Stop не 
     );
   });
 
+  // g5 25.10 (P1): исход звена следующему — итог до ПЕРВОГО замечания, а не ответ на него.
+  it('итог до первого замечания — `summary` закрывающего хода; второе замечание его не сдвигает', () => {
+    write([
+      human('доведи группу', 'u0'),
+      call('m0', 't0'),
+      result('t0'),
+      say('m1', SUMMARY),
+      stopFeedback,
+      call('m2', 't1'),
+      result('t1'),
+      say('m3', 'Проверка была, она зелёная.'),
+      { ...stopFeedback, uuid: 'stop-2' },
+      say('m4', 'Повторно: зелёная.'),
+    ]);
+    const turn = readLastAssistantTurn(projectsDir, 's1');
+    expect(turn?.summary).toBe(SUMMARY);
+    expect(turn?.text).toContain('Повторно: зелёная.');
+  });
+
+  it('без замечания `summary` нет; реплика человека сбрасывает прежний', () => {
+    write([human('доведи группу', 'u0'), say('m1', SUMMARY)]);
+    expect(readLastAssistantTurn(projectsDir, 's1')?.summary).toBeUndefined();
+    write([
+      human('доведи группу', 'u0'),
+      say('m1', SUMMARY),
+      stopFeedback,
+      say('m2', 'Проверка была.'),
+      human('что с MR?', 'u1'),
+      say('m3', 'MR открыт.'),
+    ]);
+    expect(readLastAssistantTurn(projectsDir, 's1')?.summary).toBeUndefined();
+  });
+
   it('реплика человека после замечания начинает ход заново: прежний итог не тянется', () => {
     write([
       human('доведи группу', 'u0'),

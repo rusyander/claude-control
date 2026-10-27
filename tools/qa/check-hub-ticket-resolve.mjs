@@ -11,9 +11,14 @@
  * 4. «Повторить упавшие» — тот же адрес с `retryFailed`; итог без упавших, уже
  *    открытая задача — «добавлено комментарием» с обоими дефектами;
  *    выбранный проект запомнен; всё заведено — кнопки «Разобрать…» больше нет.
+ * 2а. Проверка на повторы (владелец 25.10.2026): пока ищутся похожие открытые
+ *    задачи Jira — «Опубликовать» заперта; найденные — ссылкой с выбором
+ *    (по умолчанию «Связать»), решения уходят в теле публикации и в «Повторить
+ *    упавшие» — те же; итог называет сторону, приоритет и исполнителя от Jira.
+ * 4в. Поиск повторов не удался — окно называет причину, публикация не заперта.
  * 5. Jira не подключена — «Опубликовать» заперта с причиной, есть «Подключить
- *    Jira»; «Решить здесь»: отказ сервера виден в окне, второй раз — новый чат,
- *    вид уходит на его ленту.
+ *    Jira», повторы не ищутся; «Решить здесь»: отказ сервера виден в окне,
+ *    второй раз — новый чат, вид уходит на его ленту.
  *
  * Данные подменяются целиком (`page.route`): ни Jira, ни модели, ни прогонов
  * прогон не трогает.
@@ -241,6 +246,38 @@ await page.route('**/api/chat/split/*/tickets/target*', async (route) => {
       : { connected: false, projects: [], issueTypes: [] },
   });
 });
+/** Проверка на повторы: `found` — две похожие открытые задачи, `failed` — поиск Jira не удался. */
+let dupMode = 'found';
+const dupSearches = [];
+const similarIssue = (key, summary) => ({ key, summary, url: `${SITE}/browse/${key}` });
+await page.route('**/api/chat/split/*/tickets/duplicates*', async (route) => {
+  dupSearches.push(new URL(route.request().url()));
+  // Дольше «куда»: окно успевает показать, что проверка идёт и публикация заперта.
+  await new Promise((done) => setTimeout(done, 1500));
+  if (dupMode === 'failed') {
+    return route.fulfill({
+      json: { duplicates: [], failed: true, message: 'Jira: 503 Service Unavailable' },
+    });
+  }
+  return route.fulfill({
+    json: {
+      duplicates: [
+        {
+          proposals: ['a', 'b'],
+          title: EXPORT.title,
+          issue: similarIssue('PROJ-5', 'Экспорт в CSV медленный'),
+          reason: 'similar',
+        },
+        {
+          proposals: ['c', 'd'],
+          title: SAVE.title,
+          issue: similarIssue('PROJ-8', 'Сохранение формы ненадёжно'),
+          reason: 'title',
+        },
+      ],
+    },
+  });
+});
 const published = [];
 await page.route('**/api/chat/split/*/tickets/publish', async (route) => {
   const body = route.request().postDataJSON();
@@ -267,6 +304,7 @@ await page.route('**/api/chat/split/*/tickets/publish', async (route) => {
             'Экспорт отчёта отдаёт пустой файл',
             ['a', 'b'],
             [{ title: EXPORT.title, duplicates: [SAME_PLACE.title] }],
+            { side: 'frontend', priority: 'High', assignee: 'QA Lead' },
           ),
         ],
         failed: [
@@ -416,6 +454,46 @@ check(
   targets.length >= 1 && targets.at(-1)?.pathname === `/api/chat/split/${PARENT}/tickets/target`,
   `«куда» читается у родителя: ${targets.map((url) => url.pathname + url.search).join(', ')}`,
 );
+// 2а. Повторы ещё ищутся — публикация без решений человека не уходит.
+await dialog
+  .locator('[data-resolve-similar-loading]')
+  .waitFor({ timeout: 3000 })
+  .catch(() => {});
+check(
+  (await dialog.locator('[data-resolve-similar-loading]').count()) === 1 &&
+    (await publish.isDisabled()) &&
+    (await publish.getAttribute('title')) === 'Идёт проверка на повторы в Jira',
+  `повторы ищутся — «Опубликовать» заперта с причиной: «${await publish.getAttribute('title')}»`,
+);
+await dialog
+  .locator('[data-resolve-similar-list="2"]')
+  .waitFor({ timeout: 5000 })
+  .catch(() => {});
+check(
+  dupSearches.length === 1 &&
+    dupSearches[0]?.pathname === `/api/chat/split/${PARENT}/tickets/duplicates` &&
+    dupSearches[0]?.searchParams.get('project') === 'PROJ',
+  `повторы ищутся в выбранном проекте: ${dupSearches.map((url) => url.pathname + url.search).join(', ')}`,
+);
+const similarFive = dialog.locator('[data-resolve-similar="PROJ-5"]');
+const similarEight = dialog.locator('[data-resolve-similar="PROJ-8"]');
+check(
+  (await similarFive.getAttribute('data-resolve-similar-choice')) === 'link' &&
+    (await similarEight.getAttribute('data-resolve-similar-choice')) === 'link' &&
+    (await similarFive.locator('a').getAttribute('href')) === `${SITE}/browse/PROJ-5` &&
+    (await dialog.getByText(/Похожих открытых задач в Jira: 2/).count()) === 1,
+  'две похожие задачи — ссылками, по умолчанию «Связать»',
+);
+check(
+  (await similarFive.getByText('похожее название').count()) === 1 &&
+    (await similarEight.getByText('почти то же название').count()) === 1,
+  'у каждой названо, чем похожа',
+);
+await similarFive.locator('select').selectOption('create');
+check(
+  (await similarFive.getAttribute('data-resolve-similar-choice')) === 'create',
+  'выбор «Это другое — завести новую задачу» держится',
+);
 check(!(await publish.isDisabled()), 'прочитано — «Опубликовать» доступна');
 await shot('02-dialog-ready', dialog);
 
@@ -436,6 +514,28 @@ check(
     first?.body?.lang === 'ru' &&
     first?.body?.retryFailed === false,
   `тело публикации: ${JSON.stringify(first?.body)}`,
+);
+const decisionsSent = [
+  { proposal: 'a', choice: 'create', issueKey: 'PROJ-5' },
+  { proposal: 'c', choice: 'link', issueKey: 'PROJ-8' },
+];
+check(
+  JSON.stringify(first?.body?.duplicates) === JSON.stringify(decisionsSent),
+  `решения по повторам ушли с публикацией: ${JSON.stringify(first?.body?.duplicates)}`,
+);
+const meta = await dialog
+  .locator('[data-resolve-meta="frontend"]')
+  .innerText()
+  .catch(() => '');
+check(/FRONTEND/.test(meta) && /High/.test(meta), `итог называет сторону и приоритет: «${meta}»`);
+check(
+  /QA Lead/.test(
+    await dialog
+      .locator('[data-resolve-assignee]')
+      .innerText()
+      .catch(() => ''),
+  ),
+  'исполнитель, которого Jira назначила сама, назван в итоге',
 );
 const link = dialog.locator('[data-resolve-issue="PROJ-7"] a, a[href$="/browse/PROJ-7"]').first();
 check(
@@ -460,6 +560,13 @@ check(
   published.length === 2 && published[1]?.body?.retryFailed === true,
   `повтор ушёл с retryFailed: ${JSON.stringify(published[1]?.body)}`,
 );
+check(
+  JSON.stringify(published[1]?.body?.duplicates) === JSON.stringify(decisionsSent),
+  '«Повторить упавшие» шлёт те же решения по повторам',
+);
+// Сброс дерева после публикации не задевает запросы окна: ни Jira-поиска, ни «куда» заново.
+check(dupSearches.length === 1, `после публикации повторы заново не ищутся: ${dupSearches.length}`);
+check(targets.length === 1, `после публикации «куда» заново не читается: ${targets.length}`);
 check(
   (await dialog.locator('[data-resolve-failed]').count()) === 0 &&
     (await dialog.locator('a[href$="/browse/PROJ-8"]').count()) === 1,
@@ -531,9 +638,35 @@ check(
 );
 await shot('04b-row-commented', hub.locator('[data-split-tickets]'));
 
+// 4в. Поиск повторов не удался — причина в окне, публикация не заперта (сервер сверит сам).
+marks = {};
+dupMode = 'failed';
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-child-hub]', { timeout: 15000 }).catch(() => {});
+await page.waitForTimeout(1500);
+await page.locator('[data-resolve-tickets]').click();
+await dialog
+  .locator('[data-resolve-similar-failed]')
+  .waitFor({ timeout: 8000 })
+  .catch(() => {});
+check(
+  /503 Service Unavailable/.test(
+    await dialog
+      .locator('[data-resolve-similar-failed]')
+      .innerText()
+      .catch(() => ''),
+  ) && (await dialog.locator('[data-resolve-similar]').count()) === 0,
+  'поиск повторов не удался — окно называет причину, строк повторов нет',
+);
+check(!(await publish.isDisabled()), 'поиск не удался — «Опубликовать» не заперта');
+await shot('04c-dialog-similar-failed', dialog);
+await dialog.getByRole('button', { name: 'Закрыть' }).last().click();
+await page.waitForTimeout(500);
+
 // 5. Jira не подключена; «Решить здесь» — отказ виден, повтор открывает новый чат.
 marks = {};
 jiraConnected = false;
+const searchesBeforeOffline = dupSearches.length;
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('[data-child-hub]', { timeout: 15000 }).catch(() => {});
 await page.waitForTimeout(1500);
@@ -553,6 +686,11 @@ check(
   'причина запрета написана рядом и в подсказке',
 );
 check((await dialog.locator('[data-resolve-connect]').count()) === 1, 'есть «Подключить Jira»');
+check(
+  dupSearches.length === searchesBeforeOffline &&
+    (await dialog.locator('[data-resolve-similar-loading]').count()) === 0,
+  'Jira не подключена — повторы не ищутся',
+);
 const take = dialog.locator('[data-resolve-take]');
 check(!(await take.isDisabled()), '«Решить здесь» работает без Jira');
 await shot('05-dialog-offline', dialog);

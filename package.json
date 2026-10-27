@@ -22,6 +22,7 @@
     "test": "pnpm -r test",
     "qa:setup": "playwright install --with-deps chromium",
     "compromises": "node tools/qa/check-compromises.mjs",
+    "kit:twins": "node tools/kit-twins.mjs",
     "negatives": "node tools/qa/check-negative-scenarios.mjs && node tools/qa/check-negative-scenarios.mjs --selftest",
     "shots": "node tools/qa/check-help-shots.mjs && node tools/qa/check-help-shots.mjs --selftest",
     "brand": "node tools/qa/check-brand.mjs && node tools/qa/check-brand.mjs --selftest",

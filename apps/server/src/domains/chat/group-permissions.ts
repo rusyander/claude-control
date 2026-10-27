@@ -5,6 +5,7 @@ import {
   type GroupRequestId,
   type SplitDefaults,
 } from '@agentdeck/contracts/split-groups';
+import { statSync } from 'node:fs';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
 import type { SplitAutoNotice, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { planTreeKill, type ProcessRow } from '../../lib/kill-tree.mjs';
@@ -21,10 +22,13 @@ import {
   type WorktreeListIo,
 } from './group-copy-root.ts';
 import {
+  cdTargetsOf,
   groupCommandVerdict,
   ignoredFacts,
   isProtectedBranch,
   powershellToolStorage,
+  tempDeleteNames,
+  tempWritesOf,
   type GroupCommandScope,
   type GroupCommandVerdict,
   type KillTargets,
@@ -37,6 +41,8 @@ import {
   type OwnerEvidence,
   type OwnerRow,
 } from './group-process-owner.ts';
+import { kitOwnTempWrites, kitSessionLogFile, ownTempWrites } from './own-temp-evidence.ts';
+import { printedPidsIn } from './printed-pids.ts';
 import {
   gitDiscards,
   powershellLaunchDestroys,
@@ -159,6 +165,12 @@ export interface GroupAutoApprove {
    * или не прочитанное. `undefined` — не читали: такое звено решает человек.
    */
   tree?: GitTree;
+  /**
+   * Временные файлы вне копии, что записал прошлый вызов этого разговора
+   * (`withOwnTemp`, только для команд, удаляющих временный путь, D-10).
+   * `undefined` — своё в `/tmp` только свежий `mktemp` (F-77).
+   */
+  ownTemp?: ReadonlySet<string>;
   /** Разделение и номер группы — куда писать отметку «разрешено автоматически». */
   parentChatId: string;
   groupIndex: number;
@@ -327,6 +339,7 @@ function scopeOf(group: GroupAutoApprove): GroupCommandScope {
     ...(group.prunable ? { prunable: group.prunable } : {}),
     ...(group.aliases ? { aliases: group.aliases } : {}),
     ...(group.functions ? { functions: group.functions } : {}),
+    ...(group.ownTemp ? { ownTemp: group.ownTemp } : {}),
   };
 }
 
@@ -403,6 +416,63 @@ export function groupPushRefusal(
     '`CONFLICT` lines is a conflict, exit code 0 is none. On a real conflict resolve it and ' +
     'the lease push is allowed.'
   );
+}
+
+/**
+ * Отказ агенту вместо карточки (D-4, 25.10): git звена пошёл бы в каталоге НАД
+ * копией — `cd ..; git -C .. add …` из подпапки поднимается дважды. Такой вызов
+ * либо падает («not a git repository»), либо пишет в чужой репозиторий; человеку
+ * решать нечего — верный ответ всегда «поправь путь», а карточка держала группу
+ * посреди перебазирования, пока её никто не видел. Опасное по другой причине
+ * повтор с верным путём отдаст человеку как прежде. `undefined` — не этот случай.
+ *
+ * Каталог оболочки не прочитан (D-6, 25.10: запись вызова не успела в транскрипт)
+ * — подъёмы считаются от корня копии, и `-C ..` из подпапки выходит «над копией».
+ * Настоящий каталог мог быть глубже, но ответ тот же: ничего не исполнено, повтор
+ * с копией или абсолютным путём в ней судится без догадки. Не карточка — человек
+ * на обычный коммит в своей копии не нужен.
+ */
+export function groupGitAimRefusal(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+): string | undefined {
+  const command = shellCommandOf(request);
+  if (command === undefined || !group.worktree) return undefined;
+  const recorded = group.branch ? [group.branch] : [];
+  const judged = collectGitEffects(() => groupCommandVerdict(command, scopeOf(group)), recorded);
+  if (judged.result.kind !== 'danger') return undefined;
+  if (judged.above.length > 0) {
+    const shell = group.shellCwd ? `your shell is in ${group.shellCwd}, and ` : '';
+    return (
+      `Nothing in this command ran: ${shell}git would run in ${judged.above.join(', ')}, a folder ` +
+      `that CONTAINS your copy ${group.worktree} instead of a folder inside it — every \`cd ..\` ` +
+      'and every `-C ..` climbs one level, and they add up. Re-run it inside your copy: drop the ' +
+      `extra climb, or name the copy itself (\`git -C "${group.worktree}" …\`).`
+    );
+  }
+  if (judged.aboveGuessed.length === 0) return undefined;
+  return (
+    "Nothing in this command ran: the panel could not read your shell's directory for this " +
+    'call (or it lay outside your copy), so `..` was counted from your copy root ' +
+    `${group.worktree}: git would run ` +
+    `in ${judged.aboveGuessed.join(', ')}, a folder that CONTAINS your copy. Re-run it naming ` +
+    `the copy or an absolute path inside it instead of \`..\` (\`git -C "${group.worktree}" …\`).`
+  );
+}
+
+/**
+ * Подкоманды git по звеньям, до которых дошёл разбор (`add`, `commit`, `push`…),
+ * — повторному суду при старте (D-6): `undefined` — не оболочка.
+ */
+export function groupGitSubcommands(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+): string[] | undefined {
+  const command = shellCommandOf(request);
+  if (command === undefined) return undefined;
+  const recorded = group.branch ? [group.branch] : [];
+  return collectGitEffects(() => groupCommandVerdict(command, scopeOf(group)), recorded)
+    .subcommands;
 }
 
 const LEVEL_ORDER: readonly GroupPermissionLevel[] = ['auto', 'notify', 'human'];
@@ -526,7 +596,7 @@ export async function withProcessFacts(
   request: { toolName: string; input: unknown },
   roots: readonly number[],
   io: ProcessFactsIo = realProcessIo,
-  evidence: { transcriptDir?: string } = {},
+  evidence: { transcriptDir?: string; conversation?: string } = {},
 ): Promise<GroupAutoApprove> {
   const kills = killTargetsOf(group, request);
   if (!kills || kills.pids.length + kills.ports.length === 0) return group;
@@ -548,6 +618,9 @@ export async function withProcessFacts(
     tree,
     ...(marks ? { marks } : {}),
     ...(evidence.transcriptDir ? { transcriptDir: evidence.transcriptDir } : {}),
+    // Номера, что разговор группы напечатал о своём запуске (D-8): файл читается,
+    // только когда команда гасит номер или порт.
+    ...(evidence.conversation ? { printed: printedPidsIn(evidence.conversation) } : {}),
     ...(io.ran ? { ran: io.ran } : {}),
     ...(io.platform ? { platform: io.platform } : {}),
   });
@@ -556,6 +629,80 @@ export async function withProcessFacts(
     targets.filter((pid) => byPid.has(pid)).map((pid) => [pid, processLabel(byPid.get(pid))]),
   );
   return { ...group, ownPids: own, portHolders, processLabels };
+}
+
+/**
+ * Свои временные файлы прошлых вызовов (D-10/D-11, 26.10) — только когда команда
+ * удаляет временный путь (`tempDeleteNames`): файл транскрипта с этим вызовом
+ * (разговор или его субагент, `callFile`) тогда читается целиком. Прошлый вызов
+ * судится разбором от своего каталога — что он записал во временное.
+ */
+export function withOwnTemp(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+  toolUseId: string | undefined,
+  callFile: () => string | undefined,
+): GroupAutoApprove {
+  if (!toolUseId) return group;
+  return withOwnTempFrom(group, request, (names, writesOf) => {
+    const file = callFile();
+    return file ? ownTempWrites(file, toolUseId, names, writesOf) : new Set<string>();
+  });
+}
+
+/**
+ * `withOwnTemp` для чужого CLI (P-26, D-10): улика — журнал сессии набора (`kitOwnTempWrites`),
+ * сессия — id, что транспорт хода получил от CLI до первого вызова (поток Codex, сессия qwen serve).
+ */
+export function withForeignOwnTemp(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+  session: string | undefined,
+): GroupAutoApprove {
+  if (!session) return group;
+  return withOwnTempFrom(group, request, (names, writesOf) =>
+    kitOwnTempWrites(kitSessionLogFile(session), names, writesOf),
+  );
+}
+
+/** Общий ход обоих: имена удаляемого → улика источника → свои пути группы. */
+function withOwnTempFrom(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+  evidence: (
+    names: readonly string[],
+    writesOf: (command: string, cwd: string | undefined) => string[],
+  ) => Set<string>,
+): GroupAutoApprove {
+  const command = shellCommandOf(request);
+  if (command === undefined) return group;
+  const names = tempDeleteNames(command);
+  if (names.length === 0) return group;
+  const own = evidence(names, (text, cwd) =>
+    tempWritesOf(text, scopeOf({ ...group, ...(cwd ? { shellCwd: cwd } : {}) })),
+  );
+  return own.size > 0 ? { ...group, ownTemp: own } : group;
+}
+
+/**
+ * Каталоги `cd` команды, которых нет на диске (пересуд, D-5): запись ждала часами,
+ * и папка, в которой она работает, с тех пор убрана — исполнять нечего.
+ */
+export function missingCdTargets(
+  group: GroupAutoApprove,
+  request: { toolName: string; input: unknown },
+): string[] {
+  const command = shellCommandOf(request);
+  if (command === undefined) return [];
+  return cdTargetsOf(command, scopeOf(group)).filter((dir) => !isDirectory(dir));
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /** MR известен, а снят ли с черновика — нет (не читали, сбой форджа): считаем «на ревью». */

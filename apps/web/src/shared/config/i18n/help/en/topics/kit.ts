@@ -25,7 +25,8 @@ export const kitEn: typeof kitRu = {
     whyClean: 'No traces in your folder',
     whyCleanText:
       'The kit joins one run through a launch flag. «Yours only» brings everything back to how ' +
-      'it is without the panel: not a single file appears in or disappears from `~/.claude`.',
+      'it is without the panel: not a single file appears in or disappears from `~/.claude`. ' +
+      'Guards your layer lacks reach Claude Code through the same flag, for that run.',
     whyYours: 'Your edits are not overwritten',
     whyYoursText:
       'An edited item is saved as your copy on top of the built-in text. A panel update changes ' +
@@ -37,8 +38,12 @@ export const kitEn: typeof kitRu = {
       'through a flag and drops it when the run ends.',
     pathTextTitle: 'The same path in words',
     pathTextText:
-      'Before a launch the panel looks up the kit mode for that CLI. «Yours only» adds nothing. ' +
-      'Otherwise the panel assembles the run folder: the built-in kit, your copies on top, ' +
+      'Before a launch the panel looks up the kit mode for that CLI. «Yours only» adds only the ' +
+      'kit guards missing from your `~/.claude/hooks/lib`: consent to git writes, the ban on ' +
+      'merging MRs and PRs, destructive commands, secrets, `nvm use` (on Windows it takes Node ' +
+      'away from the whole machine), pipeline waiting and picking the ' +
+      'recommended option in an autonomous run with full access. A guard whose namesake twin ' +
+      'is in your layer yields to it, so no call is answered twice. Otherwise the panel assembles the run folder: the built-in kit, your copies on top, ' +
       'disabled items left out. Claude Code receives it through `--plugin-dir`; in «Panel kit ' +
       'only» also without your personal settings layer. Qwen Code on a local model receives an ' +
       'assembled home directory for that launch. Codex receives the rules through a launch key, ' +
@@ -47,7 +52,7 @@ export const kitEn: typeof kitRu = {
       'start and says why, instead of silently running on your global layer. For Codex the ' +
       'command line holds 24,000 characters: when the skill list does not fit next to the rules ' +
       'and your own instructions, it shrinks — descriptions cut to 240 characters, then names ' +
-      'and paths only; a kit whose rules exceed the limit even then is refused the same way, ' +
+      'only; a kit whose rules exceed the limit even then is refused the same way, ' +
       'because the panel will not trim the rules silently; ' +
       'that refusal names the limit and the kit size. The way out is the «Yours only» mode; for ' +
       'a kit too large also switching off rules in it, for a folder that failed — another try.',
@@ -58,8 +63,9 @@ export const kitEn: typeof kitRu = {
     modeWhat: 'What the agent gets',
     modeGlobal: 'Yours only',
     modeGlobalText:
-      'The default when you have a layer of your own. Only what is in `~/.claude` and its counterparts ' +
-      'for other CLIs — as without the panel.',
+      'The default when you have a layer of your own. What is in `~/.claude` and its counterparts ' +
+      'for other CLIs — as without the panel. Claude Code also gets only the kit guards your layer ' +
+      'lacks, so the merge ban and git-write consent are the same on any machine.',
     modeHybrid: 'Yours and the panel kit',
     modeHybridText:
       'Your layer plus the kit. For a same-named item yours is taken; such a row lets you choose «from the kit». ' +
@@ -102,8 +108,9 @@ export const kitEn: typeof kitRu = {
       '«Yours only» and «Yours and the panel kit». Rules and skills get through: the rules via ' +
       'the `developer_instructions` key for that launch, after your own from `config.toml`; the ' +
       'skills as the kit folder: in the chat (codex app-server) Codex sees them as its own ' +
-      'skills, and in a one-off launch (codex exec) it gets them as a «name — description — ' +
-      'path to SKILL.md» list in the same instructions; on a local model, or when the list does not fit the limit, its descriptions are cut to 240 characters, and if it still does not fit only names and paths remain. Pipelines and subagents do ' +
+      'skills, and in a one-off launch (codex exec) it gets them as a «name — description» list ' +
+      'in the same instructions; the path to SKILL.md stands once in the list heading — a folder ' +
+      'template with an example, so no skill spends a hundred characters of the limit on it. On a local model, or when the list does not fit the limit, its descriptions are cut to 240 characters, and if it still does not fit only names remain. Pipelines and subagents do ' +
       'not: Codex cannot take them for one launch. Hooks neither: Codex runs a hook only after ' +
       'it is approved in Codex itself, so they cannot be attached for a launch — the hooks variant is ' +
       'installed by hand, see the section below. The panel does not touch `~/.codex`.',
@@ -133,11 +140,38 @@ export const kitEn: typeof kitRu = {
       'copy, OpenCode — as a plugin file in `~/.config/opencode/plugins` plus the `AGENTDECK_KIT_DIR` ' +
       'variable. These CLIs have no «ask you» answer: such a call is refused with a request to ask in ' +
       'the chat first. OpenCode has no end-of-turn check — its turn-end event cannot hold a turn. Goose ' +
-      'on Windows calls hooks through `sh`: Git for Windows must be on PATH.',
+      'on Windows calls hooks through `sh`: Git for Windows must be on PATH. A full gate repeated ' +
+      'with no edit in between is refused; on every CLI but Claude Code the kit takes past gates ' +
+      'from its own session log and counts as run only a call whose execution the post-call hook ' +
+      'confirmed: one refused by you, by the CLI’s own rules or by another hook is not a run and ' +
+      'does not hold the next gate. A CLI with no post-call hook on its shell remembers no gate at all.',
     hooksNone: 'Do not act',
     hooksNoneText:
       'Continue — `cn` has a hook format, but release 1.5.47 never calls it (checked by a run); ' +
       'Cursor — the panel does not launch it; Aider — it has no tool calls, nothing to intercept.',
+
+    watchTitle: 'Group watching ships with the kit',
+    watchCaption:
+      'The watchdog and agentdeck-watchdog skills are part of the kit: split groups can be watched on ' +
+      'any machine with the panel, with no personal copy of these skills in `~/.claude`.',
+    watchStartTitle: 'How to start a watch on another machine',
+    watchStartText:
+      'Open a Claude Code chat in the «Yours and the panel kit» or «Panel kit only» mode (in «Yours ' +
+      'only» the kit skills do not arrive) and ask it to watch the groups. The agent starts ' +
+      '`watch-groups.mjs` from the kit with the group numbers. The script finds the panel itself — ' +
+      '`AGENTDECK_URL`, else `http://127.0.0.1:5178` — and the access token in ' +
+      '`~/.agentdeck/api-token`, and takes the rule texts from the snapshot in the kit when the ' +
+      'panel repo is not at hand. Watch state lives in the kit state folder (`AGENTDECK_KIT_STATE`, ' +
+      'else the system temp folder), not in `~/.claude`.',
+    watchHoldTitle: 'The turn does not end while the watch runs',
+    watchHoldText:
+      'At turn end a kit hook sends the agent back to the next watch call. The turn is released by ' +
+      'your stop command, a `hold.json` file in the project’s `.agent/live-watch`, or the end of ' +
+      'every group; after three refusals in a row with no new watch call it is released on its own. ' +
+      'With no call for 10 minutes while the agent is busy elsewhere, one line reminds it of the ' +
+      'watch — at most once per 10 minutes. Subagents and other sessions are not held. When the same ' +
+      'hook sits in your personal layer and holds this turn, the kit hook stays silent — one turn is ' +
+      'never answered twice.',
 
     globalTitle: 'Checking against the global layer',
     globalCaption: 'Every row shows how it relates to the same-named item in `~/.claude`.',

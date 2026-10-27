@@ -69,6 +69,12 @@ export class KimiServerTurn implements LiveTurn {
   private resumed = false;
   /** Сессию оставить по концу хода: её продолжит следующий ход разговора (E2b). */
   private keep = false;
+  /**
+   * CLI принял реплику хода. Снятый посреди отправки ход сессию с этой репликой
+   * не оставил: её id значил бы для панели «сессия видела и её», и следующий
+   * ход ушёл бы без неё (P-24).
+   */
+  private prompted = false;
   private readonly abort = new AbortController();
   private fetchImpl: typeof fetch = fetch;
   private readonly pollMs: number;
@@ -150,6 +156,7 @@ export class KimiServerTurn implements LiveTurn {
       this.keep = request !== undefined;
 
       await this.prompt(this.resumed && request?.resume ? request.resume.prompt : options.prompt);
+      this.prompted = true;
       this.active = true;
       onSteerable?.();
 
@@ -405,8 +412,11 @@ export class KimiServerTurn implements LiveTurn {
     this.abort.abort();
     const sessionId = this.sessionId;
     const kept = this.keep && sessionId !== undefined && result.kind === 'done';
-    if (sessionId && !kept) await this.remove(sessionId);
+    // Реплики хода сессия не получила: новая не нужна никому, продолженная
+    // остаётся при прежней отметке панели — следующий ход дошлёт ей и эту реплику.
+    const told = kept && this.prompted;
+    if (sessionId && !told && !(kept && this.resumed)) await this.remove(sessionId);
     if (this.child) killChildTree(this.child);
-    return kept ? { ...result, session: sessionId, resumed: this.resumed } : result;
+    return told ? { ...result, session: sessionId, resumed: this.resumed } : result;
   }
 }

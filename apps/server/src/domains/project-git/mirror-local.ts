@@ -18,6 +18,7 @@ import type {
   WorktreeMirrorSkipped,
 } from '@agentdeck/contracts';
 import { localizeText, serverText } from '../../lib/server-texts/server-texts.ts';
+import { addMissingHooks, LOCAL_SETTINGS } from './copy-hooks.ts';
 import { git } from './exec/exec.ts';
 import { isPanelScaffold } from '../project-tests/e2e-folder/e2e-folder.ts';
 import { PANEL_E2E_DIR } from '../project-tests/e2e-scaffold.ts';
@@ -666,6 +667,18 @@ export async function mirrorLocalLayer(
       reason: 'флаг git не поставлен',
       reasonCode: 'worktree-mirror-skip-git-flag',
     });
+
+  // Файл настроек копии свежее оригинала и при `newerOnly` остался на месте, а
+  // хуки, заведённые в оригинале позже, в нём не прописаны (`copy-hooks.ts`).
+  try {
+    if (addMissingHooks(mainDir, copyDir) > 0 && !copied.has(LOCAL_SETTINGS))
+      report.mirrored.push(LOCAL_SETTINGS);
+  } catch (error) {
+    report.skipped.push({
+      path: LOCAL_SETTINGS,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return report;
 }

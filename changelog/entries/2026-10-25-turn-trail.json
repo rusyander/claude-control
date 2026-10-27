@@ -1,0 +1,34 @@
+{
+  "title": {
+    "ru": "Под ответом в чате — след хода: скиллы, агенты, скрипты и хуки",
+    "en": "A turn trail under the chat answer: skills, agents, scripts and hooks"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В конце каждого хода агента — одна свёрнутая строка: сколько скиллов, агентов и скриптов он запускал и сколько хуков сработало, сколько из них добавили контекст и сколько времени они заняли. Раскрытая строка называет их поимённо: агент с описанием и моделью, команда скрипта с описанием вызова, хуки по событию со счётом ×N и временем, сбой хука — красной отметкой с кодом. «Добавили контекст» раскрывает начало текста, который хук дал модели. Обычные команды (git, grep, ls) и вызовы MCP в след не входят; ход без следа строки не получает.",
+        "en": "Each agent turn ends with one collapsed line: how many skills, agents and scripts it ran, how many hooks fired, how many of them added context and how long they took. Expanded, the line names them: the agent with its description and model, the script command with the call description, hooks by event with a ×N count and time, a failed hook with a red mark and its code. “Added context” expands the start of the text the hook gave the model. Plain commands (git, grep, ls) and MCP calls are not part of the trail; a turn with nothing to show gets no line."
+      },
+      "how": {
+        "ru": "Хуки берутся из транскрипта Claude Code, где CLI пишет их служебными строками, и появляются, когда ход закончен; скиллы, агенты и скрипты видны сразу, пока ход идёт. Слова человека посреди хода и уведомление о фоновой задаче ход не делят.",
+        "en": "Hooks come from the Claude Code transcript, where the CLI writes them as service lines, and appear once the turn is over; skills, agents and scripts show up while the turn is still running. A human message sent mid-turn and a background-task notification do not split the turn."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["turn-trail.png"]
+    }
+  ],
+  "images": [
+    {
+      "file": "turn-trail.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Раскрытый след хода: скилл, два агента, два скрипта и хуки по событиям",
+        "en": "An expanded turn trail: a skill, two agents, two scripts and hooks by event"
+      }
+    }
+  ]
+}

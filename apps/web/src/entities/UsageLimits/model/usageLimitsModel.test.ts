@@ -1,7 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { i18n } from '@shared/config/i18n';
 import { formatLimitPercent } from './formatLimitPercent';
-import { formatResetAt } from './formatResetAt';
 import { formatUntil } from './formatUntil';
 import { limitTone } from './limitTone';
 import { windowLabel } from './windowLabel';
@@ -49,32 +48,10 @@ describe('время до сброса', () => {
   });
 });
 
-describe('момент сброса', () => {
-  const now = new Date(2026, 9, 19, 15, 0).getTime();
-  it('сегодня — только время', () => {
-    const at = new Date(2026, 9, 19, 20, 10).getTime();
-    expect(formatResetAt(at, now, 'ru')).toBe('20:10');
-  });
-
-  it('в пределах недели — день недели и время', () => {
-    const at = new Date(2026, 9, 21, 9, 0).getTime();
-    const text = formatResetAt(at, now, 'ru');
-    expect(text).toMatch(/09:00$/);
-    expect(text).not.toMatch(/\d{2}\.\d{2}/);
-  });
-
-  it('дальше недели — дата и время', () => {
-    const at = new Date(2026, 9, 30, 9, 0).getTime();
-    expect(formatResetAt(at, now, 'ru')).toBe('30.10 09:00');
-  });
-});
-
 describe('подпись окна', () => {
   const t = i18n.t.bind(i18n);
   it('сессия, неделя и неделя модели с именем модели от сервера', () => {
-    expect(windowLabel({ id: 's', kind: 'session', percent: 1, resetsAt: null }, t)).toBe(
-      'Сессия (5 ч)',
-    );
+    expect(windowLabel({ id: 's', kind: 'session', percent: 1, resetsAt: null }, t)).toBe('Сессия');
     expect(windowLabel({ id: 'w', kind: 'weekly', percent: 1, resetsAt: null }, t)).toBe('Неделя');
     expect(
       windowLabel({ id: 'm', kind: 'weekly-model', model: 'Opus', percent: 1, resetsAt: null }, t),

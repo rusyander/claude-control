@@ -6,10 +6,11 @@ import type { SplitGroupRechecked } from '@agentdeck/contracts/chat-handoff';
 export function useRecheckGroup() {
   return useMutation({
     meta: { silentError: true },
-    mutationFn: async (input: { parentChatId: string; index: number }) => {
+    // `note` — заметка человека: уходит в задание перепроверки дословно.
+    mutationFn: async (input: { parentChatId: string; index: number; note?: string }) => {
       const { data } = await apiClient.post<SplitGroupRechecked>(
         `/chat/split/${encodeURIComponent(input.parentChatId)}/recheck`,
-        { index: input.index },
+        { index: input.index, ...(input.note ? { note: input.note } : {}) },
       );
       return data;
     },

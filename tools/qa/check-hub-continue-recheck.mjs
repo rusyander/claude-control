@@ -301,26 +301,76 @@ check((await continueOf(0).count()) === 0, 'после продолжения к
 
 // 2. «Перепроверить MR» у доставленной группы.
 const recheckOf = (index) => hub.locator(`[data-recheck-group][data-group-index="${index}"]`);
+const runOf = (index) => recheckOf(index).locator('[data-recheck-run]');
 const recheckState = async (index) =>
   (await recheckOf(index).count()) === 1 ? recheckOf(index).getAttribute('data-recheck-group') : '';
 check((await recheckState(1)) === 'open', 'у доставленной группы — «Перепроверить MR», обычная');
 check((await recheckOf(0).count()) === 0, 'у недоставленной группы перепроверки MR нет');
 await shot('02-hub-before-recheck');
-if ((await recheckOf(1).count()) === 1) {
-  await recheckOf(1).getByRole('button').click();
+
+// 2a. «Заметка» (аудит g5 27.10, H1): поле раскрывается, длиннее предела — ошибка и кнопка
+// выключена, текст в пределе уходит в запрос дословно, после успеха поле свёрнуто.
+const noteToggle = recheckOf(1).locator('[data-recheck-note-toggle]');
+const noteField = recheckOf(1).locator('[data-recheck-note] textarea');
+const NOTE = 'Нужен PDF «Отчёт для дизайна» к обеим задачам';
+check(
+  (await noteToggle.count()) === 1 && (await noteToggle.getAttribute('aria-expanded')) === 'false',
+  'рядом с перепроверкой — «Заметка», свёрнута',
+);
+if ((await noteToggle.count()) === 1) await noteToggle.click();
+check(
+  (await noteField.count()) === 1 && (await noteToggle.getAttribute('aria-expanded')) === 'true',
+  'по «Заметке» раскрылось поле',
+);
+if ((await noteField.count()) === 1) {
+  await noteField.fill('щ'.repeat(4001));
+  await page.waitForTimeout(200);
+}
+const tooLong = await recheckOf(1)
+  .locator('[data-recheck-note]')
+  .innerText()
+  .catch(() => '');
+check(
+  /длиннее 4\s?000 знаков/i.test(tooLong) && (await runOf(1).isDisabled()),
+  `заметка длиннее 4000 — ошибка у поля и кнопка выключена: «${tooLong.slice(-80)}»`,
+);
+await shot('02a-hub-note-too-long');
+if ((await noteField.count()) === 1) {
+  await noteField.fill(NOTE);
+  await page.waitForTimeout(200);
+}
+check(!(await runOf(1).isDisabled()), 'заметка в пределе — кнопка снова доступна');
+await shot('02b-hub-note-filled');
+if ((await runOf(1).count()) === 1) {
+  await runOf(1).click();
   await page.waitForTimeout(1200);
 }
 check(
-  recheckCalls.length === 1 && recheckCalls[0].parent === PARENT && recheckCalls[0].index === 1,
-  `«Перепроверить MR» ушло родителю с номером группы: ${JSON.stringify(recheckCalls)}`,
+  recheckCalls.length === 1 &&
+    recheckCalls[0].parent === PARENT &&
+    recheckCalls[0].index === 1 &&
+    recheckCalls[0].note === NOTE,
+  `«Перепроверить MR» ушло родителю с номером группы и заметкой: ${JSON.stringify(recheckCalls)}`,
+);
+check(
+  (await recheckOf(1).locator('[data-recheck-note]').count()) === 0,
+  'после отправки поле заметки свёрнуто',
 );
 check((await recheckState(1)) === 'pending', 'идущая перепроверка подписана «перепроверяется»');
+check(
+  (await recheckOf(1).locator('[data-recheck-note-toggle]').count()) === 0,
+  'пока перепроверка идёт, «Заметки» нет',
+);
 await shot('03-hub-recheck-pending');
 
 // 3. Отказ сервера — тост с причиной, кнопка обычная.
 if ((await recheckOf(2).count()) === 1) {
-  await recheckOf(2).getByRole('button').click();
-  await page.waitForTimeout(1000);
+  await runOf(2).click();
+  await page
+    .locator('li[role]', { hasText: 'MR уже влит' })
+    .first()
+    .waitFor({ timeout: 3000 })
+    .catch(() => {});
 }
 const toastText = await page
   .locator('[data-sonner-toast], [role="status"], [role="alert"]')
@@ -466,8 +516,11 @@ await page.waitForTimeout(500);
 check((await hub.count()) === 1, 'клик по MR не увёл из родителя в чат группы');
 await shot('05-hub-cards');
 
-// Клик по тексту карточки (не по кнопке) — чат группы.
-await cardOf(1).locator('[data-hub-meta]').click();
+// Клик по тексту карточки (не по кнопке) — чат группы. Открывающая кнопка растянута
+// поверх карточки (`::after`, inset 0) — мышь жмёт туда, где текст, как человек;
+// `locator.click()` отказывает: текст под слоем кнопки.
+const meta = await cardOf(1).locator('[data-hub-meta]').boundingBox();
+if (meta) await page.mouse.click(meta.x + meta.width / 2, meta.y + meta.height / 2);
 await page.waitForTimeout(1500);
 check((await page.locator('[data-child-hub]').count()) === 0, 'клик по карточке открыл чат группы');
 

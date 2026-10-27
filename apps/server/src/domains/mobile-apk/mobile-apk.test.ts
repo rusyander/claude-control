@@ -7,6 +7,7 @@ import { removeWhenFree } from '../../lib/remove-when-free.ts';
 import {
   adbDevices,
   apkStatus,
+  cancelApkBuild,
   installApk,
   startApkBuild,
   type AdbRun,
@@ -103,6 +104,36 @@ describe('mobile-apk', () => {
     expect((await apkStatus(paths, noAdb)).state).toBe('failed');
     expect(startApkBuild(paths)).toBe(true);
     expect((await settled()).state).toBe('succeeded');
+  });
+
+  it('отмена снимает всё дерево сборки, итог — cancelled; отменять нечего — отказ', async () => {
+    writeFileSync(join(paths.repoRoot, 'slow'), '');
+    expect(cancelApkBuild(paths)).toBe(false);
+    expect(startApkBuild(paths)).toBe(true);
+    const pidsFile = join(paths.repoRoot, 'pids.json');
+    const deadline = Date.now() + 15_000;
+    while (!existsSync(pidsFile) && Date.now() < deadline) {
+      await new Promise((done) => setTimeout(done, 50));
+    }
+    const { build, daemon } = JSON.parse(readFileSync(pidsFile, 'utf8')) as Record<string, number>;
+    const runner = (
+      JSON.parse(readFileSync(join(paths.stateDir, 'apk-build.json'), 'utf8')) as {
+        pid: number;
+      }
+    ).pid;
+    expect([runner, build!, daemon!].every(running)).toBe(true);
+
+    expect(cancelApkBuild(paths)).toBe(true);
+    const gone = Date.now() + 10_000;
+    while ([runner, build!, daemon!].some(running) && Date.now() < gone) {
+      await new Promise((done) => setTimeout(done, 50));
+    }
+    expect([runner, build!, daemon!].filter(running)).toEqual([]);
+    const status = await apkStatus(paths, noAdb);
+    expect(status.state).toBe('cancelled');
+    expect(status.finishedAt).toBeDefined();
+    expect(status.log.at(-1)).toMatch(/^Сборка отменена/);
+    expect(cancelApkBuild(paths)).toBe(false);
   });
 
   it('без исходников приложения собирать нечего', async () => {

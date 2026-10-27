@@ -172,6 +172,41 @@ describe('просьба группы о сервере вне профиля', 
     expect(t.group(0)?.mcpExtra).toBeUndefined();
   });
 
+  /**
+   * N8: правки и проверка идут без MCP. Просьба звена посреди цепочки уходила бы
+   * в следующее звено, а сервер — никому: планировщик спрашивает конвейер, продолжит
+   * ли конец хода эту же сессию, и тогда следующего звена не заводит.
+   */
+  it('resumesWithMcp: звено правок с новой просьбой — да; знакомый сервер, вопрос, MR, план, ревью по ссылке — нет', async () => {
+    const t = build();
+    await t.begin();
+    const fix: ChatLink = { ...t.link(0), stage: 'fix', fixFindings: ['🟡 F-1'] };
+    const outcome = (link: ChatLink, text: string) => chainOutcomeOf({ link, ok: true, text });
+    expect(t.conveyor.resumesWithMcp(fix, outcome(fix, ask('gitlab-work')))).toBe(true);
+    expect(t.conveyor.resumesWithMcp(fix, outcome(fix, 'Исправил все пункты.'))).toBe(false);
+    expect(
+      t.conveyor.resumesWithMcp(fix, outcome(fix, `${ask('gitlab-work')}\n\nКакую ветку брать?`)),
+    ).toBe(false);
+    expect(
+      t.conveyor.resumesWithMcp(
+        fix,
+        outcome(fix, `${ask('gitlab-work')}\nhttps://git.example.com/a/b/-/merge_requests/7`),
+      ),
+    ).toBe(false);
+    const plan: ChatLink = { ...t.link(0), stage: 'plan' };
+    expect(t.conveyor.resumesWithMcp(plan, outcome(plan, ask('gitlab-work')))).toBe(false);
+    const byLink: ChatLink = {
+      ...t.link(0),
+      stage: 'review',
+      review: { url: 'https://git.example.com/a/b/-/merge_requests/7', branch: 'feature/one' },
+    };
+    expect(t.conveyor.resumesWithMcp(byLink, outcome(byLink, ask('gitlab-work')))).toBe(false);
+    // Конец хода занёс сервер — следующая просьба о нём уже не новая.
+    t.conveyor.onChainEnded(fix, outcome(fix, ask('gitlab-work')));
+    expect(t.resumed).toHaveLength(1);
+    expect(t.conveyor.resumesWithMcp(fix, outcome(fix, ask('gitlab-work')))).toBe(false);
+  });
+
   it('profileInput: текст задач своей группы с общим и брифом, и уже попрошенные серверы', async () => {
     const t = build();
     await t.begin();

@@ -6,6 +6,7 @@ import {
   evidenceRunIds,
   judgeSieves,
   learnedAppliesTo,
+  looseRunIds,
   riskTier,
   sievePromptBlock,
   staleSieveIds,
@@ -15,6 +16,7 @@ import {
   type SieveMechanics,
   type SieveReportRow,
 } from '@agentdeck/contracts/sieves';
+import { localizeText, serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Эталонный судья сит: механика панели снимается только названным файлом,
@@ -250,14 +252,15 @@ describe('доказательство прогоном блока «Тесты�
       code: 'sieve-gap-run-red',
       params: { sieve: 'boundary-negative', run: 'run-000001', cases: 'forms-004' },
     });
-    const old = { found: true, red: [], changedAfter: ['src/forms/limit.ts'] };
+    const old = { found: true, red: [], changedAfter: ['src/forms/limit.ts'], tags: ['route'] };
     expect(codes(judge(evidence, { testsBlock: true, runs: { 'run-000001': old } }))).toEqual([
       'sieve-gap-run-stale',
     ]);
   });
 
   it('годный прогон снимает; одного годного среди нескольких хватает', () => {
-    const good = { found: true, red: [], changedAfter: ['e2e/forms.spec.ts'] };
+    // Прошедший кейс с живой меткой (N3): юнит-прогон живую проверку не доказывает.
+    const good = { found: true, red: [], changedAfter: ['e2e/forms.spec.ts'], tags: ['route'] };
     const bad = { found: false, red: [], changedAfter: [] };
     expect(
       judge('max+1 → 400 run:run-000002 (earlier run:run-000001)', {
@@ -265,6 +268,94 @@ describe('доказательство прогоном блока «Тесты�
         runs: { 'run-000001': bad, 'run-000002': good },
       }),
     ).toEqual([]);
+  });
+
+  it('прогон без живой метки — пробел, и его текст называет, что не засчитывается (F2)', () => {
+    // g1 26.10: ручная запись прогона и метка на своём кейсе — группа не знала, что они
+    // не в счёт, и шесть раз читала исходники панели, прежде чем сдать fail «not checked».
+    const unit = { found: true, red: [], changedAfter: [], passed: 3, tags: [] };
+    const [gap] = judge('max+1 → 400 run:run-000003', {
+      testsBlock: true,
+      runs: { 'run-000003': unit },
+    });
+    expect(gap?.code).toBe('sieve-gap-run-not-live');
+    const text = localizeText(
+      serverText('sieve-gap-run-not-live', gap?.params as Record<string, string>),
+      'en',
+    );
+    expect(text).toContain('a run recorded by hand and a tag the group set on its own case');
+    expect(text).toContain('only a run the Tests block executed (`tests-cli run`)');
+    expect(text).toContain('status fail with evidence "not checked: <reason>"');
+  });
+
+  it('дифф из одних инструментов: исполненный кейс, назвавший их, — живая проверка (строка 98)', () => {
+    // g8 26.10: у линтера сборки нет стенда — каждый MR инструментов кончался «not checked».
+    const tooling = (behaviour: string[], fact: Record<string, unknown>) =>
+      judgeSieves({
+        applicable,
+        rows: [row('boundary-negative', 'empty input → exit 2 «no files» run:run-000009')],
+        mechanics: { behaviour },
+        proof: {
+          testsBlock: true,
+          runs: { 'run-000009': { found: true, red: [], changedAfter: [], passed: 2, ...fact } },
+        },
+      });
+    const lint = ['tools/lint-locales/check.mjs'];
+    expect(tooling(lint, { tags: [], executedPaths: ['tools/lint-locales'] })).toEqual([]);
+    expect(tooling(lint, { tags: [], executedPaths: ['tools/lint-locales/check.mjs'] })).toEqual(
+      [],
+    );
+    // Исполненный кейс о другом файле, ручная запись (путей нет) и файл продукта рядом — не в счёт.
+    expect(codes(tooling(lint, { tags: [], executedPaths: ['src/forms/limit.ts'] }))).toEqual([
+      'sieve-gap-run-not-live',
+    ]);
+    expect(codes(tooling(lint, { tags: [] }))).toEqual(['sieve-gap-run-not-live']);
+    expect(
+      codes(
+        tooling([...lint, 'src/forms/limit.ts'], {
+          tags: [],
+          executedPaths: ['tools/lint-locales', 'src/forms/limit.ts'],
+        }),
+      ),
+    ).toEqual(['sieve-gap-run-not-live']);
+    const text = localizeText(
+      serverText('sieve-gap-run-not-live', { sieve: 'boundary-negative', run: 'r', tags: 'live' }),
+      'en',
+    );
+    expect(text).toContain('a diff of only `tools/` and `scripts/` files is also proved');
+  });
+
+  it('полный номер прогона так, как его печатают tests-cli run и record, — ссылка (g1 F1)', () => {
+    // g1 26.10: «Прогон 4f5ba80b-9371-… записан» и «прогон: 53b69a2e-de7c-…» не узнавались —
+    // за восемью знаками шёл дефис; группа трижды правила строку, дописывая run:.
+    const record = '4f5ba80b-9371-4f54-93b5-45728c5b2838';
+    const run = '53b69a2e-de7c-4a1b-9c2d-0e1f2a3b4c5d';
+    expect(looseRunIds(`«Прогон ${record} записан: зелёных 1»`)).toEqual([record]);
+    expect(looseRunIds(`прогон: ${run}`)).toEqual([run]);
+    expect(looseRunIds('в run 664941c8, прогон 261b8815')).toEqual(['664941c8', '261b8815']);
+    const live = { found: true, red: [], changedAfter: [], passed: 1, tags: ['route'] };
+    expect(
+      judge(`max+1 → 400; Прогон ${record} записан: зелёных 1`, {
+        testsBlock: true,
+        runs: { [record]: live },
+      }),
+    ).toEqual([]);
+  });
+
+  it('пробел «нет прогона» называет только то, что засчитается (g1 F2)', () => {
+    // Текст советовал tests-cli record и метку своего кейса — оба судья не берёт.
+    const [gap] = judge('POST max+1 → 400 as documented', { testsBlock: true });
+    expect(gap?.code).toBe('sieve-gap-no-run');
+    const params = gap?.params as Record<string, string>;
+    const en = localizeText(serverText('sieve-gap-no-run', params), 'en');
+    expect(en).not.toContain('tests-cli record');
+    expect(en).toContain(
+      'only a run the Tests block executed (`tests-cli run`) of a case tagged by someone else counts',
+    );
+    expect(en).toContain('a tag the group set on its own case');
+    const ru = localizeText(serverText('sieve-gap-no-run', params), 'ru');
+    expect(ru).not.toContain('tests-cli record');
+    expect(ru).toContain('метка, которую группа поставила своему кейсу');
   });
 
   it('n/a живой проверки прогона не требует', () => {
@@ -285,6 +376,15 @@ describe('риск и план отката', () => {
     expect(riskTier(['services/billing/charge.go']).tier).toBe('high');
     const many = Array.from({ length: 40 }, (_, index) => `src/m${index}.ts`);
     expect(riskTier(many).reasons).toEqual(['size: 40']);
+  });
+
+  it('чувствительное имя у страницы доков — не риск, у кода и данных — риск', () => {
+    expect(riskTier(['docs/access/policy.mdx'])).toEqual({ tier: 'low', reasons: [] });
+    expect(riskTier(['src/access/policy.ts']).reasons).toEqual(['sensitive: src/access/policy.ts']);
+    expect(riskTier(['db/changelog/0042-auth.xml']).reasons).toEqual([
+      'data',
+      'sensitive: db/changelog/0042-auth.xml',
+    ]);
   });
 
   it('обычный код — средний; только доки и тесты — низкий', () => {
@@ -365,7 +465,9 @@ describe('задание показывает ровно то, что потре
       row('boundary-negative', 'POST max+1 → 400, recorded run:run-000001'),
       row('project-checks', 'pnpm lint → 0 problems; pnpm test → 12 passed'),
     ];
-    const runs = { 'run-000001': { found: true, red: [], passed: 3, changedAfter: [] } };
+    const runs = {
+      'run-000001': { found: true, red: [], passed: 3, changedAfter: [], tags: ['stand'] },
+    };
     const good = { testsBlock: true, runs };
     expect(judgeSieves({ applicable, rows: fixed, mechanics, proof: good })).toEqual([]);
     const after = sievePromptBlock({

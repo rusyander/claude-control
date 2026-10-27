@@ -430,6 +430,60 @@ describe('прогон с окружением контура минует об�
     });
   });
 
+  /** P-16: снятые инструменты группы — ключ панели, который сессия применяет сама. */
+  describe('снятые инструменты группы OpenCode', () => {
+    const DENY = { AGENTDECK_OPENCODE_TOOL_DENY: '["telegram-inbox_*","jira_confluence_search"]' };
+
+    it('с одним ключом ход идёт сессией, шаблоны — сессии', async () => {
+      const ask = vi.fn(async (..._args: unknown[]) => ({ reply: 'сессией', sessionId: 's' }));
+      const seen: { env?: NodeJS.ProcessEnv }[] = [];
+      await new ProviderChatRun().start(
+        {
+          provider: getProvider('opencode'),
+          history,
+          chatId: 'chat',
+          appDataDir: 'C:/tmp/nowhere',
+          detect: () => true,
+          sessionServe: { ask, steer: async () => false } as unknown as OpencodeServe,
+          spawnImpl: recordingSpawn(seen),
+          timeoutMs: 2_000,
+          platformEnv: DENY,
+        },
+        () => {},
+      );
+      expect(ask).toHaveBeenCalledOnce();
+      expect(ask.mock.calls[0]?.[2]).toMatchObject({
+        toolDeny: ['telegram-inbox_*', 'jira_confluence_search'],
+      });
+      expect(seen).toHaveLength(0);
+    });
+
+    it('одиночный запуск (контур): ключ снят, шаблоны — deny в OPENCODE_PERMISSION', async () => {
+      const ask = vi.fn(async () => ({ reply: 'мимо', sessionId: 's' }));
+      const seen: { env?: NodeJS.ProcessEnv }[] = [];
+      await new ProviderChatRun().start(
+        {
+          provider: getProvider('opencode'),
+          history,
+          chatId: 'chat',
+          appDataDir: 'C:/tmp/nowhere',
+          detect: () => true,
+          sessionServe: { ask, steer: async () => false } as unknown as OpencodeServe,
+          spawnImpl: recordingSpawn(seen),
+          timeoutMs: 2_000,
+          platformEnv: { ...DENY, ...ROUTE },
+        },
+        () => {},
+      );
+      expect(ask).not.toHaveBeenCalled();
+      expect(seen[0]?.env?.AGENTDECK_OPENCODE_TOOL_DENY).toBeUndefined();
+      expect(JSON.parse(seen[0]?.env?.OPENCODE_PERMISSION ?? '{}')).toMatchObject({
+        'telegram-inbox_*': 'deny',
+        jira_confluence_search: 'deny',
+      });
+    });
+  });
+
   it('ассистент формы: сессия OpenCode не спрашивается при окружении прогона', async () => {
     const { runAssistant } = await import('../../assistant-runner/assistant-runner.ts');
     const ask = vi.fn(async () => ({ reply: 'мимо контура', sessionId: 's' }));

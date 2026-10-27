@@ -10,6 +10,8 @@ import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
 import type { ChainOutcome } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { carriedLink } from '../../lib/app-store/chat-links.ts';
+import type { ReviewDelta } from '@agentdeck/contracts/model-cascade';
+import type { ChatEvent } from '../../domains/chat/chat-events.ts';
 
 /**
  * Ревью группы, кончившее ход блоком продолжения (журнал 23.10: группа ушла в
@@ -70,6 +72,8 @@ function build(
     firstContext?: number;
     /** Есть ли работа в копии с этого времени (`git log --since`); пусто — есть всегда. */
     hasWork?: (since?: string) => boolean;
+    /** Охват ревью (`readReviewDelta`): git — внешняя граница, решение планировщика настоящее. */
+    reviewDelta?: (cwd: string, since?: string, startSha?: string) => ReviewDelta;
   } = {},
 ) {
   const registry = new ChatRunRegistry((): RunLike => ({
@@ -116,6 +120,7 @@ function build(
       saveLink: (chatId, link) => void links.set(chatId, link),
       markReviewed: () => undefined,
       hasWork: (_cwd, since) => options.hasWork?.(since) ?? true,
+      ...(options.reviewDelta ? { reviewDelta: options.reviewDelta } : {}),
       settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
     },
     split: {
@@ -249,5 +254,141 @@ describe('продолжение работы в чистой сессии и о
     expect(links.get(continuation?.chatId ?? '')?.stage).toBe('work');
     expect(review?.chatId.startsWith('new-')).toBe(true);
     expect(links.get(review?.chatId ?? '')?.stage).toBe('review');
+  });
+});
+
+/**
+ * Ревью группы — только сделанное ею с коммита начала (владелец 26.10, замечание 4).
+ * Своего у группы нет (только чистое слияние основной) — ревью не заводится, и это не
+ * молча: строка причины в ленту закончившегося хода, доставка называет причину.
+ */
+describe('пустой охват группы — ревью нет, причина в ленте', () => {
+  const START = 'c0ffee'.repeat(6) + 'abcd';
+  const WORK_LINK: ChatLink = {
+    parentChatId: 'родитель',
+    createdAt: '2026-10-26T10:00:00.000Z',
+    title: 'Конфликт',
+    branch: 'feature/mr',
+    groupIndex: 0,
+    stage: 'work',
+    model: 'claude-opus-5',
+    effort: 'high',
+    startSha: START,
+  };
+  const none: ReviewDelta = {
+    kind: 'none',
+    from: START.slice(0, 12),
+    published: false,
+    group: true,
+  };
+
+  function notices(registry: ChatRunRegistry, chatId: string): ChatEvent[] {
+    const seen: ChatEvent[] = [];
+    registry.attach(chatId, 0, {
+      send: ({ event }) => {
+        if (event.kind === 'notice') seen.push(event);
+      },
+      close: () => undefined,
+    });
+    return seen;
+  }
+
+  it('группа с доставкой — доставка с причиной; охват спрошен один раз, от коммита начала', async () => {
+    const asked: (string | undefined)[] = [];
+    const { registry, links, runs } = build('Слил main без конфликтов.', true, {
+      reviewDelta: (_cwd, _since, startSha) => {
+        asked.push(startSha);
+        return none;
+      },
+    });
+    links.set('чат-работы', WORK_LINK);
+
+    await run(registry, 'чат-работы');
+
+    const [next] = after(runs);
+    expect(links.get(next?.chatId ?? '')?.stage).toBe('deliver');
+    expect(next?.prompt).toContain('the panel skipped its review');
+    expect(links.get(next?.chatId ?? '')?.startSha).toBe(START);
+    expect(asked).toEqual([START]);
+    const [notice] = notices(registry, 'чат-работы');
+    expect(notice).toMatchObject({
+      kind: 'notice',
+      code: 'reviewSkipped',
+      textCode: 'review-skipped-notice',
+      textParams: { from: START.slice(0, 12) },
+    });
+  });
+
+  it('группа без доставки — звена нет, цепочка кончилась, строка причины всё равно есть', async () => {
+    const { registry, links, runs, ended } = build('Слил main без конфликтов.', false, {
+      reviewDelta: () => none,
+    });
+    links.set('чат-работы', WORK_LINK);
+
+    await run(registry, 'чат-работы');
+
+    expect(after(runs)).toEqual([]);
+    expect(ended).toHaveLength(1);
+    expect(
+      notices(registry, 'чат-работы').map((event) => event.kind === 'notice' && event.code),
+    ).toEqual(['reviewSkipped']);
+  });
+
+  it('у группы есть свои коммиты — ревью заводится, строки о пропуске нет', async () => {
+    const { registry, links, runs } = build('Сделал.', true, {
+      reviewDelta: () => ({
+        kind: 'commits',
+        from: START.slice(0, 12),
+        commits: [{ sha: 'abc123abc123', subject: 'group: fix', type: 'commit' }],
+        dirty: false,
+      }),
+    });
+    links.set('чат-работы', WORK_LINK);
+
+    await run(registry, 'чат-работы');
+
+    const [next] = after(runs);
+    expect(links.get(next?.chatId ?? '')?.stage).toBe('review');
+    expect(next?.prompt).toContain(`git diff ${START.slice(0, 12)}..HEAD`);
+    expect(notices(registry, 'чат-работы')).toEqual([]);
+  });
+
+  // Telegram R3(d), 26.10: «Ревью после работы» выключено в проекте — флаг в связи.
+  it('«Ревью после работы» выключено — доставка с причиной и строка в ленте, охват не спрошен', async () => {
+    const asked: (string | undefined)[] = [];
+    const { registry, links, runs } = build('Сделал.', true, {
+      reviewDelta: (_cwd, _since, startSha) => {
+        asked.push(startSha);
+        return none;
+      },
+    });
+    links.set('чат-работы', { ...WORK_LINK, reviewAfterWork: false });
+
+    await run(registry, 'чат-работы');
+
+    const [next] = after(runs);
+    expect(links.get(next?.chatId ?? '')?.stage).toBe('deliver');
+    expect(next?.prompt).toContain('«review after work» off for this project');
+    expect(asked).toEqual([]);
+    expect(notices(registry, 'чат-работы')).toEqual([
+      expect.objectContaining({
+        kind: 'notice',
+        code: 'reviewSkipped',
+        textCode: 'review-off-notice',
+      }),
+    ]);
+  });
+
+  it('«Ревью после работы» выключено у группы без доставки — звена нет, строка есть', async () => {
+    const { registry, links, runs, ended } = build('Сделал.', false);
+    links.set('чат-работы', { ...WORK_LINK, reviewAfterWork: false });
+
+    await run(registry, 'чат-работы');
+
+    expect(after(runs)).toEqual([]);
+    expect(ended).toHaveLength(1);
+    expect(
+      notices(registry, 'чат-работы').map((event) => event.kind === 'notice' && event.textCode),
+    ).toEqual(['review-off-notice']);
   });
 });

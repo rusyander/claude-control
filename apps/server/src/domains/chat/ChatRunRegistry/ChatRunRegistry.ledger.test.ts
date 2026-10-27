@@ -311,7 +311,13 @@ describe('ChatRunRegistry — усыновление после перезапу
       expect.objectContaining({ chatId: 'new-1', text: '', interrupted: true }),
     );
     expect(journal).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledWith({ kind: 'done', chatId: 'new-1', projectPath: '/proj' });
+    // Длительность хода — для «Закончил» в Telegram после долгой работы.
+    expect(notify).toHaveBeenCalledWith({
+      kind: 'done',
+      chatId: 'new-1',
+      projectPath: '/proj',
+      durationMs: expect.any(Number),
+    });
     expect(ledger.entries.has('new-1')).toBe(false);
     // В grace-буфере — как обычный завершённый: вкладка дотянет хвост после F5.
     expect(registry.active()[0]?.status).toBe('done');

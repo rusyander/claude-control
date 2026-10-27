@@ -29,6 +29,7 @@ export const panelTextsChatEn = {
   'summary-stop-chat-run': 'Stop the agent in chat “{{chat}}”',
   'summary-split-pause': 'Pause group “{{group}}” (chat “{{chat}}”)',
   'summary-split-resume': 'Resume group “{{group}}” after the pause (chat “{{chat}}”)',
+  'summary-split-continue': 'Continue group “{{group}}” that stopped unfinished (chat “{{chat}}”)',
   'summary-split-release':
     'Release group “{{group}}” without waiting for its predecessors (chat “{{chat}}”)',
   'summary-split-answer': 'Answer the triage question of group “{{group}}” (chat “{{chat}}”)',
@@ -58,6 +59,8 @@ export const panelTextsChatEn = {
     'The chat agent will not propose a split on its own again; the “Split tasks across chats” button still works',
   'value-split-pause-effect': 'The group’s runs stop; the group waits for “Resume”',
   'value-split-resume-effect': 'The group continues in its own session',
+  'value-split-continue-effect':
+    'The group gets what is left undone and continues in its own copy and conversation',
   'value-split-requeue-effect':
     'The group was queued — it goes back to the queue and starts when its turn comes',
   'value-split-resume-fresh-effect':

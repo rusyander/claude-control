@@ -28,11 +28,13 @@ import { SPLIT_HUMAN_TAG, SPLIT_TICKET_TAG } from './split-tickets.ts';
 import {
   DELIVERY_CHECKS_LINE,
   labelledCut,
+  MR_SHOTS_LINE,
   OWNER_PRECEDENCE_LINE,
   OWNER_PRECEDENCE_PLAIN_LINE,
   OWNER_TEXT_MAX,
   SKILL_ROUTE_LINE,
   SYNC_ON_CONFLICT_LINE,
+  taskCoverageLine,
   WORK_STAGE_CHECKS_LINE,
 } from './quality-floor.ts';
 
@@ -271,6 +273,11 @@ export interface TaskSplitStarted {
    * конвейер закрывает группу только по фактам git, а не по словам агента.
    */
   deliver?: boolean;
+  /**
+   * Задание несёт след задач (`taskCoverageLine`): доставка требует строки
+   * `task-N`. Ставит тот, кто собрал задание, — судья и слово не разойдутся.
+   */
+  taskTrace?: boolean;
   /**
    * Одноразовая база, которую панель подняла группе ревью (T7). Нужна конвейеру,
    * чтобы убрать её, когда группа закрыта; человеку не показывается.
@@ -1230,16 +1237,26 @@ export function shotCommandLine(shots: ShotCommand): string {
  * правило чтения едет в задании каждого ревьюера, а дифф — одним файлом.
  * Общее начало промптов ревьюеров кеша не даёт (промпт — один блок, а кеш
  * совпадает только по границам блоков), поэтому его здесь и не просим.
+ *
+ * Только запасной путь (g8 26.10): ревью ведёт deep-review (стадия ревью и §9
+ * доставки называют его прямо), а его review-plan сам пишет pack.diff окнами под
+ * лимит чтения прямо в промпт полосы. Безусловная строка заставляла собрать ещё и
+ * review-pack.md — 241 тыс. знаков того же диффа, — и полосы 6 вызовами читали
+ * его шапку. Режим «только шапка» не нужен: коммиты и список файлов у полос уже
+ * есть из плана навыка.
  */
 export function reviewPackLine(command: string): string {
   return (
-    'Review subagents (the review skill or the review stage of the delivery skill, with its count and depth unchanged): ' +
-    `before spawning them, build the review package — \`${command} --plan <your plan or progress file>\` ` +
-    'writes one file with the commits, the changed files, the plan and the whole diff of the copy ' +
-    '(uncommitted and new files included) and prints its path. Give every reviewer that path and, in ' +
-    'its prompt, these reading rules: read the package once (in parts if it is long) instead of ' +
-    'running git diff or git show; batch independent reads into one call; open a file again only ' +
-    'after it changed. Rebuild the package before each new review round.'
+    'Review package — only for a review WITHOUT the deep-review skill: that skill builds its own ' +
+    'pack (`review-plan.mjs` writes pack.diff in read-sized windows into each lane prompt), so with ' +
+    'it build nothing more and hand its lanes no second copy of the diff. Without it, before ' +
+    'spawning reviewers (their count and depth unchanged) build the package — ' +
+    `\`${command} --plan <your plan or progress file>\` writes one file with the commits, the ` +
+    'changed files, the plan and the whole diff of the copy (uncommitted and new files included) ' +
+    'and prints its path. Give every reviewer that path and, in its prompt, these reading rules: ' +
+    'read the package once (in parts if it is long) instead of running git diff or git show; batch ' +
+    'independent reads into one call; open a file again only after it changed. Rebuild the package ' +
+    'before each new review round.'
   );
 }
 
@@ -1314,7 +1331,7 @@ export function deliveryPreamble(input: {
     ...(input.shots ? [shotCommandLine(input.shots)] : []),
     ...(input.reviewPack ? [reviewPackLine(input.reviewPack)] : []),
     'All tasks of the group are ONE branch and ONE MR: task keys go into the MR description, and ' +
-      'each task links to the MR.',
+      `each task links to the MR. ${MR_SHOTS_LINE}`,
     input.mergeRequest
       ? `The MR already exists: ${input.mergeRequest}. Do not create a new one — push to its branch and update the description.`
       : `The panel has already created the copy's branch: ${input.branch}. Do not create another; if ` +
@@ -1475,6 +1492,9 @@ export function buildGroupPrompt(
       ? group.tasks.map((task, index) => `${index + 1}. ${task}`).join('\n')
       : (group.tasks[0] ?? ''),
   );
+  // След задач — группе с доставкой: её «готово» судит доставка, и пункт тикета
+  // без строки `task-N` держит группу (`taskCoverageGaps`, аудит 26.10).
+  if (options.deliver) parts.push(taskCoverageLine());
   // Строка приоритета — последним абзацем: задание выше написано владельцем
   // или его агентом, и всё, что панель допишет к прогону потом (преамбулы,
   // стадии), читается под ней, а не поверх неё. Навык по роду работы (U12) —

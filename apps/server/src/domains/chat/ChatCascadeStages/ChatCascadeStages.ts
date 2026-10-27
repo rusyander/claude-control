@@ -6,10 +6,14 @@ import {
   fixStagePrompt,
   loweredWorkPrompt,
   planSections,
+  provenLines,
+  REVIEW_OFF_REASON,
+  reviewSkipReason,
   reviewStagePrompt,
   scanReviewBlocks,
   verifyStagePrompt,
   type CascadeStage,
+  type GroupScope,
   type ReviewDelta,
   type StageContext,
   type TaskKind,
@@ -31,6 +35,7 @@ import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 import { initiativePrompt } from '../initiative/initiative.ts';
 import { reviewPackLine } from '@agentdeck/contracts/task-split';
 import { reviewPackCommand } from '../review-pack/review-pack.ts';
+import { deliveryCheckCommand } from '../delivery-self-check.ts';
 
 /**
  * Конвейер «работа → ревью → фикс → проверка» — решение о СЛЕДУЮЩЕМ звене.
@@ -88,6 +93,12 @@ export interface CascadeStagePlan {
 }
 
 export interface CascadeStageInput {
+  /**
+   * Ревью законченной работы не заведено: в проекте выключено «Ревью после работы»
+   * (R3(d), 26.10). Зовётся и у группы без доставки (звена нет вовсе) — лента
+   * называет причину строкой `review-off-notice`, как у пустого охвата.
+   */
+  noteReviewOff?: () => void;
   /** Связь закончившегося чата; её отсутствие значит «это не ребёнок разделения». */
   link?: ChatLink;
   /** Прогон завершился успешно. После ошибки или остановки проверять нечего. */
@@ -100,6 +111,11 @@ export interface CascadeStageInput {
    * рассуждений между вызовами. Короче `ANSWER_MIN` — итог в одну строку, тогда хвост.
    */
   answer?: string;
+  /**
+   * Итог хода до первого замечания хука Stop (`RunFinished.summary`, P1). Есть — исход
+   * звена он, какой бы длины ни был: ответ на замечание хука — хвост, а не итог.
+   */
+  summary?: string;
   /** Задание закончившегося прогона: по нему ревьюер сверяет сделанное. */
   task: string;
   /**
@@ -111,7 +127,8 @@ export interface CascadeStageInput {
   /**
    * Что работа изменила против опубликованной ветки (L7.13, `readReviewDelta`).
    * Функция по той же причине, что `hasWork`: ответ стоит запуска git и нужен
-   * только перед ревью. Нет — ревью всей работы, как раньше.
+   * только перед ревью. Нет — ревью всей работы, как раньше. У группы с коммитом
+   * начала (`link.startSha`, владелец 26.10) — коммиты группы от него.
    */
   reviewDelta?: () => ReviewDelta;
   /**
@@ -144,6 +161,12 @@ export interface CascadeStageInput {
    */
   planFile?: (plan: string) => string | undefined;
   /**
+   * Положить находки файлом в копию (R7, `writeReviewFindings`) и вернуть путь:
+   * `fix` — карточки звена правок, `open` — открытое после прохода проверки.
+   * `undefined` — файла нет, и задание о нём молчит.
+   */
+  findingsFile?: (kind: 'fix' | 'open', findings: readonly string[]) => string | undefined;
+  /**
    * Пути того, что прошлые звенья оставили в копии (L7.4, `readStageArtifacts`):
    * снимки, журнал проверок, прогоны тестов, логи гейтов. Функция — ответ стоит
    * чтения каталогов и нужен только звеньям после работы.
@@ -156,6 +179,11 @@ export interface CascadeStageInput {
    * просьба ушла бы в модель контура по умолчанию — ни экономии, ни смысла.
    */
   cheapDeliver?: boolean;
+  /**
+   * Границы группы по плану разделения (аудит g8 26.10, N2, `groupScopeOf`): правкам и
+   * проверке — чьи пути чужие и где baseline допустим. Нет плана границ — абзаца нет.
+   */
+  scope?: GroupScope;
   /** Часы — в тесте фиксируются. */
   now?: () => Date;
 }
@@ -197,8 +225,12 @@ export function stageAppendPrompt(
         })
       : // Работа после плана (Т1) — та же планка сдачи, что у работы, заведённой
         // разделением напрямую: понижение оплачивается ревью, и обещать его надо.
+        // «Ревью после работы» выключено (R3(d)) — ревью не обещается, подъём остаётся.
         plan.stage === 'work' && plan.link.lowered
-        ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined)
+        ? loweredWorkPrompt(
+            plan.link.kind as TaskKind | undefined,
+            plan.link.reviewAfterWork === false ? { review: false, raise: true } : {},
+          )
         : '',
     extra ?? '',
   ]
@@ -241,7 +273,8 @@ export function stagesAhead(
   const stage = stageOf(link);
   const review =
     stage === 'work'
-      ? Boolean(link.ceilingModel ?? (link.lowered ? undefined : link.model))
+      ? link.reviewAfterWork !== false &&
+        Boolean(link.ceilingModel ?? (link.lowered ? undefined : link.model))
       : stage === 'fix' && verifiesFixes(link);
   return { review, deliver: delivers && stage !== 'deliver' };
 }
@@ -296,8 +329,13 @@ function stageContextOf(
  */
 const ANSWER_MIN = 400;
 
-/** Исход звена для следующего: итог хода (после последнего инструмента) или хвост. */
-export function outcomeText(input: Pick<CascadeStageInput, 'text' | 'answer'>): string {
+/**
+ * Исход звена для следующего: итог до первого замечания хука Stop, иначе итог хода
+ * (после последнего инструмента), иначе хвост.
+ */
+export function outcomeText(input: Pick<CascadeStageInput, 'text' | 'answer' | 'summary'>): string {
+  const summary = input.summary?.trim() ?? '';
+  if (summary) return summary;
   const answer = input.answer?.trim() ?? '';
   return answer.length >= ANSWER_MIN ? answer : input.text;
 }
@@ -470,7 +508,9 @@ function deliverPlan(
   context: StageContext,
   sieves?: string,
   /** Итог прохода проверки (U6): что осталось открытым или что он не отчитался. */
-  verification?: { open?: string[]; unverified?: boolean },
+  verification?: { open?: string[]; openFile?: string; unverified?: boolean },
+  /** Ревью не заводилось, и почему (`reviewSkipReason`, владелец 26.10): охват группы пуст. */
+  reviewSkipped?: string,
 ): CascadeStagePlan | undefined {
   const model = link.workModel ?? link.model;
   const effort = link.workEffort ?? link.effort;
@@ -484,9 +524,15 @@ function deliverPlan(
       after,
       ...(link.branch ? { branch: link.branch } : {}),
       context,
+      deliveryCheck: deliveryCheckCommand(),
       ...(sieves ? { sieves } : {}),
       ...(verification?.open?.length ? { open: verification.open } : {}),
+      ...(verification?.openFile ? { openFile: verification.openFile } : {}),
       ...(verification?.unverified ? { unverified: true } : {}),
+      // Найденное вне охвата группы — в MR отдельным списком «было до группы, не исправлено».
+      ...(base.preExisting?.length ? { preExisting: base.preExisting } : {}),
+      ...(reviewSkipped ? { reviewSkipped } : {}),
+      ...(base.startSha ? { startSha: base.startSha } : {}),
     }),
     link: {
       ...base,
@@ -567,6 +613,9 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     ...(kind ? { kind } : {}),
     ...(link.ceilingModel ? { ceilingModel: link.ceilingModel } : {}),
     ...(link.ceilingEffort ? { ceilingEffort: link.ceilingEffort } : {}),
+    // «Ревью после работы» выключено (R3(d)) — едет по цепочке: работа после плана и
+    // подъём на потолок тоже идут без ревью.
+    ...(link.reviewAfterWork === false ? { reviewAfterWork: false as const } : {}),
     // Задание и план едут по всей цепочке (аудит 25.09, L238): звено после
     // звена иначе теряло их — у связи ревью задания уже не было.
     ...(link.task ? { task: link.task } : groupTask ? { task: groupTask } : {}),
@@ -575,6 +624,10 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     // Отчёт о ситах едет по цепочке: сделанное ревью доставка не повторяет, а
     // судья доставки видит строки всех звеньев.
     ...(sieveRows.length > 0 ? { sieveRows } : {}),
+    // Коммит начала группы (владелец 26.10): охват ревью, правок и доставки — от него.
+    ...(link.startSha ? { startSha: link.startSha } : {}),
+    // Найденное ревью вне охвата: правкам не уходит, доставка называет его в MR.
+    ...(link.preExisting?.length ? { preExisting: link.preExisting } : {}),
   };
   const sievesFor = (stage: SieveStage): string | undefined =>
     input.sieves?.(stage, sieveRows) || undefined;
@@ -597,7 +650,12 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     // заводит: итог проверки идёт в доставку. Уже заведена — доставку заведёт она.
     if (verifiesFixes(link)) {
       if (link.reviewedAt) return undefined;
-      return verifyPlan(link, base, contextAfter(outcome));
+      // Раздел `Proven:` — из итога хода, а без него из хвоста текста (N9).
+      const proven = provenLines(outcome);
+      return verifyPlan(link, base, contextAfter(outcome), {
+        ...(input.scope ? { scope: input.scope } : {}),
+        proven: proven.length > 0 ? proven : provenLines(text),
+      });
     }
     // Связь правок до U6 (замечаний не несёт) — в доставку сразу (журнал 59a).
     return input.deliver && !deliveredOnce(link, input)
@@ -615,14 +673,30 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     // с доставкой идёт в неё сразу (M8, журнал 59a). Раньше такая работа кончала
     // цепочку, и до MR её доводили только напоминания конвейера по фактам git.
     // Пустую работу не доставляем: MR без правок — не итог группы.
-    const deliverNow = (): CascadeStagePlan | undefined =>
+    const deliverNow = (reviewSkipped?: string): CascadeStagePlan | undefined =>
       input.deliver && !deliveredOnce(link, input) && hasWork()
-        ? deliverPlan(link, base, 'work', contextAfter(outcome), sievesFor('deliver'))
+        ? deliverPlan(
+            link,
+            base,
+            'work',
+            contextAfter(outcome),
+            sievesFor('deliver'),
+            undefined,
+            reviewSkipped,
+          )
         : undefined;
     // Ревью на работу заводится ровно один раз. Без отметки второе сообщение
     // человека в тот же чат заводило бы ещё одну проверку — и так на каждый ход.
     // Доставку этого круга заводит само ревью (или правки после него).
     if (link.reviewedAt) return undefined;
+    // «Ревью после работы» выключено в проекте (Telegram R3(d), 26.10): ревью не
+    // заводится, работа идёт в доставку с причиной. Подбор и подъём понижённой
+    // работы без правок на потолок остаются — это дешёвая работа, а не ревью.
+    if (link.reviewAfterWork === false) {
+      if (!hasWork()) return raisedPlan(link, base, text);
+      input.noteReviewOff?.();
+      return deliverNow(REVIEW_OFF_REASON);
+    }
     // Ревью — после КАЖДОЙ работы (U6). Ревьюер — потолок разговора; работа,
     // шедшая на потолке без записанного потолка, читается своей же моделью в
     // свежей сессии. Понижённая работа без потолка — связь старше конвейера:
@@ -637,9 +711,14 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
     if (!hasWork()) return raisedPlan(link, base, text);
     // Ветка была опубликована до этой работы, и патчи те же — пустой rebase
     // (журнал 19.10 02:19, L7.13): ревью читать нечего. Голова уже на удалённом —
-    // и доставлять нечего; нет — доставка её отправит.
+    // и доставлять нечего; нет — доставка её отправит. Группа с коммитом начала
+    // (владелец 26.10): своего с начала нет (только чистые слияния) — то же самое, и
+    // доставка называет причину, по которой ревью не было.
     const delta = input.reviewDelta?.();
-    if (delta?.kind === 'none') return delta.published ? undefined : deliverNow();
+    if (delta?.kind === 'none') {
+      return delta.published ? undefined : deliverNow(reviewSkipReason(delta));
+    }
+    const scope = delta?.kind === 'delta' || delta?.kind === 'commits' ? delta : undefined;
     const reviewSieves = sievesFor('review');
 
     return {
@@ -648,7 +727,7 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
       effort: reviewerEffort ?? '',
       prompt: reviewStagePrompt({
         task: groupTask ?? task,
-        ...(delta?.kind === 'delta' ? { delta } : {}),
+        ...(scope ? { delta: scope } : {}),
         ...(link.model ? { model: link.model } : {}),
         ...(kind ? { kind } : {}),
         ...(link.branch ? { branch: link.branch } : {}),
@@ -658,8 +737,18 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
         },
         ...(reviewSieves ? { sieves: reviewSieves } : {}),
         // Пакет ревью (5.3) — ревьюерам звена ревью доставляющей группы: работа
-        // своего ревью больше не ведёт (владелец 23.10).
-        ...(input.deliver ? { reviewPack: reviewPackLine(reviewPackCommand()) } : {}),
+        // своего ревью больше не ведёт (владелец 23.10). С g8 26.10 — только запасной
+        // путь ревью без deep-review: навык пишет свой pack.diff (`reviewPackLine`).
+        // Охват группы — пакет от коммита начала, а не от основной (`--base`, 26.10).
+        ...(input.deliver
+          ? {
+              reviewPack: reviewPackLine(
+                scope?.kind === 'commits'
+                  ? `${reviewPackCommand()} --base ${scope.from}`
+                  : reviewPackCommand(),
+              ),
+            }
+          : {}),
       }),
       link: {
         ...base,
@@ -682,27 +771,38 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
   if (link.fixFindings) {
     if (input.paused || !input.deliver || deliveredOnce(link, input)) return undefined;
     const verified = scanReviewBlocks(text);
+    const openFile = verified.findings?.length
+      ? input.findingsFile?.('open', verified.findings)
+      : undefined;
     return deliverPlan(
       link,
       base,
       'verify',
       contextAfter(scanReviewBlocks(outcome).text),
       sievesFor('deliver'),
-      verified.findings ? { open: verified.findings } : { unverified: true },
+      verified.findings
+        ? { open: verified.findings, ...(openFile ? { openFile } : {}) }
+        : { unverified: true },
     );
   }
 
   // Ревью закончилось. Блока нет вовсе — ревьюер не отчитался в понятном виде, и
   // заводить по такому ответу правки нельзя: человек прочтёт его текст сам.
-  const findings = scanReviewBlocks(text).findings;
+  const scan = scanReviewBlocks(text);
+  const findings = scan.findings;
   if (!findings) return undefined;
+  // Найденное вне охвата группы (владелец 26.10) правкам не уходит никогда: едет по
+  // связи до доставки, а та называет его в MR «было до группы, не исправлено».
+  const carried: ChatLink = scan.preExisting?.length
+    ? { ...base, preExisting: [...(base.preExisting ?? []), ...scan.preExisting] }
+    : base;
   // Замечаний нет — чинить нечего, но доставлять есть что: работа могла
   // рассчитывать на ревью и не довести ветку до MR.
   if (findings.length === 0) {
     return input.deliver && !input.paused && !deliveredOnce(link, input)
       ? deliverPlan(
           link,
-          base,
+          carried,
           'review',
           contextAfter(scanReviewBlocks(outcome).text),
           sievesFor('deliver'),
@@ -713,6 +813,7 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
   const model = link.workModel ?? link.model;
   const effort = link.workEffort ?? link.effort;
   if (!model) return undefined;
+  const findingsFile = input.findingsFile?.('fix', findings);
 
   return {
     stage: 'fix',
@@ -731,10 +832,13 @@ function planStage(input: CascadeStageInput): CascadeStagePlan | undefined {
       // карточками, а слова ревьюера вокруг блока их только пересказывали — до
       // 24 000 знаков в каждом ходе правок.
       context: stageContextOf(link, groupTask, undefined, files),
+      ...(input.scope ? { scope: input.scope } : {}),
+      ...(link.startSha ? { startSha: link.startSha } : {}),
+      ...(findingsFile ? { findingsFile } : {}),
     }),
     findings,
     link: {
-      ...base,
+      ...carried,
       stage: 'fix',
       model,
       ...(effort ? { effort } : {}),
@@ -757,6 +861,7 @@ function verifyPlan(
   link: ChatLink,
   base: ChatLink,
   context: StageContext,
+  extra: { scope?: GroupScope; proven: readonly string[] },
 ): CascadeStagePlan | undefined {
   const model = link.ceilingModel;
   const findings = link.fixFindings;
@@ -771,6 +876,8 @@ function verifyPlan(
       findings,
       ...(link.branch ? { branch: link.branch } : {}),
       context,
+      ...(extra.scope ? { scope: extra.scope } : {}),
+      ...(extra.proven.length > 0 ? { proven: extra.proven } : {}),
     }),
     link: {
       ...base,

@@ -21,6 +21,13 @@
  *   node <kit>/tools/gate-run.mjs --fresh ...        # rerun gates already green on this tree
  *   node <kit>/tools/gate-run.mjs --cwd services/api --stage 06-gates ...
  *   node <kit>/tools/gate-run.mjs --affected [--base main] "type=pnpm type-check" "always:brand=pnpm brand"
+ *   node <kit>/tools/gate-run.mjs [--tests-cli <path>] "tests=npx vitest run --reporter=default --reporter=junit --outputFile.junit={junit}"
+ *
+ * `{junit}` in a gate: the command writes a JUnit report there and gate-run imports it into the project's
+ * Tests block (`tests-cli import`; `--tests-cli`, AGENTDECK_TESTS_CLI, or the panel checkout this kit ships
+ * in names the CLI), then removes the report. Why: a green vitest gate never reached the block, the delivery
+ * check said «no run since the group started», and the group ran the same tests again through `tests-cli run`.
+ * A gate whose report did not get imported is not memoised: the next run must import it.
  *
  * `--affected`: the positionals are the FULL gate; `affected.mjs` decides whether the change lets the
  * run stay inside the touched zones (their own commands replace the positionals — CI still runs
@@ -32,7 +39,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const LEDGER = join(dirname(fileURLToPath(import.meta.url)), 'ticket-ledger.mjs');
@@ -63,7 +70,7 @@ const CWD = flag('--cwd', '');
 const AFFECTED_MODE = has('--affected');
 
 /** Positionals are the gates; everything consumed by a flag is dropped. */
-const VALUED = new Set(['--ticket', '--stage', '--cwd', '--base']);
+const VALUED = new Set(['--ticket', '--stage', '--cwd', '--base', '--tests-cli']);
 const positional = [];
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -200,9 +207,105 @@ function remember(tree, gate) {
   }
 }
 
-function run(gate) {
+// ---- {junit}: the gate's own report goes into the Tests block ------------------------------------
+const JUNIT_SLOT = '{junit}';
+/** The panel checkout this kit copy ships in (apps/server/assets/kit/agentdeck-kit/tools → repo root). */
+const SHIPPED_TESTS_CLI = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+  '..',
+  '..',
+  '..',
+  'tools',
+  'tests-cli.mjs',
+);
+/** The panel's tests-cli: the flag, else the env the panel or a brief sets, else the checkout this kit ships in. */
+function testsCli() {
+  const named = flag('--tests-cli', '') || process.env.AGENTDECK_TESTS_CLI || '';
+  if (named) return existsSync(named) ? named : null;
+  return existsSync(SHIPPED_TESTS_CLI) ? SHIPPED_TESTS_CLI : null;
+}
+/**
+ * Where a gate writes its report: the git dir when it lies inside the project (git never sees it, and the
+ * import accepts only paths inside the project), else `.agent/tmp/gate-run`. Removed after the import, so
+ * the tree the memo and the Tests block fingerprint is the one the gate ran on.
+ */
+function junitFile(index) {
+  const rel = STATE ? relative(ROOT, STATE) : '..';
+  const dir =
+    rel && !rel.startsWith('..') && !isAbsolute(rel)
+      ? join(STATE, 'junit')
+      : join(ROOT, '.agent', 'tmp', 'gate-run');
+  mkdirSync(dir, { recursive: true });
+  return join(dir, `junit-${process.pid}-${index}.xml`);
+}
+function withJunit(cmd, file) {
+  const p = file.replaceAll('\\', '/');
+  return cmd.replaceAll(JUNIT_SLOT, /\s/.test(p) && !/["']\{junit\}["']/.test(cmd) ? `"${p}"` : p);
+}
+/**
+ * Import the gate's report into the Tests block; false = results did not get there (the gate is not memoised).
+ * `sameTree` = the gate left the tree as it found it: `--tree` records the fingerprint, so a green here
+ * also counts for another group's case with the same automated test on this tree (`sameTreeGreens`).
+ */
+function importJunit(gate, file, sameTree) {
+  try {
+    if (!existsSync(file)) {
+      process.stdout.write(
+        `  junit ${gate.label}: the command wrote no report at {junit} — nothing to import\n`,
+      );
+      return false;
+    }
+    if (!existsSync(join(ROOT, '.agent', 'tests'))) return true; // no Tests block in this project: nothing owed
+    const cli = testsCli();
+    if (!cli) {
+      process.stdout.write(
+        `  junit ${gate.label}: report NOT in the Tests block — no tests-cli found (--tests-cli <path> or AGENTDECK_TESTS_CLI)\n`,
+      );
+      return false;
+    }
+    const r = spawnSync(
+      process.execPath,
+      [
+        cli,
+        'import',
+        '--project',
+        ROOT,
+        '--format',
+        'junit',
+        '--file',
+        file,
+        ...(sameTree ? ['--tree'] : []),
+      ],
+      { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+    );
+    const said = String(r.stdout || '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (r.status !== 0) {
+      const tail = `${r.stdout || ''}${r.stderr || ''}`
+        .split('\n')
+        .filter(Boolean)
+        .slice(-8)
+        .join('\n');
+      process.stdout.write(
+        `  junit ${gate.label}: import into the Tests block failed (exit ${r.status})\n${tail}\n`,
+      );
+      return false;
+    }
+    process.stdout.write(`  junit ${gate.label} → Tests block: ${said.join(' · ')}\n`);
+    return true;
+  } finally {
+    rmSync(file, { force: true });
+  }
+}
+
+function run(gate, cmd = gate.cmd) {
   const started = Date.now();
-  const r = spawnSync(gate.cmd, {
+  const r = spawnSync(cmd, {
     cwd: gate.cwd,
     encoding: 'utf8',
     shell: true,
@@ -238,10 +341,13 @@ for (const gate of gates) {
     continue;
   }
   process.stdout.write(`  … ${gate.label}\n`);
-  const r = run(gate);
+  const report = gate.cmd.includes(JUNIT_SLOT) ? junitFile(results.length) : null;
+  const r = run(gate, report ? withJunit(gate.cmd, report) : gate.cmd);
+  // Before the tree is read again: the import removes the report, so a green run on an unchanged tree is memoised.
+  const imported = report ? importJunit(gate, report, Boolean(tree) && treeKey() === tree) : true;
   if (tree) {
     const after = treeKey();
-    if (r.code === 0 && after === tree) remember(tree, gate);
+    if (r.code === 0 && after === tree && imported) remember(tree, gate);
     tree = after;
   }
   results.push({ label: gate.label, zone: gate.zone, ...r });

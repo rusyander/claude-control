@@ -5,6 +5,7 @@ import type {
   SplitPlanRecord,
 } from '../../../lib/app-store/app-store.types.ts';
 import {
+  groupPointTexts,
   groupTaskKeys,
   moveSplitTasks,
   splitTaskKeys,
@@ -109,6 +110,44 @@ describe('groupTaskKeys', () => {
       ],
     );
     expect(groupTaskKeys(record, record.groups[0]!)).toEqual(['PROJ-1']);
+  });
+});
+
+// g0 26.10 (F3): по этим текстам доставка сверяет цитаты строк `task-N`. Недостающий текст
+// дал бы ложный пробел честной строке, поэтому здесь — всё, откуда группе приходят пункты.
+describe('groupPointTexts', () => {
+  it('задание, бриф, название, общий контекст, заметки всех групп и n/a соседей; свои n/a и пустое — нет', () => {
+    const record = plan(
+      'p',
+      [['PROJ-1 фильтр журнала'], ['PROJ-2 экспорт']],
+      [
+        group(0, {
+          sieveRows: [{ id: 'task-9', status: 'n/a', evidence: 'своя строка n/a' }],
+        }),
+        group(1, {
+          sieveRows: [
+            {
+              id: 'task-1',
+              status: 'n/a',
+              evidence: 'other group: группа 1 — кнопка сброса фильтра',
+            },
+            { id: 'task-2', status: 'pass', evidence: 'сделанный пункт соседа' },
+          ],
+        }),
+      ],
+    );
+    record.proposal.shared = 'Общий контекст плана';
+    record.proposal.groups[0]!.brief = 'Бриф первой группы';
+    record.proposal.groups[1]!.notes = 'Группе 1: проверить права на сброс';
+
+    expect(groupPointTexts(record, record.groups[0]!)).toEqual([
+      'PROJ-1 фильтр журнала',
+      'Бриф первой группы',
+      'Группа 1',
+      'Общий контекст плана',
+      'Группе 1: проверить права на сброс',
+      'other group: группа 1 — кнопка сброса фильтра',
+    ]);
   });
 });
 

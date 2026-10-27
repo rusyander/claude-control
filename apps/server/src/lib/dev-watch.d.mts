@@ -39,6 +39,22 @@ export declare function ledgerBusy(
   read?: (file: string, encoding: 'utf8') => string,
 ): boolean;
 
+/** Ключ пути для сверки: прямые косые, на Windows без учёта регистра. */
+export declare function pathKey(path: string): string;
+
+/** sha1 содержимого, как у mustfail; нет файла — `absent`. */
+export declare function contentSha(path: string): string;
+
+/**
+ * Файлы под `roots`, которые живой прогон mustfail держит сейчас переписанными
+ * (журналы `<stateDir>/journal-<pid>.json`): ключ `pathKey` → отпечаток оригинала.
+ */
+export declare function mutantFiles(
+  stateDir: string,
+  roots: readonly string[],
+  isAlive: (pid: number) => boolean,
+): { unreadable: boolean; files: Map<string, string>; journaled: Map<string, string> };
+
 /** Группа разделения готовит копию (стартовала, чата нет, моложе получаса). */
 export declare function splitSetupRunning(state: unknown, now: number): boolean;
 
@@ -51,6 +67,7 @@ export declare class SourceWatcher {
     onChange: (files: string[]) => void,
     quietMs?: number,
     maxWaitMs?: number,
+    onTouched?: (path: string) => void,
   );
   start(): this;
   close(): void;

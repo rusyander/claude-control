@@ -7,6 +7,7 @@ export const panelActionsGapsEn: Record<keyof typeof panelActionsGapsRu, string>
   request_chat_handoff: 'Ask a chat to close its stage',
   read_model_cascade: 'Model picked per task',
   set_model_cascade: 'Turn model picking on or off',
+  set_review_after_work: 'Turn review after work on or off',
   list_lowered_runs: 'Lowered runs',
   read_split_overlap: 'Split branch overlaps',
   split_accept_group: 'Accept a split group',

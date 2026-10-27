@@ -5,6 +5,7 @@ import { judgePermission } from '../provider-chat/live/permission.ts';
 import { opencodeShellAsk } from '../provider-chat/live/shell-ask.ts';
 import type { LivePermissionPolicy } from '../provider-chat/live/types.ts';
 import { watchOpencodeEvents } from './opencode-events.ts';
+import { toolDenyRules } from './tool-deny.ts';
 
 /**
  * Сессионный режим OpenCode (IDEA-8) — вторая, более богатая форма ассистента
@@ -121,6 +122,12 @@ export interface OpencodeServeDeps {
    * планки сдачи, ни эскалации, ни того, о чём говорили до неё.
    */
   opening?: string;
+  /**
+   * Шаблоны инструментов, снятых у группы (`tool-deny.ts`, P-16): правила `deny` набора
+   * сессии. Набор сессии OpenCode правки только дописывает, поэтому другой набор
+   * шаблонов — новая сессия со вступлением (как смена каталога), а не правка старой.
+   */
+  toolDeny?: readonly string[];
   /**
    * Что ушло в сессию на самом деле — `opening` или `text` (TQ-09): «Что получил
    * агент» пишется этим, а не догадкой вызывающего о том, свежая ли сессия.
@@ -295,7 +302,13 @@ interface OpencodeSession {
   id: string;
   workdir: string | undefined;
   agent: string;
+  /** Снятые шаблоны, с которыми сессия заведена (`denyKey`). */
+  deny: string;
 }
+
+/** Набор шаблонов как ключ сравнения: порядок не важен. */
+const denyKey = (deny: readonly string[] | undefined): string =>
+  JSON.stringify([...(deny ?? [])].sort());
 
 /**
  * Локальный сервер OpenCode: поднимается лениво, живёт до конца процесса панели,
@@ -444,6 +457,8 @@ export class OpencodeServe {
     let session = this.sessions.get(conversationId);
     // Каталог разговора сменили — старая сессия работает в прежнем проекте.
     if (session && session.workdir !== deps.workdir) session = undefined;
+    // Другой набор снятых инструментов — новая сессия: правила старой не отзываются.
+    if (session && session.deny !== denyKey(deps.toolDeny)) session = undefined;
     const fresh = !session;
     if (!session) {
       session = await this.createSession(baseUrl, deps);
@@ -483,13 +498,18 @@ export class OpencodeServe {
     const body = await this.request(
       baseUrl,
       `/session${query}`,
-      { permission: sessionPermissionRules(agent.permission) },
+      {
+        permission: [
+          ...sessionPermissionRules(agent.permission),
+          ...toolDenyRules(deps.toolDeny ?? []),
+        ],
+      },
       deps,
     );
     if (!body || typeof body !== 'object') return undefined;
     const id = (body as { id?: unknown }).id;
     return typeof id === 'string' && id
-      ? { id, workdir: deps.workdir, agent: agent.name }
+      ? { id, workdir: deps.workdir, agent: agent.name, deny: denyKey(deps.toolDeny) }
       : undefined;
   }
 

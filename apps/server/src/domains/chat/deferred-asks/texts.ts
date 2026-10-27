@@ -24,6 +24,21 @@ const UNDRAFT_WHEN_CLEAR =
   'When no item of this work waits for the human any more, take the MR out of draft and finish ' +
   'the delivery.';
 
+/**
+ * Работа без своего MR (ревью отчётом, работа до звена доставки): слово о MR ей
+ * чужое — «снимите черновик и доведите доставку» вело оркестратор ревью к
+ * доставке, которой у него нет (split d9869abf, F1). `mr` решает вызывающий:
+ * MR ведёт только звено доставки (`deferred-wiring.ts`).
+ */
+const FINISH_WHEN_CLEAR =
+  'When no item of this work waits for the human any more, finish the remaining work of this stage.';
+
+const whenClear = (mr: boolean): string => (mr ? UNDRAFT_WHEN_CLEAR : FINISH_WHEN_CLEAR);
+/** Куда назвать то, что осталось заблокированным. */
+const gapPlace = (mr: boolean): string => (mr ? 'the MR description' : 'your report');
+const mentionPlace = (mr: boolean): string =>
+  mr ? 'commits or the MR text' : 'commits or published text';
+
 /** Первый отказ: вызов поставлен человеку. */
 export function deferralDenial(id: string, reason: string): string {
   return (
@@ -128,18 +143,21 @@ function exactCall(record: { toolName: string; input: unknown }): string {
  * Продолжение после «разрешить»: точный вызов знак в знак — новый разговор
  * группы его не помнит, а разрешение сверяется по отпечатку всего входа.
  */
-export function allowResumePrompt(record: {
-  id: string;
-  toolName: string;
-  input: unknown;
-  decidedVia?: DeferredVia;
-}): string {
+export function allowResumePrompt(
+  record: {
+    id: string;
+    toolName: string;
+    input: unknown;
+    decidedVia?: DeferredVia;
+  },
+  mr = true,
+): string {
   const who = record.decidedVia === 'auto' ? PANEL_RECHECK : 'The human allowed';
   return (
     `${who} ${record.id}. Make exactly that call now — tool ${record.toolName} with this ` +
     `input, unchanged (a one-time grant; any other call is not covered):\n${exactCall(record)}\n\n` +
-    'Then continue the remaining work. Do not mention the item in commits or the MR text. ' +
-    UNDRAFT_WHEN_CLEAR
+    `Then continue the remaining work. Do not mention the item in ${mentionPlace(mr)}. ` +
+    whenClear(mr)
   );
 }
 
@@ -158,27 +176,30 @@ function panelRefused(id: string, said: string): string {
 }
 
 /** Продолжение после «разрешить» на ворота ветки: писать в основной копии можно. */
-export function allowMainCopyPrompt(record: { id: string; input: unknown }): string {
+export function allowMainCopyPrompt(record: { id: string; input: unknown }, mr = true): string {
   const path = String((record.input as { path?: unknown } | null)?.path ?? '');
   return (
     `The human allowed ${record.id}: this work may write in the main copy of the project` +
     `${path ? ` (${path})` : ''}. Repeat the write that was refused there, then continue the ` +
-    `remaining work. Do not mention the item in commits or the MR text. ${UNDRAFT_WHEN_CLEAR}`
+    `remaining work. Do not mention the item in ${mentionPlace(mr)}. ${whenClear(mr)}`
   );
 }
 
 /** Продолжение после «запретить», когда группа уже кончила ход ожиданием. */
-export function denyResumePrompt(record: {
-  id: string;
-  message?: string;
-  decidedVia?: DeferredVia;
-}): string {
+export function denyResumePrompt(
+  record: {
+    id: string;
+    message?: string;
+    decidedVia?: DeferredVia;
+  },
+  mr = true,
+): string {
   const said = record.message?.trim() ? `: ${record.message.trim()}` : '';
-  if (record.decidedVia === 'auto') return `${panelRefused(record.id, said)} ${UNDRAFT_WHEN_CLEAR}`;
+  if (record.decidedVia === 'auto') return `${panelRefused(record.id, said)} ${whenClear(mr)}`;
   return (
     `The human refused ${record.id}${said}. Do not make that call and do not work around it. ` +
-    'Finish the work without it; if something stays blocked, name it as a gap in the MR ' +
-    `description in plain words, without the item number. ${UNDRAFT_WHEN_CLEAR}`
+    `Finish the work without it; if something stays blocked, name it as a gap in ${gapPlace(mr)} ` +
+    `in plain words, without the item number. ${whenClear(mr)}`
   );
 }
 
@@ -187,12 +208,12 @@ export function denyResumePrompt(record: {
  * стояла бы ожиданием записи, которой уже нет (D-L12). Отличается от отказа:
  * человек НЕ сказал «нет», он просто не ответил.
  */
-export function expiredResumePrompt(record: { id: string }): string {
+export function expiredResumePrompt(record: { id: string }, mr = true): string {
   return (
     `${record.id} expired without an answer from the human, and nothing of this work waits for ` +
     'the human any more. Do not make that call and do not work around it. Finish the work ' +
-    'without it and name what stays blocked in the MR description in plain words, without the ' +
-    `item number. ${UNDRAFT_WHEN_CLEAR}`
+    `without it and name what stays blocked in ${gapPlace(mr)} in plain words, without the ` +
+    `item number. ${whenClear(mr)}`
   );
 }
 
@@ -202,13 +223,13 @@ export function expiredResumePrompt(record: { id: string }): string {
  * Говорить «человек не ответил» тут нельзя — он ответил; поэтому слово своё
  * (живой прогон R8.3): вызов сейчас не делать, нужен — спросить заново.
  */
-export function lapsedGrantPrompt(record: { id: string }): string {
+export function lapsedGrantPrompt(record: { id: string }, mr = true): string {
   return (
     `The one-time grant for ${record.id} lapsed before this work used it, and nothing of this ` +
     'work waits for the human any more. Do not make that call under the old grant. If the work ' +
     'still needs it, make the call once more — it goes to the human as a fresh item; otherwise ' +
-    'finish the work without it and name what stays blocked in the MR description in plain ' +
-    `words, without the item number. ${UNDRAFT_WHEN_CLEAR}`
+    `finish the work without it and name what stays blocked in ${gapPlace(mr)} in plain ` +
+    `words, without the item number. ${whenClear(mr)}`
   );
 }
 
@@ -229,12 +250,12 @@ export interface OutcomeItem {
 const isLapsedGrant = (item: OutcomeItem): boolean =>
   item.state === 'expired' && item.grantUntil !== undefined;
 
-function singleOutcome(item: OutcomeItem): string {
+function singleOutcome(item: OutcomeItem, mr: boolean): string {
   if (item.state === 'allowed') {
-    return item.kind === 'branchGate' ? allowMainCopyPrompt(item) : allowResumePrompt(item);
+    return item.kind === 'branchGate' ? allowMainCopyPrompt(item, mr) : allowResumePrompt(item, mr);
   }
-  if (item.state === 'denied') return denyResumePrompt(item);
-  return isLapsedGrant(item) ? lapsedGrantPrompt(item) : expiredResumePrompt(item);
+  if (item.state === 'denied') return denyResumePrompt(item, mr);
+  return isLapsedGrant(item) ? lapsedGrantPrompt(item, mr) : expiredResumePrompt(item, mr);
 }
 
 function outcomeLine(item: OutcomeItem): string {
@@ -279,22 +300,31 @@ function outcomeLine(item: OutcomeItem): string {
  * каждое слово уверяло, что ждать больше нечего (RF-DL-03, RF-DL-16).
  *
  * Один исход и больше ничего не ждёт — прежний текст этого исхода, знак в знак.
+ * `mr` — у работы есть свой MR (звено доставки); нет — слово о черновике и
+ * описании MR ей не говорится (F1, d9869abf).
  */
-export function outcomesPrompt(items: readonly OutcomeItem[], waiting: readonly string[]): string {
+export function outcomesPrompt(
+  items: readonly OutcomeItem[],
+  waiting: readonly string[],
+  mr = true,
+): string {
   const [first] = items;
   if (first && items.length === 1 && (first.state !== 'expired' || waiting.length === 0)) {
-    return singleOutcome(first);
+    return singleOutcome(first, mr);
   }
+  const draft = mr ? ' — keep the MR a draft while they wait' : '';
+  const clear = mr
+    ? 'take the MR out of draft and finish the delivery.'
+    : 'finish the remaining work of this stage.';
   const tail =
     waiting.length > 0
-      ? `Still waiting for the human: ${waiting.join(', ')} — keep the MR a draft while they wait.`
-      : 'Nothing of this work waits for the human any more: take the MR out of draft and finish ' +
-        'the delivery.';
+      ? `Still waiting for the human: ${waiting.join(', ')}${draft}.`
+      : `Nothing of this work waits for the human any more: ${clear}`;
   return (
     `The panel has the human's answers on items of this work:\n${items.map(outcomeLine).join('\n')}\n\n` +
     'Then continue the remaining work. Finish without what was refused or expired and name what ' +
-    'stays blocked in the MR description in plain words, without item numbers. Do not mention the ' +
-    `items in commits or the MR text. ${tail}`
+    `stays blocked in ${gapPlace(mr)} in plain words, without item numbers. Do not mention the ` +
+    `items in ${mentionPlace(mr)}. ${tail}`
   );
 }
 

@@ -12,6 +12,7 @@
 // the CLI. Gemini, Goose, Kimi and OpenCode reach the kit only through a hook config installed by
 // hand (`variants/<cli>/`); `DIALECT_TOOLS` maps their tool names and inputs the same way.
 // `AGENTDECK_KIT_CLI` (any of KIT_CLIS; `run.mjs --cli=<name>` sets it) overrides detection.
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   mkdirSync,
@@ -305,6 +306,17 @@ function logPath(input) {
   const dir = key && stateDir('sessions');
   return dir ? join(dir, `${key}.jsonl`) : null;
 }
+
+/**
+ * One call's identity in the session log: tool + its input, as normalized. The pre hook logs a call
+ * under it, the post hook logs `ran` under the same key — a call whose `ran` never came was blocked
+ * after the kit let it through (the user, the CLI's own rules, another hook).
+ */
+export const callKey = (call) =>
+  createHash('sha1')
+    .update(`${call?.tool_name ?? ''}|${JSON.stringify(call?.tool_input ?? {})}`)
+    .digest('hex')
+    .slice(0, 16);
 
 /** Append one `{kind:'prompt'|'refusal', ...}` event; never throws. */
 export function logSessionEvent(input, event) {

@@ -143,7 +143,8 @@ describe('доставка: свежесть отчёта и прогоны бл
       WORK,
     );
     createGroup(work, 'page');
-    caseId = upsertCase(work, 'page', { title: 'Фокус' }, WORK).id;
+    // Браузерный кейс: живое сито доказывает только прогон кейса с живой меткой (N3).
+    caseId = upsertCase(work, 'page', { title: 'Фокус', tags: ['browser'] }, WORK).id;
     return work;
   }
 

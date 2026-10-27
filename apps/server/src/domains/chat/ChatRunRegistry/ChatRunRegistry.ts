@@ -15,6 +15,7 @@ import {
 } from '../ChatRunner/ChatRunner.ts';
 import { DetachedRun, type DetachedRunDeps } from '../detached-run/detached-run.ts';
 import { LiveSessionPool } from '../live-session/live-session.ts';
+import type { ControlReply } from '../live-session/control-requests.ts';
 import { withChildrenBrief } from '../children-brief/children-brief.ts';
 import { withoutMcp, type GroupRunProfile } from '../group-profile/group-profile.ts';
 import { capKitToRoute, capProfileToRoute } from './route-caps.ts';
@@ -54,12 +55,8 @@ import {
   ledgerRunOptions,
   reattachSession,
 } from '../run-reattach.ts';
-import {
-  AUTONOMOUS_ENV,
-  pickRecommended,
-  type RecommendedPick,
-} from '@agentdeck/contracts/chat-group-settings';
-import { confirmedPicks } from '../auto-pick/auto-pick.ts';
+import { AUTONOMOUS_ENV, type RecommendedPick } from '@agentdeck/contracts/chat-group-settings';
+import { confirmedPicks, recommendedPicks } from '../auto-pick/auto-pick.ts';
 import { planAnswers } from '../group-questions/group-questions.ts';
 import { withAutonomy } from '../chat-autonomy/chat-autonomy.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
@@ -70,6 +67,7 @@ import {
   withoutProjectSource,
 } from '../../local-layer/local-layer.ts';
 import type { LayerRunExtras } from '../../local-layer/local-layer.types.ts';
+import { firstQuestionOf } from '../../notify/telegram-text.ts';
 
 /**
  * Реестр прогонов Claude Code, отвязанный от HTTP-запроса.
@@ -97,6 +95,14 @@ export interface RunNotice {
   projectPath?: string;
   /** Инструмент, который просит разрешения, — только у `permission`. */
   toolName?: string;
+  /** Текст первого вопроса — только у `question`; Telegram пропускает его через маску. */
+  question?: string;
+  /** Текст последней ошибки — только у `error`; наружу идёт лишь её класс. */
+  errorText?: string;
+  /** Сколько шёл ход, мс — у `done` и `error`: «Закончил» уходит только после долгой работы. */
+  durationMs?: number;
+  /** Сессия терминала или VS Code (не прогон панели): ответ на уведомление — через хук. */
+  outside?: boolean;
 }
 
 /**
@@ -116,6 +122,12 @@ export interface RunFinished {
    * хвост в 24k нёс пересказ по ходу работы и блоки сит (группа 1, 25.10).
    */
   answer?: string;
+  /**
+   * Итог звена, когда хук Stop отбивал конец хода: ответ до ПЕРВОГО замечания хука.
+   * Ответ на замечание («страницы трогать не нужно…») — хвост, а не итог: следующее
+   * звено получало его вместо сводки и восстанавливало её по git (g5 25.10, P1).
+   */
+  summary?: string;
   /** Прогон закончился без ошибки (лимит и остановка тоже приходят ошибкой). */
   ok: boolean;
   startedAt: number;
@@ -262,6 +274,10 @@ export interface RunLike {
   readonly lostBackground?: boolean;
   /** Сообщение человека посреди хода — агенту сразу; `false` — не вышло. */
   steer?(prompt: string): boolean;
+  /** Остановить субагента хода управляющим запросом в stdin CLI. */
+  stopTask?(taskId: string): Promise<ControlReply>;
+  /** Живая сессия слушает stdin — управляющий запрос дойдёт. */
+  readonly controllable?: boolean;
 }
 
 type RunFactory = () => RunLike;
@@ -317,6 +333,11 @@ interface RegisteredRun {
   text: string;
   /** Текст после последнего вызова инструмента — итог хода (см. `RunFinished.answer`). */
   answer?: string;
+  /**
+   * Итог хода до ПЕРВОГО замечания хука Stop (`RunFinished.summary`): `undefined` —
+   * хук ход не отбивал. Строка (и пустая) — отбивал, дальше замечания не трогают.
+   */
+  summary?: string;
   events: BufferedEvent[];
   /** Размер буфера в байтах (JSON кадров) — для предела `MAX_BUFFERED_BYTES`. */
   eventBytes: number;
@@ -637,7 +658,7 @@ export class ChatRunRegistry {
    * Записать прогон в журнал лимита — посреди него (новый замер) и на конце.
    * Ключ записи один на прогон, журнал заменяет прежнюю: конец не плодит вторую.
    */
-  private writeLimitJournal(run: RegisteredRun, endedAt: number): void {
+  private writeLimitJournal(run: RegisteredRun, endedAt: number, open = false): void {
     const samples = run.limitSamples ?? [];
     if (!this.limitJournal || run.detached || (run.spentTokens <= 0 && samples.length === 0)) {
       return;
@@ -651,6 +672,7 @@ export class ChatRunRegistry {
         endedAt,
         tokens: run.spentTokens,
         samples,
+        ...(open ? { open: true as const } : {}),
       });
     } catch {
       // Молча, как журнал понижений: наблюдение не держит прогон.
@@ -662,7 +684,7 @@ export class ChatRunRegistry {
     for (const run of this.runs.values()) {
       if (run.status !== 'running' || !run.limitSamples?.length) continue;
       run.limitJournalAt = now;
-      this.writeLimitJournal(run, now);
+      this.writeLimitJournal(run, now, true);
     }
   }
 
@@ -1546,6 +1568,27 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Сколько субагентов (`local_agent`) держит живой процесс разговора между ходами.
+   * Слово панели этому разговору ждёт их конца: продолжение с другой подписью
+   * закрыло бы процесс, а с ним и агентов, — оркестратор ревью с шестью полосами
+   * потерял их от одного «отказано» (split d9869abf, F1). Фоновые команды
+   * (`local_bash`, стенд) не держат: живут часами, а слово в тот же процесс их не
+   * трогает. Усыновлённая после перезапуска сессия знает только число задач —
+   * их тип неизвестен, и они считаются агентами: потерять их дороже, чем подождать.
+   */
+  liveAgentsOf(chatId: string): number {
+    for (const id of this.liveSessionIdsOf(chatId)) {
+      const session = this.livePool.waking(id);
+      if (!session?.alive || !session.hasBackgroundWork) continue;
+      const list = session.backgroundList;
+      if (list.length === 0) return session.backgroundCount;
+      const agents = list.filter((task) => task.type === 'local_agent').length;
+      if (agents > 0) return agents;
+    }
+    return 0;
+  }
+
+  /**
    * Ждущий следующего хода процесс разговора с идущим фоном — снимком, которым
    * его продолжить (пауза дерева, 23.10): хода нет, а конец фона разбудил бы CLI.
    * Идёт ход или фона нет — `undefined`: первое снимает `stop`, второе само не
@@ -1593,6 +1636,32 @@ export class ChatRunRegistry {
       else if (closed === 'stopped' && outcome === 'absent') outcome = 'stopped';
     }
     return outcome;
+  }
+
+  /**
+   * Живой процесс разговора, которому можно написать управляющий запрос: сессия
+   * идущего хода, иначе ждущая следующего (фоновый субагент между ходами).
+   */
+  private controlTarget(chatId: string): Pick<RunLike, 'stopTask'> | undefined {
+    const run = this.runs.get(this.resolveKey(chatId, chatId));
+    if (run?.status === 'running' && run.run.controllable) return run.run;
+    for (const id of this.liveSessionIdsOf(chatId)) {
+      const session = this.livePool.waking(id);
+      if (session?.controllable) return { stopTask: (taskId) => session.stopTask(taskId) };
+    }
+    return undefined;
+  }
+
+  /** Есть кому послать `stop_task` — кнопка «Остановить» у субагентов. */
+  canStopSubagents(chatId: string): boolean {
+    return this.controlTarget(chatId) !== undefined;
+  }
+
+  /** Остановить субагента разговора (как «Stop agent» расширения VS Code). */
+  async stopSubagent(chatId: string, agentId: string): Promise<ControlReply | 'absent'> {
+    const target = this.controlTarget(chatId);
+    if (!target?.stopTask) return 'absent';
+    return target.stopTask(agentId);
   }
 
   private killSession(sessionId: string): StopOutcome {
@@ -1750,6 +1819,8 @@ export class ChatRunRegistry {
       kind: 'start',
       sessionId: meta.sessionId,
       cwd: kept.cwd,
+      // Длина вводной, ушедшей в CLI (R37): сборка панели — вводная, правила, сводка детей.
+      ...(typeof kept.prompt === 'string' ? { promptChars: kept.prompt.length } : {}),
       // Ответвление тёплой сессии: сторожу R2 нужен конец её последнего вызова.
       ...(options.fork && options.sessionId ? { forkOf: options.sessionId } : {}),
     });
@@ -2078,7 +2149,13 @@ export class ChatRunRegistry {
    */
   private raiseQuestion(run: RegisteredRun, event: ChatEvent): void {
     run.asked = true;
-    this.notify?.({ kind: 'question', chatId: run.chatId, projectPath: run.meta.projectPath });
+    const question = event.kind === 'tool' ? firstQuestionOf(event.input) : undefined;
+    this.notify?.({
+      kind: 'question',
+      chatId: run.chatId,
+      projectPath: run.meta.projectPath,
+      ...(question ? { question } : {}),
+    });
     try {
       this.onAsk?.(run.sessionId ? [run.chatId, run.sessionId] : [run.chatId], event);
     } catch {
@@ -2092,8 +2169,15 @@ export class ChatRunRegistry {
       const sessionId = event.kind === 'session' ? event.sessionId : run.sessionId;
       this.feedWatch(run.chatId, { kind: 'event', event, sessionId });
     }
-    // Сжатие окна (R3) и повтор запроса к модели (R30) — только сторожу, в ленту не идут.
-    if (event.kind === 'compact' || event.kind === 'apiRetry') return;
+    // Сжатие окна (R3), повтор запроса к модели (R30) и конец фоновой задачи (R16) — только
+    // сторожу, в ленту не идут.
+    if (event.kind === 'compact' || event.kind === 'apiRetry' || event.kind === 'bgDone') return;
+    // Хук Stop отбил конец хода: итог звена — ответ до ПЕРВОГО замечания (P1), ответ на
+    // замечание его не заменяет. Вкладкам событие не нужно.
+    if (event.kind === 'stopFeedback') {
+      run.summary ??= run.answer ?? '';
+      return;
+    }
     // Внутреннее событие: вкладкам и буферу его знать незачем.
     if (event.kind === 'toolResult') {
       run.toolResults = (run.toolResults ?? 0) + 1;
@@ -2143,7 +2227,7 @@ export class ChatRunRegistry {
       const now = Date.now();
       if (run.limitJournalAt === undefined || now - run.limitJournalAt >= LIMIT_JOURNAL_EVERY_MS) {
         run.limitJournalAt = now;
-        this.writeLimitJournal(run, now);
+        this.writeLimitJournal(run, now, true);
       }
     }
     // Вопрос, который автономия закроет сама (есть рекомендация на каждый), —
@@ -2160,7 +2244,7 @@ export class ChatRunRegistry {
     const expectedPick =
       isAsk &&
       (((this.autonomousOf?.(askKeys) === true || run.options.env?.[AUTONOMOUS_ENV] === '1') &&
-        pickRecommended(event.input) !== null) ||
+        recommendedPicks(event.input) !== null) ||
         (this.answersByPlanFor(askKeys) && planAnswers(event.input) !== null));
     if (event.kind === 'tool' && event.name === 'AskUserQuestion') {
       if (event.id) (run.askInputs ??= new Map()).set(event.id, event.input);
@@ -2267,7 +2351,13 @@ export class ChatRunRegistry {
       });
     }
     if (event.kind === 'tool' && event.name === 'AskUserQuestion' && !expectedPick) {
-      this.notify?.({ kind: 'question', chatId: run.chatId, projectPath: run.meta.projectPath });
+      const question = firstQuestionOf(event.input);
+      this.notify?.({
+        kind: 'question',
+        chatId: run.chatId,
+        projectPath: run.meta.projectPath,
+        ...(question ? { question } : {}),
+      });
     }
     if (
       this.onAsk &&
@@ -2407,6 +2497,8 @@ export class ChatRunRegistry {
     const text = run.detached ? (closing?.text ?? '') : (closing?.text ?? run.text);
     // Закрывающий ход из транскрипта — уже итог; иначе — текст после последнего инструмента.
     const answer = closing?.text ?? run.answer ?? '';
+    // Итог до первого замечания хука Stop: живой поток знает его сам, усыновлённый — из транскрипта.
+    const summary = run.summary?.trim() ? run.summary : (closing?.summary ?? '');
     // Ожидаемый автовыбор так и не пришёл до конца хода — вопрос висит.
     const asked = run.asked || Boolean(closing?.asked) || (run.expectedPicks?.size ?? 0) > 0;
     // Закрывающего хода нет — процесс умер посреди него. Раньше здесь молчали,
@@ -2435,6 +2527,7 @@ export class ChatRunRegistry {
           projectPath: run.meta.projectPath,
           text,
           ...(answer.trim() ? { answer } : {}),
+          ...(summary.trim() ? { summary } : {}),
           ok: !run.errored,
           startedAt: run.startedAt,
           options: run.options,
@@ -2490,6 +2583,8 @@ export class ChatRunRegistry {
       kind: run.errored ? 'error' : 'done',
       chatId: run.chatId,
       projectPath: run.meta.projectPath,
+      ...(run.errored && run.lastError ? { errorText: run.lastError } : {}),
+      durationMs: Math.max(0, (run.finishedAt ?? Date.now()) - run.startedAt),
     });
     // Закрываем текущих слушателей, но буфер держим ещё минуту — вдруг клиент
     // переподключается и хочет догнать хвост с терминальным событием.
@@ -2615,6 +2710,9 @@ export class ChatRunRegistry {
     }
     if (run.status === 'running') {
       run.status = 'stopped';
+      // Конец прогона в журнал лимита: `finish` остановленного уже не запишет, и в
+      // журнале осталась бы запись посреди хода — без хвоста токенов, с `open`.
+      this.writeLimitJournal(run, Date.now());
       // Конец хода сторожу: `finish` остановленного прогона уже ничего не скажет.
       this.feedWatch(run.chatId, { kind: 'finish', sessionId: run.sessionId });
     }

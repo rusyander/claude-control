@@ -232,7 +232,10 @@ describe('пробелы хода агента', () => {
     expect(gap).toContain('record --project "/p" auth:auth-002=passed');
     expect(deferred(cases, [], ['src/billing/pay.ts']).join('\n')).toContain('no case covers');
     const red = run('2026-10-15T10:06:00.000Z', [['auth-001', 'failed']]);
-    expect(deferred([cases[0]!], [red], ['src/auth/a.ts']).join('\n')).toContain('red this turn');
+    const redLine = deferred([cases[0]!], [red], ['src/auth/a.ts']).join('\n');
+    expect(redLine).toContain('red this turn');
+    // #g0:110: красное «не её» группа доказывает прогоном на развилке — команда в строке.
+    expect(redLine).toContain('run --project "/p" --case auth:auth-001 --base');
   });
 
   it('ход группы: держат другие пробелы — точная команда её автокейсов; одни автокейсы ход не держат', () => {
@@ -292,9 +295,10 @@ describe('пробелы хода агента', () => {
 
   it('красное за ход — пробел; в карантине — нет', () => {
     const red = run('2026-10-15T10:06:00.000Z', [['auth-001', 'failed']]);
-    expect(judge([auto('auth-001', ['src/auth'])], [red], ['src/auth/a.ts']).join('\n')).toContain(
-      'red this turn',
-    );
+    const chat = judge([auto('auth-001', ['src/auth'])], [red], ['src/auth/a.ts']).join('\n');
+    expect(chat).toContain('red this turn');
+    // Ход чата: развилки с основной у него может не быть — довода «не моё» не предлагают.
+    expect(chat).not.toContain('--base');
     const muted = auto('auth-001', ['src/auth']);
     muted.muted = true;
     expect(judge([muted], [red], ['src/auth/a.ts']).join('\n')).not.toContain('red this turn');

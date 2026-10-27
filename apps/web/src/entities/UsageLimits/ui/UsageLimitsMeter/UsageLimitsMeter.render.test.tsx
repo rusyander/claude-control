@@ -45,12 +45,17 @@ describe('блок лимитов подписки', () => {
   it('три окна: подпись, процент как у сервера, сброс, полоса по проценту', () => {
     const html = render(ok);
     expect(html).toContain('data-usage-limits');
-    expect(html).toContain('Сессия (5 ч)');
+    // Длина окна сессии в подписи не нужна (владелец 27.10): «Сессия», без «(5 ч)».
+    expect(html).toContain('>Сессия<');
+    expect(html).not.toContain('(5 ч)');
     expect(html).toContain('Неделя · Opus');
     expect(html).toContain('>68%<');
     expect(html).not.toContain('68.000');
     expect(html).toContain('>42.137%<');
-    expect(html).toContain('сброс 20:10');
+    // Сколько осталось до сброса, а не его час (владелец 27.10): 15:00 → 20:10 и → чт 09:00.
+    expect(html).toContain('сброс через 5 ч 10 мин');
+    expect(html).toContain('сброс через 3 д 18 ч');
+    expect(html).not.toContain('сброс 20:10');
     expect(html).toContain('width:68%');
     expect(html.match(/role="meter"/g)).toHaveLength(3);
     expect(html).toContain('aria-valuenow="68"');

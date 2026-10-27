@@ -50,6 +50,16 @@ const STATES = {
     devices: ['emulator-5554'],
   },
   noAdb: { ...base, state: 'succeeded', file: FILE, adbMissing: true },
+  cancelled: {
+    ...base,
+    state: 'cancelled',
+    startedAt: '2026-10-11T12:56:52.764Z',
+    finishedAt: '2026-10-11T12:58:00.000Z',
+    log: [
+      ...LOG,
+      'Сборка отменена. Промежуточные файлы уберёт следующая сборка или pnpm mobile:clean.',
+    ],
+  },
 };
 const COMMAND = 'node "C:/repo/outside-relay-hook.mjs" --url http://127.0.0.1:5178';
 
@@ -57,6 +67,9 @@ let apk = STATES.idle;
 let relay = { enabled: true, installed: false, shortTimeout: false, command: COMMAND };
 let buildBusy = false;
 let built = 0;
+let cancels = 0;
+/** Сборка кончилась между опросом и нажатием: отмена отвечает 409, а опрос — итогом. */
+let cancelLate;
 let installBody;
 let relayPatch;
 
@@ -78,6 +91,15 @@ await page.route('**/api/mobile/apk/build', (route) => {
   built += 1;
   if (buildBusy) return route.fulfill({ status: 409, json: { error: 'busy' } });
   apk = STATES.building;
+  return route.fulfill({ json: apk });
+});
+await page.route('**/api/mobile/apk/cancel', (route) => {
+  cancels += 1;
+  if (cancelLate) {
+    apk = cancelLate;
+    return route.fulfill({ status: 409, json: { error: 'idle' } });
+  }
+  apk = STATES.cancelled;
   return route.fulfill({ json: apk });
 });
 await page.route('**/api/mobile/apk/install', (route) => {
@@ -110,6 +132,10 @@ check(
 );
 check((await page.getByText('не собиралось').count()) === 1, 'бейдж «не собиралось»');
 check((await page.getByText('Скачать APK').count()) === 0, 'без файла ссылки на скачивание нет');
+check(
+  (await page.getByRole('button', { name: 'Отменить сборку' }).count()) === 0,
+  'не собирается — кнопки отмены нет',
+);
 await page.getByRole('button', { name: 'Собрать APK' }).click();
 await page.getByText('собирается').first().waitFor({ timeout: 5000 });
 check(built === 1, 'клик шлёт POST /mobile/apk/build', `вызовов: ${built}`);
@@ -133,6 +159,41 @@ check(
   'последняя строка вывода на месте',
 );
 await shot('building');
+
+// 2a. Отмена: кнопка есть только пока собирается; клик — POST, бейдж «отменена», сборка снова открыта.
+const cancelButton = page.getByRole('button', { name: 'Отменить сборку' });
+check((await cancelButton.count()) === 1, 'пока собирается — кнопка «Отменить сборку»');
+await cancelButton.click();
+await page.getByText('отменена', { exact: true }).first().waitFor({ timeout: 5000 });
+check(cancels === 1, 'клик шлёт POST /mobile/apk/cancel', `вызовов: ${cancels}`);
+check((await cancelButton.count()) === 0, 'отменена: кнопки отмены больше нет');
+check(
+  !(await page.getByRole('button', { name: 'Собрать APK' }).isDisabled()),
+  'отменена: «Собрать APK» снова доступна',
+);
+// Вывод — один <pre> на все строки: последняя строка его текста и есть строка об отмене.
+const lastLogLine = ((await log.textContent()) ?? '').split('\n').at(-1) ?? '';
+check(
+  lastLogLine.startsWith('Сборка отменена.'),
+  'отменена: строка об отмене в выводе',
+  lastLogLine,
+);
+await shot('cancelled');
+
+// 2b. Отмена опоздала (сборка кончилась между опросом и нажатием): 409 — карточка сразу с итогом.
+cancelLate = STATES.ready;
+await open(STATES.building);
+await page.getByRole('button', { name: 'Отменить сборку' }).click();
+await page.getByText('собрано', { exact: true }).first().waitFor({ timeout: 5000 });
+check(
+  (await page.getByRole('button', { name: 'Отменить сборку' }).count()) === 0,
+  'опоздавшая отмена (409): карточка показывает готовую сборку',
+);
+check(
+  (await page.getByText(/409|idle|Request failed/i).count()) === 0,
+  'опоздавшая отмена: тоста-ошибки нет',
+);
+cancelLate = undefined;
 
 // 3. Упала.
 await open(STATES.failed);

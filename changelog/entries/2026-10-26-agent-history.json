@@ -1,0 +1,68 @@
+{
+  "title": {
+    "ru": "«История агентов» на карточке группы: все сессии, ход главного агента целиком, странности и кто работает сейчас",
+    "en": "«Agent history» on the group card: every session, the main agent's whole turn, anomalies and who is working now"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "На карточке группы появилась кнопка «История агентов · N». Она открывает все сессии разговора новыми первыми, у группы — каждое звено со стадией, с главным агентом и субагентами каждой сессии. Раньше карточка показывала только субагентов текущей сессии, а работа прошлых звеньев не была видна.",
+        "en": "The group card has an «Agent history · N» button. It opens every session of the conversation, newest first: for a group, each link with its stage, the main agent and the subagents of each session. The card used to show only the current session's subagents, so earlier links' work was not visible."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["agent-history-before.png", "agent-history-card.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Главный агент каждой сессии открывается так же, как субагент. Ход читается из файла целиком и листается окнами по 200 шагов с точным «Шаги a–b из M». У каждого вызова показаны время, длительность, полный размер результата, ошибка или отказ хука с причиной, а у первого шага ответа — расход токенов и модель.",
+        "en": "Each session's main agent opens the same way as a subagent. Its turn is read from the whole file and paged in windows of 200 steps with an exact «Steps a–b of M». Each call shows its time, duration, full result size, an error or a hook denial with its reason, and the first step of an answer shows its token spend and model."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["agent-history-main.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Под каждым агентом строкой выводятся странности: отказы хуков, ошибки, повторные чтения одного файла и результаты длиннее 10 000 символов. По этой строке видно, где агент тратит ходы и контекст.",
+        "en": "A line under each agent lists anomalies: hook denials, errors, repeated reads of one file and results longer than 10,000 characters. It shows where the agent spends turns and context."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Рядом с кнопкой показано, кто работает сейчас: «сейчас: 1 агент · 2 субагента» или «никто не работает». Субагент без итога, который молчит дольше 15 минут, считается оборванным и в число не входит. Числа панель считает по файлам транскриптов, без вызова модели.",
+        "en": "Next to the button the panel shows who is working now: «now: 1 agent · 2 subagents» or «nobody is working». A subagent with no result that has been silent for more than 15 minutes counts as cut off and is left out. The panel counts this from the transcript files, without calling a model."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    }
+  ],
+  "images": [
+    {
+      "file": "agent-history-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Карточка группы: только субагенты текущей сессии",
+        "en": "Group card: only the current session's subagents"
+      }
+    },
+    {
+      "file": "agent-history-card.png",
+      "role": "after",
+      "caption": {
+        "ru": "Кнопка «История агентов · 7» и «сейчас: 1 агент · 1 субагент»",
+        "en": "The «Agent history · 7» button and «now: 1 agent · 1 subagent»"
+      }
+    },
+    {
+      "file": "agent-history-main.png",
+      "role": "after",
+      "caption": {
+        "ru": "Ход главного агента: длительность, размер результата, отказ хука с причиной",
+        "en": "The main agent's turn: duration, result size, a hook denial with its reason"
+      }
+    }
+  ]
+}

@@ -59,7 +59,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/chat/lowered-runs': 'action:list_lowered_runs',
   // «Что получил агент» (U8): кнопка карточки группы; агенту панели пока не нужна.
   'GET /api/chat/:chatId/received': 'gap:P3',
-  'PUT /api/chat/cascade': 'action:set_model_cascade',
+  'PUT /api/chat/cascade': 'action:set_model_cascade,set_review_after_work',
   // chat/cli-routes.ts
   'GET /api/chat/cli': 'action:cli_version',
   'POST /api/chat/cli/update': 'action:update_cli',
@@ -67,6 +67,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/chat/:chatId/group-settings': 'action:set_chat_group',
   'GET /api/chat/escalations': 'action:list_waiting',
   'GET /api/chat/watch-signals': 'gap:P3',
+  // Охват сторожа групп — строка карточки настроек.
+  'GET /api/group-watch/coverage': 'gap:P3',
   'POST /api/chat/:chatId/escalations/read': 'internal:ui-state',
   'PUT /api/chat/:chatId/group-settings': 'action:set_chat_group',
   // chat/handoff-routes.ts
@@ -105,9 +107,13 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/split/:parent/start-now': 'human:split-apply',
   'POST /api/chat/split/:parent/restart-group': 'human:split-apply',
   'POST /api/chat/split/:parent/drop-group': 'human:split-apply',
-  'POST /api/chat/split/:parent/continue-group': 'human:split-apply',
-  // Группа отвечает ревьюеру в MR и отправляет ветку — наружу.
-  'POST /api/chat/split/:parent/recheck': 'human:outward',
+  // Решение владельца 25.10: «Продолжить» сдавшуюся группу агент жмёт сам, как
+  // паузу и продолжение с паузы, — группы доходят до MR без человека.
+  'POST /api/chat/split/:parent/continue-group': 'action:split_control',
+  // Решение владельца 26.10: «Перепроверить MR» доставленной группы жмёт и
+  // наблюдатель групп, как паузу и продолжение, — не решение человека. Действия
+  // агента панели для неё ещё нет.
+  'POST /api/chat/split/:parent/recheck': 'gap:P3',
   // chat/split-routes.ts
   'GET /api/chat/split/:parent/overlap': 'action:read_split_overlap',
   'GET /api/chat/split/request': 'action:request_split',
@@ -123,6 +129,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/split/:parent/tickets/file': 'human:outward',
   // chat/split-ticket-batch-routes.ts: «Разобрать…» — публикация в Jira разом и «Решить здесь»
   'GET /api/chat/split/:parent/tickets/target': 'human:outward',
+  'GET /api/chat/split/:parent/tickets/duplicates': 'human:outward',
   'POST /api/chat/split/:parent/tickets/publish': 'human:outward',
   'POST /api/chat/split/:parent/tickets/take': 'human:split-apply',
   'GET /api/chat/split/:parent/tasks': 'human:outward',
@@ -180,6 +187,13 @@ export const ROUTE_LEDGER: RouteLedger = {
   // Выгрузка разговора файлом — кнопка человека «Экспортировать» (D2, U5c).
   'GET /api/chat/:chatId/export': 'human:download',
   'GET /api/chat/:chatId/progress': 'action:read_chat',
+  // chat/subagent-routes — дерево агентов: ход субагента, скиллы/хуки/MCP, остановка одного.
+  'GET /api/chat/:chatId/agents/:agentId': 'gap:P3',
+  'GET /api/chat/:chatId/extensions': 'gap:P3',
+  'GET /api/chat/:chatId/agents/:agentId/extensions': 'gap:P3',
+  'POST /api/chat/:chatId/agents/:agentId/stop': 'gap:P3',
+  'GET /api/chat/:chatId/agent-history': 'gap:P3',
+  'GET /api/chat/:chatId/main-agent': 'gap:P3',
   'GET /api/chat/search': 'action:search_chats',
   'GET /api/chats': 'action:list_chats',
   'GET /api/chats/:chatId/messages': 'action:read_chat',
@@ -341,11 +355,20 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/integrations/telegram/answers': 'human:secret',
   'PUT /api/integrations/telegram/answers': 'human:secret',
   'POST /api/integrations/telegram/answers/restart': 'human:secret',
+  // Подключение по /start: подтверждение назначает чат уведомлений и владельца ответов.
+  'GET /api/integrations/telegram/connect': 'human:secret',
+  'POST /api/integrations/telegram/connect': 'human:secret',
+  'POST /api/integrations/telegram/connect/cancel': 'human:secret',
+  'POST /api/integrations/telegram/connect/confirm': 'human:secret',
   'POST /api/integrations/tms/pull': 'human:outward',
   'POST /api/integrations/tms/push': 'human:outward',
   'POST /api/integrations/webhook/test': 'human:outward',
+  // integrations/forge-mr-routes.ts — живое MR для `tests-cli delivery` в копии группы.
+  'GET /api/integrations/forge/mr-review': 'internal:callback',
   // integrations/jira-routes.ts
   'GET /api/integrations/jira/issue/:key': 'action:jira_issue',
+  // Комментарии задачи для `tests-cli delivery` в копии группы, не возможность интерфейса.
+  'GET /api/integrations/jira/issue/:key/comments': 'internal:callback',
   'GET /api/integrations/jira/issue/:key/transitions': 'action:jira_transitions',
   'GET /api/integrations/jira/projects': 'action:jira_projects',
   'GET /api/integrations/jira/search': 'action:jira_search',
@@ -775,6 +798,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/mobile/apk': 'human:remote',
   'GET /api/mobile/apk/file': 'human:download',
   'POST /api/mobile/apk/build': 'human:remote',
+  'POST /api/mobile/apk/cancel': 'human:remote',
   'POST /api/mobile/apk/install': 'human:remote',
   // phone-signing-routes/phone-signing-routes.ts — подпись решений ключом телефона:
   // привязка, отзыв и режим — только человек, агент панели их не трогает.

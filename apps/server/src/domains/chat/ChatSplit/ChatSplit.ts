@@ -800,6 +800,7 @@ export async function splitTasks({
           }
         : {}),
       ...(deliver && !review ? { deliver: true } : {}),
+      ...(groupPromptOptions.deliver ? { taskTrace: true } : {}),
     });
   }
 

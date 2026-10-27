@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import type { UsageLimitWindow } from '@agentdeck/contracts';
 import { useUsageLimits } from '../../api/useUsageLimits';
 import { formatLimitPercent } from '../../model/formatLimitPercent';
-import { formatResetAt } from '../../model/formatResetAt';
 import { formatUntil } from '../../model/formatUntil';
 import { limitTone } from '../../model/limitTone';
 import { windowLabel } from '../../model/windowLabel';
@@ -13,7 +12,7 @@ import styles from './UsageLimitsMeter.module.scss';
 /**
  * Лимиты подписки Claude — блок вверху боковой панели, на каждой странице:
  * сессия (5 часов), неделя и неделя модели, если сервер её делит. Процент — как
- * его дал сервер (до трёх знаков, без дописанных нулей), полоса, момент сброса;
+ * его дал сервер (до трёх знаков, без дописанных нулей), полоса, время до сброса;
  * подробности — в подсказке. Свёрнутая панель — только проценты столбиком.
  *
  * Данные — `GET /api/usage-limits` из кэша сервера; живое обновление — событие
@@ -27,8 +26,8 @@ export function UsageLimitsMeter({ isCollapsed = false }: UsageLimitsMeterProps)
 }
 
 /**
- * Часы с шагом в полминуты: «сегодня / пн» у сброса и «через N мин» в подсказке
- * считаются от «сейчас», а одинаковый ответ сервера перерисовки не вызывает.
+ * Часы с шагом в полминуты: «через N мин» у сброса считается от «сейчас», а
+ * одинаковый ответ сервера перерисовки не вызывает.
  */
 function useMinuteClock(): number {
   const [now, setNow] = useState(() => Date.now());
@@ -57,10 +56,12 @@ export function UsageLimitsView({ limits, now, isCollapsed = false }: UsageLimit
         })
       : '';
 
+  // Под полосой — сколько осталось до сброса, а не его час (владелец 27.10: «через сколько»
+  // понятнее, чем «ср 23:59»); точный момент — в подсказке.
   const resetText = (window: UsageLimitWindow): string =>
     window.resetsAt === null
       ? t('usageLimits.resetUnknown')
-      : t('usageLimits.reset', { time: formatResetAt(window.resetsAt, now, locale) });
+      : t('usageLimits.reset', { until: formatUntil(window.resetsAt - now, t) });
 
   const tooltipOf = (window: UsageLimitWindow): string => {
     const label = windowLabel(window, t);

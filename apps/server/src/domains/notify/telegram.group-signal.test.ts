@@ -148,7 +148,9 @@ describe('сигнал сторожа как событие подписки gro
     })(notice);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const init = (fetchMock.mock.calls[0] as unknown[])[1] as RequestInit;
-    expect(String(init.body)).toContain('R1 группа молчит');
+    // Словами в первой строке; код правила — только в свёрнутой цитате.
+    expect(String(init.body)).toContain('<b>группа молчит</b>');
+    expect(String(init.body)).toContain('<blockquote expandable>R1 · ');
   });
 
   it('неудачная отправка без своего onError — предупреждение в журнал, токена в нём нет', async () => {

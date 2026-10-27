@@ -184,4 +184,19 @@ describe('project-tests/automation: своя команда прогона пр�
     // Снять то, чего нет, — не ошибка.
     expect(() => removeAutomation(root)).not.toThrow();
   });
+
+  it('запись команды из окна не стирает окружение наборов «env», записанное руками', () => {
+    const env = { 'inst-auth/': { GOFLAGS: '-modfile={copy}/.agent/tmp/inst-auth.mod' } };
+    mkdirSync(join(root, '.agent', 'tests'), { recursive: true });
+    writeFileSync(
+      join(root, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({ version: 1, command: 'go test ./...', env }),
+    );
+    writeAutomation(root, { command: 'go test -count=1 ./...' });
+    const saved = JSON.parse(
+      readFileSync(join(root, '.agent', 'tests', 'automation.json'), 'utf8'),
+    ) as { command: string; env?: unknown };
+    expect(saved.command).toBe('go test -count=1 ./...');
+    expect(saved.env).toEqual(env);
+  });
 });

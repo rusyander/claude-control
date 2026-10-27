@@ -9,7 +9,8 @@ import type {
 } from '../../../lib/app-store/app-store.types.ts';
 import { carriedLink, conversationKeys } from '../../../lib/app-store/chat-links.ts';
 import { git } from '../../project-git/exec/exec.ts';
-import { parseDirtyPaths, readMergeTarget } from '../../project-git/read.ts';
+import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
+import { parseDirtyPaths, readHeadSha, readMergeTarget } from '../../project-git/read.ts';
 import type { RecheckScope } from './split-recheck.ts';
 
 /**
@@ -40,6 +41,8 @@ export function recheckFreshBrief(input: {
   tasks: readonly string[];
   /** Есть ли `.agent/PROGRESS.md` в копии. */
   progress: boolean;
+  /** Есть ли блокнот фактов (`TASK_NOTEBOOK`) в копии. */
+  notebook?: boolean;
 }): string {
   const { group } = input;
   const lines = [
@@ -52,6 +55,16 @@ export function recheckFreshBrief(input: {
         'for this recheck. Restore the rest from the facts: git log of the branch and the MR.'
       : 'Restore the context from the facts: git log of the branch and the MR.',
   ];
+  // g0 26.10: вводная называла один PROGRESS — группа запустила pytest системным Python,
+  // хотя рецепт venv и известные красные окружения лежали в блокноте с 23.10.
+  if (input.notebook) {
+    lines.push(
+      `Found facts: ${TASK_NOTEBOOK} in the copy — commands, environment recipes, known ` +
+        'environment reds. Read it before running any check; add one line there with the Edit ' +
+        'tool (a heredoc or `>>` is refused) for every fact you had to find out in this recheck ' +
+        '— a guard refusal, a tool error, a flaky test, a command recipe.',
+    );
+  }
   const task = input.task?.trim();
   if (task) lines.push('', "The group's task, as it was given:", task);
   else if (input.tasks.length > 0) {
@@ -100,6 +113,7 @@ export type RecheckStart = (input: {
 }) => { started: boolean; busy?: boolean };
 
 const hasProgress = (cwd: string): boolean => existsSync(join(cwd, '.agent', 'PROGRESS.md'));
+const hasNotebook = (cwd: string): boolean => existsSync(join(cwd, TASK_NOTEBOOK));
 
 type Delivery = 'sent' | 'queued' | 'refused';
 
@@ -114,6 +128,10 @@ export interface RecheckSessionDeps {
   resume: (group: SplitPlanGroupRecord, prompt: string) => Delivery;
   /** Есть ли `.agent/PROGRESS.md` в копии; не задан — смотрим на диске. */
   progress?: (cwd: string) => boolean;
+  /** Есть ли блокнот фактов (`TASK_NOTEBOOK`) в копии; не задан — смотрим на диске. */
+  notebook?: (cwd: string) => boolean;
+  /** Голова копии — коммит начала нового круга; не задан — `readHeadSha`. */
+  headSha?: (cwd: string) => string | undefined;
   now?: () => number;
   log: (message: string, error?: unknown) => void;
 }
@@ -143,8 +161,28 @@ export function createRecheckSession(
       return deps.resume(group, prompt);
     }
     const key = `new-${(deps.now ?? Date.now)()}-recheck${group.index}`;
+    // Перепроверка — новая работа на готовом MR (владелец 26.10): её ревью читает только
+    // сделанное с этого момента, а не прежний круг группы. Найденное прежним ревью вне
+    // охвата — тоже того круга. Голову не прочесть — поля нет, ревью прежним путём.
+    const {
+      startSha: _start,
+      preExisting: _pre,
+      model: _model,
+      effort: _effort,
+      ...carried
+    } = carriedLink(link);
+    // Перепроверка — работа по существу (тикеты, ревью владельца, полнота), не механика
+    // доставки: модель и глубина работы группы, а не дешёвая модель звена доставки
+    // (владелец 27.10: перепроверки g5/g9 шли целиком на Sonnet от «Доставки на Sonnet»,
+    // а ревью Opus после такой же у g1 нашло одиннадцать пунктов).
+    const model = link.workModel ?? link.model;
+    const effort = link.workModel ? link.workEffort : link.effort;
+    const head = (deps.headSha ?? readHeadSha)(group.path);
     deps.setLink(key, {
-      ...carriedLink(link),
+      ...carried,
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
+      ...(head ? { startSha: head } : {}),
       conversation: key,
       createdAt: new Date((deps.now ?? Date.now)()).toISOString(),
     });
@@ -154,6 +192,7 @@ export function createRecheckSession(
       ...(link.groupTask ? { task: link.groupTask } : {}),
       tasks: record.proposal.groups[group.index]?.tasks ?? [],
       progress: (deps.progress ?? hasProgress)(group.path),
+      notebook: (deps.notebook ?? hasNotebook)(group.path),
     });
     let outcome: { started: boolean } = { started: false };
     try {
@@ -161,8 +200,8 @@ export function createRecheckSession(
         chatId: key,
         prompt: `${brief}\n\n${prompt}`,
         cwd: group.path,
-        ...(link.model ? { model: link.model } : {}),
-        ...(link.effort ? { effort: link.effort } : {}),
+        ...(model ? { model } : {}),
+        ...(effort ? { effort } : {}),
         stage: 'tell',
         fromAliases: aliases,
         ...(link.title ? { title: link.title } : {}),

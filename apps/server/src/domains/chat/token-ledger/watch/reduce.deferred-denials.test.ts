@@ -113,6 +113,16 @@ describe('R18 и отложенные человеку вызовы (D-n)', () =
     expect(r18(rows)).toMatchObject({ numbers: { denials: 5 }, params: { guard: 'deferred' } });
   });
 
+  // g8 26.10: из шести отказов R18 один был карточкой правила — она доставляет правило и велит повторить.
+  it('отказ карточки правила впервые на вызове — не стена; тот же вызов в ту же карточку снова — стена', () => {
+    const card = (n: number) =>
+      `PreToolUse:Bash hook error: rule-card: call ${n} needs a rule this session got only as a card — read it, then repeat the call.`;
+    const firsts = [1, 2, 3, 4, 5].flatMap((n) => denied(n, `git commit -m m${n}`, card(n)));
+    expect(r18(firsts, { denialRepeats: 1 })).toBeUndefined();
+    const again = [1, 2, 3, 4, 5, 6].flatMap((n) => denied(n, 'git commit -m same', card(n)));
+    expect(r18(again)).toMatchObject({ numbers: { denials: 5 }, params: { guard: 'rule-card' } });
+  });
+
   it('отказ панели с известным ответом (panel-refused) считается, как отказ стража', () => {
     const rows = [1, 2, 3, 4, 5].flatMap((n) =>
       denied(n, `gh pr ready ${n}`, keepDraftRefusal(['D-1'])),

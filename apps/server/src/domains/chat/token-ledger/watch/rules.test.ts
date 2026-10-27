@@ -250,6 +250,42 @@ describe('group watch rules', () => {
     expect(rules({ events: notCheck, now: T0 + 4 * MIN })).not.toContain('R4');
   });
 
+  // P7 (g5 25.10): отказ стража (gate-at-end) — проверка не шла; три отказа подряд R4 не повод.
+  it('R4 counts only checks the guard let run, not refused ones', () => {
+    const command = 'npx vitest run src/a.test.ts';
+    const refused = (n: number): WatchEvent[] => [
+      bash(T0 + n * MIN, command, `r${n}`),
+      {
+        kind: 'toolResult',
+        t: T0 + n * MIN + 500,
+        id: `r${n}`,
+        chars: 120,
+        isError: true,
+        denied: 'gate-at-end',
+      },
+    ];
+    const allRefused = [1, 2, 3].flatMap(refused);
+    expect(rules({ events: allRefused, now: T0 + 4 * MIN })).not.toContain('R4');
+    // Два прошедших и один отбитый — два прогона, ниже порога; третий прошедший — повод.
+    const mixed = [
+      bash(T0 + MIN, command, 'p1'),
+      done(T0 + MIN + 500, 'p1'),
+      ...refused(2),
+      bash(T0 + 3 * MIN, command, 'p3'),
+      done(T0 + 3 * MIN + 500, 'p3'),
+    ];
+    expect(rules({ events: mixed, now: T0 + 4 * MIN })).not.toContain('R4');
+    const ran = [...mixed, bash(T0 + 3.5 * MIN, command, 'p4'), done(T0 + 3.5 * MIN + 1, 'p4')];
+    const hit = hits({ events: ran, now: T0 + 4 * MIN }).find((h) => h.rule === 'R4');
+    expect(hit?.numbers).toEqual({ runs: 3 });
+    expect(hit?.since).toBe(T0 + 3.5 * MIN);
+    // Отбитый последним — не «последний прогон»: момент повода остаётся у прошедшего.
+    const refusedLast = [...ran, ...refused(5)];
+    const kept = hits({ events: refusedLast, now: T0 + 6 * MIN }).find((h) => h.rule === 'R4');
+    expect(kept?.numbers).toEqual({ runs: 3 });
+    expect(kept?.since).toBe(T0 + 3.5 * MIN);
+  });
+
   it('R5 fires on a review spawn during the work stage only', () => {
     const spawn = (stage: string) => [
       tool(
@@ -370,11 +406,19 @@ describe('group watch rules', () => {
       { t: T0 + 10 * MIN, utilization: 0.6, resetsAt },
       { t: T0, utilization: 0.5, resetsAt },
     ];
+    // Наклон по нижней границе: (0.1 − одна ступень 0.01) / 10 мин × 50 мин = 45 пунктов.
     expect(accountProjection(rising, settings, T0 + 10 * MIN)?.numbers).toEqual({
-      projectedPct: 110,
+      projectedPct: 105,
       nowPct: 60,
       resetMin: 50,
     });
+    // 27.10: 2 % → 5 % за 8 минут в начале окна, до сброса 276 минут — целые проценты дали «113 %».
+    const earlyWindow = (T0 + 284 * MIN) / 1000;
+    const burst = [
+      { t: T0, utilization: 0.02, resetsAt: earlyWindow },
+      { t: T0 + 8 * MIN, utilization: 0.05, resetsAt: earlyWindow },
+    ];
+    expect(accountProjection(burst, settings, T0 + 8 * MIN)).toBeUndefined();
     const flat = [
       { t: T0, utilization: 0.5, resetsAt },
       { t: T0 + 10 * MIN, utilization: 0.52, resetsAt },
@@ -622,6 +666,17 @@ describe('group watch rules', () => {
     expect(fires('sed -n 1,40p C:/work/panel/tools/tests-cli.mjs')).toBe(true);
     expect(fires('node C:/work/panel/tools/doctor.mjs')).toBe(true);
     expect(fires('node C:/work/panel/tools/tests-cli.mjs; cat C:/work/panel/apps/x.ts')).toBe(true);
+  });
+
+  // d9869abf:8, 26.10: стадия ревью сама велит собрать пакет `review-pack.mjs` панели.
+  it('R7 stays quiet on running the panel review pack the review stage names, fires on reading it', () => {
+    const ctx = { panelRoot: 'C:/work/panel', cwd: 'C:/work/copies/g1' };
+    const fires = (command: string) =>
+      rules({ events: [bash(T0, command)], ctx, now: T0 + MIN }).includes('R7');
+    expect(
+      fires('node "C:\\work\\panel\\tools\\review-pack.mjs" --plan .agent/PROGRESS.md | tail -5'),
+    ).toBe(false);
+    expect(fires('grep -n plan C:/work/panel/tools/review-pack.mjs')).toBe(true);
   });
 
   it('subagent push and panel read count for the link: R6 with its stage, R7', () => {

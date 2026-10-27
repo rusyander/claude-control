@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from '@tanstack/react-router';
+import { HELP_ROUTE } from '@shared/config/routes';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import type { BranchGateCardProps } from '../BranchGateCard.types';
+import { gateTarget } from '../../lib/gateTarget';
 import styles from './BranchGateCard.module.scss';
 
 /**
@@ -44,7 +47,7 @@ export function BranchGateCard({ gates, onDecide }: BranchGateCardProps) {
   };
 
   return (
-    <div className={`${styles.question} ${styles.branchGate}`}>
+    <div className={`${styles.question} ${styles.branchGate}`} data-branch-gate>
       <Stack
         direction="row"
         align="center"
@@ -55,6 +58,17 @@ export function BranchGateCard({ gates, onDecide }: BranchGateCardProps) {
         <Typography as="span" variant="body-sm" weight="semibold" color="accent">
           {t('chat.branchGate.title')}
         </Typography>
+        {/* Справка — у самой карточки: вопрос встаёт посреди ленты, и искать
+            ответ «что это и чем грозит» в меню страницы никто не станет. */}
+        <Link
+          to={HELP_ROUTE}
+          search={{ topic: 'chat' }}
+          className={styles.help}
+          title={t('common.openHelp')}
+          aria-label={t('common.openHelp')}
+        >
+          <Icon name="help" size={18} />
+        </Link>
       </Stack>
 
       {gates.map((gate) => {
@@ -63,12 +77,23 @@ export function BranchGateCard({ gates, onDecide }: BranchGateCardProps) {
         // Работа отдана группам (Д15): главный путь — передать правку им, а не
         // заводить третью копию на ту же задачу.
         const handed = gate.children && gate.children.length > 0 ? gate.children : undefined;
+        // Какой файл агент собирался править: без него вопрос «где работаем»
+        // задан про каталог, а не про правку, и отвечать на него вслепую.
+        const target = gateTarget(gate.input);
         return (
           <div key={gate.toolUseId} className={styles.questionItem}>
             <Typography variant="body-sm" color="muted">
               {t('chat.branchGate.reason', { tool: gate.toolName })}
             </Typography>
             <pre className={styles.permissionInput}>{gate.cwd}</pre>
+            {target && (
+              <Typography variant="body-sm" color="muted" as="div">
+                {t('chat.branchGate.target')}:{' '}
+                <code className={styles.target} data-branch-gate-target>
+                  {target}
+                </code>
+              </Typography>
+            )}
             {handed && (
               <Stack gap="var(--spacing-3xs)" marginTop="var(--spacing-2xs)">
                 <Typography variant="body-sm" weight="semibold">

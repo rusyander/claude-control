@@ -49,6 +49,20 @@ export function cascadeProjectKey(cwd: string): string {
  * выигрывает самое длинное: правило, поставленное ближе к работе, точнее.
  */
 export function isCascadeEnabled(entries: Array<[string, boolean]>, cwd: string): boolean {
+  return projectRuleOn(entries, cwd);
+}
+
+/**
+ * Заводится ли ревью после работы группы в этой рабочей папке (R3(d), 26.10).
+ * Тот же поиск, что у подбора: копия ветки — тот же проект, ближайшая запись
+ * сильнее. Умолчание — включено; от подбора не зависит: выключенный подбор и так
+ * снимает потолок, а выключенное ревью дешёвые модели не трогает.
+ */
+export function isReviewAfterWork(entries: Array<[string, boolean]>, cwd: string): boolean {
+  return projectRuleOn(entries, cwd);
+}
+
+function projectRuleOn(entries: Array<[string, boolean]>, cwd: string): boolean {
   const target = cascadeProjectKey(cwd);
   if (!target) return true;
 

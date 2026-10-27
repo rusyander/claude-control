@@ -1,0 +1,38 @@
+{"type":"init","timestamp":"2026-10-27T09:58:15.782Z","session_id":"cae138e2-29d6-432b-b94d-488c70269c8b","model":"gemini-2.5-flash"}
+{"type":"message","timestamp":"2026-10-27T09:58:15.783Z","role":"user","content":"QA_MULTI go"}
+{"type":"tool_use","timestamp":"2026-10-27T09:58:15.864Z","tool_name":"run_shell_command","tool_id":"run_shell_command__run_shell_command_1793095095842_0","parameters":{"command":"node -e \"process.exit(3)\""}}
+{"type":"tool_result","timestamp":"2026-10-27T09:58:17.317Z","tool_id":"run_shell_command__run_shell_command_1793095095842_0","status":"success","output":"Command exited with code: 1"}
+{"type":"tool_use","timestamp":"2026-10-27T09:58:17.327Z","tool_name":"read_file","tool_id":"read_file__read_file_1793095097326_0","parameters":{"absolute_path":"C:\\qa\\proj\\missing.txt"}}
+{"type":"tool_result","timestamp":"2026-10-27T09:58:17.329Z","tool_id":"read_file__read_file_1793095097326_0","status":"error","output":"params must have required property 'file_path'","error":{"type":"invalid_tool_params","message":"params must have required property 'file_path'"}}
+{"type":"message","timestamp":"2026-10-27T09:58:17.338Z","role":"assistant","content":"MULTI_DONE","delta":true}
+{"type":"result","timestamp":"2026-10-27T09:58:17.340Z","status":"success","stats":{"total_tokens":459,"input_tokens":450,"output_tokens":9,"cached":120,"input":330,"duration_ms":1558,"tool_calls":2,"models":{"gemini-2.5-flash":{"total_tokens":459,"input_tokens":450,"output_tokens":9,"cached":120,"input":330}}}}
+{"type":"init","timestamp":"2026-10-27T09:58:22.706Z","session_id":"10baf3a6-752c-45b5-bdd2-4e5bf080bec8","model":"gemini-2.5-flash"}
+{"type":"message","timestamp":"2026-10-27T09:58:22.707Z","role":"user","content":"QA_EXIT go"}
+{"type":"tool_use","timestamp":"2026-10-27T09:58:22.782Z","tool_name":"run_shell_command","tool_id":"run_shell_command__run_shell_command_1793095102760_0","parameters":{"command":"node -e \"console.log('boom out');console.error('boom err');process.exit(2)\""}}
+{"type":"tool_result","timestamp":"2026-10-27T09:58:24.048Z","tool_id":"run_shell_command__run_shell_command_1793095102760_0","status":"success","output":"boom out\nboom err"}
+{"type":"message","timestamp":"2026-10-27T09:58:24.056Z","role":"assistant","content":"EXIT_DONE","delta":true}
+{"type":"result","timestamp":"2026-10-27T09:58:24.059Z","status":"success","stats":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170,"duration_ms":1353,"tool_calls":1,"models":{"gemini-2.5-flash":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170}}}}
+{"type":"init","timestamp":"2026-10-27T09:58:25.690Z","session_id":"33ba33aa-d85b-45b0-9563-9f545e45e9b5","model":"gemini-2.5-flash"}
+{"type":"message","timestamp":"2026-10-27T09:58:25.691Z","role":"user","content":"QA_HOOK go"}
+{"type":"tool_use","timestamp":"2026-10-27T09:58:25.767Z","tool_name":"run_shell_command","tool_id":"run_shell_command__run_shell_command_1793095105745_0","parameters":{"command":"echo HOOKME"}}
+{"type":"tool_result","timestamp":"2026-10-27T09:58:26.149Z","tool_id":"run_shell_command__run_shell_command_1793095105745_0","status":"error","output":"Tool execution blocked: [ctx-guard] probe-guard: refused by the probe","error":{"type":"policy_violation","message":"Tool execution blocked: [ctx-guard] probe-guard: refused by the probe"}}
+{"type":"message","timestamp":"2026-10-27T09:58:26.157Z","role":"assistant","content":"HOOK_DONE","delta":true}
+{"type":"result","timestamp":"2026-10-27T09:58:26.158Z","status":"success","stats":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170,"duration_ms":468,"tool_calls":1,"models":{"gemini-2.5-flash":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170}}}}
+{"type":"init","timestamp":"2026-10-27T09:58:27.777Z","session_id":"aa439c70-5af1-4e9d-882a-107c91ce47be","model":"gemini-2.5-flash"}
+{"type":"message","timestamp":"2026-10-27T09:58:27.778Z","role":"user","content":"QA_POLICY go"}
+{"type":"tool_use","timestamp":"2026-10-27T09:58:27.855Z","tool_name":"run_shell_command","tool_id":"run_shell_command__run_shell_command_1793095107832_0","parameters":{"command":"echo POLICYME"}}
+{"type":"tool_result","timestamp":"2026-10-27T09:58:28.747Z","tool_id":"run_shell_command__run_shell_command_1793095107832_0","status":"error","output":"Tool execution denied by policy.","error":{"type":"policy_violation","message":"Tool execution denied by policy."}}
+{"type":"message","timestamp":"2026-10-27T09:58:28.763Z","role":"assistant","content":"POLICY_DONE","delta":true}
+{"type":"result","timestamp":"2026-10-27T09:58:28.764Z","status":"success","stats":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170,"duration_ms":987,"tool_calls":1,"models":{"gemini-2.5-flash":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170}}}}
+{"type":"init","timestamp":"2026-10-27T09:58:19.178Z","session_id":"246272f9-38df-453c-9900-cda92dce346a","model":"gemini-2.5-flash"}
+{"type":"message","timestamp":"2026-10-27T09:58:19.180Z","role":"user","content":"QA_DENY go"}
+{"type":"tool_use","timestamp":"2026-10-27T09:58:19.264Z","tool_name":"run_shell_command","tool_id":"run_shell_command__run_shell_command_1793095099264_0","parameters":{"command":"echo hi"}}
+{"type":"tool_result","timestamp":"2026-10-27T09:58:19.271Z","tool_id":"run_shell_command__run_shell_command_1793095099264_0","status":"error","output":"Tool \"run_shell_command\" not found. Did you mean one of: \"update_topic\", \"grep_search\", \"invoke_agent\"?","error":{"type":"tool_not_registered","message":"Tool \"run_shell_command\" not found. Did you mean one of: \"update_topic\", \"grep_search\", \"invoke_agent\"?"}}
+{"type":"message","timestamp":"2026-10-27T09:58:19.280Z","role":"assistant","content":"DENY_DONE","delta":true}
+{"type":"result","timestamp":"2026-10-27T09:58:19.282Z","status":"success","stats":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170,"duration_ms":104,"tool_calls":1,"models":{"gemini-2.5-flash":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170}}}}
+{"type":"init","timestamp":"2026-10-27T09:58:20.985Z","session_id":"4fa67545-6ab9-43c4-bd69-3a0527ebc532","model":"gemini-2.5-flash"}
+{"type":"message","timestamp":"2026-10-27T09:58:20.986Z","role":"user","content":"QA_WRITE_OFF go"}
+{"type":"tool_use","timestamp":"2026-10-27T09:58:21.042Z","tool_name":"write_file","tool_id":"write_file__write_file_1793095101042_0","parameters":{"file_path":"w.txt","content":"X"}}
+{"type":"tool_result","timestamp":"2026-10-27T09:58:21.049Z","tool_id":"write_file__write_file_1793095101042_0","status":"error","output":"Tool \"write_file\" not found. Did you mean one of: \"read_file\", \"update_topic\", \"grep_search\"?","error":{"type":"tool_not_registered","message":"Tool \"write_file\" not found. Did you mean one of: \"read_file\", \"update_topic\", \"grep_search\"?"}}
+{"type":"message","timestamp":"2026-10-27T09:58:21.058Z","role":"assistant","content":"WRITE_OFF_DONE","delta":true}
+{"type":"result","timestamp":"2026-10-27T09:58:21.059Z","status":"success","stats":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170,"duration_ms":74,"tool_calls":1,"models":{"gemini-2.5-flash":{"total_tokens":256,"input_tokens":250,"output_tokens":6,"cached":80,"input":170}}}}

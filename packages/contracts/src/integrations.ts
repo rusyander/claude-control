@@ -92,7 +92,20 @@ export interface TelegramSettings {
   /** Куда слать: id чата или канала (`@name` тоже принимается). */
   chatId: string;
   events: TelegramEvent[];
+  /**
+   * «Закончил» — только после долгой работы: ход чата панели или сессии из
+   * терминала и VS Code шёл дольше стольких минут. 0 — не сообщать. Не задано —
+   * `TELEGRAM_DONE_AFTER_MINUTES`. Галочка `runDone` у Telegram не читается: она
+   * писала о каждом ходе, и её держали выключенной как шум (решение владельца
+   * 25.10.2026); у вебхука она прежняя.
+   */
+  doneAfterMinutes?: number;
 }
+
+/** Порог «Закончил» у Telegram по умолчанию, минуты. */
+export const TELEGRAM_DONE_AFTER_MINUTES = 5;
+/** Верх порога: сутки. */
+export const TELEGRAM_DONE_MAX_MINUTES = 1440;
 
 /**
  * Вебхук: те же события, но своим адресом.
@@ -113,10 +126,13 @@ export interface WebhookSettings {
   events: NotifyEvent[];
 }
 
-/** Тело вебхука. Ровно то же, что уходит в Telegram, — заголовок без содержимого. */
+/**
+ * Тело вебхука — заголовок без содержимого. Telegram с 25.10.2026 получает
+ * развёрнутый текст (имя чата и суть), вебхук — прежнюю строку.
+ */
 export interface WebhookPayload {
   event: NotifyEvent;
-  /** Текст события по-русски — тот же, что читает человек в Telegram. */
+  /** Текст события по-русски — одна строка: событие и папка проекта. */
   text: string;
   /** Имя папки проекта; у домашнего чата пусто. */
   project?: string;
@@ -255,6 +271,19 @@ export interface IntegrationStatus extends CodedFields<'detail'> {
   account?: string;
   /** Что ответил Atlassian на вопрос о себе: облако или своя установка. */
   deployment?: AtlassianDeployment;
+  /** Последняя отправка уведомления — только у Telegram. */
+  lastSend?: TelegramLastSend;
+}
+
+/**
+ * Итог последней отправки уведомления в Telegram. Ни токена, ни текста
+ * сообщения здесь нет: только когда, дошло ли и почему нет.
+ */
+export interface TelegramLastSend {
+  at: string;
+  ok: boolean;
+  /** Причина отказа словами Telegram (`403: Forbidden: bot was blocked by the user`). */
+  error?: string;
 }
 
 export interface JiraProject {

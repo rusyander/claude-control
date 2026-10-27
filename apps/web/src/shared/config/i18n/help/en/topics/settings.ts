@@ -89,7 +89,8 @@ export const settingsEn: typeof settingsRu = {
     tabPhoneText:
       'The app APK by the «Build APK» / «Update APK» button — the same builder as ' +
       'pnpm mobile:apk, about 10 minutes, the output shows as it goes and survives a panel ' +
-      'restart. The finished file is installed on a phone adb sees, or downloaded. Also ' +
+      'restart; «Cancel build» stops it whole, Gradle included. The finished file is ' +
+      'installed on a phone adb sees, or downloaded. Also ' +
       '«The agent on the computer — under control from the phone»: the toggle (on writes the ' +
       'panel hooks into the Claude Code settings, off removes them) and, if the hooks are still ' +
       'missing, the ready command for the «Hooks» section.',

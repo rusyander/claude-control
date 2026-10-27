@@ -159,6 +159,44 @@ describe('красное не из-за ветки — заметка, а не �
     expect(verdict.notes).toBeUndefined();
   });
 
+  // g3 25.10: набор пакета красный тем же «✗ 2/59 · TestUnreadable…», что и на основной
+  // 20.10, а ветка тронула соседний файл пакета — напоминание требовало «почини» без конца.
+  const FIRST = 'TestUnreadable: policies_test.go:160: ListPolicies: ошибка <nil>';
+  const suiteRed = (total: number, failed = 2, first = FIRST) =>
+    run('own', AFTER, [
+      ['inst-users-001', 'passed'],
+      [
+        'inst-api-014',
+        'failed',
+        { note: `✗ ${failed}/${total} · ${first}\n2026/10/25 INFO loaded` },
+      ],
+    ]);
+  const judgeSuite = (own: ProjectTestRunRecord) =>
+    judgeTests({
+      groups: groups([users, api]),
+      runs: [
+        run('base', BEFORE, [
+          ['inst-api-014', 'failed', { note: `✗ 2/59 · ${FIRST}\n2026/10/21 INFO loaded` }],
+        ]),
+        own,
+      ],
+      paths: ['src/users/list.ts', 'src/api/handler.ts'],
+      startedAt: STARTED,
+      command: COMMAND,
+    });
+
+  it('задетый набор красный слово в слово как до старта (счёт без общего числа) — заметка «на основной»', () => {
+    const verdict = judgeSuite(suiteRed(61));
+    expect(verdict.missing).toEqual([]);
+    expect(verdict.noted).toEqual(['inst-api-014']);
+  });
+
+  it('задетый набор: упавших больше или первый упавший другой — держит, как раньше', () => {
+    expect(judgeSuite(suiteRed(59, 3)).missing).toEqual([expect.stringContaining('inst-api-014')]);
+    const other = judgeSuite(suiteRed(59, 2, 'TestSave: store_test.go:40: partial file'));
+    expect(other.missing).toEqual([expect.stringContaining('inst-api-014')]);
+  });
+
   it('дифф изменил файл автотеста кейса — держит, даже по таймауту', () => {
     const verdict = judgeTests({
       groups: groups([users, docs]),

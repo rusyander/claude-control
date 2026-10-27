@@ -548,6 +548,22 @@ export interface GitEffects {
   discards: GitDiscard[];
   /** Удаление данных git или слияние — для одиночного чата (`destroysOrMerges`). */
   destroys: boolean;
+  /**
+   * Каталоги, где пошёл бы git звена, если каталог — НАД копией (`cd ..; git -C ..`
+   * из подпапки, D-4 25.10): промах пути, а не чужой репозиторий (`groupGitAimRefusal`).
+   */
+  above: string[];
+  /**
+   * То же, но каталог посчитан от УГАДАННОГО корня оболочки (D-6, 25.10): запись
+   * вызова ещё не легла в транскрипт, и `-C ..` из подпапки счёлся над копией.
+   * Настоящий каталог мог быть глубже — отказ просит назвать копию, а не карточку.
+   */
+  aboveGuessed: string[];
+  /**
+   * Подкоманда git каждого звена, до которого дошёл разбор (`add`, `push`…), по
+   * звену: повторный суд при старте пускает git только из своих записей и чтений.
+   */
+  subcommands: string[];
 }
 
 /**
@@ -567,11 +583,19 @@ export function collectGitEffects<T>(
   recorded: readonly string[] = [],
 ): GitEffects & { result: T } {
   const outer = sink;
-  const mine = { discards: [] as GitDiscard[], destroys: false, recorded };
+  const mine = {
+    discards: [] as GitDiscard[],
+    destroys: false,
+    above: [] as string[],
+    aboveGuessed: [] as string[],
+    subcommands: [] as string[],
+    recorded,
+  };
   sink = mine;
   try {
     const result = judge();
-    return { result, discards: mine.discards, destroys: mine.destroys };
+    const { discards, destroys, above, aboveGuessed, subcommands } = mine;
+    return { result, discards, destroys, above, aboveGuessed, subcommands };
   } finally {
     sink = outer;
   }
@@ -597,4 +621,13 @@ export function noteDestroys(): void {
 
 export function noteDiscard(discard: GitDiscard): void {
   sink?.discards.push(discard);
+}
+
+export function noteGitAbove(dir: string, guessed = false): void {
+  const list = guessed ? sink?.aboveGuessed : sink?.above;
+  if (list && !list.includes(dir)) list.push(dir);
+}
+
+export function noteGitSubcommand(sub: string): void {
+  sink?.subcommands.push(sub);
 }

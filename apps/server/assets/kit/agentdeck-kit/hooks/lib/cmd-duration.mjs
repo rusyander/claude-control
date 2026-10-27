@@ -169,10 +169,15 @@ export function commandKey(cwd, command) {
 // The kit's own gates known to take minutes (a project's gates are learned): answered before anything is learned. Matched on
 // the script run by an interpreter in a bare segment, so a grep naming one is not a gate.
 const KNOWN_GATES = [
-  { file: /^mustfail\.mjs$/i, not: /\s(?:--help|-h|--dry)\b/ },
+  // The ruled forms run in seconds: `--files` (bug-fix files only), `--mutate` (one planned mutant),
+  // `--mutants` (planned mutants for a new test); only a whole-diff run is a known gate. A wide one is
+  // learned after its first pass (25.10 watch g0).
+  { file: /^mustfail\.mjs$/i, not: /\s(?:--help|-h|--dry|--files|--mutate|--mutants)\b/ },
   { file: /^gate-run\.mjs$/i, not: /\s(?:--help|-h|--dry)\b/ },
 ];
 const RUN = /^(?:node|bun|tsx|python3?|bash|sh)(?:\s+-{1,2}[\w-]+(?:=\S+)?)*\s+["']?([^\s"']+)/;
+// `node --check <file>` / `-c` only parses the file — a syntax check of a gate script, not its run (26.10). Global twin.
+const PARSE_ONLY = /^(?:node|bun)(?:\s+-{1,2}[\w-]+(?:=\S+)?)*?\s+(?:--check|-c)(?=\s)/;
 
 /** A known long gate in the command → a learned-shaped entry, else null. */
 export function knownGate(command) {
@@ -180,7 +185,7 @@ export function knownGate(command) {
   if (raw.includes('<<')) return null;
   for (const s of splitTop(raw, 'list').map(bareSegment)) {
     const file = RUN.exec(s)?.[1];
-    if (!file) continue;
+    if (!file || PARSE_ONLY.test(s)) continue;
     const g = KNOWN_GATES.find((x) => x.file.test(basename(file)));
     if (g && (!g.need || g.need.test(s)) && (!g.not || !g.not.test(s)))
       return { median: CAP_S, kills: 0, n: 0, gate: true };
@@ -188,13 +193,22 @@ export function knownGate(command) {
   return null;
 }
 
+// A blocking watch (skills watchdog / agentdeck-watchdog) waits by design: its length is the wait the
+// coordinator asked for (--max), and a background run ends the turn on a notifier — the dormancy the
+// watch exists to prevent. Only the timeout advice applies to it, never «run it in background».
+const WATCH_SCRIPT =
+  /skills[\\/](?:agentdeck-)?watchdog[\\/]scripts[\\/](?:watch|watch-groups)\.mjs\b/;
+export function isBlockingWatch(command) {
+  return WATCH_SCRIPT.test(String(command ?? ''));
+}
+
 /** What is known of a command here: learned (new key, then legacy), else a known gate. */
 export function knownFor(store, cwd, command) {
-  return (
+  const known =
     learned(store.keys[commandKey(cwd, command)]) ??
     learned(store.keys[legacyKey(cwd, command)]) ??
-    knownGate(command)
-  );
+    knownGate(command);
+  return known && isBlockingWatch(command) ? { ...known, wait: true } : known;
 }
 
 export function loadStore(file = FILE) {
@@ -259,7 +273,7 @@ export function verdict({
   timeoutParam = true,
 }) {
   if (!known || background) return null;
-  const slow = known.median >= 300 || known.kills > 0;
+  const slow = !known.wait && (known.median >= 300 || known.kills > 0);
   const seen = known.gate
     ? 'is a known long gate (often over 10 min'
     : `took ~${known.median} s here (${known.n} run(s)` +
@@ -273,7 +287,7 @@ export function verdict({
       'its completion notification wakes you — and do other work meanwhile, or narrow it. Repeat this exact call ' +
       'to run it in the foreground anyway.'
     );
-  if (subagent && !known.gate && (known.median >= 540 || known.kills > 0))
+  if (subagent && !known.gate && !known.wait && (known.median >= 540 || known.kills > 0))
     return (
       `cmd-duration: this command took ~${known.median} s here` +
       `${known.kills ? ` and was killed at the ${CAP_S} s cap ${known.kills}×` : ''}; a subagent has no background ` +

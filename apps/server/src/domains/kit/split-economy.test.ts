@@ -247,6 +247,9 @@ describe('session-rules: карточка группы вместо правил
       const ctx = start(CHILD, source);
       expect(ctx).toMatch(/^Kit root/);
       expect(ctx).toContain('# Group rules card');
+      // Самопроверка доставки (g1 26.10, F6/F7): выход 0 — доказательство, факт — в строку до прогона.
+      expect(ctx).toContain('exit 0 is the proof for the MR description and threads');
+      expect(ctx).toContain('run the check once, after the last row edit');
       expect(ctx).not.toContain(standard.slice(0, 200));
       expect(ctx.length).toBeLessThan(3000);
     }

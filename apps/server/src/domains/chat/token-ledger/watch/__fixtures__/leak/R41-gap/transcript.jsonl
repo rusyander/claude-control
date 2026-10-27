@@ -1,0 +1,2 @@
+{"type":"assistant","timestamp":"2026-10-26T10:00:00Z","message":{"id":"msg_0001","model":"claude-opus-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_0001","name":"Bash","input":{"command":"npx vitest run src/app.test.ts"}}],"usage":{"input_tokens":2,"cache_read_input_tokens":41200,"cache_creation_input_tokens":480,"output_tokens":310}}}
+{"type":"user","timestamp":"2026-10-26T10:00:40Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_0001","content":" Test Files  1 passed (1)"}]}}

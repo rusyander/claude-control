@@ -1,5 +1,5 @@
 import type { SplitPlanGroupRecord, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
-import { localizeText } from '../../lib/server-texts/server-texts.ts';
+import { localizeText, matchText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * «Продолжить» человека в строке группы (владелец, 05.10.2026) — группе, которая
@@ -10,17 +10,43 @@ import { localizeText } from '../../lib/server-texts/server-texts.ts';
  * перепроверка зовёт конвейер — в одном модуле был цикл импортов.
  */
 
-/** Задание группе, остановившейся недоделанной. Причина — английской стороной текста. */
+/**
+ * Задание группе, остановившейся недоделанной. Причина — английской стороной текста.
+ * `gaps` — напоминание с пробелами последней сверки доставки (живой прогон 25.10,
+ * g0 d9869abf): причина, обрезанная до 300 знаков, несла конфликт и обрывок «чужих
+ * −», а живые сита, пробелы блока «Тесты» и метка «not checked:» до группы не
+ * доходили — круг уходил на лишнее напоминание. С пробелами причина-сбой доставки
+ * не повторяется обрывком: напоминание несёт их полностью вместе с правилами.
+ */
 export function continuePrompt(input: {
   branch: string;
   deliver: boolean;
   error?: string;
+  gaps?: readonly string[];
 }): string {
-  const cause = input.error ? `: ${localizeText(input.error, 'en').slice(0, 300)}` : '';
+  const gaps = input.gaps ?? [];
+  // Шаблон с одним, двумя и тремя пробелами — `split-delivery-incomplete(-2|-3)`.
+  const ofDelivery =
+    input.error !== undefined &&
+    matchText(input.error)?.messageCode?.startsWith('split-delivery-incomplete') === true;
+  const cause =
+    input.error && !(ofDelivery && gaps.length > 0)
+      ? `: ${localizeText(input.error, 'en').slice(0, 300)}`
+      : '';
+  const restore =
+    'First restore the state from the facts: git status, git log, the MR of the branch if there ' +
+    'is one, your transcript — what is done and what is not; run the interrupted checks again.';
+  if (gaps.length > 0) {
+    return [
+      `The human asks the group to continue: its work is not finished (the last turn stopped${cause}).`,
+      restore,
+      `Then close what the last delivery check found on the branch ${input.branch}:`,
+      ...gaps,
+    ].join('\n');
+  }
   return [
     `The human asks the group to continue: its work is not finished (the last turn stopped${cause}).`,
-    'First restore the state from the facts: git status, git log, the MR of the branch if there ' +
-      'is one, your transcript — what is done and what is not; run the interrupted checks again.',
+    restore,
     `Then finish the group's tasks on the branch ${input.branch}.` +
       (input.deliver
         ? ' Deliver as agreed: commit, push the branch, open the MR (or update the existing one) ' +
@@ -94,15 +120,29 @@ export function lostConversationBrief(
       'gone (deleted outside the panel). This is a new conversation — restore the context from ' +
       `the facts: git status, git log of the branch ${group.branch}` +
       (group.mr ? `, the MR ${group.mr}.` : '.'),
-    ...(tasks.length > 0 ? ["The group's tasks:", ...tasks.map((task) => `- ${task}`)] : []),
+    ...(tasks.length > 0 ? [GROUP_TASKS_HEADER, ...tasks.map((task) => `- ${task}`)] : []),
   ].join('\n');
 }
+
+/** Заголовок списка задач группы во вводных нового разговора. */
+export const GROUP_TASKS_HEADER = "The group's tasks:";
 
 /** Первая строка вводной нового разговора вместо остывшего — общая для всех стадий. */
 export const COLD_RESUME_INTRO =
   'The panel started a new conversation instead of continuing the previous one: it stood idle ' +
   'past its prompt cache lifetime, and continuing would have written the whole window again at ' +
   'full price. The panel collected the facts below from your copy — start from them.';
+
+/**
+ * Первая строка вводной нового разговора для слова доставленной группе (N4,
+ * g5 25.10): наблюдатель MR передал красный конвейер или ветки ревьюера, и слово
+ * полное само по себе — окно доставки ему не нужно.
+ */
+export const RELAY_FRESH_INTRO =
+  'The panel started a new conversation for this word about your delivered MR: the previous ' +
+  'conversation carried the whole delivery, and re-reading that window on every request costs ' +
+  'more than this brief. The facts below come from your copy; the word after them says what to ' +
+  'do. Your notebook and the previous transcript are there if you need history.';
 
 /**
  * Вводная группе, чей разговор панель НЕ продолжает намеренно (`coldResume`):
@@ -112,11 +152,12 @@ export const COLD_RESUME_INTRO =
 export function coldResumeBrief(
   group: Pick<SplitPlanGroupRecord, 'branch' | 'mr'>,
   tasks: readonly string[],
+  intro: string = COLD_RESUME_INTRO,
 ): string {
   return [
-    COLD_RESUME_INTRO,
+    intro,
     `Branch ${group.branch}` + (group.mr ? `, MR ${group.mr}.` : '.'),
-    ...(tasks.length > 0 ? ["The group's tasks:", ...tasks.map((task) => `- ${task}`)] : []),
+    ...(tasks.length > 0 ? [GROUP_TASKS_HEADER, ...tasks.map((task) => `- ${task}`)] : []),
   ].join('\n');
 }
 

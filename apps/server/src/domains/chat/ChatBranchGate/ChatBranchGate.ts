@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { gitSync } from '../../project-git/exec/exec.ts';
 import { withoutLinks } from '../ChatRecords/ChatRecords.ts';
+import { stripChildrenBrief } from '../children-brief/children-brief.ts';
 
 /**
  * Ворота ветки: первая правка в ОСНОВНОЙ рабочей копии не проходит молча.
@@ -376,7 +377,9 @@ const TRANSLIT: Record<string, string> = {
 export function suggestBranchName(title: string | undefined, chatId: string): string {
   // Ссылка — не название: задание, начатое адресом из трекера, давало ветку
   // `agent/https-tracker-example-com-brows-…`. Ключ задачи из ссылки остаётся.
-  const slug = [...withoutLinks(title ?? '').toLowerCase()]
+  // Блоки панели — тоже: ход родителя начинается сводкой детей, и ветка звалась
+  // `agent/agentdeck-children-the-work-of-…` вместо слов человека (Telegram 26.10).
+  const slug = [...withoutLinks(stripChildrenBrief(title ?? '')).toLowerCase()]
     .map((char) => TRANSLIT[char] ?? char)
     .join('')
     .replace(/[^a-z0-9]+/g, '-')

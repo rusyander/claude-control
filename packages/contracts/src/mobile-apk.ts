@@ -6,7 +6,7 @@ import { array, boolean, enum as zEnum, number, object, string, type infer as In
  * второго пути сборки. Есть только в рабочей копии репозитория: без исходников
  * приложения собирать нечего (`available: false`).
  */
-export const mobileApkStateSchema = zEnum(['idle', 'building', 'succeeded', 'failed']);
+export const mobileApkStateSchema = zEnum(['idle', 'building', 'succeeded', 'failed', 'cancelled']);
 export type MobileApkState = Infer<typeof mobileApkStateSchema>;
 
 export const mobileApkStatusSchema = object({

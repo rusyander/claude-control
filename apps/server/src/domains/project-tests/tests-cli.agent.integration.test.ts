@@ -59,6 +59,65 @@ describe('tests-cli case / record', () => {
     ]);
   });
 
+  it('case в несуществующую группу — отказ с похожими, группа не заводится; --new-group заводит', () => {
+    const refused = cli(project, 'case', '--group', 'guide', '--json', '{"title":"Выход"}');
+    expect(refused.code).toBe(1);
+    expect(refused.out).toContain('Группы «guide» в проекте нет (похожие: gui)');
+    expect(readGroups(project).map((group) => group.id)).toEqual(['gui']);
+    const created = cli(
+      project,
+      'case',
+      '--group',
+      'guide',
+      '--new-group',
+      '--json',
+      '{"title":"Выход"}',
+    );
+    expect(created.code).toBe(0);
+    expect(
+      readGroups(project)
+        .map((group) => group.id)
+        .sort(),
+    ).toEqual(['gui', 'guide']);
+  });
+
+  it('case в проекте без групп — первая группа заводится без --new-group', () => {
+    const fresh = join(root, 'fresh');
+    mkdirSync(fresh);
+    const out = cli(fresh, 'case', '--group', 'auth', '--json', '{"title":"Вход"}');
+    expect(out.code).toBe(0);
+    expect(readGroups(fresh).map((group) => group.id)).toEqual(['auth']);
+  });
+
+  it('case по id с одними метками — правка меток, название остаётся; show печатает метки', () => {
+    // g1 26.10: `{"id":…,"tags":[…]}` отбит «нужно название», метки ушли скриптом в 5 ходов.
+    cli(project, 'case', '--group', 'gui', '--json', '{"title":"Выход","steps":["выйти"]}');
+    const tagged = cli(
+      project,
+      'case',
+      '--group',
+      'gui',
+      '--json',
+      '{"id":"gui-002","tags":["live","e2e"]}',
+    );
+    expect(tagged.code, tagged.out).toBe(0);
+    expect(tagged.out).toContain('Обновлён кейс gui:gui-002 — Выход');
+    const shown = cli(project, 'show', 'gui:gui-002');
+    expect(shown.out).toContain('1. выйти');
+    expect(shown.out).toContain('Метки: live, e2e');
+  });
+
+  it('--project из подкаталога — ближайший вверх с .agent/tests, но не выше корня git', () => {
+    // g0 26.10: после `cd inst-api` `--project .` искал файлы в `inst-api/.agent/tmp`.
+    const sub = join(project, 'pkg', 'src');
+    mkdirSync(sub, { recursive: true });
+    expect(cli(sub, 'show', 'gui:gui-001').out).toContain('Группа: gui');
+    // Вложенный репозиторий (копия в .claude/worktrees) кейсы внешнего не берёт.
+    const nested = join(project, 'nested');
+    mkdirSync(join(nested, '.git'), { recursive: true });
+    expect(cli(nested, 'show', 'gui:gui-001').out).toContain('в проекте нет');
+  });
+
   it('case с придуманным id — новый кейс, вывод называет оба id (3.4)', () => {
     const created = cli(
       project,

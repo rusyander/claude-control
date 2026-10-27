@@ -85,6 +85,7 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/chat/split/:parent/tickets/file': 'human:outward',
   // «Разобрать…» (владелец 24.10): публикация в Jira разом и чат «Решить здесь» — клик человека.
   'GET /api/chat/split/:parent/tickets/target': 'human:outward',
+  'GET /api/chat/split/:parent/tickets/duplicates': 'human:outward',
   'POST /api/chat/split/:parent/tickets/publish': 'human:outward',
   'POST /api/chat/split/:parent/tickets/take': 'human:split-apply',
   // G4 (владелец 05.10): перевод задач групп в Jira — запись в чужой сервис по кнопке.
@@ -123,6 +124,11 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'GET /api/integrations/telegram/answers': 'human:secret',
   'PUT /api/integrations/telegram/answers': 'human:secret',
   'POST /api/integrations/telegram/answers/restart': 'human:secret',
+  // Подключение по /start (решение владельца 25.10.2026: только человек).
+  'GET /api/integrations/telegram/connect': 'human:secret',
+  'POST /api/integrations/telegram/connect': 'human:secret',
+  'POST /api/integrations/telegram/connect/cancel': 'human:secret',
+  'POST /api/integrations/telegram/connect/confirm': 'human:secret',
   'POST /api/integrations/tms/pull': 'human:outward',
   'POST /api/integrations/tms/push': 'human:outward',
   'POST /api/integrations/webhook/test': 'human:outward',
@@ -150,6 +156,7 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'GET /api/mobile/apk': 'human:remote',
   'GET /api/mobile/apk/file': 'human:download',
   'POST /api/mobile/apk/build': 'human:remote',
+  'POST /api/mobile/apk/cancel': 'human:remote',
   'POST /api/mobile/apk/install': 'human:remote',
   'POST /api/remote/token': 'human:remote',
   // 24.10: подпись решений ключом телефона — привязка, отзыв, режим.
@@ -174,8 +181,7 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/chat/split/:parent/relaunch': 'human:split-apply',
   'POST /api/chat/split/:parent/restart-group': 'human:split-apply',
   'POST /api/chat/split/:parent/drop-group': 'human:split-apply',
-  'POST /api/chat/split/:parent/continue-group': 'human:split-apply',
-  'POST /api/chat/split/:parent/recheck': 'human:outward',
+  // «Перепроверить MR» снят отсюда решением владельца 26.10 (жмёт наблюдатель групп).
   'POST /api/project-tests/baseline': 'human:upload',
   // Бэкенд-разработка (владелец 12.10): доступ агента к базе, защита бэкенда,
   // запросы к API проекта и своя команда прогона — решение человека.
@@ -208,7 +214,14 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
 const CLOSED_SETS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
   // actions-chat-control.ts: MODE_ROUTE
   split_control: {
-    'MODE_ROUTE[input.mode]': ['pause', 'resume-paused', 'release', 'hold', 'resume'],
+    'MODE_ROUTE[input.mode]': [
+      'pause',
+      'resume-paused',
+      'continue-group',
+      'release',
+      'hold',
+      'resume',
+    ],
   },
   // actions-tests-manual.ts: одно определение на два действия, `kind` — его параметр
   finish_manual_run: { kind: ['finish'] },

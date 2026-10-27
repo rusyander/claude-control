@@ -182,7 +182,9 @@ description passed the read-back, the ticket shows exactly one link.
 The review move and the QA comment from the ledger, read back — the plan, never a question, gated on
 §9 + §10 only. Human threads: re-read only when the MR pre-existed or a thread arrived during the run
 — one discussions call (review.md §Human threads). **Everything past review still asks**: pulling QA
-in is the user's call.
+in is the user's call. Moved = only a key a commit of `base..HEAD` names AND whose live assignee (read
+now) is me; a skipped or someone else's key stays, named in the report («all group keys» is not «all
+delivered» — a group once moved a skipped ticket assigned to another person).
 
 **Gate:** the MR out of draft; the tracker shows review and the read-back QA comment; threads read,
 if owed, at 0 unresolved.

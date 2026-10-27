@@ -1,0 +1,45 @@
+[
+  {
+    "id": "w-old",
+    "chatId": "child-3",
+    "startedAt": 1793005200000,
+    "endedAt": 1793008200000,
+    "tokens": 300000,
+    "samples": [
+      {
+        "at": 1793008200000,
+        "fiveHour": {
+          "utilization": 0.97,
+          "resetsAt": 1793008800
+        },
+        "sevenDay": {
+          "utilization": 0.97,
+          "resetsAt": 1793010600
+        }
+      }
+    ]
+  },
+  {
+    "id": "w-a",
+    "chatId": "child-3",
+    "startedAt": 1793009400000,
+    "endedAt": 1793011200000,
+    "tokens": 300000,
+    "samples": [
+      {
+        "at": 1793009400000,
+        "fiveHour": {
+          "utilization": 0.79,
+          "resetsAt": 1793026800
+        }
+      },
+      {
+        "at": 1793011200000,
+        "fiveHour": {
+          "utilization": 0.79,
+          "resetsAt": 1793026800
+        }
+      }
+    ]
+  }
+]

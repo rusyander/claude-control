@@ -5,7 +5,7 @@ import mrEchoTrim from './lib/mr-echo-trim.mjs';
 import { runIfMain } from './lib/items.mjs';
 
 export const hooks = {
-  // An object, not text: the dispatcher sends it as `updatedMCPToolOutput` (Claude only).
+  // An object, not text: the dispatcher sends it as `updatedMCPToolOutput` (Claude; OpenCode through its plugin shim).
   'post-any': (input) => {
     const output = mrEchoTrim(input);
     return output == null ? null : { updatedMCPToolOutput: output };

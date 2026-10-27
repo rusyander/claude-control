@@ -63,6 +63,7 @@ export function wireForeignShellJudge(deps: ForeignShellJudgeWiringDeps): void {
         ...(reason.params ? { reasonParams: reason.params } : {}),
         kind: 'permission',
         cwd: call.cwd,
+        ...(call.shellCwd ? { shellCwd: call.shellCwd } : {}),
         source: sourceOfRun(store, call.scope, call.cwd, call.title),
       }).message;
     },
@@ -86,6 +87,7 @@ export function wireForeignShellJudge(deps: ForeignShellJudgeWiringDeps): void {
         allowEdits: call.allowEdits,
         ...(call.title ? { title: call.title } : {}),
         ...(call.pid ? { pid: call.pid } : {}),
+        ...(call.session ? { session: call.session } : {}),
       },
       {
         store,

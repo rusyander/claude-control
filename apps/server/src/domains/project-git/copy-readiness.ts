@@ -5,6 +5,7 @@ import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { copyProjectAccess, projectKey } from './copy-access.ts';
+import { addMissingHooks, LOCAL_SETTINGS, missingHookLabels } from './copy-hooks.ts';
 import { LINK_DIRS, mirrorLocalLayer } from './mirror-local.ts';
 import { layoutForCwd } from './cwd-layout.ts';
 
@@ -42,13 +43,16 @@ const CRITICAL: readonly string[] = [
   '.env',
 ];
 
-export type CopyGapKind = 'file' | 'link' | 'access' | 'mcp';
+export type CopyGapKind = 'file' | 'link' | 'access' | 'mcp' | 'hooks';
 
 export interface CopyGap {
   kind: CopyGapKind;
   /** Путь относительно корня копии или ключ записи доступа. */
   path: string;
-  /** `mcp`: серверы оригинала, которых нет в `.mcp.json` копии. */
+  /**
+   * `mcp`: серверы оригинала, которых нет в `.mcp.json` копии;
+   * `hooks`: хуки оригинала, не прописанные в `settings.local.json` копии.
+   */
   names?: string[];
 }
 
@@ -149,6 +153,11 @@ export function checkCopyReady(input: {
     if (names.length > 0) gaps.push({ kind: 'mcp', path: MCP_CONFIG, names });
   }
 
+  // Скрипты хуков копия видит ссылкой, а их запись — копией файла на день
+  // создания (`copy-hooks.ts`). Лишние хуки копии — не дыра, как и серверы.
+  const hooks = missingHookLabels(input.mainDir, input.copyDir);
+  if (hooks.length > 0) gaps.push({ kind: 'hooks', path: LOCAL_SETTINGS, names: hooks });
+
   for (const rel of LINK_DIRS) {
     if (!isDir(join(input.mainDir, rel))) continue;
     // Мёртвая ссылка ведёт себя хуже отсутствия: каталог как бы есть, а читать
@@ -218,13 +227,22 @@ export async function repairCopy(input: {
   // дыру видно только по содержимому — и переписывается он поверх времени.
   const before = checkCopyReady(input);
   const force = before.gaps.filter((gap) => gap.kind === 'mcp').map((gap) => gap.path);
+  // Дыра одних хуков зеркала не зовёт: повторный перенос переписал бы поверх
+  // копии всё, что в оригинале свежее, — ради нескольких записей одного файла.
+  if (before.gaps.some((gap) => gap.kind !== 'hooks')) {
+    try {
+      await mirrorLocalLayer(input.mainDir, input.copyDir, input.mirror, {
+        newerOnly: true,
+        ...(force.length > 0 ? { force } : {}),
+      });
+    } catch {
+      // Причину назовёт сверка ниже — дыры важнее текста ошибки переноса.
+    }
+  }
   try {
-    await mirrorLocalLayer(input.mainDir, input.copyDir, input.mirror, {
-      newerOnly: true,
-      ...(force.length > 0 ? { force } : {}),
-    });
+    addMissingHooks(input.mainDir, input.copyDir);
   } catch {
-    // Причину назовёт сверка ниже — дыры важнее текста ошибки переноса.
+    // Не записалось — сверка ниже оставит дыру `hooks` и назовёт её.
   }
   if (input.claudeJsonPath) {
     copyProjectAccess(input.claudeJsonPath, input.mainDir, input.copyDir);
@@ -242,6 +260,7 @@ export function describeGaps(gaps: readonly CopyGap[]): string {
   const links = gaps.filter((gap) => gap.kind === 'link').map((gap) => gap.path);
   const access = gaps.some((gap) => gap.kind === 'access');
   const servers = gaps.flatMap((gap) => (gap.kind === 'mcp' ? (gap.names ?? []) : []));
+  const hooks = gaps.flatMap((gap) => (gap.kind === 'hooks' ? (gap.names ?? []) : []));
   const parts: string[] = [];
   if (files.length > 0)
     parts.push(serverText('worktree-copy-gap-files', { files: files.join(', ') }));
@@ -249,6 +268,8 @@ export function describeGaps(gaps: readonly CopyGap[]): string {
     parts.push(serverText('worktree-copy-gap-links', { links: links.join(', ') }));
   if (servers.length > 0)
     parts.push(serverText('worktree-copy-gap-mcp', { names: servers.join(', ') }));
+  if (hooks.length > 0)
+    parts.push(serverText('worktree-copy-gap-hooks', { names: hooks.join(', ') }));
   if (access) parts.push(serverText('worktree-copy-gap-access'));
   return parts.join('; ');
 }

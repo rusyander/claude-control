@@ -219,6 +219,7 @@ export class DeferredAsks {
       askedAt: new Date(at).toISOString(),
       expiresAt: new Date(at + this.ttl()).toISOString(),
       ...(input.cwd ? { cwd: input.cwd } : {}),
+      ...(input.shellCwd ? { shellCwd: input.shellCwd } : {}),
       source: input.source ?? {},
     };
     this.state.next += 1;

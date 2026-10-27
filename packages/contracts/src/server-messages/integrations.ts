@@ -64,4 +64,5 @@ export const integrationsMessageParams = {
   'tms-run-already-sending': ['runId'],
   'integrations-bridge-script-missing': [],
   'tms-run-cases-not-found': ['because', 'system'],
+  'telegram-connect-no-candidate': [],
 } as const satisfies Record<string, readonly string[]>;

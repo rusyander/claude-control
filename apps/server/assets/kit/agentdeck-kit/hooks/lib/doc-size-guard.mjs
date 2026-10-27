@@ -18,6 +18,12 @@ const MAX_BYTES = 30 * 1024;
 // two windows, 18.10.2026). Above ~Read's own token cap it still gets the windows.
 const PERSISTED_MAX = 96 * 1024;
 const PERSISTED = /[\\/]tool-results[\\/]/;
+// A deep-review lane brief (`review-plan` writes it, the spawn stub says «Read it first, in one Read»):
+// the file IS the lane's task, read once whole by design (a 31 KB brief refused cost a measured review 6
+// errors over 66 brief reads). Only a `lane-*prompt*.md` name under `.agent/tmp/review-<slug>/` (or its
+// `plan/`) — `prompt` may sit mid-name: a rerun brief `lane-A-prompt-r2.md` was refused.
+const LANE_BRIEF =
+  /[\\/]\.agent[\\/]tmp[\\/]review-[^\\/]+[\\/](?:plan[\\/])?lane-[^\\/]*prompt[^\\/]*\.md$/i;
 
 export default function docSizeGuard(input) {
   if (process.env.AGENTDECK_KIT_DOC_SIZE === '0' || process.env.CLAUDE_DOC_SIZE === '0')
@@ -30,7 +36,7 @@ export default function docSizeGuard(input) {
 
   // Already chunked — correct usage, pass.
   if (ti.offset != null || ti.limit != null) return null;
-  if (EXEMPT.test(filePath)) return null;
+  if (EXEMPT.test(filePath) || LANE_BRIEF.test(filePath)) return null;
 
   let size;
   try {

@@ -75,4 +75,95 @@ describe('AgentRow', () => {
     expect(html).toContain('оборван: процесс разговора закрылся');
     expect(html).not.toContain('писал');
   });
+
+  const tree = {
+    level: 2,
+    isTabStop: true,
+    isSelected: false,
+    onToggle: () => undefined,
+    onOpen: () => undefined,
+    isStopping: false,
+  };
+
+  it('узел дерева: ARIA-уровень, остановка Tab, модель, вызовы, токены, время, последнее', () => {
+    const done = {
+      ...agent,
+      agentId: 'a1e0',
+      status: 'done' as const,
+      model: 'claude-haiku-4-5-20251001',
+      toolCalls: 3,
+      tokens: { input: 1200, output: 300, cacheRead: 9000, cacheCreation: 0 },
+      startedAt: '2026-10-14T15:36:13.000Z',
+      endedAt: '2026-10-14T15:39:43.000Z',
+      lastAction: 'Отчёты в src/reports/build.ts',
+    };
+    const html = renderToStaticMarkup(
+      <AgentRow agent={done} isRunning={false} processAlive now={now} tree={tree} />,
+    );
+    expect(html).toContain('role="treeitem"');
+    expect(html).toContain('aria-level="2"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('data-agent-node="a1e0"');
+    expect(html).not.toContain('aria-expanded');
+    expect(html).toContain('haiku-4-5 · 3 вызова · 10.5k ток. · за 3м 30с');
+    expect(html).toContain('последнее: Отчёты в src/reports/build.ts');
+  });
+
+  it('идущий с остановкой: кнопка, итог запроса строкой; остановленный — «остановлен»', () => {
+    const running = { ...agent, agentId: 'a2e0', toolCalls: 1 };
+    const html = renderToStaticMarkup(
+      <AgentRow
+        agent={running}
+        isRunning={false}
+        processAlive
+        now={now}
+        tree={{ ...tree, expanded: true, onStop: () => undefined, stopNote: 'остановка запрошена' }}
+      />,
+    );
+    expect(html).toContain('data-agent-stop');
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('остановка запрошена');
+    const stopped = renderToStaticMarkup(
+      <AgentRow
+        agent={{ ...running, status: 'failed', stopped: true }}
+        isRunning={false}
+        processAlive
+        now={now}
+      />,
+    );
+    expect(stopped).toContain('data-agent-view="stopped"');
+    expect(stopped).toContain('остановлен');
+    expect(stopped).not.toContain('упал');
+  });
+
+  it('скиллы, хуки и MCP под метриками; с onExtensions — кнопка окна этого агента', () => {
+    const used = {
+      ...agent,
+      status: 'done' as const,
+      extensions: [
+        { kind: 'skill' as const, name: 'deep-review', count: 1 },
+        { kind: 'hook' as const, name: 'git-guard', count: 2 },
+      ],
+    };
+    const plain = renderToStaticMarkup(
+      <AgentRow agent={used} isRunning={false} processAlive now={now} tree={tree} />,
+    );
+    expect(plain).toContain('data-agent-extensions');
+    expect(plain).toContain('deep-review');
+    expect(plain).not.toContain('aria-label="Скиллы, хуки и MCP агента');
+    const openable = renderToStaticMarkup(
+      <AgentRow
+        agent={used}
+        isRunning={false}
+        processAlive
+        now={now}
+        tree={{ ...tree, onExtensions: () => undefined }}
+      />,
+    );
+    expect(openable).toContain('aria-label="Скиллы, хуки и MCP агента «Fetch MR !990»"');
+    const none = renderToStaticMarkup(
+      <AgentRow agent={{ ...agent, status: 'done' }} isRunning={false} now={now} />,
+    );
+    expect(none).not.toContain('data-agent-extensions');
+  });
 });

@@ -84,6 +84,18 @@ export function KitTopic() {
         />
       </HelpSection>
 
+      {/* Наблюдение — отдельно от таблицы хуков: человек ищет «как следить за группами на другой машине», а не хук. */}
+      <HelpSection title={tr('watchTitle')} caption={tr('watchCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <Callout tone="info" title={tr('watchStartTitle')}>
+            {tr('watchStartText')}
+          </Callout>
+          <Callout tone="info" title={tr('watchHoldTitle')}>
+            {tr('watchHoldText')}
+          </Callout>
+        </Stack>
+      </HelpSection>
+
       <HelpSection title={tr('globalTitle')} caption={tr('globalCaption')}>
         <GuideSteps>
           <GuideStep title={tr('globalDiffers')} text={tr('globalCaption')}>

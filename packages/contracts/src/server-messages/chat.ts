@@ -124,6 +124,7 @@ export const chatMessageParams = {
   'split-drop-nothing': [],
   'split-continue-nothing': [],
   'split-recheck-nothing': [],
+  'split-recheck-note-invalid': ['max'],
   'split-recheck-merged': [],
   'split-recheck-closed': [],
   'split-tasks-jira-off': [],
@@ -140,5 +141,7 @@ export const chatMessageParams = {
   'chat-keep-session-gone': [],
   'branch-stop-unconfirmed': ['path'],
   'chat-pin-invalid': [],
+  'agent-id-invalid': [],
+  'agent-not-found': [],
   'chat-pin-child': [],
 } as const satisfies Record<string, readonly string[]>;

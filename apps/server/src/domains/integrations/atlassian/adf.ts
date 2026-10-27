@@ -16,6 +16,8 @@ export interface AdfNode {
   type?: string;
   text?: string;
   content?: AdfNode[];
+  /** Адрес «умной ссылки» (`inlineCard`, `blockCard`): текста у такого узла нет. */
+  attrs?: { url?: unknown };
   /** Есть только у корня документа; без неё облако отвечает 400. */
   version?: number;
 }
@@ -51,6 +53,16 @@ function collect(node: AdfNode, lines: string[]): void {
   if (node.type === 'text' && typeof node.text === 'string') {
     if (lines.length === 0) lines.push('');
     lines[lines.length - 1] += node.text;
+    return;
+  }
+  // Ссылка карточкой — только адрес: без него комментарий «MR: <карточка>» читался бы
+  // без ссылки, и проверка доставки не нашла бы в задаче MR (аудит g3 R7).
+  if (
+    (node.type === 'inlineCard' || node.type === 'blockCard') &&
+    typeof node.attrs?.url === 'string'
+  ) {
+    if (lines.length === 0 || node.type === 'blockCard') lines.push('');
+    lines[lines.length - 1] += node.attrs.url;
     return;
   }
   if (node.type === 'hardBreak') {

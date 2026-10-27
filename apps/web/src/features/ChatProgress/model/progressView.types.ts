@@ -8,8 +8,11 @@ import type { ProgressAgent, ProgressShell, ProgressActiveTool } from '@agentdec
  */
 export type ShellView = ProgressShell['status'] | 'lost';
 
-/** То же для субагента: `lost` — процесс разговора умер, пока он «работал». */
-export type AgentView = ProgressAgent['status'] | 'lost';
+/**
+ * То же для субагента: `lost` — процесс разговора умер, пока он «работал»;
+ * `stopped` — снят по просьбе («Остановить», TaskStop агента).
+ */
+export type AgentView = ProgressAgent['status'] | 'lost' | 'stopped';
 
 /**
  * Чистая выжимка для шапки панели прогресса. Вынесена из компонента, чтобы

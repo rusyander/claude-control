@@ -470,6 +470,7 @@ export const ROWS: Readonly<Record<string, Row>> = {
   request_chat_handoff: [['card', { chat: CHAT }]],
   read_model_cascade: [['done', proj()]],
   set_model_cascade: [['card', proj({ enabled: false })]],
+  set_review_after_work: [['card', proj({ enabled: false })]],
   list_lowered_runs: [['done']],
   read_split_overlap: [['failed', { chat: CHAT }]],
   split_accept_group: [['failed', { chat: CHAT, group: 0 }]],

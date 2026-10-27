@@ -9,6 +9,7 @@ import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { withCodexKit } from '../../kit/codex.ts';
+import type { ProviderStreamRowListener } from '../../../providers/types/assistant.ts';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
 import { providerCliCommand } from '../../../providers/cli/cli.ts';
 import { resolveRunner, getRawKey } from '../../provider-keys/provider-keys.ts';
@@ -18,6 +19,11 @@ import {
   type OpencodeServe,
   type OpencodeSessionOutcome,
 } from '../../opencode-serve/opencode-serve.ts';
+import {
+  OPENCODE_TOOL_DENY_ENV,
+  readToolDeny,
+  withToolDenyEnv,
+} from '../../opencode-serve/tool-deny.ts';
 import type {
   SessionStartSource,
   SupervisorEventInput,
@@ -33,6 +39,7 @@ import { MAX_PROMPT_CHARS, buildPrompt } from '../prompt/prompt.ts';
 import { createLiveTurn } from '../live/index.ts';
 import type { LivePermissionPolicy, LiveSessionRequest, LiveTurn } from '../live/types.ts';
 import { digestPreamble, type LiveSessionPrevious } from '../live-session/live-session.ts';
+import { withChatNode, type ChatNodeDeps } from '../../project-git/chat-node.ts';
 
 /** У прогона есть своё окружение (контур, набор, слой группы). */
 /**
@@ -49,12 +56,36 @@ const stripAnsi = (text: string): string => text.replace(ANSI, '');
  * Окружение, без которого ход идти не может (адрес контура, слой группы), —
  * оно уводит ход с общего сервера в одиночный запуск. Необязательные ключи
  * (`optionalEnvKeys`) не в счёт: настройку прогона ребёнка общий сервер
- * просто не получит, как до неё (ревью B2-F16).
+ * просто не получит, как до неё (ревью B2-F16). Стадия звена, доставка впереди и
+ * путь к tests-cli в список не входят (P-30, `CHILD_BINDING_ENV` службы): без них
+ * гейт и доставка звена судили бы ход как обычную сессию — такой ход идёт своим запуском.
  */
-const bindsEnv = (options: ProviderChatRunOptions): boolean => {
-  const optional = new Set(options.optionalEnvKeys ?? []);
+const bindsEnv = (options: ProviderChatRunOptions, own: readonly string[] = []): boolean => {
+  const optional = new Set([...(options.optionalEnvKeys ?? []), ...own]);
   return Object.keys(options.platformEnv ?? {}).some((key) => !optional.has(key));
 };
+
+/**
+ * Node проекта (`.nvmrc`, `engines`…) — первым в PATH процесса чужого CLI, как у Claude
+ * (`ChatRunner` → `withChatNode`). P-32: группа Qwen/Codex шла на Node по умолчанию (24),
+ * проект просил 22 — гейт отказывал проверкой движка, и путь к нужной версии агент искал сам.
+ * Возвращается только добавка: изменённый ключ пути поверх `env` прогона, остальное окружение
+ * `spawnCliProcess` берёт из процесса сервера, как и раньше.
+ */
+function withProjectNode(
+  options: ProviderChatRunOptions,
+  env: Record<string, string>,
+  command: string,
+): Record<string, string> {
+  if (!options.workdir) return env;
+  const base: NodeJS.ProcessEnv = { ...process.env, ...env };
+  const next = withChatNode(options.workdir, base, command, options.chatNodeDeps);
+  if (next === base) return env;
+  const out = { ...env };
+  for (const [key, value] of Object.entries(next))
+    if (value !== undefined && value !== base[key]) out[key] = value;
+  return out;
+}
 
 /** Откуда прогон берёт каталог скиллов и тело названного (П3.4). */
 export interface SkillTurnSource {
@@ -153,6 +184,7 @@ export interface ProviderChatRunOptions {
    * Ключи `platformEnv`, без которых ход может идти общим сервером сессий или
    * живым сервером: настройка прогона ребёнка разделения (потолок vitest,
    * короткий вывод тестов). Одиночный запуск их получает, общий сервер — нет.
+   * Ключи звена (стадия, доставка впереди, tests-cli панели) служба сюда не кладёт (P-30).
    */
   optionalEnvKeys?: readonly string[];
   /**
@@ -199,6 +231,8 @@ export interface ProviderChatRunOptions {
   fetchImpl?: typeof fetch;
   detect?: (command: string) => boolean;
   sessionServe?: OpencodeServe;
+  /** Где искать Node проекта (P-32); не задано — настоящая машина. */
+  chatNodeDeps?: ChatNodeDeps;
   /**
    * Подмена живого хода (В1). Подменённый `spawnImpl` без неё живой путь
    * отключает: подделка процесса говорит протоколом одиночного запуска, а не
@@ -220,6 +254,11 @@ export interface ProviderChatRunOptions {
    * прогона заменяется (`appendRunInput`). Отказ до запуска — не зовётся.
    */
   onInput?: (text: string) => void;
+  /**
+   * Каждая строка потока JSON разового хода, разобранная парсером CLI (`parseStdout`), —
+   * сторожу групп. У CLI без своего разбора потока не зовётся.
+   */
+  onStreamRow?: ProviderStreamRowListener;
 }
 
 export interface ProviderChatRunLike {
@@ -575,8 +614,10 @@ export class ProviderChatRun implements ProviderChatRunLike {
     if (provider.assistant?.sessionServer !== 'opencode') return undefined;
     // Сервер сессий общий на все разговоры: окружение ЭТОГО прогона (адрес
     // контура в `OPENCODE_CONFIG_CONTENT`) до него не доходит, и ход ушёл бы
-    // провайдером человека. С окружением — только одиночный запуск.
-    if (bindsEnv(options)) return undefined;
+    // провайдером человека. С окружением — только одиночный запуск. Снятые инструменты
+    // группы (P-16) сессия применяет сама — правилами набора, ход они не уводят.
+    if (bindsEnv(options, [OPENCODE_TOOL_DENY_ENV])) return undefined;
+    const toolDeny = readToolDeny(options.platformEnv);
 
     const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
     if (!lastUser?.content.trim()) return undefined;
@@ -605,6 +646,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
       ...(options.permission ? { permission: options.permission } : {}),
       ...(onDelta ? { onDelta } : {}),
       ...(options.onInput ? { onSent: options.onInput } : {}),
+      ...(toolDeny.length > 0 ? { toolDeny } : {}),
       opening,
     });
 
@@ -647,16 +689,17 @@ export class ProviderChatRun implements ProviderChatRunLike {
       told = text;
       options.onInput?.(text);
     };
+    const command = cliCommand ?? providerCliCommand(options.provider);
+    // Живой сервер запускается на ход — ему тот же Node проекта, что одиночному запуску (P-32).
+    const env = withProjectNode(options, options.platformEnv ?? {}, command);
     const result = await turn.run(
       {
-        command: cliCommand ?? providerCliCommand(options.provider),
+        command,
         ...(session ? { session } : {}),
         prompt,
         timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         ...(options.workdir ? { workdir: options.workdir } : {}),
-        ...(options.platformEnv && Object.keys(options.platformEnv).length > 0
-          ? { env: options.platformEnv }
-          : {}),
+        ...(Object.keys(env).length > 0 ? { env } : {}),
         ...(options.portableEnv ? { portableEnv: options.portableEnv } : {}),
         ...(options.model ? { model: options.model } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
@@ -819,11 +862,21 @@ export class ProviderChatRun implements ProviderChatRunLike {
     // `PWD` — вслед за `cwd`: унаследованный от оболочки панели, он указывал бы на
     // её каталог, а `opencode run` берёт каталог проекта из `PWD`, а не из `cwd`
     // (проверено 1.18.34) — и правил файлы мимо разговора.
-    const env = {
-      ...kit.env,
-      ...runEnv,
-      ...(options.workdir ? { PWD: options.workdir } : {}),
-    };
+    // Снятые инструменты группы OpenCode (P-16) — правилами `OPENCODE_PERMISSION`, ключ
+    // панели до CLI не доходит.
+    // Node проекта — первым в PATH (P-32), впереди PATH, собранного выше для прогона.
+    const env = withProjectNode(
+      options,
+      withToolDenyEnv(
+        {
+          ...kit.env,
+          ...runEnv,
+          ...(options.workdir ? { PWD: options.workdir } : {}),
+        },
+        process.env.OPENCODE_PERMISSION,
+      ),
+      command,
+    );
     const spawned = spawnCliProcess(command, kit.args, {
       spawnImpl: options.spawnImpl,
       ...(options.workdir ? { cwd: options.workdir } : {}),
@@ -857,7 +910,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
       const errDecoder = new TextDecoder('utf8');
       // Свой разбор stdout — у CLI, что печатает вокруг ответа служебный вывод или
       // отвечает потоком JSON. Не задан — stdout и есть ответ.
-      const parser = options.provider.assistant?.parseStdout?.();
+      const parser = options.provider.assistant?.parseStdout?.(options.onStreamRow);
       let reply = '';
       let errorText = '';
       let timedOut = false;

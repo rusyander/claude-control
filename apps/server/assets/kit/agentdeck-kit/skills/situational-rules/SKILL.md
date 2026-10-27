@@ -21,6 +21,7 @@ the left column, read the reference on the right (once per session, again after 
 | start or stop a local model (ollama, llama.cpp, LM Studio)                       | [local-models](references/local-models.md)             |
 | render a PDF or write print CSS                                                  | [pdf-layout](references/pdf-layout.md)                 |
 | write a Markdown file (where it goes, which language)                            | [doc-classification](references/doc-classification.md) |
+| take proposed tasks into work, finish one, read or write a `TASKS.md`            | [task-ledger](references/task-ledger.md)               |
 | edit a hook script or hook wiring                                                | [hook-authoring](references/hook-authoring.md)         |
 | edit an instruction file, skill, agent, rule, MCP or plugin config               | [config-work](references/config-work.md)               |
 

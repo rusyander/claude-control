@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatLink, SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts';
-import { matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
+import { localizeText, matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
 import {
   corruptObjectStore,
   DELIVERY_BUSY_RECHECK_MS,
@@ -144,6 +144,59 @@ describe('повтор панели вместо сдачи', () => {
     // Разбор — с потолком напоминаний (повтор ставит счёт на потолок), не «встало».
     expect(h.group()?.deliveryEscalatedAt).toBeDefined();
     expect(h.group()?.deliveryRetry).toEqual({ count: 1, kind: 'escalate' });
+  });
+});
+
+describe('«Продолжить» сданной группы несёт её пробелы доставки', () => {
+  // Живой прогон 25.10 (g0 d9869abf): слово несло причину сбоя, обрезанную до 300
+  // знаков, — конфликт и начало «чужих −»; живые сита и Тесты-пробелы, а с ними
+  // метка «not checked:», до группы не доходили, и круг уходил на напоминание.
+  const conflict = serverText('sieve-gap-conflicts', { files: 'api/chat/tool_guard.py' });
+  const live = serverText('sieve-gap-failed', {
+    sieve: 'branch-backend-stand',
+    evidence: 'стенд с бэкендом ветки не поднимался; тесты run:e85ab8a8 '.repeat(4),
+  });
+
+  it('каждый пробел полностью, правило меток и без «нужен человек» о самой панели', async () => {
+    const h = harness([], { resume: 'sent' });
+    await h.start();
+    patch(h, (group) => {
+      group.status = 'failed';
+      group.deliveryMissing = [
+        serverText('split-delivery-escalation-stalled', { nudges: 2 }),
+        conflict,
+        live,
+      ];
+      group.error = serverText('split-delivery-incomplete', {
+        missing: (group.deliveryMissing ?? []).join('; '),
+      });
+    });
+
+    expect(h.conveyor.continueGroup('родитель', 0, true)).toBe('sent');
+    const prompt = h.words.find((word) => word.via === 'continue')?.prompt ?? '';
+    expect(prompt).toContain(`- ${localizeText(conflict, 'en')}`);
+    expect(prompt).toContain(`- ${localizeText(live, 'en')}`);
+    expect(prompt).toContain('evidence starting "not checked: <reason>"');
+    // Аудит g1 27.10 (F11): живое сито доказывает только кейс, сделанный человеком; причина
+    // «нет такого кейса», а не «нет браузера».
+    expect(prompt).toContain('«no human-made live case covers <what>»');
+    expect(prompt).not.toContain('a human is needed');
+    // Причина сбоя — те же пробелы: второй раз обрывком она не идёт.
+    expect(prompt).not.toContain('the last turn stopped: delivery not completed');
+  });
+
+  it('сбой не доставки и без пробелов — прежнее слово с причиной', async () => {
+    const h = harness([], { resume: 'sent' });
+    await h.start();
+    patch(h, (group) => {
+      group.status = 'failed';
+      group.error = 'CLI access ended';
+    });
+
+    h.conveyor.continueGroup('родитель', 0, true);
+    const prompt = h.words.find((word) => word.via === 'continue')?.prompt ?? '';
+    expect(prompt).toContain('the last turn stopped: CLI access ended');
+    expect(prompt).toContain("Then finish the group's tasks on the branch feature/users.");
   });
 });
 

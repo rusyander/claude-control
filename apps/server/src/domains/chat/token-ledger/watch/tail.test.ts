@@ -167,7 +167,7 @@ describe('transcript tail', () => {
     const read = createTranscriptReader();
     expect(
       read({ type: 'user', timestamp: '2026-10-20T10:00:00Z', message: { content: 'go on' } }),
-    ).toEqual([{ kind: 'start', t: Date.parse('2026-10-20T10:00:00Z') }]);
+    ).toEqual([{ kind: 'start', t: Date.parse('2026-10-20T10:00:00Z'), chars: 5 }]);
     expect(
       read({ type: 'system', subtype: 'compact_boundary', timestamp: '2026-10-20T10:00:00Z' }),
     ).toEqual([{ kind: 'compact', t: Date.parse('2026-10-20T10:00:00Z') }]);

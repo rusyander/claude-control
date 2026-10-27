@@ -74,6 +74,12 @@ export function mergeSignals(
         numbers = true;
       active.numbers = hit.numbers;
       if (hit.params) active.params = hit.params;
+      // Сменился вид беды внутри правила (R16: открыт долго → шёл долго) — строка другая.
+      const textKey = hit.textKey ?? `groupWatch.rule.${hit.rule}`;
+      if (active.textKey !== textKey) {
+        active.textKey = textKey;
+        numbers = true;
+      }
       // Важность выросла (вопрос висит дольше `askAlertMinutes`) — тот же сигнал, но снова
       // кандидат наружу: «внимание» ушло один раз, а ночь у карточки — уже тревога (C02).
       // Вниз не идёт: тревога держится, пока условие не кончится.
@@ -94,7 +100,7 @@ export function mergeSignals(
       // Битое время повода — «сейчас»: `toISOString` от NaN бросает и роняет весь тик.
       at: new Date(Number.isFinite(hit.since) ? Math.min(hit.since, now) : now).toISOString(),
       numbers: hit.numbers,
-      textKey: `groupWatch.rule.${hit.rule}`,
+      textKey: hit.textKey ?? `groupWatch.rule.${hit.rule}`,
       ...(hit.params ? { params: hit.params } : {}),
     };
     signals.push(signal);

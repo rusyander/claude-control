@@ -10,7 +10,9 @@
 // of the identical call (the escape).
 // A shell write into a Markdown file (redirect, tee, Set-Content) is denied too, scratch places aside:
 // it puts a doc past the language and doc-location guards on Edit/Write.
-import { normalize } from 'node:path';
+import { readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join, normalize } from 'node:path';
 import { expand, variables } from './destructive-guard.mjs';
 import { commandText, executedText } from './shell-text.mjs';
 import { shellWords } from './split-worktree.mjs';
@@ -37,6 +39,8 @@ function pathWords(text) {
     if (word.startsWith('//') && text[m.index - 1] === ':') continue;
     // A sed/perl script (`s/a/b/g`, `y/ab/cd/`; PATH_WORD's `\b` may cut its last delimiter) names no file.
     if (/^[sy]([/|#,:@]).*\1/.test(word) && !/\.\w+$/.test(word)) continue;
+    // A string escape in code (`"\tif x {\n\t\treturn"`) is no path; a real one carries its drive.
+    if (/^\\[ntr]/.test(word)) continue;
     out.push(word);
   }
   return out;
@@ -52,15 +56,21 @@ const ABSOLUTE = /^(?:[A-Za-z]:)?[\\/]|^[~$%]/;
 function targets(raw, cwd) {
   const text = commandText(raw);
   let dir = String(cwd ?? '');
+  let cdEnd = 0;
   const out = [];
   for (const { seg, at } of segments(raw)) {
     const cd = /^\s*cd\s+["']?([^\s"';&|]+)/.exec(seg);
     if (cd) {
-      dir = resolveIn(dir, cd[1]);
+      dir = cdInto(dir, cd[1], text, at);
+      cdEnd = at + seg.length;
       continue;
     }
     if (!SED_INPLACE.test(seg) && !INLINE.test(seg) && !WRITES.test(seg)) continue;
-    const words = (SED_INPLACE.test(seg) && sedFiles(seg)) || pathWords(seg);
+    // A write naming no path (`p='x.go'` on one line, `open(p,'w')` on the next) is judged by its directory
+    // plus every path named from that `cd` on; with no `cd` the directory is the project and the deny stands.
+    const named = (SED_INPLACE.test(seg) && sedFiles(seg)) || pathWords(seg);
+    const words = named.length ? named : pathWords(text.slice(cdEnd));
+    if (!named.length) out.push(dir);
     const vars = variables(text, at);
     for (const word of words)
       for (const value of expand(word, vars)) out.push(resolveIn(dir, value));
@@ -119,6 +129,132 @@ function resolveIn(dir, word) {
   return ABSOLUTE.test(word) || !dir ? word : normalize(`${dir}/${word}`);
 }
 
+/**
+ * The directory a `cd` enters, a variable the command assigned before it expanded (`cd $S/inst-auth` after
+ * `S=$W/.agent/tmp/…` stayed `$S/…`, so the scratch copy's file read as a project file). Several values
+ * (a `for` list) keep the word as is — the judge stays on the safe side.
+ */
+function cdInto(dir, word, text, at) {
+  const values = expand(word, variables(text, at));
+  return resolveIn(dir, values.length === 1 ? values[0] : word);
+}
+
+// A script FILE run by path passes this guard (see the head), yet every check keyed on an Edit/Write path
+// still needs the files it writes: after a compaction a split group made 17 UI edits through
+// `cat > /tmp/x.mjs <<'EOF' … fs.writeFileSync(p, s) … EOF` + `node /tmp/x.mjs` with the package rules
+// unread, because rule-injector's card gate keys on `file_path`. `codeWrites` names those files for it.
+const SCRIPT_RUN =
+  /^\s*(?:\w+=\S*\s+)*(node|nodejs|tsx|python3?|py|bash|sh)(?:\.exe)?((?:\s+-{1,2}[\w-]+(?:=\S+)?)*)\s+["']?([^\s"';&|<>()]+)/i;
+// Flags after which the next word is code or a module, not a script file.
+const NOT_A_SCRIPT = /(?:^|\s)(?:-e|--eval|-p|--print|-c|-m)(?=\s|=|$)/;
+const HEREDOC_BODY =
+  /(^|\n)([^\n]*?)<<-?\s*(['"]?)([A-Za-z_]\w*)\3([^\n]*)\n([\s\S]*?)\n[ \t]*\4(?=\s|$)/g;
+const REDIRECT_TO = /(?:\d?>{1,2}(?!&)|\btee\s+(?:-a\s+)?)\s*["']?([^\s"';&|<>()]+)/;
+const SCRIPT_MAX = 256 * 1024;
+
+/** Heredocs of the command that land in a file: `{ word, body }` per redirect/tee target. */
+function heredocFiles(raw) {
+  const out = [];
+  for (const m of String(raw).matchAll(HEREDOC_BODY)) {
+    const to = REDIRECT_TO.exec(`${m[2]} ${m[5]}`)?.[1];
+    if (to) out.push({ word: to, body: m[6] });
+  }
+  return out;
+}
+
+// `$TEMP` / `%TEMP%` name the real temp dir; Git Bash's `/tmp` is the same dir on Windows.
+function tempPlaces(word) {
+  const temp = process.env.TEMP || process.env.TMP || tmpdir();
+  const out = [
+    word.replace(/\$\{?(?:TEMP|TMP|TMPDIR)\}?|%(?:TEMP|TMP)%/gi, temp.replace(/\\/g, '/')),
+  ];
+  if (process.platform === 'win32' && /^\/tmp\//.test(word))
+    out.push(join(tmpdir(), word.slice(5)));
+  return out;
+}
+
+/** The text of the script `word` runs: a heredoc of the same command, else a small scratch file. */
+function scriptBody(word, dir, heredocs) {
+  const own = heredocs.filter((h) => h.word === word || basename(h.word) === basename(word));
+  if (own.length) return own[own.length - 1].body;
+  for (const place of tempPlaces(word)) {
+    const path = resolveIn(dir, place);
+    if (!SCRATCH.test(path) && !SCRATCH.test(word)) continue;
+    try {
+      if (statSync(path).size <= SCRIPT_MAX) return readFileSync(path, 'utf8');
+    } catch {
+      /* not there */
+    }
+  }
+  return null;
+}
+
+// `const base = 'pkg/src/Form/'` then `base + 'types.ts'`, `${base}x.tsx`, `join(base, 'x')`, `base / 'x'`.
+const STRING_VAR =
+  /(?:\b(?:const|let|var)\s+|^[ \t]*)([A-Za-z_$][\w$]*)\s*=\s*(?:[\w.]+\(\s*)?(['"`])([^'"`\n]*)\2/gm;
+const JOINS = [
+  [/([A-Za-z_$][\w$]*)\s*\+\s*(['"`])([^'"`\n]+)\2/g, 1, 3, ''],
+  [/`\$\{([A-Za-z_$][\w$]*)\}([^`\n]+)`/g, 1, 2, ''],
+  [/\bjoin\(\s*([A-Za-z_$][\w$]*)\s*,\s*(['"])([^'"\n]+)\2/g, 1, 3, '/'],
+  [/\b([A-Za-z_]\w*)\s*\/\s*(['"])([^'"\n]+)\2/g, 1, 3, '/'],
+];
+function joinedPaths(body) {
+  const vars = new Map();
+  for (const m of body.matchAll(STRING_VAR)) if (!m[3].includes('${')) vars.set(m[1], m[3]);
+  const out = [];
+  if (!vars.size) return out;
+  for (const [re, name, tail, sep] of JOINS)
+    for (const m of body.matchAll(re))
+      if (vars.has(m[name]) && !m[tail].includes('${')) out.push(vars.get(m[name]) + sep + m[tail]);
+  return out;
+}
+
+// A shell redirect or tee into a source file (`cat > src/x.tsx <<EOF`, `echo … >> f`, `| tee -a f`) edits it as
+// much as a script does: `shellWrites` (below) takes every target the way it takes Markdown ones. A target
+// is judged like an Edit of it — scratch drops out here, the null device and a log (`> out.log`) match no
+// rule's file class; fd duplications (`2>&1`, `>&2`) name no target.
+const ANY_TARGET = /^\s*["']?([^\s"';&|<>()]+)(?=["'\s;&|)]|$)/;
+
+function scriptTargets(body, lang, dir, depth) {
+  if (/^(?:bash|sh)$/i.test(lang)) return depth < 2 ? codeWrites(body, dir, depth + 1) : [];
+  if (!WRITES.test(body)) return [];
+  return [...pathWords(body), ...joinedPaths(body)].map((w) => resolveIn(dir, w));
+}
+
+/**
+ * The non-scratch files this command writes through code: an inline edit (`node -e`, `python - <<EOF`,
+ * `sed -i`, `perl -pi` — what `inlineEdit` judges, here also after its repeat escape), a shell redirect or
+ * tee target, and a script run by path, its body taken from a heredoc of the same command, else from a small
+ * scratch file on disk. Every path word of a writing script counts: a name it only reads errs on the safe side.
+ */
+export function codeWrites(raw, cwd = '', depth = 0) {
+  const text = commandText(raw);
+  const out = [];
+  const command = executedText(raw, { code: 'keep' });
+  if (
+    SED_INPLACE.test(executedText(raw, { code: 'spawn' })) ||
+    (INLINE.test(command) && WRITES.test(command))
+  )
+    out.push(...targets(raw, cwd));
+  out.push(...shellWrites(raw, cwd, ANY_TARGET));
+  const heredocs = heredocFiles(raw);
+  let dir = String(cwd ?? '');
+  for (const { seg, at } of segments(raw)) {
+    const cd = /^\s*cd\s+["']?([^\s"';&|]+)/.exec(seg);
+    if (cd) {
+      dir = cdInto(dir, cd[1], text, at);
+      continue;
+    }
+    const run = SCRIPT_RUN.exec(seg);
+    if (!run || NOT_A_SCRIPT.test(run[2]) || !/[\\/]|\.\w+$/.test(run[3])) continue;
+    for (const word of expand(run[3], variables(text, at))) {
+      const body = scriptBody(word, dir, heredocs);
+      if (body) out.push(...scriptTargets(body, run[1], dir, depth));
+    }
+  }
+  return [...new Set(out)].filter((p) => !SCRATCH.test(p));
+}
+
 // A redirect, tee or Set-Content into a Markdown file (`cat > notes.md <<EOF`, `echo … >> README.md`)
 // writes a doc past the language and doc-location guards that sit on Edit/Write. Fd duplications
 // (`2>&1`, `>&2`) are not writes.
@@ -128,9 +264,20 @@ const MD_TARGET = /^\s*["']?([^\s"';&|<>()]+\.mdx?)(?=["'\s;&|)]|$)/i;
 
 /** Markdown files this command writes through the shell, each resolved like `targets`. */
 export function markdownWrites(raw, cwd = '') {
+  return shellWrites(raw, cwd, MD_TARGET);
+}
+
+/**
+ * The files `target` takes after each redirect, tee or Set-Content of the command, resolved like `targets`.
+ * Spawning interpreter code counts only inside its string literals, and a target must be path-like
+ * (separator or a file extension): a read-only `node -e "…execSync('git log')…console.log('a','->',o.count)"`
+ * named `<pkg>\,o.count` and `e=>e.page+` named `<pkg>\e.page+`, so the rule card denied a read as an edit
+ * of the package. `execSync('cat a > b.ts')` still names `b.ts`.
+ */
+function shellWrites(raw, cwd, target) {
   const text = commandText(raw);
-  // Same length as `text`: operators inside quoted data or interpreter code are blanked there.
-  const run = executedText(raw, { code: 'spawn' });
+  // Same length as `text`: operators inside quoted data, and spawning code outside its strings, are blanked.
+  const run = executedText(raw, { code: 'strings' });
   let dir = String(cwd ?? '');
   let offset = 0;
   const out = [];
@@ -139,15 +286,15 @@ export function markdownWrites(raw, cwd = '') {
     offset += part.length;
     const cd = /^\s*cd\s+["']?([^\s"';&|]+)/.exec(original);
     if (cd) {
-      dir = resolveIn(dir, cd[1]);
+      dir = cdInto(dir, cd[1], text, offset - part.length);
       continue;
     }
     for (const m of part.matchAll(MD_OP)) {
-      const target = MD_TARGET.exec(original.slice(m.index + m[0].length));
-      if (!target) continue;
+      const to = target.exec(original.slice(m.index + m[0].length));
+      if (!to || !pathWords(to[1]).length) continue;
       // `P=.agent/tmp/x; … > $P/y.md` writes scratch: a variable the command assigned is expanded.
       const vars = variables(text, offset - part.length + m.index);
-      for (const value of expand(target[1], vars)) out.push(resolveIn(dir, value));
+      for (const value of expand(to[1], vars)) out.push(resolveIn(dir, value));
     }
   }
   return out;
@@ -170,11 +317,26 @@ export function inlineEdit(raw, cwd = '') {
   return sed ? 'sed -i' : 'inline code writing a file';
 }
 
+// The Bash tool breaks a heredoc command above ~6000 chars (transcript scan 18–25.10: ≤6000 chars 0 of
+// ~3900 failed, above it 60 of 117 — «unexpected EOF», «delimited by end-of-file», the rest never runs).
+// g5 25.10: two review lanes lost a 9.8 KB `cat >> lane-B.md <<'EOF'` that way, scratch target or not,
+// and redid it with Edit — the deny sends there first. Only a heredoc that WRITES a file (redirect or
+// tee on its line): a cut there can leave a half-appended file, which an identical retry then doubles;
+// a cut heredoc script (`node <<'EOF'`) runs nothing, and its identical retry is the cheap fix.
+const HEREDOC_MAX = 6000;
+const HEREDOC_WRITE =
+  /^[^\n]*(?:\d?>{1,2}(?!&)\s*[^\s&]|\btee\b)[^\n]*<<-?\s*['"]?[A-Za-z_]\w*|^[^\n]*<<-?\s*['"]?[A-Za-z_]\w*['"]?[^\n]*(?:\d?>{1,2}(?!&)\s*[^\s&]|\|\s*tee\b)/m;
+
+/** A heredoc command that writes a file and is long enough for the Bash tool to cut it. */
+export function longHeredoc(raw) {
+  return String(raw).length > HEREDOC_MAX && HEREDOC_WRITE.test(String(raw));
+}
+
 export default function inlineEditGuard(input) {
   const tool = input?.tool_name;
   if (tool !== 'Bash' && tool !== 'PowerShell') return null;
   const command = String(input.tool_input?.command ?? '');
-  const kind = inlineEdit(command, input.cwd);
+  const kind = longHeredoc(command) ? 'heredoc' : inlineEdit(command, input.cwd);
   if (!kind) return null;
   try {
     const events = toolEvents(readTail(ownTranscript(input)));
@@ -182,6 +344,13 @@ export default function inlineEditGuard(input) {
   } catch {
     /* no transcript → judge the command alone */
   }
+  if (kind === 'heredoc')
+    return deny(
+      `inline-edit-guard: this heredoc command is ${command.length} chars; the Bash tool breaks heredoc ` +
+        `commands above ~${HEREDOC_MAX} (about half fail: «unexpected EOF», cut mid-way, the rest never runs). ` +
+        'Text into a file → Write (new file) or Edit (append at an anchor); a script → Write it to the ' +
+        'scratchpad and run it by path. Repeat this exact call if neither can do it.',
+    );
   if (kind.includes('Markdown'))
     return deny(
       `inline-edit-guard: ${kind} skips the guards on Edit/Write (doc language, doc location, secrets). ` +

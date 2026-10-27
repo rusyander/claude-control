@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { PassThrough } from 'node:stream';
 
@@ -241,7 +242,7 @@ describe('ChatRun.start: имя модели, отброшенное грамм�
  * шли дольше, чем подряд.
  */
 describe('ChatRun.start: места очереди тяжёлых шагов', () => {
-  const KEYS = ['AGENTDECK_HEAVY_SLOTS', 'VITEST_MAX_WORKERS'] as const;
+  const KEYS = ['AGENTDECK_HEAVY_SLOTS', 'VITEST_MAX_WORKERS', 'AGENTDECK_TESTS_CLI'] as const;
 
   /** Окружение, с которым CLI реально запущен. */
   async function spawnedEnv(
@@ -308,6 +309,26 @@ describe('ChatRun.start: места очереди тяжёлых шагов', (
 
   it('обычному чату метки группы нет', async () => {
     expect((await spawnedEnv()).AGENTDECK_SPLIT_CHILD).toBeUndefined();
+  });
+
+  // 26.10: gate-run в копии чужого проекта не находил tests-cli — JUnit гейта не
+  // попадал в блок «Тесты», и тот же набор гоняли второй раз.
+  it('ребёнку — путь к tests-cli этой панели, файл существует', async () => {
+    const path = (await spawnedEnv({ child: true })).AGENTDECK_TESTS_CLI ?? '';
+    expect(path.replace(/\\/g, '/')).toMatch(/\/tools\/tests-cli\.mjs$/);
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it('путь, унаследованный из копии, снят при старте; ребёнок получает свой', async () => {
+    process.env.AGENTDECK_TESTS_CLI = 'C:/elsewhere/tools/tests-cli.mjs';
+    forgetInheritedChildMarks(process.env);
+    expect(process.env.AGENTDECK_TESTS_CLI).toBeUndefined();
+    expect(existsSync((await spawnedEnv({ child: true })).AGENTDECK_TESTS_CLI ?? '')).toBe(true);
+  });
+
+  it('путь, заданный человеком после старта, сильнее нашего', async () => {
+    process.env.AGENTDECK_TESTS_CLI = 'C:/own/tests-cli.mjs';
+    expect((await spawnedEnv({ child: true })).AGENTDECK_TESTS_CLI).toBe('C:/own/tests-cli.mjs');
   });
 
   // Ревью 20.10: панель, перезапущенная агентом группы, наследовала его метки и

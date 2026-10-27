@@ -12,7 +12,12 @@ import {
 import { toUsage, type Record as TranscriptRecord } from '../ChatRecords/ChatRecords.ts';
 import { coldResume } from '../group-continuation/group-continuation.ts';
 import { coldBriefFacts } from '../cold-brief/cold-brief.ts';
-import { COLD_RESUME_INTRO, coldResumeBrief } from '../split-continue.ts';
+import {
+  COLD_RESUME_INTRO,
+  GROUP_TASKS_HEADER,
+  RELAY_FRESH_INTRO,
+  coldResumeBrief,
+} from '../split-continue.ts';
 
 /**
  * Решение «продолжить сессию или начать новую» для каждого продолжения группы
@@ -91,11 +96,31 @@ export interface ContinuationInput {
    * считалась бы остывшей и уходила в новый разговор — пинг был бы зря.
    */
   warmedAt?: number;
+  /**
+   * Слово доставленной группе (N4): решает только окно — выше
+   * `RELAY_FRESH_ABOVE_TOKENS` новый разговор и при тёплом кэше.
+   */
+  relay?: boolean;
   now: number;
 }
 
 export type Continuation =
-  { kind: 'resume' } | { kind: 'fresh'; brief: string; previous: string; contextTokens: number };
+  | { kind: 'resume' }
+  | {
+      kind: 'fresh';
+      brief: string;
+      previous: string;
+      contextTokens: number;
+      /** Почему новый: остывший кэш или слово доставленной группе (N4). */
+      reason?: 'relay';
+    };
+
+/**
+ * Окно, выше которого слово доставленной группе идёт новым разговором (N4, g5
+ * 25.10): ход по красному конвейеру вёз 146k → 168k окна доставки в каждом из 24
+ * запросов, а вводная с фактами копии — единицы тысяч.
+ */
+export const RELAY_FRESH_ABOVE_TOKENS = 60_000;
 
 /**
  * Продолжить ли сессию. Новая — когда рычаг `freshOnColdResume` включён, кэш
@@ -112,6 +137,15 @@ export function decideContinuation(input: ContinuationInput): Continuation {
   const warmedIdle = input.warmedAt !== undefined ? input.now - input.warmedAt : undefined;
   const warmed = warmedIdle !== undefined && warmedIdle < warmth.idleMs;
   const idleMs = warmed ? warmedIdle : warmth.idleMs;
+  if (input.relay && warmth.contextTokens > RELAY_FRESH_ABOVE_TOKENS) {
+    return {
+      kind: 'fresh',
+      brief: `${input.intro ?? RELAY_FRESH_INTRO}\n\n${coldBriefFacts(input.cwd, warmth.file, input.base)}`,
+      previous: input.sessionId,
+      contextTokens: warmth.contextTokens,
+      reason: 'relay',
+    };
+  }
   const cold = coldResume({
     idleMs: input.afterLimit && !warmed ? Number.POSITIVE_INFINITY : idleMs,
     contextTokens: warmth.contextTokens,
@@ -128,20 +162,52 @@ export function decideContinuation(input: ContinuationInput): Continuation {
 }
 
 /** Заметка человеку в чат группы: остывший разговор не продолжен, ход пошёл новым. */
-export function coldResumeNotice(previous: string, contextTokens: number): ChatEvent {
+export function coldResumeNotice(
+  previous: string,
+  contextTokens: number,
+  reason?: 'relay',
+): ChatEvent {
   const params = { tokens: String(Math.round(contextTokens / 1000)), previous };
+  const textCode = reason === 'relay' ? 'chat-mr-relay-fresh-notice' : 'chat-cold-resume-notice';
   return {
     kind: 'notice',
     code: 'coldResume',
-    text: serverText('chat-cold-resume-notice', params),
-    textCode: 'chat-cold-resume-notice',
+    text: serverText(textCode, params),
+    textCode,
     textParams: params,
   };
 }
 
+/**
+ * Задачи группы, которые задание стадии уже называет дословно, вводная не
+ * повторяет: g0 25.10 нёс список из семи задач дважды — 1,8k знаков на вводную.
+ */
+function dropListedTasks(intro: string, task: string): string {
+  const lines = intro.split('\n');
+  const header = lines.indexOf(GROUP_TASKS_HEADER);
+  if (header < 0) return intro;
+  let end = header + 1;
+  while (end < lines.length && lines[end]!.startsWith('- ')) end += 1;
+  const left = lines.slice(header + 1, end).filter((line) => !task.includes(line.slice(2)));
+  const list = left.length > 0 ? [GROUP_TASKS_HEADER, ...left] : [];
+  return [...lines.slice(0, header), ...list, ...lines.slice(end)].join('\n');
+}
+
+/**
+ * Вводная слова доставленной группе (N4): ветка, MR и задачи — без задания
+ * стадии. Задание доставки (52k у g5) слову наблюдателя не нужно: оно само
+ * называет MR, конвейер или ветки ревьюера.
+ */
+export function relayIntro(link: ChatLink, plan: SplitPlanRecord | undefined): string {
+  const group = plan?.groups.find((item) => item.index === link.groupIndex);
+  return plan && group
+    ? coldResumeBrief(group, plan.proposal.groups[group.index]?.tasks ?? [], RELAY_FRESH_INTRO)
+    : RELAY_FRESH_INTRO;
+}
+
 /** Вводная с заданием стадии вслед за общими строками. */
 export function withStageTask(intro: string, task: string): string {
-  return `${intro}\n${STAGE_TASK_LINE}\n\n${task}`;
+  return `${dropListedTasks(intro, task)}\n${STAGE_TASK_LINE}\n\n${task}`;
 }
 
 /**

@@ -10,6 +10,8 @@ import {
   mainCopyTargetOf,
   suggestBranchName,
 } from './ChatBranchGate.ts';
+import { childrenBrief, withChildrenBrief } from '../children-brief/children-brief.ts';
+import { withWorkspaceUpdate } from '../workspace-note/workspace-note.ts';
 
 describe('ворота ветки: что считается правкой', () => {
   it('инструменты правки — свои и чужих CLI', () => {
@@ -122,6 +124,27 @@ describe('ворота ветки: имя ветки по заданию', () =>
       ),
     ).toBe('agent/pochini-vhod-123def');
     expect(suggestBranchName('https://example.com/x', 'zzz999')).toBe('agent/chat-zzz999');
+  });
+
+  // Telegram 26.10 (R1): сводка детей и строка о тестах — слова панели, не человека.
+  it('блоки панели перед заданием имени не дают', () => {
+    const said = withWorkspaceUpdate('Почини перенос среды', 'tests run in the copy');
+    expect(said).toContain('<agentdeck-workspace>');
+    expect(suggestBranchName(said, 'abc123def')).toBe('agent/pochini-perenos-sredy-123def');
+    const briefed = withChildrenBrief(
+      'Почини перенос среды',
+      childrenBrief({
+        parentChatId: 'p',
+        order: [0],
+        groups: [{ index: 0, title: 'Шапка', branch: 'fix/a', after: [], status: 'started' }],
+      }),
+    );
+    expect(briefed).toContain('<agentdeck-children>');
+    expect(suggestBranchName(briefed, 'abc123def')).toBe('agent/pochini-perenos-sredy-123def');
+    // Одна сводка без слов человека — имя-заглушка, а не текст сводки.
+    expect(suggestBranchName(briefed.replace('Почини перенос среды', ''), 'zzz999')).toBe(
+      'agent/chat-zzz999',
+    );
   });
 
   it('задание без букв — имя всё равно годное', () => {

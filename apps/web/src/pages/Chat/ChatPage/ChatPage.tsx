@@ -16,12 +16,12 @@ import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ProjectGitControls } from '@features/ProjectGit';
 import { ChatWatchIsland } from '@features/ChatMessages';
 import { useRunModelName } from '@features/ChatModelPicker';
-import { useChats, useChatMessages, useChatAutoRefresh, useChatProgress } from '@entities/Chat';
+import { useChats } from '@entities/Chat';
+import { closeAgentPane } from '@entities/AgentTree';
 import { useProjects, useOpenInEditor } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
-import { useChatAutoMode, useSetChatAutoMode } from '@entities/ChatAutoMode';
 import { useModelCatalog } from '@entities/ModelCatalog';
-import { lastTurnFacts, TurnToolHintLine, useTurnToolHint } from '@entities/Platform';
+import { TurnToolHintLine } from '@entities/Platform';
 import { Stack } from '@shared/ui/stack';
 import { useChatMedia } from '@entities/Media';
 import { ChatSidebar } from '../ChatSidebar/ChatSidebar';
@@ -30,6 +30,7 @@ import { ChatEscalationNotices } from '../ChatEscalationNotices/ChatEscalationNo
 import { ChatArtifactsBar } from '../ChatArtifactsBar/ChatArtifactsBar';
 import { ChatThread } from '../ChatThread/ChatThread';
 import { ChatOverlays } from '../ChatOverlays/ChatOverlays';
+import { ForkConfirm } from '../ForkConfirm/ForkConfirm';
 import type { ProjectWindow } from '../ChatOverlays/ChatOverlays.types';
 import { ChatDock } from '../ChatDock/ChatDock';
 import { ChatPreviewPane } from '../ChatPreviewPane/ChatPreviewPane';
@@ -49,15 +50,14 @@ import { useChildHub } from '../model/useChildHub';
 import { useChatDots } from '../model/useChatDots';
 import { useProjectShelf } from '../model/useProjectShelf';
 import { useChatModelPrefs } from '../model/useChatModelPrefs';
-import { useMessagesLimit } from '../model/useMessagesLimit';
+import { useChatFeed } from '../model/useChatFeed';
+import { useChatAutoApprove } from '../model/useChatAutoApprove';
 import { useLocalRun } from '../model/useLocalRun';
 import { useStreamState } from '../model/useStreamState';
 import { downloadChatExport } from '../lib/downloadChatExport';
 import { keepPending } from '../lib/pending';
 import { runAssignment } from '../lib/runAssignment';
-import { withoutLiveTurn } from '../lib/liveTurn';
 import styles from './ChatPage.module.scss';
-import { isStreamShown } from '../../../shared/lib/chat-stream';
 
 /**
  * Полноценный чат с Claude Code. Переписку хранит сам Claude Code в своих
@@ -96,16 +96,12 @@ export function ChatPage() {
   // ходят: всё это живёт в одном месте — здесь только читаем.
   const session = useChatSession({ chats: chats.data });
   const { activeChat, chatId, projectPath, isProjectContext, draftKey, preview, pending } = session;
-  const localRun = useLocalRun(activeChat?.parentId ? 'groups' : 'chat', projectPath);
+  const consumer = activeChat?.parentId ? 'groups' : 'chat';
+  const localRun = useLocalRun(consumer, projectPath);
 
   const run = useAgentRun(chatId);
-  // Авторежим прав этого чата — с сервера: выбор человека в чате сильнее
-  // глобальной настройки, не выбирал — чат идёт за ней. В отправку уходит только
-  // выбор чата; без него сервер сам возьмёт глобальную.
-  const autoMode = useChatAutoMode(chatId, run.sessionId);
-  const setChatAutoMode = useSetChatAutoMode();
-  const autoApprove = autoMode.data?.enabled ?? settings?.chatAutoMode ?? true;
-  const autoApproveOverride = autoMode.data?.override;
+  // Авторежим прав этого чата: выбор чата сильнее глобальной настройки (подробности — в хуке).
+  const autoMode = useChatAutoApprove(chatId, run.sessionId, settings?.chatAutoMode);
   // Досланное из очереди сразу встаёт в ленту своим пузырём (см. хук).
   useQueuedAsPending(run.sentFromQueue, session.setPending);
   const isRunning = run.status === 'running';
@@ -120,7 +116,7 @@ export function ChatPage() {
   const models = useChatModelPrefs(draftKey, settings, runAssignment(activeChat, run));
   // Кто ответит: подпись ожидания называет модель, а через контур — модель контура.
   const modelName = useRunModelName({
-    consumer: activeChat?.parentId ? 'groups' : 'chat',
+    consumer,
     model: models.modelOverride,
     defaultModel: models.defaultModel,
   });
@@ -136,31 +132,9 @@ export function ChatPage() {
   // человек видит и в группе, а её состояние лежит в дереве родителя.
   const child = useChildHub(chats.data, activeChat?.id, activeRuns, activeChat?.parentId);
 
-  // Размер окна ленты: «Загрузить ещё» растит его, возврат в отлистанный
-  // разговор возвращает и его окно (подробности — в хуке).
-  const messagesLimit = useMessagesLimit(activeChat?.id);
-  const messages = useChatMessages(activeChat?.id, messagesLimit.limit);
-  const messageList = messages.data?.messages ?? [];
-  // Пока потоковый пузырь на экране, текущий ход агента рисует он один: из
-  // истории такой ход убираем, иначе перечитка ленты посреди прогона
-  // показывает те же вызовы дважды — по разу из каждого источника.
-  const streamShown = isStreamShown(stream);
-  const shownHistory = withoutLiveTurn(messageList, run.startedAt, streamShown);
-  // Ход через контур без вызовов или с вызовом текстом — назвать под лентой
-  // (развилки 3 и 5): иначе «агент ничего не сделал» выглядит поломкой панели.
-  const toolHint = useTurnToolHint(
-    activeChat?.parentId ? 'groups' : 'chat',
-    lastTurnFacts(messageList),
-    isRunning,
-  );
-  // Разговор мог продолжиться мимо панели — из терминала или расширения
-  // редактора. Такой ход не даёт потока событий, и лента жила бы снимком на
-  // момент открытия: вопрос агента человек увидел бы только после F5. То же
-  // с припаркованным прогоном — потока к нему нет, правда в транскрипте.
-  useChatAutoRefresh(activeChat?.id, isRunning, run.stalled === true || run.parked === true);
-  // Прогресс агента читается из транскрипта, поэтому нужен настоящий id сессии:
-  // у нового разговора он появляется только с первым событием потока.
-  const progress = useChatProgress(activeChat?.id ?? run.sessionId, isRunning);
+  // Лента: окно истории, история без текущего хода, подсказка контура,
+  // автообновление, прогресс агента и ход субагента справа (подробности — в хуке).
+  const feed = useChatFeed({ activeChatId: activeChat?.id, consumer, run, stream, isRunning });
 
   const { artifacts, artifactToDelete, askDelete, cancelDelete, confirmDelete, isDeleting } =
     useChatArtifacts({ chatId, preview, setPreview: session.setPreview });
@@ -172,8 +146,8 @@ export function ChatPage() {
     runText: run.text,
     runStatus: run.status,
     refresh: session.refresh,
-    messagesUpdatedAt: messages.dataUpdatedAt,
-    messagesData: messages.data,
+    messagesUpdatedAt: feed.messages.dataUpdatedAt,
+    messagesData: feed.messages.data,
   });
 
   useAgentNotifications({
@@ -189,12 +163,12 @@ export function ChatPage() {
   // Снятие оптимистичных пузырей — правило целиком в `keepPending`, вместе с
   // объяснением, почему одной сверки по тексту не хватает.
   useEffect(() => {
-    if (pending.length === 0 || !messages.data) return;
-    session.setPending((current) => keepPending(current, messageList));
+    if (pending.length === 0 || !feed.messages.data) return;
+    session.setPending((current) => keepPending(current, feed.messageList));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.data]);
+  }, [feed.messages.data]);
 
-  const { editMessage, dispatch, send, answerQuestion } = useChatSend({
+  const { editMessage, dispatch, send, answerQuestion, forkConfirm } = useChatSend({
     chatId,
     activeChatId: activeChat?.id,
     sessionId: run.sessionId,
@@ -204,7 +178,7 @@ export function ChatPage() {
     setDraftId: session.setDraftId,
     setPending: session.setPending,
     allowEdits,
-    autoApprove: autoApproveOverride,
+    autoApprove: autoMode.override,
     ...models.effective,
   });
 
@@ -253,7 +227,7 @@ export function ChatPage() {
   });
   // Столбец один: открытый результат сильнее предпросмотра артефакта — его
   // только что попросили, а предпросмотр открывали раньше.
-  const isRightOpen = Boolean(preview || media.shownImage || media.shownDeck);
+  const isRightOpen = Boolean(preview || media.shownImage || media.shownDeck || feed.agentPane);
 
   /**
    * Отправка в режиме картинки или презентации.
@@ -267,16 +241,6 @@ export function ChatPage() {
     const accepted = await media.submit(draft.get());
     if (accepted) draft.set('');
     return accepted;
-  };
-
-  // Авторежим прав: щелчок — выбор ЭТОГО чата, сервер его запоминает, и он
-  // сильнее глобальной настройки. Идущему прогону — тут же, в том числе под
-  // ключом, которым его завела другая вкладка, — иначе тумблер подействовал бы
-  // только со следующего сообщения.
-  const toggleAutoApprove = (enabled: boolean): void => {
-    if (!chatId) return;
-    setChatAutoMode.mutate({ chatId, enabled });
-    agentRuns.setAutoApprove(chatId, enabled);
   };
 
   return (
@@ -351,7 +315,7 @@ export function ChatPage() {
             // разделение, и сервер по ней же спрашивает маршрут потребителем
             // «Группы» — шапка обязана спрашивать тем же, иначе она говорит про
             // чужой маршрут (ревью Т8).
-            consumer={activeChat?.parentId ? 'groups' : 'chat'}
+            consumer={consumer}
             onModelChange={models.setModelOverride}
             onEffortChange={models.setEffortOverride}
             isEditorPending={openEditor.isPending}
@@ -361,8 +325,8 @@ export function ChatPage() {
             onOpenEnvironment={() => setProjectWindow('environment')}
             allowEdits={allowEdits}
             onAllowEditsChange={setAllowEdits}
-            autoApprove={autoApprove}
-            onAutoApproveChange={toggleAutoApprove}
+            autoApprove={autoMode.autoApprove}
+            onAutoApproveChange={autoMode.toggle}
             runStatus={run.status}
             errorOverflow={run.errorOverflow}
             onRetry={() => chatId && agentRuns.retry(chatId)}
@@ -391,6 +355,7 @@ export function ChatPage() {
             // убирает артефакт. Иначе выбранный файл не показывался бы вовсе.
             onPreview={(artifact) => {
               media.close();
+              closeAgentPane(false);
               session.setPreview(artifact);
             }}
             onDelete={askDelete}
@@ -407,14 +372,14 @@ export function ChatPage() {
           <ChatWatchIsland chatId={chatId} sessionId={run.sessionId} />
 
           <ChatThread
-            messages={[...shownHistory, ...pending]}
+            messages={[...feed.shownHistory, ...pending]}
             conversationId={activeChat?.id}
             stream={stream}
             modelName={modelName}
-            isLoading={messages.isLoading}
-            hasMore={messages.data?.hasMore}
-            isLoadingMore={messages.isFetching}
-            onLoadMore={messagesLimit.loadMore}
+            isLoading={feed.messages.isLoading}
+            hasMore={feed.messages.data?.hasMore}
+            isLoadingMore={feed.messages.isFetching}
+            onLoadMore={feed.messagesLimit.loadMore}
             onEdit={editMessage}
             onPickOption={answerQuestion}
             isRunning={isRunning}
@@ -458,15 +423,16 @@ export function ChatPage() {
             mediaRevision={media.revision}
           />
 
-          {toolHint && (
+          {feed.toolHint && (
             <Stack padding="0 var(--spacing-xl)">
-              <TurnToolHintLine hint={toolHint} />
+              <TurnToolHintLine hint={feed.toolHint} />
             </Stack>
           )}
 
           <ChatDock
             {...(session.draftId ? { focusKey: session.draftId } : {})}
-            progress={progress.data}
+            progress={feed.progress.data}
+            {...(feed.progressChatId ? { progressChatId: feed.progressChatId } : {})}
             isRunning={isRunning}
             awaiting={run.status === 'waiting' || Boolean(activeChat?.awaitingReply)}
             queued={run.queued}
@@ -491,6 +457,8 @@ export function ChatPage() {
             {...(media.shownImage ? { image: media.shownImage } : {})}
             {...(media.shownDeck ? { deck: media.shownDeck } : {})}
             {...(preview ? { artifact: preview } : {})}
+            {...(feed.agentPane ? { agent: feed.agentPane } : {})}
+            onCloseAgent={() => closeAgentPane()}
             width={previewWidth}
             onResize={resizePreview}
             onClose={
@@ -503,6 +471,7 @@ export function ChatPage() {
         )}
       </div>
 
+      <ForkConfirm isOpen={forkConfirm.isOpen} onAnswer={forkConfirm.answer} />
       <ChatOverlays
         isFolderPickerOpen={isFolderPickerOpen}
         onFolderPickerOpenChange={setFolderPickerOpen}

@@ -122,8 +122,9 @@ export function reachesPanelDecision(toolName: string, input: unknown): boolean 
   );
 }
 
+/** Имя инструмента MCP в форме Claude (`mcp__сервер__…`) и opencode (`сервер_…`). */
 const MR_MERGE_TOOL =
-  /(?:^|__)(?:merge_merge_request|accept_merge_request|merge_pull_request|merge_pr|mr_merge)$/i;
+  /(?:^|_)(?:merge_merge_request|accept_merge_request|merge_pull_request|merge_pr|mr_merge)$/i;
 /** Слияние MR через API форджа: `…/merge_requests/5/merge`, `…/pulls/5/merge`. */
 const API_MERGE = /\/(?:merge_requests|pulls)\/\d+\/merge\b/;
 /** Push-опция GitLab «слить, когда пройдёт конвейер» — то же слияние руками агента. */
@@ -288,6 +289,7 @@ export interface DeferCall {
   reasonParams?: DeferredReasonParams;
   kind?: DeferredAskKind;
   cwd?: string;
+  shellCwd?: string;
   source?: DeferredAskSource;
 }
 

@@ -31,6 +31,7 @@ export type ChatTextCode =
   | 'summary-stop-chat-run'
   | 'summary-split-pause'
   | 'summary-split-resume'
+  | 'summary-split-continue'
   | 'summary-split-release'
   | 'summary-split-answer'
   | 'summary-tree-pause'
@@ -56,6 +57,7 @@ export type ChatTextCode =
   | 'value-split-decline-effect'
   | 'value-split-pause-effect'
   | 'value-split-resume-effect'
+  | 'value-split-continue-effect'
   | 'value-split-requeue-effect'
   | 'value-split-resume-fresh-effect'
   | 'value-split-pause-queued-effect'
@@ -82,6 +84,8 @@ export const CHAT_TEXTS_RU: Pick<ChatTexts, ChatTextCode> = {
   'summary-stop-chat-run': 'Остановить агента в чате «{{chat}}»',
   'summary-split-pause': 'Поставить на паузу группу «{{group}}» (чат «{{chat}}»)',
   'summary-split-resume': 'Продолжить группу «{{group}}» после паузы (чат «{{chat}}»)',
+  'summary-split-continue':
+    'Продолжить группу «{{group}}», остановившуюся недоделанной (чат «{{chat}}»)',
   'summary-split-release':
     'Отпустить группу «{{group}}», не дожидаясь предшественников (чат «{{chat}}»)',
   'summary-split-answer': 'Ответить на вопрос разбора группы «{{group}}» (чат «{{chat}}»)',
@@ -111,6 +115,8 @@ export const CHAT_TEXTS_RU: Pick<ChatTexts, ChatTextCode> = {
     'Сам агент чата больше не предложит разделение; кнопка «Разделить задачи по чатам» работает по-прежнему',
   'value-split-pause-effect': 'Прогоны группы остановятся, группа ждёт «Продолжить»',
   'value-split-resume-effect': 'Группа продолжит работу своей сессией',
+  'value-split-continue-effect':
+    'Группа получит недоделанное и продолжит в своей копии и разговоре',
   'value-split-requeue-effect':
     'Группа стояла в очереди — вернётся в неё и стартует, когда дойдёт черёд',
   'value-split-resume-fresh-effect':

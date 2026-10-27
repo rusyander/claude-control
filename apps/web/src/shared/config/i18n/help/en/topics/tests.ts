@@ -604,7 +604,8 @@ export const testsEn: typeof testsRu = {
       'is missing. Processes the command left behind are killed and the copy is removed in ' +
       'the same run; if it could not be removed, the card shows it. While the check runs, e2e ' +
       'in the same project does not start (and vice versa), and the panel’s dev-server ' +
-      'restart waits for it to end.',
+      'restart waits for it to end; a file that is back to its original content by then ' +
+      'causes no restart at all.',
     agentConventionTitle: 'Asking from the chat',
     agentConventionText:
       'The buttons of this section explain the format to the agent themselves. A project ' +
@@ -632,7 +633,10 @@ export const testsEn: typeof testsRu = {
       'A turn demands at most five cases tied to the changed file by path, the narrowest ' +
       'first; the rest are checked at the end of the task. A split group does not run its ' +
       'automated cases at the end of each turn: it runs them once before "delivered", while ' +
-      'a case for the change, a recorded manual check and a red result still hold its turn; ' +
+      'a case for the change, a recorded manual check and a red result still hold its turn ' +
+      '(except a red its delivery notes as not caused by the branch — red word for word as ' +
+      'before the group started or on the fork point with main, or red from the ' +
+      'environment; the red line names the fork-point run command, run --base); ' +
       'when the turn is held anyway, the gaps add the exact run --case command for its ' +
       'automated cases — checking earlier needs no hunt for the syntax. A red run of the ' +
       'turn is cleared only by an executed green one: a “passed” recorded by word after it ' +
@@ -654,7 +658,28 @@ export const testsEn: typeof testsRu = {
       'same check is pnpm tests gate. Before saying “delivered”, a split group checks the ' +
       'block of its copy with tests-cli gaps — the same code the panel runs at the delivery ' +
       'check, for the branch as it is now; exit code 1 means gaps remain, and the command ' +
-      'names each.',
+      'names each. The whole delivery check — MR description, sieve rows, owner’s points ' +
+      'and the block — is printed by tests-cli delivery --answer <file with the sieves ' +
+      'block>; it reads the MR description through the panel, so the description is posted ' +
+      'once and then checked (--mr-description <file> checks a draft before posting); through ' +
+      'the panel it also reads the comments of the group’s tracker tickets — every delivered ' +
+      'ticket needs a link to the MR. It checks task-N rows the way the panel does: the ' +
+      'quote of the point against the tracker ticket file in the copy ' +
+      '(.agent/run/tickets.md), the group’s task and the MR description. A quote shorter ' +
+      'than three words is a label (a tool or button name), not the point; a row naming a ' +
+      'ticket key is checked against that ticket’s section, not a neighbouring ticket; the MR ' +
+      'description’s checks, screenshots and notes sections are no source of a point. Every ' +
+      'ticket point — a list line of its description or comments (*, -, #, 1.) — needs a task-N row ' +
+      'quoting it, with any status; uncovered points are named word for word, one line per ticket. ' +
+      'A passed row whose sourced proof was rewritten to another meaning with no commit since ' +
+      'is a gap too: a new proof needs new work. Exit 0 ' +
+      'is the proof for the MR description and reviewer threads: the live-MR line names the ' +
+      'open threads, the last note and the note ids the description already names. A run ' +
+      'record keeps the test count of the report (passed, failed, skipped), not only the ' +
+      'cases, and the panel compares the count in a sieve row with it. A live ' +
+      'sieve is proved by the ' +
+      'block only with a run of a case carrying a live tag (live, stand, route, browser, e2e, ' +
+      'db), not a unit case.',
 
     sourceTitle: 'Where generation takes its material from',
     sourceCaption:
@@ -1445,7 +1470,9 @@ export const testsEn: typeof testsRu = {
         'the product behaves, ' +
         'it adds or updates the case for the change on its own (tests-cli case) — a step per ' +
         'behaviour, each expected naming what is seen, never “all pass” — and records ' +
-        'what it verified: a manual case with tests-cli record (marked “by hand”), an ' +
+        'what it verified. A case goes into an existing group: a typo in --group is refused ' +
+        'with similar names, a new group is created only with --new-group. A manual case ' +
+        'goes through tests-cli record (marked “by hand”), an ' +
         'automated one only with a run; a case you wrote arrives as a draft edit to ' +
         'accept. When it cannot run commands or write files (for another CLI that is decided by ' +
         'its rights in the “Permissions” section), it says so and hands you the exact command ' +
@@ -1459,13 +1486,21 @@ export const testsEn: typeof testsRu = {
       cliTitle: 'Without the panel',
       cliText:
         'pnpm tests sync --project <dir> does the same (--dir picks the folder; without --project — ' +
-        'AGENTDECK_TESTS_PROJECT, otherwise the current directory); pnpm tests run ' +
+        'AGENTDECK_TESTS_PROJECT, otherwise the nearest directory upwards holding .agent/tests, never above ' +
+        'the git root — after a cd into a package the answer and the cases are looked up in the project, not ' +
+        'the package; none found — the current directory); pnpm tests run ' +
         '--project <dir> [--group <group>] [--case <group:case,…>] runs them (--case runs only ' +
         'the named cases; a bare case id works when it is unique in the project): without --cmd it starts the folder runner ' +
         'from the right directory with the same command as the button, takes the report of ' +
         'THIS run only (an old report file is never picked up) and records the exit code. ' +
+        'pnpm tests show <group>:<case> prints a whole case — in the form run, gaps and the ' +
+        'gate name it; show <case> takes the first case with that id. With --history show adds the ' +
+        'case outcomes from recorded runs — the same count as the case card in the panel; runs on the fork ' +
+        'point (run --base) come as a separate list: with them the gate proves a red is not the branch’s. ' +
         '--cmd takes the same {files}, {paths} and {report} substitutions: {report} is the ' +
-        'JUnit report of this run in a temporary file, and that is what the import reads. With ' +
+        'report of this run in a temporary file, and that is what the import reads. It is JUnit ' +
+        'or the native output of go test -json and cargo test (go test -json ./... > {report}): ' +
+        'the kind is told from the content, explicitly with --format go-test-json or cargo-test. With ' +
         '--group, run and import put results on that group’s cases only: in a monorepo the ' +
         'same suite directory (src/models) can exist in two packages, and without a group such ' +
         'a result is ambiguous and skipped. Vitest cases (*.test.ts files and suite ' +
@@ -1473,10 +1508,81 @@ export const testsEn: typeof testsRu = {
         'Go or Cargo report, or there is none and the root has no scripts.test — are run by ' +
         'the vitest of the nearest package.json, one package after another; a failure in one ' +
         'package does not stop the rest, and the exit code is 1. ' +
+        'Specs (*.spec.ts) and suite directories of a package with its own Playwright — the ' +
+        'package has a playwright.config, or Playwright among its dependencies without ' +
+        'vitest — run with that package’s Playwright from its directory with a JUnit report, ' +
+        'not vitest; *.test.ts files of such a package still go to vitest when it has one. ' +
+        'A mixed set (--case or a group holding vitest cases beside Go or Cargo ones) is ' +
+        'split: vitest files go to the vitest of their packages, the rest to the project ' +
+        'command, in one chain, and every case lands in one history record. ' +
+        'A requested case the run report never named is printed apart as “no result” — it ' +
+        'is not checked, and the exit code is 1 too. ' +
+        'A green run of an automated test counts, for the gates and gaps, for every case with ' +
+        'the same file and test name, in any group, while the tree stays the same (commit, ' +
+        'edits, untracked files): the same package need not run a second time; an edit to the ' +
+        'tree lifts that. An import counts that way only with --tree: a report may come from ' +
+        'another tree, so a plain import records none; import --tree records the current tree, ' +
+        'and gate-run passes it when its gate left the tree unchanged. ' +
+        'A pytest directory case finds its tests by file: pytest derives the suite name from the ' +
+        'nearest pyproject.toml, so in a repo of modules sharing a tests directory a suite takes only ' +
+        'the tests of its own files; two matching suites are a guess, and the import makes none. A file ' +
+        'pytest failed to collect turns the suite red instead of dropping out of the count. ' +
+        'run --stale runs exactly the cases gaps names as not run or stale ' +
+        '(the group start is --since or the panel state); with no gaps it says there is ' +
+        'nothing to run, exit code 0. A gate that writes JUnit drops it into ' +
+        '.agent/tests/gate-junit/<name>.xml with <name>.tree beside it — the tree fingerprint ' +
+        'from the gate’s start (tests-cli tree --out …): run --stale counts such a report ' +
+        'without a second run when the tree is the same, and names, keeps and runs past a ' +
+        'report of another tree. ' +
+        '--health asks the stand before the run (an answer ' +
+        'below 500, 401 included, means up): no answer — the command does not start, the cases ' +
+        'are recorded as «blocked» with the reason «stand does not answer», exit code 75; the ' +
+        'delivery gate reads that as environment and asks for no fork-point run. Without a ' +
+        'URL, --health takes the one the runner uses: for Playwright the baseURL from the ' +
+        'package’s playwright.config (the environment variable the config reads first, ' +
+        'otherwise its default); a URL the runner does not use is refused before the run, ' +
+        'naming both URLs. ' +
+        'A suite environment is the env field in .agent/tests/automation.json: a directory ' +
+        'from the root ("." for the whole project) → variables; a case gets the variables of ' +
+        'every key above its file, the narrower key wins, {copy} in a value is the copy root. ' +
+        'A case’s own command in this copy is tests-cli case-cmd <group:case> --cmd "…" ' +
+        '(--clear removes it, no arguments lists them): it lives in ' +
+        '.agent/tests/case-commands.json outside git, and run, run --stale and run --base use ' +
+        'it unless the call names its own --cmd. The environment and own commands belong to ' +
+        'tests-cli only; the panel’s run button does not apply them. Cases with a different ' +
+        'environment or command run in parts — one run and one history record per part. A Go ' +
+        'build that failed on the environment (missing go.sum entry with go.sum outside git, ' +
+        'the toolchain, the module proxy) is recorded as «blocked» with the reason ' +
+        '«Environment, not code», exit code 75: the branch’s code never reached the tests. ' +
         '--memo answers a green run of the same command on an unchanged tree from memory ' +
         '(a panel group gets this by default), --fresh runs anyway. An answer from memory ' +
         'goes into the history as its own "from memory" record pointing at the real run; ' +
-        'files git ignores are invisible to the memory. run waits no longer than a cap: 10 ' +
+        'files git ignores are invisible to the memory. --base runs the same cases on the ' +
+        'fork point of the branch with main (merge-base with origin/main) in a temporary git ' +
+        'tree with the copy’s cases and writes the result not into the history but into ' +
+        '.agent/tests/runs-base: evidence for the group’s delivery and turn-end gates that a ' +
+        'red is not caused by the branch. It clears only a red with the same first failure ' +
+        'line as the branch’s. On the fork point only the case’s failed tests run; a long list — the ' +
+        'whole case. The tree gets the copy’s node_modules as a link only for ' +
+        'packages whose package.json and lockfile are the same on the fork point (the run ' +
+        'names the linked ones and the skipped ones with the reason; npm install in the copy ' +
+        'does not help the fork tree); venv and the copy’s other dependencies are not there, ' +
+        'and a red from their absence proves nothing either way: the run ' +
+        'before the group started, when there is one, still decides. go.sum, go.work and ' +
+        'go.work.sum files that git does not hold come from the copy: the fork point’s go.mod ' +
+        'sets the versions, and Go does not build without them. After the run each case says ' +
+        'whether the gates will clear it: «same signature» or «signature differs — not ' +
+        'evidence». The evidence lasts ' +
+        'while the fork point stays: after a rebase onto a newer main, run it again. ' +
+        'A suite case (a pytest directory, a go test package, a vitest file) does not run ' +
+        'whole on the fork point, only the tests red on the branch in its last run: pytest ' +
+        'by their node ids, go by -run ^(A|B)$ (in the all-modules chain after -C <module>: go ' +
+        'takes -C only as the first flag), vitest by -t; otherwise (another runner, the ' +
+        'command already picks tests, more than 40 red) the case runs whole and the run says ' +
+        'why. A command with -x, --exitfirst, --maxfail=1, -failfast or --bail on a directory ' +
+        'case gets a warning before the run: the first failure stops the suite, and the red ' +
+        'tests after it stay unseen. ' +
+        'run waits no longer than a cap: 10 ' +
         'minutes per case (per case file), times the number of files. Change it with ' +
         '--case-timeout <min> or the AGENTDECK_TESTS_CASE_TIMEOUT variable; the command’s own ' +
         'timeoutMinutes wins when it is shorter. Past the cap, the run is stopped together with ' +

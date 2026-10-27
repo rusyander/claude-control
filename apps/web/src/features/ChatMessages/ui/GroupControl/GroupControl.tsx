@@ -91,6 +91,10 @@ export function GroupControl({ control }: GroupControlProps) {
           onSuccess: (result) => {
             // Что вышло, говорит ответ сервера, а не догадка строки: «queued» у
             // паузы из очереди — назад в очередь, у остальных — после хода.
+            if (result.outcome === 'restored') {
+              settled(t('chat.cascade.hub.control.resumeRestored'));
+              return;
+            }
             if (result.outcome !== 'queued') {
               settled(t('chat.cascade.hub.control.resumed'));
               return;

@@ -306,6 +306,46 @@ describe('panel-agent actions: chat gaps (lane A)', () => {
     expect(foreign.message).toContain('not registered');
   });
 
+  it('set_review_after_work: «Ревью после работы» off and back on by approval, model picking untouched, same state refused', async () => {
+    const read = await h.call('read_model_cascade', { project: projectDir });
+    expect(read.outcome, read.message).toBe('done');
+    const before = read.result as { enabled: boolean; reviewAfterWork: boolean };
+    // Из коробки ревью включено: правило хранит только «выключено».
+    expect(before.reviewAfterWork).toBe(true);
+
+    const rejected = await h.decided(
+      'set_review_after_work',
+      { project: 'p-demo', enabled: false },
+      'reject',
+    );
+    expect(rejected.result.outcome).toBe('rejected');
+    expect((await h.call('read_model_cascade', { project: 'p-demo' })).result).toMatchObject({
+      reviewAfterWork: true,
+    });
+
+    const off = await h.decided('set_review_after_work', { project: 'p-demo', enabled: false });
+    expect(off.card.preview.summaryCode).toBe('summary-set-review-after-work-off');
+    expect(off.result.outcome, off.result.message).toBe('done');
+    const stored = await h.app.inject({
+      method: 'GET',
+      url: `/api/chat/cascade?path=${encodeURIComponent(projectDir)}`,
+    });
+    // Пишется только названное поле: подбор модели остаётся, каким был.
+    expect(stored.json()).toMatchObject({ reviewAfterWork: false, enabled: before.enabled });
+
+    const same = await h.call('set_review_after_work', { project: 'p-demo', enabled: false });
+    expect(same.outcome).toBe('failed');
+    expect(same.message).toContain('Nothing would change');
+
+    const on = await h.decided('set_review_after_work', { project: 'p-demo', enabled: true });
+    expect(on.card.preview.summaryCode).toBe('summary-set-review-after-work-on');
+    expect(on.result.outcome, on.result.message).toBe('done');
+    expect((await h.call('read_model_cascade', { project: 'p-demo' })).result).toMatchObject({
+      reviewAfterWork: true,
+      enabled: before.enabled,
+    });
+  });
+
   it('list_lowered_runs: summary and newest runs first, check commands masked', async () => {
     for (const [index, ok] of [true, false, true].entries()) {
       appendLoweredRun(appData, {

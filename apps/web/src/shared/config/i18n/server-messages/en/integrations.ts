@@ -91,4 +91,6 @@ export const integrationsEn: Record<IntegrationsMessageCode, string> = {
     'The bridge script tools/mcp/atlassian.mjs was not found — the panel was started outside its own repository.',
   'tms-run-cases-not-found':
     "{{system}}: none of the run's cases was found in this project — {{because}}",
+  'telegram-connect-no-candidate':
+    'Nobody to confirm: the window is closed or /start has not arrived yet.',
 };

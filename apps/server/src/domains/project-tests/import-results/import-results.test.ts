@@ -522,3 +522,112 @@ describe('импорт результатов в группу пакета', () 
     expect(status('gb')).toBe('unknown');
   });
 });
+
+/**
+ * #g0:105 (25.10): pytest ≥ 8.1 берёт корнем ближайший pyproject.toml даже без
+ * раздела pytest — у mod-llmbox classname `tests.test_x`, а ключ набора от корня
+ * проекта `mod-llmbox.tests`; `tests` же у пяти модулей общий. Кейс-каталог не
+ * получал ни одного из 2085 результатов, и доставка ждала его строку без конца.
+ */
+describe('набор pytest по файлу теста, когда classname — от корня модуля', () => {
+  let root = '';
+  const suite = (id: string, dir: string, key: string) => ({
+    id,
+    title: dir,
+    steps: [],
+    automation: { status: 'automated', file: `${dir}/`, suite: key },
+    status: 'unknown',
+  });
+  const status = (id: string) =>
+    readGroups(root)
+      .flatMap((g) => g.cases)
+      .find((c) => c.id === id)?.status;
+  const report = (...cases: string[]) =>
+    `<testsuites><testsuite name="pytest">${cases.join('')}</testsuite></testsuites>`;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'import-pytest-'));
+    const files = [
+      'mod-llmbox/pyproject.toml',
+      'mod-llmbox/tests/test_tool_loop.py',
+      'mod-imagebox/pyproject.toml',
+      'mod-imagebox/tests/test_resize.py',
+      'mod-kbbox/tests/e2e/test_search.py',
+      'mod-parsebox/tests/e2e/test_search.py',
+      'mod-nerbox/checks/test_ner.py',
+    ];
+    for (const file of files) {
+      mkdirSync(join(root, file, '..'), { recursive: true });
+      writeFileSync(join(root, file), '');
+    }
+    const dir = join(root, '.agent', 'tests');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'suites.tests.json'),
+      JSON.stringify({
+        version: 1,
+        title: 'suites',
+        cases: [
+          suite('llm-001', 'mod-llmbox/tests', 'mod-llmbox.tests'),
+          suite('img-001', 'mod-imagebox/tests', 'mod-imagebox.tests'),
+          suite('kb-002', 'mod-kbbox/tests/e2e', 'tests.e2e'),
+          suite('parse-002', 'mod-parsebox/tests/e2e', 'tests.e2e'),
+          suite('ner-001', 'mod-nerbox/checks', 'mod-nerbox.checks'),
+        ],
+      }),
+    );
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('classname от корня модуля ложится на набор того модуля, где лежит файл', () => {
+    const result = importResults(root, {
+      format: 'junit',
+      content: report(
+        '<testcase classname="tests.test_tool_loop" name="test_a"/>',
+        '<testcase classname="tests.test_tool_loop.TestGuard" name="test_b[x]"><failure message="нет"/></testcase>',
+        '<testcase classname="tests.test_resize" name="test_c"/>',
+      ),
+      now: NOW,
+    });
+    expect(result.unmatched).toEqual([]);
+    expect(status('llm-001')).toBe('failed');
+    expect(status('img-001')).toBe('passed');
+  });
+
+  it('файл с тем же путём в двух модулях — догадка: набор не тронут, тест «без кейса»', () => {
+    const result = importResults(root, {
+      format: 'junit',
+      content: report('<testcase classname="tests.e2e.test_search" name="test_d"/>'),
+      now: NOW,
+    });
+    expect(result.unmatched).toEqual(['test_d']);
+    expect(status('kb-002')).toBe('unknown');
+    expect(status('parse-002')).toBe('unknown');
+  });
+
+  it('ошибка сбора (classname пуст, модуль в имени) красит набор своего каталога', () => {
+    const result = importResults(root, {
+      format: 'junit',
+      content: report(
+        '<testcase classname="tests.test_resize" name="test_c"/>',
+        '<testcase classname="" name="tests.test_resize"><error message="collection failure"/></testcase>',
+      ),
+      now: NOW,
+    });
+    expect(result.unmatched).toEqual([]);
+    expect(status('img-001')).toBe('failed');
+  });
+
+  it('файла теста нет ни в одном наборе — «без кейса», а не первый попавшийся набор', () => {
+    const result = importResults(root, {
+      format: 'junit',
+      content: report('<testcase classname="checks.test_missing" name="test_e"/>'),
+      now: NOW,
+    });
+    expect(result.unmatched).toEqual(['test_e']);
+    expect(status('ner-001')).toBe('unknown');
+  });
+});

@@ -25,6 +25,11 @@ export interface ForeignShellCall {
   readonly title?: string;
   /** pid процесса CLI хода — корень живого дерева для суда погашения (P-06). */
   readonly pid?: number;
+  /**
+   * id сессии CLI хода (поток Codex, сессия qwen serve) = `session_id` хука набора: журнал
+   * сессии набора — улика своих временных файлов прошлых вызовов (P-26, D-10).
+   */
+  readonly session?: string;
 }
 
 /** Решение судьи: `human` — карточка человеку (только одиночный чат). */
@@ -68,6 +73,8 @@ export interface ForeignShellBridge {
     input: unknown;
     guard: GuardHit | undefined;
     cwd: string;
+    /** Каталог оболочки CLI внутри копии, от которого судили (P-26). */
+    shellCwd?: string;
     title?: string;
   }) => string;
   /** Состояние MR группы (`withMrState` маршрута): нужно пушу своей ветки на ревью. */

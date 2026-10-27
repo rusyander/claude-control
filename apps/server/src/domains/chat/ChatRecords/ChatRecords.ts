@@ -45,6 +45,19 @@ export interface Record {
     /** `peer` — отчёт субагента, а не человек. */
     origin?: { kind?: string };
     isMeta?: boolean;
+    /**
+     * Срабатывание хука (`hook_success`, `hook_additional_context`,
+     * `hook_blocking_error`): событие с инструментом («PreToolUse:Bash»),
+     * команда, замер CLI, код выхода, дописанный в контекст текст, отказ.
+     */
+    hookName?: string;
+    hookEvent?: string;
+    command?: string;
+    durationMs?: number;
+    exitCode?: number;
+    stdout?: string;
+    content?: unknown;
+    blockingError?: { blockingError?: string; command?: string };
   };
   message?: {
     /** Ход модели: его блоки лежат отдельными строками с одним `id`. */

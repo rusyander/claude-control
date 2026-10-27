@@ -35,6 +35,14 @@ export const SYNC_ON_CONFLICT_LINE =
   'CONFLICT line = a real conflict: `git rebase origin/<main>` and resolve it yourself.';
 
 /**
+ * Снимки в описании MR. g5 25.10 (MR !1101): правка экрана ушла в MR без снимков
+ * и без слова почему — ревьюер не отличит «не снимали» от «нечего снимать».
+ */
+export const MR_SHOTS_LINE =
+  'A change a user sees on screen carries its before/after shots in the MR description; ' +
+  'shipped without them, the description says so and why (stand down, no access) — never silently.';
+
+/**
  * Проверки звена работы, за которым идёт доставка (владелец 23.10: один полный
  * гейт на группу, в доставке). Охват назван панельным прямо: строка старшинства
  * иначе отдавала его правилу проекта «полные проверки перед “готово”».
@@ -290,7 +298,44 @@ export const OWNER_POINT_ID = /^owner-(\d+)$/;
  * потому — в каждое звено группы вместе с заданием.
  */
 export function ownerCoverageLine(): string {
-  return `Requirement trace: before you start, list every point of the owner's request above as a numbered checklist — a condition, a check, a depth, a format or a permission the owner named is a point too. The answer that ends your stage reports every point as a row of a \`\`\`${blockLang('sieves')} block: {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"the point in a few words — file:line, the command and a line of its output, or why it does not apply"}]}; a point that belongs to another group of this split is "n/a" with evidence "other group: <its title or task>"; a later stage updates the rows it changes. A point of your share left unreported or "fail" keeps the group from being done.`;
+  return `Requirement trace: before you start, list every point of the owner's request above as a numbered checklist — a condition, a check, a depth, a format or a permission the owner named is a point too. The answer that ends your stage reports every point as a row of a \`\`\`${blockLang('sieves')} block: {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"the point in a few words — file:line, the command and a line of its output, or why it does not apply"}]}; a point that belongs to another group of this split is "n/a" with evidence ${DEFERRAL_EVIDENCE}; a point the split itself already did (picking the tasks, dividing the groups) is "n/a" with "${SPLIT_STAGE_EVIDENCE}: <what it did>"; a later stage updates the rows it changes. A point of your share left unreported or "fail" keeps the group from being done.`;
+}
+
+/**
+ * Как назвать владельца отданного пункта, чтобы доставка могла его проверить
+ * (`deferralGaps`): «группа N» без пути из её списка — то самое «вне скоупа —
+ * группа 6» g9 26.10, где у группы 6 не было ни одного файла той админки.
+ */
+const DEFERRAL_EVIDENCE =
+  '"other group: group <N> «<its title>» — <a file or folder from that group\'s owned list>" or "tracker: <KEY> filed for it"';
+
+/**
+ * Пункт слов владельца, который сделало само разделение до запуска групп: отобрать
+ * задачи с доски, поделить их на группы (живая проба 26.10: шесть групп из десяти
+ * отдали эти пункты «другой группе», потому что другой формы строка не знала).
+ * Только для `owner-N`: задачу группы разделение за неё не делает.
+ */
+export const SPLIT_STAGE_EVIDENCE = 'split stage';
+
+/**
+ * Текст задач трекера группы, который панель кладёт в копию (`task-tickets.ts`, 9.5):
+ * из него группа берёт пункты следа задач, по нему доставка сверяет их цитаты.
+ */
+export const TASK_TICKETS_FILE = '.agent/run/tickets.md';
+
+/** Строки отчёта о пунктах задач группы (след задач): `task-1`, `task-2`, … */
+export const TASK_POINT_ID = /^task-(\d+)$/;
+
+/**
+ * След задач — то же, что след требований (U2), но по задачам группы и задачам
+ * трекера, на которые они ссылаются (живой аудит 26.10: десять групп сдали «готово»
+ * без половины пунктов тикетов, и проверка доставки ни разу не сверила тикет с
+ * веткой). Группа сама раскладывает задачи на пункты и отчитывается строками
+ * `task-N`; доставка судит строки (`taskCoverageGaps`) и владельцев отданных
+ * пунктов (`deferralGaps`), недостающее досдаёт напоминание той же сессии.
+ */
+export function taskCoverageLine(): string {
+  return `Task trace: first list every point of your tasks — each acceptance criterion, item, example and tail of the task and of every ticket it links (read each in full), plus what plan notes hand you. Your stage's last answer reports each as a row of a \`\`\`${blockLang('sieves')} block: {"sieves":[{"id":"task-1","status":"pass|fail|n/a","evidence":"<KEY> «the point, word for word» — file:line, or a command and its output line"}]}; the «…» quote is checked against the ticket file, the task and the MR description; "n/a" = "does not apply: <why>" or ${DEFERRAL_EVIDENCE}. Later stages re-report changed rows. Unreported or "fail" = not done.`;
 }
 
 /** В общем контексте группы есть блок слов владельца — значит, и след требований. */

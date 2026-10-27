@@ -44,7 +44,10 @@ import { registerChatCascadeRoutes } from '../routes/chat/cascade-routes.ts';
 import { registerChatHandoffRoutes } from '../routes/chat/handoff-routes.ts';
 import { registerChatTreeRoutes } from '../routes/chat/tree-routes/tree-routes.ts';
 import { registerChatGroupSettingsRoutes } from '../routes/chat/group-settings-routes/group-settings-routes.ts';
-import { registerChatWatchSignalsRoutes } from '../routes/chat/watch-signals-routes.ts';
+import {
+  registerChatWatchSignalsRoutes,
+  registerGroupWatchCoverageRoutes,
+} from '../routes/chat/watch-signals-routes.ts';
 import { registerSandboxRoutes } from '../routes/sandbox-routes/sandbox-routes.ts';
 import { registerResourceRoutes } from '../routes/resource-routes/resource-routes.ts';
 import { registerBackupRoutes } from '../routes/backup-routes/backup-routes.ts';
@@ -108,6 +111,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     treePause,
     pendingAsks,
     splitConveyor,
+    groupWatcher,
     statusChats,
     splitOverlap,
     splitReview,
@@ -236,6 +240,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         // Пауза группы или всего дерева — решение человека: досылка вкладки её не снимает.
         (chatId) =>
           pausedGroupOf(context.store, splitConveyor)(chatId) || treePause.isPaused(chatId),
+        runtime.outsideTurnEnded,
       ),
     // Правило «подбирать модель под задачу»: одно положение на проект, без
     // зависимостей — ни реестр прогонов, ни сессия ему не нужны.
@@ -244,6 +249,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerChatGroupSettingsRoutes,
     // Сигналы сторожа одиночных чатов — только хранилище: пишет их сторож.
     registerChatWatchSignalsRoutes,
+    // Охват сторожа групп — строка настроек: считает сам сторож по своим сессиям.
+    (instance) => registerGroupWatchCoverageRoutes(instance, () => groupWatcher.coverageSummary()),
     // Разделение задач по чатам заводит копии репозитория и открывает разговоры —
     // у Claude через реестр прогонов, у чужого CLI через его собственный сервис.
     // Поэтому оба живут дольше запроса и приходят сюда параметром.
@@ -311,6 +318,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         registry: chatRuns,
         session: chatSession,
         providerChats,
+        cover: runtime.telegramAnswersCover,
+        chatTitle: runtime.chatTitle,
       }),
     (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
     // Реестр подписанных компромиссов партии «контур». Своих зависимостей нет:

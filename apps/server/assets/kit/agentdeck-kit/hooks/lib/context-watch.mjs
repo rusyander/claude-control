@@ -81,12 +81,24 @@ export default function contextWatch(input) {
   const limits = limitsFor();
   const ctx = lastContextTokens(path);
   if (!ctx || ctx < limits.floor) return null;
+  // A split-group run (AGENTDECK_SPLIT_CHILD, set by the panel): the panel manages the window — it
+  // starts a fresh conversation by window size — and the copy keeps its state in its notebook, not in
+  // PROGRESS.md. The regular nudge was injected and ignored in every later request (g5 25.10, N8).
+  const split = process.env.AGENTDECK_SPLIT_CHILD === '1';
+  if (split && ctx < limits.urgent) return null;
 
   const bucket = Math.floor(ctx / limits.bucket);
   const session = String(input?.session_id ?? 'x').slice(0, 12);
   if (alreadySent(session, bucket)) return null;
 
   const k = Math.round(ctx / 1000);
+  if (split) {
+    return (
+      `[context-watch] ctx ${k}k, compaction near. Before the next step, write what a fresh ` +
+      `conversation needs into .agent/run/notebook.agent.md (done / in progress / left / decisions, ` +
+      `files by path), then continue the task.`
+    );
+  }
   if (limits.window !== null) {
     // Local model: nothing is billed, the window is small and compaction takes everything not on disk.
     const of = `${k}k of ${Math.round(limits.window / 1000)}k`;
@@ -105,17 +117,13 @@ export default function contextWatch(input) {
       `Then continue the task.`
     );
   }
-  // A split-group run (AGENTDECK_SPLIT_CHILD, set by the panel) gets no /clear advice: the panel
-  // drives its next stage and picks same-session vs fresh by window size — the advice made groups
-  // ask for fresh sessions that re-read everything.
-  const clearTail =
-    process.env.AGENTDECK_SPLIT_CHILD === '1'
-      ? ''
-      : ` Task closed → tell the user plainly, in their language: continuing is cheaper after /clear.`;
+  // A split-group run returned above: no /clear advice there either — the advice made groups ask for
+  // fresh sessions that re-read everything.
   return (
     `[context-watch] ctx ${k}k, re-billed whole on every request. Refresh .agent/PROGRESS.md ` +
     `(done / in progress / left / decisions / paths), briefly, files by path, then carry on at full ` +
-    `depth — this counter is not a deadline.${clearTail}`
+    `depth — this counter is not a deadline. Task closed → tell the user plainly, in their ` +
+    `language: continuing is cheaper after /clear.`
   );
 }
 

@@ -3,6 +3,7 @@ import { execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { HANDOFF_BLOCK_LANG } from '@agentdeck/contracts/chat-handoff';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import type { RunLike } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
@@ -24,6 +25,7 @@ import { createRuntime, type Runtime } from './runtime.ts';
 const PARENT = 'родитель-f07';
 const FINDING = 'SENTINEL_FINDING foo.ts:12 null deref';
 const DELIVERY = 'SENTINEL_DELIVERY push the branch feature/g1 and open an MR';
+const HANDOFF = 'SENTINEL_HANDOFF next: EditModelPage read-only view';
 
 const base: ChatLink = {
   parentChatId: PARENT,
@@ -182,6 +184,71 @@ describe('непорождённое звено правок и доставки
     expect(run?.prompt).toContain(DELIVERY);
     const deny = (run?.platformSettings as StageSettings | undefined)?.permissions?.deny ?? [];
     expect(deny).not.toContain('Bash(git push*)');
+  });
+
+  it('продолжение работы, оборванное паузой до первого хода, стартует своей вводной (d9869abf:9)', async () => {
+    seed('new-cont', {
+      ...base,
+      stage: 'work',
+      createdAt: '2026-10-20T03:00:00.000Z',
+      stagePrompt: HANDOFF,
+    });
+    const plan = store.getSplitPlan(PARENT)!;
+    plan.groups[0] = { ...plan.groups[0]!, status: 'paused', pausedAt: '2026-10-20T03:00:02.000Z' };
+    store.setSplitPlan(plan);
+    // Ход работы не кончается: конец завёл бы ревью уже после теста, в чужой `started`.
+    (runtime.chatRuns as unknown as { createRun: () => RunLike }).createRun = () => ({
+      start: (options) => {
+        started.push(options);
+        return new Promise<void>(() => undefined);
+      },
+      stop: () => undefined,
+    });
+
+    expect(runtime.splitConveyor.resumePaused(PARENT, 0, true)).toBe('sent');
+    await new Promise((done) => setTimeout(done, 100));
+
+    const run = started[0];
+    expect(run?.permissionPrompt?.runId).toBe('new-cont');
+    expect(run?.sessionId).toBeUndefined();
+    expect(run?.prompt).toContain(HANDOFF);
+  });
+
+  // Та же беда со стороны сборки: перенос связи продолжения (`carryLink`) хранит
+  // вводную, с которой продолжение стартовало, — иначе пауза до первого хода её теряет.
+  it('продолжение группы по контексту несёт в связи ту же вводную, что ушла в прогон (d9869abf:9)', async () => {
+    const work: ChatLink = { ...base, stage: 'work', conversation: 'чат-w' };
+    store.setChatLink('чат-w', work);
+    const proposal = { done: 'этап закрыт', next: HANDOFF, checkpoint: '.agent/PROGRESS.md' };
+    (runtime.chatRuns as unknown as { createRun: () => RunLike }).createRun = () => ({
+      start: (options, onEvent) => {
+        started.push(options);
+        if (started.length > 1) return new Promise<void>(() => undefined);
+        mkdirSync(join(project, '.agent'), { recursive: true });
+        writeFileSync(join(project, '.agent', 'PROGRESS.md'), 'progress', 'utf8');
+        onEvent({
+          kind: 'text',
+          text: ['Готово.', '', '```' + HANDOFF_BLOCK_LANG, JSON.stringify(proposal), '```'].join(
+            '\n',
+          ),
+        });
+        // Окно почти полно — продолжение уходит в чистую сессию, а не в эту же.
+        onEvent({ kind: 'usage', input: 10, output: 5, cacheRead: 990_000, cacheCreation: 0 });
+        onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: 'work-sid' });
+        return Promise.resolve();
+      },
+      stop: () => undefined,
+    });
+
+    runtime.chatRuns.start('чат-w', { prompt: 'работай', cwd: project }, { projectPath: project });
+    await new Promise((done) => setTimeout(done, 100));
+
+    const next = started[1];
+    expect(next?.prompt).toContain(HANDOFF);
+    expect(next?.sessionId).toBeUndefined();
+    const key = next?.permissionPrompt?.runId ?? '';
+    expect(key).toMatch(/^new-/);
+    expect(store.getChatLink(key)?.stagePrompt).toBe(next?.prompt);
   });
 
   it('связь без сохранённого задания — к человеку, а не продолжение работы общим словом', async () => {

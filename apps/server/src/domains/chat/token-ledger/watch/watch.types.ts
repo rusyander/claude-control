@@ -25,6 +25,8 @@ export type WatchEvent =
       fresh?: true;
       prev?: { t: number; ctx: number; model?: string };
       cause?: FreshCause;
+      /** Длина вводной хода, знаков (R37): промпт прогона или реплика транскрипта. */
+      chars?: number;
     }
   | {
       kind: 'call';
@@ -43,6 +45,11 @@ export type WatchEvent =
        * расход субагентов (R13) — нет: веер без единого запуска был бы выдумкой.
        */
       remainder?: boolean;
+      /**
+       * Итог хода, а не один запрос: CLI назвал только сумму всех запросов хода (поток
+       * Gemini CLI). В расход идёт, окно разговора (R19, R2, R34) по нему не судится.
+       */
+      turnTotal?: true;
     }
   | {
       kind: 'tool';
@@ -68,7 +75,11 @@ export type WatchEvent =
       errorKind?: ToolErrorKind;
       /** Голова ошибки под маской: повтор той же ошибки (R24). */
       errorHead?: string;
+      /** Вызов ушёл в фон под этим id (R16, фон долго) — `bg-tasks.ts`. */
+      bgTaskId?: string;
     }
+  /** Фоновая задача кончилась (`<task-notification>`): её запись закрыта (R16). */
+  | { kind: 'bgDone'; t: number; taskId: string; status?: string }
   /** Текст ответа модели (не размышление): хвост хода — вопрос текстом (R27), вердикт ревью (R33). */
   | { kind: 'say'; t: number; text: string }
   /** Запрос к модели сорвался и повторяется (`system/api_error`, `api_retry`) — R30. */
@@ -76,7 +87,15 @@ export type WatchEvent =
   /** Сжатие окна; `manual` — `/compact` по просьбе, не буря (R3 его не считает). */
   | { kind: 'compact'; t: number; manual?: boolean }
   /** Замер пятичасового окна; `rejected` — лимит исчерпан (R10). */
-  | { kind: 'limit'; t: number; utilization?: number; resetsAt?: number; rejected?: boolean }
+  | {
+      kind: 'limit';
+      t: number;
+      utilization?: number;
+      resetsAt?: number;
+      rejected?: boolean;
+      /** Замер недельного окна (R9), не пятичасового. */
+      week?: true;
+    }
   /** Вставка CLI в окно (`environment`, `diagnostics`, контекст хуков) — знаки по роду. */
   | { kind: 'insert'; t: number; type: string; chars: number }
   /** Модель пишет текст или думает: сессия жива, хотя ни вызова, ни инструмента нет (R1). */
@@ -162,10 +181,18 @@ export interface OpenTool {
   fullGate?: boolean;
   /** Стадия звена при вызове — в строку тяжёлой проверки (R21). */
   stage?: string;
+  /** Последняя правка дерева сессии на старте проверки — проход R21. */
+  editAt?: number;
   /** Подпись входа вызова (команда под маской или вход целиком): тот же ли вызов упал снова (R24). */
   sig?: string;
   /** Отпечаток полной команды без `cd` — сверка одной беды между группами (R23). */
   print?: string;
+  /**
+   * Подпись R4, под которой вызов посчитан на старте, и прежний `lastAt` записи: отказ
+   * стража (вызов не шёл) снимает счёт обратно — P7, g5 25.10.
+   */
+  checkSig?: string;
+  checkPrevAt?: number;
 }
 
 /** Тяжёлая проверка, которая действительно шла (R21): полный гейт, весь набор тестов. */
@@ -177,6 +204,11 @@ export interface HeavyCheck {
   minutes: number;
   label: string;
   stage?: string;
+  /**
+   * Последняя правка дерева сессии до начала проверки (`treeEditAt`): проверки с одной
+   * правкой — один проход по дереву (R21 считает проходы, а не команды).
+   */
+  editAt?: number;
 }
 
 /** Состояние одной сессии. Ограничено: кольцо вызовов 200, списки и словари — по своим потолкам. */
@@ -195,6 +227,11 @@ export interface WatchState {
   /** Окно первого вызова сессии, если сторож его видел, — база свежего старта. */
   firstCtx?: number;
   /**
+   * База роста окна (R19 рост): первый вызов, увиденный сторожем, после сжатия — первый за
+   * ним. Не `firstCtx`: та бывает взята из начала транскрипта, до сжатий, которых сторож не видел.
+   */
+  growthBase?: number;
+  /**
    * Чтение кэша последнего вызова сессии. У чужого CLI это след холодного
    * продолжения (R2, `readDrop`): чтение было и упало после паузы.
    */
@@ -206,6 +243,21 @@ export interface WatchState {
   /** Путь → чтения подряд без правки этого файла. */
   reads: Record<string, { count: number; lastAt: number }>;
   lastEditAt?: number;
+  /**
+   * Последняя правка КОДА или дерева: заметки (`*.md`, `*.txt`, `.agent/`) и файлы вне копии
+   * её не двигают — после них прежний прогон проверки по-прежнему про то же дерево (R4, R21).
+   */
+  treeEditAt?: number;
+  /** Начало нынешнего хода: два круга траты в одном ходе — тревога (эскалация R4/R11/R21/R24). */
+  turnAt?: number;
+  /** Вызовы, что уже кончились, но шли долго (R16, «шёл долго»): держатся полчаса. */
+  slowCalls?: Array<{ at: number; ranMs: number; expectMs?: number; label: string }>;
+  /** Открытые фоновые задачи и фоновые субагенты (R16, «фон долго»): id → начало и вызов. */
+  bgTasks?: Record<string, { at: number; label: string }>;
+  /** Длинные вводные хода (R37). */
+  briefs?: Array<{ at: number; chars: number }>;
+  /** Итоговый текст хода признаёт пропуск проверки или обход (R44): слова и выдержка. */
+  admissions?: Array<{ at: number; phrase: string; excerpt: string }>;
   subagents: Array<{ at: number; description: string; agentType: string; stage?: string }>;
   /**
    * Вызовы навыков (`Skill`): своим списком со своим потолком — в общем списке
@@ -270,7 +322,14 @@ export interface WatchState {
   /** Подпись «вызов + ошибка» → падения подряд без правки между (R24). */
   errors: Record<string, ErrorRun>;
   /** Отбитые защищённые действия (R25): что за действие и какая команда. */
-  deniedOps: Array<{ at: number; op: string; text: string; subject: string }>;
+  deniedOps: Array<{
+    at: number;
+    op: string;
+    text: string;
+    subject: string;
+    guard?: string;
+    named?: true;
+  }>;
   /** Отбитое действие исполнено другой командой (R25). */
   bypasses: Array<{ at: number; op: string; command: string; afterMs: number }>;
   /** Остановка чужих процессов (R26): цель — имя, порт или PID из поиска по порту. */
@@ -318,8 +377,9 @@ export interface PendingOp {
   /**
    * Защищённое действие (R25), текст команды без комментариев оболочки и предмет
    * действия (`op-subject.ts`): исправленный повтор — другой предмет, не обход.
+   * `named` — пуш назвал свой чекаут (`git -C <путь>`), см. `namesCheckout`.
    */
-  guarded?: { op: string; text: string; subject: string };
+  guarded?: { op: string; text: string; subject: string; acked?: true; named?: true };
 }
 
 /** Серия одинаковых падений одного вызова (R24): времена падений (последние 10), что за вызов и ошибка. */
@@ -378,6 +438,11 @@ export interface RuleHit {
   params?: Record<string, string>;
   /** Когда условие возникло (для поля `at` сигнала). */
   since: number;
+  /**
+   * Свой текст строки вместо `groupWatch.rule.<правило>`: вид беды внутри одного правила
+   * (R16 — открыт долго, шёл долго, фон долго; R40 — что с журналом проверок).
+   */
+  textKey?: string;
 }
 
 /** Окружение оценки: пороги, корень панели (R7), каталог копии. */

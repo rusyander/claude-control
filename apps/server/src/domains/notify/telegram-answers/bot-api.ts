@@ -1,4 +1,5 @@
-import { safeDetail, telegramApiBase } from '../telegram.ts';
+import { safeDetail, telegramApiBase } from '../telegram-api.ts';
+import { htmlToPlain, isParseRefusal } from './html.ts';
 import type {
   BotCall,
   BotUpdate,
@@ -49,7 +50,13 @@ export async function callBot<T>(
     const text = error instanceof Error ? error.message : String(error);
     return { ok: false, status: 0, aborted, description: scrub(text) };
   }
-  let parsed: { ok?: boolean; result?: T; description?: string; error_code?: number } = {};
+  let parsed: {
+    ok?: boolean;
+    result?: T;
+    description?: string;
+    error_code?: number;
+    parameters?: { retry_after?: number };
+  } = {};
   try {
     parsed = (await response.json()) as typeof parsed;
   } catch {
@@ -57,10 +64,12 @@ export async function callBot<T>(
   }
   if (response.ok && parsed.ok !== false)
     return { ok: true, status: response.status, result: parsed.result as T };
+  const retryAfter = parsed.parameters?.retry_after;
   return {
     ok: false,
     status: parsed.error_code ?? response.status,
     description: scrub(parsed.description ?? `HTTP ${response.status}`),
+    ...(typeof retryAfter === 'number' && retryAfter >= 0 ? { retryAfter } : {}),
   };
 }
 
@@ -79,6 +88,81 @@ export const getUpdates = (token: string, offset: number, timeout: number, signa
     { timeoutMs: (timeout + 15) * 1000, ...(signal ? { signal } : {}) },
   );
 
+/** Дольше этого Telegram не ждём: просьба подождать минуты — сбой, а не очередь. */
+export const MAX_RETRY_AFTER_S = 120;
+const MAX_ATTEMPTS = 3;
+
+export interface HtmlCallOptions {
+  /** Пауза перед повтором после 429; подменяется в тестах. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    timer.unref?.();
+  });
+
+/**
+ * Очередь отправок в один чат: пока одна отправка ждёт `retry_after`, следующая
+ * в тот же чат не обгоняет её и не получает свой 429 зря. Разные чаты не ждут
+ * друг друга.
+ */
+const chatQueues = new Map<string, Promise<unknown>>();
+
+function inChatQueue<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const tail = chatQueues.get(key) ?? Promise.resolve();
+  const next = tail.then(work, work);
+  const settled = next.catch(() => undefined);
+  chatQueues.set(key, settled);
+  void settled.then(() => {
+    if (chatQueues.get(key) === settled) chatQueues.delete(key);
+  });
+  return next;
+}
+
+/**
+ * Вызов с текстом разметки HTML. Telegram не разобрал разметку (400 «can't parse
+ * entities») — тот же вызов простым текстом: сообщение важнее оформления.
+ * 429 — ждём, сколько Telegram просит (до 120 с), и повторяем, до трёх попыток;
+ * просит дольше — отказ сразу: повтор через две минуты встретил бы тот же 429.
+ */
+export function callHtml<T>(
+  token: string,
+  method: string,
+  html: string,
+  rest: Record<string, unknown>,
+  options: HtmlCallOptions = {},
+): Promise<BotCall<T>> {
+  const key = `${botIdOf(token) ?? ''}:${String(rest.chat_id ?? '')}`;
+  return inChatQueue(key, async () => {
+    let result = await callHtmlOnce<T>(token, method, html, rest);
+    for (
+      let attempt = 1;
+      attempt < MAX_ATTEMPTS && !result.ok && result.status === 429;
+      attempt++
+    ) {
+      const seconds = Math.max(result.retryAfter ?? 1, 0);
+      if (seconds > MAX_RETRY_AFTER_S) break;
+      await (options.sleep ?? wait)(seconds * 1_000);
+      result = await callHtmlOnce<T>(token, method, html, rest);
+    }
+    return result;
+  });
+}
+
+async function callHtmlOnce<T>(
+  token: string,
+  method: string,
+  html: string,
+  rest: Record<string, unknown>,
+): Promise<BotCall<T>> {
+  const first = await callBot<T>(token, method, { ...rest, text: html, parse_mode: 'HTML' });
+  if (first.ok || !isParseRefusal(first.status, first.description)) return first;
+  return callBot<T>(token, method, { ...rest, text: htmlToPlain(html) });
+}
+
+/** Сообщение разметкой HTML: динамическое в `text` уже экранировано (`compose.ts`). */
 export const sendMessage = (
   token: string,
   chatId: string,
@@ -86,9 +170,8 @@ export const sendMessage = (
   markup?: ReplyMarkup,
   replyTo?: number,
 ) =>
-  callBot<SentBotMessage>(token, 'sendMessage', {
+  callHtml<SentBotMessage>(token, 'sendMessage', text, {
     chat_id: chatId,
-    text,
     disable_web_page_preview: true,
     ...(markup ? { reply_markup: markup } : {}),
     ...(replyTo
@@ -104,13 +187,31 @@ export const editMessageText = (
   text: string,
   keyboard: InlineKeyboard,
 ) =>
-  callBot<unknown>(token, 'editMessageText', {
+  callHtml<unknown>(token, 'editMessageText', text, {
     chat_id: chatId,
     message_id: messageId,
-    text,
     disable_web_page_preview: true,
     reply_markup: { inline_keyboard: keyboard },
   });
+
+/** Меню команд бота; `language` — для пользователей с этим языком Telegram. */
+export const setMyCommands = (
+  token: string,
+  commands: readonly { command: string; description: string }[],
+  language?: string,
+) =>
+  callBot<unknown>(token, 'setMyCommands', {
+    commands,
+    ...(language ? { language_code: language } : {}),
+  });
+
+/** Удалить одно сообщение. Telegram удаляет только моложе 48 часов. */
+export const deleteMessage = (token: string, chatId: string, messageId: number) =>
+  callBot<boolean>(token, 'deleteMessage', { chat_id: chatId, message_id: messageId });
+
+/** Удалить до 100 сообщений одного чата разом. */
+export const deleteMessages = (token: string, chatId: string, messageIds: readonly number[]) =>
+  callBot<boolean>(token, 'deleteMessages', { chat_id: chatId, message_ids: messageIds });
 
 export const answerCallbackQuery = (token: string, id: string, text?: string) =>
   callBot<unknown>(token, 'answerCallbackQuery', {

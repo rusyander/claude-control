@@ -127,7 +127,12 @@ describe('сторож на вырезках прогона 20.10', () => {
   });
 
   it('R3 молчит: сжатия группы 0 в 19:07 и 19:25 — 18 мин, дальше порога владельца', () => {
-    expect(rulesOf(replay(load('compact-calm')))).toEqual([]);
+    // Горит только рост окна (R19): 49k первым вызовом после сжатия 19:07, 215k в 19:25.
+    expect(rulesOf(replay(load('compact-calm')))).toEqual(['R19']);
+    expect(first(replay(load('compact-calm')), 'R19')).toMatchObject({
+      at: '19:25:00',
+      numbers: { growK: 166, nowK: 215, firstK: 49 },
+    });
   });
 
   it('R6: группа 3 пушит в стадии работы при звене доставки впереди (карточка 24); коммит — своя работа', () => {
@@ -216,9 +221,11 @@ describe('сторож на вырезках прогона 20.10', () => {
         (event) => event.kind === 'tool' && event.name === 'AskUserQuestion',
       )?.t ?? 0;
     const table: Array<[string, Replay, GroupWatchRule[]]> = [
-      ['cold-resume', {}, ['R2']],
+      // Рост R19: разговор начат с 64k (22:28), к 19:00 следующего дня окно 174k.
+      ['cold-resume', {}, ['R2', 'R19']],
       ['compact-storm', {}, ['R3']],
-      ['compact-calm', {}, []],
+      // Окно выросло с 49k после сжатия 19:07 до 215k к 19:25 — рост R19, он и довёл до сжатия.
+      ['compact-calm', {}, ['R19']],
       ['commit-in-work', { node: { deliverAhead: true } }, ['R6']],
       ['panel-sources', {}, ['R7']],
       ['review-in-work', {}, ['R5', 'R11']],

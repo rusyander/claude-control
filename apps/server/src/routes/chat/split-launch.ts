@@ -38,6 +38,7 @@ import {
 } from '../../domains/chat/ChatSplit/ChatSplit.ts';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
 import { seedTaskNotebook } from '../../domains/chat/task-notebook/task-notebook.ts';
+import { writeOwnerBrief } from '../../domains/chat/owner-brief/owner-brief.ts';
 import { seedTaskTickets } from '../../domains/chat/task-tickets/task-tickets.ts';
 import type { TicketSource } from '../../domains/chat/task-tickets/task-tickets.types.ts';
 import { trackerKeys } from '../../domains/chat/tracker-keys.ts';
@@ -60,9 +61,14 @@ import {
   cascadeCeilingFor,
   expandAssignedModel,
   isCascadeEnabled,
+  isReviewAfterWork,
 } from '../../domains/model-cascade/model-cascade.ts';
 import { planForeignAssignment } from '../../domains/provider-cascade/provider-cascade.ts';
-import { bootstrapPlanFor, resolveProjectDelivery } from '../../domains/project-git/project-git.ts';
+import {
+  bootstrapPlanFor,
+  readHeadSha,
+  resolveProjectDelivery,
+} from '../../domains/project-git/project-git.ts';
 import { readMergeRequestByUrl } from '../../domains/integrations/forge.ts';
 import { forgeTokenForUrl } from '../../domains/integrations/forge-pick.ts';
 import {
@@ -275,6 +281,18 @@ export function createSplitLauncher(
     ? isCascadeEnabled(cascadeEntries, settingsDir)
     : Boolean(runnableCeiling);
   const planned = canPlan && Boolean(parentKey);
+  /**
+   * «Ревью после работы» проекта (R3(d), 26.10) — снимается здесь, один раз на
+   * разделение, и едет в связь/шапку, как потолок: тумблер, переключённый посреди
+   * цепочки, идущую группу не меняет. Выключено — работа идёт в доставку без ревью;
+   * подбор, подъём на потолок, проверка правок и доставка остаются как были.
+   */
+  const reviewAfterWork = isReviewAfterWork(ctx.store.getProjectReviewEntries(), settingsDir);
+  const reviewOffField: { reviewAfterWork?: false } = reviewAfterWork
+    ? {}
+    : { reviewAfterWork: false };
+  // Планка сдачи понижённой работы не обещает ревью, которого не будет; подъём — обещает.
+  const loweredReview = reviewAfterWork ? {} : { review: false, raise: true };
 
   /**
    * Ветка MR для ревью-группы (Т7). Спрашиваем фордж, а не верим блоку агента:
@@ -369,6 +387,11 @@ export function createSplitLauncher(
     const ceilingFields = runnableCeiling
       ? { ceilingModel: runnableCeiling.model, ceilingEffort: runnableCeiling.effort }
       : {};
+    // Коммит начала группы — голова копии сейчас (владелец 26.10): ревью группы читает
+    // только сделанное ею с него, а не весь MR, на который её завели. Не репозиторий —
+    // поля нет, ревью идёт прежним путём.
+    const head = path ? readHeadSha(path) : undefined;
+    const startSha = head ? { startSha: head } : {};
     if (stage === 'plan' && assignment && canPlan) {
       return {
         parentChatId: parent,
@@ -388,9 +411,11 @@ export function createSplitLauncher(
         lowered: assignment.lowered,
         ...(assignment.kind ? { kind: assignment.kind } : {}),
         ...ceilingFields,
+        ...reviewOffField,
         task: labelledCut(prompt, TASK_MAX_CHARS),
         ...groupTask,
         ...bounds,
+        ...startSha,
       };
     }
     // Ревью по ссылке (Т7): стадия у группы своя, и в связь ложится всё, из
@@ -451,8 +476,12 @@ export function createSplitLauncher(
             ...ceilingFields,
           }
         : {}),
+      // Ревью после работы выключено в проекте — и связи без назначения тоже: без
+      // подбора её работа читалась бы своей же моделью (`reviewer` планировщика).
+      ...reviewOffField,
       // Работа без плана держит границы сама — как их держала бы связь плана.
       ...bounds,
+      ...startSha,
     };
   };
 
@@ -506,6 +535,7 @@ export function createSplitLauncher(
       !isPlan && assignment?.lowered
         ? loweredWorkPrompt(assignment.kind, {
             ...(namesProjectChecks(prompt) ? { checksInTask: true } : {}),
+            ...loweredReview,
           })
         : '',
       // Та же стадия, что ляжет в связь (`linkRecord`), и то же дополнение, что
@@ -599,6 +629,7 @@ export function createSplitLauncher(
     // Ревью по ссылке шапки не получает (его конвейер живёт в связи), как и
     // группа в проекте с выключенным подбором: там конец цепочки ловит сеть
     // планировщика (`createForeignStagePlanner`).
+    // «Ревью после работы» проекта — в шапку, снятым при запуске (как у связи Claude).
     const cascade: ProviderChatCascade | undefined =
       isPlan && assignment
         ? {
@@ -609,6 +640,7 @@ export function createSplitLauncher(
             workModel: assignment.model,
             ...(assignment.effort ? { workEffort: assignment.effort } : {}),
             ...(assignment.kind ? { kind: assignment.kind } : {}),
+            ...reviewOffField,
           }
         : assignment?.lowered
           ? {
@@ -619,6 +651,7 @@ export function createSplitLauncher(
               workModel: assignment.model,
               workEffort: assignment.effort,
               ...(assignment.kind ? { kind: assignment.kind } : {}),
+              ...reviewOffField,
             }
           : input.review || !canPlan
             ? undefined
@@ -627,6 +660,7 @@ export function createSplitLauncher(
                 group: title,
                 branch,
                 ...(assignment?.kind ? { kind: assignment.kind } : {}),
+                ...reviewOffField,
               };
     const created = createChat(appData, provider.id, {
       title,
@@ -659,6 +693,7 @@ export function createSplitLauncher(
         ? loweredWorkPrompt(assignment.kind, {
             reviewer: 'cli',
             ...(namesProjectChecks(prompt) ? { checksInTask: true } : {}),
+            ...loweredReview,
           })
         : '',
       // Строки группы звена — те же, что у ребёнка Claude, и собраны по связи,
@@ -780,6 +815,13 @@ export function createSplitLauncher(
       );
     } catch (error) {
       deps.log.warn({ err: error }, 'task notebook not seeded');
+    }
+    // Слова владельца файлом (живая группа 26.10) — тоже до старта: сжатие может
+    // случиться уже в работе, а звенья после неё перепишут файл своими строками.
+    try {
+      writeOwnerBrief(input.cwd, { task: input.groupTask, group: input.title, keepOwn: true });
+    } catch (error) {
+      deps.log.warn({ err: error }, 'owner brief not written');
     }
     // Задачи трекера (9.5) — не дожидаясь: CLI поднимается секунды, чтение Jira
     // занимает доли секунды, а файл пишется целиком через временный. Не успел —

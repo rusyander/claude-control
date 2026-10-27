@@ -26,6 +26,9 @@ import { dirname, join } from 'node:path';
 export default function skillHint(input, prompt) {
   if (process.env.AGENTDECK_KIT_SKILL_HINT === '0' || process.env.CLAUDE_SKILL_HINT === '0')
     return null;
+  // A panel group turn is the panel's brief: it names its own skills and quotes the owner's first
+  // message, so a match here lists skills the brief already chose (five on one recheck brief).
+  if (process.env.AGENTDECK_GROUP_STAGE) return null;
   if (!prompt.trim()) return null;
 
   // \b is ASCII-only in JS, so Cyrillic stems carry explicit lookarounds inline in each pattern below.

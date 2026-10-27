@@ -1,9 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AppSettings } from '@agentdeck/contracts';
-import { GROUP_WATCH_DEFAULTS } from '@agentdeck/contracts/group-watch';
+import {
+  GROUP_WATCH_DEFAULTS,
+  type GroupWatchCoverageSummary,
+} from '@agentdeck/contracts/group-watch';
 import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
 import { i18n } from '@shared/config/i18n';
+import { queryKeys } from '@shared/api/query-keys';
 import { GroupWatchCard } from './GroupWatchCard';
 
 /**
@@ -11,20 +16,30 @@ import { GroupWatchCard } from './GroupWatchCard';
  * читает — выборы порогов заблокированы и сказано почему; включённый — всё
  * правится. Доставка — текстом про событие подписки, не своим выключателем.
  */
-const render = (groupWatch: AppSettings['groupWatch'] | undefined, keepWarm?: boolean): string =>
-  renderToStaticMarkup(
-    <GroupWatchCard
-      settings={
-        {
-          groupWatch,
-          ...(keepWarm === undefined
-            ? {}
-            : { groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, keepWarm } }),
-        } as AppSettings
-      }
-      patch={() => undefined}
-    />,
+const render = (
+  groupWatch: AppSettings['groupWatch'] | undefined,
+  keepWarm?: boolean,
+  coverage?: GroupWatchCoverageSummary,
+): string => {
+  // Ответ охвата — в кэше запроса, как его положил бы `useGroupWatchCoverage`; нет — строки нет.
+  const client = new QueryClient();
+  if (coverage) client.setQueryData(queryKeys.groupWatchCoverage, coverage);
+  return renderToStaticMarkup(
+    <QueryClientProvider client={client}>
+      <GroupWatchCard
+        settings={
+          {
+            groupWatch,
+            ...(keepWarm === undefined
+              ? {}
+              : { groupEconomy: { ...GROUP_ECONOMY_DEFAULTS, keepWarm } }),
+          } as AppSettings
+        }
+        patch={() => undefined}
+      />
+    </QueryClientProvider>,
   );
+};
 
 const selects = (html: string): string[] => [...html.matchAll(/<select[^>]*>/g)].map((m) => m[0]);
 
@@ -49,9 +64,35 @@ beforeAll(async () => {
 });
 
 describe('GroupWatchCard', () => {
+  it('охват: счёт живых групп по источникам и пробелы с молчащими правилами; ответа нет — строки нет', () => {
+    const coverage: GroupWatchCoverageSummary = {
+      groups: { stream: 2, transcript: 1, 'text-only': 1, blind: 0 },
+      gaps: ['devWatch', 'transcript'],
+    };
+    const html = render(GROUP_WATCH_DEFAULTS, undefined, coverage);
+    expect(html).toContain('data-group-watch-coverage');
+    expect(html).toContain(
+      'Охват сейчас: Живые группы: поток — 2, транскрипт — 1, только текст — 1. Нет dev-watch, переписки CLI:',
+    );
+    expect(html).toContain('R38 и R39 молчат');
+    expect(html).toContain('правила вызовов молчат');
+    expect(render(GROUP_WATCH_DEFAULTS)).not.toContain('data-group-watch-coverage');
+    const full = render(GROUP_WATCH_DEFAULTS, undefined, {
+      groups: { stream: 0, transcript: 0, 'text-only': 0, blind: 0 },
+      gaps: [],
+    });
+    expect(full).toContain('Охват сейчас: Живых групп сейчас нет. Все источники на месте.');
+    const off = render({ ...GROUP_WATCH_DEFAULTS, enabled: false }, undefined, {
+      groups: { stream: 0, transcript: 0, 'text-only': 0, blind: 3 },
+      gaps: [],
+    });
+    expect(off).toContain('Сторож выключен — живые группы он не видит (3).');
+    expect(off).not.toContain('Все источники на месте');
+  });
+
   it('включённый сторож: все пороги правятся, пометки «выключен» нет', () => {
     const html = render({ ...GROUP_WATCH_DEFAULTS, enabled: true });
-    expect(THRESHOLD_COUNT).toBe(40);
+    expect(THRESHOLD_COUNT).toBe(49);
     expect(selects(html)).toHaveLength(THRESHOLD_COUNT);
     expect(selects(html).filter((tag) => tag.includes('disabled'))).toEqual([]);
     expect(html).not.toContain('data-group-watch-off');
@@ -75,11 +116,33 @@ describe('GroupWatchCard', () => {
       expect(at).toBeGreaterThan(-1);
       return html.slice(at, html.indexOf('</select>', at));
     };
-    expect(field('Тяжёлых проверок за группу (R21)')).toContain('2 раза (по умолчанию)');
+    expect(field('Проходов тяжёлых проверок за группу (R21)')).toContain('2 раза (по умолчанию)');
     expect(field('Проверка тяжёлая, если идёт дольше (R21)')).toContain('3 мин (по умолчанию)');
   });
 
-  it('выключенный сторож и выключенный тёплый кэш: все 38 порогов заблокированы и сказано почему', () => {
+  it('пороги перенесённых правил: секунды, тысячи знаков, миллионы токенов, проценты окна', () => {
+    const html = render({ ...GROUP_WATCH_DEFAULTS, enabled: true });
+    const field = (label: string): string => {
+      const at = html.indexOf(label);
+      expect(at).toBeGreaterThan(-1);
+      return html.slice(at, html.indexOf('</select>', at));
+    };
+    expect(field('Кончившийся вызов шёл дольше (R16)')).toContain('120 с (по умолчанию)');
+    expect(field('Фоновая задача открыта дольше (R16)')).toContain('10 мин (по умолчанию)');
+    expect(field('Вводная хода группы длиннее (R37)')).toContain('15 тыс. знаков (по умолчанию)');
+    expect(field('Перезапусков сервера панели за час')).toContain('3 раза (по умолчанию)');
+    expect(field('Прогон сдвинул пятичасовое окно на (R42)')).toContain('5 % (по умолчанию)');
+    expect(field('Прогон сдвинул недельное окно на (R42)')).toContain('2 % (по умолчанию)');
+    expect(field('Прогон съел токенов больше (R42)')).toContain('3 млн токенов (по умолчанию)');
+    expect(field('человеку ничего не ждёт, дольше (R43)')).toContain('60 мин (по умолчанию)');
+    // Рост окна посреди сессии (R19): тысячи токенов, свой выбор рядом с заводским.
+    const growth = field('Окно сессии выросло над первым запросом на (R19)');
+    expect(growth).toContain('100 тыс. токенов (по умолчанию)');
+    expect(growth).toContain('60 тыс. токенов');
+    expect(growth).toContain('150 тыс. токенов');
+  });
+
+  it('выключенный сторож и выключенный тёплый кэш: все пороги заблокированы и сказано почему', () => {
     const html = render({ ...GROUP_WATCH_DEFAULTS, enabled: false }, false);
     expect(selects(html).filter((tag) => tag.includes('disabled'))).toHaveLength(THRESHOLD_COUNT);
     expect(html).toContain('data-group-watch-off');
@@ -123,6 +186,18 @@ describe('GroupWatchCard', () => {
     const watchOff = render({ ...GROUP_WATCH_DEFAULTS, enabled: false });
     expect(toggleTag(watchOff, SINGLE_LABEL)).toContain('disabled');
     expect(toggleTag(watchOff, 'Сторож включён')).not.toContain('disabled');
+  });
+
+  it('пауза сторожа (F1): по умолчанию выключена, без сторожа заблокирована, состояние из настроек', () => {
+    const PAUSE_LABEL = 'Ставить группу на паузу на конце хода';
+    const byDefault = render(undefined);
+    expect(byDefault).toContain(PAUSE_LABEL);
+    expect(toggleTag(byDefault, PAUSE_LABEL)).toContain('aria-checked="false"');
+    expect(toggleTag(byDefault, PAUSE_LABEL)).not.toContain('disabled');
+    const on = render({ ...GROUP_WATCH_DEFAULTS, enabled: true, autoPause: true });
+    expect(toggleTag(on, PAUSE_LABEL)).toContain('aria-checked="true"');
+    const watchOff = render({ ...GROUP_WATCH_DEFAULTS, enabled: false, autoPause: true });
+    expect(toggleTag(watchOff, PAUSE_LABEL)).toContain('disabled');
   });
 
   it('новые пороги R22–R33: поля с заводскими значениями и формой слова «группы»', () => {

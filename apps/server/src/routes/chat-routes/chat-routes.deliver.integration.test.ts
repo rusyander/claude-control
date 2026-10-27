@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { HANDOFF_BLOCK_LANG, HANDOFF_GROUP_MAX_CHAIN } from '@agentdeck/contracts/chat-handoff';
@@ -8,6 +8,7 @@ import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
 import { OWNER_PRECEDENCE_PLAIN_LINE } from '@agentdeck/contracts/quality-floor';
 import { WARM_DELIVER_LINE } from '../../domains/chat/group-continuation/group-continuation.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
+import { REVIEW_FINDINGS } from '../../domains/chat/review-findings/review-findings.ts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { createHandoffPlanner, registerChatHandoffRoutes } from '../chat/handoff-routes.ts';
@@ -683,6 +684,26 @@ describe('звено доставки группы разделения', () => 
     // F-07: задание правок — в связи до рождения звена, слово в слово как у запуска.
     expect(saved[0]?.stagePrompt).toBe(fix?.prompt);
     expect(saved[0]?.stagePrompt).toContain('поправь a.ts:1');
+  });
+
+  // Аудит g9 27.10 (R7): перепроверка искала свои R-1..R-3 по старому транскрипту.
+  it('правки группы кладут карточки ревью файлом в копию с номерами R-n', async () => {
+    const copy = mkdtempSync(join(tmpdir(), 'cc-findings-'));
+    try {
+      const verdict = ['```agentdeck:review', '{"findings":["поправь a.ts:1"]}', '```'].join('\n');
+      const { registry, links, runs } = build(`Проверил.\n${verdict}`, { delivers: true });
+      links.set('чат-ревью', REVIEW_LINK);
+      registry.start('чат-ревью', { prompt: FIRST_PROMPT, cwd: copy }, { projectPath: copy });
+      await new Promise((done) => setTimeout(done, 20));
+
+      const fix = stageRuns(runs)[0];
+      expect(fix?.prompt).toContain(`The panel keeps this list in ${REVIEW_FINDINGS} as R-1,`);
+      const file = readFileSync(join(copy, REVIEW_FINDINGS), 'utf8');
+      expect(file).toContain(`branch ${REVIEW_LINK.branch}; 1 card.`);
+      expect(file).toContain('## R-1 · поправь a.ts:1');
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
   });
 
   it('связь работы и ревью задания звена не хранит — им продолжать нечего (F-07)', async () => {

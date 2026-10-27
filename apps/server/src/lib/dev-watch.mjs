@@ -23,6 +23,9 @@
  *   решение 30.09). Пока правки ждут, панель видит это (`dev-restart.json`) и
  *   может попросить перезапуск сейчас (`dev-restart.request`).
  *   `AGENTDECK_DEV_DEFER=0` — перезапускать сразу;
+ * - не поднимает сервер на мутанте: пока живой mustfail держит файл сервера
+ *   переписанным, перезапуск ждёт, а файл, вернувшийся к оригиналу, перезапуска
+ *   не стоит (`mutantFiles`);
  * - прежде чем погасить работающий сервер, пробует новую сборку
  *   (`dev-boot-probe.mjs`): не поднимается — прежний сервер работает дальше,
  *   а в журнал уходит файл и строка ошибки;
@@ -30,14 +33,16 @@
  *   остаётся пустой до следующей правки, а посредники чатов — без сервера.
  */
 /* global process, setTimeout, clearTimeout, setInterval, console, URL */
-import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, statSync, watch } from 'node:fs';
-import { homedir } from 'node:os';
+import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, realpathSync, statSync, watch } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { appDataDirOf } from './brand.mjs';
 import {
   appendDevLog,
+  appendServerLog,
   clearRestartState,
   deferReason,
   RUNS_WAIT_CAP_MS,
@@ -126,9 +131,11 @@ function scan(dir, out) {
  * отпечатков.
  */
 export class SourceWatcher {
-  constructor(roots, onChange, quietMs = QUIET_MS, maxWaitMs = MAX_WAIT_MS) {
+  /** `onTouched(path)` — каждая настоящая правка в миг события, до пачки и её тишины. */
+  constructor(roots, onChange, quietMs = QUIET_MS, maxWaitMs = MAX_WAIT_MS, onTouched = undefined) {
     this.roots = roots;
     this.onChange = onChange;
+    this.onTouched = onTouched;
     this.quietMs = quietMs;
     this.maxWaitMs = maxWaitMs;
     this.stamps = new Map();
@@ -168,6 +175,7 @@ export class SourceWatcher {
     else this.stamps.set(path, current);
     const now = Date.now();
     if (!this.pending.size) this.firstAt = now;
+    this.onTouched?.(path);
     this.pending.add(path);
     clearTimeout(this.timer);
     const left = Math.max(0, this.firstAt + this.maxWaitMs - now);
@@ -251,6 +259,24 @@ export function runsWait(ledgers, isAlive, deferredSince, now, capMs) {
 
 /** Подготовка копии старше этого — след процесса, умершего без перезапуска. */
 const SETUP_STALE_MS = 30 * 60_000;
+/** Рождение этапа (сита, запуск CLI, первый ответ) дольше этого — уже не рождение. */
+const STAGE_BIRTH_MS = 2 * 60_000;
+
+/**
+ * Рождается ли этап группы: связь этапа заведена (`new-…` со `stagePrompt`), а
+ * разговора ещё нет — сита собираются, CLI стартует. Хода в журнале ещё нет;
+ * перезапуск в эти секунды оставлял группу без этапа (d9869abf:5, 25.10).
+ */
+function stageBirthRunning(state, now) {
+  const links = state && typeof state === 'object' ? state.chatLinks : undefined;
+  if (!links || typeof links !== 'object') return false;
+  return Object.entries(links).some(([key, link]) => {
+    if (!key.startsWith('new-') || !link || typeof link.stagePrompt !== 'string') return false;
+    if (link.retiredAt) return false;
+    const at = Date.parse(link.createdAt ?? '');
+    return Number.isFinite(at) && now - at >= 0 && now - at < STAGE_BIRTH_MS;
+  });
+}
 
 /**
  * Идёт ли подготовка копии у группы разделения: группа «стартует», а чата ещё
@@ -259,6 +285,7 @@ const SETUP_STALE_MS = 30 * 60_000;
  * оставлял группы без чата и с полузаведёнными копиями (живой прогон 29.09).
  */
 export function splitSetupRunning(state, now) {
+  if (stageBirthRunning(state, now)) return true;
   const plans = state && typeof state === 'object' ? state.splitPlans : undefined;
   if (!plans || typeof plans !== 'object') return false;
   return Object.values(plans).some(
@@ -309,6 +336,85 @@ export function ledgerBusy(file, isAlive, read = readFileSync) {
   const result = readJsonSteady(file, read);
   if (result.unreadable) return true;
   return busyRun(Array.isArray(result.value) ? result.value : [], isAlive);
+}
+
+/**
+ * Ключ пути для сверки: настоящий путь (короткое имя `RUSYAN~1` из `TEMP` и длинное — один файл), прямые
+ * косые, на Windows без учёта регистра (`c:` и `C:`). Файла нет — путь как есть.
+ */
+export function pathKey(path) {
+  let real;
+  try {
+    real = realpathSync.native(path);
+  } catch {
+    real = resolve(path);
+  }
+  const flat = real.replace(/\\/g, '/');
+  return process.platform === 'win32' ? flat.toLowerCase() : flat;
+}
+
+/** Отпечаток содержимого так же, как у mustfail: sha1, а нет файла — `absent`. */
+export function contentSha(path) {
+  try {
+    return createHash('sha1').update(readFileSync(path)).digest('hex');
+  } catch {
+    return 'absent';
+  }
+}
+
+const MUSTFAIL_JOURNAL = /^journal-\d+\.json$/;
+
+/**
+ * Файлы под `roots`, которые живой прогон проверки поломкой (`mustfail.mjs` из
+ * `~/.claude/tools` и кита) держит сейчас переписанными: ключ пути (`pathKey`) →
+ * отпечаток оригинала. Прогон переписывает файлы прямо в рабочей копии и до
+ * каждой записи ведёт журнал `<git-dir>/mustfail/journal-<pid>.json`; в панельном
+ * журнале проверок (`mutation-runs.json`) его нет. Перезапуск посреди него поднимал
+ * панель на мутанте (25.10: conflicts.ts в 10:06, живые группы судились сломанным
+ * кодом). Файл, вернувшийся к оригиналу, не держит: между мутантами перезапуск
+ * разрешён, а чужой процесс с номером умершего прогона не держит ничего.
+ * `journaled` — все файлы живых прогонов под `roots`, и вернувшиеся: запись
+ * «контроля» (тот же текст, новое время записи) — тоже работа mustfail, не правка.
+ * Нечитаемый журнал — `unreadable`, это «занято».
+ */
+export function mutantFiles(stateDir, roots, isAlive) {
+  const files = new Map();
+  const journaled = new Map();
+  let names;
+  try {
+    names = readdirSync(stateDir).filter((name) => MUSTFAIL_JOURNAL.test(name));
+  } catch {
+    return { unreadable: false, files, journaled };
+  }
+  const under = roots.map((root) => `${pathKey(root)}/`);
+  let unreadable = false;
+  for (const name of names) {
+    const result = readJsonSteady(join(stateDir, name));
+    if (result.unreadable) {
+      unreadable = true;
+      continue;
+    }
+    const journal = result.value;
+    if (!journal || typeof journal.pid !== 'number' || !isAlive(journal.pid)) continue;
+    for (const [full, entry] of Object.entries(journal.files ?? {})) {
+      const key = pathKey(full);
+      if (!entry || !under.some((root) => key.startsWith(root))) continue;
+      journaled.set(key, entry.before);
+      if (contentSha(full) !== entry.before) files.set(key, entry.before);
+    }
+  }
+  return { unreadable, files, journaled };
+}
+
+/** Каталог журналов mustfail этой рабочей копии; вне git — там, где mustfail ищет его сам. */
+function mustfailStateDir(repoRoot) {
+  const result = spawnSync('git', ['rev-parse', '--git-path', 'mustfail'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const out = result.status === 0 ? result.stdout.trim() : '';
+  return out ? resolve(repoRoot, out) : join(tmpdir(), 'claude-mustfail');
 }
 
 /** Готовится ли копия группы; нечитаемое состояние — занято. */
@@ -383,6 +489,10 @@ function main() {
   const checkLedgers = CHECK_LEDGERS.map((name) => join(appData, name));
   const stateFile = join(appData, 'state.json');
   const repoRoot = resolve(serverDir, '..', '..');
+  const mustfailDir = mustfailStateDir(repoRoot);
+  // Файлы, попавшие в пачку только записью мутанта: ключ → отпечаток оригинала. Вернулся
+  // файл к нему — сервер и так работает на этом коде, перезапуск ему не нужен.
+  const mutantBase = new Map();
   // Прошлый сторож мог оставить и состояние, и запрос: новый начинает с чистого.
   clearRestartState(appData);
   takeRestartRequest(appData);
@@ -405,10 +515,15 @@ function main() {
     const startedAt = Date.now();
     child = spawn(process.execPath, ['--experimental-strip-types', 'src/index.ts'], {
       cwd: serverDir,
-      stdio: 'inherit',
+      // Поток ошибок — ещё и в `server.log` (`appendServerLog`): под keepalive он иначе терялся.
+      stdio: ['inherit', 'inherit', 'pipe'],
       // Сервер читает состояние отсрочки там же, где его пишет сторож: его
       // собственный каталог данных может переехать настройкой.
       env: { ...process.env, AGENTDECK_DEV_RESTART_DIR: appData },
+    });
+    child.stderr?.on('data', (chunk) => {
+      process.stderr.write(chunk);
+      appendServerLog(appData, chunk);
     });
     appendDevLog(appData, `сервер запущен (pid ${child.pid}, сторож ${process.pid})`);
     const current = child;
@@ -453,6 +568,27 @@ function main() {
     launch();
   };
 
+  // Живые ходы, подготовку копий и проверки ждём без предела; предел — только
+  // у нечитаемого журнала ходов без доказанного живого хода (`runsWait`).
+  const busyRuns = (now) =>
+    runsWait(
+      runLedgers.map((file) => readJsonSteady(file)),
+      pidAlive,
+      deferredSince,
+      now,
+      RUNS_CAP_MS,
+    );
+  const busyReason = (turns, now) => {
+    const mutants = mutantFiles(mustfailDir, roots, pidAlive);
+    return deferReason(
+      turns.wait,
+      setupBusy(stateFile, now),
+      mutants.unreadable ||
+        mutants.files.size > 0 ||
+        checkLedgers.some((file) => ledgerBusy(file, pidAlive)),
+    );
+  };
+
   const restart = async () => {
     clearTimeout(timer);
     if (probing) {
@@ -465,24 +601,9 @@ function main() {
     // успел перезапустить сам) иначе сорвал бы следующую, и живые ходы
     // оборвались бы без клика (ревью 30.09).
     const forced = takeRestartRequest(appData) && deferredSince !== undefined;
-    // Живые ходы, подготовку копий и проверки ждём без предела; предел — только
-    // у нечитаемого журнала ходов без доказанного живого хода (`runsWait`).
-    const turns = runsWait(
-      runLedgers.map((file) => readJsonSteady(file)),
-      pidAlive,
-      deferredSince,
-      now,
-      RUNS_CAP_MS,
-    );
+    const turns = busyRuns(now);
     const { capped, runs } = turns;
-    const waitingFor =
-      defer && !forced
-        ? deferReason(
-            turns.wait,
-            setupBusy(stateFile, now),
-            checkLedgers.some((file) => ledgerBusy(file, pidAlive)),
-          )
-        : undefined;
+    const waitingFor = defer && !forced ? busyReason(turns, now) : undefined;
     if (waitingFor) {
       if (deferredSince === undefined) {
         deferredSince = now;
@@ -512,6 +633,16 @@ function main() {
     }
     deferredSince = undefined;
     clearRestartState(appData);
+    for (const file of [...pending]) {
+      const key = pathKey(file);
+      if (!mutantBase.has(key)) continue;
+      if (contentSha(file) === mutantBase.get(key)) pending.delete(file);
+      mutantBase.delete(key);
+    }
+    if (pending.size === 0) {
+      log('файлы проверки поломкой вернулись к оригиналу — перезапуск не нужен');
+      return;
+    }
     const files = [...pending];
     pending.clear();
     const named = `${files.slice(0, 3).join(', ')}${files.length > 3 ? ` и ещё ${files.length - 3}` : ''}`;
@@ -532,6 +663,14 @@ function main() {
       );
       return;
     }
+    // Проба идёт секунды, и за них стартует ход: проверка занятости до пробы
+    // его не видела, и перезапуск рвал этап на рождении (группа d9869abf:5,
+    // 25.10: связь доставки создана, разговор не начат). Занято — снова ждём.
+    if (defer && !forced && busyReason(busyRuns(Date.now()), Date.now())) {
+      for (const file of files) pending.add(file);
+      void restart();
+      return;
+    }
     log(`перезапуск: ${named}`);
     clearTimeout(relaunchTimer);
     crashes = 0;
@@ -546,10 +685,24 @@ function main() {
     }
   };
 
-  const sources = new SourceWatcher(roots, (files) => {
-    for (const file of files) pending.add(file);
-    if (deferredSince === undefined) void restart();
-  }).start();
+  // Мутант помечается в миг записи: к закрытию пачки (тишина) mustfail его уже вернул бы. Файл, уже
+  // ждущий настоящей правкой, не помечается — его перезапуск нужен.
+  const noteMutant = (file) => {
+    const key = pathKey(file);
+    if (mutantBase.has(key) || pending.has(file) || sources.pending.has(file)) return;
+    const { journaled } = mutantFiles(mustfailDir, roots, pidAlive);
+    if (journaled.has(key)) mutantBase.set(key, journaled.get(key));
+  };
+  const sources = new SourceWatcher(
+    roots,
+    (files) => {
+      for (const file of files) pending.add(file);
+      if (deferredSince === undefined) void restart();
+    },
+    QUIET_MS,
+    MAX_WAIT_MS,
+    noteMutant,
+  ).start();
   // Просьба о перезапуске, пока пачка ждёт тишины, закрывает её сразу; посреди отсрочки просьбу забирает
   // ожидание ходов (`restart`), как прежде. Просьба без ждущих правок снимается: оставшись в файле, она
   // закрыла бы следующую пачку на первом же сохранении.

@@ -1,6 +1,11 @@
 import { codexArguments, usageOf } from '../../../analytics/scanner/foreign.ts';
+import { guardLabel } from '../watch/tool-outcome.ts';
 import type { WatchEvent } from '../watch/watch.types.ts';
-import type { ForeignRowReader, ForeignTranscriptKind } from './foreign.types.ts';
+import type {
+  ForeignRowReader,
+  ForeignToolDialect,
+  ForeignTranscriptKind,
+} from './foreign.types.ts';
 
 /**
  * Строка переписки Codex или Qwen Code → события сторожа групп. Потока событий
@@ -50,12 +55,58 @@ function patchTarget(patch: unknown): string | undefined {
 
 const SHELL_TOOLS = new Set(['exec_command', 'shell', 'shell_command', 'local_shell']);
 
+/** Инструменты OpenCode с путём файла (`filePath`) → имена Claude. */
+const OPENCODE_FILE_TOOLS = new Map([
+  ['read', 'Read'],
+  ['write', 'Write'],
+  ['edit', 'Edit'],
+  ['multiedit', 'MultiEdit'],
+]);
+
+/**
+ * Инструмент OpenCode 1.18 → Claude. Формы аргументов — записи НАСТОЯЩЕГО opencode
+ * 1.18.35 (`__fixtures__/opencode-1.18-session.json`): `bash` с `timeout` в мс,
+ * файловые — с `filePath`, `task` — субагент, `apply_patch` (модели GPT) — патч.
+ */
+function opencodeTool(
+  name: string,
+  input: Record<string, unknown>,
+): { name: string; input: Record<string, unknown> } {
+  if (name === 'bash') {
+    const command = str(input.command);
+    const timeout = num(input.timeout);
+    return {
+      name: 'Bash',
+      input: { ...(command ? { command } : {}), ...(timeout ? { timeout } : {}) },
+    };
+  }
+  const fileTool = OPENCODE_FILE_TOOLS.get(name);
+  if (fileTool) {
+    const path = str(input.filePath) ?? str(input.file_path);
+    return { name: fileTool, input: path ? { file_path: path } : {} };
+  }
+  if (name === 'apply_patch') {
+    const target = patchTarget(input.patchText ?? input.patch);
+    return { name: 'Edit', input: target ? { file_path: target } : {} };
+  }
+  if (name === 'grep' || name === 'glob') {
+    const pattern = str(input.pattern);
+    const path = str(input.path);
+    return {
+      name: name === 'grep' ? 'Grep' : 'Glob',
+      input: { ...(pattern ? { pattern } : {}), ...(path ? { path } : {}) },
+    };
+  }
+  if (name === 'task') return { name: 'Agent', input };
+  return { name, input };
+}
+
 /**
  * Имя и аргументы инструмента CLI → имя и аргументы Claude, которые читают
  * правила сторожа. Незнакомое имя проходит как есть.
  */
 export function normalizeToolName(
-  kind: ForeignTranscriptKind,
+  kind: ForeignToolDialect,
   name: string,
   input: Record<string, unknown>,
 ): { name: string; input: Record<string, unknown> } {
@@ -78,6 +129,7 @@ export function normalizeToolName(
     }
     return { name, input };
   }
+  if (kind === 'opencode') return opencodeTool(name, input);
   if (name === 'run_shell_command') {
     const command = str(input.command);
     const timeout = num(input.timeout);
@@ -108,9 +160,47 @@ export function normalizeToolName(
 }
 
 /** Длина ответа инструмента в знаках: строка — как есть, иное — его JSON. */
-function resultChars(value: unknown): number {
+export function resultChars(value: unknown): number {
   if (value === undefined || value === null) return 0;
   return typeof value === 'string' ? value.length : JSON.stringify(value).length;
+}
+
+/**
+ * Отказ вызова у Codex (P-35): ответ на просьбу о разрешении «нет» — судья команд
+ * панели (`foreign-shell-judge`) или человек карточкой. Форма — запись НАСТОЯЩЕГО
+ * codex 0.155.1 (`codex app-server`, решение `decline`, win32):
+ * `exec_command failed: CreateProcess { message: "Rejected(\"rejected by user\")" }`
+ * (`__fixtures__/codex-0.155-judge-deny.jsonl`). Только голова ответа и только
+ * после «<инструмент> failed:» — вывод команды, где эти слова встретились по делу,
+ * не отказ. Хуки набора у Codex до одобрения в `/hooks` не срабатывают, их форма
+ * отказа живьём не снята — она не угадывается (`unsupported`, правило форматов).
+ */
+const CODEX_REJECTED = /^[\w.-]+ failed: [^\n]{0,80}?\bRejected\(\\?"rejected by user\\?"\)/;
+
+function codexDenied(output: unknown): string | undefined {
+  const text = str(output) ?? str(obj(output)?.content);
+  return text && CODEX_REJECTED.test(text.slice(0, 200)) ? 'permission' : undefined;
+}
+
+/**
+ * Отказ вызова у Qwen Code (P-35) — по `toolCallResult` строки ответа, формы записей
+ * НАСТОЯЩЕГО qwen 0.24.3 (`__fixtures__/qwen-0.24-*-deny.jsonl`), вызов не начинался
+ * (`executionStatus: 'not_started'`):
+ *   - `errorType: 'execution_denied'` — отказ хука `PreToolUse` (набор панели: карточка
+ *     правила, сита пуша…); текст причины — ответ инструмента, страж назван им, как у
+ *     Claude (`guardLabel`: «rule-card: …» → `rule-card`);
+ *   - `status: 'cancelled'` — просьба о разрешении получила «нет» (судья команд панели
+ *     в `qwen serve` или человек карточкой).
+ */
+function qwenDenied(record: Json, id: string, body: Json | undefined): string | undefined {
+  const result = obj(record.toolCallResult);
+  if (!result || result.executionStatus !== 'not_started') return undefined;
+  if (str(result.callId) && result.callId !== id) return undefined;
+  if (result.errorType === 'execution_denied') {
+    const text = str(body?.error) ?? str(result.resultDisplay) ?? '';
+    return guardLabel(text) || 'permission';
+  }
+  return result.status === 'cancelled' ? 'permission' : undefined;
 }
 
 function outputText(content: unknown): number {
@@ -211,7 +301,9 @@ function codexItem(payload: Json, t: number): WatchEvent[] {
     const output = payload.output;
     // Вывод бывает объектом `{ content, success }` — считаем его содержимое.
     const chars = resultChars(obj(output)?.content ?? output);
-    return [{ kind: 'toolResult', t, id, chars }];
+    // Отбитый вызов — повод R18 и R25, как у Claude (`toolOutcome`).
+    const denied = codexDenied(output);
+    return [{ kind: 'toolResult', t, id, chars, ...(denied ? { denied } : {}) }];
   }
   if (payload.type === 'reasoning') return [{ kind: 'activity', t }];
   if (payload.type === 'message' && payload.role === 'assistant') {
@@ -280,7 +372,17 @@ export function qwenWatchEvents(): ForeignRowReader {
         const id = str(response?.id);
         if (!id) return [];
         const body = obj(response?.response);
-        return [{ kind: 'toolResult', t, id, chars: resultChars(body?.output ?? body?.error) }];
+        // Отбитый вызов — повод R18 и R25, как у Claude (`toolOutcome`).
+        const denied = qwenDenied(record, id, body);
+        return [
+          {
+            kind: 'toolResult',
+            t,
+            id,
+            chars: resultChars(body?.output ?? body?.error),
+            ...(denied ? { denied } : {}),
+          },
+        ];
       });
     }
     if (record.type !== 'assistant') return [];

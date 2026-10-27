@@ -1,0 +1,155 @@
+{
+  "title": {
+    "ru": "Перепроверка MR — одним проходом, хуки оригинала доходят до копий, сито принимает ссылку на прогон основы",
+    "en": "An MR recheck runs in one pass, the original's hooks reach the copies, the sieve accepts a citation of a base run"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Хук, добавленный в `settings.local.json` оригинала после создания копии, теперь доходит до неё. Готовность копии называет недостающие хуки, а «Добрать» дописывает их, не перенося окружение заново. Раньше копия жила со снимком настроек на день создания, и новый страж оригинала в ней не срабатывал.",
+        "en": "A hook added to the original's `settings.local.json` after a copy was created now reaches the copy. Copy readiness names the missing hooks, and «Fill in» adds them without moving the environment again. Before, a copy kept the settings snapshot of its creation day, and a new guard of the original never fired in it."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка сит при доставке принимает заметку, которая ссылается на прогон основы ветки: красное в таком прогоне засчитывается как то, что было до ветки. Раньше такая ссылка отклонялась как прогон, которого нет, и группа гоняла проверки ещё раз.",
+        "en": "The sieve check of delivery accepts a note that cites a run of the branch base: a red in such a run counts as present before the branch. Before, such a citation was refused as an unknown run, and the group ran the checks once more."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Вводная «Перепроверить MR» ведёт группу одним проходом: первый шаг — одна проба конфликта с целью MR без проверок, затем все правки, затем проверки охвата один раз и один пуш. Тесты затронутой зоны идут одной командой блока «Тесты», без ручных go test, pytest и vitest. Охват больше 20 файлов вводная не перечисляет — его выводит названная команда. Факт, который пришлось выяснять, группа дописывает в блокнот правкой файла.",
+        "en": "The «Recheck MR» brief leads the group in one pass: the first step is a single conflict probe against the MR target with no checks, then every edit, then the scope checks once and one push. Touched-zone tests run as one Tests block command, with no hand-run go test, pytest or vitest. A scope over 20 files is no longer listed in the brief — the named command prints it. A fact the group had to find out goes into the notebook as a file edit."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сито пуша снова спрашивает о снятых строках, если после подтверждения сняты новые, и называет коммиты, которые их принесли, с командой `git show`. Раньше старое подтверждение покрывало любые новые удаления в том же файле.",
+        "en": "The push sieve asks about removed lines again when new ones are removed after a confirmation, and names the commits that brought them with a `git show` command. Before, an old confirmation covered any new removal in the same file."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правила больше не приходят туда, где не применимы: к черновым скриптам в `.agent/tmp`, `tmp/` и `scratchpad/`, к правке во время слияния или перебазирования и к уже лежащим страницам сайта документации. Ревизия документов молчит в прогоне группы.",
+        "en": "Rules no longer arrive where they cannot apply: scratch scripts in `.agent/tmp`, `tmp/` and `scratchpad/`, an edit during a merge or rebase, and existing pages of the documentation site. The document review stays silent in a group run."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Отказ на `git merge-tree --quiet` подсказывает читать код выхода до пайпа через `${PIPESTATUS[0]}`: после `| head` код `$?` — это код последней команды.",
+        "en": "The refusal of `git merge-tree --quiet` tells to read the exit code before a pipe through `${PIPESTATUS[0]}`: after `| head`, `$?` is the code of the last command."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "При перепроверке MR задача, не менявшаяся в трекере после доставки, лежит в файле задач копии одной строкой-указателем, а её полный текст — в соседнем файле, только для цитаты. Проверка доставки ищет цитаты в обоих. Раньше группа перечитывала все задачи целиком, хотя вводная просила этого не делать.",
+        "en": "In an MR recheck a task unchanged in the tracker since delivery sits in the copy's tasks file as one pointer line, and its full text is in a neighbouring file, only for quoting. The delivery check looks for quotes in both. Before, the group re-read every task in full although the brief asked it not to."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Ход группы, в котором были отказы стражей или ошибки команд, а блокнот копии не изменился, останавливается один раз с перечнем этих фактов: группа записывает в блокнот, что выяснила. Раньше такие факты терялись, и следующая перепроверка выясняла их заново.",
+        "en": "A group turn that hit guard refusals or command errors and left the copy's notebook unchanged is stopped once with a list of those facts: the group writes down what it found out. Before, such facts were lost, and the next recheck found them out again."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Описание MR группа публикует один раз; повторная публикация проходит только после проверки доставки, прошедшей на новом тексте (`--mr-description <файл>`). Раньше каждое исправление описания уходило в MR целиком до проверки, и находки проверки стоили ещё одной публикации.",
+        "en": "A group posts the MR description once; a re-post goes through only after a delivery check that passed on the new text (`--mr-description <file>`). Before, every correction of the description went to the MR in full before the check, and each finding of the check cost one more post."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Если группа переписала своими словами строку следа задачи, которую уже сдала, проверка доставки просит убрать эту строку из ответа: панель хранит прежнюю, и пробел закрывается в том же ходе. Раньше подсказка вела к ещё одному кругу доставки.",
+        "en": "When a group rewords a task trace row it has already delivered, the delivery check asks it to drop that row from the answer: the panel keeps the earlier one, and the gap closes in the same turn. Before, the hint led to one more delivery round."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Находки ревью группы лежат файлом в её копии с номерами: R-1, R-2… — замечания, по которым заведены правки, V-1, V-2… — то, что проход проверки оставил открытым. Задания правок и доставки называют этот файл, вводная новой сессии показывает его оглавление, а перепроверка MR ищет свои находки в нём. Раньше номера жили только в прошлом разговоре, и после сжатия группа искала их по старой переписке.",
+        "en": "A group's review findings sit in a file in its copy, numbered: R-1, R-2… for the findings the fixes were started for, V-1, V-2… for what the verification pass left open. The fix and delivery tasks name this file, a new session's brief shows its index, and an MR recheck looks its findings up there. Before, the numbers lived only in the previous conversation, and after a compaction the group searched old transcripts for them."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Пробелы доставки одного вида, которые разнятся только номером пункта или сита, приходят группе одной строкой: наставление полным текстом один раз, остальные номера списком. Проверка доставки без файла ответа предупреждает, что строки сит и пунктов в её выводе — из прошлого раунда. Раньше семь пунктов без источника были семью одинаковыми абзацами, и группа разбирала жалобы на ответ, который уже собиралась заменить.",
+        "en": "Delivery gaps of one kind that differ only in the point or sieve number reach the group as one line: the instruction in full once, the other numbers as a list. The delivery check run without an answer file warns that the sieve and task rows in its output come from the earlier round. Before, seven unsourced points were seven identical paragraphs, and the group worked through complaints about an answer it was about to replace."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "У «Перепроверить MR» появилась кнопка «Заметка»: текст до 4000 знаков уходит в задание перепроверки дословно, и каждая просьба из него — пункт перепроверки, как замечание ревьюера. Раньше замечание, которого нет в MR, группе было не передать.",
+        "en": "«Recheck MR» got a «Note» button: up to 4000 characters go into the recheck task verbatim, and every request in it is a point of the recheck, like a reviewer comment. Before, a remark that was not in the MR could not reach the group."
+      },
+      "area": { "ru": "Группы", "en": "Groups" },
+      "images": ["recheck-note-before.png", "recheck-note-after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка доставки сверяет каждый пункт списка в описании и комментариях задачи трекера со строками следа задач: пункт, который не цитирует ни одна строка, — пробел с ключом задачи и текстом пункта. Перепроверка MR не считает такую задачу сданной и перечисляет её непокрытые пункты в задании. Раньше проверялись только сданные строки, и просьба из комментария к задаче могла не попасть ни в работу, ни в отчёт.",
+        "en": "The delivery check matches every list item in a tracker task's description and comments against the task-trace rows: an item no row quotes is a gap naming the task key and the item. An MR recheck does not count such a task as delivered and lists its uncovered items in the task. Before, only the reported rows were checked, and a request from a task comment could end up in neither the work nor the report."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В «Настройке копий» правка, начатая, пока предыдущее сохранение ещё в пути, остаётся в поле, и «Сохранить» снова активна. Раньше ответ сохранения сбрасывал черновик целиком и стирал допечатанный текст.",
+        "en": "In «Copy settings» an edit started while the previous save is still in flight stays in the field, and «Save» is active again. Before, the save's reply reset the whole draft and erased the text typed meanwhile."
+      },
+      "area": { "ru": "Копии", "en": "Copies" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Окно сессии в блоке «Лимиты подписки» подписано просто «Сессия», без «(5 ч)»: время до сброса и так стоит рядом.",
+        "en": "The session window in «Plan usage limits» is labelled just «Session», without «(5 h)»: the time to reset sits right next to it."
+      },
+      "area": { "ru": "Лимиты", "en": "Limits" }
+    }
+  ],
+  "images": [
+    {
+      "file": "recheck-note-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "У доставленной группы только «Перепроверить MR»",
+        "en": "A delivered group has only «Recheck MR»"
+      }
+    },
+    {
+      "file": "recheck-note-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "«Заметка» раскрывает поле: текст уйдёт группе дословно",
+        "en": "«Note» opens a field: the text reaches the group verbatim"
+      }
+    }
+  ]
+}

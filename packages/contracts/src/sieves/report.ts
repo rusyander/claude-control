@@ -1,4 +1,5 @@
 import { blockLangPattern } from '../brand.ts';
+import { TASK_POINT_ID } from '../quality-floor.ts';
 import { SIEVE_CLASSES, type SieveClass } from './catalog.ts';
 
 // ---------------------------------------------------------------- отчёт
@@ -15,6 +16,22 @@ export interface SieveReportRow {
    * кода после сдачи снимает зачёт (`sieve-gap-stale`).
    */
   at?: string;
+  /**
+   * Прежняя строка того же сита с ДРУГИМ статусом — ставит `mergeSieveRows`, из
+   * блока модели не читается. По ней судья видит переворот fail → pass без нового
+   * доказательства (`flipWithoutProof`; g3 25.10: owner-4 сдан pass с тем же «красный
+   * только на Windows», что неделей раньше был fail, и панель приняла).
+   */
+  was?: { status: SieveStatus; evidence: string };
+  /**
+   * Прежнее доказательство строки следа задач (`task-N`) с ТЕМ ЖЕ статусом, когда
+   * новый ответ его переписал, — ставит `mergeSieveRows`, из блока модели не
+   * читается. Повтор той же строки более поздним ответом метку снимает (группа
+   * подтвердила). Судья доставки сверяет `at` с последним коммитом: переписанное
+   * без коммита — пробел (g0 26.10: task-1285 «правка с тестами», через 13 минут
+   * «код не менялся», код между ответами не трогали, и доставка приняла обе).
+   */
+  rewrote?: { evidence: string; at?: string };
 }
 
 /** Штамп прочтения строкам, сданным ЭТИМ ответом. */
@@ -30,6 +47,32 @@ const RUN_REF = /(?:^|[^\w-])run:\s*([A-Za-z0-9][\w-]{5,63})/g;
  */
 export function evidenceRunIds(evidence: string): string[] {
   return [...new Set([...evidence.matchAll(RUN_REF)].map((match) => match[1]!))];
+}
+
+/**
+ * Ссылка на прогон без `run:` — как её пишут группы: `run 664941c8`, `в прогоне
+ * 664941c8`, и полный номер так, как его печатают `tests-cli run` и `tests-cli record`
+ * (`прогон: 53b69a2e-de7c-…`, «Прогон 4f5ba80b-9371-… записан»). g3 25.10: «в run
+ * 664941c8» панель не узнала; g1 26.10: полный номер не узнавался вовсе (за восемью
+ * знаками шёл дефис) — три правки строки и лишний круг `delivery`. Номер — полный UUID
+ * или hex от 8 знаков (начало номера: `readRun` найдёт прогон и по нему).
+ */
+const LOOSE_RUN_REF =
+  /(?:^|[^\p{L}\p{N}_-])(?:run|прогон\p{L}*)\s*[:#№]?\s*([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8,64})(?![\p{L}\p{N}_-])/giu;
+
+/** Номера из свободных форм ссылки (`LOOSE_RUN_REF`) — кандидаты, а не факт. */
+export function looseRunIds(evidence: string): string[] {
+  return [...new Set([...evidence.matchAll(LOOSE_RUN_REF)].map((match) => match[1]!))];
+}
+
+/**
+ * Прогоны, на которые сослалось доказательство: `run:<id>` всегда, свободная
+ * форма — только номер, который есть в истории блока «Тесты» копии (`exists`):
+ * иначе «run 12345678» в выводе чужой команды стал бы ссылкой на несуществующий
+ * прогон и держал строку.
+ */
+export function citedRunIds(evidence: string, exists: (id: string) => boolean): string[] {
+  return [...new Set([...evidenceRunIds(evidence), ...looseRunIds(evidence).filter(exists)])];
 }
 
 /** Строка выученного сита, как её пишет группа. */
@@ -70,8 +113,9 @@ export const NAMING_SIEVES: ReadonlySet<string> = new Set([
 ]);
 /** Потолок для них: список механики ограничен (до 80 файлов), строка — нет. */
 const NAMING_EVIDENCE_MAX = 16_000;
-// Строки сит и пунктов задания владельца (U2, `owner-N`) — в одном отчёте.
-export const SIEVE_ROWS_MAX = 80;
+// Строки сит, пунктов задания владельца (U2, `owner-N`) и задач (`task-N`) — в одном
+// отчёте: у тикета-зонтика g9 26.10 одних пунктов приёмки и хвостов было 60+.
+export const SIEVE_ROWS_MAX = 160;
 const LEARNED_MAX = 20;
 export const LEARNED_TEXT_MIN = 20;
 export const LEARNED_TEXT_MAX = 400;
@@ -218,7 +262,42 @@ export function mergeSieveRows(
     const prior = byId.get(row.id);
     if (prior?.at && row.at && Date.parse(row.at) < Date.parse(prior.at)) continue;
     byId.delete(row.id);
-    byId.set(row.id, row);
+    // Прежний статус едет со строкой, пока статус не сменится снова: повтор того же
+    // pass вторым ответом переворот не стирает (`flipWithoutProof`).
+    const was =
+      prior && prior !== row && prior.status !== row.status
+        ? { status: prior.status, evidence: prior.evidence }
+        : (row.was ?? prior?.was);
+    const rewrote = rewroteOf(prior, row);
+    if (!was && !rewrote && !row.rewrote) {
+      byId.set(row.id, row);
+      continue;
+    }
+    const merged: SieveReportRow = { ...row };
+    if (rewrote) merged.rewrote = rewrote;
+    else delete merged.rewrote;
+    if (was) merged.was = was;
+    byId.set(row.id, merged);
   }
   return [...byId.values()].slice(-SIEVE_ROWS_MAX);
+}
+
+/**
+ * Метка переписанного доказательства строки следа задач (`SieveReportRow.rewrote`).
+ * Только `task-N` и только при том же статусе: смену статуса судит `was`. Тот же
+ * снимок ответа сливается не раз (звенья, алиасы цепочки) — подтверждением считается
+ * лишь повтор строки ответом с более поздним штампом.
+ */
+function rewroteOf(
+  prior: SieveReportRow | undefined,
+  row: SieveReportRow,
+): SieveReportRow['rewrote'] {
+  if (!TASK_POINT_ID.test(row.id)) return undefined;
+  if (!prior || prior === row) return row.rewrote;
+  if (prior.status !== row.status) return undefined;
+  if (prior.evidence !== row.evidence) {
+    return { evidence: prior.evidence, ...(prior.at ? { at: prior.at } : {}) };
+  }
+  const later = Boolean(prior.at && row.at && Date.parse(row.at) > Date.parse(prior.at));
+  return later ? undefined : (row.rewrote ?? prior.rewrote);
 }

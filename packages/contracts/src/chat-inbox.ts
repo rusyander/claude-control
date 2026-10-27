@@ -149,6 +149,18 @@ export const inboxChatSchema = object({
    * ближайшего шага. Вопросы и права такой сессии помечены `relay`.
    */
   outside: boolean().optional(),
+  /**
+   * Кто ведёт сессию — по полю `entrypoint` последней записи транскрипта:
+   * панель (`claude -p`), VS Code, терминал или другой клиент. В отличие от
+   * `outside` не гаснет, когда ход затих: по нему Telegram решает, можно ли
+   * ответить на вопрос продолжением чата панели. Нет поля — CLI его не пишет.
+   */
+  client: union([
+    literal('panel'),
+    literal('vscode'),
+    literal('terminal'),
+    literal('other'),
+  ]).optional(),
   /** Чей это разговор: приложение, CLI, группа и стадия. */
   source: inboxSourceSchema.optional(),
   /** Последнее движение: время транскрипта, начала прогона или вопроса. */
@@ -157,6 +169,7 @@ export const inboxChatSchema = object({
   asks: array(inboxAskSchema),
 });
 export type InboxChat = Infer<typeof inboxChatSchema>;
+export type InboxClient = NonNullable<InboxChat['client']>;
 
 /**
  * Отложенный вопрос D-n (`deferred-asks.ts`): прогон уже пошёл дальше, а

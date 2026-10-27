@@ -1,0 +1,240 @@
+{
+  "title": {
+    "ru": "Стражи групп реже отказывают зря: пуш и MR без решения человека, пауза не теряет ожидание, красный CI на инфраструктуре не уходит группе",
+    "en": "Group guards refuse needlessly less often: push and MR need no human decision, a pause keeps the wait, a red CI caused by infrastructure never reaches the group"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Звено группы, за которым идёт доставка, больше не заводит решение D-n на пуш или создание MR и не ждёт его: пуш и MR — не решение человека, их делает стадия доставки. Попытка опубликовать раньше отклоняется с тем же пояснением. Раньше рабочее звено поднимало лишний D-n на пуш, который доставка делает и так.",
+        "en": "A group stage followed by delivery no longer raises a D-n decision for a push or an MR creation and does not wait on one: push and MR are no decision for the human, the delivery stage does them. An earlier attempt to publish is refused with the same explanation. Before, a working stage raised an extra D-n for a push that delivery makes anyway."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Страж чтения больше не принимает `cmd &> файл` и `cmd &>> файл` за вывод файла в окно: это перенаправление обоих потоков, как `> файл`.",
+        "en": "The read guard no longer takes `cmd &> file` and `cmd &>> file` for printing the file into the window: it redirects both streams, like `> file`."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Пробел «прогон записан раньше последней правки» в блоке «Тесты» копии называет только изменённые файлы, которые лежат под устаревшими кейсами, а команда запуска стоит первой. Раньше в список попадали все изменённые файлы, и группа гоняла доставку ещё раз ради файла, которого кейсы не касались.",
+        "en": "The «run recorded before the latest change» gap of the copy's Tests block names only the changed files that fall under the stale cases, and the run command comes first. Before, every changed file was listed, and the group ran delivery once more for a file the cases did not touch."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сита пуша не запускаются, пока карточка правила заведомо откажет в этом пуше: один запрос `git fetch` и разбор blame раньше шли впустую на пуш, который тут же отклонялся, и повторно на его повтор. Если отказа всё же не случилось, сита выполняются после остальных проверок.",
+        "en": "Push sieves wait while the rule card is certain to refuse the push: one `git fetch` and a blame pass used to run for a push that was refused at once, and again for its repeat. If no refusal comes after all, the sieves run after the other checks."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Требование к содержанию строки сита (например, «`n/a` не сдаётся при правке кода живой проверки») считается только по файлам поведения, которые относятся к этому ситу. Раньше правка, например, линтера сборки отбивала `n/a` контракта.",
+        "en": "A sieve row's content requirement (for example, «`n/a` is not accepted when live-checked code changed») counts only behaviour files that belong to that sieve. Before, a build linter edit, for example, bounced the contract's `n/a`."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пометка «чувствительный путь» (план отката в описании MR) ставится только на файлы кода и данных. Страница доков вроде `access/policy.mdx` плана отката больше не требует.",
+        "en": "The «sensitive path» mark (a rollback plan in the MR description) is set only for code and data files. A docs page such as `access/policy.mdx` no longer asks for a rollback plan."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Гейт, который остановила проверка версии Node (`EBADENGINE`, `Unsupported engine`, собственная проверка проекта «рассчитан на Node…»), не считается запуском гейта: вердикта по коду нет, повторный запуск на нужной версии не отклоняется как «красный, правок не было». Правки в `.agent/` тоже не считаются правками кода.",
+        "en": "A gate stopped by the Node version check (`EBADENGINE`, `Unsupported engine`, a project's own «built for Node…» pre-check) does not count as a gate run: there is no verdict on the code, and a re-run on the right version is not refused as «red, no edits since». Edits under `.agent/` do not count as code edits either."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Оболочка группы запускается на версии Node проекта: в PATH сервера на Windows раскрываются буквальные `%ИМЯ%` (например, переменные nvm). Раньше нужный узел выпадал из начала PATH, первым оказывался другой, и группа гоняла гейты не на той версии.",
+        "en": "A group's shell runs on the project's Node version: literal `%NAME%` entries in the server PATH on Windows are expanded (nvm variables, for example). Before, the right node dropped out of the start of the PATH, another came first, and the group ran gates on the wrong version."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группы Qwen Code, Codex, OpenCode, Kimi, Goose и Gemini получают то же, что группы Claude: Node, которого просит проект (`.nvmrc`, `engines`), стоит первым в PATH их CLI, а гейт, который остановила проверка версии Node, не считается запуском — ни по ответу команды, ни по логу фонового запуска. Раньше такие группы шли на Node по умолчанию, и повтор гейта на нужной версии отклонялся как «правок не было».",
+        "en": "Qwen Code, Codex, OpenCode, Kimi, Goose and Gemini groups get what Claude groups get: the Node the project asks for (`.nvmrc`, `engines`) comes first in their CLI's PATH, and a gate stopped by the Node version check does not count as a run — whether the refusal is in the command's output or in a background run's log. Before, such groups ran on the default Node, and a re-run of the gate on the right version was refused as «no edits since»."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`tests-cli case --group <имя>` с несуществующей группой отказывает и называет похожие группы проекта; новая группа заводится только флагом `--new-group`. Раньше опечатка в имени тихо создавала лишнюю группу.",
+        "en": "`tests-cli case --group <name>` with an unknown group refuses and names similar groups of the project; a new group is created only with `--new-group`. Before, a typo in the name silently created an extra group."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа на паузе, которая ждала человека (ответ на вопрос, решение, ручной шаг, красный MR), сохраняет это ожидание: после «Продолжить» она снова ждёт ответа, новый ход ей не отправляется, а уведомление сообщает об этом. Раньше продолжение посылало группе ход, хотя ждали её не работу, а ответ человека.",
+        "en": "A paused group that was waiting for the human (an answer to a question, a decision, a manual step, a red MR) keeps that wait: after «Continue» it waits for the answer again, no new turn is sent to it, and a notification says so. Before, resuming sent the group a turn although what was awaited was the human's answer, not the group's work."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Задание конвейера MR, упавшее по таймауту, пока под так и не запустился (скрипт не начался: нет свободного узла, не скачан образ), считается сбоем инфраструктуры: панель перезапускает его сама, а группе красный не передаётся. Повторяющиеся строки лога сворачиваются в «(×N)»: 25 минут ожидания пода занимали больше половины вводной группы.",
+        "en": "An MR pipeline job that timed out while its pod never started (the script did not begin: no free node, image not pulled) is treated as an infrastructure failure: the panel retries it itself and the red is not handed to the group. Repeated log lines are folded into «(×N)»: 25 minutes of waiting for a pod took more than half of the group's brief."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Цитата в строке следа задач с вложенными «ёлочками» читается целиком: «Кнопка «Сохранить» не работает» — одна цитата, а не «Сохранить». Раньше пункт тикета выходил «без источника», и группа читала исходники в поисках причины.",
+        "en": "A quote in a task trace row with nested «guillemets» is read whole: «The «Save» button does not work» is one quote, not «Save». Before, the ticket point came out «without a source», and the group read sources looking for the reason."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "«Перепроверить MR» просит группу найти раздел тикета поиском по `## <КЛЮЧ>` и прочесть только этот диапазон, а не открывать файл тикетов целиком. Раньше при ни одной изменённой задаче группа читала весь файл (около 44 КБ) и дважды упиралась в отказ стража размера документов.",
+        "en": "«Recheck MR» asks the group to find a ticket section by searching for `## <KEY>` and to read only that range, never the whole tickets file. Before, with no updated tasks the group read the whole file (about 44 KB) and hit the document size guard twice."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правила наблюдателя групп об обходе защищённого действия (R25) и о череде отказов (R18) не считают отказ карточки правила неудавшимся действием: это просьба прочитать правило и повторить вызов. Исправленный повтор после такой карточки больше не поднимает тревогу «обход».",
+        "en": "The group watcher rules on bypassing a protected action (R25) and on a run of refusals (R18) no longer count a rule card refusal as a failed action: it asks to read the rule and repeat the call. A corrected repeat after such a card no longer raises a «bypass» alarm."
+      },
+      "area": { "ru": "Наблюдатель", "en": "Watcher" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Живую проверку сита на диффе, где весь изменённый код лежит в `tools/` или `scripts/` (линтер сборки, скрипт), доказывает прогон, исполненный блоком «Тесты», в котором прошёл кейс, называющий эти файлы. У такого кода нет стенда, и раньше каждый MR инструментов кончался строкой «not checked». Ручная запись прогона по-прежнему не в счёт, а хоть один файл продукта в диффе снова требует кейс с живой меткой.",
+        "en": "A sieve's live check on a diff whose changed code all lies under `tools/` or `scripts/` (a build linter, a script) is proved by a run the Tests block executed in which a case naming those files passed. Such code has no stand, so every tooling MR used to end with a «not checked» row. A hand-recorded run still does not count, and a single product file in the diff requires a live-tagged case again."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа разделения больше не может одобрить MR: одобрение закрыто в профиле группы и в страже слияния — инструмент MCP в обеих формах имени, `glab mr approve`, `gh pr review --approve` и запрос REST на `/approve`. Одобрение, как и слияние, остаётся человеку; вне групп страж одобрение не трогает.",
+        "en": "A split group can no longer approve an MR: approval is closed in the group profile and in the merge guard — the MCP tool in both name forms, `glab mr approve`, `gh pr review --approve` and a REST request to `/approve`. Approval, like merging, stays with the human; outside groups the guard leaves approval alone."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Слияние MR через инструмент opencode с именем вида `<сервер>_merge_merge_request` проходило мимо стража слияния и мимо проверки команд группы: оба ждали только имя с двойным подчёркиванием. Теперь эта форма отказывается так же, как остальные.",
+        "en": "Merging an MR through an opencode tool named like `<server>_merge_merge_request` slipped past the merge guard and the group command check: both expected only the double-underscore name. This form is now refused like the others."
+      },
+      "area": { "ru": "Чужие CLI", "en": "Foreign CLIs" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отчёт фонового агента, который приходит в разговор репликой («Another Claude session sent a message…», `<agent-message>`), больше не считается словами владельца: разрешение на запуск агентов и другие «да» этого хода берутся только из настоящих реплик человека.",
+        "en": "A background agent's report that arrives in the conversation as a turn («Another Claude session sent a message…», `<agent-message>`) is no longer counted as the owner's words: the permission to spawn agents and other yeses of the turn come only from real human turns."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Агент панели включает и выключает «Ревью после работы» проекта отдельной карточкой с подтверждением, а чтение правила подбора модели возвращает оба тумблера. Меняется только названный тумблер: подбор модели остаётся, каким был.",
+        "en": "The panel agent turns a project's «Review after work» on and off with its own confirmation card, and reading the model-picking rule returns both switches. Only the named switch changes: model picking stays as it was."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Звено группы чужого CLI (Codex, Qwen Code и другие) с первого хода знает, что за ним: ревью в новой сессии того же CLI и звено доставки с гейтом и MR. Раньше рабочее звено узнавало о доставке впереди только отказом пуша. Ревью обещается по шапке разговора, как его заводит панель, без обещания более сильной модели.",
+        "en": "A foreign-CLI group stage (Codex, Qwen Code and others) knows from its first turn what comes after it: a review in a fresh session of the same CLI and a delivery stage with the gate and the MR. Before, the work stage learned of the delivery ahead only from a refused push. Review is promised from the conversation header, the way the panel schedules it, with no promise of a stronger model."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сторож групп видит отказы в переписке Qwen Code и Codex: отказ хука и отказ судьи панели у Qwen Code, отклонённую команду у Codex. Раньше такие вызовы выглядели исполненными, и правила о стене отказов и обходе отказа у групп этих CLI не срабатывали.",
+        "en": "The group watcher sees refusals in Qwen Code and Codex transcripts: a hook refusal and the panel judge's refusal in Qwen Code, a declined command in Codex. Before, such calls looked executed, and the rules on a wall of refusals and on bypassing a refusal never fired for these CLIs' groups."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Перепроверить MR» закрывает и собственные открытые находки группы: замечания своего ревью с пометкой «не влияет на поведение» и пункты «open after verification» в описании MR исправляются в той же ветке. Открытым остаётся только то, что ждёт решения человека. Раньше перепроверка о таких пунктах молчала, и они оставались в MR.",
+        "en": "«Recheck MR» also closes the group's own open findings: remarks of its own review marked «does not affect behaviour» and «open after verification» items of the MR description are fixed in the same branch. Only a point waiting for a human decision stays open. Before, the recheck said nothing about such points, and they stayed in the MR."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Перепроверить MR» идёт на модели и глубине работы группы, а не на модели звена доставки. При включённой «Доставке на Sonnet» вся перепроверка — перечитывание тикетов, ревью владельца, полнота — шла на Sonnet, хотя это работа по существу, а не механика доставки.",
+        "en": "«Recheck MR» runs on the group's work model and effort, not on the delivery step's model. With «Delivery on Sonnet» on, the whole recheck — re-reading tickets, the owner's review, completeness — ran on Sonnet, though it is substantive work, not delivery mechanics."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Задание «Перепроверить MR» требует заново проверить причину каждого перенесённого «не проверено» (то, что продукт сам создаёт на стенде, помехой не считается). Пункты задач, чьи тикеты не менялись при неподвижной голове ветки, не перечитываются и не сдаются заново, а строки сит сдаются только изменённые этой перепроверкой: панель хранит прежние по id.",
+        "en": "The «Recheck MR» task asks to re-check the reason of every carried «not checked» (what the product itself creates on the stand is no obstacle). Task points whose tickets did not change while the branch head stayed put are neither re-read nor reported again, and only sieve rows changed by this recheck are reported: the panel keeps the earlier ones by id."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Задание звена сит и напоминание доставки называют, что доказывает живое сито: только прогон кейса, который человек сделал или пометил живым. Нет такого кейса — причина «no human-made live case covers <что>», а не «нет браузера».",
+        "en": "The sieve step's task and the delivery reminder name what proves a live sieve: only a run of a case a human made or marked live. No such case — the reason is «no human-made live case covers <what>», not «no browser»."
+      },
+      "area": { "ru": "Сита", "en": "Sieves" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пробел доставки «доказательство переписано без нового коммита» не ставится, если в строке сменился только однобуквенный предлог, и показывает «было» и «стало» с места расхождения. Раньше обе строки обрезались по одинаковому началу, группа не видела разницы и тратила на догадку лишний круг доставки.",
+        "en": "The delivery gap «evidence rewritten with no new commit» is not raised when only a one-letter word changed in the row, and it shows «was» and «now» from the first difference. Before, both rows were cut at the same start, the group could not see the difference and spent an extra delivery round guessing."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Прогноз сторожа групп «пятичасовое окно будет заполнено на N % к сбросу» больше не завышается: сервер отдаёт проценты целыми, и рост на одну ступень округления за несколько минут раньше читался как наклон всего окна (прогноз 113 % при занятых 5 %).",
+        "en": "The group watcher's forecast «the five-hour window will be N % full at reset» is no longer inflated: the server returns whole percents, and a one-step rise within a few minutes used to read as the slope of the whole window (113 % forecast at 5 % used)."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Блок «Лимиты подписки» в боковой панели показывает, сколько осталось до сброса: «сброс через 3 ч 40 мин», «сброс через 1 д 22 ч» вместо «сброс 05:20» и «сброс чт 00:00». Точный день и час — в подсказке.",
+        "en": "The «Subscription limits» block in the sidebar shows the time left until the reset: «resets in 3 h 40 min», «resets in 1 d 22 h» instead of «resets 05:20» and «resets Thu 00:00». The exact day and hour are in the tooltip."
+      },
+      "area": { "ru": "Интерфейс", "en": "Interface" }
+    }
+  ]
+}

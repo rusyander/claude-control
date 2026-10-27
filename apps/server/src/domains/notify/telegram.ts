@@ -1,10 +1,17 @@
 import { basename } from 'node:path';
-import type { TelegramEvent, TelegramSettings } from '@agentdeck/contracts';
+import type { TelegramEvent, TelegramLastSend, TelegramSettings } from '@agentdeck/contracts';
 import type { GroupSignalSeverity, GroupWatchRule } from '@agentdeck/contracts/group-watch';
+import { TELEGRAM_DONE_AFTER_MINUTES } from '@agentdeck/contracts/integrations';
 import type { RunNotice } from '../chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { describeFailure, failureCode, parseJson, sendRequest } from '../integrations/http/http.ts';
 import { unreachable } from '../integrations/errors.ts';
 import type { CodedText } from '../../lib/server-text/server-text.ts';
+import { safeDetail, telegramApiBase } from './telegram-api.ts';
+import { deliverTelegram, type DeliveryOptions } from './telegram-delivery.ts';
+import { composeRich, composeSignal } from './telegram-text.ts';
+import { escapeHtml } from './telegram-answers/html.ts';
+import type { ChatRoute } from './telegram-answers/telegram-answers.types.ts';
+import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 
 /**
  * Уведомления в Telegram — второй адресат тех же событий, что уходят на телефон.
@@ -13,40 +20,19 @@ import type { CodedText } from '../../lib/server-text/server-text.ts';
  * только тот, у кого оно установлено и спарено. Telegram получает и владелец без
  * приложения, и общий чат команды, куда стоит уронить строку «регресс упал».
  *
- * НАРУЖУ УХОДИТ РОВНО ЗАГОЛОВОК: вид события и имя папки проекта. Ни промпта,
- * ни ответа агента, ни путей внутри проекта — та же граница, что и у Expo
- * (`domains/remote-notify.ts`), и по той же причине: содержимому разговора
- * незачем покидать машину. Бот — чужой сервер, и это решает всё.
+ * НАРУЖУ УХОДЯТ ИМЯ И СУТЬ, НЕ СОДЕРЖИМОЕ (решение владельца 25.10.2026): вид
+ * события, имя папки проекта, имя чата и одна строка сути — инструмент,
+ * текст вопроса под маской секретов, число упавших тестов, класс ошибки
+ * (`telegram-text.ts`). Ни кода, ни путей, ни промпта, ни ответа агента: бот —
+ * чужой сервер. Вебхук и push по-прежнему получают только заголовок (`compose`).
  *
  * Отправка НИКОГДА не ждёт и никого не задерживает: прогон уже кончился, а
  * единственное, чем сеть может помешать, — задержать ответ следующему запросу.
  */
 
-/**
- * Адрес Bot API. Переменная — шов проверок (`tools/qa/check-group-watch.mjs`
- * поднимает свой приёмник на loopback): настоящий сервер Telegram проверка
- * трогать не должна. Читается при каждой отправке.
- *
- * Принимается только https или http на loopback: токен бота — часть адреса, и
- * открытый http на чужой машине отдал бы его любому на пути. Иное значение —
- * настоящий сервер, как без переменной.
- */
-const TELEGRAM_API = 'https://api.telegram.org';
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
-
-export function telegramApiBase(
-  raw: string | undefined = process.env.AGENTDECK_TELEGRAM_API,
-): string {
-  if (!raw) return TELEGRAM_API;
-  try {
-    const url = new URL(raw);
-    const safe =
-      url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname));
-    return safe ? raw.replace(/\/+$/, '') : TELEGRAM_API;
-  } catch {
-    return TELEGRAM_API;
-  }
-}
+// Адрес Bot API и вычистка токена живут отдельно: их же берёт клиент ответов
+// (`telegram-answers/bot-api.ts`), а этот модуль сам зовёт его отправку.
+export { safeDetail, telegramApiBase };
 const apiBase = (): string => telegramApiBase();
 const SYSTEM = 'Telegram';
 
@@ -76,6 +62,15 @@ export interface BudgetNotice {
   projectPath?: undefined;
 }
 
+/**
+ * Место, куда опрос ответов из Telegram подставляет «права и вопросы доставляю
+ * я». Отправитель собирается раньше опроса (опрос живёт в маршрутах), поэтому
+ * ответ читается при каждой отправке, а не запоминается.
+ */
+export interface TelegramAnswersCover {
+  covers: () => boolean;
+}
+
 export type TelegramNotice = RunNotice | TestFailedNotice | BudgetNotice | GroupSignalNotice;
 
 export interface TelegramDeps {
@@ -88,6 +83,27 @@ export interface TelegramDeps {
    * после него уже начался и повтора не будет.
    */
   onError?: (error: unknown) => void;
+  /** Имя чата по его ключу — вторая строка текста; нет — строки нет. */
+  titleOf?: (chatId: string) => string | undefined;
+  /** Ключ чата для ссылки «Открыть чат →»: временный `new-…` — его сессия. */
+  openIdOf?: (chatId: string) => string;
+  /** Имя CLI по id провайдера («Codex») — для первой строки чужих разговоров. */
+  cliNameOf?: (providerId: string) => string | undefined;
+  /**
+   * Ответы из Telegram включены и опрос жив: права и вопросы доставит их
+   * сообщение с кнопками, и второе, без кнопок, только дублировало бы его.
+   */
+  answersCover?: () => boolean;
+  /** Итог каждой отправки — на карточку Telegram («Последняя отправка»). */
+  onResult?: (result: TelegramLastSend) => void;
+  /**
+   * Отправленное сообщение — номер для /clear и чат, куда уйдёт ответ на него
+   * (reply владельца): `sent-log.ts`.
+   */
+  onSent?: (chatId: string, messageId: number, route?: ChatRoute) => void;
+  /** Пауза перед повтором и часы — подменяются в тестах. */
+  delivery?: DeliveryOptions;
+  now?: () => number;
 }
 
 /**
@@ -203,22 +219,141 @@ export async function telegramMe(token: string): Promise<string> {
 /**
  * Отправитель для реестров прогонов: та же форма, что у push-уведомителя.
  * Выключено, нет токена, нет чата или событие не подписано — тишина, без единого
- * запроса наружу.
+ * запроса наружу. Права и вопросы молчат и тогда, когда их уже доставляют
+ * ответы из Telegram (`answersCover`).
  */
 export function createTelegramNotifier(deps: TelegramDeps): (notice: TelegramNotice) => void {
   return (notice) => {
     const settings = deps.settings();
     if (!settings.enabled || !settings.chatId) return;
-    if (!settings.events.includes(noticeEvent(notice))) return;
+    if (!subscribed(settings, notice)) return;
+    if ((notice.kind === 'permission' || notice.kind === 'question') && deps.answersCover?.()) {
+      return;
+    }
     const token = deps.token();
     if (!token) return;
 
-    void sendTelegramMessage(token, settings.chatId, compose(notice)).catch((error: unknown) => {
+    void send(deps, token, settings.chatId, notice).catch((error: unknown) => {
       // Нет сети, лёг сервис, бот выкинут из чата — уведомление просто не дошло.
       // Состояние панели от этого не меняется, и падать тут не с чего.
       (deps.onError ?? warnSendFailed)(error);
     });
   };
+}
+
+/**
+ * Подписан ли Telegram на событие. «Закончил» судится порогом длительности, а не
+ * галочкой `runDone`: о каждом ходе — шум, о часовой работе — то, ради чего
+ * уведомление и нужно.
+ */
+function subscribed(settings: TelegramSettings, notice: TelegramNotice): boolean {
+  // Сигнал сторожа «внимание» — телеметрия (кэш, окна, расход, дубли вопросов):
+  // в Telegram уходит только «тревога» (решение владельца 25.10.2026).
+  if (notice.kind === 'groupSignal' && notice.severity !== 'alert') return false;
+  if (notice.kind !== 'done') return settings.events.includes(noticeEvent(notice));
+  const minutes = settings.doneAfterMinutes ?? TELEGRAM_DONE_AFTER_MINUTES;
+  return minutes > 0 && (notice.durationMs ?? 0) >= minutes * 60_000;
+}
+
+async function send(
+  deps: TelegramDeps,
+  token: string,
+  chatId: string,
+  notice: TelegramNotice,
+): Promise<void> {
+  const panelChat = 'chatId' in notice ? notice.chatId : undefined;
+  const openId = panelChat ? (deps.openIdOf?.(panelChat) ?? panelChat) : undefined;
+  const title = titleSafe(deps, notice);
+  const text = telegramText(notice, title, openId, viaOf(deps, notice, openId));
+  const result = await deliverTelegram(token, chatId, text, deps.delivery);
+  if (result.ok && result.messageId !== undefined) {
+    deps.onSent?.(chatId, result.messageId, routeOf(notice, openId, title));
+  }
+  const at = new Date((deps.now ?? Date.now)()).toISOString();
+  deps.onResult?.(
+    result.ok ? { at, ok: true } : { at, ok: false, error: safeDetail(result.error) },
+  );
+  if (!result.ok) throw new Error(safeDetail(result.error));
+}
+
+/**
+ * Текст Telegram разметкой HTML. События прогона — `composeRich`; сигнал
+ * сторожа — «⚠️ ТРЕВОГА» словами, с чатом и группой, правило и числа в цитате
+ * («внимание» в Telegram не уходит, `subscribed`); бюджет — своей
+ * строкой. Вебхук и push получают прежнюю строку `compose`.
+ */
+function telegramText(
+  notice: TelegramNotice,
+  title: string | undefined,
+  openId: string | undefined,
+  via: string | undefined,
+): string {
+  if (notice.kind === 'groupSignal') {
+    // Словами: что с группой; группа, код правила и числа — в свёрнутой цитате.
+    const parts = groupSignalParts(notice);
+    const group = notice.group
+      ? `группа ${notice.group.index}${notice.group.title ? ` «${notice.group.title}»` : ''}`
+      : '';
+    const details = [group, [notice.rule, parts.details].filter(Boolean).join(' · ')]
+      .filter(Boolean)
+      .join(' · ');
+    return composeSignal({
+      type: '⚠️ ТРЕВОГА',
+      essence: GROUP_SIGNAL_TITLES[notice.rule] ?? parts.essence,
+      ...(title ? { session: title } : {}),
+      project: parts.project,
+      details,
+      ...(openId ? { openId } : {}),
+    });
+  }
+  if (notice.kind === 'budgetNear' || notice.kind === 'budgetOver') {
+    return composeSignal({ type: '💰 БЮДЖЕТ', essence: compose(notice).replace(/^\S+\s+/, '') });
+  }
+  return composeRich(notice, title, openId, via) ?? escapeHtml(compose(notice));
+}
+
+/**
+ * Чужой CLI или сессия вне панели — в первую строку между проектом и сессией:
+ * «📁 shop · Codex · …», «📁 shop · VS Code · …». Claude Code не пишется.
+ */
+function viaOf(
+  deps: TelegramDeps,
+  notice: TelegramNotice,
+  openId: string | undefined,
+): string | undefined {
+  if ('outside' in notice && notice.outside) return 'VS Code';
+  const foreign = openId ? parseForeignChatKey(openId) : undefined;
+  if (!foreign) return undefined;
+  return deps.cliNameOf?.(foreign.providerId) ?? foreign.providerId;
+}
+
+/**
+ * Куда уйдёт ответ-reply на уведомление: чат панели (не чужого CLI — у него
+ * своя отправка) или сессия вне панели. Бюджету отвечать некуда.
+ */
+function routeOf(
+  notice: TelegramNotice,
+  openId: string | undefined,
+  title: string | undefined,
+): ChatRoute | undefined {
+  if (!openId || parseForeignChatKey(openId)) return undefined;
+  return {
+    chatId: openId,
+    ...(notice.projectPath ? { projectPath: notice.projectPath } : {}),
+    ...(title ? { title } : {}),
+    ...('outside' in notice && notice.outside ? { outside: true, sessionId: openId } : {}),
+  };
+}
+
+/** Имя чата не главнее самого уведомления: сбой поиска — без второй строки. */
+function titleSafe(deps: TelegramDeps, notice: TelegramNotice): string | undefined {
+  const chatId = 'chatId' in notice ? notice.chatId : undefined;
+  if (!chatId || !deps.titleOf) return undefined;
+  try {
+    return deps.titleOf(chatId);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Отказ отправки в журнал: текст ошибки уже без токена (`label` запроса, `safeDetail`). */
@@ -227,10 +362,6 @@ function warnSendFailed(error: unknown): void {
   console.warn('[notify] telegram send failed:', safeDetail(text));
 }
 
-/**
- * Хвост ответа для подробности отказа — с вырезанным токеном на случай, если
- * Telegram вернул его в тексте ошибки (он это делает, отвечая на битый адрес).
- */
 /** Параметры кода — тот же текст по частям: токен из них вычищается так же. */
 function safeCode(code: CodedText): CodedText {
   const params = Object.fromEntries(
@@ -240,10 +371,6 @@ function safeCode(code: CodedText): CodedText {
     ]),
   );
   return { ...code, params };
-}
-
-export function safeDetail(text: string): string {
-  return text.replace(/bot\d+:[\w-]+/g, 'bot<токен>').slice(0, 300);
 }
 
 /**
@@ -262,6 +389,10 @@ export interface GroupSignalNotice {
   numbers: Record<string, number>;
   projectPath?: string;
   stage?: string;
+  /** Чат звена, где сработало: имя чата и ссылка в Telegram. */
+  chatId?: string;
+  /** Группа словами: номер (с 1) и имя. */
+  group?: { index: number; title?: string };
 }
 
 /** Короткое имя правила для строки в Telegram — только правила, что туда уходят. */
@@ -317,7 +448,7 @@ const GROUP_SIGNAL_NUMBERS: Record<string, (value: number) => string> = {
   ahead: (value) => `впереди в очереди: ${value}`,
   tools: (value) => `вызовов: ${value}`,
   afterMin: (value) => `через ${value} мин после паузы`,
-  gates: (value) => `прогонов: ${value}`,
+  gates: (value) => `проходов тяжёлых проверок: ${value}`,
   totalMin: (value) => `всего ${value} мин`,
   fails: (value) => `падений: ${value}`,
   kills: (value) => `остановок: ${value}`,
@@ -345,6 +476,25 @@ const STAGE_TITLES: Record<string, string> = {
   review: 'ревью',
   deliver: 'доставка',
 };
+
+/** Сигнал сторожа по частям: правило с именем и числа со стадией — общие для обоих текстов. */
+export function groupSignalParts(notice: GroupSignalNotice): {
+  essence: string;
+  details: string;
+  project: string;
+} {
+  const title = GROUP_SIGNAL_TITLES[notice.rule];
+  const own = GROUP_SIGNAL_NUMBERS_BY_RULE[notice.rule];
+  const numbers = Object.entries(notice.numbers)
+    .map(([key, value]) => (own?.[key] ?? GROUP_SIGNAL_NUMBERS[key])?.(value) ?? `${key} ${value}`)
+    .join(', ');
+  const stage = notice.stage ? `стадия «${STAGE_TITLES[notice.stage] ?? notice.stage}»` : '';
+  return {
+    essence: `${notice.rule}${title ? ` ${title}` : ''}`,
+    details: [numbers, stage].filter(Boolean).join('; '),
+    project: notice.projectPath ? basename(notice.projectPath) : '',
+  };
+}
 
 export function composeGroupSignal(notice: GroupSignalNotice): string {
   const project = notice.projectPath ? basename(notice.projectPath) : '';

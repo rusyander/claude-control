@@ -24,6 +24,7 @@ function run(
     seenAt?: number;
     settings?: Partial<GroupWatch>;
     noLive?: boolean;
+    deferredWaiting?: boolean;
   } = {},
 ) {
   const record = { index: 1, title: 'g', status: 'started', ...group } as SplitPlanGroupRecord;
@@ -32,6 +33,9 @@ function run(
     plans: { parent: { groups: [record] } },
     ...(options.noLive ? {} : { live: () => ({ ...IDLE, ...options.live }) }),
     ...(options.seenAt !== undefined ? { seenAt: () => options.seenAt } : {}),
+    ...(options.deferredWaiting !== undefined
+      ? { deferredWaiting: () => options.deferredWaiting === true }
+      : {}),
     lastSeen,
     nudgeSnap: options.nudgeSnap ?? new Map(),
     settings: { ...GROUP_WATCH_DEFAULTS, ...options.settings },
@@ -195,6 +199,35 @@ describe('sweepGroups R28 напоминания о доставке не дви
     expect(rule(run(same, { settings: { nudgeRepeats: 3 } }).hits, 'R28')).toBeUndefined();
   });
 
+  it('каждый круг находит новое недостающее — сведение «переделка» с числом новых пунктов', () => {
+    const reworked = {
+      deliveryNudges: 2,
+      deliveryMissing: ['б', 'в', 'г'],
+      deliveryHistory: [round(1, ['а', 'б']), round(5, ['б', 'в', 'г'])],
+    };
+    expect(rule(run(reworked).hits, 'R28')).toEqual({
+      rule: 'R28',
+      severity: 'info',
+      numbers: { nudges: 2, fresh: 2 },
+      params: { missing: 'в' },
+      since: T0 + 5 * MIN,
+      textKey: 'groupWatch.rule.R28rounds',
+    });
+    // Порог напоминаний тот же: одного круга с новым мало.
+    expect(rule(run(reworked, { settings: { nudgeRepeats: 3 } }).hits, 'R28')).toBeUndefined();
+    // Новое на прошлом круге, а последний только сжался — движение вперёд.
+    const settling = {
+      deliveryNudges: 3,
+      deliveryMissing: ['б'],
+      deliveryHistory: [...reworked.deliveryHistory, round(9, ['б'])],
+    };
+    expect(rule(run(settling).hits, 'R28')).toBeUndefined();
+    // Напоминание не туда — «внимание» прежним текстом, не сведение.
+    const misplaced = { ...reworked, deliver: true, deliveryNudgeStage: 'review' };
+    expect(rule(run(misplaced).hits, 'R28')).toMatchObject({ severity: 'warn' });
+    expect(rule(run(misplaced).hits, 'R28')?.textKey).toBeUndefined();
+  });
+
   it('журнала доставки нет (старая запись): наборы — из того, что сторож видел при росте счётчика', () => {
     const nudgeSnap = new Map<string, NudgeSnap>();
     const first = run({ deliveryNudges: 1, deliveryMissing: ['а'] }, { nudgeSnap });
@@ -254,5 +287,49 @@ describe('sweepGroups R28 напоминания о доставке не дви
     expect(
       rule(run({ ...base, deliver: false, deliveryNudgeStage: 'work' }).hits, 'R28'),
     ).toBeUndefined();
+  });
+});
+
+describe('sweepGroups R43 пауза стоит, а решать нечего (F1)', () => {
+  const pausedAt = new Date(T0).toISOString();
+
+  it('пауза человека: час — напоминание info; раньше — молчит', () => {
+    expect(rule(run({ status: 'paused', pausedAt }, { now: T0 + 59 * MIN }).hits, 'R43')).toBe(
+      undefined,
+    );
+    expect(
+      rule(run({ status: 'paused', pausedAt }, { now: T0 + 60 * MIN }).hits, 'R43'),
+    ).toMatchObject({
+      severity: 'info',
+      numbers: { pausedMin: 60 },
+      textKey: 'groupWatch.rule.R43',
+    });
+  });
+
+  it('пауза сторожа: четверть порога, правило в тексте; порог читается из настроек', () => {
+    const watch = {
+      status: 'paused' as const,
+      pausedAt,
+      pausedBy: 'watch' as const,
+      pausedRule: 'R12',
+    };
+    expect(rule(run(watch, { now: T0 + 15 * MIN }).hits, 'R43')).toMatchObject({
+      params: { rule: 'R12' },
+      textKey: 'groupWatch.rule.R43watch',
+    });
+    expect(
+      rule(run(watch, { now: T0 + 15 * MIN, settings: { unresumedMinutes: 120 } }).hits, 'R43'),
+    ).toBeUndefined();
+  });
+
+  it('ждущий D-n или пауза на вопросе — молчит; группа идёт — молчит', () => {
+    const late = T0 + 300 * MIN;
+    expect(
+      rule(run({ status: 'paused', pausedAt }, { now: late, deferredWaiting: true }).hits, 'R43'),
+    ).toBeUndefined();
+    expect(
+      rule(run({ status: 'paused', pausedAt, pausedWait: 'question' }, { now: late }).hits, 'R43'),
+    ).toBeUndefined();
+    expect(rule(run({ pausedAt }, { now: late }).hits, 'R43')).toBeUndefined();
   });
 });

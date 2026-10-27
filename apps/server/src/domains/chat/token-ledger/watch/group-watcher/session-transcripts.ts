@@ -1,9 +1,15 @@
+import {
+  foreignDocumentKind,
+  foreignDocumentReader,
+  foreignDocumentSource,
+} from '../../foreign/foreign-document.ts';
 import { foreignWatchEvents } from '../../foreign/foreign-events.ts';
 import { firstRecordAt, foreignTranscriptKind } from '../../foreign/foreign-transcript.ts';
 import { TranscriptTail } from '../tail.ts';
 import { createTranscriptReader } from '../transcript-events.ts';
 import type { WatchEvent } from '../watch.types.ts';
 import type { GroupWatcherDeps, Session, TranscriptHint } from './group-watcher.types.ts';
+import { SessionDocuments } from './session-documents.ts';
 import { WATCH_TICK_MS } from './timing.ts';
 
 /**
@@ -15,6 +21,8 @@ import { WATCH_TICK_MS } from './timing.ts';
 export class SessionTranscripts {
   private readonly deps: GroupWatcherDeps;
   private readonly tail = new TranscriptTail();
+  /** Переписка-документ (Continue): перечитывается целиком, отступа хвоста нет. */
+  private readonly docs = new SessionDocuments();
 
   constructor(deps: GroupWatcherDeps) {
     this.deps = deps;
@@ -43,6 +51,11 @@ export class SessionTranscripts {
     return kind ? foreignWatchEvents(kind) : createTranscriptReader();
   }
 
+  /** Род документа сессии: переписка чужого CLI одним файлом JSON. */
+  private docKind(session: Session) {
+    return session.provider ? foreignDocumentKind(session.provider) : undefined;
+  }
+
   /**
    * Файл переписки чужого CLI до смены id: ключ разговора на месте id первого
    * хода сменится настоящим id — файл тот же, отступ его хвоста остаётся (иначе
@@ -58,7 +71,10 @@ export class SessionTranscripts {
    * потока — с нынешнего конца; база окна — из начала транскрипта.
    */
   bound(session: Session, sessionId: string, before: string | undefined, now: number): void {
-    if (before !== undefined && this.mainFile(session) !== before) this.tail.forget(before);
+    if (before !== undefined && this.mainFile(session) !== before) {
+      this.tail.forget(before);
+      this.docs.forget(before);
+    }
     const dir = session.provider ? undefined : this.deps.subagentDir?.(sessionId);
     if (dir) this.tail.prime(dir, now);
     if (session.detached) this.primeMain(session, now);
@@ -72,8 +88,12 @@ export class SessionTranscripts {
     delete session.readTail;
     if (keepMain) return;
     const file = this.mainFile(session, old);
-    if (file) this.tail.forget(file);
+    if (file) {
+      this.tail.forget(file);
+      this.docs.forget(file);
+    }
     delete session.readMain;
+    delete session.readDoc;
   }
 
   /**
@@ -85,8 +105,24 @@ export class SessionTranscripts {
     // Новый разговор: первый вызов сторож увидит сам и со временем (R19) — транскрипт,
     // уже успевший его записать, не должен его опередить.
     if (session.state.fresh) return;
+    const docKind = this.docKind(session);
+    // Документ Continue: каждый ответ — свой запуск `cn -p` и свой разговор, первый
+    // вызов сторож видит сам; базы из прошлого документа у нового разговора нет.
+    if (docKind === 'continue') return;
     const file = this.mainFile(session, sessionId);
     if (!file) return;
+    if (docKind) {
+      // Сессия OpenCode живёт через ходы (`opencode serve`): база — её первый вызов.
+      // Читатель свой, одноразовый: отданное читателем сессии он не трогает.
+      const doc = foreignDocumentSource(docKind).load(file);
+      const call = (doc === undefined ? [] : foreignDocumentReader(docKind)(doc, Date.now())).find(
+        (event): event is Extract<WatchEvent, { kind: 'call' }> =>
+          event.kind === 'call' && !event.sidechain,
+      );
+      const ctx = call ? call.input + call.cacheRead + call.cacheWrite : 0;
+      if (ctx > 0) session.state.firstCtx = ctx;
+      return;
+    }
     const read = this.mainReader(session);
     for (const row of this.tail.head(file)) {
       const call = read(row).find(
@@ -109,6 +145,12 @@ export class SessionTranscripts {
   primeMain(session: Session, now: number): void {
     const file = this.mainFile(session);
     if (!file) return;
+    const docKind = this.docKind(session);
+    if (docKind) {
+      session.readDoc ??= foreignDocumentReader(docKind);
+      this.docs.prime(file, session.readDoc, now, session.turnAt, foreignDocumentSource(docKind));
+      return;
+    }
     if (session.provider && session.turnAt !== undefined) {
       const born = firstRecordAt(file);
       if (born !== undefined && born >= session.turnAt) return;
@@ -152,11 +194,24 @@ export class SessionTranscripts {
       if (session.state.lastEventAt < now) session.state.lastEventAt = now;
       return [];
     }
-    session.readMain ??= this.mainReader(session);
     const { stage } = session.target;
-    return this.tail
-      .readFile(file, now, minIntervalMs)
-      .flatMap(({ row }) => session.readMain?.(row) ?? [])
-      .map((event) => (event.kind === 'tool' && stage ? { ...event, stage } : event));
+    const docKind = this.docKind(session);
+    let events: WatchEvent[];
+    if (docKind) {
+      session.readDoc ??= foreignDocumentReader(docKind);
+      events = this.docs.read(
+        file,
+        session.readDoc,
+        now,
+        minIntervalMs,
+        foreignDocumentSource(docKind),
+      );
+    } else {
+      session.readMain ??= this.mainReader(session);
+      events = this.tail
+        .readFile(file, now, minIntervalMs)
+        .flatMap(({ row }) => session.readMain?.(row) ?? []);
+    }
+    return events.map((event) => (event.kind === 'tool' && stage ? { ...event, stage } : event));
   }
 }

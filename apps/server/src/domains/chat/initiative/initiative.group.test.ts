@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { HANDOFF_BLOCK_LANG, HANDOFF_SYSTEM_PROMPT } from '@agentdeck/contracts/chat-handoff';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
 import { TASK_TICKETS } from '../task-tickets/task-tickets.ts';
+import { OWNER_BRIEF } from '../owner-brief/owner-brief.ts';
 import { WORK_HABITS_SHARED_NOTE } from '../group-profile/group-profile.ts';
 import {
   BACKGROUND_PROMPT,
@@ -47,10 +48,12 @@ describe('дописка группы разделения', () => {
    * 23.10) — три правила при ужатых источнике, вопросе, сообщении в работе и этапах:
    * фоновые подагенты — конец хода (два цикла sleep по 700 с), без вопросов и
    * «Waiting for the human: D-n» (три хода AskUserQuestion), `>>` в списке оболочки
-   * (отказы стража на дописке в .md).
+   * (отказы стража на дописке в .md). +130 (26.10) — путь к файлу слов владельца:
+   * после сжатия группа 2,5 минуты искала их в транскрипте; окупается одним
+   * несделанным поиском.
    */
-  it('не длиннее 4580 знаков при обоих тумблерах', () => {
-    expect(group.length).toBeLessThanOrEqual(4580);
+  it('не длиннее 4710 знаков при обоих тумблерах', () => {
+    expect(group.length).toBeLessThanOrEqual(4710);
   });
 
   /**
@@ -111,10 +114,11 @@ describe('дописка группы разделения', () => {
    * +170 — правка через Edit, не оболочкой (журнал 19.10 19:42–19:50).
    * +170 — P-08 (25.10): «не спрашивай о развилках» и D-n для необратимого шага
    * вместо «спроси, если шаг необратим» — чужая группа вставала на вопросе.
+   * +130 (26.10) — путь к файлу слов владельца: Codex и Qwen сжимают переписку так же.
    */
-  it('правила группы в чужом CLI — не длиннее 2340 знаков', () => {
+  it('правила группы в чужом CLI — не длиннее 2470 знаков', () => {
     const foreign = `${FOREIGN_CHILD_PROMPT} ${FOREIGN_GROUP_ECONOMY_PROMPT}`;
-    expect(foreign.length).toBeLessThanOrEqual(2340);
+    expect(foreign.length).toBeLessThanOrEqual(2470);
     expect(foreign).not.toContain('LSP');
   });
 
@@ -138,15 +142,15 @@ describe('дописка группы разделения', () => {
    * С тумблером «привычки работы» (22.10) звено чужого CLI получает ещё и общую
    * часть заметки о привычках — `foreignChildExtra` склеивает её третьей: +340.
    * Потолок меряет то, что реально едет в каждом вызове, а не две строки из трёх.
-   * +170 — P-08 (25.10), как и потолок без привычек.
+   * +170 — P-08 (25.10), как и потолок без привычек. +130 (26.10) — файл слов владельца.
    */
-  it('правила группы в чужом CLI с привычками работы — не длиннее 2680 знаков', () => {
+  it('правила группы в чужом CLI с привычками работы — не длиннее 2810 знаков', () => {
     const foreign = [
       FOREIGN_CHILD_PROMPT,
       FOREIGN_GROUP_ECONOMY_PROMPT,
       WORK_HABITS_SHARED_NOTE,
     ].join(' ');
-    expect(foreign.length).toBeLessThanOrEqual(2680);
+    expect(foreign.length).toBeLessThanOrEqual(2810);
   });
 
   /**
@@ -251,6 +255,19 @@ describe('дописка группы разделения', () => {
     ]) {
       expect(GROUP_ECONOMY_PROMPT, anchor).toContain(anchor);
     }
+  });
+
+  /**
+   * Живая группа 26.10: после сжатия просьба владельца и номера `owner-N` нашлись
+   * только grep'ом по транскрипту (7 вызовов, 2,5 минуты). Путь к файлу, который
+   * пишет панель, стоит в системной дописке — она сжатие переживает — у Claude и у
+   * чужих CLI; у aider (без сжатия) его нет.
+   */
+  it('после сжатия слова владельца — одним чтением файла, не поиском по транскрипту', () => {
+    expect(OWNER_BRIEF).toBe('.agent/run/owner-request.agent.md');
+    expect(group).toContain(`read ${OWNER_BRIEF} (if present), not the transcript`);
+    expect(FOREIGN_GROUP_ECONOMY_PROMPT).toContain(OWNER_BRIEF);
+    expect(NO_TOOL_LOOP_ECONOMY_PROMPT).not.toContain(OWNER_BRIEF);
   });
 
   it('несёт каждое правило: вопрос, сообщение в работе, этапы, автономию, передний план', () => {

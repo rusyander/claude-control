@@ -202,6 +202,8 @@ export const queryKeys = {
   chatEscalations: ['chat-escalations'] as const,
   /** Активные сигналы сторожа одиночных чатов: один список на все, по чату. */
   chatWatchSignals: ['chat-watch-signals'] as const,
+  /** Охват сторожа групп для строки настроек: сколько групп каким источником видно. */
+  groupWatchCoverage: ['group-watch-coverage'] as const,
   /** Отложенные вопросы D-n: один список на все чаты и группы, как его отдаёт сервер. */
   chatDeferred: ['chat-deferred'] as const,
   /** Резервные копии: список обновляется после каждой записи в конфиг. */

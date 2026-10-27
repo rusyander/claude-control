@@ -35,6 +35,7 @@
 //
 // Cost when the command is not a publish: one regex over the raw command, no process spawned.
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { closeSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { executedText, commandText } from './shell-text.mjs';
@@ -82,12 +83,40 @@ function ackLine(line, add) {
   add(text.split(/\s+/)[0]);
 }
 
+// Shell brace form (`docs/{ru,en}/a.mdx`) names every expansion, as the delivery sieve judge reads it
+// (contracts `sieves/judge.ts` braceForms, P-18): group #0 23.10 wrote its sieve paths so. Capped like
+// the judge — past the cap the rest stays unnamed, never «named».
+const BRACE_GROUP = /\{([^{}\n]*,[^{}\n]*)\}/;
+const BRACE_MAX = 256;
+function braceForms(word) {
+  const done = [];
+  const todo = [word];
+  while (todo.length > 0 && done.length + todo.length <= BRACE_MAX) {
+    const current = todo.shift();
+    const group = BRACE_GROUP.exec(current);
+    if (!group) {
+      done.push(current);
+      continue;
+    }
+    const head = current.slice(0, group.index);
+    const tail = current.slice(group.index + group[0].length);
+    for (const alt of group[1].split(',')) todo.push(`${head}${alt.trim()}${tail}`);
+  }
+  return done;
+}
+
+/** `# sieve-ack:` words: whitespace and commas part names, commas inside `{…}` part brace alternatives. */
+const ackWords = (text) => text.match(/(?:[^\s,{}]|\{[^{}\n]*\})+/g) ?? [];
+
 /** Files named on `# sieve-ack:` comment lines of the raw command; `@<file>` adds every line of that file. */
 export function ackedFiles(raw, cwd) {
   const out = new Set();
-  const add = (f) => f && out.add(slash(f).replace(/^\.\//, ''));
+  const add = (f) => {
+    if (!f) return;
+    for (const one of braceForms(f)) out.add(slash(one).replace(/^\.\//, ''));
+  };
   for (const m of String(raw ?? '').matchAll(ACK)) {
-    for (const f of m[1].split(/[\s,]+/)) {
+    for (const f of ackWords(m[1])) {
       if (!f.startsWith('@')) add(f);
       else
         try {
@@ -353,7 +382,7 @@ function sessionStart(transcriptPath) {
 
 /** One branch against fresh main → `{conflicts, foreign, notes, main, since, startSha}`. */
 function sieve(git, t, input) {
-  const res = { conflicts: [], foreign: [], notes: [], label: t.label };
+  const res = { conflicts: [], foreign: [], brought: {}, notes: [], label: t.label };
   const cwd = t.dir;
   const remotes = git(cwd, ['remote'])
     .stdout.split('\n')
@@ -483,11 +512,15 @@ function sieve(git, t, input) {
       unblamed.push({ file, why: firstLine(blame.stderr) || `exit ${blame.code}` });
       continue;
     }
+    // Every late commit under the removed lines: the deny names them, so the agent reads what each one
+    // brought (`git show <sha> -- <file>`) BEFORE the ack — a force-push once went out first.
+    const shas = [];
     for (const m of blame.stdout.matchAll(/^([0-9a-f]{40}) \d+ \d+/gm)) {
-      if (late.has(m[1])) {
-        res.foreign.push(file);
-        break;
-      }
+      if (late.has(m[1]) && !shas.includes(m[1])) shas.push(m[1]);
+    }
+    if (shas.length) {
+      res.foreign.push(file);
+      res.brought[file] = shas;
     }
   }
   if (unblamed.length) {
@@ -553,6 +586,26 @@ function writeAckList(cwd, dir, files) {
   }
 }
 
+/** `file ← sha «subject»` per open file of one sieved branch; a subject is read once per commit. */
+function broughtList(git, r) {
+  const subjects = new Map();
+  const subject = (sha) => {
+    if (!subjects.has(sha)) {
+      const log = git(r.scan?.cwd ?? '.', ['log', '-1', '--format=%s', sha]);
+      subjects.set(sha, log.code === 0 ? log.stdout.trim().split('\n')[0].slice(0, 80) : '');
+    }
+    return subjects.get(sha);
+  };
+  const named = (sha) => `${sha.slice(0, 10)}${subject(sha) ? ` «${subject(sha)}»` : ''}`;
+  const shown = r.open.slice(0, LIST_MAX).map((f) => {
+    const shas = (r.brought?.[f] ?? []).slice(0, 3);
+    return shas.length ? `${f} ← ${shas.map(named).join(', ')}` : f;
+  });
+  return (
+    shown.join('; ') + (r.open.length > LIST_MAX ? ` (+${r.open.length - LIST_MAX} more)` : '')
+  );
+}
+
 const list = (files) =>
   files.slice(0, LIST_MAX).join(', ') +
   (files.length > LIST_MAX ? ` (+${files.length - LIST_MAX} more)` : '');
@@ -571,16 +624,72 @@ function readAcks(root) {
     return {};
   }
 }
-export function priorAcks(root, branch) {
-  const files = branch ? readAcks(root)[branch] : null;
-  return new Set(Array.isArray(files) ? files.filter((f) => typeof f === 'string') : []);
+/**
+ * Files acked on an earlier push of `branch` whose removed lines are still the acked ones:
+ * `fingerprintOf(file)` (this push's `removedFingerprint`) must equal the stored `~removed` print, as
+ * the panel's `pushAckedOf` demands. A path alone let a NEW main line removed after a rebase pass
+ * silently; no stored print (an older ack) or nothing to hash with → asked again.
+ */
+export function priorAcks(root, branch, fingerprintOf) {
+  if (!branch || typeof fingerprintOf !== 'function') return new Set();
+  const data = readAcks(root);
+  const files = Array.isArray(data[branch])
+    ? data[branch].filter((f) => typeof f === 'string')
+    : [];
+  const prints = data[ACK_PRINTS]?.[branch];
+  if (!files.length || !prints || typeof prints !== 'object') return new Set();
+  return new Set(
+    files.filter((f) => typeof prints[f] === 'string' && prints[f] === fingerprintOf(f)),
+  );
 }
-export function rememberAcks(root, branch, files) {
-  if (!root || !branch || !files.length) return;
+// What an ack covered: `"~removed": {"<branch>": {"<file>": "<fingerprint>"}}` beside the lists (`~` is
+// not allowed in a git branch name, so the key never meets a branch). The panel's delivery sieve
+// (`sieve-facts.ts` pushAckedOf) accepts the push ack for a file only while its removed lines still
+// hash the same — g0 23.10 (!1071) was asked the same 6 files twice, once here, once at delivery.
+const ACK_PRINTS = '~removed';
+/** Removed lines of a one-file `git diff -U0` → sha256 prefix; the panel's `removedFingerprint` twin. */
+export function removedFingerprint(diff) {
+  const lines = [];
+  let hunk = false;
+  for (const line of String(diff).split('\n')) {
+    if (line.startsWith('@@')) hunk = true;
+    else if (hunk && line.startsWith('-')) lines.push(line.slice(1).replace(/\r$/, ''));
+  }
+  return createHash('sha256').update(lines.join('\n')).digest('hex').slice(0, 16);
+}
+/** Fingerprints of the acked files at this push — the panel's diff flags, from the merge-base. */
+function fingerprintsOf(git, scan, files) {
+  const out = {};
+  for (const file of files) {
+    const d = git(scan.cwd, [
+      'diff',
+      '-U0',
+      '--no-color',
+      '--no-ext-diff',
+      '--no-renames',
+      scan.base,
+      scan.ref,
+      '--',
+      file,
+    ]);
+    if (d.code === 0) out[file] = removedFingerprint(d.stdout);
+  }
+  return out;
+}
+export function rememberAcks(root, branch, files, prints = {}) {
+  if (!root || !branch || (!files.length && !Object.keys(prints).length)) return;
   try {
     const data = readAcks(root);
     const known = Array.isArray(data[branch]) ? data[branch] : [];
-    data[branch] = [...new Set([...known, ...files])].sort();
+    if (files.length || known.length) data[branch] = [...new Set([...known, ...files])].sort();
+    if (Object.keys(prints).length) {
+      const all = data[ACK_PRINTS] && typeof data[ACK_PRINTS] === 'object' ? data[ACK_PRINTS] : {};
+      all[branch] = {
+        ...(all[branch] && typeof all[branch] === 'object' ? all[branch] : {}),
+        ...prints,
+      };
+      data[ACK_PRINTS] = all;
+    }
     const file = path.join(root, ACKS_FILE);
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
@@ -627,12 +736,20 @@ export default function pushSieves(input) {
         'Publishing the conflict on purpose (a backup push, resolving in the forge UI): add a comment line `# sieve-ack: conflict` and run it again.',
     );
   }
-  const priors = results.map((r) => (r.foreign.length ? priorAcks(r.root, r.branch) : new Set()));
+  const priors = results.map((r) =>
+    r.foreign.length && r.scan
+      ? priorAcks(r.root, r.branch, (f) => fingerprintsOf(git, r.scan, [f])[f] ?? null)
+      : new Set(),
+  );
   const foreign = results
     .map((r, i) => ({ ...r, open: r.foreign.filter((f) => !acked.has(f) && !priors[i].has(f)) }))
     .filter((r) => r.open.length);
   if (foreign.length) {
     const r0 = foreign[0];
+    const ex = {
+      sha: (r0.brought[r0.open[0]]?.[0] ?? r0.mainShort ?? 'main').slice(0, 10),
+      file: r0.open[0],
+    };
     // Escape first, full list last and in a file: a capped list made the agent rebuild it by hand,
     // and a prose ack read as file names cost a second identical deny.
     const all = [...new Set(foreign.flatMap((r) => r.open))];
@@ -647,11 +764,11 @@ export default function pushSieves(input) {
           : '') +
         `Removal intended → add the comment line \`# sieve-ack: ${ackFile ? `@${ackFile}` : '<every file below>'}\`` +
         `${ackFile ? ` (it lists all ${all.length} flagged files)` : ''} and run it again; the ack is remembered for this branch, later pushes ask only about new files. Otherwise restore what was not yours: ` +
-        `usually lost to a rebase or a file rewritten from a stale copy; \`git log -p ${r0.startSha}..${r0.mainShort} -- <file>\` shows what landed. ` +
+        `usually lost to a rebase or a file rewritten from a stale copy. Before the ack read what each commit below brought — \`git show <sha> -- <file>\` (here first: \`git show ${ex.sha} -- ${ex.file}\`). ` +
         foreign
           .map(
             (r) =>
-              `\`${r.label}\` deletes lines that reached ${r.main} after this task began (${r.since}) — someone else's work: ${r.open.join(', ')}.`,
+              `\`${r.label}\` deletes lines that reached ${r.main} after this task began (${r.since}) — someone else's work: ${broughtList(git, r)}.`,
           )
           .join(' '),
     );
@@ -660,10 +777,13 @@ export default function pushSieves(input) {
   results.forEach((r, i) => {
     const earlier = r.foreign.filter((f) => !acked.has(f) && priors[i].has(f));
     if (earlier.length) remembered.push(`\`${r.label}\` ${list(earlier)}`);
+    // An explicit ack on THIS command re-stamps what it covers; a remembered one stamps nothing.
+    const explicit = r.foreign.filter((f) => acked.has(f));
     rememberAcks(
       r.root,
       r.branch,
-      r.foreign.filter((f) => acked.has(f) && !priors[i].has(f)),
+      explicit.filter((f) => !priors[i].has(f)),
+      r.scan && explicit.length ? fingerprintsOf(git, r.scan, explicit) : {},
     );
   });
   // 3. Content sieves over what the branch adds (push-sieves-scan.mjs). A thrown scan is a note, never a deny.

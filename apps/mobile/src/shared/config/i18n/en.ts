@@ -9,6 +9,7 @@ import { foreignChatEn } from './foreign-chat/en.ts';
 import { projectsEn } from './projects/en.ts';
 import { computersEn } from './computers/en.ts';
 import { signingEn } from './signing/en.ts';
+import { groupWatchEn } from './group-watch/en.ts';
 
 /**
  * English mirrors `ru.ts` and is typed against it: a missing or renamed key
@@ -261,11 +262,14 @@ export const en: Dictionary = {
     nothing: 'Nothing found',
     sandbox: 'sandbox',
     messages: (count: number) => `${count} msg.`,
+    forkOf: (title: string) => `branch of “${title}”`,
+    forkOfUnknown: 'branch of another conversation',
   },
 
   projects: projectsEn,
   computers: computersEn,
   signing: signingEn,
+  groupWatch: groupWatchEn,
 
   git: {
     title: 'Git',
@@ -306,6 +310,8 @@ export const en: Dictionary = {
       access: (path: string) => `no ${path} entry in .claude.json`,
       mcp: (path: string, names: string) =>
         `${path} of the copy lacks the original servers: ${names}`,
+      hooks: (path: string, names: string) =>
+        `${path} of the copy does not register the original hooks: ${names}`,
     },
     bootstrapRunning: (command: string) => `install running: ${command}`,
     bootstrapFailed: (command: string) => `install failed: ${command}`,

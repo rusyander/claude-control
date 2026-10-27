@@ -397,6 +397,45 @@ describe('ревью r1: гонки паузы с подготовкой и вы
     expect(t.group(0)?.status).toBe('started');
   });
 
+  it('A5: пауза посреди ожидания человека — «Продолжить» возвращает к нему, без слова', async () => {
+    const t = build({ parallel: 1 });
+    await t.begin();
+    const record = t.records.get(PARENT) as SplitPlanRecord;
+    Object.assign(record.groups[0]!, { status: 'awaiting', waitingFor: 'mr-red' });
+    t.records.set(PARENT, record);
+
+    t.conveyor.pause(PARENT, 0);
+    expect(t.group(0)).toMatchObject({ status: 'paused', pausedWait: 'mr-red' });
+    expect(t.group(0)?.waitingFor).toBeUndefined();
+
+    expect(t.conveyor.resumePaused(PARENT, 0)).toBe('restored');
+    expect(t.resumed).toEqual([]);
+    expect(t.group(0)).toMatchObject({ status: 'awaiting', waitingFor: 'mr-red' });
+    expect(t.group(0)?.pausedWait).toBeUndefined();
+    expect(t.group(0)?.pausedAt).toBeUndefined();
+  });
+
+  it('A6: ожидание не человека и убитый паузой фон — продолжение словом', async () => {
+    const t = build({ parallel: 2 });
+    await t.begin();
+    const record = t.records.get(PARENT) as SplitPlanRecord;
+    Object.assign(record.groups[0]!, { status: 'awaiting', waitingFor: 'delivery' });
+    Object.assign(record.groups[1]!, { status: 'awaiting', waitingFor: 'question' });
+    t.records.set(PARENT, record);
+
+    t.conveyor.pause(PARENT, 0);
+    t.conveyor.pause(PARENT, 1);
+    expect(t.group(0)?.pausedWait).toBeUndefined();
+    const paused = t.records.get(PARENT) as SplitPlanRecord;
+    paused.groups[1]!.pausedTasks = ['npm run dev'];
+    t.records.set(PARENT, paused);
+
+    expect(t.conveyor.resumePaused(PARENT, 0)).toBe('sent');
+    expect(t.conveyor.resumePaused(PARENT, 1)).toBe('sent');
+    expect(t.resumed).toEqual([0, 1]);
+    expect(t.group(1)?.pausedWait).toBeUndefined();
+  });
+
   it('A4: «Убрать» закрывает и группу на паузе — место уходит очереди', async () => {
     const t = build({ parallel: 1 });
     await t.begin();

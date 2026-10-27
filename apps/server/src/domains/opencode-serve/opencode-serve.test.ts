@@ -324,6 +324,32 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
     expect(second?.sessionId).toBe('ses_2');
   });
 
+  it('снятые инструменты группы (P-16) — правила deny последними в наборе сессии; другой набор — новая сессия', async () => {
+    const { fetchImpl, calls } = fakeServer();
+    const serve = new OpencodeServe();
+    const deny = ['telegram-inbox_*', 'jira_confluence_search'];
+    const first = await serve.ask('conv-1', 'вопрос', depsOf(fetchImpl, { toolDeny: deny }));
+    const created = calls.filter((call) => call.url.split('?')[0]!.endsWith('/session'));
+    const rules = (created[0]?.body as { permission: { permission: string }[] }).permission;
+    expect(rules.slice(-2)).toEqual([
+      { permission: 'telegram-inbox_*', pattern: '*', action: 'deny' },
+      { permission: 'jira_confluence_search', pattern: '*', action: 'deny' },
+    ]);
+    // Тот же набор в другом порядке — та же сессия.
+    const same = await serve.ask(
+      'conv-1',
+      'ещё',
+      depsOf(fetchImpl, { toolDeny: [...deny].reverse() }),
+    );
+    expect(same?.sessionId).toBe(first?.sessionId);
+    // Группа попросила сервер назад — набор сессии не отозвать, сессия новая и без deny.
+    const back = await serve.ask('conv-1', 'и ещё', depsOf(fetchImpl));
+    expect(back?.sessionId).not.toBe(first?.sessionId);
+    const latest = calls.filter((call) => call.url.split('?')[0]!.endsWith('/session')).at(-1);
+    const after = (latest?.body as { permission: { action: string }[] }).permission;
+    expect(after.some((rule) => rule.action === 'deny')).toBe(false);
+  });
+
   it('правила агента не прочитаны → сессии нет, undefined (one-shot как раньше)', async () => {
     const { fetchImpl, calls } = fakeServer({ agents: { not: 'an array' } });
     const serve = new OpencodeServe();

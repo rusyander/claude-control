@@ -5,7 +5,14 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SieveReportRow, SieveStatus } from '@agentdeck/contracts/sieves';
 import type { ProjectTestStatus } from '@agentdeck/contracts';
-import { createGroup, upsertCase, writeRun } from '../../project-tests/project-tests.ts';
+import {
+  createGroup,
+  upsertCase,
+  writeBaseRun,
+  writeRun,
+} from '../../project-tests/project-tests.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { ownerCoverageGaps, taskCoverageGaps } from '../owner-coverage/owner-coverage.ts';
 import { NOTE_MARKS_LINE, sieveDeliveryGaps, sievePrompt } from './sieve-gate.ts';
 
 /**
@@ -76,7 +83,13 @@ function uiBranch(extra: Record<string, string> = {}): {
     WORK,
   );
   createGroup(work, 'page');
-  const page = upsertCase(work, 'page', { title: 'Фокус', codePaths: ['src/Page.tsx'] }, WORK).id;
+  // Тег живой проверки: прогон доказывает сито интерфейса, только если зелёный кейс — браузерный (N3).
+  const page = upsertCase(
+    work,
+    'page',
+    { title: 'Фокус', codePaths: ['src/Page.tsx'], tags: ['browser'] },
+    WORK,
+  ).id;
   const other = upsertCase(
     work,
     'page',
@@ -174,10 +187,54 @@ describe('живое сито «не проверено» — заметка, а
     expect(gaps.noted).not.toContain('project-checks');
   });
 
+  // g3 25.10: owner-3 «not checked», owner-4 «not caused by the branch» шли в напоминании
+  // и заметкой (описание MR обязано их назвать), и «пункт владельца не выполнен» — дойти оно не могло.
+  it('пункт владельца с меткой — заметка и не «не выполнен»; без метки — пробел, как раньше', async () => {
+    const { work } = uiBranch();
+    const owner = [
+      row('owner-1', 'fail', 'not checked: the branch stand with its backend cannot start here'),
+      row('owner-2', 'fail', 'not caused by the branch: red on Windows only, Linux container ok'),
+      row('owner-3', 'fail', 'the export button is not wired yet'),
+    ];
+    const gaps = await gapsOf(work, owner);
+    expect(gaps.noted).toEqual(expect.arrayContaining(['owner-1', 'owner-2']));
+    expect(gaps.noted).not.toContain('owner-3');
+    expect(ownerCoverageGaps(owner, true, gaps.noted)).toEqual([
+      serverText('delivery-gap-owner-failed', {
+        point: 'owner-3',
+        evidence: 'the export button is not wired yet',
+      }),
+    ]);
+  });
+
+  // Пункты задачи (`task-N`) судятся так же, как пункты владельца: `taskCoverageGaps`
+  // берёт те же `noted`/`rejected`, и «не проверено: нет стенда» было бы «не выполнен».
+  it('пункт задачи с меткой — заметка и не «не выполнен»; метка без причины — отказ с причиной', async () => {
+    const { work } = uiBranch();
+    const task = [
+      row('task-1', 'fail', 'not checked: нет стенда с бэкендом ветки'),
+      row('task-2', 'fail', 'not caused by the branch: red on Windows only, Linux container ok'),
+      row('task-3', 'fail', 'not checked:'),
+      row('task-4', 'fail', 'the export button is not wired yet'),
+    ];
+    const gaps = await gapsOf(work, task);
+    expect(gaps.noted).toEqual(expect.arrayContaining(['task-1', 'task-2']));
+    expect(gaps.noted).not.toContain('task-3');
+    expect(gaps.noted).not.toContain('task-4');
+    expect(gaps.rejected?.['task-3']).toBe(serverText('note-rejected-no-reason', {}));
+    expect(gaps.rejected?.['task-1']).toBeUndefined();
+    const lines = taskCoverageGaps(task, true, gaps.noted, gaps.rejected);
+    expect(lines.join('\n')).not.toContain('task-1');
+    expect(lines.join('\n')).not.toContain('task-2');
+    expect(lines.join('\n')).toContain('task-4');
+  });
+
   it('задание звена называет обе метки', async () => {
     const { work } = uiBranch();
     const prompt = await sievePrompt({ cwd: work, stage: 'deliver', done: [] });
     expect(prompt).toContain(NOTE_MARKS_LINE);
+    // Аудит g1 27.10 (F11): причина живого сита — нет кейса человека, а не «нет браузера».
+    expect(prompt).toContain('«no human-made live case covers <what>»');
   });
 });
 
@@ -352,6 +409,93 @@ describe('«не из-за ветки» у сита безопасности и 
     expect(gaps.noted ?? []).not.toContain('browser-focus');
   });
 
+  // g9 27.10 (#g9:1296): ссылку на прогон, который сам `tests-cli base` записал на
+  // развилке, судья не находил («нет в истории копии»), а зелёный прогон кейсов
+  // ветки рядом с ним держал строку как «ссылка без красного».
+  function forkRun(work: string, id: string, results: [string, ProjectTestStatus][]): void {
+    writeBaseRun(work, {
+      id,
+      mode: 'run',
+      actor: 'agent',
+      commit: git(work, ['merge-base', 'HEAD', 'origin/main']).trim(),
+      status: 'done',
+      startedAt: REPORTED,
+      finishedAt: REPORTED,
+      results: results.map(([caseId, status]) => ({
+        pointId: `page:${caseId}`,
+        groupId: 'page',
+        caseId,
+        status,
+      })),
+      summary: {
+        total: results.length,
+        passed: results.filter(([, status]) => status === 'passed').length,
+        failed: results.filter(([, status]) => status === 'failed').length,
+        skipped: 0,
+        blocked: 0,
+      },
+    } as Parameters<typeof writeBaseRun>[1]);
+  }
+
+  it('ссылка на прогон развилки (tests-cli base) с красным кейсом — заметка', async () => {
+    const { work, other } = uiBranch();
+    forkRun(work, 'fork-run-01', [[other, 'failed']]);
+    const gaps = await gapsOf(work, [
+      row(
+        'browser-focus',
+        'fail',
+        'not caused by the branch: red on the fork too, run:fork-run-01',
+      ),
+    ]);
+    expect(ofSieve(gaps.missing, 'browser-focus')).toEqual([]);
+    expect(gaps.noted).toContain('browser-focus');
+  });
+
+  it('зелёный прогон кейсов ветки рядом с прогоном развилки — довод строки, а не помеха', async () => {
+    const { work, page, other } = uiBranch();
+    forkRun(work, 'fork-run-02', [[other, 'failed']]);
+    recordRun(work, 'run-green-04', REPORTED, [[page, 'passed']]);
+    const gaps = await gapsOf(work, [
+      row(
+        'browser-focus',
+        'fail',
+        'not caused by the branch: red on the fork, run:fork-run-02; branch cases green, run:run-green-04',
+      ),
+    ]);
+    expect(ofSieve(gaps.missing, 'browser-focus')).toEqual([]);
+    expect(gaps.noted).toContain('browser-focus');
+  });
+
+  it('migration-safety: ссылка на прогон развилки — заметка, зелёный прогон рядом — держит', async () => {
+    const { work, page, other } = dataBranch();
+    forkRun(work, 'fork-run-03', [[other, 'failed']]);
+    recordRun(work, 'run-green-05', REPORTED, [[page, 'passed']]);
+    const alone = await gapsOf(work, [
+      row('migration-safety', 'fail', 'not caused by the branch: red on main, run:fork-run-03'),
+    ]);
+    expect(ofSieve(alone.missing, 'migration-safety')).toEqual([]);
+    expect(alone.noted).toContain('migration-safety');
+    const mixed = await gapsOf(work, [
+      row(
+        'migration-safety',
+        'fail',
+        'not caused by the branch: red on main, run:fork-run-03, run:run-green-05',
+      ),
+    ]);
+    expect(mixed.missing.join('\n')).toContain('сито migration-safety не пройдено');
+    expect(mixed.missing.join('\n')).toContain('run-green-05');
+  });
+
+  it('migration-safety: свободная ссылка «прогон <номер>» на прогон развилки — заметка', async () => {
+    const { work, other } = dataBranch();
+    forkRun(work, 'ba5e0001', [[other, 'failed']]);
+    const gaps = await gapsOf(work, [
+      row('migration-safety', 'fail', 'not caused by the branch: red on main, прогон ba5e0001'),
+    ]);
+    expect(ofSieve(gaps.missing, 'migration-safety')).toEqual([]);
+    expect(gaps.noted).toContain('migration-safety');
+  });
+
   it('сито другого класса (browser-focus) — словами, как раньше, заметка', async () => {
     const { work } = uiBranch();
     const gaps = await gapsOf(work, [
@@ -359,5 +503,97 @@ describe('«не из-за ветки» у сита безопасности и 
     ]);
     expect(ofSieve(gaps.missing, 'browser-focus')).toEqual([]);
     expect(gaps.noted).toContain('browser-focus');
+  });
+});
+
+// g3 25.10 (#g3:145/148): owner-4 «not caused by the branch … (run:ac24faf5)» со ссылкой на
+// ЗЕЛЁНЫЙ прогон дважды вернулся «пункт не выполнен» без слова, почему пометку не приняли, —
+// группа дважды пересказала то же доказательство (~146k контекста на ход).
+describe('отклонённая пометка называет причину и что сделать', () => {
+  const dataBranch = () =>
+    uiBranch({ 'migrations/002_add_col.sql': 'ALTER TABLE users ADD COLUMN nick text;\n' });
+  const lineOf = (lines: string[], id: string) => lines.find((line) => line.includes(id)) ?? '';
+
+  it('пункт владельца со ссылкой на зелёный прогон — «нет красного», совет сдать pass', async () => {
+    const { work, page } = uiBranch();
+    recordRun(work, 'run-green-04', REPORTED, [[page, 'passed']]);
+    const owner = [
+      row(
+        'owner-4',
+        'fail',
+        'not caused by the branch: red on Windows only; Linux passed all (run:run-green-04)',
+      ),
+    ];
+    const gaps = await gapsOf(work, owner);
+    const [line, ...rest] = ownerCoverageGaps(owner, true, gaps.noted, gaps.rejected);
+    expect(rest).toEqual([]);
+    expect(line).toContain('пункт задания владельца owner-4 не выполнен');
+    expect(line).toContain('пометка не принята: в прогоне run-green-04 нет красного');
+    expect(line).toContain('сдайте строку pass с этим прогоном');
+  });
+
+  it('ссылка на прогон, где красное задела ветка, — называет прогон и кейсы', async () => {
+    const { work, page } = uiBranch();
+    recordRun(work, 'run-own-006', REPORTED, [[page, 'failed']]);
+    const gaps = await gapsOf(work, [
+      row('browser-focus', 'fail', 'not caused by the branch: flaky on main, run:run-own-006'),
+    ]);
+    expect(lineOf(gaps.missing, 'browser-focus')).toContain(
+      `пометка не принята: в прогоне run-own-006 красные кейсы ${page} покрывают код, который ветка меняла`,
+    );
+  });
+
+  it('ссылка на прогон, которого нет, — «нет в истории»', async () => {
+    const { work } = uiBranch();
+    const gaps = await gapsOf(work, [
+      row('browser-focus', 'fail', 'not caused by the branch: flaky on main, run:run-nope-01'),
+    ]);
+    expect(lineOf(gaps.missing, 'browser-focus')).toContain(
+      'пометка не принята: прогона run-nope-01 нет в истории блока «Тесты» копии',
+    );
+  });
+
+  it('сито данных словами — «слов мало», формат ссылки', async () => {
+    const { work } = dataBranch();
+    const gaps = await gapsOf(work, [
+      row('migration-safety', 'fail', 'not caused by the branch: the rollback was broken on main'),
+    ]);
+    expect(lineOf(gaps.missing, 'migration-safety')).toContain(
+      'пометка не принята: у сита безопасности и данных слов мало',
+    );
+  });
+
+  it('сито данных со ссылкой на прогон, красный только по таймауту, — «не было до старта»', async () => {
+    const { work, page, other } = dataBranch();
+    recordRun(work, 'run-own-dat4', REPORTED, [
+      [page, 'passed'],
+      [other, 'failed', 'Timeout 30000ms exceeded'],
+    ]);
+    const gaps = await gapsOf(work, [
+      row('migration-safety', 'fail', 'not caused by the branch: red on main, run:run-own-dat4'),
+    ]);
+    expect(lineOf(gaps.missing, 'migration-safety')).toContain(
+      'пометка не принята: прогоны run-own-dat4 не показывают красного, бывшего до старта группы',
+    );
+  });
+
+  it('«not checked» у неживого сита — «снимает только живую проверку»', async () => {
+    const { work } = uiBranch();
+    const gaps = await gapsOf(work, [
+      row('project-checks', 'fail', 'not checked: no time to run the gate'),
+    ]);
+    expect(lineOf(gaps.missing, 'сито project-checks не пройдено')).toContain(
+      'пометка не принята: «not checked» снимает только живую проверку',
+    );
+  });
+
+  it('принятая пометка и fail без пометки причин не получают', async () => {
+    const { work } = uiBranch();
+    const gaps = await gapsOf(work, [
+      row('browser-focus', 'fail', 'not caused by the branch: the focus trap is broken on main'),
+      row('owner-1', 'fail', 'the export button is not wired yet'),
+    ]);
+    expect(gaps.rejected ?? {}).toEqual({});
+    expect(gaps.missing.join('\n')).not.toContain('пометка не принята');
   });
 });

@@ -233,4 +233,83 @@ describe('маршрут прав группы: каталог оболочки 
     ).toBe('deny');
     expect(await ask('lsof -ti:5173 | xargs kill -9', 'toolu_n3_pipe')).toBe('deny');
   });
+
+  // D-8 (25.10): номер своего dev-сервера группа увидела в своём же `netstat` и
+  // гасит по нему; процесса уже нет — ни дерева, ни метки. Своё доказывает печать.
+  it('D-8: номер из своего netstat (порт своего запуска) — сам; не напечатанный — отказ', async () => {
+    const atMs = Date.now() - 60_000;
+    const line = (offsetMs: number, content: unknown[], type = 'assistant'): void => {
+      const record = {
+        type,
+        cwd: copy,
+        sessionId: GROUP,
+        timestamp: new Date(atMs + offsetMs).toISOString(),
+        message: { id: `msg-${offsetMs}`, role: type, content },
+      };
+      writeFileSync(transcript(), `${JSON.stringify(record)}\n`, { flag: 'a' });
+    };
+    const bash = (id: string, command: string) => ({
+      type: 'tool_use',
+      id,
+      name: 'Bash',
+      input: { command },
+    });
+    line(0, [bash('toolu_d8_dev', 'npm --prefix inst-admin-ui run dev -- --port 5180')]);
+    line(5_000, [bash('toolu_d8_ns', 'netstat -ano | grep LISTENING | grep ":518"')]);
+    line(
+      6_000,
+      [
+        {
+          type: 'tool_result',
+          tool_use_id: 'toolu_d8_ns',
+          content: '  TCP    [::1]:5180   [::]:0   LISTENING       9999996',
+        },
+      ],
+      'user',
+    );
+    // Номера заведомо без процесса (Windows выдаёт кратные 4 и куда меньше).
+    expect(await ask('taskkill //PID 9999996 //T //F', 'toolu_d8_own')).toBe('allow');
+    expect(await ask('taskkill //PID 9999992 //T //F', 'toolu_d8_other')).toBe('deny');
+  });
+
+  // D-10/D-11 (26.10): субагент группы снял копию в `/tmp` и убирает её. Его вызовы
+  // — в его файле `<сессия>/subagents/*.jsonl`; своё доказывает его прошлый `cp`.
+  it('D-10: уборка своей копии в `/tmp` субагентом — сама; без его `cp` — карточка', async () => {
+    const subagents = join(root, 'projects', 'copy-dir', GROUP, 'subagents');
+    mkdirSync(subagents, { recursive: true });
+    // Файл разговора есть всегда: субагента заводит его вызов `Agent`.
+    recordCall('toolu_agent', copy);
+    const stem = `rr${process.pid}${Math.random().toString(36).slice(2, 8)}`;
+    const own = join(tmpdir(), `${stem}-c.bak`);
+    const foreign = join(tmpdir(), `${stem}-f.bak`);
+    try {
+      writeFileSync(own, 'backup');
+      writeFileSync(foreign, 'backup');
+      const atMs = Date.now();
+      const line = (id: string, offsetMs: number, block: unknown, type = 'assistant') =>
+        JSON.stringify({
+          type,
+          cwd: copy,
+          isSidechain: true,
+          timestamp: new Date(atMs + offsetMs).toISOString(),
+          message: { id: `msg-${id}`, role: type, content: [block] },
+        });
+      const use = (id: string, command: string, offsetMs: number) =>
+        line(id, offsetMs, { type: 'tool_use', id, name: 'Bash', input: { command } });
+      writeFileSync(
+        join(subagents, 'agent-a1.jsonl'),
+        `${[
+          use('toolu_cp', `cp inst-docs-ui/package.json /tmp/${stem}-c.bak`, -5_000),
+          line('r', 5_000, { type: 'tool_result', tool_use_id: 'toolu_cp' }, 'user'),
+          use('toolu_d10_own', `rm /tmp/${stem}-c.bak`, 6_000),
+          use('toolu_d10_foreign', `rm /tmp/${stem}-f.bak`, 7_000),
+        ].join('\n')}\n`,
+      );
+      expect(await ask(`rm /tmp/${stem}-c.bak`, 'toolu_d10_own')).toBe('allow');
+      expect(await ask(`rm /tmp/${stem}-f.bak`, 'toolu_d10_foreign')).toBe('deferred');
+    } finally {
+      rmSync(own, { force: true });
+      rmSync(foreign, { force: true });
+    }
+  });
 });

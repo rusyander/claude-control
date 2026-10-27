@@ -9,6 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent-images": "./src/agent-images.ts",
+    "./agent-history": "./src/agent-history.ts",
+    "./agent-live": "./src/agent-live.ts",
     "./verify-ledger": "./src/verify-ledger.ts",
     "./api-explorer": "./src/api-explorer.ts",
     "./logs": "./src/logs.ts",

@@ -18,6 +18,7 @@ import { defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { writePlatform, writeToken } from '../../domains/platform/store/store.ts';
 import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
 import { createRuntime, type Runtime } from './runtime.ts';
+import { GUARD_TWINS } from '../../domains/kit/service.ts';
 
 /**
  * Набор панели (В2) на проводке сборки: облачный Claude — без контура, без
@@ -122,12 +123,17 @@ describe('набор панели доезжает до прогона обла�
   const kitDir = (mode: string) =>
     join(root, 'agentdeck', 'kit', 'effective', mode, 'agentdeck-kit');
 
-  it('«глобальные» — ни флага плагина, ни варианта правил', async () => {
+  it('«глобальные» — только набор-страховка стражей, без варианта правил; свои стражи — ни флага', async () => {
     runtime.kit.setMode('claude', 'global');
     const run = await send('глобальный');
     expect(run).toBeDefined();
-    expect(run?.args).not.toContain('--plugin-dir');
+    expect(run?.args).toEqual(['--plugin-dir', kitDir('guards')]);
     expect(run?.env.AGENTDECK_KIT_VARIANT).toBeUndefined();
+    // Слой человека держит свои стражи (`GUARD_TWINS`) — набор не подключается вовсе.
+    mkdirSync(join(root, 'hooks', 'lib'), { recursive: true });
+    for (const twin of new Set(Object.values(GUARD_TWINS)))
+      writeFileSync(join(root, 'hooks', 'lib', `${twin}.mjs`), '// own guard');
+    expect((await send('глобальный-2'))?.args).toEqual([]);
   });
 
   it('«оба» — --plugin-dir собранного набора и стандартный вариант', async () => {
@@ -146,7 +152,7 @@ describe('набор панели доезжает до прогона обла�
       'project,local',
     ]);
     runtime.kit.setMode('claude', 'global');
-    expect((await send('наш-2'))?.args).toEqual([]);
+    expect((await send('наш-2'))?.args).toEqual(['--plugin-dir', kitDir('guards')]);
   });
 
   /** Контур заведён так же, как его заводит «Скачать и подключить» (`connect.ts`); шлюз — живой. */
@@ -187,7 +193,8 @@ describe('набор панели доезжает до прогона обла�
     try {
       runtime.kit.setMode('claude', 'global');
       const run = await send('локальный-глобальный');
-      expect(run?.args).not.toContain('--plugin-dir');
+      // Полный набор не подключён — только стражи, которых нет в слое человека.
+      expect(run?.args).toEqual(['--plugin-dir', kitDir('guards')]);
       // Окно — то, что отдаёт сервис моделей (запись о запущенном сервере либо наименьшее
       // окно агента); сам выбор окна проверяет `local-models.run-env.test.ts`.
       const window = runtime.localModels.runEnv();

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, delimiter, join } from 'node:path';
 import {
@@ -37,6 +37,8 @@ export interface ChatNodeDeps {
   defaultNode: (env: NodeJS.ProcessEnv) => string | undefined;
   installed: (env: NodeJS.ProcessEnv) => InstalledRuntime[];
   exists: (path: string) => boolean;
+  /** Настоящий путь каталога (узел nvm-windows → папка версии); не разрешился — сам путь. */
+  realpath: (path: string) => string;
   now: () => number;
 }
 
@@ -64,6 +66,13 @@ export const realChatNodeDeps: ChatNodeDeps = {
       exec: async () => undefined,
     }),
   exists: existsSync,
+  realpath: (path) => {
+    try {
+      return realpathSync.native(path);
+    } catch {
+      return path;
+    }
+  },
   now: Date.now,
 };
 
@@ -135,7 +144,12 @@ function resolveDirs(
   if (!bare || !holdsCli(best.dir, command, deps)) return [best.dir];
   const cliDir = path.split(delimiter).find((dir) => dir && holdsCli(dir, command, deps));
   // CLI не найден по PATH или рядом с ним свой Node — впереди он снова дал бы не ту версию.
-  if (!cliDir || NODE_NAMES.some((name) => deps.exists(join(cliDir, name)))) return undefined;
+  if (!cliDir) return undefined;
+  if (NODE_NAMES.some((name) => deps.exists(join(cliDir, name)))) {
+    // g8 26.10: первый `claude` по PATH лежал в узле nvm-windows (`C:\nvm4w\nodejs`), а узел ведёт
+    // в выбранную папку версии — CLI и Node там те же. Отказ оставлял группу на 24.
+    return deps.realpath(cliDir) === deps.realpath(best.dir) ? [best.dir] : undefined;
+  }
   return [cliDir, best.dir];
 }
 

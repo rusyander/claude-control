@@ -57,6 +57,18 @@ describe('подсказка навыка ревью в наборе', () => {
     expect(hint('просто сделай ревью моей ветки')).toContain('agentdeck-kit:deep-review');
   });
 
+  it('ход группы панели (AGENTDECK_GROUP_STAGE) — без подсказки: навыки называет её вводная', () => {
+    const before = process.env.AGENTDECK_GROUP_STAGE;
+    process.env.AGENTDECK_GROUP_STAGE = 'deliver';
+    try {
+      expect(hint('сделай ревью моей ветки')).toBe('');
+    } finally {
+      if (before === undefined) delete process.env.AGENTDECK_GROUP_STAGE;
+      else process.env.AGENTDECK_GROUP_STAGE = before;
+    }
+    expect(hint('сделай ревью моей ветки')).toContain('agentdeck-kit:deep-review');
+  });
+
   it('остальные подсказки «просто сделай» по-прежнему глушит', () => {
     expect(hint('просто сделай ревью и напиши тесты')).not.toContain('unit-integration-tests');
   });

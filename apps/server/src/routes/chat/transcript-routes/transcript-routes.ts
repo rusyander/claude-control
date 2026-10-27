@@ -12,7 +12,7 @@ import {
 } from '../../../domains/chat/ChatHistory/ChatHistory.ts';
 import { summarizedMessageIds } from '../../../domains/platform/gateway/summarized-ledger/summarized-ledger.ts';
 import { genTimesById } from '../../../domains/chat/gen-time-ledger/gen-time-ledger.ts';
-import { readChatProgress } from '../../../domains/chat/ChatProgress/ChatProgress.ts';
+import { readChatProgressWithTree } from '../../../domains/chat/subagent-tree/subagent-tree.ts';
 import { readStepsFile } from '../../../domains/chat/steps-file/steps-file.ts';
 import { heavyQueueDir, heavyQueueWait } from '../../../domains/group-progress/heavy-wait.ts';
 import { searchChats } from '../../../domains/chat/ChatSearch/ChatSearch.ts';
@@ -51,6 +51,8 @@ export function registerChatTranscriptRoutes(
    * ходе групп (5.1). Без неё следующий вопрос в нём ушёл бы на модели из настроек.
    */
   assignedOf: (chatId: string) => { model: string; effort: string } | undefined = () => undefined,
+  /** Есть ли живой процесс, которому послать `stop_task`, — «Остановить» у субагентов. */
+  canStopAgents: (chatId: string) => boolean = () => false,
 ): void {
   // Тарифы достаёт слой маршрутов: кэш прайса и свои цены пользователя видны
   // только отсюда. Отдаём функцию, а не снимок, — правка цен подхватывается
@@ -214,7 +216,20 @@ export function registerChatTranscriptRoutes(
       Object.keys(pins).length === 0
         ? withLinks
         : withLinks.map((chat) => (pins[chat.id] ? { ...chat, pinnedAt: pins[chat.id] } : chat));
-    const withAssigned = withPins.map((chat) => {
+    // Ветка правки реплики — меткой на выдаче: её транскрипт несёт историю и
+    // название исходного, и без метки в списке стояли два одинаковых чата.
+    const forks = ctx.store.getChatForks();
+    const titles = new Map(chats.map((chat) => [chat.id, chat.title]));
+    const withForks =
+      Object.keys(forks).length === 0
+        ? withPins
+        : withPins.map((chat) => {
+            const origin = forks[chat.id];
+            if (!origin) return chat;
+            const title = titles.get(origin);
+            return { ...chat, forkOf: { id: origin, ...(title ? { title } : {}) } };
+          });
+    const withAssigned = withForks.map((chat) => {
       const assigned = chat.assignedModel ? undefined : assignedOf(chat.id);
       return assigned ? { ...chat, assignedModel: assigned.model, effort: assigned.effort } : chat;
     });
@@ -314,7 +329,9 @@ export function registerChatTranscriptRoutes(
    * Только чтение — план принадлежит агенту, панель его не правит.
    */
   app.get<{ Params: { chatId: string } }>('/api/chat/:chatId/progress', (request) => {
-    const progress = readChatProgress(projectsDir(ctx), request.params.chatId);
+    // Субагенты — деревом: вложенные, потерянные в середине большого файла, с
+    // моделью, вызовами и расходом каждого (по их собственным транскриптам).
+    const progress = readChatProgressWithTree(projectsDir(ctx), request.params.chatId);
     // Файл шагов в рабочей папке разговора (у группы — её копия): «Шаг N из M»
     // без плана агента (решение владельца 29.09).
     // Файл, записанный раньше начала разговора, — от прежней задачи в той же
@@ -338,6 +355,7 @@ export function registerChatTranscriptRoutes(
       ...(steps ? { steps } : {}),
       ...(heavyQueue ? { heavyQueue } : {}),
       processAlive: isProcessAlive(request.params.chatId),
+      canStopAgents: canStopAgents(request.params.chatId),
     };
   });
 

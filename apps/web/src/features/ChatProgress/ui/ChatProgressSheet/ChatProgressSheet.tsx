@@ -5,9 +5,10 @@ import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { formatDuration } from '@shared/lib/format-duration';
+import { AgentExtensionsModal, AgentHistoryButton, ExtensionChips } from '@entities/AgentTree';
 import { useNow } from '../../model/useNow';
 import { TaskRow } from '../TaskRow/TaskRow';
-import { AgentRow } from '../AgentRow/AgentRow';
+import { AgentTree } from '../AgentTree/AgentTree';
 import { ShellRow } from '../ShellRow/ShellRow';
 import type { ChatProgressSheetProps } from '../ChatProgressSheet.types';
 import styles from './ChatProgressSheet.module.scss';
@@ -23,21 +24,27 @@ import { clockTicks } from '../../model/clockTicks';
  * галочки, но тогда галочка в панели и состояние у агента разошлись бы в первый
  * же ход, и панель начала бы врать.
  *
- * Когда агент раздаёт работу субагентам, их видно тут же веткой ниже: кто
- * запущен, с какой задачей, чем кончил. Иначе про оркестрацию известно только
- * то, что «что-то идёт».
+ * Когда агент раздаёт работу субагентам, их видно тут же деревом ниже: кто
+ * запущен, кем, с какой задачей, на какой модели, сколько вызовов и токенов,
+ * чем кончил. Узел открывает ход субагента справа, идущего можно остановить.
+ * Иначе про оркестрацию известно только то, что «что-то идёт».
  *
  * Ниже плана — что идёт прямо сейчас и что увели в фон, с таймером. Двадцать
  * минут тишины без этой строки не отличить от зависания, а фоновая команда,
  * умершая вместе с процессом разговора, выглядела бы идущей.
  */
 export function ChatProgressSheet({
+  chatId,
   progress,
   isRunning = false,
   awaiting = false,
 }: ChatProgressSheetProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
+  // Окно «Скиллы, хуки и MCP»: null — закрыто, без agentId — главный агент.
+  const [extensionsOf, setExtensionsOf] = useState<{ agentId?: string } | null>(null);
+  const openExtensions = (agentId: string | undefined): void =>
+    setExtensionsOf(agentId ? { agentId } : {});
   const summary = summarizeProgress(progress, isRunning);
   const now = useNow(clockTicks(summary, isRunning));
   const waiting = awaiting && !isRunning;
@@ -140,29 +147,53 @@ export function ChatProgressSheet({
             </Typography>
           )}
 
+          {progress?.extensions && progress.extensions.length > 0 && (
+            <Stack
+              direction="row"
+              align="center"
+              gap="var(--spacing-2xs)"
+              marginTop="var(--spacing-sm)"
+              className={styles.extensions}
+              data-progress-extensions
+            >
+              <Typography variant="caption" color="subtle" as="span">
+                {t('agentTree.extensions.mainLine')}
+              </Typography>
+              <ExtensionChips
+                summary={progress.extensions}
+                {...(chatId ? { onOpen: () => openExtensions(undefined) } : {})}
+              />
+            </Stack>
+          )}
+
           {progress && progress.agents.length > 0 && (
             <Stack gap="var(--spacing-2xs)" marginTop="var(--spacing-sm)">
               <Typography variant="caption" color="subtle" as="span">
                 {t('chat.progress.tree')}
               </Typography>
-              <ul className={styles.tree}>
-                {progress.agents.map((agent) => (
-                  <AgentRow
-                    key={agent.id}
-                    agent={agent}
-                    isRunning={isRunning}
-                    {...(progress.processAlive !== undefined
-                      ? { processAlive: progress.processAlive }
-                      : {})}
-                    now={now}
-                  />
-                ))}
-              </ul>
+              <AgentTree
+                {...(chatId ? { chatId, onExtensions: openExtensions } : {})}
+                agents={progress.agents}
+                isRunning={isRunning}
+                {...(progress.processAlive !== undefined
+                  ? { processAlive: progress.processAlive }
+                  : {})}
+                canStop={progress.canStopAgents === true}
+                now={now}
+              />
               {summary.agentsLost > 0 && (
                 <Typography variant="caption" color="subtle" as="p" data-agents-lost-hint>
                   {t('chat.progress.agentsLostHint')}
                 </Typography>
               )}
+            </Stack>
+          )}
+
+          {/* Агенты всех сессий разговора (у группы — всех её звеньев): дерево
+              выше знает только текущую. Кнопка прячется сама, пока сессий нет. */}
+          {chatId && (
+            <Stack direction="row" marginTop="var(--spacing-sm)" data-progress-history>
+              <AgentHistoryButton chatId={chatId} isRunning={isRunning} />
             </Stack>
           )}
 
@@ -192,6 +223,20 @@ export function ChatProgressSheet({
             </Stack>
           )}
         </div>
+      )}
+
+      {chatId && progress && (
+        <AgentExtensionsModal
+          chatId={chatId}
+          isOpen={extensionsOf !== null}
+          onOpenChange={(open) => {
+            if (!open) setExtensionsOf(null);
+          }}
+          agents={progress.agents}
+          mainSummary={progress.extensions}
+          initialAgentId={extensionsOf?.agentId}
+          isRunning={isRunning}
+        />
       )}
     </div>
   );

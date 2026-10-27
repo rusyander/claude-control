@@ -125,7 +125,7 @@ describe('Telegram и D-n на настоящем маршруте решени�
   /** Сервис с настоящими сводкой, применением и закрытием, как в `registerTelegramAnswersRoutes`. */
   async function start() {
     const store = new AnswersStore();
-    store.setSettings({ enabled: true, afterMinutes: 0, ownerId: OWNER });
+    store.setSettings({ enabled: true, afterMinutes: 0, ownerId: OWNER, ownerName: '' });
     service = new TelegramAnswersService({
       store,
       token: () => TOKEN,
@@ -147,6 +147,8 @@ describe('Telegram и D-n на настоящем маршруте решени�
       scanMs: 3_600_000,
       startupGraceMs: 0,
       confirmMissingMs: 0,
+      // Тишина после старта (B7) проверяется в telegram-batch.test.ts.
+      sendGraceMs: 0,
     });
     await service.restart();
     await service.scan();
@@ -185,7 +187,7 @@ describe('Telegram и D-n на настоящем маршруте решени�
     await decideInPanel(record.id, 'deny');
     await press('Разрешить', 'cb-race');
     expect(toastOf('cb-race')).toBe('Уже отвечено');
-    expect(lastEdit()).toMatch(/💻 Отвечено в панели · \d\d:\d\d/);
+    expect(lastEdit()).toMatch(/^💻 Отвечено в панели \d\d:\d\d · npm publish --access public/);
     expect(lastEdit()).not.toContain('✅ Разрешено');
     const after = deferredAsksOf(ctx).get(record.id);
     expect(after?.state).toBe('denied');
@@ -208,7 +210,7 @@ describe('Telegram и D-n на настоящем маршруте решени�
     await start();
     await decideInPanel(record.id, 'deny');
     await service!.scan();
-    expect(lastEdit()).toMatch(/💻 Отвечено в панели · \d\d:\d\d/);
+    expect(lastEdit()).toMatch(/^💻 Отвечено в панели \d\d:\d\d · npm publish --access public/);
     expect(lastEdit()).not.toContain('⌛ Уже не актуально');
   });
 
@@ -217,7 +219,7 @@ describe('Telegram и D-n на настоящем маршруте решени�
     await start();
     deferredAsksOf(ctx).withdraw((scope) => scope.kind === 'group');
     await service!.scan();
-    expect(lastEdit()).toMatch(/⌛ Уже не актуально · \d\d:\d\d/);
+    expect(lastEdit()).toMatch(/^⌛ Уже не актуально \d\d:\d\d · npm publish --access public/);
     expect(lastEdit()).not.toContain('💻 Отвечено в панели');
     expect(deferredAsksOf(ctx).get(record.id)?.state).toBe('withdrawn');
   });
@@ -228,7 +230,7 @@ describe('Telegram и D-n на настоящем маршруте решени�
     deferredAsksOf(ctx).withdraw((scope) => scope.kind === 'group');
     await press('Разрешить', 'cb-gone');
     expect(toastOf('cb-gone')).toBe('Уже не актуально');
-    expect(lastEdit()).toMatch(/⌛ Уже не актуально · \d\d:\d\d/);
+    expect(lastEdit()).toMatch(/^⌛ Уже не актуально \d\d:\d\d · npm publish --access public/);
     expect(deferredAsksOf(ctx).get(record.id)?.state).toBe('withdrawn');
   });
 
@@ -237,7 +239,7 @@ describe('Telegram и D-n на настоящем маршруте решени�
     const { press } = await start();
     await press('Разрешить', 'cb-own');
     expect(toastOf('cb-own')).toBe('Принято');
-    expect(lastEdit()).toMatch(/✅ Разрешено · \d\d:\d\d/);
+    expect(lastEdit()).toMatch(/^✅ Разрешено \d\d:\d\d · npm publish --access public/);
     const after = deferredAsksOf(ctx).get(record.id);
     expect(after?.state).toBe('allowed');
     expect(after?.decidedVia).toBe('telegram');

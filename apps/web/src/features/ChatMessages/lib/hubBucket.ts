@@ -18,7 +18,9 @@ export function hubBucket(group: ChildStageGroup): HubBucket {
     // «Убрать» решает человек.
     group.pending === 'interrupted' ||
     group.waitingFor === 'question' ||
-    group.waitingFor === 'decision'
+    group.waitingFor === 'decision' ||
+    // Красный конвейер MR, а ход кончился без правки: «готово» было бы ложью.
+    group.waitingFor === 'mr-red'
   ) {
     return 'ask';
   }

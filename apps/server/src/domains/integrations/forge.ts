@@ -548,6 +548,29 @@ export async function retryMergeRequestJob(
   return true;
 }
 
+/**
+ * Лог задания конвейера MR по ссылке (P8) — текстом, как его отдаёт GitLab
+ * (`/jobs/:id/trace`). Наблюдатель MR берёт из него хвост для продолжения группы.
+ * `undefined` — ссылка не про MR GitLab (у GitHub заданий с причиной панель не читает);
+ * отказ форджа бросается.
+ */
+export async function readMergeRequestJobLog(
+  url: string,
+  token: string,
+  jobId: string,
+): Promise<string | undefined> {
+  const ref = parseMergeRequestUrl(url);
+  const access = forgeAccessForUrl(url, token);
+  if (!ref || !access || access.kind !== 'gitlab') return undefined;
+  const response = await sendRequest({
+    url: `${access.api}/projects/${projectRef(access)}/jobs/${encodeURIComponent(jobId)}/trace`,
+    system: systemName(access),
+    headers: { ...headers(access), Accept: 'text/plain' },
+  });
+  if (!response.ok) throw failedResponse(systemName(access), response, 300);
+  return response.text;
+}
+
 /** Кто мы для форджа — то же «представились», что и у Atlassian. */
 export async function whoAmI(access: ForgeIdentity): Promise<string> {
   // Ручка называется одинаково у обоих: `/user` отдаёт владельца токена.

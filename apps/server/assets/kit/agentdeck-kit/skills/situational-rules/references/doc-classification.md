@@ -25,7 +25,8 @@ explicit request.
 - Unsure → agent/local, or ask.
 - Project with its own layout → ASK before restructuring. "Hands off" →
   `node <kit>/tools/doc-policy-set.mjs <dir> off`.
-- `TASKS.md` is human-facing and holds ONLY open tasks — delivered → `.agent/archive/TASKS-done-<date>.md`
-  in the same pass. Never delete the file, never read it whole.
+- `TASKS.md` is human-facing and holds ONLY open tasks (`[x]` inside one marks its finished items) — a task
+  all `[x]` → `.agent/archive/TASKS-done-<date>.md` in the same pass. Never delete the file, never read it
+  whole. Location, format, single writer → `task-ledger.md`.
 - Whole-project sort = skill `agentdeck-kit:docs-triage` (on request). Mechanical check any time:
   `node <kit>/tools/docs-validate.mjs`.

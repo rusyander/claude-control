@@ -17,6 +17,7 @@ import { GroupHead } from '../GroupText/GroupHead';
 import { GroupAsk } from '../GroupAsk/GroupAsk';
 import { GroupPermission } from '../GroupPermission/GroupPermission';
 import { GroupSignals } from '../GroupSignals/GroupSignals';
+import { GroupCoverage } from '../GroupCoverage/GroupCoverage';
 import { MergeOrderChip } from '../MergeOrderChip/MergeOrderChip';
 import type { GroupCardProps } from './GroupCard.types';
 import styles from './GroupCard.module.scss';
@@ -26,6 +27,7 @@ import { deliveryStopOf } from '../../lib/deliveryStop';
 import { statusTone } from '../../lib/statusTone';
 import { HoldAnswer } from './HoldAnswer/HoldAnswer';
 import { GroupProgress } from '../GroupProgress/GroupProgress';
+import { GroupAgents } from '../GroupAgents/GroupAgents';
 import { RunInputs } from '../RunInputs/RunInputs';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 
@@ -66,6 +68,12 @@ export function GroupCard({
     : 'chat.cascade.hub.mr';
   const cleanup = group.copy && parentChatId ? group.copy : undefined;
   const watchSignals = group.watchSignals?.length ? group.watchSignals : undefined;
+  // Охват сторожа — только неполный: полный поток со всеми источниками фишки не даёт.
+  const coverage =
+    group.watchCoverage &&
+    (group.watchCoverage.by !== 'stream' || group.watchCoverage.gaps.length > 0)
+      ? group.watchCoverage
+      : undefined;
   // Чего не хватило до доставки по фактам git — пунктами, свёрнуто (владелец
   // 22.10.2026): одной строкой через «;» список в десяток пунктов занимал пол-
   // карточки. В подвале, а не в тексте: текст лежит внутри кнопки «открыть чат».
@@ -215,6 +223,11 @@ export function GroupCard({
         />
       </div>
 
+      {/* Субагенты группы: сколько идёт и закончило, переход к каждому. */}
+      {openable && chatId && onOpen && (
+        <GroupAgents chatId={chatId} group={group} onOpen={onOpen} />
+      )}
+
       {/* Что под карточкой — во всю её ширину и над растянутой кнопкой:
           форма ответа, отметка уборки копии, предупреждения панели. */}
       {/* Пустой список сигналов — не повод для подвала: пустой блок дал бы лишний отступ. */}
@@ -224,6 +237,7 @@ export function GroupCard({
         group.hold ||
         group.autoNotices ||
         watchSignals ||
+        coverage ||
         missing.length > 0) && (
         <div className={styles.groupFoot}>
           {/* Запрос прав — первым: на нём группа стоит, на вопросе — нет. */}
@@ -263,6 +277,7 @@ export function GroupCard({
               {...(onOpen ? { onOpen: (target: string) => onOpen(target) } : {})}
             />
           )}
+          {coverage && <GroupCoverage coverage={coverage} />}
           {cleanup?.cleaned && parentChatId && (
             <GroupCopyCleanup
               parentChatId={parentChatId}

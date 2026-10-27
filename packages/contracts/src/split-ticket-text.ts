@@ -91,6 +91,28 @@ export function nearDuplicate(a: string, b: string, ratio = NEAR_DUPLICATE_RATIO
 }
 
 /**
+ * Порог «похоже на открытую задачу Jira» — ниже склеивающего: склейку решает
+ * сервер сам, а похожую задачу только ПОКАЗЫВАЕТ человеку, и решает он.
+ */
+export const SIMILAR_ISSUE_RATIO = 0.5;
+
+/** Название дефекта похоже на название задачи трекера — повод спросить человека. */
+export function similarTitle(a: string, b: string): boolean {
+  return nearDuplicate(a, b, SIMILAR_ISSUE_RATIO);
+}
+
+/**
+ * Значимые слова названия для полнотекстового поиска трекера: буквы и цифры,
+ * без служебных и коротких, не больше восьми — спецзнаки Lucene сюда не попадут.
+ */
+export function searchWords(value: string): string[] {
+  const words = normTitle(value)
+    .split(' ')
+    .filter((word) => word.length >= 3 && !STOP_WORDS.has(word));
+  return [...new Set(words)].slice(0, 8);
+}
+
+/**
  * Файлы, которые называет «где»: всё похожее на путь с расширением, без
  * `:строка` и `:строка:столбец`, слэши прямые, регистр нижний. «web» или
  * «экран настроек» файлов не называют — такая находка ни с кем по файлу не склеится.

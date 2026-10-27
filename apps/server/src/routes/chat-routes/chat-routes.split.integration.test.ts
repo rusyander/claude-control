@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
 import { COLD_RESUME_INTRO } from '../../domains/chat/split-continue.ts';
+import { planCascadeStage } from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -32,6 +33,7 @@ import { readChoice, writeChoice } from '../../domains/groups/choice/choice.ts';
 import { createSplitLauncher, launchFromRecord } from '../chat/split-launch.ts';
 import { createReviewStarter } from '../chat/review-starter.ts';
 import { TASK_NOTEBOOK } from '../../domains/chat/task-notebook/task-notebook.ts';
+import { OWNER_BRIEF } from '../../domains/chat/owner-brief/owner-brief.ts';
 import { pauseResumePrompt } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import { wireGroupActivation } from '../../bootstrap/group-activation-wiring/group-activation-wiring.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
@@ -226,6 +228,11 @@ describe('POST /api/chat/split', () => {
       expect(run.prompt).toContain("Owner's request, verbatim");
       expect(run.prompt).toContain('Общее');
       expect(run.prompt).not.toContain('Split the tasks of this conversation');
+      // Живая группа 26.10: те же слова — файлом в копии с самого старта, чтобы
+      // после сжатия группа читала их, а не искала в транскрипте.
+      const brief = readFileSync(join(run.cwd ?? '', OWNER_BRIEF), 'utf8');
+      expect(brief.split(sentinel)).toHaveLength(2);
+      expect(brief).toContain('"id":"owner-1"');
     }
   });
 
@@ -391,6 +398,8 @@ describe('POST /api/chat/split', () => {
       expect(link?.groupTask).toBeTruthy();
       expect(run.prompt).toContain(link?.groupTask as string);
       expect(link?.groupTask).not.toContain(OWNER_PRECEDENCE_LINE);
+      // Каталог не репозиторий — коммита начала нет, ревью идёт прежним путём.
+      expect(link).not.toHaveProperty('startSha');
     }
   });
 
@@ -631,7 +640,7 @@ describe('POST /api/chat/split', () => {
     expect(resumed.started).toBe(true);
     const turn = started.at(-1);
     expect(turn?.chatId).toBe(first.chatId);
-    expect(turn?.prompt).toContain('The human paused the group');
+    expect(turn?.prompt).toContain('The group was paused and is now resumed');
     expect(turn?.appendSystemPrompt).toBe(appended);
 
     // Связь переехала на настоящий ключ, а вкладка помнит временный: дописка
@@ -908,6 +917,80 @@ describe('POST /api/chat/split', () => {
       const body = response.json() as { chats: { model?: string; kind?: string }[] };
       expect(body.chats[0]?.model).toBeUndefined();
       expect(body.chats[0]?.kind).toBeUndefined();
+    });
+
+    // Telegram R3(d), 26.10: ревью выключается своим тумблером, подбор остаётся.
+    it('«Ревью после работы» выключено — снято в связь при запуске, подбор и подъём остаются', async () => {
+      store.setProjectReviewAfterWork(project, false);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      // Дешёвая работа на месте: механика — ниже потолка.
+      expect(started[0]?.model).toBe('sonnet');
+      expect(started[0]?.appendSystemPrompt).toContain('BELOW the ceiling');
+      expect(started[0]?.appendSystemPrompt).toContain(
+        'The panel will not start a review of this work',
+      );
+      expect(started[0]?.appendSystemPrompt).toContain(
+        'the panel re-runs the task on the ceiling model',
+      );
+      const link = store.getChatLink(started[0]?.chatId ?? '');
+      expect(link).toMatchObject({ lowered: true, reviewAfterWork: false });
+      expect(link?.ceilingModel).toBe('claude-opus-5');
+
+      // Тумблер, включённый посреди цепочки, идущую группу не меняет: флаг уже в связи,
+      // и её работа идёт в доставку без ревью.
+      store.setProjectReviewAfterWork(project, true);
+      const next = planCascadeStage({
+        link: store.getChatLink(started[0]?.chatId ?? '')!,
+        ok: true,
+        text: 'готово',
+        task: 'переименовать поле',
+        hasWork: () => true,
+        deliver: true,
+      });
+      expect(next?.stage).toBe('deliver');
+      expect(next?.prompt).toContain('«review after work» off for this project');
+    });
+
+    it('«Ревью после работы» по умолчанию — поля в связи нет, работа идёт в ревью', async () => {
+      await app.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal: kinds,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+
+      const link = store.getChatLink(started[0]?.chatId ?? '');
+      expect(link?.reviewAfterWork).toBeUndefined();
+      expect(started[0]?.appendSystemPrompt).toContain(
+        'the panel itself starts a review of your diff on the ceiling model',
+      );
+      const next = planCascadeStage({
+        link: link!,
+        ok: true,
+        text: 'готово',
+        task: 'переименовать поле',
+        hasWork: () => true,
+        deliver: true,
+      });
+      expect(next?.stage).toBe('review');
     });
 
     it('просьба «раздели задачи» несёт классы только там, где правило действует', async () => {
@@ -1736,6 +1819,53 @@ describe('POST /api/chat/split', () => {
         expect(cwds).toHaveLength(2);
         expect(new Set(cwds.map(norm)).size).toBe(2);
         expect(cwds.every(inCopies)).toBe(true);
+      }, 20_000);
+
+      // Владелец 26.10, замечание 4: ревью группы, заведённой на готовый MR, читало ветку
+      // целиком. Мерило охвата — коммит начала группы, записанный в связь при запуске.
+      it('связь группы несёт коммит начала — голову своей копии в момент запуска', async () => {
+        const conveyor = withConveyor();
+        const triageId = await startTriage(conveyor, project);
+        started.length = 0;
+        finishTriage(conveyor, triageId);
+        await waitStarts(2);
+        expect(started).toHaveLength(2);
+        const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: project, encoding: 'utf8' });
+        for (const run of started) {
+          const copyHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+            cwd: run.cwd,
+            encoding: 'utf8',
+          }).trim();
+          expect(copyHead).toBe(head.trim());
+          expect(store.getChatLink(run.chatId)?.startSha).toBe(copyHead);
+        }
+      }, 20_000);
+
+      it('звено плана тоже несёт коммит начала — ревью после плана меряет от него', async () => {
+        const conveyor = withConveyor();
+        const instance = await withRoutes(conveyor);
+        const first = await instance.inject({
+          method: 'POST',
+          url: '/api/chat/split',
+          payload: {
+            projectPath: project,
+            proposal: kinds,
+            startRuns: true,
+            parentChatId: 'parent-1',
+            ...ceiling,
+          },
+        });
+        await instance.close();
+        started.length = 0;
+        finishTriage(conveyor, (first.json() as { triage: { chatId: string } }).triage.chatId);
+        await waitStarts(1);
+        const plan = started.find((run) => store.getChatLink(run.chatId)?.stage === 'plan');
+        expect(plan).toBeDefined();
+        const copyHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+          cwd: plan?.cwd ?? '',
+          encoding: 'utf8',
+        }).trim();
+        expect(store.getChatLink(plan?.chatId ?? '')?.startSha).toBe(copyHead);
       }, 20_000);
 
       it('перезапуск из итога разбора уводит группы из подкаталога в копии', async () => {

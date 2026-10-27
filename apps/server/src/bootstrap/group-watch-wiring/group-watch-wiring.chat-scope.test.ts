@@ -241,3 +241,70 @@ describe('wireGroupWatch R22 через живость группы панели
     w.watcher.stop();
   });
 });
+
+describe('wireGroupWatch R43 пауза стоит, а решать нечего (F1)', () => {
+  function pauseGroup(store: AppStore, extra: Record<string, unknown>): void {
+    store.setSplitPlan({
+      parentChatId: 'parent',
+      projectPath: '/work/app',
+      createdAt: '2026-10-23T10:00:00.000Z',
+      groups: [
+        {
+          index: 1,
+          title: 'g',
+          status: 'paused',
+          path: '/work/app/.copies/g1',
+          pausedAt: new Date(T0).toISOString(),
+          ...extra,
+        },
+      ],
+    } as unknown as SplitPlanRecord);
+  }
+
+  it('пауза сторожа 15 мин — R43 info на записи группы с правилом паузы', () => {
+    vi.useFakeTimers({ now: T0 });
+    const w = wire();
+    pauseGroup(w.store, { pausedBy: 'watch', pausedRule: 'R4' });
+    vi.setSystemTime(T0 + 15 * MIN);
+    w.watcher.tick();
+    expect(w.groupSignals()).toMatchObject([
+      {
+        rule: 'R43',
+        severity: 'info',
+        params: { rule: 'R4' },
+        textKey: 'groupWatch.rule.R43watch',
+      },
+    ]);
+    // Правило группы, не сессии: у стоящей группы сессии нет, а сирота-напоминание не закрывается.
+    vi.setSystemTime(T0 + 40 * MIN);
+    w.watcher.tick();
+    const r43 = w.groupSignals().filter((signal) => signal.rule === 'R43');
+    expect(r43).toHaveLength(1);
+    expect(r43[0]?.clearedAt).toBeUndefined();
+    w.watcher.stop();
+  });
+
+  it('пауза человека 15 мин — ещё рано; ждущий D-n — молчит и через час', () => {
+    vi.useFakeTimers({ now: T0 });
+    let waiting = false;
+    const w = wire({ extra: { deferredWaiting: () => waiting } });
+    pauseGroup(w.store, { pausedBy: 'human' });
+    vi.setSystemTime(T0 + 15 * MIN);
+    w.watcher.tick();
+    expect(w.groupSignals()).toEqual([]);
+    waiting = true;
+    vi.setSystemTime(T0 + 70 * MIN);
+    w.watcher.tick();
+    expect(w.groupSignals()).toEqual([]);
+    waiting = false;
+    vi.setSystemTime(T0 + 75 * MIN);
+    w.watcher.tick();
+    expect(w.groupSignals().map((signal) => signal.rule)).toEqual(['R43']);
+    // «Продолжить» — группа снова идёт: напоминание закрыто, а не висит дальше.
+    pauseGroup(w.store, { status: 'started', pausedBy: 'human' });
+    vi.setSystemTime(T0 + 76 * MIN);
+    w.watcher.tick();
+    expect(w.groupSignals().find((signal) => signal.rule === 'R43')?.clearedAt).toBeTruthy();
+    w.watcher.stop();
+  });
+});

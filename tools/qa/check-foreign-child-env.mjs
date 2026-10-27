@@ -34,6 +34,8 @@ const CLI = process.argv[2];
 // Мест очереди у ребёнка — по ядрам машины (`ChatRunner.ts CHILD_HEAVY_SLOTS`, 20.10):
 // прежнее «ровно 2» краснело на любой машине больше чем с 11 ядрами.
 const SLOTS = String(Math.max(2, Math.floor(availableParallelism() / 4)));
+/** Стадии звена (`ChatCascadeStages.ts` `stageOf`). */
+const STAGES = ['triage', 'plan', 'work', 'review', 'fix', 'deliver'];
 if (CLI === undefined) {
   const self = fileURLToPath(import.meta.url);
   const codes = ['codex', 'qwen'].map(
@@ -84,6 +86,8 @@ appendFileSync(
     excluded: settings.mcp?.excluded ?? [],
     threshold: settings.context?.autoCompactThreshold ?? null,
     queueDir: pick('AGENTDECK_HEAVY_QUEUE_DIR'),
+    stage: pick('AGENTDECK_GROUP_STAGE'),
+    deliverAhead: pick('AGENTDECK_GROUP_DELIVER_AHEAD'),
     queueHooks: ['PreToolUse', 'PostToolUse', 'PostToolUseFailure'].filter((event) =>
       (settings.hooks?.[event] ?? []).some((group) =>
         (group.hooks ?? []).some((hook) => String(hook.command).includes('heavy-queue-hook.mjs')),
@@ -91,6 +95,9 @@ appendFileSync(
     ),
     prompt: stdin.length,
     noted: [argv.join(' '), stdin, ...contextFiles].some((text) => text.includes(NOTE)),
+    wikiNoted: [argv.join(' '), stdin, ...contextFiles].some((text) =>
+      text.includes('Tracker wiki tools'),
+    ),
     // Ревью A3: чей это запуск — группа «Форма входа», её второй ход, новая группа.
     login: [argv.join(' '), stdin].some((text) => text.includes('починить валидацию')),
     turn2: [argv.join(' '), stdin].some((text) => text.includes('A3-TURN-2')),
@@ -113,7 +120,8 @@ const SEED = {
       [
         '[mcp_servers.jira]',
         'command = "node"',
-        'args = ["jira-mcp.mjs"]',
+        // `mcp-atlassian` — сервер трекера с вики: её группе снимают поимённо (P-16).
+        'args = ["jira-mcp.mjs", "mcp-atlassian"]',
         '',
         '[mcp_servers.telegram-inbox]',
         'command = "node"',
@@ -131,7 +139,7 @@ const SEED = {
       join(home, '.qwen', 'settings.json'),
       JSON.stringify({
         mcpServers: {
-          jira: { command: 'node', args: ['jira-mcp.mjs'] },
+          jira: { command: 'node', args: ['jira-mcp.mjs', 'mcp-atlassian'] },
           'telegram-inbox': { command: 'node', args: ['telegram.mjs'] },
           'figma.dev': { httpUrl: 'https://mcp.figma.com/mcp' },
         },
@@ -266,6 +274,18 @@ await runOnStand(
       brief(kids),
     );
 
+    // Стадия звена (P-09): её читает `gate-at-end` набора в хуке CLI — один полный гейт
+    // на группу. У звена — своя стадия, у обычного разговора — никакой.
+    const stages = (list) =>
+      JSON.stringify(list.map((call) => ({ stage: call.stage, ahead: call.deliverAhead })));
+    check(
+      'стадия звена в окружении у каждого запуска звена, у обычного разговора — нет',
+      kids.length > 0 &&
+        kids.every((call) => STAGES.includes(call.stage ?? '')) &&
+        plain.every((call) => call.stage === null && call.deliverAhead === null),
+      `звенья ${stages(kids)}; разговор ${stages(plain)}`,
+    );
+
     // Лёгкий набор MCP — у групп; разбор не группа, обычный разговор — тоже.
     const off = OFF[CLI];
     const offOf = (list) =>
@@ -312,6 +332,28 @@ await runOnStand(
         JSON.stringify(groups.map((call) => call.argv.slice(0, 5))),
       );
     }
+    // Вики трекера (P-16): задачи о ней молчат — Codex снимает имена `confluence_*`
+    // поимённо (`disabled_tools`) и говорит о том группе; у Qwen поимённого снятия нет —
+    // ни снятия, ни строки (строка без снятия звала бы просить то, что есть).
+    const wikiOff = (call) =>
+      call.argv.some(
+        (arg) =>
+          arg.startsWith('mcp_servers.jira.disabled_tools=[') &&
+          arg.includes('"confluence_search"'),
+      );
+    const wikiOf = (list) =>
+      JSON.stringify(list.map((call) => ({ off: wikiOff(call), noted: call.wikiNoted })));
+    check(
+      CLI === 'codex'
+        ? 'вики трекера снята поимённо у групп и только у них, строка о ней — тоже'
+        : 'у Qwen вики трекера не снимается и строки о ней нет',
+      CLI === 'codex'
+        ? groups.length > 0 &&
+            groups.every((call) => wikiOff(call) && call.wikiNoted) &&
+            rest.every((call) => !wikiOff(call) && !call.wikiNoted)
+        : [...plain, ...kids].every((call) => !wikiOff(call) && !call.wikiNoted),
+      wikiOf([...plain, ...kids]),
+    );
     const limited = (call) => call.argv.includes('model_auto_compact_token_limit=160000');
     check(
       CLI === 'codex'

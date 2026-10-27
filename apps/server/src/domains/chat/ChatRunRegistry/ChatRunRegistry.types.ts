@@ -75,7 +75,15 @@ export type RunWatchFeed =
    * `detached` — прогон подхвачен после перезапуска без потока: событий не будет, только конец.
    * `forkOf` — ответвление (`--fork-session`) этой сессии: окно и кэш начинаются с её.
    */
-  | { kind: 'start'; sessionId?: string; cwd: string; detached?: true; forkOf?: string }
+  | {
+      kind: 'start';
+      sessionId?: string;
+      cwd: string;
+      detached?: true;
+      forkOf?: string;
+      /** Длина вводной хода, знаков (R37 — длинная вводная). */
+      promptChars?: number;
+    }
   | { kind: 'event'; event: ChatEvent; sessionId?: string }
   | { kind: 'finish'; sessionId?: string };
 

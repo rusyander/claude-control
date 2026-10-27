@@ -1,0 +1,217 @@
+{
+  "title": {
+    "ru": "Группа доделывает свои пункты сама: отчёт по каждому пункту задач, проверка отданного соседям",
+    "en": "A group finishes its own points: a report on every task point, hand-offs to siblings checked"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "В меню чата рядом с «Подбирать модель под задачу» появился тумблер «Ревью после работы», он запоминается на проект и по умолчанию включён. Выключенный убирает ревью на потолке после работы группы: работа сразу идёт в доставку, а в ленте группы появляется строка с причиной. Подбор модели, подъём понижённой работы без правок на потолок, проверка правок и доставка остаются как были. Положение снимается при запуске разделения, поэтому переключение не меняет уже идущие группы. Тумблер действует и для групп чужих CLI.",
+        "en": "The chat menu gains a «Review after work» toggle next to «Match the model to the task»; it is remembered per project and is on by default. Turned off, it drops the ceiling review after a group's work: the work goes straight to delivery and the group feed shows a line with the reason. Model picking, raising lowered work with no changes to the ceiling, verification of fixes and delivery stay as they were. The setting is captured when a split starts, so switching it does not change groups already running. The toggle applies to groups of other CLIs as well."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Группа с доставкой отчитывается строкой task-N по каждому пункту своих задач и тикетов, на которые они ссылаются: критерии приёмки, перечисленное, примеры, хвост текста. Без такого отчёта или с пунктом «fail» «готово» не ставится, а недостающее уходит напоминанием той же сессии.",
+        "en": "A delivering group reports a task-N row for every point of its tasks and of the tickets they link: acceptance criteria, listed items, examples, the tail of the text. Without that report, or with a point at «fail», «done» is not set, and what is missing goes to the same session as a reminder."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Пункт, отданный «другой группе» или помеченный «вне скоупа», больше не принимается на слово. Он засчитывается, только если названная группа этого разделения жива, названный файл лежит в её списке и слияние, которого пункт ждал, ещё не случилось, — или если названа заведённая задача трекера. Иначе пункт остаётся за группой. Раньше группы сдавали «готово», отдав пункты группе, у которой не было ни одного файла той части, и эти пункты не делал никто.",
+        "en": "A point handed to «another group» or marked «out of scope» is no longer taken on trust. It counts only when the named group of this split is alive, the named file is in its list and the merge the point waited for has not happened yet — or when a filed tracker ticket is named. Otherwise the point stays with the group. Groups used to report «done» after handing points to a group that owned no file of that part, and nobody did those points."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Пункт просьбы владельца, который сделало само разделение (отбор задач с доски, деление на группы), группа отмечает строкой «split stage: что сделано», и он засчитывается. Так же засчитывается пункт, отданный MR вне этого разделения. Для пунктов задач группы такая пометка не принимается: задачи группы разделение за неё не делает.",
+        "en": "A point of the owner's request that the split itself did (picking tasks from the board, dividing the groups) is marked by the group with a «split stage: what was done» row and counts. A point handed to an MR outside this split counts as well. The mark is not accepted for the group's own task points: the split does not do a group's tasks for it."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "«Перепроверить MR» передаёт группе список полноты: её отданные пункты без подтверждённого владельца, что соседи передали ей строками отчёта и заметками плана, её заметки о порядке слияния и состояние, MR и файлы каждой соседней группы. Раньше вместо списка была одна общая строка, и группа сверяла полноту по памяти.",
+        "en": "«Recheck MR» hands the group a completeness list: its handed-off points with no confirmed owner, what siblings handed to it as report rows and plan notes, its notes on the merge order, and the state, MR and files of every sibling group. It used to be one general line, and the group checked completeness from memory."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правка README, CHANGELOG, AGENTS.md или заметок больше не требует от группы запроса к стенду по ситу контракта. Контрактом считаются только доки API: файлы в каталоге доков или контрактов и файлы, названные по API (api, openapi, reference, spec, schema).",
+        "en": "Editing README, CHANGELOG, AGENTS.md or notes no longer makes a group send a stand request for the contract sieve. Only API docs count as a contract: files under a docs or contracts directory and files named after the API (api, openapi, reference, spec, schema)."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Гейт группы, запущенный через gate-run с отчётом JUnit, сам попадает в блок «Тесты»: панель передаёт группе путь к tests-cli. Если гейт не менял дерево, запись хранит его отпечаток, и зелёный результат засчитывается кейсам с тем же автотестом на этом дереве. Раньше отчёт терялся, и тот же набор тестов гоняли второй раз.",
+        "en": "A group gate run through gate-run with a JUnit report lands in the Tests block by itself: the panel hands the group the tests-cli path. When the gate left the tree unchanged, the record keeps its fingerprint, and the green result counts for cases with the same automated test on that tree. Before, the report was lost and the same suite ran a second time."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Решение D-n группы Codex, Qwen Code или OpenCode, которое ждёт человека, закрывается отказом агенту, если папки, куда команда уходит `cd`, больше нет, — так же, как у группы Claude. Запись хранит каталог оболочки, от которого её судили, и относительный `cd` проверяется от него. Раньше такая запись висела человеку до конца срока.",
+        "en": "A D-n decision of a Codex, Qwen Code or OpenCode group that waits for the human is closed with a refusal to the agent when the folder the command `cd`s into no longer exists, as for a Claude group. The record keeps the shell folder it was judged from, and a relative `cd` is checked from it. Before, such a record waited for the human until it expired."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "После сжатия разговора группа Codex или Qwen Code получает нужный раздел правила текстом сразу на старте, как группа Claude, и первая правка файла не отказывается карточкой правила. Вызовы прошедшего отрезка набор теперь берёт из своего журнала сессии и режет его по меткам сжатия: стенограмму этих CLI он не читает. Раньше после каждого сжатия первая правка отказывалась и правило перечитывалось заново.",
+        "en": "After a conversation is compacted, a Codex or Qwen Code group gets the rule section it needs as text right at the start, as a Claude group does, and its first file edit is no longer refused with a rule card. The kit now takes the calls of the finished stretch from its own session log, cut at compaction marks, since it cannot read these CLIs' transcripts. Before, the first edit after every compaction was refused and the rule was read again."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа Codex или Qwen Code удаляет свою же копию файла в `/tmp` сама, без решения D-n, как группа Claude: своё узнаётся по журналу сессии набора — копию снял вызов этой же сессии, и он завершился. Удаление по маске, чужого файла или копии из незавершённого вызова по-прежнему ждёт человека. Раньше любое такое удаление уходило человеку.",
+        "en": "A Codex or Qwen Code group deletes its own copy of a file in `/tmp` by itself, without a D-n decision, as a Claude group does: the kit's session log shows the copy was made by a call of the same session and that call finished. A glob delete, someone else's file or a copy from an unfinished call still waits for the human. Before, every such delete went to the human."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Звено группы OpenCode, Kimi или Goose получает свою стадию, признак «доставка впереди» и путь к `tests-cli` панели: такой ход идёт своим запуском CLI, а не через общий сервер, поднятый без этих ключей. Раньше звено шло через общий сервер, и ключей у него не было.",
+        "en": "A stage of an OpenCode, Kimi or Goose group gets its stage, the delivery-ahead mark and the path to the panel's `tests-cli`: such a turn runs in its own CLI process instead of the shared server started without these keys. Before, the stage went through the shared server and had none of them."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ревью группы проверяет только то, что сделала сама группа. При запуске в связь группы записывается коммит, с которого она начала, и ревью читает её коммиты с него: слияние — только разрешёнными конфликтами, после rebase — сравнением серий коммитов. Раньше группа, заведённая на готовый MR ради одного конфликта, получала ревью всей ветки и полчаса чинила то, что сломано до неё.",
+        "en": "A group's review checks only what the group itself did. At launch the group's link records the commit it started from, and the review reads the group's commits from it: a merge only by its conflict resolutions, a rebase by comparing the commit series. Before, a group started on a ready MR for one conflict got a review of the whole branch and spent half an hour fixing what was broken before it."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Если с коммита начала у группы нет своих правок (ни коммита, только слияния без конфликтов или rebase с теми же патчами), ревью не заводится: группа идёт сразу в доставку, а в ленте появляется строка с причиной. Найденное ревью в коде, который группа не меняла, идёт отдельным списком «было до группы, не исправлено» в описание MR и на правки не уходит. То же — у групп Codex, Qwen Code и других CLI.",
+        "en": "When a group has no changes of its own since its start commit (no commits, only merges without conflicts or a rebase with the same patches), no review is started: the group goes straight to delivery and the feed shows a line with the reason. What the review finds in code the group did not change goes as a separate «pre-existing, not fixed» list into the MR description and never to the fix stage. The same holds for Codex, Qwen Code and other CLI groups."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Если конвейер MR позеленел, пока группа ждала человека из-за красного, наблюдатель MR это замечает. Дальше панель сама сверяет доставку: всё на месте — группа получает «готово» без лишнего хода и заметку человеку, есть пробелы — уходит напоминание с ними. Раньше такая группа ждала человека, хотя ждать было уже нечего.",
+        "en": "When the MR pipeline turns green while the group waits for the human over the red one, the MR watcher notices it. The panel then checks the delivery itself: nothing missing — the group is done with no extra turn and the human gets a note; gaps — a reminder with them goes out. Before, such a group kept waiting for the human with nothing left to wait for."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Цитата короче трёх слов в строке следа задач больше не считается источником пункта: это метка, и проверка доставки называет её отдельным пробелом. Цитата под ключом одной задачи ищется только в разделе её тикета и в тексте задания, а в описании MR — без разделов проверок, тестов, скриншотов и заметок. Раньше пункт проходил по метке инструмента или по строке соседнего тикета.",
+        "en": "A quote shorter than three words in a task trace row no longer counts as the point's source: it is a label, and the delivery check names it as a gap of its own. A quote under one task's key is looked for only in that ticket's section and the task text, and in the MR description without its checks, tests, screenshots and notes sections. Before, a point passed on a tool label or on a line of a sibling ticket."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Пробелы источника строк следа задач теперь отчётные: напоминание просит ответить только названными строками, без коммита и push. Заметки, которые живое описание MR уже называет, приходят счётом, а не текстом, и в напоминании, и в выводе tests-cli delivery.",
+        "en": "Task trace source gaps are now report-only: the reminder asks for the named rows only, with no commit and no push. Notes the live MR description already names come as a count, not as text, both in the reminder and in the tests-cli delivery output."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "tests-cli delivery печатает строку о прочитанном MR: сколько веток ревьюера открыто, кто и когда оставил последнюю реплику, какие заметки называет описание. Группа приводит эту строку как доказательство и не перечитывает MR через форж. Карточка правил группы добавляет: выход 0 — доказательство, перечитанный факт сначала записывается в строку, а проверка запускается один раз после последней правки строк.",
+        "en": "tests-cli delivery prints a line about the MR it read: how many reviewer threads are open, who left the last note and when, which notes the description names. The group cites that line as evidence and does not re-read the MR through the forge. The group rules card adds: exit 0 is the proof, a re-read fact goes into the row first, and the check runs once after the last row edit."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Команду группы, которая печатает только в /dev/null и отбрасывает код выхода (например, `sed -n 1,3p f >/dev/null; …`), страж чтения отклоняет: такая команда ничего не делает, а стоит отдельного хода. Повтор той же команды проходит. Проверки кодом выхода (`grep -q … && …`) и запись в файл не затрагиваются.",
+        "en": "A group command that prints only to /dev/null and drops its exit code (for example `sed -n 1,3p f >/dev/null; …`) is refused by the read guard: it does nothing and costs a turn of its own. Repeating the same command passes. Exit-code checks (`grep -q … && …`) and writes to a file are not affected."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка чата описывает, как сейчас судятся команды группы. Подкоманды docker, выгрузка `git archive -o`, `git diff --output` и распаковка `tar -x -C` за пределы копии уходят человеку. Git над копией отклоняется с причиной и не превращается в решение D-n. Клон ревьюера считается черновиком, а `git clean` со связанными node_modules — нет. Папки `.agent/<папка>/…` и временные файлы прошлых вызовов того же разговора считаются своими. Добавлены объём «Перепроверить MR» и источники строк task-N. Раньше справка утверждала, что любая запись в `.agent/` уходит человеку.",
+        "en": "The chat help describes how group commands are judged now. Docker subcommands, `git archive -o`, `git diff --output` and `tar -x -C` outside the copy go to the human. Git above the copy is refused with a reason and is not turned into a D-n decision. The reviewer clone counts as scratch, while `git clean` with linked node_modules does not. `.agent/<folder>/…` and temp files from earlier calls of the same conversation count as the group's own. The scope of «Recheck MR» and the sources of task-N rows are added. The help used to claim that any write under `.agent/` goes to the human."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    }
+  ]
+}

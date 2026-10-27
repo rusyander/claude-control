@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import type { OutsideRelayState } from '@agentdeck/contracts/chat-inbox';
 import type { MobileApkInstallResult, MobileApkStatus } from '@agentdeck/contracts/mobile-apk';
 import { apiClient } from '@shared/api/client';
@@ -22,6 +23,26 @@ export function useBuildMobileApk() {
   return useMutation({
     mutationFn: async () => (await apiClient.post<MobileApkStatus>('/mobile/apk/build')).data,
     // Отказ показывает карточка своим тостом — общий тост MutationCache молчит.
+    meta: { silentError: true },
+    onSuccess: (status) => queryClient.setQueryData(queryKeys.mobileApk, status),
+  });
+}
+
+export function useCancelMobileApk() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        return (await apiClient.post<MobileApkStatus>('/mobile/apk/cancel')).data;
+      } catch (error) {
+        // 409 — сборка кончилась между опросом и нажатием: отменять нечего, это не ошибка,
+        // карточка просто показывает итог сразу.
+        if (axios.isAxiosError(error) && error.response?.status === 409) {
+          return (await apiClient.get<MobileApkStatus>('/mobile/apk')).data;
+        }
+        throw error;
+      }
+    },
     meta: { silentError: true },
     onSuccess: (status) => queryClient.setQueryData(queryKeys.mobileApk, status),
   });

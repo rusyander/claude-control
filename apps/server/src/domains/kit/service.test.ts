@@ -8,12 +8,16 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { KitMode } from '@agentdeck/contracts/local-models';
 import { CODEX_KIT_ENV } from './codex.ts';
 import {
+  GUARD_HOOKS,
+  GUARD_TWINS,
   KIT_VARIANT_ENV,
   KitRefusal,
   KitService,
@@ -52,6 +56,13 @@ const service = () =>
 const statePath = () => join(appData, 'kit', 'state.json');
 const effective = (mode: string) => join(appData, 'kit', 'effective', mode, 'agentdeck-kit');
 
+/** Слой человека со своими стражами (`GUARD_TWINS`) — как у владельца: стражи набора уступают. */
+function ownGuards(): void {
+  mkdirSync(join(claudeDir, 'hooks', 'lib'), { recursive: true });
+  for (const twin of new Set(Object.values(GUARD_TWINS)))
+    writeFileSync(join(claudeDir, 'hooks', 'lib', `${twin}.mjs`), '// own guard');
+}
+
 function refusal(run: () => unknown): string | undefined {
   try {
     run();
@@ -79,7 +90,7 @@ afterEach(() => {
 describe('режимы по провайдерам', () => {
   it('по умолчанию «глобальные»; что кто умеет — честно', () => {
     const view = service().describe();
-    expect(view.version).toBe('1.4.0');
+    expect(view.version).toBe('1.5.0');
     expect(view.builtinDir).toBe(builtinKitDir());
     expect(view.mineDir).toBe(join(appData, 'kit', 'mine'));
     expect(view.providers).toEqual([
@@ -350,12 +361,14 @@ describe('runExtras: что получает прогон', () => {
   const extras = (provider: string, local = false, hasSources = false) =>
     service().runExtras({ provider, local, hasSources });
 
-  it('Claude «глобальные» — ничего', () => {
+  it('Claude «глобальные» со своими стражами в слое — ничего', () => {
+    ownGuards();
     expect(extras('claude')).toEqual({ args: [], env: {} });
     expect(existsSync(join(appData, 'kit', 'effective'))).toBe(false);
   });
 
   it('Claude «глобальные» на локальной модели — набор не подключается, но блок дисциплины едет дописью', () => {
+    ownGuards();
     const result = extras('claude', true);
     expect(result.args).toEqual([]);
     expect(result.env).toEqual({});
@@ -390,6 +403,7 @@ describe('runExtras: что получает прогон', () => {
   });
 
   it('человек выключил элемент «local.md» — на «глобальных» дописи нет; своя копия читается первой', () => {
+    ownGuards();
     const kit = service();
     kit.setEnabled('rules/local.md', false);
     expect(kit.runExtras({ provider: 'claude', local: true, hasSources: false })).toEqual({
@@ -525,7 +539,107 @@ describe('runExtras: что получает прогон', () => {
     expect(readFileSync(join(effective('hybrid'), RULE), 'utf8')).toBe('# МОИ ПРАВИЛА\n');
   });
 
+  it('«глобальные» без своих стражей — набор-страховка: одни стражи PreToolUse', () => {
+    const result = extras('claude');
+    expect(result).toEqual({ args: ['--plugin-dir', effective('guards')], env: {} });
+    const dir = effective('guards');
+    for (const id of Object.keys(GUARD_TWINS)) expect(existsSync(join(dir, id)), id).toBe(true);
+    // `nvm use` ломает Node всей машины — страж едет и в наборе-страховке.
+    expect(existsSync(join(dir, 'hooks', 'nvm-use-guard.mjs'))).toBe(true);
+    // Ни навыков, ни правил, ни прочих хуков: слой человека остаётся его слоем.
+    for (const gone of [
+      SKILL,
+      COMMAND,
+      RULE,
+      'hooks/session-rules.mjs',
+      'hooks/read-discipline.mjs',
+    ])
+      expect(existsSync(join(dir, gone)), gone).toBe(false);
+    const hooks = JSON.parse(readFileSync(join(dir, 'hooks', 'hooks.json'), 'utf8')) as {
+      hooks: Record<string, { matcher?: string; hooks: { command: string }[] }[]>;
+    };
+    expect(Object.keys(hooks.hooks)).toEqual(['PreToolUse']);
+    const dispatcher = hooks.hooks.PreToolUse!.find((group) =>
+      group.hooks.some((h) => h.command.includes('/hooks/lib/run.mjs" pre')),
+    );
+    expect(dispatcher?.matcher).toBe(GUARD_HOOKS.preMatcher);
+    // Чужой CLI при «глобальных» — по-прежнему ничего.
+    expect(extras('qwen')).toEqual({ args: [], env: {} });
+  });
+
+  it('страж с двойником в слое человека уступает ему; выключенный не едет', () => {
+    mkdirSync(join(claudeDir, 'hooks', 'lib'), { recursive: true });
+    writeFileSync(join(claudeDir, 'hooks', 'lib', 'git-guard.mjs'), '// own');
+    const kit = service();
+    kit.setEnabled('hooks/secret-guard.mjs', false);
+    const [, dir] = kit.runExtras({ provider: 'claude', local: false, hasSources: false }).args;
+    expect(existsSync(join(dir ?? '', 'hooks', 'git-guard.mjs'))).toBe(false);
+    expect(existsSync(join(dir ?? '', 'hooks', 'secret-guard.mjs'))).toBe(false);
+    expect(existsSync(join(dir ?? '', 'hooks', 'forge-merge-guard.mjs'))).toBe(true);
+    // Остальные выключены — набора-страховки нет вовсе.
+    for (const id of Object.keys(GUARD_TWINS)) kit.setEnabled(id, false);
+    expect(kit.runExtras({ provider: 'claude', local: false, hasSources: false }).args).toEqual([]);
+  });
+
+  it('«оба набора»: страж уступает своему двойнику и там', () => {
+    ownGuards();
+    service().setMode('claude', 'hybrid');
+    const [, dir] = extras('claude').args;
+    for (const id of Object.keys(GUARD_TWINS))
+      expect(existsSync(join(dir ?? '', id)), id).toBe(false);
+    expect(existsSync(join(dir ?? '', 'hooks', 'read-discipline.mjs'))).toBe(true);
+  });
+
+  it('набор-страховка — рабочий: его диспетчер отказывает git-записи без согласия', () => {
+    const [, dir] = extras('claude').args;
+    const out = spawnSync(process.execPath, [join(dir ?? '', 'hooks', 'lib', 'run.mjs'), 'pre'], {
+      input: JSON.stringify({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Bash',
+        tool_input: { command: 'git commit -m x' },
+        session_id: 'guards-overlay',
+      }),
+      encoding: 'utf8',
+      env: { ...process.env, AGENTDECK_SPLIT_CHILD: '' },
+      timeout: 15_000,
+    });
+    const verdict = JSON.parse(out.stdout) as {
+      hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
+    };
+    expect(verdict.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(verdict.hookSpecificOutput.permissionDecisionReason).toContain('git-guard');
+  });
+
+  it('matcher набора-страховки ловит каждый инструмент, который судят его стражи', async () => {
+    const items = (await import(
+      pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'items.mjs')).href
+    )) as { PRE_TOOLS: Record<string, RegExp> };
+    const matcher = new RegExp(`^(?:${GUARD_HOOKS.preMatcher})$`);
+    const sample = [
+      'Bash',
+      'PowerShell',
+      'Write',
+      'Edit',
+      'NotebookEdit',
+      'AskUserQuestion',
+      'Read',
+      'Grep',
+      'Agent',
+      'mcp__gitlab__merge_merge_request',
+      'mcp__github__merge_pull_request',
+      'mcp__agentdeck-atlassian__jira_create_issue',
+    ];
+    for (const id of Object.keys(GUARD_TWINS)) {
+      const name = id.replace(/^hooks\/|\.mjs$/g, '');
+      const reach = items.PRE_TOOLS[name];
+      if (!reach) continue; // guard-destructive стоит своей строкой hooks.json, не через диспетчер
+      for (const tool of sample.filter((t) => reach.test(t)))
+        expect(matcher.test(tool), `${name}: ${tool}`).toBe(true);
+    }
+  });
+
   it('смена режима действует со следующего старта, без нового экземпляра', () => {
+    ownGuards();
     const kit = service();
     expect(kit.runExtras({ provider: 'claude', local: false, hasSources: false }).args).toEqual([]);
     kit.setMode('claude', 'hybrid');

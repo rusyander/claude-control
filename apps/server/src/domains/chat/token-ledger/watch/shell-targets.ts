@@ -45,23 +45,50 @@ export function withoutComments(command: string): string {
  * do taskkill …; done; sleep 1` — одна пауза после остановки, не опрос (C18).
  */
 export function sleepInLoopBody(command: string): boolean {
+  return /\bsleep\s+\d/.test(loopParts(command).body);
+}
+
+/**
+ * Текст циклов команды — заголовок (`while ! grep …`, `for f in $(ls …)`) и тело до
+ * парного `done`. Опрос судится по нему: `| tail -4` чужого шага до цикла делал опросом
+ * готовность vite `for …; do curl … && break; sleep 0.5; done` (g1 26.10, R11 ×2).
+ */
+export function loopText(command: string): string {
+  return loopParts(command).text;
+}
+
+function loopParts(command: string): { body: string; text: string } {
   let depth = 0;
   let from = 0;
+  let head = 0;
   let body = '';
+  let text = '';
   // Ключевое слово — только в начале команды (после `;`, `&`, `|`, `(`, строки): `grep -q done`
   // — слово-аргумент, не конец цикла.
   for (const match of command.matchAll(/(^\s*|[;&|(\n]\s*)(do|done)(?=[\s;&|)]|$)/g)) {
     const at = (match.index ?? 0) + (match[1]?.length ?? 0);
     if (match[2] === 'do') {
-      if (depth === 0) from = at + 2;
+      if (depth === 0) {
+        from = at + 2;
+        const keyword = [...command.slice(0, at).matchAll(/(^|[\s;&|(])(for|while|until)\s/g)].at(
+          -1,
+        );
+        head = keyword ? (keyword.index ?? 0) + (keyword[1]?.length ?? 0) : at;
+      }
       depth += 1;
     } else if (depth > 0) {
       depth -= 1;
-      if (depth === 0) body += ` ${command.slice(from, at)}`;
+      if (depth === 0) {
+        body += ` ${command.slice(from, at)}`;
+        text += ` ${command.slice(head, at)}`;
+      }
     }
   }
-  if (depth > 0) body += ` ${command.slice(from)}`;
-  return /\bsleep\s+\d/.test(body);
+  if (depth > 0) {
+    body += ` ${command.slice(from)}`;
+    text += ` ${command.slice(head)}`;
+  }
+  return { body, text };
 }
 
 // ─── R26: остановка процессов ───────────────────────────────────────────────

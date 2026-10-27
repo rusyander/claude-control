@@ -92,6 +92,26 @@ describe('запись в блок «Тесты» от агента чата', (
     expect(after[1]?.attributes).toEqual({ 'agent-id': 'auth-login-enter' });
   });
 
+  /** g1 26.10: `case --json '{"id":…,"tags":[…]}'` отбит «нужно название» — метки ушли скриптом в 5 ходов. */
+  it('правка по id без названия — меняет только названные поля, название и шаги остаются', () => {
+    root = mkdtempSync(join(tmpdir(), 'agent-write-'));
+    agentUpsertCase(
+      root,
+      'chat',
+      { title: 'Экран «Нет доступа»', steps: ['Открыть чат'], codePaths: ['src/a.tsx'] },
+      NOW,
+    );
+    const result = agentUpsertCase(root, 'chat', { id: 'chat-001', tags: ['live', 'e2e'] }, NOW);
+    expect(result).toMatchObject({ kind: 'saved', created: false });
+    expect(readGroup(root, 'chat').cases[0]).toMatchObject({
+      title: 'Экран «Нет доступа»',
+      tags: ['live', 'e2e'],
+      codePaths: ['src/a.tsx'],
+    });
+    // Нового кейса без названия по-прежнему нет.
+    expect(() => agentUpsertCase(root!, 'chat', { tags: ['live'] }, NOW)).toThrow(/название/);
+  });
+
   it('кейс человека не переписывается — правка уходит черновиком', () => {
     root = mkdtempSync(join(tmpdir(), 'agent-write-'));
     agentUpsertCase(root, 'auth', { title: 'заготовка' }, NOW);

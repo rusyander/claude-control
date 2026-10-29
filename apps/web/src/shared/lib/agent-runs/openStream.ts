@@ -144,7 +144,7 @@ export async function openResponse(
   }
 }
 
-export const isConnectTimeout = (error: unknown): boolean =>
+const isConnectTimeout = (error: unknown): boolean =>
   error instanceof DOMException && error.name === CONNECT_TIMEOUT;
 
 /** Открыть один поток: `send` стартует прогон (POST), `attach` подключается (GET). */

@@ -45,7 +45,7 @@ const CLAUDE_WORKTREES = '/.claude/worktrees/';
  * Нужна и когда git не ответил: удалённую копию git уже не узнает, а в
  * истории чатов её путь остался.
  */
-export function foldWorktree(path: string): string {
+function foldWorktree(path: string): string {
   const unified = canonicalPath(path);
   const lower = unified.toLowerCase();
   const panel = lower.lastIndexOf(`${WORKTREES_DIR_SUFFIX}/`.toLowerCase());

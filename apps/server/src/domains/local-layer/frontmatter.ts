@@ -1,5 +1,3 @@
-import { globToRegExp } from '../project-git/mirror-local.ts';
-
 /**
  * Шапка правила (`---` … `---`) и её ключ `paths` — ровно то, что CLI читает,
  * решая, грузить правило сразу или при касании пути. Остальные ключи шапки
@@ -55,15 +53,4 @@ export function expandBraces(pattern: string): string[] {
   const head = pattern.slice(0, match.index);
   const tail = pattern.slice(match.index + match[0].length);
   return (match[1] as string).split(',').flatMap((part) => expandBraces(`${head}${part}${tail}`));
-}
-
-/** Шаблоны правила против пути от его базы; регистр не важен там, где не важен диску. */
-export function globsMatch(globs: readonly string[], relPath: string, caseless: boolean): boolean {
-  const path = relPath.replaceAll('\\', '/');
-  return globs.some((glob) =>
-    expandBraces(glob).some((one) => {
-      const re = globToRegExp(one);
-      return new RegExp(re.source, caseless ? 'i' : '').test(path);
-    }),
-  );
 }

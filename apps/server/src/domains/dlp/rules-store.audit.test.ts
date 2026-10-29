@@ -3,8 +3,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DlpRule } from '@agentdeck/contracts';
-import { AliasVault } from './mask.ts';
-import { DlpRulesError, parseRules, readRules, saveRules, validateRules } from './rules-store.ts';
+import { AliasVault } from '@agentdeck/dlp/mask';
+import { DlpRulesError, parseRules, readRules } from '@agentdeck/dlp/rules-file';
+import { saveRules, validateRules } from './rules-store.ts';
 
 /**
  * Что нашёл аудит раздела: мусор вместо правила ронял сохранение в 500, повтор

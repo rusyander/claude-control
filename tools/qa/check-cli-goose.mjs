@@ -29,7 +29,6 @@
  * Код выхода: 0 — сходится, 1 — провал, 2 — не проверено.
  */
 import { execFileSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -44,6 +43,7 @@ import {
   wait,
 } from './throwaway-stand.mjs';
 import { cliProcesses, reap } from './foreign-cli.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const CANNED_PARTS = ['GOOSE_STUB_CANNED_5d2a ', 'вторая часть\n', '    строка с отступом'];
@@ -68,84 +68,32 @@ function findCliDir() {
  * оболочки — на запрос, где в тексте есть путь-метка и ещё нет результата
  * инструмента; служебные запросы Goose (имя сессии) метки не несут.
  */
-function startStub() {
+async function startStub() {
   const requests = [];
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) {
-        requests.push({ url: req.url, other: true });
-        res.writeHead(404);
-        res.end('{}');
-        return;
-      }
-      let parsed = {};
-      try {
-        parsed = JSON.parse(body);
-      } catch {
-        // не JSON — пусть будет пустой запрос
-      }
-      const tools = (parsed.tools ?? []).map((tool) => tool.function?.name);
-      const toolResults = (parsed.messages ?? [])
+  const stub = await startStubModel({
+    // Всё, кроме chat/completions, — 404 и пометка «прочее» в записи.
+    route: ({ path, query }) => {
+      if (path.endsWith('chat/completions')) return undefined;
+      requests.push({ url: path + query, other: true });
+      return { status: 404, body: {} };
+    },
+    script: ({ request, info }) => {
+      const tools = info.tools.map((tool) => tool.name);
+      const toolResults = (request.body.messages ?? [])
         .filter((message) => message.role === 'tool')
         .map((message) =>
           typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
         );
-      const target = body.match(/QA-TARGET<([^>]+)>/)?.[1]?.replaceAll('\\\\', '\\');
+      const target = request.raw.match(/QA-TARGET<([^>]+)>/)?.[1]?.replaceAll('\\\\', '\\');
       const call = Boolean(target) && toolResults.length === 0;
       const shell = tools.find((name) => /(^|__)shell$/.test(name ?? '')) ?? 'shell';
       requests.push({ tools, call, toolResults, target });
-
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const send = (delta, finish = null) =>
-        res.write(
-          `data: ${JSON.stringify({
-            id: 'stub',
-            object: 'chat.completion.chunk',
-            created: 1,
-            model: 'stub-model',
-            choices: [{ index: 0, delta, finish_reason: finish }],
-          })}\n\n`,
-        );
-      if (call) {
-        send({
-          role: 'assistant',
-          tool_calls: [
-            {
-              index: 0,
-              id: `call_${requests.length}`,
-              type: 'function',
-              function: {
-                name: shell,
-                arguments: JSON.stringify({ command: `echo ${WRITTEN}> "${target}"` }),
-              },
-            },
-          ],
-        });
-        send({}, 'tool_calls');
-      } else {
-        send({ role: 'assistant', content: CANNED_PARTS[0] });
-        for (const part of CANNED_PARTS.slice(1)) send({ content: part });
-        send({}, 'stop');
-      }
-      res.write('data: [DONE]\n\n');
-      res.end();
-    });
+      if (!call) return { text: CANNED_PARTS };
+      const args = { command: `echo ${WRITTEN}> "${target}"` };
+      return { tool: { name: shell, args, id: `call_${requests.length}` } };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        requests,
-        close: () =>
-          new Promise((closed) => {
-            server.closeAllConnections();
-            server.close(() => closed());
-          }),
-      }),
-    ),
-  );
+  return { port: stub.port, requests, close: () => stub.close() };
 }
 
 /**

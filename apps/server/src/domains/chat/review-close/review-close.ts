@@ -30,7 +30,7 @@ import { removeReviewStand, type ReviewStandContainer } from '../review-stand/re
  */
 
 /** Сколько имён на карточке. */
-export const DIRT_FILES_MAX = 20;
+const DIRT_FILES_MAX = 20;
 
 /** Каталоги, которые панель ставит копии сама и которые «правкой» не считаются. */
 const PANEL_DIRS = ['node_modules', '.venv', 'venv'] as const;
@@ -52,7 +52,7 @@ export function statusPaths(stdout: string): string[] {
 }
 
 /** Правки копии, не считая того, что панель положила сама. */
-export async function copyDirt(
+async function copyDirt(
   copy: string,
   mirror: WorktreeMirrorSettings | undefined,
 ): Promise<{ total: number; files: string[] } | undefined> {

@@ -25,7 +25,7 @@ function groupLabel(source: DeferredAskView['source'], t: TFunction): string {
  * агента по-английски и стоял английской строкой в русской плашке (живой
  * прогон 23.10). Кода нет — запись старше, показываем `reason` как есть.
  */
-export function reasonLabel(item: DeferredAskView, t: TFunction): string {
+function reasonLabel(item: DeferredAskView, t: TFunction): string {
   if (!item.reasonCode) return item.reason;
   if (item.reasonCode !== 'backend-guard') return t(`deferredAsks.reasons.${item.reasonCode}`);
   const rule = item.reasonParams?.rule ?? '';

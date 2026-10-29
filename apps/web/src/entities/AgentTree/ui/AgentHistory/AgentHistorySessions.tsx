@@ -9,13 +9,17 @@ import { formatTokens } from '@shared/lib/formatTokens';
 import { agentTokenTotal, shortModel } from '../../model/agentTree';
 import {
   anomalyParts,
+  interruptedPart,
+  hasLiveMarks,
   historyAgentState,
+  sessionLive,
   repeatedReadsHint,
   mainTokenTotal,
   sessionNumber,
   sessionSpanMs,
 } from '../../model/agentHistory';
 import { STATE_TONE } from './AgentHistory.constants';
+import { AgentHistoryNow } from './AgentHistoryNow';
 import type { AgentHistorySessionsProps } from './AgentHistory.types';
 import styles from './AgentHistory.module.scss';
 
@@ -56,19 +60,31 @@ export function AgentHistorySessions({
     ]);
   };
 
-  /** Странности агента строкой под его строкой; нет — ничего. */
+  /**
+   * Странности агента строкой под его строкой; нет — ничего. Обрывы паузой —
+   * своим цветом и своей подсказкой после ошибок: это не ошибка вызова.
+   */
   const anomalyLine = (anomalies: Parameters<typeof anomalyParts>[0]) => {
     const list = anomalyParts(anomalies, t);
-    if (list.length === 0) return null;
+    const cut = interruptedPart(anomalies, t);
+    if (list.length === 0 && !cut) return null;
     return (
-      <Typography
-        variant="caption"
-        as="span"
-        className={styles.anomalies}
-        title={repeatedReadsHint(anomalies, t)}
-        data-agent-history-anomalies
-      >
-        {list.join(' · ')}
+      <Typography variant="caption" as="span" className={styles.main} data-agent-history-anomalies>
+        {list.length > 0 && (
+          <span className={styles.anomalies} title={repeatedReadsHint(anomalies, t)}>
+            {list.join(' · ')}
+          </span>
+        )}
+        {list.length > 0 && cut && ' · '}
+        {cut && (
+          <span
+            className={styles.interrupted}
+            title={t('agentTree.anomalies.interruptedHint')}
+            data-agent-history-interrupted
+          >
+            {cut}
+          </span>
+        )}
       </Typography>
     );
   };
@@ -84,6 +100,9 @@ export function AgentHistorySessions({
         <Typography variant="body-sm" color="subtle" as="p">
           {t('agentTree.history.empty')}
         </Typography>
+      )}
+      {history && sessions.length > 0 && hasLiveMarks(history) && (
+        <AgentHistoryNow history={history} picked={picked} onPick={onPick} />
       )}
       <ol className={styles.sessionList}>
         {sessions.map((session, index) => (
@@ -102,9 +121,16 @@ export function AgentHistorySessions({
                     defaultValue: session.stage,
                   })}`}
               </Typography>
-              {session.current && (
-                <span className={styles.current}>{t('agentTree.history.current')}</span>
-              )}
+              <span className={styles.badges}>
+                {sessionLive(session) && (
+                  <span className={styles.sessionLive} data-agent-history-session-live>
+                    {t('agentTree.history.sessionLive')}
+                  </span>
+                )}
+                {session.current && (
+                  <span className={styles.current}>{t('agentTree.history.current')}</span>
+                )}
+              </span>
             </div>
             <Typography variant="caption" color="subtle" as="span">
               {sessionLine(session)}

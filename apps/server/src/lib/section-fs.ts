@@ -13,7 +13,7 @@ import { join, relative, sep } from 'node:path';
  */
 
 /** Абсолютный ли путь по любым правилам (POSIX, Windows-диск, UNC). */
-export function looksAbsolute(value: string): boolean {
+function looksAbsolute(value: string): boolean {
   return /^([/\\]|[A-Za-z]:)/.test(value);
 }
 
@@ -23,7 +23,7 @@ export function looksAbsolute(value: string): boolean {
  * может — это выбор пользователя и корень доверия. Если дальше по пути ничего не
  * существует, подменять нечего.
  */
-export function hasSymlinkOnPath(baseDir: string, fullPath: string): boolean {
+function hasSymlinkOnPath(baseDir: string, fullPath: string): boolean {
   let current = baseDir;
   for (const segment of relative(baseDir, fullPath).split(sep)) {
     current = join(current, segment);
@@ -109,7 +109,7 @@ export function fileSizeOf(path: string): number {
 export const SECTION_MAX_FILE_BYTES = 1_000_000;
 
 /** Предохранители обхода каталога: он пользовательский, глубина и размер не наши. */
-export const SECTION_MAX_DEPTH = 8;
+const SECTION_MAX_DEPTH = 8;
 export const SECTION_MAX_ENTRIES = 2000;
 
 /**

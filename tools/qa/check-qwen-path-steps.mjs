@@ -20,11 +20,11 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { NotChecked, REPO, reporter, startStand, wait } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const NOW = '2026-10-07T10:00:00.000Z';
@@ -40,29 +40,10 @@ function findCli() {
 
 /** Заглушка OpenAI chat: каждый запрос запоминается целиком, ответ — «DONE». */
 async function startModel() {
-  const bodies = [];
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) return void res.writeHead(404).end();
-      bodies.push(body);
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const head = { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'stub-model' };
-      const send = (choice, usage) =>
-        res.write(
-          `data: ${JSON.stringify({ ...head, choices: [choice], ...(usage ? { usage } : {}) })}\n\n`,
-        );
-      send({ index: 0, delta: { role: 'assistant', content: 'DONE' } });
-      send(
-        { index: 0, delta: {}, finish_reason: 'stop' },
-        { prompt_tokens: 5, completion_tokens: 1, total_tokens: 6 },
-      );
-      res.end('data: [DONE]\n\n');
-    });
+  const stub = await startStubModel({
+    script: () => ({ text: 'DONE', usage: { input: 5, output: 1 } }),
   });
-  await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  return { base: `http://127.0.0.1:${server.address().port}`, bodies, close: () => server.close() };
+  return { base: stub.baseUrl, bodies: stub.bodies, close: () => stub.close() };
 }
 
 /** Звенья работы, группа с шагом после работы и выбор группы — хранилищем панели. */

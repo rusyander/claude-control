@@ -11,7 +11,7 @@
  */
 
 /** Буква матрицы по уровню верности. Словарь один на обе проверки. */
-export const LETTER = {
+const LETTER = {
   native: 'Н',
   emulated: 'Э',
   wired: 'П',
@@ -167,13 +167,6 @@ export const LAYERS = [
     }),
   ],
 ];
-
-/** Запись слоя по подписи строки таблицы. Нет такой строки — это ошибка вызова. */
-export function layerItem(label) {
-  const found = LAYERS.find(([name]) => name === label);
-  if (!found) throw new Error(`слоя «${label}» нет среди представителей`);
-  return found[1];
-}
 
 /** Клетка таблицы по приговору: уровень, а через косую — исход без условия. */
 export function cellOf(verdict) {

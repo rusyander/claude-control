@@ -4,7 +4,7 @@ import type { LimitShare } from '@agentdeck/contracts';
  * Доля окна процентом. Меньше 10 % — с десятой: группа на пятичасовом окне
  * часто тратит 2–4 %, и округление до целых сливало бы «0,4» и «1,4» в одно.
  */
-export function formatSharePercent(share: number, locale: string): string {
+function formatSharePercent(share: number, locale: string): string {
   return new Intl.NumberFormat(locale, {
     style: 'percent',
     maximumFractionDigits: share < 0.1 ? 1 : 0,

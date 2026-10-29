@@ -6,6 +6,8 @@ const WORDS = {
   actor: { ci: 'CI', agent: 'агент' },
   e2e: 'автотесты панели',
   e2eActor: 'панель',
+  core: 'проверки ядра задач',
+  coreActor: 'ядро задач',
 };
 
 describe('runLabel', () => {
@@ -13,6 +15,13 @@ describe('runLabel', () => {
     expect(runLabel({ mode: 'import', actor: 'ci', origin: 'e2e' }, WORDS)).toEqual({
       title: 'автотесты панели',
       actor: 'панель',
+    });
+  });
+
+  it('проверка ядра задач подписана ядром, а не CI и не панелью', () => {
+    expect(runLabel({ mode: 'import', actor: 'ci', origin: 'core' }, WORDS)).toEqual({
+      title: 'проверки ядра задач',
+      actor: 'ядро задач',
     });
   });
 

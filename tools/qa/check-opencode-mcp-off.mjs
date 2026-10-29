@@ -27,10 +27,10 @@
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const SELF = fileURLToPath(import.meta.url);
@@ -124,58 +124,25 @@ function findCli(name) {
  * Заглушка модели: копит имена инструментов каждого запроса под меткой текущего хода
  * (`seen[метка]`), отвечает «done». `GET /label/<метка>` — начался следующий ход.
  */
-function startModel() {
+async function startModel() {
   const seen = {};
   let label = 'none';
-  const srv = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (req.url.startsWith('/label/')) {
-        label = decodeURIComponent(req.url.slice('/label/'.length));
-        return void res.writeHead(200).end('{}');
+  const stub = await startStubModel({
+    // `/label/<ход>` — метка водителя; прочее вне chat/completions — 404, как было.
+    route: ({ path }) => {
+      if (path.startsWith('/label/')) {
+        label = decodeURIComponent(path.slice('/label/'.length));
+        return { body: {} };
       }
-      if (!req.url.includes('chat/completions')) return void res.writeHead(404).end('{}');
-      let body = {};
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        // не JSON — инструментов не видно
-      }
-      (seen[label] ??= []).push(
-        ...(body.tools ?? []).map((tool) => tool.function?.name).filter(Boolean),
-      );
-      const message = { role: 'assistant', content: 'done' };
-      const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
-      if (!body.stream) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            id: 'stub',
-            object: 'chat.completion',
-            created: 1,
-            model: 'stub-model',
-            choices: [{ index: 0, message, finish_reason: 'stop' }],
-            usage,
-          }),
-        );
-        return;
-      }
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const chunk = (choices, extra = {}) =>
-        res.write(
-          `data: ${JSON.stringify({ id: 'stub', object: 'chat.completion.chunk', created: 1, model: 'stub-model', choices, ...extra })}\n\n`,
-        );
-      chunk([{ index: 0, delta: message, finish_reason: null }]);
-      chunk([{ index: 0, delta: {}, finish_reason: 'stop' }]);
-      chunk([], { usage });
-      res.write('data: [DONE]\n\n');
-      res.end();
-    });
+      return path.includes('chat/completions') ? undefined : { status: 404, body: {} };
+    },
+    script: ({ request }) => {
+      const names = (request.body.tools ?? []).map((tool) => tool.function?.name);
+      (seen[label] ??= []).push(...names.filter(Boolean));
+      return 'done';
+    },
   });
-  return new Promise((resolve) =>
-    srv.listen(0, '127.0.0.1', () => resolve({ srv, seen, port: srv.address().port })),
-  );
+  return { seen, port: stub.port, close: () => stub.close() };
 }
 
 async function removeLater(dir) {
@@ -307,7 +274,7 @@ async function main() {
     console.log(`  (opencode serve не ответил на запрос каталога — стартов: ${results.warm})`);
   }
   if (results.warm && !results.plain) {
-    model.srv.close();
+    await model.close();
     await removeLater(home);
     console.log('\nНЕ ПРОВЕРЕНО: opencode serve не поднялся трижды');
     process.exit(2);
@@ -353,7 +320,7 @@ async function main() {
   check('вики трекера в запросе нет', wikiOf(once.tools).length === 0, once.tools);
   check('имена задач трекера на месте (2)', tasksOf(once.tools).length === 2, once.tools);
 
-  model.srv.close();
+  await model.close();
   await removeLater(home);
   console.log(bad === 0 ? '\nOK' : `\nПРОВАЛОВ: ${bad}`);
   process.exit(bad === 0 ? 0 : 1);

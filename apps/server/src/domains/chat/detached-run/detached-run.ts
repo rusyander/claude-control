@@ -16,7 +16,7 @@ import { isPidAlive } from '../run-ledger/run-ledger.ts';
  */
 
 /** Как часто спрашивать систему, жив ли процесс. */
-export const DETACHED_POLL_MS = 5_000;
+const DETACHED_POLL_MS = 5_000;
 
 /** Заметки ленте: код — для перевода на вебе, текст — для клиента без словаря. */
 export const ADOPTED_NOTICE =

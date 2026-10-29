@@ -144,6 +144,53 @@ describe('review-sweep: --paths', () => {
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/not a commit/);
   });
+
+  it('CLI: голова — дерево (`git write-tree`), неотслеживаемый код читается, а не код 2', () => {
+    const repo = makeRepo('sweep-tree');
+    put(repo, 'a.go', ['package a']);
+    const base = commit(repo, 'base');
+    put(repo, 'b.go', ['package a', 'func B() {}']);
+    git(repo, 'add', '-A');
+    const tree = git(repo, 'write-tree');
+    const r = spawnSync(
+      process.execPath,
+      [join(TOOLS, 'review-sweep.mjs'), 'sweep', '--repo', repo, '--base', base, '--head', tree],
+      { encoding: 'utf8' },
+    );
+    expect(r.stderr).not.toMatch(/is not a commit/);
+    expect(r.status).toBe(0);
+  });
+});
+
+// Хранилища стража — под корнем теста, настоящее состояние набора тест не трогает.
+process.env.AGENTDECK_KIT_STATE = join(root, 'kit-state');
+process.env.AGENTDECK_KIT_DOC_POLICY_STORE = join(root, 'kit-state', 'doc-hygiene.json');
+const docBloatGuard = (
+  (await import(
+    pathToFileURL(join(builtinKitDir(), 'hooks', 'lib', 'doc-bloat-guard.mjs')).href
+  )) as { default: (input: unknown) => string | null }
+).default;
+
+describe('doc-bloat-guard: бюджет скилла', () => {
+  const write = (rel: string, kb: number): string => {
+    const file = join(root, 'bloat', rel);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, 'x'.repeat(kb * 1024));
+    return file;
+  };
+  const run = (file: string) => docBloatGuard({ tool_input: { file_path: file } });
+
+  it('файл скилла до 16 КБ — страж молчит', () => {
+    expect(run(write('.claude/skills/s/SKILL.md', 10))).toBeNull();
+  });
+
+  it('файл скилла больше 16 КБ — страж предупреждает', () => {
+    expect(run(write('.claude/skills/big/SKILL.md', 17))).toMatch(/doc-bloat-guard/);
+  });
+
+  it('прочий агентский документ того же размера — предупреждение остаётся', () => {
+    expect(run(write('proj/CLAUDE.md', 10))).toMatch(/doc-bloat-guard/);
+  });
 });
 
 describe('review-position', () => {

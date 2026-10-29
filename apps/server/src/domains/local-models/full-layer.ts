@@ -29,7 +29,7 @@ interface PlatformLike {
   rules: { ours: OurRules };
 }
 
-export interface FullLayerDeps<P extends PlatformLike> {
+interface FullLayerDeps<P extends PlatformLike> {
   read: () => P[];
   write: (platform: P) => void;
   done: () => boolean;
@@ -41,9 +41,7 @@ function sameRules(left: OurRules, right: OurRules): boolean {
   return (Object.keys(right) as (keyof OurRules)[]).every((key) => left[key] === right[key]);
 }
 
-export function migrateLocalFullLayer<P extends PlatformLike>(
-  deps: FullLayerDeps<P>,
-): FullLayerOutcome {
+function migrateLocalFullLayer<P extends PlatformLike>(deps: FullLayerDeps<P>): FullLayerOutcome {
   if (deps.done()) return 'done';
   const local = deps.read().find((platform) => platform.id === LOCAL_PLATFORM_ID);
   if (!local) {

@@ -74,7 +74,7 @@ export function onCopy(path: string, apply: (copy: string) => void): ConfigPrevi
  * же `writeJsonFile` по второй копии, а не догадкой о форматировании: форму
  * (BOM, CRLF, хвост) писатель сохраняет сам, и сравнивать нужно с ним.
  */
-export function reformatsJson(path: string): boolean {
+function reformatsJson(path: string): boolean {
   const sandbox = createConfigSandbox(path);
   try {
     const data = readJsonFile<unknown>(sandbox.path, undefined);

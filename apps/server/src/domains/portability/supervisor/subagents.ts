@@ -18,7 +18,7 @@ import { buildSkillCatalog, type SkillCatalogEntry } from './skills-router.ts';
  */
 
 /** Описание субагента: то же, что у Claude лежит в шапке его файла. */
-export interface SupervisorSubagent {
+interface SupervisorSubagent {
   readonly name: string;
   readonly description: string;
   /** Инструкции субагента — его системный промпт. */

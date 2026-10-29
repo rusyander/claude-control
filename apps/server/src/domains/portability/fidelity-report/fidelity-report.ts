@@ -33,7 +33,7 @@ import type { SectionTargets } from '../project/project.ts';
  * Уровень назван, а разделов цели на нём не дали. Отдельный класс, а не голая
  * `Error`: вызывающий обязан уметь отличить «так нельзя» от поломки.
  */
-export class FidelityScopeUnsupportedError extends Error {
+class FidelityScopeUnsupportedError extends Error {
   readonly scope: string;
 
   constructor(scope: string) {

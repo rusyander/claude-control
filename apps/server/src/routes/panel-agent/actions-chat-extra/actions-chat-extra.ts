@@ -6,7 +6,7 @@ import {
   type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
 import { KNOWN_EDITORS } from '../../../domains/fs/EditorLauncher.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

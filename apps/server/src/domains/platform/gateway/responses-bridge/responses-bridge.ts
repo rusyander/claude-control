@@ -21,9 +21,9 @@ import { serverText } from '../../../../lib/server-texts/server-texts.ts';
  * `store: false` и всю историю в каждом запросе; запрос, который опирается на
  * `previous_response_id`, получает отказ, а не ответ без половины разговора.
  *
- * Форма событий сверена с тем, что принимает codex 0.160 (`tools/qa/stub-steer-model.mjs`,
- * живой прогон): `response.created` → `output_item.added` → дельты →
- * `output_item.done` → `response.completed` с `usage`.
+ * Форма событий сверена с тем, что принимает codex 0.160 (диалект `openai-responses`
+ * общей заглушки `packages/stub-model`, живой прогон): `response.created` →
+ * `output_item.added` → дельты → `output_item.done` → `response.completed` с `usage`.
  */
 
 type Json = Record<string, unknown>;

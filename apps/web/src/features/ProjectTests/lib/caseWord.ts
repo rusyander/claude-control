@@ -1,6 +1,6 @@
 import type { ProjectTestMutationCase } from '@agentdeck/contracts';
 
-export const CASE_WORD = {
+const CASE_WORD = {
   failed: 'testsE2e.mutation.caseCaught',
   blocked: 'testsE2e.mutation.caseCaught',
   passed: 'testsE2e.mutation.caseMissed',

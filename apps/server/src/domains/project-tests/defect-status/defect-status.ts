@@ -50,7 +50,7 @@ export interface DefectStatusDeps {
 }
 
 /** Кейс, который стоит перепроверить: провален, а дефект уже закрыт. */
-export interface DefectRecheck {
+interface DefectRecheck {
   groupId: string;
   caseId: string;
   title: string;

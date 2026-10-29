@@ -12,7 +12,7 @@ import type { ChatProgress } from '@agentdeck/contracts';
  * написанные раньше этого соглашения, пишут `step` и `name` — принимаются так же.
  * Неверный файл — шага нет: панель не выдумывает «0 из 0».
  */
-export const STEPS_FILE = join('.agent', 'steps.json');
+const STEPS_FILE = join('.agent', 'steps.json');
 
 /** Больше — не шаги, а опечатка или чужой файл. */
 const MAX_STEPS = 1000;

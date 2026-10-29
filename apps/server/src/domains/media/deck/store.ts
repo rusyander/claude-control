@@ -42,7 +42,7 @@ export const DECK_MIME: Record<MediaDeckFormat, string> = {
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
 
-export function deckDir(appDataDir: string): string {
+function deckDir(appDataDir: string): string {
   return join(appDataDir, 'media', 'decks');
 }
 
@@ -114,7 +114,7 @@ export function cacheDeckPdf(appDataDir: string, id: string, bytes: Buffer): voi
  * идентификатора — их несколько, и оставленный `.pptx` от удалённой колоды был бы
  * мегабайтом без имени и без темы.
  */
-export function trimDecks(appDataDir: string): void {
+function trimDecks(appDataDir: string): void {
   const dir = deckDir(appDataDir);
   if (!existsSync(dir)) return;
 

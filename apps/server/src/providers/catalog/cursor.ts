@@ -2,6 +2,10 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { unimplementedPaths } from './config-dirs.ts';
+import { assistantApiOf, runFactsOf } from './run-facts.ts';
+
+/** Факты запуска Cursor — из пакета `@agentdeck/providers`. */
+const facts = runFactsOf('cursor');
 
 /**
  * Каталог конфигурации Cursor. Переопределения через переменную окружения
@@ -24,11 +28,11 @@ const cursorHome = (): string => join(homedir(), '.cursor');
  * показывает такие файлы отдельным списком и никогда их не правит.
  */
 export const cursorProvider: ConfigProvider = {
-  id: 'cursor',
-  name: 'Cursor',
-  status: 'experimental',
-  paths: unimplementedPaths('cursor'),
-  cli: { command: 'cursor-agent', windowsCommand: 'cursor-agent.cmd' },
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
+  cli: facts.binary,
   // Правила Cursor — КАТАЛОГ ~/.cursor/rules с файлами `.mdc` (CURSOR-1).
   // `instructionsFile`/`instructionsList` у него не бывает: модель одна из трёх.
   instructionsRules: {
@@ -90,7 +94,7 @@ export const cursorProvider: ConfigProvider = {
   },
   // У Cursor нет собственного модельного API и запуск ассистента через CLI не
   // поддерживаем → ассистент unsupported (раннер всегда `none`).
-  assistant: { apiKind: 'none', apiKeyEnvVars: [], cliRunnable: false },
+  assistant: assistantApiOf(facts),
   capabilities: buildCapabilities({
     // CURSOR-1: правила Cursor — КАТАЛОГ ~/.cursor/rules/*.mdc (много файлов с
     // frontmatter). Формат подтверждён документацией и реализован собственной,

@@ -17,7 +17,7 @@ import type { DeliveryVerdict } from '../split-conveyor/split-conveyor.ts';
 import { testsDeliveryGaps } from '../tests-gate/tests-gate.ts';
 import { run } from '../../project-git/sieve-facts/sieve-facts.ts';
 import { readTaskTickets } from '../task-tickets/task-tickets.ts';
-import { ticketPointGaps } from '../ticket-points/ticket-points.ts';
+import { misnumberedPointGaps, ticketPointGaps } from '../ticket-points/ticket-points.ts';
 import { taskSourceGaps } from './task-sources.ts';
 import { trackerDeliveryGaps, type DeliveryTracker } from './tracker-comments.ts';
 
@@ -208,6 +208,8 @@ export async function deliveryFacts(
     rows: group.sieveRows,
     required: group.taskTrace === true,
   });
+  // Строка `task-1298-perms` судьями пунктов не видна (g1 27.10) — пробел, а не тишина.
+  const misnumbered = misnumberedPointGaps(group.sieveRows);
   return {
     missing: [
       ...missing,
@@ -216,6 +218,7 @@ export async function deliveryFacts(
       ...(description.sections ?? []),
       ...(threads ? [threads.line] : []),
       ...(tracker?.missing ?? []),
+      ...misnumbered,
       ...sources,
       ...points,
       ...(sieves?.missing ?? []),

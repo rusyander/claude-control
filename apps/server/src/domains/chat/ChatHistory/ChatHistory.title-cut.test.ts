@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { maskSecretsInText, SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import { readChats } from './ChatHistory.ts';
 
 /**

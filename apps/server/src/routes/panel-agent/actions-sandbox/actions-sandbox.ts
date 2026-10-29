@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { PanelActionPreviewField } from '@agentdeck/contracts/panel-agent';
 import { maskSecretsInLine } from '../../../domains/config-preview/unified-diff.ts';
 import type { SandboxSelection } from '../../../domains/sandbox/SandboxConfig.types.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

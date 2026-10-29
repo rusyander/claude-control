@@ -83,7 +83,7 @@ interface ProbeRecipeBase {
  * этот путь» разные CLI собирают РАЗНЫЕ вызовы, и собрать их может только сам
  * рецепт.
  */
-export interface ProbeTool {
+interface ProbeTool {
   readonly name: string;
   /**
    * Аргументы вызова. `workdir` — рабочий каталог прогона; он здесь потому, что

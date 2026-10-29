@@ -162,7 +162,7 @@ export function providerTrackedFiles(store: TrackedFilesSettingsSource): Tracked
  * эти файлы перенос, и других копий у них не существует. Восстановление
  * запрещено, как у всех чужих файлов: цель по basename не находится.
  */
-export function subscriptionTrackedFiles(store: TrackedFilesSettingsSource): TrackedFile[] {
+function subscriptionTrackedFiles(store: TrackedFilesSettingsSource): TrackedFile[] {
   const subscriptions = store.getPortabilitySubscriptions?.() ?? {};
   const files: TrackedFile[] = [];
 

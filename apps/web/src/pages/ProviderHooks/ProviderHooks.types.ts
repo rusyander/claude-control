@@ -5,13 +5,13 @@
  */
 
 /** Один аргумент команды (argv-элемент). */
-export interface ArgvRow {
+interface ArgvRow {
   id: number;
   value: string;
 }
 
 /** Одна переменная окружения действия. */
-export interface EnvRow {
+interface EnvRow {
   id: number;
   key: string;
   value: string;

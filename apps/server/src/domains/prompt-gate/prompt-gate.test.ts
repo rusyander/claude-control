@@ -8,7 +8,7 @@ import { AppStore } from '../../lib/app-store/app-store.ts';
 import { applyPromptGate, describePromptGate, gateScriptPath } from './prompt-gate.ts';
 import { buildGateScript } from './script.ts';
 import { saveRules } from '../dlp/rules-store.ts';
-import { scanText } from '../dlp/rules.ts';
+import { scanText } from '@agentdeck/dlp/rules';
 import { scanPrompt } from './gate-core.mjs';
 
 /**
@@ -196,7 +196,7 @@ describe('гейт на промпте', () => {
     expect(describePromptGate(store, location()).problem).toBeTruthy();
   });
 
-  // Образцы Р11 живут в `dlp/builtins.mjs` и попадают в хук вставкой. Проверка —
+  // Образцы Р11 живут в `@agentdeck/dlp/builtins` и попадают в хук вставкой. Проверка —
   // запуском: новый образец обязан останавливать промпт в НАСТОЯЩЕМ скрипте,
   // иначе вставка потеряла бы его молча, а прокси продолжал бы находить.
   it('скрипт останавливает промпт по образцу, которого не было в прошлом ядре', () => {

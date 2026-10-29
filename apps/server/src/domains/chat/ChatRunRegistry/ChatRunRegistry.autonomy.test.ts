@@ -275,6 +275,36 @@ describe('ChatRunRegistry — автономия чата', () => {
     autonomous = false;
     expect(registry.isAutonomous('c1')).toBe(false);
   });
+
+  /**
+   * «Развилки группы: спрашивать меня»: задание велит нести развилку человеку даже
+   * с рекомендацией. Автономия группы остаётся (права, D-n), но вопрос она не
+   * закрывает: ни метки для хука автовыбора, ни отложенного сигнала.
+   */
+  it('развилки группы у человека: автономна, но вопросы не выбирает — без метки, сигнал сразу', () => {
+    const notices: string[] = [];
+    registry.setNotifier((notice) => notices.push(notice.kind));
+    registry.setQuestionsToHumanResolver((keys) => keys.includes('group'));
+    registry.start('group', OPTIONS, {});
+    expect(runs[0]?.options?.env?.[AUTONOMOUS_ENV]).toBeUndefined();
+    expect(registry.isAutonomous('group')).toBe(true);
+    expect(registry.picksQuestions('group')).toBe(false);
+    runs[0]!.emit({ kind: 'tool', name: 'AskUserQuestion', input: QUESTION, id: 'q1' });
+    expect(notices).toEqual(['question']);
+    // Обычный автономный чат рядом — по-прежнему выбирает сам.
+    registry.start('plain', OPTIONS, {});
+    expect(runs[1]?.options?.env?.[AUTONOMOUS_ENV]).toBe('1');
+    expect(registry.picksQuestions('plain')).toBe(true);
+  });
+
+  it('осечка решателя «развилки у человека» — вопрос человеку', () => {
+    registry.setQuestionsToHumanResolver(() => {
+      throw new Error('store');
+    });
+    registry.start('c1', OPTIONS, {});
+    expect(registry.picksQuestions('c1')).toBe(false);
+    expect(runs[0]?.options?.env?.[AUTONOMOUS_ENV]).toBeUndefined();
+  });
 });
 
 describe('ChatRunRegistry — снятые тяжёлые схемы (chatLeanTools)', () => {

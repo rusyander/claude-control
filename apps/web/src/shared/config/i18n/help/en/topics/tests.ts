@@ -671,6 +671,9 @@ export const testsEn: typeof testsRu = {
       'description’s checks, screenshots and notes sections are no source of a point. Every ' +
       'ticket point — a list line of its description or comments (*, -, #, 1.) — needs a task-N row ' +
       'quoting it, with any status; uncovered points are named word for word, one line per ticket. ' +
+      'A point row id is task- or owner- and a number (task-1, owner-2); a row like ' +
+      'task-1298-perms covers no point, and the check names such rows as a gap of their own — ' +
+      'renumber them, the quotes and proof stay. ' +
       'A passed row whose sourced proof was rewritten to another meaning with no commit since ' +
       'is a gap too: a new proof needs new work. Exit 0 ' +
       'is the proof for the MR description and reviewer threads: the live-MR line names the ' +
@@ -1395,8 +1398,10 @@ export const testsEn: typeof testsRu = {
       historyText:
         'Every autotest run is one record on the Runs tab labelled “autotests” · “panel”: how ' +
         'many passed and failed, reports next to it. A build report import is labelled ' +
-        'differently — “import” · “CI” — and when the history holds both, a “Records” filter ' +
-        'appears above the list: all, panel autotests or CI import. A failed test fails its ' +
+        'differently — “import” · “CI”; a check executed by the task core is labelled “checks” · ' +
+        '“task core”. When the history holds two ' +
+        'of these sources, a “Records” filter appears above the list: all, panel autotests, task ' +
+        'core checks or CI import. A failed test fails its ' +
         'case; a test without a case tag is named in the result as “without a case”. The record label ' +
         'travels into its reports too: the MD, HTML and PDF heading (“Run: panel autotests”), the ' +
         'last CSV column “Record” and the sides of pnpm tests diff. A report is written in the ' +

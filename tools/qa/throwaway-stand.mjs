@@ -134,7 +134,12 @@ export const LIVE_SESSION_CHURN = [
   /\/\.claude\/(history\.jsonl|backups|cache|sessions|projects|todos|shell-snapshots|statsig|session-env|file-history|debug|ide|plans|paste-cache|telemetry)(\/|$)/,
   // Рабочая панель человека (:5178) пишет своё состояние, пока идёт проверка.
   // Стенд в него не пишет: его каталог Claude и состояние — во временном доме.
-  /\/\.claude\/agentdeck(\/state\.json)?$/,
+  /\/\.claude\/agentdeck(\/(state\.json|server\.log))?$/,
+  // `~/.claude` человека может быть git-репозиторием, куда коммитят его же
+  // сессии; живая сессия Codex держит свои `tmp/arg0`. Ни один проверяемый CLI
+  // туда не пишет (их каталоги — во временном доме), а прогон 28.10 краснел на них.
+  /\/\.claude\/\.git(\/|$)/,
+  /\/\.codex\/tmp(\/|$)/,
   // Уборка и автообновление маркетплейсов, которые Claude Code делает при каждом
   // запуске. Стенд `claude` не запускает (его нет в PATH стенда).
   /\/\.claude\/\.last-cleanup$/,

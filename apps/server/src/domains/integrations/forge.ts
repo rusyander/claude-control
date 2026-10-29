@@ -421,7 +421,7 @@ export interface ForgeMergeRequest {
  * ошибка здесь тихая: копия заведётся от похожей ветки, ревью прочитает чужой
  * дифф и напишет уверенные замечания не про тот код.
  */
-export async function readMergeRequest(
+async function readMergeRequest(
   access: ForgeAccess,
   mergeRequestNumber: number,
 ): Promise<ForgeMergeRequest> {

@@ -9,7 +9,7 @@ export interface TrustBadge {
   checkedAt?: string;
 }
 
-export const LEVEL_BADGE: Record<ProviderCheckLevel, { key: string; tone: TrustTone }> = {
+const LEVEL_BADGE: Record<ProviderCheckLevel, { key: string; tone: TrustTone }> = {
   verified: { key: 'providerCheck.badge.verified', tone: 'success' },
   partial: { key: 'providerCheck.badge.partial', tone: 'warning' },
   failed: { key: 'providerCheck.badge.failed', tone: 'danger' },

@@ -12,6 +12,15 @@
     "./agent-history": "./src/agent-history.ts",
     "./agent-live": "./src/agent-live.ts",
     "./verify-ledger": "./src/verify-ledger.ts",
+    "./core/ids": "./src/core/ids.ts",
+    "./core/states": "./src/core/states.ts",
+    "./core/journal": "./src/core/journal.ts",
+    "./core/commands": "./src/core/commands.ts",
+    "./core/decisions": "./src/core/decisions.ts",
+    "./core/facts": "./src/core/facts.ts",
+    "./core/routes": "./src/core/routes.ts",
+    "./core/model-tools": "./src/core/model-tools.ts",
+    "./core/records": "./src/core/records.ts",
     "./api-explorer": "./src/api-explorer.ts",
     "./logs": "./src/logs.ts",
     "./backend-guard": "./src/backend-guard.ts",
@@ -95,6 +104,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@agentdeck/providers": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

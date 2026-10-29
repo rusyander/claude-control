@@ -26,7 +26,7 @@ import type { ProcessRow } from '../kill-tree.mjs';
  */
 
 /** Ответ помощника по одному номеру. */
-export type MarkVerdict = 'yes' | 'no' | 'unknown' | 'reused' | 'gone';
+type MarkVerdict = 'yes' | 'no' | 'unknown' | 'reused' | 'gone';
 
 const MARK_TIMEOUT_MS = 15_000;
 
@@ -155,7 +155,7 @@ function powershellPath(): string {
 }
 
 /** Вывод помощника `pid ответ` → карта; пустой разбор — ответа нет. */
-export function parseMarkVerdicts(text: string): Map<number, MarkVerdict> | undefined {
+function parseMarkVerdicts(text: string): Map<number, MarkVerdict> | undefined {
   const verdicts = new Map<number, MarkVerdict>();
   for (const line of text.split(/\r?\n/)) {
     const match = /^(\d+) (yes|no|unknown|reused|gone)$/.exec(line.trim());
@@ -165,7 +165,7 @@ export function parseMarkVerdicts(text: string): Map<number, MarkVerdict> | unde
 }
 
 /** Ответы помощника по номерам; `undefined` — помощник не отработал. */
-export function readWindowsMarkVerdicts(
+function readWindowsMarkVerdicts(
   rows: readonly ProcessRow[],
   name: string,
 ): Promise<Map<number, MarkVerdict> | undefined> {
@@ -205,7 +205,7 @@ export function readWindowsMarkVerdicts(
  * кандидаты и так несут путь копии, и ложная метка там стоит не больше прежнего
  * правила возраста.
  */
-export function parsePsEnvMarks(text: string, name: string): Map<number, boolean> {
+function parsePsEnvMarks(text: string, name: string): Map<number, boolean> {
   const marks = new Map<number, boolean>();
   const pattern = new RegExp(`(?:^|\\s)${name}=\\S`);
   for (const line of text.split(/\r?\n/)) {

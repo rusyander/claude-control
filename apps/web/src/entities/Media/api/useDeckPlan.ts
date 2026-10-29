@@ -4,7 +4,7 @@ import { agentQuery } from '../lib/agentQuery';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getDeckPlan(agent: boolean): Promise<MediaDeckPlan> {
+async function getDeckPlan(agent: boolean): Promise<MediaDeckPlan> {
   const { data } = await apiClient.get<MediaDeckPlan>(`/media/decks/plan${agentQuery(agent)}`);
   return data;
 }

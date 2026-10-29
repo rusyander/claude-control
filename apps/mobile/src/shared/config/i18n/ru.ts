@@ -559,6 +559,8 @@ export const ru = {
       actor: { agent: 'агент', human: 'человек', ci: 'CI' },
       e2e: 'автотесты панели',
       e2eActor: 'панель',
+      core: 'проверки ядра задач',
+      coreActor: 'ядро задач',
       state: {
         running: 'идёт',
         done: 'закончен',

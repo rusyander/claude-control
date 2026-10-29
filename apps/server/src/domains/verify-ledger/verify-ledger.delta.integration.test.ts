@@ -153,6 +153,19 @@ describe('verify-ledger: сужение от последнего зелёног
     ]);
   });
 
+  // 28.10: повтор по ключу суженного прогона показал «3 файла из 3» на команду о 5 файлах без слова
+  // о сужении — читатель принял его за ложный зелёный и выключил журнал.
+  it('повтор суженного прогона говорит, что он суженный, и от какого зелёного', () => {
+    vitest(['run']);
+    const green = events().length;
+    put('web/src/a.ts', 'export const a = 2;\n');
+    expect(vitest(['run']).err).toContain('[verify-ledger] delta since green');
+    const again = vitest(['run']);
+    expect(again.err).toContain('[verify-ledger] reused green');
+    expect(again.err).toMatch(/that run was narrowed \(delta since green \S+ from [\d-]+T/);
+    expect(events().length).toBeGreaterThan(green);
+  });
+
   it.each([
     ['конфиг vitest', 'web/vitest.config.ts', 'export default {};\n'],
     ['файл setupFiles', 'web/src/testing/setup.ts', 'export const s = 1;\n'],

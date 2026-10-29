@@ -47,7 +47,7 @@ function commandOf(block: ContentBlock): string | undefined {
 }
 
 /** Номера, напечатанные о своём запуске, по уже прочитанным записям разговора. */
-export function printedPids(records: readonly Record[]): Map<number, PrintedPid> {
+function printedPids(records: readonly Record[]): Map<number, PrintedPid> {
   const calls = new Map<string, { command: string; atMs: number }>();
   /** Порт → самый ранний запуск на нём. */
   const launched = new Map<number, number>();

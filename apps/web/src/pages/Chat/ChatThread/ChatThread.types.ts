@@ -12,7 +12,7 @@ import type { ChildHub } from '../model/useChildHub';
 import type { TaskSplitApi } from '../model/useTaskSplit';
 
 /** Права и модель, с которыми уходит ответ дочернему разговору. */
-export interface ChildAnswerOptions {
+interface ChildAnswerOptions {
   allowEdits: boolean;
   /** Не задан — ребёнок идёт за своим выбором авторежима или глобальной настройкой. */
   autoApprove?: boolean;

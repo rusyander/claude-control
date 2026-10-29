@@ -91,7 +91,7 @@ export interface GroupProfileInput {
 }
 
 /** Рычаги экономии, которые едут в запуск группы; окно сжатия — своим полем выше. */
-export type GroupEconomyInput = Pick<
+type GroupEconomyInput = Pick<
   GroupEconomy,
   'bashOutputChars' | 'readOutputTokens' | 'cacheTtl' | 'detachIde' | 'workHabits'
 >;

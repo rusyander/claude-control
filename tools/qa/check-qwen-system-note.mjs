@@ -16,11 +16,11 @@
  *
  * Запуск: node tools/qa/check-qwen-system-note.mjs
  */
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { NotChecked, startStand, wait } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const TAG = '<agentdeck-workspace>';
@@ -37,40 +37,13 @@ function findCli(name) {
 /** Заглушка OpenAI chat: каждый запрос записан, ответ — одно слово потоком. */
 async function startStub() {
   const bodies = [];
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ data: [{ id: 'stub-model', object: 'model' }] }));
-        return;
-      }
-      try {
-        bodies.push(JSON.parse(raw || '{}'));
-      } catch {
-        bodies.push({});
-      }
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const chunk = (delta, finish = null) =>
-        `data: ${JSON.stringify({
-          id: 'c',
-          object: 'chat.completion.chunk',
-          created: 1,
-          model: 'stub-model',
-          choices: [{ index: 0, delta, finish_reason: finish }],
-        })}\n\n`;
-      res.write(chunk({ role: 'assistant', content: 'OK' }));
-      res.write(chunk({}, 'stop'));
-      res.end('data: [DONE]\n\n');
-    });
+  const stub = await startStubModel({
+    script: ({ request }) => {
+      bodies.push(request.body);
+      return 'OK';
+    },
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  return {
-    port: server.address().port,
-    bodies,
-    close: () => new Promise((resolve) => server.close(resolve)),
-  };
+  return { port: stub.port, bodies, close: () => stub.close() };
 }
 
 let failures = 0;

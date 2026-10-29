@@ -10,6 +10,7 @@ import type {
 import { carriedLink, conversationKeys } from '../../../lib/app-store/chat-links.ts';
 import { git } from '../../project-git/exec/exec.ts';
 import { TASK_NOTEBOOK } from '../task-notebook/task-notebook.ts';
+import { pickRemote } from '../../project-git/parse.ts';
 import { parseDirtyPaths, readHeadSha, readMergeTarget } from '../../project-git/read.ts';
 import type { RecheckScope } from './split-recheck.ts';
 
@@ -54,6 +55,9 @@ export function recheckFreshBrief(input: {
       ? 'Working notes: .agent/PROGRESS.md in the copy — context of the earlier work, not tasks ' +
         'for this recheck. Restore the rest from the facts: git log of the branch and the MR.'
       : 'Restore the context from the facts: git log of the branch and the MR.',
+    // Живой прогон 27.10: все три перепроверки открылись `cat блокнот | tail; head PROGRESS` —
+    // и все три получили отказ bash-read-cap (вывод файлов больше 8k знаков в оболочке).
+    'Read these files with the Read tool (offset/limit for a part), never cat / head / tail in Bash.',
   ];
   // g0 26.10: вводная называла один PROGRESS — группа запустила pytest системным Python,
   // хотя рецепт venv и известные красные окружения лежали в блокноте с 23.10.
@@ -76,16 +80,42 @@ export function recheckFreshBrief(input: {
 }
 
 /**
+ * Ветка цели MR, как её знают ссылки копии: `<удалённый>/<цель>`, иначе локальная
+ * `<цель>`; ни той ни другой (агент ещё не делал fetch) — `undefined`.
+ */
+async function targetRef(
+  copy: string,
+  target: string,
+  run: (cwd: string, args: string[]) => Promise<string>,
+): Promise<string | undefined> {
+  const read = async (args: string[]): Promise<string> =>
+    (await run(copy, args).catch(() => '')).trim();
+  const remote = pickRemote(await read(['remote']));
+  const candidates = [
+    ...(remote ? [[`${remote}/${target}`, `refs/remotes/${remote}/${target}`]] : []),
+    [target, `refs/heads/${target}`],
+  ];
+  for (const [ref, full] of candidates) {
+    if (await read(['rev-parse', '--verify', '--quiet', full as string])) return ref;
+  }
+  return undefined;
+}
+
+/**
  * Охват перепроверки по копии группы: что ветка меняет против цели MR и что
- * лежит в дереве копии мимо него. Цель — основание группы (отведена от ветки
- * предшественника) или ветка основной копии в том виде, в каком её знают ссылки.
+ * лежит в дереве копии мимо него. Цель — ветка, в которую MR сольют (`target`,
+ * от форджа), затем основание группы (отведена от ветки предшественника), затем
+ * основная ветка проекта (`readMergeTarget`). Ветка, выгруженная в папке проекта
+ * прямо сейчас, целью не бывает: 27.10 охват и проба конфликтов шли против
+ * `feat-VAB-403/…`, и группа не видела трёх настоящих конфликтов с `origin/main`.
  * Сеть не трогается; не прочитано — `undefined`.
  */
 export async function readRecheckScope(
-  input: { mainDir: string; copy: string; base?: string },
+  input: { mainDir: string; copy: string; base?: string; target?: string },
   run: (cwd: string, args: string[]) => Promise<string> = git,
 ): Promise<RecheckScope | undefined> {
-  const base = input.base ?? (await readMergeTarget(input.mainDir));
+  const fromTarget = input.target ? await targetRef(input.copy, input.target, run) : undefined;
+  const base = fromTarget ?? input.base ?? (await readMergeTarget(input.mainDir));
   if (!base) return undefined;
   const [diff, status] = await Promise.all([
     run(input.copy, ['diff', '--name-only', '-z', `${base}...HEAD`]),

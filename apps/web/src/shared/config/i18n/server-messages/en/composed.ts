@@ -226,6 +226,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'task point {{point}}: «{{quote}}» is a label (a tool, button or file name), not the point: the quote has fewer than three words. Quote the point itself word for word — a phrase from its ticket section, the group’s task or the MR description',
   'delivery-gap-task-point-unmapped':
     'ticket {{key}}: points of the ticket that no task-N row quotes — {{count}}: {{points}}. For each, a task-N row quoting the point in «…» with the ticket key: pass with the proof if done; fail with the reason if not done (and named in the MR description); n/a with the reason if it is no requirement. Full text — the ## {{key}} section of .agent/run/tickets.md',
+  'delivery-gap-point-id-shape':
+    'rows {{ids}} are no point rows: a point id is task-<number> or owner-<number> (task-1, task-2, …); under another id a row covers no point. Renumber them and keep their quotes and proof',
   'delivery-gap-task-rewritten':
     'task point {{point}}: the evidence was rewritten with no new commit — it was «{{was}}», now «{{now}}»; only one can be true. The earlier one is already reported: if it holds, drop this row from your answer — the panel keeps the earlier one, and the gap closes in this same turn. If the new one is true, check it against the ticket and the code; the same row repeated in a later answer closes this gap',
   'delivery-gap-task-note-rejected':

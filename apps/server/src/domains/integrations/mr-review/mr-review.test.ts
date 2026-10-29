@@ -83,6 +83,7 @@ describe('readMergeRequestReview (GitLab)', () => {
           author: USER('rustam'),
           description: 'Что и зачем.',
           has_conflicts: true,
+          target_branch: 'main',
           head_pipeline: { id: 7763, status: 'failed', web_url: 'https://git.acme.local/p/7763' },
         },
       ],
@@ -98,6 +99,8 @@ describe('readMergeRequestReview (GitLab)', () => {
       description: 'Что и зачем.',
       // Конфликт с целевой веткой — для «Перепроверить MR» (владелец 05.10).
       conflicts: true,
+      // Цель MR — база охвата перепроверки, а не ветка папки проекта (живой прогон 27.10).
+      targetBranch: 'main',
       pipeline: { id: '7763', status: 'failed', url: 'https://git.acme.local/p/7763' },
       threads: [
         {

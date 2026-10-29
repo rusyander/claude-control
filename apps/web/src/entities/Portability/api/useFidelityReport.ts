@@ -5,7 +5,7 @@ import { levelParams } from '../lib/levelParams';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getFidelity(
+async function getFidelity(
   provider: string,
   target: string,
   level: PortabilityLevel,

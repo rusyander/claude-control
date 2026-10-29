@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@agentdeck/contracts": "workspace:*",
+    "@agentdeck/dlp": "workspace:*",
+    "@agentdeck/providers": "workspace:*",
     "@fastify/cors": "^11.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "^5.0.0",

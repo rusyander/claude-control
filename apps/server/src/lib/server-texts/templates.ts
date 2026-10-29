@@ -1523,6 +1523,10 @@ export const serverTextTemplates = {
     ru: 'задача {{key}}: пунктов тикета без строки task-N, которая их цитирует, — {{count}}: {{points}}. На каждый — строка task-N с цитатой пункта в «…» и ключом задачи: pass с доказательством, если сделан; fail с причиной, если не сделан (и он назван в описании MR); n/a с причиной, если это не требование. Полный текст — раздел ## {{key}} файла .agent/run/tickets.md',
     en: 'ticket {{key}}: points of the ticket that no task-N row quotes — {{count}}: {{points}}. For each, a task-N row quoting the point in «…» with the ticket key: pass with the proof if done; fail with the reason if not done (and named in the MR description); n/a with the reason if it is no requirement. Full text — the ## {{key}} section of .agent/run/tickets.md',
   },
+  'delivery-gap-point-id-shape': {
+    ru: 'строки {{ids}} — не строки пунктов: id пункта — task-<число> или owner-<число> (task-1, task-2, …); под другим id строка не покрывает ни одного пункта. Перенумеруйте их, цитаты и доказательства оставьте',
+    en: 'rows {{ids}} are no point rows: a point id is task-<number> or owner-<number> (task-1, task-2, …); under another id a row covers no point. Renumber them and keep their quotes and proof',
+  },
   'delivery-gap-task-rewritten': {
     ru: 'пункт задач группы {{point}}: доказательство переписано без нового коммита — было «{{was}}», стало «{{now}}»; верно только одно. Прежнее уже сдано: если верно оно, уберите эту строку из ответа — панель хранит прежнюю, и пробел снимется в этом же ходе. Если верно новое — сверьте его с тикетом и кодом; та же строка, повторённая следующим ответом, снимает этот пробел',
     en: 'task point {{point}}: the evidence was rewritten with no new commit — it was «{{was}}», now «{{now}}»; only one can be true. The earlier one is already reported: if it holds, drop this row from your answer — the panel keeps the earlier one, and the gap closes in this same turn. If the new one is true, check it against the ticket and the code; the same row repeated in a later answer closes this gap',

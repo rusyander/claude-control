@@ -4,7 +4,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function postSubscriptionApply(
+async function postSubscriptionApply(
   request: SubscriptionAddress & { fingerprint: string },
 ): Promise<SubscriptionApplyAnswer> {
   const { data } = await apiClient.post<SubscriptionApplyAnswer>(

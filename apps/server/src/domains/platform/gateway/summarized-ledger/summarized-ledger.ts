@@ -47,7 +47,7 @@ function isRecord(value: unknown): value is SummarizedRecord {
   return typeof record.at === 'string' && typeof record.platformId === 'string';
 }
 
-export function readSummarized(appDataDir: string): SummarizedRecord[] {
+function readSummarized(appDataDir: string): SummarizedRecord[] {
   const cached = cache.get(appDataDir);
   if (cached) return cached;
   let records: SummarizedRecord[];

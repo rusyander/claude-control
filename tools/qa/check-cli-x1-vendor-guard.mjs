@@ -24,12 +24,12 @@
  *
  * Запуск: `node tools/qa/check-cli-x1-vendor-guard.mjs [--server-dir <копия apps/server>]`.
  */
-import { createServer } from 'node:http';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runOnStand, wait } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const serverAt = process.argv.indexOf('--server-dir');
 const SERVER_DIR = serverAt > 0 ? process.argv[serverAt + 1] : undefined;
@@ -43,17 +43,14 @@ const SENTINEL = {
 
 // --- ловушка 1: адрес из OPENAI_BASE_URL -----------------------------------
 const trapHits = [];
-const trap = createServer((req, res) => {
-  let raw = '';
-  req.on('data', (chunk) => (raw += chunk));
-  req.on('end', () => {
-    trapHits.push({ method: req.method, path: req.url, headers: req.headers, body: raw });
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ choices: [{ message: { content: 'TRAP_REPLY' } }] }));
-  });
+const trap = await startStubModel({
+  // Ловушка: любой запрос сюда — улика; записан с сырыми заголовками и телом.
+  route: ({ method, path, query, headers, raw }) => {
+    trapHits.push({ method, path: path + query, headers, body: raw });
+    return { body: { choices: [{ message: { content: 'TRAP_REPLY' } }] } };
+  },
 });
-await new Promise((done) => trap.listen(0, '127.0.0.1', done));
-const trapUrl = `http://127.0.0.1:${trap.address().port}/v1`;
+const trapUrl = `${trap.baseUrl}/v1`;
 
 // --- ловушка 2: любой fetch панели за пределы машины ------------------------
 const work = mkdtempSync(join(tmpdir(), 'cc-x1-trap-'));

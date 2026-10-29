@@ -17,7 +17,7 @@ export interface TicketTargetTracker extends BatchTracker {
 }
 
 /** Bug, если есть; иначе Task; иначе первый. Без регистра: «bug» у своей установки бывает. */
-export function defaultIssueType(types: readonly string[]): string | undefined {
+function defaultIssueType(types: readonly string[]): string | undefined {
   const find = (name: string) => types.find((type) => type.toLowerCase() === name);
   return find('bug') ?? find('task') ?? types[0];
 }

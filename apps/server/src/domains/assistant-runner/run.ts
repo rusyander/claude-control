@@ -12,11 +12,7 @@ import {
   withImagePaths,
 } from './cli.ts';
 import { runProviderApi } from './api.ts';
-import {
-  SECRET_MASK,
-  maskSecretsInText,
-  restoreMaskedSecrets,
-} from '../../lib/secret-mask/secret-mask.ts';
+import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '@agentdeck/dlp/secret-mask';
 import type { AssistantMessage, AssistantRunResult, RunAssistantDeps } from './types.ts';
 
 // --- Публичный switch --------------------------------------------------------

@@ -266,7 +266,7 @@ function runNode(file) {
       const passed = code === 0 && !timedOut;
       // Код 2 — «не проверено» (`NotChecked` в throwaway-stand.mjs): нет CLI или
       // стенд не поднялся. Это не дефект продукта — пропуск с причиной.
-      const notChecked = code === 2 && !timedOut;
+      const notChecked = (code === 2 || (!passed && Boolean(mutationBusy(output)))) && !timedOut;
       console.log(
         `  код ${code ?? 'нет'}${timedOut ? ' (таймаут)' : ''} за ${Math.round(seconds)} с`,
       );
@@ -298,6 +298,17 @@ function runVitest(file, cases) {
   const result = spawnVitest(root, [target], report);
   const seconds = (Date.now() - started) / 1000;
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  const busy = result.status !== 0 ? mutationBusy(output) : undefined;
+  if (busy) {
+    rmSync(report, { force: true });
+    console.log(`  стенд занят мутантами — не проверено`);
+    return suiteOf(file, cases, {
+      status: 'skipped',
+      seconds,
+      message: `Не проверено. ${busy} Повторите после конца mustfail.`,
+      output: tail(output, 80),
+    });
+  }
   if (!existsSync(report)) {
     return suiteOf(file, cases, {
       status: 'failed',
@@ -566,6 +577,15 @@ function same(left, right) {
 /** Тест лежит внутри блока describe с этим именем. */
 function under(name, block) {
   return norm(name).startsWith(`${norm(block)} > `);
+}
+
+/**
+ * Строка отказа `mutation-guard`: другой прогон mustfail подменяет файлы дерева, тест не запускался
+ * на настоящем коде. Это занятый стенд, а не дефект — пропуск с причиной (29.10 параллельные зоны
+ * ядра портили друг другу историю «провалами»).
+ */
+function mutationBusy(output) {
+  return output.match(/mutation-guard: (?:mustfail \(pid|журнал mustfail)[^\n]*/)?.[0];
 }
 
 /** Строки, в которых скрипт сам назвал провал; иначе — хвост вывода. */

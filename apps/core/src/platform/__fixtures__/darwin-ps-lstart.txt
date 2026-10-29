@@ -1,0 +1,5 @@
+    1     0 Ss   Mon Oct 26 08:01:12 2026     /sbin/launchd
+  412     1 S    Mon Oct 26 08:01:20 2026     /usr/libexec/logd
+51200   510 S    Wed Oct 28 10:15:30 2026     -zsh
+51234 51200 S+   Wed Oct 28 10:15:32 2026     node /Users/dev/work/agentdeck/node_modules/.bin/vitest run
+51299 51234 Z+   Wed Oct 28 10:15:33 2026     (node)

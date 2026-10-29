@@ -24,7 +24,7 @@ import { parseDocument, visit, isScalar, isPair } from 'yaml';
  */
 
 /** Метка вместо значения. Ищется глазами и грепом на новой машине. */
-export const REDACTED = '__REDACTED__';
+const REDACTED = '__REDACTED__';
 
 /**
  * Имя ключа, за которым может стоять секрет. Список намеренно широкий:
@@ -41,7 +41,7 @@ export interface RedactionResult {
 }
 
 /** Похоже ли имя ключа на секрет. Отдельно — чтобы правило было одно на весь домен. */
-export function isSecretKeyName(name: string): boolean {
+function isSecretKeyName(name: string): boolean {
   return SECRET_KEY.test(name);
 }
 

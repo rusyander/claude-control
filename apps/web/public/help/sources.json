@@ -34,7 +34,7 @@
         {
           "path": "apps/server/src/domains/platform/gateway/pipeline/pipeline.ts",
           "why": "«Путь одного запроса»: что панель делает с запросом между CLI и контуром",
-          "sha": "a1a3d5e384981a09"
+          "sha": "e3a47ca99b486297"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/status/status.ts",
@@ -334,7 +334,7 @@
         {
           "path": "apps/server/src/domains/platform/data-mask/data-mask.ts",
           "why": "«Остальные три строки»: когда маска данных панели включается сама на контуре, чем маскирует и что сильнее галочки",
-          "sha": "10f8321d63747a2b"
+          "sha": "b21351c66dbc65c5"
         },
         {
           "path": "apps/web/src/pages/Platform/DataMaskRow/DataMaskRow.tsx",
@@ -505,7 +505,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "bcda6454b0ab8d5d"
+          "sha": "d084c436ffa3c7c2"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions/ChatPermissions.ts",
@@ -540,12 +540,12 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "67ebea900492ba63"
+          "sha": "5252cface4ce522c"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
           "why": "«Перепроверить MR»: что панель читает из MR и когда отказывает",
-          "sha": "bff54547887e924e"
+          "sha": "16c6969cc24281df"
         },
         {
           "path": "apps/server/src/domains/chat/handoff-coverage/handoff-coverage.ts",
@@ -585,7 +585,7 @@
         {
           "path": "apps/server/src/domains/chat/split-overlap/split-overlap.ts",
           "why": "«Пересечения веток»: когда считаются и что красное",
-          "sha": "510cf05fb8b60d06"
+          "sha": "eb919e9a0e215485"
         },
         {
           "path": "apps/server/src/domains/chat/token-ledger/watch/rules.ts",
@@ -635,12 +635,12 @@
         {
           "path": "apps/server/src/domains/chat/token-ledger/watch/group-watcher/group-sweep.ts",
           "why": "«Сторож групп»: R22 группа стоит без хода (порог, втрое — тревога, причина), R28 напоминания впустую и новые круги доставки",
-          "sha": "722f69a5c2a9323f"
+          "sha": "13f9a082cc6776f4"
         },
         {
           "path": "apps/server/src/domains/chat/token-ledger/watch/group-watcher/restart-rules.ts",
           "why": "«Сторож групп»: R38 перезапуск ждёт правок группы (минуты ожидания) и случившийся из-за них, R39 частые перезапуски",
-          "sha": "80b15b796778c6ac"
+          "sha": "650efadff25377dc"
         },
         {
           "path": "apps/server/src/domains/chat/token-ledger/watch/group-watcher/run-summary.ts",
@@ -905,7 +905,7 @@
         {
           "path": "apps/server/src/domains/chat/split-recheck/recheck-session.ts",
           "why": "«Перепроверить MR»: новый разговор в копии, охват MR, когда слово идёт прежней сессии",
-          "sha": "c2eb03bd8cd20ed5"
+          "sha": "c8c79e9fcc65361e"
         },
         {
           "path": "apps/web/src/features/ChatMessages/lib/groupProgress.ts",
@@ -925,7 +925,7 @@
         {
           "path": "apps/server/src/domains/chat/deferred-asks/store.ts",
           "why": "«Отложенные вопросы D-n»: срок жизни D-n, срок выданного разрешения, переходы состояний",
-          "sha": "d90268dbb1e38827"
+          "sha": "2313bf9d016c068b"
         },
         {
           "path": "apps/server/src/domains/chat/deferred-asks/texts.ts",
@@ -1010,7 +1010,7 @@
         {
           "path": "apps/server/src/domains/chat/subagent-tree/extension-trail.ts",
           "why": "«Смотреть план агента»: какие скиллы, MCP и хуки попадают в значки и окно, итог и длительность каждого",
-          "sha": "239014b463e715e5"
+          "sha": "e2107b930bad1652"
         },
         {
           "path": "apps/web/src/entities/AgentTree/model/extensions.ts",
@@ -1045,22 +1045,32 @@
         {
           "path": "apps/server/src/domains/chat/agent-history/agent-history.ts",
           "why": "«История агентов»: сессии новыми первыми, главный агент целиком, правило «сейчас работают» и порог 15 минут",
-          "sha": "7d405bb528432a12"
+          "sha": "0c42fbdaacff2719"
         },
         {
           "path": "apps/server/src/domains/chat/subagent-tree/agent-anomalies.ts",
           "why": "странности агента: отказы хуков, ошибки, повторные чтения, результаты длиннее 10 000 символов",
-          "sha": "953bfadb09315d57"
+          "sha": "5b153cb699420e95"
         },
         {
           "path": "apps/web/src/entities/AgentTree/ui/AgentTranscript/AgentTranscript.tsx",
           "why": "ход агента окнами по 200 шагов: «Показать раньше», «Позже», «К последним», «Шаги a–b из M»",
-          "sha": "bab6732a5acf8714"
+          "sha": "154899a56f4ba127"
         },
         {
           "path": "apps/web/src/entities/AgentTree/model/agentHistory.ts",
           "why": "строка «сейчас: N агентов · M субагентов» / «никто не работает», строка странностей",
-          "sha": "d809176c735da52c"
+          "sha": "1b934539c17ab05f"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentHistory/AgentHistoryNow.tsx",
+          "why": "блок «Сейчас» окна истории: главный работает/не работает и чем занят, работающие субагенты или «Субагентов сейчас нет»",
+          "sha": "7cb685148b8b6f3a"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentTranscript/AgentStepRow.tsx",
+          "why": "шаг хода: «ошибка», «отказ хука», «прервано» у вызова, оборванного паузой",
+          "sha": "228a614e4662b7a5"
         },
         {
           "path": "apps/web/src/features/ChatMessages/lib/turnTrail.ts",
@@ -1075,10 +1085,10 @@
         {
           "path": "apps/server/src/domains/chat/hook-trace/hook-trace.ts",
           "why": "«След хода»: какие хуки CLI записывает и на какой ход они садятся",
-          "sha": "ed1a5a2dfe788616"
+          "sha": "1e42d11cbc4afd0c"
         }
       ],
-      "confirmedAt": "2026-10-27T11:13:07.671Z"
+      "confirmedAt": "2026-10-27T21:21:44.822Z"
     },
     {
       "topic": "tests",
@@ -1222,7 +1232,7 @@
         {
           "path": "apps/web/src/pages/Tests/model/hasBothOrigins.ts",
           "why": "«Прогон лёг в историю»: подпись «автотесты» · «панель» против «импорт» · «CI», когда появляется отбор «Записи»",
-          "sha": "249c4e03639794e5"
+          "sha": "d18803a7f7669fd1"
         },
         {
           "path": "apps/web/src/pages/Tests/model/visibleRuns.ts",
@@ -1232,7 +1242,7 @@
         {
           "path": "apps/web/src/pages/Tests/model/runLabelKeys.ts",
           "why": "«Прогон лёг в историю»: подпись «автотесты» · «панель» против «импорт» · «CI», когда появляется отбор «Записи»",
-          "sha": "94120d329cf72717"
+          "sha": "c4cf4020049ab20c"
         },
         {
           "path": "apps/server/src/domains/project-tests/e2e-watch/e2e-watch.ts",
@@ -1257,7 +1267,7 @@
         {
           "path": "apps/server/src/domains/chat/delivery-check/delivery-check.ts",
           "why": "Проверка доставки: одна сверка на панель и tests-cli delivery (описание MR, сита, пункты, блок «Тесты», задачи трекера)",
-          "sha": "1d67927973312dac"
+          "sha": "5e1f61faee39e99e"
         },
         {
           "path": "apps/server/src/domains/project-tests/pyramid/pyramid.ts",
@@ -1267,7 +1277,7 @@
         {
           "path": "apps/server/src/domains/project-tests/export-run/export-run.ts",
           "why": "«Прогон лёг в историю»: подпись записи в заголовке MD/HTML/PDF и столбец CSV «Запись»",
-          "sha": "16b32337c8b839d6"
+          "sha": "afe85abfa81c925f"
         },
         {
           "path": "apps/server/src/domains/project-tests/mutation/mutation.ts",
@@ -1287,7 +1297,7 @@
         {
           "path": "apps/server/src/lib/dev-watch.mjs",
           "why": "«Проверка набора поломкой»: перезапуск dev-сервера панели ждёт конца идущих проверок",
-          "sha": "53a66ded4e3358d3"
+          "sha": "b288e7868f46b368"
         },
         {
           "path": "apps/server/src/domains/project-tests/suites/suites.ts",
@@ -1320,7 +1330,7 @@
           "sha": "8c3dbfdb5307309b"
         }
       ],
-      "confirmedAt": "2026-10-27T11:52:15.350Z"
+      "confirmedAt": "2026-10-29T08:01:27.570Z"
     },
     {
       "topic": "rules",
@@ -1629,25 +1639,25 @@
         {
           "path": "apps/server/src/providers/catalog/qwen.ts",
           "why": "Проектный уровень Qwen Code: хуки и скиллы проекта, которые называет документ",
-          "sha": "4336e944d21f3411"
+          "sha": "b576835d88f73605"
         },
         {
           "path": "apps/server/src/providers/catalog/opencode.ts",
           "why": "Проектный уровень OpenCode: права, хуки только на чтение, плагины",
-          "sha": "a087c40a2e0a94e1"
+          "sha": "2b9e4869f4e43612"
         },
         {
           "path": "apps/server/src/providers/catalog/kimi.ts",
           "why": "Проектный уровень Kimi Code: скиллы и MCP есть, проектных прав нет",
-          "sha": "46785828367da3cd"
+          "sha": "aadfd9ef83acaeb4"
         },
         {
           "path": "apps/server/src/providers/catalog/cursor.ts",
           "why": "Проектный уровень Cursor: каталог правил вместо файла инструкций",
-          "sha": "63a38bc6338e0bd3"
+          "sha": "9c8043fbcf1f98fa"
         }
       ],
-      "confirmedAt": "2026-10-22T20:55:39.904Z"
+      "confirmedAt": "2026-10-27T21:08:31.063Z"
     },
     {
       "topic": "skills",
@@ -2048,7 +2058,7 @@
         {
           "path": "apps/server/src/domains/backups/backups.ts",
           "why": "«Что на диске»: каталог копий, имя с меткой времени, ротация",
-          "sha": "378d9348788521bf"
+          "sha": "44697251a09d504c"
         },
         {
           "path": "apps/server/src/domains/changelog/build.ts",
@@ -2117,7 +2127,7 @@
         {
           "path": "apps/server/src/domains/backups/backups.ts",
           "why": "«Копии перед записью»: список копий, «Откатить» и что именно возвращается",
-          "sha": "378d9348788521bf"
+          "sha": "44697251a09d504c"
         },
         {
           "path": "apps/server/src/lib/claude-paths/claude-paths.ts",
@@ -2189,7 +2199,7 @@
         {
           "path": "apps/server/src/domains/watcher/report.ts",
           "why": "«Как читать отчёт»: WATCH-REPORT.md в корне приложения, оглавление, WR-n, тип и важность, разделы на месте, улики, секреты вычищены",
-          "sha": "555336a45812262d"
+          "sha": "0f32f4f782f6bcf5"
         },
         {
           "path": "apps/server/src/domains/watcher/report-texts.ts",
@@ -2204,7 +2214,7 @@
         {
           "path": "apps/server/src/bootstrap/watcher-capture/watcher-capture.ts",
           "why": "«Что попадает в отчёт»: серверные сигналы — 5xx, правила 4xx, ошибки и предупреждения журнала, медленные ответы, запуски CLI с ошибкой",
-          "sha": "80389a1b5883180c"
+          "sha": "ad4e13067368261a"
         },
         {
           "path": "apps/web/src/shared/lib/watch-capture/watch-capture.ts",
@@ -2360,7 +2370,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram-text.ts",
           "why": "«Telegram»: первая строка «вид · суть», вторая — хэштег и чат, ссылка «Открыть чат →», суть без кода и путей",
-          "sha": "c1c5025b79e0149f"
+          "sha": "22e75fde1f9f693c"
         },
         {
           "path": "apps/server/src/domains/notify/telegram-delivery.ts",
@@ -2405,7 +2415,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram-answers/compose.ts",
           "why": "«Сообщение»: «вид · суть», хэштег и чат, цитата, ссылка, сворачивание отвеченного в строку итога",
-          "sha": "07de1351756d4524"
+          "sha": "998b239529b3f117"
         },
         {
           "path": "apps/server/src/domains/notify/telegram-answers/cleanup.ts",
@@ -2415,7 +2425,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram-answers/replies.ts",
           "why": "Ответ reply в чат: картинки и PDF до 20 МБ, альбом одной отправкой, VS Code — только текст, строки ответа бота",
-          "sha": "1334d4f68380931d"
+          "sha": "0724f33bc75e8161"
         },
         {
           "path": "apps/server/src/domains/notify/telegram-answers/bot-api.ts",
@@ -2427,20 +2437,20 @@
     {
       "topic": "dlp",
       "document": "apps/web/src/pages/Help/topics/DlpTopic/DlpTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:13.663Z",
+      "confirmedAt": "2026-10-27T19:51:07.959Z",
       "sources": [
         {
           "path": "apps/server/src/domains/dlp/DlpProxy.ts",
           "why": "«Как это работает»: слушатель, счётчики и перезапуск при смене правил",
-          "sha": "2bb82e2356692047"
+          "sha": "48d616e17b3c010d"
         },
         {
-          "path": "apps/server/src/domains/dlp/api-shapes.ts",
+          "path": "packages/dlp/src/api-shapes.ts",
           "why": "«Что разбирается»: какие тела панель понимает и что делает с незнакомым",
           "sha": "3a92bc2023e6b27d"
         },
         {
-          "path": "apps/server/src/domains/dlp/rules.ts",
+          "path": "packages/dlp/src/rules.ts",
           "why": "«Три вида правил»: порядок «сначала блок, потом маска»",
           "sha": "e638432fe3b997c9"
         },
@@ -2452,17 +2462,17 @@
         {
           "path": "apps/server/src/domains/prompt-gate/script.ts",
           "why": "«Проверка перед отправкой»: что видит хук, два его действия и fail-open",
-          "sha": "5919ff30a18ee445"
+          "sha": "245d2c91da9dee94"
         },
         {
-          "path": "apps/server/src/domains/dlp/builtins.mjs",
+          "path": "packages/dlp/src/builtins.mjs",
           "why": "«Виды правил» и «Завести правила»: список встроенных образцов и какие из них сверяют контрольную сумму",
           "sha": "62d503fb2853a7b1"
         },
         {
           "path": "apps/server/src/domains/prompt-gate/prompt-gate.ts",
           "why": "«Где лежит»: скрипт прошлой версии против правленного руками, пересборка",
-          "sha": "62d973a4b069f97e"
+          "sha": "6de2f0561092be0c"
         }
       ]
     },
@@ -2520,12 +2530,12 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-config/actions-config.ts",
           "why": "«Что агент умеет»: правила, скиллы, хуки, MCP, права, CLAUDE.md и их классы риска",
-          "sha": "1b7f711224d1a579"
+          "sha": "e6b006b011469b8c"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-config-secrets.ts",
           "why": "«Ключи»: секреты MCP скрыты при чтении, от модели только пустое значение или ссылка ${VAR}",
-          "sha": "1fcbdf3690077e80"
+          "sha": "bbe747bd1272b3ef"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-contour/actions-contour.ts",
@@ -2540,7 +2550,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-tests/actions-tests.ts",
           "why": "«Что агент умеет»: тестирование, прогон и удаление кейса — опасное",
-          "sha": "8e1f49252ee27186"
+          "sha": "8eb0b07fb10edaf5"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-tests-reads.ts",
@@ -2570,17 +2580,17 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-project-config/actions-project-config.ts",
           "why": "«Что агент умеет»: настройки проекта — CLAUDE.md и удаление MCP/прав опасные, MCP/права/выбор групп — изменение",
-          "sha": "d32ac0f6e3c324b7"
+          "sha": "26c5168c815c7911"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-project-git/actions-project-git.ts",
           "why": "«Что агент умеет»: git и копии проекта — опасное; настройки разделения — изменение; push агенту не дан",
-          "sha": "6ac93f62b900a600"
+          "sha": "1dd685c1cf6aae93"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-project-runner/actions-project-runner.ts",
           "why": "«Что агент умеет»: dev-серверы и порт — опасное, остановка — изменение; код только читается",
-          "sha": "2e9fbe45203e017f"
+          "sha": "31f95ad44cb06fd9"
         },
         {
           "path": "apps/server/src/routes/panel-agent/panel-agent-routes/panel-agent-routes.ts",
@@ -2610,7 +2620,7 @@
         {
           "path": "apps/server/src/domains/panel-agent/data-mask/data-mask.ts",
           "why": "«Ключ из чата уходит меткой»: правила маски, ключи всегда, битые правила — отказ",
-          "sha": "a96b2ff385cfd78b"
+          "sha": "c5f1588fc8cd53ee"
         },
         {
           "path": "apps/server/src/domains/panel-agent/journal/journal.ts",
@@ -2715,7 +2725,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-hooks-env/actions-hooks-env.ts",
           "why": "«Что агент умеет»: хуки и переменные окружения, секрет env без значения",
-          "sha": "0b1c25e897730ed0"
+          "sha": "ce4ffca7b04782f0"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-work/actions-work.ts",
@@ -2725,12 +2735,12 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-app/actions-app.ts",
           "why": "«Что агент умеет» и «Настройки только для вас»: настройки, провайдер, эндпоинты, интеграции, DLP",
-          "sha": "87e658d8d16d6ea8"
+          "sha": "302faeea1fa09ed0"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-panel/actions-panel.ts",
           "why": "«Что агент умеет»: обзор, поиск, аналитика, сравнение — чтение",
-          "sha": "0fbc9aae7a88ee78"
+          "sha": "626b935105c3f544"
         },
         {
           "path": "apps/server/src/routes/panel-agent/help-routes.ts",
@@ -2740,37 +2750,37 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-groups/actions-groups.ts",
           "why": "«Группы»: разбор группы, черновик по описанию, шаги пути и числа — через карточку",
-          "sha": "7c1511aa8ed1a979"
+          "sha": "31997832f83451fd"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-groups-sources/actions-groups-sources.ts",
           "why": "«Группы»: находки и импорт, копия в общие с советами, слияние, переопределение, включение по папке, шаг пути → ресурс",
-          "sha": "2acffc89007597cf"
+          "sha": "f6cbf11267fc6b88"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-entities-extra/actions-entities-extra.ts",
           "why": "«Скиллы», «Хуки», «Переменные», «Права», «MCP»: имя скилла, порядок хуков, перенос между файлами, правка права, связь MCP, файлы структуры скилла",
-          "sha": "dcce930171d1b19b"
+          "sha": "a24c0acf335d16a3"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-chat-extra/actions-chat-extra.ts",
           "why": "«Сессия и файлы чата»: продолжение и перезапуск сессии, файлы чата, открытие в редакторе, выгрузка остаётся человеку",
-          "sha": "c3e6c6af11fc305e"
+          "sha": "f7e7a64bf8c648b0"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-sandbox/actions-sandbox.ts",
           "why": "«Песочница»: прогон хука, вопрос Claude, песочница на один вызов, вызов инструмента MCP остаётся человеку",
-          "sha": "0401db4db2d62174"
+          "sha": "7adc6242db9697ff"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-contour-agents/actions-contour-agents.ts",
           "why": "«Агенты и эмбеддинги контура»: риск каждого действия, что возвращают эмбеддинги, ключ не виден",
-          "sha": "9bc32fadeda2f3f2"
+          "sha": "3dbeddd4b0228abd"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-chat/actions-chat.ts",
           "why": "«Чаты»: чтение ленты, поиск по переписке, что ждёт человека — что агент видит и что маскирует",
-          "sha": "ffd297c380af89c9"
+          "sha": "1f5cb94816e5704f"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-chat-control/actions-chat-control.ts",
@@ -2780,7 +2790,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-chat-kit.ts",
           "why": "«Чаты»: как агент находит чат и с какой моделью уходит сообщение",
-          "sha": "65c6d31b149fb8da"
+          "sha": "beefda50a7a4ac17"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-settings-extra/actions-settings-extra.ts",
@@ -2805,12 +2815,12 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-portability/actions-portability.ts",
           "why": "«Аналитика и перенос»: план, применение и отмена переноса среды, архив среды",
-          "sha": "b8622cfe42a03da9"
+          "sha": "91b1542bfa3c2395"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-misc-extra/actions-misc-extra.ts",
           "why": "«Аналитика и перенос», «История и копии», «Плагины»: идущие агенты, где идёт сессия, стоп вне панели, удаление копии, каркас плагина",
-          "sha": "326d90b3a913a1b1"
+          "sha": "f213dcc127c2e54b"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-gaps-chat/actions-gaps-chat.ts",
@@ -2830,7 +2840,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-gaps-tests/actions-gaps-tests.ts",
           "why": "«Тесты»: черновик и статусы дефектов, черновики тестов, папка e2e, группы по умолчанию",
-          "sha": "67e9991917a3d807"
+          "sha": "1c55133e755dc960"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-group-copy.ts",
@@ -2954,7 +2964,7 @@
         {
           "path": "apps/server/src/domains/groups/copy.ts",
           "why": "«Копия в общие»: что копируется, суффикс занятого имени, переключение стороны",
-          "sha": "062cb6b365c155d2"
+          "sha": "b8cda5a77ff33dc1"
         },
         {
           "path": "apps/server/src/domains/group-discovery/run.ts",
@@ -3264,7 +3274,7 @@
         {
           "path": "apps/server/src/domains/groups/qwen-layer/qwen-layer.ts",
           "why": "«Группа в чате Qwen Code»: что едет слоем на прогон (MCP, хуки, правила, перечень скиллов), что нет (разрешения), системные настройки машины сохраняются",
-          "sha": "0c7e24055d476607"
+          "sha": "e66b1f7db9e4e5c7"
         },
         {
           "path": "apps/server/src/domains/groups/qwen-run-layer/qwen-run-layer.ts",
@@ -3307,7 +3317,7 @@
           "sha": "b280d6dc187cf339"
         }
       ],
-      "confirmedAt": "2026-10-22T21:40:00.017Z"
+      "confirmedAt": "2026-10-27T21:08:31.337Z"
     },
     {
       "topic": "phone",
@@ -3601,7 +3611,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-27T12:03:32.989Z",
+      "confirmedAt": "2026-10-27T21:02:34.201Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -3621,7 +3631,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "7dffb88fe9d7c31c"
+          "sha": "ae381177ebe5fac8"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

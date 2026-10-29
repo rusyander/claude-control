@@ -24,11 +24,11 @@
  * Запуск: [STEER_CLI_DIR=<каталог с codex>] node tools/qa/check-codex-wiki-off.mjs
  */
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const server = (path) => new URL(`../../apps/server/src/${path}`, import.meta.url).href;
@@ -58,61 +58,21 @@ function findCli(name) {
 }
 
 /** Заглушка OpenAI responses: имена инструментов первого запроса, ответ — «done». */
-function startModel() {
+async function startModel() {
   const seen = { tools: undefined };
-  const srv = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (!/\/responses/.test(req.url ?? '')) return void res.writeHead(404).end();
-      let body = {};
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        // не JSON — инструментов не видно
-      }
+  const stub = await startStubModel({
+    route: ({ path }) => (/\/responses/.test(path) ? undefined : { status: 404, body: {} }),
+    script: ({ request }) => {
       // Инструменты MCP Codex кладёт пространством имён: `{name, tools: [...]}`.
-      seen.tools ??= (body.tools ?? []).flatMap((tool) =>
+      seen.tools ??= (request.body.tools ?? []).flatMap((tool) =>
         Array.isArray(tool.tools)
           ? tool.tools.map((inner) => `${tool.name}/${inner.name}`)
           : [tool.name ?? tool.type],
       );
-      const item = {
-        type: 'message',
-        id: 'msg_1',
-        role: 'assistant',
-        status: 'completed',
-        content: [{ type: 'output_text', text: 'done', annotations: [] }],
-      };
-      const resp = { id: 'resp_1', object: 'response', model: 'stub-model', output: [item] };
-      const usage = {
-        input_tokens: 10,
-        output_tokens: 1,
-        total_tokens: 11,
-        input_tokens_details: { cached_tokens: 0 },
-        output_tokens_details: { reasoning_tokens: 0 },
-      };
-      const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      send('response.created', {
-        type: 'response.created',
-        response: { ...resp, status: 'in_progress', output: [] },
-      });
-      send('response.output_item.done', {
-        type: 'response.output_item.done',
-        output_index: 0,
-        item,
-      });
-      send('response.completed', {
-        type: 'response.completed',
-        response: { ...resp, status: 'completed', usage },
-      });
-      res.end();
-    });
+      return 'done';
+    },
   });
-  return new Promise((resolve) =>
-    srv.listen(0, '127.0.0.1', () => resolve({ srv, seen, port: srv.address().port })),
-  );
+  return { seen, port: stub.port, close: () => stub.close() };
 }
 
 async function removeLater(dir) {
@@ -173,7 +133,7 @@ async function run(tasksText, raw) {
     env: { ...(kit.env ?? {}), PWD: work },
   });
   if (spawned.error) {
-    model.srv.close();
+    await model.close();
     await removeLater(root);
     return { mcp, args: kit.args, code: 'spawn', tools: [], log: spawned.error.message };
   }
@@ -186,7 +146,7 @@ async function run(tasksText, raw) {
     const timer = setTimeout(() => (killChildProcessTree(child), resolve('timeout')), 120_000);
     child.on('exit', (exit) => (clearTimeout(timer), resolve(exit)));
   });
-  model.srv.close();
+  await model.close();
   await removeLater(root);
   return { mcp, args: kit.args, code, tools: model.seen.tools ?? [], log: log.slice(-400) };
 }

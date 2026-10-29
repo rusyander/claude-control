@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getChoice(path: string, group?: string): Promise<ProjectGroupChoiceView> {
+async function getChoice(path: string, group?: string): Promise<ProjectGroupChoiceView> {
   const { data } = await apiClient.get<ProjectGroupChoiceView>('/projects/group-choice', {
     params: { path, ...(group ? { group } : {}) },
   });

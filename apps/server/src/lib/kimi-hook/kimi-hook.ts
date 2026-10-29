@@ -41,7 +41,7 @@ import {
  */
 
 /** Имя региона таблиц со списком хуков. */
-export const KIMI_HOOKS_KEY = 'hooks';
+const KIMI_HOOKS_KEY = 'hooks';
 
 /** Поля правила, которые ведёт панель. Любое другое → fail-closed. */
 const RULE_KEYS = ['event', 'matcher', 'command', 'timeout'];
@@ -82,7 +82,7 @@ export interface KimiHookRule {
 }
 
 /** Таймаут: целое в задокументированных границах. */
-export function isValidKimiTimeout(value: unknown): value is number {
+function isValidKimiTimeout(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isInteger(value) &&

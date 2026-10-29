@@ -8,7 +8,7 @@ import type {
   SessionStopResult,
 } from '@agentdeck/contracts';
 import type { BackupEntry } from '../../../domains/backups/backups.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

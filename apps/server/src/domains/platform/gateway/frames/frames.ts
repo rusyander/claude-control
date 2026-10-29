@@ -1,5 +1,5 @@
 import type { PlatformViolationAction } from '@agentdeck/contracts';
-import { parseFrame, serializeFrame, splitFrames } from '../../../dlp/sse.ts';
+import { parseFrame, serializeFrame, splitFrames } from '@agentdeck/dlp/sse';
 import type { DriverViolationName, VendorFrame, VendorFrameKind } from '../../drivers/driver.ts';
 import { readViolations } from '../status/status.ts';
 import {

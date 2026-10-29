@@ -11,7 +11,7 @@ import type { SplitSettingsView } from '@agentdeck/contracts/task-split';
 import { bootstrapPlanFor } from '../../../domains/project-git/bootstrap.ts';
 import { commitContentPrint } from '../../../domains/project-git/content-print.ts';
 import { worktreeDirFor } from '../../../domains/project-git/worktrees.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

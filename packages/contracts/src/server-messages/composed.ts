@@ -157,6 +157,7 @@ export const composedMessageParams = {
   'delivery-gap-task-quote-unfound': ['point', 'quote'],
   'delivery-gap-task-quote-label': ['point', 'quote'],
   'delivery-gap-task-point-unmapped': ['key', 'count', 'points'],
+  'delivery-gap-point-id-shape': ['ids'],
   'delivery-gap-task-rewritten': ['point', 'was', 'now'],
   'delivery-gap-task-note-rejected': ['point', 'evidence', 'why'],
   'delivery-gap-defer-unowned': ['point', 'evidence'],

@@ -39,7 +39,7 @@ import { stripBom } from '../text-form/text-form.ts';
 export { UnrecognizedFormatError, EnvKeyNotEncodableError };
 
 /** Задокументированный ключ переменных окружения в `~/.aider.conf.yml`. */
-export const AIDER_SET_ENV_KEY = 'set-env';
+const AIDER_SET_ENV_KEY = 'set-env';
 
 /**
  * Задокументированный ключ ССЫЛОК на файлы контекста/инструкций (AIDER-1):
@@ -47,7 +47,7 @@ export const AIDER_SET_ENV_KEY = 'set-env';
  * (inline-массив и маркированный список), а одиночная строка = список из одного
  * элемента. Единого «файла инструкций» у Aider нет — есть вот этот список ссылок.
  */
-export const AIDER_READ_KEY = 'read';
+const AIDER_READ_KEY = 'read';
 
 /**
  * Ключ переменной непригоден для формы `КЛЮЧ=значение`: пустой, содержит `=`

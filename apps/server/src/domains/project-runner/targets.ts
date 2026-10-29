@@ -204,7 +204,7 @@ const anyTool: ToolCheck = () => true;
  * стеков нашли, чем запускать. Каталог, уже найденный воркспейсами Node, второй
  * раз не добавляется.
  */
-export function backendTargetDirs(root: string): string[] {
+function backendTargetDirs(root: string): string[] {
   const dirs = new Set<string>();
   const addGoPrograms = (moduleDir: string) => {
     if (!existsSync(join(root, moduleDir, 'go.mod'))) return;

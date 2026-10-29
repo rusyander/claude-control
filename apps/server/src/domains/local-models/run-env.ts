@@ -1,4 +1,5 @@
 import { LOCAL_COMPACT_RESERVE_TOKENS } from '@agentdeck/contracts/local-models';
+import { claudeRunFacts } from '@agentdeck/providers/claude';
 
 /**
  * Окружение прогона Claude Code на локальной модели: настоящее окно сервера и
@@ -38,20 +39,12 @@ import { LOCAL_COMPACT_RESERVE_TOKENS } from '@agentdeck/contracts/local-models'
 /** Резерв под ответ: меньше облачного, чтобы сжатие оставляло место истории. */
 export const LOCAL_MAX_OUTPUT_TOKENS = 8_192;
 
-/** Все переменные, которые ставит `localRunEnv`, — в порядке записи. */
-export const LOCAL_RUN_ENV_VARS = [
-  'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
-  'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
-  'CLAUDE_CODE_MAX_OUTPUT_TOKENS',
-  'CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY',
-  'CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS',
-  'CLAUDE_STREAM_IDLE_TIMEOUT_MS',
-  'CLAUDE_BYTE_STREAM_IDLE_TIMEOUT_MS',
-  'API_TIMEOUT_MS',
-  'CLAUDE_CODE_RETRY_WATCHDOG',
-  'CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS',
-  'MAX_MCP_OUTPUT_TOKENS',
-] as const;
+/**
+ * Все переменные, которые ставит `localRunEnv`, — в порядке записи. Список — факт запуска
+ * Claude Code (канал пределов, `@agentdeck/providers/claude`); тест сверяет с ним писателя.
+ */
+export const LOCAL_RUN_ENV_VARS: readonly string[] =
+  claudeRunFacts.limitsChannel?.via === 'env' ? claudeRunFacts.limitsChannel.vars : [];
 
 /**
  * Только для прогонов через шлюз панели (L7). Claude Code с чужим адресом API поиск
@@ -72,7 +65,7 @@ const FALLBACK_PROMPT_TPS = 150;
 /** Запас на разброс скорости: тот же коэффициент, что у шлюза. */
 const BUDGET_SLACK = 1.5;
 /** Какая доля окна на ответ одного инструмента. */
-export const LOCAL_TOOL_OUTPUT_SHARE = 8;
+const LOCAL_TOOL_OUTPUT_SHARE = 8;
 
 /**
  * Срок ожидания первого байта и паузы в потоке: полное окно, разобранное на измеренной

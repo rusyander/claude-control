@@ -54,7 +54,7 @@ import { registerTelegramConnectRoutes } from './telegram-connect-routes.ts';
  * наружу уходит только маской.
  */
 
-export const ANSWERS_TOKEN_ID = 'int:telegram-answers';
+const ANSWERS_TOKEN_ID = 'int:telegram-answers';
 
 /** Решённые человеком состояния D-n: ответ дан в окне или на телефоне, не в этом сообщении. */
 const DECIDED = new Set<DeferredAskState>(['allowed', 'denied', 'consumed']);

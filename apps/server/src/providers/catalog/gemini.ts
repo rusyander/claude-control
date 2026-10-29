@@ -2,8 +2,12 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { unimplementedPaths } from './config-dirs.ts';
-import { geminiContourBypass } from './gemini-contour.ts';
+import { geminiAuthBlocks } from './gemini-contour.ts';
 import { createGeminiStreamParser } from './gemini-stream.ts';
+import { assistantApiOf, endpointConfigOf, modelsOf, runFactsOf } from './run-facts.ts';
+
+/** Факты запуска Gemini CLI — из пакета `@agentdeck/providers`. */
+const facts = runFactsOf('gemini');
 
 /** Каталог конфигурации Gemini: переопределения документация не заявляет. */
 const geminiHome = (): string => join(homedir(), '.gemini');
@@ -26,11 +30,11 @@ const GEMINI_TOOL_NAMES: Readonly<Record<string, string>> = {
 };
 
 export const geminiProvider: ConfigProvider = {
-  id: 'gemini',
-  name: 'Gemini CLI',
-  status: 'experimental',
-  paths: unimplementedPaths('gemini'),
-  cli: { command: 'gemini', windowsCommand: 'gemini.cmd' },
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
+  cli: facts.binary,
   // Глобальный файл инструкций Gemini задокументирован (~/.gemini/GEMINI.md).
   instructionsFile: () => join(geminiHome(), 'GEMINI.md'),
   // MCP-серверы Gemini — объект mcpServers в ~/.gemini/settings.json. Запись:
@@ -122,9 +126,7 @@ export const geminiProvider: ConfigProvider = {
   // рабочий CLI (`gemini`). Обе стандартные переменные подхватываются автоматически.
   // One-shot: `gemini -p <prompt>` — неинтерактивный print-режим (флаг задокументирован).
   assistant: {
-    apiKind: 'google',
-    apiKeyEnvVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
-    cliRunnable: true,
+    ...assistantApiOf(facts),
     // Подбор модели (Т12): `-m/--model` задокументирован («Specify the model»)
     // и работает вместе с `-p`. Аналога глубины у Gemini CLI нет — `run.effort`
     // здесь не участвует вовсе, и придумывать ему флаг нельзя.
@@ -158,15 +160,10 @@ export const geminiProvider: ConfigProvider = {
   // `GEMINI_MODEL`, ключ — `GEMINI_API_KEY`; всё это документация прямо
   // разрешает держать в `.env`, куда панель и пишет. Vertex-адрес
   // (`GOOGLE_VERTEX_BASE_URL`) — другой вид авторизации, сюда не тянем.
-  endpointConfig: {
-    google: {
-      baseUrlEnv: 'GOOGLE_GEMINI_BASE_URL',
-      modelEnv: 'GEMINI_MODEL',
-      credentialEnv: 'GEMINI_API_KEY',
-      // Адрес читается только при входе ключом API (`gemini-contour.ts`).
-      bypass: () => geminiContourBypass(geminiSettings()),
-    },
-  },
+  // Адрес читается только при входе ключом API (`gemini-contour.ts`).
+  endpointConfig: endpointConfigOf(facts, (bypass) =>
+    geminiAuthBlocks(bypass.requires, geminiSettings()),
+  ),
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',
@@ -188,12 +185,8 @@ export const geminiProvider: ConfigProvider = {
     analytics: 'unsupported',
     sandbox: 'unsupported',
   }),
-  // Модели: каталог Google (models.dev).
-  modelVendors: ['google'],
-  // Лестница подбора (Т12): `flash-lite` и `flash` — младшие линейки Gemini, обе
-  // ниже линейки `pro`, которой CLI работает по умолчанию. Семейства однородны:
-  // в каждом только своя ступень, поэтому «свежайшая в семействе» не меняет
-  // класс модели. `gemini-pro` в лестницу не берём — верх у чужого CLI это его
+  // Модели: каталог Google (models.dev). Лестница подбора (Т12) — младшие линейки
+  // Gemini, обе ниже `pro`, которой CLI работает по умолчанию; верх у чужого CLI — его
   // собственная настройка, и панель её не подменяет.
-  modelLadder: ['gemini-flash-lite', 'gemini-flash'],
+  ...modelsOf(facts),
 };

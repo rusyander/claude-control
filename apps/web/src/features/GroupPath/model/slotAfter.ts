@@ -2,7 +2,7 @@ import type { PathEntry } from '@agentdeck/contracts';
 import type { PathSlot } from './pathEdit.types';
 import { anchorAfter } from './anchorAfter';
 
-export function isInSkillBlock(entry: PathEntry | undefined): boolean {
+function isInSkillBlock(entry: PathEntry | undefined): boolean {
   return entry?.kind === 'skill-step' || (entry?.kind === 'custom' && Boolean(entry.step.within));
 }
 

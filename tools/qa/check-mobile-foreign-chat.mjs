@@ -30,12 +30,12 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { REPO, reporter, startStand, wait } from './throwaway-stand.mjs';
 import { PACKAGE, device, firstDevice } from './android-device.mjs';
 import { startProxy, transcriptDir } from './mobile-device-fixtures.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 // Модель держит ответ, пока проверка его не отпустит (через RELEASE_MS после ухода
@@ -78,92 +78,26 @@ function findCli(name) {
 }
 
 /** Заглушка модели (OpenAI responses, поток): ответ с номером хода — когда отпустят. */
-function startModel() {
+async function startModel() {
   let turns = 0;
-  let releases = [];
   let firstAt = 0;
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (!/\/responses/.test(req.url ?? '')) return void res.writeHead(404).end();
+  const stub = await startStubModel({
+    // Codex ходит только в /responses; прочее — 404, как у прежней заглушки.
+    route: ({ path }) => (/\/responses/.test(path) ? undefined : { status: 404, body: {} }),
+    // Поток начат и держится HOLD_MS (или до `release()`): ход «идёт», пока телефон смотрит.
+    script: () => {
       turns += 1;
       if (!firstAt) firstAt = Date.now();
-      const text = ANSWER(turns);
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      const resp = { id: `resp_${turns}`, object: 'response', model: 'stub-model', output: [] };
-      const item = {
-        type: 'message',
-        id: `msg_${turns}`,
-        role: 'assistant',
-        status: 'completed',
-        content: [{ type: 'output_text', text, annotations: [] }],
-      };
-      send('response.created', {
-        type: 'response.created',
-        response: { ...resp, status: 'in_progress' },
-      });
-      let answered = false;
-      const answer = () => {
-        if (answered || res.destroyed) return;
-        answered = true;
-        send('response.output_item.added', {
-          type: 'response.output_item.added',
-          output_index: 0,
-          item: { ...item, content: [] },
-        });
-        send('response.output_text.delta', {
-          type: 'response.output_text.delta',
-          item_id: item.id,
-          output_index: 0,
-          content_index: 0,
-          delta: text,
-        });
-        send('response.output_item.done', {
-          type: 'response.output_item.done',
-          output_index: 0,
-          item,
-        });
-        send('response.completed', {
-          type: 'response.completed',
-          response: {
-            ...resp,
-            status: 'completed',
-            output: [item],
-            usage: {
-              input_tokens: 10,
-              output_tokens: 1,
-              total_tokens: 11,
-              input_tokens_details: { cached_tokens: 0 },
-              output_tokens_details: { reasoning_tokens: 0 },
-            },
-          },
-        });
-        res.end();
-      };
-      releases.push(answer);
-      setTimeout(answer, HOLD_MS);
-    });
+      return { text: ANSWER(turns), stallMs: HOLD_MS };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        turns: () => turns,
-        firstAt: () => firstAt,
-        release: () => {
-          for (const answer of releases) answer();
-          releases = [];
-        },
-        close: () =>
-          new Promise((resolve) => {
-            server.closeAllConnections?.();
-            server.close(() => resolve());
-          }),
-      }),
-    ),
-  );
+  return {
+    port: stub.port,
+    turns: () => turns,
+    firstAt: () => firstAt,
+    release: () => stub.release(),
+    close: () => stub.close(),
+  };
 }
 
 const serial = firstDevice();

@@ -148,6 +148,37 @@ describe('AgentHistorySessions — сессии разговора в окне �
     expect(historyPollMs(false, { ...history, live: { agents: 0, subagents: 1 } })).toBe(5000);
   });
 
+  it('оборванные паузой — своей строкой «прервано паузой», не в «ошибок»', () => {
+    const cut: AgentHistory = {
+      ...history,
+      sessions: [
+        {
+          ...history.sessions[0]!,
+          main: {
+            toolCalls: 3,
+            anomalies: {
+              denials: 0,
+              errors: 0,
+              interrupted: 2,
+              repeatedReads: [],
+              largeResults: 0,
+            },
+          },
+        },
+      ],
+    };
+    const html = render({ history: cut });
+    expect(html).toContain('data-agent-history-interrupted');
+    expect(html).toContain('прервано паузой 2');
+    expect(html).not.toContain('ошибок');
+  });
+
+  it('старый сервер без отметок «сейчас» — окна «Сейчас» нет, «идёт» как раньше', () => {
+    const html = render();
+    expect(html).not.toContain('data-agent-history-now');
+    expect(html).not.toContain('data-agent-history-session-live');
+  });
+
   it('пустая история и чтение — свои строки', () => {
     expect(
       render({ history: { sessions: [], agentCount: 0, live: { agents: 0, subagents: 0 } } }),

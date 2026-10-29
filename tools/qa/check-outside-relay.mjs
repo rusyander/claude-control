@@ -23,27 +23,27 @@
  *   7. сообщение к концу хода — ход продолжается с ним (Stop);
  *   8. выключено: запрос сразу только в окне, сообщение не принимается (409).
  *
- * Нужны стенд (`pnpm dev`) и `claude` на PATH. Переключатель стенда
- * возвращается в прежнее положение. Настроек Claude Code человека не трогает.
+ * Нужен `claude` на PATH; панель — своя одноразовая (`throwaway-stand.mjs`), её
+ * переключатель пересылки и состояние живут во временном доме. Ни панели, ни
+ * настроек Claude Code человека проверка не трогает.
  * Выход 1 — хоть одна строка FAIL, 2 — стенд не отвечает или без маршрутов
  * `/api/outside/*`. `RELAY_DEBUG=1` печатает ход каждого прогона.
  *
  * Запуск: node tools/qa/check-outside-relay.mjs
  */
-import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
+import { startStand } from './throwaway-stand.mjs';
 
-const BASE = process.env.PANEL_URL ?? 'http://127.0.0.1:5178';
-const TOKEN = (() => {
-  try {
-    return readFileSync(join(homedir(), '.agentdeck', 'api-token'), 'utf8').trim();
-  } catch {
-    return '';
-  }
-})();
+// Одноразовый стенд, а не панель человека: маршрут решения пускает только
+// узнанное окно (`human-only.ts`), и на рабочей панели запрос этого процесса
+// получал 403 «окно не узнано» на каждой строке. Стенд узнаёт процесс, который
+// его поднял, а переключатель пересылки щёлкается в его состоянии, не в нашем.
+const stand = await startStand({ web: false, label: 'outside-relay' });
+const BASE = stand.apiUrl;
 const QUESTION = 'Какой цвет?';
 const QUESTIONS = [
   {
@@ -64,34 +64,15 @@ const debug = (...a) => process.env.RELAY_DEBUG && console.error('[relay]', ...a
 async function api(method, path, body) {
   const response = await fetch(`${BASE}${path}`, {
     method,
-    headers: {
-      ...(body ? { 'content-type': 'application/json' } : {}),
-      authorization: `Bearer ${TOKEN}`,
-    },
+    headers: body ? { 'content-type': 'application/json' } : {},
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await response.text();
   return { status: response.status, body: text ? JSON.parse(text) : undefined };
 }
 
-const toolUse = (id, name, input) => ({
-  blocks: [
-    [
-      { type: 'tool_use', id, name, input: {} },
-      { type: 'input_json_delta', partial_json: JSON.stringify(input) },
-    ],
-  ],
-  stop: 'tool_use',
-});
-const say = (text) => ({
-  blocks: [
-    [
-      { type: 'text', text: '' },
-      { type: 'text_delta', text },
-    ],
-  ],
-  stop: 'end_turn',
-});
+const toolUse = (id, name, input) => ({ tool: { name, args: input, id } });
+const say = (text) => ({ text });
 const resultOf = (body, id) =>
   (body.messages ?? [])
     .flatMap((message) => (Array.isArray(message.content) ? message.content : []))
@@ -102,57 +83,18 @@ const resultOf = (body, id) =>
  * сценария и складывает в `requests`; служебные (заголовок, классификатор)
  * получают «ок».
  */
-function startModel(respond) {
+async function startModel(respond) {
   const requests = [];
-  const sse = (res, { blocks, stop }) => {
-    res.writeHead(200, { 'content-type': 'text/event-stream' });
-    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    send('message_start', {
-      type: 'message_start',
-      message: {
-        id: `m${requests.length}`,
-        type: 'message',
-        role: 'assistant',
-        model: 'stub',
-        content: [],
-        stop_reason: null,
-        usage: { input_tokens: 1, output_tokens: 1 },
-      },
-    });
-    blocks.forEach(([start, delta], index) => {
-      send('content_block_start', { type: 'content_block_start', index, content_block: start });
-      send('content_block_delta', { type: 'content_block_delta', index, delta });
-      send('content_block_stop', { type: 'content_block_stop', index });
-    });
-    send('message_delta', {
-      type: 'message_delta',
-      delta: { stop_reason: stop },
-      usage: { output_tokens: 1 },
-    });
-    send('message_stop', { type: 'message_stop' });
-    res.end();
-  };
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', async () => {
-      if (req.url.includes('count_tokens')) return res.end(JSON.stringify({ input_tokens: 1 }));
-      if (!req.url.includes('/messages')) return res.end('{}');
-      const body = JSON.parse(raw || '{}');
-      if (!(body.tools ?? []).some((tool) => tool.name === 'Bash')) return sse(res, say('ок'));
-      requests.push(body);
-      sse(res, await respond(body, requests.length));
-    });
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: async ({ request }) => {
+      if (!request.tools.includes('Bash')) return say('ок');
+      requests.push(request.body);
+      return respond(request.body, requests.length);
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        requests,
-        close: () => server.close(),
-      }),
-    ),
-  );
+  return { url: stub.baseUrl, requests, close: () => stub.close() };
 }
 
 /**
@@ -297,6 +239,7 @@ const row = (name, expected, actual, ok) => rows.push({ name, expected, actual, 
 const before = await api('GET', '/api/outside/relay');
 if (before.status !== 200 || typeof before.body?.command !== 'string') {
   console.error(`Стенд ${BASE} не отвечает или старый: ${before.status}`);
+  await stand.stop();
   process.exit(2);
 }
 const command = before.body.command;
@@ -525,7 +468,7 @@ try {
     );
   }
 } finally {
-  await api('PATCH', '/api/outside/relay', { enabled: before.body.enabled });
+  await stand.stop();
 }
 
 console.table(

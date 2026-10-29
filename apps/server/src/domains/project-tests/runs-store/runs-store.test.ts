@@ -372,4 +372,24 @@ describe('project-tests/runs-store', () => {
       r4000000: undefined,
     });
   });
+
+  it('прогон ядра задач (G14): origin core и coreRecordId доходят до истории; чужой coreRecordId отброшен', () => {
+    const core = (id: string, day: string, origin: string): ProjectTestRunRecord =>
+      ({
+        ...record(id, `2026-09-${day}T10:00:00.000Z`),
+        mode: 'import',
+        actor: 'ci',
+        origin,
+        coreRecordId: `${'a'.repeat(64)}.${id}`,
+      }) as unknown as ProjectTestRunRecord;
+    writeRun(project, core('c1000000', '05', 'core'));
+    writeRun(project, core('c2000000', '06', 'ci'));
+    const byId = Object.fromEntries(readRuns(project).map((run) => [run.id, run]));
+    expect(byId.c1000000).toMatchObject({
+      origin: 'core',
+      coreRecordId: `${'a'.repeat(64)}.c1000000`,
+    });
+    expect(byId.c2000000?.origin).toBe('ci');
+    expect(byId.c2000000).not.toHaveProperty('coreRecordId');
+  });
 });

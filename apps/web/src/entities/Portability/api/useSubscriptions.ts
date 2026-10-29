@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getSubscriptions(): Promise<SubscriptionsAnswer> {
+async function getSubscriptions(): Promise<SubscriptionsAnswer> {
   const { data } = await apiClient.get<SubscriptionsAnswer>('/portability/subscriptions');
   return data;
 }

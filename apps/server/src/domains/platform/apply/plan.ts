@@ -159,9 +159,4 @@ export function buildPlatformApplyPlan(
   };
 }
 
-/** Цель по идентификатору — общая часть плана и применения. */
-export function findTarget(targets: ContourTarget[], targetId: string): ContourTarget | undefined {
-  return targets.find((item) => item.targetId === targetId);
-}
-
 export { PLATFORM_ASSISTANT_TARGET };

@@ -20,10 +20,9 @@ import {
 } from './shared.ts';
 
 /** Почему комментарии не прочитаны — коды для `tests-cli delivery`, человеку их не показывают. */
-export type JiraCommentsMiss = 'not-connected' | 'unreachable';
+type JiraCommentsMiss = 'not-connected' | 'unreachable';
 
-export type JiraCommentsReply =
-  { comments: string[] } | { comments: null; reason: JiraCommentsMiss };
+type JiraCommentsReply = { comments: string[] } | { comments: null; reason: JiraCommentsMiss };
 
 /**
  * Jira глазами панели: найти задачу, прочитать её, завести дефект, дописать

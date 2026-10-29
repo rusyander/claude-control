@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { WatchEntryClass, WatchSeverity, WatchVerdict } from '@agentdeck/contracts';
 import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { refNumber, type ReportRefs } from './events.ts';
 import {
   LOCATION_LINE,

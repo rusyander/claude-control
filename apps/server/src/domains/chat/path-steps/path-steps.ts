@@ -34,7 +34,7 @@ import { buildPath } from '../../groups/path/path.ts';
  *    без блока и после этого цепочка ждёт человека.
  */
 
-export const GATE_BLOCK_KIND = 'gate';
+const GATE_BLOCK_KIND = 'gate';
 
 /**
  * Отложенный ответ стадии и её задание. Раньше хвост 24k и 16k: длинный план
@@ -71,7 +71,7 @@ function enOf(text: { ru: string; en: string } | undefined): string {
  * которую владелец правил последней, `source`) идёт всегда, а перевод — только
  * подсказкой после него, когда он есть и отличается.
  */
-export function ownerTextOf(
+function ownerTextOf(
   text: { ru: string; en: string } | undefined,
   source: PathStep['source'],
 ): string {
@@ -111,7 +111,7 @@ const LANGUAGE_SAMPLE_MAX = 160;
  * английские, значит строка с буквами не латиницы — его. Такой строки нет —
  * человек, видимо, пишет по-английски, и хватает общей строки.
  */
-export function stepAnswerLanguageLine(task: string): string {
+function stepAnswerLanguageLine(task: string): string {
   const human = task
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -160,7 +160,7 @@ function gateReportLines(gate: string): string {
  * панель не знает, закрыт ли шаг, а человека рядом может не быть. Одно — и
  * той же сессией: шаг помнит, что сделал, и ему остаётся только отчитаться.
  */
-export function gateNudgePrompt(step: PathStep, task = ''): string {
+function gateNudgePrompt(step: PathStep, task = ''): string {
   const title = enOf(step.title);
   return [
     `Your answer to the path step${title ? ` "${title}"` : ''} ended without the gate block, so ` +

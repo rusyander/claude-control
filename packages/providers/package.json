@@ -1,0 +1,34 @@
+{
+  "name": "@agentdeck/providers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Факты запуска каждого CLI (имя, бинарь, каналы адреса модели, ключи, лестница моделей, глубина, пределы, событие окна) — один источник для каталога панели и переходников ядра",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./channels": "./src/channels.ts",
+    "./effort": "./src/effort.ts",
+    "./registry": "./src/registry.ts",
+    "./literals": "./src/literals.ts",
+    "./claude": "./src/claude.ts",
+    "./codex": "./src/codex.ts",
+    "./gemini": "./src/gemini.ts",
+    "./qwen": "./src/qwen.ts",
+    "./continue": "./src/continue.ts",
+    "./goose": "./src/goose.ts",
+    "./kimi": "./src/kimi.ts",
+    "./cursor": "./src/cursor.ts",
+    "./opencode": "./src/opencode.ts",
+    "./aider": "./src/aider.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

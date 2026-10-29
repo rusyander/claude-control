@@ -420,7 +420,7 @@ export function groupOf<G extends { index: number }>(
   return record.groups.find((group) => group.index === index);
 }
 
-export function ownCopyOf(
+function ownCopyOf(
   record: Pick<SplitPlanRecord, 'projectPath' | 'copyRoot'>,
   group: { path?: string; cleaned?: unknown } | undefined,
 ): string | undefined {

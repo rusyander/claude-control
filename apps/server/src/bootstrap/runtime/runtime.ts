@@ -966,7 +966,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   });
   // Пока группы работают — пересчёт по расписанию (находка 61c), а не только по
   // концу цепочки: соседи сходятся в одном файле задолго до своего конца.
-  splitOverlap.watchDrift();
+  const stopOverlapDrift = splitOverlap.watchDrift();
   /**
    * Ревью запроса на слияние по ссылке (Т7). Домен решает, что делать с
    * замечаниями, а всё, что умеет ПИСАТЬ, подаётся сюда снаружи: комментарий в
@@ -2560,6 +2560,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     groupWatcher.stop();
     // Пинги тёплого кэша: тик гаснет, идущий пинг погасил `detachAll` выше.
     keepWarm.stop();
+    // Пересчёт пересечений групп по расписанию: тик звал бы git в проектах групп уже
+    // после закрытия сборки.
+    stopOverlapDrift();
     // Ждущие карточки агента — ответить отменой: иначе запрос переходника висит
     // до таймаута уже мёртвого процесса.
     panelPending.cancelAll();
@@ -2612,12 +2615,13 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           read: readMr,
           jobLog: readJobLog,
           recheck: (parent, at, prompt) => splitConveyor.recheckDelivered(parent, at, prompt),
-          scope: (record, group) =>
+          scope: (record, group, target) =>
             group.path
               ? readRecheckScope({
                   mainDir: copyRootOf(record),
                   copy: group.path,
                   ...(group.base ? { base: group.base } : {}),
+                  ...(target ? { target } : {}),
                 })
               : Promise.resolve(undefined),
           // Задачи трекера — заново в копию (g0 26.10, F3): изменённые после последней

@@ -39,6 +39,9 @@ import type { AnyPanelAction } from '../registry.ts';
  * спрашивает, а не правит этот список.
  */
 const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
+  // Решение 28.10 (новая строка, не переклассификация): команда ядру — пауза, одобрение,
+  // перезапуск — полномочие человека; ядро вдобавок судит pid пира.
+  'POST /api/core/commands': 'human:rights',
   // Решение владельца 30.09: перезапуск dev-сервера обрывает живые ходы.
   'POST /api/dev-restart': 'human:dev-restart',
   // Решение владельца 30.09: проверка поломкой правит код в копии и тратит время.

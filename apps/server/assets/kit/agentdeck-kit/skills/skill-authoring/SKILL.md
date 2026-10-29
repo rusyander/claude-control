@@ -92,7 +92,7 @@ in-flow steering. One that reads as an instruction belongs in the body, phrased 
 ## 7. Ship checklist
 
 - [ ] Invocation axis deliberate; description within budget (§2), triggers not identity.
-- [ ] `SKILL.md` ≤8 KB (≤12 KB once ≥3 `references/` files carry the detail; each reference ≤12 KB) —
+- [ ] `SKILL.md` ≤8 KB (≤16 KB once ≥3 `references/` files carry the detail; each reference ≤16 KB) —
       the audit checks it. The cap is a ceiling, never a target: a line earns its bytes by changing behaviour.
 - [ ] Headroom left: under 80 B from a cap the audit warns early, body and `references/` alike —
       answer it by disclosing a block, never by trimming meaning to fit the number.

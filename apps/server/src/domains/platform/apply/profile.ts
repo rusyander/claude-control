@@ -33,7 +33,7 @@ import type { AppStore } from '../../../lib/app-store/app-store.ts';
  */
 
 /** Префикс идентификатора: столкнуться с профилем человека он не может. */
-export const MANAGED_PROFILE_PREFIX = 'contour-';
+const MANAGED_PROFILE_PREFIX = 'contour-';
 
 /**
  * Заглушка вместо ключа в чужом конфиге. Настоящий ключ контура не пишется

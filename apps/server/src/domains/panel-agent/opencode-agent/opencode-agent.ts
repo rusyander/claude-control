@@ -27,7 +27,7 @@ import {
  * его скилл, его MCP-сервер и 11 встроенных инструментов.
  */
 
-export const OPENCODE_AGENT_NAME = PANEL_AGENT_BRIDGE_ID;
+const OPENCODE_AGENT_NAME = PANEL_AGENT_BRIDGE_ID;
 
 /** Ключи конфига человека, без которых ход остался бы без его модели и входа. */
 const USER_CONFIG_KEYS = [
@@ -39,7 +39,7 @@ const USER_CONFIG_KEYS = [
 ] as const;
 
 /** Каталог данных OpenCode человека (там `auth.json`): `$XDG_DATA_HOME/opencode`. */
-export function userOpencodeDataDir(env: NodeJS.ProcessEnv = process.env): string {
+function userOpencodeDataDir(env: NodeJS.ProcessEnv = process.env): string {
   const raw = env.XDG_DATA_HOME?.trim();
   return join(raw ? resolve(raw) : join(homedir(), '.local', 'share'), 'opencode');
 }
@@ -70,7 +70,7 @@ function userProvidersAndModel(configDir: string, env: NodeJS.ProcessEnv): Recor
 }
 
 /** Конфиг хода: провайдеры человека, переходник и агент только с переходником. */
-export function opencodeAgentConfig(
+function opencodeAgentConfig(
   bridge: BridgeLaunch,
   systemPromptText: string,
   user: Record<string, unknown>,

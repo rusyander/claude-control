@@ -12,7 +12,7 @@ export interface DragState {
 }
 
 /** Атрибут ручки: по нему фокус находит ручку перенесённого шага после перерисовки. */
-export const DRAG_HANDLE_ATTR = 'data-drag-handle';
+const DRAG_HANDLE_ATTR = 'data-drag-handle';
 
 export interface DragHandleProps {
   [DRAG_HANDLE_ATTR]: string;

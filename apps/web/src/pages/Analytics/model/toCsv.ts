@@ -1,7 +1,7 @@
 import { csvCell } from './report';
 
 /** Строка CSV из ячеек с экранированием каждой. */
-export function csvRow(cells: Array<string | number | boolean>): string {
+function csvRow(cells: Array<string | number | boolean>): string {
   return cells.map(csvCell).join(',');
 }
 

@@ -34,14 +34,14 @@ export const SLIDE_H = DECK_H_IN;
 export const MX = 0.92;
 export const CONTENT_W = SLIDE_W - MX * 2;
 /** Планка акцента над заголовком. */
-export const RULE_Y = 0.66;
+const RULE_Y = 0.66;
 export const TITLE_Y = 0.88;
 /** Верх содержимого и два его низа: со сносками и без. */
 export const BODY_Y = 2.15;
 export const BODY_BOTTOM = 6.32;
 export const CITES_Y = 6.0;
-export const FOOT_LINE_Y = 6.62;
-export const FOOT_TEXT_Y = 6.74;
+const FOOT_LINE_Y = 6.62;
+const FOOT_TEXT_Y = 6.74;
 
 export const FONT = DECK_FONT_PPTX;
 

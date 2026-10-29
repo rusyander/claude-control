@@ -51,7 +51,7 @@ const fileKey = (path: string, caseless: boolean): string =>
   caseless ? slash(path).toLowerCase() : slash(path);
 
 /** Файлы настроек трёх источников — те же, что читает CLI. */
-export function settingsFiles(root: string, place: TeamPlace): string[] {
+function settingsFiles(root: string, place: TeamPlace): string[] {
   return [
     join(place.configDir, 'settings.json'),
     join(root, '.claude', 'settings.json'),

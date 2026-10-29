@@ -148,7 +148,7 @@ function safeSedScript(script: string): boolean {
 }
 
 /** `sed -n 257,330p файл`, `sed 's/a/b/g'` — печать; `-i`, `w`, `e` — уже нет. */
-export function sedReadOnly(args: Word[]): boolean {
+function sedReadOnly(args: Word[]): boolean {
   const scripts: Word[] = [];
   const positional: Word[] = [];
   for (let i = 0; i < args.length; i += 1) {

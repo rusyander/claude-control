@@ -5,7 +5,6 @@ import { skillTextSteps } from './skillText';
 import { rowText } from './describe';
 import { isAutoKnob } from './knobs';
 import { skillSource } from './stepSource';
-import { rowHint } from './rowHint';
 import { knobNumbers } from './knobNumbers';
 import { KNOB_AUTO } from './knobs.constants';
 import { knobSelectValue } from './knobSelectValue';
@@ -282,7 +281,9 @@ describe('описание строки', () => {
     const text = rowText(review!, known, 'ru');
     expect(text).toMatchObject({ kind: 'text' });
     expect(text.kind === 'text' && text.text).toContain('Second paragraph.');
-    expect(rowHint(text)).toEqual({ kind: 'text', text: 'Run 3 rounds; each round has 2 agents.' });
+    expect(text.kind === 'text' && firstParagraph(text.text)).toBe(
+      'Run 3 rounds; each round has 2 agents.',
+    );
   });
 
   it('скилла нет в списке — сводка сервера; стадия — её подсказка', () => {

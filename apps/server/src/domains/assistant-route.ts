@@ -65,7 +65,7 @@ export interface HelperRouteDeps {
 }
 
 /** Отказ окна: русский текст на языке панели плюс код для клиента. */
-export interface HelperRefusal {
+interface HelperRefusal {
   error: string;
   messageCode: ServerTextCode;
   params?: TextParams;
@@ -167,7 +167,7 @@ export function resolveHelperRoute(deps: HelperRouteDeps): HelperRoute {
   return refused(deps.store, 'assistant-provider-unavailable', names);
 }
 
-export interface HelperRunOptions {
+interface HelperRunOptions {
   appDataDir: string;
   timeoutMs: number;
   /** Пустая временная папка окна — рабочий каталог чужого CLI. */
@@ -186,7 +186,7 @@ function outcomeOf(result: AssistantRunResult): HelperOutcome {
  * `runClaudeOneShot`, тот возвращает конверт JSON и читает картинки потоком).
  * Промпт уже под маской: секреты сняли вызывающие.
  */
-export async function runHelperRoute(
+async function runHelperRoute(
   route: Exclude<HelperRoute, { kind: 'claude' }>,
   prompt: string,
   images: readonly AgentImage[],

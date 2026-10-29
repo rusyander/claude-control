@@ -64,8 +64,6 @@ export type ExtraPreviewRequest =
       isEnabled: boolean;
     };
 
-export const EXTRA_PREVIEW_KINDS = ['hook', 'env', 'instructions', 'script', 'entity'] as const;
-
 export interface ExtraPreview {
   files: ConfigPreviewFile[];
   notes: PanelPreviewNote[];

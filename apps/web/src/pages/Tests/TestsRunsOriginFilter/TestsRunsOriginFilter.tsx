@@ -21,6 +21,7 @@ export function TestsRunsOriginFilter({ value, onChange }: TestsRunsOriginFilter
         options={[
           { value: 'all', label: t('tests.runs.origin.all') },
           { value: 'e2e', label: t('tests.runs.origin.onlyE2e') },
+          { value: 'core', label: t('tests.runs.origin.onlyCore') },
           { value: 'ci', label: t('tests.runs.origin.onlyCi') },
         ]}
       />

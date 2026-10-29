@@ -6,7 +6,7 @@ import {
   INTEGRATION_SECRET_PREFIX,
 } from './pageTarget.constants';
 
-export const SECRET_PREFIXES = [
+const SECRET_PREFIXES = [
   CONTOUR_KEY_PREFIX,
   MCP_SECRET_PREFIX,
   ENV_SECRET_PREFIX,

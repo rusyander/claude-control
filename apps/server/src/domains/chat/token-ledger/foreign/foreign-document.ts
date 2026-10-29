@@ -96,7 +96,7 @@ function samePath(a: string, b: string, platform: NodeJS.Platform): boolean {
 }
 
 /** Документ целиком; недописанный (CLI пишет его прямо сейчас) или чужой — `undefined`. */
-export function readDocument(path: string): unknown {
+function readDocument(path: string): unknown {
   try {
     return JSON.parse(readFileSync(path, 'utf8')) as unknown;
   } catch {

@@ -23,7 +23,7 @@ const CONFIGS = [
 ];
 
 /** Конфиг Playwright в каталоге пакета или `undefined`. */
-export function playwrightConfigIn(dir: string): string | undefined {
+function playwrightConfigIn(dir: string): string | undefined {
   const name = CONFIGS.find((item) => existsSync(join(dir, item)));
   return name ? join(dir, name) : undefined;
 }

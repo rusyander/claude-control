@@ -31,10 +31,10 @@
  * Запуск: [STEER_CLI_DIR=<каталог с codex>] node tools/qa/check-codex-tool-output-limit.mjs
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const BIG = 40_000;
@@ -70,90 +70,34 @@ function findCli(name) {
 }
 
 /** Заглушка модели: без вывода инструмента — вызов оболочки, с ним — «done». */
-function startModel() {
+async function startModel() {
   const outputs = [];
-  const srv = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (!/\/responses/.test(req.url ?? '')) return void res.writeHead(404).end();
-      let body = {};
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        // не JSON — ответим текстом
-      }
-      const input = Array.isArray(body.input) ? body.input : [];
-      const tools = (body.tools ?? []).flatMap((tool) =>
-        Array.isArray(tool.tools)
-          ? tool.tools.map((inner) => inner.name)
-          : [tool.name ?? tool.type],
-      );
+  // Инструменты MCP Codex кладёт пространством имён: `{name, tools: [...]}` — разворачиваем.
+  const toolNames = (body) =>
+    (body.tools ?? []).flatMap((tool) =>
+      Array.isArray(tool.tools) ? tool.tools.map((inner) => inner.name) : [tool.name ?? tool.type],
+    );
+  const args = {
+    exec_command: { cmd: 'node big.js' },
+    shell_command: { command: 'node big.js' },
+    shell: { command: ['node', 'big.js'] },
+  };
+  const stub = await startStubModel({
+    route: ({ path }) => (/\/responses/.test(path) ? undefined : { status: 404, body: {} }),
+    script: ({ request }) => {
+      const input = Array.isArray(request.body.input) ? request.body.input : [];
       const done = input.filter((item) => item.type === 'function_call_output');
       for (const item of done) {
         outputs.push(typeof item.output === 'string' ? item.output : JSON.stringify(item.output));
       }
       // Имя инструмента оболочки зависит от версии Codex — берём то, что он предложил.
+      const tools = toolNames(request.body);
       const shell = ['exec_command', 'shell_command', 'shell'].find((name) => tools.includes(name));
-      const args = {
-        exec_command: { cmd: 'node big.js' },
-        shell_command: { command: 'node big.js' },
-        shell: { command: ['node', 'big.js'] },
-      };
-      const n = outputs.length + done.length + 1;
-      const item =
-        done.length === 0 && shell
-          ? {
-              type: 'function_call',
-              id: `fc_${n}`,
-              call_id: `call_${n}`,
-              name: shell,
-              arguments: JSON.stringify(args[shell]),
-              status: 'completed',
-            }
-          : {
-              type: 'message',
-              id: `msg_${n}`,
-              role: 'assistant',
-              status: 'completed',
-              content: [{ type: 'output_text', text: 'done', annotations: [] }],
-            };
-      const resp = {
-        id: `resp_${n}`,
-        object: 'response',
-        model: 'stub-model',
-        status: 'in_progress',
-        output: [],
-      };
-      const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      send('response.created', { type: 'response.created', response: resp });
-      send('response.output_item.done', {
-        type: 'response.output_item.done',
-        output_index: 0,
-        item,
-      });
-      send('response.completed', {
-        type: 'response.completed',
-        response: {
-          ...resp,
-          status: 'completed',
-          output: [item],
-          usage: {
-            input_tokens: 10,
-            output_tokens: 1,
-            total_tokens: 11,
-            input_tokens_details: { cached_tokens: 0 },
-            output_tokens_details: { reasoning_tokens: 0 },
-          },
-        },
-      });
-      res.end();
-    });
+      if (done.length === 0 && shell) return { tool: { name: shell, args: args[shell] } };
+      return 'done';
+    },
   });
-  return new Promise((resolve) =>
-    srv.listen(0, '127.0.0.1', () => resolve({ srv, outputs, port: srv.address().port })),
-  );
+  return { outputs, port: stub.port, close: () => stub.close() };
 }
 
 /** Временный каталог: Codex отпускает свои клоны плагинов не сразу — повторяем. */
@@ -217,7 +161,7 @@ async function run(env, options = {}) {
   const childEnv = { ...(options.strip === false ? platformEnv : (kit.env ?? {})), PWD: work };
   const spawned = spawnCliProcess('codex', kit.args, { cwd: work, env: childEnv });
   if (spawned.error) {
-    model.srv.close();
+    await model.close();
     await removeLater(root);
     return {
       args: kit.args,
@@ -243,7 +187,7 @@ async function run(env, options = {}) {
   } catch {
     seen = undefined;
   }
-  model.srv.close();
+  await model.close();
   await removeLater(root);
   return {
     args: kit.args,

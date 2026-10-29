@@ -752,7 +752,10 @@ export default function pushSieves(input) {
     };
     // Escape first, full list last and in a file: a capped list made the agent rebuild it by hand,
     // and a prose ack read as file names cost a second identical deny.
-    const all = [...new Set(foreign.flatMap((r) => r.open))];
+    // The list = every flagged file THIS command must name: the open ones AND those its ack already
+    // covers. Written with the open ones only, the same `@list` ack then dropped what it had covered
+    // (1 → 17 → 1 files, three denies of one push).
+    const all = [...new Set(results.flatMap((r, i) => r.foreign.filter((f) => !priors[i].has(f))))];
     const ackFile = writeAckList(input?.cwd, targets[0].dir, all);
     const flagged = new Set(results.flatMap((r) => r.foreign));
     const named = [...acked].filter((a) => a !== 'conflict');

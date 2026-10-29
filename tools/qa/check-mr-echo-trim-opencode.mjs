@@ -19,7 +19,6 @@
  */
 import { spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findCli } from './foreign-cli.mjs';
@@ -30,6 +29,7 @@ import {
   reporter,
   snapshotRealProviderDirs,
 } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 /**
@@ -76,25 +76,16 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
  * Заглушка модели: запрос с меткой и инструментом форджа без результата — вызов правки MR;
  * с результатом — запоминает его текст и отвечает текстом. Служебные запросы — текст.
  */
-function startStub() {
+async function startStub() {
   const state = { result: null, called: false };
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) {
-        res.writeHead(404);
-        res.end('{}');
-        return;
-      }
-      let parsed = {};
-      try {
-        parsed = JSON.parse(body);
-      } catch {
-        // не JSON — пустой запрос
-      }
-      const tools = (parsed.tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
-      const results = (parsed.messages ?? [])
+  const stub = await startStubModel({
+    // Только chat/completions; прочее — 404, как у прежней заглушки.
+    route: ({ path }) =>
+      path.includes('chat/completions') ? undefined : { status: 404, body: {} },
+    script: ({ request }) => {
+      const { body } = request;
+      const tools = (body.tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
+      const results = (body.messages ?? [])
         .filter((m) => m.role === 'tool')
         .map((m) =>
           typeof m.content === 'string'
@@ -103,79 +94,15 @@ function startStub() {
                 .map((part) => (typeof part?.text === 'string' ? part.text : ''))
                 .join('\n'),
         );
-      const main = body.includes(MARK) && tools.includes(TOOL);
+      const main = request.raw.includes(MARK) && tools.includes(TOOL);
       if (main && results.length) state.result = results[results.length - 1];
-      const call = main && !results.length;
-      if (call) state.called = true;
-      const message = call
-        ? {
-            role: 'assistant',
-            content: null,
-            tool_calls: [
-              {
-                id: 'call_mr',
-                type: 'function',
-                function: {
-                  name: TOOL,
-                  arguments: JSON.stringify({ iid: '7', description: DESCRIPTION }),
-                },
-              },
-            ],
-          }
-        : { role: 'assistant', content: `STUB_DONE_${TOKEN}` };
-      const finish = call ? 'tool_calls' : 'stop';
-      if (!parsed.stream) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            id: 'stub',
-            object: 'chat.completion',
-            created: 1,
-            model: 'stub-model',
-            choices: [{ index: 0, message, finish_reason: finish }],
-            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-          }),
-        );
-        return;
-      }
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const chunk = (delta, reason = null) =>
-        res.write(
-          `data: ${JSON.stringify({
-            id: 'stub',
-            object: 'chat.completion.chunk',
-            created: 1,
-            model: 'stub-model',
-            choices: [{ index: 0, delta, finish_reason: reason }],
-          })}\n\n`,
-        );
-      if (call)
-        chunk({
-          role: 'assistant',
-          tool_calls: message.tool_calls.map((one, index) => ({ index, ...one })),
-        });
-      else chunk({ role: 'assistant', content: message.content });
-      chunk({}, finish);
-      res.write(
-        `data: ${JSON.stringify({ id: 'stub', object: 'chat.completion.chunk', created: 1, model: 'stub-model', choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\n`,
-      );
-      res.write('data: [DONE]\n\n');
-      res.end();
-    });
+      if (!main || results.length) return `STUB_DONE_${TOKEN}`;
+      state.called = true;
+      const args = { iid: '7', description: DESCRIPTION };
+      return { tool: { name: TOOL, args, id: 'call_mr' } };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        state,
-        close: () =>
-          new Promise((closed) => {
-            server.closeAllConnections();
-            server.close(() => closed());
-          }),
-      }),
-    ),
-  );
+  return { port: stub.port, state, close: () => stub.close() };
 }
 
 /** Запуск CLI с таймаутом; дерево процессов снимается целиком (иначе CLI переживёт проверку). */

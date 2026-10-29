@@ -9,7 +9,7 @@ import {
   type AskSeen,
 } from '../auto-pick/auto-pick.ts';
 import { layoutForCwd } from '../../project-git/copy-readiness.ts';
-import { findSecretSpans, SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { findSecretSpans, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import {
   FULL_READ_LIMIT,
   fileSessionId,

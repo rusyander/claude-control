@@ -90,7 +90,7 @@ export const DRAFT_ADD_RESET_FIELDS = [
 type RunOwned = Pick<ProjectTestCase, (typeof RUN_OWNED_FIELDS)[number]>;
 
 /** Путь файла черновика внутри `.agent/tests/`. */
-export function draftRelativePath(runId: string): string {
+function draftRelativePath(runId: string): string {
   return `${DRAFTS_DIR}/${assertRunId(runId)}${SUFFIX}`;
 }
 

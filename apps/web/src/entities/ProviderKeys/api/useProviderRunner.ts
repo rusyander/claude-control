@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getProviderRunner(): Promise<ProviderRunnerInfo> {
+async function getProviderRunner(): Promise<ProviderRunnerInfo> {
   const { data } = await apiClient.get<ProviderRunnerInfo>('/provider-runner');
   return data;
 }

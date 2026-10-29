@@ -29,15 +29,15 @@ import type {
  */
 
 /** Версия формата. Растёт при несовместимом изменении раскладки архива. */
-export const ARCHIVE_FORMAT_VERSION = 1;
+const ARCHIVE_FORMAT_VERSION = 1;
 
 /** Метка, по которой архив узнаётся среди прочих zip. */
-export const ARCHIVE_KIND = `${BRAND_SLUG}-environment`;
+const ARCHIVE_KIND = `${BRAND_SLUG}-environment`;
 /** Метка архивов, собранных до переименования продукта: они по-прежнему разворачиваются. */
-export const LEGACY_ARCHIVE_KIND = `${LEGACY_BRAND_SLUG}-environment`;
+const LEGACY_ARCHIVE_KIND = `${LEGACY_BRAND_SLUG}-environment`;
 
-export const MANIFEST_PATH = 'MANIFEST.json';
-export const README_PATH = 'README.md';
+const MANIFEST_PATH = 'MANIFEST.json';
+const README_PATH = 'README.md';
 
 export type {
   ManifestLocation,

@@ -98,7 +98,7 @@ export interface OutsideRelayDeps {
 }
 
 /** Метка в папке флагов: сервер их пишет, отсутствие флага значит «пусто». */
-export const RELAY_FLAG_MARKER = '.server';
+const RELAY_FLAG_MARKER = '.server';
 
 /** Имя флага сессии — то же правило в `outside-relay-hook.mjs`. */
 export const relayFlagName = (sessionId: string): string => sessionId.replace(/[^a-zA-Z0-9-]/g, '');

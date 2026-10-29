@@ -70,6 +70,13 @@ describe('состояние субагента', () => {
     expect(agentState(agent('r', { status: 'running' }), false)).toBe('running');
   });
 
+  it('вызов Agent оборван паузой — «оборван», не «ошибка», даже при живом ходе', () => {
+    expect(agentState(agent('p', { status: 'failed', interrupted: true }), true, true)).toBe(
+      'lost',
+    );
+    expect(agentState(agent('f', { status: 'failed' }), true, true)).toBe('failed');
+  });
+
   it('счёт карточки группы: идущие и все остальные исходы', () => {
     const agents = [
       agent('run', { status: 'running' }),

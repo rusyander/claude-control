@@ -23,7 +23,7 @@ import { BRAND_SLUG } from '../../lib/brand.mjs';
 
 export const DATABASE_MCP_ID = `${BRAND_SLUG}-database`;
 
-export function databaseMcpScript(): string {
+function databaseMcpScript(): string {
   return fileURLToPath(new URL('../../../../../tools/mcp/database.mjs', import.meta.url));
 }
 

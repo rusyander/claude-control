@@ -135,7 +135,7 @@ function walk(schema: unknown, value: unknown, path: string, issues: ApiSchemaIs
 }
 
 /** Ответ контракта для кода: точный, потом `2XX`, потом `default`. */
-export function responseFor(endpoint: ApiEndpoint, status: number): ApiResponseSpec | undefined {
+function responseFor(endpoint: ApiEndpoint, status: number): ApiResponseSpec | undefined {
   const exact = endpoint.responses.find((response) => response.status === String(status));
   if (exact) return exact;
   const range = `${String(status)[0]}XX`;

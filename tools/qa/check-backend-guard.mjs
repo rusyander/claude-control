@@ -31,12 +31,12 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { AxeBuilder } from '@axe-core/playwright';
 import { chromium } from 'playwright';
 import { NotChecked, REPO, runOnStand, wait } from './throwaway-stand.mjs';
 import { seedChatTranscript } from './backend-fixtures.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const SHOTS = join(REPO, '.agent', 'screenshots', 'before-after', 'backend-guard');
 mkdirSync(SHOTS, { recursive: true });
@@ -80,37 +80,23 @@ const textsOf = (message) =>
  * последнем сообщении человека — вызов Bash; есть результат инструмента — ход
  * закончен словом. Всё прочее (заголовок чата и т. п.) — «ок».
  */
-function startStub() {
+async function startStub() {
   const results = [];
   const requests = [];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      let body = {};
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-      } catch {
-        // не JSON — отвечаем как на постороннее
-      }
-      requests.push(req.url);
-      if (req.url?.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ input_tokens: 10 }));
-        return;
-      }
-      if (!req.url?.includes('/messages')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end('{}');
-        return;
-      }
-      const messages = body.messages ?? [];
+  const stub = await startStubModel({
+    // Наблюдатель всех запросов; вне `/messages` (служебные пути CLI) — пустой JSON.
+    route: ({ path, query }) => {
+      requests.push(path + query);
+      return path.includes('/messages') ? undefined : { body: {} };
+    },
+    script: ({ request }) => {
+      const messages = request.body.messages ?? [];
       const toolResults = messages.flatMap((message) =>
         Array.isArray(message.content)
           ? message.content.filter((part) => part.type === 'tool_result')
           : [],
       );
-      const hasBash = (body.tools ?? []).some((tool) => tool.name === 'Bash');
+      const hasBash = request.tools.includes('Bash');
       // Просьба и контекст CLI приходят разными сообщениями — метку ищем во всех сообщениях человека.
       const asked = messages
         .filter((message) => message.role === 'user')
@@ -127,72 +113,11 @@ function startStub() {
       } else if (hasBash && asked.includes('RUN:guard')) command = GUARD_CMD;
       else if (hasBash && asked.includes('RUN:prod')) command = PROD_CMD;
       else if (hasBash && asked.includes('RUN:safe')) command = SAFE_CMD;
-
-      const block = command
-        ? {
-            start: {
-              type: 'tool_use',
-              id: `toolu_qa_${Math.random().toString(36).slice(2, 10)}`,
-              name: 'Bash',
-              input: {},
-            },
-            delta: {
-              type: 'input_json_delta',
-              partial_json: JSON.stringify({ command, description: 'qa' }),
-            },
-          }
-        : {
-            start: { type: 'text', text: '' },
-            delta: { type: 'text_delta', text: toolResults.length ? 'готово' : 'ок' },
-          };
-      const events = [
-        [
-          'message_start',
-          {
-            type: 'message_start',
-            message: {
-              id: `msg_qa_${results.length}`,
-              type: 'message',
-              role: 'assistant',
-              model: body.model ?? 'stub',
-              content: [],
-              stop_reason: null,
-              usage: { input_tokens: 10, output_tokens: 1 },
-            },
-          },
-        ],
-        [
-          'content_block_start',
-          { type: 'content_block_start', index: 0, content_block: block.start },
-        ],
-        ['content_block_delta', { type: 'content_block_delta', index: 0, delta: block.delta }],
-        ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-        [
-          'message_delta',
-          {
-            type: 'message_delta',
-            delta: { stop_reason: command ? 'tool_use' : 'end_turn' },
-            usage: { output_tokens: 1 },
-          },
-        ],
-        ['message_stop', { type: 'message_stop' }],
-      ];
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      for (const [event, data] of events)
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.end();
-    });
+      if (command) return { tool: { name: 'Bash', args: { command, description: 'qa' } } };
+      return toolResults.length ? 'готово' : 'ок';
+    },
   });
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        results,
-        requests,
-        close: () => server.close(),
-      }),
-    );
-  });
+  return { url: stub.baseUrl, results, requests, close: () => stub.close() };
 }
 
 const STUB_ENV = (url) => ({

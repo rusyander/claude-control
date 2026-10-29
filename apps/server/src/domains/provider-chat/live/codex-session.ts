@@ -10,7 +10,7 @@ import type { StdioRpc } from './stdio-rpc.ts';
  */
 
 /** Сколько ждать ответа на `initialize`, — дальше считаем, что режима нет. */
-export const CODEX_HANDSHAKE_MS = 20_000;
+const CODEX_HANDSHAKE_MS = 20_000;
 
 export const CODEX_EFFORTS: ReadonlySet<string> = new Set([
   'minimal',

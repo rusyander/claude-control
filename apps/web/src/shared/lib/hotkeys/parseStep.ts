@@ -1,7 +1,7 @@
 import type { KeyStep } from './hotkeys.types';
 
 /** Модификаторы, которые сворачиваем в общий признак `mod` (Ctrl или Cmd). */
-export const MOD_TOKENS = new Set(['mod', 'ctrl', 'control', 'cmd', 'meta', 'command']);
+const MOD_TOKENS = new Set(['mod', 'ctrl', 'control', 'cmd', 'meta', 'command']);
 
 /**
  * Разбирает один шаг аккорда: `mod+k` → `{ key: 'k', mod: true }`, `g` →

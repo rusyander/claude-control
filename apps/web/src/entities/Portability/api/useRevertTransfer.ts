@@ -4,7 +4,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function postRevert(
+async function postRevert(
   pair: TransferPair & { confirm: readonly string[] },
 ): Promise<TransferRevertAnswer> {
   const { data } = await apiClient.post<TransferRevertAnswer>('/portability/revert', pair);

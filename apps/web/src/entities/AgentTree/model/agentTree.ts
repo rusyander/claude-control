@@ -5,6 +5,8 @@ import type { AgentCounts, AgentState, AgentTreeNode } from './agentTree.types';
  * Состояние субагента для показа. Фоновый живёт, пока жив процесс CLI
  * разговора: умер процесс — итога не будет, хотя транскрипт зовёт его
  * «работает» (живой прогон 14.10). Сервер без признака процесса — как было.
+ * Вызов `Agent`, оборванный паузой или концом сессии, — тоже «оборван», не
+ * «ошибка»: итога нет, но субагент не падал.
  */
 export function agentState(
   agent: ProgressAgent,
@@ -12,6 +14,7 @@ export function agentState(
   processAlive: boolean | undefined = undefined,
 ): AgentState {
   if (agent.stopped) return 'stopped';
+  if (agent.interrupted) return 'lost';
   if (agent.status === 'running' && !isRunning && processAlive === false) return 'lost';
   return agent.status;
 }

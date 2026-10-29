@@ -4,7 +4,7 @@ import type { AssistantOption, AssistantSpec } from '@shared/lib/assistant-field
 import { memberRef } from './groupAssistant';
 import type { GroupAssistantInput } from './groupAssistant.types';
 
-export function memberOptions(catalog: readonly PickerItem[], members: readonly GroupMember[]) {
+function memberOptions(catalog: readonly PickerItem[], members: readonly GroupMember[]) {
   const options: AssistantOption[] = catalog.map((item) => ({
     value: memberRef(item),
     label: `${item.kind} · ${item.label}`,

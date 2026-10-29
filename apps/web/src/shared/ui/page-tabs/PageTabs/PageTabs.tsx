@@ -11,7 +11,7 @@ import styles from '../page-tabs.module.scss';
 import { Icon } from '@shared/ui/icon';
 
 /** Ближайший предок с прокруткой — область, к верху которой липнет полоса. */
-export function scrollerOf(node: HTMLElement | null): HTMLElement | null {
+function scrollerOf(node: HTMLElement | null): HTMLElement | null {
   let scroller = node?.parentElement ?? null;
   while (scroller && !['auto', 'scroll'].includes(getComputedStyle(scroller).overflowY)) {
     scroller = scroller.parentElement;
@@ -44,7 +44,7 @@ export function markWhenStuck(node: HTMLElement | null): (() => void) | undefine
  * не видно по её рамке — на миг снимаем прилипание и меряем: без отрисовки,
  * одно синхронное чтение раскладки.
  */
-export function bringStripBack(node: HTMLElement | null): void {
+function bringStripBack(node: HTMLElement | null): void {
   const root = scrollerOf(node);
   if (!node || !root || node.dataset.stuck !== 'true') return;
   node.style.position = 'static';

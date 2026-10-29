@@ -72,7 +72,7 @@ const u = (input: number, output: number, cacheRead: number, cacheCreation: numb
   cacheCreation,
 });
 
-export const BIG_RESULT = 'x'.repeat(12_000);
+const BIG_RESULT = 'x'.repeat(12_000);
 export const DENIAL_TEXT = 'PreToolUse:Bash hook error: [destructive-guard] rm -rf запрещён';
 
 /** Сессия `s-exact` в своём проекте; вернёт каталог проектов и путь транскрипта. */

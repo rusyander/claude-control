@@ -1514,4 +1514,16 @@ module.exports = {
   envDrift,
   canonical,
   verify,
+  // Ключ проверки ядра (`apps/core`, фаза 3) строится из тех же частей — одна реализация на оба.
+  ENV_SESSION,
+  HIDDEN_LOCKS,
+  sha,
+  git,
+  realDir,
+  fileDigest,
+  envGet,
+  splitNodeOptions,
+  dropMachine,
+  pathPart,
+  hmacKey,
 };

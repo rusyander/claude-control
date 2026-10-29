@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 
 /** Хук, отклоняющий любой вызов инструмента (`RunOptions.denyTools`). */
-export const DENY_TOOLS_HOOK = fileURLToPath(new URL('./deny-tools-hook.mjs', import.meta.url));
+const DENY_TOOLS_HOOK = fileURLToPath(new URL('./deny-tools-hook.mjs', import.meta.url));
 
 /**
  * Команда хука: node этого сервера и путь скрипта в кавычках, с прямыми косыми —

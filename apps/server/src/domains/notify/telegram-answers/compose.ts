@@ -9,7 +9,7 @@ import type {
   SentItem,
   SentMessage,
 } from './telegram-answers.types.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { bold, code, escapeHtml, expandable, htmlToPlain } from './html.ts';
 
 /**

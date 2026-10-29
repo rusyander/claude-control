@@ -27,7 +27,7 @@ import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
  */
 
 /** Запись `plugin`, которую панель не ведёт (пара «имя + настройки»). */
-export interface OpencodePluginPreservedEntry {
+interface OpencodePluginPreservedEntry {
   /** Позиция в массиве — единственная её идентичность (имени у пары может не быть). */
   index: number;
   /** Значение в компактном JSON — только для показа (в файле оно не меняется). */

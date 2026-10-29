@@ -7,7 +7,7 @@ import { encodeAttempts } from './encodeAttempts';
 import { renamedFor } from './renamedFor';
 import { AgentImageError } from './image';
 
-export const browserCodec: ImageCodec = {
+const browserCodec: ImageCodec = {
   measure: async (file) => {
     const bitmap = await createImageBitmap(file);
     return { width: bitmap.width, height: bitmap.height, source: bitmap };

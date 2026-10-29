@@ -90,6 +90,18 @@ describe('AgentExtensions', () => {
       expect(html).toContain('в контекст');
     });
 
+    it('MCP, оборванный паузой, — «прервано» спокойной меткой, не «ошибка»', () => {
+      const cut: AgentExtensions = {
+        ...data,
+        total: 1,
+        items: [{ kind: 'mcp', name: 'gitlab/get_issue', outcome: 'interrupted' }],
+      };
+      const html = renderToStaticMarkup(<ExtensionTimeline data={cut} isLoading={false} />);
+      expect(html).toContain('data-extension-outcome="interrupted"');
+      expect(html).toMatch(/class="[^"]*neutral[^"]*">прервано</);
+      expect(html).not.toContain('ошибка');
+    });
+
     it('меньше секунды — в миллисекундах, больше — в секундах', () => {
       const html = renderToStaticMarkup(<ExtensionTimeline data={data} isLoading={false} />);
       expect(html).toContain('120 мс');

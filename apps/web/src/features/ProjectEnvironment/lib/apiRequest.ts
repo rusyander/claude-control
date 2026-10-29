@@ -83,7 +83,7 @@ export function draftFromEndpoint(endpoint: ApiEndpoint): ApiDraft {
 }
 
 /** Маска секрета из истории — такой заголовок повторно не отправляем. */
-export const isMasked = (value: string): boolean => value.includes('••••');
+const isMasked = (value: string): boolean => value.includes('••••');
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 

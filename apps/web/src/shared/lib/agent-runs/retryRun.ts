@@ -4,7 +4,7 @@ import { i18n } from '@shared/config/i18n';
 import { pickRetryPrompt } from './pickRetryPrompt';
 
 /** Хвост транскрипта: своя реплика — последняя из реплик человека, дальше смотреть незачем. */
-export const RETRY_TAIL = 5;
+const RETRY_TAIL = 5;
 
 /** Задача заново или «продолжай» — по тому, дожила ли реплика до транскрипта. */
 export async function retryPromptFor(run: AgentRun): Promise<string> {

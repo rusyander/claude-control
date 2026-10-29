@@ -8,7 +8,7 @@ import { ApiSendError } from './api-explorer.types.ts';
  */
 
 export const SEND_TIMEOUT_MS = 30_000;
-export const BODY_CAP_BYTES = 2 * 1024 * 1024;
+const BODY_CAP_BYTES = 2 * 1024 * 1024;
 
 /** Эти заголовки ставит сам fetch; заданные руками он отвергает или они лгут о теле. */
 const DROPPED = new Set([

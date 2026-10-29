@@ -11,7 +11,7 @@ import { runs } from './agent-runs.state.constants';
 import { setRun } from './setRun';
 import { findKey } from './findKey';
 
-export function isStopUnconfirmed(error: unknown): boolean {
+function isStopUnconfirmed(error: unknown): boolean {
   const data = (error as { response?: { data?: { code?: unknown } } } | null)?.response?.data;
   return data?.code === 'stop_unconfirmed';
 }
@@ -23,7 +23,7 @@ export function isStopUnconfirmed(error: unknown): boolean {
  * Ждём, пока прежний поток дочитается: он закрывает ход по метке остановки, и
  * снять её раньше значило бы превратить его конец в падение с авто-рестартом.
  */
-export function resumeAfterRefusedStop(key: string, id: string, message: string, tries = 0): void {
+function resumeAfterRefusedStop(key: string, id: string, message: string, tries = 0): void {
   if (!runs.has(key)) return;
   if (controllers.has(key) && tries < 100) {
     setTimeout(() => resumeAfterRefusedStop(key, id, message, tries + 1), 20);

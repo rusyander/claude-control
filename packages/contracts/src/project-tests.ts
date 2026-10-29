@@ -568,9 +568,11 @@ export type ProjectTestActor = 'agent' | 'human' | 'ci';
  * Откуда пришла запись импорта: `ci` — отчёт сборки, принесённый человеком
  * или `pnpm tests import`; `e2e` — прогон автотестов папки, запущенный панелью.
  * Обе — `mode:'import'`: результаты легли из junit, агента не было. Поле
- * различает их в истории; запись без него — прежний импорт из CI.
+ * различает их в истории; запись без него — прежний импорт из CI. `core` — проверка, исполненная
+ * ядром задач в подготовленном им окружении (G14): у такой записи есть `coreRecordId`, и вердикт
+ * кейса из неё — исполненная команда, а не слово агента.
  */
-export type ProjectTestRunOrigin = 'ci' | 'e2e';
+export type ProjectTestRunOrigin = 'ci' | 'e2e' | 'core';
 
 /** Сводка по прогону — то, что видно в списке истории без раскрытия. */
 // Итог по статусам живёт листом (`project-tests-summary`): его берёт и папка e2e,
@@ -641,6 +643,11 @@ export interface ProjectTestRunRecord {
   actor: ProjectTestActor;
   /** Только у `mode:'import'`; читать через `runOrigin` — пусто значит `ci`. */
   origin?: ProjectTestRunOrigin;
+  /**
+   * Id записи проверки ядра (`<key>.<seq>`), из которой лёг этот прогон (`origin:'core'`, P50):
+   * по нему прогон кейса сводится к подписанной записи с ключом, командой и логом.
+   */
+  coreRecordId?: string;
   groupId?: string;
   planId?: string;
   environmentId?: string;

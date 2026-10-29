@@ -456,17 +456,18 @@ function main() {
   const repo = path.resolve(o.repo ?? '.');
   const head = o.head ?? 'HEAD';
   // An unknown revision makes `git diff` print nothing: the sweep would report a clean diff of an empty one.
-  for (const rev of [o.base, head]) {
-    const ok = spawnSync(
-      'git',
-      ['-C', repo, 'rev-parse', '--verify', '--quiet', `${rev}^{commit}`],
-      {
-        encoding: 'utf8',
-      },
+  // A tree id is a readable side too: untracked code is reviewed as HEAD^{tree} vs `git write-tree`.
+  const readable = (rev) =>
+    ['commit', 'tree'].some(
+      (kind) =>
+        spawnSync('git', ['-C', repo, 'rev-parse', '--verify', '--quiet', `${rev}^{${kind}}`], {
+          encoding: 'utf8',
+        }).status === 0,
     );
-    if (ok.status !== 0) {
+  for (const rev of [o.base, head]) {
+    if (!readable(rev)) {
       console.error(
-        `review-sweep: ${rev} is not a commit in ${repo} — a sweep over an unreadable diff is not a clean one`,
+        `review-sweep: ${rev} is not a commit or tree in ${repo} — a sweep over an unreadable diff is not a clean one`,
       );
       return 2;
     }

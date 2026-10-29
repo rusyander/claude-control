@@ -20,10 +20,10 @@
  * Запуск: node tools/qa/check-qwen-atlassian-bridge.mjs
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { NotChecked, reporter, startStand, wait } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const BRIDGE = 'agentdeck-atlassian';
@@ -45,56 +45,17 @@ function findCli() {
  * приходит следующим запросом; на него и на служебные запросы — «DONE».
  */
 async function startModel() {
-  const bodies = [];
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) return void res.writeHead(404).end();
-      bodies.push(body);
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const head = { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'stub-model' };
-      const send = (choice, usage) =>
-        res.write(
-          `data: ${JSON.stringify({ ...head, choices: [choice], ...(usage ? { usage } : {}) })}\n\n`,
-        );
-      const parsed = JSON.parse(body);
-      const asked = (parsed.messages ?? []).some(
-        (message) => message.role === 'user' && JSON.stringify(message.content).includes(QUESTION),
-      );
-      const answered = (parsed.messages ?? []).some((message) => message.role === 'tool');
-      const canSearch = (parsed.tools ?? []).some((tool) => tool.function?.name === 'tool_search');
-      if (asked && canSearch && !answered) {
-        send({
-          index: 0,
-          delta: {
-            role: 'assistant',
-            tool_calls: [
-              {
-                index: 0,
-                id: `call_${bodies.length}`,
-                type: 'function',
-                function: { name: 'tool_search', arguments: '{"query":"jira"}' },
-              },
-            ],
-          },
-        });
-        send(
-          { index: 0, delta: {}, finish_reason: 'tool_calls' },
-          { prompt_tokens: 5, completion_tokens: 1, total_tokens: 6 },
-        );
-        return void res.end('data: [DONE]\n\n');
-      }
-      send({ index: 0, delta: { role: 'assistant', content: 'DONE' } });
-      send(
-        { index: 0, delta: {}, finish_reason: 'stop' },
-        { prompt_tokens: 5, completion_tokens: 1, total_tokens: 6 },
-      );
-      res.end('data: [DONE]\n\n');
-    });
+  const stub = await startStubModel({
+    script: ({ info }) => {
+      const asked = info.userTexts.some((text) => text.includes(QUESTION));
+      const canSearch = info.tools.some((tool) => tool.name === 'tool_search');
+      const usage = { input: 5, output: 1 };
+      return asked && canSearch && !info.hasToolResult
+        ? { tool: { name: 'tool_search', args: { query: 'jira' } }, usage }
+        : { text: 'DONE', usage };
+    },
   });
-  await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  return { base: `http://127.0.0.1:${server.address().port}`, bodies, close: () => server.close() };
+  return { base: stub.baseUrl, bodies: stub.bodies, close: () => stub.close() };
 }
 
 const { check, finish } = reporter();

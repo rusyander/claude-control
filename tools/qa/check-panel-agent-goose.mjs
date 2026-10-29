@@ -25,10 +25,10 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join, relative } from 'node:path';
 import { NotChecked, reporter, startStand } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const BRIDGE_PREFIX = 'agentdeck-panel__';
@@ -52,25 +52,17 @@ function findCli(name) {
  * текст двумя кусками (Goose шлёт каждый кусок своей строкой). Запрос без
  * инструментов — заголовок разговора, который Goose просит сам.
  */
-function startAgentModel() {
+async function startAgentModel() {
   const requests = [];
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (req.method === 'GET') {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ object: 'list', data: [{ id: 'stub-model', object: 'model' }] }));
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        // не JSON — пустой сценарий
-      }
-      const tools = (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
-      const toolResult = (body.messages ?? []).find((message) => message.role === 'tool');
+  const facts = (body) => ({
+    tools: (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name),
+    toolResult: (body.messages ?? []).find((message) => message.role === 'tool'),
+  });
+  const stub = await startStubModel({
+    // Наблюдатель: что дошло до модели — каждый POST с сырым ключом, ответ даёт сценарий.
+    route: ({ method, headers, raw, body = {} }) => {
+      if (method !== 'POST') return undefined;
+      const { tools, toolResult } = facts(body);
       const system = (body.messages ?? [])
         .filter((message) => message.role === 'system')
         .map((message) =>
@@ -80,63 +72,23 @@ function startAgentModel() {
       requests.push({
         tools,
         system,
-        auth: req.headers.authorization ?? '',
+        auth: headers.authorization ?? '',
         hints: raw.includes(HINTS_MARK),
         toolResult: toolResult ? JSON.stringify(toolResult.content) : null,
       });
+      return undefined;
+    },
+    script: ({ request }) => {
+      const { tools, toolResult } = facts(request.body);
       const target = tools.find((name) => name === `${BRIDGE_PREFIX}where_am_i`);
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
-      const head = { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'stub-model' };
-      if (target && !toolResult) {
-        send({
-          ...head,
-          choices: [
-            {
-              index: 0,
-              delta: {
-                role: 'assistant',
-                tool_calls: [
-                  {
-                    index: 0,
-                    id: 'call_1',
-                    type: 'function',
-                    function: { name: target, arguments: '{}' },
-                  },
-                ],
-              },
-            },
-          ],
-        });
-        send({ ...head, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
-      } else {
-        const seen = JSON.stringify(toolResult?.content ?? '').includes(ROUTE_MARK)
-          ? 'ROUTE_SEEN'
-          : 'PLAIN';
-        send({
-          ...head,
-          choices: [{ index: 0, delta: { role: 'assistant', content: 'AGENT_OK ' } }],
-        });
-        send({ ...head, choices: [{ index: 0, delta: { content: seen } }] });
-        send({
-          ...head,
-          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-        });
-      }
-      res.write('data: [DONE]\n\n');
-      res.end();
-    });
+      if (target && !toolResult) return { tool: { name: target, args: {}, id: 'call_1' } };
+      const seen = JSON.stringify(toolResult?.content ?? '').includes(ROUTE_MARK)
+        ? 'ROUTE_SEEN'
+        : 'PLAIN';
+      return { text: ['AGENT_OK ', seen], usage: { input: 1, output: 1 } };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        requests,
-        close: () => new Promise((r) => (server.closeAllConnections?.(), server.close(() => r()))),
-      }),
-    ),
-  );
+  return { port: stub.port, requests, close: () => stub.close() };
 }
 
 /** Снимок каталога: относительный путь → размер и время правки. */

@@ -261,7 +261,7 @@ const groupEconomyPatchSchema = object({
 /**
  * Настройки прокси защиты данных. Правил здесь нет намеренно — они в отдельном
  * файле, и через общий PATCH настроек не правятся: в словарях правил лежат сами
- * персональные данные (см. `domains/dlp/rules-store.ts`).
+ * персональные данные (см. `@agentdeck/dlp/rules-file`).
  */
 const dlpSettingsSchema = object({
   enabled: boolean(),

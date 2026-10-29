@@ -7,6 +7,7 @@ import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
+import { agentdeckCorePlugin } from './tools/eslint-rules/no-absent-in-catch.mjs';
 
 export default tseslint.config(
   // Сборки, зависимости и рабочий мусор проверок — не исходный код.
@@ -50,6 +51,8 @@ export default tseslint.config(
       'tools/**/*.{mjs,js}',
       'docs/**/*.{mjs,js}',
       'apps/server/assets/**/*.mjs',
+      // Подставные процессы тестов ядра (дерево, дамп argv) — такие же скрипты Node.
+      'apps/core/src/**/__fixtures__/**/*.mjs',
       '*.cjs',
       '*.mjs',
     ],
@@ -150,6 +153,15 @@ export default tseslint.config(
       'no-lonely-if': 'warn',
     },
   },
+  // Ядро: «нет» из `catch` запрещено (01 §Facts, P44) — сбой чтения обязан стать `unknown`.
+  {
+    files: ['apps/core/src/**/*.ts'],
+    ignores: ['apps/core/src/**/*.test.ts'],
+    plugins: { 'agentdeck-core': agentdeckCorePlugin },
+    rules: { 'agentdeck-core/no-absent-in-catch': 'error' },
+  },
+  // P51 (развилка по ОС только в `platform/`) — не здесь: литеральный линт ядра
+  // `apps/core/src/literal-lint/` (наборы правил данными, тот же механизм возьмёт P108).
   // Исключения из max-lines: тесты, данные и наборы историй — не логика, порог строк к ним не применим.
   // Словари i18n и тексты справки — тоже данные: их размер задан объёмом интерфейса, а не сложностью.
   {

@@ -163,6 +163,9 @@ describe('POST /api/chat/split/:parent/status-ask', () => {
     runtime.chatRuns.stopAll();
     runtime.shutdown();
     await app.close();
+    // Конец хода группы запускает сверку пересечений без ожидания (`watchOverlap`): её git
+    // стоит в `project`, и под нагрузкой rmSync ловил EBUSY, пока он не вышел.
+    await runtime.splitOverlap.settled();
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 

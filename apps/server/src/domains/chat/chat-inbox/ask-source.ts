@@ -11,7 +11,7 @@ import type { ChatInbox, InboxLaunch, InboxSource } from '@agentdeck/contracts/c
  */
 
 /** Связь разговора с группой разделения — ровно то, что нужно подписи. */
-export interface SourceLink {
+interface SourceLink {
   parentChatId?: string;
   title?: string;
   groupIndex?: number;
@@ -38,7 +38,7 @@ export interface SourceDeps {
 /** Инструменты запуска агента: нынешнее имя и прежнее. */
 const LAUNCH_TOOLS = new Set(['Agent', 'Task']);
 
-export function isLaunchTool(toolName: string): boolean {
+function isLaunchTool(toolName: string): boolean {
   return LAUNCH_TOOLS.has(toolName);
 }
 

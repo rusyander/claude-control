@@ -67,6 +67,7 @@ interface GlMergeRequest {
   state?: string;
   description?: string | null;
   has_conflicts?: boolean;
+  target_branch?: string;
   author?: GlUser;
   head_pipeline?: { id?: number; status?: string; web_url?: string } | null;
 }
@@ -180,6 +181,7 @@ export async function readMergeRequestReview(
     ...(mr.author?.username ? { author: mr.author.username } : {}),
     description: mr.description ?? '',
     ...(typeof mr.has_conflicts === 'boolean' ? { conflicts: mr.has_conflicts } : {}),
+    ...(mr.target_branch ? { targetBranch: mr.target_branch } : {}),
     threads,
     ...(pipeline?.id !== undefined && pipeline.status
       ? {

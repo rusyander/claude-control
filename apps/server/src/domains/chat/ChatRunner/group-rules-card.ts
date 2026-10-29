@@ -10,7 +10,7 @@ import {
  * Карточка правил группы в каталоге личной конфигурации: её кладёт хук начала
  * сессии (`hooks/session-brief.mjs`) звену группы вместо личного `CLAUDE.md`.
  */
-export const GROUP_RULES_CARD = ['hooks', 'cards', 'group-rules.md'] as const;
+const GROUP_RULES_CARD = ['hooks', 'cards', 'group-rules.md'] as const;
 
 export interface GroupRulesCardSwap {
   /** Шаблоны `claudeMdExcludes`, снимающие личный `CLAUDE.md` из запроса. */

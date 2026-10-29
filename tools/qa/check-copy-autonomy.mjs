@@ -26,7 +26,6 @@
  *
  * Запуск: `node tools/qa/check-copy-autonomy.mjs`
  */
-import { createServer } from 'node:http';
 import { execFileSync, spawn } from 'node:child_process';
 import {
   chmodSync,
@@ -42,6 +41,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PANEL_PORT = Number(process.env.COPY_PANEL_PORT ?? 5266);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
@@ -114,6 +114,17 @@ async function api(path, init = {}) {
     body = text;
   }
   return { status: res.status, body };
+}
+
+/** Ход чата `chatId` больше не идёт (по `/api/chat/active`), ждать не дольше `seconds`. */
+async function runEnded(chatId, seconds) {
+  for (let i = 0; i < seconds; i++) {
+    const active = await api('/chat/active');
+    const runs = Array.isArray(active.body) ? active.body : [];
+    if (!runs.some((run) => run.chatId === chatId && run.status === 'running')) return true;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return false;
 }
 
 /**
@@ -200,80 +211,17 @@ function resolveClaude() {
 }
 
 /** Стаб вместо API Anthropic: записывает каждый запрос и отвечает одним словом. */
-function startStub() {
+async function startStub() {
   const seen = [];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      let body;
-      try {
-        body = raw ? JSON.parse(raw) : {};
-      } catch {
-        body = {};
-      }
-      if (req.url?.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ input_tokens: 10 }));
-        return;
-      }
-      if (!req.url?.includes('/messages')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end('{}');
-        return;
-      }
-      seen.push(body);
-      const events = [
-        [
-          'message_start',
-          {
-            type: 'message_start',
-            message: {
-              id: 'msg_copy',
-              type: 'message',
-              role: 'assistant',
-              model: body.model ?? 'stub',
-              content: [],
-              stop_reason: null,
-              usage: { input_tokens: 10, output_tokens: 1 },
-            },
-          },
-        ],
-        [
-          'content_block_start',
-          { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
-        ],
-        [
-          'content_block_delta',
-          { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ок' } },
-        ],
-        ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-        [
-          'message_delta',
-          {
-            type: 'message_delta',
-            delta: { stop_reason: 'end_turn' },
-            usage: { output_tokens: 1 },
-          },
-        ],
-        ['message_stop', { type: 'message_stop' }],
-      ];
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      for (const [event, data] of events)
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.end();
-    });
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      seen.push(request.body);
+      return 'ок';
+    },
   });
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        seen,
-        close: () => server.close(),
-      }),
-    );
-  });
+  return { url: stub.baseUrl, seen, close: () => stub.close() };
 }
 
 /**
@@ -466,9 +414,14 @@ try {
         facts.text.includes(MARK.skill),
         'в запросе из копии есть скилл проекта — ссылка .claude/skills работает',
       );
+      // Свежий CLI откладывает инструменты MCP за ToolSearch: имя инструмента
+      // приходит не в `tools`, а списком отложенных в сообщениях. Имя появится
+      // только у сервера, который CLI поднял из `.mcp.json` копии. Согласие этим
+      // не доказывается: `claude -p` поднимает сервер и без него (проверено
+      // подменой) — согласие стережёт строка про запись копии выше.
       check(
-        facts.tools.includes(MARK.mcp),
-        'в запросе из копии есть сервер из .mcp.json — согласие приехало записью доступа',
+        facts.tools.includes(MARK.mcp) || facts.text.includes(MARK.mcp),
+        'в запросе из копии есть сервер из .mcp.json — CLI поднял его в копии',
         facts.tools.join(', '),
       );
     }
@@ -505,6 +458,10 @@ try {
 
   // --- 4. Уборка копии забирает её запись ------------------------------------
   rmSync(join(copy, '.claude'), { force: true });
+  // Отправка из пункта 2 запустила ход в копии, а живой ход панель убрать не
+  // даёт (409, и это верно). Ждём его конца, как подождал бы человек.
+  const repairEnded = await runEnded('qa-copy-repair', 30);
+  check(repairEnded, 'ход отправки в копию закончился до уборки');
   const removed = await api('/project-git/worktrees/remove', {
     method: 'POST',
     body: JSON.stringify({ path: repo, worktreePath: copy, force: true }),

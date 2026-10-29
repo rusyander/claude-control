@@ -2,7 +2,7 @@ import type { ChildStageGroup } from '../ui/ChildStages.types';
 import type { HubBucket } from './hubSummary.types';
 
 /** Код закрытия группы отменой плана (`split-conveyor` → `cancel`). */
-export const PLAN_CANCELLED = 'split-group-plan-cancelled';
+const PLAN_CANCELLED = 'split-group-plan-cancelled';
 
 export function hubBucket(group: ChildStageGroup): HubBucket {
   // Подготовка копии — уже работа группы: место она держит, прогон вот-вот

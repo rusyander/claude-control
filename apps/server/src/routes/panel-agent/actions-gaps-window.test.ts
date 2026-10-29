@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { textWindow } from './action-kit/action-kit.ts';
 import type { AnyPanelAction } from './registry.ts';
 import { GAPS_PROJECT_ACTIONS } from './actions-gaps-projects/actions-gaps-projects.ts';

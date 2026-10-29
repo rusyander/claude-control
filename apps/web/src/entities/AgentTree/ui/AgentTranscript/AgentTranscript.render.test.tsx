@@ -78,6 +78,15 @@ describe('AgentStepRow — шаг хода', () => {
     expect(html).toContain('<pre');
   });
 
+  it('оборван паузой — «прервано» своим цветом, не «ошибка»', () => {
+    const html = step(call({ result: '[Tool call interrupted by pause]', interrupted: true }));
+    expect(html).toContain('data-step-interrupted');
+    expect(html).toContain('>прервано<');
+    expect(html).toMatch(/class="[^"]*toolInterrupted/);
+    expect(html).not.toContain('>ошибка<');
+    expect(html).not.toMatch(/class="[^"]*toolError/);
+  });
+
   it('первый шаг ответа — расход этого ответа и модель', () => {
     const html = step({
       kind: 'thinking',
@@ -122,6 +131,17 @@ describe('AgentTranscript — ход главного агента', () => {
     expect(html).toContain('Шаги 2499–2500 из 2500');
     expect(html).toContain('Показать раньше');
     expect(html).toContain('start="2499"');
+    expect(html).not.toContain('data-agent-pane-interrupted');
+  });
+
+  it('оборванные паузой вызовы — своей строкой, отдельно от странностей', () => {
+    const html = pane('s-cut', 'main', {
+      ...data,
+      anomalies: { denials: 0, errors: 0, interrupted: 3, repeatedReads: [], largeResults: 0 },
+    });
+    expect(html).toContain('data-agent-pane-interrupted');
+    expect(html).toContain('прервано паузой 3');
+    expect(html).not.toContain('data-agent-pane-anomalies');
   });
 
   it('ранние шаги ушли из памяти — сказано, сколько, и «раньше» нет', () => {

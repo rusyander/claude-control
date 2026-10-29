@@ -55,7 +55,6 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer as createHttpServer } from 'node:http';
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -64,6 +63,7 @@ import { setTimeout as wait } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
 import { killProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const isWindows = process.platform === 'win32';
 /** Начало прогона: процесс, запущенный раньше, нашим быть не может. */
@@ -372,6 +372,10 @@ function buildStand(stand) {
   for (const file of ['heavy-queue-hook.mjs', 'heavy-queue-classify.mjs']) {
     copyFileSync(join(REPO, 'tools', file), join(stand, 'tools', file));
   }
+  // Журнал проверок сервер берёт по пути от исходников (`runtime.ts`, `ledger-checks.ts`).
+  cpSync(join(REPO, 'tools', 'verify-ledger'), join(stand, 'tools', 'verify-ledger'), {
+    recursive: true,
+  });
   // Зависимости — ссылкой: копировать их незачем, а менять их проверка не
   // будет. Ссылка снимается первой при уборке (`unlinkStand`). Контракты сервер
   // берёт через неё же (`@agentdeck/contracts`), а сторожу нужен лишь каталог:
@@ -984,68 +988,12 @@ const R_COMMAND = ['rm', '-rf', 'r-build', '&&', 'echo', 'restart-ok', '>', R_MA
  */
 async function startModelStub() {
   const seen = [];
-  const sse = (res, blocks, stop) => {
-    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-    const ev = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    ev('message_start', {
-      type: 'message_start',
-      message: {
-        id: `msg_r${seen.length}`,
-        type: 'message',
-        role: 'assistant',
-        model: 'stub-restart',
-        content: [],
-        stop_reason: null,
-        usage: { input_tokens: 1, output_tokens: 1 },
-      },
-    });
-    blocks.forEach((block, index) => {
-      if (block.type === 'text') {
-        ev('content_block_start', {
-          type: 'content_block_start',
-          index,
-          content_block: { type: 'text', text: '' },
-        });
-        ev('content_block_delta', {
-          type: 'content_block_delta',
-          index,
-          delta: { type: 'text_delta', text: block.text },
-        });
-      } else {
-        ev('content_block_start', {
-          type: 'content_block_start',
-          index,
-          content_block: { type: 'tool_use', id: block.id, name: block.name, input: {} },
-        });
-        ev('content_block_delta', {
-          type: 'content_block_delta',
-          index,
-          delta: { type: 'input_json_delta', partial_json: JSON.stringify(block.input) },
-        });
-      }
-      ev('content_block_stop', { type: 'content_block_stop', index });
-    });
-    ev('message_delta', {
-      type: 'message_delta',
-      delta: { stop_reason: stop },
-      usage: { output_tokens: 1 },
-    });
-    ev('message_stop', { type: 'message_stop' });
-    res.end();
-  };
-  const server = createHttpServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      let body = {};
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-      } catch {
-        /* не JSON — побочный запрос */
-      }
-      if (req.url?.includes('count_tokens')) return res.end(JSON.stringify({ input_tokens: 1 }));
-      if (!req.url?.includes('/messages')) return res.end('{}');
-      if (!body.tools?.length) return sse(res, [{ type: 'text', text: 'ок' }], 'end_turn');
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      const { body } = request;
+      if (!body.tools?.length) return 'ок';
       // CLI 2.1.28x дописывает в конец служебные сообщения роли system — результат
       // инструмента ищется в последнем сообщении человека, а не в последнем вообще.
       const last = body.messages?.findLast((message) => message.role === 'user');
@@ -1062,29 +1010,12 @@ async function startModelStub() {
           text: text(block).slice(0, 300),
         })),
       });
-      if (results.length === 0) {
-        return sse(
-          res,
-          [
-            {
-              type: 'tool_use',
-              id: R_TOOL,
-              name: 'Bash',
-              input: { command: R_COMMAND, description: 'Clean the build, write the marker' },
-            },
-          ],
-          'tool_use',
-        );
-      }
-      return sse(res, [{ type: 'text', text: R_DONE }], 'end_turn');
-    });
+      if (results.length > 0) return R_DONE;
+      const args = { command: R_COMMAND, description: 'Clean the build, write the marker' };
+      return { tool: { name: 'Bash', args, id: R_TOOL } };
+    },
   });
-  await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  return {
-    url: `http://127.0.0.1:${server.address().port}`,
-    seen,
-    close: () => server.close(),
-  };
+  return { url: stub.baseUrl, seen, close: () => stub.close() };
 }
 
 /** Номера процессов прогона чата по журналу панели (CLI, посредник). */
@@ -1280,6 +1211,9 @@ const watch = spawn(process.execPath, [join(serverDir, 'src', 'lib', 'dev-watch.
     WEB_PORT: String(WEB_PORT),
     // Перезапуск посреди хода — то, что проверяется; сторож его не откладывает.
     AGENTDECK_DEV_DEFER: '0',
+    // Тишина перед перезапуском у сторожа по умолчанию 60 с (25.10) — столько же, сколько
+    // сценарий ждёт перезапуска: он приходил после окна и падал в окно следующего шага.
+    AGENTDECK_DEV_QUIET_MS: '1500',
     FAKE_STATE_DIR: state,
     FAKE_BG_MS: String(BG_MS),
     // Фальшивый CLI сценария R обрывает вызов прав по тишине, как настоящий; мост

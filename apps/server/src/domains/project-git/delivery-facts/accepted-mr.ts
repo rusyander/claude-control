@@ -13,7 +13,7 @@ import { TICKET_KEY, hasKey } from './delivery-facts.ts';
 /** Последний адрес MR (GitLab `/-/merge_requests/N`, GitHub `/pull/N`) в тексте ответа. */
 const MR_URL = /https?:\/\/[^\s<>()"'`]+?\/(?:-\/merge_requests|pull)\/\d+/g;
 
-export function mrUrlIn(text: string | undefined): string | undefined {
+function mrUrlIn(text: string | undefined): string | undefined {
   return text ? [...text.matchAll(MR_URL)].at(-1)?.[0] : undefined;
 }
 
@@ -29,7 +29,7 @@ export interface AcceptedMrInput {
 }
 
 /** Ветка-источник MR — ветка группы: та же или своя с её ключом задачи. */
-export function ownMrBranch(source: string, branch: string, claimed: readonly string[]): boolean {
+function ownMrBranch(source: string, branch: string, claimed: readonly string[]): boolean {
   if (source === branch) return true;
   if (claimed.includes(source)) return false;
   return (branch.match(TICKET_KEY) ?? []).some((key) => hasKey(source, key));

@@ -6771,9 +6771,12 @@ export const ru = {
       origin: {
         e2e: 'автотесты',
         e2eActor: 'панель',
+        core: 'проверки',
+        coreActor: 'ядро задач',
         filter: 'Записи',
         all: 'все',
         onlyE2e: 'автотесты панели',
+        onlyCore: 'проверки ядра задач',
         onlyCi: 'импорт из CI',
       },
       passed: 'пройдено: {{count}}',

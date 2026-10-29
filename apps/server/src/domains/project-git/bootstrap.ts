@@ -63,10 +63,10 @@ export type { BootstrapChain, BootstrapPlan, BootstrapStep } from './bootstrap.t
 
 export const BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
 /** Хвост лога, который уезжает в карточку и в задание агента. */
-export const LOG_TAIL_CHARS = 2000;
+const LOG_TAIL_CHARS = 2000;
 
 /** Сколько цепочек одного плана идёт разом: шесть `npm ci` сразу забивают диск. */
-export const BOOTSTRAP_CHAIN_LIMIT = 4;
+const BOOTSTRAP_CHAIN_LIMIT = 4;
 
 type PackageManager = 'pnpm' | 'npm' | 'yarn';
 

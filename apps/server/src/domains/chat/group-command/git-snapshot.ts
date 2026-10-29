@@ -25,7 +25,7 @@ const run = promisify(execFile);
 
 /** Снимков держим не больше стольких и не дольше двух недель (`pruneBackups`). */
 export const BACKUP_KEEP = 50;
-export const BACKUP_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const BACKUP_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * Программы из настроек копии здесь не нужны: `core.fsmonitor` исполнил бы

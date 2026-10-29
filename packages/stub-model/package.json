@@ -1,0 +1,23 @@
+{
+  "name": "@agentdeck/stub-model",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Заглушка модели по сценарию: три протокола провода (Anthropic messages, OpenAI chat и responses), поток SSE, след запросов — одна на тесты ядра и проверки tools/qa",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.mts",
+      "default": "./src/index.mjs"
+    }
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

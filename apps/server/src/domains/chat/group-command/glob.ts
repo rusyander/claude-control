@@ -28,7 +28,7 @@ function bracket(pattern: string, start: number): { source: string; end: number 
   return { source: `[${negate ? '^' : ''}${escaped}]`, end };
 }
 
-export function segmentGlob(pattern: string, dotglob: boolean): RegExp {
+function segmentGlob(pattern: string, dotglob: boolean): RegExp {
   let source = '';
   for (let i = 0; i < pattern.length; i += 1) {
     const ch = pattern[i] as string;

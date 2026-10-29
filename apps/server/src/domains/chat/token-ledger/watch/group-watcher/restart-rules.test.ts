@@ -76,6 +76,30 @@ describe('R39 перезапусков за час — столько и бол�
     ).toBeUndefined();
     expect(restartStorm(undefined, GROUP_WATCH_DEFAULTS, T('11:45:00'))).toBeUndefined();
   });
+
+  // Живой прогон 27.10: семь перезапусков до нажатой перепроверки всплыли бурей у трёх групп.
+  it('перезапуски до старта группы её не задели — не в счёт; с самого старта — в счёт', () => {
+    const done = parseDevRestarts(fixture('R39-restart-storm/fire.log'));
+    expect(
+      restartStorm({ done }, GROUP_WATCH_DEFAULTS, T('11:45:00'), T('11:05:01')),
+    ).toBeUndefined();
+    expect(
+      restartStorm({ done }, GROUP_WATCH_DEFAULTS, T('11:45:00'), T('11:05:00'))?.numbers,
+    ).toEqual({ restarts: 3 });
+  });
+
+  // Живой прогон 27.10 18:27: три перезапуска от правок сторожа, пока группы стояли на паузе,
+  // всплыли бурей сразу после «Продолжить».
+  it('перезапуск, пока группа на паузе, её не задел — не в счёт; в миг «Продолжить» и вне паузы — в счёт', () => {
+    const done = parseDevRestarts(fixture('R39-restart-storm/fire.log'));
+    const storm = (from: string, to: string) =>
+      restartStorm({ done }, GROUP_WATCH_DEFAULTS, T('11:45:00'), 0, [{ from: T(from), to: T(to) }])
+        ?.numbers;
+    expect(storm('11:20:00', '11:39:00')).toBeUndefined();
+    expect(storm('11:40:00', '11:44:00')).toBeUndefined();
+    expect(storm('11:30:00', '11:40:00')).toEqual({ restarts: 3 });
+    expect(storm('11:41:00', '11:44:00')).toEqual({ restarts: 3 });
+  });
 });
 
 describe('R38 перезапуск ждёт правок группы', () => {

@@ -12,7 +12,7 @@ import { RUN_DIR, ensureRunDir } from '../../../lib/run-dir/run-dir.ts';
 export const REVIEW_FINDINGS = `${RUN_DIR}/review-findings.agent.md`;
 
 /** Что записать: карточки звена правок или открытое после прохода проверки. */
-export type ReviewFindingsKind = 'fix' | 'open';
+type ReviewFindingsKind = 'fix' | 'open';
 
 /** Заголовок карточки в оглавлении вводной — первая строка, не длиннее этого. */
 const TITLE_MAX = 100;

@@ -13,6 +13,7 @@ import styles from './AgentTranscript.module.scss';
  * Шаг агента: реплика, размышление или вызов с итогом. Вызов без итога — то,
  * чем агент занят прямо сейчас; итог с ошибкой — своим цветом, отказ хука —
  * своей меткой с причиной, чтобы упавший шаг находился глазом в длинном ходе.
+ * Вызов, оборванный паузой или концом сессии, — «прервано» своим цветом: это не ошибка.
  * У вызова — время, длительность и полный размер результата; у первого шага
  * ответа модели — расход этого ответа и модель.
  */
@@ -60,9 +61,15 @@ export function AgentStepRow({ step }: AgentStepRowProps) {
   ].filter(Boolean);
   return (
     <li
-      className={cn(styles.step, styles.tool, step.isError && styles.toolError)}
+      className={cn(
+        styles.step,
+        styles.tool,
+        step.isError && styles.toolError,
+        step.interrupted && styles.toolInterrupted,
+      )}
       data-agent-step="tool"
       {...(step.denial !== undefined ? { 'data-step-denied': '' } : {})}
+      {...(step.interrupted ? { 'data-step-interrupted': '' } : {})}
     >
       {turn}
       <div className={styles.call}>
@@ -73,6 +80,11 @@ export function AgentStepRow({ step }: AgentStepRowProps) {
           <span className={styles.badgeError}>{t('agentTree.pane.denied')}</span>
         ) : (
           step.isError && <span className={styles.badgeError}>{t('agentTree.pane.error')}</span>
+        )}
+        {step.interrupted && (
+          <span className={styles.badgeInterrupted} title={t('agentTree.pane.interruptedHint')}>
+            {t('agentTree.pane.interrupted')}
+          </span>
         )}
       </div>
       {meta.length > 0 && (

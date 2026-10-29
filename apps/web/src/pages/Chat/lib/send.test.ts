@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { planSend } from './send';
 import { isSupportedUpload, unsupportedUploadNames } from './uploads';
-import { clearsComposer } from './clearsComposer';
 
 /**
  * Отправка сообщения из поля ввода.
@@ -28,12 +27,6 @@ describe('planSend', () => {
       action: 'dispatch',
       prompt: 'привет',
     });
-  });
-
-  it('поле ввода очищается только при принятой отправке', () => {
-    expect(clearsComposer({ ok: true })).toBe(true);
-    expect(clearsComposer({ ok: false, code: 'run_busy', message: 'занят' })).toBe(false);
-    expect(clearsComposer({ ok: false, message: 'нет связи' })).toBe(false);
   });
 });
 

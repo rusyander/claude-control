@@ -12,7 +12,7 @@ import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { definePanelAction, fingerprintOf, type AnyPanelAction } from '../registry.ts';
 import { dataField, summaryText, textField } from '../texts/texts.ts';
 import { readRoute } from '../action-kit/action-kit.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { TEST_LIBRARY_ACTIONS } from '../actions-tests-library.ts';
 import { testsPage, testsQuery as query } from '../tests-page.ts';
 import { assertRegistered, registeredOnly } from '../tests-block-kit.ts';

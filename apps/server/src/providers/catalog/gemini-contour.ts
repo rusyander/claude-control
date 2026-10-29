@@ -18,12 +18,6 @@ import { dirname, join } from 'node:path';
  * возможности).
  */
 
-/** Способ входа, при котором CLI идёт по `GOOGLE_GEMINI_BASE_URL`. */
-export const GEMINI_CONTOUR_AUTH = 'gemini-api-key';
-
-/** Название настройки для отказа: имя и значение, которого она требует. */
-export const GEMINI_AUTH_SETTING = `security.auth.selectedType ≠ "${GEMINI_CONTOUR_AUTH}"`;
-
 function readSettings(file: string): Record<string, unknown> {
   try {
     const root: unknown = JSON.parse(readFileSync(file, 'utf8'));
@@ -66,7 +60,7 @@ function systemDefaultsPath(): string {
  * читаются: CLI берёт их только у доверенной папки, а прогон о папке здесь не
  * знает, — проект, сменивший способ входа, получит отказ уже от самого CLI.
  */
-export function geminiAuthType(
+function geminiAuthType(
   userSettings: string = join(homedir(), '.gemini', 'settings.json'),
 ): string | undefined {
   return (
@@ -76,7 +70,11 @@ export function geminiAuthType(
   );
 }
 
-/** Настройка, из-за которой контур не дойдёт до CLI; `undefined` — дойдёт. */
-export function geminiContourBypass(userSettings?: string): string | undefined {
-  return geminiAuthType(userSettings) === GEMINI_CONTOUR_AUTH ? undefined : GEMINI_AUTH_SETTING;
+/**
+ * Не дойдёт ли контур до CLI: способ входа не тот, при котором CLI идёт по
+ * `GOOGLE_GEMINI_BASE_URL`. Нужный способ и имя настройки для отказа — факты канала
+ * (`@agentdeck/providers/gemini`), здесь только чтение настроек человека.
+ */
+export function geminiAuthBlocks(requiredAuth: string | undefined, userSettings?: string): boolean {
+  return geminiAuthType(userSettings) !== requiredAuth;
 }

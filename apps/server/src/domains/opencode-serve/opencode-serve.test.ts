@@ -494,12 +494,14 @@ describe('OpencodeServe: просьбы о разрешении решает dec
       'вопрос',
       depsOf(fetchImpl, { permission: { allowEdits: true, ask: async () => 'allow', judge } }),
     );
-    // Сервер общий на все разговоры — pid хода не назвать.
+    // Сервер общий на все разговоры — ни pid хода, ни id сессии CLI до хода не назвать
+    // (третий аргумент судьи — сессия, его дают Codex и qwen serve).
     expect(judge).toHaveBeenCalledWith(
       {
         command: 'git branch -D old',
         shell: process.platform === 'win32' ? 'unknown' : 'bash',
       },
+      undefined,
       undefined,
     );
     // Причина судьи — модели в самом отказе: без неё модель видит общий отказ и

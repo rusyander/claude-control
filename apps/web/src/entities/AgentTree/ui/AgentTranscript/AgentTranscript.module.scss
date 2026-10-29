@@ -103,6 +103,11 @@
   border-left-color: var(--color-danger);
 }
 
+// Оборван паузой или концом сессии — не ошибка: спокойный цвет, своя метка.
+.toolInterrupted {
+  border-left-color: var(--color-info);
+}
+
 .call {
   display: flex;
   flex-wrap: wrap;
@@ -125,10 +130,21 @@
 }
 
 .badgeRunning,
-.badgeError {
+.badgeError,
+.badgeInterrupted {
   padding: 0 var(--spacing-3xs);
   border-radius: 4px;
   font-size: var(--font-size-caption);
+}
+
+.badgeInterrupted {
+  color: var(--color-info);
+  background: var(--color-info-subtle);
+}
+
+// Обрывы паузой в строке странностей хода — не цветом опасности.
+.interrupted {
+  color: var(--color-info);
 }
 
 .badgeRunning {

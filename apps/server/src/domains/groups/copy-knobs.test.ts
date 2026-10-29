@@ -19,7 +19,7 @@ import { groupKnobsLine, KNOBS_EXTRACTION_VERSION } from './knobs/knobs.ts';
 import { promotePathStep } from './promote/promote.ts';
 import { readRules, saveRule } from '../rules/rules.ts';
 import { readHooks, readHooksFromFiles } from '../hooks/hooks.ts';
-import { maskSecretsInText, SECRET_MASK } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import * as safeIo from '../../lib/safe-io/safe-io.ts';
 import { memberContent } from './members/members.ts';
 

@@ -13,12 +13,18 @@ const LEVELS = [0.8, 0.9, 0.95];
 const HEAVY = { five: 0.05, seven: 0.02, tokens: 3e6 };
 
 const moved = (a, b) => (!a || !b ? null : a.resetsAt !== b.resetsAt ? b.utilization : b.utilization - a.utilization);
-// The window before a run: the last sample of an earlier run when it is recent, else the run's own first sample.
-// A sample hours old sits in an older window, and the reset since read as the whole new window spent by this one
-// run (g1 26.10: «+49% while it ran» for 46 → 49 %, armed as heavy).
+// The window before a run: the latest sample of any run at or before its start and recent, else the run's own first
+// sample. A sample hours old sits in an older window, and the reset since read as the whole new window spent by this
+// one run (g1 26.10: «+49% while it ran» for 46 → 49 %, armed as heavy). A neighbour's sample AFTER the start is the
+// middle of this run: groups run together, and the neighbour's end cut the move to its tail (g1 27.10: «+1%» for
+// 9 → 20 %, g5 «+0%» for 9 → 22 %). Twin of the panel's window-rules.ts runBase.
 const RECENT = 15 * 60e3;
-const startOf = (r, before) =>
-  before && before.at >= (r.startedAt ?? 0) - RECENT ? before : (r.samples?.length ?? 0) > 1 ? r.samples[0] : null;
+const startOf = (r, pool) => {
+  const t = r.startedAt ?? 0;
+  let best = null;
+  for (const x of pool) if (x.at <= t && x.at >= t - RECENT && (!best || x.at > best.at)) best = x;
+  return best ?? ((r.samples?.length ?? 0) > 1 ? r.samples[0] : null);
+};
 
 export function scanWindow(ctx, units) {
   const { o, s, emit } = ctx;
@@ -50,12 +56,10 @@ export function scanWindow(ctx, units) {
     bySession[r.sessionId] ??= units.find(([, u]) => u.dir && fs.existsSync(path.join(u.dir, `${r.sessionId}.jsonl`)))?.[0] ?? '';
     return bySession[r.sessionId] || undefined;
   };
-  let base = null;
+  const pool = runs.flatMap((x) => x.samples ?? []);
   let latest = null;
   for (const r of runs.filter((x) => x.endedAt).sort((a, b) => a.endedAt - b.endedAt)) {
     const last = r.samples?.at(-1) ?? null;
-    const before = base;
-    if (last) base = last;
     if (last && (!latest || last.at >= latest.at)) latest = last;
     // A record written mid-run (`open`) is a sample, not the end: its endedAt is the sample time and the run goes on
     // (25.10: an open record read as a finished run, «63k tok in 20s», and the real end was never shown).
@@ -68,7 +72,7 @@ export function scanWindow(ctx, units) {
       continue;
     }
     // Groups run in parallel: the move is the window's while this run ran, an upper bound of its own share.
-    const from = startOf(r, before);
+    const from = startOf(r, pool);
     const d5 = moved(from?.fiveHour, last?.fiveHour);
     const d7 = moved(from?.sevenDay, last?.sevenDay);
     const heavy = (d5 ?? 0) >= HEAVY.five || (d7 ?? 0) >= HEAVY.seven || (r.tokens ?? 0) >= HEAVY.tokens;

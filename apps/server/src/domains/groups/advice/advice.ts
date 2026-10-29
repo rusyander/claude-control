@@ -9,7 +9,7 @@ import {
 } from '../../../lib/app-store/group-sources.ts';
 import { hookContentId } from '../../../lib/hook-id.ts';
 import { writeTextFile } from '../../../lib/safe-io/safe-io.ts';
-import { maskSecretsInText, restoreMaskedSecrets } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText, restoreMaskedSecrets } from '@agentdeck/dlp/secret-mask';
 import type { EntityToggleDeps } from '../../entity-toggle.ts';
 import { readHooks, writeHooks } from '../../hooks/hooks.ts';
 import { deleteMcpServer, saveMcpServer } from '../../mcp/mcp.ts';

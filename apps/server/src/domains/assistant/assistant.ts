@@ -7,7 +7,7 @@ import { killChildTree } from '../../lib/process-tree/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli/cli.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import { coded } from '../../lib/server-text/server-text.ts';
-import { SECRET_MASK } from '../../lib/secret-mask/secret-mask.ts';
+import { SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import {
   readStreamJsonResult,
   STREAM_JSON_INPUT_ARGS,

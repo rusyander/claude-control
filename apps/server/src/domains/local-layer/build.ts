@@ -29,7 +29,7 @@ import type {
  * - `overrides/` — переносимые копии замен.
  */
 
-export const PLUGIN_NAME = 'project';
+const PLUGIN_NAME = 'project';
 
 /** Сколько знаков должно сэкономить сжатие, чтобы слой без замен окупал себя. */
 export const MIN_SAVED_CHARS = 500;

@@ -78,7 +78,7 @@ export type Store = keyof typeof STORES;
 
 export const CONTOUR = 'sweep-contour';
 export const ENDPOINT = 'sweep-endpoint';
-export const MCP_STDIO = 'sweep-stdio';
+const MCP_STDIO = 'sweep-stdio';
 export const MCP_HTTP = 'sweep-http';
 export const PROJECT_MCP = 'sweep-proj-mcp';
 export const CHAT = '5e3c0a52-7d1b-4c1e-9f0a-1b2c3d4e5f60';

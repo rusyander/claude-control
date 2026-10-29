@@ -3,7 +3,12 @@ import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { gooseConfigDir, unimplementedPaths } from './config-dirs.ts';
 import { createGooseStreamParser } from './goose-stream.ts';
-import { contourModelName, readConfigRoot } from './run-endpoint.ts';
+import { GOOSE_RUN_PROVIDER } from '@agentdeck/providers/goose';
+import { readConfigRoot } from './run-endpoint.ts';
+import { assistantApiOf, runEndpointOf, runFactsOf } from './run-facts.ts';
+
+/** Факты запуска Goose — из пакета `@agentdeck/providers`. */
+const facts = runFactsOf('goose');
 
 /** ОДИН `config.yaml` держит и MCP-серверы (`extensions`), и режим `GOOSE_MODE`. */
 const gooseConfigYaml = (): string => join(gooseConfigDir(), 'config.yaml');
@@ -44,11 +49,11 @@ const gooseConfigYaml = (): string => join(gooseConfigDir(), 'config.yaml');
  * ключей ОС либо `secrets.yaml`, который панель вести не станет.
  */
 export const gooseProvider: ConfigProvider = {
-  id: 'goose',
-  name: 'Goose',
-  status: 'experimental',
-  paths: unimplementedPaths('goose'),
-  cli: { command: 'goose', windowsCommand: 'goose.cmd' },
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
+  cli: facts.binary,
   instructionsFile: () => join(gooseConfigDir(), '.goosehints'),
   mcpConfig: { format: 'goose-yaml', path: gooseConfigYaml },
   permissionsConfig: {
@@ -110,9 +115,7 @@ export const gooseProvider: ConfigProvider = {
   // внутри самого Goose, а ключ лежит в его связке ключей. Поэтому `none` +
   // запуск через CLI (подписка/настройка пользователя), без ключа в панели.
   assistant: {
-    apiKind: 'none',
-    apiKeyEnvVars: [],
-    cliRunnable: true,
+    ...assistantApiOf(facts),
     // Подбора модели (Т12) у Goose НЕТ: `--model` задокументирован только В ПАРЕ
     // с `--provider`, а какой провайдер настроен у пользователя, панель не знает
     // — как и вендора его моделей (`modelVendors` не задан).
@@ -142,36 +145,15 @@ export const gooseProvider: ConfigProvider = {
     // запуском (`GOOSE_MODE`, см. `oneShotEnv`).
     editsControl: 'flag',
   },
-  // Контур (X7): провайдер `openai` целиком из окружения — справочник
-  // переменных Goose говорит, что окружение перебивает `config.yaml`. Адрес
-  // делится на хост и путь (`OPENAI_BASE_PATH` — без ведущей косой черты, с
-  // `chat/completions` на конце). Субагенты получают тот же провайдер явно: иначе
-  // они пошли бы провайдером из конфига. Заголовок сессии и список моделей
-  // идут этим же провайдером — живая проба, всё дошло до заглушки контура.
-  runEndpoint: {
-    apiKind: 'openai-compat',
-    env: ({ baseUrl, model, key }) => {
-      const url = new URL(baseUrl);
-      const name = contourModelName(model);
-      return {
-        GOOSE_PROVIDER: 'openai',
-        GOOSE_MODEL: name,
-        GOOSE_SUBAGENT_PROVIDER: 'openai',
-        GOOSE_SUBAGENT_MODEL: name,
-        OPENAI_HOST: url.origin,
-        OPENAI_BASE_PATH: `${url.pathname.replace(/^\/+|\/+$/g, '')}/chat/completions`,
-        OPENAI_API_KEY: key,
-      };
-    },
-    // Ведущая модель другого провайдера (lead/worker) ушла бы своим ключом мимо
-    // контура; провайдер `openai` ходит тем же адресом, что и основной.
-    bypass: () => {
-      const lead = readConfigRoot(gooseConfigYaml(), 'yaml').GOOSE_LEAD_PROVIDER;
-      return typeof lead === 'string' && lead.trim() && lead.trim() !== 'openai'
-        ? 'GOOSE_LEAD_PROVIDER'
-        : undefined;
-    },
-  },
+  // Контур (X7): провайдер `openai` целиком из окружения (`@agentdeck/providers/goose`
+  // собирает его). Заголовок сессии и список моделей идут этим же провайдером — живая
+  // проба, всё дошло до заглушки контура. Ведущая модель другого провайдера
+  // (lead/worker) ушла бы своим ключом мимо контура; провайдер прогона ходит тем же
+  // адресом, что и основной, — его ведущая модель обходом не считается.
+  runEndpoint: runEndpointOf(facts, (bypass) => {
+    const lead = readConfigRoot(gooseConfigYaml(), 'yaml')[bypass.setting];
+    return typeof lead === 'string' && lead.trim() !== '' && lead.trim() !== GOOSE_RUN_PROVIDER;
+  }),
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',

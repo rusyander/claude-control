@@ -31,7 +31,7 @@ const REFUSAL_CODE = {
   'panel-plugins': 'plugins-provider-unsupported',
 } as const satisfies Record<GuardedSection, string>;
 
-export interface SectionRefusal {
+interface SectionRefusal {
   error: 'provider_unsupported';
   message: string;
   messageCode: (typeof REFUSAL_CODE)[GuardedSection];
@@ -43,7 +43,7 @@ export interface SectionRefusal {
  * OpenCode, Qwen Code и Codex раздел плагинов `ready`, но СВОЙ (`files`, другие
  * маршруты); `/api/plugins*` говорят только на языке `claude plugin …`.
  */
-export function isSectionReady(provider: ConfigProvider, section: GuardedSection): boolean {
+function isSectionReady(provider: ConfigProvider, section: GuardedSection): boolean {
   if (section === 'panel-plugins') {
     return provider.capabilities.plugins === 'ready' && pluginsModelOf(provider) === 'panel';
   }
@@ -51,7 +51,7 @@ export function isSectionReady(provider: ConfigProvider, section: GuardedSection
 }
 
 /** Тело отказа для активного провайдера или undefined, если раздел у него есть. */
-export function sectionRefusal(
+function sectionRefusal(
   store: SettingsSource,
   section: GuardedSection,
 ): SectionRefusal | undefined {

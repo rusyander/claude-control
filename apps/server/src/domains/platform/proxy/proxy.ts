@@ -48,7 +48,7 @@ export type ProxyRoute =
   | { kind: 'unsupported'; value: string; source: string };
 
 /** Ответ на CONNECT дольше этого — прокси есть, но он не пропускает. */
-export const TUNNEL_TIMEOUT_MS = 20_000;
+const TUNNEL_TIMEOUT_MS = 20_000;
 
 function firstNamed(
   env: ProxyEnv,

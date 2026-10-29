@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { headLine, panelLink, placeOf, withLink } from './telegram-answers/compose.ts';
 import { bold, escapeHtml, expandable } from './telegram-answers/html.ts';
 

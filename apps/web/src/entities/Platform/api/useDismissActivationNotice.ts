@@ -2,7 +2,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function dismissActivationNotice(): Promise<void> {
+async function dismissActivationNotice(): Promise<void> {
   await apiClient.delete('/platforms/activation-notice');
 }
 

@@ -14,6 +14,9 @@ import { GroupAgents } from './GroupAgents';
  * (строка «Агенты» знает только текущую). Данные — в кэше запросов, как их
  * кладут хуки.
  */
+/** Текст без разметки: числа в «сейчас: …» — отдельные span со своим цветом. */
+const text = (html: string): string => html.replace(/<[^>]+>/g, '');
+
 function render(progress: ChatProgress, history: AgentHistory | undefined): string {
   const client = new QueryClient();
   client.setQueryData(chatKeys.progress('g1'), progress);
@@ -88,7 +91,10 @@ describe('GroupAgents — кнопка истории агентов', () => {
     expect(html).toContain('data-group-agent-jump="ag10"');
     expect(html).toContain('История агентов · 5');
     expect(html).toContain('data-agent-history-live="1:2"');
-    expect(html).toContain('сейчас: 1 агент · 2 субагента');
+    expect(text(html)).toContain('сейчас: 1 агент · 2 субагента');
+    // Числа выделены: агенты — цветом «идёт», субагенты — акцентом.
+    expect(html).toMatch(/class="[^"]*liveCountAgents[^"]*" data-live-count="agents">1</);
+    expect(html).toMatch(/class="[^"]*liveCountSubagents[^"]*" data-live-count="subagents">2</);
   });
 
   it('никто не работает — приглушённое «никто не работает», а не пустота', () => {
@@ -106,11 +112,15 @@ describe('GroupAgents — кнопка истории агентов', () => {
       { tasks: [], agents: [] },
       { sessions: [session('g1', 0)], agentCount: 0, live: { agents: 5, subagents: 1 } },
     );
-    expect(many).toContain('сейчас: 5 агентов · 1 субагент');
+    expect(text(many)).toContain('сейчас: 5 агентов · 1 субагент');
     const subs = render(
       { tasks: [], agents: [] },
       { sessions: [session('g1', 0)], agentCount: 0, live: { agents: 0, subagents: 3 } },
     );
-    expect(subs).toContain('сейчас: 0 агентов · 3 субагента');
+    expect(text(subs)).toContain('сейчас: 0 агентов · 3 субагента');
+    // Ноль — приглушённо, без выделения; ненулевое рядом — выделено.
+    expect(subs).toMatch(/class="[^"]*liveCount_[^"]*" data-live-count="agents">0</);
+    expect(subs).not.toMatch(/liveCountAgents[^"]*" data-live-count="agents"/);
+    expect(subs).toMatch(/liveCountSubagents[^"]*" data-live-count="subagents">3</);
   });
 });

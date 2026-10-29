@@ -4,7 +4,7 @@ import { newRuleId } from './rules';
 /**
  * Образцы, которые отклоняют запрос, а не маскируют: ключ и токен уходят целиком
  * или не уходят вовсе. Тот же выбор, что у встроенного набора маски контура на
- * сервере (`dlp/default-rules.ts`).
+ * сервере (`packages/dlp/src/default-rules.ts`).
  */
 export const BLOCKING: readonly DlpBuiltinPattern[] = ['secret_key', 'jwt'];
 

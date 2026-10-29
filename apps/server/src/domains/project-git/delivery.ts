@@ -37,12 +37,12 @@ export function findDeliverySkill(projectDir: string): string | undefined {
   }
 }
 
-export function hasRemote(projectDir: string): boolean {
+function hasRemote(projectDir: string): boolean {
   const out = gitSync(projectDir, ['remote']);
   return out !== undefined && pickRemote(out) !== undefined;
 }
 
-export function readDeliveryProfile(
+function readDeliveryProfile(
   projectDir: string,
   input: { enabled: boolean; bootstrap?: string; heavy?: SplitDefaults['heavy'] },
 ): DeliveryProfile {
@@ -71,7 +71,7 @@ export function effectiveParallel(
   return stored.parallel ?? (heavy ? defaults.parallelHeavy : defaults.parallelLight);
 }
 
-export function splitSettingsView(
+function splitSettingsView(
   stored: StoredSplitSettings,
   profile: DeliveryProfile,
   defaults: SplitDefaults = SPLIT_DEFAULTS_BUILTIN,

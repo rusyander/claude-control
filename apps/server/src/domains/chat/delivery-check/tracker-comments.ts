@@ -24,7 +24,7 @@ export interface DeliveryTracker {
 }
 
 /** Ключи группы, названные в сообщениях коммитов `base..HEAD`; не назван ни один — все. */
-export async function deliveredTickets(
+async function deliveredTickets(
   cwd: string,
   base: string | undefined,
   keys: readonly string[],

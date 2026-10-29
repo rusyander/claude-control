@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ClaudeLocation } from '@agentdeck/contracts';
-import { SECRET_MASK } from '../../lib/secret-mask/secret-mask.ts';
+import { SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import { askAssistant, type AssistRequest } from './assistant.ts';
 import { assistStructure } from '../resources/ResourceAssistant.ts';
 

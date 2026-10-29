@@ -29,10 +29,10 @@
  * нужен установленный `claude` (путь — `CLAUDE_CLI`); стенд и настройки человека
  * не трогаются.
  */
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-agenthold-';
 const START = 'start-hold-4417 run the review lanes';
@@ -86,122 +86,32 @@ function whoCalls(body) {
   return 'other';
 }
 
-function sse(res, blocks, stopReason) {
-  const events = [
-    {
-      type: 'message_start',
-      message: {
-        id: `msg_${Math.random().toString(36).slice(2)}`,
-        type: 'message',
-        role: 'assistant',
-        model: 'stub',
-        content: [],
-        stop_reason: null,
-        usage: { input_tokens: 10, output_tokens: 1 },
-      },
-    },
-  ];
-  blocks.forEach((block, index) => {
-    if (block.type === 'text') {
-      events.push(
-        { type: 'content_block_start', index, content_block: { type: 'text', text: '' } },
-        { type: 'content_block_delta', index, delta: { type: 'text_delta', text: block.text } },
-      );
-    } else {
-      events.push(
-        {
-          type: 'content_block_start',
-          index,
-          content_block: { type: 'tool_use', id: block.id, name: block.name, input: {} },
-        },
-        {
-          type: 'content_block_delta',
-          index,
-          delta: { type: 'input_json_delta', partial_json: JSON.stringify(block.input) },
-        },
-      );
-    }
-    events.push({ type: 'content_block_stop', index });
-  });
-  events.push(
-    { type: 'message_delta', delta: { stop_reason: stopReason }, usage: { output_tokens: 1 } },
-    { type: 'message_stop' },
-  );
-  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-  for (const data of events) res.write(`event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`);
-  res.end();
-}
-
 /** Стаб API: пишет каждый запрос и ведёт разговор по ролям вызова. */
-function startStub() {
+async function startStub() {
   const seen = [];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // пустое тело — тоже запрос
-      }
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      const { body } = request;
       const who = whoCalls(body);
       seen.push({ who, body, at: Date.now() });
-      if (who === 'sub') {
-        setTimeout(() => sse(res, [{ type: 'text', text: LANE_DONE }], 'end_turn'), SUB_DELAY_MS);
-        return;
-      }
-      if (who !== 'main') {
-        sse(res, [{ type: 'text', text: 'ok' }], 'end_turn');
-        return;
-      }
-      const history = JSON.stringify(body.messages ?? []);
-      if (history.includes(LANE_DONE)) {
-        sse(res, [{ type: 'text', text: WAKE_WORD }], 'end_turn');
-        return;
-      }
-      const last = body.messages?.at(-1);
-      const answered = textOf(last?.content).includes('tool_result');
-      if (answered) {
-        sse(res, [{ type: 'text', text: LAUNCHED_LINE }], 'end_turn');
-        return;
-      }
-      const names = (body.tools ?? []).map((tool) => tool.name);
-      const name = names.includes('Agent') ? 'Agent' : 'Task';
-      sse(
-        res,
-        [
-          {
-            type: 'tool_use',
-            id: 'toolu_hold_1',
-            name,
-            input: {
-              description: 'Review lane A',
-              prompt: SUBTASK,
-              subagent_type: 'general-purpose',
-              run_in_background: true,
-            },
-          },
-        ],
-        'tool_use',
-      );
-    });
+      // Подагент отвечает не сразу — главный разговор успевает закончить ход.
+      if (who === 'sub') return { text: LANE_DONE, holdMs: SUB_DELAY_MS };
+      if (who !== 'main') return 'ok';
+      if (JSON.stringify(body.messages ?? []).includes(LANE_DONE)) return WAKE_WORD;
+      if (textOf(body.messages?.at(-1)?.content).includes('tool_result')) return LAUNCHED_LINE;
+      const name = request.tools.includes('Agent') ? 'Agent' : 'Task';
+      const args = {
+        description: 'Review lane A',
+        prompt: SUBTASK,
+        subagent_type: 'general-purpose',
+        run_in_background: true,
+      };
+      return { tool: { name, args, id: 'toolu_hold_1' } };
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        seen,
-        close: () => server.close(),
-      }),
-    ),
-  );
+  return { url: stub.baseUrl, seen, close: () => stub.close() };
 }
 
 const withTimeout = (promise, ms, what) =>

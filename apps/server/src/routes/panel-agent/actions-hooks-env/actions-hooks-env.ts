@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { CommandsResponse, EnvVar, Hook } from '@agentdeck/contracts';
 import type { ConfigPreviewRequest } from '../../../domains/config-preview/config-preview.ts';
 import { isSecretEnvKey } from '@agentdeck/contracts/env-secret';
-import { maskSecretsInText, SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import { definePanelAction, type AnyPanelAction, type InjectRoute } from '../registry.ts';
 import { assertClaude, permissionId } from '../actions-config/actions-config.ts';
 import {

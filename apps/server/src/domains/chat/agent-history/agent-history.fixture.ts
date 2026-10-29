@@ -48,7 +48,7 @@ const result = (minute: number, id: string, text: string) => ({
 });
 
 /** Файл субагента: `calls` вызовов Grep, ответы по одному на вызов. */
-export function writeSubagent(
+function writeSubagent(
   sessionPath: string,
   agentId: string,
   toolUseId: string,

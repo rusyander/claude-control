@@ -26,7 +26,7 @@ export type ComposeDbVerdict =
   | undefined;
 
 /** Движок по образу: `docker.io/library/postgres:18` → `postgres`; реестр и тег регэксп терпит. */
-export function engineOfImage(image: string | undefined): string | undefined {
+function engineOfImage(image: string | undefined): string | undefined {
   if (!image) return undefined;
   if (POSTGRES_IMAGE.test(image)) return 'postgres';
   return OTHER_IMAGES.find(([pattern]) => pattern.test(image))?.[1];

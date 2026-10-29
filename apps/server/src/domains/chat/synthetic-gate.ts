@@ -25,7 +25,7 @@ function textOf(message: Message | undefined): string {
     .trim();
 }
 
-export function isSyntheticMessage(message: Message | undefined): boolean {
+function isSyntheticMessage(message: Message | undefined): boolean {
   if (!message) return false;
   return message.model === SYNTHETIC_MODEL || textOf(message) === SYNTHETIC_TEXT;
 }

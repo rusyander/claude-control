@@ -1,6 +1,6 @@
 import type { ComposeService } from '@entities/Compose';
 
-export type ServiceTone = 'success' | 'warning' | 'danger' | 'neutral';
+type ServiceTone = 'success' | 'warning' | 'danger' | 'neutral';
 
 export interface ServiceStateView {
   tone: ServiceTone;

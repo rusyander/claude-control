@@ -5,7 +5,7 @@ import type { ResumeSeed } from './group-watcher.types.ts';
 const SEEDS_CAP = 200;
 
 /** Затравка по состоянию сессии: конец последнего вызова, база и отметка пинга. */
-export function seedOf(state: {
+function seedOf(state: {
   lastCallAt: number;
   firstCtx?: number | undefined;
   warmedAt?: number | undefined;

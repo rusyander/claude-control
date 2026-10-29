@@ -25,10 +25,10 @@ import type { FeedAnchor, FeedProbe, FeedRow, FeedSnapshot } from './feedPositio
  * полтора десятка детей), и мало, чтобы память не росла без конца в вкладке,
  * открытой неделями: самый давний выпадает первым.
  */
-export const FEED_MEMORY_LIMIT = 50;
+const FEED_MEMORY_LIMIT = 50;
 
 /** Порог «у низа», px: ближе — лента держится низа (тот же, что был в прокрутке ленты). */
-export const PINNED_THRESHOLD = 160;
+const PINNED_THRESHOLD = 160;
 
 /** Хранилище, переживающее перезагрузку: sessionStorage вкладки или подмена в тесте. */
 export interface FeedStorage {

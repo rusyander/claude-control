@@ -55,11 +55,11 @@ import { deleteYamlKey, otherYamlKeysProjection, parseYamlMapDocument } from './
 export { UnrecognizedFormatError };
 
 /** Ключ MCP-серверов в `config.yaml` — СПИСОК записей с полем `name` внутри. */
-export const CONTINUE_MCP_KEY = 'mcpServers';
+const CONTINUE_MCP_KEY = 'mcpServers';
 
 /** Три задокументированных списка `permissions.yaml`, в порядке показа. */
 export const CONTINUE_PERMISSION_KEYS = ['allow', 'ask', 'exclude'] as const;
-export type ContinuePermissionKey = (typeof CONTINUE_PERMISSION_KEYS)[number];
+type ContinuePermissionKey = (typeof CONTINUE_PERMISSION_KEYS)[number];
 
 /** Запись MCP-сервера Continue как она лежит в файле (чужие поля тоже здесь). */
 export type ContinueRawServer = Record<string, unknown>;
@@ -68,7 +68,7 @@ export type ContinueRawServer = Record<string, unknown>;
  * Разобрать конфигурацию Continue (общая основа — `lib/yaml-doc.ts`: корень
  * обязан быть отображением, ошибка разбора → fail-closed).
  */
-export function parseContinueDocument(text: string): Document {
+function parseContinueDocument(text: string): Document {
   return parseYamlMapDocument(text);
 }
 
@@ -126,7 +126,7 @@ export function writeContinueServers(text: string, servers: ContinueRawServer[])
 }
 
 /** Ключ списка моделей Continue: там же живёт `apiBase` — адрес эндпоинта. */
-export const CONTINUE_MODELS_KEY = 'models';
+const CONTINUE_MODELS_KEY = 'models';
 
 /**
  * Модели Continue как они лежат в файле. Адрес эндпоинта у Continue — поле

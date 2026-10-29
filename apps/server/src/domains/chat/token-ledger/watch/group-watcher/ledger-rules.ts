@@ -25,7 +25,7 @@ export interface LedgerFeedEvent {
 }
 
 /** Находка R40 в копии: вид, проверка и подробность для строки. */
-export interface LedgerFinding {
+interface LedgerFinding {
   at: number;
   kind: 'replay' | 'off' | 'mismatch' | 'mode';
   check: string;

@@ -7,7 +7,7 @@ import { queryKeys } from '@shared/api/query-keys';
  * Чем пойдёт прогон этого потребителя. Короткий ответ вместо карточек: шапке
  * чата нужна одна строка, а карточка везёт каталог, пробу и учёт расхода.
  */
-export async function getRunPlan(consumer: string, project = ''): Promise<PlatformRunPlan> {
+async function getRunPlan(consumer: string, project = ''): Promise<PlatformRunPlan> {
   const { data } = await apiClient.get<PlatformRunPlan>(
     `/platform-run-plan/${encodeURIComponent(consumer)}`,
     project ? { params: { project } } : undefined,

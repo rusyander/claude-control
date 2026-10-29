@@ -217,7 +217,7 @@ export function readGgufWeightType(path: string): string | undefined {
   return parseGgufWeightType(buf);
 }
 
-export function parseGgufWeightType(buf: Buffer): string | undefined {
+function parseGgufWeightType(buf: Buffer): string | undefined {
   if (buf.length < 24 || buf.toString('latin1', 0, 4) !== 'GGUF') return undefined;
   const reader = new Reader(buf);
   try {

@@ -22,6 +22,14 @@ import { serverMessageCodes } from '@agentdeck/contracts/server-messages';
  * src/bootstrap/server-ru-literals.test.ts`, затем разобрать дифф.
  */
 const SRC = resolve(import.meta.dirname, '..');
+/**
+ * Пакет DLP уехал из сервера, но его тексты (отказы правил, метки) по-прежнему
+ * уходят в ответы панели — закрепка смотрит и туда, с ключом от корня репозитория.
+ */
+const DLP_SRC = resolve(import.meta.dirname, '../../../../packages/dlp/src');
+const REPO = resolve(DLP_SRC, '../../..');
+/** Факты запуска CLI: имена и значения из них уходят в каталог панели — смотрим и туда. */
+const PROVIDERS_SRC = resolve(REPO, 'packages/providers/src');
 const PINS = join(import.meta.dirname, 'server-ru-literals.pins.json');
 const CYRILLIC = /[А-Яа-яЁё]/;
 const MARKER =
@@ -121,9 +129,13 @@ describe('русские литералы сервера без кода', () =>
   it('совпадают с закреплённым списком (новый — краснеет, убранный — тоже)', () => {
     const pins = JSON.parse(readFileSync(PINS, 'utf8')) as Record<string, Pin>;
     const actual: Record<string, number> = {};
-    for (const path of sources(SRC)) {
+    for (const [root, path] of [
+      ...sources(SRC).map((path) => [SRC, path] as const),
+      ...sources(DLP_SRC).map((path) => [REPO, path] as const),
+      ...sources(PROVIDERS_SRC).map((path) => [REPO, path] as const),
+    ]) {
       const n = uncodedRussianLiterals(path);
-      if (n > 0) actual[relative(SRC, path).replaceAll('\\', '/')] = n;
+      if (n > 0) actual[relative(root, path).replaceAll('\\', '/')] = n;
     }
     if (process.env.WRITE_RU_PINS === '1') {
       const next: Record<string, Pin> = {};

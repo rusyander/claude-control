@@ -338,7 +338,7 @@ const CLI_CHILD =
  * сошла бы за CLI — её номер ушёл бы в журнал, и уборка следующего старта
  * сняла бы чужой процесс (так же, как `taskkill /T`, см. `lib/kill-tree.mjs`).
  */
-export function listChildProcesses(pid: number): Promise<ChildProcessInfo[]> {
+function listChildProcesses(pid: number): Promise<ChildProcessInfo[]> {
   const script =
     `$parent = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = ${pid}"; ` +
     `if ($parent) { Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = ${pid}" | ` +

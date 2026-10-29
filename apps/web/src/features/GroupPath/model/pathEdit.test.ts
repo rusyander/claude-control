@@ -3,12 +3,10 @@ import type { PathEntry, PathStep } from '@agentdeck/contracts';
 import { customSteps } from './pathEdit';
 import { stepFromProposal } from './stepDraft';
 import { renumber } from './renumber';
-import { canMoveInPath } from './canMoveInPath';
 import { removeStep } from './removeStep';
 import { anchorAfter } from './anchorAfter';
 import { insertAfter } from './insertAfter';
 import { moveToSlot } from './moveToSlot';
-import { moveInPath } from './moveInPath';
 import { replaceStep } from './replaceStep';
 import { isBilingual } from './isBilingual';
 
@@ -154,7 +152,8 @@ describe('шаги внутри скилла', () => {
   });
 
   it('перенос вниз через шаг скилла меняет место внутри скилла', () => {
-    const next = moveInPath(SKILL, 'inner', 1);
+    // Строка 3 — второй шаг скилла: перенос на одну строку вниз.
+    const next = moveToSlot(SKILL, 'inner', 3);
     expect(next.find((item) => item.id === 'inner')?.within).toEqual({
       skillId: 'td',
       index: 1,
@@ -163,7 +162,8 @@ describe('шаги внутри скилла', () => {
   });
 
   it('перенос шага стадии вверх заводит его внутрь скилла, вон из блока — снимает within', () => {
-    const up = moveInPath(SKILL, 'after', -1);
+    // Шаг стоит на строке 5; после строки 3 — на одну строку выше, внутрь скилла.
+    const up = moveToSlot(SKILL, 'after', 3);
     expect(up.find((item) => item.id === 'after')?.within).toMatchObject({ index: 1 });
     const out = moveToSlot(SKILL, 'inner', 4);
     expect(out.find((item) => item.id === 'inner')).not.toHaveProperty('within');
@@ -180,9 +180,11 @@ describe('шаги внутри скилла', () => {
   });
 });
 
-describe('moveInPath', () => {
+// Перенос на одну строку — то, что даёт перетаскивание на соседнее место: шаг
+// со строки `from` вверх встаёт после строки `from - 2`, вниз — после `from + 1`.
+describe('moveToSlot: перенос на соседнюю строку', () => {
   it('внутри стадии меняется местами с соседом', () => {
-    expect(ids(moveInPath(ENTRIES, 'work-2', -1))).toEqual([
+    expect(ids(moveToSlot(ENTRIES, 'work-2', 4))).toEqual([
       'plan:plan-1:0',
       'work:work-2:0',
       'work:work-1:1',
@@ -211,31 +213,30 @@ describe('moveInPath', () => {
       { kind: 'builtin', stage: 'fix' },
       { kind: 'builtin', stage: 'deliver' },
     ];
-    entries = rebuild(moveInPath(entries, 'work-1', -1));
+    entries = rebuild(moveToSlot(entries, 'work-1', 3));
     expect(customSteps(entries).find((item) => item.id === 'work-1')?.within?.index).toBe(-1);
-    entries = rebuild(moveInPath(entries, 'work-1', -1));
+    // Теперь work-1 — строка 4, сразу под «Работой»: шаг вверх — после строки 2.
+    entries = rebuild(moveToSlot(entries, 'work-1', 2));
     expect(ids(customSteps(entries))).toContain('plan:work-1:1');
   });
 
   it('вниз через строку стадии уходит первым в следующую', () => {
-    expect(ids(moveInPath(ENTRIES, 'work-2', 1))).toEqual([
+    expect(ids(moveToSlot(ENTRIES, 'work-2', 7))).toEqual([
       'plan:plan-1:0',
       'work:work-1:0',
       'review:work-2:0',
     ]);
   });
 
-  it('с краёв пути двигаться некуда — стрелка гаснет', () => {
+  it('выше первой стадии и для чужого id перенос не идёт — шаги те же', () => {
     const edge: PathEntry[] = [
       { kind: 'builtin', stage: 'triage' },
       { kind: 'custom', step: step('t', 'triage', 0) },
       { kind: 'builtin', stage: 'deliver' },
       { kind: 'custom', step: step('d', 'deliver', 0) },
     ];
-    expect(canMoveInPath(edge, 't', -1)).toBe(false);
-    expect(canMoveInPath(edge, 'd', 1)).toBe(false);
-    expect(canMoveInPath(ENTRIES, 'work-1', -1)).toBe(true);
-    expect(canMoveInPath(ENTRIES, 'нет', 1)).toBe(false);
+    expect(moveToSlot(edge, 't', -1)).toEqual(customSteps(edge));
+    expect(moveToSlot(ENTRIES, 'нет', 4)).toEqual(customSteps(ENTRIES));
   });
 });
 
@@ -285,8 +286,7 @@ describe('сценарий: шаги без стадий', () => {
   const FLAT: PathEntry[] = [a, b, c].map((item) => ({ kind: 'custom', step: item }));
 
   it('второй шаг поднимается на первое место — у сценария выше стадии нет', () => {
-    expect(canMoveInPath(FLAT, 'b', -1)).toBe(true);
-    const next = moveInPath(FLAT, 'b', -1);
+    const next = moveToSlot(FLAT, 'b', -1);
     // Встал в самое начало одного-единственного ряда: место — номер, не стадия.
     expect(ids(next)).toEqual(['work:b:0', 'work:a:1', 'work:c:2']);
   });
@@ -294,7 +294,7 @@ describe('сценарий: шаги без стадий', () => {
   it('перетаскивание в самое начало (-1) у сценария работает, у конвейера — нет', () => {
     expect(moveToSlot(FLAT, 'c', -1)[0]).toMatchObject({ id: 'c', anchor: 'work', order: 0 });
     expect(moveToSlot(ENTRIES, 'plan-1', -1)).toEqual(customSteps(ENTRIES));
-    expect(canMoveInPath(FLAT, 'a', -1)).toBe(false);
+    expect(moveToSlot(FLAT, 'a', -1)).toEqual(customSteps(FLAT));
   });
 
   // F-126: у сценария один ряд — `work`, как пишет его агент панели

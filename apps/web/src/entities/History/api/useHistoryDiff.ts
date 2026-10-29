@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function fetchDiff(name: string): Promise<HistoryDiff> {
+async function fetchDiff(name: string): Promise<HistoryDiff> {
   const { data } = await apiClient.get<HistoryDiff>('/history/diff', { params: { name } });
   return data;
 }

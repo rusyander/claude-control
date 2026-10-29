@@ -1,6 +1,6 @@
 import type { PlatformSpendDay, PlatformStatus } from '@agentdeck/contracts';
 
-export const NO_SPEND: PlatformSpendDay = {
+const NO_SPEND: PlatformSpendDay = {
   day: '',
   requests: 0,
   promptTokens: 0,

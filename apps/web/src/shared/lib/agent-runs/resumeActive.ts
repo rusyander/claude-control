@@ -11,7 +11,7 @@ import { setRun } from './setRun';
 import { findKey } from './findKey';
 
 /** Знаем ли мы прогон по СЕРВЕРНОМУ ключу — тому, под которым его завела чужая вкладка. */
-export function ownerOfServerKey(key: string): string | undefined {
+function ownerOfServerKey(key: string): string | undefined {
   for (const [own, run] of runs) if (run.serverRunId === key) return own;
   return undefined;
 }

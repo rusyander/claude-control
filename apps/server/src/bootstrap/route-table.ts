@@ -93,6 +93,7 @@ import { registerWatcherRoutes } from '../routes/watcher-routes/watcher-routes.t
 import { registerDevRestartRoutes } from '../routes/dev-restart-routes/dev-restart-routes.ts';
 import { registerPanelAgentRoutes } from '../routes/panel-agent/panel-agent-routes/panel-agent-routes.ts';
 import { registerPanelAgentRunRoutes } from '../routes/panel-agent/run-routes/run-routes.ts';
+import { registerCoreProxyRoutes } from '../routes/core-proxy/core-proxy-routes.ts';
 import type { AccessGateDeps } from '../lib/access-gate/access-gate.ts';
 import type { Runtime } from './runtime/runtime.ts';
 
@@ -392,6 +393,9 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     (instance, context) => registerWatcherRoutes(instance, context, runtime.watcher),
     // Отложенный перезапуск dev-сервера: правки ждут живых ходов, панель это видит.
     registerDevRestartRoutes,
+    // Прокладка к ядру (07 фаза 2): дом ядра читается на каждом запросе — ядро могло
+    // перезапуститься на другом порте; команда — строка `human:` журнала возможностей.
+    (instance) => registerCoreProxyRoutes(instance),
     // Агент панели: действия исполняются настоящими маршрутами через `inject`,
     // поэтому ему нужен тот же гейт доступа (токен при удалённом доступе), а
     // решению по карточке — список своих источников.

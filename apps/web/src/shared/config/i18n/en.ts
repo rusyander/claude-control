@@ -6484,9 +6484,12 @@ export const en: TranslationSchema = {
       origin: {
         e2e: 'autotests',
         e2eActor: 'panel',
+        core: 'checks',
+        coreActor: 'task core',
         filter: 'Records',
         all: 'all',
         onlyE2e: 'panel autotests',
+        onlyCore: 'task core checks',
         onlyCi: 'CI import',
       },
       passed: 'passed: {{count}}',

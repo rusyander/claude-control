@@ -5,7 +5,7 @@ import type {
 } from '@agentdeck/contracts';
 
 /** Бейдж провайдера в строке проекта. */
-export interface ProjectBadge extends ProviderChatProjectProvider {
+interface ProjectBadge extends ProviderChatProjectProvider {
   /** Это активный провайдер — новый разговор будет у него. */
   isActive: boolean;
 }

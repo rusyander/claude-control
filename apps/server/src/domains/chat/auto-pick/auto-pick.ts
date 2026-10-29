@@ -128,7 +128,7 @@ export function confirmedPicks(
 }
 
 /** Критичность выбора — по заголовку его вопроса в теле вызова. */
-export function withCritical(
+function withCritical(
   input: unknown,
   picks: readonly { question: string; label: string }[],
 ): RecommendedPick[] {

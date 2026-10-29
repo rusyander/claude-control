@@ -12,5 +12,9 @@ export function runLabelKeys(run: { mode: string; actor: string; origin?: string
   if (runOrigin(run) === 'e2e') {
     return { mode: 'tests.runs.origin.e2e', actor: 'tests.runs.origin.e2eActor' };
   }
+  // Проверка ядра задач — исполненная команда в окружении ядра, не отчёт сборки.
+  if (runOrigin(run) === 'core') {
+    return { mode: 'tests.runs.origin.core', actor: 'tests.runs.origin.coreActor' };
+  }
   return { mode: `tests.runs.mode.${run.mode}`, actor: `tests.runs.actor.${run.actor}` };
 }

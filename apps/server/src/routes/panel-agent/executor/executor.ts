@@ -13,7 +13,7 @@ export interface InjectAccess {
  * Сколько исполнитель ждёт кадра сессии от потокового маршрута. CLI называет
  * сессию за пару секунд; дольше — отцепляемся и честно говорим, что имени ещё нет.
  */
-export const STREAM_HEAD_TIMEOUT_MS = 20_000;
+const STREAM_HEAD_TIMEOUT_MS = 20_000;
 
 /**
  * Сколько исполнитель ждёт ответа маршрута ЧТЕНИЯ (GET). Без срока зависшее
@@ -22,7 +22,7 @@ export const STREAM_HEAD_TIMEOUT_MS = 20_000;
  * чтение — каталог плагинов: `claude plugin list` (60 с) и `--available`
  * (180 с) подряд. Запись срока не получает: её исход после него был бы неизвестен.
  */
-export const READ_ROUTE_TIMEOUT_MS = 4 * 60_000;
+const READ_ROUTE_TIMEOUT_MS = 4 * 60_000;
 
 /** Кадры, после которых начало прогона известно: дальше читать незачем. */
 const HEAD_KINDS = new Set(['session', 'done', 'error', 'gone']);

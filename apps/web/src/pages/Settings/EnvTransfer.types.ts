@@ -7,7 +7,7 @@ import type {
 } from '@agentdeck/contracts';
 
 /** Коды строк списка: по одному на строку, `null` — строка кодом не читается. */
-export type ServerListCodes = (NestedServerMessage | null)[];
+type ServerListCodes = (NestedServerMessage | null)[];
 
 export interface EnvTransferChecklistItem {
   source: string;
@@ -54,7 +54,7 @@ export interface EnvTransferPromptsPlan {
   problem?: string;
 }
 
-export interface EnvTransferSkipped {
+interface EnvTransferSkipped {
   sourcePath: string;
   reason: string;
 }

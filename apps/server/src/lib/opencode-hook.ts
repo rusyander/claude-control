@@ -52,7 +52,7 @@ import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
  */
 
 /** Одна пара переменной окружения действия (порядок файла сохраняется). */
-export interface OpencodeHookEnvVar {
+interface OpencodeHookEnvVar {
   key: string;
   value: string;
 }
@@ -72,7 +72,7 @@ export interface OpencodeHookPatternGroup {
 }
 
 /** Запись, которую панель не ведёт: показывается только для чтения. */
-export interface OpencodeHookPreservedEntry {
+interface OpencodeHookPreservedEntry {
   key: string;
   /** Значение в компактном JSON — только для показа (в файле оно не меняется). */
   value: string;
@@ -234,7 +234,7 @@ export function readOpencodeHook(rawExperimental: unknown): OpencodeHookState {
 }
 
 /** Имена событий внутри `hook`, которые панель НЕ ведёт (нельзя ни менять, ни удалять). */
-export function preservedHookEvents(rawExperimental: unknown): Set<string> {
+function preservedHookEvents(rawExperimental: unknown): Set<string> {
   return new Set(readOpencodeHook(rawExperimental).preservedEvents.map((entry) => entry.key));
 }
 

@@ -249,7 +249,9 @@ describe('cmd-duration: длительность команды выучивае
     };
     const read = () => JSON.parse(readFileSync(file, 'utf8')) as Store;
     const entry = Object.entries(read().keys).find(([k]) => k.endsWith(command))?.[1];
-    expect(entry?.runs).toEqual([0]);
+    // Длительность — настоящая (под нагрузкой два запуска хука дают 1–2 с), не потолок в 600 с.
+    expect(entry?.runs).toHaveLength(1);
+    expect(entry!.runs[0]).toBeLessThan(60);
     expect(entry?.kills ?? 0).toBe(0);
     expect(read().pending.fail1).toBeUndefined();
 

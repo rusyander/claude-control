@@ -1,14 +1,16 @@
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import type { DlpInfo, DlpPreviewResult, DlpRule } from '@agentdeck/contracts';
 import type { DlpProxy, DlpRuntime } from './DlpProxy.ts';
-import { AliasVault, maskText } from './mask.ts';
-import { builtinInfos } from './default-rules.ts';
-import { readRules } from './rules-store.ts';
+import { AliasVault, maskText } from '@agentdeck/dlp/mask';
+import { builtinInfos } from '@agentdeck/dlp/default-rules';
+import { readRules } from '@agentdeck/dlp/rules-file';
 import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
- * Защита данных — фасад раздела. Разбор форматов и сам слушатель живут в
- * `dlp/`, здесь — сборка настроек в рабочую конфигурацию и ответ панели.
+ * Защита данных — фасад раздела. Образцы, правила, маска и разбор форматов живут
+ * в пакете `@agentdeck/dlp` (их зовёт и ядро); здесь — то, что есть только у
+ * панели: слушатель-прокси, его журнал, запись правил и сборка настроек в рабочую
+ * конфигурацию и ответ панели.
  *
  * Адрес, куда пересылать, берётся либо прямой строкой, либо из профиля «своего
  * эндпоинта» (часть A): прокси и профиль складываются — CLI смотрит в прокси,
@@ -16,14 +18,9 @@ import { coded } from '../../lib/server-text/server-text.ts';
  */
 
 export { DlpProxy } from './DlpProxy.ts';
-export type { DlpRuntime } from './DlpProxy.ts';
-export { readRules, saveRules, parseRules, validateRules, DlpRulesError } from './rules-store.ts';
+export { readRules, parseRules, DlpRulesError } from '@agentdeck/dlp/rules-file';
+export { saveRules, validateRules } from './rules-store.ts';
 export { readJournal, clearJournal } from './journal.ts';
-export { AliasVault, maskText } from './mask.ts';
-export { scanText } from './rules.ts';
-export { builtinInfos, builtinRuleSet, maskRulesFor } from './default-rules.ts';
-export { apiKindForPath } from './api-shapes.ts';
-export { joinUpstream } from './DlpProxy.ts';
 
 export class DlpConfigError extends Error {}
 

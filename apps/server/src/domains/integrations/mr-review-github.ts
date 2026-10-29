@@ -22,6 +22,7 @@ const QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: St
       url
       body
       mergeable
+      baseRefName
       author { login }
       commits(last: 1) { nodes { commit { oid statusCheckRollup { state } } } }
       reviewThreads(first: 100, after: $cursor) {
@@ -67,6 +68,8 @@ interface GhPullRequest {
   state?: string;
   /** `MERGEABLE` · `CONFLICTING` · `UNKNOWN` (GitHub ещё считает). */
   mergeable?: string;
+  /** Ветка, в которую PR сольют. */
+  baseRefName?: string;
   url?: string;
   body?: string | null;
   author?: GhAuthor | null;
@@ -169,6 +172,7 @@ export async function readGithubReview(
     description: pr.body ?? '',
     ...(pr.mergeable === 'CONFLICTING' ? { conflicts: true } : {}),
     ...(pr.mergeable === 'MERGEABLE' ? { conflicts: false } : {}),
+    ...(pr.baseRefName ? { targetBranch: pr.baseRefName } : {}),
     threads,
     ...(pipeline ? { pipeline } : {}),
   };

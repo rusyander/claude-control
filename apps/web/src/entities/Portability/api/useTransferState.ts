@@ -4,7 +4,7 @@ import { apiClient } from '@shared/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getTransferState(pair: TransferPair): Promise<TransferStateAnswer> {
+async function getTransferState(pair: TransferPair): Promise<TransferStateAnswer> {
   const { data } = await apiClient.get<TransferStateAnswer>('/portability/transfer', {
     params: pair,
   });

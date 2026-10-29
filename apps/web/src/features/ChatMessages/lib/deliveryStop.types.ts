@@ -16,7 +16,7 @@ export interface DeliveryStopItem {
  */
 export type DeliveryHumanKind = 'merge' | 'destructive' | 'credentials' | 'corrupt-store';
 
-export interface DeliveryHumanItem {
+interface DeliveryHumanItem {
   kind: DeliveryHumanKind;
   item: DeliveryStopItem;
 }

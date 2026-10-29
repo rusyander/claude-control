@@ -13,7 +13,7 @@ import {
 import type { AgentDigest, AgentTokens } from './agent-digest.types.ts';
 import { ExtensionTrail, MainExtensionTrail, type ExtensionSnapshot } from './extension-trail.ts';
 import { IncrementalLogs } from './incremental-log.ts';
-import { AnomalyTally, hookDenialReason } from './agent-anomalies.ts';
+import { AnomalyTally, hookDenialReason, isInterruptedResult } from './agent-anomalies.ts';
 
 /**
  * Сводка субагента по его транскрипту `subagents/agent-<id>.jsonl`: модель,
@@ -232,7 +232,9 @@ class DigestState {
     if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
       step.durationMs = end - start;
     }
-    if (block.is_error) step.isError = true;
+    // Обрыв паузой или концом сессии CLI пишет с `is_error` — это не ошибка вызова.
+    if (isInterruptedResult(text)) step.interrupted = true;
+    else if (block.is_error) step.isError = true;
     const denial = hookDenialReason(text);
     if (denial !== undefined) step.denial = denial;
     this.anomalies.result(step);

@@ -24,87 +24,17 @@
  * Запуск: `node tools/qa/check-subagent-stop.mjs`. Нужен установленный `claude`
  * (`CLAUDE_CLI` — свой путь).
  */
-import { createServer } from 'node:http';
 import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
 import { NotChecked, reporter } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const MAIN_MARK = 'STOPPROBE-MAIN';
 const SUB_MARK = 'STOPPROBE-SUB';
-
-const sse = (res, events) => {
-  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-  for (const [event, data] of events)
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-};
-
-const start = (id, model) => [
-  'message_start',
-  {
-    type: 'message_start',
-    message: {
-      id,
-      type: 'message',
-      role: 'assistant',
-      model,
-      content: [],
-      stop_reason: null,
-      usage: { input_tokens: 10, output_tokens: 1 },
-    },
-  },
-];
-
-function textReply(res, model, text) {
-  sse(res, [
-    start(`msg_${Date.now()}`, model),
-    [
-      'content_block_start',
-      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
-    ],
-    [
-      'content_block_delta',
-      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
-    ],
-    ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-    [
-      'message_delta',
-      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
-    ],
-    ['message_stop', { type: 'message_stop' }],
-  ]);
-  res.end();
-}
-
-function toolReply(res, model, name, input) {
-  sse(res, [
-    start(`msg_${Date.now()}`, model),
-    [
-      'content_block_start',
-      {
-        type: 'content_block_start',
-        index: 0,
-        content_block: { type: 'tool_use', id: `toolu_stop_${Date.now()}`, name, input: {} },
-      },
-    ],
-    [
-      'content_block_delta',
-      {
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) },
-      },
-    ],
-    ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-    [
-      'message_delta',
-      { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 1 } },
-    ],
-    ['message_stop', { type: 'message_stop' }],
-  ]);
-  res.end();
-}
+/** Сколько держится запрос субагента: дольше любого прогона — оборвать его должен CLI. */
+const SUB_HOLD_MS = 10 * 60_000;
 
 /** Первая реплика человека в запросе — по ней видно, чей это запрос. */
 function firstUserText(body) {
@@ -121,71 +51,39 @@ const hasToolResult = (body) =>
       message.content.some((block) => block.type === 'tool_result'),
   );
 
-function startStub() {
-  const state = { agentTool: '', subHeld: 0, subAborted: 0, mainTurns: 0, requests: 0 };
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      let body;
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-      } catch {
-        body = {};
-      }
-      if (req.url?.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ input_tokens: 10 }));
-        return;
-      }
-      if (!req.url?.includes('/messages')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end('{}');
-        return;
-      }
-      state.requests += 1;
-      const model = body.model ?? 'stub';
+async function startStub() {
+  const state = { agentTool: '', mainTurns: 0 };
+  const subs = [];
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      const { body } = request;
       const said = firstUserText(body);
       if (said.includes(SUB_MARK)) {
-        // Субагент: держим запрос, пока CLI его не оборвёт.
-        state.subHeld += 1;
-        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-        res.write(`event: ping\ndata: {"type":"ping"}\n\n`);
-        const keep = setInterval(() => res.write(`event: ping\ndata: {"type":"ping"}\n\n`), 2000);
-        res.on('close', () => {
-          clearInterval(keep);
-          if (!res.writableEnded) state.subAborted += 1;
-        });
-        return;
+        // Субагент: поток начат и держится, пока CLI его не оборвёт (`aborted` в записи).
+        subs.push(request);
+        return { text: 'ok', stallMs: SUB_HOLD_MS };
       }
-      if (said.includes(MAIN_MARK) && !hasToolResult(body)) {
-        const tool = (body.tools ?? []).find(
-          (item) => item.name === 'Agent' || item.name === 'Task',
-        );
-        if (tool) {
-          state.agentTool = tool.name;
-          state.mainTurns += 1;
-          toolReply(res, model, tool.name, {
-            description: 'stop probe',
-            prompt: `${SUB_MARK} wait for the model`,
-            subagent_type: 'general-purpose',
-            run_in_background: true,
-          });
-          return;
-        }
-      }
-      textReply(res, model, 'ok');
-    });
+      const tool = request.tools.find((name) => name === 'Agent' || name === 'Task');
+      if (!said.includes(MAIN_MARK) || hasToolResult(body) || !tool) return 'ok';
+      state.agentTool = tool;
+      state.mainTurns += 1;
+      const args = {
+        description: 'stop probe',
+        prompt: `${SUB_MARK} wait for the model`,
+        subagent_type: 'general-purpose',
+        run_in_background: true,
+      };
+      return { tool: { name: tool, args, id: `toolu_stop_${Date.now()}` } };
+    },
   });
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        state,
-        close: () => server.close(),
-      }),
-    );
+  Object.defineProperties(state, {
+    requests: { enumerable: true, get: () => stub.requests.length },
+    subHeld: { enumerable: true, get: () => subs.length },
+    subAborted: { enumerable: true, get: () => subs.filter((sub) => sub.aborted).length },
   });
+  return { url: stub.baseUrl, state, close: () => stub.close() };
 }
 
 /** id субагента — из его meta в одноразовом каталоге конфигурации. */

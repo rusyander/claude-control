@@ -220,6 +220,7 @@ describe('ledger gate against the live route table', () => {
       'POST /api/integrations/telegram/connect/confirm',
       'POST /api/settings/import',
       'POST /api/chat/split/:parent/review-decision',
+      'POST /api/core/commands',
     ]) {
       expect(human.some((entry) => entry.key === key)).toBe(true);
     }
@@ -271,6 +272,9 @@ describe('ledger gate against the live route table', () => {
         await call('DELETE', '/api/integrations/telegram', {}),
         await call('PUT', '/api/integrations/webhook', { settings: { url: 'http://evil' } }),
         await call('DELETE', '/api/integrations/webhook', {}),
+        // Команда ядру (пауза, одобрение) — рукой человека: процесс модели не доходит даже
+        // до прокладки, ядро в одноразовом доме не тронуто.
+        await call('POST', '/api/core/commands', { kind: 'pause', target: {}, fields: {} }),
       ];
       // 403 — процесс теста не браузер; 503 — ОС не ответила (тоже отказ, не пропуск).
       for (const result of results) {

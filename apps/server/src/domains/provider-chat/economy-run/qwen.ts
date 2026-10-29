@@ -123,7 +123,7 @@ export function qwenAuthType(
 }
 
 /** Личные настройки Qwen (`<QWEN_HOME>/settings.json`); нет файла — пусто. */
-export function qwenOwnSettings(env: NodeJS.ProcessEnv): Record<string, unknown> {
+function qwenOwnSettings(env: NodeJS.ProcessEnv): Record<string, unknown> {
   const home = env.QWEN_HOME || join(homedir(), '.qwen');
   return settingsFile(join(home, 'settings.json'));
 }
@@ -177,7 +177,7 @@ export function qwenRunModel(
  * ходят и чужие модели (OpenAI-совместимые, Claude при входе через Anthropic), а
  * список моделей Qwen в выборе — только alibaba. Нет модели или записи — неизвестно.
  */
-export function cloudContextLimit(appData: string, model: string | undefined): number | undefined {
+function cloudContextLimit(appData: string, model: string | undefined): number | undefined {
   if (!model) return undefined;
   const models = new ModelCatalogStore(appData).allModels();
   const id = model.includes('/') ? model.slice(model.lastIndexOf('/') + 1) : model;
@@ -222,7 +222,7 @@ export function qwenContextWindow(options: {
 const QWEN_DEFAULT_COMPACT_PCT = 0.85;
 
 /** Порог, который действовал бы без рычага: ключ слитых настроек, иначе 0,85. */
-export function qwenEffectiveThreshold(layers: readonly Record<string, unknown>[]): number {
+function qwenEffectiveThreshold(layers: readonly Record<string, unknown>[]): number {
   const own = settingAt(layers, ['context', 'autoCompactThreshold']);
   // Тот же фильтр, что у CLI (`getAutoCompactThreshold`): вне (0, 1] — умолчание.
   return typeof own === 'number' && own > 0 && own <= 1 ? own : QWEN_DEFAULT_COMPACT_PCT;
@@ -259,7 +259,7 @@ export function qwenEconomyPatch(options: {
 }
 
 /** Патч поверх выбранного файла: прочие ключи тех же разделов остаются. */
-export function mergeQwenEconomy(
+function mergeQwenEconomy(
   base: Record<string, unknown>,
   patch: QwenEconomyPatch,
 ): Record<string, unknown> {

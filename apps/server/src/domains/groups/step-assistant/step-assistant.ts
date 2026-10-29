@@ -56,11 +56,7 @@ function saveDrafts(appData: string, drafts: Drafts): void {
 }
 
 /** Данные первого сообщения: режим, стадия, соседи, группа, опись ресурсов. */
-export function draftContext(
-  deps: EntityToggleDeps,
-  group: Group,
-  request: PathStepDraftRequest,
-): string {
+function draftContext(deps: EntityToggleDeps, group: Group, request: PathStepDraftRequest): string {
   const neighbours = (group.path?.steps ?? [])
     .filter((step) => step.anchor === request.anchor && step.id !== request.stepId)
     .sort((a, b) => a.order - b.order)
@@ -101,7 +97,7 @@ export function draftContext(
 }
 
 /** Ответ модели → предложение; у перевода лишнего быть не может. */
-export function readProposal(reply: string, mode: PathStepDraftRequest['mode']): PathStepProposal {
+function readProposal(reply: string, mode: PathStepDraftRequest['mode']): PathStepProposal {
   const parsed = pathStepProposalSchema.safeParse(readJsonBlock(reply, PATH_STEP_BLOCK_KIND));
   if (!parsed.success) {
     throw new GroupRequestError(502, 'model_unreadable', 'group-model-unreadable');

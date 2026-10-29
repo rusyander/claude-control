@@ -8,14 +8,14 @@ export type ShotLang = 'ru' | 'en';
 export type ShotVariantKey = `${ShotTheme}-${ShotLang}`;
 
 /** Один снятый вариант: файл рядом с остальными и его размер в пикселях. */
-export interface ShotVariantFile {
+interface ShotVariantFile {
   file: string;
   width: number;
   height: number;
 }
 
 /** Какие варианты кадра сняты. Нет ключа — варианта нет на диске. */
-export type ShotVariants = Partial<Record<ShotVariantKey, ShotVariantFile>>;
+type ShotVariants = Partial<Record<ShotVariantKey, ShotVariantFile>>;
 
 /**
  * Опись вариантов раздела: `apps/web/public/help/<раздел>/variants.json`.

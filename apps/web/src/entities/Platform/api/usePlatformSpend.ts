@@ -8,7 +8,7 @@ import { queryKeys } from '@shared/api/query-keys';
  * Расход контура по дням. Как и список карточек, наружу этот запрос НЕ ходит:
  * остаток бюджета у контура не спросить, всё считается по своему учёту.
  */
-export async function getSpend(id: string): Promise<PlatformSpendInfo> {
+async function getSpend(id: string): Promise<PlatformSpendInfo> {
   const { data } = await apiClient.get<PlatformSpendInfo>(path(id, '/spend'));
   return data;
 }

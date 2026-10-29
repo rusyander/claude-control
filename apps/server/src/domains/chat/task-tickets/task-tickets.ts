@@ -103,14 +103,14 @@ function renderPointer(issue: JiraIssueBrief, since: string | undefined): string
 }
 
 /** Задачи, у которых в файле задач строка-указатель, а текст — в `TASK_TICKETS_STANDING`. */
-export interface StandingTickets {
+interface StandingTickets {
   keys: ReadonlySet<string>;
   /** Последняя доставка группы — с чем сравнивали. */
   since?: string;
 }
 
 /** Текст файла: шапка с временем чтения, затем задачи по порядку. */
-export function renderTickets(
+function renderTickets(
   reads: readonly TicketRead[],
   skipped: readonly string[],
   at: string,

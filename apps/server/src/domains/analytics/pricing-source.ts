@@ -18,7 +18,7 @@ import { BUILT_IN_SNAPSHOT, type PricingEntry, type PricingSnapshot } from './pr
 export const PRICING_URL = 'https://platform.claude.com/docs/en/about-claude/pricing.md';
 
 /** Сутки. Прайс меняется в день анонса модели — чаще ходить незачем. */
-export const PRICING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const PRICING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** Сеть не должна подвешивать открытие настроек. */
 const FETCH_TIMEOUT_MS = 10_000;

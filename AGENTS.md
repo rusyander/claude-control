@@ -28,27 +28,33 @@ default and the only verified one. No database — **source of truth = Claude Co
 
 - `apps/server` — Fastify :5178, reads/writes `~/.claude`, spawns `claude`
 - `apps/web` — React + Vite :8888, proxies `/api`
+- `apps/core` — task execution core, its own process beside the panel (journal per task, CLI sessions through a
+  detached session host, permits, model routes); never imports panel code and back (depcruise `core-*`).
+  `pnpm core`, `pnpm core:test`, `pnpm core:test:all` (Windows + Linux container, merged coverage); spec
+  `.agent/core-spec/`, map `.agent/code-map-core.agent.md`
 - `apps/mobile` — Expo (SDK 57 / RN 0.86) phone app over the same API, own toolchain (`npm`, not
   the pnpm workspace); `pnpm mobile`, `pnpm mobile:type-check`, `pnpm mobile:test`, `pnpm mobile:apk` (release APK to
   the repo root, gitignored, replaces the previous one), `pnpm mobile:clean`. Expo's API moves
   between SDKs — check https://docs.expo.dev/versions/v57.0.0/ before writing native code
 - `packages/contracts` — shared types + zod schemas
-- `tools/` — `doctor.mjs` (environment check), `qa/*.mjs` (Playwright runs), `tailscale-serve.mjs`
-  (`pnpm remote` / `off`), `keepalive.mjs` (`pnpm keepalive[:install|:off|:status]` — watchdog over
-  both dev halves), `build-mobile-apk.mjs` (Windows: builds from a short real-path mirror `C:\adapk\<clone tag>`
-  — SDK ninja 1.10 breaks on >260-char library paths of any long clone; `AGENTDECK_APK_DIR` moves it),
-  `clean-mobile-build.mjs` (Gradle native intermediates in
-  `node_modules/*/android/{build,.cxx}`, ~10 GB per release build, plus that mirror; the build sweeps them,
-  `--keep-build` opts out, `--dry` measures), `make-mobile-icons.mjs` (one SVG mark → every icon/splash size),
-  `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record|gaps|delivery` — the QA
-  workspace of a project without the panel; CI exit codes: `report` 1 on a failure outside quarantine, `diff` 1 on NEW
-  failures only, `lint` 1 only with `--fail-on`, `gaps` 1 on any Tests-block delivery gap, `delivery` 1 on any gap of
-  the whole delivery check (MR description, sieves, owner points, Tests block) — same code as the panel's delivery
-  check), `docs/` — PDF guides: `shots-{chat,tests}-guide.mjs` shoot a
-  fully stubbed panel, `build-guide.mjs` prints through Chromium (`build-*-guide.mjs` = source, out, footer) →
-  `docs/{CHAT,TESTS}-GUIDE.ru.pdf`; sources and frames in `.agent/{chat,tests}-guide/`, OUT of git (a fresh
-  clone re-shoots against a running stand). `PAGES=<dir>` rasterises page by page — every page is looked at
-  before a PDF is handed over
+- `packages/dlp` — DLP engine (builtins, rules, masking, request/response filters, secret-mask), subpath exports
+  loaded from source by strip-types like contracts; the proxy, journal and rule saving stay in the server
+- `packages/providers` — run facts per CLI (binary, vendor API, endpoint channels, effort, model ladder, limits),
+  pure, no IO; the server catalog maps them (`providers/catalog/run-facts.ts`), a new CLI starts here
+- `packages/stub-model` — THE scripted model stub (plain ESM, no build, zero deps): anthropic-messages,
+  openai-chat, openai-responses; steps text/tool/custom/error/hold/stall/window; trace file; loopback,
+  refuses 5170–5180. Every new model stub is a scenario over it, never its own SSE code (P120)
+- `tools/` — `doctor.mjs`, `qa/*.mjs` (Playwright, one area each), `tailscale-serve.mjs` (`pnpm remote`/`off`),
+  `keepalive.mjs` (`pnpm keepalive[:install|:off|:status]`, watchdog over both dev halves), mobile
+  `build-mobile-apk.mjs` (Windows: builds from a short mirror `C:\adapk\<clone tag>` — SDK ninja 1.10 breaks on
+  > 260-char paths; `AGENTDECK_APK_DIR` moves it), `clean-mobile-build.mjs` (Gradle native intermediates ~10 GB per
+  > build + that mirror; the build sweeps them, `--keep-build` opts out, `--dry` measures), `make-mobile-icons.mjs`
+  > (one SVG → every icon/splash); `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|
+case|record|gaps|delivery` — QA workspace without the panel; exit 1: `report` failure outside quarantine, `diff`
+  > NEW failures only, `lint` only with `--fail-on`, `gaps`/`delivery` any gap — same code as the panel's delivery
+  > check); `docs/` PDF guides: `shots-{chat,tests}-guide.mjs` shoot a stubbed panel, `build-guide.mjs` prints via
+  > Chromium → `docs/{CHAT,TESTS}-GUIDE.ru.pdf`; sources/frames `.agent/{chat,tests}-guide/`, out of git (fresh clone
+  > re-shoots on a running stand); `PAGES=<dir>` rasterises — every page looked at before a PDF is handed over
 
 Needs **Node 22.6+** (server runs with `--experimental-strip-types`), pnpm 10, `claude` in PATH.
 
@@ -104,23 +110,17 @@ a new entry goes into the area file, never back here.
   holds, per topic, the modules whose BEHAVIOUR the document describes + a content fingerprint of each
   (EOL and comment-only lines ignored). One moves ⇒ `pnpm shots` RED, naming topic, files and command.
   Clearing it: re-read the document, fix the text, then `node tools/help-shots/sources.mjs <topic>`
-  (rewrites the fingerprints; nothing auto-heals). 32 topics watched (20.10); an unwatched topic never
-  reddens. **Adding a topic = ONE entry** (topic id from `HELP_GROUPS`, document path, narrow `path`+`why`
-  list, empty `sha`) then that command — narrow = the modules carrying what the human reads, never a tree.
+  (rewrites the fingerprints; nothing auto-heals); an unwatched topic never reddens. **Adding a topic = ONE
+  entry** (id from `HELP_GROUPS`, document path, narrow `path`+`why` list, empty `sha`) then that command.
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
 - **Changelog travels with the change** (owner 12.10.2026). Tab «Что нового» (default tab of `/history`) = curated
-  `changelog/entries/<YYYY-MM-DD>-<slug>.json` (one per push/MR) + git facts; commits without an entry show
-  from their message. A commit/push with a user-visible change (feature, fix, behaviour, UI, help) adds or
-  updates its entry IN THE SAME commit, never a follow-up; later commits of the same push/MR update that
-  entry (every commit touching the file binds to it). Pure internal work (refactor, tests, agent docs, CI)
-  needs none — keep its commit message readable, the page shows it as is. Draft `pnpm changelog:new`, then
-  rewrite: title = outcome; items by kind added/improved/fixed/changed/removed/docs/internal; `how` only where
-  the approach matters to a reader; a visible fix carries its before/after pair in `changelog/assets/<id>/`
-  (≤400 KB, stubbed data only — public repo). Text = published text: Russian, impersonal, what + why, no
-  authorship, no process narration, no company/contour names, no local paths. Format change → contracts
-  schema + this rule + help topic `history` in one pass. Map: `code-map.agent.md` / `code-map-web.agent.md`,
-  spec `.agent/changelog-page-plan.agent.md`. Uncommitted numbers live only on the «Незакоммиченные правки»
-  card. `pnpm changelog:remind` runs in pre-commit (warns, never blocks).
+  `changelog/entries/<YYYY-MM-DD>-<slug>.json` (one per push/MR) + git facts. A commit/push with a
+  user-visible change (feature, fix, behaviour, UI, help) adds or updates its entry IN THE SAME commit, never a
+  follow-up; later commits of that push/MR update it. Pure internal work (refactor, tests, agent docs, CI) needs
+  none — its commit message shows as is. Draft `pnpm changelog:new`, then rewrite by the authoring rules in
+  `.agent/changelog-page-plan.agent.md` §Authoring (published text: Russian, impersonal, no local paths; a
+  visible fix carries its before/after pair, stubbed data only — public repo). Format change → contracts schema,
+  this rule and help topic `history` in one pass. `pnpm changelog:remind` in pre-commit warns, never blocks.
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && pnpm compromises
 && pnpm negatives && pnpm shots && pnpm brand && pnpm mobile:contracts && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node
@@ -129,20 +129,9 @@ because Playwright reports a 304 revalidation as the cached 200). `pnpm test` me
 pinned in each `vitest.config.ts` (raise them when coverage grows, never lower silently). The same
 gate runs unattended: pre-commit (husky + lint-staged: eslint, prettier check, LF + raw-NUL check —
 `tools/check-lf.mjs`) and `.github/workflows/ci.yml` (format:check → type-check → lint → test →
-depcruise, plus mobile type-check + tests). Area checks on top — each is the only one that sees its real path;
-none needs the stand:
-
-- help → `node tools/qa/check-help.mjs` (on-page `help.…` keys called under a missing name; `tsc` checks the
-  dictionary, not call sites);
-- contour `domains/platform/**` → `node tools/qa/check-platform-wire.mjs` (throwaway panel + `stub-platform.mjs`,
-  whole socket path client → gateway → contour) **and** `check-platform-run-env.mjs` (fake CLIs on PATH dump the
-  env and argv that reached a real process);
-- our layers (`domains/platform/layers/layers.ts`, run registry flags) → `check-run-layers.mjs` (real `claude`,
-  throwaway config dir with a marker per layer, stub model; the request body is the evidence of what a flag
-  REMOVES; needs an installed CLI, `CLAUDE_CLI` overrides);
-- images (`domains/media/**`, composer mode menu, gateway content parts) → `check-chat-media.mjs` (the file on
-  disk vs the upstream bytes, `state.json` + request trace searched for base64).
-  Every other contour test builds its frames inside itself — green there proves nothing about a real wire.
+depcruise, plus mobile type-check + tests). Area checks on top (help, contour wire + run env, our layers, images,
+core) — each the only one that sees its real path: [agents-area-checks.agent.md](.agent/agents-area-checks.agent.md),
+run the one for the area touched.
 
 ## Tests block — agentdeck tests itself through it
 

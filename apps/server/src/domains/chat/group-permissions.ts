@@ -812,14 +812,6 @@ export function groupDecision(
   return allowed ? level : 'human';
 }
 
-/** Можно ли разрешить запрос группы без человека (`auto` или `notify`). */
-export function groupAllows(
-  group: GroupAutoApprove,
-  request: { toolName: string; input: unknown; guardedPatterns: string[] },
-): boolean {
-  return groupDecision(group, request) !== 'human';
-}
-
 /**
  * Повтор одного и того же вопроса группой под «Развилки: по плану» (F-128):
  * ответ панели мгновенный, и агент, не принявший его, спрашивал снова и снова —

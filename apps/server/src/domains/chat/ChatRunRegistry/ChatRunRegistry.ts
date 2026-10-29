@@ -895,6 +895,36 @@ export class ChatRunRegistry {
    */
   private autonomousOf?: (keys: readonly string[]) => boolean;
 
+  /**
+   * Развилки группы — человеку (`groupQuestions: 'human'`): вопрос такой группы
+   * автономия сама НЕ закрывает, даже с рекомендованным вариантом. Задание велит
+   * агенту нести развилку человеку (`groupQuestionsHumanLine`), и автовыбор поверх
+   * этого ответил бы за человека. Права и отложенные решения D-n это не трогает —
+   * только выбор варианта в `AskUserQuestion` (брокер, метка для хука, сигнал).
+   */
+  private questionsToHumanOf?: (keys: readonly string[]) => boolean;
+
+  setQuestionsToHumanResolver(resolver: (keys: readonly string[]) => boolean): void {
+    this.questionsToHumanOf = resolver;
+  }
+
+  /** Закрывает ли автономия вопросы разговора сама: автономен и развилки не у человека. */
+  picksQuestions(chatId: string): boolean {
+    const run = this.runs.get(this.resolveKey(chatId));
+    const keys = run?.sessionId ? [run.chatId, run.sessionId] : [run?.chatId ?? chatId];
+    return this.picksQuestionsFor(keys);
+  }
+
+  private picksQuestionsFor(keys: readonly string[]): boolean {
+    if (!(this.autonomousOf?.(keys) ?? false)) return false;
+    try {
+      return !(this.questionsToHumanOf?.(keys) ?? false);
+    } catch {
+      // Осечка решателя — вопрос человеку: выбор за него без уверенности хуже ожидания.
+      return false;
+    }
+  }
+
   setAutonomyResolver(resolver: (keys: readonly string[]) => boolean): void {
     this.autonomousOf = resolver;
   }
@@ -1988,8 +2018,9 @@ export class ChatRunRegistry {
       deniedTools: this.deniedToolsOf?.() ?? [],
       // Метка автономии решается на КАЖДОМ старте и кладётся или снимается
       // безусловно: продолжение приходит со старыми параметрами, и метка прошлой
-      // жизни пережила бы снятую галочку.
-      env: withAutonomy(options.env, this.autonomousOf?.(keys) ?? false),
+      // жизни пережила бы снятую галочку. Её читает только автовыбор хука, поэтому
+      // группа с развилками у человека её не получает.
+      env: withAutonomy(options.env, this.picksQuestionsFor(keys)),
       // Пинг тёплого кэша идёт своим словом: сводка детей и перемена строки о тестах
       // принадлежат ходу человека, а не ему.
       prompt: ping
@@ -2243,7 +2274,7 @@ export class ChatRunRegistry {
     const isAsk = event.kind === 'tool' && event.name === 'AskUserQuestion';
     const expectedPick =
       isAsk &&
-      (((this.autonomousOf?.(askKeys) === true || run.options.env?.[AUTONOMOUS_ENV] === '1') &&
+      (((this.picksQuestionsFor(askKeys) || run.options.env?.[AUTONOMOUS_ENV] === '1') &&
         recommendedPicks(event.input) !== null) ||
         (this.answersByPlanFor(askKeys) && planAnswers(event.input) !== null));
     if (event.kind === 'tool' && event.name === 'AskUserQuestion') {

@@ -3,7 +3,7 @@ import type { LogLine } from '@agentdeck/contracts';
 /** Сколько строк держим на цель: больше человек в окне не листает, а память — общая. */
 export const LOG_BUFFER_LINES = 5000;
 /** Строка длиннее обрезается: однострочный JSON на мегабайт подвесил бы окно. */
-export const LOG_LINE_CHARS = 4000;
+const LOG_LINE_CHARS = 4000;
 
 // Цвета и движения курсора: панель их не рисует, а поиск по «error» спотыкался бы о `\x1b[31m`.
 // eslint-disable-next-line no-control-regex
@@ -80,7 +80,7 @@ export interface RunLog {
 }
 
 /** Сколько остановленных целей помнит панель — по одной на цель, старые уходят первыми. */
-export const FINISHED_LOGS = 30;
+const FINISHED_LOGS = 30;
 
 /**
  * Вывод остановленных целей: после «Стоп» человек часто как раз и идёт читать,

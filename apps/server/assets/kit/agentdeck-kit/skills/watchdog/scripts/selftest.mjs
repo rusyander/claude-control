@@ -341,8 +341,8 @@ check('a call open in the live conversation is still OPEN', lines(r15b.out, 'OPE
 
 // A sleep is a wait only where this shell or a runner it blocks on runs it (g3 25.10: a container's command paused a group).
 const { sleepWaits } = await import('./lib/core.mjs');
-const waits = ['sleep 5', 'cd x && sleep 5', 'for i in 1 2; do sleep 3; done', 'bash -c "sleep 5"', 'powershell -Command "Start-Sleep 5"', 'timeout 60 sleep 5', 'FOO=1 sleep 2', 'docker run --rm alpine sleep 5', 'docker exec "$CID" sleep 5', 'ssh host sleep 5', `node -e "execSync('sleep 5')"`, 'ping -n 5 127.0.0.1'];
-const idle = ['CID=$(docker create --label claude.ephemeral=1 -u 1000:1000 -e GOFLAGS=-mod=mod -w /src/app-config golang:1.25 sleep 600 2>&1 | tail -1); docker start "$CID"', 'docker run -d alpine sleep 600', 'docker run --detach alpine sleep 600', 'podman exec -d c sleep 9', 'sudo docker create img sleep 60', 'echo "sleep 5"', 'git log --grep "sleep 5"'];
+const waits = ['sleep 5', 'cd x && sleep 5', 'for i in 1 2; do sleep 3; done', 'bash -c "sleep 5"', 'powershell -Command "Start-Sleep 5"', 'timeout 60 sleep 5', 'FOO=1 sleep 2', 'docker run --rm alpine sleep 5', 'docker exec "$CID" sleep 5', 'ssh host sleep 5', `node -e "execSync('sleep 5')"`, 'ping -n 5 127.0.0.1', 'sleep 0.5', 'sleep 05', 'sleep 0; sleep 3', 'Start-Sleep -Milliseconds 500', 'timeout /t 10'];
+const idle = ['CID=$(docker create --label claude.ephemeral=1 -u 1000:1000 -e GOFLAGS=-mod=mod -w /src/app-config golang:1.25 sleep 600 2>&1 | tail -1); docker start "$CID"', 'docker run -d alpine sleep 600', 'docker run --detach alpine sleep 600', 'podman exec -d c sleep 9', 'sudo docker create img sleep 60', 'echo "sleep 5"', 'git log --grep "sleep 5"', 'sleep 0; node tests-cli.mjs delivery --project .', 'sleep 0s && x', 'powershell -Command "Start-Sleep -Seconds 0"', 'timeout /t 0', 'ping -n 1 127.0.0.1'];
 for (const c of waits) check(`a wait: ${c}`, sleepWaits(c) === true);
 for (const c of idle) check(`not a wait: ${c.slice(0, 60)}`, sleepWaits(c) === false);
 

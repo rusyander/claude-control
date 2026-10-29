@@ -38,6 +38,25 @@ export function isServerMessageCode(value: unknown): value is ServerMessageCode 
   );
 }
 
+/**
+ * Код человеческого текста на брошенной ошибке (или объекте): сервер и ядро пишут
+ * по-русски, клиент переводит код своим словарём, а строка остаётся запасной.
+ * Здесь, а не на сервере: ядро и пакет DLP вешают те же коды, а сервер им недоступен.
+ */
+export interface CodedText {
+  messageCode: ServerMessageCode;
+  params?: ServerMessageParams;
+}
+
+/** Та же ошибка (или объект) с кодом текста. Возвращает свой аргумент — удобно в `throw`. */
+export function coded<T extends object>(
+  target: T,
+  messageCode: ServerMessageCode,
+  params?: ServerMessageParams,
+): T & CodedText {
+  return Object.assign(target, params ? { messageCode, params } : { messageCode });
+}
+
 /** Подстановки в тексте словаря — те же `{{имя}}`, что у i18next в панели. */
 export function templateParams(template: string): string[] {
   return [...template.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((match) => match[1] as string);

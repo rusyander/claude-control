@@ -8,7 +8,7 @@ export const ANCHOR_TIMEOUT_MS = 10_000;
 
 /** Разметка окна и кнопки агента — по ним политика фокуса отличает «своё» от страницы. */
 export const WINDOW_SELECTOR = '[data-panel-agent-window]';
-export const TRIGGER_SELECTOR = '[data-panel-agent-trigger]';
+const TRIGGER_SELECTOR = '[data-panel-agent-trigger]';
 
 /**
  * Фокус никто не держит: он на теле страницы, в самом окне агента или на его
@@ -144,7 +144,7 @@ export function focusWindow(panel: HTMLElement): void {
  * `data-agent-anchor`: у полей форм id бывает сгенерированным, и странице
  * проще пометить нужное место явно.
  */
-export function findAnchor(root: ParentNode, focus: string): HTMLElement | null {
+function findAnchor(root: ParentNode, focus: string): HTMLElement | null {
   const byId = (root as Document).getElementById?.(focus) ?? null;
   if (byId) return byId;
   const escaped = focus.replace(/["\\]/g, '\\$&');
@@ -205,7 +205,7 @@ export function watchForAnchor<T>({
 }
 
 /** Сколько держится подсветка якоря, в который фокус не перенесён. */
-export const HIGHLIGHT_MS = 2_500;
+const HIGHLIGHT_MS = 2_500;
 
 /**
  * Показать якорь, не трогая фокус: прокрутка и подсветка. Человек печатает —

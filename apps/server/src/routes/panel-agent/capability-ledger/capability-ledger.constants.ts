@@ -866,4 +866,11 @@ export const ROUTE_LEDGER: RouteLedger = {
   // Баг словами человека и отчёт страницей (09.10.2026): действий агента под них нет.
   'POST /api/watcher/reports': 'gap:P3',
   'GET /api/watcher/report': 'gap:P3',
+  // core-proxy-routes.ts — прокладка к ядру (07 фаза 2). Число страницы берёт само окно;
+  // задачи ядра агенту пока не показаны; команда ядру — только рукой человека (решение
+  // координатора 28.10: новая строка `human:` сужает доступ, D2 не задет).
+  'GET /api/core/nonce': 'internal:ui-state',
+  'GET /api/core/tasks': 'gap:P3',
+  'GET /api/core/tasks/:id': 'gap:P3',
+  'POST /api/core/commands': 'human:rights',
 };

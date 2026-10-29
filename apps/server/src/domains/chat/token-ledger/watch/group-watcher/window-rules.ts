@@ -20,12 +20,25 @@ export const WEEK_BASIS_MS = 6 * 60 * MINUTE_MS;
 /** Шаг замера окна: доля приходит целыми процентами — наклон по нижней границе. */
 const UTILIZATION_STEP = 0.01;
 /**
- * Окно до прогона — последний замер более раннего прогона, если он свежее стольких
- * минут до начала; иначе первый замер самого прогона. Замер часовой давности лежит
- * в прошлом окне, и сброс после него читался как всё новое окно, потраченное одним
- * прогоном (g1 26.10: «+49 %» при 46 → 49 %).
+ * Окно до прогона — самый поздний замер любого прогона не позже начала и свежее стольких
+ * минут до него; иначе первый замер самого прогона. Замер часовой давности лежит в прошлом
+ * окне, и сброс после него читался как всё новое окно, потраченное одним прогоном (g1 26.10:
+ * «+49 %» при 46 → 49 %). Замер соседа ПОСЛЕ начала — уже середина этого прогона: группы идут
+ * вместе, и опора на конец соседа обрезала сдвиг до хвоста (g1 27.10: «+1 %» при 9 → 20 %,
+ * g5 «+0 %» при 9 → 22 %).
  */
 export const RUN_BASE_RECENT_MS = 15 * MINUTE_MS;
+
+type RunSample = LimitRunRecord['samples'][number];
+
+function runBase(run: LimitRunRecord, pool: readonly RunSample[]): RunSample | undefined {
+  let best: RunSample | undefined;
+  for (const sample of pool) {
+    if (sample.at > run.startedAt || sample.at < run.startedAt - RUN_BASE_RECENT_MS) continue;
+    if (!best || sample.at > best.at) best = sample;
+  }
+  return best ?? (run.samples.length > 1 ? run.samples[0] : undefined);
+}
 
 const pct = (share: number): number => Math.round(share * 100);
 const hours = (ms: number): number => Math.round(ms / (60 * MINUTE_MS));
@@ -170,21 +183,14 @@ export function heavyRuns(
  */
 export function finishedRuns(runs: readonly LimitRunRecord[], now: number): FinishedRun[] {
   const out: FinishedRun[] = [];
-  let base: LimitRunRecord['samples'][number] | undefined;
+  const pool = runs.flatMap((run) => run.samples);
   const ordered = runs
     .filter((run) => Number.isFinite(run.endedAt))
     .sort((left, right) => left.endedAt - right.endedAt);
   for (const run of ordered) {
-    const before = base;
-    const last = run.samples.at(-1);
-    if (last) base = last;
     if (run.open || run.endedAt > now || now - run.endedAt > EVENT_HOLD_MS) continue;
-    const from =
-      before && before.at >= run.startedAt - RUN_BASE_RECENT_MS
-        ? before
-        : run.samples.length > 1
-          ? run.samples[0]
-          : undefined;
+    const last = run.samples.at(-1);
+    const from = runBase(run, pool);
     const five =
       from?.fiveHour && last?.fiveHour ? windowDelta(from.fiveHour, last.fiveHour) : undefined;
     const seven =

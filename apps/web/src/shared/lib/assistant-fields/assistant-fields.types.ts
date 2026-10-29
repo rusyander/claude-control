@@ -22,31 +22,31 @@ interface AssistantFieldBase {
 }
 
 /** Строка. Число и логическое значение приводятся к строке. */
-export interface AssistantTextSpec extends AssistantFieldBase {
+interface AssistantTextSpec extends AssistantFieldBase {
   type: 'text';
 }
 
 /** Одно значение из списка (выпадающий список, кнопки-варианты). */
-export interface AssistantChoiceSpec extends AssistantFieldBase {
+interface AssistantChoiceSpec extends AssistantFieldBase {
   type: 'choice';
   options: readonly AssistantOption[];
 }
 
 /** Несколько значений из списка, порядок значим (отметки, выбор проектов). */
-export interface AssistantChoicesSpec extends AssistantFieldBase {
+interface AssistantChoicesSpec extends AssistantFieldBase {
   type: 'choices';
   options: readonly AssistantOption[];
 }
 
 /** Свободный список строк (фильтры хука, аргументы). */
-export interface AssistantListSpec extends AssistantFieldBase {
+interface AssistantListSpec extends AssistantFieldBase {
   type: 'list';
   /** Примеры, которые знает форма; значения вне них тоже принимаются. */
   suggestions?: readonly string[];
 }
 
 /** Число. `nullable` — `null` сбрасывает поле к умолчанию. */
-export interface AssistantNumberSpec extends AssistantFieldBase {
+interface AssistantNumberSpec extends AssistantFieldBase {
   type: 'number';
   integer?: boolean;
   min?: number;
@@ -55,7 +55,7 @@ export interface AssistantNumberSpec extends AssistantFieldBase {
 }
 
 /** Переключатель. */
-export interface AssistantFlagSpec extends AssistantFieldBase {
+interface AssistantFlagSpec extends AssistantFieldBase {
   type: 'flag';
 }
 
@@ -70,7 +70,7 @@ export type AssistantFieldSpec =
 export type AssistantSpec = Record<string, AssistantFieldSpec>;
 
 /** Вид значения поля после проверки. */
-export type AssistantValueOf<F extends AssistantFieldSpec> = F extends { type: 'text' | 'choice' }
+type AssistantValueOf<F extends AssistantFieldSpec> = F extends { type: 'text' | 'choice' }
   ? string
   : F extends { type: 'choices' | 'list' }
     ? string[]

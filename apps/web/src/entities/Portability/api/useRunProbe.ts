@@ -3,12 +3,12 @@ import { apiClient } from '@shared/api/client';
 import { useMutation } from '@tanstack/react-query';
 
 /** Что нужно пробе: цель и уровень. Источник ей не нужен — она про ЦЕЛЬ. */
-export interface ProbeRequest {
+interface ProbeRequest {
   target: string;
   scope: 'global' | 'project';
 }
 
-export async function postProbe(request: ProbeRequest): Promise<ProbeAnswer> {
+async function postProbe(request: ProbeRequest): Promise<ProbeAnswer> {
   const { data } = await apiClient.post<ProbeAnswer>('/portability/probe', request);
   return data;
 }

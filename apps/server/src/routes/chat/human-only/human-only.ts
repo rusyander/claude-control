@@ -50,7 +50,7 @@ import { isThrowawayStand, osTempRoots, type PanelDirs } from './throwaway-stand
 
 export const CLIENT_PORT_HEADER = 'x-agentdeck-client-port';
 
-export type HumanRefusal =
+type HumanRefusal =
   | 'model-process'
   | 'peer-unknown'
   | 'same-machine-remote'
@@ -308,7 +308,7 @@ export function refuseNonHuman(reply: FastifyReply, check: Exclude<HumanCheck, {
  * (`ledger-gate.test.ts`) видит, что маршрут закрыт, а общий хук журнала
  * возможностей не ставит ворота второй раз.
  */
-export const HUMAN_GATE = Symbol.for('agentdeck.human-gate');
+const HUMAN_GATE = Symbol.for('agentdeck.human-gate');
 
 export type HumanGateHandler = ((request: FastifyRequest, reply: FastifyReply) => Promise<void>) & {
   [HUMAN_GATE]: HumanMode;

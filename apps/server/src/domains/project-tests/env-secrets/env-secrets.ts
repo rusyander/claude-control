@@ -173,7 +173,7 @@ export function describeSecrets(
  * кто заглянул через плечо. Здесь видно только длину и два последних символа —
  * этого хватает, чтобы отличить «вставил не то» от «вставил то».
  */
-export function secretMask(value: string): string {
+function secretMask(value: string): string {
   if (!value) return '';
   if (value.length <= 4) return '••••';
   return `${'•'.repeat(Math.min(value.length - 2, 12))}${value.slice(-2)}`;

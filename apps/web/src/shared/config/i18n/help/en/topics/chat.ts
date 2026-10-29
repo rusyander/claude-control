@@ -70,12 +70,22 @@ export const chatEn: typeof chatRu = {
       'from the whole file, in windows of 200 steps (“Show earlier”, “Later”, “To the latest”) with ' +
       'an exact “Steps a–b of M”. Each call shows its time, duration, full result size, an ' +
       'error or a hook denial with its reason; the first step of an answer shows that answer’s ' +
-      'token spend and model. A line under each agent lists anomalies: hook denials, errors, ' +
+      'token spend and model. A call cut by a pause or the end of the session is marked ' +
+      '“interrupted” in a calm colour: it never got a result, but it is not an error. ' +
+      'A line under each agent lists anomalies: hook denials, errors, ' +
       'repeated reads of one file (the hint names the files) and results longer than 10,000 ' +
-      'characters; zero counts are hidden. Next to the button — who is working now: “now: 1 ' +
-      'agent · 2 subagents”, or a muted “nobody is working”. The main agent counts while its ' +
+      'characters; zero counts are hidden. Calls cut by a pause are not counted as errors — ' +
+      'their number stands on its own line, “cut by a pause N”. Next to the button — who is ' +
+      'working now: “now: 1 agent · 2 subagents”, the numbers bold and coloured (agents in the ' +
+      '“running” colour, subagents in the accent, a zero muted), or a muted “nobody is ' +
+      'working”. At the top of the window, the “Now” block: whether the main agent is working ' +
+      'and what it is doing (the call, since when and for how long, or “writing an answer”), ' +
+      'which subagents are working and what each is doing, or plainly “No subagents working ' +
+      'now”; clicking a row opens its turn on the right, and a session with someone working is ' +
+      'marked “working now”. The main agent counts while its ' +
       'turn is open and its process is alive or its file was written in the last 15 minutes; a ' +
-      'subagent with no result that has been silent for over 15 minutes counts as cut off. The ' +
+      'subagent with no result that has been silent for over 15 minutes counts as cut off — by ' +
+      'one rule for the numbers by the button and for the window. The ' +
       'panel counts all of this itself from the transcript files, no model is called; while ' +
       'someone is working the number refreshes every 5 seconds',
     canChatDots:
@@ -2090,7 +2100,10 @@ export const chatEn: typeof chatRu = {
       'hours later, and resuming the old session then re-reads almost its whole ' +
       'context and picks up long-finished threads, so the new one gets the facts ' +
       'instead: branch, copy, MR, the group’s task and the scope — the files the ' +
-      'branch changes against the MR target. The new conversation runs on the group’s work ' +
+      'branch changes against the MR target. The target is the branch the MR merges into, as ' +
+      'the forge names it, not the branch checked out in the project folder right now; when ' +
+      'the MR is unreadable — the branch the group was cut from, or the project’s main branch. ' +
+      'Group overlaps are counted against it too. The new conversation runs on the group’s work ' +
       'model and effort, not the delivery step’s model: a recheck is substantive work, and ' +
       '“Delivery on Sonnet” does not apply to it. Checks run on the scope only; files ' +
       'outside it are named and never staged, committed or reverted. What is ' +
@@ -2601,7 +2614,9 @@ export const chatEn: typeof chatRu = {
       'already restarted because of a group’s edits — for half an hour the note names its ' +
       'files, the minutes of waiting and how many other live groups were running at that ' +
       'minute (the watch keeps group edits on disk, a restart does not wipe them); the server ' +
-      'restarted three times in an hour with a live group; the check ledger in the group’s ' +
+      'restarted three times in an hour with a live group (only restarts since its start or ' +
+      'its pressed recheck and outside its pauses count — earlier ones and those during a pause ' +
+      'did not touch it); the check ledger in the group’s ' +
       'copy does not work as promised (a green key run again, the ledger off, a result ' +
       'that disagrees with the record); a group’s check went past the ledger — each one a ' +
       'note. Subscription window: the five-hour or weekly window reached 80, 90 and 95 % — ' +

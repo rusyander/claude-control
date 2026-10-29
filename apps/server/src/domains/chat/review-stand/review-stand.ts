@@ -22,8 +22,8 @@ import { DockerStateProbe, shortDetail, type DockerExec } from '../../compose/do
  */
 
 /** Метка контейнеров, которые создаёт панель для ревью: по ней их находят и убирают. */
-export const REVIEW_STAND_LABEL = 'agentdeck.ephemeral';
-export const REVIEW_STAND_LABEL_VALUE = 'review';
+const REVIEW_STAND_LABEL = 'agentdeck.ephemeral';
+const REVIEW_STAND_LABEL_VALUE = 'review';
 const GROUP_LABEL = 'agentdeck.review-group';
 
 /** Старше этого одноразовый контейнер при старте панели считается забытым. */

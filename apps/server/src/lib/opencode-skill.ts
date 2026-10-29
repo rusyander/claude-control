@@ -38,7 +38,7 @@ import { coded } from './server-text/server-text.ts';
 export const SKILL_FILE_NAME = 'SKILL.md';
 
 /** Ключи шапки, которыми управляет панель (в задокументированном порядке). */
-export const SKILL_MANAGED_KEYS = ['name', 'description'] as const;
+const SKILL_MANAGED_KEYS = ['name', 'description'] as const;
 
 /** Грамматика имени скилла: строчные буквы/цифры, одиночные дефисы-разделители. */
 export const SKILL_NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;

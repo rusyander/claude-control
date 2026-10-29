@@ -31,7 +31,7 @@ export function childStageEnv(link: ChatLink, delivers: boolean): Record<string,
  * списком замечаний. Шапки нет (подбор выключен) — ревью планировщик не заведёт.
  * `reviewedAt` — ревью уже заведено: следующий ход того же разговора его не ждёт.
  */
-export function foreignStagesAhead(
+function foreignStagesAhead(
   link: ChatLink,
   delivers: boolean,
   cascade: ProviderChatCascade | undefined,

@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { isProductCode, isTestPath, touchKinds } from '@agentdeck/contracts/sieves';
-import { DLP_BUILTINS } from '../../dlp/builtins.mjs';
+import { DLP_BUILTINS } from '@agentdeck/dlp/builtins';
 
 /**
  * Механика сит по диффу — чистые функции над добавленными и удалёнными строками

@@ -35,8 +35,6 @@ type ToolEvent = Extract<WatchEvent, { kind: 'tool' }>;
 type ResultEvent = Extract<WatchEvent, { kind: 'toolResult' }>;
 
 const MINUTE_MS = 60_000;
-/** Подпись одобрения в комментарии команды — то, чего просит отказ сита пуша (`push-sieves`). */
-const SIEVE_ACK = /(^|\s)#\s*sieve-ack:/m;
 /**
  * Публикация из звена (R6): пуш и создание MR — работа звена доставки. Шаг
  * должен НАЧИНАТЬСЯ с команды: `echo "git push"` или `grep 'gh pr create'` —
@@ -181,7 +179,6 @@ export function noteToolIncidents(state: WatchState, event: ToolEvent, ctx: Watc
               op: guarded,
               text: opText(event.name, input),
               subject: opSubject(event.name, input, guarded),
-              ...(command && SIEVE_ACK.test(command) ? { acked: true as const } : {}),
               ...(guarded === 'push' && command && namesCheckout(command)
                 ? { named: true as const }
                 : {}),
@@ -316,8 +313,10 @@ function settlePending(state: WatchState, event: ResultEvent, ctx: WatchContext)
   const span = ctx.settings.bypassMinutes * MINUTE_MS;
   // Отбитое то же действие ДРУГОЙ командой: повтор той же (с подписью одобрения в комментарии) — не обход;
   // исправленный повтор — другой предмет (цель названа, `-d` вместо `-D`, описание MR поправлено), не обход (F-56).
-  // Отказ сита пуша просит повторить с `# sieve-ack:` — повтор с ним одобрен, даже если
-  // команда вокруг другая (g3 25.10: в повтор добавили счёт файлов — тревога «обход»).
+  // Отказ сита пуша не обойти другой командой: пуш — только `git push`, а его сито судит каждый —
+  // прошедший пуш оно пропустило само (подпись `# sieve-ack`, запомненное подтверждение ветки,
+  // возвращённые строки). g3 25.10: повтор со счётом файлов; g5 27.10: пуш через 27 мин после
+  // отказа, подтверждение запомнено — оба читались «обходом».
   // Пуш без названного чекаута, повторённый с `git -C` — запрошенное стражем исправление.
   // Отказ карточки правила велит прочитать правило и повторить вызов по нему: исправленный повтор —
   // ровно запрошенное (g8 26.10: текст коммита без пересказа процесса читался «обходом»).
@@ -325,7 +324,7 @@ function settlePending(state: WatchState, event: ResultEvent, ctx: WatchContext)
     (denied) =>
       denied.text !== guarded.text &&
       denied.guard !== 'rule-card' &&
-      !(denied.guard === 'push-sieves' && guarded.acked) &&
+      denied.guard !== 'push-sieves' &&
       !(denied.op === 'push' && !denied.named && guarded.named) &&
       bypassesDenial(denied, guarded) &&
       pending.at - denied.at <= span &&

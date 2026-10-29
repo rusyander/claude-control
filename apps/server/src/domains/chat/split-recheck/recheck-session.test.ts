@@ -162,6 +162,20 @@ describe('вводная нового разговора перепроверк�
     expect(brief).toContain("The group's tasks:\n- PROJ-1\n- PROJ-2");
     expect(brief).toContain('working copy —, MR —');
   });
+
+  // Живой прогон 27.10: три перепроверки открылись `cat … | tail; head PROGRESS` — отказ bash-read-cap.
+  it('заметки и блокнот велит читать инструментом Read, не cat/head/tail', () => {
+    const brief = recheckFreshBrief({
+      previous: 'old-session',
+      group: group(),
+      tasks: [],
+      progress: true,
+      notebook: true,
+    });
+    expect(brief).toContain(
+      'with the Read tool (offset/limit for a part), never cat / head / tail',
+    );
+  });
 });
 
 describe('охват перепроверки по копии', () => {
@@ -183,6 +197,38 @@ describe('охват перепроверки по копии', () => {
     });
     expect(calls.every((call) => call.cwd === 'C:/wt/front')).toBe(true);
     expect(calls.find((call) => call.args[0] === 'diff')?.args).toContain('main...HEAD');
+  });
+
+  // Живой прогон 27.10: охват и проба конфликтов шли против `feat-VAB-403/…` — ветки,
+  // выгруженной в папке проекта, — и группа не видела трёх конфликтов с `origin/main`.
+  it('цель MR от форджа старше основания группы и ветки папки проекта', async () => {
+    const diffs: string[] = [];
+    const run = (refs: string[]) => async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote') return 'origin\n';
+      if (args[0] === 'rev-parse') {
+        if (refs.includes(args.at(-1) as string)) return 'abc\n';
+        throw new Error('unknown ref');
+      }
+      if (args[0] === 'diff') diffs.push(args.at(-1) as string);
+      return '';
+    };
+    const remote = await readRecheckScope(
+      { mainDir: 'C:/repo', copy: 'C:/wt/g5', base: 'feat-predecessor', target: 'main' },
+      run(['refs/remotes/origin/main']),
+    );
+    expect(remote?.base).toBe('origin/main');
+    const local = await readRecheckScope(
+      { mainDir: 'C:/repo', copy: 'C:/wt/g5', target: 'release' },
+      run(['refs/heads/release']),
+    );
+    expect(local?.base).toBe('release');
+    // Цели нет в ссылках копии (fetch не было) — основание группы, а не догадка.
+    const absent = await readRecheckScope(
+      { mainDir: 'C:/repo', copy: 'C:/wt/g5', base: 'feat-predecessor', target: 'main' },
+      run([]),
+    );
+    expect(absent?.base).toBe('feat-predecessor');
+    expect(diffs).toEqual(['origin/main...HEAD', 'release...HEAD', 'feat-predecessor...HEAD']);
   });
 });
 

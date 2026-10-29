@@ -1,0 +1,40 @@
+{
+  "title": {
+    "ru": "Ядро исполнения задач получило основу и проверки, а `mustfail` набора больше не стирает чужую правку",
+    "en": "The task execution core gets its base and its checks, and the kit's `mustfail` no longer wipes someone else's edit"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`mustfail` набора: файл, который во время прогона изменил кто-то другой, остаётся как есть, а прогон выходит с кодом 2 и называет мутант и сохранённую копию. Раньше при возврате файла поверх чужой правки ложилась копия времени плана.",
+        "en": "Kit `mustfail`: a file someone else changed during the run is left as is, and the run exits with code 2 naming the mutant and the saved copy. Before, putting the file back wrote the plan-time copy over the other edit."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`mustfail` набора занимает рабочее дерево до первого прогона: второй прогон в той же копии отказывает сразу, а не мутирует файлы поверх первого.",
+        "en": "Kit `mustfail` claims the working tree before its first run: a second run in the same copy refuses at once instead of mutating files on top of the first."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "internal",
+      "text": {
+        "ru": "Ядро исполнения задач (`apps/core`) — отдельный процесс рядом с панелью: журнал задачи, восстановление после перезапуска, переходники CLI и маршруты модели, слой различий Windows, Linux и macOS. Проверки: профиль проекта находится сам, узкие прогоны в форме раннера, общая очередь, нестабильные тесты и карантин, захват запусков проверок сессии, сервисы в контейнерах. В панель ядро ещё не подключено.",
+        "en": "The task execution core (`apps/core`) is a separate process beside the panel: task journal, recovery after a restart, CLI adapters and model routes, a layer over the Windows, Linux and macOS differences. Checks: the project profile is detected on its own, narrow runs in the runner's own form, a shared queue, flaky tests and quarantine, capture of a session's check runs, services in containers. The core is not wired into the panel yet."
+      },
+      "area": { "ru": "Ядро", "en": "Core" }
+    },
+    {
+      "kind": "internal",
+      "text": {
+        "ru": "Общие пакеты: движок DLP, факты запуска по каждому CLI и сценарная заглушка модели вынесены из сервера в `packages/`.",
+        "en": "Shared packages: the DLP engine, per-CLI run facts and the scripted model stub moved from the server into `packages/`."
+      },
+      "area": { "ru": "Ядро", "en": "Core" }
+    }
+  ]
+}

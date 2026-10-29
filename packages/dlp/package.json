@@ -1,0 +1,33 @@
+{
+  "name": "@agentdeck/dlp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Защита данных: встроенные образцы, правила, обратимая маска, маска секретов — общие для панели и ядра",
+  "exports": {
+    "./api-shapes": "./src/api-shapes.ts",
+    "./builtins": "./src/builtins.mjs",
+    "./default-rules": "./src/default-rules.ts",
+    "./mask": "./src/mask.ts",
+    "./request-filter": "./src/request-filter.ts",
+    "./response-filter": "./src/response-filter.ts",
+    "./rules": "./src/rules.ts",
+    "./rules-file": "./src/rules-file.ts",
+    "./secret-mask": "./src/secret-mask.ts",
+    "./sse": "./src/sse.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentdeck/contracts": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

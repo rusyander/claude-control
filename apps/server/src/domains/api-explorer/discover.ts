@@ -47,7 +47,7 @@ const HEAD_SNIFF =
   /["']?(openapi|swagger)["']?\s*:\s*["']?(3\.|2\.0)|getpostman\.com\/json\/collection/;
 
 /** Известные адреса контракта у фреймворков: springdoc, FastAPI, swag, Express. */
-export const WELL_KNOWN_PATHS = [
+const WELL_KNOWN_PATHS = [
   '/openapi.json',
   '/v3/api-docs',
   '/swagger/doc.json',
@@ -111,7 +111,7 @@ const PROBE_TIMEOUT_MS = 1500;
  * минуту: вкладку открывают часто, а сервис, который не отдаёт контракт, так и
  * не начнёт.
  */
-export async function probeService(baseUrl: string, fresh = false): Promise<string | undefined> {
+async function probeService(baseUrl: string, fresh = false): Promise<string | undefined> {
   const cached = probeCache.get(baseUrl);
   if (!fresh && cached && Date.now() - cached.at < PROBE_TTL_MS) return cached.url;
   const base = baseUrl.replace(/\/$/, '');

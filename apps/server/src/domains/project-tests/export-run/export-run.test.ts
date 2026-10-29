@@ -276,6 +276,11 @@ describe('project-tests/export-run', () => {
       'автотесты панели',
     ]);
 
+    writeRun(project, { ...run(), mode: 'import', actor: 'ci', origin: 'core' });
+    expect(exportRun(project, 'run-1', 'md').body.toString('utf8')).toContain(
+      'Прогон: проверки ядра задач',
+    );
+
     writeRun(project, { ...run(), mode: 'import', actor: 'ci' });
     const md = exportRun(project, 'run-1', 'md').body.toString('utf8');
     expect(md).toContain('# Прогон: импорт из CI');

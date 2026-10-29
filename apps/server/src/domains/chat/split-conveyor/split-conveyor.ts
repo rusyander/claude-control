@@ -48,7 +48,7 @@ import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
 import type { RunFinished } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import type { SplitGroupContext } from '../ChatSplit/ChatSplit.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { GroupTestsVerdict } from '../tests-gate/tests-gate.ts';
 import type { MrReviewThread } from '../../integrations/mr-review/mr-review.ts';
 import { noteRelayed, REVIEW_REPLY_LINES } from '../mr-watch/review-threads.ts';
@@ -3102,7 +3102,7 @@ export class SplitConveyor {
     delete group.error;
     // Пауза и ожидание лимита — про прошлый ход: группа снова работает.
     // Отложенное продолжение не стирается — оно уйдёт ей после этого хода.
-    delete group.pausedAt;
+    endPause(group, this.now().toISOString());
     delete group.limitUntil;
     // Проверка доставки прошлого хода кончилась вместе с ним: следующая
     // считает попытки и простой сервиса заново.
@@ -3303,6 +3303,7 @@ export class SplitConveyor {
         'tail',
         'retries',
         'pausedAt',
+        'pauseSpans',
         'limitUntil',
         'parked',
         'deliver',
@@ -3724,7 +3725,7 @@ export class SplitConveyor {
       const group = live.groups[index] as SplitPlanGroupRecord;
       group.status = 'started';
       group.startedAt = at;
-      delete group.pausedAt;
+      endPause(group, at);
       // «Завести заново» оборванную группу: метка обрыва осталась бы на идущей
       // группе, и хаб звал бы «Продолжить», которое ничего не делает (ревью 30.09).
       delete group.waitingFor;
@@ -4107,7 +4108,7 @@ export class SplitConveyor {
     }
     if (!seated(group)) {
       group.status = 'pending';
-      delete group.pausedAt;
+      endPause(group, this.now().toISOString());
       delete group.pausedWait;
       this.deps.store.set(record);
       void this.launchNext(record).catch((error) => {
@@ -4123,7 +4124,7 @@ export class SplitConveyor {
       if (group.chatId && !group.pausedTasks?.length) {
         group.status = 'awaiting';
         group.waitingFor = wait;
-        delete group.pausedAt;
+        endPause(group, this.now().toISOString());
         this.deps.store.set(record);
         // Ожидание красного MR снова смотрит наблюдатель (F2): на паузе его проверки молчат.
         if (wait === 'mr-red') this.deps.watchOverlap?.(parentChatId);
@@ -4136,7 +4137,7 @@ export class SplitConveyor {
       // Пауза пришла, пока копия ещё заводится: запуск жив и сам пустит прогон,
       // если группа снова «стартует». Второй запуск завёл бы вторую копию.
       group.status = 'started';
-      delete group.pausedAt;
+      endPause(group, this.now().toISOString());
       this.deps.store.set(record);
       return 'sent';
     }
@@ -4708,6 +4709,23 @@ export class SplitConveyor {
     }
     return outcomes;
   }
+}
+
+/** Сколько отрезков пауз помнить: R39 смотрит час, больше пауз за час не бывает по делу. */
+const MAX_PAUSE_SPANS = 8;
+
+/**
+ * Пауза кончилась — группа снова идёт: её отрезок остаётся в записи. Перезапуск внутри
+ * него живой прогон не задел (R39). Живой прогон 27.10 18:27: перезапуски от правок
+ * сторожа на паузе всплыли бурей сразу после «Продолжить».
+ */
+function endPause(group: SplitPlanGroupRecord, at: string): void {
+  if (group.pausedAt && group.pausedAt < at) {
+    group.pauseSpans = [...(group.pauseSpans ?? []), { from: group.pausedAt, to: at }].slice(
+      -MAX_PAUSE_SPANS,
+    );
+  }
+  delete group.pausedAt;
 }
 
 /** Перепроверка снята: ход кончился, слово не дошло или потерялось. */

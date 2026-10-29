@@ -1,9 +1,6 @@
 import { GIT_NETWORK_TIMEOUT_MS } from './constants.ts';
 import { git } from './exec/exec.ts';
-import { requireRepo } from './read.ts';
-
-/** Имена основной ветки, если удалённый не назвал свою (`<remote>/HEAD` не заведён). */
-const MAIN_NAMES = ['main', 'master'];
+import { MAIN_BRANCH_NAMES as MAIN_NAMES, requireRepo } from './read.ts';
 
 /**
  * От чего отводить новую ветку группы разделения: основная ветка проекта, а не

@@ -1,9 +1,9 @@
 import type { DlpRule } from '@agentdeck/contracts';
 import type { PanelAgentMessage } from '@agentdeck/contracts/panel-agent';
-import { BLOCKING_BUILTINS, builtinRuleSet, maskRulesFor } from '../../dlp/default-rules.ts';
-import type { DlpBuiltinId } from '../../dlp/builtins.mjs';
-import { AliasVault, maskText } from '../../dlp/mask.ts';
-import { replaceSecrets } from '../../../lib/secret-mask/secret-mask.ts';
+import { BLOCKING_BUILTINS, builtinRuleSet, maskRulesFor } from '@agentdeck/dlp/default-rules';
+import type { DlpBuiltinId } from '@agentdeck/dlp/builtins';
+import { AliasVault, maskText } from '@agentdeck/dlp/mask';
+import { replaceSecrets } from '@agentdeck/dlp/secret-mask';
 
 /**
  * Маска реплик человека до модели (§3.4 задания агента панели): ключ, вставленный

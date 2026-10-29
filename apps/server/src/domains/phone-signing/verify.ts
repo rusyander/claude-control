@@ -33,7 +33,7 @@ export function publicKeyHash(publicKey: string): string | undefined {
 }
 
 /** Ed25519 через `node:crypto`; любая ошибка формы ключа или подписи — «не сошлось». */
-export function verifyEd25519(publicKey: string, message: string, signature: string): boolean {
+function verifyEd25519(publicKey: string, message: string, signature: string): boolean {
   const raw = fromBase64Url(publicKey);
   const sig = fromBase64Url(signature);
   if (!raw || raw.length !== 32 || !sig || sig.length !== 64) return false;

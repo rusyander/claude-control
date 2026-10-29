@@ -5,10 +5,9 @@ import type { MrReview } from '../../domains/integrations/mr-review/mr-review.ty
 import { appDataOf, type IntegrationsDeps } from './shared.ts';
 
 /** Почему MR не прочитан — коды для `tests-cli delivery`, человеку их не показывают. */
-export type ForgeMrMiss = 'not-mr' | 'no-token' | 'unreachable';
+type ForgeMrMiss = 'not-mr' | 'no-token' | 'unreachable';
 
-export type ForgeMrReply =
-  { review: Omit<MrReview, 'pipeline'> } | { review: null; reason: ForgeMrMiss };
+type ForgeMrReply = { review: Omit<MrReview, 'pipeline'> } | { review: null; reason: ForgeMrMiss };
 
 /**
  * MR глазами доставки: описание, ветки ревьюера, состояние — тем же чтением, что

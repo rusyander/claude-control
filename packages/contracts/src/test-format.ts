@@ -243,11 +243,16 @@ export function pointId(
  * Откуда пришла запись истории, если это импорт: `e2e` — автотесты папки,
  * прогнанные панелью, `ci` — отчёт сборки. У записи без поля — `ci`: так
  * писались все импорты до появления прогона панелью. Не импорт — `undefined`.
- * Одно правило для сервера, веба и телефона, чтобы подпись не разъехалась.
+ * Одно правило для сервера, веба и телефона, чтобы подпись не разъехалась. `core` — проверка ядра
+ * задач (G14); мусор в поле — `ci`: подписать чужой отчёт прогоном ядра хуже, чем наоборот.
  */
-export function runOrigin(run: { mode: string; origin?: string }): 'ci' | 'e2e' | undefined {
+export function runOrigin(run: {
+  mode: string;
+  origin?: string;
+}): 'ci' | 'e2e' | 'core' | undefined {
   if (run.mode !== 'import') return undefined;
-  return run.origin === 'e2e' ? 'e2e' : 'ci';
+  if (run.origin === 'e2e' || run.origin === 'core') return run.origin;
+  return 'ci';
 }
 
 /** Пустая сводка прогона — из неё складывают счёт по результатам. */

@@ -18,10 +18,10 @@
  * (путь — `CLAUDE_CLI`); стенд и настройки человека не трогаются.
  */
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-bashceiling-';
 
@@ -54,68 +54,17 @@ function workBase() {
 }
 
 /** Стаб API: пишет каждый запрос, отвечает словом. */
-function startStub() {
+async function startStub() {
   const seen = [];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      try {
-        seen.push(JSON.parse(raw));
-      } catch {
-        seen.push({});
-      }
-      const message = {
-        id: 'msg_bc',
-        type: 'message',
-        role: 'assistant',
-        model: 'stub',
-        content: [],
-        stop_reason: null,
-        usage: { input_tokens: 10, output_tokens: 1 },
-      };
-      const events = [
-        ['message_start', { type: 'message_start', message }],
-        [
-          'content_block_start',
-          { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
-        ],
-        [
-          'content_block_delta',
-          { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
-        ],
-        ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-        [
-          'message_delta',
-          {
-            type: 'message_delta',
-            delta: { stop_reason: 'end_turn' },
-            usage: { output_tokens: 1 },
-          },
-        ],
-        ['message_stop', { type: 'message_stop' }],
-      ];
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      for (const [event, data] of events)
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.end();
-    });
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      seen.push(request.body);
+      return 'ok';
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        seen,
-        close: () => server.close(),
-      }),
-    ),
-  );
+  return { url: stub.baseUrl, seen, close: () => stub.close() };
 }
 
 /** Потолок из описания Bash в запросе: «up to N ms» → N. */

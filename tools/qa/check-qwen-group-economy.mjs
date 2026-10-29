@@ -25,10 +25,10 @@
  *
  * Запуск: node tools/qa/check-qwen-group-economy.mjs
  */
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { NotChecked, runOnStand, wait } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const PLAIN_WORDS = 'PLAIN-ECONOMY-p1';
@@ -115,84 +115,37 @@ function toolResult(bodies, callId) {
 async function startStub() {
   const bodies = [];
   const readPath = { plain: '', group: '' };
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ data: [{ id: 'stub-model', object: 'model' }] }));
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        // Пустое тело — тоже запрос: записан как есть.
-      }
+  const stub = await startStubModel({
+    script: ({ request }) => {
+      const body = request.body;
       bodies.push(body);
       if (process.env.QWEN_ECONOMY_DUMP) {
         writeFileSync(process.env.QWEN_ECONOMY_DUMP, JSON.stringify(bodies, null, 1));
       }
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const chunk = (extra) =>
-        res.write(
-          `data: ${JSON.stringify({ id: 'c', object: 'chat.completion.chunk', created: 1, model: 'stub-model', ...extra })}\n\n`,
-        );
       const last = (body.messages ?? []).at(-1);
       const whose = whoseOf(body);
       // 130 000 токенов — только у итогового ответа хода: сжатие тогда случается в
       // начале следующего хода, и ответ инструмента первого хода до модели доходит.
-      const tokens = isMain(body) && last?.role === 'tool' ? 130_000 : 1_000;
-      const usage = { prompt_tokens: tokens, completion_tokens: 10, total_tokens: tokens + 10 };
-      let call;
+      const usage = { input: isMain(body) && last?.role === 'tool' ? 130_000 : 1_000, output: 10 };
       if (isMain(body) && last?.role !== 'tool' && whose) {
-        call = usersOf(body).includes(SECOND_WORDS)
-          ? { name: 'read_file', arguments: JSON.stringify({ file_path: readPath[whose] }) }
+        const tool = usersOf(body).includes(SECOND_WORDS)
+          ? { name: 'read_file', args: { file_path: readPath[whose] } }
           : {
               name: 'run_shell_command',
-              arguments: JSON.stringify({
+              args: {
                 command: `node -e "process.stdout.write('y'.repeat(${BIG}))"`,
                 description: 'big output',
-              }),
-            };
-      }
-      if (call) {
-        const id = `call_${whose}_${call.name}_${bodies.length}`;
-        chunk({
-          choices: [
-            {
-              index: 0,
-              delta: {
-                role: 'assistant',
-                tool_calls: [{ index: 0, id, type: 'function', function: call }],
               },
-              finish_reason: null,
-            },
-          ],
-        });
-        chunk({ choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage });
-      } else {
-        const answer = isCompression(body)
-          ? `<analysis>a</analysis><state_snapshot><overall_goal>stub ${whose === 'group' ? GROUP_TASK : ''}</overall_goal></state_snapshot>`
-          : 'OK';
-        chunk({
-          choices: [
-            { index: 0, delta: { role: 'assistant', content: answer }, finish_reason: null },
-          ],
-        });
-        chunk({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage });
+            };
+        return { tool: { ...tool, id: `call_${whose}_${tool.name}_${bodies.length}` }, usage };
       }
-      res.end('data: [DONE]\n\n');
-    });
+      const text = isCompression(body)
+        ? `<analysis>a</analysis><state_snapshot><overall_goal>stub ${whose === 'group' ? GROUP_TASK : ''}</overall_goal></state_snapshot>`
+        : 'OK';
+      return { text, usage };
+    },
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  return {
-    port: server.address().port,
-    bodies,
-    readPath,
-    close: () => new Promise((resolve) => server.close(resolve)),
-  };
+  return { port: stub.port, bodies, readPath, close: () => stub.close() };
 }
 
 const bigFile = () =>

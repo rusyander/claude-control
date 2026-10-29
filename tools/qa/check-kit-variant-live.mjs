@@ -23,7 +23,6 @@
  * Запуск: node tools/qa/check-kit-variant-live.mjs [goose] [opencode] [continue]
  */
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
 import {
   cpSync,
   existsSync,
@@ -46,6 +45,7 @@ import {
   reporter,
   snapshotRealProviderDirs,
 } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const KIT = join(REPO, 'apps', 'server', 'assets', 'kit', 'agentdeck-kit');
@@ -68,101 +68,28 @@ let checked = 0;
  * инструмента — вызов оболочки с `sed -i`, после одного — `echo`, дальше — текст. Служебные
  * запросы CLI (имя сессии, заголовок) метки не несут и получают текст.
  */
-function startStub(shellName) {
+async function startStub(shellName) {
   const requests = [];
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) {
-        res.writeHead(404);
-        res.end('{}');
-        return;
-      }
-      let parsed = {};
-      try {
-        parsed = JSON.parse(body);
-      } catch {
-        // не JSON — пустой запрос
-      }
-      const tools = (parsed.tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
-      const results = (parsed.messages ?? [])
+  const stub = await startStubModel({
+    // Только chat/completions; прочее — 404, как у прежней заглушки.
+    route: ({ path }) =>
+      path.includes('chat/completions') ? undefined : { status: 404, body: {} },
+    script: ({ request }) => {
+      const { body } = request;
+      const tools = (body.tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
+      const results = (body.messages ?? [])
         .filter((m) => m.role === 'tool')
         .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
-      const marked = body.includes(MARK);
+      const marked = request.raw.includes(MARK);
       const shell = shellName(tools);
       const command = !marked || !shell ? null : [SED, `echo ${ECHO}`][results.length];
       requests.push({ tools, results, marked, command });
-      const id = `call_${requests.length}`;
-      const message = command
-        ? {
-            role: 'assistant',
-            content: null,
-            tool_calls: [
-              {
-                id,
-                type: 'function',
-                function: {
-                  name: shell,
-                  arguments: JSON.stringify({ command, description: 'qa' }),
-                },
-              },
-            ],
-          }
-        : { role: 'assistant', content: `STUB_DONE_${TOKEN}` };
-      const finish = command ? 'tool_calls' : 'stop';
-      if (!parsed.stream) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            id: 'stub',
-            object: 'chat.completion',
-            created: 1,
-            model: 'stub-model',
-            choices: [{ index: 0, message, finish_reason: finish }],
-            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-          }),
-        );
-        return;
-      }
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const chunk = (delta, reason = null) =>
-        res.write(
-          `data: ${JSON.stringify({
-            id: 'stub',
-            object: 'chat.completion.chunk',
-            created: 1,
-            model: 'stub-model',
-            choices: [{ index: 0, delta, finish_reason: reason }],
-          })}\n\n`,
-        );
-      if (command)
-        chunk({
-          role: 'assistant',
-          tool_calls: message.tool_calls.map((call, index) => ({ index, ...call })),
-        });
-      else chunk({ role: 'assistant', content: message.content });
-      chunk({}, finish);
-      res.write(
-        `data: ${JSON.stringify({ id: 'stub', object: 'chat.completion.chunk', created: 1, model: 'stub-model', choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\n`,
-      );
-      res.write('data: [DONE]\n\n');
-      res.end();
-    });
+      if (!command) return `STUB_DONE_${TOKEN}`;
+      const args = { command, description: 'qa' };
+      return { tool: { name: shell, args, id: `call_${requests.length}` } };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        requests,
-        close: () =>
-          new Promise((closed) => {
-            server.closeAllConnections();
-            server.close(() => closed());
-          }),
-      }),
-    ),
-  );
+  return { port: stub.port, requests, close: () => stub.close() };
 }
 
 /** Запуск CLI с таймаутом; дерево процессов снимается целиком (иначе CLI переживёт проверку). */

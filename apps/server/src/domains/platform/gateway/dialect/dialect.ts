@@ -1,4 +1,4 @@
-import type { DlpApiKind } from '../../../dlp/api-shapes.ts';
+import type { DlpApiKind } from '@agentdeck/dlp/api-shapes';
 import type { DriverRequestField } from '../../drivers/driver.ts';
 import {
   encodeToolResult,

@@ -379,7 +379,7 @@ export interface PendingOp {
    * действия (`op-subject.ts`): исправленный повтор — другой предмет, не обход.
    * `named` — пуш назвал свой чекаут (`git -C <путь>`), см. `namesCheckout`.
    */
-  guarded?: { op: string; text: string; subject: string; acked?: true; named?: true };
+  guarded?: { op: string; text: string; subject: string; named?: true };
 }
 
 /** Серия одинаковых падений одного вызова (R24): времена падений (последние 10), что за вызов и ошибка. */

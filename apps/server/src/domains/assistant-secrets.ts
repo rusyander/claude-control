@@ -7,7 +7,7 @@ import {
   maskNamedValue,
   maskSecretsInText,
   restoreMaskedSecrets,
-} from '../lib/secret-mask/secret-mask.ts';
+} from '@agentdeck/dlp/secret-mask';
 
 /**
  * Секреты формы и помощник (U6 F3, 28.09): модель видит маску, форма получает
@@ -17,7 +17,7 @@ import {
  * переменные и заголовки без маски, форма переменной — набранное значение. Они
  * попадали и в модель, и в транскрипт CLI.
  *
- * Детектор — общий с агентом панели (`lib/secret-mask/secret-mask.ts`), своего нет: два
+ * Детектор — общий с агентом панели (`@agentdeck/dlp/secret-mask`), своего нет: два
  * детектора разошлись бы первым же новым видом секрета.
  */
 

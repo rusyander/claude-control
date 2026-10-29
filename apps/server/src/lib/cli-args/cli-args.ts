@@ -1,3 +1,5 @@
+import { claudeRunFacts } from '@agentdeck/providers/claude';
+
 /**
  * Проверка значений, которые уходят в аргументы командной строки.
  *
@@ -42,8 +44,11 @@ export function safeModel(value: string | undefined): string | undefined {
   return MODEL.test(value) ? value : undefined;
 }
 
-/** Уровень продумывания (--effort). Белый список — чужого в аргументы не пустим. */
-const EFFORT_LEVELS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+/**
+ * Уровень продумывания (--effort). Белый список — чужого в аргументы не пустим; значения —
+ * факт запуска Claude Code (`@agentdeck/providers/claude`).
+ */
+const EFFORT_LEVELS = new Set(claudeRunFacts.effort?.values ?? []);
 
 export function safeEffort(value: string | undefined): string | undefined {
   if (!value) return undefined;

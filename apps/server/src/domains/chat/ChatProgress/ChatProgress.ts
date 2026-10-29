@@ -15,6 +15,7 @@ import {
 } from '../ChatHistory/ChatHistory.ts';
 import { isHumanPrompt } from '../chat-inbox/chat-inbox.ts';
 import { killsProcess } from '../group-command/kill.ts';
+import { isInterruptedResult } from '../subagent-tree/agent-anomalies.ts';
 
 /**
  * Прогресс агента по его собственному следу в транскрипте.
@@ -617,10 +618,13 @@ export function applyToolResult(block: TranscriptBlock, agents: Map<string, Prog
     return;
   }
 
+  // Пауза или конец сессии посреди субагента: итога нет, но это обрыв, а не его ошибка.
+  const interrupted = isInterruptedResult(text);
   agents.set(id, {
     ...agent,
-    status: block.is_error ? 'failed' : 'done',
+    status: block.is_error || interrupted ? 'failed' : 'done',
     result: publicResult(text) || undefined,
+    ...(interrupted ? { interrupted: true } : {}),
   });
 }
 

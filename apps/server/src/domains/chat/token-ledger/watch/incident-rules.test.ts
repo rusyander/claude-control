@@ -259,8 +259,11 @@ describe('R25 отбитое действие выполнено другим п
       ).toBeUndefined();
     });
 
-    it('без подписи или после отказа другого стража — обход, как раньше', () => {
-      expect(hit(pair('push-sieves', retry), 'R25')).toMatchObject({ severity: 'alert' });
+    // g5 27.10: подтверждение запомнено для ветки, пуш через 27 мин прошёл без подписи — сито
+    // судит каждый `git push`, прошедший оно пропустило само.
+    it('без подписи после отказа сита — тоже тишина; после отказа другого стража — обход', () => {
+      expect(hit(pair('push-sieves', retry), 'R25')).toBeUndefined();
+      expect(hit(pair('git-guard', retry), 'R25')).toMatchObject({ severity: 'alert' });
       expect(
         hit(pair('git-guard', `${retry} # sieve-ack: @.agent/tmp/sieve-ack.txt`), 'R25'),
       ).toMatchObject({ severity: 'alert' });

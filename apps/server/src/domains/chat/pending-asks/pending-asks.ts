@@ -48,7 +48,7 @@ export interface PendingAsksDeps {
 /** Сколько записей держать: дерево разделения — десятки разговоров, не тысячи. */
 const LIMIT = 200;
 /** Хвост ответа, кончившегося вопросом текстом: хватает на вопрос с вариантами. */
-export const TEXT_ASK_MAX = 1_500;
+const TEXT_ASK_MAX = 1_500;
 
 export class PendingAsks {
   private readonly deps: PendingAsksDeps;

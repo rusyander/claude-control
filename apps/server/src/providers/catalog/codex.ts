@@ -2,7 +2,9 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { CODEX_BLOCKING_EVENTS, CODEX_HOOK_EVENTS } from '../../lib/codex-hook/codex-hook.ts';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
+import { effortArgs } from '@agentdeck/providers/effort';
 import { codexHome, unimplementedPaths } from './config-dirs.ts';
+import { assistantApiOf, endpointFileOf, modelsOf, runFactsOf } from './run-facts.ts';
 
 /**
  * Один и тот же `~/.codex/config.toml` держит сразу три раздела — MCP,
@@ -11,19 +13,18 @@ import { codexHome, unimplementedPaths } from './config-dirs.ts';
 const codexConfigToml = (): string => join(codexHome(), 'config.toml');
 
 /**
- * Значения глубины, задокументированные для `model_reasoning_effort`. Незнакомое
- * не передаётся вовсе: выдуманный уровень уронил бы прогон целиком, а «панель
- * ничего не сказала» значит «как настроено у пользователя» — рабочее состояние.
+ * Факты запуска Codex — из пакета `@agentdeck/providers`: бинарь, ключи, канал адреса,
+ * глубина (`model_reasoning_effort`, незнакомое значение не передаётся вовсе), лестница.
  */
-const CODEX_EFFORTS = ['low', 'medium', 'high'];
+const facts = runFactsOf('codex');
 
 /** Codex (OpenAI): AGENTS.md + ~/.codex/config.toml (MCP в [mcp_servers]). */
 export const codexProvider: ConfigProvider = {
-  id: 'codex',
-  name: 'Codex (OpenAI)',
-  status: 'experimental',
-  paths: unimplementedPaths('codex'),
-  cli: { command: 'codex', windowsCommand: 'codex.cmd' },
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
+  cli: facts.binary,
   // Глобальный файл инструкций Codex задокументирован (~/.codex/AGENTS.md) →
   // раздел инструкций реально работает; override игнорируем (файл глобальный).
   instructionsFile: () => join(codexHome(), 'AGENTS.md'),
@@ -89,16 +90,11 @@ export const codexProvider: ConfigProvider = {
   // `model_providers` в том же config.toml (его документация: провайдер
   // описывается блоком с `base_url`/`wire_api`, и выбирается корневым ключом
   // `model_provider`). Значит контур сюда переносится — но не через env.
-  endpointFile: {
-    format: 'codex-toml',
-    path: codexConfigToml,
-    apiKind: 'openai-compat',
-    // Ручка `/responses`, а не `/chat/completions`: `wire_api = "chat"` codex
-    // больше не принимает и с таким конфигом не стартует вовсе (живая проба
-    // 22.09.2026, `codex-cli 0.155.1`). Шлюз обслуживает его переводом на краю
-    // (MAP D, `gateway/responses-bridge.ts`), поэтому codex — цель контура.
-    wireApi: 'responses',
-  },
+  // Ручка `/responses`, а не `/chat/completions` (диалект `openai-responses` в фактах):
+  // `wire_api = "chat"` codex больше не принимает и с таким конфигом не стартует вовсе
+  // (живая проба 22.09.2026, `codex-cli 0.155.1`). Шлюз обслуживает его переводом на
+  // краю (MAP D, `gateway/responses-bridge.ts`), поэтому codex — цель контура.
+  endpointFile: endpointFileOf(facts, codexConfigToml),
   // Детект «конфиг найден» (Ф7): каталог ~/.codex. Только проверка существования.
   configLocations: () => [codexHome()],
   // Группа Claude едет на прогон накладкой поверх конфига Codex (`-c`, корни
@@ -146,9 +142,7 @@ export const codexProvider: ConfigProvider = {
   // Ассистент Codex: API — OpenAI (ключ OPENAI_API_KEY), есть рабочий CLI (`codex`).
   // One-shot: `codex exec <prompt>` — неинтерактивный запуск (флаг задокументирован).
   assistant: {
-    apiKind: 'openai',
-    apiKeyEnvVars: ['OPENAI_API_KEY'],
-    cliRunnable: true,
+    ...assistantApiOf(facts),
     // Подбор модели (Т12): `-m/--model` задокументирован у самой `codex exec`, а
     // глубина — единственная среди всех чужих CLI — задаётся ключом конфига
     // `-c model_reasoning_effort=<low|medium|high>`. Кавычек из примеров
@@ -165,9 +159,7 @@ export const codexProvider: ConfigProvider = {
     oneShotArgs: (_prompt, run) => [
       'exec',
       ...(run?.model ? ['-m', run.model] : []),
-      ...(CODEX_EFFORTS.includes(run?.effort ?? '')
-        ? ['-c', `model_reasoning_effort=${run?.effort}`]
-        : []),
+      ...effortArgs(facts, run?.effort),
       // «Разрешить правки» (`codex exec --help` 0.160: `-s, --sandbox
       // read-only|workspace-write|danger-full-access`). Выключено — только
       // чтение: спросить человека `exec` не может, молча править нельзя.
@@ -205,13 +197,8 @@ export const codexProvider: ConfigProvider = {
     analytics: 'ready',
     sandbox: 'unsupported',
   }),
-  // Модели: каталог OpenAI (models.dev). Codex CLI работает с моделями OpenAI.
-  modelVendors: ['openai'],
-  // Лестница подбора (Т12): обе ступени — модели самого Codex, поэтому выбор
-  // между ними не меняет ни вендора, ни доступа. `gpt-codex-spark` — младшая
-  // (быстрая) кодовая модель, `gpt-codex` — старшая; семейства однородны, и
-  // «свежайшая в семействе» означает ту же ступень следующего поколения.
-  // Флагман общего назначения (`gpt`, `gpt-pro`) сюда не берём: подбор
-  // существует, чтобы понижать, а не чтобы менять линейку.
-  modelLadder: ['gpt-codex-spark', 'gpt-codex'],
+  // Модели: каталог OpenAI (models.dev). Лестница подбора (Т12): обе ступени — модели
+  // самого Codex, поэтому выбор между ними не меняет ни вендора, ни доступа; флагман
+  // общего назначения сюда не берём — подбор существует, чтобы понижать.
+  ...modelsOf(facts),
 };

@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "noEmit": true,
+    // Ядро запускается node --experimental-strip-types, как и сервер: типы только стираются,
+    // поэтому enum, namespace и parameter properties ловятся здесь, а не на холодном старте.
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src",
+    "vitest.config.ts",
+    "vitest.temp-sandbox.ts",
+    "vitest.coverage-dir.ts",
+    "vitest.whole-suite.ts",
+    "vitest.whole-suite.test.ts",
+    "vitest.coverage-merge.test.ts"
+  ]
+}

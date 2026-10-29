@@ -136,6 +136,7 @@ function build(
     now: () => new Date(NOW),
   });
   const reads: string[] = [];
+  const scopeTargets: (string | undefined)[] = [];
   const recheck = (note?: string) =>
     recheckDeliveredMr(
       {
@@ -157,7 +158,12 @@ function build(
           : {}),
         ...(options.scope
           ? {
-              scope: async () => {
+              scope: async (
+                _record: SplitPlanRecord,
+                _group: SplitPlanGroupRecord,
+                at?: string,
+              ) => {
+                scopeTargets.push(at);
                 if (options.scope instanceof Error) throw options.scope;
                 return options.scope;
               },
@@ -186,7 +192,19 @@ function build(
     stage: 'work',
   });
   const flush = () => new Promise((done) => setTimeout(done, 5));
-  return { conveyor, recheck, resumed, fresh, logs, reads, group, link, flush, records };
+  return {
+    conveyor,
+    recheck,
+    resumed,
+    fresh,
+    logs,
+    reads,
+    scopeTargets,
+    group,
+    link,
+    flush,
+    records,
+  };
 }
 
 const codeOf = (error: unknown) => (error as { messageCode?: string }).messageCode;
@@ -590,6 +608,28 @@ describe('«Перепроверить MR»: охват и новый разго
     expect(prompt).not.toContain('   - svc/o20.go');
     expect(prompt).toContain('   - +3 more');
     expect(prompt).toContain('never git add -A, git add . or commit -a');
+  });
+
+  // Живой прогон 27.10: три перепроверки дали `mr_discussions` jmespath без `items` — отказ.
+  it('шаг обсуждений называет форму ответа mr_discussions', async () => {
+    const t = build({ review: { state: 'open', threads: [] } });
+    await t.recheck();
+    expect(t.resumed[0]!.prompt).toContain(
+      '`mr_discussions` answers `{items: […], pagination}` — a jmespath starts at `items`',
+    );
+  });
+
+  // Живой прогон 27.10: база охвата бралась от ветки, выгруженной в папке проекта.
+  it('охват считается против цели MR от форджа; MR не прочитан — цели нет', async () => {
+    const read = build({
+      scope: scope(1, 0),
+      review: { state: 'open', threads: [], targetBranch: 'main' },
+    });
+    await read.recheck();
+    expect(read.scopeTargets).toEqual(['main']);
+    const unread = build({ scope: scope(1, 0), review: new Error('forge down') });
+    await unread.recheck();
+    expect(unread.scopeTargets).toEqual([undefined]);
   });
 
   it('ровно на границе: 20 — списком целиком, 21 — счётом', async () => {

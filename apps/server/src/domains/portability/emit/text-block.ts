@@ -16,8 +16,8 @@ import type { EnvItem, PermissionDecision } from '@agentdeck/contracts/portable-
  */
 
 /** Метки области, которую ведёт панель. ASCII намеренно: их читает код, а не человек. */
-export const BLOCK_BEGIN = '<!-- agentdeck:portability:begin -->';
-export const BLOCK_END = '<!-- agentdeck:portability:end -->';
+const BLOCK_BEGIN = '<!-- agentdeck:portability:begin -->';
+const BLOCK_END = '<!-- agentdeck:portability:end -->';
 
 /** Область панели целиком, с предупреждением человеку первой строкой. */
 export function blockOf(blocks: readonly string[]): string {

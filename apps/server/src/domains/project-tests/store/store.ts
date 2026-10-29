@@ -75,7 +75,7 @@ export const DEFAULT_GROUPS: { id: string; title: string; description: string }[
 ];
 
 /** Идентификатор группы = имя файла. */
-export function assertGroupId(id: string): string {
+function assertGroupId(id: string): string {
   return assertId(id, 'Идентификатор группы');
 }
 

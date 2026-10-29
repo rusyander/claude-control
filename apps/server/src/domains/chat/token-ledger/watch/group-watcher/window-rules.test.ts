@@ -13,6 +13,7 @@ import { accountProjection, type LimitPoint } from '../rules.ts';
 import { streamWatchEvents } from '../stream-events.ts';
 import {
   accountWindow,
+  finishedRuns,
   heavyRunHit,
   heavyRuns,
   weekProjection,
@@ -163,6 +164,20 @@ describe('R42 тяжёлый прогон', () => {
       since: T('10:40:00'),
       textKey: 'groupWatch.rule.R42',
     });
+  });
+
+  it('вырезка overlap: группы идут вместе — опора не позже начала прогона, а не конец соседа', () => {
+    // Журнал, каким его прочёл сторож 27.10 в 19:29 (+05): три законченных прогона и открытый
+    // следующий g9. Опора на последний замер соседа давала g1 «+1 %» при 9 → 20 %, g5 «+0 %» при 9 → 22 %.
+    const list = finishedRuns(
+      runs('R42-heavy-run/overlap.json'),
+      Date.parse('2026-10-27T14:29:07Z'),
+    );
+    expect(list.map((run) => [run.id, Math.round((run.five ?? 0) * 100)])).toEqual([
+      ['r-g9', 10],
+      ['r-g1', 11],
+      ['r-g5', 13],
+    ]);
   });
 
   it('вырезка near-miss: опора из сброшенного окна часовой давности — не «+49 %»; на шаг под порогами; давний и открытый — тишина', () => {

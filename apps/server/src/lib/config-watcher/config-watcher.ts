@@ -49,7 +49,7 @@ export interface ConfigWatcher {
  * запущенного самой панелью, а чужой разговор приходилось догонять руками
  * через F5.
  */
-export function projectsPath(paths: ClaudePaths): string {
+function projectsPath(paths: ClaudePaths): string {
   // Разделитель берём из самого каталога, а не у платформы: путь приходит и в
   // POSIX-виде (переменная окружения, настройка «свой каталог»), а `join` на
   // Windows превратил бы его в смешанный — и сравнение с путём из наблюдателя
@@ -59,7 +59,7 @@ export function projectsPath(paths: ClaudePaths): string {
 }
 
 /** Файлы и каталоги конфигурации, изменения которых интересуют интерфейс. */
-export function watchedPaths(paths: ClaudePaths): string[] {
+function watchedPaths(paths: ClaudePaths): string[] {
   return [
     paths.settings,
     paths.settingsLocal,

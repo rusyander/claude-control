@@ -2,7 +2,7 @@
  * Отметка группы: разрешение по строке «с отметкой» или (`kind: 'answer'`) ответ
  * панели на вопрос группы; `free` — ответ свободным текстом, вариант не подошёл.
  */
-export interface GroupAutoNotice {
+interface GroupAutoNotice {
   at: string;
   summary: string;
   kind?: 'answer';

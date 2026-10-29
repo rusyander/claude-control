@@ -244,7 +244,7 @@ function spread(field: keyof ParsedCaseRow, names: string[]): Record<string, key
 }
 
 /** Заголовок в сравнимый вид: регистр, пробелы и пунктуация значения не имеют. */
-export function normalizeHeader(value: string): string {
+function normalizeHeader(value: string): string {
   return value
     .trim()
     .toLowerCase()

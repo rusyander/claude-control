@@ -108,6 +108,7 @@ export default function docBloatGuard(input) {
     return null;
   }
   if (size <= SMELL) return null;
+  if (/\/\.claude\/skills\/.+\.md$/i.test(p) && size <= BUDGET.skill) return null;
   if (alreadyNagged(p, size)) return null;
 
   const kb = Math.round(size / 1024);

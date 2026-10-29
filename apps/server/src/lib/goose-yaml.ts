@@ -59,10 +59,10 @@ import { deleteYamlKey, otherYamlKeysProjection, parseYamlMapDocument } from './
 export { UnrecognizedFormatError };
 
 /** Ключ расширений Goose — ОТОБРАЖЕНИЕ «имя → запись». */
-export const GOOSE_EXTENSIONS_KEY = 'extensions';
+const GOOSE_EXTENSIONS_KEY = 'extensions';
 
 /** Ключ режима аппрувов — скаляр в КОРНЕ файла. */
-export const GOOSE_MODE_KEY = 'GOOSE_MODE';
+const GOOSE_MODE_KEY = 'GOOSE_MODE';
 
 /** Задокументированные режимы аппрувов Goose, в порядке показа (общий словарь). */
 export { GOOSE_MODES, type GooseMode };
@@ -71,13 +71,13 @@ export { GOOSE_MODES, type GooseMode };
 export const GOOSE_DEFAULT_MODE: GooseMode = 'auto';
 
 /** Типы расширений, которые и есть внешние MCP-серверы. */
-export const GOOSE_MCP_TYPES = ['stdio', 'sse', 'streamable_http'] as const;
+const GOOSE_MCP_TYPES = ['stdio', 'sse', 'streamable_http'] as const;
 
 /** Запись расширения как она лежит в файле (чужие поля тоже здесь). */
 export type GooseRawExtension = Record<string, unknown>;
 
 /** Разобрать `config.yaml` Goose (общая основа — `lib/yaml-doc.ts`). */
-export function parseGooseDocument(text: string): Document {
+function parseGooseDocument(text: string): Document {
   return parseYamlMapDocument(text);
 }
 

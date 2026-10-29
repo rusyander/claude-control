@@ -18,7 +18,7 @@ import { readJsonFile, writeTextFile } from '../../../lib/safe-io/safe-io.ts';
 
 const FILE = 'chat-gen-times.json';
 /** Сколько последних ответов помним. Старше — скорость у ответа гаснет. */
-export const GEN_TIMES_CAP = 2000;
+const GEN_TIMES_CAP = 2000;
 
 type Entry = [messageId: string, genMs: number];
 
@@ -54,7 +54,7 @@ function readEntries(appDataDir: string): Entry[] {
 }
 
 /** Нужен ли ход журналу: облачный Claude скорости в ленте не получает. */
-export function wantsGenTime(model: string | undefined): boolean {
+function wantsGenTime(model: string | undefined): boolean {
   return Boolean(model) && !/^claude/i.test(model ?? '');
 }
 

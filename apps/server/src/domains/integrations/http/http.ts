@@ -18,7 +18,7 @@ import { coded, type CodedText } from '../../../lib/server-text/server-text.ts';
  */
 
 /** Потолок ожидания одного запроса. Больше — интерфейс выглядит зависшим. */
-export const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 /** Сколько ждём по `Retry-After`, даже если сервис попросил больше. */
 const MAX_RETRY_DELAY_MS = 5_000;

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import { maskDeep } from '../action-kit/action-kit.ts';
 import { maskResult, netMessage, netPreview, netResult } from './result-net.ts';
 

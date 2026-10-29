@@ -2,6 +2,10 @@ import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { continueHome, unimplementedPaths } from './config-dirs.ts';
 import { continueOneShotArgs } from './continue-args.ts';
+import { assistantApiOf, endpointFileOf, runFactsOf } from './run-facts.ts';
+
+/** Факты запуска Continue — из пакета `@agentdeck/providers`. */
+const facts = runFactsOf('continue');
 
 /**
  * Continue: `~/.continue/config.yaml` (MCP) + `~/.continue/permissions.yaml` (права).
@@ -42,12 +46,12 @@ import { continueOneShotArgs } from './continue-args.ts';
  * Угадывать не станем.
  */
 export const continueProvider: ConfigProvider = {
-  id: 'continue',
-  name: 'Continue',
-  status: 'experimental',
-  paths: unimplementedPaths('continue'),
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
   // Бинарь CLI — `cn` (пакет @continuedev/cli).
-  cli: { command: 'cn', windowsCommand: 'cn.cmd' },
+  cli: facts.binary,
   mcpConfig: {
     format: 'continue-yaml',
     path: () => join(continueHome(), 'config.yaml'),
@@ -61,15 +65,9 @@ export const continueProvider: ConfigProvider = {
   },
   // Адрес у Continue — поле `apiBase` КОНКРЕТНОЙ модели в config.yaml (его
   // документация): общей переменной окружения для этого нет. Контур добавляет
-  // свою запись в список моделей и не трогает чужие.
-  endpointFile: {
-    format: 'continue-yaml',
-    path: () => join(continueHome(), 'config.yaml'),
-    apiKind: 'openai-compat',
-    // `provider: openai` + `apiBase` у Continue — это путь `/chat/completions`,
-    // ровно тот, который шлюз и обслуживает.
-    wireApi: 'chat',
-  },
+  // свою запись в список моделей и не трогает чужие. `provider: openai` + `apiBase` у
+  // Continue — это путь `/chat/completions`, ровно тот, который шлюз и обслуживает.
+  endpointFile: endpointFileOf(facts, () => join(continueHome(), 'config.yaml')),
   permissionsConfig: {
     format: 'continue-yaml',
     path: () => join(continueHome(), 'permissions.yaml'),
@@ -138,9 +136,7 @@ export const continueProvider: ConfigProvider = {
   // окружение `cn`, тот дописывал открытым текстом в `config.yaml`.
   // One-shot: `cn -p "<промпт>"` — задокументированный headless-режим.
   assistant: {
-    apiKind: 'none',
-    apiKeyEnvVars: [],
-    cliRunnable: true,
+    ...assistantApiOf(facts),
     // `cn [--config <свой config.yaml>] [--allow|--exclude Write/Edit/MultiEdit/Bash] -p <промпт>`;
     // почему именно так — `continue-args.ts` (каждый флаг проверен живым `cn` 1.5.47).
     oneShotArgs: (prompt, run) => continueOneShotArgs(prompt, run),

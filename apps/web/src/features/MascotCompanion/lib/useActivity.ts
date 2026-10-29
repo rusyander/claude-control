@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 /** Столько без клавиш, кликов и движения мыши — и Дека задрёмывает. */
-export const SLEEP_AFTER_MS = 5 * 60_000;
+const SLEEP_AFTER_MS = 5 * 60_000;
 
 /** Как часто сверяться с часами: сон — не секундное дело. */
 const CHECK_EVERY_MS = 15_000;

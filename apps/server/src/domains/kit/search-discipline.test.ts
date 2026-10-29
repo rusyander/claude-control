@@ -132,6 +132,14 @@ describe('search-discipline: grep -r по дереву с node_modules', () => {
     expect(bash('grep -r -e x -e y inst-api', REPO)).toBe('');
   });
 
+  // g5 27.10: шаблон `"<Button"` в кавычках читался перенаправлением и пропадал — путь становился
+  // шаблоном, и grep по подпапке отказывался как обход `.`.
+  it('B16 «<» в кавычках — шаблон; перенаправление без кавычек по-прежнему снимается', () => {
+    expect(bash('grep -rn "<Button" -A4 inst-api | grep -n "icon=" | head -5', REPO)).toBe('');
+    expect(bash("grep -rn '>x' inst-api", REPO)).toBe('');
+    expect(bash('grep -rn x 2>/dev/null', REPO)).not.toBe('');
+  });
+
   // g9 26.10: `grep -rn … inst-admin-ui/*.json` отказан как обход всего inst-admin-ui.
   it('B15 маска в последнем сегменте называет файлы, а не дерево', () => {
     writeFileSync(join(MONO, 'web-ui', 'package.json'), '{}');

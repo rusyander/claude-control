@@ -35,7 +35,6 @@
  * Запуск: `node tools/qa/check-cli-aider.mjs`.
  */
 import { execFileSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import {
   existsSync,
   mkdirSync,
@@ -56,6 +55,7 @@ import {
   startStand,
   wait,
 } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 
@@ -73,53 +73,24 @@ let notChecked = '';
 
 // --- заглушка модели: ответ по сценарию, запись запросов с заголовками -------
 const stub = { reply: '', requests: [] };
-const model = createServer((req, res) => {
-  let raw = '';
-  req.on('data', (chunk) => (raw += chunk));
-  req.on('end', () => {
-    let body = {};
-    try {
-      body = JSON.parse(raw || '{}');
-    } catch {
-      // не JSON — ответ по сценарию всё равно
-    }
-    stub.requests.push({ path: req.url, auth: req.headers.authorization, raw });
-    if (req.method === 'GET') {
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ object: 'list', data: [{ id: 'stub-model', object: 'model' }] }));
-      return;
-    }
+const model = await startStubModel({
+  // Наблюдатель: каждый запрос (и GET списка моделей) с путём, сырым ключом и телом.
+  route: ({ method, path, query, headers, raw }) => {
+    stub.requests.push({ path: path + query, auth: headers.authorization, raw });
+    return method === 'GET'
+      ? { body: { object: 'list', data: [{ id: 'stub-model', object: 'model' }] } }
+      : undefined;
+  },
+  // Кусками — как настоящая модель: разбор stdout обязан склеить ответ сам.
+  script: () => {
     const text = stub.reply;
-    const head = { id: 'c1', created: 1, model: body.model ?? 'stub-model' };
-    const usage = { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 };
-    if (body.stream) {
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      // Кусками — как настоящая модель: разбор stdout обязан склеить ответ сам.
-      for (const part of [text.slice(0, 7), text.slice(7, 30), text.slice(30)]) {
-        const chunk = { ...head, object: 'chat.completion.chunk' };
-        chunk.choices = [{ index: 0, delta: { content: part } }];
-        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-      }
-      const last = { ...head, object: 'chat.completion.chunk', usage };
-      last.choices = [{ index: 0, delta: {}, finish_reason: 'stop' }];
-      res.write(`data: ${JSON.stringify(last)}\n\ndata: [DONE]\n\n`);
-      res.end();
-      return;
-    }
-    res.writeHead(200, { 'content-type': 'application/json' });
-    const message = { role: 'assistant', content: text };
-    res.end(
-      JSON.stringify({
-        ...head,
-        object: 'chat.completion',
-        choices: [{ index: 0, message, finish_reason: 'stop' }],
-        usage,
-      }),
-    );
-  });
+    return {
+      text: [text.slice(0, 7), text.slice(7, 30), text.slice(30)],
+      usage: { input: 10, output: 2 },
+    };
+  },
 });
-await new Promise((done) => model.listen(0, '127.0.0.1', done));
-const modelUrl = `http://127.0.0.1:${model.address().port}/v1`;
+const modelUrl = `${model.baseUrl}/v1`;
 
 const PLAIN = 'Привет из заглушки: «ёлка» — 42.\n\nВторая строка ответа.';
 const EDIT = [
@@ -409,8 +380,7 @@ check(
     .join('; '),
 );
 
-model.closeAllConnections?.();
-model.close();
+await model.close();
 try {
   rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 } catch (error) {

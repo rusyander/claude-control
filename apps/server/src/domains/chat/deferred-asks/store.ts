@@ -6,7 +6,7 @@ import {
   type DeferredScope,
 } from '@agentdeck/contracts/deferred-asks';
 import { writeJsonFile } from '../../../lib/safe-io/safe-io.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { callHash } from './hash.ts';
 import type {
   DeferredAskFile,

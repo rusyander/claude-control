@@ -15,7 +15,7 @@
  * вставкой прямо перед ядром (`script.ts`).
  */
 
-import { DLP_BUILTINS } from '../dlp/builtins.mjs';
+import { DLP_BUILTINS } from '@agentdeck/dlp/builtins';
 
 const ENDINGS =
   '(?:ами|ями|ыми|ими|ого|его|ему|ому|ов|ев|ей|ой|ом|ем|ым|им|их|ах|ях|ам|ям|ую|ью|а|у|е|ы|и|я|ю|о)?';

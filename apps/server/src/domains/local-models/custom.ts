@@ -39,7 +39,7 @@ const PREFERRED_QUANTS = [
 ];
 
 /** Какое квантование качается по умолчанию: ходовое Q4, иначе самое крупное из умещающихся в 20 ГБ, иначе меньшее. */
-export function defaultQuantOf(quants: ModelQuant[]): ModelQuant | undefined {
+function defaultQuantOf(quants: ModelQuant[]): ModelQuant | undefined {
   for (const id of PREFERRED_QUANTS) {
     const found = quants.find((quant) => quant.id === id);
     if (found) return found;
@@ -93,7 +93,7 @@ async function paramsOf(repo: string, fetchImpl: FetchLike): Promise<number | un
 const round1 = (value: number): number => Math.round(value * 10) / 10;
 
 /** Устройство для подсчёта кеша: слои с кешем, головы, длина головы; не прочиталось — `undefined`. */
-export function archOf(facts: GgufFacts):
+function archOf(facts: GgufFacts):
   | {
       layers: number;
       kvLayers: number;

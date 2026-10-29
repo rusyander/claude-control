@@ -298,7 +298,7 @@ const SLOW_PERMISSION_MS = 10_000;
  * Ссылка — своя ветка группы на удалённом (`origin/<своя>`, `refs/remotes/<удалённый>/<своя>`),
  * а своя ветка — не основная. Своя — по git (`ownBranch`) или по записи разделения (`branch`).
  */
-export function isOwnUpstream(ref: string, group: GroupAutoApprove): boolean {
+function isOwnUpstream(ref: string, group: GroupAutoApprove): boolean {
   const name = /^(?:refs\/remotes\/)?[^/\s]+\/(.+)$/.exec(ref)?.[1];
   if (!name) return false;
   return [group.ownBranch, group.branch].includes(name) && !isProtectedBranch(name, group.base);
@@ -1131,8 +1131,9 @@ export function registerChatRunRoutes(
         }
         // Автономный чат: тот же отказ с выбором, что пишет хук `autonomous-pick`
         // там, где брокера нет, — лента узнаёт его по метке. Без рекомендации или с
-        // рекомендацией «для человека» — вопрос человеку (`recommendedPicks`).
-        const picks = registry.isAutonomous(runId) ? recommendedPicks(input) : null;
+        // рекомендацией «для человека» — вопрос человеку (`recommendedPicks`). Группа,
+        // чьи развилки решает человек (`groupQuestions: 'human'`), — тоже ему.
+        const picks = registry.picksQuestions(runId) ? recommendedPicks(input) : null;
         const message = picks ? autonomousPickMessage(picks) : QUESTION_DENIED;
         return reply.send({ behavior: 'deny', message });
       }

@@ -7,7 +7,7 @@ import type {
 } from '@agentdeck/contracts';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { PanelActionPreviewField } from '@agentdeck/contracts/panel-agent';
 import { encode, readRoute, routeError } from './action-kit/action-kit.ts';
 import type { InjectRoute, StreamHead } from './registry.ts';

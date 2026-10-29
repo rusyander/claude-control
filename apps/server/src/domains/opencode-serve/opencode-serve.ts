@@ -53,7 +53,7 @@ import { toolDenyRules } from './tool-deny.ts';
  */
 
 /** Ответ сессионного раннера: текст плюс id сессии, которую держит CLI. */
-export interface OpencodeSessionReply {
+interface OpencodeSessionReply {
   reply: string;
   sessionId: string;
 }
@@ -63,7 +63,7 @@ export interface OpencodeSessionReply {
  * оборвался, когда его куски уже ушли наружу. К one-shot отсюда не возвращаются:
  * он повторил бы ход (и показал бы его второй раз поверх уже напечатанного).
  */
-export interface OpencodeSessionFailure {
+interface OpencodeSessionFailure {
   error: string;
   sessionId: string;
 }
@@ -193,7 +193,7 @@ export interface OpencodePermissionRule {
  * Что держит переключатель: `edit` (у OpenCode это и `write`, и `patch`) и
  * `bash`. Те же два, что у прочих CLI с переключателем: правка файла и команда.
  */
-export const GATED_PERMISSIONS = ['edit', 'bash'] as const;
+const GATED_PERMISSIONS = ['edit', 'bash'] as const;
 
 const ACTIONS: readonly string[] = ['allow', 'ask', 'deny'];
 

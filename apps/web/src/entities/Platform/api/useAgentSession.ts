@@ -4,10 +4,7 @@ import { path } from '../lib/path';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getAgentSession(
-  id: string,
-  sessionId: string,
-): Promise<PlatformAgentSession> {
+async function getAgentSession(id: string, sessionId: string): Promise<PlatformAgentSession> {
   const { data } = await apiClient.get<PlatformAgentSession>(
     path(id, `/agents/sessions/${encodeURIComponent(sessionId)}`),
   );

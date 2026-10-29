@@ -3,7 +3,7 @@ import type { SplitGroupStatusView } from '@agentdeck/contracts/chat-handoff';
 import type { GroupStep } from './groupStep';
 
 /** Состояние группы на индикаторе: работает / ждёт очередь / ждёт разрешения / стоит / закончила. */
-export type GroupProgressState = 'working' | 'queued' | 'permission' | 'stalled' | 'finished';
+type GroupProgressState = 'working' | 'queued' | 'permission' | 'stalled' | 'finished';
 
 export interface GroupProgressInput {
   progress: ChatProgress | undefined;

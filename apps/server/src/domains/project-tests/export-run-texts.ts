@@ -17,6 +17,8 @@ export interface RunTexts {
   status: Record<string, string>;
   mode: Record<string, string>;
   panelAutotests: string;
+  /** Прогон, исполненный ядром задач (`origin:'core'`): не панель и не CI. */
+  coreChecks: string;
   actor: Record<string, string>;
   /** Незавершённый прогон — словом в шапке: без него прерванный читался завершённым. */
   state: Record<string, string>;
@@ -78,6 +80,7 @@ export const RUN_TEXTS: Record<ExportLanguage, RunTexts> = {
       import: 'импорт из CI',
     },
     panelAutotests: 'автотесты панели',
+    coreChecks: 'проверки ядра задач',
     actor: { agent: 'агент', human: 'человек', ci: 'CI' },
     state: { running: 'ещё идёт', stopped: 'прерван', error: 'сорвался' },
     finishedState: 'завершён',
@@ -140,6 +143,7 @@ export const RUN_TEXTS: Record<ExportLanguage, RunTexts> = {
       import: 'import from CI',
     },
     panelAutotests: 'panel autotests',
+    coreChecks: 'task core checks',
     actor: { agent: 'agent', human: 'person', ci: 'CI' },
     state: { running: 'still running', stopped: 'stopped', error: 'broke down' },
     finishedState: 'finished',

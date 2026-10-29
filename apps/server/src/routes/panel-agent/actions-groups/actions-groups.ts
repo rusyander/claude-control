@@ -25,7 +25,7 @@ import {
   routeFingerprint,
   stateCard,
 } from '../action-kit/action-kit.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { findGroup, groupDraft, groupInput } from '../actions-app/actions-app.ts';
 import { MAX_SCENARIO_STEPS, draftScenario } from '../actions-scenario.ts';
 import { GROUP_COPY_ACTIONS } from '../actions-group-copy.ts';

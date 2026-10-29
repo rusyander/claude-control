@@ -4,7 +4,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function postApply(
+async function postApply(
   pair: TransferPair & { fingerprint: string },
 ): Promise<TransferApplyAnswer> {
   const { data } = await apiClient.post<TransferApplyAnswer>('/portability/apply', pair);

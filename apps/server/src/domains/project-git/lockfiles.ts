@@ -34,7 +34,7 @@ export const LOCKFILES = [
  * 23.10, D5: две группы получили «не закоммичено: go.mod» в каталогах, которых
  * их задача не касалась, — правку сделала подготовка панели, не агент).
  */
-export const PREP_MANIFESTS = ['go.mod', 'go.sum', 'uv.lock'] as const;
+const PREP_MANIFESTS = ['go.mod', 'go.sum', 'uv.lock'] as const;
 
 const LOCKFILE_PATHSPECS = [...LOCKFILES, ...PREP_MANIFESTS].flatMap((name) => [
   name,
@@ -145,7 +145,7 @@ export async function snapshotPrepTree(dir: string): Promise<boolean> {
  * до подготовки (`before`) — работа агента, в запись не идёт.
  * Пустое дерево — запись пустая: прежняя от прошлой подготовки не живёт.
  */
-export async function recordPrepLeftovers(
+async function recordPrepLeftovers(
   dir: string,
   before: ReadonlySet<string> = new Set(),
 ): Promise<string[]> {

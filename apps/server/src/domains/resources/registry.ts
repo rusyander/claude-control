@@ -40,7 +40,7 @@ export interface ResourceLayout {
   ignoreDirs?: string[];
 }
 
-export const RESOURCE_LAYOUTS: Record<ResourceKind, ResourceLayout> = {
+const RESOURCE_LAYOUTS: Record<ResourceKind, ResourceLayout> = {
   skill: {
     kind: 'skill',
     rootFor: (location, id) => resourceRoot(location.paths.skills, id),

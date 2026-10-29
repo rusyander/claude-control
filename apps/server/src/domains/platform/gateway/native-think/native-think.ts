@@ -1,4 +1,4 @@
-import { parseFrame, serializeFrame, splitFrames } from '../../../dlp/sse.ts';
+import { parseFrame, serializeFrame, splitFrames } from '@agentdeck/dlp/sse';
 import { ThinkSplitter, type ThinkMode } from '../think-tail/think-tail.ts';
 
 /**

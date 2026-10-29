@@ -1,6 +1,6 @@
 import type { SectionKind, RuleSection } from './ruleSections.types';
 
-export const SECTION_HEADING: Record<Exclude<SectionKind, 'custom'>, string> = {
+const SECTION_HEADING: Record<Exclude<SectionKind, 'custom'>, string> = {
   allow: 'Что можно',
   deny: 'Что нельзя',
   caution: 'С осторожностью',

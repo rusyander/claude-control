@@ -34,7 +34,7 @@ const SWITCH_PATHS_SHOWN = 5;
  * Отказ смены ветки с тем, что держит дерево грязным (g9 26.10, F12): общий текст без
  * файлов звено доставки повторило тем же вызовом через шесть секунд — второй отказ.
  */
-export function switchRefusal(status: string): string {
+function switchRefusal(status: string): string {
   const paths = parseDirtyPaths(status);
   if (paths.length === 0) return SWITCH_REFUSAL;
   const shown = paths.slice(0, SWITCH_PATHS_SHOWN).join(', ');
@@ -48,7 +48,7 @@ export function switchRefusal(status: string): string {
 // Неслитый индекс снимок держит (`git-snapshot.ts`, журнал 24.10 D31/D32):
 // разрешение конфликта затиранием (`checkout --ours`, `restore`) идёт само.
 // Сюда доходит лишь отказ самого git (копия не читается, нет места).
-export const SNAPSHOT_REFUSAL =
+const SNAPSHOT_REFUSAL =
   'This command would discard uncommitted changes, and the panel could not save them first ' +
   '(snapshot under refs/agentdeck/backup/ failed), so it is refused. Commit the current edits ' +
   '(a wip commit is fine), then repeat; after the commit the old state is in the history and ' +
@@ -100,7 +100,7 @@ export interface TreeIo {
  * (`status.showUntrackedFiles=no` прятал их, и `clean -fd` сносил их без
  * снимка — ревью 23.10, A-10); подмодули — без `ignore` из настроек.
  */
-export const GUARD_STATUS_ARGS = [
+const GUARD_STATUS_ARGS = [
   '--no-optional-locks',
   'status',
   '--porcelain',
@@ -149,7 +149,7 @@ const realTreeIo: TreeIo = {
  */
 const REWRITES_IGNORES = /\.gitignore|info[\\/]+exclude|excludesfile/i;
 
-export function rewritesIgnores(command: string): boolean {
+function rewritesIgnores(command: string): boolean {
   return /\bclean\b/.test(command) && REWRITES_IGNORES.test(command);
 }
 

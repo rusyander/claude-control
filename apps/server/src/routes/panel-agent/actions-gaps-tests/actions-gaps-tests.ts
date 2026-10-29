@@ -13,7 +13,7 @@ import {
   type AnyPanelAction,
   type InjectRoute,
 } from '../registry.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { maskResult } from '../result-net/result-net.ts';
 import { dataField, summaryText, textField } from '../texts/texts.ts';
 import { testsPage, testsQuery } from '../tests-page.ts';

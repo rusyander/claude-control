@@ -23,7 +23,8 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
     // Всё временное — в один каталог прогона, который уходит целиком (`vitest.temp-sandbox.ts`).
-    globalSetup: ['./vitest.temp-sandbox.ts'],
+    // Первым — отказ прогона посреди чужого mustfail в этой рабочей копии (tools/mutation-guard.mjs).
+    globalSetup: ['../../tools/mutation-guard.mjs', './vitest.temp-sandbox.ts'],
     // Пятисекундный срок по умолчанию рассчитан на чистую логику, а десятки
     // тестов здесь поднимают настоящий репозиторий: `git init`, коммиты,
     // копии. В одиночку набор укладывается, но `pnpm test` гонит веб и сервер

@@ -1,0 +1,28 @@
+{
+  "name": "@agentdeck/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ядро исполнения задач: журнал, сценарий, сессии CLI, проверки, публикация",
+  "main": "./src/index.ts",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@agentdeck/contracts": "workspace:*",
+    "@agentdeck/dlp": "workspace:*",
+    "@agentdeck/providers": "workspace:*",
+    "@agentdeck/stub-model": "workspace:*",
+    "fastify": "^5.10.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

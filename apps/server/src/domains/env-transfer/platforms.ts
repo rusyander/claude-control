@@ -79,7 +79,7 @@ export function panelPlatformsChecklist(platforms: Platform[]): ChecklistItem[] 
  * единственная причина, по которой разбор секции вообще заглядывает в
  * хранилище ключей — значение ключа отсюда не выходит.
  */
-export interface PlatformImportPlanEntry {
+interface PlatformImportPlanEntry {
   id: string;
   title: string;
   driver: string;

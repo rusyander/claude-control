@@ -3,7 +3,7 @@ import { DEFAULT_INTEGRATIONS, linkRows, type LinkSites } from '@entities/Integr
 import { cleanLink } from './cleanLink';
 
 /** Без сайтов: строки привязки от адресов не зависят, только их ссылки. */
-export const NO_SITES: LinkSites = {
+const NO_SITES: LinkSites = {
   jira: DEFAULT_INTEGRATIONS.jira,
   confluence: DEFAULT_INTEGRATIONS.confluence,
 };

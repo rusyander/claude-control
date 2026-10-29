@@ -120,7 +120,7 @@ function escapeForRegExp(value: string): string {
 }
 
 /** Как тело скилла попадает к цели. */
-export type SkillBodyChannel = 'instructions' | 'file';
+type SkillBodyChannel = 'instructions' | 'file';
 
 export interface SkillBodyDelivery {
   readonly channel: SkillBodyChannel;

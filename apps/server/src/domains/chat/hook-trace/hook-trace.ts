@@ -1,5 +1,5 @@
 import type { ChatMessage, HookTrace } from '@agentdeck/contracts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 
 /**
  * Хуки хода — для «следа хода» под ответом.

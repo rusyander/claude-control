@@ -56,7 +56,7 @@ export interface AutoApproveState {
  * прогон давно кончился, — дети разделения заводятся тогда, когда человек
  * прочитал карточку, и между этим панель успевает перезапуститься.
  */
-export const TOGGLES_FILE = 'chat-toggles.json';
+const TOGGLES_FILE = 'chat-toggles.json';
 
 /**
  * Авторежим, выбранный человеком в чате, — отдельным файлом от тумблеров
@@ -64,7 +64,7 @@ export const TOGGLES_FILE = 'chat-toggles.json';
  * без авторежима» остановку переживать обязан: иначе после «Стоп» чат молча
  * вернулся бы к глобальной настройке.
  */
-export const AUTO_MODE_FILE = 'chat-auto-mode.json';
+const AUTO_MODE_FILE = 'chat-auto-mode.json';
 
 /** Сколько чатов помнят свой выбор авторежима: это настройка, а не след прогона. */
 const MAX_OVERRIDES = 1000;

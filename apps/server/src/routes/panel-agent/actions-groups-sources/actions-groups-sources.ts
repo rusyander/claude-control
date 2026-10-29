@@ -14,7 +14,7 @@ import {
 } from '@agentdeck/contracts/group-sources';
 import { groupsForCwd } from '../../../domains/group-activation/group-activation.ts';
 import { unifiedDiff } from '../../../domains/config-preview/unified-diff.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { definePanelAction, fingerprintOf, type AnyPanelAction } from '../registry.ts';
 import {
   card,

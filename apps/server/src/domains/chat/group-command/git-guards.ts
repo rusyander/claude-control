@@ -118,7 +118,7 @@ export function disablesHooks(text: string, platform: string = process.platform)
 }
 
 /** `git config --get x`, `git config --list`, `git config get x` — чтение настроек. */
-export function configReads(args: Word[]): boolean {
+function configReads(args: Word[]): boolean {
   if (args.some((arg) => arg.dynamic)) return false;
   const texts = args.map((arg) => arg.text);
   const reads =
@@ -291,7 +291,7 @@ export function longFlag(text: string, name: string, shortest: number): boolean 
 }
 
 /** Флаг удаления: короткий с буквой (`-d`, `-D`, `-df`, `-rd`) или `--delete` с сокращениями. */
-export function deleteFlag(text: string, letters: RegExp): boolean {
+function deleteFlag(text: string, letters: RegExp): boolean {
   return longFlag(text, 'delete', 1) || (/^-[a-zA-Z]+$/.test(text) && letters.test(text));
 }
 

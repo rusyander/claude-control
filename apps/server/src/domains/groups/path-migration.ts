@@ -55,7 +55,7 @@ function skillDirOf(skillsDir: string, id: string): string | undefined {
  * скрипт триггера), а тело совпадает со сборкой сценария. Любое отличие — это
  * чья-то правка, и удалять её панель не вправе.
  */
-export function isUntouchedScenarioSkill(dir: string, group: Group): boolean {
+function isUntouchedScenarioSkill(dir: string, group: Group): boolean {
   if (!group.scenario) return false;
   const files = readdirSync(dir);
   if (files.some((name) => name !== 'SKILL.md' && name !== 'trigger.mjs')) return false;

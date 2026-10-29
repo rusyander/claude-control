@@ -9,7 +9,7 @@ export interface TurnFrame {
 type Listener = (frame: TurnFrame | 'end') => void;
 
 /** Сколько кадров хода держать для догоняющего клиента. */
-export const TURN_FEED_LIMIT = 5000;
+const TURN_FEED_LIMIT = 5000;
 
 /**
  * Кадры одного хода агента панели — для клиента, который отцепился и вернулся.

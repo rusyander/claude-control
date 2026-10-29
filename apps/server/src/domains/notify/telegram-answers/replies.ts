@@ -1,4 +1,4 @@
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { telegramApiBase } from '../telegram-api.ts';
 import { callBot } from './bot-api.ts';
 import { escapeHtml } from './html.ts';

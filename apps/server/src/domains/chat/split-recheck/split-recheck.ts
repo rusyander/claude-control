@@ -325,10 +325,13 @@ export function recheckPrompt(input: {
       'test / pytest / vitest of the same zone before it; cite its run id in the sieve rows — a ' +
       'test gate of the project records nothing in the Tests block, and the delivery check reads ' +
       'only that block; a green on an unchanged tree is replayed, not re-run.',
-    '2. Reviewer comments. Re-read ALL MR discussions in full. For each unresolved one waiting ' +
-      'for an answer — fix it in the branch and reply in the same thread with what was done, or ' +
-      'reply why you do not change it. The reviewer resolves the thread, not you. Write the ' +
-      'replies in the language of the discussion.',
+    // Живой прогон 27.10: все три перепроверки дали `mr_discussions` jmespath без `items` — отказ
+    // mcp-shape-guard: правило о форме приходит с первым вызовом, а вызовы шли параллельно.
+    '2. Reviewer comments. Re-read ALL MR discussions in full (a GitLab MCP `mr_discussions` ' +
+      'answers `{items: […], pagination}` — a jmespath starts at `items`). For each unresolved ' +
+      'one waiting for an answer — fix it in the branch and reply in the same thread with what ' +
+      'was done, or reply why you do not change it. The reviewer resolves the thread, not you. ' +
+      'Write the replies in the language of the discussion.',
   );
   if (review && review.threads.length > 0) {
     lines.push(
@@ -388,10 +391,14 @@ export interface MrRecheckDeps {
   jobLog?: (mrUrl: string, jobId: string) => Promise<string | undefined>;
   /** Отметка и слово группе (`SplitConveyor.recheckDelivered`); отказ — исключением. */
   recheck: (parentChatId: string, index: number, prompt: string) => SplitGroupRechecked;
-  /** Охват по копии группы (`readRecheckScope`); не задан или не прочитан — правила без списка. */
+  /**
+   * Охват по копии группы (`readRecheckScope`); не задан или не прочитан — правила без списка.
+   * `target` — ветка, в которую MR сольют, как её назвал фордж; не прочитан — `undefined`.
+   */
   scope?: (
     record: SplitPlanRecord,
     group: SplitPlanGroupRecord,
+    target?: string,
   ) => Promise<RecheckScope | undefined>;
   /**
    * Перечитать задачи трекера группы в её копию (`recheckTickets`); не задано или не
@@ -462,7 +469,7 @@ export async function recheckDeliveredMr(
   if (deps.scope) {
     const read = target(deps, parentChatId, index);
     try {
-      scope = await deps.scope(read.record, read.group);
+      scope = await deps.scope(read.record, read.group, review?.targetBranch);
     } catch (error) {
       // Охват не прочитан — правила охвата едут без списка: перепроверка не ждёт git.
       deps.log('mr recheck: scope unreadable', error);

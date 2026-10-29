@@ -31,7 +31,7 @@ import {
  * (ключ шифра — имя машины и пользователя, не путь, так что копия читается),
  * активная учётка в `google_accounts.json`. Папка хода удаляется в конце хода.
  */
-export const GEMINI_AUTH_FILES: readonly string[] = [
+const GEMINI_AUTH_FILES: readonly string[] = [
   '.env',
   'oauth_creds.json',
   'google_accounts.json',
@@ -45,7 +45,7 @@ export const GEMINI_AUTH_FILES: readonly string[] = [
  * (`tools.exclude` — устаревший запрещающий список). `toolName` обязателен и у
  * правила с `mcpName`: без него файл правил отклоняется целиком.
  */
-export const GEMINI_AGENT_POLICY = [
+const GEMINI_AGENT_POLICY = [
   '[[rule]]',
   'toolName = "*"',
   'decision = "deny"',
@@ -60,7 +60,7 @@ export const GEMINI_AGENT_POLICY = [
 ].join('\n');
 
 /** Каталог `.gemini` человека: `GEMINI_CLI_HOME`, иначе домашний. */
-export function userGeminiDir(env: NodeJS.ProcessEnv = process.env): string {
+function userGeminiDir(env: NodeJS.ProcessEnv = process.env): string {
   const raw = env.GEMINI_CLI_HOME?.trim();
   return join(raw ? resolve(raw) : homedir(), '.gemini');
 }
@@ -90,7 +90,7 @@ function userAuthAndModel(userDir: string): Record<string, unknown> {
 }
 
 /** Настройки дома хода: переходник без вопроса CLI, ни скиллов, ни хуков. */
-export function geminiAgentSettings(
+function geminiAgentSettings(
   bridge: BridgeLaunch,
   user: Record<string, unknown>,
 ): Record<string, unknown> {

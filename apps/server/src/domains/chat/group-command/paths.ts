@@ -190,10 +190,6 @@ export function isTempPattern(pattern: string): boolean {
  */
 const SCRATCHPAD = /\/(temp|tmp)\/claude\/[^/]+\/[0-9a-f-]{36}\/scratchpad(\/|$)/i;
 
-export function isScratchpad(path: string): boolean {
-  return SCRATCHPAD.test(path);
-}
-
 /** Корень рабочей папки CLI, под которой лежит путь. */
 export function scratchpadRoot(path: string): string | undefined {
   const match = SCRATCHPAD.exec(path);

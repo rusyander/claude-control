@@ -219,7 +219,7 @@ export interface HandoffPlannerDeps {
 }
 
 /** Откуда планировщик берёт свои шаги пути. */
-export interface PathStepDeps {
+interface PathStepDeps {
   /** Шаги группы этого разговора, привязанные к стадии, в порядке пути; группы нет — пусто. */
   /** `cwd` — каталог прогона: по нему закрепление сверяется с парой проекта (F-107). */
   stepsAt: (aliases: string[], stage: CascadeStage, cwd: string) => PathStep[];
@@ -277,7 +277,7 @@ export interface SplitStageDeps {
 }
 
 /** Что планировщику нужно снаружи, чтобы завести звено конвейера. */
-export interface CascadeStageDeps {
+interface CascadeStageDeps {
   /** Связь закончившегося чата — по любому из его ключей. */
   linkOf: (aliases: string[]) => ChatLink | undefined;
   /** Записать связь нового звена. Строго ДО запуска (см. `SplitLink`). */

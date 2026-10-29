@@ -3,27 +3,30 @@
  * которым панель резолвит раннер ассистента (`api` / `cli` / `none`).
  */
 import type { ProviderEditsControl } from '@agentdeck/contracts';
+import type {
+  CliBinary,
+  EndpointApiKind,
+  RunEndpointInput as PackageRunEndpointInput,
+  VendorApiKind,
+} from '@agentdeck/providers/types';
 
-/** Имена исполняемого файла CLI: обычное и windows-обёртка (`.cmd`). */
-export interface ProviderCli {
-  command: string;
-  windowsCommand: string;
-}
+/** Имена исполняемого файла CLI: обычное и windows-обёртка (`.cmd`); факт — пакет `providers`. */
+export type ProviderCli = CliBinary;
 
 /**
  * Тип модельного API провайдера — какой ключ и какого рода ему нужен, чтобы
  * ассистент панели ходил в модель напрямую (режим `api`). `none` — у провайдера
  * нет собственного модельного API (Cursor): прямой вызов невозможен.
  */
-export type AssistantApiKind = 'anthropic' | 'openai' | 'google' | 'openai-compat' | 'none';
+export type AssistantApiKind = VendorApiKind;
 
 /**
  * Вид API СВОЕГО эндпоинта. Уже, чем `AssistantApiKind`: для чужого адреса
  * `openai` и `openai-compat` — одно и то же, а `none` эндпоинтом не бывает.
- * Значение то же, что в контракте (`packages/contracts/src/endpoints.ts`);
- * вторая копия здесь потому, что contracts входит в сервер только типом.
+ * Значение то же, что в контракте (`packages/contracts/src/endpoints.ts`); здесь — из
+ * пакета фактов запуска, где вид выводится из диалекта канала.
  */
-export type ProviderEndpointApiKind = 'anthropic' | 'google' | 'openai-compat';
+export type ProviderEndpointApiKind = EndpointApiKind;
 
 /**
  * ЗАДОКУМЕНТИРОВАННЫЕ имена переменных окружения, которыми CLI переводится на
@@ -110,14 +113,7 @@ export interface ProviderEndpointFile {
 }
 
 /** Адрес шлюза, модель и заглушка ключа — то, из чего собирается окружение прогона. */
-export interface RunEndpointInput {
-  /** Адрес шлюза под этот прогон, с `/v1` на конце (диалект `openai-compat`). */
-  baseUrl: string;
-  /** Модель контура; пусто — контур модель не назвал. */
-  model: string;
-  /** Заглушка: настоящий ключ подставляет шлюз. */
-  key: string;
-}
+export type RunEndpointInput = PackageRunEndpointInput;
 
 /**
  * Адрес эндпоинта ОДНОГО прогона, собранный окружением, у которого нет ни

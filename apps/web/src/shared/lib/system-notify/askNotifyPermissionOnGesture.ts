@@ -2,12 +2,12 @@ import { ASKED_KEY } from './systemNotify.constants';
 import { api } from './api';
 
 /** Жесты, на которых браузер разрешает спросить. */
-export const GESTURES = ['pointerdown', 'keydown'] as const;
+const GESTURES = ['pointerdown', 'keydown'] as const;
 
 /** Перехват до страницы: жест, который страница гасит у себя, тоже считается. */
-export const CAPTURE = { capture: true } as const;
+const CAPTURE = { capture: true } as const;
 
-export function wasAsked(): boolean {
+function wasAsked(): boolean {
   try {
     return localStorage.getItem(ASKED_KEY) === '1';
   } catch {
@@ -15,7 +15,7 @@ export function wasAsked(): boolean {
   }
 }
 
-export function rememberAsked(): void {
+function rememberAsked(): void {
   try {
     localStorage.setItem(ASKED_KEY, '1');
   } catch {

@@ -31,7 +31,6 @@
  * иначе из PATH. Нет его — «не проверено» (код 2), не провал.
  * Код выхода: 0 — сходится, 1 — провал, 2 — не проверено.
  */
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -47,6 +46,7 @@ import {
   wait,
 } from './throwaway-stand.mjs';
 import { cliProcesses, reap } from './foreign-cli.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const CANNED = 'KIMI_STUB_CANNED_7c1e\n    code line\n• bullet line';
@@ -67,82 +67,31 @@ function findCliDir() {
 }
 
 /** Заглушка OpenAI `/chat/completions` (поток SSE) с журналом запросов. */
-function startStub() {
+async function startStub() {
   const requests = [];
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) {
-        requests.push({ url: req.url, other: true });
-        res.writeHead(404);
-        res.end('{}');
-        return;
-      }
-      let parsed = {};
-      try {
-        parsed = JSON.parse(body);
-      } catch {
-        // не JSON — пусть будет пустой запрос
-      }
-      const tools = (parsed.tools ?? []).map((tool) => tool.function?.name);
-      const toolResults = (parsed.messages ?? [])
+  const stub = await startStubModel({
+    // Всё, кроме chat/completions, — 404 и пометка «прочее» в записи.
+    route: ({ path, query }) => {
+      if (path.endsWith('chat/completions')) return undefined;
+      requests.push({ url: path + query, other: true });
+      return { status: 404, body: {} };
+    },
+    script: ({ request, info }) => {
+      const tools = info.tools.map((tool) => tool.name);
+      const toolResults = (request.body.messages ?? [])
         .filter((message) => message.role === 'tool')
         .map((message) =>
           typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
         );
       // Без результата инструмента — зовём Write, даже если его не показали.
       const call = toolResults.length === 0;
-      requests.push({ tools, call, toolResults, model: parsed.model });
-
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const send = (delta, finish = null) =>
-        res.write(
-          `data: ${JSON.stringify({
-            id: 'stub',
-            object: 'chat.completion.chunk',
-            created: 1,
-            model: 'stub-model',
-            choices: [{ index: 0, delta, finish_reason: finish }],
-          })}\n\n`,
-        );
-      if (call) {
-        send({
-          role: 'assistant',
-          tool_calls: [
-            {
-              index: 0,
-              id: `call_${requests.length}`,
-              type: 'function',
-              function: {
-                name: 'Write',
-                arguments: JSON.stringify({ path: PROBE, content: WRITTEN }),
-              },
-            },
-          ],
-        });
-        send({}, 'tool_calls');
-      } else {
-        send({ role: 'assistant', content: CANNED });
-        send({}, 'stop');
-      }
-      res.write('data: [DONE]\n\n');
-      res.end();
-    });
+      requests.push({ tools, call, toolResults, model: info.model });
+      if (!call) return CANNED;
+      const args = { path: PROBE, content: WRITTEN };
+      return { tool: { name: 'Write', args, id: `call_${requests.length}` } };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        requests,
-        close: () =>
-          new Promise((closed) => {
-            server.closeAllConnections();
-            server.close(() => closed());
-          }),
-      }),
-    ),
-  );
+  return { port: stub.port, requests, close: () => stub.close() };
 }
 
 const configText = (port, mode) =>
@@ -318,16 +267,13 @@ async function stand(label, options, scenario) {
 async function checkVendorApi() {
   const sentinel = `qa-kimi-key-${Math.random().toString(36).slice(2, 8)}`;
   const trapHits = [];
-  const trap = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      trapHits.push({ path: req.url, headers: req.headers, body: raw });
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ choices: [{ message: { content: 'TRAP_REPLY' } }] }));
-    });
+  const trap = await startStubModel({
+    // Ловушка: любой запрос сюда — улика; записан с сырыми заголовками и телом.
+    route: ({ path, query, headers, raw }) => {
+      trapHits.push({ path: path + query, headers, body: raw });
+      return { body: { choices: [{ message: { content: 'TRAP_REPLY' } }] } };
+    },
   });
-  await new Promise((done) => trap.listen(0, '127.0.0.1', done));
   const work = mkdtempSync(join(tmpdir(), 'cc-kimi-d1-'));
   const offBoxLog = join(work, 'off-box.jsonl');
   const preload = join(work, 'fetch-trap.mjs');
@@ -356,7 +302,7 @@ globalThis.fetch = async (input, init = {}) => {
       settings: { provider: 'kimi' },
       env: {
         KIMI_API_KEY: sentinel,
-        OPENAI_BASE_URL: `http://127.0.0.1:${trap.address().port}/v1`,
+        OPENAI_BASE_URL: `${trap.baseUrl}/v1`,
         NODE_OPTIONS: `--import=${pathToFileURL(preload).href}`,
       },
     });
@@ -402,7 +348,7 @@ globalThis.fetch = async (input, init = {}) => {
     } else throw error;
   } finally {
     if (panel) await panel.stop();
-    await new Promise((done) => trap.close(() => done()));
+    await trap.close();
     rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   }
 }

@@ -4,7 +4,11 @@ import {
   type GroupEconomySupport,
 } from '@agentdeck/contracts/group-economy-support';
 import { detectClaudeLocation } from '../lib/claude-paths/claude-paths.ts';
+import { assistantApiOf, endpointConfigOf, modelsOf, runFactsOf } from './catalog/run-facts.ts';
 import { uniformCapabilities, type ConfigProvider } from './types/types.ts';
+
+/** Факты запуска Claude Code — из пакета `@agentdeck/providers`, здесь не объявляются. */
+const facts = runFactsOf('claude');
 
 /**
  * Адаптер Claude Code — провайдер #1. Поведение панели не меняется: пути
@@ -13,11 +17,11 @@ import { uniformCapabilities, type ConfigProvider } from './types/types.ts';
  * `ready`: у Claude каждый раздел панели реально работает.
  */
 export const claudeProvider: ConfigProvider = {
-  id: 'claude',
-  name: 'Claude Code',
-  status: 'verified',
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
   paths: (override) => detectClaudeLocation(override).paths,
-  cli: { command: 'claude', windowsCommand: 'claude.cmd' },
+  cli: facts.binary,
   capabilities: uniformCapabilities('ready'),
   // Рычаги экономии групп придуманы на Claude и все доходят его собственными
   // ключами (`group-profile.ts`): канала диспетчера ему не нужно.
@@ -52,7 +56,7 @@ export const claudeProvider: ConfigProvider = {
   // Ассистент Claude: API — Anthropic (ключ ANTHROPIC_API_KEY), но у него есть
   // рабочий CLI-путь (`claude`), поэтому при отсутствии ключа, но найденном CLI
   // раннер = `cli` — текущее поведение чата сохраняется (регресс-ноль).
-  assistant: { apiKind: 'anthropic', apiKeyEnvVars: ['ANTHROPIC_API_KEY'], cliRunnable: true },
+  assistant: assistantApiOf(facts),
   // Свой эндпоинт (шлюз организации, прокси, локальная модель): задокументирован
   // `ANTHROPIC_BASE_URL` — «the variable that points Claude Code at the gateway»,
   // — плюс `ANTHROPIC_MODEL` для выбора модели. Токен документация предлагает
@@ -61,15 +65,9 @@ export const claudeProvider: ConfigProvider = {
   // `ANTHROPIC_API_KEY` (заголовок `x-api-key`) требует ещё и одобрения в
   // интерактивной сессии. Всё это пишется в блок `env` файла settings.json —
   // ровно туда, куда указывает документация шлюзов.
-  endpointConfig: {
-    anthropic: {
-      baseUrlEnv: 'ANTHROPIC_BASE_URL',
-      modelEnv: 'ANTHROPIC_MODEL',
-      credentialEnv: 'ANTHROPIC_AUTH_TOKEN',
-    },
-  },
+  endpointConfig: endpointConfigOf(facts),
   // Модели: каталог Anthropic (models.dev). Алиасы (`opus`, `sonnet`, `haiku`)
   // CLI разворачивает сам, поэтому каталог нужен ровно для двух вещей — видеть
   // вышедшие модели и заметить смену поколения у пришпиленного дефолта.
-  modelVendors: ['anthropic'],
+  ...modelsOf(facts),
 };

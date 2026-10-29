@@ -2,7 +2,7 @@ import type { ProjectTestStep, ProjectTestCaseInput } from '@agentdeck/contracts
 import type { CaseDraft } from '../model/useCaseDraft.types';
 
 /** Пустой шаг выбрасывается: пустая строка в файле — это мусор, а не шаг. */
-export function trimStep(step: ProjectTestStep): ProjectTestStep | undefined {
+function trimStep(step: ProjectTestStep): ProjectTestStep | undefined {
   const action = step.action.trim();
   const ref = step.ref?.trim();
   if (!action && !ref) return undefined;

@@ -160,13 +160,29 @@ export function restartByGroup(
 /**
  * R39 — перезапусков за последний час не меньше `restartStorm`: каждый стопорит все живые
  * прогоны, ищи, что пишет в обслуживаемое дерево. Держится, пока за час их столько.
+ *
+ * `from` — с какого момента группа идёт (старт, нажатая перепроверка): перезапуск до него
+ * её ничем не задел. Живой прогон 27.10: семь перезапусков от правок, пока ни одна группа
+ * не шла, всплыли бурей у трёх перепроверок, нажатых позже.
+ *
+ * `paused` — отрезки пауз группы `[from, to)`: перезапуск на паузе тоже её не задел, а в
+ * миг «Продолжить» — задел. Живой прогон 27.10 18:27: три перезапуска от правок сторожа,
+ * пока группы стояли на паузе, всплыли бурей сразу после продолжения.
  */
 export function restartStorm(
   feed: RestartFeed | undefined,
   settings: GroupWatch,
   now: number,
+  from = 0,
+  paused: readonly { from: number; to: number }[] = [],
 ): RuleHit | undefined {
-  const hour = (feed?.done ?? []).filter((one) => one.at <= now && now - one.at < HOUR_MS);
+  const hour = (feed?.done ?? []).filter(
+    (one) =>
+      one.at <= now &&
+      now - one.at < HOUR_MS &&
+      one.at >= from &&
+      !paused.some((span) => one.at >= span.from && one.at < span.to),
+  );
   if (hour.length < settings.restartStorm) return undefined;
   const sorted = hour.map((one) => one.at).sort((a, b) => a - b);
   return {

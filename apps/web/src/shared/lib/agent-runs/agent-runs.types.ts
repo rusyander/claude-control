@@ -87,13 +87,13 @@ export interface QueuedMessage {
 }
 
 /** Слово «на ходу», чей запрос к серверу ещё не ответил. */
-export interface SteeringMessage {
+interface SteeringMessage {
   id: string;
   text: string;
 }
 
 /** Слово человека, переданное агенту посреди хода: он учтёт его на ближайшем шаге. */
-export interface SteeredMessage {
+interface SteeredMessage {
   text: string;
   at: string;
 }

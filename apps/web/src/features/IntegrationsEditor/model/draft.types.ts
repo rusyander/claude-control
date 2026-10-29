@@ -14,7 +14,7 @@ export type IntegrationDraft = Record<string, string>;
  */
 
 /** `minutes` — целое число минут 0…1440 строкой формы, на сервер уходит числом. */
-export type IntegrationFieldKind = 'text' | 'select' | 'minutes';
+type IntegrationFieldKind = 'text' | 'select' | 'minutes';
 
 export interface IntegrationField {
   /** Ключ в настройках коннектора и часть ключа словаря подписи. */

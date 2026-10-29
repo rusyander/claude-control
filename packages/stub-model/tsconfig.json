@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "noEmit": true,
+    // Код пакета — `.mjs` без сборки (его грузят и vitest ядра, и голый `node tools/qa/*.mjs`);
+    // TypeScript видит его только через `index.d.mts`, а тесты — обычный TS.
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "vitest.config.ts"]
+}

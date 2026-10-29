@@ -15,6 +15,19 @@ const DENIAL_LIMIT = 600;
 /** CLI пишет отказ хука результатом вызова: «PreToolUse:Bash hook error: …». */
 const HOOK_DENIAL = /^[A-Za-z]+:\S+ hook error:\s*([\s\S]*)$/u;
 
+/**
+ * Результат, который CLI дописывает за вызов, оборванный паузой или концом
+ * сессии: «[Tool call interrupted: the session ended before this call's result
+ * was recorded…]». Пишется с `is_error`, но это обрыв, а не ошибка вызова —
+ * иначе каждая пауза группы добавляла бы «ошибок N».
+ */
+const TOOL_INTERRUPTED = /^\[Tool call interrupted\b/u;
+
+/** Вызов оборван паузой или концом сессии — по тексту его результата. */
+export function isInterruptedResult(text: string): boolean {
+  return TOOL_INTERRUPTED.test(text.trimStart());
+}
+
 /** Причина отказа хука по тексту результата; не отказ — `undefined`. */
 export function hookDenialReason(text: string): string | undefined {
   const match = HOOK_DENIAL.exec(text.trim());
@@ -28,6 +41,7 @@ export class AnomalyTally {
   private denials = 0;
   private errors = 0;
   private largeResults = 0;
+  private interrupted = 0;
   private readonly reads = new Map<string, number>();
 
   /** Вызов `Read` файла `path`. */
@@ -35,9 +49,10 @@ export class AnomalyTally {
     this.reads.set(path, (this.reads.get(path) ?? 0) + 1);
   }
 
-  /** Вызов получил результат: отказ хука, ошибка, размер. */
+  /** Вызов получил результат: отказ хука, ошибка, обрыв, размер. */
   result(step: AgentStep): void {
     if (step.denial !== undefined) this.denials += 1;
+    else if (step.interrupted) this.interrupted += 1;
     else if (step.isError) this.errors += 1;
     if ((step.resultChars ?? 0) > LARGE_RESULT_CHARS) this.largeResults += 1;
   }
@@ -52,6 +67,7 @@ export class AnomalyTally {
       errors: this.errors,
       repeatedReads,
       largeResults: this.largeResults,
+      ...(this.interrupted > 0 ? { interrupted: this.interrupted } : {}),
     };
   }
 }
@@ -63,6 +79,7 @@ export function hasAnomalies(anomalies: AgentAnomalies | undefined): anomalies i
     (anomalies.denials > 0 ||
       anomalies.errors > 0 ||
       anomalies.largeResults > 0 ||
+      (anomalies.interrupted ?? 0) > 0 ||
       anomalies.repeatedReads.length > 0),
   );
 }

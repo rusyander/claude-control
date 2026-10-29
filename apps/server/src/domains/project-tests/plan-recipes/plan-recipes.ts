@@ -46,13 +46,13 @@ import { coded } from '../../../lib/server-text/server-text.ts';
 export { DEFAULT_CASE_DURATION };
 
 /** Бюджет «дыма», когда его не задали: полчаса — столько ждут перед выкладкой. */
-export const DEFAULT_SMOKE_BUDGET = 30;
+const DEFAULT_SMOKE_BUDGET = 30;
 
 /**
  * Порог «нестабильных» по умолчанию, доля 0–1. Кейс, меняющий результат чаще
  * чем в каждом пятом переходе, чинят как сломанный тест, а не как найденный баг.
  */
-export const DEFAULT_FLAKY_THRESHOLD = 0.8;
+const DEFAULT_FLAKY_THRESHOLD = 0.8;
 
 /** Данные, которые собрал вызывающий: сам генератор не читает ни диск, ни сеть. */
 export interface PlanRecipeInput extends ProjectTestPlanBuildRequest {

@@ -6,7 +6,7 @@ import type { ComposePort, ComposeService, ComposeServiceState } from '@agentdec
  */
 
 /** Сервис, как он описан в файле (`compose config --format json`). */
-export interface DeclaredService {
+interface DeclaredService {
   name: string;
   image?: string;
   build: boolean;

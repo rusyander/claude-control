@@ -14,11 +14,11 @@ import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../lib/brand.mjs';
 /** Метка триггера сценария группы; за ней — id группы. */
 export const SCENARIO_MARKER = '# agentdeck:scenario';
 /** Та же метка до переименования продукта — такие хуки уже лежат в settings.json у людей. */
-export const LEGACY_SCENARIO_MARKER = `# ${LEGACY_BRAND_SLUG}:scenario`;
+const LEGACY_SCENARIO_MARKER = `# ${LEGACY_BRAND_SLUG}:scenario`;
 
 /** Метка сценария-автоматизации; за ней — id автоматизации. */
-export const AUTOMATION_MARKER = '# agentdeck:automation';
-export const LEGACY_AUTOMATION_MARKER = `# ${LEGACY_BRAND_SLUG}:automation`;
+const AUTOMATION_MARKER = '# agentdeck:automation';
+const LEGACY_AUTOMATION_MARKER = `# ${LEGACY_BRAND_SLUG}:automation`;
 
 /** Команда несёт метку сценария группы — под нынешним или прежним именем. */
 export function hasScenarioMarker(command: string): boolean {

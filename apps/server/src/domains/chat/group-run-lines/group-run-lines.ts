@@ -47,7 +47,7 @@ type GroupStore = Pick<
  * именно на первом ходу скилл спрашивает, сколько агентов заводить, и путь
  * группы нужен с первой строки.
  */
-export function chatGroupChoice(
+function chatGroupChoice(
   store: Omit<GroupStore, 'getGroups'>,
   keys: readonly string[],
   pendingParent?: string,

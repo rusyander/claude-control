@@ -79,7 +79,7 @@ export function supervisorOwnedEvents(
 }
 
 /** Вызов инструмента, как его увидел провод. */
-export interface WireToolCall {
+interface WireToolCall {
   /** Идентификатор вызова — он же связывает решение с вызовом. */
   readonly id: string;
   readonly name: string;

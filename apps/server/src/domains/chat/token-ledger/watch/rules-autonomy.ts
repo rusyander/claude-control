@@ -113,7 +113,7 @@ function shortPath(path: string): string {
 }
 
 /** Пауза гасит процесс CLI не сразу; свой сервер, живой дольше этого, пережил паузу. */
-export const ORPHAN_AFTER_MS = 2 * 60_000;
+const ORPHAN_AFTER_MS = 2 * 60_000;
 
 /**
  * R36: группа на паузе, а порт, который подняла её сессия (`--port N`, `PORT=N`), ещё

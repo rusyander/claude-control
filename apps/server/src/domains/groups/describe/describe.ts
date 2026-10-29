@@ -31,7 +31,7 @@ export interface DescribeSource {
   steps: readonly string[];
 }
 
-export interface DescribedStep {
+interface DescribedStep {
   title: LocalizedLine;
   summary: LocalizedLine;
 }
@@ -127,7 +127,7 @@ export function describeFailureCount(): number {
 }
 
 /** Шаги скилла в запросе описания — поимённо и с числом: модель не вправе потерять хвост. */
-export function describeData(source: DescribeSource): string {
+function describeData(source: DescribeSource): string {
   const head = `${source.kind} ${source.id}:\n${source.text}`;
   if (source.steps.length === 0) return head;
   const list = source.steps.map((title, index) => `${index + 1}. ${title}`).join('\n');
@@ -138,7 +138,7 @@ export function describeData(source: DescribeSource): string {
 }
 
 /** Ответ модели → запись кэша; нечитаемый ответ — ошибка (повтор через окно). */
-export function entryFromReply(source: DescribeSource, reply: string): DescribeEntry {
+function entryFromReply(source: DescribeSource, reply: string): DescribeEntry {
   const parsed = describeAnswerSchema.safeParse(readJsonBlock(reply, DESCRIBE_BLOCK_KIND));
   if (!parsed.success) throw new Error(`describe ${source.key}: unreadable answer`);
   const { title, summary, steps } = parsed.data;

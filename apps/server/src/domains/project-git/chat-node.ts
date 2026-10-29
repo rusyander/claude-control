@@ -45,7 +45,7 @@ export interface ChatNodeDeps {
 const TTL_MS = 60_000;
 const CLI_SUFFIXES = ['', '.cmd', '.exe', '.ps1', '.bat'];
 
-export const realChatNodeDeps: ChatNodeDeps = {
+const realChatNodeDeps: ChatNodeDeps = {
   defaultNode: (env) => {
     try {
       return execFileSync('node', ['-v'], {

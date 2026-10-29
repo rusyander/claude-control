@@ -1,6 +1,6 @@
 import { migrateLegacyStorageKeys } from './migrate';
 
-export function safeStorage(pick: () => Storage): Storage | undefined {
+function safeStorage(pick: () => Storage): Storage | undefined {
   try {
     return pick();
   } catch {

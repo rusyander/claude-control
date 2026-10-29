@@ -18,7 +18,7 @@ const ISSUE_CODES: Readonly<Record<string, ServerMessageCode>> = {
   'последняя реплика должна быть человека': 'panel-agent-last-not-user',
 };
 
-export function issueCode(message: string | undefined): ServerMessageCode | undefined {
+function issueCode(message: string | undefined): ServerMessageCode | undefined {
   return message === undefined ? undefined : ISSUE_CODES[message];
 }
 

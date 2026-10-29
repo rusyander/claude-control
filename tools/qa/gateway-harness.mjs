@@ -73,7 +73,7 @@ export function reporter() {
  * его собственным сообщениям, и вылавливать число из них значило бы завести
  * разборщик чужого вывода там, где хватает файла.
  */
-export async function waitForPort(portFile, tries = 60) {
+async function waitForPort(portFile, tries = 60) {
   for (let attempt = 0; attempt < tries; attempt += 1) {
     if (existsSync(portFile)) {
       const port = Number(readFileSync(portFile, 'utf8').trim());

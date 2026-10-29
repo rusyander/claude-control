@@ -73,7 +73,7 @@ export const FORMAT_CHECK_REGISTRY: readonly ProviderSchemaSpec[] = [
 ];
 
 /** Неделя: схемы меняются с релизами CLI, чаще ходить незачем. */
-export const FORMAT_CHECK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const FORMAT_CHECK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Сеть не должна подвешивать раздел настроек. */
 const FETCH_TIMEOUT_MS = 10_000;
@@ -155,7 +155,7 @@ function resolveRef(root: unknown, ref: string): unknown {
 }
 
 /** Свести схему и список ведомых ключей к итогу по провайдеру. */
-export function checkSchema(spec: ProviderSchemaSpec, schema: unknown): FormatCheckProvider {
+function checkSchema(spec: ProviderSchemaSpec, schema: unknown): FormatCheckProvider {
   const keys = spec.keys.map((key) => ({
     path: key.path,
     section: key.section,

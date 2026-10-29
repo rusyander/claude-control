@@ -23,7 +23,7 @@ import { NO_PRINTS, printsOf, type OpenTrackerIssue, type TicketPrints } from '.
 export type { OpenTrackerIssue } from './prints.ts';
 
 /** Дефекты задачи, которые уходят комментарием в открытую задачу. */
-export interface ExistingMatch {
+interface ExistingMatch {
   issue: OpenTrackerIssue;
   clusters: SplitTicketCluster[];
 }

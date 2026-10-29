@@ -1,4 +1,4 @@
-import { TASK_POINT_ID } from '@agentdeck/contracts/quality-floor';
+import { OWNER_POINT_ID, TASK_POINT_ID } from '@agentdeck/contracts/quality-floor';
 import type { SieveReportRow } from '@agentdeck/contracts/sieves';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { normalizeQuoteText, pointQuotes } from '../delivery-check/task-sources.ts';
@@ -128,6 +128,21 @@ export function unmappedPoints(
     out.set(point.key, [...(out.get(point.key) ?? []), clip(point.text)]);
   }
   return [...out].map(([key, list]) => ({ key, points: list }));
+}
+
+/** Приставка строки пункта: `task-…` / `owner-…`. */
+const POINT_PREFIX = /^(?:task|owner)-/iu;
+
+/**
+ * Строки с приставкой пункта, но не номером (g1 27.10): 12 строк `task-1298-perms`… молча не
+ * покрыли ни одного пункта — судьи пунктов берут только `task-<число>` / `owner-<число>`, — и
+ * группа пять раз читала код панели, чтобы узнать почему. Пробел называет такие строки.
+ */
+export function misnumberedPointGaps(rows: readonly SieveReportRow[] | undefined): string[] {
+  const ids = (rows ?? [])
+    .map((row) => row.id)
+    .filter((id) => POINT_PREFIX.test(id) && !TASK_POINT_ID.test(id) && !OWNER_POINT_ID.test(id));
+  return ids.length > 0 ? [serverText('delivery-gap-point-id-shape', { ids: ids.join(', ') })] : [];
 }
 
 /** Пробелы доставки: по строке на задачу с непокрытыми пунктами (`required` — след задач отдан). */

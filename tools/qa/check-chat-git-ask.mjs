@@ -31,6 +31,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-chatgitask-';
 const TOOLS = fileURLToPath(new URL('..', import.meta.url));
@@ -151,53 +152,6 @@ function toolResults(output) {
   return results;
 }
 
-function sse(blocks, stop) {
-  const events = [
-    [
-      'message_start',
-      {
-        type: 'message_start',
-        message: {
-          id: 'msg_cg',
-          type: 'message',
-          role: 'assistant',
-          model: 'stub',
-          content: [],
-          stop_reason: null,
-          usage: { input_tokens: 10, output_tokens: 1 },
-        },
-      },
-    ],
-  ];
-  blocks.forEach(([start, delta], index) => {
-    events.push([
-      'content_block_start',
-      { type: 'content_block_start', index, content_block: start },
-    ]);
-    events.push(['content_block_delta', { type: 'content_block_delta', index, delta }]);
-    events.push(['content_block_stop', { type: 'content_block_stop', index }]);
-  });
-  events.push([
-    'message_delta',
-    { type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 1 } },
-  ]);
-  events.push(['message_stop', { type: 'message_stop' }]);
-  return events
-    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-    .join('');
-}
-
-const textReply = (text) =>
-  sse(
-    [
-      [
-        { type: 'text', text: '' },
-        { type: 'text_delta', text },
-      ],
-    ],
-    'end_turn',
-  );
-
 /** Ключ первой реплики главного разговора — по нему стаб отличает его от побочных. */
 const MAIN_MARK = 'chat-git-ask main conversation';
 /** Инструменты, которые CLI дал главному разговору (первый его запрос). */
@@ -208,61 +162,27 @@ const offeredTools = [];
  * очереди; любой другой запрос (заголовок, классификатор авторежима) получает
  * «no» — классификатор ничего не разрешает.
  */
-function startStub() {
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // пустое тело — тоже запрос
-      }
-      const tools = (body.tools ?? []).map((tool) => tool.name);
+async function startStub() {
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      const { body, tools } = request;
       const first = JSON.stringify(body.messages?.[0]?.content ?? '');
       const main = tools.includes('Bash') && first.includes(MAIN_MARK);
       if (DEBUG)
         console.log(`[stub] main=${main} tools=${tools.join(',')} results=${resultCount(body)}`);
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      if (!main) {
-        res.end(textReply('no'));
-        return;
-      }
+      if (!main) return 'no';
       if (offeredTools.length === 0) offeredTools.push(...tools);
       // Инструмента PowerShell не дали — его вызовы не шлём, проверка скажет об этом.
-      const calls = CALLS.filter((call) => tools.includes(call.name));
       const done = resultCount(body);
-      const call = calls[done];
-      res.end(
-        call
-          ? sse(
-              [
-                [
-                  { type: 'tool_use', id: `toolu_cg${done}`, name: call.name, input: {} },
-                  {
-                    type: 'input_json_delta',
-                    partial_json: JSON.stringify({ command: call.command }),
-                  },
-                ],
-              ],
-              'tool_use',
-            )
-          : textReply('ok'),
-      );
-    });
+      const call = CALLS.filter((item) => tools.includes(item.name))[done];
+      if (!call) return 'ok';
+      // Итог вызова проверка ищет в потоке CLI по этому id.
+      return { tool: { name: call.name, args: { command: call.command }, id: `toolu_cg${done}` } };
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({ url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() }),
-    ),
-  );
+  return { url: stub.baseUrl, close: () => stub.close() };
 }
 
 /**

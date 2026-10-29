@@ -44,6 +44,16 @@ describe('hasBothOrigins', () => {
     expect(hasBothOrigins([{ mode: 'import', origin: 'e2e' }, { mode: 'run' }])).toBe(false);
     expect(hasBothOrigins([])).toBe(false);
   });
+
+  it('проверки ядра рядом с CI — тоже два источника, отбор нужен и режет по ядру', () => {
+    const withCore = [
+      { id: 'core', mode: 'import', origin: 'core' },
+      { id: 'ci', mode: 'import' },
+    ];
+    expect(hasBothOrigins(withCore)).toBe(true);
+    expect(filterRunsByOrigin(withCore, 'core').map((run) => run.id)).toEqual(['core']);
+    expect(filterRunsByOrigin(withCore, 'ci').map((run) => run.id)).toEqual(['ci']);
+  });
 });
 
 describe('runLabelKeys', () => {
@@ -51,6 +61,10 @@ describe('runLabelKeys', () => {
     expect(runLabelKeys({ mode: 'import', actor: 'ci', origin: 'e2e' })).toEqual({
       mode: 'tests.runs.origin.e2e',
       actor: 'tests.runs.origin.e2eActor',
+    });
+    expect(runLabelKeys({ mode: 'import', actor: 'ci', origin: 'core' })).toEqual({
+      mode: 'tests.runs.origin.core',
+      actor: 'tests.runs.origin.coreActor',
     });
     expect(runLabelKeys({ mode: 'import', actor: 'ci' })).toEqual({
       mode: 'tests.runs.mode.import',

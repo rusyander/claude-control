@@ -5,7 +5,7 @@ import type { IconName } from '@shared/ui/icon';
  * (создать сущность, открыть смежную страницу). Логику не несёт — только ведёт
  * по адресу, а действие выполняет уже сам раздел (форма создания, история).
  */
-export interface QuickAction {
+interface QuickAction {
   label: string;
   /** Адрес назначения — тот же строковый путь, что у маршрутов роутера. */
   to: string;

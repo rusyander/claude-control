@@ -64,7 +64,7 @@ export interface LiveTransport {
 }
 
 /** С чем поднимать процесс — подмножество `LiveLaunch`. */
-export interface TransportLaunch {
+interface TransportLaunch {
   command: string;
   args: string[];
   cwd: string;
@@ -93,7 +93,7 @@ export interface RelayAddress {
 }
 
 /** Первая строка подключения к посреднику: старый посредник служебную строку молча пропускает. */
-export function relayHello(token: string): string {
+function relayHello(token: string): string {
   return `${JSON.stringify({ type: 'relay_hello', token })}\n`;
 }
 
@@ -199,7 +199,7 @@ export function relayOpener(options: RelayOptions = {}): TransportOpener {
  * уходила строкой «Не удалось запустить «claude»: relay closed», и человек
  * читал это как поломку установки.
  */
-export function relayLost(message: string): Error {
+function relayLost(message: string): Error {
   return Object.assign(new Error(message), { relayLost: true });
 }
 

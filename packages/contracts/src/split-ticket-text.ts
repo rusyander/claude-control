@@ -61,7 +61,7 @@ function stem(word: string): string {
 }
 
 /** Основы значимых слов названия: короче трёх букв и служебные не считаются. */
-export function titleTokens(value: string): Set<string> {
+function titleTokens(value: string): Set<string> {
   return new Set(
     normTitle(value)
       .split(' ')
@@ -94,7 +94,7 @@ export function nearDuplicate(a: string, b: string, ratio = NEAR_DUPLICATE_RATIO
  * Порог «похоже на открытую задачу Jira» — ниже склеивающего: склейку решает
  * сервер сам, а похожую задачу только ПОКАЗЫВАЕТ человеку, и решает он.
  */
-export const SIMILAR_ISSUE_RATIO = 0.5;
+const SIMILAR_ISSUE_RATIO = 0.5;
 
 /** Название дефекта похоже на название задачи трекера — повод спросить человека. */
 export function similarTitle(a: string, b: string): boolean {

@@ -27,7 +27,7 @@ import type { PlatformClientTools } from '@agentdeck/contracts/platform-presets'
  * Судьба поля запроса. Та же шкала, что у строки таблицы диалектов: драйвер
  * уточняет ею общие строки, а не заводит вторую таблицу.
  */
-export type DriverFieldFate = 'mapped' | 'renamed' | 'lossy' | 'dropped';
+type DriverFieldFate = 'mapped' | 'renamed' | 'lossy' | 'dropped';
 
 /** Чем ЭТОТ контур отличается от общей судьбы поля. */
 export type DriverRequestField = DriverFieldLoss | DriverFieldRename;
@@ -249,7 +249,7 @@ export interface DriverAuth {
  * Как инструменты клиента доходят до модели (см. `clientTools`). Значения —
  * общие с манифестом контракта: мастер показывает ровно то, чем ходит драйвер.
  */
-export type DriverClientTools = PlatformClientTools;
+type DriverClientTools = PlatformClientTools;
 
 /** Поверхность агентов контура (см. `agents`). */
 export interface DriverAgents {
@@ -260,7 +260,7 @@ export interface DriverAgents {
 }
 
 /** Откуда у контура берутся картинки. */
-export type DriverImages =
+type DriverImages =
   /** Частью ответа модели `image_generation` в обычном `chat/completions`. */
   | 'chat-part'
   /**

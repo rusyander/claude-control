@@ -282,7 +282,7 @@ export function chatTitleText(records: Record[]): string {
  * человека, и разговор звался первой строкой правил, одинаковой у всех колод
  * (живой прогон 26.09.2026). Название берётся из слов человека.
  */
-export function mediaRequestTitle(text: string): string {
+function mediaRequestTitle(text: string): string {
   const request = mediaRequestOf(text);
   // Слово режима — по нему в списке видно, что это колода или картинка.
   return request ? mediaTitle(request.kind, request.topic) : text;

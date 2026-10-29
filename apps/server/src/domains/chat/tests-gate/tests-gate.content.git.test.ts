@@ -50,12 +50,20 @@ function cli(dir: string, ...args: string[]) {
   return { code: out.status, out: `${out.stdout}${out.stderr}` };
 }
 
-function addCase(dir: string, group: string, codePath: string, file: string): void {
+// newGroup: в проекте, где группы уже есть, новая заводится только явным --new-group (tests-cli).
+function addCase(
+  dir: string,
+  group: string,
+  codePath: string,
+  file: string,
+  newGroup = false,
+): void {
   const made = cli(
     dir,
     'case',
     '--group',
     group,
+    ...(newGroup ? ['--new-group'] : []),
     '--json',
     JSON.stringify({
       title: `${group} works`,
@@ -107,7 +115,7 @@ describe(
       git(dir, 'fetch', '-q', 'origin');
       git(dir, 'checkout', '-q', '-b', 'group');
       addCase(dir, 'auth', 'src/auth', 'tests/login.test.mjs');
-      addCase(dir, 'other', 'src/other', 'tests/other.test.mjs');
+      addCase(dir, 'other', 'src/other', 'tests/other.test.mjs', true);
       startedAt = new Date(Date.now() - 60_000).toISOString();
       // Группа правит покрытое кейсом auth-001 — этот прогон и судится.
       put(dir, 'src/auth/login.ts', 'export const a = 2;\n');

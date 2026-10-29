@@ -1,0 +1,4 @@
+  510 /bin/zsh -l TERM_PROGRAM=Apple_Terminal SHELL=/bin/zsh HOME=/Users/dev
+61001 node /Users/dev/agentdeck/cli.js PATH=/usr/bin:/bin AGENTDECK_TREE=task-70 HOME=/Users/dev
+61002 /usr/bin/python3 -m http.server PATH=/usr/bin:/bin AGENTDECK_TREE=task-7 HOME=/Users/dev
+61003 /usr/bin/grep AGENTDECK_TREE=task-7 PATH=/usr/bin

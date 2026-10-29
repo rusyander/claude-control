@@ -20,16 +20,16 @@ import type {
  */
 
 /** Состояние формы, по которому шапка решает, что показывать. */
-export interface PermissionsFormHeaderState {
+interface PermissionsFormHeaderState {
   dirty: boolean;
   submit: () => void;
 }
 
 /** Шапка раздела: своя у глобальной страницы и у таба проекта. */
-export type PermissionsFormHeader = (state: PermissionsFormHeaderState) => ReactNode;
+type PermissionsFormHeader = (state: PermissionsFormHeaderState) => ReactNode;
 
 /** Черновик прав Continue, который форма отдаёт наружу на сохранение. */
-export interface ContinuePermissionsDraft {
+interface ContinuePermissionsDraft {
   allow: string[];
   ask: string[];
   exclude: string[];
@@ -42,7 +42,7 @@ export interface ContinuePermissionsFormProps {
 }
 
 /** Черновик прав Cursor, который форма отдаёт наружу на сохранение. */
-export interface CursorPermissionsDraft {
+interface CursorPermissionsDraft {
   allow: string[];
   deny: string[];
 }
@@ -54,7 +54,7 @@ export interface CursorPermissionsFormProps {
 }
 
 /** Черновик прав Goose, который форма отдаёт наружу на сохранение. */
-export interface GoosePermissionsDraft {
+interface GoosePermissionsDraft {
   mode: GooseMode;
 }
 
@@ -65,7 +65,7 @@ export interface GoosePermissionsFormProps {
 }
 
 /** Черновик прав Kimi Code, который форма отдаёт наружу на сохранение. */
-export interface KimiPermissionsDraft {
+interface KimiPermissionsDraft {
   mode: KimiMode;
   rules: KimiPermissionRule[];
 }
@@ -83,7 +83,7 @@ export interface OpencodePermissionsFormProps {
 }
 
 /** Черновик прав Qwen Code, который форма отдаёт наружу на сохранение. */
-export interface QwenPermissionsDraft {
+interface QwenPermissionsDraft {
   approvalMode: QwenApprovalMode;
   allow: string[];
   ask: string[];

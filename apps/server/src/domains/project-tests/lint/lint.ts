@@ -55,7 +55,7 @@ const RULES = {
 } satisfies Record<string, { severity: ProjectTestLintSeverity; title: string }>;
 
 /** Идентификатор правила — только из таблицы выше. */
-export type ProjectTestLintRule = keyof typeof RULES;
+type ProjectTestLintRule = keyof typeof RULES;
 
 /** Порядок серьёзности: в таком виде замечания и читают. */
 const SEVERITY_ORDER: Record<ProjectTestLintSeverity, number> = { error: 0, warning: 1, info: 2 };

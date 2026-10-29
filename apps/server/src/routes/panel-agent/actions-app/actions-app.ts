@@ -31,7 +31,7 @@ import {
   unmasked,
 } from '../action-kit/action-kit.ts';
 import { dataField, textField } from '../texts/texts.ts';
-import { maskNamedValue, SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskNamedValue, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import { needsToken } from '../../../domains/integrations/store/store.ts';
 
 /**

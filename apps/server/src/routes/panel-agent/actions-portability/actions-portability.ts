@@ -10,7 +10,7 @@ import type {
   TransferStateAnswer,
 } from '@agentdeck/contracts/portable-transfer';
 import type { PanelActionPreview } from '@agentdeck/contracts/panel-agent';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

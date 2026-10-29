@@ -285,7 +285,7 @@ export const SHOT_VARIANTS = [
 ];
 
 /** Вариант по теме и языку прогона. */
-export function shotVariant(theme = shotTheme(), lang = shotLanguage()) {
+function shotVariant(theme = shotTheme(), lang = shotLanguage()) {
   return SHOT_VARIANTS.find((variant) => variant.theme === theme && variant.lang === lang);
 }
 
@@ -323,7 +323,7 @@ export const VARIANT_INDEX = 'variants.json';
  * Одна функция на обе стороны: съёмка пишет её результат, сторож считает
  * заново и сравнивает — разойтись им не на чем.
  */
-export function buildVariantIndex(topic, scenarios) {
+function buildVariantIndex(topic, scenarios) {
   const frames = {};
   const ordered = [...scenarios].sort((a, b) => a.scenario.localeCompare(b.scenario));
   for (const { scenario, manifest } of ordered) {

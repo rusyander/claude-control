@@ -56,7 +56,7 @@ import { writeReviewFindings } from '../review-findings/review-findings.ts';
  */
 
 /** Связи панели: домен ищет по ним ключи одного разговора и соседей по дереву. */
-export interface SplitReviewStore {
+interface SplitReviewStore {
   /** Все связи разом — по ним же находятся вторые ключи одного разговора. */
   all(): Record<string, ChatLink>;
   set(chatId: string, link: ChatLink): void;

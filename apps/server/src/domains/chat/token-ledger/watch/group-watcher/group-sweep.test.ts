@@ -25,6 +25,8 @@ function run(
     settings?: Partial<GroupWatch>;
     noLive?: boolean;
     deferredWaiting?: boolean;
+    /** Перезапуски dev-watch (R39): моменты. */
+    restarts?: number[];
   } = {},
 ) {
   const record = { index: 1, title: 'g', status: 'started', ...group } as SplitPlanGroupRecord;
@@ -35,6 +37,9 @@ function run(
     ...(options.seenAt !== undefined ? { seenAt: () => options.seenAt } : {}),
     ...(options.deferredWaiting !== undefined
       ? { deferredWaiting: () => options.deferredWaiting === true }
+      : {}),
+    ...(options.restarts
+      ? { restarts: { done: options.restarts.map((at) => ({ at, files: ['a.ts'] })) } }
       : {}),
     lastSeen,
     nudgeSnap: options.nudgeSnap ?? new Map(),
@@ -331,5 +336,31 @@ describe('sweepGroups R43 пауза стоит, а решать нечего (F
       rule(run({ status: 'paused', pausedAt, pausedWait: 'question' }, { now: late }).hits, 'R43'),
     ).toBeUndefined();
     expect(rule(run({ pausedAt }, { now: late }).hits, 'R43')).toBeUndefined();
+  });
+});
+
+// Живой прогон 27.10: семь перезапусков от правок до нажатой перепроверки всплыли бурей у трёх групп.
+describe('sweepGroups R39 буря перезапусков — только с момента, когда группа идёт', () => {
+  const restarts = [T0 + 1 * MIN, T0 + 5 * MIN, T0 + 9 * MIN];
+  const at = (offset: number) => new Date(T0 + offset * MIN).toISOString();
+
+  it('старт раньше перезапусков — буря; перепроверка нажата после них — тишина', () => {
+    expect(rule(run({ startedAt: at(0) }, { restarts }).hits, 'R39')).toMatchObject({
+      numbers: { restarts: 3 },
+    });
+    expect(
+      rule(run({ startedAt: at(0), recheckRequestedAt: at(10) }, { restarts }).hits, 'R39'),
+    ).toBeUndefined();
+    expect(rule(run({ startedAt: at(6) }, { restarts }).hits, 'R39')).toBeUndefined();
+  });
+
+  // Живой прогон 27.10 18:27: перезапуски от правок сторожа, пока группы стояли на паузе.
+  it('перезапуск на паузе группы — не в счёт: отрезки паузы из записи группы', () => {
+    const paused = { startedAt: at(0), pauseSpans: [{ from: at(4), to: at(6) }] };
+    expect(rule(run(paused, { restarts }).hits, 'R39')).toBeUndefined();
+    const later = { startedAt: at(0), pauseSpans: [{ from: at(10), to: at(11) }] };
+    expect(rule(run(later, { restarts }).hits, 'R39')).toMatchObject({
+      numbers: { restarts: 3 },
+    });
   });
 });

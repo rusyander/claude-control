@@ -43,6 +43,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-forgeask-';
 const TOOLS = fileURLToPath(new URL('..', import.meta.url));
@@ -217,77 +218,19 @@ function resultCount(body) {
   return count;
 }
 
-function sse(blocks, stop) {
-  const events = [
-    [
-      'message_start',
-      {
-        type: 'message_start',
-        message: {
-          id: 'msg_fa',
-          type: 'message',
-          role: 'assistant',
-          model: 'stub',
-          content: [],
-          stop_reason: null,
-          usage: { input_tokens: 10, output_tokens: 1 },
-        },
-      },
-    ],
-  ];
-  blocks.forEach(([start, delta], index) => {
-    events.push([
-      'content_block_start',
-      { type: 'content_block_start', index, content_block: start },
-    ]);
-    events.push(['content_block_delta', { type: 'content_block_delta', index, delta }]);
-    events.push(['content_block_stop', { type: 'content_block_stop', index }]);
-  });
-  events.push([
-    'message_delta',
-    { type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 1 } },
-  ]);
-  events.push(['message_stop', { type: 'message_stop' }]);
-  return events
-    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-    .join('');
-}
-
-const textReply = (text) =>
-  sse(
-    [
-      [
-        { type: 'text', text: '' },
-        { type: 'text_delta', text },
-      ],
-    ],
-    'end_turn',
-  );
-
 /**
  * Стаб API. Главный разговор (в нём есть инструменты хранилища) зовёт их по
  * очереди; любой другой запрос — побочный (заголовок, классификатор авторежима)
  * — получает ответ, который ничего не разрешает: так проверка не зависит от
  * того, как классификатор читает стаб, — разрешить вызов он не может.
  */
-function startStub() {
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // пустое тело — тоже запрос
-      }
-      const tools = (body.tools ?? []).map((tool) => tool.name);
+async function startStub() {
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request, info }) => {
+      const body = request.body;
+      const tools = info.tools.map((tool) => tool.name);
       const main = tools.some((name) => /__create_merge_request_note$/.test(name));
       if (DEBUG) {
         const system = JSON.stringify(body.system ?? '').slice(0, 160);
@@ -295,34 +238,14 @@ function startStub() {
           `[stub] main=${main} tools=${tools.length} results=${resultCount(body)} [${tools.join(',')}] ${system}`,
         );
       }
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      if (!main) {
-        res.end(textReply('no'));
-        return;
-      }
+      if (!main) return 'no';
       offeredTools = tools;
       const done = resultCount(body);
       const next = callAt(done, tools);
-      res.end(
-        next
-          ? sse(
-              [
-                [
-                  { type: 'tool_use', id: `toolu_fa${done}`, name: next.name, input: {} },
-                  { type: 'input_json_delta', partial_json: JSON.stringify(next.input) },
-                ],
-              ],
-              'tool_use',
-            )
-          : textReply('ok'),
-      );
-    });
+      return next ? { tool: { name: next.name, args: next.input, id: `toolu_fa${done}` } } : 'ok';
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({ url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() }),
-    ),
-  );
+  return { url: stub.baseUrl, close: () => stub.close() };
 }
 
 /**

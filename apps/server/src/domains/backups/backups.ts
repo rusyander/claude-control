@@ -22,7 +22,7 @@ import { isEncryptedBackup, decryptSecret } from '../../lib/secret-crypto/secret
 import { SKILLS_DISABLED_DIR } from '../skills/skills.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
 import { MAX_DIFF_BYTES } from '../history/constants.ts';
-import { SECRET_MASK } from '../../lib/secret-mask/secret-mask.ts';
+import { SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 
 /**
  * Резервные копии и откат к ним.

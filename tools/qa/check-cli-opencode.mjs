@@ -27,7 +27,6 @@
  * Код выхода: 0 — всё сходится, 1 — провал, 2 — не проверено.
  */
 import { execFileSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import {
   existsSync,
   mkdirSync,
@@ -49,6 +48,7 @@ import {
 } from './throwaway-stand.mjs';
 import { cliProcesses, reap } from './foreign-cli.mjs';
 import { startStubModel } from './stub-steer-model.mjs';
+import { startStubModel as startLibraryModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const PROBE = 'probe-edit.txt';
@@ -396,16 +396,13 @@ child.on('exit', (code) => process.exit(code ?? 1));
   // --- Ключ без CLI ------------------------------------------------------------
   console.log('\nБез CLI в PATH, ключ сохранён');
   const trapHits = [];
-  const trap = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      trapHits.push({ method: req.method, path: req.url, headers: req.headers, body: raw });
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ choices: [{ message: { content: 'TRAP_REPLY' } }] }));
-    });
+  const trap = await startLibraryModel({
+    // Ловушка: любой запрос сюда — улика; записан с сырыми заголовками и телом.
+    route: ({ method, path, query, headers, raw }) => {
+      trapHits.push({ method, path: path + query, headers, body: raw });
+      return { body: { choices: [{ message: { content: 'TRAP_REPLY' } }] } };
+    },
   });
-  await new Promise((done) => trap.listen(0, '127.0.0.1', done));
   const SENTINEL = 'qa-opencode-key-9Xw3';
   try {
     stand = await startStand({
@@ -415,7 +412,7 @@ child.on('exit', (code) => process.exit(code ?? 1));
       label: 'cli-opencode-key',
       settings: { provider: 'opencode' },
       env: {
-        OPENAI_BASE_URL: `http://127.0.0.1:${trap.address().port}/v1`,
+        OPENAI_BASE_URL: `${trap.baseUrl}/v1`,
         OPENAI_API_KEY: SENTINEL,
       },
     });
@@ -441,7 +438,7 @@ child.on('exit', (code) => process.exit(code ?? 1));
       short(trapHits),
     );
   } finally {
-    await new Promise((done) => trap.close(done));
+    await trap.close();
   }
 } catch (error) {
   if (error instanceof NotChecked) {

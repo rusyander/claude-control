@@ -41,7 +41,7 @@ import { deliveryCheckCommand } from '../delivery-self-check.ts';
 type Delivery = 'sent' | 'queued' | 'refused' | 'busy';
 
 /** Старт разговора стадии — тот же, что у звеньев ревью (`createReviewStarter`). */
-export type DeliverStageStart = (input: {
+type DeliverStageStart = (input: {
   chatId: string;
   prompt: string;
   cwd: string;

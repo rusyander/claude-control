@@ -43,8 +43,8 @@ export const SUPERVISOR_EVENTS = [
 export type SupervisorEvent = (typeof SUPERVISOR_EVENTS)[number];
 
 export type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact';
-export type SessionEndReason = 'clear' | 'logout' | 'prompt_input_exit' | 'other';
-export type PreCompactTrigger = 'manual' | 'auto';
+type SessionEndReason = 'clear' | 'logout' | 'prompt_input_exit' | 'other';
+type PreCompactTrigger = 'manual' | 'auto';
 
 /**
  * Описание прогона — единственный источник общих полей нагрузки.

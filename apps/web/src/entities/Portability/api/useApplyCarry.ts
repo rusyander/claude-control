@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function postCarryApply(keys: string[]): Promise<CarryApplyAnswer> {
+async function postCarryApply(keys: string[]): Promise<CarryApplyAnswer> {
   const { data } = await apiClient.post<CarryApplyAnswer>('/portability/carry/apply', { keys });
   return data;
 }

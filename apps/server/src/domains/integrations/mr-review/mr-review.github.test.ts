@@ -79,6 +79,7 @@ function page(input: {
           url: `${base}/o/r/pull/5`,
           author: human('group-bot-user'),
           body: 'Что и зачем.',
+          baseRefName: 'main',
           ...(input.mergeable ? { mergeable: input.mergeable } : {}),
           commits: {
             nodes: [
@@ -163,6 +164,8 @@ describe('readMergeRequestReview (GitHub)', () => {
       description: 'Что и зачем.',
       // Конфликт с целевой веткой — для «Перепроверить MR» (владелец 05.10).
       conflicts: true,
+      // Цель PR — база охвата перепроверки (живой прогон 27.10).
+      targetBranch: 'main',
     });
     expect(review?.pipeline).toEqual({
       id: 'abc123',

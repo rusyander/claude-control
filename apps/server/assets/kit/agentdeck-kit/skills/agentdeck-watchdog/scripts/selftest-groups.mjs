@@ -546,6 +546,14 @@ check('RUN: a stage-start run under a pending key is attributed by its transcrip
   ]));
   r = await run(WATCH, [...common, '--once']);
   check('RUN: a sample hours old in an older window is no baseline — the run\'s own first sample is', tagLines(r.out, 'RUN').some((l) => /2000k tok in 15m · 5h 49% \(\+3% while it ran\)/.test(l) && !/heavy/.test(l)), tagLines(r.out, 'RUN').join(' | '));
+  // Groups run together: a neighbour's sample after this run started is its middle, not its start (g1 27.10: «+1%»
+  // for 9 → 20 % — the base was g9's last sample, taken 59 min into g1's run).
+  fs.writeFileSync(limitRuns, JSON.stringify([
+    { id: 'ovA', chatId: 'c0b', sessionId: 's', startedAt: now8 - 600e3, endedAt: now8 - 200e3, tokens: 1000, samples: [sample(now8 - 590e3, 0.09, 0.5), sample(now8 - 200e3, 0.19, 0.5)] },
+    { id: 'ovB', chatId: 'c0b', sessionId: 's', startedAt: now8 - 610e3, endedAt: now8 - 100e3, tokens: 1000, samples: [sample(now8 - 605e3, 0.09, 0.5), sample(now8 - 100e3, 0.2, 0.5)] },
+  ]));
+  r = await run(WATCH, [...common, '--once']);
+  check('RUN: overlapping runs — each moves from its own start, not from the neighbour\'s end', tagLines(r.out, 'RUN').some((l) => /5h 19% \(\+10% while it ran\)/.test(l)) && tagLines(r.out, 'RUN').some((l) => /5h 20% \(\+11% while it ran\)/.test(l)), tagLines(r.out, 'RUN').join(' | '));
   // The window checks below read the level the earlier runs left.
   fs.writeFileSync(limitRuns, runsKept);
 }

@@ -15,7 +15,7 @@ import type { GlobalLayerText } from '@agentdeck/contracts';
  */
 
 /** Файлы: путь → текст; `null` в ветке — файл удалён. */
-export type CaseFiles = Record<string, string | null>;
+type CaseFiles = Record<string, string | null>;
 
 export interface CorpusCase {
   id: string;
@@ -46,7 +46,7 @@ const SECRETS: Readonly<Record<string, string>> = {
   pem: ['-----BEGIN RSA', 'PRIVATE KEY-----'].join(' '),
 };
 
-export function expandSecrets(text: string): string {
+function expandSecrets(text: string): string {
   return text.replace(/\{\{secret:([\w-]+)\}\}/g, (whole, name: string) => SECRETS[name] ?? whole);
 }
 

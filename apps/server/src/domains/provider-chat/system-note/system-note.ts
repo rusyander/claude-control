@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
+import { qwenRunFacts } from '@agentdeck/providers/qwen';
 import {
   QWEN_SYSTEM_SETTINGS_ENV,
   baseSystemSettings,
@@ -41,8 +42,30 @@ function objectAt(value: unknown): Record<string, unknown> {
     : {};
 }
 
+/** Путь и ключи пределов в файле настроек — факт запуска Qwen Code (`@agentdeck/providers/qwen`). */
+function qwenLimitsChannel(): {
+  path: string[];
+  keys: { window: string; timeout: string; idle: string };
+} {
+  const limits = qwenRunFacts.limitsChannel;
+  if (limits?.via !== 'settings-file')
+    throw new Error('providers: qwen has no settings-file limits channel');
+  return limits;
+}
+
+/** Копия `root`, где объект по `path` дополнен `values`; остальное — как было. */
+function mergeAt(
+  root: Record<string, unknown>,
+  path: readonly string[],
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const [head, ...rest] = path;
+  if (head === undefined) return { ...root, ...values };
+  return { ...root, [head]: mergeAt(objectAt(root[head]), rest, values) };
+}
+
 /** Текст `QWEN.md`: та же обёртка, что была в реплике, — модель узнаёт голос панели. */
-export function qwenNoteText(note: string): string {
+function qwenNoteText(note: string): string {
   return `<agentdeck-workspace>${note.trim()}</agentdeck-workspace>\n`;
 }
 
@@ -127,20 +150,12 @@ export function writeQwenLimits(options: {
   env: NodeJS.ProcessEnv;
   now?: number;
 }): Record<string, string> {
-  const base = baseSystemSettings(options.env);
-  const model = objectAt(base.model);
-  const merged = {
-    ...base,
-    model: {
-      ...model,
-      generationConfig: {
-        ...objectAt(model.generationConfig),
-        contextWindowSize: options.limits.contextWindow,
-        timeout: options.limits.timeoutMs,
-        streamIdleTimeoutMs: options.limits.idleMs,
-      },
-    },
-  };
+  const { path, keys } = qwenLimitsChannel();
+  const merged = mergeAt(baseSystemSettings(options.env), path, {
+    [keys.window]: options.limits.contextWindow,
+    [keys.timeout]: options.limits.timeoutMs,
+    [keys.idle]: options.limits.idleMs,
+  });
   return writeSettingsLayer(
     qwenLimitLayersRoot(options.appData),
     layerDigest({ kind: 'qwen-local-limits', merged }),

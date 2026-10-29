@@ -21,25 +21,34 @@
  *
  * Подменена только модель (`OPENAI_BASE_URL` на заглушку в этом файле): она
  * отвечает вызовом `glob` на первый запрос хода и текстом после результата,
- * а размер окна (`usage.prompt_tokens`) задаёт сама. Дом Qwen Code — временный
- * (`foreign-cli.mjs`). Нет `qwen` ни в `STEER_CLI_DIR`, ни в PATH — «не проверено»
+ * а размер окна (`usage.prompt_tokens`) задаёт сама. Адрес модели — «облачный»
+ * (`CLOUD_HOST`), до заглушки ход доходит через прокси этого файла
+ * (`HTTPS_PROXY`): адрес на петле панель считает своим локальным сервером
+ * моделей CLI (`ownLocalEndpoint`), а у локальной модели кэша провайдера нет —
+ * остывшая сессия там продолжается всегда, и пункт 4 не наступил бы. Дом Qwen
+ * Code — временный (`foreign-cli.mjs`). Нет `qwen` ни в `STEER_CLI_DIR`, ни в PATH — «не проверено»
  * (код 2), не провал.
  *
  * Запуск: `node tools/qa/check-foreign-group-watch.mjs`.
  */
 import { execFileSync } from 'node:child_process';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
+import { connect } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { NotChecked, reporter, startStand, wait } from './throwaway-stand.mjs';
 import { FOREIGN_CLIS, applyCliEnv, cliProcesses, findCli, reap } from './foreign-cli.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const TASK = 'MARKER-W-TASK: list the markdown files and stop';
 const BRIEF = 'Facts the panel collected';
 /** Имя копии группы (`<проект>-worktrees/feature-list`) — по ветке. */
 const GROUP_DIR = 'feature-list';
 const FIRST = 12_000;
+/** «Облачный» адрес модели: `.invalid` не разрешается — мимо прокси ход упадёт, а не уйдёт в сеть. */
+const CLOUD_HOST = 'cloud-model.invalid';
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
 const BIG = 60_000;
 
 /**
@@ -49,19 +58,11 @@ const BIG = 60_000;
  * Вводная новой сессии — ответ текстом, окно 12k. Остальное (разбор, служебные
  * запросы CLI) — короткий ответ.
  */
-function startModel() {
+async function startModel() {
   const requests = [];
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      let body = {};
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        // не JSON — пустой запрос
-      }
-      const messages = Array.isArray(body.messages) ? body.messages : [];
+  const stub = await startStubModel({
+    script: ({ request }) => {
+      const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
       const text = (content) =>
         Array.isArray(content)
           ? content.map((part) => part?.text ?? '').join('\n')
@@ -79,67 +80,90 @@ function startModel() {
       const brief = users.some((u) => u.includes(BRIEF));
       const nextSpeaker = all.includes('next_speaker');
       requests.push({ n: requests.length + 1, group, brief, hasTool, nextSpeaker, users });
-      let prompt = 500;
-      let cached = 0;
-      let reply = { content: 'ok' };
-      if (group) {
-        prompt = hasTool ? BIG : FIRST;
-        cached = hasTool ? BIG - 1000 : 0;
-        if (nextSpeaker) reply = { content: '{"reasoning":"done","next_speaker":"user"}' };
-        else if (!hasTool && !brief)
-          reply = {
-            tool_calls: [
-              {
-                index: 0,
-                id: `call_${requests.length}`,
-                type: 'function',
-                function: { name: 'glob', arguments: JSON.stringify({ pattern: '*.md' }) },
-              },
-            ],
-          };
-        else reply = { content: 'Group work done.' };
+      if (!group) return { text: 'ok', usage: { input: 500, output: 5, cached: 0 } };
+      // Контекст группы после инструмента — большой и почти весь из кеша.
+      const usage = hasTool
+        ? { input: BIG, output: 5, cached: BIG - 1000 }
+        : { input: FIRST, output: 5, cached: 0 };
+      if (nextSpeaker) return { text: '{"reasoning":"done","next_speaker":"user"}', usage };
+      if (!hasTool && !brief) {
+        const call = { name: 'glob', args: { pattern: '*.md' }, id: `call_${requests.length}` };
+        return { tool: call, usage };
       }
-      const usage = {
-        prompt_tokens: prompt,
-        completion_tokens: 5,
-        total_tokens: prompt + 5,
-        prompt_tokens_details: { cached_tokens: cached },
-      };
-      const finish = reply.tool_calls ? 'tool_calls' : 'stop';
-      const head = { id: `c${requests.length}`, created: 1, model: 'stub-model' };
-      if (!body.stream) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            ...head,
-            object: 'chat.completion',
-            choices: [
-              { index: 0, message: { role: 'assistant', ...reply }, finish_reason: finish },
-            ],
-            usage,
-          }),
-        );
-        return;
-      }
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
-      const chunk = { ...head, object: 'chat.completion.chunk' };
-      send({ ...chunk, choices: [{ index: 0, delta: { role: 'assistant', ...reply } }] });
-      send({ ...chunk, choices: [{ index: 0, delta: {}, finish_reason: finish }] });
-      send({ ...chunk, choices: [], usage });
-      res.write('data: [DONE]\n\n');
-      res.end();
-    });
+      return { text: 'Group work done.', usage };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        requests,
-        close: () => new Promise((closed) => server.close(() => closed())),
-      }),
-    ),
-  );
+  return { port: stub.port, requests, close: () => stub.close() };
+}
+
+/**
+ * Прокси на петле между `qwen` и заглушкой: `CLOUD_HOST` ведёт на заглушку,
+ * адреса на петле — как есть (служебные соединения CLI), остальное — отказ.
+ * Понимает и туннель (`CONNECT`), и запрос с полным адресом.
+ */
+async function startCloudProxy(stubPort) {
+  let hits = 0;
+  const target = (host, port) => {
+    if (host === CLOUD_HOST) {
+      hits += 1;
+      return { host: '127.0.0.1', port: stubPort };
+    }
+    return LOOPBACK.has(host) ? { host: host.replace(/^\[|\]$/g, ''), port } : undefined;
+  };
+  const server = createServer((req, res) => {
+    let url;
+    try {
+      url = new URL(req.url ?? '');
+    } catch {
+      res.writeHead(400).end();
+      return;
+    }
+    const to = target(url.hostname, Number(url.port) || 80);
+    if (!to) {
+      res.writeHead(403).end();
+      return;
+    }
+    const upstream = httpRequest(
+      { ...to, method: req.method, path: url.pathname + url.search, headers: req.headers },
+      (reply) => {
+        res.writeHead(reply.statusCode ?? 502, reply.headers);
+        reply.pipe(res);
+      },
+    );
+    upstream.on('error', () => res.destroy());
+    req.pipe(upstream);
+  });
+  server.on('connect', (req, socket, head) => {
+    let url;
+    try {
+      url = new URL(`http://${req.url}`);
+    } catch {
+      socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+      return;
+    }
+    const to = target(url.hostname, Number(url.port) || 443);
+    if (!to) {
+      socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+      return;
+    }
+    const upstream = connect(to.port, to.host, () => {
+      socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+      if (head.length) upstream.write(head);
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+    });
+    upstream.on('error', () => socket.destroy());
+    socket.on('error', () => upstream.destroy());
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    url: `http://127.0.0.1:${server.address().port}`,
+    hits: () => hits,
+    close: () => {
+      server.closeAllConnections();
+      return new Promise((resolve) => server.close(resolve));
+    },
+  };
 }
 
 async function until(probe, seconds, step = 300) {
@@ -181,7 +205,15 @@ if (!dir) {
 const { check, finish } = reporter();
 const model = await startModel();
 const root = mkdtempSync(join(tmpdir(), 'cc-group-watch-qwen-'));
-const restoreEnv = applyCliEnv(FOREIGN_CLIS.qwen.env(root, `http://127.0.0.1:${model.port}`), dir);
+const proxy = await startCloudProxy(model.port);
+const restoreEnv = applyCliEnv(
+  {
+    ...FOREIGN_CLIS.qwen.env(root, `http://${CLOUD_HOST}`),
+    HTTPS_PROXY: proxy.url,
+    HTTP_PROXY: proxy.url,
+  },
+  dir,
+);
 const qwenHome = process.env.QWEN_HOME;
 const before = cliProcesses(dir, 'qwen');
 let stand;
@@ -273,6 +305,11 @@ try {
     180,
   );
   await until(async () => (await status())?.isRunning === false, 120);
+  check(
+    'модель для панели — облачная: ход `qwen` шёл на CLOUD_HOST через прокси',
+    proxy.hits() > 0,
+    `соединений с ${CLOUD_HOST}: ${proxy.hits()}`,
+  );
   check(
     'первый ход группы дошёл до модели: вызов glob и ответ после результата',
     Boolean(firstDone),
@@ -383,6 +420,7 @@ try {
   await wait(500);
   if (stand) rmSync(stand.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   await model.close();
+  await proxy.close();
   restoreEnv();
   rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 }

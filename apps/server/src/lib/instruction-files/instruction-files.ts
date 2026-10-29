@@ -48,7 +48,7 @@ export type { InstructionFilesMode, InstructionFilesSource };
 
 export const DEFAULT_INSTRUCTION_FILES_MODE: InstructionFilesMode = 'claude-md-or-agents-md';
 
-export function isInstructionFilesMode(value: unknown): value is InstructionFilesMode {
+function isInstructionFilesMode(value: unknown): value is InstructionFilesMode {
   return typeof value === 'string' && (instructionFilesModes as readonly string[]).includes(value);
 }
 
@@ -161,14 +161,14 @@ const AGENTS_NAMES = ['AGENTS.md', join('.claude', 'AGENTS.md')];
 export const INSTRUCTION_BASE_NAMES = ['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md'] as const;
 
 /** Найденный источник инструкций: путь, имя файла и признак устаревшего ключа. */
-export interface InstructionSource {
+interface InstructionSource {
   filePath: string;
   fileName: string;
   legacy: boolean;
 }
 
 /** Почему источник не взят — причина попадает в пропуск паспорта. */
-export interface InstructionSkip {
+interface InstructionSkip {
   detail: string;
 }
 

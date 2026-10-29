@@ -28,10 +28,10 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 // Слой собираем из `.ts`: Node 22 без флага TypeScript не читает, а junit-run зовёт скрипт
 // голым `node` — перезапускаемся с флагом и отдаём его код выхода.
@@ -59,8 +59,12 @@ function findQwen() {
     return existsSync(process.env.QWEN_CLI) ? pick(process.env.QWEN_CLI) : null;
   const dirs = [process.env.STEER_CLI_DIR, process.env.PATH].filter(Boolean).join(delimiter);
   for (const dir of dirs.split(delimiter)) {
-    const entry = join(dir, '..', '@qwen-code', 'qwen-code', 'cli-entry.js');
-    if (existsSync(join(dir, 'qwen')) && existsSync(entry)) return pick(entry);
+    // Пакет лежит рядом с `.bin` (`node_modules/.bin/qwen`) или под префиксом npm (Windows:
+    // `<prefix>/qwen` + `<prefix>/node_modules/@qwen-code`).
+    const entry = [join(dir, '..'), join(dir, 'node_modules')]
+      .map((base) => join(base, '@qwen-code', 'qwen-code', 'cli-entry.js'))
+      .find((p) => existsSync(p));
+    if (existsSync(join(dir, 'qwen')) && entry) return pick(entry);
     if (process.platform !== 'win32' && existsSync(join(dir, 'qwen')))
       return pick(join(dir, 'qwen'));
   }
@@ -69,45 +73,16 @@ function findQwen() {
 
 /** Заглушка модели: без результата инструмента — вызов оболочки с `command`, иначе «DONE». */
 async function startModel(command) {
-  const bodies = [];
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (c) => (body += c));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) return void res.writeHead(404).end();
-      bodies.push(body);
-      const json = JSON.parse(body || '{}');
-      const shell = (json.tools ?? [])
-        .map((t) => t.function?.name)
-        .find((n) => /shell|bash/i.test(n ?? ''));
-      const answered = (json.messages ?? []).some((m) => m.role === 'tool');
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const head = { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'stub-model' };
-      const send = (choice, usage) =>
-        res.write(
-          `data: ${JSON.stringify({ ...head, choices: [choice], ...(usage ? { usage } : {}) })}\n\n`,
-        );
-      const usage = { prompt_tokens: 5, completion_tokens: 1, total_tokens: 6 };
-      if (shell && !answered) {
-        const args = { command, is_background: false, description: 'gate' };
-        const call = { index: 0, id: 'call1', type: 'function' };
-        send({
-          index: 0,
-          delta: {
-            role: 'assistant',
-            tool_calls: [{ ...call, function: { name: shell, arguments: JSON.stringify(args) } }],
-          },
-        });
-        send({ index: 0, delta: {}, finish_reason: 'tool_calls' }, usage);
-      } else {
-        send({ index: 0, delta: { role: 'assistant', content: 'DONE' } });
-        send({ index: 0, delta: {}, finish_reason: 'stop' }, usage);
-      }
-      res.end('data: [DONE]\n\n');
-    });
+  const stub = await startStubModel({
+    script: ({ info }) => {
+      const shell = info.tools.map((tool) => tool.name).find((name) => /shell|bash/i.test(name));
+      const usage = { input: 5, output: 1 };
+      if (!shell || info.hasToolResult) return { text: 'DONE', usage };
+      const args = { command, is_background: false, description: 'gate' };
+      return { tool: { name: shell, args, id: 'call1' }, usage };
+    },
   });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  return { base: `http://127.0.0.1:${server.address().port}`, bodies, close: () => server.close() };
+  return { base: stub.baseUrl, bodies: stub.bodies, close: () => stub.close() };
 }
 
 const { writeQwenQuietRun } = await import(

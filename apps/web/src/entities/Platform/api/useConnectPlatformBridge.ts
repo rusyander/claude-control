@@ -3,12 +3,12 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function connectBridge(): Promise<PlatformBridgeInfo> {
+async function connectBridge(): Promise<PlatformBridgeInfo> {
   const { data } = await apiClient.post<PlatformBridgeInfo>('/platforms/mcp/connect');
   return data;
 }
 
-export async function disconnectBridge(): Promise<PlatformBridgeInfo> {
+async function disconnectBridge(): Promise<PlatformBridgeInfo> {
   const { data } = await apiClient.delete<PlatformBridgeInfo>('/platforms/mcp/connect');
   return data;
 }

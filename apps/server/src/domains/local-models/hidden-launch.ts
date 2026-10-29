@@ -27,7 +27,7 @@ export function psQuote(value: string): string {
  * -ArgumentList` склеивает элементы пробелом как есть, без кавычек. Пробел или `"` —
  * в кавычки; `"` внутри — `\"`; обратные косые перед кавычкой и в конце удваиваются.
  */
-export function winArg(value: string): string {
+function winArg(value: string): string {
   if (value !== '' && !/[\s"]/.test(value)) return value;
   const escaped = value
     .replace(/(\\*)"/g, (_match, slashes: string) => `${slashes}${slashes}\\"`)

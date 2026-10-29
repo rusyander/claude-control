@@ -12,7 +12,7 @@ import { inClaudeGlobals, type GroupScope } from '@agentdeck/contracts/group-sou
  */
 
 /** Предел вложенности групп — страховка обхода поверх защиты от циклов. */
-export const MAX_GROUP_DEPTH = 32;
+const MAX_GROUP_DEPTH = 32;
 
 /**
  * Плоский список сущностей-листьев группы: рекурсивно разворачивает вложенные

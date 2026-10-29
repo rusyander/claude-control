@@ -77,6 +77,22 @@
   font-size: var(--font-size-caption);
 }
 
+.badges {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: var(--spacing-3xs);
+}
+
+// В сессии кто-то работает прямо сейчас — словом и цветом «идёт».
+.sessionLive {
+  padding: 0 var(--spacing-2xs);
+  border-radius: 999px;
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+
 .main {
   overflow-wrap: anywhere;
 }
@@ -113,6 +129,75 @@
 
 .liveNone {
   color: var(--color-fg-subtle);
+}
+
+// Числа «сейчас: N агент · M субагентов»: ноль — приглушённо, не ноль — жирным
+// и своим цветом (агенты — цветом «идёт», как точка идущего, субагенты — акцентом).
+.liveCount {
+  color: var(--color-fg-subtle);
+  font-weight: var(--font-weight-regular);
+}
+
+.liveCountAgents {
+  color: var(--color-warning);
+  font-weight: var(--font-weight-semibold);
+}
+
+.liveCountSubagents {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+// «Сейчас» вверху колонки сессий: кто работает и чем занят.
+.now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+.nowLive {
+  border-left-color: var(--color-warning);
+}
+
+.nowGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nowState {
+  font-weight: var(--font-weight-medium);
+}
+
+.nowStateLive {
+  color: var(--color-warning);
+}
+
+.nowDoing {
+  overflow-wrap: anywhere;
+}
+
+// Вызов «ждёт» (фоновая команда, ожидание итога) — словом, не только цветом.
+.nowWaiting {
+  padding: 0 var(--spacing-3xs);
+  border-radius: 4px;
+  background: var(--color-info-subtle);
+  color: var(--color-info);
+}
+
+// Оборванные паузой вызовы — не ошибки: свой, спокойный цвет.
+.interrupted {
+  color: var(--color-info);
+  overflow-wrap: anywhere;
 }
 
 .agentList {

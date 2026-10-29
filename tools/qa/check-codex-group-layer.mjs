@@ -29,10 +29,10 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { NotChecked, reporter, startStand, wait } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const tag = Math.random().toString(36).slice(2, 8);
@@ -68,83 +68,23 @@ function commandLines() {
 }
 
 /** Заглушка OpenAI responses: тело копится, ответ «OK» после паузы (снимок argv). */
-function startModel() {
-  const bodies = [];
+async function startModel() {
   let onHold;
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', async () => {
-      if (!/\/responses/.test(req.url ?? '')) return void res.writeHead(404).end();
-      bodies.push(raw);
+  const stub = await startStubModel({
+    // Codex ходит только в /responses; прочее — 404, как у прежней заглушки.
+    route: ({ path }) => (/\/responses/.test(path) ? undefined : { status: 404, body: {} }),
+    // Ответ держится HOLD_MS: в это время сняты командные строки процессов codex.
+    script: async () => {
       await onHold?.();
-      await wait(HOLD_MS);
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      const resp = {
-        id: 'r1',
-        object: 'response',
-        model: 'stub-model',
-        status: 'in_progress',
-        output: [],
-      };
-      const item = {
-        type: 'message',
-        id: 'm1',
-        role: 'assistant',
-        status: 'completed',
-        content: [{ type: 'output_text', text: 'OK', annotations: [] }],
-      };
-      send('response.created', { type: 'response.created', response: resp });
-      send('response.output_item.added', {
-        type: 'response.output_item.added',
-        output_index: 0,
-        item: { ...item, content: [] },
-      });
-      send('response.output_text.delta', {
-        type: 'response.output_text.delta',
-        item_id: 'm1',
-        output_index: 0,
-        content_index: 0,
-        delta: 'OK',
-      });
-      send('response.output_item.done', {
-        type: 'response.output_item.done',
-        output_index: 0,
-        item,
-      });
-      send('response.completed', {
-        type: 'response.completed',
-        response: {
-          ...resp,
-          status: 'completed',
-          output: [item],
-          usage: {
-            input_tokens: 10,
-            output_tokens: 1,
-            total_tokens: 11,
-            input_tokens_details: { cached_tokens: 0 },
-            output_tokens_details: { reasoning_tokens: 0 },
-          },
-        },
-      });
-      res.end();
-    });
+      return { text: 'OK', holdMs: HOLD_MS };
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        bodies,
-        setHold: (fn) => (onHold = fn),
-        close: () =>
-          new Promise((r) => {
-            server.closeAllConnections?.();
-            server.close(() => r());
-          }),
-      }),
-    ),
-  );
+  return {
+    port: stub.port,
+    bodies: stub.bodies,
+    setHold: (fn) => (onHold = fn),
+    close: () => stub.close(),
+  };
 }
 
 // MCP-сервер группы: пишет метку с тем, что получил в окружении, и отвечает на рукопожатие.

@@ -1,8 +1,9 @@
 /**
- * Имена CLI провайдеров для процессов, которые не могут импортировать каталог
- * провайдеров (`tools/doctor.mjs` идёт обычным `node`, без разбора TypeScript).
- * Источник правды — `providers/catalog/catalog.ts`; совпадение закреплено тестом
- * `provider-cli-names.test.ts`, поэтому новый провайдер без строки здесь краснит.
+ * Имена CLI провайдеров для процессов, которые не могут импортировать пакет фактов
+ * (`tools/doctor.mjs` идёт обычным `node`, без разбора TypeScript, и проверяет версию Node
+ * раньше всего — импорт `.ts` уронил бы его до понятного сообщения). Источник правды —
+ * `packages/providers` (`CLI_RUN_FACTS`); совпадение с ним и с каталогом панели закреплено
+ * тестом `provider-cli-names.test.ts`, поэтому новый CLI без строки здесь краснит.
  */
 export const PROVIDER_CLI_NAMES = [
   { id: 'claude', name: 'Claude Code', command: 'claude', windowsCommand: 'claude.cmd' },

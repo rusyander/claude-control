@@ -27,12 +27,12 @@ const APP_NAME = 'AgentDeck';
 const BOOT_DRIFT_MS = 120_000;
 
 /** Включено ли окно при старте: флаг-файл, который пишет `pnpm keepalive:app`. */
-export function appFlagPath(stateDir) {
+function appFlagPath(stateDir) {
   return join(stateDir, 'open-app');
 }
 
 /** Отметка «в эту загрузку окно уже открывали». */
-export function appMarkerPath(stateDir) {
+function appMarkerPath(stateDir) {
   return join(stateDir, 'app-opened');
 }
 
@@ -74,7 +74,7 @@ export function writeMarker(stateDir, bootAt) {
  * Apps», Edge — прямо в «Программы»; ярлык открывает приложение в его окне,
  * а не вкладкой.
  */
-export function shortcutCandidates(env) {
+function shortcutCandidates(env) {
   const programs = join(env.APPDATA ?? '', 'Microsoft', 'Windows', 'Start Menu', 'Programs');
   return [
     join(programs, 'Chrome Apps', `${APP_NAME}.lnk`),
@@ -88,7 +88,7 @@ export function shortcutCandidates(env) {
  * запасной путь, когда приложение не установлено: окно то же, только значок в
  * панели задач браузерный.
  */
-export function appBrowserCandidates(env) {
+function appBrowserCandidates(env) {
   const roots = [env['ProgramFiles(x86)'], env.ProgramFiles, env.LOCALAPPDATA].filter(Boolean);
   const paths = [];
   for (const root of roots) {

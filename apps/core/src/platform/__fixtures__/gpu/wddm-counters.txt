@@ -1,0 +1,3 @@
+\host\gpu adapter memory(luid_0x00000000_0x00014bd8_phys_0)\dedicated usage=3393007616
+\host\gpu adapter memory(luid_0x00000000_0x0001b2db_phys_0)\dedicated usage=0
+\host\gpu adapter memory(luid_0x00000000_0x0001b330_phys_0)\dedicated usage=316264448

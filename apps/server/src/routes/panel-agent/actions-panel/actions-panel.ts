@@ -26,7 +26,7 @@ import {
   readRoute,
   stateCard,
 } from '../action-kit/action-kit.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { safePluginId } from '../../../lib/cli-args/cli-args.ts';
 import { isMarketplaceSource } from '../../../domains/plugins/actions.ts';
 import { dataField } from '../texts/texts.ts';

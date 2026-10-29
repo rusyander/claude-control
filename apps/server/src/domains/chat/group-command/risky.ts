@@ -7,7 +7,7 @@ import type { Word } from './shell-parse.ts';
  */
 
 /** Клиенты баз: снос в их команде — человеку. */
-export const DB_CLIENT =
+const DB_CLIENT =
   /^(psql|mysql|mariadb|sqlite3|sqlcmd|mongosh|mongo|redis-cli|clickhouse-client|clickhouse|pgcli|mycli|duckdb|cqlsh)(\.exe)?$/i;
 const DB_DROP =
   /\b(drop\s+(table|database|schema|index|view|materialized|sequence|user|role|owned|extension|type|function|collection)|truncate\b|delete\s+from\b|flushall\b|flushdb\b|dropDatabase\b)|\.drop\s*\(/i;
@@ -15,7 +15,7 @@ const DB_DROP =
 const DB_DESTROY =
   /(^|\s)(dropdb|dropuser)(\s|$)|\bprisma\s+migrate\s+reset\b|\bprisma\s+db\s+push\b.*--force-reset\b|\bdb:(drop|reset)\b|\bmanage\.py\s+flush\b|\bmigrate(:|\s+)(reset|fresh|rollback|down)\b/i;
 
-export function isDbClient(words: Word[]): boolean {
+function isDbClient(words: Word[]): boolean {
   return words.some((word) => DB_CLIENT.test(word.text.split(/[\\/]/).at(-1) ?? ''));
 }
 

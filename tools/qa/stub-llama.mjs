@@ -14,11 +14,11 @@
  *
  * Never touches the user's `~/.ollama`, `~/.claude` or a real llama.cpp install.
  */
-import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const T_U32 = 4;
 const T_STRING = 8;
@@ -172,17 +172,11 @@ export function zipBuffer(files) {
   return Buffer.concat([...locals, centralBuffer, end]);
 }
 
-async function readBody(req) {
-  let text = '';
-  for await (const chunk of req) text += chunk;
-  try {
-    return text ? JSON.parse(text) : {};
-  } catch {
-    return {};
-  }
-}
-
 /**
+ * Модельные пути (`/v1/messages`, `/v1/chat/completions`) отвечает общая заглушка
+ * `packages/stub-model`; пути самого llama-server (здоровье, свойства, слоты, подсчёт
+ * токенов) — `route` ниже, поверх того же сокета.
+ *
  * @param {{ port?: number, alias?: string, nCtx?: number, tokensPerSec?: number, loadingMs?: number,
  *           inputTokens?: number, sleeping?: boolean, countTools?: boolean, slotTokens?: number,
  *           slotDir?: string }} [options]
@@ -192,105 +186,102 @@ export async function startStubLlama(options = {}) {
   const startedAt = Date.now();
   // Сон по простою (`--sleep-idle-seconds`): /health, /props, /v1/models не будят, всё остальное — будит, как у настоящего.
   const state = { sleeping: options.sleeping === true };
-  const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? '/', 'http://x');
-    const json = (status, value) => {
-      res.writeHead(status, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(value));
-    };
-    const payload = req.method === 'GET' ? {} : await readBody(req);
-    calls.push({ method: req.method, path: url.pathname, query: url.search, body: payload });
-    const exempt = ['/health', '/props', '/v1/models'].includes(url.pathname);
+  const MODEL_PATHS = ['/v1/messages', '/v1/chat/completions'];
+  const route = ({ method, path, query, body: parsed }) => {
+    const payload = method === 'GET' ? {} : (parsed ?? {});
+    calls.push({ method, path, query, body: payload });
+    const exempt = ['/health', '/props', '/v1/models'].includes(path);
     if (state.sleeping && !exempt) state.sleeping = false;
-    if (url.pathname === '/health') {
+    const action = new URLSearchParams(query).get('action');
+    if (path === '/health') {
       if (Date.now() - startedAt < (options.loadingMs ?? 0))
-        return json(503, { error: { message: 'Loading model', code: 503 } });
-      return json(200, { status: 'ok' });
+        return { status: 503, body: { error: { message: 'Loading model', code: 503 } } };
+      return { body: { status: 'ok' } };
     }
-    if (url.pathname === '/props')
-      return json(200, {
-        build_info: 'b11583-stub',
-        model_alias: options.alias ?? 'stub',
-        is_sleeping: state.sleeping,
-        default_generation_settings: { n_ctx: options.nCtx ?? 65536 },
-      });
-    if (url.pathname === '/slots/0' && url.searchParams.get('action') === 'erase')
-      return json(200, { id_slot: 0, n_erased: 2038 });
+    if (path === '/props')
+      return {
+        body: {
+          build_info: 'b11583-stub',
+          model_alias: options.alias ?? 'stub',
+          is_sleeping: state.sleeping,
+          default_generation_settings: { n_ctx: options.nCtx ?? 65536 },
+        },
+      };
+    if (path === '/slots/0' && action === 'erase') return { body: { id_slot: 0, n_erased: 2038 } };
     // Сохранение и восстановление кеша слота — ответы сборки b11583 (замер 15.10). Файлы
     // «пишутся» в память заглушки: восстановить можно только сохранённое ею же. С `slotDir`
     // (`--slot-save-path`) файл ложится и на диск, как у настоящего, — его видит панель.
-    if (url.pathname === '/slots/0' && url.searchParams.get('action') === 'save') {
+    if (path === '/slots/0' && action === 'save') {
       state.savedSlots ??= new Set();
       state.savedSlots.add(payload.filename);
       if (options.slotDir) writeFileSync(join(options.slotDir, payload.filename), 'slot');
-      return json(200, {
-        id_slot: 0,
-        filename: payload.filename,
-        n_saved: options.slotTokens ?? 22358,
-        n_written: 2262668504,
-        timings: { save_ms: 1830 },
-      });
+      return {
+        body: {
+          id_slot: 0,
+          filename: payload.filename,
+          n_saved: options.slotTokens ?? 22358,
+          n_written: 2262668504,
+          timings: { save_ms: 1830 },
+        },
+      };
     }
-    if (url.pathname === '/slots/0' && url.searchParams.get('action') === 'restore') {
+    if (path === '/slots/0' && action === 'restore') {
       const onDisk = options.slotDir && existsSync(join(options.slotDir, payload.filename));
       if (!state.savedSlots?.has(payload.filename) && !onDisk)
-        return json(400, {
-          error: { code: 400, message: 'failed to restore slot', type: 'invalid_request_error' },
-        });
-      return json(200, {
-        id_slot: 0,
-        filename: payload.filename,
-        n_restored: options.slotTokens ?? 22358,
-        n_read: 2262668504,
-        timings: { restore_ms: 2224 },
-      });
-    }
-    if (url.pathname === '/v1/messages/count_tokens')
-      return json(200, {
-        // `countTools`: инструменты запроса прибавляют токены (четверть длины JSON) — так видна цена набора.
-        input_tokens:
-          (options.inputTokens ?? 7768) +
-          (options.countTools ? Math.ceil(JSON.stringify(payload.tools ?? []).length / 4) : 0),
-      });
-    if (url.pathname === '/v1/chat/completions') {
-      const rate = options.tokensPerSec ?? 42;
-      return json(200, {
-        choices: [{ message: { role: 'assistant', content: 'function merge() {}' } }],
-        timings: {
-          prompt_n: 120,
-          prompt_ms: 60,
-          predicted_n: 256,
-          predicted_ms: (256 / rate) * 1000,
+        return {
+          status: 400,
+          body: {
+            error: { code: 400, message: 'failed to restore slot', type: 'invalid_request_error' },
+          },
+        };
+      return {
+        body: {
+          id_slot: 0,
+          filename: payload.filename,
+          n_restored: options.slotTokens ?? 22358,
+          n_read: 2262668504,
+          timings: { restore_ms: 2224 },
         },
-      });
+      };
     }
-    if (url.pathname === '/v1/messages')
-      return json(200, {
-        id: 'msg_stub',
-        type: 'message',
-        role: 'assistant',
-        model: payload.model ?? options.alias ?? 'stub',
-        content: [{ type: 'text', text: 'ok' }],
-        stop_reason: 'end_turn',
-        usage: { input_tokens: 12, output_tokens: 2 },
-      });
-    return json(404, { error: { message: 'not found' } });
+    if (path === '/v1/messages/count_tokens')
+      return {
+        body: {
+          // `countTools`: инструменты запроса прибавляют токены (четверть длины JSON) — так видна цена набора.
+          input_tokens:
+            (options.inputTokens ?? 7768) +
+            (options.countTools ? Math.ceil(JSON.stringify(payload.tools ?? []).length / 4) : 0),
+        },
+      };
+    if (MODEL_PATHS.includes(path)) return undefined;
+    return { status: 404, body: { error: { message: 'not found' } } };
+  };
+  const stub = await startStubModel({
+    ...(options.port === undefined ? {} : { port: options.port }),
+    models: [options.alias ?? 'stub'],
+    route,
+    script: ({ dialect }) => {
+      if (dialect === 'anthropic-messages') return { text: 'ok', usage: { input: 12, output: 2 } };
+      // Замер скорости панели читает `timings` llama-server из ответа.
+      const rate = options.tokensPerSec ?? 42;
+      const timings = {
+        prompt_n: 120,
+        prompt_ms: 60,
+        predicted_n: 256,
+        predicted_ms: (256 / rate) * 1000,
+      };
+      return { text: 'function merge() {}', extra: { timings } };
+    },
   });
-  await new Promise((done) => server.listen(options.port ?? 0, '127.0.0.1', done));
-  const address = server.address();
   return {
-    port: typeof address === 'object' && address ? address.port : 0,
+    port: stub.port,
     calls,
     /** Уложить сервер спать, как по простою. */
     sleep: () => {
       state.sleeping = true;
     },
     isSleeping: () => state.sleeping,
-    close: () =>
-      new Promise((done) => {
-        server.closeAllConnections?.();
-        server.close(() => done(undefined));
-      }),
+    close: () => stub.close(),
   };
 }
 

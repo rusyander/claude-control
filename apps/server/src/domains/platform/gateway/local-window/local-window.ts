@@ -162,7 +162,7 @@ export function promptTooLongMessage(tokens: number, limit: number): string {
  * переполнение, после которого ход умирал. Выше этой доли шлюз спрашивает у сервера
  * точный счёт (замер: ~36 мс).
  */
-export const LOCAL_PRECOUNT_SHARE = 0.75;
+const LOCAL_PRECOUNT_SHARE = 0.75;
 
 /** Нужен ли точный счёт вместо оценки. */
 export function needsPrecount(estimate: number, context: number): boolean {

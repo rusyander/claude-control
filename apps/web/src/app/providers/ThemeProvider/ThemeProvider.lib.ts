@@ -12,7 +12,7 @@ export function systemTheme(): 'dark' | 'light' {
  * горел полосой над интерфейсом (владелец 22.10.2026); окно должно продолжать
  * интерфейс, а не спорить с ним.
  */
-export const WINDOW_BAR_COLOR: Record<'dark' | 'light', string> = {
+const WINDOW_BAR_COLOR: Record<'dark' | 'light', string> = {
   light: '#ffffff',
   dark: '#16191f',
 };

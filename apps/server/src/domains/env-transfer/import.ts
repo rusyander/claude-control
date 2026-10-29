@@ -31,7 +31,7 @@ import type { CodedFields } from '@agentdeck/contracts/server-messages';
  * или путь выводит за его пределы — запись помечается нерешённой и не пишется.
  */
 
-export interface ImportPlanEntry extends CodedFields<'problem'> {
+interface ImportPlanEntry extends CodedFields<'problem'> {
   archivePath: string;
   /** Путь внутри места — как он выглядит в архиве. */
   relative: string;

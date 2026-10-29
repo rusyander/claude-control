@@ -109,7 +109,7 @@ export function parseCimCommandTable(text: string): CommandRow[] | undefined {
 }
 
 /** Вывод `ps -A -o pid= -o ppid= -o etime= -o args=` → снимок той же формы. */
-export function parsePsCommandTable(text: string, nowMs: number): CommandRow[] | undefined {
+function parsePsCommandTable(text: string, nowMs: number): CommandRow[] | undefined {
   const rows: CommandRow[] = [];
   for (const line of text.split(/\r?\n/)) {
     const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
@@ -398,7 +398,7 @@ function procEnviron(pid: number): string | undefined {
 }
 
 /** В сыром окружении (`A=1\0B=2`) есть переменная `name` с непустым значением. */
-export function environHas(environ: string | undefined, name: string): boolean {
+function environHas(environ: string | undefined, name: string): boolean {
   return Boolean(
     environ
       ?.split('\0')

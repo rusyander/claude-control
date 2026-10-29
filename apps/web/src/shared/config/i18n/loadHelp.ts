@@ -3,7 +3,7 @@ import type { HelpSchema } from './help/ru';
 import { i18n } from './instance';
 import { helpReady } from './help-loader.constants';
 
-export const helpPending = new Map<Language, Promise<void>>();
+const helpPending = new Map<Language, Promise<void>>();
 
 /*
  * Справка — 400 КБ текста на язык, а читают её редко: грузится при первом
@@ -11,7 +11,7 @@ export const helpPending = new Map<Language, Promise<void>>();
  * странице. Ключи остаются `help.…` в общем неймспейсе — документы разделов
  * ничего не знают о том, что их словарь приехал отдельно.
  */
-export const helpDictionaries: Record<Language, () => Promise<HelpSchema>> = {
+const helpDictionaries: Record<Language, () => Promise<HelpSchema>> = {
   ru: () => import('./help/ru').then((m) => m.helpRu),
   en: () => import('./help/en').then((m) => m.helpEn),
 };

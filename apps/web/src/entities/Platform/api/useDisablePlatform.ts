@@ -5,7 +5,7 @@ import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { invalidateApplied } from '../lib/invalidateApplied';
 
 /** Снять применение: целиком либо точечно — одну строку журнала. */
-export async function disablePlatform(input: {
+async function disablePlatform(input: {
   id: string;
   targets?: string[];
 }): Promise<PlatformRollbackResult> {

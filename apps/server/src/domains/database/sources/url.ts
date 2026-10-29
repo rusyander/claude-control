@@ -85,7 +85,7 @@ export function parseDatabaseUrl(raw: string): ParsedTarget | undefined {
 }
 
 /** Строка ключей libpq: `host=localhost port=5432 dbname=app user=app password='a b'`. */
-export function parseKeyValueDsn(value: string): ParsedTarget | undefined {
+function parseKeyValueDsn(value: string): ParsedTarget | undefined {
   const pairs = new Map<string, string>();
   for (const match of value.matchAll(/(\w+)\s*=\s*(?:'((?:[^'\\]|\\.)*)'|(\S+))/g)) {
     pairs.set((match[1] ?? '').toLowerCase(), (match[2] ?? match[3] ?? '').replace(/\\(.)/g, '$1'));

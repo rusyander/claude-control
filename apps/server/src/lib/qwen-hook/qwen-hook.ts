@@ -84,7 +84,7 @@ export interface QwenHookRule {
 }
 
 /** Событие, форму которого панель не поняла: сохраняется целиком. */
-export interface QwenHookPreservedEvent {
+interface QwenHookPreservedEvent {
   key: string;
   value: string;
 }
@@ -123,7 +123,7 @@ function isCleanString(value: unknown): value is string {
 }
 
 /** Таймаут: целое в границах поля. */
-export function isValidQwenTimeout(value: unknown): value is number {
+function isValidQwenTimeout(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isInteger(value) &&

@@ -60,6 +60,21 @@ const has = (name) => argv.includes(`--${name}`);
 
 // --help prints the header above (usage, modes, exit codes, safety). Without it a lane asked for help,
 // got only "--cmd is required" and read the source instead (live review 18.10.2026: 3 calls, 5k chars).
+// The --mutants plan shape is printed too: fix and verify sessions each read runMutants' source to learn
+// it (4 calls). The example line is valid input — the test parses it.
+const MUTANT_PLAN_HELP = [
+  '--mutants <plan.json> — a JSON array (one object = one mutant); the identity control runs by itself:',
+  '  file     string, required — path relative to --cwd (absolute works)',
+  '  find     string, required, non-empty — exact text; must occur once, else set nth',
+  '  replace  string, required — the break; "" deletes; equal to find = refused (that is the control)',
+  '  test     string, optional — substring of the FAIL line of the test that must kill it; another test failing = not proof',
+  '  spec     string, optional — the test file holding that test; the mutant runs only it ({spec} in --cmd, else it',
+  '           replaces the test files --cmd lists). Unset: the one listed test file whose source names `test`',
+  '  nth      number, optional — which occurrence of find (1-based) when it repeats',
+  '  multi-line find/replace: write \\n, a CRLF file is matched too',
+  'Example:',
+  '[{"file":"src/limits.js","find":"if (n >= max)","replace":"if (n > max)","test":"rejects at the cap"}]',
+].join('\n');
 if (has('help') || argv.includes('-h')) {
   const head = [];
   for (const line of readFileSync(new URL(import.meta.url), 'utf8')
@@ -73,7 +88,8 @@ if (has('help') || argv.includes('-h')) {
       `Vitest «related {file}» → graph mode (2 runs + tie-breaks, no --max cap): --trust-green (gate just green, skip baseline) ` +
       `--budget <min, default 8> --no-graph (old per-file runs). A file with its own sibling test (<name>.test.<ext>) is judged by it first, ` +
       `the graph walks only the rest (--no-sibling: graph only). A check that runs no test at all stops at once (exit 2). ` +
-      `Verdicts are memoised per tree; --fresh ignores the memo.`,
+      `Verdicts are memoised per tree; --fresh ignores the memo.\n\n` +
+      MUTANT_PLAN_HELP,
   );
   process.exit(0);
 }
@@ -116,6 +132,10 @@ const STATE = TOP
   : join(tmpdir(), 'claude-mustfail');
 const SCOPE = (TOP || longPath(CWD)).replace(/\\/g, '/').toLowerCase();
 const JOURNAL = join(STATE, `journal-${process.pid}.json`);
+// Every check this run spawns inherits it: a repo-side guard may refuse a suite started while a FOREIGN run
+// holds the tree mutated, and must let this run's own checks through (agents sharing one working copy read
+// each other's mutants as flaky tests).
+process.env.MUSTFAIL_PID = String(process.pid);
 const BACKUPS = join(STATE, String(process.pid));
 const journal = {
   pid: process.pid,
@@ -153,11 +173,13 @@ function intend(full, bytes) {
     persist();
   }
 }
+/** A file someone edited mid-run was left as is — its plan-time original stays on disk for a human. */
+let keepBackups = false;
 /** Every file is back: the journal and the backups have nothing left to protect. */
 function closeJournal() {
   try {
     rmSync(JOURNAL, { force: true });
-    rmSync(BACKUPS, { recursive: true, force: true });
+    if (!keepBackups) rmSync(BACKUPS, { recursive: true, force: true });
   } catch {
     /* a leftover journal whose files all match their originals settles silently next start */
   }
@@ -175,14 +197,25 @@ const refuse = (msg) => {
   process.exit(2);
 };
 
-/** Settle journals of dead runs in this tree; refuse while another live run owns it. */
+const busy = (j) =>
+  refuse(
+    `another mustfail run (pid ${j.pid}, started ${j.started}) is rewriting this tree right now — a second run would ` +
+      `back up its mutations as originals. Wait for it; if pid ${j.pid} is not mustfail, delete ${j.file}.`,
+  );
+
+/**
+ * Settle journals of dead runs in this tree. @returns the live foreign ones. A journal under OUR pid but
+ * not this run's start is a dead run whose pid came back (reboot, pid reuse): its files are put back, never
+ * overwritten by this run's journal of the same name — the backups folder is the same one too.
+ */
 function settle() {
   let names;
   try {
     names = readdirSync(STATE).filter((n) => /^journal-\d+\.json$/.test(n));
   } catch {
-    return;
+    return [];
   }
+  const live = [];
   for (const n of names) {
     const file = join(STATE, n);
     let j;
@@ -193,12 +226,13 @@ function settle() {
         `unreadable journal ${file} — a killed run may have left files rewritten. Check them against git, then delete it.`,
       );
     }
-    if (j.pid === process.pid || j.scope !== SCOPE) continue;
-    if (alive(j.pid))
-      refuse(
-        `another mustfail run (pid ${j.pid}, started ${j.started}) is rewriting this tree right now — a second run would ` +
-          `back up its mutations as originals. Wait for it; if pid ${j.pid} is not mustfail, delete ${file}.`,
-      );
+    if (j.scope !== SCOPE) continue;
+    const own = j.pid === process.pid;
+    if (own && j.started === journal.started) continue;
+    if (!own && alive(j.pid)) {
+      live.push({ pid: j.pid, started: j.started, file });
+      continue;
+    }
     const restored = [];
     const stuck = [];
     for (const [full, e] of Object.entries(j.files ?? {})) {
@@ -232,9 +266,11 @@ function settle() {
     rmSync(file, { force: true });
     rmSync(join(STATE, String(j.pid)), { recursive: true, force: true });
   }
+  return live;
 }
 
-settle();
+const first = settle();
+if (first.length) busy(first[0]);
 if (has('recover')) process.exit(0);
 
 // A console closed under the run (SIGHUP) or Ctrl+Break (SIGBREAK) still leaves time to put files back.
@@ -249,6 +285,17 @@ if (!CMD) {
   console.error('mustfail: --cmd "<command that must be able to go red>" is required');
   process.exit(2);
 }
+
+// The tree is claimed BEFORE the first check run, not at the first write: baselines run long, and a second run
+// starting under them saw no journal, ran its own and then both rewrote one tree (core review A1r2-F01, 29.10).
+// Two runs claiming at once both see each other on the re-read: the later start (then the higher pid) yields.
+persist();
+process.on('exit', () => {
+  if (!Object.keys(journal.files).length) rmSync(JOURNAL, { force: true });
+});
+const before = (a, b) => a.started < b.started || (a.started === b.started && a.pid < b.pid);
+const earlier = settle().find((j) => before(j, journal));
+if (earlier) busy(earlier);
 
 // Which shell runs the check is not a detail: on Windows `shell: true` is cmd.exe, and a POSIX-shaped
 // command handed to it can SUCCEED where it was meant to fail. Measured 18.09.2026 while testing this
@@ -528,10 +575,24 @@ async function runMutants() {
   const timeoutFor = (cmd) => Number(flag('timeout')) || Math.max(60_000, 5 * slowest.get(cmd));
 
   let live = null; // the one file currently written, so a signal or a throw can put it back
+  let liveBytes = null; // what this run wrote there — anything else is someone's edit, never overwritten
   const putBack = () => {
     if (!live) return true;
     const { full, before } = live;
     try {
+      // A parallel agent edited the file during a mutant run; restoring the plan-time original
+      // silently erased that edit. Bytes this run did not write are not its to put back.
+      const now = existsSync(full) ? readFileSync(full) : null;
+      if (now === null || !now.equals(liveBytes)) {
+        keepBackups = true;
+        console.error(
+          `\nmustfail: ${full} CHANGED during the run (someone edited it) — left as is, not restored.\n` +
+            `  The edit may have been made on top of the mutant: check the file for ${JSON.stringify(live.replace)} (was ${JSON.stringify(live.find)}).\n` +
+            `  Plan-time original kept in ${journal.files[full]?.backup ?? BACKUPS}. Re-plan the mutants against the current file.`,
+        );
+        live = null;
+        return false;
+      }
       writeFileSync(full, before);
       if (readFileSync(full).equals(before)) {
         live = null;
@@ -551,10 +612,21 @@ async function runMutants() {
       process.exit(2);
     });
   const apply = (m, bytes) => {
+    // The mutant was cut from the file as read at plan time; written over a newer file it would erase
+    // the newer edit too. A file that moved since → stop, the plan no longer describes it.
+    const now = existsSync(m.full) ? readFileSync(m.full) : null;
+    if (now === null || !now.equals(m.before)) {
+      console.error(
+        `\nmustfail: ${m.full} changed since the plan was read (someone edited it) — mutant not written; re-plan against the current file.`,
+      );
+      return false;
+    }
     track(m.full, m.before);
     intend(m.full, bytes);
     live = m;
+    liveBytes = bytes;
     writeFileSync(m.full, bytes);
+    return true;
   };
 
   // Failing-test lines as runners print them: vitest/jest (FAIL, ×, ✕, ●), node:test (✖, not ok),
@@ -574,7 +646,7 @@ async function runMutants() {
     // It must SURVIVE. If it dies, the harness breaks tests by itself — a watcher cache, a path, line
     // endings — and every RED below would be noise (23.09.2026: 11/11 "killed" by file-not-found).
     const c = muts[0];
-    apply(c, c.identity);
+    if (!apply(c, c.identity)) return 2;
     const cr = await exec(cmdFor(c), timeoutFor(cmdFor(c)));
     if (!putBack()) return 2;
     if (cr.status !== 0) {
@@ -591,7 +663,7 @@ async function runMutants() {
     ]);
 
     for (const m of muts) {
-      apply(m, m.mutated);
+      if (!apply(m, m.mutated)) return 2;
       const r = await exec(cmdFor(m), timeoutFor(cmdFor(m)));
       if (!putBack()) return 2;
       const failing = r.out
@@ -954,21 +1026,42 @@ function save(path) {
   const full = join(root, path);
   const before = existsSync(full) ? readFileSync(full) : null;
   const backup = track(full, before);
-  saved.set(path, { full, before, backup });
+  saved.set(path, { full, before, backup, wrote: undefined });
+}
+
+/**
+ * Put one saved file back — only while it still holds the bytes this run wrote (a restore of the
+ * plan-time original once erased a parallel agent's edit). Someone's edit stays; its original is kept.
+ * @returns false when the file could not be written back
+ */
+function putFileBack(path) {
+  const e = saved.get(path);
+  if (e.wrote === undefined) return true; // this run never wrote it
+  const now = existsSync(e.full) ? readFileSync(e.full) : null;
+  if (now === null || !now.equals(e.wrote)) {
+    keepBackups = true;
+    e.wrote = undefined;
+    console.error(
+      `\nmustfail: ${path} CHANGED during the run (someone edited it) — left as is, not restored; the edit may sit on top of the base revert. Original kept in ${e.backup}.`,
+    );
+    return true;
+  }
+  e.wrote = undefined;
+  if (e.before === null) {
+    if (existsSync(e.full)) unlinkSync(e.full);
+    return true;
+  }
+  writeFileSync(e.full, e.before);
+  return readFileSync(e.full).equals(e.before);
 }
 
 function restore() {
   if (restored) return true;
   restored = true;
   const broken = [];
-  for (const [path, { full, before }] of saved) {
+  for (const path of saved.keys()) {
     try {
-      if (before === null) {
-        if (existsSync(full)) unlinkSync(full);
-      } else {
-        writeFileSync(full, before);
-        if (!readFileSync(full).equals(before)) broken.push(path);
-      }
+      if (!putFileBack(path)) broken.push(path);
     } catch {
       broken.push(path);
     }
@@ -992,12 +1085,13 @@ for (const sig of SIGNALS) {
 
 /** Revert one path to base. @returns 'reverted' | 'new' (did not exist at base) */
 function revert(path) {
-  const { full } = saved.get(path);
+  const e = saved.get(path);
   const content = atBase(path);
   if (content === null) return 'new';
-  intend(full, content);
-  mkdirSync(dirname(full), { recursive: true });
-  writeFileSync(full, content);
+  intend(e.full, content);
+  mkdirSync(dirname(e.full), { recursive: true });
+  e.wrote = content;
+  writeFileSync(e.full, content);
   return 'reverted';
 }
 
@@ -1071,12 +1165,7 @@ async function graphMode() {
     'RED·symbol': 'the import of a vanished symbol failed, not a behaviour check',
   };
 
-  const putBack = (f) => {
-    const { full, before } = saved.get(f);
-    if (before === null) {
-      if (existsSync(full)) unlinkSync(full);
-    } else writeFileSync(full, before);
-  };
+  const putBack = (f) => putFileBack(f);
 
   // Own sibling test first (g9 25.10: the graph walk took 105 s + 102 s for 2 files whose 6 test files run
   // directly in ~10 s). Revert one file, run only its `<name>.test.<ext>`: red = covered, proven without the
@@ -1264,12 +1353,7 @@ try {
       for (const f of list) save(f);
       for (const f of list) revert(f);
       const all = run();
-      for (const f of list) {
-        const { full, before } = saved.get(f);
-        if (before === null) {
-          if (existsSync(full)) unlinkSync(full);
-        } else writeFileSync(full, before);
-      }
+      for (const f of list) putFileBack(f);
       if (all.status === 0) {
         nothingCovered = true;
         exitCode = 1;
@@ -1337,9 +1421,7 @@ try {
       const r = run(path);
       // Put this file back before the next one, so each verdict is about one file alone. A file the
       // change DELETED has no local content: base content was written above, so removing it restores.
-      const { full, before } = saved.get(path);
-      if (before === null) unlinkSync(full);
-      else writeFileSync(full, before);
+      putFileBack(path);
       if (r.status !== 0) {
         const out = (r.stdout || '') + (r.stderr || '');
         if (unionGreen && NO_TESTS.test(out)) {
@@ -1406,6 +1488,13 @@ if (green) {
 if (exitCode === 0 && !rows.some(([, v]) => v.startsWith('RED'))) {
   console.error(
     'mustfail: nothing proven — no target could be reverted (new files). Prove new code with --mutants.',
+  );
+  process.exit(2);
+}
+// A file someone edited mid-run was left as is: the verdicts above ran on a tree nobody owned alone.
+if (keepBackups) {
+  console.error(
+    'mustfail: a file changed under the run (see CHANGED above) — verdicts are not trustworthy, re-run on a quiet tree.',
   );
   process.exit(2);
 }

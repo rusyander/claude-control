@@ -99,6 +99,22 @@ describe('след скиллов, хуков и MCP', () => {
     expect(snap.summary[0]).toMatchObject({ errors: 1, count: 1 });
   });
 
+  it('MCP, оборванный паузой: «прервано», не ошибка и не в счёт ошибок', () => {
+    const snap = trailOf([
+      toolUse('p2', 'mcp__telegram-inbox__telegram_send_message', { text: 'x' }, 1),
+      toolResult(
+        'p2',
+        "[Tool call interrupted: the session ended before this call's result was recorded.]",
+        5,
+        true,
+      ),
+    ]);
+    expect(snap.items[0]).toMatchObject({ outcome: 'interrupted', durationMs: 4000 });
+    // Сводка не передаёт нулевой счёт ошибок.
+    expect(snap.summary[0]).toMatchObject({ count: 1 });
+    expect(snap.summary[0]?.errors).toBeUndefined();
+  });
+
   it('hook_success: имя скрипта из команды, замер CLI; код 2 — отказ, иной ненулевой — ошибка', () => {
     const snap = trailOf([
       hook(

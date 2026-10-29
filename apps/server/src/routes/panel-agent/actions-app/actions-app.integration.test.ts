@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
-import { SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import type { ServerContext } from '../../../context.ts';
 import { registerAccessGate } from '../../../lib/access-gate/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../../lib/empty-body.ts';

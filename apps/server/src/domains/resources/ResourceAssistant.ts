@@ -9,11 +9,7 @@ import {
   type HelperAsk,
 } from '../assistant/assistant.ts';
 import { maskAssistText } from '../assistant-secrets.ts';
-import {
-  SECRET_MASK,
-  maskSecretsInText,
-  restoreMaskedSecrets,
-} from '../../lib/secret-mask/secret-mask.ts';
+import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '@agentdeck/dlp/secret-mask';
 import type { AgentImage } from '../../lib/agent-images/agent-images.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 

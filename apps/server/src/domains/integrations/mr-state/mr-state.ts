@@ -22,7 +22,7 @@ import type { MrReview } from '../mr-review/mr-review.types.ts';
  * проекта не роняет остальные — она уходит в `failed`.
  */
 
-export type MrState = MrReview['state'];
+type MrState = MrReview['state'];
 
 export interface MrStates {
   states: Map<string, MrState>;

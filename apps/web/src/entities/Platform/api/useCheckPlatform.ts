@@ -13,7 +13,7 @@ import { queryKeys } from '@shared/api/query-keys';
  * проба её не стирает. Иначе карточка теряла бы «а три часа назад отвечал» до
  * перезагрузки списка.
  */
-export function lastOkPatch(
+function lastOkPatch(
   fresh: PlatformHealthRecord,
   previous: PlatformHealthRecord | undefined,
 ): { lastOkAt?: string } {

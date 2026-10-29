@@ -13,7 +13,7 @@ interface Use {
   at: number;
 }
 /** Вызов инструмента так, как его видят хуки набора. */
-export interface EconomyUse {
+interface EconomyUse {
   name: string;
   input: Record<string, unknown>;
 }

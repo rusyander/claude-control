@@ -16,7 +16,7 @@ import { Prec, type Extension } from '@codemirror/state';
  */
 
 /** Тема: рамок и фона у самого редактора нет — их рисует окно вокруг. */
-export const editorTheme: Extension = EditorView.theme({
+const editorTheme: Extension = EditorView.theme({
   '&': {
     height: '100%',
     backgroundColor: 'transparent',
@@ -52,7 +52,7 @@ export const editorTheme: Extension = EditorView.theme({
 });
 
 /** Подсветка синтаксиса теми же переменными — см. пояснение выше. */
-export const highlightStyle = HighlightStyle.define([
+const highlightStyle = HighlightStyle.define([
   { tag: [tags.keyword, tags.modifier, tags.controlKeyword], color: 'var(--code-keyword)' },
   { tag: [tags.string, tags.special(tags.string)], color: 'var(--code-string)' },
   { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--code-comment)' },

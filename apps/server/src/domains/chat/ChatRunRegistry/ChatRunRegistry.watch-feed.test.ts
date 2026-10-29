@@ -66,9 +66,16 @@ describe('ChatRunRegistry → сторож групп', () => {
       { origin: 'chat' },
     );
     registry.start('child-work', { prompt: 'работа', cwd: '/work' }, { origin: 'chat' });
+    // promptChars — длина вводной, ушедшей в CLI (R37 сторожа: длинная вводная).
     expect(feeds.map((entry) => entry.feed)).toEqual([
-      { kind: 'start', sessionId: undefined, cwd: '/work', forkOf: 's-work' },
-      { kind: 'start', sessionId: undefined, cwd: '/work' },
+      {
+        kind: 'start',
+        sessionId: undefined,
+        cwd: '/work',
+        promptChars: 'доставка'.length,
+        forkOf: 's-work',
+      },
+      { kind: 'start', sessionId: undefined, cwd: '/work', promptChars: 'работа'.length },
     ]);
   });
 

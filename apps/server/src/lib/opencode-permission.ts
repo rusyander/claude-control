@@ -180,7 +180,7 @@ export function readOpencodePermission(raw: unknown): OpencodePermissionState {
 }
 
 /** Имена записей `permission`, которые панель НЕ ведёт (нельзя ни менять, ни удалять). */
-export function preservedKeys(raw: unknown): Set<string> {
+function preservedKeys(raw: unknown): Set<string> {
   return new Set(readOpencodePermission(raw).preserved.map((entry) => entry.key));
 }
 

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { WatchSeverity } from '@agentdeck/contracts';
 import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { fingerprintOf, normalizeText, remarkFingerprint } from './fingerprint.ts';
 import type { WatchEvent, WatchFinding, WatchRemark, WatchSignal } from './types.ts';
 

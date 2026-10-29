@@ -107,7 +107,7 @@ function main() {
     writeAll(
       2,
       Buffer.from(
-        `[verify-ledger] reused green ${hit.runId} from ${at} (key ${key.slice(0, 8)}): nothing it depends on changed since; this output and exit code are that run's${forceHint(L, 'AGENTDECK_VERIFY_LEDGER=off forces a run')}\n`,
+        `[verify-ledger] reused green ${hit.runId} from ${at} (key ${key.slice(0, 8)}): nothing it depends on changed since; this output and exit code are that run's${narrowedNote(hit)}${forceHint(L, 'AGENTDECK_VERIFY_LEDGER=off forces a run')}\n`,
       ),
     );
     const empty = Buffer.alloc(0);
@@ -211,6 +211,7 @@ function narrow(L, D, { repo, match, cwd, delta, base, event, startedAt }) {
   ];
   base.scope = `delta:${last.tree.slice(0, 12)}`;
   base.chain = (last.chain ?? 0) + 1;
+  base.deltaOf = { runId: last.runId, at: last.at };
   const names = `${delta.files.slice(0, 5).join(', ')}${delta.files.length > 5 ? ', …' : ''}`;
   const what = listed
     ? `vitest run of the ${delta.shape.files.length} listed file(s) limited to tests whose imports reach ${delta.files.length} changed file(s) (${names}); the rest keep that green's verdict, none selected = none affected`
@@ -229,6 +230,16 @@ function narrow(L, D, { repo, match, cwd, delta, base, event, startedAt }) {
     ...(listed ? { mode: 'files' } : {}),
   });
   return true;
+}
+
+/**
+ * Повтор по ключу суженного прогона выводит только выбранные им тесты: без этой строки
+ * «3 файла из 3» на команду о 5 файлах читается как ложный зелёный (28.10 — журнал выключили).
+ */
+function narrowedNote(hit) {
+  if (!String(hit.scope ?? '').startsWith('delta:')) return '';
+  const from = hit.deltaOf?.at ? ` from ${new Date(hit.deltaOf.at).toISOString()}` : '';
+  return `; that run was narrowed (delta since green ${hit.deltaOf?.runId ?? 'unknown'}${from}): its output lists only the tests it selected, the rest keep that green's verdict`;
 }
 
 /**

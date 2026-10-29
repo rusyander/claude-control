@@ -33,7 +33,7 @@ export type Answer =
     };
 
 /** Параметры прошлого хода разговора — ответ на вопрос продолжает его с ними же. */
-export interface RunParams {
+interface RunParams {
   model?: string;
   effort?: string;
   permissionMode?: string;

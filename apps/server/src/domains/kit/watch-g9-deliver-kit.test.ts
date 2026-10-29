@@ -137,6 +137,23 @@ describe('F3 gate-at-end: в доставке повтор отказа гейт
     );
   });
 
+  it('27.10 19:47: причина в первом же вызове — отказ говорит, что она прочитана, и её повтор знак в знак проходит', () => {
+    const reasoned = `${GATE} # gate-reason: final tree after the nit fixes`;
+    const first = gate(reasoned, ran);
+    expect(decision(first)).toBe('deny');
+    expect(reason(first)).toContain('was read, but it lifts only a refusal of this same command');
+    expect(reason(first)).not.toContain('repeat the call with `# gate-reason:');
+    const refused = [
+      ...ran,
+      use('Bash', { command: reasoned }, 'd2'),
+      result('d2', `PreToolUse:Bash hook error: [ctx-guard] ${reason(first)}`),
+    ];
+    expect(decision(gate(reasoned, refused))).toBeUndefined();
+    const short = gate(`${GATE} # gate-reason: flaky`, ran);
+    expect(reason(short)).toContain('under three words');
+    expect(reason(gate(GATE, ran))).toContain('repeat the call with `# gate-reason:');
+  });
+
   it('вне доставки повтор того же вызова остаётся побегом', () => {
     const fix = { AGENTDECK_GROUP_STAGE: 'fix', AGENTDECK_HEAVY_QUEUE_DIR: dir };
     const plainRan = [prompt('поправь'), use('Bash', { command: GATE }, 'f1'), result('f1', 'ok')];

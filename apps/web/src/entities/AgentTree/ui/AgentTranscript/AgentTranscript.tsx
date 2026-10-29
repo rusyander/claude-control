@@ -10,7 +10,7 @@ import { formatTokens } from '@shared/lib/formatTokens';
 import { useChatProgress } from '@entities/Chat';
 import { useAgentTranscript } from '../../api/agentTreeApi';
 import { shortModel } from '../../model/agentTree';
-import { anomalyParts, repeatedReadsHint } from '../../model/agentHistory';
+import { anomalyParts, interruptedPart, repeatedReadsHint } from '../../model/agentHistory';
 import { AgentStepRow } from './AgentStepRow';
 import type { AgentTranscriptProps } from './AgentTranscript.types';
 import styles from './AgentTranscript.module.scss';
@@ -65,6 +65,7 @@ export function AgentTranscript({ chatId, agentId, onClose }: AgentTranscriptPro
   const first = data?.start ?? 0;
   const shownEnd = first + (data?.steps.length ?? 0);
   const anomalies = anomalyParts(data?.anomalies, t);
+  const cut = interruptedPart(data?.anomalies, t);
   const tokens = data?.tokens;
 
   return (
@@ -130,6 +131,17 @@ export function AgentTranscript({ chatId, agentId, onClose }: AgentTranscriptPro
             data-agent-pane-anomalies
           >
             {anomalies.join(' · ')}
+          </Typography>
+        )}
+        {cut && (
+          <Typography
+            variant="caption"
+            as="p"
+            className={styles.interrupted}
+            title={t('agentTree.anomalies.interruptedHint')}
+            data-agent-pane-interrupted
+          >
+            {cut}
           </Typography>
         )}
         {data?.prompt && (

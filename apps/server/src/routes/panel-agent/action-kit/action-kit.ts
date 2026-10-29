@@ -7,7 +7,7 @@ import {
   maskSecretsInText,
   restoreMaskedSecrets,
   SECRET_MASK,
-} from '../../../lib/secret-mask/secret-mask.ts';
+} from '@agentdeck/dlp/secret-mask';
 import { unifiedDiff } from '../../../domains/config-preview/unified-diff.ts';
 import type {
   ConfigPreviewRequest,

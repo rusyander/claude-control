@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export interface ApplyInput extends PromptGateSettings {
+interface ApplyInput extends PromptGateSettings {
   /** Вернуть свой скрипт поверх правки человека — только по явной кнопке. */
   force?: boolean;
 }

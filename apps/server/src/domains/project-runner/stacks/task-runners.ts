@@ -11,7 +11,7 @@ import type { StackCandidate, StackProbe } from './stacks.types.ts';
  * раньше `go run .` — но только с «запускающими» именами: `make up` чаще
  * поднимает Docker, а `make build` ничего не запускает вовсе.
  */
-export const RUN_TASK_NAMES = ['dev', 'run', 'serve', 'start'] as const;
+const RUN_TASK_NAMES = ['dev', 'run', 'serve', 'start'] as const;
 
 /** Имена целей Makefile: `name:` в начале строки, не присваивание `name := …`. */
 export function makeTargets(text: string): string[] {

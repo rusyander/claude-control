@@ -88,7 +88,7 @@ async function mainBranch(cwd: string, remote: string): Promise<string | undefin
 }
 
 /** Файл и удалённые строки из `diff -U0`: `@@ -start,count +… @@`. */
-export interface RemovedHunk {
+interface RemovedHunk {
   path: string;
   start: number;
   count: number;

@@ -89,7 +89,7 @@ export interface StageResult {
 }
 
 /** Профиль цели и приговоры — один раз на план. */
-export function emitContext(env: AgentEnvironment, deps: EmitDeps): EmitContext {
+function emitContext(env: AgentEnvironment, deps: EmitDeps): EmitContext {
   const targets = sectionTargets(deps.target, deps.scope, {
     override: deps.override,
     projectRoot: deps.projectRoot,

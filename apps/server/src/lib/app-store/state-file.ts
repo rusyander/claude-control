@@ -101,7 +101,7 @@ export const GROUP_SIGNAL_TELEGRAM_MIGRATION = 'group-signal-telegram';
  * Отметка ставится и когда переносить нечего: иначе снятая потом галочка
  * возвращалась бы на каждом старте — блок без выключателя выглядит так же.
  */
-export function withGroupSignalSubscription(loaded: Partial<AppState>): Partial<AppState> {
+function withGroupSignalSubscription(loaded: Partial<AppState>): Partial<AppState> {
   const done = Array.isArray(loaded.doneMigrations) ? loaded.doneMigrations : [];
   if (done.includes(GROUP_SIGNAL_TELEGRAM_MIGRATION)) return loaded;
   const marked = { ...loaded, doneMigrations: [...done, GROUP_SIGNAL_TELEGRAM_MIGRATION] };
@@ -129,7 +129,7 @@ export function withGroupSignalSubscription(loaded: Partial<AppState>): Partial<
  * в свой срез `groupWatchSignals` (F-42). Срез уже знает группу — его и держим:
  * он пишется только сторожем. Повторная загрузка ничего не находит.
  */
-export function withWatchSlice(loaded: Partial<AppState>): Partial<AppState> {
+function withWatchSlice(loaded: Partial<AppState>): Partial<AppState> {
   const plans = loaded.splitPlans;
   if (!plans || typeof plans !== 'object') return loaded;
   const legacy = Object.entries(plans).filter(

@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function refreshModels(): Promise<ModelCatalogResponse> {
+async function refreshModels(): Promise<ModelCatalogResponse> {
   const { data } = await apiClient.get<ModelCatalogResponse>('/models?refresh=true');
   return data;
 }

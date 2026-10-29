@@ -3,9 +3,7 @@ import type { SubscriptionDriftPlan } from '@agentdeck/contracts/portable-subscr
 import { apiClient } from '@shared/api/client';
 import { useMutation } from '@tanstack/react-query';
 
-export async function postDriftPlan(
-  address: DriftAddress,
-): Promise<{ plan: SubscriptionDriftPlan }> {
+async function postDriftPlan(address: DriftAddress): Promise<{ plan: SubscriptionDriftPlan }> {
   const { data } = await apiClient.post<{ plan: SubscriptionDriftPlan }>(
     '/portability/subscription/drift/plan',
     address,

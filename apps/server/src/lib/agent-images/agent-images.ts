@@ -19,7 +19,7 @@ import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contract
 
 export type { AgentImage };
 
-export interface AgentImagesRefusal {
+interface AgentImagesRefusal {
   error: 'invalid_images';
   message: string;
   messageCode: ServerMessageCode;

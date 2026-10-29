@@ -137,8 +137,8 @@
     },
     "hooks-lib:doc-bloat-guard.mjs": {
       "same": false,
-      "kit": "5c6f115ede231d56",
-      "global": "da6069ded901d18c"
+      "kit": "1163518026198aaa",
+      "global": "80acd64bc586573f"
     },
     "hooks-lib:doc-daily-review.mjs": {
       "same": false,
@@ -147,8 +147,8 @@
     },
     "hooks-lib:doc-policy.mjs": {
       "same": false,
-      "kit": "1959afabdd1c6ee5",
-      "global": "ef16800fc97a122e"
+      "kit": "c8d5367bde1fa50b",
+      "global": "ebd274912268c465"
     },
     "hooks-lib:doc-size-guard.mjs": {
       "same": false,
@@ -167,7 +167,7 @@
     },
     "hooks-lib:gate-at-end.mjs": {
       "same": false,
-      "kit": "9a714fbb086ba5be",
+      "kit": "760f5c007ccf33c7",
       "global": "84e1ff255c1b4eb6"
     },
     "hooks-lib:git-guard.mjs": {
@@ -210,6 +210,11 @@
       "kit": "3f2f35300dfd8394",
       "global": "3f2f35300dfd8394"
     },
+    "hooks-lib:persisted-output-hint.mjs": {
+      "same": true,
+      "kit": "a49bf714a2134035",
+      "global": "a49bf714a2134035"
+    },
     "hooks-lib:pipeline-watch-guard.mjs": {
       "same": false,
       "kit": "335f25c29c05fd99",
@@ -238,7 +243,7 @@
     "hooks-lib:prompt/skill-hint.mjs": {
       "same": false,
       "kit": "2f5a3cf75c526b90",
-      "global": "8c96303dada10ec9"
+      "global": "0867d2db3f865439"
     },
     "hooks-lib:prompt/verify-hard-hint.mjs": {
       "same": false,
@@ -252,8 +257,8 @@
     },
     "hooks-lib:push-sieves.mjs": {
       "same": false,
-      "kit": "a07870d2fbfdf99d",
-      "global": "e8ea6c8a4b4f2c8b"
+      "kit": "82d8bc6789b64b16",
+      "global": "b04b2e8f3721b454"
     },
     "hooks-lib:read-discipline.mjs": {
       "same": false,
@@ -292,8 +297,8 @@
     },
     "hooks-lib:search-discipline.mjs": {
       "same": false,
-      "kit": "e5983a445503fbc7",
-      "global": "d36bba7c97d5a166"
+      "kit": "0a0ef89348cd7cdf",
+      "global": "1944dfef5f515bf9"
     },
     "hooks-lib:secret-guard.mjs": {
       "same": false,
@@ -308,12 +313,14 @@
     "hooks-lib:spawn-cost-guard.mjs": {
       "same": false,
       "kit": "07a2851134a3c244",
-      "global": "1fca5c2b01b216f7"
+      "global": "42973e98361b6795",
+      "omits": "the owner-file spawn grant (takeOwnerGrant/grantCovers, written by the personal agents-grant script) — the kit ships no such script, so the kit guard keeps only its session grants"
     },
     "hooks-lib:spawn-grant.mjs": {
       "same": false,
       "kit": "5a2d440ce3fc87eb",
-      "global": "36d46524534207cf"
+      "global": "cc9f6f169cf18659",
+      "omits": "runsGrantScript (refuses running the personal agents-grant script except -Status/-Off) — the kit ships no such script"
     },
     "hooks-lib:split-worktree.mjs": {
       "same": false,
@@ -502,8 +509,8 @@
     },
     "skills:doc-hygiene/SKILL.md": {
       "same": false,
-      "kit": "cd9271d90bb03b24",
-      "global": "5b9c52fb970db9ca"
+      "kit": "872eeee9e8aabe68",
+      "global": "975f159ca62ed4a5"
     },
     "skills:docs-triage/SKILL.md": {
       "same": false,
@@ -592,13 +599,13 @@
     },
     "skills:skill-authoring/SKILL.md": {
       "same": false,
-      "kit": "8b964355bc295495",
-      "global": "742eafe06750153b"
+      "kit": "d079c8f590199da8",
+      "global": "42bfe23c0c4d800a"
     },
     "skills:skill-map/SKILL.md": {
       "same": false,
       "kit": "c6f12a493858cce0",
-      "global": "de2c6f75b747311d"
+      "global": "0d05ac173ed13683"
     },
     "skills:stand-doctor/SKILL.md": {
       "same": false,
@@ -692,8 +699,8 @@
     },
     "tools:mustfail.mjs": {
       "same": false,
-      "kit": "5bdf0b99bb7af7c6",
-      "global": "7088525ed8aefcac"
+      "kit": "bc51046282f08025",
+      "global": "3b39cc2021708004"
     },
     "tools:node-need-brief.mjs": {
       "same": false,
@@ -742,8 +749,8 @@
     },
     "tools:review-sweep.mjs": {
       "same": false,
-      "kit": "3896330c3404616f",
-      "global": "725097baf364718f"
+      "kit": "0d64c503a366a3c5",
+      "global": "b77353e96aaebba3"
     },
     "tools:review-sync-brief.mjs": {
       "same": false,
@@ -837,8 +844,8 @@
     },
     "watch-skills:agentdeck-watchdog/scripts/lib/window.mjs": {
       "same": true,
-      "kit": "b5b646ac79deba9a",
-      "global": "b5b646ac79deba9a"
+      "kit": "5d717d592982823e",
+      "global": "5d717d592982823e"
     },
     "watch-skills:agentdeck-watchdog/scripts/rule-texts.json": {
       "same": true,
@@ -852,8 +859,8 @@
     },
     "watch-skills:agentdeck-watchdog/scripts/selftest-groups.mjs": {
       "same": true,
-      "kit": "4d1abca6744df751",
-      "global": "4d1abca6744df751"
+      "kit": "8b9ccc00f96a2c57",
+      "global": "8b9ccc00f96a2c57"
     },
     "watch-skills:agentdeck-watchdog/scripts/selftest-stage-audit.mjs": {
       "same": true,
@@ -882,8 +889,8 @@
     },
     "watch-skills:watchdog/scripts/lib/core.mjs": {
       "same": true,
-      "kit": "1f58429aa08361cf",
-      "global": "1f58429aa08361cf"
+      "kit": "b7cee1bc8722aa71",
+      "global": "b7cee1bc8722aa71"
     },
     "watch-skills:watchdog/scripts/lib/foreign.mjs": {
       "same": true,
@@ -912,8 +919,8 @@
     },
     "watch-skills:watchdog/scripts/selftest.mjs": {
       "same": true,
-      "kit": "2689de1c0a21ec1e",
-      "global": "2689de1c0a21ec1e"
+      "kit": "c11af54c9e7ecf60",
+      "global": "c11af54c9e7ecf60"
     },
     "watch-skills:watchdog/scripts/show.mjs": {
       "same": true,

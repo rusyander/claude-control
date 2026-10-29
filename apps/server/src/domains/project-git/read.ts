@@ -296,6 +296,33 @@ export async function readCurrentBranch(projectDir: string): Promise<string | un
   return out.trim() || undefined;
 }
 
+/** Имена основной ветки, если удалённый не назвал свою (`<remote>/HEAD` не заведён). */
+export const MAIN_BRANCH_NAMES = ['main', 'master'];
+
+/**
+ * Основная ветка проекта без сети: на что указывает `<remote>/HEAD`, иначе `<remote>/main`
+ * или `<remote>/master`; удалённого нет — локальная `main`/`master`. `ref` — как её
+ * назвать git'у, `name` — имя ветки, чтобы сравнить с выгруженной.
+ */
+async function readDefaultBranch(
+  read: (args: string[]) => Promise<string>,
+): Promise<{ ref: string; name: string } | undefined> {
+  const exists = async (ref: string): Promise<boolean> =>
+    Boolean(await read(['rev-parse', '--verify', '--quiet', ref]));
+  const remote = pickRemote(await read(['remote']));
+  if (remote) {
+    const head = await read(['symbolic-ref', '--quiet', '--short', `refs/remotes/${remote}/HEAD`]);
+    const pointed = head.startsWith(`${remote}/`) ? [head.slice(remote.length + 1)] : [];
+    for (const name of [...pointed, ...MAIN_BRANCH_NAMES]) {
+      if (await exists(`refs/remotes/${remote}/${name}`)) return { ref: `${remote}/${name}`, name };
+    }
+  }
+  for (const name of MAIN_BRANCH_NAMES) {
+    if (await exists(`refs/heads/${name}`)) return { ref: name, name };
+  }
+  return undefined;
+}
+
 /**
  * База, от которой считать правки веток разделения: ветка основной копии — но в
  * том виде, в каком её знает удалённый, если локальная от него отстала.
@@ -314,10 +341,16 @@ export async function readCurrentBranch(projectDir: string): Promise<string | un
  * локальная ветка, как раньше. Сеть не трогаем: только то, что уже в ссылках.
  */
 export async function readMergeTarget(projectDir: string): Promise<string | undefined> {
-  const local = await readCurrentBranch(projectDir);
-  if (!local) return undefined;
   const read = async (args: string[]): Promise<string> =>
     (await git(projectDir, args).catch(() => '')).trim();
+  const local = await readCurrentBranch(projectDir);
+  // Основная копия выгружена на ветку задачи (живой прогон 27.10: `feat-VAB-403/…` в папке
+  // проекта) — сливать группы в неё никто не будет: копии отведены от основной ветки
+  // проекта (`defaultBaseOf`), и охват перепроверки с пробой конфликтов шли против чужой
+  // ветки. База тогда — основная ветка проекта, как её знают ссылки.
+  const main = await readDefaultBranch(read);
+  if (main && local !== main.name) return main.ref;
+  if (!local) return undefined;
   let remote = await read([
     'rev-parse',
     '--abbrev-ref',

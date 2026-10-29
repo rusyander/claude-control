@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { WATCH_SEEN_HEADER } from '@agentdeck/contracts/watcher';
 import { observeCliExits, observeSpawnFailures } from '../../lib/cli-spawn/cli-spawn.ts';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { WatchSignal } from '../../domains/watcher/types.ts';
 
 /**

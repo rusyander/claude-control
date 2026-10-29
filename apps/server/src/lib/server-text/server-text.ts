@@ -2,8 +2,9 @@ import { STATUS_CODES } from 'node:http';
 import { matchText } from '../server-texts/server-texts.ts';
 import type { FastifyInstance } from 'fastify';
 import {
+  coded,
   isServerMessageCode,
-  type ServerMessageCode,
+  type CodedText,
   type ServerMessageParams,
 } from '@agentdeck/contracts/server-messages';
 
@@ -14,21 +15,10 @@ import {
  * запасной — для старых записей и клиентов, которые кода не знают. Здесь два
  * способа донести код до ответа, не переписывая каждый класс ошибки:
  * `coded(error, …)` вешает код на брошенную ошибку, `codeOf(error)` снимает его
- * там, где маршрут превращает ошибку в тело ответа.
+ * там, где маршрут превращает ошибку в тело ответа. Сам `coded` живёт в contracts:
+ * его зовут и пакеты, которым сервер недоступен (DLP).
  */
-export interface CodedText {
-  messageCode: ServerMessageCode;
-  params?: ServerMessageParams;
-}
-
-/** Та же ошибка (или объект) с кодом текста. Возвращает свой аргумент — удобно в `throw`. */
-export function coded<T extends object>(
-  target: T,
-  messageCode: ServerMessageCode,
-  params?: ServerMessageParams,
-): T & CodedText {
-  return Object.assign(target, params ? { messageCode, params } : { messageCode });
-}
+export { coded, type CodedText };
 
 /**
  * Код, прочитанный из записи (`messageCode` файла, группы, черновика): он

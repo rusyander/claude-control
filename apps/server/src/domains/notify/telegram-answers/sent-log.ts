@@ -12,7 +12,7 @@ import type { ChatRoute } from './telegram-answers.types.ts';
  * тут нечего сверять. Без каталога — только память (юниты).
  */
 
-export const SENT_LOG_FILE = 'telegram-sent.json';
+const SENT_LOG_FILE = 'telegram-sent.json';
 /** Старше Telegram удалять не даёт — такие записи не нужны. */
 export const DELETE_WINDOW_MS = 48 * 3_600_000;
 const MAX_ENTRIES = 2_000;

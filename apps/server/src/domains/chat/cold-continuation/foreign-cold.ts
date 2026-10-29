@@ -75,7 +75,7 @@ function rowTime(row: unknown): number {
  * сессии времени нет — `live-session.ts`), окно последнего и первого вызова и
  * последний ответ модели (итог прежней стадии для вводной).
  */
-export function foreignWarmth(
+function foreignWarmth(
   kind: ForeignTranscriptKind,
   file: string,
 ): (ForeignWarmth & { lastAnswer: string }) | undefined {

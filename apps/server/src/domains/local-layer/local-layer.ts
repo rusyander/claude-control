@@ -35,7 +35,7 @@ import type {
  * слой как есть: слой без выгоды ничего не стоит включать.
  */
 
-export const LAYER_DIR = join('.agent', 'local-layer');
+const LAYER_DIR = join('.agent', 'local-layer');
 
 const memo = new Map<string, { signature: string; status: LocalLayerStatus }>();
 
@@ -66,7 +66,7 @@ function readJson<T>(file: string): T | undefined {
   }
 }
 
-export function readLayerConfig(root: string): LayerConfig | undefined {
+function readLayerConfig(root: string): LayerConfig | undefined {
   const raw = readJson<Partial<LayerConfig>>(join(layerDirOf(root), 'layer.json'));
   if (!raw) return undefined;
   const mode: LocalLayerMode = raw.mode === 'on' || raw.mode === 'off' ? raw.mode : 'auto';

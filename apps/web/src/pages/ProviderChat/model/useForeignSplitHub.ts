@@ -23,7 +23,7 @@ import { useForeignReviews } from './useForeignReviews';
 import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /** Что хаб разделения отдаёт ленте чужого чата — ровно её пропсы. */
-export type ForeignSplitHubProps = Pick<
+type ForeignSplitHubProps = Pick<
   ProviderChatMessagesProps,
   | 'isSplitPending'
   | 'stages'

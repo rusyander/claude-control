@@ -21,7 +21,7 @@ const STEP_TITLES = 8;
 const MAX_FILE = 256 * 1024;
 const TITLE_CAP = 160;
 
-export interface SuiteCheck {
+interface SuiteCheck {
   /** Что проверяет тест — словами автора. */
   text: string;
   /** Имя теста в коде (`TestLogin`, `test_reads_yaml`), если оно не совпадает с текстом. */
@@ -61,7 +61,7 @@ function firstSentence(text: string): string {
 }
 
 /** `CheckPermission_AdminActionCovers` → «Check permission: admin action covers». */
-export function humanizeName(name: string): string {
+function humanizeName(name: string): string {
   return name
     .replace(/^(Test|test_?)/, '')
     .split('_')

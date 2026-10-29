@@ -38,7 +38,7 @@ import {
   unmasked,
   withSavedId,
 } from '../action-kit/action-kit.ts';
-import { maskSecretsInText, SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 
 /**
  * Действия раздела «Конфигурация» (А7): правила, скиллы, хуки, MCP, права —

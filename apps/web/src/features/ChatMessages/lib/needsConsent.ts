@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 /** Отказы, которые снимает согласие человека: потолок групп и лимит подписки. */
-export const CONSENT_CODES = new Set([
+const CONSENT_CODES = new Set([
   'split-group-no-slot',
   'split-group-no-slot-paused',
   'split-limit-active',

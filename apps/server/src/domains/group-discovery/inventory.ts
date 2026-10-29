@@ -2,7 +2,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import type { DiscoveredMemberKind } from '@agentdeck/contracts/group-sources';
 import { readJsonFile, readTextFile } from '../../lib/safe-io/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { readHooksFromFiles } from '../hooks/hooks.ts';
 import { RELAY_HOOK_FILE } from '../chat/outside-relay/outside-relay-install.ts';
 import { TURN_HOOK_SCRIPT } from '../project-tests/turn-hooks/turn-hooks.ts';

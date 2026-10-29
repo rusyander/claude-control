@@ -4,7 +4,7 @@ import { path } from '../lib/path';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { invalidateApplied } from '../lib/invalidateApplied';
 
-export async function applyPlatform(input: {
+async function applyPlatform(input: {
   id: string;
   targets: string[];
   overwrite?: string[];

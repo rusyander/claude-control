@@ -54,7 +54,7 @@ export function effectiveChoice(choice: StoredProjectChoice | null, pair: GroupP
  * Выбор каждой пары проекта картой. Запись v1 (строка) раскладывается на пару,
  * чью сторону называет; выборы групп, которых больше нет, отпадают.
  */
-export function pairChoicesOf(
+function pairChoicesOf(
   stored: StoredProjectChoice | null | undefined,
   pairs: readonly GroupPair[],
 ): PairChoices {
@@ -124,7 +124,7 @@ function boundTo(group: Group, path: string): boolean {
  * включит копию при первом же чате. Отказ, а не молчаливое снятие привязки:
  * её ставил человек, и решать, какая из двух правок главнее, ему.
  */
-export function assertChoiceKeepsPair(
+function assertChoiceKeepsPair(
   groups: readonly Group[],
   path: string,
   choice: StoredProjectChoice | null,

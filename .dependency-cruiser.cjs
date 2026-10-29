@@ -150,6 +150,177 @@ module.exports = {
       },
       to: { path: '^apps/server/src/domains/platform/drivers/(?!index\\.ts|driver\\.ts)' },
     },
+    // Ядро (`apps/core`): слои из спецификации 00 §Parts —
+    // api → conductor → {части} → {journal, adapters} → platform → lib → contracts, только вниз.
+    {
+      name: 'core-apart-from-panel',
+      comment:
+        'Ядро — отдельный процесс: панель говорит с ним по HTTP, а не импортом. Импорт через ' +
+        'границу в любую сторону делает перезапуск панели перезапуском задач (F12).',
+      severity: 'error',
+      from: { path: '^apps/core/' },
+      to: { path: '^apps/(server|web|mobile)/' },
+    },
+    {
+      name: 'core-tools-only-copied',
+      comment:
+        'Прогон ядра на Linux (`tools/core-linux.mjs`) несёт в контейнер из `tools/` только ' +
+        'eslint-rules и mutation-guard. Импорт остального (28.10: подставной раннер тянул ' +
+        '`tools/qa/stub-llama.mjs`) зелёный на Windows и красный только в контейнере.',
+      severity: 'error',
+      from: { path: '^apps/core/' },
+      to: { path: '^tools/(?!eslint-rules/|mutation-guard\\.mjs$)' },
+    },
+    {
+      name: 'panel-apart-from-core',
+      comment: 'Обратная сторона той же границы: сервер и фронт не тянут код ядра.',
+      severity: 'error',
+      from: { path: '^apps/(server|web|mobile)/' },
+      to: { path: '^apps/core/' },
+    },
+    {
+      name: 'core-lib-is-leaf',
+      severity: 'error',
+      from: { path: '^apps/core/src/lib/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/(?!lib/)' },
+    },
+    {
+      name: 'core-platform-above-lib-only',
+      comment: 'Слой различий систем (09) ничего не знает о журнале, сценарии и CLI.',
+      severity: 'error',
+      from: { path: '^apps/core/src/platform/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/(?!platform/|lib/)' },
+    },
+    {
+      name: 'core-session-host-thin',
+      comment:
+        'Хост сессии переживает смерть ядра (01 §Sessions), поэтому держит только платформу: ' +
+        'журнал и решения живут в ядре, не в хосте.',
+      severity: 'error',
+      from: { path: '^apps/core/src/session-host/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/(?!session-host/|platform/|lib/)' },
+    },
+    {
+      name: 'core-journal-below-parts',
+      comment:
+        'Журнал не знает ни частей, ни переходников (00 §Parts: «The journal never imports adapters»).',
+      severity: 'error',
+      from: { path: '^apps/core/src/journal/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/(?!journal/|platform/|lib/)' },
+    },
+    {
+      name: 'core-reduce-only-via-resume',
+      comment:
+        'Состояние задачи пересобирается одним путём — `resume()` (01 §State, F05, P11): ' +
+        'свёртку журнала импортирует только он, а вид для чтения берёт её у него же.',
+      severity: 'error',
+      from: {
+        path: '^apps/core/src/',
+        pathNot: '^apps/core/src/journal/(resume|reduce/reduce)\\.ts$|\\.test\\.ts$',
+      },
+      to: { path: '^apps/core/src/journal/reduce/reduce\\.ts$' },
+    },
+    {
+      name: 'core-adapters-below-parts',
+      severity: 'error',
+      from: { path: '^apps/core/src/adapters/', pathNot: '\\.test\\.ts$' },
+      to: {
+        path: '^apps/core/src/(api|conductor|verifier|economy|context|publisher|policy|observer|mcp)/',
+      },
+    },
+    {
+      name: 'core-parts-apart',
+      comment:
+        'Части не зовут нутро друг друга: обмен — типизированными решениями через дирижёра ' +
+        '(00 §Parts). Своя папка и нижние слои разрешены, соседняя часть и всё выше — нет.',
+      severity: 'error',
+      from: {
+        path: '^apps/core/src/(verifier|economy|context|publisher|policy|observer)/',
+        pathNot: '\\.test\\.ts$',
+      },
+      to: {
+        path: '^apps/core/src/(?!$1/|journal/|adapters/|routes/|platform/|lib/)',
+      },
+    },
+    {
+      name: 'core-routes-below-parts',
+      comment:
+        'Маршрут (11 R:PR-01) — слой под частями, рядом с переходниками: знает платформу, lib и ' +
+        'шов контрактов. Журнал он не импортирует — пишет через данный ему RouteRecorder.',
+      severity: 'error',
+      from: { path: '^apps/core/src/routes/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/(?!routes/|platform/|lib/)' },
+    },
+    {
+      name: 'core-adapters-apart-from-routes',
+      comment:
+        'Переходник и маршрут встречаются только в решении compat через шов ' +
+        '(`contracts/core/routes`): переходник не знает, какой маршрут ему дали, маршрут — какой CLI.',
+      severity: 'error',
+      from: { path: '^apps/core/src/adapters/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/routes/' },
+    },
+    {
+      name: 'core-providers-only-in-adapters-routes',
+      comment:
+        'Реестр CLI (P108): имена CLI знают только переходники и маршруты; литеральный линт ' +
+        'строит из реестра свои правила. Остальное ядро перебирает решения, а не реестр.',
+      severity: 'error',
+      from: {
+        path: '^apps/core/src/',
+        pathNot: '^apps/core/src/(adapters|routes|literal-lint)/|/__fixtures__/|\\.test\\.ts$',
+      },
+      // Импорт пакета воркспейса depcruise не разрешает (exports с `.ts`): `resolved` остаётся
+      // именем пакета, поэтому правило ловит и путь пакета, и само имя.
+      to: { path: '^packages/providers/|(^|/)@agentdeck/providers(/|$)' },
+    },
+    {
+      name: 'core-conductor-below-api',
+      severity: 'error',
+      from: { path: '^apps/core/src/conductor/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/(api|mcp)/' },
+    },
+    {
+      name: 'core-io-only-in-platform',
+      comment:
+        'Внешнее чтение идёт через readFact (01 §Facts): `node:fs` и `node:child_process` ' +
+        'доступны только платформе, переходникам на ней и хосту сессии. Иначе исключение ' +
+        'диска снова читается как «нет» (F25). Подставные процессы `__fixtures__/` — не код ' +
+        'ядра, а внешние программы тестов, как и сами тесты.',
+      severity: 'error',
+      from: {
+        path: '^apps/core/src/',
+        pathNot: '^apps/core/src/(platform|adapters|session-host)/|/__fixtures__/|\\.test\\.ts$',
+      },
+      to: { path: '^(node:)?(fs|fs/promises|child_process)$' },
+    },
+    {
+      name: 'core-contracts-barrel-types-only',
+      comment: 'Та же причина, что у сервера: ядро идёт под --experimental-strip-types.',
+      severity: 'error',
+      from: { path: '^apps/core/src/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^packages/contracts/src/index\\.ts$', dependencyTypesNot: ['type-only'] },
+    },
+    // Факты запуска CLI (`packages/providers`, спецификация 11 C2) — один источник для
+    // каталога панели и переходников ядра, поэтому ни от одного из них не зависят.
+    {
+      name: 'providers-package-apart-from-apps',
+      comment:
+        'Факты запуска читают и панель, и ядро; импорт из приложения сделал бы пакет частью ' +
+        'одного из них, и второй получил бы чужой слой вместе с фактами.',
+      severity: 'error',
+      from: { path: '^packages/providers/' },
+      to: { path: '^apps/' },
+    },
+    {
+      name: 'providers-package-pure',
+      comment:
+        'Факты — данные и чистые функции: ни диска, ни процессов, ни окружения ОС. Прочитать ' +
+        'конфиг человека и решить про обход — дело того, кто знает путь к файлу (каталог панели).',
+      severity: 'error',
+      from: { path: '^packages/providers/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^(node:)?(fs|fs/promises|child_process|os|process)$' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

@@ -2,15 +2,18 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { opencodeConfigDir, opencodeConfigFile, unimplementedPaths } from './config-dirs.ts';
-import { contourModelName } from './run-endpoint.ts';
+import { assistantApiOf, modelsOf, runEndpointOf, runFactsOf } from './run-facts.ts';
+
+/** Факты запуска OpenCode — из пакета `@agentdeck/providers`. */
+const facts = runFactsOf('opencode');
 
 /** OpenCode: AGENTS.md + opencode.json. */
 export const opencodeProvider: ConfigProvider = {
-  id: 'opencode',
-  name: 'OpenCode',
-  status: 'experimental',
-  paths: unimplementedPaths('opencode'),
-  cli: { command: 'opencode', windowsCommand: 'opencode.cmd' },
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
+  cli: facts.binary,
   // Глобальный файл инструкций OpenCode — обычный markdown
   // ~/.config/opencode/AGENTS.md (тот же де-факто стандарт, что у Codex).
   instructionsFile: () => join(opencodeConfigDir(), 'AGENTS.md'),
@@ -201,9 +204,7 @@ export const opencodeProvider: ConfigProvider = {
   // сам CLI, панель шлёт только новое сообщение. Панель пробует его ПЕРВЫМ и при
   // любой заминке молча возвращается к one-shot (см. domains/opencode-serve.ts).
   assistant: {
-    apiKind: 'openai-compat',
-    apiKeyEnvVars: [],
-    cliRunnable: true,
+    ...assistantApiOf(facts),
     // «Разрешить правки» (D2): `--auto` — «одобрять просьбы, которые не
     // запрещены явно» (`run --help`, 1.18.34) — только при включённых правках.
     // Без него `run` отклоняет каждую просьбу сам («auto-rejecting»). Просьбы
@@ -215,36 +216,9 @@ export const opencodeProvider: ConfigProvider = {
     editsControl: 'flag',
   },
   // Контур (X7): `OPENCODE_CONFIG_CONTENT` — конфиг строкой, по документации
-  // старше глобального и проектного (сливается с ними). Провайдер `contour` —
-  // встроенный `@ai-sdk/openai-compatible`, и он единственный разрешённый: модель
-  // по умолчанию, малая (заголовок сессии) и модели встроенных агентов смотрят
-  // туда. Без последних `agent.build.model` человека на выключенном провайдере
-  // роняет прогон (UnknownError, живая проба).
-  runEndpoint: {
-    apiKind: 'openai-compat',
-    env: ({ baseUrl, model, key }) => {
-      const name = contourModelName(model);
-      const ref = `contour/${name}`;
-      const agent = Object.fromEntries(
-        ['build', 'plan', 'general', 'explore'].map((id) => [id, { model: ref }]),
-      );
-      return {
-        OPENCODE_CONFIG_CONTENT: JSON.stringify({
-          provider: {
-            contour: {
-              npm: '@ai-sdk/openai-compatible',
-              options: { baseURL: baseUrl, apiKey: key },
-              models: { [name]: {} },
-            },
-          },
-          model: ref,
-          small_model: ref,
-          agent,
-          enabled_providers: ['contour'],
-        }),
-      };
-    },
-  },
+  // старше глобального и проектного (сливается с ними); собирает его
+  // `@agentdeck/providers/opencode`, единственным разрешённым провайдером.
+  runEndpoint: runEndpointOf(facts),
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',
@@ -282,7 +256,7 @@ export const opencodeProvider: ConfigProvider = {
     sandbox: 'unsupported',
   }),
   // Модели: собственный шлюз OpenCode Zen (models.dev, вендор `opencode`).
-  modelVendors: ['opencode'],
+  ...modelsOf(facts),
   // Подбора модели (Т12) у OpenCode НЕТ: флаг `--model provider/model`
   // задокументирован, но шлюз ведёт модели ВСЕХ вендоров сразу (claude, gpt,
   // gemini, glm, kimi…), и выбор ступени здесь означает выбор вендора за

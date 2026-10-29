@@ -570,11 +570,11 @@ function main() {
 
   // Живые ходы, подготовку копий и проверки ждём без предела; предел — только
   // у нечитаемого журнала ходов без доказанного живого хода (`runsWait`).
-  const busyRuns = (now) =>
+  const busyRuns = (now, since = deferredSince) =>
     runsWait(
       runLedgers.map((file) => readJsonSteady(file)),
       pidAlive,
-      deferredSince,
+      since,
       now,
       RUNS_CAP_MS,
     );
@@ -631,6 +631,9 @@ function main() {
         `предел ожидания нечитаемого журнала ходов (${capLabel(RUNS_CAP_MS)}): живых ходов в нём не видно — перезапуск`,
       );
     }
+    // Начало отсрочки нужно и сверке после пробы: без него предел нечитаемого журнала
+    // ходов считался заново, и битый файл откладывал перезапуск по кругу (28.10).
+    const since = deferredSince;
     deferredSince = undefined;
     clearRestartState(appData);
     for (const file of [...pending]) {
@@ -666,8 +669,9 @@ function main() {
     // Проба идёт секунды, и за них стартует ход: проверка занятости до пробы
     // его не видела, и перезапуск рвал этап на рождении (группа d9869abf:5,
     // 25.10: связь доставки создана, разговор не начат). Занято — снова ждём.
-    if (defer && !forced && busyReason(busyRuns(Date.now()), Date.now())) {
+    if (defer && !forced && busyReason(busyRuns(Date.now(), since), Date.now())) {
       for (const file of files) pending.add(file);
+      deferredSince = since;
       void restart();
       return;
     }

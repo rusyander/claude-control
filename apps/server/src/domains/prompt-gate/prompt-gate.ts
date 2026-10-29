@@ -5,7 +5,7 @@ import type { Hook, PromptGateInfo, PromptGateSettings } from '@agentdeck/contra
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { readHooks, writeHooks } from '../hooks/hooks.ts';
-import { readRules } from '../dlp/rules-store.ts';
+import { readRules } from '@agentdeck/dlp/rules-file';
 import { buildGateScript, type GateScriptConfig } from './script.ts';
 import { BRAND_NAME, BRAND_SLUG, LEGACY_BRAND_NAME, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
 

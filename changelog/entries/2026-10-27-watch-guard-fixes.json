@@ -1,0 +1,80 @@
+{
+  "title": {
+    "ru": "Стражи набора больше не отказывают зря, сторож групп не поднимает ложных тревог, а модель знает, когда видела только начало вывода",
+    "en": "Kit guards stop refusing for nothing, the group watcher stops raising false alarms, and the model knows when it saw only the start of an output"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Новый пункт набора `persisted-output-hint`. Когда вывод команды больше потолка, CLI сохраняет его в файл и показывает модели только превью ~2 КБ. Пункт говорит модели, что она видела только начало, называет файл с полным выводом и просит прочитать его, прежде чем делать выводы. Раньше группа судила о диффе на 9,6 КБ по первым 2 КБ.",
+        "en": "New kit item `persisted-output-hint`. When a command's output is over the cap, the CLI saves it to a file and shows the model a ~2 KB preview. The item tells the model it saw only the start, names the file with the whole output and asks it to read that file before concluding anything. Before, a group judged a 9.6 KB diff from its first 2 KB."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`push-sieves`: отказ называет все отмеченные файлы, которые эта команда должна подтвердить, а не только ещё не подтверждённые. Раньше то же подтверждение сбрасывало уже принятые файлы, и один пуш получал три отказа подряд.",
+        "en": "`push-sieves`: a refusal names every flagged file this command must acknowledge, not only the ones not yet acknowledged. Before, the same acknowledgement dropped the accepted files, and one push got three refusals in a row."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`search-discipline`: шаблон в кавычках вроде `\"<Button\"` больше не принимается за перенаправление. Раньше папка поиска становилась шаблоном, и поиск отклонялся как обход всего дерева.",
+        "en": "`search-discipline`: a quoted pattern such as `\"<Button\"` is no longer read as a redirection. Before, the search folder became the pattern and the search was refused as a walk of the whole tree."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "`gate-at-end` в доставке: если причина `# gate-reason` указана в первом же вызове гейта, отказ говорит, что она прочитана и что её повтор пройдёт. Раньше отказ просил добавить причину, которая уже стояла в команде, и группа шла читать исходник набора.",
+        "en": "`gate-at-end` in delivery: when a `# gate-reason` comes with the very first gate call, the refusal says it was read and that its repeat runs. Before, the refusal asked for a reason the command already carried, and the group went to read the kit's source."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проверка доставки называет строки пунктов задачи, чей номер не в форме `task-<n>` или `owner-<n>`. Такие строки молча не покрывали ни одного пункта.",
+        "en": "The delivery check names ticket-point rows whose id is not in the `task-<n>` or `owner-<n>` form. Such rows silently covered no point at all."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сигналы сторожа групп: «шторм перезапусков» не считает перезапуски до старта группы и во время её паузы; сдвиг окна лимита за прогон считается от замера на момент старта, а не от замера соседней группы посреди прогона; отказ сита пуша больше не читается как «отказанное действие сделано другим путём».",
+        "en": "Group watcher signals: the «restart storm» no longer counts restarts before the group started or while it was paused; the limit-window move of a run is measured from the sample at its start, not from a neighbour group's sample taken mid-run; a push-sieve refusal is no longer read as «a refused action done another way»."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Группа с настройкой вопросов «спрашивать меня» снова передаёт развилки человеку. После того как автовыбор стал узнавать вариант «(рекомендую)», такая группа под автоодобрением выбирала его сама, хотя её вводная обещала вопрос человеку.",
+        "en": "A group whose questions are set to «ask me» hands its forks to the human again. Once auto-pick learned to recognise a «(recommended)» option, such a group under auto-approve picked it by itself, although its brief promised the question to the human."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Перезапуск панели при правке её кода больше не откладывается по кругу из-за нечитаемого журнала ходов. Предел ожидания такого журнала отсчитывается от начала отсрочки и после проверочного запуска, а не начинается заново. Раньше битый файл журнала держал старый код сервера сколь угодно долго.",
+        "en": "A panel restart after an edit of its code is no longer deferred in a loop by an unreadable run ledger. The wait cap for such a ledger counts from the start of the deferral, also after the trial start, instead of starting over. Before, a broken ledger file kept the old server code running for as long as it stayed broken."
+      },
+      "area": { "ru": "Панель", "en": "Panel" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "`mustfail` набора: `--help` печатает форму плана мутантов с рабочим примером, а каждая проверка прогона получает `MUSTFAIL_PID`, по которому сторож репозитория отличает свой прогон от чужого в общей рабочей копии.",
+        "en": "Kit `mustfail`: `--help` prints the mutant plan shape with a working example, and every check of a run gets `MUSTFAIL_PID`, by which a repository guard tells its own run from a foreign one in a shared working copy."
+      },
+      "area": { "ru": "Набор", "en": "Kit" }
+    }
+  ]
+}

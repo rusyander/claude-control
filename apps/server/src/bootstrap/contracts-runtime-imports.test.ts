@@ -21,6 +21,17 @@ import { dirname, join, resolve } from 'node:path';
  */
 
 const CONTRACTS = resolve(import.meta.dirname, '../../../../packages/contracts');
+/** Пакет DLP сервер грузит так же — из исходников, без сборки; беда у него та же. */
+const DLP = resolve(import.meta.dirname, '../../../../packages/dlp');
+/** Факты запуска CLI сервер берёт значениями — каталог провайдеров и ограничения прогона. */
+const PROVIDERS = resolve(import.meta.dirname, '../../../../packages/providers');
+const PACKAGES = [
+  { root: CONTRACTS, name: 'packages/contracts' },
+  { root: DLP, name: 'packages/dlp' },
+  { root: PROVIDERS, name: 'packages/providers' },
+];
+/** Расширение, с которым node находит файл сам: `.ts` исходника или `.mjs` образцов DLP. */
+const LOADABLE = /\.(?:ts|mjs)$/;
 
 /**
  * Относительный импорт или ре-экспорт ЗНАЧЕНИЯ.
@@ -50,13 +61,13 @@ function typesOnly(clause: string): boolean {
  * соседним правилом — `server-contracts-barrel-types-only` в
  * `.dependency-cruiser.cjs` не даёт серверу взять из неё ни одного значения.
  */
-function subpathEntries(): string[] {
-  const manifest = JSON.parse(readFileSync(join(CONTRACTS, 'package.json'), 'utf8')) as {
+function subpathEntries(root: string): string[] {
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
     exports: Record<string, string>;
   };
   return Object.entries(manifest.exports)
     .filter(([subpath]) => subpath !== '.')
-    .map(([, relative]) => resolve(CONTRACTS, relative));
+    .map(([, relative]) => resolve(root, relative));
 }
 
 /** Все файлы, которые процесс дотянет из этого — по относительным импортам значений. */
@@ -85,7 +96,7 @@ function reachable(entry: string): Map<string, string[]> {
       found.push(specifier);
       // Дальше идём только по тому, что действительно найдём на диске: путь без
       // расширения как раз и есть нарушение, и его файл лежит рядом с `.ts`.
-      const target = specifier.endsWith('.ts') ? specifier : `${specifier}.ts`;
+      const target = LOADABLE.test(specifier) ? specifier : `${specifier}.ts`;
       queue.push(resolve(dirname(file), target));
     }
     if (found.length > 0) specifiers.set(file, found);
@@ -98,11 +109,13 @@ describe('контракты, загружаемые сервером без с�
   it('относительный импорт значения несёт расширение .ts — иначе сервер не стартует', () => {
     const broken: string[] = [];
 
-    for (const entry of subpathEntries()) {
-      for (const [file, specifiers] of reachable(entry)) {
-        for (const specifier of specifiers) {
-          if (specifier.endsWith('.ts')) continue;
-          broken.push(`${file.replace(CONTRACTS, 'packages/contracts')} → '${specifier}'`);
+    for (const { root, name } of PACKAGES) {
+      for (const entry of subpathEntries(root)) {
+        for (const [file, specifiers] of reachable(entry)) {
+          for (const specifier of specifiers) {
+            if (LOADABLE.test(specifier)) continue;
+            broken.push(`${file.replace(root, name)} → '${specifier}'`);
+          }
         }
       }
     }

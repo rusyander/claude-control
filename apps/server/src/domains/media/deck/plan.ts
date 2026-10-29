@@ -22,26 +22,25 @@ import { deckLine, deckLines, hasText } from './text.ts';
  * перед залом.
  */
 
-export type SlideLayout =
-  'bullets' | 'statement' | 'stats' | 'columns' | 'quote' | 'section' | 'figure';
+type SlideLayout = 'bullets' | 'statement' | 'stats' | 'columns' | 'quote' | 'section' | 'figure';
 
 /** Три ступени кегля. Что именно они значат, решает формат. */
-export type SizeStep = 'big' | 'mid' | 'small';
+type SizeStep = 'big' | 'mid' | 'small';
 
 /** Плотность списка: два пункта и двенадцать — это разные слайды. */
-export type ListTier = 'airy' | 'normal' | 'dense';
+type ListTier = 'airy' | 'normal' | 'dense';
 
-export interface PlannedStat {
+interface PlannedStat {
   value: string;
   label: string;
 }
 
-export interface PlannedColumn {
+interface PlannedColumn {
   title: string;
   bullets: string[];
 }
 
-export interface PlannedQuote {
+interface PlannedQuote {
   text: string;
   author: string;
 }

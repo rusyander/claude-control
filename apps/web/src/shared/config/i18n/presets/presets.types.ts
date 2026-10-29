@@ -1,16 +1,16 @@
 /** Название и пояснение одной заготовки. */
-export interface PresetText {
+interface PresetText {
   title: string;
   description: string;
 }
 
 /** Заготовка хука: ещё и текст сообщения, которым она заполняет поле. */
-export interface HookPresetText extends PresetText {
+interface HookPresetText extends PresetText {
   message?: string;
 }
 
 /** Событие хука: когда срабатывает и для чего его берут. */
-export interface HookEventText {
+interface HookEventText {
   when: string;
   useFor: string;
 }

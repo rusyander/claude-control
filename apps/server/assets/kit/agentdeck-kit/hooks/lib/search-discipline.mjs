@@ -353,11 +353,16 @@ function shellTokens(cmd) {
   let cur = '';
   let has = false;
   let quote = null;
+  // Only a word whose first char stood outside quotes can be a redirection: `grep -rn "<Button" -A4 dir`
+  // lost its quoted pattern as `<…`, the folder became the pattern and the grep read as a walk of `.` (g5 27.10).
+  let bare = false;
   const flush = () => {
-    if (has && !/^\d*[<>]/.test(cur)) out.push(cur);
+    const redirection = bare && /^\d*[<>]/.test(cur);
+    if (has && !redirection) out.push(cur);
     else if (has && /^\d*[<>]&?$/.test(cur)) out.push({ redirect: true });
     cur = '';
     has = false;
+    bare = false;
   };
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i];
@@ -391,6 +396,7 @@ function shellTokens(cmd) {
       out.push({ op: c });
       continue;
     }
+    if (!has) bare = true;
     cur += c;
     has = true;
   }

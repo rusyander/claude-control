@@ -1,0 +1,67 @@
+import { createHash } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
+import { CREATED, deps, openFresh } from '../journal/__fixtures__/journal-harness.ts';
+import { readJournalLines } from '../journal/read-lines.ts';
+import { newId } from '../lib/ids/uuidv7.ts';
+import { dlpSecretMask } from './secret-mask.ts';
+
+/**
+ * Маска журнала, которую подключает загрузка (P61), через настоящий журнал в обе стороны:
+ * хеши и коммиты — идентификаторы, а не секреты (без них `task.created` с хешем профиля и
+ * `layer.changed` отвергались схемой, ref и ключ идемпотентности ложились «••••••»); настоящий
+ * ключ, в том числе hex под секретным именем, по-прежнему не доходит до диска.
+ */
+const SHA256 = createHash('sha256').update('profile').digest('hex');
+const GIT_SHA = createHash('sha1').update('commit').digest('hex');
+const VENDOR_KEY = 'sk-ant-api03-Zx9Qw8Er7Ty6Ui5Op4As3Df2Gh1Jk0LzXcVbNm';
+const HEX_TOKEN = createHash('sha1').update('token').digest('hex');
+
+describe('journal secret mask wired by boot', () => {
+  it('B1 hash- and commit-shaped identifiers reach the journal verbatim', async () => {
+    const { task, dir, taskId } = await openFresh(undefined, deps({ mask: dlpSecretMask }));
+    task.append({
+      kind: 'task.created',
+      actor: 'core',
+      data: {
+        ...CREATED,
+        profileHash: SHA256,
+        userLayerHash: SHA256,
+        repos: [{ repoKey: 'r1', path: '/tmp/r1', baseRef: GIT_SHA }],
+      },
+    });
+    task.append({ kind: 'layer.changed', actor: 'core', data: { userLayerHash: SHA256 } });
+    task.append({
+      kind: 'action.started',
+      actor: 'core',
+      data: { actionId: newId(), kind: 'push', target: 'origin/feature', idempotencyHint: GIT_SHA },
+    } as never);
+    task.close();
+    const lines = readJournalLines(dir, taskId).lines;
+    const created = lines.find((l) => l.kind === 'task.created')!;
+    const data = created.data as typeof CREATED;
+    expect(data.profileHash).toBe(SHA256);
+    expect(data.userLayerHash).toBe(SHA256);
+    expect(data.repos[0]!.baseRef).toBe(GIT_SHA);
+    expect(created.masked).toBeUndefined();
+    expect(lines.find((l) => l.kind === 'layer.changed')!.data).toEqual({ userLayerHash: SHA256 });
+    const started = lines.find((l) => l.kind === 'action.started')!.data as {
+      idempotencyHint: string;
+    };
+    expect(started.idempotencyHint).toBe(GIT_SHA);
+  });
+
+  it('B1 a real key is still masked: vendor prefix, and hex under a secret name', async () => {
+    const { task, dir, taskId } = await openFresh(undefined, deps({ mask: dlpSecretMask }));
+    task.append({
+      kind: 'error',
+      actor: 'core',
+      data: { code: 'leak', detail: `key ${VENDOR_KEY} and GITHUB_TOKEN=${HEX_TOKEN}` },
+    });
+    task.close();
+    const raw = readJournalLines(dir, taskId).lines.find((l) => l.kind === 'error')!;
+    const text = JSON.stringify(raw);
+    expect(text).not.toContain(VENDOR_KEY);
+    expect(text).not.toContain(HEX_TOKEN);
+    expect(raw.masked).toBe(2);
+  });
+});

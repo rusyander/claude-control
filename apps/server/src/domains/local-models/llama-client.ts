@@ -14,7 +14,7 @@ export type { FetchLike } from './download.ts';
 /** `ok` — слушает и модель загружена; `loading` — слушает, модель ещё грузится (503). */
 export type Health = 'ok' | 'loading';
 
-export interface ServerProps {
+interface ServerProps {
   /** `b11583-9880…` — сборка и коммит. */
   buildInfo: string;
   /** Окно слота, токенов. */
@@ -42,7 +42,7 @@ export interface SlotState {
  */
 export const SLOT_TIMEOUT_MS = 1_500;
 
-export interface BenchResult {
+interface BenchResult {
   evalCount: number;
   evalDurationNs: number;
   promptCount: number;
@@ -50,7 +50,7 @@ export interface BenchResult {
 }
 
 /** Ответ сервера с ошибкой — с его же текстом, иначе человеку нечего прочесть. */
-export class LlamaError extends Error {
+class LlamaError extends Error {
   readonly status: number;
 
   constructor(message: string, status: number) {
@@ -74,11 +74,11 @@ async function failure(response: Response): Promise<LlamaError> {
  * Промпт замера — один и тот же каждый раз: скорость разных моделей и разных
  * машин сравнима, только если они отвечали на одно.
  */
-export const BENCH_PROMPT =
+const BENCH_PROMPT =
   'Write a TypeScript function that merges two sorted arrays into one sorted array. Return only the code.';
 
 /** Сколько ждать сброса кеша слота. */
-export const ERASE_TIMEOUT_MS = 3_000;
+const ERASE_TIMEOUT_MS = 3_000;
 
 export interface LlamaClient {
   health(): Promise<Health | undefined>;

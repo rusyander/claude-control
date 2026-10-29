@@ -58,6 +58,8 @@ describe('история агентов по сессиям', () => {
       toolCalls: 3,
       tokens: { input: 60, output: 3, cacheRead: 300, cacheCreation: 0 },
       model: 'claude-opus-4-1',
+      // s-work кончается репликой «Готово» (минута 45), открытых вызовов нет.
+      lastAction: 'Готово',
     });
   });
 

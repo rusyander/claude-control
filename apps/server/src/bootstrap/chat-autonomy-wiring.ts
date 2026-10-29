@@ -83,6 +83,13 @@ export function wireChatAutonomy(deps: ChatAutonomyWiringDeps): ChatAutonomyWiri
     return view.autonomous || view.autonomousInherited ? group : undefined;
   };
   deps.chatRuns.setQuestionPlanResolver((keys) => planGroupOf(keys) !== undefined);
+  // «Развилки группы: спрашивать меня» — задание велит нести развилку человеку даже с
+  // рекомендацией; автовыбор автономии ответил бы за него (брокер, метка хука).
+  deps.chatRuns.setQuestionsToHumanResolver(
+    (keys) =>
+      deps.store.getSplitDefaults().groupQuestions === 'human' &&
+      groupAutoApproveFor(deps.store, keys) !== undefined,
+  );
   // Счёт продолжений — в `state.json` (F-87): перезапуск панели не дарит новых.
   const waitCounter: WaitResumeCounter = {
     get: (conversation) => deps.store.getGroupWaitResume(conversation)?.count ?? 0,

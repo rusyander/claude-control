@@ -14,10 +14,10 @@
 //   node tools/qa/check-live-resume-ghost.mjs
 //
 // Код выхода 1 — хоть одна строка таблицы красная.
-import { createServer } from 'node:http';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const seen = [];
@@ -32,108 +32,31 @@ function lastUserText(body) {
     .join(' ');
 }
 
-function startStub() {
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => {
-      let body;
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-      } catch {
-        body = {};
-      }
-      if (req.url?.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ input_tokens: 10 }));
-        return;
-      }
-      if (!req.url?.includes('/messages')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end('{}');
-        return;
-      }
-      const text = lastUserText(body);
-      const hasBash = (body.tools ?? []).some((t) => t.name === 'Bash');
+async function startStub() {
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      const text = lastUserText(request.body);
       seen.push(text);
       // Первое сообщение — фоновая команда, которая переживёт ход; дальше — эхо метки.
-      const block =
-        hasBash && /START_BG/.test(text) && !/\[tool_result\]/.test(text)
-          ? {
-              type: 'tool_use',
-              id: 'toolu_bg1',
-              name: 'Bash',
-              input: {
-                command: IS_WIN ? 'ping -n 600 127.0.0.1' : 'sleep 600',
-                description: 'background probe',
-                run_in_background: true,
-              },
-            }
-          : {
-              type: 'text',
-              text: /PROMPT_TWO/.test(text)
-                ? 'REPLY_TO_PROMPT_TWO'
-                : /\[tool_result\]/.test(text)
-                  ? 'BG_STARTED'
-                  : 'REPLY_OTHER',
-            };
-      const isText = block.type === 'text';
-      const events = [
-        [
-          'message_start',
-          {
-            type: 'message_start',
-            message: {
-              id: `msg_${seen.length}`,
-              type: 'message',
-              role: 'assistant',
-              model: body.model ?? 'stub',
-              content: [],
-              stop_reason: null,
-              usage: { input_tokens: 10, output_tokens: 1 },
-            },
-          },
-        ],
-        [
-          'content_block_start',
-          {
-            type: 'content_block_start',
-            index: 0,
-            content_block: isText ? { type: 'text', text: '' } : { ...block, input: {} },
-          },
-        ],
-        [
-          'content_block_delta',
-          {
-            type: 'content_block_delta',
-            index: 0,
-            delta: isText
-              ? { type: 'text_delta', text: block.text }
-              : { type: 'input_json_delta', partial_json: JSON.stringify(block.input) },
-          },
-        ],
-        ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-        [
-          'message_delta',
-          {
-            type: 'message_delta',
-            delta: { stop_reason: isText ? 'end_turn' : 'tool_use' },
-            usage: { output_tokens: 1 },
-          },
-        ],
-        ['message_stop', { type: 'message_stop' }],
-      ];
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      for (const [event, data] of events)
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.end();
-    });
+      if (
+        request.tools.includes('Bash') &&
+        /START_BG/.test(text) &&
+        !/\[tool_result\]/.test(text)
+      ) {
+        const args = {
+          command: IS_WIN ? 'ping -n 600 127.0.0.1' : 'sleep 600',
+          description: 'background probe',
+          run_in_background: true,
+        };
+        return { tool: { name: 'Bash', args, id: 'toolu_bg1' } };
+      }
+      if (/PROMPT_TWO/.test(text)) return 'REPLY_TO_PROMPT_TWO';
+      return /\[tool_result\]/.test(text) ? 'BG_STARTED' : 'REPLY_OTHER';
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({ url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() }),
-    ),
-  );
+  return { url: stub.baseUrl, close: () => stub.close() };
 }
 
 async function waitFor(check, ms) {

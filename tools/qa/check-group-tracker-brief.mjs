@@ -6,9 +6,13 @@
  * что сделает с ними CLI: доедет ли `updatedToolOutput` хука из `--settings` до
  * модели вместо ответа MCP-сервера и не заменит ли этот `--settings` хуки
  * человека. Подменены модель (стаб вместо API Anthropic, который зовёт
- * инструменты трекера по очереди) и сервер трекера (`mcp-tracker-stub.mjs`).
- * Своё — всё остальное: набор серверов, флаги и настройки строит настоящий
- * `groupRunProfile`, хук — настоящий `tools/tracker-brief-hook.mjs`.
+ * инструменты трекера по очереди), сервер трекера (`mcp-tracker-stub.mjs`) и
+ * панель за брокером прав (разрешает всё: её решение проверяет
+ * `check-group-forge-ask.mjs`). Своё — всё остальное: набор серверов, флаги и
+ * настройки строит настоящий `groupRunProfile`, хук — настоящий
+ * `tools/tracker-brief-hook.mjs`, запросы прав идут настоящим брокером
+ * (`permission-prompt-server.mjs`): трекер у группы под `ask` (19.10), без
+ * брокера CLI в `-p` отказывает каждому вызову.
  *
  * Случаи:
  * - с хуком группы: ответ смены статуса и ответ комментария доходят до модели
@@ -26,9 +30,20 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-trackerbrief-';
 const TOOLS = fileURLToPath(new URL('..', import.meta.url));
+const BROKER = join(
+  TOOLS,
+  '..',
+  'apps',
+  'server',
+  'src',
+  'domains',
+  'chat',
+  'permission-prompt-server.mjs',
+);
 /** Команда хука — так её собирает `runtime.ts`. */
 const HOOK = `node "${join(TOOLS, 'tracker-brief-hook.mjs')}"`;
 const COMMENT = 'Готово, проверено на стенде';
@@ -87,100 +102,41 @@ function toolResults(body) {
   return results;
 }
 
-function sse(blocks, stop) {
-  const events = [
-    [
-      'message_start',
-      {
-        type: 'message_start',
-        message: {
-          id: 'msg_tb',
-          type: 'message',
-          role: 'assistant',
-          model: 'stub',
-          content: [],
-          stop_reason: null,
-          usage: { input_tokens: 10, output_tokens: 1 },
-        },
-      },
-    ],
-  ];
-  blocks.forEach(([start, delta], index) => {
-    events.push([
-      'content_block_start',
-      { type: 'content_block_start', index, content_block: start },
-    ]);
-    events.push(['content_block_delta', { type: 'content_block_delta', index, delta }]);
-    events.push(['content_block_stop', { type: 'content_block_stop', index }]);
+/** Стаб API: в разговоре с инструментами трекера зовёт их по очереди, иначе — слово. */
+async function startStub() {
+  const seen = [];
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request, info }) => {
+      const tools = info.tools.map((tool) => tool.name);
+      const main = tools.some((name) => /__jira_transition_issue$/.test(name));
+      if (main) seen.push(request.body);
+      const done = toolResults(request.body).size;
+      const next = main ? CALLS[done] : undefined;
+      const name = next && tools.find((tool) => tool.endsWith(`__${next[0]}`));
+      return name ? { tool: { name, args: next[1], id: `toolu_tb${done}` } } : 'ok';
+    },
   });
-  events.push([
-    'message_delta',
-    { type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 1 } },
-  ]);
-  events.push(['message_stop', { type: 'message_stop' }]);
-  return events
-    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-    .join('');
+  return { url: stub.baseUrl, seen, close: () => stub.close() };
 }
 
-/** Стаб API: в разговоре с инструментами трекера зовёт их по очереди, иначе — слово. */
-function startStub() {
-  const seen = [];
+/** Панель за брокером прав: разрешает всё и помнит, о чём спросили. */
+async function startPanel() {
+  const asked = [];
   const server = createServer((req, res) => {
     const chunks = [];
     req.on('data', (chunk) => chunks.push(chunk));
     req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // пустое тело — тоже запрос
-      }
-      const tools = (body.tools ?? []).map((tool) => tool.name);
-      const main = tools.some((name) => /__jira_transition_issue$/.test(name));
-      if (main) seen.push(body);
-      const done = toolResults(body).size;
-      const next = main ? CALLS[done] : undefined;
-      const name = next && tools.find((tool) => tool.endsWith(`__${next[0]}`));
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      res.end(
-        name
-          ? sse(
-              [
-                [
-                  { type: 'tool_use', id: `toolu_tb${done}`, name, input: {} },
-                  { type: 'input_json_delta', partial_json: JSON.stringify(next[1]) },
-                ],
-              ],
-              'tool_use',
-            )
-          : sse(
-              [
-                [
-                  { type: 'text', text: '' },
-                  { type: 'text_delta', text: 'ok' },
-                ],
-              ],
-              'end_turn',
-            ),
-      );
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+      if (body.toolName) asked.push(body.toolName);
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ behavior: 'allow', updatedInput: body.input }));
     });
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        seen,
-        close: () => server.close(),
-      }),
-    ),
-  );
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  return { url: `http://127.0.0.1:${port}`, asked, close: () => server.close() };
 }
 
 async function main() {
@@ -189,6 +145,7 @@ async function main() {
   const { groupRunProfile } =
     await import('../../apps/server/src/domains/chat/group-profile/group-profile.ts');
   const stub = await startStub();
+  const panel = await startPanel();
   const work = mkdtempSync(join(workBase(), PREFIX));
   console.log(`CLI: ${exe}\nКаталог: ${work}\n`);
   const userHook = join(work, 'user-hook.mjs');
@@ -230,6 +187,20 @@ async function main() {
     writeFileSync(mcpFile, JSON.stringify(profile.mcp.config));
     const settingsFile = join(work, label, 'settings.json');
     writeFileSync(settingsFile, JSON.stringify(profile.settings));
+    // Брокер прав — своим `--mcp-config`, как у `ChatRunner`.
+    const brokerFile = join(work, label, 'perm.json');
+    writeFileSync(
+      brokerFile,
+      JSON.stringify({
+        mcpServers: {
+          'perm-guard': {
+            command: process.execPath,
+            args: [BROKER],
+            env: { PERM_RUN_ID: `tb-${label}`, PERM_BASE_URL: panel.url, PERM_PROGRESS_MS: '0' },
+          },
+        },
+      }),
+    );
     const env = {
       ...process.env,
       ...profile.env,
@@ -239,6 +210,11 @@ async function main() {
       ANTHROPIC_API_KEY: 'tb-stub',
       ANTHROPIC_MODEL: 'claude-sonnet-4-5',
       DISABLE_AUTOUPDATER: '1',
+      // Свежий CLI откладывает инструменты MCP за ToolSearch: инструментов трекера
+      // в запросе нет, стаб не узнаёт главный разговор и отвечает словом — 0 из 7
+      // (28.10). Под проверкой хук после вызова, не загрузка инструмента; как в
+      // check-group-forge-ask.mjs.
+      ENABLE_TOOL_SEARCH: 'false',
     };
     const args = [
       '-p',
@@ -252,10 +228,13 @@ async function main() {
       mcpFile,
       '--settings',
       settingsFile,
-      '--allowedTools',
-      'mcp__jira',
+      '--mcp-config',
+      brokerFile,
+      '--permission-prompt-tool',
+      'mcp__perm-guard__approve',
     ];
     const from = stub.seen.length;
+    const askedFrom = panel.asked.length;
     const output = await new Promise((resolve) => {
       const child = spawn(exe, args, { cwd: project, env, stdio: ['pipe', 'pipe', 'pipe'] });
       let out = '';
@@ -275,10 +254,15 @@ async function main() {
     return {
       results: toolResults(requests.at(-1) ?? {}),
       userLog: existsSync(userLog) ? readFileSync(userLog, 'utf8') : '',
+      asked: panel.asked.slice(askedFrom),
     };
   }
 
   const brief = await run('hook', HOOK);
+  check(
+    CALLS.every(([name]) => brief.asked.some((tool) => tool.endsWith(`__${name}`))),
+    `вызовы трекера дошли до панели брокером прав (${brief.asked.join(', ')})`,
+  );
   check(brief.results.size === 3, `с хуком: модель получила три ответа (${brief.results.size})`);
   const transition = brief.results.get('jira_transition_issue') ?? '';
   check(
@@ -314,6 +298,7 @@ async function main() {
   );
 
   stub.close();
+  panel.close();
   rmSync(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   console.log(bad ? `\nПровалов: ${bad}` : '\nВсё ок');
   process.exit(bad ? 1 : 0);

@@ -31,7 +31,7 @@ import { serverText } from '../../../../lib/server-texts/server-texts.ts';
  */
 
 /** Сколько ждём ЗАГОЛОВКОВ ответа. Дальше поток может идти сколько угодно. */
-export const UPSTREAM_HEADERS_TIMEOUT_MS = 60_000;
+const UPSTREAM_HEADERS_TIMEOUT_MS = 60_000;
 
 /**
  * Сколько ждём цельного ответа, когда драйвер предела не объявил: его заголовки
@@ -78,7 +78,7 @@ export const UPSTREAM_RETRY_PAUSE_MS = 700;
  * читает как «панель зависла». Названная контуром пауза сверх потолка означает
  * не «подожди», а «сегодня не твой день» — такой ответ отдаём клиенту как есть.
  */
-export const UPSTREAM_RETRY_MAX_PAUSE_MS = 2_000;
+const UPSTREAM_RETRY_MAX_PAUSE_MS = 2_000;
 
 export interface UpstreamCall {
   platform: Platform;

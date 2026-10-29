@@ -181,7 +181,7 @@ function urlOfRef(ref: string, base: string): string | undefined {
 }
 
 /** Как выбрать MR группы из тех, чья голова совпала с копией. */
-export interface DeliveredMrOptions {
+interface DeliveredMrOptions {
   /** Ссылка из ответа агента — подсказка, не факт. */
   hint?: string;
   /** Ветка группы — та, чей MR ищется. */
@@ -207,7 +207,7 @@ export interface DeliveredMrOptions {
  * основанием копии, MR не доказывает: он с тем же успехом предшественника.
  * Голова, совпавшая с HEAD удалённого (`main`), — MR без своих коммитов.
  */
-export async function pickDeliveredMr(
+async function pickDeliveredMr(
   refs: Map<string, string>,
   head: string,
   base: string | undefined,
@@ -448,7 +448,7 @@ const IMAGE_TARGET =
   /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?[^)]*\)|<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi;
 
 /** Адреса картинок описания в порядке появления, без повторов. */
-export function imageLinks(text: string): string[] {
+function imageLinks(text: string): string[] {
   return [
     ...new Set([...text.matchAll(IMAGE_TARGET)].flatMap((m) => m[1] ?? m[2] ?? []).filter(Boolean)),
   ];

@@ -1,7 +1,7 @@
 import type { RowType } from './rowWords.types';
 import type { StepSourceKind, StepSource } from './stepSource.types';
 
-export const TYPE_OF_SOURCE: Record<StepSourceKind, RowType> = {
+const TYPE_OF_SOURCE: Record<StepSourceKind, RowType> = {
   builtin: 'stage',
   'our-skill': 'our-skill',
   'project-skill': 'our-skill',

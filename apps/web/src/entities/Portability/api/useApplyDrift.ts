@@ -5,7 +5,7 @@ import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 import { PANEL_CANON_PROVIDER } from '@agentdeck/contracts/portable-subscribe';
 
-export async function postDriftApply(
+async function postDriftApply(
   request: DriftAddress & { fingerprint?: string },
 ): Promise<SubscriptionDriftAnswer> {
   const { data } = await apiClient.post<SubscriptionDriftAnswer>(

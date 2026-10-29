@@ -13,7 +13,7 @@ import {
   type ProjectGroupChoiceView,
 } from '@agentdeck/contracts/group-sources';
 import { unifiedDiff } from '../../../domains/config-preview/unified-diff.ts';
-import { maskSecretsInText, SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

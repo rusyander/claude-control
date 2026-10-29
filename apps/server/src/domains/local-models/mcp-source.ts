@@ -52,7 +52,7 @@ const projectKey = (path: string): string => {
  * панель, отдавая проектные серверы через флаг, спрашивает те же ключи: запись
  * проекта в `~/.claude.json` и `settings.json` личный и проекта. Отказ сильнее.
  */
-export function mcpjsonApproval(
+function mcpjsonApproval(
   project: string,
   files: { userConfig: string; userSettings: string },
 ): (id: string) => boolean {

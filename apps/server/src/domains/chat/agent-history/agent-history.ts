@@ -71,6 +71,8 @@ export function mainOf(digest: AgentDigest): AgentHistoryMain {
     ...(digest.model ? { model: digest.model } : {}),
     ...(hasAnomalies(digest.anomalies) ? { anomalies: digest.anomalies } : {}),
     ...(digest.ended ? {} : { turnOpen: true }),
+    ...(digest.openTool ? { openTool: digest.openTool } : {}),
+    ...(digest.lastAction ? { lastAction: digest.lastAction } : {}),
   };
 }
 
@@ -188,20 +190,39 @@ function fresh(at: string | number | undefined, now: number): boolean {
  * итога нет И его файл писался недавно: оборванный или снятый субагент итога
  * не пишет, и без порога молчания он числился бы работающим вечно.
  */
-export function liveCounts(
-  sessions: ReadonlyArray<{ session: SessionBody; keys: string[]; lastWriteMs: number }>,
-  probe: LiveProbe,
-): AgentHistoryLive {
+export function liveOf({ session, keys, lastWriteMs }: LiveInput, probe: LiveProbe): SessionLive {
+  const main = Boolean(
+    session.main.turnOpen && (probe.alive(keys) || fresh(lastWriteMs, probe.now)),
+  );
+  const agents = session.agents
+    .filter(
+      (agent) =>
+        agent.status === 'running' && fresh(agent.lastActivityAt ?? agent.startedAt, probe.now),
+    )
+    .map((agent) => agent.id);
+  return { main, agents };
+}
+
+/** Сессия и то, по чему видно, работает ли она: ключи процесса и время записи. */
+interface LiveInput {
+  session: SessionBody;
+  keys: string[];
+  lastWriteMs: number;
+}
+
+/** Работает ли главный агент сессии и какие её субагенты (`ProgressAgent.id`). */
+export interface SessionLive {
+  main: boolean;
+  agents: string[];
+}
+
+/** Сколько работает сейчас по всем сессиям — сумма `liveOf`, второго правила нет. */
+function sumLive(lives: readonly SessionLive[]): AgentHistoryLive {
   let agents = 0;
   let subagents = 0;
-  for (const { session, keys, lastWriteMs } of sessions) {
-    if (session.main.turnOpen && (probe.alive(keys) || fresh(lastWriteMs, probe.now))) {
-      agents += 1;
-    }
-    for (const agent of session.agents) {
-      if (agent.status !== 'running') continue;
-      if (fresh(agent.lastActivityAt ?? agent.startedAt, probe.now)) subagents += 1;
-    }
+  for (const live of lives) {
+    if (live.main) agents += 1;
+    subagents += live.agents.length;
   }
   return { agents, subagents };
 }
@@ -243,14 +264,28 @@ export function readAgentHistory(
     });
   }
   const entries = [...byPath.values()];
+  // Кто работает — по запросу, вне кэша: отметки сессий и числа рядом с кнопкой
+  // берутся из одного `liveOf`, и окно не может разойтись с «сейчас: N агент».
+  // Один замер на сессию: реестр процессов между двумя опросами мог бы сменить ответ.
+  const lives = entries.map((entry) => liveOf(entry, probe));
   const sessions = entries
-    .map((entry) => entry.session)
+    .map((entry, index) => withLive(entry.session, lives[index] ?? NOT_LIVE))
     .sort((a, b) => timeOf(b.startedAt) - timeOf(a.startedAt));
   return {
     sessions,
     agentCount: sessions.reduce((sum, session) => sum + session.agents.length, 0),
-    live: liveCounts(entries, probe),
+    live: sumLive(lives),
   };
+}
+
+const NOT_LIVE: SessionLive = { main: false, agents: [] };
+
+/**
+ * Сессия с отметками «работает сейчас» — всегда, и пустыми: по их наличию окно
+ * отличает этот ответ от ответа сервера, который отметок ещё не знал.
+ */
+function withLive(session: AgentHistorySession, live: SessionLive): AgentHistorySession {
+  return { ...session, liveMain: live.main, liveAgents: live.agents };
 }
 
 /**

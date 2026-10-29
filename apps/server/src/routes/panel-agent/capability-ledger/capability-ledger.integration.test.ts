@@ -46,6 +46,10 @@ const rogue = (
 const ROGUES: AnyPanelAction[] = [
   // Человеческое (D2): разделение применяет только клик человека.
   rogue('rogue_split', { route: () => ({ method: 'POST', url: '/api/chat/split', body: {} }) }),
+  // Команда ядру (пауза, одобрение) — человеческая строка, а не «нет в реестре».
+  rogue('rogue_core_command', {
+    route: () => ({ method: 'POST', url: '/api/core/commands', body: { kind: 'pause' } }),
+  }),
   // Маршрута нет в реестре вовсе — закрыто по умолчанию.
   rogue('rogue_unknown', { route: () => ({ method: 'POST', url: '/api/nowhere' }) }),
   // Маршрут есть, но отдан другому действию (`save_rule`).
@@ -102,6 +106,7 @@ describe('capability ledger in the panel-agent executor', () => {
       };
     app.post('/api/chat/split', count('POST /api/chat/split'));
     app.post('/api/nowhere', count('POST /api/nowhere'));
+    app.post('/api/core/commands', count('POST /api/core/commands'));
     app.post('/api/rules', count('POST /api/rules'));
     app.delete('/api/projects/:id', count('DELETE /api/projects/:id'));
     app.get('/api/env/reveal', count('GET /api/env/reveal', { value: 'x' }));
@@ -169,6 +174,7 @@ describe('capability ledger in the panel-agent executor', () => {
 
   it.each([
     ['rogue_split', 'POST /api/chat/split', /human’s \(POST chat\/split\)/],
+    ['rogue_core_command', 'POST /api/core/commands', /human’s \(POST core\/commands\)/],
     ['rogue_unknown', 'POST /api/nowhere', /POST nowhere, which is not in the ledger/],
     ['rogue_borrow', 'POST /api/rules', /POST rules is not granted to rogue_borrow/],
     ['rogue_prep_write', 'POST /api/rules', /rogue_prep_write may only read POST rules/],

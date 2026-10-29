@@ -164,6 +164,29 @@ describe('пересечения веток разделения на насто
     expect(view?.files).toEqual([]);
   });
 
+  // Живой прогон 27.10: человек выгрузил в папке проекта ветку своей задачи
+  // (`feat-VAB-403/…`), и охват перепроверки с пробой конфликтов пошли против неё.
+  it('основная копия на ветке задачи — база основная ветка проекта, не эта ветка', async () => {
+    git(main, 'checkout', '-q', '-b', 'feat-own-task');
+    commit(main, { 'web/a.ts': 'own\n', 'api/own.go': 'o\n' }, 'own task, not pushed');
+    git(main, 'push', '-q', 'origin', 'feat-own-task');
+    expect(await readMergeTarget(main)).toBe('origin/main');
+
+    const g0 = group('g0', 'origin/main');
+    commit(g0, { 'web/b.ts': 'b0\n' }, 'g0');
+    plan([g0]);
+
+    const view = await overlap().check('родитель');
+
+    expect(view?.unread).toEqual([]);
+    expect(view?.counted).toEqual([{ index: 0, files: 1, names: ['web/b.ts'] }]);
+  });
+
+  it('основная копия без ветки (отсоединённая голова) — база основная ветка проекта', async () => {
+    git(main, 'checkout', '-q', '--detach');
+    expect(await readMergeTarget(main)).toBe('origin/main');
+  });
+
   it('локальный main впереди удалённого — база он: его коммиты не правки групп', async () => {
     commit(main, { 'docs/local.md': 'l\n' }, 'local, not pushed');
     expect(await readMergeTarget(main)).toBe('main');

@@ -3,7 +3,7 @@ import { apiClient } from '@shared/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getPrompt(id: PromptId): Promise<PromptRecord> {
+async function getPrompt(id: PromptId): Promise<PromptRecord> {
   const { data } = await apiClient.get<PromptRecord>(`/prompts/${id}`);
   return data;
 }

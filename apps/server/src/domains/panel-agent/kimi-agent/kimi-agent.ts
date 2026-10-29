@@ -24,7 +24,7 @@ import {
  */
 
 /** Разделы `config.toml` человека, которые нужны модели: провайдер, модель и их настройки. */
-export const KIMI_MODEL_KEYS: readonly string[] = [
+const KIMI_MODEL_KEYS: readonly string[] = [
   'default_model',
   'default_provider',
   'providers',

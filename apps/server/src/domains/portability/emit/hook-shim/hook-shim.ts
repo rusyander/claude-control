@@ -64,7 +64,7 @@ function camelCase(name: string): string {
  * Все написания одного поля, в порядке поиска: сперва имя Claude (нагрузка
  * хозяина может уже совпадать), затем его camelCase, затем чужие слова.
  */
-export function hostSpellingsOf(field: string): readonly string[] {
+function hostSpellingsOf(field: string): readonly string[] {
   const names = [field, ...(HOST_EXTRA_SPELLINGS[field] ?? [])];
   return [...new Set(names.flatMap((name) => [name, camelCase(name)]))];
 }
@@ -125,11 +125,11 @@ export function hookShimConfig(params: { event: string; command: string }): Hook
  * допускает, поэтому в имени оно становится дефисом; второго способа считать
  * тождество хука при этом не появляется.
  */
-export function hookShimId(config: Pick<HookShimConfig, 'event' | 'command'>): string {
+function hookShimId(config: Pick<HookShimConfig, 'event' | 'command'>): string {
   return hookContentId(config.event, undefined, config.command).replace(':', '-');
 }
 
-export function hookShimFileName(config: Pick<HookShimConfig, 'event' | 'command'>): string {
+function hookShimFileName(config: Pick<HookShimConfig, 'event' | 'command'>): string {
   return `${BRAND_SLUG}-hook-shim-${hookShimId(config)}.mjs`;
 }
 

@@ -28,7 +28,7 @@ export type {
 export const LOCAL_ACTIONS: readonly string[] = ['where_am_i', 'list_sections', 'open_page'];
 
 /** Почему нажать должен человек — модели, по-английски. */
-export const HUMAN_REASONS: Readonly<Record<HumanReason, string>> = {
+const HUMAN_REASONS: Readonly<Record<HumanReason, string>> = {
   'split-apply': 'applying, cancelling or cleaning up a split is the human’s click',
   rights: 'permission and branch decisions and auto-approve belong to the human',
   outward: 'writes that leave this machine (git push, tracker, wiki, publishing) are the human’s',
@@ -152,7 +152,7 @@ export function resolveRouteKey(
  * адреса действия кладёт id модели в сегмент (`encodeURIComponent('..')` — это `..`),
  * так что такой адрес — всегда попытка выйти за строку реестра, а не данные.
  */
-export function disguisedPath(url: string): boolean {
+function disguisedPath(url: string): boolean {
   if (!url.startsWith('/') || url.startsWith('//')) return true;
   const path = url.split(/[?#]/, 1)[0]!;
   // eslint-disable-next-line no-control-regex -- управляющие символы и есть предмет проверки

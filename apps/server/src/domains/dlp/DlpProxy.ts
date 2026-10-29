@@ -1,9 +1,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { DlpRule, DlpStatus } from '@agentdeck/contracts';
-import { apiKindForPath, type DlpApiKind } from './api-shapes.ts';
-import { AliasVault } from './mask.ts';
-import { maskRequestBody } from './request-filter.ts';
-import { ResponseStreamFilter, restoreJsonResponse } from './response-filter.ts';
+import { apiKindForPath, type DlpApiKind } from '@agentdeck/dlp/api-shapes';
+import { AliasVault } from '@agentdeck/dlp/mask';
+import { maskRequestBody } from '@agentdeck/dlp/request-filter';
+import { ResponseStreamFilter, restoreJsonResponse } from '@agentdeck/dlp/response-filter';
 import { appendJournal } from './journal.ts';
 import {
   localizeText,

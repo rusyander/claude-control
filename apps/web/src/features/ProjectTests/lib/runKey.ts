@@ -1,5 +1,5 @@
 /** Подпись прогона одним ключом словаря: вложенные тернарники здесь запрещены. */
-export const RUNNING_KEY: Record<string, string> = {
+const RUNNING_KEY: Record<string, string> = {
   generate: 'projectTests.runGenerate',
   explore: 'projectTests.runExplore',
   automate: 'projectTests.runAutomate',

@@ -10,7 +10,7 @@ import type {
   SkillItem,
   SubagentItem,
 } from '@agentdeck/contracts/portable-env';
-import { findSecretSpans, isSecretFree, isSecretName } from '../../lib/secret-mask/secret-mask.ts';
+import { findSecretSpans, isSecretFree, isSecretName } from '@agentdeck/dlp/secret-mask';
 import {
   envItemId,
   envSkip,
@@ -255,7 +255,7 @@ export function pluginItem(params: {
 
 /**
  * Имя ключа выглядит учётной записью — ТЕМ ЖЕ детектором, каким панель решает
- * это везде (`lib/secret-mask/secret-mask.ts`), а не своим выражением.
+ * это везде (`@agentdeck/dlp/secret-mask`), а не своим выражением.
  *
  * Своё здесь стояло и было уже, и оно было. Требовалось `api_key` или
  * `access_key` целиком, так что `OPENAI_KEY` и `GITHUB_PAT` секретами не

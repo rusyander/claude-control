@@ -16,7 +16,7 @@ import { normalizeProjectPath } from './projects.ts';
  */
 
 /** Пустой каркас: у проекта всегда есть место под привязку и под группы. */
-export function emptyLinks(): IntegrationLinks {
+function emptyLinks(): IntegrationLinks {
   return { project: {}, groups: {} };
 }
 

@@ -8,7 +8,7 @@ import { groupKeyOf, scopeOf } from '@agentdeck/contracts/group-sources';
 import { updateGroupSources, projectKey } from '../../lib/app-store/group-sources.ts';
 import { hookContentId } from '../../lib/hook-id.ts';
 import { copyRecursive } from '../../lib/safe-io/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { EntityToggleDeps } from '../entity-toggle.ts';
 import { readHooks, writeHooks } from '../hooks/hooks.ts';
 import { saveMcpServer } from '../mcp/mcp.ts';

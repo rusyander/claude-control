@@ -1,7 +1,7 @@
 import type { ModelPricing, PricingEntry } from '@agentdeck/contracts';
 import { PRICING_FIELDS } from './PricingRow.constants';
 
-export function samePrice(a: ModelPricing, b: ModelPricing): boolean {
+function samePrice(a: ModelPricing, b: ModelPricing): boolean {
   return PRICING_FIELDS.every((field) => a[field] === b[field]);
 }
 

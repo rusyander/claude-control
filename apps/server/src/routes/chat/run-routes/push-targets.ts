@@ -30,8 +30,7 @@ import { steersGit } from '../../../domains/chat/group-command/walk.ts';
  */
 
 /** Цель пуша: ветка по имени, или «доказать нельзя» с причиной для текста отказа. */
-export type PushTarget =
-  { kind: 'branch'; name: string } | { kind: 'unresolved'; why: UnresolvedPush };
+type PushTarget = { kind: 'branch'; name: string } | { kind: 'unresolved'; why: UnresolvedPush };
 
 /**
  * Почему цель не доказана. Текст причины уходит агенту (`texts.ts`), поэтому

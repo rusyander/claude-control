@@ -46,7 +46,7 @@ const defaultExec: CliExec = (file, args, options = {}) => {
 const VERSION = /(\d+)\.(\d+)\.(\d+)/;
 
 /** Версия из вывода `--version` («2.1.282 (Claude Code)»). */
-export function parseCliVersion(text: string): string | undefined {
+function parseCliVersion(text: string): string | undefined {
   return VERSION.exec(text)?.[0];
 }
 

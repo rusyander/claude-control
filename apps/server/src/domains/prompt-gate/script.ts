@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { buildEnglishGateScript } from './script-en.ts';
 import type { GateScriptConfig } from './script.types.ts';
 
@@ -19,16 +20,19 @@ import type { GateScriptConfig } from './script.types.ts';
 export type { GateScriptConfig } from './script.types.ts';
 
 /**
- * Ядро читается из файлов рядом: одна копия логики и одна копия образцов на
- * прокси и на хук. Образцы идут первыми — ядро ссылается на них по имени.
+ * Ядро читается из файлов: одна копия логики и одна копия образцов на прокси и
+ * на хук. Образцы идут первыми — ядро ссылается на них по имени. Образцы — файл
+ * пакета DLP: путь к нему берёт резолвер node, а не относительный путь, чтобы
+ * переезд пакета не ломал сборку хука молча.
  */
 export function coreSource(): string {
   // `export` и импорт образцов снимаются: оба файла вставляются в тело скрипта.
-  const read = (path: string): string =>
-    readFileSync(new URL(path, import.meta.url), 'utf8')
+  const read = (file: string | URL): string =>
+    readFileSync(file, 'utf8')
       .replace(/^export /gm, '')
       .replace(/^import .*;\n/gm, '');
-  return `${read('../dlp/builtins.mjs').trim()}\n\n${read('./gate-core.mjs').trim()}\n`;
+  const builtins = createRequire(import.meta.url).resolve('@agentdeck/dlp/builtins');
+  return `${read(builtins).trim()}\n\n${read(new URL('./gate-core.mjs', import.meta.url)).trim()}\n`;
 }
 
 export function buildGateScript(config: GateScriptConfig): string {

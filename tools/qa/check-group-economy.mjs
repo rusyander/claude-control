@@ -24,10 +24,10 @@
  * (путь — `CLAUDE_CLI`); стенд и настройки человека не трогаются.
  */
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-economy-';
 const BIG_OUTPUT = 20_000;
@@ -117,109 +117,22 @@ const resultText = (block) =>
     ? block.content
     : (block?.content ?? []).map((part) => part.text ?? '').join('');
 
-function sse(res, content, stopReason) {
-  const message = {
-    id: `msg_${Date.now()}`,
-    type: 'message',
-    role: 'assistant',
-    model: 'stub',
-    content: [],
-    stop_reason: null,
-    usage: { input_tokens: 10, output_tokens: 1 },
-  };
-  const events = [['message_start', { type: 'message_start', message }]];
-  content.forEach((block, index) => {
-    if (block.type === 'text') {
-      events.push(
-        [
-          'content_block_start',
-          { type: 'content_block_start', index, content_block: { type: 'text', text: '' } },
-        ],
-        [
-          'content_block_delta',
-          { type: 'content_block_delta', index, delta: { type: 'text_delta', text: block.text } },
-        ],
-      );
-    } else {
-      events.push(
-        [
-          'content_block_start',
-          {
-            type: 'content_block_start',
-            index,
-            content_block: { type: 'tool_use', id: block.id, name: block.name, input: {} },
-          },
-        ],
-        [
-          'content_block_delta',
-          {
-            type: 'content_block_delta',
-            index,
-            delta: { type: 'input_json_delta', partial_json: JSON.stringify(block.input) },
-          },
-        ],
-      );
-    }
-    events.push(['content_block_stop', { type: 'content_block_stop', index }]);
-  });
-  events.push(
-    [
-      'message_delta',
-      { type: 'message_delta', delta: { stop_reason: stopReason }, usage: { output_tokens: 1 } },
-    ],
-    ['message_stop', { type: 'message_stop' }],
-  );
-  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-  for (const [event, data] of events)
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  res.end();
-}
-
 /** Стаб API: главный цикл (есть инструмент Bash) идёт по сценарию, прочее — словом. */
-function startStub() {
+async function startStub() {
   const state = { script: [], seen: [] };
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (req.url?.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ input_tokens: Math.ceil(raw.length / 4) }));
-        return;
-      }
-      if (!req.url?.includes('/messages')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end('{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // Не JSON — запрос без инструментов, ответ «ok» ниже.
-      }
-      const main = (body.tools ?? []).some((tool) => tool.name === 'Bash');
-      if (!main) return sse(res, [{ type: 'text', text: 'ok' }], 'end_turn');
-      state.seen.push(body);
-      const step = state.script[toolResults(body).length];
-      if (!step) return sse(res, [{ type: 'text', text: 'done' }], 'end_turn');
-      sse(
-        res,
-        [{ type: 'tool_use', id: `toolu_${toolResults(body).length}`, ...step }],
-        'tool_use',
-      );
-    });
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request, info }) => {
+      if (!info.tools.some((tool) => tool.name === 'Bash')) return 'ok';
+      state.seen.push(request.body);
+      const done = toolResults(request.body).length;
+      const step = state.script[done];
+      if (!step) return 'done';
+      return { tool: { name: step.name, args: step.input, id: `toolu_${done}` } };
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        state,
-        close: () => server.close(),
-      }),
-    ),
-  );
+  return { url: stub.baseUrl, state, close: () => stub.close() };
 }
 
 /** Все `cache_control` тела запроса, где бы они ни стояли. */

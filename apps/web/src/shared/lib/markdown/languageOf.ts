@@ -1,7 +1,7 @@
 import { bundledLanguages } from 'shiki/langs';
 
 /** Язык определяем по расширению — в артефактах это единственная подсказка. */
-export const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
   js: 'javascript',
   mjs: 'javascript',
   cjs: 'javascript',

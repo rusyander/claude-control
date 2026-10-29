@@ -32,7 +32,7 @@ const MIN_WAIT_MS = 1_000;
  * владелец 11.10 — «из коробки», без ручной установки.
  */
 /** Команда хука этой панели: адрес API и файл токена. */
-export function panelRelayCommand(): string {
+function panelRelayCommand(): string {
   return relayHookCommand(`http://127.0.0.1:${process.env.PORT ?? 5178}`, apiTokenPath());
 }
 

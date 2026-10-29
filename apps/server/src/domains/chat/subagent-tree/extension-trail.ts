@@ -4,6 +4,7 @@ import type {
   AgentExtensionUse,
 } from '@agentdeck/contracts';
 import type { TranscriptBlock, TranscriptRecord } from '../ChatHistory/ChatHistory.ts';
+import { isInterruptedResult } from './agent-anomalies.ts';
 
 /**
  * След скиллов, хуков и MCP агента по его транскрипту — для значков узла
@@ -214,7 +215,9 @@ export class ExtensionTrail {
 
   /** Результат вызова скилла или MCP: итог и время от вызова. */
   private settle(use: AgentExtensionUse, block: TranscriptBlock, at: string | undefined): void {
-    use.outcome = block.is_error ? 'error' : 'ok';
+    // Обрыв паузой или концом сессии CLI пишет с `is_error` — это не ошибка вызова.
+    if (isInterruptedResult(resultText(block))) use.outcome = 'interrupted';
+    else use.outcome = block.is_error ? 'error' : 'ok';
     const start = use.at ? Date.parse(use.at) : Number.NaN;
     const end = at ? Date.parse(at) : Number.NaN;
     if (Number.isFinite(start) && Number.isFinite(end) && end >= start)

@@ -5,7 +5,7 @@ import type { Group, GroupMember, Hook } from '@agentdeck/contracts';
 import type { GroupScope } from '@agentdeck/contracts/group-sources';
 import { projectKey } from '../../lib/app-store/group-sources.ts';
 import { readTextFile } from '../../lib/safe-io/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { readHooks, readHooksFromFiles } from '../hooks/hooks.ts';
 import { readScriptContent } from '../scripts/scripts.ts';
 import type { DescribeSource } from './describe/describe.ts';

@@ -27,6 +27,11 @@ export const agentAnomaliesSchema = object({
   repeatedReads: array(object({ path: string(), count: number() })),
   /** Результатов длиннее 10 000 символов. */
   largeResults: number(),
+  /**
+   * Вызовов, оборванных паузой или концом сессии: результата нет, CLI дописал
+   * за них «[Tool call interrupted…]». Не ошибка вызова; нуль не передаётся.
+   */
+  interrupted: number().optional(),
 });
 
 export type AgentAnomalies = Infer<typeof agentAnomaliesSchema>;
@@ -46,6 +51,11 @@ export const agentStepSchema = object({
   result: string().optional(),
   /** Вызов кончился ошибкой. */
   isError: boolean().optional(),
+  /**
+   * Вызов оборван паузой или концом сессии — результата не было, CLI дописал
+   * «[Tool call interrupted…]». Не ошибка: `isError` при этом нет.
+   */
+  interrupted: boolean().optional(),
   /** Вызов: от записи вызова до записи его результата, мс. */
   durationMs: number().optional(),
   /** Вызов: длина ВСЕГО результата в символах (`result` — только его начало). */
@@ -68,7 +78,8 @@ export type AgentExtensionKind = Infer<typeof agentExtensionKindSchema>;
 /**
  * Итог одного срабатывания: `ok` — прошло; `error` — кончилось ошибкой;
  * `denied` — хук отказал в вызове или в конце хода; `context` — хук дописал
- * текст в контекст модели; `running` — вызов ещё идёт.
+ * текст в контекст модели; `running` — вызов ещё идёт; `interrupted` — вызов
+ * оборван паузой или концом сессии, результата не было.
  */
 export const agentExtensionOutcomeSchema = union([
   literal('ok'),
@@ -76,6 +87,7 @@ export const agentExtensionOutcomeSchema = union([
   literal('denied'),
   literal('context'),
   literal('running'),
+  literal('interrupted'),
 ]);
 
 export type AgentExtensionOutcome = Infer<typeof agentExtensionOutcomeSchema>;

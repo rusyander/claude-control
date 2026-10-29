@@ -7,7 +7,7 @@ import {
   type TicketProblemDetail,
   type TicketSeverity,
 } from '@agentdeck/contracts/split-ticket-batch';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { TicketLang } from './compose.ts';
 
 /**

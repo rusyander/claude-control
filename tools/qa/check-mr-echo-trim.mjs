@@ -16,10 +16,10 @@
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, parse } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const TOOLS = dirname(dirname(fileURLToPath(import.meta.url)));
 const KIT_RUN = join(
@@ -86,111 +86,35 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
 });
 `;
 
-function sse(blocks, stop) {
-  const events = [
-    [
-      'message_start',
-      {
-        type: 'message_start',
-        message: {
-          id: 'msg_mr',
-          type: 'message',
-          role: 'assistant',
-          model: 'stub',
-          content: [],
-          stop_reason: null,
-          usage: { input_tokens: 10, output_tokens: 1 },
-        },
-      },
-    ],
-  ];
-  blocks.forEach(([start, delta], index) => {
-    events.push([
-      'content_block_start',
-      { type: 'content_block_start', index, content_block: start },
-    ]);
-    events.push(['content_block_delta', { type: 'content_block_delta', index, delta }]);
-    events.push(['content_block_stop', { type: 'content_block_stop', index }]);
-  });
-  events.push([
-    'message_delta',
-    { type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 1 } },
-  ]);
-  events.push(['message_stop', { type: 'message_stop' }]);
-  return events.map(([e, d]) => `event: ${e}\ndata: ${JSON.stringify(d)}\n\n`).join('');
-}
-const textReply = (text) =>
-  sse(
-    [
-      [
-        { type: 'text', text: '' },
-        { type: 'text_delta', text },
-      ],
-    ],
-    'end_turn',
-  );
-
 /** Модель-стаб: в главном разговоре зовёт правку MR, следующим запросом запоминает её итог. */
-function startStub() {
+async function startStub() {
   const state = { result: null };
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => {
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      } catch {
-        /* пустое тело — тоже запрос */
-      }
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const main = (body.tools ?? []).some((t) => /__update_merge_request$/.test(t.name));
-      if (!main) return res.end(textReply('no'));
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      const { body } = request;
+      const name = request.tools.find((tool) => /__update_merge_request$/.test(tool));
+      if (!name) return 'no';
       const results = (body.messages ?? []).flatMap((m) =>
         Array.isArray(m.content) ? m.content.filter((b) => b.type === 'tool_result') : [],
       );
-      if (results.length) {
-        const last = results[results.length - 1];
-        // Тексты блоков итога — то, что прочтёт модель (без JSON-обёртки блоков).
-        state.result =
-          typeof last.content === 'string'
-            ? last.content
-            : (Array.isArray(last.content) ? last.content : [])
-                .map((b) => (typeof b?.text === 'string' ? b.text : ''))
-                .join('\n');
-        return res.end(textReply('ok'));
+      if (!results.length) {
+        const args = { iid: '7', description: DESCRIPTION };
+        return { tool: { name, args, id: 'toolu_mr0' } };
       }
-      const name = body.tools.find((t) => /__update_merge_request$/.test(t.name)).name;
-      res.end(
-        sse(
-          [
-            [
-              { type: 'tool_use', id: 'toolu_mr0', name, input: {} },
-              {
-                type: 'input_json_delta',
-                partial_json: JSON.stringify({ iid: '7', description: DESCRIPTION }),
-              },
-            ],
-          ],
-          'tool_use',
-        ),
-      );
-    });
+      const last = results[results.length - 1];
+      // Тексты блоков итога — то, что прочтёт модель (без JSON-обёртки блоков).
+      state.result =
+        typeof last.content === 'string'
+          ? last.content
+          : (Array.isArray(last.content) ? last.content : [])
+              .map((b) => (typeof b?.text === 'string' ? b.text : ''))
+              .join('\n');
+      return 'ok';
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        state,
-        close: () => server.close(),
-      }),
-    ),
-  );
+  return { url: stub.baseUrl, state, close: () => stub.close() };
 }
 
 async function runOnce(exe, work, label, { hook, child }) {

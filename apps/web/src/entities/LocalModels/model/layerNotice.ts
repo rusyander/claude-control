@@ -1,7 +1,7 @@
 import type { LocalLayerFit } from '@agentdeck/contracts/local-models';
 
 /** Чем починить слой, который не влезает в окно: ключ строки словаря и её числа. */
-export type LayerFixView =
+type LayerFixView =
   | { key: 'fixContext'; context: number }
   | { key: 'fixQuant'; context: number; quant: string }
   | { key: 'fixNone' };

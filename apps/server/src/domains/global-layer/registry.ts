@@ -10,7 +10,7 @@ import type { GlobalLayerText } from '@agentdeck/contracts';
  * (`runners.ts`), и пары одного рода его делят.
  */
 
-export interface PairSide {
+interface PairSide {
   /** Модуль, который исполняет прогон: у панели — от корня репозитория, у глобального — от каталога конфигурации. */
   module: string;
   /** Файлы стороны: их отпечаток решает, изменилась ли она после сверки. */

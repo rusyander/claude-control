@@ -24,11 +24,11 @@
  * (путь — `CLAUDE_CLI`); стенд и настройки человека не трогаются.
  */
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-boardfields-';
 const TOOLS = fileURLToPath(new URL('..', import.meta.url));
@@ -93,100 +93,22 @@ function toolResults(body) {
 /** Поля, которые сервер получил, — из эха в ответе. */
 const receivedFields = (text) => /"received_fields":"([^"]*)"/.exec(text)?.[1] ?? '';
 
-function sse(blocks, stop) {
-  const events = [
-    [
-      'message_start',
-      {
-        type: 'message_start',
-        message: {
-          id: 'msg_bf',
-          type: 'message',
-          role: 'assistant',
-          model: 'stub',
-          content: [],
-          stop_reason: null,
-          usage: { input_tokens: 10, output_tokens: 1 },
-        },
-      },
-    ],
-  ];
-  blocks.forEach(([start, delta], index) => {
-    events.push([
-      'content_block_start',
-      { type: 'content_block_start', index, content_block: start },
-    ]);
-    events.push(['content_block_delta', { type: 'content_block_delta', index, delta }]);
-    events.push(['content_block_stop', { type: 'content_block_stop', index }]);
-  });
-  events.push([
-    'message_delta',
-    { type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 1 } },
-  ]);
-  events.push(['message_stop', { type: 'message_stop' }]);
-  return events
-    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-    .join('');
-}
-
 /** Стаб API: в разговоре с инструментами доски зовёт их по очереди, иначе — слово. */
-function startStub() {
+async function startStub() {
   const seen = [];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // пустое тело — тоже запрос
-      }
-      const tools = (body.tools ?? []).map((tool) => tool.name);
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      const tools = request.tools;
       const main = tools.some((name) => /__jira_get_board_issues$/.test(name));
-      if (main) seen.push(body);
-      const done = toolResults(body).length;
-      const next = main ? CALLS[done] : undefined;
+      if (main) seen.push(request.body);
+      const next = main ? CALLS[toolResults(request.body).length] : undefined;
       const name = next && tools.find((tool) => tool.endsWith(`__${next[0]}`));
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      res.end(
-        name
-          ? sse(
-              [
-                [
-                  { type: 'tool_use', id: `toolu_bf${done}`, name, input: {} },
-                  { type: 'input_json_delta', partial_json: JSON.stringify(next[1]) },
-                ],
-              ],
-              'tool_use',
-            )
-          : sse(
-              [
-                [
-                  { type: 'text', text: '' },
-                  { type: 'text_delta', text: 'ok' },
-                ],
-              ],
-              'end_turn',
-            ),
-      );
-    });
+      return name ? { tool: { name, args: next[1] } } : 'ok';
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        seen,
-        close: () => server.close(),
-      }),
-    ),
-  );
+  return { url: stub.baseUrl, seen, close: () => stub.close() };
 }
 
 async function main() {
@@ -244,6 +166,10 @@ async function main() {
       ANTHROPIC_API_KEY: 'bf-stub',
       ANTHROPIC_MODEL: 'claude-sonnet-4-5',
       DISABLE_AUTOUPDATER: '1',
+      // Свежий CLI прячет инструменты MCP за ToolSearch, и в `tools` запроса их
+      // нет — стаб не узнавал главный поток и отвечал словом. Загрузка
+      // инструментов здесь не проверяется, поэтому они идут списком сразу.
+      ENABLE_TOOL_SEARCH: 'false',
     };
     const args = [
       '-p',

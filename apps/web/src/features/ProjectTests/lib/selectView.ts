@@ -31,7 +31,7 @@ export interface LibraryView {
  * же списком, каким бы ни был порядок. Равные — по названию, чтобы строки не
  * прыгали между перерисовками.
  */
-export function sortByRisk(
+function sortByRisk(
   rows: CaseWithGroup[],
   risk: Map<string, ProjectTestRiskItem>,
 ): CaseWithGroup[] {

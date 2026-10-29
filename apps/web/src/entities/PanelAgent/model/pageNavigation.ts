@@ -10,7 +10,7 @@ import {
   DLP_RULE_PREFIX,
 } from './pageTarget.constants';
 
-export function queryOf(search: Record<string, string>): string {
+function queryOf(search: Record<string, string>): string {
   const query = new URLSearchParams(search).toString();
   return query ? `?${query}` : '';
 }
@@ -28,20 +28,20 @@ export const ENV_SECRET_TAB = 'secret';
  * Вкладки настроек, где живут поля токенов. Имена — из `pages/Settings/model/tabs.constants.ts`;
  * сущность страницу не импортирует, поэтому строки повторены здесь.
  */
-export const SETTINGS_ENDPOINTS_TAB = 'models';
+const SETTINGS_ENDPOINTS_TAB = 'models';
 
-export const SETTINGS_INTEGRATIONS_TAB = 'integrations';
+const SETTINGS_INTEGRATIONS_TAB = 'integrations';
 
 /** Фокус чата «проект»: агент создал проект и просил открыть его чат. */
-export const CHAT_PROJECT_PREFIX = 'project:';
+const CHAT_PROJECT_PREFIX = 'project:';
 
 /** Вкладка правил /dlp — из `pages/Dlp/model/tabs.ts`. */
-export const DLP_RULES_TAB = 'rules';
+const DLP_RULES_TAB = 'rules';
 
-export const LIST_ALL_TAB_PAGES = new Set(['/rules', '/scripts']);
+const LIST_ALL_TAB_PAGES = new Set(['/rules', '/scripts']);
 
 /** Вкладка-отбор «Все» правил и скриптов (`pages/{Rules,Scripts}/model/tabs.ts`). */
-export const LIST_ALL_TAB = 'all';
+const LIST_ALL_TAB = 'all';
 
 /**
  * Разделы, у которых `focus` агента — это часть адреса, а не якорь в разметке.
@@ -49,7 +49,7 @@ export const LIST_ALL_TAB = 'all';
  * вкладка), а страница читает его из запроса: без перевода агент «открывал бы»
  * чат, но не тот разговор, и тесты, но не ту вкладку.
  */
-export const FOCUS_AS_SEARCH: Record<string, 'id' | 'tab'> = {
+const FOCUS_AS_SEARCH: Record<string, 'id' | 'tab'> = {
   '/chat': 'id',
   '/projects': 'id',
   '/tests': 'tab',
@@ -74,7 +74,7 @@ export interface PageNavigation {
   composerMode?: ChatComposerMode;
 }
 
-export function composerModeOf(value: string | undefined): ChatComposerMode | undefined {
+function composerModeOf(value: string | undefined): ChatComposerMode | undefined {
   return value === 'deck' || value === 'image' ? value : undefined;
 }
 

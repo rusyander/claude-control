@@ -70,7 +70,7 @@ export class MdcFormatError extends Error {
 }
 
 /** Ключи frontmatter, которыми управляет панель (в задокументированном порядке). */
-export const MDC_MANAGED_KEYS = ['description', 'globs', 'alwaysApply'] as const;
+const MDC_MANAGED_KEYS = ['description', 'globs', 'alwaysApply'] as const;
 
 /** Расширение файла правила Cursor. Всё прочее в каталоге правил CLI игнорирует. */
 export const MDC_EXTENSION = '.mdc';

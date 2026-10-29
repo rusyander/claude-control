@@ -27,7 +27,6 @@
  * Запуск: `node tools/qa/check-local-layer.mjs` (нужен `claude`; `CLAUDE_CLI`
  * задаёт путь). Стенд человека не трогается.
  */
-import { createServer } from 'node:http';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -44,6 +43,7 @@ import { dirname, join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as wait } from 'node:timers/promises';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const MCP_SERVER = fileURLToPath(new URL('./mcp-marker.mjs', import.meta.url));
 const PREFIX = 'cc-local-layer-qa-';
@@ -98,76 +98,21 @@ const write = (file, text) => {
  * шаг — вызов Read, после сценария — конец хода. Служебные запросы CLI
  * (заголовок, сжатие) получают пустой текст и в улики не попадают.
  */
-function startStub() {
+async function startStub() {
   const state = { seen: [], script: [] };
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      let body;
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-      } catch {
-        body = {};
-      }
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      const main = Array.isArray(body.tools) && body.tools.length > 5;
-      if (main) state.seen.push(body);
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      // Главный разговор — с полным набором инструментов; побочные запросы CLI — без него.
+      const main = request.tools.length > 5;
+      if (main) state.seen.push(request.body);
       const step = main ? state.script[state.seen.length - 1] : undefined;
-      const block = step
-        ? { type: 'tool_use', id: `tu_${state.seen.length}`, name: 'Read', input: {} }
-        : { type: 'text', text: '' };
-      const delta = step
-        ? { type: 'input_json_delta', partial_json: JSON.stringify({ file_path: step }) }
-        : { type: 'text_delta', text: 'ок' };
-      const events = [
-        [
-          'message_start',
-          {
-            type: 'message_start',
-            message: {
-              id: 'msg_ll',
-              type: 'message',
-              role: 'assistant',
-              model: body.model ?? 'stub',
-              content: [],
-              stop_reason: null,
-              usage: { input_tokens: 10, output_tokens: 1 },
-            },
-          },
-        ],
-        ['content_block_start', { type: 'content_block_start', index: 0, content_block: block }],
-        ['content_block_delta', { type: 'content_block_delta', index: 0, delta }],
-        ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-        [
-          'message_delta',
-          {
-            type: 'message_delta',
-            delta: { stop_reason: step ? 'tool_use' : 'end_turn' },
-            usage: { output_tokens: 1 },
-          },
-        ],
-        ['message_stop', { type: 'message_stop' }],
-      ];
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      for (const [event, data] of events)
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.end();
-    });
+      if (!step) return 'ок';
+      return { tool: { name: 'Read', args: { file_path: step }, id: `tu_${state.seen.length}` } };
+    },
   });
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        state,
-        close: () => server.close(),
-      }),
-    );
-  });
+  return { url: stub.baseUrl, state, close: () => stub.close() };
 }
 
 /** Хук команды: пишет свой голос в журнал корня, найденного от СВОЕГО места. */
@@ -320,7 +265,11 @@ async function main() {
       team: count(first, MARK.team),
       always: count(first, MARK.always),
       skill: first.includes(MARK.skill),
-      mcp: (stub.state.seen[0]?.tools ?? []).some((tool) => tool.name === MARK.mcp),
+      // Свежий CLI откладывает инструменты MCP за ToolSearch: имя приходит не в
+      // `tools`, а списком отложенных инструментов в сообщениях первого запроса.
+      mcp:
+        (stub.state.seen[0]?.tools ?? []).some((tool) => tool.name === MARK.mcp) ||
+        first.includes(MARK.mcp),
       scopedAtStart: first.includes(MARK.scoped),
       nestedAtStart: first.includes(MARK.nested),
       scoped: count(last, MARK.scoped),

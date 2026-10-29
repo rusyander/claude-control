@@ -38,7 +38,8 @@ jobs:
       - run: pnpm type-check
       - run: pnpm lint
       # Покрытие считается и проверяется по порогу в каждом прогоне (vitest.config).
-      - run: pnpm test
+      # Ядро здесь не гоняется: у него своё задание на трёх ОС и слитый порог (ниже).
+      - run: pnpm -r --filter '!@agentdeck/core' test
       - run: pnpm depcruise
       # Подписи компромиссов: реестр ↔ код ↔ интерфейс ↔ словарь. Единственный
       # прогон из `tools/qa/`, которому не нужен ни стенд, ни сеть, — и без него
@@ -60,6 +61,81 @@ jobs:
       # Прежнее имя продукта не возвращается: разрешённые места
       # перечислены с точным числом вхождений, самопроверка — внутри.
       - run: pnpm brand
+
+  # Ядро (apps/core) на трёх ОС. Часть кода исполняется только на одной из них (exec-бит,
+  # группы процессов и environ — POSIX; таблица процессов и WMI — Windows), поэтому порог
+  # покрытия судит слитая карта всех трёх, а не прогон одной ОС. macOS-прогон здесь — первая
+  # настоящая проверка ядра на macOS (машины с macOS у владельца нет).
+  core:
+    name: core · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Каталог отчёта назван явно, как в `pnpm core:test:all`: иначе у прогона свой `coverage/run-<pid>`.
+      - run: pnpm exec vitest run --coverage.reportsDirectory=coverage/ci
+        working-directory: apps/core
+      # `*.alone.test.ts` — по одному файлу, когда соседних процессов уже нет (vitest.config.ts).
+      - run: pnpm exec vitest run --passWithNoTests
+        working-directory: apps/core
+        env:
+          AGENTDECK_CORE_ALONE: '1'
+      # Красный прогон тоже отдаёт карту (reportOnFailure). Корень у каждого раннера свой,
+      # поэтому пути карты приводятся к пути от корня репозитория здесь же, на этом раннере.
+      - if: always()
+        run: node tools/core-coverage-merge.mjs --normalize apps/core/coverage/ci/coverage-final.json core-coverage-${{ runner.os }}.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-coverage-${{ runner.os }}
+          path: core-coverage-${{ runner.os }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  core-coverage:
+    name: core · merged coverage 85/80/85/85
+    needs: core
+    # Цифры всех ОС печатаются и при красном прогоне — видно, где именно провал.
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: core-coverage-*
+          merge-multiple: true
+      # Порог — apps/core/coverage-thresholds.json; карты с разным набором файлов или с разной
+      # версией исходника — отказ (код 2), а не тихое слияние.
+      - run: >-
+          node tools/core-coverage-merge.mjs
+          --map windows=core-coverage-Windows.json
+          --map linux=core-coverage-Linux.json
+          --map macos=core-coverage-macOS.json
+      # Порог прошёл, а прогон какой-то ОС упал — задание всё равно красное.
+      - if: needs.core.result != 'success'
+        run: |
+          echo "core tests failed on at least one OS: ${{ needs.core.result }}"
+          exit 1
 
   mobile:
     name: mobile · types · tests

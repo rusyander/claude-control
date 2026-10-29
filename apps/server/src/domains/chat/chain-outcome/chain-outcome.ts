@@ -170,7 +170,7 @@ export function replyTail(text: string): string | undefined {
  * `/pull/N`. Группа с доставкой кончает ответ ссылкой на свой MR — по ней хаб
  * ведёт прямо в него, а не в чат группы.
  */
-export function lastMergeRequestUrl(text: string): string | undefined {
+function lastMergeRequestUrl(text: string): string | undefined {
   const found = text.match(/https?:\/\/[^\s<>()[\]'"`]+?\/(?:-\/merge_requests|pull)\/\d+/g);
   return found?.at(-1);
 }

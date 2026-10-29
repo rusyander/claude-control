@@ -20,7 +20,7 @@ const REPO_PATTERN = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/;
 const FILE_PATTERN = /^[A-Za-z0-9][\w.+-]*\.gguf$/;
 
 /** Репозиторий и файл — только то, что бывает у настоящих: из них строится путь на диске. */
-export function validRepoFile(repo: string, file: string): boolean {
+function validRepoFile(repo: string, file: string): boolean {
   return REPO_PATTERN.test(repo) && FILE_PATTERN.test(file) && !repo.includes('..');
 }
 

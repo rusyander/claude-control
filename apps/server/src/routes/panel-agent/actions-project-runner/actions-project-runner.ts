@@ -7,7 +7,7 @@ import type {
   ProjectRunnerTarget,
   ProjectRunnerView,
 } from '@agentdeck/contracts';
-import { maskSecretsInText, SECRET_MASK } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import { planTreeKill, readPosixProcessTable, readProcessTable } from '../../../lib/kill-tree.mjs';
 import { ancestorsOf } from '../../../domains/analytics/session-process.ts';
 import {

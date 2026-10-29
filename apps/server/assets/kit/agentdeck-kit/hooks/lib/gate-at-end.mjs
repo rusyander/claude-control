@@ -854,6 +854,24 @@ export const repeatEscapes = () => groupStage() !== 'deliver';
 const REASON_FORM =
   'In the delivery stage a bare repeat does not lift this: if this run is still needed, repeat the call ' +
   'with `# gate-reason: <what changed since that run that narrow checks cannot cover>` at its end.';
+/**
+ * The deny's last sentence for a delivery-stage call. A call that already carries a reason is told why it
+ * lifted nothing (g9 27.10 19:47: three gate calls, each with a valid reason but no refusal of that same
+ * command before it, got the text asking for the reason they carried, and the group read the kit's source
+ * for 3 min to learn the rule) — and this refusal is the one its repeat needs.
+ */
+function reasonFormFor(command) {
+  if (!GATE_REASON.exec(String(command))?.[1]?.trim()) return REASON_FORM;
+  if (!gateReason(command))
+    return (
+      'Your `# gate-reason` has under three words: name what changed since that run that narrow checks ' +
+      'cannot cover, then repeat this call with it.'
+    );
+  return (
+    'Your `# gate-reason` was read, but it lifts only a refusal of this same command and none stood before ' +
+    'it — this deny is that refusal: repeat this exact call, reason included, and it runs.'
+  );
+}
 
 /**
  * Segments of a shell command, each a list of words with their quotes kept: split on unquoted
@@ -1367,7 +1385,8 @@ export default function gateAtEnd(input) {
       : wasJustRefused(events, tool, (other) => flat(other?.command) === flat(typed))
   )
     return null;
-  const again = (when) => (deliver ? REASON_FORM : `Repeat this exact call ${when}.`);
+  const reasonForm = deliver ? reasonFormFor(typed) : REASON_FORM;
+  const again = (when) => (deliver ? reasonForm : `Repeat this exact call ${when}.`);
 
   // Foreground stays the rule where background is not wanted: a split group (the panel reads the end
   // of its turn as the result) and a local-model run (local-discipline refuses background shells).
@@ -1486,7 +1505,7 @@ export default function gateAtEnd(input) {
           `${edits} edit(s) since. Check them narrowly first — the tests of the touched files (\`vitest related ` +
           '<files> --run`, `pytest <file>`), lint and type-check of those files or their package. The full gate ' +
           'runs once more, on the FINAL tree, after the last edit. ' +
-          REASON_FORM,
+          reasonForm,
       );
     }
     // 'unknown' = a run known only from state (its result scrolled out with a compaction): it ran,

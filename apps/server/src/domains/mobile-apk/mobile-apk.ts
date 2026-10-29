@@ -39,7 +39,7 @@ export interface ApkPaths {
 /** Вызов `adb`: подменяется в тестах, в панели — настоящий процесс. */
 export type AdbRun = (args: string[], timeoutMs: number) => Promise<string>;
 
-export const runAdb: AdbRun = (args, timeoutMs) =>
+const runAdb: AdbRun = (args, timeoutMs) =>
   new Promise((resolve, reject) => {
     execFile('adb', args, { timeout: timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
       if (error && (error as NodeJS.ErrnoException).code === 'ENOENT') return reject(error);
@@ -52,7 +52,7 @@ const scriptOf = (paths: ApkPaths): string =>
   paths.script ?? join(paths.repoRoot, 'tools', 'build-mobile-apk.mjs');
 
 /** Собирать есть что: сборщик и исходники приложения на месте. */
-export function apkBuildAvailable(paths: ApkPaths): boolean {
+function apkBuildAvailable(paths: ApkPaths): boolean {
   return (
     existsSync(scriptOf(paths)) && existsSync(join(paths.repoRoot, 'apps', 'mobile', 'app.json'))
   );

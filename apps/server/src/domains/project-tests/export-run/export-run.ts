@@ -44,6 +44,7 @@ export function runTitle(
 ): string {
   const texts = RUN_TEXTS[lang];
   if (runOrigin(run) === 'e2e') return texts.panelAutotests;
+  if (runOrigin(run) === 'core') return texts.coreChecks;
   return texts.mode[run.mode] ?? run.mode;
 }
 

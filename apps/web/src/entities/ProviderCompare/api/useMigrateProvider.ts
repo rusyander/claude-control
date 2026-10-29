@@ -2,9 +2,7 @@ import type { ProviderMigrateRequest, ProviderMigrateResponse } from '@agentdeck
 import { apiClient } from '@shared/api/client';
 import { useMutation } from '@tanstack/react-query';
 
-export async function postMigrate(
-  request: ProviderMigrateRequest,
-): Promise<ProviderMigrateResponse> {
+async function postMigrate(request: ProviderMigrateRequest): Promise<ProviderMigrateResponse> {
   const { data } = await apiClient.post<ProviderMigrateResponse>('/provider-migrate', request);
   return data;
 }

@@ -5,7 +5,7 @@ import { apiClient } from '@shared/api/client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function putSubscription(
+async function putSubscription(
   request: SubscriptionAddress & { layers: readonly EnvItemKind[] },
 ): Promise<{ subscription: EnvSubscription }> {
   const { data } = await apiClient.put<{ subscription: EnvSubscription }>(

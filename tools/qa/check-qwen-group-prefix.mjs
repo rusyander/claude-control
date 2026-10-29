@@ -34,11 +34,11 @@
  * Запуск: node tools/qa/check-qwen-group-prefix.mjs
  */
 import { spawnSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NotChecked, runOnStand, wait } from './throwaway-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const TRACKER_TOOL = 'stub_tracker_search';
@@ -86,66 +86,22 @@ const isGroupOne = (body) =>
  */
 async function startStub() {
   const bodies = [];
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      if (!req.url.includes('chat/completions')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ data: [{ id: 'stub-model', object: 'model' }] }));
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        // Пустое тело — тоже запрос: записан как есть.
-      }
+  const stub = await startStubModel({
+    script: ({ request, info }) => {
+      const body = request.body;
       bodies.push(body);
       if (process.env.QWEN_PREFIX_DUMP) {
         writeFileSync(process.env.QWEN_PREFIX_DUMP, JSON.stringify(bodies, null, 1));
       }
-      res.writeHead(200, { 'content-type': 'text/event-stream' });
-      const send = (choice) =>
-        res.write(
-          `data: ${JSON.stringify({ id: 'c', object: 'chat.completion.chunk', created: 1, model: 'stub-model', choices: [choice] })}\n\n`,
-        );
-      const answered = (body.messages ?? []).some((message) => message.role === 'tool');
       const probe =
         isMain(body) &&
-        !answered &&
+        !info.hasToolResult &&
         !usersOf(body).includes(SECOND_WORDS) &&
         (usersOf(body).includes(PLAIN_WORDS) || isGroupOne(body));
-      if (probe) {
-        send({
-          index: 0,
-          delta: {
-            role: 'assistant',
-            tool_calls: [
-              {
-                index: 0,
-                id: `call_${bodies.length}`,
-                type: 'function',
-                function: { name: 'tool_search', arguments: '{"query":"stub"}' },
-              },
-            ],
-          },
-          finish_reason: null,
-        });
-        send({ index: 0, delta: {}, finish_reason: 'tool_calls' });
-      } else {
-        send({ index: 0, delta: { role: 'assistant', content: 'OK' }, finish_reason: null });
-        send({ index: 0, delta: {}, finish_reason: 'stop' });
-      }
-      res.end('data: [DONE]\n\n');
-    });
+      return probe ? { tool: { name: 'tool_search', args: { query: 'stub' } } } : 'OK';
+    },
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  return {
-    port: server.address().port,
-    bodies,
-    close: () => new Promise((resolve) => server.close(resolve)),
-  };
+  return { port: stub.port, bodies, close: () => stub.close() };
 }
 
 /**

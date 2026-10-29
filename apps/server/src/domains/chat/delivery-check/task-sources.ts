@@ -145,7 +145,7 @@ const OWN_SECTION =
   /провер|прогон|гейт|тест|скриншот|снимк|замет|check|gate|verif|test|screenshot|shot|note/iu;
 
 /** Описание MR без разделов проверок, снимков и заметок (`#`-заголовки): пункты задач — до них. */
-export function descriptionPoints(description: string): string {
+function descriptionPoints(description: string): string {
   const kept: string[] = [];
   let own = false;
   for (const line of description.split('\n')) {

@@ -22,13 +22,13 @@ export interface ShellAliasIo {
   read(file: string): Promise<string>;
 }
 
-export const realShellAliasIo: ShellAliasIo = {
+const realShellAliasIo: ShellAliasIo = {
   list: (dir) => readdir(dir),
   read: (file) => readFile(file, 'utf8'),
 };
 
 /** Каталог настроек CLI: `CLAUDE_CONFIG_DIR` или `~/.claude`. */
-export function cliConfigDir(): string {
+function cliConfigDir(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 }
 

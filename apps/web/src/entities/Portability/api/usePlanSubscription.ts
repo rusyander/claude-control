@@ -3,7 +3,7 @@ import type { SubscriptionSyncPlan } from '@agentdeck/contracts/portable-subscri
 import { apiClient } from '@shared/api/client';
 import { useMutation } from '@tanstack/react-query';
 
-export async function postSubscriptionPlan(
+async function postSubscriptionPlan(
   address: SubscriptionAddress,
 ): Promise<{ plan: SubscriptionSyncPlan }> {
   const { data } = await apiClient.post<{ plan: SubscriptionSyncPlan }>(

@@ -23,10 +23,7 @@ import { GAPS_TEXTS_RU } from '../texts-gaps.ts';
  * лишние/забытые подстановки — в `texts.test.ts`.
  */
 /** Формы русского множественного числа: Intl.PluralRules('ru') знает one/few/many/other. */
-export type RuPluralText = Record<
-  Extract<PanelPluralForm, 'one' | 'few' | 'many' | 'other'>,
-  string
->;
+type RuPluralText = Record<Extract<PanelPluralForm, 'one' | 'few' | 'many' | 'other'>, string>;
 
 /** Текст кода: строка, а у кодов с подстановкой count — ещё и формы числа. */
 export type PanelTextsRu = {
@@ -387,7 +384,7 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
 const ruPlural = new Intl.PluralRules('ru');
 
 /** Шаблон кода с учётом числа: «1 кейс», «3 кейса», «5 кейсов» — вместо «кейс(ов)». */
-export function panelTemplateRu(code: PanelTextCode, params?: PanelTextParams): string {
+function panelTemplateRu(code: PanelTextCode, params?: PanelTextParams): string {
   const text: string | RuPluralText = PANEL_TEXTS_RU[code];
   if (typeof text === 'string') return text;
   const count = Number(params?.count);

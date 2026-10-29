@@ -6,7 +6,7 @@ import { buildProjectsCsv } from './buildProjectsCsv';
 import { buildSessionsCsv } from './buildSessionsCsv';
 
 /** Заголовок секции отдельной строкой-ячейкой над её таблицей. */
-export function titledSection(title: string, csv: string): string {
+function titledSection(title: string, csv: string): string {
   return `${csvCell(title)}\r\n${csv}`;
 }
 

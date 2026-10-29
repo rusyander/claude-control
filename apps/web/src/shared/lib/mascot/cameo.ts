@@ -7,7 +7,7 @@ export const CAMEO_APPEAR_MS = 20_000;
 export const CAMEO_LINE_MS = 7_000;
 
 /** Как часто Дека что-то говорит на долгом ходу. */
-export const CAMEO_EVERY_MS = 60_000;
+const CAMEO_EVERY_MS = 60_000;
 
 /** С этих отметок реплика сменяется на «задача непростая» и «долгий ход». */
 export const CAMEO_LONG_MS = 3 * 60_000;

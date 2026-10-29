@@ -293,6 +293,21 @@ function quietNudges(input: GroupSweepInput, key: string, group: SplitPlanGroupR
   input.nudgeSnap.set(key, { nudges, rounds: [], floor: { nudges, at: input.now } });
 }
 
+/** С какого момента группа идёт: старт или нажатая позже перепроверка (R39); нет — 0. */
+function goingSince(group: SplitPlanGroupRecord): number {
+  const stamps = [group.startedAt, group.recheckRequestedAt]
+    .map((stamp) => (stamp ? Date.parse(stamp) : NaN))
+    .filter(Number.isFinite);
+  return stamps.length > 0 ? Math.max(...stamps) : 0;
+}
+
+/** Отрезки прошлых пауз группы в мс (R39): битый отрезок пропускается. */
+function pausedSpans(group: SplitPlanGroupRecord): { from: number; to: number }[] {
+  return (group.pauseSpans ?? [])
+    .map((span) => ({ from: Date.parse(span.from), to: Date.parse(span.to) }))
+    .filter((span) => Number.isFinite(span.from) && Number.isFinite(span.to));
+}
+
 /**
  * Обход всех живых групп всех разделений: попадания R22 и R28 на каждую (пустой список
  * тоже — им закрываются прежние сигналы). Память сторожа ограничена живыми группами.
@@ -355,7 +370,13 @@ export function sweepGroups(input: GroupSweepInput): GroupSweepHit[] {
         idleNudges(input, parentChatId, group),
         stuckDeferred(input, parentChatId, group),
         restartByGroup(input.restarts, input.editedFilesOf?.(key) ?? [], input.now, othersOf(key)),
-        restartStorm(input.restarts, input.settings, input.now),
+        restartStorm(
+          input.restarts,
+          input.settings,
+          input.now,
+          goingSince(group),
+          pausedSpans(group),
+        ),
         ledgerFinding(input.ledger, group.path, input.now),
         ledgerGaps(input.ledger, group.path, input.checkRunsOf?.(key) ?? [], input.now),
         heavyRunHit(input.heavyRunsOf?.(key) ?? []),

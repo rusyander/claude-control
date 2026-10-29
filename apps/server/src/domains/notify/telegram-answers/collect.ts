@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import type { ChatInbox, InboxAsk, InboxChat } from '@agentdeck/contracts/chat-inbox';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { ForeignPendingAsk } from '../../provider-chat/ProviderChatService/ProviderChatService.ts';
 import { describeAsk } from './describe.ts';
 import type { AskSourceInfo, ChatRoute, PendingAskItem } from './telegram-answers.types.ts';

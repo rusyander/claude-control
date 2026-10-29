@@ -25,7 +25,7 @@ import type { JobHandle } from './jobs.ts';
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
-export async function sha256File(path: string): Promise<string> {
+async function sha256File(path: string): Promise<string> {
   const hash = createHash('sha256');
   await pipeline(createReadStream(path), hash);
   return hash.digest('hex');
@@ -113,7 +113,7 @@ const run = (cmd: string, args: string[]): Promise<void> =>
  * первым в PATH из Git Bash стоит GNU tar, который zip не открывает вовсе
  * («This does not look like a tar archive» — замер 13.10).
  */
-export function tarCommand(os: NodeJS.Platform, env: NodeJS.ProcessEnv = process.env): string {
+function tarCommand(os: NodeJS.Platform, env: NodeJS.ProcessEnv = process.env): string {
   if (os !== 'win32') return 'tar';
   const root = env.SystemRoot ?? env.windir ?? 'C:\\Windows';
   const system = join(root, 'System32', 'tar.exe');

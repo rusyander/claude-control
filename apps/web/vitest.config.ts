@@ -32,6 +32,8 @@ export default mergeConfig(
       // Пока покрыта чистая логика — разбор текста, сборка разметки, сторы.
       // Ей браузер не нужен, а без jsdom прогон остаётся быстрым.
       environment: 'node',
+      // Отказ прогона посреди чужого mustfail в этой рабочей копии.
+      globalSetup: ['../../tools/mutation-guard.mjs'],
       include: ['src/**/*.test.{ts,tsx}'],
       coverage: {
         provider: 'v8',

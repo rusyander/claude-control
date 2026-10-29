@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import type { DlpRule } from '@agentdeck/contracts';
 import { DlpProxy, joinUpstream } from './DlpProxy.ts';
 import { readJournal, clearJournal, appendJournal } from './journal.ts';
-import { readRules, saveRules, validateRules, DlpRulesError } from './rules-store.ts';
+import { readRules, DlpRulesError } from '@agentdeck/dlp/rules-file';
+import { saveRules, validateRules } from './rules-store.ts';
 
 /**
  * Сквозные проверки прокси: настоящий сокет, настоящий «верхний» сервер.

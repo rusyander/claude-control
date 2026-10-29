@@ -8,7 +8,7 @@ import type { PlatformBudgetState, PlatformStatus } from '@agentdeck/contracts';
  * значило бы уронить весь раздел «Контур» из-за строки расхода: карточка обязана
  * промолчать, а не рухнуть, — ровно как со сводкой проверок шлюза.
  */
-export const NO_BUDGET: PlatformBudgetState = {
+const NO_BUDGET: PlatformBudgetState = {
   spentUsd: 0,
   budgetUsd: 0,
   share: 0,

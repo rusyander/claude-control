@@ -34,7 +34,7 @@ export interface AgentRowProps {
   children?: ReactNode;
 }
 
-export interface AgentRowTree {
+interface AgentRowTree {
   level: number;
   /** У узла есть вложенные: раскрыт ли он. Нет вложенных — `undefined`. */
   expanded?: boolean;

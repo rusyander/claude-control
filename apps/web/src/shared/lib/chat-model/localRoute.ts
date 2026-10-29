@@ -20,7 +20,6 @@ const LOCAL_KEYS = {
 } as const;
 
 export type RouteKey = keyof typeof LOCAL_KEYS;
-export type RouteWordsKey = RouteKey | (typeof LOCAL_KEYS)[RouteKey];
 
 /** Ключ подписи прогона: у локального контура — его слова, у остальных — слова контура. */
 export function routeKey<K extends RouteKey>(key: K, local: boolean): K | (typeof LOCAL_KEYS)[K] {

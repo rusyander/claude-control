@@ -56,10 +56,10 @@ import {
 export { UnrecognizedFormatError };
 
 /** Скалярный ключ корня: режим аппрувов новых сессий. */
-export const KIMI_MODE_KEY = 'default_permission_mode';
+const KIMI_MODE_KEY = 'default_permission_mode';
 
 /** Регион правил — массив таблиц `[[permission.rules]]`. */
-export const KIMI_PERMISSION_KEY = 'permission';
+const KIMI_PERMISSION_KEY = 'permission';
 
 /** Задокументированные режимы, в порядке роста самостоятельности агента (общий словарь). */
 export { KIMI_MODES, type KimiMode };

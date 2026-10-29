@@ -1,4 +1,4 @@
-export function extensionForType(type: string): string | undefined {
+function extensionForType(type: string): string | undefined {
   if (type === 'image/png') return 'png';
   if (type === 'image/jpeg') return 'jpg';
   if (type === 'image/gif') return 'gif';

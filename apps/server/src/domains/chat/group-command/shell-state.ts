@@ -22,7 +22,7 @@ const MKTEMP_DIR = /\s(?:-[qu]*d[dqu]*|--directory)(?=\s|\))/;
  * Окружение, которое подгружает чужой код в каждую следующую программу, в том
  * числе во встроенные проверки оболочки (F-15): `LD_PRELOAD`, `BASH_ENV`.
  */
-export const CODE_ENV =
+const CODE_ENV =
   /^(LD_\w+|DYLD_\w+|BASH_ENV|ENV|PERL5OPT|PERL5LIB|RUBYOPT|PYTHONSTARTUP|PROMPT_COMMAND|PS4)$/;
 
 /**

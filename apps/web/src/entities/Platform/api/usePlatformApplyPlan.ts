@@ -4,7 +4,7 @@ import { path } from '../lib/path';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
-export async function getApplyPlan(id: string): Promise<PlatformApplyPlan> {
+async function getApplyPlan(id: string): Promise<PlatformApplyPlan> {
   const { data } = await apiClient.get<PlatformApplyPlan>(path(id, '/apply'));
   return data;
 }

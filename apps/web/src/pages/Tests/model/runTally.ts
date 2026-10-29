@@ -18,7 +18,7 @@ export interface RunTally {
 }
 
 /** Режимы, которые проходят кейсы: у них и нулевой счёт — итог. */
-export const PASSING_MODES: ReadonlySet<string> = new Set(['run', 'manual', 'import']);
+const PASSING_MODES: ReadonlySet<string> = new Set(['run', 'manual', 'import']);
 
 /**
  * Строка прогона словами.

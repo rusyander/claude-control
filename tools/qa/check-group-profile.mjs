@@ -22,7 +22,6 @@
  * Запуск: `node tools/qa/check-group-profile.mjs`. Нужен установленный `claude`
  * (путь — `CLAUDE_CLI`); стенд человека не трогается.
  */
-import { createServer } from 'node:http';
 import {
   existsSync,
   mkdirSync,
@@ -37,6 +36,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as wait } from 'node:timers/promises';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const MCP_SERVER = fileURLToPath(new URL('./mcp-marker.mjs', import.meta.url));
 const PREFIX = 'cc-groupprofile-';
@@ -94,73 +94,17 @@ function resolveClaude() {
 }
 
 /** Стаб вместо API: записывает каждый запрос к `/messages` и отвечает одним словом. */
-function startStub() {
+async function startStub() {
   const seen = [];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      try {
-        seen.push(JSON.parse(raw));
-      } catch {
-        seen.push({});
-      }
-      const events = [
-        [
-          'message_start',
-          {
-            type: 'message_start',
-            message: {
-              id: 'msg_gp',
-              type: 'message',
-              role: 'assistant',
-              model: 'stub',
-              content: [],
-              stop_reason: null,
-              usage: { input_tokens: 10, output_tokens: 1 },
-            },
-          },
-        ],
-        [
-          'content_block_start',
-          { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
-        ],
-        [
-          'content_block_delta',
-          { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ок' } },
-        ],
-        ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-        [
-          'message_delta',
-          {
-            type: 'message_delta',
-            delta: { stop_reason: 'end_turn' },
-            usage: { output_tokens: 1 },
-          },
-        ],
-        ['message_stop', { type: 'message_stop' }],
-      ];
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      for (const [event, data] of events)
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.end();
-    });
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request }) => {
+      seen.push(request.body);
+      return 'ок';
+    },
   });
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        seen,
-        close: () => server.close(),
-      }),
-    );
-  });
+  return { url: stub.baseUrl, seen, close: () => stub.close() };
 }
 
 const serversOf = (map) =>
@@ -436,11 +380,17 @@ async function main() {
       plain.text.includes('cards with buttons') && plain.text.includes('Ask the user once'),
       'не группа: дописка чата и вопрос о тестах на месте (проба видит дописку)',
     );
+    // Опоры — из нынешних текстов initiative.ts (GROUP_SOURCE сжат в 3bb94adeb).
+    const groupMissing = [
+      'A split group started from the AgentDeck panel',
+      'agentdeck:handoff',
+      'ONLY in the foreground',
+    ].filter((anchor) => !lean.text.includes(anchor));
     check(
-      lean.text.includes('as a split group') &&
-        lean.text.includes('agentdeck:handoff') &&
-        lean.text.includes('ONLY in the foreground'),
-      'группа: дописка группы с правилом этапов и проверками на переднем плане',
+      groupMissing.length === 0,
+      `группа: дописка группы с правилом этапов и проверками на переднем плане${
+        groupMissing.length ? ` — нет: ${groupMissing.join(' | ')}` : ''
+      }`,
     );
     check(
       !lean.text.includes('cards with buttons') &&
@@ -481,9 +431,19 @@ async function main() {
       status.tools.length === 0,
       `лёгкий чат: MCP-серверов нет — ${status.tools.join(', ') || 'ни одного'}`,
     );
+    // NotebookEdit нынешний CLI отдаёт отложенно (через ToolSearch) — в теле
+    // запроса его нет ни у кого; лёгкому чату его закрывает STATUS_DENIED_TOOLS
+    // по имени, так что контроль меряет то, что CLI кладёт в запрос сам.
+    const plainMissing = ['Edit', 'Write', 'Bash'].filter(
+      (name) => !plain.toolNames.includes(name),
+    );
     check(
-      ['Edit', 'Write', 'NotebookEdit', 'Bash'].every((name) => plain.toolNames.includes(name)),
-      'без профиля инструменты правки в запросе (проба видит то, что меряет)',
+      plainMissing.length === 0,
+      `без профиля инструменты правки в запросе (проба видит то, что меряет)${
+        plainMissing.length
+          ? ` — нет: ${plainMissing.join(', ')}; есть: ${plain.toolNames.join(', ')}`
+          : ''
+      }`,
     );
     check(
       !['Edit', 'Write', 'NotebookEdit', 'Bash'].some((name) => status.toolNames.includes(name)),

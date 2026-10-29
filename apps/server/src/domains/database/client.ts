@@ -36,7 +36,7 @@ const RAW_TYPES = { getTypeParser: () => (value: string) => value };
 const CONNECT_TIMEOUT_MS = 8_000;
 
 /** Ошибка драйвера → вид, по которому окно скажет человеку, что делать. */
-export function classifyError(error: unknown): DbError {
+function classifyError(error: unknown): DbError {
   if (error instanceof DbError) return error;
   const err = error as { code?: string; message?: string; position?: string };
   const message = err?.message ?? String(error);

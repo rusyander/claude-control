@@ -52,7 +52,7 @@ const RETRY_AFTER_MS = 10 * 60_000;
 const RETRY_CEILING_MS = 24 * 60 * 60_000;
 /** Сколько символов ответа модели хранится для разбора неудачи. */
 const REPLY_KEEP = 4_000;
-export const KNOBS_EMPTY_REASON = 'knobs-empty';
+const KNOBS_EMPTY_REASON = 'knobs-empty';
 
 interface CacheEntry {
   hash: string;
@@ -144,7 +144,7 @@ export function groundedKnobs(skillId: string, raw: unknown, skillText: string):
   return knobs;
 }
 
-export interface SkillKnobsInput {
+interface SkillKnobsInput {
   deps: MemberDeps;
   ask: GroupAsk;
   /** Промпт каталога `group-knobs` с подставленным языком блока. */
@@ -157,7 +157,7 @@ export interface SkillKnobsInput {
  * Числа одного скилла: из кэша, если хэш тот же; иначе выписка моделью.
  * Скилла нет — `undefined`. Два одновременных запроса ждут один вызов.
  */
-export async function skillKnobs(input: SkillKnobsInput): Promise<Knob[] | undefined> {
+async function skillKnobs(input: SkillKnobsInput): Promise<Knob[] | undefined> {
   const { deps, ask, prompt, scope, skillId } = input;
   const content = memberContent(deps, scope, { kind: 'skill', id: skillId });
   if (!content) return undefined;

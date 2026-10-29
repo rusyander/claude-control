@@ -155,7 +155,7 @@ function copyChatGroupSettings(state: AppState, source: string, target: string):
 }
 
 /** Ключ заметки: один и тот же блок ребёнка, прочитанный дважды, — одна заметка. */
-export function escalationId(notice: Pick<EscalationNotice, 'childChatId' | 'text'>): string {
+function escalationId(notice: Pick<EscalationNotice, 'childChatId' | 'text'>): string {
   let hash = 0;
   const source = `${notice.childChatId}\n${notice.text}`;
   for (let index = 0; index < source.length; index += 1) {

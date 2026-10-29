@@ -46,7 +46,7 @@ export function isSecretFile(path: string): boolean {
 }
 
 /** Эта копия — файла секретов? По basename исходного пути. */
-export function isSecretsPath(path: string): boolean {
+function isSecretsPath(path: string): boolean {
   return basename(path) === secretsBasename;
 }
 

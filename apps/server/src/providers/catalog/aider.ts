@@ -3,6 +3,10 @@ import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { aiderOneShotArgs, aiderOneShotEnv, createAiderStdoutParser } from './aider-run.ts';
 import { AIDER_CONFIG_BASENAME, aiderConfigFile, unimplementedPaths } from './config-dirs.ts';
+import { assistantApiOf, endpointConfigOf, runFactsOf } from './run-facts.ts';
+
+/** Факты запуска Aider — из пакета `@agentdeck/providers`. */
+const facts = runFactsOf('aider');
 
 /**
  * Aider: конфиг `.aider.conf.yml`.
@@ -38,11 +42,11 @@ import { AIDER_CONFIG_BASENAME, aiderConfigFile, unimplementedPaths } from './co
  * атомарная запись, round-trip-проверка до записи (см. `lib/aider-yaml/aider-yaml.ts`).
  */
 export const aiderProvider: ConfigProvider = {
-  id: 'aider',
-  name: 'Aider',
-  status: 'experimental',
-  paths: unimplementedPaths('aider'),
-  cli: { command: 'aider', windowsCommand: 'aider.cmd' },
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
+  cli: facts.binary,
   // Инструкции Aider — СПИСОК ССЫЛОК `read` в том же ~/.aider.conf.yml, а не
   // отдельный файл: `instructionsFile` у него не бывает (см. AIDER-1).
   instructionsList: { format: 'aider-yaml', path: aiderConfigFile },
@@ -92,9 +96,7 @@ export const aiderProvider: ConfigProvider = {
   // One-shot: `aider --message <prompt>` и флаги, снятые живыми пробами 0.86.2
   // (`aider-run.ts`: без человека каждый вопрос Aider отвечается «да»).
   assistant: {
-    apiKind: 'openai',
-    apiKeyEnvVars: ['OPENAI_API_KEY'],
-    cliRunnable: true,
+    ...assistantApiOf(facts),
     // Подбора модели (Т12) у Aider НЕТ, хотя `--model` задокументирован: своего
     // вендора у него нет вовсе (`modelVendors` не задан — оболочка поверх любой
     // модели), значит нет и каталога, из которого брать ступени лестницы.
@@ -112,17 +114,8 @@ export const aiderProvider: ConfigProvider = {
   // («Specify the model to use for the main chat») и переменная ключа с тем же
   // префиксом. Пишутся в `set-env` его же конфига. Anthropic-адреса в
   // справочнике переменных нет — вид API у профиля тут только совместимый с
-  // OpenAI.
-  endpointConfig: {
-    'openai-compat': {
-      baseUrlEnv: 'AIDER_OPENAI_API_BASE',
-      modelEnv: 'AIDER_MODEL',
-      // Без приставки litellm внутри Aider не знает, куда слать запрос, и
-      // падает до модели (живая проба 12.10.2026, aider 0.86.2).
-      modelPrefix: 'openai/',
-      credentialEnv: 'AIDER_OPENAI_API_KEY',
-    },
-  },
+  // OpenAI. Имена и приставка модели `openai/` — факты пакета `@agentdeck/providers`.
+  endpointConfig: endpointConfigOf(facts),
   capabilities: buildCapabilities({
     // AIDER-1: инструкции есть, но модель другая — список ссылок `read`.
     globalInstructions: 'ready',

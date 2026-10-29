@@ -9,7 +9,7 @@ import { queryKeys } from '@shared/api/query-keys';
  * Сохранить контур. Ключ едет РЯДОМ с настройкой и только когда его тронули:
  * форма правки поля ключа не присылает вовсе, и сохранённый остаётся на месте.
  */
-export async function savePlatform(input: {
+async function savePlatform(input: {
   platform: Platform;
   token?: string;
 }): Promise<PlatformStatus> {

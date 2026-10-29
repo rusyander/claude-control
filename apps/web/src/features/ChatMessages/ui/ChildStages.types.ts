@@ -209,7 +209,7 @@ export interface GroupMergeOrder {
   before: string[];
 }
 
-export type SplitGroupResult = NonNullable<SplitPlanView['groups'][number]['result']>;
+type SplitGroupResult = NonNullable<SplitPlanView['groups'][number]['result']>;
 
 export interface ChildStagesProps {
   groups: ChildStageGroup[];

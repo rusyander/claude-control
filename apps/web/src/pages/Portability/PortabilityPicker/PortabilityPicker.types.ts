@@ -1,7 +1,7 @@
 import type { PortabilityLevel } from '@entities/Portability';
 import type { AgentEnvironment } from '@agentdeck/contracts/portable-env';
 
-export interface PickerOption {
+interface PickerOption {
   value: string;
   label: string;
 }

@@ -7,7 +7,7 @@ import { useMutation } from '@tanstack/react-query';
  * (единственное место, где человек их правит), и вторая сборка здесь разошлась бы
  * с ними после первой же правки.
  */
-export async function mediaPrompt(
+async function mediaPrompt(
   kind: MediaPromptKind,
   topic: string,
   reviseOf?: string,

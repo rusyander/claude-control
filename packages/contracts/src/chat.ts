@@ -512,6 +512,12 @@ export const progressAgentSchema = object({
    * работы нет, но это решение, а не падение.
    */
   stopped: boolean().optional(),
+  /**
+   * Вызов `Agent` оборван паузой или концом сессии: CLI дописал за него
+   * «[Tool call interrupted…]». `status` — `failed` (итога нет), но это обрыв,
+   * а не ошибка субагента.
+   */
+  interrupted: boolean().optional(),
   /** Скиллы, хуки и MCP субагента по его транскрипту — сводка по именам. */
   extensions: array(agentExtensionSummarySchema).optional(),
 });

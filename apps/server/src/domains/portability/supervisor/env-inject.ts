@@ -1,7 +1,7 @@
 import type { Group, ProviderEnvVar } from '@agentdeck/contracts';
 import type { EnvItem, EnvItemKind, EnvSectionState } from '@agentdeck/contracts/portable-env';
 import { getStoredKey, maskKey } from '../../../lib/provider-keys/provider-keys.ts';
-import { isSecretName } from '../../../lib/secret-mask/secret-mask.ts';
+import { isSecretName } from '@agentdeck/dlp/secret-mask';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
 
 /**

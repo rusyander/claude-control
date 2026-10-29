@@ -39,7 +39,7 @@ export interface GroupLayerHook {
   timeoutMs?: number;
 }
 
-export interface GroupLayerWritten {
+interface GroupLayerWritten {
   env: Record<string, string>;
   args?: string[];
   dir: string;

@@ -1,6 +1,6 @@
 import type { PanelAgentEvent } from '@agentdeck/contracts/panel-agent';
 
-export const AGENT_EVENT_TYPES = new Set(['agent-open-page', 'agent-pending', 'agent-decided']);
+const AGENT_EVENT_TYPES = new Set(['agent-open-page', 'agent-pending', 'agent-decided']);
 
 /**
  * Кадр агента ли это. Кадры агента идут по тому же `/api/events`, что и

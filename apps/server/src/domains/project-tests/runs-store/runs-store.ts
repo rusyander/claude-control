@@ -169,6 +169,10 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     // Старый импорт без поля — из CI; мусор в поле — тоже: подписать чужой
     // отчёт прогоном панели хуже, чем наоборот.
     origin: runOrigin({ mode, origin: optional(record.origin) }),
+    // Ссылка на запись проверки ядра (G14) — только у прогона ядра: на чужом поле ей не верим.
+    ...(record.origin === 'core' && optional(record.coreRecordId)
+      ? { coreRecordId: optional(record.coreRecordId) }
+      : {}),
     groupId: optional(record.groupId),
     planId: optional(record.planId),
     environmentId: optional(record.environmentId),

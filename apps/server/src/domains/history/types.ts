@@ -11,7 +11,7 @@ export interface Snapshot {
  * следующая копия того же файла; `previous` больше не выдаётся (так звалась
  * прежняя, ошибочная база), но окно и старые кадры справки её ещё знают.
  */
-export type BaseLabel = 'next' | 'previous' | 'current' | 'initial';
+type BaseLabel = 'next' | 'previous' | 'current' | 'initial';
 
 /** Что взято базой сравнения: путь (undefined — базы нет) и метка. */
 export interface DiffBase {

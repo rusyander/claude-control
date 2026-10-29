@@ -9,10 +9,7 @@ import type {
 import { WRONG } from './assistant-fields.constants';
 import { matchOption } from './matchOption';
 
-export function readChoices(
-  field: AssistantFieldSpec & { type: 'choices' },
-  raw: unknown,
-): Checked {
+function readChoices(field: AssistantFieldSpec & { type: 'choices' }, raw: unknown): Checked {
   if (!Array.isArray(raw) || raw.some((item) => typeof item !== 'string')) return WRONG;
   const known: string[] = [];
   const unknown: string[] = [];
@@ -30,7 +27,7 @@ export function readChoices(
     : { ok: true, value: known };
 }
 
-export function readNumber(field: AssistantFieldSpec & { type: 'number' }, raw: unknown): Checked {
+function readNumber(field: AssistantFieldSpec & { type: 'number' }, raw: unknown): Checked {
   if (raw === null) return field.nullable ? { ok: true, value: null } : WRONG;
   const value =
     typeof raw === 'string' && /^-?\d+(\.\d+)?$/.test(raw.trim()) ? Number(raw.trim()) : raw;
@@ -41,7 +38,7 @@ export function readNumber(field: AssistantFieldSpec & { type: 'number' }, raw: 
   return { ok: true, value };
 }
 
-export function readField(field: AssistantFieldSpec, raw: unknown): Checked {
+function readField(field: AssistantFieldSpec, raw: unknown): Checked {
   switch (field.type) {
     case 'text':
       if (typeof raw === 'string') return { ok: true, value: raw };

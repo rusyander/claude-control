@@ -7,7 +7,7 @@ import type {
   PlatformStatus,
 } from '@agentdeck/contracts';
 import { platformIdPattern } from '@agentdeck/contracts/platform';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

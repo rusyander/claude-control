@@ -2,7 +2,7 @@
  * Что значит шаг языка (не Node): команда собирается в момент запуска, потому
  * что интерпретатор и его версия известны только машине, а не плану.
  */
-export type LanguageStepKind = 'python-venv' | 'python-deps' | 'uv-sync' | 'go-download';
+type LanguageStepKind = 'python-venv' | 'python-deps' | 'uv-sync' | 'go-download';
 
 /** Одна команда подготовки; `cwd` — каталог относительно корня копии, `''` — сам корень. */
 export interface BootstrapStep {

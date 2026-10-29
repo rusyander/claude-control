@@ -91,7 +91,7 @@ const FORBIDDEN_COMMANDS =
   /\bgit\s+(commit|push|reset|checkout|switch|clean|rebase|merge|cherry-pick|tag|stash|worktree)\b/;
 
 /** Файлы автотестов, названные самими кейсами: их и пишет режим `automate`. */
-export function automationFiles(cases: ProjectTestCase[]): string[] {
+function automationFiles(cases: ProjectTestCase[]): string[] {
   const files = cases
     .map((item) => item.automation?.file?.trim())
     .filter((file): file is string => Boolean(file));
@@ -99,7 +99,7 @@ export function automationFiles(cases: ProjectTestCase[]): string[] {
 }
 
 /** Папка черновиков — единственное, куда пишет генерация. */
-export const DRAFTS_WRITE_DIR = `${TESTS_DIR}/drafts`;
+const DRAFTS_WRITE_DIR = `${TESTS_DIR}/drafts`;
 
 /** Границы прогона по режиму. */
 export function runScope(

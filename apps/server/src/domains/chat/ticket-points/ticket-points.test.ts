@@ -1,7 +1,12 @@
 import type { SieveReportRow } from '@agentdeck/contracts/sieves';
 import { describe, expect, it } from 'vitest';
 import { matchText } from '../../../lib/server-texts/server-texts.ts';
-import { ticketPointGaps, ticketPoints, unmappedPoints } from './ticket-points.ts';
+import {
+  misnumberedPointGaps,
+  ticketPointGaps,
+  ticketPoints,
+  unmappedPoints,
+} from './ticket-points.ts';
 
 /**
  * Пункты тикетов против строк следа задач (аудит g5 27.10, H1). Владелец просил в комментариях
@@ -163,5 +168,24 @@ describe('ticket-points: пробел доставки', () => {
       row('task-4', '«Нужен PDF «Отчёт для дизайна» к обеим задачам»'),
     ];
     expect(ticketPointGaps({ tickets: TICKETS, rows: all, required: true })).toEqual([]);
+  });
+});
+
+// g1 27.10: 12 строк `task-1298-perms`… молча не покрыли ни одного пункта, группа читала код панели.
+describe('ticket-points: строка с приставкой пункта, но не номером', () => {
+  it('называет task-/owner- без номера; номерные и прочие id молчат', () => {
+    const rows = [
+      row('task-1298-perms', '«Фильтр журнала принимает диапазон дат»'),
+      row('owner-2b', 'x'),
+      row('task-3', 'x'),
+      row('owner-1', 'x'),
+      row('browser-focus', 'x'),
+    ];
+    const gaps = misnumberedPointGaps(rows);
+
+    expect(codes(gaps)).toEqual(['delivery-gap-point-id-shape']);
+    expect(matchText(gaps[0] ?? '')?.params).toEqual({ ids: 'task-1298-perms, owner-2b' });
+    expect(misnumberedPointGaps(rows.slice(2))).toEqual([]);
+    expect(misnumberedPointGaps(undefined)).toEqual([]);
   });
 });

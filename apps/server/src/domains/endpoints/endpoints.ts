@@ -49,7 +49,7 @@ export { applyEndpointProfile, EndpointApplyError } from './endpoint-apply.ts';
  * которые лежат в том же файле под своими id: сталкиваться им нельзя, а
  * заводить второе хранилище ради этого — лишний файл с секретами на диске.
  */
-export function endpointTokenId(profileId: string): string {
+function endpointTokenId(profileId: string): string {
   return `endpoint:${profileId}`;
 }
 
@@ -71,7 +71,7 @@ export function clearEndpointToken(appDataDir: string, profileId: string): void 
 }
 
 /** Найти профиль по id; пусто/не найден — первый в списке (или `undefined`). */
-export function findEndpointProfile(
+function findEndpointProfile(
   profiles: EndpointProfile[],
   profileId?: string,
 ): EndpointProfile | undefined {

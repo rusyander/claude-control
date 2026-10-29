@@ -3,7 +3,7 @@ import type { TransferPlan } from '@agentdeck/contracts/portable-transfer';
 import { apiClient } from '@shared/api/client';
 import { useMutation } from '@tanstack/react-query';
 
-export async function postPlan(pair: TransferPair): Promise<TransferPlan> {
+async function postPlan(pair: TransferPair): Promise<TransferPlan> {
   const { data } = await apiClient.post<TransferPlan>('/portability/plan', pair);
   return data;
 }

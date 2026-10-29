@@ -17,7 +17,7 @@
  */
 
 /** Разделы состояния панели на потоке событий. */
-export const APP_STATE_DOMAINS = {
+const APP_STATE_DOMAINS = {
   settings: 'settings',
   groups: 'groups',
 } as const;

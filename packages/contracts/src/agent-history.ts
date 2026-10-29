@@ -1,5 +1,5 @@
 import { object, string, array, boolean, number, record, type infer as Infer } from 'zod';
-import { progressAgentSchema } from './chat.ts';
+import { progressActiveToolSchema, progressAgentSchema } from './chat.ts';
 import { agentAnomaliesSchema, agentTokensSchema } from './agent-tree.ts';
 
 /**
@@ -24,6 +24,13 @@ export const agentHistoryMainSchema = object({
   anomalies: agentAnomaliesSchema.optional(),
   /** Ход главного агента открыт: ответ ещё не закончен. */
   turnOpen: boolean().optional(),
+  /**
+   * Последний вызов главного агента без результата: имя, чем вызван, с какого
+   * времени. У живого — то, чем он занят сейчас; у молчащего — где он встал.
+   */
+  openTool: progressActiveToolSchema.optional(),
+  /** Последнее действие главного агента одной строкой: вызов с аргументом или реплика. */
+  lastAction: string().optional(),
 });
 
 export type AgentHistoryMain = Infer<typeof agentHistoryMainSchema>;
@@ -47,6 +54,14 @@ export const agentHistorySessionSchema = object({
   agents: array(progressAgentSchema),
   /** Странности субагентов по `agentId` — только у тех, у кого они есть. */
   anomalies: record(string(), agentAnomaliesSchema).optional(),
+  /**
+   * Главный агент этой сессии работает прямо сейчас — то же правило, что у
+   * `live.agents`: число сессий с этой отметкой и есть `live.agents`. Сервер
+   * шлёт обе отметки всегда; нет их — ответ сервера, который их ещё не знал.
+   */
+  liveMain: boolean().optional(),
+  /** `id` субагентов сессии, работающих сейчас; их число по сессиям = `live.subagents`. */
+  liveAgents: array(string()).optional(),
 });
 
 export type AgentHistorySession = Infer<typeof agentHistorySessionSchema>;

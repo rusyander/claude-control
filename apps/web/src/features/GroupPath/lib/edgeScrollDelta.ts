@@ -2,7 +2,7 @@
 export const EDGE = 56;
 
 /** Скорость у самого края, px за кадр; к границе полосы спадает. */
-export const MAX_SPEED = 18;
+const MAX_SPEED = 18;
 
 /** Сдвиг за кадр: у верхнего края — вверх, у нижнего — вниз, в середине — ноль. */
 export function edgeScrollDelta(y: number, top: number, bottom: number): number {

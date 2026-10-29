@@ -38,7 +38,7 @@ import type { ProviderPermissionRuleGrammar } from '../../../providers/types/sec
  */
 
 /** Префикс, которым канон записывает режим подтверждений целого CLI. */
-export const MODE_RULE_PREFIX = 'mode:';
+const MODE_RULE_PREFIX = 'mode:';
 
 /** Правило канона о режиме. Одна точка, где этот префикс появляется. */
 export function modeRule(mode: string): string {
@@ -198,7 +198,7 @@ function hasWildcard(argument: string): boolean {
  * файла настроек, `~` и буква диска — абсолютные, `.`/`..` — относительные к
  * каталогу, которого шаблон цели не знает.
  */
-export function pathAnywhere(argument: string): string | null {
+function pathAnywhere(argument: string): string | null {
   const path = argument.trim().replace(/\\/g, '/');
   if (!path || /[*?[\]{}]/.test(path)) return null;
   if (path.startsWith('/') || path.startsWith('~') || /^[A-Za-z]:/.test(path)) return null;

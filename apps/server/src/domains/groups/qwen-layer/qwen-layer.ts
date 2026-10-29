@@ -3,6 +3,7 @@ import { platform } from 'node:os';
 import { join } from 'node:path';
 import type { Group } from '@agentdeck/contracts';
 import { scopeProvider } from '@agentdeck/contracts/group-sources';
+import { qwenRunFacts } from '@agentdeck/providers/qwen';
 import { readJsoncFile } from '../../../lib/safe-io/safe-io.ts';
 
 /**
@@ -16,7 +17,15 @@ import { readJsoncFile } from '../../../lib/safe-io/safe-io.ts';
  * qwen-code 0.25.0 (provider-formats, «Qwen group layer»).
  */
 
-export const QWEN_SYSTEM_SETTINGS_ENV = 'QWEN_CODE_SYSTEM_SETTINGS_PATH';
+/** Имя переменной — факт запуска Qwen Code (канал пределов, `@agentdeck/providers/qwen`). */
+export const QWEN_SYSTEM_SETTINGS_ENV = qwenSettingsFileVar();
+
+function qwenSettingsFileVar(): string {
+  const limits = qwenRunFacts.limitsChannel;
+  if (limits?.via !== 'settings-file')
+    throw new Error('providers: qwen has no settings-file limits channel');
+  return limits.fileVar;
+}
 
 /** Куда класть слои: каталог на отпечаток содержимого, старые подчищаются. */
 export function qwenLayersRoot(appData: string): string {

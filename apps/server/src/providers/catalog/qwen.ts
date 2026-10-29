@@ -2,6 +2,10 @@ import { join } from 'node:path';
 import { QWEN_HOOK_EVENTS } from '../../lib/qwen-hook/qwen-hook.ts';
 import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { qwenHome, unimplementedPaths } from './config-dirs.ts';
+import { assistantApiOf, endpointConfigOf, modelsOf, runFactsOf } from './run-facts.ts';
+
+/** Факты запуска Qwen Code — из пакета `@agentdeck/providers`. */
+const facts = runFactsOf('qwen');
 
 /** MCP, права и хуки Qwen лежат в одном `settings.json`, каждый — своим ключом. */
 const qwenSettings = (): string => join(qwenHome(), 'settings.json');
@@ -21,11 +25,11 @@ const qwenSettings = (): string => join(qwenHome(), 'settings.json');
  * Каталог конфигурации переносится переменной `QWEN_HOME` (см. `qwenHome()`).
  */
 export const qwenProvider: ConfigProvider = {
-  id: 'qwen',
-  name: 'Qwen Code',
-  status: 'experimental',
-  paths: unimplementedPaths('qwen'),
-  cli: { command: 'qwen', windowsCommand: 'qwen.cmd' },
+  id: facts.id,
+  name: facts.name,
+  status: facts.status,
+  paths: unimplementedPaths(facts.id),
+  cli: facts.binary,
   // Глобальный файл инструкций (контекстный файл) задокументирован:
   // `~/.qwen/QWEN.md` — «you, across all your projects»; проектный — QWEN.md в
   // корне репозитория.
@@ -144,9 +148,7 @@ export const qwenProvider: ConfigProvider = {
   // OPENAI_BASE_URL/OPENAI_MODEL), у ModelStudio/DashScope — DASHSCOPE_API_KEY.
   // One-shot: `qwen -p <промпт>` — задокументированный headless-режим.
   assistant: {
-    apiKind: 'openai-compat',
-    apiKeyEnvVars: ['OPENAI_API_KEY', 'DASHSCOPE_API_KEY'],
-    cliRunnable: true,
+    ...assistantApiOf(facts),
     // «Разрешить правки» (`qwen --help` 0.25.0: `--approval-mode
     // plan|default|auto-edit|auto|yolo`). Включено — `yolo`, как живой ход, где
     // каждая просьба получает «да»; выключено — `default`: в `-p` спросить
@@ -167,19 +169,8 @@ export const qwenProvider: ConfigProvider = {
   // OpenAI (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`) и Anthropic
   // (`ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`), — и сам же
   // говорит, что берёт их из `.env` (порядок: `.qwen/.env` → `.env` → домашние).
-  // Поэтому профиль обоих видов сюда переносится.
-  endpointConfig: {
-    'openai-compat': {
-      baseUrlEnv: 'OPENAI_BASE_URL',
-      modelEnv: 'OPENAI_MODEL',
-      credentialEnv: 'OPENAI_API_KEY',
-    },
-    anthropic: {
-      baseUrlEnv: 'ANTHROPIC_BASE_URL',
-      modelEnv: 'ANTHROPIC_MODEL',
-      credentialEnv: 'ANTHROPIC_API_KEY',
-    },
-  },
+  // Поэтому профиль обоих видов сюда переносится (порядок видов — порядок каналов фактов).
+  endpointConfig: endpointConfigOf(facts),
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',
@@ -209,7 +200,7 @@ export const qwenProvider: ConfigProvider = {
     sandbox: 'unsupported',
   }),
   // Модели: каталог Alibaba (models.dev) — семейство Qwen.
-  modelVendors: ['alibaba'],
+  ...modelsOf(facts),
   // Подбора модели (Т12) у Qwen НЕТ, и это решение, а не пробел: флаг `--model`
   // задокументирован, но семейства каталога неоднородны — в `qwen` лежат разом
   // `flash`, `plus` и `max`, и «свежайшая в семействе» завтра означала бы `max`,

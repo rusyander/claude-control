@@ -38,7 +38,7 @@ export { SUPPORTED_UPLOAD_EXTENSIONS, isSupportedUpload };
  * латиница была единственной, и `отчёт.txt` со `схема.txt` превращались в один
  * и тот же `_____.txt` — второй файл молча затирал первый, а агент читал не то.
  */
-export function safeUploadName(name: string): string {
+function safeUploadName(name: string): string {
   const last = basename(name.replace(/\\/g, '/'));
   const cleaned = last.replace(/[^\p{L}\p{N}._\- ]/gu, '_').trim();
   // Одни точки — это `.` и `..`, то есть не имя вовсе.

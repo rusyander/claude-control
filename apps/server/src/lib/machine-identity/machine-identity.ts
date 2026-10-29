@@ -27,7 +27,7 @@ export function machineName(): string {
 /** Прочитанные номера: спрашивают на каждом уведомлении, диск — один раз. */
 const cache = new Map<string, string>();
 
-export function machineIdPath(): string {
+function machineIdPath(): string {
   return join(panelHomeDir(), ID_FILE);
 }
 

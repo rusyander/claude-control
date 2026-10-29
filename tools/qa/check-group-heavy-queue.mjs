@@ -29,11 +29,11 @@
  * `claude` (путь — `CLAUDE_CLI`); стенд и настройки человека не трогаются.
  */
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, parse } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const PREFIX = 'cc-heavyqueue-';
 const TOOLS = fileURLToPath(new URL('..', import.meta.url));
@@ -70,99 +70,26 @@ function workBase() {
   throw new Error('нет каталога вне домашней папки: задайте PUBLIC');
 }
 
-function sse(blocks, stop) {
-  const events = [
-    [
-      'message_start',
-      {
-        type: 'message_start',
-        message: {
-          id: 'msg_hq',
-          type: 'message',
-          role: 'assistant',
-          model: 'stub',
-          content: [],
-          stop_reason: null,
-          usage: { input_tokens: 10, output_tokens: 1 },
-        },
-      },
-    ],
-  ];
-  blocks.forEach(([start, delta], index) => {
-    events.push([
-      'content_block_start',
-      { type: 'content_block_start', index, content_block: start },
-    ]);
-    events.push(['content_block_delta', { type: 'content_block_delta', index, delta }]);
-    events.push(['content_block_stop', { type: 'content_block_stop', index }]);
-  });
-  events.push([
-    'message_delta',
-    { type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 1 } },
-  ]);
-  events.push(['message_stop', { type: 'message_stop' }]);
-  return events
-    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-    .join('');
-}
-
 /**
  * Стаб API: в разговоре с Bash зовёт `toolInput` один раз, потом — слово.
  * Список — по вызову на каждый ответ инструмента по порядку.
  */
-function startStub(toolInput) {
+async function startStub(toolInput) {
   const calls = Array.isArray(toolInput) ? toolInput : [toolInput];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!req.url?.includes('/messages') || req.url.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(req.url?.includes('count_tokens') ? '{"input_tokens":10}' : '{}');
-        return;
-      }
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // пустое тело — тоже запрос
-      }
-      const bash = (body.tools ?? []).some((tool) => tool.name === 'Bash');
-      const answered = (JSON.stringify(body.messages ?? []).match(/"tool_result"/g) ?? []).length;
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request, info }) => {
+      const bash = info.tools.some((tool) => tool.name === 'Bash');
+      const answered = (JSON.stringify(request.body.messages ?? []).match(/"tool_result"/g) ?? [])
+        .length;
       const call = bash ? calls[answered] : undefined;
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      res.end(
-        call
-          ? sse(
-              [
-                [
-                  { type: 'tool_use', id: `toolu_hq${Date.now()}`, name: 'Bash', input: {} },
-                  {
-                    type: 'input_json_delta',
-                    partial_json: JSON.stringify({ description: 'gate', ...call }),
-                  },
-                ],
-              ],
-              'tool_use',
-            )
-          : sse(
-              [
-                [
-                  { type: 'text', text: '' },
-                  { type: 'text_delta', text: 'ok' },
-                ],
-              ],
-              'end_turn',
-            ),
-      );
-    });
+      if (!call) return 'ok';
+      const args = { description: 'gate', ...call };
+      return { tool: { name: 'Bash', args, id: `toolu_hq${Date.now()}` } };
+    },
   });
-  return new Promise((resolve) =>
-    server.listen(0, '127.0.0.1', () =>
-      resolve({ url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() }),
-    ),
-  );
+  return { url: stub.baseUrl, close: () => stub.close() };
 }
 
 /**

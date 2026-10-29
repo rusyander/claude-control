@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
 /** Переходник MCP: одна ручка на три действия — узнать, подключить, убрать. */
-export async function getBridge(): Promise<PlatformBridgeInfo> {
+async function getBridge(): Promise<PlatformBridgeInfo> {
   const { data } = await apiClient.get<PlatformBridgeInfo>('/platforms/mcp/connect');
   return data;
 }

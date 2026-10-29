@@ -11,7 +11,7 @@ import {
   writePanelAgentConversation,
 } from './conversations.ts';
 import { maskPanelAgentMessages } from '../data-mask/data-mask.ts';
-import { builtinRuleSet } from '../../dlp/default-rules.ts';
+import { builtinRuleSet } from '@agentdeck/dlp/default-rules';
 
 /**
  * Ревью 26.09 (probe-z5/two-sealed): окно выбрасывает каждый оборванный ход —

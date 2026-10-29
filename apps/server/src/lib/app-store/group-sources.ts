@@ -49,7 +49,7 @@ export interface PendingAdvice {
 }
 
 /** Участник оригинала на момент копирования. */
-export interface MemberBase {
+interface MemberBase {
   /** Ключ участника в копии (`<kind>:<id>`): имя могло смениться суффиксом. */
   to: string;
   text: string;
@@ -110,7 +110,7 @@ export function readGroupSources(appData: string): GroupSourcesState {
   } as GroupSourcesState;
 }
 
-export function writeGroupSources(appData: string, state: GroupSourcesState): void {
+function writeGroupSources(appData: string, state: GroupSourcesState): void {
   writePanelJson(appData, FILE, state);
 }
 

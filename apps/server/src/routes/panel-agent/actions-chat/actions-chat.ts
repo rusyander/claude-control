@@ -4,7 +4,7 @@ import type { ChatInbox } from '@agentdeck/contracts/chat-inbox';
 import type { ChatAwaitingView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatEscalationsView } from '@agentdeck/contracts/chat-group-settings';
 import { scanSplitBlocks, type TaskSplitProposal } from '@agentdeck/contracts/task-split';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { ProjectInfo } from '../../../domains/chat/ChatProjects/ChatProjects.ts';
 import { encode, readRoute } from '../action-kit/action-kit.ts';
 import { findChat, readTree, runningOf } from '../actions-chat-kit.ts';

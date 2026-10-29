@@ -102,7 +102,7 @@ export interface KeepWarmInput {
   now: number;
 }
 
-export type KeepWarmSkip =
+type KeepWarmSkip =
   | 'off'
   | 'ttl-5m'
   /** В хвосте нет записи в кэш — часовой кэш не подтверждён (локальная модель, контур). */

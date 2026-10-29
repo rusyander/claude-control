@@ -34,7 +34,7 @@ export const PW_NET = 731;
 export const COPY = 740;
 export const ORPHAN = 750;
 export const SERVICE = 760;
-export const TEMP_ROOT = 770;
+const TEMP_ROOT = 770;
 export const TEMP_NET = 771;
 export const EDGE_UNDER_CHROME = 780;
 
@@ -74,7 +74,7 @@ export const chrome = (pid: number, args: string, session = 1, path = CHROME): P
   return { pid, name: 'chrome.exe', session, path, commandLine, argv: [path, ...args.split(' ')] };
 };
 
-export const NET_ARGS = '--type=utility --utility-sub-type=network.mojom.NetworkService';
+const NET_ARGS = '--type=utility --utility-sub-type=network.mojom.NetworkService';
 
 export const WINDOWS = facts([
   { pid: 1, name: 'System', session: 0 },

@@ -369,6 +369,41 @@ describe('SplitOverlap', () => {
     expect(view?.files).toHaveLength(1);
   });
 
+  it('settled ждёт пересчёт, запущенный без ожидания, и его сбой не бросает', async () => {
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let stored = record();
+    const overlap = new SplitOverlap({
+      git: {
+        // git ещё работает в каталоге проекта, пока ворота закрыты.
+        mergeBase: () => gate.then(() => Promise.reject(new Error('git упал'))),
+        changedFiles: () => Promise.resolve([]),
+      },
+      store: {
+        get: () => stored,
+        set: (next) => {
+          stored = next;
+        },
+      },
+      emit: () => true,
+      log: () => {},
+    });
+    void overlap.check('parent').catch(() => undefined);
+    let done = false;
+    const waiting = overlap.settled().then(() => {
+      done = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(done).toBe(false);
+    release?.();
+    await waiting;
+    expect(done).toBe(true);
+    // Пересчётов нет — ждать нечего.
+    await overlap.settled();
+  });
+
   it('база группы, ждавшей предшественников, — их ветка, а не ветка проекта', async () => {
     const seen: string[] = [];
     let stored = record();

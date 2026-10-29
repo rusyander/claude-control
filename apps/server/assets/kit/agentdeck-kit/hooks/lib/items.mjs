@@ -88,6 +88,7 @@ export const MANIFEST = {
     'context-watch',
     'review-publish-guard',
     'cmd-duration',
+    'persisted-output-hint',
     'batch-nudge',
     'mr-echo-trim',
     'watch-keepalive',

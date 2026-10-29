@@ -22,7 +22,6 @@
  * Запуск: `node tools/qa/check-group-override.mjs`. Нужен установленный `claude`
  * (путь — `CLAUDE_CLI`); стенд человека и его конфигурация не трогаются.
  */
-import { createServer } from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -38,6 +37,7 @@ import {
 import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const MARK = {
   text: 'GOVERRIDETEXTMARKER',
@@ -75,105 +75,32 @@ function resolveClaude() {
 }
 
 /** Стаб вместо API: записывает каждый запрос к модели и отвечает одним словом. */
-function startStub() {
+async function startStub() {
   const seen = [];
   const state = { invokeSkill: null };
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      let body;
-      try {
-        body = raw ? JSON.parse(raw) : {};
-      } catch {
-        body = {};
-      }
-      if (req.url?.includes('count_tokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ input_tokens: 10 }));
-        return;
-      }
-      if (!req.url?.includes('/messages')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end('{}');
-        return;
-      }
+  const stub = await startStubModel({
+    // Вне `/messages` (служебные пути CLI) — пустой JSON, как было у своего стаба.
+    route: ({ path }) => (path.includes('/messages') ? undefined : { body: {} }),
+    script: ({ request, info }) => {
+      const body = request.body;
       seen.push(body);
       // Случай «модель всё же зовёт скилл»: основной запрос (в нём есть
       // инструмент Skill) без результата инструмента получает вызов скилла, и
       // следующий запрос несёт ответ CLI на этот вызов — он и есть улика.
-      const hasSkillTool = (body.tools ?? []).some((tool) => tool.name === 'Skill');
+      const hasSkillTool = info.tools.some((tool) => tool.name === 'Skill');
       const last = body.messages?.at(-1);
       const answered =
         Array.isArray(last?.content) && last.content.some((part) => part.type === 'tool_result');
-      const block =
-        state.invokeSkill && hasSkillTool && !answered
-          ? {
-              start: { type: 'tool_use', id: `toolu_${seen.length}`, name: 'Skill', input: {} },
-              delta: {
-                type: 'input_json_delta',
-                partial_json: JSON.stringify({ skill: state.invokeSkill }),
-              },
-              stop: 'tool_use',
-            }
-          : {
-              start: { type: 'text', text: '' },
-              delta: { type: 'text_delta', text: 'ok' },
-              stop: 'end_turn',
-            };
+      if (!state.invokeSkill || !hasSkillTool || answered) return 'ok';
+      const skill = state.invokeSkill;
       // Скилл зовётся один раз на прогон. Признак «ответ уже есть» ненадёжен: CLI
       // кладёт после tool_result ещё свои части, и без этого стаб звал скилл
       // снова — 1200–1500 запросов за прогон, пока тела не роняли JSON.stringify.
-      if (block.stop === 'tool_use') state.invokeSkill = null;
-      const events = [
-        [
-          'message_start',
-          {
-            type: 'message_start',
-            message: {
-              id: 'msg_override',
-              type: 'message',
-              role: 'assistant',
-              model: body.model ?? 'stub',
-              content: [],
-              stop_reason: null,
-              usage: { input_tokens: 10, output_tokens: 1 },
-            },
-          },
-        ],
-        [
-          'content_block_start',
-          { type: 'content_block_start', index: 0, content_block: block.start },
-        ],
-        ['content_block_delta', { type: 'content_block_delta', index: 0, delta: block.delta }],
-        ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-        [
-          'message_delta',
-          {
-            type: 'message_delta',
-            delta: { stop_reason: block.stop },
-            usage: { output_tokens: 1 },
-          },
-        ],
-        ['message_stop', { type: 'message_stop' }],
-      ];
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      for (const [event, data] of events)
-        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      res.end();
-    });
+      state.invokeSkill = null;
+      return { tool: { name: 'Skill', args: { skill }, id: `toolu_${seen.length}` } };
+    },
   });
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () =>
-      resolve({
-        url: `http://127.0.0.1:${server.address().port}`,
-        seen,
-        state,
-        close: () => server.close(),
-      }),
-    );
-  });
+  return { url: stub.baseUrl, seen, state, close: () => stub.close() };
 }
 
 /** Проект со своим скиллом, своими исключениями гита и своим личным файлом настроек. */

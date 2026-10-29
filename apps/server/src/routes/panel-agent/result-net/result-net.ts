@@ -9,7 +9,7 @@ import {
   maskArgList,
   SECRET_MASK,
   type SecretSpan,
-} from '../../../lib/secret-mask/secret-mask.ts';
+} from '@agentdeck/dlp/secret-mask';
 
 /**
  * Последняя сетка перед моделью (D8, 28.09.2026): КАЖДЫЙ результат и текст

@@ -60,7 +60,7 @@ const attempt =
     }
   };
 
-export const OS_IO: FactsIo = {
+const OS_IO: FactsIo = {
   readLink: attempt((path) => readlinkSync(path)),
   readText: attempt((path) => readFileSync(path, 'utf8')),
   realpath: attempt((path) => realpathSync.native(path)),

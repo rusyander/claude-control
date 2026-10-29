@@ -1,5 +1,5 @@
 /** Прямоугольник на экране — только нужные поля `DOMRect`. */
-export interface PlaceRect {
+interface PlaceRect {
   top: number;
   right: number;
 }

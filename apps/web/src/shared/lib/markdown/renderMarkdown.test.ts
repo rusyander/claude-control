@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { renderMarkdown } from './renderMarkdown';
-import { renderMarkdownInline } from './renderMarkdownInline';
 import { renderDocumentMarkdown } from './renderDocumentMarkdown';
 
 /**
@@ -163,7 +162,6 @@ describe('renderMarkdown: безопасность и обычная разме�
 
   it('пустой текст даёт пустую строку, а не падение', () => {
     expect(renderMarkdown('')).toBe('');
-    expect(renderMarkdownInline('')).toBe('');
   });
 
   it('одиночный перенос строки сохраняется', () => {
@@ -173,12 +171,6 @@ describe('renderMarkdown: безопасность и обычная разме�
 
   it('незакрытая обратная кавычка не роняет разбор', () => {
     expect(() => renderMarkdown('текст с `незакрытой кавычкой')).not.toThrow();
-  });
-
-  it('inline-вариант не оборачивает текст в абзац', () => {
-    const html = renderMarkdownInline('просто **текст**');
-    expect(html).not.toContain('<p>');
-    expect(html).toContain('<strong>текст</strong>');
   });
 });
 

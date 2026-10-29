@@ -12,7 +12,7 @@ import { isPostmanCollection, parsePostman } from './postman.ts';
  * изменился, адрес — полминуты (сервис разработчика перезапускают часто).
  */
 
-export const SPEC_CAP_BYTES = 10 * 1024 * 1024;
+const SPEC_CAP_BYTES = 10 * 1024 * 1024;
 const URL_TTL_MS = 30_000;
 const FETCH_TIMEOUT_MS = 10_000;
 

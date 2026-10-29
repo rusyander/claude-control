@@ -215,8 +215,3 @@ export function listFiles(root: string, dir: string, suffix: string): string[] {
     return [];
   }
 }
-
-/** Существует ли файл раздела. */
-export function testsFileExists(root: string, relative: string): boolean {
-  return existsSync(testsPath(root, relative));
-}

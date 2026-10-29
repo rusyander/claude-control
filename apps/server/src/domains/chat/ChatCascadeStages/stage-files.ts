@@ -12,7 +12,7 @@ import { gitSync } from '../../project-git/exec/exec.ts';
  */
 
 /** Каталог планов групп в копии — рядом с остальными рабочими заметками `.agent/`. */
-export const GROUP_PLAN_DIR = '.agent/plans';
+const GROUP_PLAN_DIR = '.agent/plans';
 
 /**
  * Путь файла плана от корня копии. Имя — по содержимому: две группы в одном

@@ -14,6 +14,8 @@ const OUTCOME_TONE: Record<AgentExtensionOutcome, BadgeTone> = {
   denied: 'danger',
   context: 'info',
   running: 'warning',
+  // Оборван паузой или концом сессии — не ошибка.
+  interrupted: 'neutral',
 };
 
 /**

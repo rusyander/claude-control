@@ -71,7 +71,7 @@ const FINISHED = new Set(['success', 'failed', 'canceled', 'skipped', 'manual'])
  * CI, а не код ветки: умер раннер, не ответил API GitLab, сломался
  * планировщик. `script_failure` и прочие — дело кода, их читает группа.
  */
-export const INFRA_FAILURE_REASONS: ReadonlySet<string> = new Set([
+const INFRA_FAILURE_REASONS: ReadonlySet<string> = new Set([
   'runner_system_failure',
   'api_failure',
   'scheduler_failure',
@@ -83,7 +83,7 @@ export const INFRA_FAILURE_REASONS: ReadonlySet<string> = new Set([
  * инфраструктуре. Хоть одно с причиной кода или без причины (GitHub, задания
  * не прочлись) — `undefined`, и красный судится группой как прежде.
  */
-export function infraJobs(red: MrReviewPipeline): MrReviewFailedJob[] | undefined {
+function infraJobs(red: MrReviewPipeline): MrReviewFailedJob[] | undefined {
   const jobs = red.failedJobs;
   if (!jobs || jobs.length === 0) return undefined;
   return jobs.every((job) => job.reason !== undefined && INFRA_FAILURE_REASONS.has(job.reason))
@@ -143,8 +143,8 @@ export {
 } from './review-threads.ts';
 
 /** Сколько упавших заданий и строк лога каждого продолжение несёт (P8): хвост, а не лог. */
-export const MR_WATCH_LOG_JOBS = 2;
-export const MR_WATCH_LOG_LINES = 40;
+const MR_WATCH_LOG_JOBS = 2;
+const MR_WATCH_LOG_LINES = 40;
 const LOG_LINE_MAX = 400;
 
 /** Хвост лога упавшего задания — что панель уже прочла у форджа. */
@@ -207,7 +207,7 @@ const TIMEOUT_FAILURE_REASONS: ReadonlySet<string> = new Set([
  * код ветки не запускался. g1 26.10, конвейер 12035: semgrep-scan 25 минут ждал узел
  * («0/30 nodes are available: 30 Insufficient cpu») и упал `job_execution_timeout`.
  */
-export function scriptNeverStarted(trace: string): boolean {
+function scriptNeverStarted(trace: string): boolean {
   return /section_start:\d+:/.test(trace) && !/section_start:\d+:step_script\b/.test(trace);
 }
 
@@ -216,7 +216,7 @@ export function scriptNeverStarted(trace: string): boolean {
  * скрипт так и не начался (`scriptNeverStarted`). Лог таймаута не прочёлся — не доказано,
  * красный судит группа, как прежде.
  */
-export async function infraFailures(
+async function infraFailures(
   read: ((mrUrl: string, jobId: string) => Promise<string | undefined>) | undefined,
   mr: string,
   red: MrReviewPipeline,

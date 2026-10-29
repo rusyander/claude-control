@@ -1,0 +1,445 @@
+import { spawnSync } from 'node:child_process';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import type { ActionKind, JournalLine } from '@agentdeck/contracts/core/journal';
+import type { RouteLease, RouteResource } from '@agentdeck/contracts/core/routes';
+import type { AdapterEvent, SessionHandle } from '../../../adapters/index.ts';
+import type { DenySet } from '../../../adapters/adapter.types.ts';
+import { stopSession } from '../../../adapters/launcher/session-io.ts';
+import type { BootedCore } from '../../../bootstrap/boot.ts';
+import type { RoadStart } from '../../../bootstrap/session-road.ts';
+import { ActionFailed, runAction } from '../../../conductor/outbox.ts';
+import type { LiveTask } from '../../../journal/resume.ts';
+import { readJournalLines } from '../../../journal/read-lines.ts';
+import { newId } from '../../../lib/ids/uuidv7.ts';
+import type { SdkAdapter } from '../../../adapters/sdk-stream/sdk-adapter.ts';
+import { briefFor } from '../script.ts';
+import type { ChildConfig, ChildResult, KillPoint, ReattachedSession } from './e2e.types.ts';
+import { journalKillHit } from './kill-match.ts';
+
+/**
+ * Дирижёр фазы 2 для сквозного прогона — внутри процесса ядра. Каждый шаг решается по журналу
+ * (F05): перезапущенное ядро продолжает с того места, где журнал остановился, а не сначала.
+ *
+ * Живая сессия прежнего ядра прикрепляется заново (01 §Sessions at core death, P89): переходник
+ * восстанавливает её поток из stdout.log, мост MCP находит новое ядро по `procs.json`; та же
+ * сессия доводит шаг. Новая сессия — только вместо кончившейся или потерянной.
+ * Ровно один коммит держится тем, что коммит — эффект самой сессии в своей копии.
+ */
+
+/** Метка дерева сессии: по ней сверка `process-start` ищет процесс (01 §Outbox). */
+export const SESSION_MARKER = 'AGENTDECK_TREE';
+export const STUB_MODEL = 'stub-model';
+const OPEN_SESSION = new Set(['starting', 'live', 'quiet']);
+
+type Note = (event: string, data?: Record<string, unknown>) => void;
+
+/** Смерть ядра без единой строчки после: запись причины в файл (stdout на Windows асинхронен). */
+export function die(killLog: string, why: string): never {
+  appendFileSync(killLog, `${JSON.stringify({ at: Date.now(), why, pid: process.pid })}\n`);
+  process.kill(process.pid, 'SIGKILL');
+  // Сигнал доставляется не мгновенно: ни одна строка JS после него не должна исполниться.
+  for (;;) {
+    /* ждём смерти */
+  }
+}
+
+export function installJournalKill(task: LiveTask, kill: KillPoint, killLog: string): void {
+  if (kill.at !== 'journal') return;
+  const hit = journalKillHit(kill);
+  task.subscribe((line, state) => {
+    if (hit(line, state)) die(killLog, `journal ${line.kind}#${kill.nth} seq ${line.seq}`);
+  });
+}
+
+function git(cwd: string, args: string[]): string {
+  const run = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
+  if (run.status !== 0) throw new ActionFailed('git', `git ${args.join(' ')}: ${run.stderr}`);
+  return run.stdout;
+}
+
+/** Что журнал помнит о запуске сессии (`session.started`). */
+function startedFacts(task: LiveTask, sessionId: string): { cwd: string; argv: string[] } {
+  const lines = readJournalLines(task.dir, task.taskId).lines as JournalLine[];
+  const line = lines.find((l) => l.kind === 'session.started' && l.sessionId === sessionId);
+  const data = line?.data as { cwd?: string; argv?: string[] } | undefined;
+  return { cwd: data?.cwd ?? '', argv: data?.argv ?? [] };
+}
+
+/** Аренда заглушки из журнала: строка `resource.created` вида `stub-server`, ещё живая. */
+function journalLease(task: LiveTask, routeId: string): RouteLease | undefined {
+  const lines = readJournalLines(task.dir, task.taskId).lines as JournalLine[];
+  for (const line of lines) {
+    if (line.kind !== 'resource.created') continue;
+    const data = line.data as { rid: string; kind: string; ref: string; release: unknown };
+    if (data.kind !== 'stub-server' || task.state.resources[data.rid]?.status !== 'live') continue;
+    const resource = {
+      rid: data.rid,
+      kind: data.kind,
+      ref: data.ref,
+      release: data.release,
+    } as RouteResource;
+    return { leaseId: data.rid, routeId, model: STUB_MODEL, resources: [resource] };
+  }
+  return undefined;
+}
+
+function cliPin(cliHome: string, marker: string): Record<string, string> {
+  for (const dir of [
+    cliHome,
+    join(cliHome, 'AppData', 'Roaming'),
+    join(cliHome, 'AppData', 'Local'),
+  ])
+    mkdirSync(dir, { recursive: true });
+  const keep = ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'windir', 'ComSpec', 'PATHEXT', 'LANG'];
+  const pin: Record<string, string> = {};
+  for (const name of keep) {
+    const value = process.env[name];
+    if (value !== undefined) pin[name] = value;
+  }
+  return {
+    ...pin,
+    HOME: cliHome,
+    USERPROFILE: cliHome,
+    APPDATA: join(cliHome, 'AppData', 'Roaming'),
+    LOCALAPPDATA: join(cliHome, 'AppData', 'Local'),
+    HOMEDRIVE: '',
+    HOMEPATH: '',
+    [SESSION_MARKER]: marker,
+  };
+}
+
+/** Запреты шага сквозного прогона; запреты платформы дорога сессии добавляет сама. */
+const STEP_DENY: DenySet = { paths: [], commands: [['git', 'push']], mcpTools: [], tools: [] };
+
+export async function conduct(
+  core: BootedCore,
+  cfg: ChildConfig,
+  note: Note,
+  killLog: string,
+): Promise<ChildResult> {
+  const events: string[] = [];
+  const launched: string[] = [];
+  const stoppedOrphans: string[] = [];
+  const reattached: ReattachedSession[] = [];
+  const adapter = core.adapters.get(cfg.adapter);
+  if (!adapter) throw new Error(`adapter ${cfg.adapter} not registered`);
+  const route = core.routes.require(cfg.routeId);
+
+  // ── задача ──
+  let task: LiveTask | undefined;
+  if (cfg.taskId) {
+    task = core.registry.live(cfg.taskId);
+    if (!task) throw new Error(`task ${cfg.taskId} not opened by this core`);
+  } else {
+    task = await core.registry.create({
+      title: cfg.taskTitle,
+      repos: [{ repoKey: 'r1', path: cfg.repo, baseRef: cfg.baseBranch }],
+      build: 'stub-e2e',
+      scenario: { id: 'default', version: 1 },
+      profileHash: null,
+      modelCeiling: null,
+      userLayerHash: null,
+      envPin: '',
+      requirementsSource: 'text',
+      // Разрешённая тройка задачи: совместимость дороги сессии решает по ней (06 §Precedence).
+      allowedRoutes: [
+        { adapter: adapter.id, route: { kind: route.kind, id: route.id }, modelPattern: '*' },
+      ],
+      routesSourceLevel: 2,
+    });
+  }
+  const live = task;
+  note('task', { taskId: live.taskId });
+  if (cfg.kill && cfg.taskId === undefined) {
+    // `task.created` пишется внутри `registry.create`, до возврата задачи: смерть «сразу после
+    // неё» — здесь, пока ни одной строки после не записано.
+    if (cfg.kill.at === 'journal' && cfg.kill.kind === 'task.created') {
+      die(killLog, 'journal task.created#1');
+    }
+    installJournalKill(live, cfg.kill, killLog);
+  }
+
+  // ── единица ──
+  let unitId = Object.keys(live.state.units)[0];
+  if (!unitId) {
+    unitId = newId();
+    live.append({
+      kind: 'unit.created',
+      actor: 'core',
+      unitId,
+      data: { unitId, repoKey: 'r1', branch: `agentdeck/${unitId.slice(-8)}`, ownedPaths: [] },
+    });
+  }
+  const branch = live.state.units[unitId]!.branch;
+  const copy = join(cfg.copiesDir, unitId);
+
+  const parked = (actionId: string, kind: ActionKind): ChildResult => ({
+    taskId: live.taskId,
+    unitId: unitId!,
+    copy,
+    stepState: 'n/a',
+    outcome: 'parked',
+    parkedOn: { actionId, kind },
+    launched,
+    stoppedOrphans,
+    reattached,
+    events,
+  });
+  /** Начатое и не законченное после сверки (`retry`/`ask`) — ждём, повтора вслепую нет. */
+  const open = (kind: ActionKind, target?: string) =>
+    Object.entries(live.state.actions).find(
+      ([, a]) =>
+        a.kind === kind &&
+        (target === undefined || a.target === target) &&
+        (a.status === 'started' || a.status === 'awaiting-human'),
+    );
+  const doneAction = (kind: ActionKind, target?: string) =>
+    Object.values(live.state.actions).some(
+      (a) =>
+        a.kind === kind && a.status === 'done' && (target === undefined || a.target === target),
+    );
+  const effectKill = (kind: ActionKind): void => {
+    if (cfg.kill?.at === 'effect' && cfg.kill.action === kind) die(killLog, `effect ${kind}`);
+  };
+
+  // ── копия (действие outbox) ──
+  const waitingCopy = open('copy-create', copy);
+  if (waitingCopy) return parked(waitingCopy[0], 'copy-create');
+  if (!doneAction('copy-create', copy)) {
+    const made = await runAction(
+      live,
+      { kind: 'copy-create', target: copy, idempotencyHint: 'dir' },
+      async () => {
+        mkdirSync(dirname(copy), { recursive: true });
+        git(dirname(copy), ['clone', '--quiet', '--branch', cfg.baseBranch, cfg.repo, copy]);
+        git(copy, ['checkout', '--quiet', '-b', branch]);
+        git(copy, ['config', 'user.name', 'agentdeck-stub']);
+        git(copy, ['config', 'user.email', 'stub@example.invalid']);
+        git(copy, ['config', 'core.autocrlf', 'false']);
+        effectKill('copy-create');
+        return { dir: copy, branch };
+      },
+      { unitId },
+    );
+    if (!made.ok) throw new Error(`copy-create failed: ${made.code}`);
+  }
+
+  // ── шаг ──
+  let stepId = Object.keys(live.state.steps)[0];
+  if (!stepId) {
+    stepId = newId();
+    live.append({
+      kind: 'step.started',
+      actor: 'core',
+      unitId,
+      stepId,
+      data: { stepId, unitId, stepKind: cfg.stepKind, budgetMs: cfg.waitMs },
+    });
+  }
+  // Ядро умерло между `step.started` и переходом: шаг ещё в очереди — переход пишется сейчас.
+  if (live.state.steps[stepId]?.state === 'queued') {
+    live.append({
+      kind: 'step.transition',
+      actor: 'core',
+      stepId,
+      data: { stepId, event: 'start', from: 'queued', to: 'running' },
+    });
+  }
+  const step = stepId;
+  const stepState = (): string => live.state.steps[step]?.state ?? 'absent';
+  const result = (outcome: ChildResult['outcome']): ChildResult => ({
+    taskId: live.taskId,
+    unitId: unitId!,
+    copy,
+    stepState: stepState(),
+    outcome,
+    launched,
+    stoppedOrphans,
+    reattached,
+    events,
+  });
+
+  // Запуск прежнего ядра без строки сессии (эффект `process-start` до `session.started`): в
+  // журнале сессии нет — дерево снимается, шаг получает новую сессию (правило продолжения).
+  const sessionDir = (sessionId: string): string => join(cfg.sessionsDir, sessionId);
+  const waitingStart = open('process-start');
+  if (waitingStart) return parked(waitingStart[0], 'process-start');
+  for (const action of Object.values(live.state.actions)) {
+    if (action.kind !== 'process-start' || action.status !== 'done') continue;
+    const sessionId = action.target.split(/[\\/]/).pop()!;
+    if (live.state.sessions[sessionId]) continue;
+    const stopped = await stopSession(action.target, 'tree');
+    stoppedOrphans.push(`${sessionId}:${stopped.how}`);
+  }
+  // Открытые сессии прежнего ядра (01 §Sessions at core death, P89): живой хост — та же сессия
+  // продолжает шаг; кончилась — `exited`; хост мёртв — дерево снимается, `lost`; живость не
+  // прочитана — сессию не хороним и не заменяем.
+  let resumed: SessionHandle | undefined;
+  /** Сколько первых событий прикреплённого потока — история (ответ `reattach`, F-105). */
+  let replayed: number | undefined;
+  for (const [sessionId, session] of Object.entries(live.state.sessions)) {
+    if (!OPEN_SESSION.has(session.state)) continue;
+    const got =
+      'reattach' in adapter && !resumed
+        ? await (adapter as SdkAdapter).reattach({
+            sessionId,
+            dir: sessionDir(sessionId),
+            host: { pid: session.hostPid, start: session.hostStart },
+            spawned: startedFacts(live, sessionId),
+            permitServer: true,
+          })
+        : ({ state: 'unknown', reason: 'adapter cannot reattach' } as const);
+    note('reattach', {
+      sessionId,
+      state: got.state,
+      ...('reason' in got ? { reason: got.reason } : {}),
+    });
+    if (got.state === 'live') {
+      resumed = got.handle;
+      replayed = got.replayed;
+      reattached.push({
+        sessionId,
+        hostPid: got.handle.host.pid,
+        hostStart: got.handle.host.start,
+        conversationId: got.conversationId,
+        replayed: got.replayed,
+      });
+      // Ядро умерло между `session.started` и переходом: сессия жива — переход пишется сейчас.
+      if (session.state === 'starting') {
+        live.append({
+          kind: 'session.transition',
+          actor: 'core',
+          sessionId,
+          data: { sessionId, event: 'spawned', from: 'starting', to: 'live' },
+        });
+      }
+      continue;
+    }
+    if (got.state === 'unknown') return result('session-unknown');
+    if (got.state === 'lost') {
+      const stopped = await stopSession(sessionDir(sessionId), 'tree');
+      stoppedOrphans.push(`${sessionId}:${stopped.how}`);
+    }
+    live.append({
+      kind: 'session.transition',
+      actor: 'core',
+      sessionId,
+      data:
+        got.state === 'lost'
+          ? { sessionId, event: 'host-dead', from: session.state, to: 'lost' }
+          : { sessionId, event: 'exited', from: session.state, to: 'ended' },
+    });
+  }
+  // Заявление принято прежним ядром (`step.claimed` переводит шаг в `checking`), а сессии,
+  // которая его сделала, уже нет — запускать нечего.
+  if (cfg.until === 'claimed' && stepState() === 'checking' && !resumed) return result('claimed');
+  if (stepState() !== 'running' && !resumed) {
+    throw new Error(`step ${step} is ${stepState()}, not running`);
+  }
+
+  // ── сессия (действие outbox) — только если прежней живой нет ──
+  // Дорога сессии ядра (03 §Launcher): та же, что у продукта, — совместимость по разрешённой
+  // тройке задачи, аренда маршрута (живая из журнала после перезапуска), токен, PATH входа,
+  // настоящий хук ядра, оверлей запретов, прикрепление и поиск ресурсов на остановке.
+  const startOf = (sessionId: string): RoadStart => {
+    const lease = journalLease(live, route.id);
+    return {
+      task: live,
+      stepId: step,
+      stepKind: cfg.stepKind,
+      adapterId: adapter.id,
+      routeId: route.id,
+      model: STUB_MODEL,
+      sessionId,
+      dir: sessionDir(sessionId),
+      cwd: copy,
+      brief: briefFor({ stepId: step, copyRoot: copy, request: cfg.request }),
+      deny: STEP_DENY,
+      tools: 'all',
+      // Слой человека снимается там, где переходник это умеет; иначе (Qwen) его нет и так: дом CLI
+      // — одноразовый каталог стенда, а не настоящий.
+      layer: { hooks: adapter.caps.layerControl ? 'off' : 'on' },
+      pin: cliPin(cfg.cliHome, sessionId),
+      pathPrefix: [dirname(process.execPath)],
+      ...(lease ? { lease } : {}),
+    };
+  };
+  const launchNew = async (): Promise<SessionHandle> => {
+    const sessionId = newId();
+    const prepared = await core.road.prepare(startOf(sessionId));
+    if (!prepared.ok) throw new Error(`session road refused: ${prepared.reason}`);
+    const got = await core.road.launch(prepared.prepared, {
+      afterEffect: () => effectKill('process-start'),
+    });
+    if (!got.ok) throw new Error(got.reason);
+    const handle = got.handle;
+    launched.push(sessionId);
+    core.road.started(prepared.prepared, handle, got.layer);
+    return handle;
+  };
+  const handle = resumed ?? (await launchNew());
+  const sessionId = handle.sessionId;
+
+  // Судья решает по тем же запретам, что оверлей CLI получил при запуске (F-11) — их собирает
+  // дорога: платформа, `.git` и настройки CLI копии, сам инструмент права, область чтения.
+  const context = core.road.contextFor(startOf(sessionId));
+  let cliInitiated = false;
+  let claimedTurnEnded = false;
+  const attached = core.road.attach({
+    task: live,
+    sessionId,
+    adapter,
+    handle,
+    context,
+    cwd: copy,
+    resumed: resumed !== undefined,
+    ...(replayed === undefined ? {} : { replayed }),
+    onEvent: (event: AdapterEvent) => {
+      events.push(event.type);
+      if (event.type === 'turn.cli-initiated') cliInitiated = true;
+      if (event.type === 'turn.ended' && stepState() !== 'running') claimedTurnEnded = true;
+    },
+  });
+  let ended = false;
+  void attached.done.then(() => {
+    ended = true;
+  });
+  // cmdId — шаг: та же сессия после перезапуска ядра получает «дубль», а не второе сообщение.
+  if (stepState() === 'running') {
+    const sent = await adapter.send(handle, cfg.request, step);
+    note('sent', { sessionId, dup: sent.dup });
+  }
+
+  const deadline = Date.now() + cfg.waitMs;
+  let outcome: ChildResult['outcome'] = 'timeout';
+  for (;;) {
+    if (cfg.until === 'claimed' && stepState() === 'checking' && claimedTurnEnded) {
+      outcome = 'claimed';
+      break;
+    }
+    if (cfg.until === 'cli-initiated' && cliInitiated) {
+      outcome = 'cli-initiated';
+      break;
+    }
+    if (ended) {
+      outcome = cfg.until === 'claimed' && stepState() === 'checking' ? 'claimed' : 'session-ended';
+      break;
+    }
+    if (Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  // Разговор CLI, каким его увидело ЭТО ядро (история + живой хвост) — доказательство той же сессии.
+  for (const entry of reattached) {
+    entry.conversationId = (adapter as SdkAdapter).session(handle)?.conversationId ?? null;
+  }
+  // Остановка дорогой: порты до, временный каталог и остаток дерева после — в журнал задачи.
+  const end = await attached.end('soft');
+  note('session.end', {
+    sessionId,
+    how: end.stop.how,
+    found: end.found.map((f) => f.kind),
+    unread: end.unread,
+  });
+  return result(outcome);
+}

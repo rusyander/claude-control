@@ -1,0 +1,78 @@
+{
+  "title": {
+    "ru": "«История агентов» показывает, кто работает сейчас; вызов, оборванный паузой, — «прервано», а не ошибка",
+    "en": "«Agent history» shows who is working now; a call cut by a pause is «interrupted», not an error"
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Вверху окна «История агентов» — блок «Сейчас»: работает ли главный агент и чем занят (вызов, с какого времени и сколько идёт, или «пишет ответ»), какие субагенты работают и что делает каждый, или прямо «Субагентов сейчас нет». Щелчок по строке открывает ход справа; сессия с работающими помечена «работает сейчас».",
+        "en": "The top of the «Agent history» window holds a «Now» block: whether the main agent is working and what it is doing (the call, since when and for how long, or «writing an answer»), which subagents are working and what each is doing, or plainly «No subagents working now». Clicking a row opens its turn on the right; a session with someone working is marked «working now»."
+      },
+      "how": {
+        "ru": "Сервер отмечает у каждой сессии, работает ли главный агент и какие субагенты, по тому же правилу, из которого сложены числа «сейчас: …»: окно и строка у кнопки не расходятся, молчащий дольше 15 минут субагент без итога и там и там оборван.",
+        "en": "The server marks per session whether the main agent is working and which subagents are, by the same rule the «now: …» numbers are summed from: the window and the line by the button never disagree, and a subagent silent for over 15 minutes with no result is cut off in both."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "В строке «сейчас: N агент · M субагентов» числа жирные и своим цветом: агенты — цветом «идёт», субагенты — акцентом; ноль — приглушённо и обычным начертанием.",
+        "en": "In the «now: N agents · M subagents» line the numbers are bold and coloured: agents in the «running» colour, subagents in the accent; a zero is muted and regular weight."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вызов, оборванный паузой или концом сессии, больше не показан как «ошибка» и не входит в «ошибок N»: у шага метка «прервано» спокойным цветом, у агента — своя строка «прервано паузой N», в окне «Скиллы, хуки и MCP» — итог «прервано». Субагент, оборванный паузой, — «оборван», а не «ошибка».",
+        "en": "A call cut by a pause or the end of the session is no longer shown as an «error» and no longer counted in «errors N»: the step carries a calm «interrupted» badge, the agent its own «cut by a pause N» line, and the «Skills, hooks and MCP» window an «interrupted» outcome. A subagent cut by a pause is «cut off», not «failed»."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Чат» описывает блок «Сейчас», выделенные числа и метку «прервано».",
+        "en": "The «Chat» help covers the «Now» block, the highlighted numbers and the «interrupted» badge."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ],
+  "images": [
+    {
+      "file": "modal-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "До: окно перечисляет сессии, но не говорит, кто работает сейчас; обрыв паузой засчитан в ошибки",
+        "en": "Before: the window lists sessions but not who is working now; a pause cut is counted as an error"
+      }
+    },
+    {
+      "file": "modal-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "После: блок «Сейчас» с главным агентом и работающим субагентом, их вызовы и время; «прервано паузой» отдельно от ошибок",
+        "en": "After: the «Now» block with the main agent and a working subagent, their calls and timing; «cut by a pause» apart from errors"
+      }
+    },
+    {
+      "file": "pane-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "До: вызов, оборванный паузой, помечен «ошибка»",
+        "en": "Before: a call cut by a pause is marked «error»"
+      }
+    },
+    {
+      "file": "pane-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "После: тот же вызов — «прервано» спокойным цветом",
+        "en": "After: the same call is «interrupted» in a calm colour"
+      }
+    }
+  ]
+}

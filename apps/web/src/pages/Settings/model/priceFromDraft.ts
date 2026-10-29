@@ -1,7 +1,7 @@
 import type { PricingDraft, PricingField } from './PricingRow.types';
 import type { ModelPricing } from '@agentdeck/contracts';
 
-export function parseRate(raw: string | undefined): number | undefined {
+function parseRate(raw: string | undefined): number | undefined {
   const trimmed = (raw ?? '').trim();
   if (!trimmed) return undefined;
 

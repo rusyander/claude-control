@@ -1,5 +1,5 @@
 import type { Platform, PlatformDataMask } from '@agentdeck/contracts';
-import { maskRulesFor } from '../../dlp/default-rules.ts';
+import { maskRulesFor } from '@agentdeck/dlp/default-rules';
 import type { PlatformDriver } from '../drivers/driver.ts';
 
 /**

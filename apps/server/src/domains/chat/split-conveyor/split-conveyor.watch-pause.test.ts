@@ -16,7 +16,10 @@ const GROUPS = [
   { title: 'Два', branch: 'feature/two', tasks: ['PROJ-2 вторая'] },
 ];
 
-async function build(background: Record<string, string[]> = {}) {
+async function build(
+  background: Record<string, string[]> = {},
+  clock = { now: new Date('2026-10-27T10:00:00.000Z') },
+) {
   const records = new Map<string, SplitPlanRecord>();
   const conveyor = new SplitConveyor({
     store: {
@@ -47,7 +50,7 @@ async function build(background: Record<string, string[]> = {}) {
     schedule: () => 0,
     backgroundTasks: (chatId) => background[chatId] ?? [],
     log: () => undefined,
-    now: () => new Date('2026-10-27T10:00:00.000Z'),
+    now: () => clock.now,
   });
   await conveyor.begin({
     parentChatId: PARENT,
@@ -119,5 +122,45 @@ describe('SplitConveyor.pauseByWatch: пауза сторожа на безоп�
     expect(t.group(0)).toMatchObject({ status: 'paused', pausedBy: 'human' });
     expect(t.group(0)?.pausedRule).toBeUndefined();
     expect(t.conveyor.view([PARENT])?.groups[0]).toMatchObject({ pausedBy: 'human' });
+  });
+
+  // Живой прогон 27.10 18:27: перезапуски от правок сторожа, пока группы стояли на паузе,
+  // R39 счёл ударом по живому прогону — отрезок паузы нигде не оставался.
+  it('конец паузы оставляет её отрезок: с паузы до хода продолжения, и так каждую паузу', async () => {
+    const clock = { now: new Date('2026-10-27T10:00:00.000Z') };
+    const t = await build({}, clock);
+    t.conveyor.pauseByWatch(t.link(0), 'R12');
+    clock.now = new Date('2026-10-27T10:07:00.000Z');
+    t.conveyor.resumePaused(PARENT, 0);
+    t.conveyor.onChainResumed(t.link(0), 'chat-0');
+    expect(t.group(0)?.pausedAt).toBeUndefined();
+    expect(t.group(0)?.pauseSpans).toEqual([
+      { from: '2026-10-27T10:00:00.000Z', to: '2026-10-27T10:07:00.000Z' },
+    ]);
+
+    t.conveyor.pause(PARENT, 0);
+    clock.now = new Date('2026-10-27T10:20:00.000Z');
+    t.conveyor.resumePaused(PARENT, 0);
+    t.conveyor.onChainResumed(t.link(0), 'chat-0');
+    expect(t.group(0)?.pauseSpans).toEqual([
+      { from: '2026-10-27T10:00:00.000Z', to: '2026-10-27T10:07:00.000Z' },
+      { from: '2026-10-27T10:07:00.000Z', to: '2026-10-27T10:20:00.000Z' },
+    ]);
+  });
+
+  it('пауза над ожиданием человека: «Продолжить» возвращает ожидание и тоже оставляет отрезок', async () => {
+    const clock = { now: new Date('2026-10-27T10:00:00.000Z') };
+    const t = await build({}, clock);
+    const record = t.records.get(PARENT) as SplitPlanRecord;
+    Object.assign(record.groups[0]!, { status: 'awaiting', waitingFor: 'question' });
+    t.records.set(PARENT, record);
+    t.conveyor.pause(PARENT, 0);
+    clock.now = new Date('2026-10-27T10:05:00.000Z');
+
+    expect(t.conveyor.resumePaused(PARENT, 0)).toBe('restored');
+    expect(t.group(0)).toMatchObject({ status: 'awaiting', waitingFor: 'question' });
+    expect(t.group(0)?.pauseSpans).toEqual([
+      { from: '2026-10-27T10:00:00.000Z', to: '2026-10-27T10:05:00.000Z' },
+    ]);
   });
 });

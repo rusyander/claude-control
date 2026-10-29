@@ -23,6 +23,12 @@ export interface AgentHistorySessionsProps {
   onPick: (pick: HistoryPick) => void;
 }
 
+export interface AgentHistoryNowProps {
+  history: AgentHistory;
+  picked: HistoryPick | undefined;
+  onPick: (pick: HistoryPick) => void;
+}
+
 export interface AgentHistoryButtonProps {
   /** Любая сессия разговора: сервер сам соберёт все сессии его группы. */
   chatId: string;

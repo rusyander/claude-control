@@ -75,8 +75,3 @@ export function shownPath(cwd: string, file: string): string {
   const rel = relative(cwd, file);
   return rel.includes('\\') || rel.includes('/') || process.platform === 'win32' ? rel : `./${rel}`;
 }
-
-/** Склейка команды для показа: аргумент с пробелом — в кавычках. */
-export function displayOf(file: string, args: string[]): string {
-  return [file, ...args].map((part) => (/\s/.test(part) ? `"${part}"` : part)).join(' ');
-}

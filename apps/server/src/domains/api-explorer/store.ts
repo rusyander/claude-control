@@ -189,7 +189,7 @@ function maskUrl(url: string): string {
 }
 
 /** Запись истории без секретов: заголовки авторизации и такие же параметры адреса — маской. */
-export function sanitizeEntry(entry: ApiHistoryEntry): ApiHistoryEntry {
+function sanitizeEntry(entry: ApiHistoryEntry): ApiHistoryEntry {
   return {
     ...entry,
     url: maskUrl(entry.url),

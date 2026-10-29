@@ -18,14 +18,14 @@ import type { LocalPaths } from './paths.ts';
  * нашёл этот `qwen` без особых веток, каталог его запуска дописывается в начало
  * PATH процесса панели — как если бы человек поставил CLI сам.
  */
-export const QWEN_CODE_PACKAGE = '@qwen-code/qwen-code';
-export const QWEN_CODE_VERSION = '0.25.0';
+const QWEN_CODE_PACKAGE = '@qwen-code/qwen-code';
+const QWEN_CODE_VERSION = '0.25.0';
 
 export function qwenDir(paths: LocalPaths): string {
   return join(paths.tools, 'qwen-code');
 }
 
-export function qwenBinDir(paths: LocalPaths): string {
+function qwenBinDir(paths: LocalPaths): string {
   return join(qwenDir(paths), 'node_modules', '.bin');
 }
 
@@ -33,7 +33,7 @@ function binNames(os: NodeJS.Platform): string[] {
   return os === 'win32' ? ['qwen.cmd', 'qwen.exe', 'qwen'] : ['qwen'];
 }
 
-export function panelQwenBinary(paths: LocalPaths, os: NodeJS.Platform = process.platform): string {
+function panelQwenBinary(paths: LocalPaths, os: NodeJS.Platform = process.platform): string {
   return (
     binNames(os)
       .map((name) => join(qwenBinDir(paths), name))
@@ -41,7 +41,7 @@ export function panelQwenBinary(paths: LocalPaths, os: NodeJS.Platform = process
   );
 }
 
-export function systemQwenBinary(
+function systemQwenBinary(
   env: NodeJS.ProcessEnv,
   os: NodeJS.Platform = process.platform,
   skipDir = '',

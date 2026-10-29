@@ -39,10 +39,10 @@ import { serverText } from '../../../lib/server-texts/server-texts.ts';
  * исходниках: у произвольного совместимого шлюза пяти причин нет, и
  * подставлять их ему значило бы утверждать непроверенное.
  */
-export const KEY_REJECTED_DETAIL = serverText('gateway-key-rejected');
+const KEY_REJECTED_DETAIL = serverText('gateway-key-rejected');
 
 /** Текст 402 — одной строкой по той же причине, что и у 401. */
-export const KEY_BUDGET_DETAIL = serverText('gateway-key-budget');
+const KEY_BUDGET_DETAIL = serverText('gateway-key-budget');
 
 /**
  * Строка матрицы. `evidence` обязателен и не имеет умолчания намеренно: это

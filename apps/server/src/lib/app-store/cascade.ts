@@ -13,11 +13,6 @@ import { normalizeProjectPath } from './projects.ts';
  * (подпапка проекта, копия ветки) — решает домен: здесь только чтение и запись.
  */
 
-/** Явно записанное положение тумблера. `undefined` — по умолчанию, включено. */
-export function getProjectCascade(state: AppState, path: string): boolean | undefined {
-  return state.projectCascade[normalizeProjectPath(path)];
-}
-
 /** Все записанные положения: домен ищет среди них подходящее рабочей папке. */
 export function projectCascadeEntries(state: AppState): Array<[string, boolean]> {
   return Object.entries(state.projectCascade);

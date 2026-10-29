@@ -489,6 +489,8 @@ export const en: Dictionary = {
       actor: { agent: 'agent', human: 'human', ci: 'CI' },
       e2e: 'panel autotests',
       e2eActor: 'panel',
+      core: 'task core checks',
+      coreActor: 'task core',
       state: {
         running: 'in progress',
         done: 'finished',

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { EnvVar, Hook, McpServer, PermissionRule, Skill } from '@agentdeck/contracts';
 import { unifiedDiff } from '../../../domains/config-preview/unified-diff.ts';
 import { isLocalId, LOCAL_ID_PREFIX, stripLocalPrefix } from '../../../lib/settings-source.ts';
-import { maskSecretsInText } from '../../../lib/secret-mask/secret-mask.ts';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import {
   definePanelAction,
   fingerprintOf,

@@ -1,8 +1,5 @@
 import type { InboxClient, InboxLaunch, InboxQuestion } from '@agentdeck/contracts/chat-inbox';
-import type {
-  TelegramAnswersSettings,
-  TelegramAnswersStatus,
-} from '@agentdeck/contracts/telegram-answers';
+import type { TelegramAnswersSettings } from '@agentdeck/contracts/telegram-answers';
 
 /** Итог вызова Bot API: значение, а не исключение — опросу нужен код. */
 export type BotCall<T> =
@@ -25,13 +22,13 @@ export type ReplyMarkup =
   | { inline_keyboard: InlineKeyboard }
   | { force_reply: true; input_field_placeholder?: string; selective?: boolean };
 
-export interface BotUser {
+interface BotUser {
   id: number;
   is_bot?: boolean;
   first_name?: string;
   username?: string;
 }
-export interface BotChat {
+interface BotChat {
   id: number;
   type?: string;
 }
@@ -39,11 +36,11 @@ export interface SentBotMessage {
   message_id: number;
   chat: BotChat;
 }
-export interface BotPhotoSize {
+interface BotPhotoSize {
   file_id: string;
   file_size?: number;
 }
-export interface BotDocument {
+interface BotDocument {
   file_id: string;
   file_name?: string;
   mime_type?: string;
@@ -267,11 +264,6 @@ export interface PendingDelete {
 
 /** Почему ожидание пропало из сводки, пока висело в Telegram. */
 export type Vanished = { kind: 'inPanel' } | { kind: 'stale' } | { kind: 'deferred'; id: string };
-
-export interface AnswersStatusHolder {
-  status: TelegramAnswersStatus;
-  settings?: TelegramAnswersSettings;
-}
 
 /** Исход применения ответа маршрутом панели. */
 export type ApplyOutcome =

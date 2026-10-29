@@ -32,14 +32,14 @@ import { classifyCall, GUARD_VERSION, type GuardConfig, type GuardHit } from './
  * всех прогонах проекта, а группа только собирает её на странице групп.
  */
 
-export const GUARD_EVENT = 'PreToolUse';
+const GUARD_EVENT = 'PreToolUse';
 /** Bash — команды; MCP — аргументы чужих серверов баз (SQL в поле запроса). */
 export const GUARD_MATCHER = 'Bash|mcp__.*';
 const SCRIPT_REL = '.claude/hooks/backend-guard.mjs';
 const CONFIG_REL = '.claude/backend-guard.json';
 const RULE_REL = '.claude/rules/backend-safety.md';
 const SETTINGS_REL = '.claude/settings.json';
-export const GUARD_RULE_ID = 'backend-safety';
+const GUARD_RULE_ID = 'backend-safety';
 /** `$CLAUDE_PROJECT_DIR` — хук срабатывает и из подкаталога, и в копии ветки. */
 export const GUARD_COMMAND = `node "$CLAUDE_PROJECT_DIR/${SCRIPT_REL}"`;
 export const GUARD_HOOK_ID = hookContentId(GUARD_EVENT, GUARD_MATCHER, GUARD_COMMAND);
@@ -119,7 +119,7 @@ function hookPresent(settings: RawSettings): boolean {
 const knownRule = (value: unknown): value is BackendGuardRule =>
   typeof value === 'string' && (BACKEND_GUARD_RULES as readonly string[]).includes(value);
 
-export function readGuardConfig(root: string): StoredConfig {
+function readGuardConfig(root: string): StoredConfig {
   const raw = readJsonFile<unknown>(abs(root, CONFIG_REL), {});
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as StoredConfig) : {};
 }

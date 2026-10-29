@@ -11,7 +11,7 @@ import { withLimitSample } from '../limit-journal/limit-journal.ts';
  */
 
 /** Расход пинга — то, что ляжет в учёт токенов группы с меткой keep-warm. */
-export interface WarmUsage {
+interface WarmUsage {
   input: number;
   cacheRead: number;
   cacheWrite: number;
@@ -46,7 +46,7 @@ export interface WarmRunLike {
 }
 
 /** Потолок одного пинга: ответ в одно слово не идёт и минуты, дольше — зависание. */
-export const WARM_PING_TIMEOUT_MS = 3 * 60_000;
+const WARM_PING_TIMEOUT_MS = 3 * 60_000;
 
 /**
  * Запускает пинг и собирает его исход. Первый же вызов инструмента обрывает ход:

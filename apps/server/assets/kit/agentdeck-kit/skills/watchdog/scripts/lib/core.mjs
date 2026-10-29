@@ -85,8 +85,12 @@ const SLEEP_SKIP = new Set(['do', 'then', 'else', 'elif', '!', '{', 'sudo', 'exe
 const SLEEP_LOCAL = /^(?:time|nohup|env|nice|ionice|stdbuf|timeout|watch|xargs|caffeinate)$/i;
 const SLEEP_SHELL = /^(?:(?:ba|z|da|k)?sh|pwsh|powershell|cmd)(?:\.exe)?$/i;
 const SLEEP_RUNNER = /^(?:ssh|wsl|kubectl|oc|vagrant|docker|podman|nerdctl)(?:\.exe)?$/i;
+// A zero sleep waits nothing: g1 27.10 prefixed `sleep 0;` to a delivery run and it read as a SLEEP owing a row.
+const ZERO_SLEEP =
+  /^[;&|(\s"'`]?(?:sleep\s+0+(?:\.0+)?[smhd]?(?![\w.])|Start-Sleep\s+(?:-\w+\s+)?0+(?:\.0+)?(?![\w.])|timeout(?:\.exe)?\s+\/t\s+0+(?!\d)|ping\s+-n\s+[01]\s)/i;
 export const sleepWaits = (cmd) => {
   for (const m of String(cmd).matchAll(new RegExp(SLEEP_RE.source, 'gi'))) {
+    if (ZERO_SLEEP.test(cmd.slice(m.index))) continue;
     const before = cmd.slice(0, m.index + (/^[;&|(\s"'`]/.test(m[0]) ? 1 : 0));
     const cut = Math.max(...[';', '&', '|', '(', '\n', '`'].map((c) => before.lastIndexOf(c)));
     const words = before.slice(cut + 1).split(/\s+/).map((w) => w.replace(/^["']+|["']+$/g, '')).filter(Boolean);

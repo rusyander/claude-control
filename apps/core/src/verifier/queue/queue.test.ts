@@ -5,12 +5,20 @@ import { join } from 'node:path';
 import type { QueueConfig, QueueLease } from '@agentdeck/contracts/core/records';
 import { afterAll, describe, expect, it } from 'vitest';
 import { newId } from '../../lib/ids/uuidv7.ts';
-import { parseQueueSection, queueConfigReader } from './config.ts';
+import { parseCoreConfig } from '../../platform/core-config/read.ts';
+import { queueConfigReader, queueSectionOf, type QueueConfigRead } from './config.ts';
 import { DEFAULT_QUEUE_CONFIG, MIN_BEAT_MS } from './order.ts';
 import { createCheckQueue, flightFile, type CheckQueueDeps } from './queue.ts';
 import type { Liveness, QueueEvent } from './queue.types.ts';
 
 /** Очередь на настоящем каталоге (одноразовый дом ядра): аренда, отбор у мёртвого, две сборки. */
+
+/** Раздел `queue` текста настройки через единого читателя (без файла). */
+function section(text: string): QueueConfigRead {
+  const read = parseCoreConfig(text);
+  if (!('value' in read)) throw new Error('config text not read');
+  return queueSectionOf(read.value, DEFAULT_QUEUE_CONFIG);
+}
 
 const roots: string[] = [];
 function tempQueue(): string {
@@ -148,27 +156,18 @@ describe('check queue on disk (D§3.8, 00:59)', () => {
   });
 
   it('queue config: re-read per poll, rejected fields named once, unreadable keeps the last good value', () => {
-    expect(parseQueueSection('{}', DEFAULT_QUEUE_CONFIG)).toEqual({
-      config: DEFAULT_QUEUE_CONFIG,
-      issues: [],
-    });
-    const bad = parseQueueSection(
-      '{"queue":{"slots":0,"shareCap":0.25,"beatMs":"x"}}',
-      DEFAULT_QUEUE_CONFIG,
-    );
+    expect(section('{}')).toEqual({ config: DEFAULT_QUEUE_CONFIG, issues: [] });
+    const bad = section('{"queue":{"slots":0,"shareCap":0.25,"beatMs":"x"}}');
     expect(bad.config).toMatchObject({ slots: DEFAULT_QUEUE_CONFIG.slots, shareCap: 0.25 });
     expect(bad.issues).toEqual(['queue.slots: 0 rejected', 'queue.beatMs: "x" rejected']);
-    expect(parseQueueSection('nope', DEFAULT_QUEUE_CONFIG).issues[0]).toMatch(/not JSON/);
-    expect(parseQueueSection('{"queue":3}', DEFAULT_QUEUE_CONFIG).issues).toEqual([
-      'queue: not an object',
-    ]);
+    const notObject = section('{"queue":3}');
+    expect(notObject.config).toEqual(DEFAULT_QUEUE_CONFIG);
+    expect(notObject.issues).toEqual([expect.stringMatching(/^queue: .*expected object/)]);
     // Такт ниже пола, которым бьют держатели (B1r5-F04): живой держатель выглядел бы молчащим.
-    const fast = parseQueueSection(`{"queue":{"beatMs":${MIN_BEAT_MS - 1}}}`, DEFAULT_QUEUE_CONFIG);
+    const fast = section(`{"queue":{"beatMs":${MIN_BEAT_MS - 1}}}`);
     expect(fast.config.beatMs).toBe(DEFAULT_QUEUE_CONFIG.beatMs);
     expect(fast.issues).toEqual([`queue.beatMs: ${MIN_BEAT_MS - 1} rejected`]);
-    expect(
-      parseQueueSection(`{"queue":{"beatMs":${MIN_BEAT_MS}}}`, DEFAULT_QUEUE_CONFIG).config.beatMs,
-    ).toBe(MIN_BEAT_MS);
+    expect(section(`{"queue":{"beatMs":${MIN_BEAT_MS}}}`).config.beatMs).toBe(MIN_BEAT_MS);
     const dir = tempQueue();
     const file = join(dir, 'config.json');
     const issues: string[] = [];

@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { qwenRunFacts } from '@agentdeck/providers/qwen';
 import { envVarsChannels } from '@agentdeck/providers/channels';
+import { tierLadderOf } from '@agentdeck/providers/ladder';
 import {
   type AdapterCaps,
   type AdapterChannelSummary,
@@ -14,6 +15,7 @@ import {
 import { homeDir } from '../../platform/os-kind.ts';
 import { READ_ONLY_DENIED } from '../read-only.ts';
 import { trustedLayer, type LayerPolicy } from '../sdk-stream/layer-run.ts';
+import { qwenInventory } from './layer-parts.ts';
 import { repoDenyDetail, repoDenyRefusal } from '../sdk-stream/repo-deny.ts';
 import {
   createSdkAdapter,
@@ -21,6 +23,7 @@ import {
   type SdkAdapterOptions,
   type SdkLaunchPlan,
 } from '../sdk-stream/sdk-adapter.ts';
+import { QWEN_OUTCOME } from './outcome.ts';
 import { mapQwenPermission, qwenDenyRules } from './permission.ts';
 import { qwenSessionId } from './session-id.ts';
 import { qwenReadLayer } from './read-layer.ts';
@@ -56,9 +59,16 @@ const FILES = {
  * отказ запуска с именем ключа. Слой человека остаётся `on`; запреты репозитория-источника ядро
  * несёт данными (`repo-deny.ts`).
  */
+/** Подмена слоя у Qwen — одной строкой в LayerRun и решении `layer-run`. */
+export const QWEN_NO_CONTROL = 'qwen: no layer control';
+
 export const QWEN_LAYER: LayerPolicy = {
   readCliMark: qwenTrustMark,
   untrusted: (asked) => asked,
+  inventory: (pin, cwd) => qwenInventory(pin, cwd),
+  // Проба Q7: `--exclude-tools skill` оставляет список навыков модели, `--safe-mode` гасит MCP
+  // ядра (F-89) — ни хуки, ни навыки, ни источники не отключаются: сеанс идёт `on`, названо (G3).
+  noControl: QWEN_NO_CONTROL,
 };
 
 /**
@@ -131,6 +141,9 @@ export const QWEN_CAPS: AdapterCaps = {
   effort: false,
   images: false,
   subagents: false,
+  // Проба Q7: навыки не отключаются (G3); хук ядра срабатывает и внутри подагента `agent`.
+  skillControl: false,
+  subagentHooks: true,
   login: qwenRunFacts.login,
   channels: QWEN_CHANNELS,
   windowEvent: false,
@@ -299,7 +312,6 @@ export function refuseQwen(
   options: QwenAdapterOptions = {},
   layer: LayerRun = trustedLayer(spec),
 ): string | null {
-  if (spec.layer.hooks !== 'on') return `layer ${spec.layer.hooks} is not controllable`;
   // Недоверенная копия несёт запреты репозитория данными: файл не разобран — отказ (F-86).
   if (!layer.repoLayer) {
     const refused =
@@ -359,11 +371,14 @@ export function qwenPermitReply(reply: unknown): unknown {
 }
 
 export function createQwenAdapter(options: QwenAdapterOptions = {}): SdkAdapter {
+  // Факты Qwen лестницы не называют (`qwenRunFacts`): ранг его моделей неизвестен честно.
+  const ladder = tierLadderOf(qwenRunFacts);
   const adapter = createSdkAdapter(
     {
       id: qwenRunFacts.id,
       caps: QWEN_CAPS,
       command: qwenRunFacts.binary.command,
+      ...(ladder ? { ladder } : {}),
       echo: false,
       inBandPermit: true,
       // Без `initialize` первой строкой CLI в «прямом» режиме: вопрос о праве висит молча
@@ -376,6 +391,7 @@ export function createQwenAdapter(options: QwenAdapterOptions = {}): SdkAdapter 
       refuse: (spec, layer) => refuseQwen(spec, options, layer),
       mapPermission: mapQwenPermission,
       classifyError: (text) => (MISSING_CONVERSATION.test(text) ? 'fresh-required' : null),
+      outcome: QWEN_OUTCOME,
     },
     options,
   );

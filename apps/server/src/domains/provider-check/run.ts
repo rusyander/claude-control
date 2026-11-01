@@ -5,6 +5,7 @@ import type {
 } from '@agentdeck/contracts';
 import { getProvider } from '../../providers/registry.ts';
 import { checkAssistant } from './steps-assistant.ts';
+import { checkCoreRoute } from './steps-core-route.ts';
 import { checkCli, checkConfig } from './steps-environment.ts';
 import { checkEnv, checkInstructions, checkMcp, checkPermissions } from './steps-write-cycle.ts';
 import type { ProviderCheckDeps } from './types.ts';
@@ -43,6 +44,7 @@ export async function checkProvider(
     checkPermissions(provider.id, deps),
     checkEnv(provider.id, deps),
     checkInstructions(provider, deps),
+    await checkCoreRoute(provider.id, deps.coreRoutes),
     await checkAssistant(provider, deps),
   ];
 

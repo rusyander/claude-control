@@ -1,0 +1,96 @@
+{
+  "title": {
+    "ru": "Ядро задач подключено к панели: список и лента задач, экран запуска, сценарии и справка по разделу",
+    "en": "The task core is wired into the panel: task list and timeline, the launch screen, scenarios and a help document"
+  },
+  "summary": {
+    "ru": "Раздел «Задачи ядра» показывает журнал задачи ядра лентой, задаёт ядру вопросы и передаёт ответы человека. Ядро — свой процесс (`pnpm core`); панель ходит к нему только через прокладку `/api/core/*`.",
+    "en": "The «Core tasks» section shows a core task's journal as a timeline, asks the core questions and passes the human's answers on. The core is its own process (`pnpm core`); the panel reaches it only through the `/api/core/*` proxy."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Список задач ядра и лента задачи. В списке — состояние каждой задачи и ссылка на ленту, в шапке — кнопки «Сценарии ядра» и «Запуск задачи ядра». В ленте — состояние и строка потока, строки журнала по времени (сессии CLI, шаги, проверки, решения, сигналы); у решения заголовок исхода и «детали» с причинами ядра дословно, у проверки — ссылка на её запись; справа расход, внизу итоговый отчёт.",
+        "en": "The core task list and the task timeline. The list shows each task's state and a link to its timeline, the header has «Core scenarios» and «Launch a core task» buttons. The timeline shows state and the stream line, journal rows in time order (CLI sessions, steps, checks, decisions, signals); a decision shows an outcome headline and «details» with the core's reasons verbatim, a check links to its record; spend on the right, the final report below."
+      },
+      "area": { "ru": "Задачи ядра", "en": "Core tasks" },
+      "images": ["core-tasks.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Вопросы ядра — карточкой над лентой: одобрить деление, решить судьбу шага с исчерпанными кругами, выдать доступ, ответить на вопрос модели. Повторный щелчок не отправляет вторую команду.",
+        "en": "Core questions appear as a card above the timeline: approve the split, decide what to do with a step that ran out of rounds, grant access, answer the model's question. A second click does not send a second command."
+      },
+      "area": { "ru": "Задачи ядра", "en": "Core tasks" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Экран запуска: форма задачи, оценка времени и токенов по истории прогонов («неизвестно», когда истории нет), проверка дорог с полем пути к CLI, отвергнутые правки файла репозитория, деление на части и запуск. Ожидание CI после публикации выключено по умолчанию.",
+        "en": "The launch screen: task form, a time and token estimate from run history («unknown» when there is none), a road check with a CLI path field, rejected repository-file edits, the split into parts and launch. Waiting for CI after publishing is off by default."
+      },
+      "area": { "ru": "Задачи ядра", "en": "Core tasks" },
+      "images": ["core-estimate.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сценарии ядра: библиотека пресетов и своих версий, новый сценарий на основе пресета, правка сценария идущей задачи со следующего шага. Записанная версия больше не меняется — правка становится новой версией.",
+        "en": "Core scenarios: a library of presets and own versions, a new scenario based on a preset, editing a running task's scenario from the next step. A written version never changes — an edit becomes a new version."
+      },
+      "area": { "ru": "Задачи ядра", "en": "Core tasks" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Без запущенного ядра раздел показывает карточку «Ядро задач не запущено» с командой `pnpm core`, а не ошибку. Плашка «Ядро ещё не знает эту панель» объясняет, почему ядро не принимает команды: процесс панели не записан ему звеном — запуск через `pnpm dev` или `pnpm keepalive` делает эту запись.",
+        "en": "With no core running the section shows a «The task core is not running» card naming `pnpm core` instead of an error. The «The core does not know this panel yet» notice explains why the core refuses commands: the panel process is not recorded to it as a hop — starting with `pnpm dev` or `pnpm keepalive` makes that record."
+      },
+      "area": { "ru": "Задачи ядра", "en": "Core tasks" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Задачи ядра»: как страницы доходят до ядра, запуск ядра, экран запуска по шагам, ответы на вопросы, чтение ленты, сценарии, плашка о незаписанной панели и чего раздел пока не умеет — с кадрами панели и двумя схемами. Кнопка «?» на всех трёх страницах ядра ведёт в этот документ.",
+        "en": "Help document «Core tasks»: how pages reach the core, starting the core, the launch screen step by step, answering questions, reading the timeline, scenarios, the unrecorded-panel notice and what the section cannot do yet — with panel shots and two diagrams. The «?» button on all three core pages opens it."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Сигналы ядра в ленте читаются строкой: заголовок и предмет сигнала вместо сырого JSON, факты — списком; сигнал, которого нет в каталоге, помечен «Сигнал вне каталога».",
+        "en": "Core signals in the timeline read as a line: the signal title and subject instead of raw JSON, facts as a list; a signal missing from the catalog is marked «Signal outside the catalog»."
+      },
+      "area": { "ru": "Задачи ядра", "en": "Core tasks" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Справка разделов «Тесты», «Настройки», «Интеграции» и «Группы» снова описывает экраны такими, какие они сейчас.",
+        "en": "Help for the «Tests», «Settings», «Integrations» and «Groups» sections describes the screens as they are now again."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ],
+  "images": [
+    {
+      "file": "core-tasks.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Раздел «Задачи ядра»: список задач, кнопки сценариев и запуска в шапке",
+        "en": "The «Core tasks» section: the task list, scenario and launch buttons in the header"
+      }
+    },
+    {
+      "file": "core-estimate.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Оценка без истории прогонов — «неизвестно», а не выдуманное число",
+        "en": "An estimate without run history says «unknown» instead of a made-up number"
+      }
+    }
+  ]
+}

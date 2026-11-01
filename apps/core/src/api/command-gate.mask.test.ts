@@ -2,6 +2,7 @@ import type { CommandEnvelope } from '@agentdeck/contracts/core/commands';
 import { afterEach, describe, expect, it } from 'vitest';
 import { dlpSecretMask } from '../bootstrap/secret-mask.ts';
 import { processCommand } from '../conductor/commands.ts';
+import { commandEnv } from '../conductor/commands/__fixtures__/command-env.ts';
 import { createTaskRegistry, type TaskRegistry } from '../conductor/tasks.ts';
 import { CREATED, deps, tempDir } from '../journal/__fixtures__/journal-harness.ts';
 import { newId } from '../lib/ids/uuidv7.ts';
@@ -45,7 +46,7 @@ describe('command gate: retries judged under the journal mask', () => {
       fields: { reason: `stop ${SECRET}` },
       proof: {},
     };
-    const decided = await processCommand(task, command, proof);
+    const decided = await processCommand(task, command, proof, commandEnv());
     expect(decided.code).toBeUndefined();
     if (task.state.ended === null) {
       task.append({ kind: 'task.ended', actor: 'core', data: { outcome: 'cancelled' } });

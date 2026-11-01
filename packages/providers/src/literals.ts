@@ -12,6 +12,8 @@ export interface CliLiterals {
   binaryNames: string[];
   envVarNames: string[];
   modelFamilyPrefixes: string[];
+  /** Имена ступеней модели (`modelRungs`): алиасы CLI и приставки их полных имён. */
+  modelAliases: string[];
 }
 
 /**
@@ -49,6 +51,9 @@ export function deriveLiterals(all: readonly CliRunFacts[]): CliLiterals {
     ),
     envVarNames: sortedUnique(all.flatMap(envVarsOf)),
     modelFamilyPrefixes: sortedUnique(all.flatMap((facts) => facts.modelLadder ?? [])),
+    modelAliases: sortedUnique(
+      all.flatMap((facts) => (facts.modelRungs ?? []).flatMap((rung) => [rung.model, ...rung.ids])),
+    ),
   };
 }
 

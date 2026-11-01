@@ -35,38 +35,8 @@
   border-style: dashed;
 }
 
-/* Ручка — своя цель под палец (32px); указатель захватывает она, а не строка,
-   поэтому прокрутка списка пальцем по строке продолжает работать. */
-.handle {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  min-height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-fg-muted);
-  cursor: grab;
-  touch-action: none;
-
-  &:hover {
-    background: var(--color-surface-sunken);
-    color: var(--color-fg);
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
-  }
-}
-
+/* Место ручки у шага без переноса: номера и названия стоят ровно под строками с ручкой
+   (сама ручка — `entities/StepPath` DragHandle). */
 .handleSpace {
   flex-shrink: 0;
   width: 24px;

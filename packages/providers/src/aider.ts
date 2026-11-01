@@ -10,7 +10,8 @@ export const aiderRunFacts: CliRunFacts = {
   login: 'cli-config',
   // Прямой вызов — только ключом OpenAI и только в OpenAI: своего API у Aider нет, а
   // «совместимый» вид отдал бы ключ неизвестно чьему серверу.
-  vendorApi: { kind: 'openai', keyVars: ['OPENAI_API_KEY'] },
+  // Адрес — из документации OpenAI API (`https://api.openai.com/v1/chat/completions`).
+  vendorApi: { kind: 'openai', keyVars: ['OPENAI_API_KEY'], baseUrl: 'https://api.openai.com/v1' },
   cliRunnable: true,
   channels: [
     // Свои имена под собственным префиксом: `AIDER_OPENAI_API_BASE` («Specify the api base

@@ -9,10 +9,19 @@ import {
   TASK_MACHINE,
   UNIT_MACHINE,
   type MachineDef,
-  type TaskState,
 } from '@agentdeck/contracts/core/states';
+import type { ScenarioRef } from '@agentdeck/contracts/core/scenario';
 import { commandBodyHash } from '../command-body.ts';
-import { REDUCER_VERSION, type TaskFoldState } from './reduce.types.ts';
+import {
+  REDUCER_VERSION,
+  WORKING,
+  type AskRecord,
+  type StepRecord,
+  type TaskFoldState,
+} from './reduce.types.ts';
+import { reduceStage4 } from './stage4.ts';
+import { initialStage5, recordBudget, reduceStage5 } from './stage5.ts';
+import { initialPublish, reducePublish } from './publish.ts';
 
 /**
  * `reduce(state, event)` — чистая свёртка журнала (01 §State). Зовут её только `resume()` и вид
@@ -43,11 +52,22 @@ export function initialState(taskId: string): TaskFoldState {
     counters: { masked: 0, repairedBytes: 0, errors: 0, clockJumps: 0 },
     work: { activeMs: 0, lastMono: null, lastBootId: null },
     anomalies: [],
+    layerHashes: {},
+    scenario: null,
+    requirements: {},
+    extractionReview: null,
+    splits: {},
+    overrides: [],
+    deliveries: {},
+    grants: [],
+    report: null,
+    pause: null,
+    hintDecisions: {},
+    observerParks: {},
+    ...initialStage5(),
+    ...initialPublish(),
   };
 }
-
-/** Состояния задачи, в которых идёт работа (паузы, ожидание человека и окна не считаются). */
-const WORKING: readonly TaskState[] = ['estimating', 'running', 'publishing'];
 
 function applyTransition<S extends string, E extends string>(
   machine: MachineDef<S, E>,
@@ -91,6 +111,16 @@ function own<T>(map: Record<string, T>, key: string): T | undefined {
 }
 
 export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
+  const base = reduceBase(state, line);
+  // Публикация (этап 6) — после основной свёртки той же строки: ей нужны действие и команда,
+  // которые основная уже записала (`action.started`, `command.applied`).
+  return reducePublish(base, line, (reason) => ({
+    ...base,
+    anomalies: [...base.anomalies, { seq: line.seq, reason }].slice(-50),
+  }));
+}
+
+function reduceBase(state: TaskFoldState, line: JournalLine): TaskFoldState {
   const next: TaskFoldState = {
     ...state,
     seq: line.seq,
@@ -107,26 +137,31 @@ export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
   const twice = (what: string, id: string): TaskFoldState => anomaly(`${what} ${id} created twice`);
 
   switch (line.kind) {
-    case 'task.created':
+    case 'task.created': {
       if (next.created !== null) return anomaly('task.created twice');
-      return { ...next, created: (line as JournalLine<'task.created'>).data };
+      const created = (line as JournalLine<'task.created'>).data;
+      const scenario = { ref: created.scenario, pending: null, rejected: 0 };
+      return { ...next, created, scenario };
+    }
     case 'task.transition': {
       const data = (line as JournalLine<'task.transition'>).data;
       const result = applyTransition(TASK_MACHINE, next.task, data);
-      return result.ok ? { ...next, task: result.to } : anomaly(result.reason);
+      if (!result.ok) return anomaly(result.reason);
+      return { ...next, task: result.to, pause: pauseAfter(next, line, data.event) };
     }
     case 'task.ended':
       return { ...next, ended: (line as JournalLine<'task.ended'>).data.outcome };
     case 'unit.created': {
       const data = (line as JournalLine<'unit.created'>).data;
       if (own(next.units, data.unitId)) return twice('unit', data.unitId);
-      return {
-        ...next,
-        units: {
-          ...next.units,
-          [data.unitId]: { state: UNIT_MACHINE.initial, branch: data.branch },
-        },
-      };
+      const { unitId: _id, ...facts } = data;
+      const unit = { state: UNIT_MACHINE.initial, ...facts, createdSeq: line.seq };
+      // Единица деления — и в его списке: потребителям не выводить состав из всех единиц заново.
+      const split = data.splitId === null ? undefined : own(next.splits, data.splitId);
+      const splits = split
+        ? { ...next.splits, [data.splitId!]: { ...split, units: [...split.units, data.unitId] } }
+        : next.splits;
+      return { ...next, splits, units: { ...next.units, [data.unitId]: unit } };
     }
     case 'unit.transition': {
       const data = (line as JournalLine<'unit.transition'>).data;
@@ -138,15 +173,35 @@ export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
     case 'step.started': {
       const data = (line as JournalLine<'step.started'>).data;
       if (own(next.steps, data.stepId)) return twice('step', data.stepId);
-      const step = { state: STEP_MACHINE.initial, unitId: data.unitId, stepKind: data.stepKind };
-      return { ...next, steps: { ...next.steps, [data.stepId]: step } };
+      const step: StepRecord = {
+        state: STEP_MACHINE.initial,
+        unitId: data.unitId,
+        stepKind: data.stepKind,
+        stepDefId: data.stepDefId,
+        round: data.round,
+        startedSeq: line.seq,
+        budgetMs: data.budgetMs,
+        workAtStart: next.work.activeMs,
+        extensions: 0,
+        reminders: 0,
+        remindedTurns: [],
+        stops: [],
+      };
+      return {
+        ...next,
+        steps: { ...next.steps, [data.stepId]: step },
+        scenario: scenarioAtStep(next.scenario, data.scenario),
+      };
     }
     case 'step.transition': {
       const data = (line as JournalLine<'step.transition'>).data;
       const step = own(next.steps, data.stepId);
       const result = applyTransition(STEP_MACHINE, step?.state, data);
       if (!result.ok || !step) return anomaly(result.ok ? 'step missing' : result.reason);
-      return { ...next, steps: { ...next.steps, [data.stepId]: { ...step, state: result.to } } };
+      // Красное после заявления (G14): шаг ждёт повтора следующим кругом — это помнит свёртка.
+      const red = data.event === 'checked-red' ? { red: { seq: line.seq } } : {};
+      const moved = { ...step, state: result.to, ...red };
+      return { ...next, steps: { ...next.steps, [data.stepId]: moved } };
     }
     case 'step.claimed': {
       // Заявление `step_done` само переводит шаг в проверку: отдельной строки перехода нет.
@@ -174,17 +229,37 @@ export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
         hostStart: d.hostStart,
         cliPid: d.cliPid,
         cliStart: d.cliStart,
+        hints: [],
+        parkAsked: null,
       };
-      return { ...next, sessions: { ...next.sessions, [d.sessionId]: session } };
+      const sessions = { ...next.sessions, [d.sessionId]: session };
+      if (!own(next.observerParks, d.stepId)) return { ...next, sessions };
+      const { [d.stepId]: _parked, ...observerParks } = next.observerParks;
+      return { ...next, sessions, observerParks };
+    }
+    case 'layer.changed': {
+      // Ключ — CLI сеанса строки: хеш описи у каждого CLI свой (свои файлы слоя).
+      const session = line.sessionId ? own(next.sessions, line.sessionId) : undefined;
+      if (!session) return anomaly(`layer.changed: no session ${line.sessionId ?? '-'}`);
+      const { userLayerHash } = (line as JournalLine<'layer.changed'>).data;
+      return { ...next, layerHashes: { ...next.layerHashes, [session.adapter]: userLayerHash } };
     }
     case 'session.transition': {
       const data = (line as JournalLine<'session.transition'>).data;
       const session = own(next.sessions, data.sessionId);
       const result = applyTransition(SESSION_MACHINE, session?.state, data);
       if (!result.ok || !session) return anomaly(result.ok ? 'session missing' : result.reason);
+      // Просьба о паузе живёт до конца сессии: парковать уже нечего.
+      const over = SESSION_MACHINE.terminal.includes(result.to);
+      const moved = { ...session, state: result.to, parkAsked: over ? null : session.parkAsked };
+      const sessions = { ...next.sessions, [data.sessionId]: moved };
+      if (!over || !session.parkAsked) return { ...next, sessions };
+      // Сессия кончилась при просьбе о паузе: повтор шага пишет продолжение с этой причиной.
+      const park = { ...session.parkAsked, sessionId: data.sessionId };
       return {
         ...next,
-        sessions: { ...next.sessions, [data.sessionId]: { ...session, state: result.to } },
+        sessions,
+        observerParks: { ...next.observerParks, [session.stepId]: park },
       };
     }
     case 'check.transition': {
@@ -225,10 +300,15 @@ export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
     case 'human.asked': {
       const data = (line as JournalLine<'human.asked'>).data;
       if (own(next.asks, data.askId)) return twice('ask', data.askId);
-      return {
-        ...next,
-        asks: { ...next.asks, [data.askId]: { state: ASK_MACHINE.initial, point: data.point } },
+      const ask: AskRecord = {
+        state: ASK_MACHINE.initial,
+        point: data.point,
+        source: data.source,
+        dedupe: data.dedupe,
+        stepId: line.stepId ?? null,
+        lateAnswer: false,
       };
+      return { ...next, asks: { ...next.asks, [data.askId]: ask } };
     }
     case 'ask.transition': {
       const data = (line as JournalLine<'ask.transition'>).data;
@@ -272,7 +352,24 @@ export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
       // Сверка не смогла узнать исход и спросила человека: действие ждёт ответа, а не новой
       // сверки на каждой загрузке (иначе вопрос множится).
       const d = (line as JournalLine<'decision'>).data;
-      const out = d.output as { actionId?: unknown; verdict?: unknown } | null;
+      const out = d.output as {
+        actionId?: unknown;
+        verdict?: unknown;
+        fired?: unknown;
+        action?: unknown;
+      } | null;
+      // Решение наблюдателя с подсказкой ждёт свою строку `signal` (её `cause` — эта строка): там
+      // подсказка ляжет в сессию уже с decisionId, которым её снимет доставка.
+      if (d.class === 'observer' && out?.fired === true && out.action === 'hint') {
+        const hintDecisions = { ...next.hintDecisions, [String(line.seq)]: d.decisionId };
+        return { ...next, hintDecisions };
+      }
+      // Повтор запаркованного шага записал свою строку маршрута — метка паузы снята.
+      if ((d.class === 'tier' || d.class === 'continuation') && line.stepId) {
+        if (!own(next.observerParks, line.stepId)) return next;
+        const { [line.stepId]: _taken, ...observerParks } = next.observerParks;
+        return { ...next, observerParks };
+      }
       if (d.class !== 'reconcile' || !out || out.verdict !== 'ask') return next;
       const actionId = typeof out.actionId === 'string' ? out.actionId : '';
       const action = own(next.actions, actionId);
@@ -293,6 +390,7 @@ export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
         proof: d.proof,
         bodyHash: commandBodyHash(d),
         ...((line.masked ?? 0) > 0 ? { masked: true } : {}),
+        ...(d.kind === 'pause' ? { now: (d.fields as { now?: unknown }).now === true } : {}),
       };
       return { ...next, commands: { ...next.commands, [line.cmdId]: record } };
     }
@@ -349,9 +447,39 @@ export function reduce(state: TaskFoldState, line: JournalLine): TaskFoldState {
       return { ...next, counters: { ...next.counters, errors: next.counters.errors + 1 } };
     case 'clock.jump':
       return { ...next, counters: { ...next.counters, clockJumps: next.counters.clockJumps + 1 } };
+    case 'budget.state': {
+      // Бюджет помнится по области (этап 5); срок шага из той же строки ведёт модуль этапа 4.
+      const budgeted = recordBudget(next, line as JournalLine<'budget.state'>);
+      return reduceStage4(budgeted, line, anomaly) ?? budgeted;
+    }
     default:
-      // Прочие виды (телеметрия, решения, сигналы, бюджет…) состояния задачи пока не меняют:
-      // их читают по журналу части, которым они нужны.
-      return next;
+      // Виды этапов 4 и 5 — свои модули; прочие (телеметрия, решения…) состояния задачи не
+      // меняют: их читают по журналу части, которым они нужны.
+      return reduceStage4(next, line, anomaly) ?? reduceStage5(next, line, anomaly) ?? next;
   }
+}
+
+/** Пауза помнит, «сейчас» ли её просили (G10); продолжение и конец задачи её снимают. */
+function pauseAfter(
+  state: TaskFoldState,
+  line: JournalLine,
+  event: string,
+): TaskFoldState['pause'] {
+  if (event === 'pause') {
+    const command = line.cmdId ? own(state.commands, line.cmdId) : undefined;
+    return { seq: line.seq, now: command?.now === true };
+  }
+  return event === 'resume' || event === 'cancel' || event === 'fail' ? null : state.pause;
+}
+
+/** Новая версия сценария действует со следующего шага (02:35): шаг на ней — правка применена. */
+function scenarioAtStep(
+  current: TaskFoldState['scenario'],
+  ref: ScenarioRef,
+): TaskFoldState['scenario'] {
+  if (!current) return current;
+  const pending = current.pending;
+  if (pending && pending.to.id === ref.id && pending.to.version === ref.version)
+    return { ...current, ref, pending: null };
+  return current;
 }

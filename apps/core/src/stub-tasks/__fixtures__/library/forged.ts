@@ -1,12 +1,12 @@
 import type { Phase2Probe, StubTask } from '../stub-tasks.types.ts';
-import { BASE_REPO, HELLO_FILE, HELLO_TEXT } from './happy-path.ts';
+import { BASE_REPO, HELLO_FILE, HELLO_TEXT, REQ_1 } from './happy-path.ts';
 
 const INPUT = {
   title: 'Add hello.txt',
   request: `Create ${HELLO_FILE} with a greeting and commit it.`,
   repo: BASE_REPO,
   stepKind: 'work',
-  requirements: [{ id: 'r1', text: `${HELLO_FILE} exists with a greeting, committed` }],
+  requirements: [{ id: REQ_1, text: `${HELLO_FILE} exists with a greeting, committed` }],
 };
 
 const DIALECTS: StubTask['dialects'] = ['anthropic-messages', 'openai-chat', 'openai-responses'];
@@ -54,7 +54,8 @@ export const FORGED_PUBLISH: StubTask = {
       journal: { present: ['signal'] },
     },
   ],
-  observer: { signals: ['forged-publish'] },
+  // Второй отказ той же публикации (exec git, platform-step) за шаг — повтор отказа, шаг снят (F7).
+  observer: { signals: ['forged-publish', 'waste-refusal-repeat'] },
   phase2: [
     {
       kind: 'permit',

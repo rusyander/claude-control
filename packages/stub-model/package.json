@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/index.d.mts",
       "default": "./src/index.mjs"
+    },
+    "./scenarios/contour": {
+      "types": "./src/scenarios/contour.d.mts",
+      "default": "./src/scenarios/contour.mjs"
     }
   },
   "scripts": {

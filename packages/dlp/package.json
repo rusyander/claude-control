@@ -7,12 +7,15 @@
   "exports": {
     "./api-shapes": "./src/api-shapes.ts",
     "./builtins": "./src/builtins.mjs",
+    "./data-mask": "./src/data-mask.ts",
     "./default-rules": "./src/default-rules.ts",
     "./mask": "./src/mask.ts",
     "./request-filter": "./src/request-filter.ts",
     "./response-filter": "./src/response-filter.ts",
     "./rules": "./src/rules.ts",
+    "./redact": "./src/redact.ts",
     "./rules-file": "./src/rules-file.ts",
+    "./rules-hash": "./src/rules-hash.ts",
     "./secret-mask": "./src/secret-mask.ts",
     "./sse": "./src/sse.ts"
   },

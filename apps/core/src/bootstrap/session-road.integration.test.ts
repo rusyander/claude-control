@@ -197,6 +197,41 @@ describe('session road: one entry from compat to resource release', () => {
     expect(lines(live).some((l) => l.kind === 'session.started')).toBe(false);
   }, 60_000);
 
+  it('P110 compat refusal names the allowed tier alternatives with facts the road read itself; an unregistered alternative is not a candidate (stage 5 W)', async () => {
+    const core = await bootCore({
+      home: join(tempDir('road-alt-'), 'core'),
+      build: 'road-test',
+      routeConfig: { stub: [{ name: 'alt', script: [], models: ['m1'] }] },
+    });
+    cores.push(core);
+    const s: Stand = { ...(await stand()), core };
+    const live = await core.registry.create({
+      ...CREATED,
+      allowedRoutes: [
+        { adapter: claudeRunFacts.id, route: { kind: 'stub', id: 'stub:alt' }, modelPattern: '*' },
+      ],
+    });
+    const start = startOf(
+      s,
+      live,
+      fixturePath(claudeRunFacts.id, 'permit'),
+      join(s.live.root, 'd.json'),
+    );
+    const got = await core.road.prepare({
+      ...start,
+      alternatives: [
+        { adapterId: claudeRunFacts.id, routeId: 'stub:alt', model: 'm1' },
+        { adapterId: claudeRunFacts.id, routeId: 'stub:gone', model: 'm1' },
+      ],
+    });
+    expect(got.ok).toBe(false);
+    if (got.ok) return;
+    expect(got.compat).toMatchObject({ kind: 'refused', code: 'not_allowed' });
+    const alternatives = (got.compat as { alternatives: { route: string; model: string }[] })
+      .alternatives;
+    expect(alternatives.map((a) => `${a.route}/${a.model}`)).toEqual(['stub:alt/m1']);
+  }, 60_000);
+
   it('the road launches with the login PATH and the core procs file in the CLI env, attaches the session (permit tool 200, not 503), and its core hook decides every tool call', async () => {
     const s = await stand();
     const { core } = s;
@@ -435,6 +470,45 @@ describe('session road: one entry from compat to resource release', () => {
       ran: 'on',
       repoLayer: true,
       trust: 'cli',
+    });
+  }, 120_000);
+
+  it('continuation same-session: the road passes --resume <conversation root> to the CLI and journals resumeOf + cacheAgeMs; a fresh start journals nulls (stage 5 W)', async () => {
+    const s = await stand();
+    const { core } = s;
+    const startedOf = async (resume: RoadStart['resume']) => {
+      const live = await task(core, true);
+      const base = startOf(
+        s,
+        live,
+        fixturePath(claudeRunFacts.id, 'permit'),
+        join(s.live.root, `dump-${newId()}.json`),
+      );
+      const prepared = await core.road.prepare(resume ? { ...base, resume } : base);
+      if (!prepared.ok) throw new Error(prepared.reason);
+      const p = prepared.prepared;
+      const launched = await core.road.launch(p);
+      if (!launched.ok) throw new Error(launched.reason);
+      stops.push(() => p.adapter.stop(launched.handle, 'tree'));
+      core.road.started(p, launched.handle, launched.layer);
+      await p.adapter.stop(launched.handle, 'tree');
+      const line = lines(live).find((l) => l.kind === 'session.started');
+      return line?.data as { argv: string[]; resumeOf: unknown; cacheAgeMs: unknown };
+    };
+    const root = newId();
+    const prior = newId();
+    const resumed = await startedOf({ conversationId: root, of: prior, cacheAgeMs: 4000 });
+    expect(resumed.argv[resumed.argv.indexOf('--resume') + 1]).toBe(root);
+    expect(resumed.argv).not.toContain('--session-id');
+    expect({ resumeOf: resumed.resumeOf, cacheAgeMs: resumed.cacheAgeMs }).toEqual({
+      resumeOf: prior,
+      cacheAgeMs: 4000,
+    });
+    const fresh = await startedOf(undefined);
+    expect(fresh.argv).not.toContain('--resume');
+    expect({ resumeOf: fresh.resumeOf, cacheAgeMs: fresh.cacheAgeMs }).toEqual({
+      resumeOf: null,
+      cacheAgeMs: null,
     });
   }, 120_000);
 

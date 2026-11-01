@@ -1,0 +1,7 @@
+// Путь шире базы: путь длинный, база — имя ветки; кнопка удаления по низу полей.
+.repoRow {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) auto;
+  gap: var(--spacing-xs);
+  align-items: end;
+}

@@ -24,7 +24,7 @@ describe('journal secret mask wired by boot', () => {
       actor: 'core',
       data: {
         ...CREATED,
-        profileHash: SHA256,
+        profilePins: [{ repoKey: 'r1', inputsFp: SHA256 }],
         userLayerHash: SHA256,
         repos: [{ repoKey: 'r1', path: '/tmp/r1', baseRef: GIT_SHA }],
       },
@@ -39,7 +39,7 @@ describe('journal secret mask wired by boot', () => {
     const lines = readJournalLines(dir, taskId).lines;
     const created = lines.find((l) => l.kind === 'task.created')!;
     const data = created.data as typeof CREATED;
-    expect(data.profileHash).toBe(SHA256);
+    expect(data.profilePins[0]!.inputsFp).toBe(SHA256);
     expect(data.userLayerHash).toBe(SHA256);
     expect(data.repos[0]!.baseRef).toBe(GIT_SHA);
     expect(created.masked).toBeUndefined();
@@ -63,5 +63,36 @@ describe('journal secret mask wired by boot', () => {
     expect(text).not.toContain(VENDOR_KEY);
     expect(text).not.toContain(HEX_TOKEN);
     expect(raw.masked).toBe(2);
+  });
+
+  it('W2b a panel endpoint route id (api-key:endpoint:<id> with digits) reaches the journal verbatim; a key under api-key: is still masked', async () => {
+    // Настоящий id карточки панели: `ep-<время36>-<хвост>` (EndpointCard.addProfile).
+    const ROUTE = 'api-key:endpoint:ep-mh1abc23-x9k2ab';
+    const { task, dir, taskId } = await openFresh(undefined, deps({ mask: dlpSecretMask }));
+    task.append({
+      kind: 'task.created',
+      actor: 'core',
+      data: {
+        ...CREATED,
+        allowedRoutes: [
+          { adapter: 'claude', route: { kind: 'api-key', id: ROUTE }, modelPattern: '*' },
+        ],
+      } as never,
+    });
+    task.append({
+      kind: 'error',
+      actor: 'core',
+      data: { code: 'leak', detail: `api-key: hunter2-pass9 and api-key:endpoint:${VENDOR_KEY}` },
+    });
+    task.close();
+    const lines = readJournalLines(dir, taskId).lines;
+    const created = lines.find((l) => l.kind === 'task.created')!;
+    expect(
+      (created.data as { allowedRoutes: { route: { id: string } }[] }).allowedRoutes[0]!.route.id,
+    ).toBe(ROUTE);
+    expect(created.masked).toBeUndefined();
+    const text = JSON.stringify(lines.find((l) => l.kind === 'error')!);
+    expect(text).not.toContain('hunter2-pass9');
+    expect(text).not.toContain(VENDOR_KEY);
   });
 });

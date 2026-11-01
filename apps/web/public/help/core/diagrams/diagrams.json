@@ -1,0 +1,24 @@
+{
+  "topic": "core",
+  "source": "docs/diagrams/core-guide/core-guide.drawio",
+  "pages": [
+    {
+      "name": "panel-to-core",
+      "file": "panel-to-core.png",
+      "page": 1,
+      "source": "2563acadd5022b6b",
+      "width": 1541,
+      "height": 772,
+      "exportedAt": "2026-11-01T16:34:47.915Z"
+    },
+    {
+      "name": "launch-to-steps",
+      "file": "launch-to-steps.png",
+      "page": 2,
+      "source": "1bf33443d72c4c92",
+      "width": 1611,
+      "height": 732,
+      "exportedAt": "2026-11-01T16:34:50.955Z"
+    }
+  ]
+}

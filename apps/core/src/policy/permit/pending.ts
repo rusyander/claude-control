@@ -27,6 +27,13 @@ export interface PendingPermits {
     waitMs: number,
   ): Promise<ClaimOutcome>;
   forget(sessionId: string): void;
+  /**
+   * Вопрос о праве этой сессии принят и ещё ждёт своего запроса в потоке (`claim` не ответил):
+   * CLI стоит посреди хода и ждёт ядро — тишина потока тогда не тишина модели (этап 8, F9).
+   * Именно ожидание, а не состояние `claimed`: то держится до `tool.result`, через всё
+   * исполнение разрешённого инструмента, и зависший инструмент никогда не стал бы тишиной.
+   */
+  deciding(sessionId: string): boolean;
 }
 
 interface Entry {
@@ -153,6 +160,7 @@ export function createPendingPermits(opts: {
         set.add(check);
       });
     },
+    deciding: (sessionId) => (waiters.get(sessionId)?.size ?? 0) > 0,
     forget(sessionId) {
       sessions.delete(sessionId);
       for (const fn of [...(waiters.get(sessionId) ?? [])]) fn(true);

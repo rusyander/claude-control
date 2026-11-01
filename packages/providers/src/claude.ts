@@ -12,8 +12,13 @@ export const claudeRunFacts: CliRunFacts = {
   binary: { command: 'claude', windowsCommand: 'claude.cmd' },
   // Вход учётной записью Claude (подписка) — `domains/account.ts`, `domains/credentials`.
   login: 'account',
-  // API — Anthropic, ключ `ANTHROPIC_API_KEY`; адрес вендора CLI знает сам.
-  vendorApi: { kind: 'anthropic', keyVars: ['ANTHROPIC_API_KEY'] },
+  // API — Anthropic, ключ `ANTHROPIC_API_KEY`. Адрес — корень хоста из документации Anthropic
+  // (Messages API: `POST https://api.anthropic.com/v1/messages`); путь диалекта дописывает звено.
+  vendorApi: {
+    kind: 'anthropic',
+    keyVars: ['ANTHROPIC_API_KEY'],
+    baseUrl: 'https://api.anthropic.com',
+  },
   cliRunnable: true,
   channels: [
     // Свой адрес: задокументирован `ANTHROPIC_BASE_URL` («the variable that points Claude Code
@@ -33,6 +38,15 @@ export const claudeRunFacts: CliRunFacts = {
   effort: { argv: ['--effort', '{effort}'], values: ['low', 'medium', 'high', 'xhigh', 'max'] },
   // Каталог Anthropic (models.dev). Алиасы (`opus`, `sonnet`, `haiku`) CLI разворачивает сам.
   modelVendors: ['anthropic'],
+  // Лестница уровня ядра — алиасы `--model` (справка бинаря 2.1.310: «an alias for the latest
+  // model (e.g. 'fable', 'opus', or 'sonnet') or a model's full name»), порядок силы — тот же,
+  // что у подбора панели (`MODEL_RANK` контрактов). Полное имя (`claude-opus-5-5`) — та же ступень.
+  modelRungs: [
+    { model: 'haiku', ids: ['claude-haiku'] },
+    { model: 'sonnet', ids: ['claude-sonnet'] },
+    { model: 'opus', ids: ['claude-opus'] },
+    { model: 'fable', ids: ['claude-fable'] },
+  ],
   // Окно и сроки локальной модели — окружением прогона (бинарь 2.1.286, разбор 13.10 и L4b):
   // без них Claude Code считает окно облачным и рвёт законный разбор длинного промпта.
   // Порядок — порядок записи в `localRunEnv`.

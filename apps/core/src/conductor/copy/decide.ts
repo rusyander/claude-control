@@ -108,6 +108,16 @@ export function decideCopySetup(input: CopySetupInput | CopyCreateFailed): CopyS
     left.push({ kind: 'install', subject: `${cmd} in ${where}`, why });
     fail('install', run.tail || `${cmd}: ${why}`, run.firstError);
   }
+  // Отложенная установка — не провал: копия оценки только читает; названо, что зависимостей нет.
+  if (input.deferred && !input.plan.unread) {
+    installOk = false;
+    const planned = input.plan.steps.map((s) => `${s.command} ${s.args.join(' ')}`.trim());
+    left.push({
+      kind: 'install',
+      subject: 'dependencies',
+      why: `deferred until the first step that edits the copy${planned.length > 0 ? ` (${planned.join('; ')})` : ''}`,
+    });
+  }
 
   if ('value' in input.reverted) {
     for (const path of input.reverted.value)
@@ -147,5 +157,12 @@ export function decideCopySetup(input: CopySetupInput | CopyCreateFailed): CopyS
   }
   for (const item of gaps) brief.push(`Not in the copy: ${item.subject} — ${item.why}.`);
 
-  return { verdict, envPrepared, leftBehind: left, ...(failure ? { failure } : {}), brief };
+  return {
+    verdict,
+    envPrepared,
+    leftBehind: left,
+    ...(failure ? { failure } : {}),
+    brief,
+    ...(input.deferred ? { installDeferred: true as const } : {}),
+  };
 }

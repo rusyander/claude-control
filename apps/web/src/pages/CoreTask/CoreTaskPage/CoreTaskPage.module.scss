@@ -1,0 +1,16 @@
+.back {
+  width: fit-content;
+  text-decoration: none;
+}
+
+// Лента шире боковых панелей; на узком экране панели уходят под ленту.
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: var(--spacing-md);
+  align-items: start;
+
+  @media (max-width: 960px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

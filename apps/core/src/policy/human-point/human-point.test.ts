@@ -18,6 +18,7 @@ const policy: HumanPointPolicy = {
 
 const ask = (action: HumanPointInput['action'], blocking: boolean): HumanPointInput => ({
   source: 'ask_human',
+  point: null,
   action,
   question: 'q',
   options: ['a', 'b'],

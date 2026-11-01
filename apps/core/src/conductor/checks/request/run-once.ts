@@ -102,6 +102,8 @@ export function settle(
       standEpoch: result.standEpoch,
       taskId: req.taskId,
       checkRunId,
+      // Итог migration/contract — в подписанную запись, а не только в лог (зона F).
+      ...(result.classOutcome ? { classOutcome: result.classOutcome } : {}),
     };
     // Срезанный раннером вывод (2 МБ + метка) хранилище замечает само; срез обёртки — нет.
     const written = g.store.value.write(draft, result.log, result.truncated);

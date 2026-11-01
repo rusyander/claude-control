@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SESSION_STATE_V, type SessionStateDoc } from '@agentdeck/contracts/core/user-layer';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CUSTOM_CMD, npmCmdShim } from '../../platform/__fixtures__/shims.ts';
 import { waitFor } from '../../platform/__fixtures__/harness.ts';
@@ -37,13 +38,26 @@ const NASTY = [
   '&|<>^!',
   "it's",
 ];
+const STATE_DOC: SessionStateDoc = {
+  v: SESSION_STATE_V,
+  source: 'core',
+  asOf: 7,
+  task: 't-1',
+  step: { id: 's-2', kind: 'implement', title: 'Implement', defId: 'work' },
+  requirements: [{ id: 'r-1', text: 'R one', verdict: 'open' }],
+  ownedPaths: ['src/a.ts'],
+  requiredChecks: ['unit'],
+  budgets: { tokens: { spent: 0, limit: null }, minutes: { spent: 0, limit: 10 } },
+  ciWait: false,
+  layer: { hooks: 'observe', skills: 'on' },
+};
 const CORE: CoreSessionVars = {
   taskId: 't-1',
   stepId: 's-2',
   stepKind: 'implement',
   coreUrl: 'http://127.0.0.1:1',
   sessionToken: 'session-access-value',
-  state: { owned: ['src/a.ts'] },
+  state: STATE_DOC,
 };
 const PLANTED = 'AGENTDECK_LAUNCHER_PLANTED';
 
@@ -184,7 +198,9 @@ describe('launcher — P25 every spawn through the session host', () => {
       string,
       unknown
     >;
-    expect(state).toMatchObject({ task: 't-1', step: 's-2', owned: ['src/a.ts'] });
+    // Снимок G8: документ дороги целиком, `source: 'snapshot'`, объект шага не затёрт id шага.
+    expect(state).toEqual({ ...STATE_DOC, source: 'snapshot' });
+    expect(readFileSync(dump.env.AGENTDECK_STATE ?? '', 'utf8')).not.toContain(CORE.sessionToken);
     // Журнал получает имена, а не значения (там токен сессии и ключи маршрута).
     expect(run.spawned.envNames).toContain('AGENTDECK_SESSION_TOKEN');
     expect(JSON.stringify(run.spawned)).not.toContain(CORE.sessionToken);

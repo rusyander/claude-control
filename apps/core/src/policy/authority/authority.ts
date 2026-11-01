@@ -1,4 +1,4 @@
-import type { CommandKind } from '@agentdeck/contracts/core/commands';
+import type { AuthorityKind } from '@agentdeck/contracts/core/commands';
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
 
 /**
@@ -18,7 +18,13 @@ export type CommandProof = JournalDataV1['command.received']['proof'];
 
 export type ProofClass = 'human' | 'human-strict';
 
-export const COMMAND_PROOF_CLASS: Record<CommandKind, ProofClass> = {
+/**
+ * Класс доказательства на КАЖДЫЙ вид — таблица исчерпывающая: новый вид команды не соберётся, пока
+ * не назван его класс. Оценка (`/v1/estimate`) создаёт задачу — `human`, как запуск; правка списка
+ * требований — единственная дорога к `waived`, поэтому `human-strict`, как ответ и грант (G2).
+ */
+export const COMMAND_PROOF_CLASS: Record<AuthorityKind, ProofClass> = {
+  estimate: 'human',
   launch: 'human',
   pause: 'human',
   resume: 'human',
@@ -30,13 +36,21 @@ export const COMMAND_PROOF_CLASS: Record<CommandKind, ProofClass> = {
   'edit-split': 'human',
   'message-to-step': 'human',
   answer: 'human-strict',
+  'edit-requirements': 'human-strict',
   'approve-split': 'human-strict',
   grant: 'human-strict',
   'fresh-rerun': 'human-strict',
   'publish-now': 'human-strict',
   'release-resource': 'human-strict',
+  'clear-exhausted': 'human-strict',
   'move-build': 'human-strict',
   'clean-remote': 'human-strict',
+  // Настройка ядра (пункт 5, `grantRequired`, доверие репозиториям) — шире любой задачи (F23).
+  'set-config': 'human-strict',
+  // Библиотека сценариев общая для всех задач, запись однократная — шире любой задачи (F6).
+  'save-scenario': 'human-strict',
+  // Ключ устройства доказывает человека для каждой строгой команды — перенос ключей строже всех (F11).
+  'adopt-devices': 'human-strict',
 };
 
 export type AuthorityDecision =
@@ -50,7 +64,7 @@ export type AuthorityRefusal =
   | 'signature-invalid'
   | 'signature-required';
 
-export function decideAuthority(kind: CommandKind, proof: CommandProof): AuthorityDecision {
+export function decideAuthority(kind: AuthorityKind, proof: CommandProof): AuthorityDecision {
   if (proof.token === 'session' || proof.peer === 'session-descendant') {
     return {
       allow: false,

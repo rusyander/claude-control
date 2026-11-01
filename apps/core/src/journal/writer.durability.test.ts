@@ -8,7 +8,13 @@ import { readJournalLines } from './read-lines.ts';
 import { resume } from './resume.ts';
 import { openWriter } from './writer.ts';
 import { JournalDurabilityError, NO_MASK, TASK_FILES } from './journal.types.ts';
-import { deps, fakeClock, openFresh, tempDir } from './__fixtures__/journal-harness.ts';
+import {
+  deps,
+  fakeClock,
+  openFresh,
+  tempDir,
+  toolEventData,
+} from './__fixtures__/journal-harness.ts';
 
 /**
  * Долговечность журнала на настоящих вызовах ОС (ревью M5, M7, m1). `node:fs` подменён
@@ -110,7 +116,7 @@ describe('journal durability on real fs calls', () => {
       writer.append({
         kind: 'tool.event',
         actor: 'core',
-        data: { sessionId, effectClass: 'read', target: `f${i}`, ms: i },
+        data: toolEventData(sessionId, `f${i}`, i),
       });
     }
     expect(os.fsyncs - start).toBe(1);
@@ -122,7 +128,7 @@ describe('journal durability on real fs calls', () => {
     writer.append({
       kind: 'tool.event',
       actor: 'core',
-      data: { sessionId, effectClass: 'read', target: 'late', ms: 1 },
+      data: toolEventData(sessionId, 'late', 1),
     });
     os.failFsync = 1;
     expect(() => timers[1]?.()).not.toThrow();
@@ -192,7 +198,7 @@ describe('journal durability on real fs calls', () => {
     writer.append({
       kind: 'tool.event',
       actor: 'core',
-      data: { sessionId: newId(), effectClass: 'read', target: 'f', ms: 1 },
+      data: toolEventData(newId(), 'f', 1),
     });
     const start = os.fsyncs;
     writer.close();

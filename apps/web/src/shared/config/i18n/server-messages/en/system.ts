@@ -19,4 +19,7 @@ export const systemEn: Record<SystemMessageCode, string> = {
   'location-dir-unavailable': 'The folder is unavailable: {{dir}}',
   'location-dir-unreadable': 'No permission to read the folder: {{dir}}',
   'location-app-data-failed': 'The panel data folder in {{root}} cannot be created: {{detail}}',
+  'core-absent': 'The task core is not running',
+  'core-unverified': 'The task core did not prove its identity: the request was not sent',
+  'core-unreachable': 'The task core does not answer',
 };

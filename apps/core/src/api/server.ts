@@ -1,8 +1,17 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { parseCommand } from '@agentdeck/contracts/core/commands';
+import type { Fact } from '@agentdeck/contracts/core/facts';
 import { isUuidv7 } from '@agentdeck/contracts/core/ids';
+import type { HealthReply, TaskReply, TasksReply } from '@agentdeck/contracts/core/panel-api';
+import type { Route, RoutePrice } from '@agentdeck/contracts/core/routes';
 import type { TaskRegistry } from '../conductor/tasks.ts';
-import { commandsInFlight, processCommand, type CommandResult } from '../conductor/commands.ts';
+import {
+  commandsInFlight,
+  processCommand,
+  type CommandEnv,
+  type CommandResult,
+} from '../conductor/commands.ts';
+import { windowHealth, type WindowBook } from '../economy/window/index.ts';
 import { linesAfter } from '../journal/read-view.ts';
 import { join } from 'node:path';
 import type { CommandProof } from '../policy/authority/authority.ts';
@@ -18,8 +27,19 @@ import {
   type TokenClass,
   type TokenSources,
 } from './auth.ts';
+import { registerConfig } from './config.ts';
+import { registerDevices, type DevicesPort } from './devices.ts';
+import type { ConfigPort } from './config.types.ts';
 import { apiError, commandStatus } from './errors.ts';
+import { registerEstimate } from './estimate.ts';
+import type { RouteContext } from './route-context.types.ts';
+import { registerProfiles } from './profiles.ts';
+import { registerRecords } from './records.ts';
+import { registerReport } from './report.ts';
+import { registerRoutesView } from './routes.ts';
+import { registerScenarios } from './scenarios.ts';
 import { followTask, lastEventId, openSse } from './sse.ts';
+import { priceBookOf, taskViewOf } from './task-view.ts';
 
 /**
  * HTTP API ядра (07 §API) — только на 127.0.0.1, порт вне 5170–5180 (P59). Каждое чтение —
@@ -38,13 +58,33 @@ export interface HealthInfo {
 
 export interface ApiDeps {
   registry: TaskRegistry;
+  /**
+   * Среда команд и ручек этапа 4: дом ядра и порт среды деления. Загрузка собирает API раньше
+   * дирижёра, поэтому `split()` читается в момент команды, а не при сборке.
+   */
+  env: CommandEnv;
   tokens: TokenSources;
   nonces: NonceStore;
   peer: PeerDeps;
   signature: SignatureDeps;
   health: HealthInfo;
+  /** Книга окон ядра (G7) — та же, что пишет проводка экономики: health читает её. */
+  windows: WindowBook;
   now: () => number;
   pingMs?: number;
+  /** Порт настройки ядра (этап 7, зона настройки); нет — `/v1/config` отвечает 501. */
+  config?: () => ConfigPort | undefined;
+  /**
+   * Цена маршрута для вида задачи (этап 9): чтение реестра маршрутов. Нет — расход показан
+   * токенами без цены, а не деньгами по догадке (P127).
+   */
+  routePrice?: (routeId: string, model: string) => Promise<Fact<RoutePrice>>;
+  /** Маршруты этой загрузки для `/v1/routes` (этап 9); нет — 501 «реестр не подключён». */
+  routes?: () => readonly Route[] | undefined;
+  /** Доверенные звенья пересылки для health (P131): сколько и когда надзор их записал. */
+  trustedHops?: () => { count: number; recordedAt: number | null };
+  /** Перенос ключей телефона в устройства ядра (G9); нет — `/v1/devices/adopt` отвечает 501. */
+  devices?: () => DevicesPort | undefined;
 }
 
 const READ_TOKENS: ReadonlySet<TokenClass> = new Set(['core', 'panel-bearer']);
@@ -71,22 +111,27 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
         sum + Object.values(t.state.commands).filter((c) => c.status === 'received').length,
       0,
     );
-    return {
+    const body: HealthReply = {
       ok: true,
       ...deps.health,
       uptimeMs: deps.now() - deps.health.startedAt,
       liveTasks: live.length,
       queue: { commandsInFlight: commandsInFlight(), commandsPending: pending },
-      // Окно лимитов судит `economy/window` (03) — его в ядре ещё нет: названо, а не нуль.
-      window: { unknown: 'economy/window not built yet (phase 5)' },
+      // Окно лимитов судит `economy/window` (03): вердикт на маршрут × вид предела из книги ядра.
+      window: windowHealth(deps.windows, deps.now()),
       // Отставание журнала — самая старая строка без fsync по всем живым задачам (07).
       journalLagMs: Math.max(0, ...live.map((t) => t.journalLagMs())),
+      // Звенья, которым надзор разрешил пересылать pid (P131); `null` — надзора у загрузки нет.
+      trustedHops: deps.trustedHops?.() ?? null,
     };
+    return body;
   });
 
   app.get('/v1/tasks', async (request, reply) => {
     if (!requireRead(request, reply)) return reply;
-    return { tasks: deps.registry.list() };
+    // Тип ответа — контракт панели: строка списка, разошедшаяся с ним, не собирается.
+    const body: TasksReply = { tasks: deps.registry.list() };
+    return body;
   });
 
   app.get<{ Params: { id: string } }>('/v1/tasks/:id', async (request, reply) => {
@@ -96,7 +141,17 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     try {
       const state = deps.registry.view(id);
       if (!state) return reply.code(404).send(apiError('no-task', 'Задачи нет'));
-      return { task: state, live: Boolean(deps.registry.live(id)) };
+      // Вид для панели — из той же свёртки и строк журнала (P43: расход — только `spendOf`).
+      const lines = linesAfter(join(deps.registry.tasksDir, id), id, 0);
+      const view = taskViewOf({
+        taskId: id,
+        state,
+        lines,
+        priceFor: await priceBookOf(lines, deps.routePrice),
+        attention: deps.registry.attentionOf(id),
+      });
+      const body: TaskReply = { task: state, live: Boolean(deps.registry.live(id)), view };
+      return body;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       return reply.code(500).send(apiError('journal-unreadable', reason));
@@ -137,14 +192,24 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     return reply;
   });
 
-  // Маршруты моделей (11 §Phases): адрес занят заранее, наполнение — шаг маршрутов. Значения
-  // доступа эта ручка не отдаёт никогда — только виды и наличие.
-  app.get('/v1/routes', async (request, reply) => {
-    if (!requireRead(request, reply)) return reply;
-    return reply
-      .code(501)
-      .send(apiError('not-implemented', 'Маршруты появятся с реестром маршрутов'));
-  });
+  // Ручки этапов 4 и 9 живут в своих модулях: здесь только регистрация. Маршруты моделей
+  // (11 §Phases) отдают вид и наличие доступа, значение — никогда.
+  const routeContext: RouteContext = {
+    registry: deps.registry,
+    env: deps.env,
+    requireRead,
+    tokenOf,
+    proof: { nonces: deps.nonces, peer: deps.peer, signature: deps.signature, seen },
+    now: deps.now,
+  };
+  registerEstimate(app, routeContext);
+  registerScenarios(app, routeContext);
+  registerConfig(app, routeContext, () => deps.config?.());
+  registerRecords(app, routeContext);
+  registerReport(app, routeContext);
+  registerProfiles(app, routeContext);
+  registerRoutesView(app, routeContext, () => deps.routes?.());
+  registerDevices(app, routeContext, () => deps.devices?.());
 
   app.get<{ Querystring: { page?: string } }>('/v1/nonce', async (request, reply) => {
     if (!requireRead(request, reply)) return reply;
@@ -201,7 +266,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
       const status = opened.refused === 'no such task' ? 404 : 409;
       return reply.code(status).send(apiError('task-unavailable', opened.refused));
     }
-    return send(await processCommand(opened.task, command, proofOnce));
+    return send(await processCommand(opened.task, command, proofOnce, deps.env));
   });
 
   return app;

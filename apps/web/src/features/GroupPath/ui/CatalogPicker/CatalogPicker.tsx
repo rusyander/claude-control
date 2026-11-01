@@ -9,7 +9,7 @@ import { TypeChip } from '../TypeChip/TypeChip';
 import type { CatalogPickerProps } from './CatalogPicker.types';
 import styles from './CatalogPicker.module.scss';
 import { matchesFilter } from '../../model/matchesFilter';
-import { pickLang } from '../../lib/pickLang';
+import { pickLang } from '@entities/StepPath';
 import { TYPES, ROW_TYPE } from './CatalogPicker.constants';
 
 /**

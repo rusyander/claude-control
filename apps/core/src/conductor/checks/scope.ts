@@ -1,22 +1,13 @@
 import type { CheckRegistry, TreeRow } from '@agentdeck/contracts/core/records';
+import { changedPaths } from '../../platform/git.ts';
 import { closureOf, covers } from '../../verifier/key/index.ts';
 
 /**
  * Изменённые единицы копии (04:56, D§3.2): единица изменена, если путь из её замыкания (свои
  * пути + пути потребляемых единиц) отличается от базы. Тронута обвязка (конфиг раннера, скрипт
  * гейта) — изменены все: она входит в ключ каждой единицы. Посреди работы гонятся только они.
+ * Сравнение путей — `platform/git/diff.ts` (то же, что дифф единицы после шага).
  */
-
-export function changedPaths(rows: readonly TreeRow[], baseRows: readonly TreeRow[]): string[] {
-  const base = new Map(baseRows.map((r) => [r.path, `${r.mode} ${r.blob}`]));
-  const out = new Set<string>();
-  for (const r of rows) {
-    if (base.get(r.path) !== `${r.mode} ${r.blob}`) out.add(r.path);
-    base.delete(r.path);
-  }
-  for (const gone of base.keys()) out.add(gone);
-  return [...out].sort();
-}
 
 export function changedUnitsOf(
   registry: CheckRegistry,

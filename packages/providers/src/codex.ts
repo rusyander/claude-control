@@ -9,7 +9,8 @@ export const codexRunFacts: CliRunFacts = {
   // Вход учётной записью ChatGPT — отказ CLI «…when using Codex with a ChatGPT account»
   // (`domains/provider-chat/cascade/cheap-deliver.ts`).
   login: 'account',
-  vendorApi: { kind: 'openai', keyVars: ['OPENAI_API_KEY'] },
+  // Адрес — из документации OpenAI API (`https://api.openai.com/v1/chat/completions`).
+  vendorApi: { kind: 'openai', keyVars: ['OPENAI_API_KEY'], baseUrl: 'https://api.openai.com/v1' },
   cliRunnable: true,
   channels: [
     // Адрес — не переменной окружения, а таблицей `model_providers` в `config.toml`

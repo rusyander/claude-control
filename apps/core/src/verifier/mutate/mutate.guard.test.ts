@@ -183,7 +183,9 @@ describe('verifier/mutate tree guard (G6)', () => {
     expect(base.AGENTDECK_MUTATE_PROBE_SECRET).toBeUndefined();
     expect(base.PATH).toBeTruthy();
     expect(base.MUSTFAIL_PID).toBe(String(process.pid));
-    expect(base.TMPDIR?.startsWith(stateDir(dir))).toBe(true);
+    // Своя папка прогона — во временном каталоге системы, не под `.git` (тест с `git init` в TEMP).
+    expect(base.TMPDIR?.startsWith(join(tmpdir(), 'agentdeck-mutate-'))).toBe(true);
+    expect(base.TMPDIR?.startsWith(stateDir(dir))).toBe(false);
     expect(injected.ONLY).toBe('this');
     expect(injected.AGENTDECK_MUTATE_PROBE_SECRET).toBeUndefined();
     expect(injected.MUSTFAIL_PID).toBe(String(process.pid));

@@ -11,7 +11,13 @@ export const geminiRunFacts: CliRunFacts = {
   binary: { command: 'gemini', windowsCommand: 'gemini.cmd' },
   // Вход Google-аккаунтом (и Vertex AI) — свои серверы CLI (`gemini-contour.ts`).
   login: 'account',
-  vendorApi: { kind: 'google', keyVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] },
+  // Адрес — корень хоста Gemini API из документации Google
+  // (`https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`).
+  vendorApi: {
+    kind: 'google',
+    keyVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+    baseUrl: 'https://generativelanguage.googleapis.com',
+  },
   cliRunnable: true,
   channels: [
     // `GOOGLE_GEMINI_BASE_URL` («Overrides the default base URL for Gemini API requests»),

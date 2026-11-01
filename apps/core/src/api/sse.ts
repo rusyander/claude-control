@@ -1,5 +1,6 @@
 import type { ServerResponse } from 'node:http';
 import type { JournalLine } from '@agentdeck/contracts/core/journal';
+import { SSE_PING_MS } from '@agentdeck/contracts/core/panel-api';
 
 /**
  * Поток событий задачи (07 §API): `id:` = `seq`, повтор пропущенного по `Last-Event-ID`,
@@ -7,10 +8,9 @@ import type { JournalLine } from '@agentdeck/contracts/core/journal';
  * журнала после `Last-Event-ID`, потом живые события; дубль по `seq` не уходит дважды.
  * Задача, не живая при подписке, подхватывается, когда её откроют; задача, ушедшая из живых
  * (аренда потеряна, ядро останавливается), закрывает поток — клиент переподключится по
- * `Last-Event-ID` (ревью M2, 28.10: поток слал одни пинги без конца).
+ * `Last-Event-ID` (ревью M2, 28.10: поток слал одни пинги без конца). Шаг пинга — в контрактах:
+ * по нему же клиент панели судит, что поток умер молча.
  */
-
-export const SSE_PING_MS = 25_000;
 
 /**
  * После какого `seq` начинать. Порядок: заголовок `Last-Event-ID` (переподключение EventSource

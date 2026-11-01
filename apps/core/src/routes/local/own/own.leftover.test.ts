@@ -30,6 +30,12 @@ const flags = vi.hoisted(() => ({
   /** Остановка «никого не нашла»: чистый отчёт без единой цели, хранитель жив. */
   invisible: false,
   keeperPids: [] as number[],
+  /**
+   * Настоящая личность хранителя, снятая в миг, когда его номер впервые виден (он заведомо жив):
+   * под нагрузкой полного прогона Linux хранитель неудачного запуска уходил раньше, чем тест
+   * читал его личность после `acquire` (31.10, `no identity for pid`).
+   */
+  keeperIds: new Map<number, unknown>(),
   /** Номера, которые «отвечают» после остановки (чужой процесс на номере снятого). */
   answering: new Set<number>(),
   /** Пока снимок «не отвечает» — прочитать личности настоящей таблицей (сервер ещё жив). */
@@ -44,6 +50,8 @@ vi.mock('../../../platform/process-identity.ts', async (importOriginal) => {
       const [pid] = args;
       if (flags.unreadIdentity && pid !== process.pid) {
         flags.keeperPids.push(pid);
+        const seen = await real.identityOfPid(...args);
+        if ('value' in seen) flags.keeperIds.set(pid, seen.value);
         // Хранитель успевает запустить сервер, а снимок таблицы не отвечает.
         await new Promise((done) => setTimeout(done, 1_500));
         await flags.capture?.();
@@ -85,6 +93,8 @@ const track = (...pids: number[]): void => {
 };
 /** Личность живого процесса настоящей таблицей (мимо подмены «не прочитан»); нет — проверка не начинается. */
 async function realIdentity(pid: number): Promise<ProcessIdentity> {
+  const seen = flags.keeperIds.get(pid) as ProcessIdentity | undefined;
+  if (seen) return seen;
   const read = await createLivenessProbe(undefined, 0).identityOf(pid);
   if (!hasValue(read)) throw new Error(`no identity for pid ${pid}: ${JSON.stringify(read)}`);
   return read.value;

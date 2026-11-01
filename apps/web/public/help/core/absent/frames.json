@@ -1,0 +1,40 @@
+{
+  "topic": "core",
+  "scenario": "absent",
+  "frames": [
+    {
+      "id": "01-card",
+      "side": "panel",
+      "file": "01-card.png",
+      "masked": 0,
+      "width": 1004,
+      "height": 257,
+      "shotAt": "2026-11-01T17:11:59.047Z",
+      "text": "Ядро задач не запущено Панель не нашла запущенного ядра на этой машине. Запустите его командой pnpm core.",
+      "en": {
+        "file": "01-card.en.png",
+        "masked": 0,
+        "width": 1004,
+        "height": 257,
+        "shotAt": "2026-11-01T17:12:03.931Z",
+        "text": "The task core is not running The panel found no running core on this machine. Start it with pnpm core."
+      },
+      "dark": {
+        "file": "01-card.dark.png",
+        "masked": 0,
+        "width": 1004,
+        "height": 257,
+        "shotAt": "2026-11-01T17:12:08.111Z",
+        "text": "Ядро задач не запущено Панель не нашла запущенного ядра на этой машине. Запустите его командой pnpm core."
+      },
+      "darkEn": {
+        "file": "01-card.dark.en.png",
+        "masked": 0,
+        "width": 1004,
+        "height": 257,
+        "shotAt": "2026-11-01T17:12:12.393Z",
+        "text": "The task core is not running The panel found no running core on this machine. Start it with pnpm core."
+      }
+    }
+  ]
+}

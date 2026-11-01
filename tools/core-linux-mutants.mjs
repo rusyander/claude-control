@@ -15,11 +15,18 @@ import { stripVTControlCharacters } from 'node:util';
 
 const plan = JSON.parse(Buffer.from(process.env.MUTANT_PLAN ?? '', 'base64').toString('utf8'));
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Полное имя «a > b > it»: vitest 4 склеивает части пробелом, vitest 5 — « > »; разделитель берёт
+// обе формы (как `fullNamePattern` в verifier/run/argv.ts), иначе базовый прогон «passed 0».
+const namePattern = (test) =>
+  test
+    .split(/\s+[>›]\s+/)
+    .map(escape)
+    .join('(?: > | )');
 
 function vitest(spec, test) {
   const run = spawnSync(
     'pnpm',
-    ['exec', 'vitest', 'run', spec, '--coverage.enabled=false', '-t', escape(test)],
+    ['exec', 'vitest', 'run', spec, '--coverage.enabled=false', '-t', namePattern(test)],
     {
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,

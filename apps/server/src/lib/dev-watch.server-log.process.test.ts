@@ -26,6 +26,9 @@ const DEV_WATCH = new URL('./dev-watch.mjs', import.meta.url);
 const PROBE = new URL('./dev-boot-probe.mjs', import.meta.url);
 const BRAND = new URL('./brand.mjs', import.meta.url);
 const RESTART = new URL('./dev-restart.mjs', import.meta.url);
+const HOP_RECORDER = new URL('./hop-recorder.mjs', import.meta.url);
+// Сторож пишет звенья ядру (P131): дом ядра теста — пустой временный, не настоящий.
+process.env.AGENTDECK_CORE_HOME = mkdtempSync(join(tmpdir(), 'dw-core-'));
 
 const FAKE_SERVER = `import { appendFileSync } from 'node:fs';
 appendFileSync(process.env.PIDS_FILE as string, \`\${process.pid}\\n\`);
@@ -79,6 +82,7 @@ describe('dev-сторож: поток ошибок сервера в server.log
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(serverDir, 'src', 'index.ts'), FAKE_SERVER);
     const config = join(root, 'config');
     const { appDataDirOf } = (await import(BRAND.href)) as {
@@ -123,6 +127,13 @@ describe('dev-сторож: поток ошибок сервера в server.log
     expect(lines[0]).toMatch(/Z permission-request: Bash toolu_slow answered in 131 s$/);
     expect(lines[1]).toMatch(/Z вторая строка предупреждения$/);
     // Поток не перехвачен, а раздвоен: тот, кто смотрит терминал сторожа, видит его как есть.
+    // Запись в server.log синхронна, а труба stderr на Windows — нет: под нагрузкой файл
+    // успевал раньше трубы, и проверка без ожидания краснела на пустом потоке.
+    await until(
+      () => (watchStderr.includes('вторая строка предупреждения') ? true : undefined),
+      30_000,
+      `stderr сторожа\n${watchStderr}`,
+    );
     expect(watchStderr).toContain('permission-request: Bash toolu_slow answered in 131 s');
     expect(watchStderr).toContain('вторая строка предупреждения');
   }, 60_000);

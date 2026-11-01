@@ -46,6 +46,13 @@ export const DECISION_CLASSES = [
     inputs: 'extracted list, evidence, reviewer confirmations',
   },
   {
+    id: 'gates',
+    module: 'conductor/gates',
+    decisionType: 'GatesDecision',
+    inputs:
+      'step gate list, requirements verdict, latest core records, red-before, review findings/confirmations',
+  },
+  {
     id: 'publish-ready',
     module: 'publisher/ready',
     decisionType: 'PublishReadyDecision',
@@ -124,10 +131,35 @@ export const DECISION_CLASSES = [
     inputs: 'journal predicates',
   },
   {
+    id: 'forged-publish',
+    module: 'observer/forged-publish',
+    decisionType: 'ForgedPublishDecision',
+    inputs: 'remote refs vs step start, own-account forge events in the step window, copy closure',
+  },
+  {
+    id: 'hook-block',
+    module: 'observer/hook-block',
+    decisionType: 'HookBlockDecision',
+    inputs: 'hook.refused fact, the refused call, inventory hooks by event + matcher',
+  },
+  {
+    id: 'hook-loop',
+    module: 'observer/hook-loop',
+    decisionType: 'HookLoopDecision',
+    inputs: 'hook-block decisions of the task, current refusal key (step, hook, tool, target)',
+  },
+  {
     id: 'copy-setup',
     module: 'conductor/copy/decide',
     decisionType: 'CopySetupDecision',
     inputs: 'mirror report, env rewrite, install plan + runs, lockfile revert, long paths',
+  },
+  {
+    id: 'red-before',
+    module: 'conductor/outcomes/red-before',
+    decisionType: 'RedBeforeDecision',
+    inputs:
+      'regression check of the step, changed test files, pinned base tree, check records base + copy',
   },
   {
     id: 'cleanup',
@@ -161,8 +193,55 @@ export const DECISION_CLASSES = [
     inputs:
       'server liveness fact (process.alive: pid + start), port health probe (route.availability)',
   },
+  {
+    id: 'budget',
+    module: 'economy/budget',
+    decisionType: 'BudgetDecision',
+    inputs:
+      'scenario step budget, learned p90 of the key, used tokens (G10) and active ms, overBudget',
+  },
+  {
+    id: 'keep-warm',
+    module: 'economy/keep-warm',
+    decisionType: 'KeepWarmDecision',
+    inputs:
+      'session parked, last turn, context tokens, cache TTL, adapter resume, window verdict, pings, rates',
+  },
+  {
+    id: 'set-route',
+    module: 'conductor/commands/set-route',
+    decisionType: 'SetRouteDecision',
+    inputs: 'current allowed set, wanted set, route registry, contour policy (level 1)',
+  },
+  {
+    id: 'precedence',
+    module: 'policy/resolve',
+    decisionType: 'PrecedenceDecision',
+    inputs: 'key, value per level 1-5, platform floor',
+  },
+  {
+    id: 'layer-run',
+    module: 'adapters/layer-run',
+    decisionType: 'LayerRunDecision',
+    inputs: 'asked modes, adapter caps, trust, inventory hash',
+  },
 ] as const satisfies readonly DecisionClassDef[];
 
 export type DecisionClassId = (typeof DECISION_CLASSES)[number]['id'];
 
 export const DECISION_CLASS_IDS = DECISION_CLASSES.map((c) => c.id) as readonly DecisionClassId[];
+
+/**
+ * Решение класса `precedence` (06:3-9, G1): ОДИН судья старшинства по ключу. Уровень 1 — пол
+ * платформы, его не опустить; уровень 2 может расширить; уровни 3-5 только сужают — расширение
+ * отвергнуто и названо (источник + почему). Решение `layer-run` — `user-layer.ts`.
+ */
+export interface PrecedenceDecision {
+  /** `steps.<id>.checks.required`, `routes`, `humanPoints`, `userLayer.hooks`, … */
+  key: string;
+  value: unknown;
+  sourceLevel: 1 | 2 | 3 | 4 | 5;
+  source: string;
+  applied: { level: number; source: string; value: unknown; note: string }[];
+  rejected: { level: number; source: string; value: unknown; why: string }[];
+}

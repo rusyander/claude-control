@@ -13,6 +13,8 @@ export const ROADS = [
   'ram',
   'ports',
   'repo-access',
+  /** git ≥ 2.38 (`merge-tree --write-tree`) — только когда сценарий публикует (05 §Push and MR). */
+  'git-version',
 ] as const;
 
 export type Road = (typeof ROADS)[number];
@@ -37,6 +39,8 @@ export type RoadResult =
 export interface PreflightInput {
   /** Профиль требует сервисов (рецепты или `needs` у проверок); профиль неизвестен — `'unknown'`. */
   needsServices: boolean | 'unknown';
+  /** Сценарий задачи публикует; `false` — дорога `git-version` пропущена, не задано — проверяется. */
+  publishes?: boolean;
 }
 
 export type PreflightProbes = Partial<Record<Road, RoadProbe>>;

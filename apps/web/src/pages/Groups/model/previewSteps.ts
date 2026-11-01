@@ -1,6 +1,6 @@
 import type { SkillStepTitle } from './tile.types';
 import type { PathEntry } from '@agentdeck/contracts';
-import { pickLang } from '@features/GroupPath';
+import { pickLang } from '@entities/StepPath';
 
 /** Сколько шагов карточка показывает словами: дальше — «и ещё N». */
 export const TILE_PREVIEW_STEPS = 3;

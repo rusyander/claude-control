@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { PathEntry } from '@agentdeck/contracts';
-import { pickLang } from '../lib/pickLang';
+import { pickLang } from '@entities/StepPath';
 
 /** Подпись строки пути на языке интерфейса — и для списка, и для доступных имён кнопок. */
 export function useEntryTitle(): (entry: PathEntry) => string {

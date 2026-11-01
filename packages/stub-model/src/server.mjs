@@ -187,6 +187,26 @@ export function startStubModel(options = {}) {
     res.end();
   }
 
+  /**
+   * Поток пути вызывающего: кадры пишет пакет, а не сценарий — так у чужой формы провода
+   * (вендорные кадры контура) нет своего кода SSE (P120). Задержка — перед каждым кадром,
+   * обрываемая, как удержание модели: клиент ушёл — кадры больше не пишутся.
+   */
+  async function routeStream(res, status, own) {
+    const { frames, delayMs = 0 } = own.sse;
+    if (!Array.isArray(frames))
+      throw new TypeError('stub-model: route sse.frames must be an array');
+    res.socket?.setNoDelay(true);
+    res.writeHead(status, { ...SSE_HEADERS, ...own.headers });
+    // Заголовки уходят сразу, до первой задержки: клиент видит начатый поток, как у контура.
+    res.flushHeaders();
+    for (const item of frames) {
+      if (delayMs && !(await sleep(delayMs, res))) return;
+      if (!res.destroyed) res.write(frame(item.event, item.data));
+    }
+    res.end();
+  }
+
   async function handle(req, res) {
     const raw = await readBody(req);
     const url = req.url ?? '/';
@@ -214,6 +234,10 @@ export function startStubModel(options = {}) {
         const status = own.status ?? 200;
         writeTrace({ ...base, kind: 'route', status });
         if (res.destroyed || res.writableEnded) return;
+        if (own.sse) {
+          await routeStream(res, status, own);
+          return;
+        }
         const text = typeof own.body === 'string';
         res.writeHead(status, {
           'content-type': text ? 'text/plain; charset=utf-8' : 'application/json',
@@ -298,7 +322,8 @@ export function startStubModel(options = {}) {
     if (closing) return;
     const meta = {
       n: record.n,
-      model: info.model ?? models[0] ?? 'stub-model',
+      // `step.model` — модель, которую «назвал» маршрут вместо запрошенной (подмена, P119).
+      model: step.model ?? info.model ?? models[0] ?? 'stub-model',
       created: nowSeconds(),
       usage: step.usage,
       extra: step.extra,

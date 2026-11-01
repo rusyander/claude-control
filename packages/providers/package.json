@@ -8,6 +8,7 @@
     "./types": "./src/types.ts",
     "./channels": "./src/channels.ts",
     "./effort": "./src/effort.ts",
+    "./ladder": "./src/ladder.ts",
     "./registry": "./src/registry.ts",
     "./literals": "./src/literals.ts",
     "./claude": "./src/claude.ts",

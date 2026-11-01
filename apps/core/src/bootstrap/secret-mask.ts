@@ -9,8 +9,11 @@ import type { MaskFn } from '../journal/journal.types.ts';
  * baseRef, ключ идемпотентности), не секрет. Без этого схема отвергала `task.created` с
  * хешем и `layer.changed`, а ref ложился «••••••» навсегда (ревью B1, 28.10). Hex под
  * секретным именем (`GITHUB_TOKEN=…`) и ключи с префиксом вендора прячутся по-прежнему.
+ *
+ * `keepRouteIds`: `api-key:endpoint:<id>` — id маршрута реестра (W2b): id карточки панели с
+ * цифрой иначе шёл за пароль после `api-key:`, и схема отвергала `task.created`.
  */
-const OPTIONS: MaskOptions = { keepHashes: true };
+const OPTIONS: MaskOptions = { keepHashes: true, keepRouteIds: true };
 
 export const dlpSecretMask: MaskFn = (text) => {
   const count = findSecretSpans(text, OPTIONS).length;

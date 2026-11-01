@@ -13,7 +13,7 @@
  */
 
 import { PERMISSION_RULE_IDS, type PermissionRuleId } from './permission-rules.ts';
-import { SPLIT_MAX_GROUPS, SPLIT_PARALLEL_DEFAULT, SPLIT_PARALLEL_HEAVY } from './task-split.ts';
+import { SPLIT_MAX_GROUPS, SPLIT_PARALLEL_DEFAULT, SPLIT_PARALLEL_HEAVY } from './split-limits.ts';
 
 /**
  * Строки разрешений группы. `routine` — обычная работа (правки, сборка,

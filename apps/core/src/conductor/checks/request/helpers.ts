@@ -6,6 +6,8 @@ import type {
   CheckRegistry,
   Verdict,
 } from '@agentdeck/contracts/core/records';
+import type { WindowDecision } from '@agentdeck/contracts/core/economy';
+import { routeWait } from '../../../economy/window/index.ts';
 import { realDir } from '../../../platform/copy-fs.ts';
 import { isInside } from '../../../platform/paths.ts';
 import { MIN_BEAT_MS } from '../../../verifier/queue/order.ts';
@@ -21,10 +23,21 @@ export const POLL_MS = 250;
 /** Сколько последних прогонов проверки и единицы учат срок: старая история — другая машина. */
 export const HISTORY_RUNS = 50;
 export const EMPTY_REGISTRY: CheckRegistry = { units: {}, machinery: [], checks: [], rejected: [] };
-export const WINDOW: CheckDecisionInput['window'] = {
-  verdict: 'open',
-  basis: 'not-modelled-until-phase-5',
-};
+/**
+ * Окно для суда проверки (decisions.ts: check ← window verdict) по вердиктам маршрута шага,
+ * который её просит: класс — `final-gate` на финале (он не ждёт никогда, 03:157), иначе
+ * `background`. Держит — `refused` (суд отложит `until: 'window'`), `warn` — только предупреждение.
+ * Фактов нет — открыто: то же правило, что у самой книги окон (L, `no-fact`).
+ */
+export function checkWindow(
+  decisions: readonly WindowDecision[],
+  phase: CheckDecisionInput['phase'],
+): CheckDecisionInput['window'] {
+  const basis = 'economy-window' as const;
+  if (routeWait(decisions, phase === 'final' ? 'final-gate' : 'background').wait)
+    return { verdict: 'refused', basis };
+  return { verdict: decisions.some((d) => d.verdict === 'warn') ? 'warn' : 'open', basis };
+}
 
 /**
  * Вердикт прогона с поправкой узкой выборки: зелёный без единого выполненного теста — не зелёный

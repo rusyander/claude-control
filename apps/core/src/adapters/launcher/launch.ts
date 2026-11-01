@@ -6,6 +6,7 @@ import { writeFileAtomic } from '../../platform/safe-io/atomic-write.ts';
 import { launchSession, type SessionLaunchDeps } from '../../session-host/launch.ts';
 import { composeEnv, coreVarsEnv } from './env.ts';
 import type { LaunchInput, LaunchOutcome } from './launcher.types.ts';
+import { stateSnapshot } from './state-snapshot.ts';
 
 /**
  * Каждый запуск CLI ядром (03 §Launcher, P25): исполняемый файл разрешается ЗДЕСЬ, до хоста
@@ -27,17 +28,8 @@ export async function launchCli(
   const tmpDir = join(dir, SESSION_TMP);
   mkdirSync(tmpDir, { recursive: true, mode: 0o700 });
   const statePath = join(dir, SESSION_STATE);
-  // `agentdeck state` для авторов хуков: пока файлом, команда читает его же (спец. 03 F19).
-  writeFileAtomic(
-    statePath,
-    JSON.stringify({
-      task: input.core.taskId,
-      step: input.core.stepId,
-      stepKind: input.core.stepKind,
-      ...(input.core.state ?? {}),
-    }),
-    { mode: 0o600 },
-  );
+  // Снимок `agentdeck state` (G8): команда читает его, только когда ядро недоступно.
+  writeFileAtomic(statePath, JSON.stringify(stateSnapshot(input.core)), { mode: 0o600 });
   const env = composeEnv(input.env, coreVarsEnv(input.core, tmpDir, statePath));
   const cwd = longForm(input.cwd);
   // Явный относительный путь — от cwd сессии, как у хоста (`spawnResolved`), не от каталога ядра.

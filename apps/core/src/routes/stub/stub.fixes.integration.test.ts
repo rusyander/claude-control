@@ -172,7 +172,10 @@ describe('stub route on failure paths (review core-s2)', () => {
     const retry = await route.release(lease, r.record);
     expect(retry.verified).toHaveLength(1);
     expect(r.events).toEqual([expect.stringMatching(/^verified:server stopped/)]);
-    expect(alive(pid)).toBe(false);
+    // По личности (pid + старт), не по номеру: в полном прогоне Windows отдаёт освободившийся pid
+    // новому процессу за секунды, и `kill(pid, 0)` видел бы чужой живой процесс (01.11).
+    const identity = seen.find((one) => one.pid === pid)!;
+    expect(await createLivenessProbe().isAlive(identity, { fresh: true })).toBe('dead');
   }, 60_000);
 
   it('C5: shutdown goes past a failing release and stops every server, then names the failure', async () => {

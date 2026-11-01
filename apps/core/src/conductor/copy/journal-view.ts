@@ -1,5 +1,6 @@
 import { readJournalLines } from '../../journal/read-lines.ts';
 import type { LiveTask } from '../../journal/resume.ts';
+import { BASE_PIN_SIGNAL, parseBasePin } from '../estimate/base-pin.ts';
 import type { CopySetupDecision } from './copy.types.ts';
 
 /**
@@ -16,17 +17,27 @@ export interface UnitRepo {
   /** Основная копия репозитория. */
   path: string;
   baseRef: string;
+  /**
+   * Ссылка, от которой приколота база (`signal base-pin`: `origin/main`, `origin/<ветка MR>`);
+   * `baseRef` — только её sha. Нет строки (задача не из оценки) — `undefined`.
+   */
+  pinnedRef?: string;
 }
 
 export function unitRepoOf(task: LiveTask, unitId: string): UnitRepo | { missing: string } {
   let unit: { repoKey: string; branch: string } | undefined;
   let repos: { repoKey: string; path: string; baseRef: string }[] = [];
+  const pins = new Map<string, string>();
   for (const line of readJournalLines(task.dir, task.taskId).lines) {
     if (line.kind === 'task.created') {
       repos = (line.data as { repos: typeof repos }).repos;
     } else if (line.kind === 'unit.created') {
       const data = line.data as { unitId: string; repoKey: string; branch: string };
       if (data.unitId === unitId) unit = { repoKey: data.repoKey, branch: data.branch };
+    } else if (line.kind === 'signal') {
+      const s = line.data as { signal: string; subject: string; detail: string };
+      const pin = s.signal === BASE_PIN_SIGNAL ? parseBasePin(s.detail) : null;
+      if (pin) pins.set(s.subject, pin.ref);
     }
   }
   if (!unit) return { missing: `unit ${unitId}: no unit.created` };
@@ -39,6 +50,7 @@ export function unitRepoOf(task: LiveTask, unitId: string): UnitRepo | { missing
     branch: unit.branch,
     path: repo.path,
     baseRef: repo.baseRef,
+    ...(pins.has(key) ? { pinnedRef: pins.get(key) as string } : {}),
   };
 }
 
@@ -80,6 +92,34 @@ export function copyResourceOf(
         found = { rid: data.rid, unitId: line.unitId, released: false };
     } else if (line.kind === 'resource.released' && found) {
       if ((line.data as { rid: string }).rid === found.rid) found.released = true;
+    }
+  }
+  return found;
+}
+
+/**
+ * Живая копия единицы по журналу (`resource.created` вида `copy` с её `unitId`, не снятая): cwd
+ * шагов и проверок единицы. Исполнитель (зона B) и крючки зоны F читают её отсюда, а не из памяти
+ * процесса — после перезапуска ядра памяти нет. Нет копии — `undefined`.
+ */
+export function unitCopyOf(
+  task: LiveTask,
+  unitId: string,
+): { rid: string; dir: string; repo: string } | undefined {
+  let found: { rid: string; dir: string; repo: string } | undefined;
+  for (const line of readJournalLines(task.dir, task.taskId).lines) {
+    if (line.kind === 'resource.created' && line.unitId === unitId) {
+      const data = line.data as { rid: string; kind: string; ref: string };
+      if (data.kind !== 'copy') continue;
+      try {
+        const ref = JSON.parse(data.ref) as { worktree?: unknown; repo?: unknown };
+        if (typeof ref.worktree === 'string' && typeof ref.repo === 'string')
+          found = { rid: data.rid, dir: ref.worktree, repo: ref.repo };
+      } catch {
+        // ref копии сессии в другой форме — не копия единицы
+      }
+    } else if (line.kind === 'resource.released' && found) {
+      if ((line.data as { rid: string }).rid === found.rid) found = undefined;
     }
   }
   return found;

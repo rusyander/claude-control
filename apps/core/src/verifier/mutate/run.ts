@@ -1,4 +1,5 @@
 import type { MutantPlanRow } from '@agentdeck/contracts/core/records';
+import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { readBaseEnv } from '../../platform/base-env.ts';
 import { eolOf } from '../../platform/encoding.ts';
@@ -114,18 +115,18 @@ function absolute(root: string, path: string): string {
 
 /**
  * Окружение детей-раннеров: основа — переданная или базовая платформы (не окружение ядра), плюс
- * MUSTFAIL_PID для mutation-guard и своя временная папка прогона под каталогом копий (уходит с ним).
+ * MUSTFAIL_PID для mutation-guard и своя временная папка прогона. Папка — во временном каталоге
+ * системы, НЕ под журналом в `.git`: тест, который заводит репозиторий в TEMP, внутри каталога
+ * git получал отказ git («not a work tree») — красный без мутации, а не утверждение теста.
  */
-async function runnerEnv(
+function runnerEnv(
   io: MutateIo,
-  options: RunPlanOptions,
-  journal: OwnJournal,
+  base: NodeJS.ProcessEnv,
   pid: number,
-): Promise<NodeJS.ProcessEnv> {
-  const base = options.env ?? (await readBaseEnv({ temp: false }));
-  const temp = join(journal.backups, 'tmp');
+): { env: NodeJS.ProcessEnv; temp: string } {
+  const temp = join(tmpdir(), `agentdeck-mutate-${pid}-${Date.now().toString(36)}`);
   io.ensureDir(temp);
-  return { ...base, MUSTFAIL_PID: String(pid), TMPDIR: temp, TMP: temp, TEMP: temp };
+  return { env: { ...base, MUSTFAIL_PID: String(pid), TMPDIR: temp, TMP: temp, TEMP: temp }, temp };
 }
 
 export async function runPlan(
@@ -163,11 +164,14 @@ async function runHeld(
   const baselines = new Map<string, string | undefined>();
   const results: MutantResult[] = [];
   let failure: unknown;
+  let temp: string | undefined;
   try {
+    const own = runnerEnv(io, options.env ?? (await readBaseEnv({ temp: false })), pid);
+    temp = own.temp;
     const ctx: TestRunContext = {
       root: options.root,
       scratchDir: journal.backups,
-      env: await runnerEnv(io, options, journal, pid),
+      env: own.env,
     };
     for (const [index, row] of rows.entries()) {
       const label = `#${index + 1} ${row.file} · ${row.test}`;
@@ -178,6 +182,8 @@ async function runHeld(
   } catch (error) {
     failure = error;
   }
+  // Временная папка прогона уходит с ним; не убралась — не повод терять возврат файлов.
+  if (temp !== undefined) io.remove(temp);
   const stuck = journal.restoreAll();
   // Журнал остаётся: следующий старт (наш или mustfail) вернёт файлы по нему.
   if (stuck.length > 0) throw new MutateRefusal(`mutate: НЕ ВЕРНУЛИСЬ файлы: ${stuck.join(', ')}`);

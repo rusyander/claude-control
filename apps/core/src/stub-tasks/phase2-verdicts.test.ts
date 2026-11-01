@@ -7,7 +7,12 @@ import { mapClaudePermission } from '../adapters/claude/permission.ts';
 import { mapQwenPermission } from '../adapters/qwen/permission.ts';
 import { actionReaders } from '../bootstrap/action-readers.ts';
 import { processCommand } from '../conductor/commands.ts';
-import { seedSession, toolDeps } from '../conductor/model-tools/__fixtures__/seed.ts';
+import { commandEnv } from '../conductor/commands/__fixtures__/command-env.ts';
+import {
+  seedRequirements,
+  seedSession,
+  toolDeps,
+} from '../conductor/model-tools/__fixtures__/seed.ts';
 import { bindingOf } from '../conductor/model-tools/binding.ts';
 import { handleModelTool } from '../conductor/model-tools/model-tools.ts';
 import { runAction } from '../conductor/outbox.ts';
@@ -21,7 +26,8 @@ import { newId } from '../lib/ids/uuidv7.ts';
 import { sweepMarker } from '../platform/env-marker.ts';
 import { decidePermit } from '../policy/permit/permit.ts';
 import type { PermitContext } from '../policy/permit/permit.types.ts';
-import { STUB_TASKS } from './__fixtures__/library/index.ts';
+import { READ_BY_FORGE, STUB_TASKS } from './__fixtures__/library/index.ts';
+import { decisionClasses, undeclaredDecisions } from './__fixtures__/decision-outcomes.ts';
 import { commandLine, fillDeep } from './__fixtures__/script.ts';
 import type { Phase2Probe, StubTask } from './__fixtures__/stub-tasks.types.ts';
 
@@ -43,8 +49,17 @@ function probes<K extends Phase2Probe['kind']>(kind: K): [string, number, StubTa
   );
 }
 
+/**
+ * Каждая строка, прочитанная пробой, проходит через исходы решений панели (этап 9, F1):
+ * решение настоящего кода, которому не объявлен исход, — красный тест здесь, а не заголовок
+ * без шаблона на экране.
+ */
+const seenClasses = new Set<string>();
 function linesAfter(task: LiveTask, seq: number) {
-  return readJournalLines(task.dir, task.taskId).lines.filter((l) => l.seq > seq);
+  const lines = readJournalLines(task.dir, task.taskId).lines.filter((l) => l.seq > seq);
+  expect(undeclaredDecisions(lines), 'decision outcome undeclared').toEqual([]);
+  for (const cls of decisionClasses(lines)) seenClasses.add(cls);
+  return lines;
 }
 
 function expectJournal(
@@ -60,6 +75,11 @@ describe('phase-2 verdicts of the stub-task library', () => {
     '%s probe %i: model tool on a live task',
     async (_id, _i, task, probe) => {
       const fresh = await openFresh();
+      // Требования задачи — строки журнала с id ядра: заявка на id, которого ядро не выдало, — отказ (G3).
+      seedRequirements(
+        fresh.task,
+        task.input.requirements.map((r) => r.id),
+      );
       const seeded = seedSession(fresh.task, { stepKind: task.input.stepKind });
       const bound = bindingOf(fresh.task, seeded.sessionId);
       if (!('binding' in bound)) throw new Error(bound.reason);
@@ -167,6 +187,7 @@ describe('phase-2 verdicts of the stub-task library', () => {
           proof: {},
         },
         async () => probe.proof,
+        commandEnv(),
       );
       expect(result.status).toBe(probe.expect.status);
       if (probe.expect.code) expect(result.code).toBe(probe.expect.code);
@@ -189,7 +210,7 @@ describe('phase-2 verdicts of the stub-task library', () => {
  * Мир одного действия: цель, подсказка сверки, сам эффект и `count` — сколько раз эффект виден
  * В МИРЕ (каталог на диске, помеченный процесс в таблице ОС), а не счётчик в замыкании теста:
  * тот рос только внутри самого эффекта, и проверка «сверка не повторила эффект» не могла
- * покраснеть (F-79). `count` нет — у действия нет мира фазы 2 (пуш, MR, трекер).
+ * покраснеть (F-79). `count` нет — у действия нет мира фазы 2 (трекер, контейнер).
  */
 interface World {
   target: string;
@@ -249,7 +270,7 @@ function worldFor(kind: ActionKind): World {
       cleanup: () => undefined,
     };
   }
-  // Пуш, MR, ответ, трекер, контейнер: мира фазы 2 нет — эффект только счётчик.
+  // Трекер, контейнер: мира фазы 2 нет — эффект только счётчик.
   return {
     target: `stub/${kind}`,
     hint: `stub-${kind}`,
@@ -260,7 +281,10 @@ function worldFor(kind: ActionKind): World {
 
 describe('outbox crash inside every action (P86)', () => {
   it.each(
-    probes('reconcile').map(([id, i, task, p]) => [p.action, p.cut, id, i, task, p] as const),
+    probes('reconcile')
+      // Действия публикации судит `outbox-crash.forge.test.ts`: их мир — голый репозиторий и форж.
+      .filter(([, , , p]) => !READ_BY_FORGE.includes(p.action))
+      .map(([id, i, task, p]) => [p.action, p.cut, id, i, task, p] as const),
   )('%s killed %s: the new core reconciles by fact', async (kind, cut, _id, _i, _task, probe) => {
     const fresh = await openFresh();
     const world = worldFor(kind);
@@ -338,3 +362,12 @@ async function reconcileCase(
     expect(linesAfter(task, beforeLate).map((l) => l.kind)).toContain(want.pastWindow.then);
   }
 }
+
+// Последним в файле: пробы выше уже прошли и записали классы, которые настоящий код журналит.
+describe('panel decision outcomes over the phase-2 probes (stage 9, F1)', () => {
+  it('the probes above journaled decisions of these classes, each with a declared outcome', () => {
+    // Классы, чей писатель не исполняется пробами фазы 2, держит равенство типов в
+    // `api/decision-outcomes.test.ts` (вид выхода ядра = объявленный список исходов).
+    expect([...seenClasses].sort()).toEqual(['human-point', 'reconcile']);
+  });
+});

@@ -377,7 +377,15 @@ export class SdkSession {
           input:
             typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {},
         });
-        this.emit([{ type: 'ask', ask, denied: true }]);
+        const toolUseId = control.request.tool_use_id;
+        this.emit([
+          {
+            type: 'ask',
+            ask,
+            denied: true,
+            ...(typeof toolUseId === 'string' && toolUseId !== '' ? { toolUseId } : {}),
+          },
+        ]);
       } catch (error) {
         // Сопоставление упало — вопрос всё равно получает отказ, а сбой назван (core-s2 F-42).
         this.emit([

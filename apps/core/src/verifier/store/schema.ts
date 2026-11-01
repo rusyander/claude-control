@@ -43,6 +43,50 @@ const verdict = z.discriminatedUnion('kind', [
 
 const testRef = z.strictObject({ file: z.string().optional(), name: z.string().min(1) });
 
+/**
+ * Итог классов migration/contract (зона F): часть записи, а не строка в сжатом логе — читатель
+ * берёт его из подписанного файла, и подмена итога ломает подпись, как подмена вердикта.
+ */
+const migrationOutcome = z.strictObject({
+  applied: z.array(z.string()),
+  down: z.enum(['reverted', 'differs', 'not-supported']),
+  schemaDiff: z.strictObject({ added: z.array(z.string()), removed: z.array(z.string()) }),
+  findings: z.array(
+    z.strictObject({
+      file: z.string(),
+      statement: z.string(),
+      kind: z.enum([
+        'drop',
+        'truncate',
+        'delete-without-where',
+        'update-without-where',
+        'alter-type',
+        'other',
+      ]),
+    }),
+  ),
+  failed: z.strictObject({ file: z.string(), tail: z.string() }).nullable(),
+});
+
+const contractOutcome = z.strictObject({
+  format: z.enum(['openapi', 'proto', 'graphql']),
+  file: z.string(),
+  changes: z.array(
+    z.strictObject({
+      kind: z.enum(['removed', 'added', 'changed']),
+      at: z.string(),
+      breaking: z.boolean(),
+      detail: z.string(),
+    }),
+  ),
+  generatedDrift: z.array(z.string()).nullable(),
+});
+
+const classOutcome = z.discriminatedUnion('class', [
+  z.strictObject({ class: z.literal('migration'), value: migrationOutcome }),
+  z.strictObject({ class: z.literal('contract'), value: z.array(contractOutcome) }),
+]);
+
 const draftShape = {
   key: sha,
   parts: keyPartsSchema,
@@ -64,6 +108,7 @@ const draftShape = {
   standEpoch: z.number().nullable(),
   taskId: uuid.nullable(),
   checkRunId: uuid.nullable(),
+  classOutcome: classOutcome.optional(),
 };
 
 export const recordDraftSchema = z.strictObject(draftShape);

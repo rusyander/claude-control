@@ -1,0 +1,23 @@
+{
+  "name": "@agentdeck/pricing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Тарифы моделей и расчёт стоимости токенов — общие для панели и ядра, без сети и файлов",
+  "exports": {
+    "./pricing": "./src/pricing.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentdeck/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

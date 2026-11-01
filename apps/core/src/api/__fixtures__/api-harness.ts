@@ -1,5 +1,6 @@
 import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
+import { dirname } from 'node:path';
 import type { CommandEnvelope, CommandKind } from '@agentdeck/contracts/core/commands';
 import {
   buildSignedMessage,
@@ -9,17 +10,22 @@ import {
   toBase64Url,
   utf8Bytes,
 } from '@agentdeck/contracts/phone-signing';
+import type { SplitEnv } from '../../conductor/estimate/index.ts';
 import { createTaskRegistry, type TaskRegistry } from '../../conductor/tasks.ts';
 import { CREATED, deps, fakeClock, tempDir } from '../../journal/__fixtures__/journal-harness.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
+import { layoutOf, type CoreHomeLayout } from '../../platform/core-home.ts';
+import { ensureDir } from '../../platform/safe-io/files.ts';
 import { createNonceStore, type NonceStore } from '../../policy/authority/nonce.ts';
 import {
   publicKeyHash,
   sha256Hex,
   type SigningDevice,
 } from '../../policy/authority/device-signature.ts';
+import { WindowBook } from '../../economy/window/index.ts';
 import { signedBody, type PeerDeps } from '../auth.ts';
-import { buildApi } from '../server.ts';
+import type { ConfigPort } from '../config.types.ts';
+import { buildApi, type ApiDeps } from '../server.ts';
 
 /**
  * Стенд API ядра для тестов: настоящий Fastify на 127.0.0.1 со случайным портом, настоящий
@@ -82,6 +88,12 @@ export interface Stand {
   /** Часы журнала задач стенда — тесты двигают их сами. */
   clock: ReturnType<typeof fakeClock>;
   registry: TaskRegistry;
+  /** Дом ядра стенда: задачи в `layout.tasks`, библиотека сценариев — `layout.scenarios`. */
+  layout: CoreHomeLayout;
+  /** Книга окон, которую читает `/v1/health`: тест кладёт в неё факт предела. */
+  windows: WindowBook;
+  /** Отдать API среду деления (как загрузка после `startConductor`); `undefined` — дирижёра нет. */
+  setSplit(env: SplitEnv | undefined): void;
   nonces: NonceStore;
   taskId: string;
   device: Device;
@@ -96,11 +108,27 @@ export interface Stand {
   close(): Promise<void>;
 }
 
-export async function startStand(tasksDir = tempDir('api-')): Promise<Stand> {
+/**
+ * Перезапуск передаёт каталог задач прежнего стенда — дом тот же, `<дом>/tasks`. `config` — порт
+ * настройки ядра (этап 7): без него `/v1/config` отвечает 501, как у загрузки без зоны настройки.
+ */
+export async function startStand(
+  tasksDir?: string,
+  opts: {
+    config?: () => ConfigPort | undefined;
+    routes?: ApiDeps['routes'];
+    devices?: ApiDeps['devices'];
+  } = {},
+): Promise<Stand> {
+  const layout = layoutOf(tasksDir ? dirname(tasksDir) : tempDir('api-'));
+  ensureDir(layout.tasks);
   const clock = fakeClock();
-  const registry = createTaskRegistry(tasksDir, deps({ clock }));
+  const registry = createTaskRegistry(layout.tasks, deps({ clock }));
+  // Дирижёра у стенда нет: оценка и запуск отказывают «не подключено», пока тест не отдаст среду.
+  let split: SplitEnv | undefined;
   const task = await registry.create(CREATED);
   const nonces = createNonceStore();
+  const windows = new WindowBook();
   const device = makeDevice();
   const peer = {
     direct: DIRECT_PID as number | 'unknown',
@@ -118,6 +146,7 @@ export async function startStand(tasksDir = tempDir('api-')): Promise<Stand> {
   };
   const app = buildApi({
     registry,
+    env: { layout, split: () => split },
     tokens: {
       core: TOKENS.core,
       panelBearer: TOKENS.panel,
@@ -131,10 +160,14 @@ export async function startStand(tasksDir = tempDir('api-')): Promise<Stand> {
       bootId: newId(),
       pid: process.pid,
       startedAt: Date.now(),
-      home: tasksDir,
+      home: layout.root,
     },
+    windows,
     now: Date.now,
     pingMs: 60_000,
+    ...(opts.config ? { config: opts.config } : {}),
+    ...(opts.routes ? { routes: opts.routes } : {}),
+    ...(opts.devices ? { devices: opts.devices } : {}),
   });
   await app.listen({ host: '127.0.0.1', port: 0 });
   const url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
@@ -144,6 +177,11 @@ export async function startStand(tasksDir = tempDir('api-')): Promise<Stand> {
     url,
     clock,
     registry,
+    layout,
+    windows,
+    setSplit(env) {
+      split = env;
+    },
     nonces,
     taskId: task.taskId,
     device,

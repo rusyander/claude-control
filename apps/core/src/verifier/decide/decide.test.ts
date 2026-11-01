@@ -67,7 +67,7 @@ function input(over: Partial<CheckDecisionInput> = {}): CheckDecisionInput {
     inflight: null,
     phase: 'final',
     changedUnits: ['app'],
-    window: { verdict: 'open', basis: 'not-modelled-until-phase-5' },
+    window: { verdict: 'open', basis: 'economy-window' },
     fresh: null,
     quarantined: [],
     ...over,
@@ -207,14 +207,13 @@ describe('verifier/decide', () => {
     expect(withRecords([rec()], { inflight }).kind).toBe('replay');
   });
 
-  it('G12 only a refused window defers; open, warn and not-modelled never block a run', () => {
+  it('G12 only a refused window defers; open and warn never block a run', () => {
     const refused = withRecords([], {
       window: { verdict: 'refused', basis: 'economy-window' },
     });
     expect(refused).toMatchObject({ kind: 'defer', until: 'window' });
     for (const verdict of ['open', 'warn'] as const)
-      for (const basis of ['economy-window', 'not-modelled-until-phase-5'] as const)
-        expect(withRecords([], { window: { verdict, basis } }).kind).toBe('run');
+      expect(withRecords([], { window: { verdict, basis: 'economy-window' } }).kind).toBe('run');
     expect(
       withRecords([rec()], { window: { verdict: 'refused', basis: 'economy-window' } }).kind,
     ).toBe('replay');

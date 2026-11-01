@@ -17,9 +17,17 @@ export type Template = string;
 
 export type Move =
   | { op: 'write'; path: Template; content: string }
-  | { op: 'read'; path: Template }
-  /** Команда оболочки CLI; `background` — фоновый запуск (пробуждение CLI после хода, P48). */
-  | { op: 'shell'; argv: Template[]; background?: boolean }
+  /**
+   * Чтение файла; `range` — окно строк (этап 8: перечитывание того же окна против соседних —
+   * разные вызовы для наблюдателя). Инструмент чтения CLI без полей окна — чтение целиком.
+   */
+  | { op: 'read'; path: Template; range?: { offset: number; limit: number } }
+  /**
+   * Команда оболочки CLI; `background` — фоновый запуск (пробуждение CLI после хода, P48).
+   * `exit` — код выхода, который сообщает ПОДДЕЛЬНЫЙ CLI (этап 8: повтор падающей команды);
+   * настоящий CLI исполняет команду, и код у него свой — поле он не видит.
+   */
+  | { op: 'shell'; argv: Template[]; background?: boolean; exit?: number }
   /**
    * Вызов инструмента сервера `agentdeck`. `invalid: true` — ход намеренно не проходит схему
    * (P72): тест библиотеки требует, чтобы схема его ОТВЕРГЛА, а не приняла.
@@ -31,7 +39,54 @@ export type Move =
 export interface MoveTiming {
   holdMs?: number;
   stallMs?: number;
+  /**
+   * Метка: ход CLI кончается ПОСЛЕ этого хода (этап 8: пакет подсказок уходит на конце хода).
+   * Настоящий CLI кончает ход сам, на ответе текстом, — поэтому сценарий заглушки за помеченным
+   * ходом вставляет ответ текстом (`TURN_END_TEXT`), следующий ход задачи идёт в следующем ходе CLI.
+   * Подделка CLI на метке пишет конец хода.
+   */
+  turnEnd?: true;
+  /**
+   * Расход ответа модели на этом ходе (этап 8, рост контекста): токены, которые CLI сообщит
+   * событием `usage`. Заглушка кладёт их в `usage` ответа протокола (`input` + `cacheWrite` — во
+   * вход, `cacheRead` — в поле кеша); подделка CLI пишет событие как есть. Нет — расход заглушки
+   * по умолчанию (10 / 2), подделка не пишет ничего.
+   */
+  usage?: MoveUsage;
+  /**
+   * Факт окна подписки на ответе этого хода (этап 8, окно маршрута): заглушка отдаёт его
+   * заголовками предела протокола, подделка CLI — событием `window`. Нет — заголовков нет.
+   */
+  window?: MoveWindow;
 }
+
+export interface MoveUsage {
+  input: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  /** Ответ подагента CLI (у него нет своей сессии ядра — контекст главной он не растит). */
+  subagent?: true;
+  /** Окно контекста, которое назвала сама сессия (claude `result.modelUsage`), — вход CLI. */
+  contextWindow?: number;
+}
+
+export interface MoveWindow {
+  /** Вердикт источника: обслуживает / обслуживает с предупреждением / отказал. */
+  status: 'allowed' | 'allowed_warning' | 'rejected';
+  /** Занятая доля окна, 0..100. */
+  usedPct: number;
+  /** Через сколько мс от ответа окно сбросится. */
+  resetInMs: number;
+}
+
+/**
+ * Аренда маршрута, которую шаг взял при запуске (этап 8, утечка ресурса): ресурс аренды —
+ * строка `resource.created` ядра, сессия называет аренду (`session.started.lease`), в конце
+ * задачи её снимает настоящий `releaseTaskLeases`. `released` — маршрут снял и подтвердил;
+ * `refused` — снятие маршрута отказало с этой причиной (внешняя граница: сервер маршрута).
+ */
+export type LeaseFault = { release: 'released' } | { release: 'refused'; reason: string };
 
 export type TimedMove = Move & MoveTiming;
 
@@ -128,6 +183,25 @@ export type Phase2Probe =
       expect: ReconcileExpect;
     };
 
+/** Зона этапа 4, чья проба (`.agent/tmp/core-s4-plan.agent.md` §1). */
+export type Stage4Zone = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
+/**
+ * Проба дирижёра этапа 4: что зона обязана показать на настоящем цикле (волна 2) — свойство,
+ * команды человека по дороге, строки журнала и классы решений. До волны 2 тест библиотеки
+ * сверяет её с контрактами: вид команды, вид строки и класс решения — существующие.
+ */
+export interface Phase4Probe {
+  zone: Stage4Zone;
+  property: PropertyId;
+  /** Команды человека, которые проба подаёт, по порядку (тело — из `COMMAND_FIELDS`). */
+  commands?: { kind: CommandKind; fields: Record<string, unknown> }[];
+  expect: {
+    journal: { present?: JournalKind[]; absent?: JournalKind[] };
+    decisions?: DecisionClassId[];
+  };
+}
+
 export interface ReconcileExpect {
   verdict: 'happened' | 'not-happened' | 'retry' | 'ask';
   /** Строка журнала, которую пишет решение (`null` — только само решение). */
@@ -156,5 +230,13 @@ export interface StubTask {
   verdicts: Verdict[];
   observer: ObserverExpectation;
   phase2: Phase2Probe[];
+  /** Пробы этапа 4; задача без них — дирижёр её только проводит, ничего своего не судит. */
+  phase4?: Phase4Probe[];
   e2e?: EndToEnd;
+  /** Аренда маршрута шага и исход её снятия; нет — шаг без аренды. */
+  lease?: LeaseFault;
+  /** Окно контекста маршрута шага в токенах; нет — неизвестно (рост контекста молчит). */
+  routeWindowTokens?: number;
+  /** `grantRequired` конфига ядра для репозитория задачи (P130); нет — пусто. */
+  grantRequired?: { globs: string[]; ops: ('edit' | 'exec-db')[] }[];
 }

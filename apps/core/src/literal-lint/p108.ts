@@ -18,19 +18,19 @@ import type { LiteralRule, LiteralRuleSet } from './literal-lint.ts';
 
 const TEST_FILES = ['\\.test\\.ts$', '(^|/)__fixtures__/'];
 
-/** Псевдонимы моделей Claude CLI — в реестре их нет (это не семейства-лестницы), список здесь. */
-export const CLAUDE_MODEL_ALIASES = ['opus', 'sonnet', 'haiku'] as const;
-
 /** Виды маршрутов (`RouteKind` шва): id маршрута — `<вид>:<имя>`. */
 export const ROUTE_ID_PREFIXES = ['cli-login', 'api-key', 'local', 'gateway', 'stub'] as const;
 
 const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
 const alternatives = (values: readonly string[]): string =>
-  // Длинные раньше коротких: `gemini-flash-lite` не съедается `gemini-flash`.
-  [...values]
-    .sort((a, b) => b.length - a.length || a.localeCompare(b))
-    .map(escape)
-    .join('|');
+  // Пустой список не совпадает ни с чем: `^()\b` поймал бы любую строку.
+  values.length === 0
+    ? '(?!)'
+    : // Длинные раньше коротких: `gemini-flash-lite` не съедается `gemini-flash`.
+      [...values]
+        .sort((a, b) => b.length - a.length || a.localeCompare(b))
+        .map(escape)
+        .join('|');
 
 export function p108Rules(literals: CliLiterals): LiteralRule[] {
   return [
@@ -74,7 +74,8 @@ export function p108Rules(literals: CliLiterals): LiteralRule[] {
     {
       id: 'model-alias',
       in: 'strings',
-      pattern: `^(claude-)?(${alternatives(CLAUDE_MODEL_ALIASES)})(\\b|$)`,
+      // Алиасы и приставки полных имён — ступени модели фактов CLI (`modelRungs`), не список здесь.
+      pattern: `^(${alternatives(literals.modelAliases)})(\\b|$)`,
       message: 'a model alias of one CLI belongs to that adapter.',
     },
     {
@@ -96,7 +97,8 @@ export function p108Rules(literals: CliLiterals): LiteralRule[] {
  * Разрешённые папки ровно по спеке (11 §Code shape, P108): `adapters/<cli>/` каждого CLI реестра,
  * `routes/<вид>/` каждого вида маршрута и `routes/{compat, hops}`. Общие части слоя (`launcher`,
  * `sdk-stream`, `deny-overlay`, реестр и адрес маршрутов) перебирают реестр и никого не называют
- * (F-94: раньше разрешался весь `adapters/` и весь `routes/`).
+ * (F-94: раньше разрешался весь `adapters/` и весь `routes/`). `hop-host/` — процесс звена за
+ * `routes/hops` (11 §Hop chain): переводит протоколы вендоров, их имена там — сам протокол.
  */
 export function p108Allowed(literals: CliLiterals): string[] {
   return [
@@ -104,6 +106,7 @@ export function p108Allowed(literals: CliLiterals): string[] {
     ...ROUTE_ID_PREFIXES.map((kind) => `routes/${kind}`),
     'routes/compat',
     'routes/hops',
+    'hop-host',
   ];
 }
 

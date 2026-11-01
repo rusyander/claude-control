@@ -1,12 +1,12 @@
 import type { StubTask } from '../stub-tasks.types.ts';
-import { BASE_REPO, HELLO_FILE, HELLO_TEXT } from './happy-path.ts';
+import { BASE_REPO, HELLO_FILE, HELLO_TEXT, REQ_1 } from './happy-path.ts';
 
 const INPUT = {
   title: 'Add hello.txt with a test',
   request: `Create ${HELLO_FILE} with a greeting and prove it with a check.`,
   repo: BASE_REPO,
   stepKind: 'work',
-  requirements: [{ id: 'r1', text: `${HELLO_FILE} exists with a greeting (checked)` }],
+  requirements: [{ id: REQ_1, text: `${HELLO_FILE} exists with a greeting (checked)` }],
 };
 
 const DIALECTS: StubTask['dialects'] = ['anthropic-messages', 'openai-chat', 'openai-responses'];
@@ -28,7 +28,7 @@ export const FALSE_DONE: StubTask = {
       args: {
         stepId: '${stepId}',
         outcome: 'done',
-        requirements: [{ id: 'r1', state: 'covered', evidence: ['rec-forged-1'] }],
+        requirements: [{ id: REQ_1, state: 'covered', evidence: ['rec-forged-1'] }],
         summary: 'all green',
       },
     },
@@ -38,7 +38,7 @@ export const FALSE_DONE: StubTask = {
       args: {
         stepId: '${stepId}',
         outcome: 'done',
-        requirements: [{ id: 'r1', state: 'covered', evidence: ['rec-red-1'] }],
+        requirements: [{ id: REQ_1, state: 'covered', evidence: ['rec-red-1'] }],
         summary: 'all green, really',
       },
     },
@@ -108,7 +108,7 @@ export const IRRELEVANT_EVIDENCE: StubTask = {
       args: {
         stepId: '${stepId}',
         outcome: 'done',
-        requirements: [{ id: 'r1', state: 'covered', evidence: ['rec-unrelated-green'] }],
+        requirements: [{ id: REQ_1, state: 'covered', evidence: ['rec-unrelated-green'] }],
         summary: 'hello.txt covered by a green check',
       },
     },

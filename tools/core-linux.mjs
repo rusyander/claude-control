@@ -132,9 +132,25 @@ function quote(arg) {
  * Тесты ядра, которые поднимают кусок панели отдельным процессом (P23: прокладка
  * `apps/server/src/routes/core-proxy`), — их входы. Внутрь идёт только замыкание
  * относительных импортов от входа, а не весь `apps/server/src` (~40 МБ): pid пира читается
- * по-разному на каждой ОС, и Linux должен судить настоящий код прокладки.
+ * по-разному на каждой ОС, и Linux должен судить настоящий код прокладки. `dev-watch.mjs` и
+ * `dev-boot-probe.mjs` копирует в одноразовый корень тест P131 (запись звена панели при
+ * перезапуске): без них в копии он падал на ENOENT, а не на поведении.
  */
-const PANEL_ENTRIES = ['apps/server/src/routes/core-proxy/__fixtures__/proxy-host.ts'];
+const PANEL_ENTRIES = [
+  'apps/server/src/routes/core-proxy/__fixtures__/proxy-host.ts',
+  'apps/server/src/lib/dev-watch.mjs',
+  'apps/server/src/lib/dev-boot-probe.mjs',
+];
+
+/**
+ * Данные панели, которые тесты ядра читают как данные, а не импорт: записанная строка CLI
+ * (окно лимита Claude, `adapters/claude/window.test.ts`) и шаблоны чата llama-server
+ * (пометка отложенных инструментов, `hop-host/.../deferred-tools.test.ts`).
+ */
+const PANEL_DATA = [
+  'apps/server/src/domains/chat/__fixtures__/stream-json-2.1.177.jsonl',
+  'apps/server/src/domains/local-models/data/templates',
+];
 
 const RELATIVE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.{1,2}\/[^'"]+)['"]/g;
 
@@ -148,7 +164,12 @@ function importClosure(root, entries) {
     const abs = join(root, rel);
     if (!existsSync(abs)) throw new Error(`[core-linux] import closure: ${rel} not found`);
     seen.add(rel);
-    for (const [, spec] of readFileSync(abs, 'utf8').matchAll(RELATIVE_IMPORT)) {
+    // Строки комментариев пропускаются: пример `import './x'` в комментарии — не импорт.
+    const code = readFileSync(abs, 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+      .join('\n');
+    for (const [, spec] of code.matchAll(RELATIVE_IMPORT)) {
       queue.push(posix.normalize(posix.join(posix.dirname(rel), spec)));
     }
   }
@@ -162,6 +183,10 @@ function copyList() {
   }
   list.push('packages', 'apps/core');
   list.push(...importClosure(ROOT, PANEL_ENTRIES));
+  for (const rel of PANEL_DATA) {
+    if (!existsSync(join(ROOT, rel))) throw new Error(`[core-linux] panel data: ${rel} not found`);
+    list.push(rel);
+  }
   // Правила линта ядра проверяются тестом ядра (`*.lint.test.ts`) — без них он падает на импорте.
   if (existsSync(join(ROOT, 'tools', 'eslint-rules'))) list.push('tools/eslint-rules');
   // globalSetup ядра (vitest.config.ts); в копии без .git он видит «мутации нет».

@@ -294,6 +294,23 @@ export const queryKeys = {
   logs: {
     sources: (projectPath: string) => ['logs', 'sources', projectPath] as const,
   },
+  /**
+   * Ядро задач (этап 9) — отдельный процесс за прокладкой `/api/core/*`. Корень один: ядро
+   * перезапустилось — перечитывается всё его, а не угаданный кусок.
+   */
+  core: {
+    all: ['core'] as const,
+    health: ['core', 'health'] as const,
+    tasks: ['core', 'tasks'] as const,
+    task: (taskId: string) => ['core', 'tasks', taskId] as const,
+    routes: ['core', 'routes'] as const,
+    scenarios: ['core', 'scenarios'] as const,
+    scenario: (ref: string) => ['core', 'scenarios', ref] as const,
+    config: ['core', 'config'] as const,
+    record: (id: string) => ['core', 'records', id] as const,
+    report: (taskId: string) => ['core', 'tasks', taskId, 'report'] as const,
+    profile: (repoKey: string) => ['core', 'profiles', repoKey] as const,
+  },
 };
 
 /**

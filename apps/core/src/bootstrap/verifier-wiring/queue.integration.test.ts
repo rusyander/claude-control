@@ -119,6 +119,38 @@ describe('queue wiring on a real repo, home and task (zone C)', () => {
     s.task.close();
   }, 120_000);
 
+  it('P61 a session secret printed by a failing check is masked in the reply the model reads', async () => {
+    const s = await stand();
+    const secret = 'plainsessionvalue0123456789';
+    writeFileSync(
+      join(s.repo, 'leak.mjs'),
+      `console.log('FAIL leaks ${secret}');\nconsole.error('boom ${secret}');\nprocess.exit(1);\n`,
+    );
+    writeFileSync(
+      join(s.repo, '.agentdeck/checks.json'),
+      `${JSON.stringify({
+        v: 1,
+        checks: [
+          { id: 'leak', class: 'static', argv: ['node', 'leak.mjs'], requiredAt: ['publish'] },
+        ],
+      })}\n`,
+    );
+    const asked: [string, string][] = [];
+    const w = queueWiring({
+      registry: { live: () => s.task },
+      layout: s.home,
+      known: (taskId, sessionId) => {
+        asked.push([taskId, sessionId]);
+        return [secret];
+      },
+    });
+    const reply = (await w.check(s.task, s.b, { checkId: 'leak' })) as ModelCheckReply;
+    expect(reply.verdict).toBe('fail');
+    expect(asked).toEqual([[s.task.taskId, s.b.sessionId]]);
+    expect(JSON.stringify(reply)).not.toContain(secret);
+    s.task.close();
+  }, 120_000);
+
   it('idle pre-run of a finished task runs the project check; the final request replays it', async () => {
     const s = await stand();
     const w = queueWiring({ registry: { live: () => s.task }, layout: s.home });

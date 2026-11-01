@@ -1,0 +1,7 @@
+/* Короткие поля шага — сеткой по ширине формы: на узком экране в столбец,
+   на широком по два-три в ряд, длинное указание шагу — во всю ширину. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-xs) var(--spacing-sm);
+}

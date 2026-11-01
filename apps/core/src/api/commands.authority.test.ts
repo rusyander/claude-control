@@ -49,13 +49,24 @@ describe('POST /v1/commands: authority before the task opens', () => {
   it('F-47 V2 a session token and a proofless core token on an ENDED task after restart: 409, the journal is untouched, the task stays closed', async () => {
     const s = await seeded((task) => {
       task.append({ kind: 'task.ended', actor: 'core', data: { outcome: 'cancelled' } });
+      // Конец закрыт (отчёт есть): без отчёта загрузка открыла бы задачу, чтобы закрыть его.
+      task.append({
+        kind: 'report.final',
+        actor: 'core',
+        data: { at: 'ended', report: { sha256: 'a'.repeat(64), bytes: 1 } },
+      });
     });
     core = await bootCore({ home: s.home, build: 'cmd-auth' });
     expect(core.registry.live(s.taskId)).toBeUndefined();
     const before = lines(s.dir, s.taskId).length;
     const sessionToken = core.sessionTokens.mint({ taskId: s.taskId, sessionId: newId() });
     const coreToken = readFileSync(s.layout.token, 'utf8').trim();
-    const envelope = { kind: 'pause', target: { taskId: s.taskId }, fields: {}, proof: {} };
+    const envelope = {
+      kind: 'pause',
+      target: { taskId: s.taskId },
+      fields: { now: false },
+      proof: {},
+    };
     for (const bearer of [sessionToken, sessionToken, coreToken]) {
       const res = await post(core.url, bearer, { ...envelope, cmdId: newId() });
       expect(res.status).toBe(409);

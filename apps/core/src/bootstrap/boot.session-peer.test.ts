@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTaskRegistry } from '../conductor/tasks.ts';
-import { CREATED, deps, tempDir } from '../journal/__fixtures__/journal-harness.ts';
+import {
+  CREATED,
+  deps,
+  FIRST_ROUND,
+  SOLO_UNIT,
+  tempDir,
+} from '../journal/__fixtures__/journal-harness.ts';
 import type { LiveTask } from '../journal/resume.ts';
 import { newId } from '../lib/ids/uuidv7.ts';
 import { ensureCoreHome } from '../platform/core-home.ts';
@@ -57,14 +63,14 @@ function seedRealSession(task: LiveTask, host: { pid: number; start: string }): 
     kind: 'unit.created',
     actor: 'core',
     unitId,
-    data: { unitId, repoKey: 'r1', branch: 'agentdeck/peer', ownedPaths: [] },
+    data: { unitId, repoKey: 'r1', branch: 'agentdeck/peer', ownedPaths: [], ...SOLO_UNIT },
   });
   task.append({
     kind: 'step.started',
     actor: 'core',
     unitId,
     stepId,
-    data: { stepId, unitId, stepKind: 'work', budgetMs: 600_000 },
+    data: { stepId, unitId, stepKind: 'work', budgetMs: 600_000, ...FIRST_ROUND },
   });
   task.append({
     kind: 'step.transition',

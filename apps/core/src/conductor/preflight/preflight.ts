@@ -70,6 +70,8 @@ async function checkRoad(
     };
   if (road === 'container-engine' && input.needsServices === false)
     return { road, status: 'skipped', detail: 'profile needs no services' };
+  if (road === 'git-version' && input.publishes === false)
+    return { road, status: 'skipped', detail: 'the scenario does not publish' };
   const probe = probes[road];
   if (!probe)
     return { road, status: 'unknown', detail: 'not wired: no probe for this road in this build' };

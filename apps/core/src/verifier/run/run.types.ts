@@ -51,6 +51,8 @@ export interface RunResult {
   failedCount?: number;
   standEpoch: number | null;
   standMoved: boolean;
+  /** Итог своего исполнителя класса (migration/contract, зона F) — ложится в запись под подпись. */
+  classOutcome?: NonNullable<CheckRecord['classOutcome']>;
   /** Остановка дерева оставила процессы или не доказана — названо, не скрыто (P40). */
   residual?: string;
   /** Временный каталог прогона снят и перечитан (P40); иначе причина. */

@@ -1,0 +1,38 @@
+/* Хэши, пути и id без пробелов: без переноса строка уходит за край карточки. */
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+/* Проза ядра бывает списком строк через перевод строки (пути вне своих) — переносы сохраняются. */
+.text {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px var(--spacing-xs);
+  margin: 0;
+}
+
+.facts dt,
+.facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.items {
+  margin: 0;
+  padding-left: var(--spacing-md);
+}
+
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -2,7 +2,15 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { parseDarwinPs, parseProcStat, parseWinTable, readLinuxTable } from './process-table.ts';
+import {
+  cpuSourceOf,
+  DARWIN_PS_ARGS,
+  parseDarwinPs,
+  parseProcStat,
+  parsePsTime,
+  parseWinTable,
+  readLinuxTable,
+} from './process-table.ts';
 import { parseLsofTcp, parseWinTcp, readLinuxTcp, socketOwners } from './tcp-table.ts';
 
 /**
@@ -14,9 +22,19 @@ import { parseLsofTcp, parseWinTcp, readLinuxTcp, socketOwners } from './tcp-tab
 const root = mkdtempSync(join(tmpdir(), 'proc readers ü '));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-/** `pid (comm) state ppid …` — 22-е поле starttime. */
-function statLine(pid: number, comm: string, state: string, ppid: number, start: number): string {
+/** `pid (comm) state ppid …` — 14/15-е поля utime/stime (тики), 22-е — starttime. */
+function statLine(
+  pid: number,
+  comm: string,
+  state: string,
+  ppid: number,
+  start: number,
+  cpu: [number, number] = [0, 0],
+): string {
   const fields = [state, String(ppid), ...Array.from({ length: 17 }, () => '0'), String(start)];
+  // Поле N → fields[N - 3]: utime (14) и stime (15).
+  fields[11] = String(cpu[0]);
+  fields[12] = String(cpu[1]);
   return `${pid} (${comm}) ${fields.join(' ')} 0 0\n`;
 }
 
@@ -44,7 +62,7 @@ describe('P56 process table — /proc reader', () => {
     const table = readLinuxTable(proc);
     if (!('value' in table)) throw new Error(JSON.stringify(table));
     expect(table.value.sort((a, b) => a.pid - b.pid)).toEqual([
-      { pid: 1, ppid: 0, start: 'abcdef12:5', startMs: 1_700_000_000_050, image: 'init' },
+      { pid: 1, ppid: 0, start: 'abcdef12:5', startMs: 1_700_000_000_050, image: 'init', cpuMs: 0 },
       {
         pid: 20,
         ppid: 1,
@@ -52,6 +70,7 @@ describe('P56 process table — /proc reader', () => {
         startMs: 1_700_000_002_500,
         zombie: true,
         image: 'odd ) (name',
+        cpuMs: 0,
       },
       {
         pid: 21,
@@ -60,6 +79,7 @@ describe('P56 process table — /proc reader', () => {
         startMs: 1_700_000_003_000,
         zombie: true,
         image: 'dead',
+        cpuMs: 0,
       },
     ]);
   });
@@ -70,7 +90,9 @@ describe('P56 process table — /proc reader', () => {
       '7/stat': statLine(7, 'x', 'S', 1, 9),
     });
     expect(readLinuxTable(noBoot)).toEqual({
-      value: [{ pid: 7, ppid: 1, start: 'boot:9', startMs: 1_700_000_000_090, image: 'x' }],
+      value: [
+        { pid: 7, ppid: 1, start: 'boot:9', startMs: 1_700_000_000_090, image: 'x', cpuMs: 0 },
+      ],
     });
     const noBtime = fakeProc('proc-c', { stat: 'cpu 1\n' });
     expect(readLinuxTable(noBtime)).toEqual({ unknown: `${noBtime}/stat has no btime` });
@@ -79,8 +101,8 @@ describe('P56 process table — /proc reader', () => {
 
   it('P56 parsers: a stat line with a non-numeric starttime is refused; Windows rows with created 0 have no start; ps lines with a bad date are skipped', () => {
     expect(parseProcStat('5 (x) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 zz')).toBeUndefined();
-    expect(parseWinTable('4 0 0\nnot a row\n8 4 133000000000000000\n')).toEqual([
-      { pid: 4, ppid: 0, start: '', startMs: Number.NaN },
+    expect(parseWinTable('4 0 0 0\nnot a row\n8 4 133000000000000000 0\n')).toEqual([
+      { pid: 4, ppid: 0, start: '', startMs: Number.NaN, cpuMs: 0 },
       expect.objectContaining({ pid: 8, ppid: 4, start: '133000000000000000' }),
     ]);
     expect(parseDarwinPs('  10     1 Ss   Xyz Abc 99 99:99:99 2026 /sbin/launchd\n')).toEqual([]);
@@ -88,15 +110,61 @@ describe('P56 process table — /proc reader', () => {
 
   it('A2-F02 image column: Windows rows carry the image name (spaces kept, absent when the snapshot has none), macOS rows the ucomm', () => {
     expect(
-      parseWinTable('4 0 0 System\n0 0 0\n8 4 133000000000000000 Claude Code Helper.exe\r\n'),
+      parseWinTable('4 0 0 0 System\n0 0 0 0\n8 4 133000000000000000 0 Claude Code Helper.exe\r\n'),
     ).toEqual([
-      { pid: 4, ppid: 0, start: '', startMs: Number.NaN, image: 'System' },
-      { pid: 0, ppid: 0, start: '', startMs: Number.NaN },
+      { pid: 4, ppid: 0, start: '', startMs: Number.NaN, image: 'System', cpuMs: 0 },
+      { pid: 0, ppid: 0, start: '', startMs: Number.NaN, cpuMs: 0 },
       expect.objectContaining({ pid: 8, image: 'Claude Code Helper.exe' }),
     ]);
     expect(parseDarwinPs('  10     1 Ss   Wed Oct 28 10:15:32 2026 claude\n')).toEqual([
       expect.objectContaining({ pid: 10, ppid: 1, image: 'claude' }),
     ]);
+  });
+});
+
+describe('stage 8 process CPU — readers of every OS (F9)', () => {
+  it('stage 8 /proc CPU: utime + stime (fields 14, 15) × 1000 / CLK_TCK 100, read after the LAST paren of a comm with spaces; a non-numeric tick → null, not zero', () => {
+    const proc = fakeProc('proc-cpu', {
+      stat: 'btime 1700000000\n',
+      '5/stat': statLine(5, 'claude (x) y', 'S', 1, 9, [250, 75]),
+      '6/stat': statLine(6, 'child', 'S', 5, 10, [1, 2]),
+    });
+    const table = readLinuxTable(proc);
+    if (!('value' in table)) throw new Error(JSON.stringify(table));
+    const byPid = new Map(table.value.map((r) => [r.pid, r]));
+    expect(byPid.get(5)?.cpuMs).toBe(3_250);
+    expect(byPid.get(6)?.cpuMs).toBe(30);
+    // rest[11] (utime) — не число; starttime (rest[19]) годен: строка не отвергнута, процессора нет.
+    const odd = '7 (x) S 1 0 0 0 0 0 0 0 0 0 zz 0 0 0 0 0 0 0 9 0 0';
+    expect(parseProcStat(odd)?.starttime).toBe('9');
+    expect(parseProcStat(odd)?.cpuTicks).toBeNull();
+    expect(cpuSourceOf('linux')).toContain('CLK_TCK = 100');
+  });
+
+  it('stage 8 Windows CPU column: user + kernel in 100 ns units → ms; «-» (CIM without times) → null; an image that starts with digits stays the image', () => {
+    const rows = parseWinTable(
+      '8 4 133000000000000000 123456789 7zFM.exe\n9 4 133000000000000000 - x.exe\n',
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({ pid: 8, cpuMs: 12_345, image: '7zFM.exe' }),
+      expect.objectContaining({ pid: 9, cpuMs: null, image: 'x.exe' }),
+    ]);
+    expect(cpuSourceOf('win32')).toContain('100 ns');
+  });
+
+  it('stage 8 macOS ps time column: BSD mm:ss.cc and [dd-]hh:mm:ss read as ms; recorded output without the column → cpuMs null; ps asks for time before lstart', () => {
+    expect(parsePsTime('0:00.03')).toBe(30);
+    expect(parsePsTime('125:01.50')).toBe(7_501_500);
+    expect(parsePsTime('1-02:03:04')).toBe(((26 * 60 + 3) * 60 + 4) * 1000);
+    expect(parsePsTime('bad')).toBeNull();
+    expect(parseDarwinPs('  10     1 Ss   2:03.40 Wed Oct 28 10:15:32 2026 claude code\n')).toEqual(
+      [expect.objectContaining({ pid: 10, cpuMs: 123_400, image: 'claude code' })],
+    );
+    expect(parseDarwinPs('  10     1 Ss   Wed Oct 28 10:15:32 2026 claude\n')).toEqual([
+      expect.objectContaining({ cpuMs: null }),
+    ]);
+    expect(DARWIN_PS_ARGS.indexOf('time=')).toBeLessThan(DARWIN_PS_ARGS.indexOf('lstart='));
+    expect(DARWIN_PS_ARGS.indexOf('time=')).toBeGreaterThan(-1);
   });
 });
 

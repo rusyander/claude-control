@@ -1,0 +1,96 @@
+{
+  "total_count": 5,
+  "jobs": [
+    {
+      "id": 7001,
+      "run_id": 501,
+      "head_sha": "1111111111111111111111111111111111111111",
+      "status": "completed",
+      "conclusion": "failure",
+      "name": "unit-tests",
+      "started_at": "2026-10-30T10:00:05Z",
+      "completed_at": "2026-10-30T10:03:40Z",
+      "steps": [
+        { "name": "Set up job", "status": "completed", "conclusion": "success", "number": 1 },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        { "name": "Run tests", "status": "completed", "conclusion": "failure", "number": 3 },
+        { "name": "Complete job", "status": "completed", "conclusion": "success", "number": 4 }
+      ]
+    },
+    {
+      "id": 7002,
+      "run_id": 501,
+      "head_sha": "1111111111111111111111111111111111111111",
+      "status": "completed",
+      "conclusion": "failure",
+      "name": "lint",
+      "started_at": "2026-10-30T10:00:05Z",
+      "completed_at": "2026-10-30T10:00:40Z",
+      "steps": [
+        { "name": "Set up job", "status": "completed", "conclusion": "failure", "number": 1 },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 2
+        },
+        { "name": "Run lint", "status": "completed", "conclusion": "skipped", "number": 3 }
+      ]
+    },
+    {
+      "id": 7003,
+      "run_id": 501,
+      "head_sha": "1111111111111111111111111111111111111111",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "name": "e2e",
+      "started_at": "2026-10-30T10:00:05Z",
+      "completed_at": "2026-10-30T10:06:00Z",
+      "steps": []
+    },
+    {
+      "id": 7004,
+      "run_id": 501,
+      "head_sha": "1111111111111111111111111111111111111111",
+      "status": "completed",
+      "conclusion": "success",
+      "name": "build",
+      "started_at": "2026-10-30T10:00:05Z",
+      "completed_at": "2026-10-30T10:02:00Z",
+      "steps": [
+        { "name": "Set up job", "status": "completed", "conclusion": "success", "number": 1 },
+        { "name": "Run build", "status": "completed", "conclusion": "success", "number": 2 }
+      ]
+    },
+    {
+      "id": 7005,
+      "run_id": 501,
+      "head_sha": "1111111111111111111111111111111111111111",
+      "status": "queued",
+      "conclusion": null,
+      "name": "deploy-preview",
+      "started_at": "2026-10-30T10:00:05Z",
+      "completed_at": null,
+      "steps": []
+    },
+    {
+      "id": 7006,
+      "run_id": 501,
+      "head_sha": "1111111111111111111111111111111111111111",
+      "status": "completed",
+      "conclusion": "timed_out",
+      "name": "integration",
+      "started_at": "2026-10-30T10:00:05Z",
+      "completed_at": "2026-10-30T11:00:05Z",
+      "steps": [
+        { "name": "Set up job", "status": "completed", "conclusion": "success", "number": 1 },
+        { "name": "Run integration", "status": "completed", "conclusion": "cancelled", "number": 2 }
+      ]
+    }
+  ]
+}

@@ -38,8 +38,16 @@ import { createServer } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { HOP_RECORD_ENV, listenerPid, watchHops } from '../../apps/server/src/lib/hop-recorder.mjs';
 import { brandEnvName, legacyEnvName } from '../../apps/server/src/lib/brand.mjs';
-import { killProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
+import {
+  filetimeFromMs,
+  killLeftovers,
+  killProcessTree,
+  readPosixProcessTable,
+  readProcessTable,
+  WATCH_SLACK_MS,
+} from '../../apps/server/src/lib/kill-tree.mjs';
 
 // Префиксы переменных панели — нынешний и прежний. Прежний собирает brand.mjs
 // из частей: литерал старого имени в дереве запрещён (`pnpm brand`).
@@ -344,6 +352,12 @@ function checkAddedPathDirs(raw) {
  * (esbuild у Vite, MCP-процессы проверки у сервера) держатся за stdin-трубу
  * родителя и завершаются, когда она закрывается.
  */
+/**
+ * Маршрут-заглушка ядра стенда по умолчанию: один ответ текстом (`packages/stub-model`, шаг
+ * `text`). Свой сценарий — `startStand({ core: { stub: [...] } })`.
+ */
+export const DEFAULT_CORE_STUBS = [{ name: 'stand', script: ['stub reply'] }];
+
 /** Имя метки жизни стенда рядом с фальшивыми CLI (`fake-cli-images.mjs` её ждёт). */
 export const STAND_ALIVE = '.stand-alive';
 
@@ -411,6 +425,157 @@ export function reapStandRelays(stateDir) {
   }
 }
 
+const readJsonQuiet = (path) => {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return undefined;
+  }
+};
+
+const listQuiet = (dir) => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Личности хостов сессий ядра стенда и их CLI — по записям самого ядра, не по имени процесса:
+ * `host.json` каждой сессии (`tasks/<задача>/sessions/<сессия>/`, хост пишет его сам, как только
+ * поднял CLI) и строки `session.started` журналов задач (`hostPid`/`hostStart`, `cliPid`/`cliStart`).
+ * Обе записи нужны: ядро, убитое между запуском хоста и строкой журнала, оставляет только
+ * `host.json`, а сессия с каталогом вне `sessions/` — только строку журнала.
+ */
+export function coreSessionIdentities(coreHome) {
+  const found = new Map();
+  const add = (pid, start, role) => {
+    if (!Number.isInteger(pid) || pid <= 0 || typeof start !== 'string' || !start) return;
+    found.set(`${pid}:${start}`, { pid, start, role });
+  };
+  const tasks = join(coreHome, 'tasks');
+  for (const task of listQuiet(tasks)) {
+    const dir = join(tasks, task);
+    for (const session of listQuiet(join(dir, 'sessions'))) {
+      const record = readJsonQuiet(join(dir, 'sessions', session, 'host.json'));
+      add(record?.host?.pid, record?.host?.start, 'host');
+      add(record?.child?.pid, record?.child?.start, 'cli');
+    }
+    let text;
+    try {
+      text = readFileSync(join(dir, 'journal.jsonl'), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const raw of text.split('\n')) {
+      if (!raw.includes('"session.started"')) continue;
+      let line;
+      try {
+        line = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (line?.kind !== 'session.started') continue;
+      add(line.data?.hostPid, line.data?.hostStart, 'host');
+      add(line.data?.cliPid, line.data?.cliStart, 'cli');
+    }
+  }
+  return [...found.values()];
+}
+
+/** Часы Linux для разбора старта: номер загрузки и её момент. Нет `/proc` — `undefined`. */
+function linuxClock() {
+  try {
+    const bootId = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    const btime = /^btime (\d+)$/m.exec(readFileSync('/proc/stat', 'utf8'))?.[1];
+    return btime ? { bootId, btimeMs: Number(btime) * 1000 } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Старт процесса из записи ядра (`platform/process-table.ts`) → время создания в тиках FILETIME
+ * снимка `kill-tree.mjs`. Windows: ядро пишет то же число, сверка точная. Linux:
+ * `<boot_id>:<тики с загрузки>` (другая загрузка — процесса уже нет: `null`). macOS:
+ * `<секунды>:<хеш имени>`. Не разобрать — `undefined`: личность не доказать, снимать нельзя.
+ */
+export function createdOfStart(start, platform = process.platform, clock = linuxClock) {
+  if (platform === 'win32') return /^\d+$/.test(start) ? BigInt(start) : undefined;
+  if (platform === 'darwin') {
+    const seconds = /^(\d+):/.exec(start)?.[1];
+    return seconds ? filetimeFromMs(Number(seconds) * 1000) : undefined;
+  }
+  const match = /^([^:]+):(\d+)$/.exec(start);
+  const now = match ? clock() : undefined;
+  if (!match || !now) return undefined;
+  if (now.bootId !== match[1]) return null;
+  // Тики `/proc/<pid>/stat` — сотые доли секунды (USER_HZ = 100, как у ядра задач).
+  return filetimeFromMs(now.btimeMs + Number(match[2]) * 10);
+}
+
+/**
+ * Снять хосты сессий ядра стенда вместе с их CLI (и потомками). Хост запускается отвязанным
+ * (на Windows — вырывом из задания через WMI): ни снятие дерева панели и ядра, ни уход процесса
+ * проверки его не уносят, и хост с `claude.exe` под ним жил после стенда, держа его каталог (EBUSY
+ * при удалении, проход s9). Снимается только процесс, чьё время создания совпало с записанным
+ * стартом (Windows — точно, POSIX — с запасом `WATCH_SLACK_MS`), и по дескриптору со сверкой
+ * (`killLeftovers`): освободившийся номер мог достаться чужому. Синхронно — зовётся и из `exit`.
+ * Итог: `ids` — найденные личности, `stopped` — номера, по которым ушёл сигнал, `unprovable` —
+ * записи, чей старт не разобрать.
+ */
+export function reapCoreSessions(coreHome, impl = {}) {
+  const platform = impl.platform ?? process.platform;
+  const ids = coreSessionIdentities(coreHome);
+  const unprovable = [];
+  // Один номер мог принадлежать двум процессам в разное время (перезапуск хоста): у каждой
+  // пачки номер встречается раз — карта `pid → время` иначе потеряла бы одну из личностей.
+  const batches = [];
+  for (const id of ids) {
+    const created = createdOfStart(id.start, platform, impl.clock);
+    if (created === null) continue;
+    if (created === undefined) {
+      unprovable.push(id);
+      continue;
+    }
+    let batch = batches.find((map) => !map.has(id.pid));
+    if (!batch) batches.push((batch = new Map()));
+    batch.set(id.pid, created);
+  }
+  const slackMs = platform === 'win32' ? 0 : WATCH_SLACK_MS;
+  const stopped = batches.flatMap((batch) => killLeftovers(batch, { slackMs }, impl));
+  return { ids, stopped, unprovable };
+}
+
+/**
+ * Кто из `ids` всё ещё жив той же личностью (снимок после снятия). Снимка нет — живыми
+ * считаются все: доказать обратное нечем, и отчёт об этом честнее тишины.
+ */
+export function liveCoreSessions(ids, impl = {}) {
+  if (ids.length === 0) return [];
+  const platform = impl.platform ?? process.platform;
+  const readTable =
+    impl.readTable ?? (platform === 'win32' ? readProcessTable : readPosixProcessTable);
+  const table = readTable();
+  if (!table) return ids.map((id) => ({ ...id, why: 'снимка процессов нет' }));
+  const slack = BigInt(platform === 'win32' ? 0 : WATCH_SLACK_MS) * 10_000n;
+  const byPid = new Map(table.map((row) => [row.pid, row]));
+  const left = [];
+  for (const id of ids) {
+    const row = byPid.get(id.pid);
+    const created = createdOfStart(id.start, platform, impl.clock);
+    if (!row || created === null) continue;
+    if (created === undefined) {
+      left.push({ ...id, why: 'старт не разобрать — личность не доказать' });
+      continue;
+    }
+    const gap = row.created > created ? row.created - created : created - row.created;
+    if (gap <= slack) left.push({ ...id, why: 'жив после снятия' });
+  }
+  return left;
+}
+
 /**
  * Поднять одноразовый стенд.
  *
@@ -444,6 +609,11 @@ export async function startStand({
   // заглушки). Явное — поэтому чистка `shellLeak` его не трогает; дом и PATH
   // стенда всё равно главнее.
   env: extraEnv = {},
+  // Ядро задач рядом с панелью (этап 9): `true` или `{ stub: [...] }` — свой процесс
+  // `apps/core` со своим временным домом, тем же, что видит прокладка панели
+  // (`AGENTDECK_CORE_HOME`). Маршруты моделей — только заглушки `packages/stub-model`
+  // (раздел `routes.stub` настройки ядра): настоящий CLI и сеть стенду не нужны.
+  core = false,
 } = {}) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), `cc-${label}-`)));
   const home = join(root, 'home');
@@ -474,7 +644,18 @@ export async function startStand({
     `${JSON.stringify({ settings: { onboardingDone: true, language: 'ru', theme: 'light', ...isolated, ...settings } })}\n`,
     'utf8',
   );
-  if (seed) await seed({ root, home, cfg });
+  const coreHome = core ? join(root, 'core-home') : '';
+  const hopFile = core ? join(root, 'core-hops.json') : '';
+  if (core) {
+    mkdirSync(coreHome, { recursive: true });
+    const stub = core === true || !core.stub ? DEFAULT_CORE_STUBS : core.stub;
+    writeFileSync(
+      join(coreHome, 'config.json'),
+      `${JSON.stringify({ routes: { stub } }, null, 2)}\n`,
+      'utf8',
+    );
+  }
+  if (seed) await seed({ root, home, cfg, coreHome });
 
   // Фальшивые CLI (`fakeCli: { claude: '<исходник .mjs>' }`) — первыми в PATH
   // панели: скрипт запускается этим же node через обёртку под именем CLI. Так
@@ -536,6 +717,10 @@ export async function startStand({
     // («No auth type is selected», прогон 21.10), а стенд мог подхватить его сервер
     // моделей. Свой пустой каталог; проверка с настоящими моделями задаёт свой в `env`.
     AGENTDECK_LOCAL_MODELS_DIR: join(root, 'local-models'),
+    // Дом ядра — общий у панели (прокладка читает его procs.json и token) и у ядра стенда.
+    // Итог записи звеньев — файл сторожа стенда: прокладка не шлёт команду ядру, пока её pid
+    // не записан (P131), ровно как у `dev-watch`.
+    ...(core ? { AGENTDECK_CORE_HOME: coreHome, [HOP_RECORD_ENV]: hopFile } : {}),
     ...extraEnv,
     ...homeEnv,
     PATH: [...(fakeNames.length > 0 ? [bin] : []), shellPath.path, ...extraPath].join(delimiter),
@@ -544,19 +729,52 @@ export async function startStand({
   const apiPort = await freePort();
   const webPort = web ? await freePort() : 0;
   const children = [];
-  const stop = async () => {
-    if (fakeNames.length > 0) {
-      rmSync(join(bin, STAND_ALIVE), { force: true });
-      await wait(700);
-    }
-    for (const child of children) killTree(child);
-    reapStandRelays(stateDir);
-    await wait(500);
-    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  let hops;
+  let stopped;
+  /**
+   * Снять стенд. Хосты сессий ядра — после панели и ядра (снятое ядро новых не запустит) и до
+   * удаления каталога: живой хост держал его, и удаление падало EBUSY, унося с собой и снятие.
+   * Удаление, которое всё же не прошло, стенд не роняет — уборка не должна прятать итог
+   * проверки. Итог: `left` — процессы ядра, которые снять не вышло, `removeError` — почему
+   * каталог остался; оба ещё и строкой в вывод.
+   */
+  const stop = () => {
+    stopped ??= (async () => {
+      hops?.stop();
+      if (fakeNames.length > 0) {
+        rmSync(join(bin, STAND_ALIVE), { force: true });
+        await wait(700);
+      }
+      for (const child of children) killTree(child);
+      reapStandRelays(stateDir);
+      const reaped = coreHome ? reapCoreSessions(coreHome) : { ids: [] };
+      let left = liveCoreSessions(reaped.ids);
+      // TerminateProcess асинхронен: процесс уходит из снимка не мгновенно.
+      for (let round = 0; left.length > 0 && round < 6; round += 1) {
+        await wait(500);
+        left = liveCoreSessions(left);
+      }
+      await wait(500);
+      let removeError;
+      try {
+        rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+      } catch (error) {
+        removeError = error instanceof Error ? error.message : String(error);
+      }
+      for (const id of left) {
+        console.log(`стенд: не снят процесс ядра (${id.role}) pid ${id.pid}: ${id.why}`);
+      }
+      if (removeError) console.log(`стенд: каталог ${root} не удалён: ${removeError}`);
+      return { left, ...(removeError ? { removeError } : {}) };
+    })();
+    return stopped;
   };
   // `finally` не выполняется, когда процесс уносят снаружи: без этого панель
-  // переживала бы свой прогон.
-  const reap = () => children.forEach(killTree);
+  // переживала бы свой прогон, а отвязанные хосты сессий ядра — и панель.
+  const reap = () => {
+    children.forEach(killTree);
+    if (coreHome) reapCoreSessions(coreHome);
+  };
   process.once('exit', reap);
   process.once('SIGINT', () => {
     reap();
@@ -636,6 +854,47 @@ export async function startStand({
     throw new NotChecked('одноразовый фронт не поднялся.');
   }
 
+  // Ядро — после панели: готовность меряется настоящей дорогой браузера (панель → прокладка
+  // → сверка строки procs.json → ядро), а не прямым запросом к порту ядра.
+  let coreLog = '';
+  let coreChild;
+  if (core) {
+    // Сторож звеньев стенда — тот же `watchHops`, что у `dev-watch`: звенья — сервер панели и
+    // слушатель фронта; ядро, поднятое ниже, записывается первым же опросом после своей строки
+    // в procs.json. Обхода только для проверок нет: стенд доверен ядру тем же путём, что прод.
+    hops = watchHops({
+      coreHome,
+      pidsOf: () => [server.pid, ...(web ? [listenerPid(webPort)] : [])],
+      file: hopFile,
+      everyMs: 300,
+    });
+    await hops.refresh();
+    coreChild = spawn(
+      process.execPath,
+      ['--experimental-strip-types', '--no-warnings', 'src/index.ts', '--home', coreHome],
+      {
+        cwd: join(REPO, 'apps/core'),
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false,
+        windowsHide: true,
+      },
+    );
+    coreChild.stdout.on('data', (chunk) => (coreLog += chunk));
+    coreChild.stderr.on('data', (chunk) => (coreLog += chunk));
+    coreChild.on(
+      'exit',
+      (code, signal) => (coreLog += `\n[ядро вышло: код ${code}, сигнал ${signal}]\n`),
+    );
+    children.push(coreChild);
+    if (!(await waitFor(`${apiUrl}/api/core/health`, 90, () => coreChild.exitCode !== null))) {
+      await stop();
+      const thrown = codeCrash(coreLog);
+      if (thrown) throw new Error(`ядро стенда упало на коде ${thrown}:\n${coreLog.slice(-2000)}`);
+      throw new NotChecked(`ядро стенда не поднялось:\n${coreLog.slice(-2000)}`);
+    }
+  }
+
   /** Запрос к API одноразовой панели; ответ разобран, если это JSON. */
   async function api(path, init = {}) {
     const hasBody = init.body !== undefined;
@@ -683,6 +942,8 @@ export async function startStand({
     if (!(await waitFor(`${apiUrl}/api/system`, 60, () => server.exitCode !== null))) {
       throw new Error(`панель не поднялась после жёсткого перезапуска:\n${log.slice(-2000)}`);
     }
+    // Новый сервер — новое звено; прежний pid ядро снимает этой же записью.
+    await hops?.refresh();
     return { killedPid, pid: server.pid };
   }
 
@@ -700,6 +961,9 @@ export async function startStand({
     restartHard,
     serverPid: () => server.pid,
     log: () => log,
+    coreHome,
+    corePid: () => coreChild?.pid,
+    coreLog: () => coreLog,
   };
 }
 

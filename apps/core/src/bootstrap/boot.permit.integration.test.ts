@@ -229,7 +229,7 @@ describe('core boot: the permission road of a live session', () => {
       JSON.stringify({ routes: { localOwn: { models: [] } } }),
     );
     await expect(bootCore({ home, build: 'permit-test' })).rejects.toThrow(
-      /routes\.localOwn\.server\.command/,
+      /routes: localOwn\.server: .*; localOwn\.models: /,
     );
   });
 

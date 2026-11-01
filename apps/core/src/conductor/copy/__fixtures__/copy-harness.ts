@@ -3,7 +3,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Profile } from '@agentdeck/contracts/core/records';
 import { copyWiring } from '../../../bootstrap/copy-wiring.ts';
-import { CREATED, openFresh, tempDir } from '../../../journal/__fixtures__/journal-harness.ts';
+import {
+  CREATED,
+  openFresh,
+  SOLO_UNIT,
+  tempDir,
+} from '../../../journal/__fixtures__/journal-harness.ts';
 import { readJournalLines } from '../../../journal/read-lines.ts';
 import type { LiveTask } from '../../../journal/resume.ts';
 import { newId } from '../../../lib/ids/uuidv7.ts';
@@ -74,7 +79,7 @@ export async function taskWithUnit(
     kind: 'unit.created',
     actor: 'core',
     unitId,
-    data: { unitId, repoKey: 'r1', branch, ownedPaths: [] },
+    data: { unitId, repoKey: 'r1', branch, ownedPaths: [], ...SOLO_UNIT },
   });
   return { task, unitId, branch };
 }

@@ -150,6 +150,8 @@ export function createRelease(
       for (const resource of [...lease.resources].reverse()) {
         if (resource.kind === 'model-load') {
           try {
+            // Аренда своей модели без имени модели не выдаётся (`requireModel`); такая строка — порча.
+            if (lease.model === null) throw new Error(`lease ${lease.leaseId} names no model`);
             const list = await entry.router!.client.unload(
               lease.model,
               options.unloadTimeoutMs ?? 60_000,

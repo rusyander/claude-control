@@ -4,7 +4,7 @@ import { useResourceSummary } from '@entities/Group';
 import type { RowTextViewProps } from './RowTextView.types';
 import styles from './RowTextView.module.scss';
 import { firstParagraph } from '../../model/firstParagraph';
-import { pickLang } from '../../lib/pickLang';
+import { pickLang } from '@entities/StepPath';
 
 /**
  * Описание строки порядка работы на языке интерфейса. Сводку ресурса

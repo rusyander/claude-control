@@ -28,6 +28,9 @@ import { deferredAsksEn } from './deferred-asks/en.ts';
 import { phoneSigningEn } from './phone-signing/en.ts';
 import { turnTrailEn } from './turn-trail/en.ts';
 import { agentTreeEn } from './agent-tree/en.ts';
+import { coreTimelineEn } from './core-timeline/en.ts';
+import { coreLaunchEn } from './core-launch/en.ts';
+import { coreScenarioEn } from './core-scenario/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
@@ -59,6 +62,9 @@ export const en: TranslationSchema = {
   phoneSigning: phoneSigningEn,
   turnTrail: turnTrailEn,
   agentTree: agentTreeEn,
+  coreTimeline: coreTimelineEn,
+  coreLaunch: coreLaunchEn,
+  coreScenario: coreScenarioEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
   /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/en.ts`. */
@@ -164,6 +170,9 @@ export const en: TranslationSchema = {
     platform: 'Contour',
     localModels: 'Local models',
     kit: 'Panel kit',
+    coreTasks: 'Core tasks',
+    coreLaunch: 'Launch a core task',
+    coreScenarios: 'Core scenarios',
     help: 'Help',
     sectionMain: 'Main',
     sectionBehavior: 'Agent behaviour',
@@ -5741,6 +5750,7 @@ export const en: TranslationSchema = {
       permissions: 'Round trip: permissions',
       env: 'Round trip: environment variables',
       instructions: 'Round trip: global instructions',
+      coreRoute: 'Route in the task core',
       assistant: 'Assistant launch',
     },
   },
@@ -7007,7 +7017,10 @@ export const en: TranslationSchema = {
       confluence: { baseUrl: 'Site URL', email: 'Email', deployment: 'Deployment' },
       gitlab: { baseUrl: 'Installation URL', repo: 'Repository' },
       github: { baseUrl: 'Installation URL', repo: 'Repository' },
-      telegram: { chatId: 'Chat', doneAfterMinutes: '«Finished» when work took longer than, min' },
+      telegram: {
+        chatId: 'Chat',
+        doneAfterMinutes: '«Task closed» and «waits for you» when work took longer than, min',
+      },
       zephyr: { projectKey: 'Project', groupId: 'Test group' },
       xray: { projectKey: 'Project', groupId: 'Test group' },
       testit: { baseUrl: 'Installation URL', projectKey: 'Project', groupId: 'Test group' },
@@ -7036,7 +7049,7 @@ export const en: TranslationSchema = {
       telegram: {
         chatId: 'A numeric chat id or a @channel name.',
         doneAfterMinutes:
-          'Panel chats and sessions from a terminal or VS Code. 0 means no finish messages.',
+          'Panel chats and sessions from a terminal or VS Code. Intermediate stops never arrive. 0 means no turn-end messages.',
       },
       zephyr: {
         projectKey: 'Key of the Jira project holding cases and cycles.',

@@ -20,7 +20,14 @@ const note = (event: string, data: Record<string, unknown> = {}): void => {
   );
 };
 
-const core = await bootCore({ home: cfg.home, build: 'stub-e2e' });
+// Задачу стенда ведёт `conduct` (свой исполнитель над той же дорогой): исполнитель продукта
+// подхватил бы ту же запущенную задачу вторым.
+const core = await bootCore({
+  home: cfg.home,
+  build: 'stub-e2e',
+  loop: false,
+  ...(cfg.observer ? { observer: cfg.observer } : {}),
+});
 note('boot', { url: core.url });
 try {
   const result = await conduct(core, cfg, note, killLog);

@@ -1,3 +1,4 @@
+import type { SessionStateDoc } from '@agentdeck/contracts/core/user-layer';
 import type { Identity } from '../../session-host/protocol.ts';
 
 /**
@@ -15,8 +16,11 @@ export interface CoreSessionVars {
   coreUrl: string;
   /** Токен сессии: только чтение + инструменты модели. */
   sessionToken: string;
-  /** Что видит `agentdeck state`: шаг, требования, свои пути, обязательные проверки, бюджеты. */
-  state?: Record<string, unknown>;
+  /**
+   * Снимок `agentdeck state` на запуск (G8): шаг, требования, свои пути, обязательные проверки,
+   * бюджеты. Нет — в `state.json` неполный снимок с причиной (`incomplete`), не выдуманные поля.
+   */
+  state?: SessionStateDoc;
 }
 
 /**

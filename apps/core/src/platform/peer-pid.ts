@@ -29,7 +29,7 @@ export interface PeerQuery {
 const LOOPBACK_V4 = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 
 /** Одно написание адреса: `::ffff:127.0.0.1` (двойной стек) и `127.0.0.1` — один адрес. */
-export function normalizeAddress(address: string): string {
+function normalizeAddress(address: string): string {
   const lower = address
     .trim()
     .toLowerCase()

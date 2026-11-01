@@ -44,9 +44,11 @@ import {
   storeRoot,
   type RecordStore,
 } from '../../verifier/store/index.ts';
+import { WindowBook } from '../../economy/window/index.ts';
 import { buildCoreApi } from '../boot-api.ts';
 import type { SessionRuntime } from '../session-runtime.ts';
 import { captureEntry, REFUSE_EXIT } from './capture-entry.ts';
+import { buildVerifierWiring } from './index.ts';
 import { queueWiring } from './queue.ts';
 
 /**
@@ -259,6 +261,7 @@ async function bootStand(
   const theirs = seedSession(other, { stepKind: 'work' });
   const sessions = { permitDeps: () => undefined } as unknown as SessionRuntime;
   const notes: Stand['notes'] = [];
+  const note = (event: string, data: Record<string, unknown>) => notes.push({ event, data });
   const app = buildCoreApi({
     registry,
     layout: home,
@@ -272,7 +275,11 @@ async function bootStand(
       startedAt: Date.now(),
       home: home.root,
     },
-    note: (event, data) => notes.push({ event, data }),
+    windows: new WindowBook(),
+    note,
+    verifier: buildVerifierWiring({ registry, layout: home, note }),
+    // Дирижёра стенд не запускает: среды деления нет.
+    split: () => undefined,
   });
   await app.listen({ host: '127.0.0.1', port: 0 });
   const port = (app.server.address() as AddressInfo).port;

@@ -45,6 +45,14 @@ describe('task registry', () => {
     const b = await first.create(CREATED);
     const ended = await first.create(CREATED);
     ended.append({ kind: 'task.ended', actor: 'core', data: { outcome: 'cancelled' } });
+    ended.append({
+      kind: 'report.final',
+      actor: 'core',
+      data: { at: 'ended', report: { sha256: 'a'.repeat(64), bytes: 1 } },
+    });
+    // Кончилась, но крах не дал закрыть конец (отчёта нет) — она не закончена: открывается.
+    const unclosed = await first.create(CREATED);
+    unclosed.append({ kind: 'task.ended', actor: 'core', data: { outcome: 'cancelled' } });
     first.closeAll();
 
     const resumeSpy = vi.mocked(resumeModule.resume);
@@ -55,9 +63,10 @@ describe('task registry', () => {
     // Перезапуск ядра: новая загрузка открывает незаконченные задачи.
     const second = createTaskRegistry(root, deps());
     const boot = await second.openUnfinished();
-    expect(boot.opened.sort()).toEqual([a.taskId, b.taskId].sort());
+    const unfinished = [a.taskId, b.taskId, unclosed.taskId].sort();
+    expect(boot.opened.sort()).toEqual(unfinished);
     expect(boot.refused).toEqual([]);
-    expect(resumeSpy.mock.calls.map((c) => c[1]).sort()).toEqual([a.taskId, b.taskId].sort());
+    expect(resumeSpy.mock.calls.map((c) => c[1]).sort()).toEqual(unfinished);
 
     // Законченная задача видна через ту же свёртку, без аренды и без второго пути.
     foldSpy.mockClear();
@@ -73,6 +82,7 @@ describe('task registry', () => {
       [
         [a.taskId, true],
         [b.taskId, true],
+        [unclosed.taskId, true],
         [ended.taskId, false],
       ].sort(),
     );
@@ -105,5 +115,23 @@ describe('task registry', () => {
     writeFileSync(notDir, '');
     const registry = createTaskRegistry(notDir, deps());
     await expect(registry.openUnfinished()).rejects.toThrow(/tasks dir unreadable/);
+  });
+
+  it('stage 8 onLive sees every task that becomes live (created, reopened), before its watchers', async () => {
+    const root = tempDir('reg-');
+    const order: string[] = [];
+    const hooks = { onLive: (t: { taskId: string }) => order.push(`live ${t.taskId}`) };
+    const first = createTaskRegistry(root, deps(), hooks);
+    const task = await first.create(CREATED);
+    expect(order).toEqual([`live ${task.taskId}`]);
+    first.closeAll();
+    order.length = 0;
+    const second = createTaskRegistry(root, deps(), hooks);
+    second.watch(task.taskId, { live: () => order.push('watcher'), gone: () => {} });
+    expect(await second.openUnfinished()).toMatchObject({ opened: [task.taskId] });
+    // Уже открытая задача второй раз не «оживает».
+    await second.open(task.taskId);
+    expect(order).toEqual([`live ${task.taskId}`, 'watcher']);
+    second.closeAll();
   });
 });

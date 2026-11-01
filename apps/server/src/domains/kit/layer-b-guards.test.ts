@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -18,7 +26,21 @@ const DISPATCH = join(builtinKitDir(), 'hooks', 'lib', 'run.mjs');
 const dir = mkdtempSync(join(tmpdir(), 'kit-layer-b-'));
 // Рабочая копия группы и правленые файлы — вне системного temp: temp сам по себе зона агента
 // и ничего бы не доказал.
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), `.layer-b-${process.pid}`);
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, `.layer-b-${process.pid}`);
+// Прогон, убитый до afterAll, оставляет свою копию в дереве репозитория — её убирает следующий.
+for (const name of readdirSync(HERE)) {
+  const pid = /^\.layer-b-(\d+)$/.exec(name)?.[1];
+  if (pid && !pidAlive(Number(pid))) rmSync(join(HERE, name), { recursive: true, force: true });
+}
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
   rmSync(ROOT, { recursive: true, force: true });

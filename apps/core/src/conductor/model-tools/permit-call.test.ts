@@ -5,6 +5,7 @@ import { mapQwenPermission } from '../../adapters/qwen/permission.ts';
 import { SDK_PERMIT_CODEC } from '../../adapters/sdk-stream/permit-codec.ts';
 import { openFresh, tempDir } from '../../journal/__fixtures__/journal-harness.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
+import { permitRefusalOf } from '../../observer/waste/facts.ts';
 import { createPendingPermits } from '../../policy/permit/pending.ts';
 import { decidePermit } from '../../policy/permit/permit.ts';
 import type { PermitContext } from '../../policy/permit/permit.types.ts';
@@ -131,6 +132,24 @@ describe('agentdeck-permit', () => {
       (l) => l.kind === 'decision',
     );
     expect(decisions.map((l) => (l.data as { class: string }).class)).toEqual(['permit']);
+    s.task.close();
+  });
+
+  it('stage 8: the permit decision row names the CLI call id and tool, so a hook refusal and a permit refusal of one call count once', async () => {
+    const s = await setup();
+    s.requested('toolu_p', 'Bash');
+    const got = await answerPermitCall(
+      s.task,
+      s.b,
+      raw('Bash', 'toolu_p', { command: 'git push' }),
+      s.permitDeps,
+    );
+    expect(got).toMatchObject({ kind: 'decided', allow: false });
+    const line = readJournalLines(s.task.dir, s.task.taskId).lines.find(
+      (l) => l.kind === 'decision',
+    )!;
+    const refusal = permitRefusalOf(line);
+    expect(refusal).toMatchObject({ toolUseId: 'toolu_p', tool: 'Bash', action: 'exec' });
     s.task.close();
   });
 

@@ -1,3 +1,5 @@
+import { CORE_STUB_TASK_ID, installCoreTaskStub } from './core-task-stub.mjs';
+
 /**
  * Все разделы панели — один список для обходов доступности и клавиатуры.
  * Маршруты повторяют `apps/web/src/app/router/router.tsx`: добавился раздел —
@@ -442,6 +444,20 @@ export const PANEL_PAGES = [
         .waitFor({ timeout: 5000 })
         .catch(() => undefined);
     },
+  },
+  // Ядро задач (этап 9): без ядра раздел рисует карточку отказа прокладки — её и обходим.
+  { path: '/core', name: 'Задачи ядра' },
+  { path: '/core/launch', name: 'Запуск задачи ядра' },
+  { path: '/core/scenarios', name: 'Сценарии ядра' },
+  // Лента задачи — страница с параметром: настоящей задачи на стенде может не быть, поэтому
+  // id, вид задачи и поток её журнала отдаёт подмена (`page.route` переживает перезагрузку
+  // `prepare`). Маркер — панель сигналов с хотя бы одной строкой: поток дошёл и свернулся.
+  {
+    path: `/core?id=${CORE_STUB_TASK_ID}`,
+    name: 'Задача ядра — лента',
+    slug: 'core-task',
+    prepare: installCoreTaskStub,
+    ready: '[data-core-signal]',
   },
   { path: '/search', name: 'Поиск' },
   { path: '/history', name: 'История изменений — что нового' },

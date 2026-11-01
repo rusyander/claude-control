@@ -2,19 +2,32 @@ import { basename } from 'node:path';
 import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { headLine, panelLink, placeOf, withLink } from './telegram-answers/compose.ts';
 import { bold, escapeHtml, expandable } from './telegram-answers/html.ts';
+import type { TurnEnd } from './turn-end/turn-end.types.ts';
 
 /**
- * Текст уведомления в Telegram о прогоне (итоговый формат владельца 25.10.2026):
+ * Текст уведомления в Telegram о прогоне. Конец хода — две карточки и только
+ * они (решение владельца 30.10.2026):
  *
- *   <b>✅ ГОТОВО · 📁 shop · Аудит проекта</b>
- *   шёл 12 мин
+ *   <b>✅ Задача закрыта · 📁 shop · Аудит проекта</b>
+ *   Аудит закончен: 12 находок исправлены, MR !12 открыт.
+ *   шёл 42 мин
  *
  *   <a href="http://127.0.0.1:8888/chat?id=…">Открыть чат →</a>
  *
+ *   <b>⏳ Агент ждёт вас · 📁 shop · VS Code · Аудит проекта</b>
+ *   <b>Нужно решить:</b> Опубликовать замечания тредами в MR?
+ *   1. Да
+ *   2. Нет
+ *   шёл 42 мин
+ *
+ *   <a href="…">Открыть чат →</a>
+ *
  * Первая строка — вид, проект за меткой «📁» и сессия (чужой CLI или «VS Code» —
- * между ними), вторая — суть ровно один раз, ссылка — последней. Кода, путей,
- * промпта и ответа агента нет: суть вопроса — под маской секретов, пути
- * свёрнуты до имени файла, у ошибки — только класс в свёрнутой цитате.
+ * между ними), ссылка — последней. Из ответа агента — только одна-две фразы
+ * итога или то, что решить (`turn-end/`), под маской секретов, пути свёрнуты до
+ * имени файла. Промежуточный конец хода сюда не доходит вовсе (`telegram.ts`).
+ * Вопрос и разрешение посреди хода — тот же вид «Агент ждёт вас»; у ошибки —
+ * только класс в свёрнутой цитате.
  *
  * Только для Telegram: вебхук и push шлют прежнюю строку (`compose`).
  */
@@ -30,7 +43,14 @@ export interface RichNotice {
   durationMs?: number;
   failed?: number;
   total?: number;
+  /** Разбор конца хода — у `done`: закрыта или ждёт. */
+  turn?: TurnEnd;
 }
+
+/** Вид карточки «закрыта». */
+export const CLOSED_TYPE = '✅ Задача закрыта';
+/** Вид карточки «ждёт» — и у конца хода, и у вопроса или разрешения посреди него. */
+export const WAITING_TYPE = '⏳ Агент ждёт вас';
 
 const QUESTION_LIMIT = 300;
 
@@ -77,21 +97,39 @@ export function spanOf(ms: number): string {
 const safe = (text: string, limit = Number.POSITIVE_INFINITY): string =>
   escapeHtml(clip(withoutPaths(maskSecretsInText(text)).replace(/\s+/g, ' ').trim(), limit));
 
-/** Вид первой строкой и суть второй (уже разметкой). */
-function partsOf(notice: RichNotice): { type: string; essence: string } {
+/** Длительность — не суть, а пояснение: обычным шрифтом. */
+const spanLine = (notice: RichNotice): string =>
+  notice.durationMs === undefined ? '' : `шёл ${spanOf(notice.durationMs)}`;
+
+/** Конец хода: итог закрытой задачи или что решить и из чего выбирать. */
+function turnParts(notice: RichNotice, turn: TurnEnd): { type: string; lines: string[] } {
+  if (turn.kind === 'waiting') {
+    return {
+      type: WAITING_TYPE,
+      lines: [
+        `${bold('Нужно решить:')} ${safe(turn.ask || 'ответ в чате', QUESTION_LIMIT)}`,
+        ...turn.options.map((option, index) => `${index + 1}. ${safe(option, 80)}`),
+        spanLine(notice),
+      ],
+    };
+  }
+  return {
+    type: CLOSED_TYPE,
+    lines: [turn.kind === 'closed' ? safe(turn.summary, 240) : '', spanLine(notice)],
+  };
+}
+
+/** Вид первой строкой и строки под ней (уже разметкой). */
+function partsOf(notice: RichNotice): { type: string; lines: string[] } {
   switch (notice.kind) {
     case 'done':
-      // Длительность — не суть, а пояснение: обычным шрифтом.
-      return {
-        type: '✅ ГОТОВО',
-        essence: notice.durationMs === undefined ? '' : `шёл ${spanOf(notice.durationMs)}`,
-      };
+      return turnParts(notice, notice.turn ?? { kind: 'closed', summary: '' });
     case 'error':
-      return { type: '🛑 ОШИБКА', essence: bold('Агент упал') };
+      return { type: '🛑 ОШИБКА', lines: [bold('Агент упал')] };
     case 'permission':
       return {
-        type: '🔐 РАЗРЕШЕНИЕ',
-        essence: bold(safe(notice.toolName ?? 'Нужно разрешение', 200)),
+        type: WAITING_TYPE,
+        lines: [`${bold('Нужно разрешение:')} ${safe(notice.toolName ?? 'инструмент', 200)}`],
       };
     case 'question': {
       const text = withoutPaths(maskSecretsInText(notice.question ?? ''))
@@ -99,23 +137,41 @@ function partsOf(notice: RichNotice): { type: string; essence: string } {
         .trim();
       const whole =
         text.length > QUESTION_LIMIT ? `${text.slice(0, QUESTION_LIMIT)}…полностью в панели` : text;
-      return { type: '❓ ВОПРОС', essence: bold(escapeHtml(whole || 'Агент задал вопрос')) };
+      return {
+        type: WAITING_TYPE,
+        lines: [`${bold('Нужно решить:')} ${escapeHtml(whole || 'вопрос в чате')}`],
+      };
     }
     default:
       return {
         type: '🧪 ТЕСТЫ',
-        essence: bold(
-          notice.total
-            ? `${notice.failed ?? 0} из ${notice.total} упали`
-            : `Упало: ${notice.failed ?? 0}`,
-        ),
+        lines: [
+          bold(
+            notice.total
+              ? `${notice.failed ?? 0} из ${notice.total} упали`
+              : `Упало: ${notice.failed ?? 0}`,
+          ),
+        ],
       };
   }
 }
 
+/**
+ * Имя чата, которое ничего не говорит: «Прогресс по .agent/PROGRESS.md»,
+ * «Продолжение по …» — так CLI называет сессию, начатую словами «продолжай по
+ * PROGRESS.md» (выборка 28–30.10: все 85 уведомлений вне панели). Такое имя в
+ * первую строку не идёт.
+ */
+export function isContinuationTitle(title: string): boolean {
+  return (
+    /(продолж|прогресс|continue|progress|resume)/iu.test(title) && /\.md\b|PROGRESS/u.test(title)
+  );
+}
+
 /** Проект и сессия первой строки: пути в имени чата свёрнуты. */
 function placeOfNotice(title: string | undefined, project: string, via?: string): string {
-  return placeOf(title ? withoutPaths(title) : '', project, via);
+  const named = title && !isContinuationTitle(title) ? withoutPaths(title) : '';
+  return placeOf(named, project, via);
 }
 
 /**
@@ -134,12 +190,12 @@ export function composeRich(
     return undefined;
   }
   const project = notice.projectPath ? basename(notice.projectPath) : '';
-  const { type, essence } = partsOf(notice);
+  const { type, lines: body } = partsOf(notice);
   const errorClass = notice.kind === 'error' ? errorClassOf(notice.errorText) : undefined;
   const chat = openId ?? notice.chatId;
   const lines = [
     headLine(type, placeOfNotice(title, project, via)),
-    essence,
+    ...body,
     errorClass ? expandable(escapeHtml(errorClass)) : '',
   ].filter(Boolean);
   return withLink(lines, chat ? panelLink(chat) : undefined).join('\n');
@@ -174,4 +230,16 @@ export function firstQuestionOf(input: unknown): string | undefined {
   return typeof first?.question === 'string' && first.question.trim()
     ? first.question.trim()
     : undefined;
+}
+
+/** Подписи вариантов первого вопроса `AskUserQuestion` — из его входа. */
+export function questionOptionsOf(input: unknown): string[] {
+  const questions = (input as { questions?: unknown } | null | undefined)?.questions;
+  if (!Array.isArray(questions)) return [];
+  const options = (questions[0] as { options?: unknown } | undefined)?.options;
+  if (!Array.isArray(options)) return [];
+  return options
+    .map((option) => (option as { label?: unknown } | null)?.label)
+    .filter((label): label is string => typeof label === 'string' && Boolean(label.trim()))
+    .map((label) => label.trim());
 }

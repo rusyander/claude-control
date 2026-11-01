@@ -86,7 +86,9 @@ describe('P51 literal lint — OS branches only inside platform/', () => {
     }
     expect(LITERAL_RULE_SETS.map((set) => set.id)).toEqual(['P51', 'P108']);
     expect(P51_OS_BRANCH.allowed).toEqual(['platform']);
-  });
+    // Разбор всего дерева ядра — работа растёт с деревом: в общем прогоне с покрытием и всеми
+    // соседями 20 с по умолчанию не хватило ни на Windows, ни на Linux (30.10, ~600 файлов).
+  }, 90_000);
 
   it('P51 literal lint probe: every forbidden form caught at its line outside platform/; comments, strings-as-text and module specifiers are not', () => {
     const scan = scanSources([{ path: 'conductor/probe.ts', text: PROBE }], P51_OS_BRANCH);

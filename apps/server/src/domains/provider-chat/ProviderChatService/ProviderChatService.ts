@@ -1684,6 +1684,9 @@ export class ProviderChatService {
     if (this.notify && !live.stopped) {
       try {
         const workdir = readChat(live.appDataDir, live.providerId, chatId)?.workdir;
+        // Ответ хода — по нему Telegram отличает «задача закрыта» и «ждёт вас» от
+        // промежуточной остановки (`notify/turn-end/`).
+        const answer = event.type === 'done' ? (event.message?.content ?? live.partial) : '';
         this.notify({
           kind: event.type === 'done' ? 'done' : 'error',
           chatId: foreignChatKey(live.providerId, chatId),
@@ -1692,6 +1695,8 @@ export class ProviderChatService {
             ? { errorText: event.error }
             : {}),
           durationMs: Math.max(0, Date.now() - live.startedAt),
+          ...(answer.trim() ? { answer } : {}),
+          turnKey: String(live.startedAt),
         });
       } catch {
         // Уведомление — не часть хода: его сбой не должен задеть очередь.

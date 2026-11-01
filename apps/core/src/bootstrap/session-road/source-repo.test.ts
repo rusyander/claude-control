@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CREATED, openFresh } from '../../journal/__fixtures__/journal-harness.ts';
+import {
+  CREATED,
+  FIRST_ROUND,
+  openFresh,
+  SOLO_UNIT,
+} from '../../journal/__fixtures__/journal-harness.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { sourceRepoOf } from './source-repo.ts';
@@ -21,14 +26,20 @@ function step(task: LiveTask, repoKey: string): string {
     kind: 'unit.created',
     actor: 'core',
     unitId,
-    data: { unitId, repoKey, branch: `agentdeck/${unitId.slice(-8)}`, ownedPaths: [] },
+    data: {
+      unitId,
+      repoKey,
+      branch: `agentdeck/${unitId.slice(-8)}`,
+      ownedPaths: [],
+      ...SOLO_UNIT,
+    },
   });
   task.append({
     kind: 'step.started',
     actor: 'core',
     unitId,
     stepId,
-    data: { stepId, unitId, stepKind: 'work', budgetMs: 60_000 },
+    data: { stepId, unitId, stepKind: 'work', budgetMs: 60_000, ...FIRST_ROUND },
   });
   return stepId;
 }

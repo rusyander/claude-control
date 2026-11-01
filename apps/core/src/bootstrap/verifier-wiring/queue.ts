@@ -4,6 +4,7 @@ import type {
   CheckRegistry,
   CheckRequest,
   QueueClass,
+  ServiceRecipe,
   Unmet,
 } from '@agentdeck/contracts/core/records';
 import {
@@ -18,6 +19,7 @@ import {
   type PreRunScope,
 } from '../../conductor/checks/index.ts';
 import { changedUnitsOf } from '../../conductor/checks/scope.ts';
+import { pinnedBaseOf, unitCopyOf } from '../../conductor/copy/index.ts';
 import type { ModelToolDeps } from '../../conductor/model-tools/model-tools.types.ts';
 import type { TaskRegistry } from '../../conductor/tasks.ts';
 import type { LiveTask } from '../../journal/resume.ts';
@@ -28,7 +30,7 @@ import { diskFree, diskVerdict, memFree, memVerdict } from '../../platform/machi
 import { createLivenessProbe, identityOfPid } from '../../platform/process-identity.ts';
 import { openAppendLog, type AppendLog } from '../../platform/safe-io/append-log.ts';
 import { readBaseEnv } from '../../platform/base-env.ts';
-import { isAbsolutePath, pathListDelimiter } from '../../platform/paths.ts';
+import { isAbsolutePath, pathKey, pathListDelimiter } from '../../platform/paths.ts';
 import { toolStamp } from '../../platform/tool-version.ts';
 import { readQuarantine, writeQuarantine } from '../../verifier/flaky/index.ts';
 import { envDigester, readKey } from '../../verifier/key/index.ts';
@@ -44,6 +46,10 @@ import {
 } from '../../verifier/store/index.ts';
 import { keyEnv } from './caller-env.ts';
 import { checkServices } from './check-services.ts';
+import { classRun, type ClassRunDeps } from './class-run.ts';
+import { checkEconomy } from './economy.ts';
+import type { WindowBook } from '../../economy/window/index.ts';
+import { readPinnedProfile } from './pinned-profile.ts';
 import type { ServicesWiring } from './services.ts';
 
 /**
@@ -52,13 +58,18 @@ import type { ServicesWiring } from './services.ts';
  * только первой проверке. Инструмент модели `check` идёт сюда (`check`), ранние прогоны в
  * простое — `preRun` (зовёт дирижёр, когда единица закончена).
  *
- * Пока не построено (названо, не скрыто): копий нет (G7) — проверка идёт в папке репозитория
- * задачи; пауза и отмена задачи не снимают идущий прогон (только срок p95×3); пин окружения — PATH оболочки входа и базовые
- * переменные ОС, пока зона E не закрепляет окружение задачи.
+ * Проверка шага идёт в копии его единицы от её закреплённой базы (G7); копии нет — в папке
+ * репозитория задачи. Реестр — закреплённый снимок профиля задачи (G21, `pinned-profile.ts`), пока
+ * он есть: сдвиг профиля посреди задачи называется, но набор проверок задачи не меняет.
+ *
+ * Пока не построено (названо, не скрыто): пауза и отмена задачи не снимают идущий прогон (только
+ * срок p95×3); пин окружения — PATH оболочки входа и базовые переменные ОС, пока зона E не
+ * закрепляет окружение задачи.
  *
  * Зона F: эпоха стенда — реестр стендов `services.stands` (сдвиг посреди прогона — `no-verdict
  * (stand)`); сервисы проверки с `needs` — `checkServices` (рецепты профиля, контейнер задачи,
  * адреса в окружение копии). Без `services` — эпоха `null`, а проверка с `needs` — `no-verdict`.
+ * Классы `migration` и `contract` идут не раннером, а своими исполнителями (`class-run.ts`).
  */
 
 /** Единицы репозитория для запроса: реестр, изменённые против базы и проверки по единицам. */
@@ -75,7 +86,11 @@ export interface QueueWiring {
   /** Вход и его чтения (хранилище, реестр, ключ) — дорогам захвата и забору очереди (волна 2). */
   parts(): Promise<Fact<{ service: CheckService; deps: CheckDeps }>>;
   /** База `null` (псевдозадача, итог из очереди) — изменёнными считаются все единицы (04:55). */
-  scope(repo: { repoKey: string; path: string; baseRef: string | null }): Promise<CheckScope>;
+  /** `taskId` — реестр из закреплённого снимка профиля задачи (G21), если он есть. */
+  scope(
+    repo: { repoKey: string; path: string; baseRef: string | null },
+    taskId?: string,
+  ): Promise<CheckScope>;
   preRun(scope: PreRunScope): Promise<PreRunOutcome>;
 }
 
@@ -84,6 +99,12 @@ export interface QueueWiringDeps {
   layout: Partial<CoreHomeLayout>;
   /** Зона F: стенды задач и сервисы проверок (`verifier-wiring/index.ts` передаёт свои). */
   services?: Pick<ServicesWiring, 'ensureServices' | 'stands'>;
+  /** Исполнители классов migration/contract: тесты дают свой движок (внешняя граница). */
+  classes?: Pick<ClassRunDeps, 'engine' | 'run'>;
+  /** Книга окон ядра (G7): окно суда проверки — по маршруту сессии шага. Нет — открыто. */
+  windows?: WindowBook;
+  /** Секреты окружения сеанса (P61): выдержки ответа `check` модели маскируются и по значению. */
+  known?(taskId: string, sessionId: string): readonly string[];
   /** Цифры машины; тесты дают свои (внешняя граница — ОС), иначе настоящие. */
   machine?: {
     diskFree: (path: string) => ReturnType<typeof diskFree>;
@@ -201,6 +222,44 @@ export function queueWiring(deps: QueueWiringDeps): QueueWiring {
     return taskOf(req.taskId)?.state.created?.repos.find((r) => r.repoKey === req.project);
   }
 
+  /**
+   * База прогона по его cwd: копия единицы — её закреплённая база, папка репозитория — `baseRef`
+   * задачи; не узнана — `null` (контракт без вердикта, не «нет изменений»).
+   */
+  function baseOfRun(taskId: string, cwd: string): string | null {
+    const task = taskOf(taskId);
+    if (!task) return null;
+    const inside = (dir: string): boolean => {
+      const a = pathKey(cwd);
+      const b = pathKey(dir);
+      return a === b || a.startsWith(`${b}/`) || a.startsWith(`${b}\\`);
+    };
+    for (const unitId of Object.keys(task.state.units)) {
+      const copy = unitCopyOf(task, unitId);
+      if (copy && inside(copy.dir)) {
+        const repo = task.state.created?.repos.find(
+          (r) => r.repoKey === task.state.units[unitId]?.repoKey,
+        );
+        return pinnedBaseOf(task, unitId) ?? repo?.baseRef ?? null;
+      }
+    }
+    return task.state.created?.repos.find((r) => inside(r.path))?.baseRef ?? null;
+  }
+
+  /** Реестр закреплённого снимка профиля задачи (G21); снимка нет — `undefined`, читается живой. */
+  function pinnedRegistry(req: {
+    taskId: string;
+    project: string;
+  }): Promise<Fact<CheckRegistry>> | undefined {
+    const profiles = deps.layout.profiles;
+    const fp = taskOf(req.taskId)?.state.created?.profilePins.find(
+      (p) => p.repoKey === req.project,
+    )?.inputsFp;
+    if (!profiles || !fp) return undefined;
+    const snap = readPinnedProfile(profiles, fp);
+    return snap ? Promise.resolve({ value: snap.registry }) : undefined;
+  }
+
   function storeOf(root: string, home: string): Fact<RecordStore> {
     const known = stores.get(root);
     if (known) return { value: known };
@@ -266,7 +325,8 @@ export function queueWiring(deps: QueueWiringDeps): QueueWiring {
         const dir = storeDir(req);
         return 'value' in dir ? storeOf(dir.value, home.root) : dir;
       },
-      registry: (req) => registryOf({ repoKey: req.project, path: req.copyDir }, profileDeps),
+      registry: (req) =>
+        pinnedRegistry(req) ?? registryOf({ repoKey: req.project, path: req.copyDir }, profileDeps),
       key: async ({ req, entry, registry, unit, selection }) => {
         const envDigest = digester();
         if (!envDigest) return { unknown: `verify key: ${why(verifyKey)}` };
@@ -335,6 +395,18 @@ export function queueWiring(deps: QueueWiringDeps): QueueWiring {
       onJournalLoss: (taskId, kind, reason) =>
         note({ kind: 'journal-loss', taskId, line: kind, reason }),
       tempRoot: join(home.root, 'tmp', 'checks'),
+      run: classRun({
+        ...deps.classes,
+        baseOf: (spec) => baseOfRun(spec.taskId, spec.cwd),
+        recipes: async (taskId) => {
+          const out: ServiceRecipe[] = [];
+          for (const repo of taskOf(taskId)?.state.created?.repos ?? []) {
+            const p = await profileOf({ repoKey: repo.repoKey, path: repo.path }, profileDeps);
+            if ('value' in p) out.push(...p.value.serviceRecipes);
+          }
+          return out;
+        },
+      }),
       now: Date.now,
       newId,
       quarantine: (req) => {
@@ -345,6 +417,8 @@ export function queueWiring(deps: QueueWiringDeps): QueueWiring {
         const dir = storeDir(req);
         if ('value' in dir) writeQuarantine(dir.value, entries);
       },
+      // Окно маршрута шага и разовый fresh-перезапуск (этап 5): книга окон ядра и журнал задачи.
+      ...checkEconomy({ registry: deps.registry, windows: deps.windows }),
       blockers: async (): Promise<Unmet[]> => {
         const disk = diskVerdict(await machine.diskFree(home.root));
         doubtOf('disk', disk);
@@ -371,15 +445,17 @@ export function queueWiring(deps: QueueWiringDeps): QueueWiring {
     return ready;
   }
 
-  async function scopeOf(repo: {
-    repoKey: string;
-    path: string;
-    baseRef: string | null;
-  }): Promise<CheckScope> {
-    const registry: Fact<CheckRegistry> = await registryOf(
-      { repoKey: repo.repoKey, path: repo.path },
-      copyProfileDeps((deps.layout.profiles as string | undefined) ?? ''),
-    );
+  async function scopeOf(
+    repo: { repoKey: string; path: string; baseRef: string | null },
+    taskId?: string,
+  ): Promise<CheckScope> {
+    const registry: Fact<CheckRegistry> = await ((taskId
+      ? pinnedRegistry({ taskId, project: repo.repoKey })
+      : undefined) ??
+      registryOf(
+        { repoKey: repo.repoKey, path: repo.path },
+        copyProfileDeps((deps.layout.profiles as string | undefined) ?? ''),
+      ));
     let changedUnits: string[] = [];
     if ('value' in registry) {
       const [rows, baseRows] = await Promise.all([
@@ -405,23 +481,31 @@ export function queueWiring(deps: QueueWiringDeps): QueueWiring {
 
   async function contextOf(
     task: LiveTask,
-    b: { stepId: string; stepKind: string },
+    b: { stepId: string; stepKind: string; sessionId?: string },
   ): Promise<Fact<ModelCheckContext>> {
     const created = task.state.created;
-    const repo = created?.repos[0];
+    // Проверка шага идёт в копии его единицы (G7), от её закреплённой базы; копии ещё нет
+    // (псевдозадача, шаг без единицы) — в папке репозитория задачи, как до копий.
+    const unitId = task.state.steps[b.stepId]?.unitId;
+    const unitRepoKey = unitId ? task.state.units[unitId]?.repoKey : undefined;
+    const repo = created?.repos.find((r) => r.repoKey === unitRepoKey) ?? created?.repos[0];
     if (!created || !repo) return { unknown: 'task has no repository pinned' };
-    const scope = await scopeOf(repo);
+    const copy = unitId ? unitCopyOf(task, unitId) : undefined;
+    const copyDir = copy?.dir ?? repo.path;
+    const baseRef = (unitId ? pinnedBaseOf(task, unitId) : undefined) ?? repo.baseRef;
+    const scope = await scopeOf({ repoKey: repo.repoKey, path: copyDir, baseRef }, task.taskId);
     return {
       value: {
         taskId: task.taskId,
         stepId: b.stepId,
         project: repo.repoKey,
-        copyDir: repo.path,
+        copyDir,
         class: classOf(b.stepKind),
         phase: b.stepKind === 'final-gate' ? 'final' : 'mid-task',
         registryUnits: scope.registryUnits,
         changedUnits: scope.changedUnits,
         packageChecks: scope.packageChecks,
+        ...(deps.known && b.sessionId ? { known: deps.known(task.taskId, b.sessionId) } : {}),
       },
     };
   }
@@ -449,10 +533,11 @@ export function queueWiring(deps: QueueWiringDeps): QueueWiring {
     async preRun(scope) {
       const ready = await ensure();
       if (!('value' in ready)) return { answers: [], stopped: why(ready) };
-      const registry = await registryOf(
-        { repoKey: scope.project, path: scope.copyDir },
-        copyProfileDeps((deps.layout.profiles as string | undefined) ?? ''),
-      );
+      const registry = await (pinnedRegistry({ taskId: scope.taskId, project: scope.project }) ??
+        registryOf(
+          { repoKey: scope.project, path: scope.copyDir },
+          copyProfileDeps((deps.layout.profiles as string | undefined) ?? ''),
+        ));
       if (!('value' in registry)) return { answers: [], stopped: `registry: ${why(registry)}` };
       return idlePreRun(
         ready.value.service,

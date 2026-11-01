@@ -1,0 +1,25 @@
+{
+  "name": "@agentdeck/sieves",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Сита исходящего содержимого перед публикацией — общие для панели и публикатора ядра",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sieve-scan": "./src/sieve-scan.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentdeck/contracts": "workspace:*",
+    "@agentdeck/dlp": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

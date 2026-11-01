@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -93,6 +96,48 @@ describe('core hook process: the CLI asks, the core decides, the exit code answe
         body: { tool: 'Bash', input: { command: 'git push' } },
       },
     ]);
+  }, 30_000);
+
+  it('the CLI tool_use_id goes to the core as toolUseId (stage 8: refusal dedupe)', async () => {
+    const c = await core([{ status: 200, body: { allow: true, reason: 'ok' } }]);
+    const withId = JSON.stringify({ ...JSON.parse(CALL), tool_use_id: 'toolu_01' });
+    expect((await hook(sessionEnv(c.url), withId)).code).toBe(0);
+    expect(c.seen[0]?.body).toEqual({
+      tool: 'Bash',
+      input: { command: 'git push' },
+      toolUseId: 'toolu_01',
+    });
+  }, 30_000);
+
+  it('qwen: tool_call_id (the stream id) wins over its internal tool_use_id, so the permit row joins its tool.event', async () => {
+    // Записанная проба qwen 0.24.3: первая строка хука и первый tool_use потока той же сессии.
+    const fixtures = join(dirname(fileURLToPath(import.meta.url)), '../adapters/qwen/__fixtures__');
+    const hookLine = JSON.parse(
+      readFileSync(join(fixtures, 's8-probe.hooks.jsonl'), 'utf8').split('\n')[0]!,
+    ) as { tool: string; toolUseId: string; toolCallId: string };
+    const streamIds = [
+      ...readFileSync(join(fixtures, 's8-probe.jsonl'), 'utf8').matchAll(
+        /"type":"tool_use","id":"([^"]+)"/g,
+      ),
+    ].map((m) => m[1]);
+    expect(hookLine.toolUseId).not.toBe(hookLine.toolCallId);
+    expect(streamIds).toContain(hookLine.toolCallId);
+    expect(streamIds).not.toContain(hookLine.toolUseId);
+
+    const c = await core([{ status: 200, body: { allow: true, reason: 'ok' } }]);
+    const qwenCall = JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: hookLine.tool,
+      tool_input: { command: 'echo x' },
+      tool_use_id: hookLine.toolUseId,
+      tool_call_id: hookLine.toolCallId,
+    });
+    expect((await hook(sessionEnv(c.url), qwenCall)).code).toBe(0);
+    expect((c.seen[0]?.body as { toolUseId?: string }).toolUseId).toBe(hookLine.toolCallId);
+    // Пустой tool_call_id — не id: берётся tool_use_id.
+    const emptyCallId = JSON.stringify({ ...JSON.parse(qwenCall), tool_call_id: '' });
+    expect((await hook(sessionEnv(c.url), emptyCallId)).code).toBe(0);
+    expect((c.seen[1]?.body as { toolUseId?: string }).toolUseId).toBe(hookLine.toolUseId);
   }, 30_000);
 
   it('denied by the core → exit 2, the reason on stderr for the model', async () => {

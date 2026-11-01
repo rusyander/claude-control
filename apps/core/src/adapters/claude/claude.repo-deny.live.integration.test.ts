@@ -137,7 +137,7 @@ describe.skipIf(!present)('claude adapter on the real CLI — F-86 repo deny in 
     const result = await run('claude-f86-deny-ctl-', {
       repo: source,
       trust: untrusted,
-      layer: { hooks: 'on' },
+      layer: { hooks: 'on', skills: 'on' },
       deny: [null, null],
     });
     expect(result.layer).toMatchObject({ ran: 'observe', repoLayer: false });
@@ -149,7 +149,7 @@ describe.skipIf(!present)('claude adapter on the real CLI — F-86 repo deny in 
     const result = await run('claude-f86-deny-', {
       repo: source,
       trust: untrusted,
-      layer: { hooks: 'on' },
+      layer: { hooks: 'on', skills: 'on' },
       deny: [['Bash(touch:*)'], ['Read(/secret.txt)']],
     });
     expect(result.layer).toMatchObject({ ran: 'observe', repoLayer: false });
@@ -162,7 +162,7 @@ describe.skipIf(!present)('claude adapter on the real CLI — F-86 repo deny in 
     const result = await run('claude-f86-deny-obs-', {
       repo: (live) => live.cwd,
       trust: (live) => ({ sourceRepo: live.cwd, panelMark: true }),
-      layer: { hooks: 'observe' },
+      layer: { hooks: 'observe', skills: 'on' },
       deny: [['Read(/secret.txt)'], null],
     });
     expect(result.layer).toMatchObject({ ran: 'observe', repoLayer: true });
@@ -179,7 +179,7 @@ describe.skipIf(!present)('claude adapter on the real CLI — F-86 repo deny in 
     const result = await run('claude-f86-deny-human-ctl-', {
       repo: (live) => live.cwd,
       trust: trustedCwd,
-      layer: { hooks: 'on' },
+      layer: { hooks: 'on', skills: 'on' },
       deny: [null, null],
     });
     expect(result.configSecretRead).toBe(true);
@@ -194,7 +194,7 @@ describe.skipIf(!present)('claude adapter on the real CLI — F-86 repo deny in 
       const result = await run(`claude-f86-deny-human-${mode}-`, {
         repo: (live) => live.cwd,
         trust: trustedCwd,
-        layer: { hooks: mode },
+        layer: { hooks: mode, skills: 'on' },
         deny: [null, null],
         humanDeny: ['Read(/secret.txt)'],
       });
@@ -209,7 +209,7 @@ describe.skipIf(!present)('claude adapter on the real CLI — F-86 repo deny in 
     const result = await run('claude-f86-deny-proj-on-', {
       repo: (live) => live.cwd,
       trust: trustedCwd,
-      layer: { hooks: 'on' },
+      layer: { hooks: 'on', skills: 'on' },
       deny: [['Read(/secret.txt)'], null],
     });
     expect(result.secretRead).toBe(false);

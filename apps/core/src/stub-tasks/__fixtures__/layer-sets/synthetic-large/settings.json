@@ -1,0 +1,55 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{NODE}}\" \"{{HOOKS}}/mark.mjs\" \"{{MARKERS}}\" synth-pre"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{NODE}}\" \"{{HOOKS}}/mark.mjs\" \"{{MARKERS}}\" synth-pre-write"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{NODE}}\" \"{{HOOKS}}/mark.mjs\" \"{{MARKERS}}\" synth-post"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{NODE}}\" \"{{HOOKS}}/mark.mjs\" \"{{MARKERS}}\" synth-prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{NODE}}\" \"{{HOOKS}}/mark.mjs\" \"{{MARKERS}}\" synth-stop"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -371,3 +371,56 @@ describe('непрозрачный ключ с малым числом цифр'
     expect(leaked).toBeLessThanOrEqual(3);
   });
 });
+
+describe('keepRouteIds: the core registry route id is a name, not a pair', () => {
+  const ROUTE = 'api-key:endpoint:ep-mh1abc23-x9k2ab';
+  const KEY = ['sk-ant-api03-', 'Zx9Qw8Er7Ty6Ui5Op4As3Df2'].join('');
+
+  it('off by default: the pair rule still masks it (panel behaviour unchanged)', () => {
+    expect(maskSecretsInText(`route ${ROUTE}`)).toBe(`route api-key:${SECRET_MASK}`);
+  });
+
+  it('on: the route id stays, a spaced pair and a vendor key in the tail are still masked', () => {
+    const opts = { keepRouteIds: true };
+    expect(maskSecretsInText(`"id":"${ROUTE}"`, opts)).toBe(`"id":"${ROUTE}"`);
+    expect(maskSecretsInText('api-key: endpoint:hunter29', opts)).not.toContain('hunter29');
+    expect(maskSecretsInText(`api-key:endpoint:${KEY}`, opts)).not.toContain(KEY);
+  });
+});
+
+describe('repoKey: the core repo key is a name, not a secret pair', () => {
+  const REPO = 'claude-control-1a2b3c4d';
+  const VENDOR = ['sk-ant-api03-', 'Zx9Qw8Er7Ty6Ui5Op4As3Df2'].join('');
+  const OPAQUE = ['aB3xY9kLmN0p', 'QrS7tUvW2zCd'].join('');
+
+  it('the repo key shape under the exact name stays in every pair form', () => {
+    for (const text of [
+      `{"repoKey":"${REPO}","globs":[".claude/**"]}`,
+      '{"repoKey":"My Project-0f1e2d3c"}',
+      `repoKey=${REPO}`,
+      `repoKey: "${REPO}"`,
+      `repoKey: ${REPO}`,
+    ]) {
+      expect(maskSecretsInText(text, { keepHashes: true, keepRouteIds: true })).toBe(text);
+      expect(maskSecretsInText(text)).toBe(text);
+    }
+  });
+
+  it('a value without the shape, another name, or a secret-shaped value is still masked', () => {
+    expect(maskSecretsInText('{"repoKey":"hunter2"}')).toBe(`{"repoKey":"${SECRET_MASK}"}`);
+    expect(maskSecretsInText('repoKey=hunter2')).toBe(`repoKey=${SECRET_MASK}`);
+    expect(maskSecretsInText(`{"apiKey":"${REPO}"}`)).toBe(`{"apiKey":"${SECRET_MASK}"}`);
+    expect(maskSecretsInText(`{"repo_key":"${REPO}"}`)).toBe(`{"repo_key":"${SECRET_MASK}"}`);
+    expect(maskSecretsInText(`API_TOKEN=${REPO}`)).toBe(`API_TOKEN=${SECRET_MASK}`);
+    expect(maskSecretsInText(`{"repoKey":"${VENDOR}-1a2b3c4d"}`)).not.toContain(VENDOR);
+    expect(maskSecretsInText(`{"repoKey":"${OPAQUE}-1a2b3c4d"}`)).not.toContain(OPAQUE);
+  });
+
+  it('a secret beside the repo key in the same JSON is masked, the repo key is not', () => {
+    const text = `{"grants":[{"repoKey":"${REPO}"}],"detail":["token: ${OPAQUE}"],"password":"pw-1a2b3c4d"}`;
+    const out = maskSecretsInText(text, { keepHashes: true, keepRouteIds: true });
+    expect(out).toContain(`"repoKey":"${REPO}"`);
+    expect(out).not.toContain(OPAQUE);
+    expect(out).toContain(`"password":"${SECRET_MASK}"`);
+  });
+});

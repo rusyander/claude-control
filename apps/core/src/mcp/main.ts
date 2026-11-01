@@ -9,7 +9,8 @@ import type { McpHandlers } from './stdio-server.ts';
 import { serveStdio } from './stdio-server.ts';
 
 /**
- * Процессы сессии: `node --experimental-strip-types run.ts agentdeck|permit|hook`. Мосты MCP
+ * Процессы сессии: `node --experimental-strip-types run.ts agentdeck|permit|hook|container|
+ * recorder|state` (`recorder` — запись хука в `observe`, `state` — `agentdeck state`). Мосты MCP
  * `agentdeck` и `agentdeck-permit` кладёт в `mcpServers` шага дорога сессии ядра
  * (`bootstrap/session-road`), не запускатель: он только поднимает CLI с тем, что ему дали.
  * `hook` — хук ядра PreToolUse (`hook.ts`), его команду дорога отдаёт переходнику в `coreHook`.
@@ -31,6 +32,10 @@ export function coreMcpServers(nodeArgv: readonly string[]): Record<string, McpS
 export const HOOK_MODE = 'hook';
 /** Режим `run.ts` обёртки движка контейнеров сессии (`container <движок> <id> <argv> …`). */
 export const CONTAINER_MODE = 'container';
+/** Режим `run.ts` записи хука человека в `observe` (этап 7). */
+export const RECORDER_MODE = 'recorder';
+/** Режим `run.ts` команды `agentdeck state` (этап 7). */
+export const STATE_MODE = 'state';
 
 const BRIDGES: Record<string, { name: string; handlers(client: CoreClient): McpHandlers }> = {
   agentdeck: { name: CORE_MCP_SERVER, handlers: agentdeckHandlers },
@@ -49,6 +54,15 @@ export async function runBridge(which: string | undefined): Promise<number> {
     // Лениво: мосты MCP не грузят обёртку, обёртка — мосты не стартует.
     const { runContainerWrapper } = await import('./container-wrap.ts');
     return runContainerWrapper(process.argv.slice(3));
+  }
+  // Лениво, как обёртка: запись хука и `agentdeck state` не грузят мосты MCP.
+  if (which === RECORDER_MODE) {
+    const { runRecorder } = await import('./recorder.ts');
+    return runRecorder(process.argv.slice(3));
+  }
+  if (which === STATE_MODE) {
+    const { runStateCli } = await import('./state-cli.ts');
+    return runStateCli(process.argv.slice(3));
   }
   const bridge = which ? BRIDGES[which] : undefined;
   if (!bridge) {

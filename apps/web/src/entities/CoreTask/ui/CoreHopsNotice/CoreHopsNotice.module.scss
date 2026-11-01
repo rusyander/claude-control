@@ -1,0 +1,8 @@
+// Предупреждение — плашкой с рамкой, а не одним цветом текста: цвет не единственный носитель смысла.
+.notice {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-warning);
+  border-radius: 8px;
+  background: var(--color-warning-subtle);
+  overflow-wrap: anywhere;
+}

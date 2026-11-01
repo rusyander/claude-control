@@ -1,0 +1,86 @@
+/* Строка шага — как у «Порядка работы» групп: компактная, номер колонкой,
+   выбранный шаг отмечен полоской слева, а не цветом всей строки. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  padding: 4px var(--spacing-xs) 4px 2px;
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.selected {
+  border-left-color: var(--color-accent);
+}
+
+/* Переносимый шаг приглушён: видно, откуда он ушёл, а место — на линии «+». */
+.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.number {
+  flex-shrink: 0;
+  min-width: 22px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+.open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+.title {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--font-size-body-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Живая область переноса: диктору — да, глазу — нет. */
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

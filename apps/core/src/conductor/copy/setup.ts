@@ -64,6 +64,13 @@ export interface SetupInput {
   endpoints: readonly ServiceEndpoint[];
   configured?: ConfiguredInstall;
   longPaths: CopySetupInput['longPaths'];
+  /**
+   * Копия оценки (G6): план установки посчитан и назван, но не исполнен — оценка только читает,
+   * а установка идёт минутами. Доставит её первый шаг работы (`deferred` в решении).
+   */
+  deferInstall?: boolean;
+  /** Второй заход над той же копией (доставка отложенной установки): зеркало только свежего. */
+  newerOnly?: boolean;
 }
 
 export interface SetupDeps {
@@ -175,7 +182,8 @@ async function revertStage(
 ): Promise<Fact<RepoPath[]>> {
   if (!('value' in mirror))
     return { unknown: `mirror report: ${'unknown' in mirror ? mirror.unknown : 'absent'}` };
-  const keep = new Set(mirror.value.mirrored.filter(isLockfile));
+  // Второй заход: lock-файл человека лёг первым и теперь «оставлен» — он тоже его правка.
+  const keep = new Set([...mirror.value.mirrored, ...(mirror.value.kept ?? [])].filter(isLockfile));
   const after = await dirtyPaths(copy, LOCKFILE_PATHSPECS, git);
   if (!('value' in after)) return after;
   const churn = after.value.filter((d) => !keep.has(d.path));
@@ -185,7 +193,11 @@ async function revertStage(
 
 export async function setupCopy(input: SetupInput, deps: SetupDeps): Promise<SetupResult> {
   const git = deps.git ?? {};
-  const mirror = await factOf(() => mirrorLocalLayer(input.main, input.copy, input.settings, git));
+  const mirror = await factOf(() =>
+    mirrorLocalLayer(input.main, input.copy, input.settings, git, {
+      newerOnly: input.newerOnly === true,
+    }),
+  );
   const profile = input.profile;
   const roots = 'value' in profile ? profile.value.stacks.map((s) => s.root).filter(Boolean) : [];
   const env = await envStage(input, [...roots, ...mirroredEnvDirs(mirror)], deps);
@@ -204,7 +216,7 @@ export async function setupCopy(input: SetupInput, deps: SetupDeps): Promise<Set
           notes: [],
           unread: `profile: ${'unknown' in profile ? profile.unknown : 'absent'}`,
         };
-  const installs = await installStage(input, plan, deps);
+  const installs = input.deferInstall ? [] : await installStage(input, plan, deps);
   // Откат и без установки в этом заходе: переписанное установкой до краха тоже её грязь.
   const reverted = await revertStage(input.copy, mirror, git);
   const setupInput: CopySetupInput = {
@@ -214,6 +226,7 @@ export async function setupCopy(input: SetupInput, deps: SetupDeps): Promise<Set
     installs,
     reverted,
     longPaths: input.longPaths,
+    ...(input.deferInstall ? { deferred: true } : {}),
   };
   return { decision: decideCopySetup(setupInput), input: setupInput };
 }

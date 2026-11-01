@@ -22,8 +22,8 @@ const SHELL_TOOLS = new Set(['run_shell_command', 'monitor']);
 const NET_TOOLS = new Set(['web_fetch', 'web_search']);
 /**
  * Только состояние разговора CLI (Qwen Code 0.24.3 `ToolNames`): `tool_search` грузит отложенные
- * инструменты (ядра тоже), `todo_write` ведёт список дел сеанса. `agent`/`skill`/`tool_call`
- * действуют — `other`.
+ * инструменты (ядра тоже), `todo_write` ведёт список дел сеанса. `agent`/`skill` — свои классы
+ * `subagent`/`skill` (судятся по фактам слоя), `tool_call` действует — `other`.
  */
 const CONVERSATION_TOOLS = new Set(['tool_search', 'todo_write']);
 
@@ -49,6 +49,22 @@ function searchTarget(tool: string, input: Record<string, unknown>): string {
   return isAbsolute(mask) ? mask : join(root, mask);
 }
 
+const lineIndex = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+
+/**
+ * Диапазон `read_file` (этап 8): `offset` у Qwen Code — индекс строки с нуля (проба 0.24.3: offset
+ * 10 → «Read lines 11-15»), в канон ядра (номер первой строки с единицы) — плюс один, чтобы
+ * диапазоны обоих CLI сравнивались одинаково. Ни одного поля — «без диапазона» (`null`); Qwen
+ * при этом сам режет большой файл по размеру («Read lines 1-252 of 400 (truncated)»).
+ */
+export function qwenReadRange(input: Record<string, unknown>): PermissionAsk['range'] {
+  const offset = lineIndex(input.offset);
+  const limit = lineIndex(input.limit);
+  if (offset === null && limit === null) return null;
+  return { offset: offset === null ? null : offset + 1, limit };
+}
+
 export function mapQwenPermission(raw: RawToolCall): PermissionAsk {
   const input = raw.input;
   const tool = raw.tool;
@@ -61,7 +77,13 @@ export function mapQwenPermission(raw: RawToolCall): PermissionAsk {
   }
   if (READ_TOOLS.has(tool)) {
     const target = text(input.file_path) || text(input.path);
-    return { action: 'read', target, tool, display: `${tool} ${target}`.trim() };
+    return {
+      action: 'read',
+      target,
+      ...(tool === 'read_file' ? { range: qwenReadRange(input) } : {}),
+      tool,
+      display: `${tool} ${target}`.trim(),
+    };
   }
   if (EDIT_TOOLS.has(tool)) {
     const target = text(input.file_path) || text(input.notebook_path);
@@ -87,6 +109,16 @@ export function mapQwenPermission(raw: RawToolCall): PermissionAsk {
   }
   if (CONVERSATION_TOOLS.has(tool)) {
     return { action: 'conversation', target: tool, tool, display: tool };
+  }
+  // Проба L Q7 (0.24.3): навык — `skill {skill, args?}`, подагент — `agent {description, prompt,
+  // subagent_type}`; модели в вызове нет — модель определения или сеанса.
+  if (tool === 'skill') {
+    const target = text(input.skill);
+    return { action: 'skill', target, tool, display: `${tool} ${target}`.trim() };
+  }
+  if (tool === 'agent') {
+    const target = text(input.subagent_type);
+    return { action: 'subagent', target, model: null, tool, display: `${tool} ${target}`.trim() };
   }
   return { action: 'other', target: tool, tool, display: tool };
 }

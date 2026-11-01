@@ -64,7 +64,7 @@ describe('P12 process identity — fake process table', () => {
 
 describe('P12 process identity — parsers of recorded OS output', () => {
   it('P12 Windows snapshot: FILETIME start kept exact, startMs from the 1601 epoch', () => {
-    const rows = parseWinTable('0 0 0\n4 0 0\n1234 900 133432704000000000\r\n');
+    const rows = parseWinTable('0 0 0 0\n4 0 0 0\n1234 900 133432704000000000 0\r\n');
     expect(rows.find((r) => r.pid === 1234)).toMatchObject({
       ppid: 900,
       start: '133432704000000000',
@@ -82,6 +82,7 @@ describe('P12 process identity — parsers of recorded OS output', () => {
       starttime: '987654',
       state: 'S',
       comm: 'my (odd) name',
+      cpuTicks: 3,
     });
   });
 

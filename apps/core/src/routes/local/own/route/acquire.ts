@@ -7,7 +7,13 @@ import type {
 } from '@agentdeck/contracts/core/routes';
 import { newId } from '../../../../lib/ids/uuidv7.ts';
 import { ensureDir, pathExists } from '../../../../platform/safe-io/files.ts';
-import { createResource, releaseOf, RouteRefused, throwIfAborted } from '../../../lease.ts';
+import {
+  createResource,
+  releaseOf,
+  requireModel,
+  RouteRefused,
+  throwIfAborted,
+} from '../../../lease.ts';
 import { decideFit, pinDeviceEnv } from '../fit.ts';
 import { dropWait, serverRef, waitRank, writeLeaseState } from '../lease-state.ts';
 import type { SlotHold } from '../slot.ts';
@@ -77,11 +83,13 @@ export function createAcquire(
     spec: RouteAcquireSpec,
     record: RouteRecorder,
   ): Promise<RouteLease> {
-    const model = options.models.find((item) => item.id === spec.model);
-    if (!model) throw new RouteRefused('model_absent', `${spec.model} is not in the own model set`);
+    // Модель по умолчанию CLI своей модели не бывает: серверу нужно имя загружаемой модели.
+    const asked = requireModel({ id, caps: OWN_CAPS }, spec);
+    const model = options.models.find((item) => item.id === asked);
+    if (!model) throw new RouteRefused('model_absent', `${asked} is not in the own model set`);
     // Та же проверка, что у `read.models()` (F-70): нет файла — нет модели, слот не занимается.
     if (!pathExists(model.path))
-      throw new RouteRefused('model_absent', `${spec.model}: model file ${model.path} not found`);
+      throw new RouteRefused('model_absent', `${asked}: model file ${model.path} not found`);
     const releaseSpec = releaseOf(spec);
     const hold = await takeSlot(spec, record);
     const resources: RouteResource[] = [];

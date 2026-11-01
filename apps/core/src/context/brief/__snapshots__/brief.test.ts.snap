@@ -1,0 +1,67 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`brief snapshot per step kind (P13) > fix: sections, bytes and total 1`] = `
+{
+  "bytes": 809,
+  "kind": "fix",
+  "sections": [
+    "task:27",
+    "step:84",
+    "requirements:82",
+    "knowledge:43",
+    "handoff:163",
+    "findings:112",
+    "reminder:298",
+  ],
+  "total": 6000,
+}
+`;
+
+exports[`brief snapshot per step kind (P13) > plan: sections, bytes and total 1`] = `
+{
+  "bytes": 665,
+  "kind": "plan",
+  "sections": [
+    "task:27",
+    "step:85",
+    "requirements:82",
+    "knowledge:43",
+    "handoff:127",
+    "reminder:301",
+  ],
+  "total": 12000,
+}
+`;
+
+exports[`brief snapshot per step kind (P13) > review: sections, bytes and total 1`] = `
+{
+  "bytes": 886,
+  "kind": "review",
+  "sections": [
+    "task:27",
+    "step:87",
+    "requirements:82",
+    "knowledge:43",
+    "handoff:163",
+    "findings:112",
+    "reminder:372",
+  ],
+  "total": 8000,
+}
+`;
+
+exports[`brief snapshot per step kind (P13) > work: sections, bytes and total 1`] = `
+{
+  "bytes": 698,
+  "kind": "work",
+  "sections": [
+    "task:27",
+    "step:85",
+    "requirements:82",
+    "knowledge:43",
+    "handoff:163",
+    "reminder:298",
+  ],
+  "total": 10000,
+}
+`;

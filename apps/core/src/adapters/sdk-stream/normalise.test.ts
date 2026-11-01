@@ -63,10 +63,20 @@ describe('sdk-stream normaliser — recorded streams', () => {
       'ended 22 REPLY_1',
     ]);
     expect(events.filter((e) => e.type === 'text.delta').length).toBeGreaterThan(0);
-    // Вход — из начала сообщения, выход — из дельты: части сводятся по id сообщения.
+    // Вход — из начала сообщения, выход — из дельты: части сводятся по id сообщения; окно —
+    // из `result.modelUsage.stub-model.contextWindow` записи.
+    const stub = { input: 11, cacheRead: 5, cacheWrite: 0, cacheWrite1h: 0, output: 3 };
+    const reported = { model: 'stub-model', contextWindow: 64_000 };
     expect(n.usage()).toEqual([
-      { messageId: 'msg_stub_1', input: 11, cacheRead: 5, cacheWrite: 0, output: 3 },
-      { messageId: 'msg_stub_2', input: 11, cacheRead: 5, cacheWrite: 0, output: 3 },
+      { messageId: 'msg_stub_1', ...stub, ...reported },
+      { messageId: 'msg_stub_2', ...stub, ...reported },
+    ]);
+    // Первое сообщение издано без окна и ещё раз с ним (итог хода), второе — сразу с ним.
+    const usage = events.flatMap((e) => (e.type === 'usage' ? [e] : []));
+    expect(usage.map((u) => [u.messageId, u.contextWindow ?? null])).toEqual([
+      ['msg_stub_1', null],
+      ['msg_stub_1', 64_000],
+      ['msg_stub_2', 64_000],
     ]);
     expect(n.conversationId).toBe('9b3cf7bf-2fde-4b51-8105-d5430440b8db');
     expect(n.busy).toBe(false);
@@ -165,7 +175,14 @@ describe('sdk-stream normaliser — cases no recording gives', () => {
       }),
     );
     expect(tool).toEqual([
-      { type: 'tool.requested', toolUseId: 't1', name: 'Read', input: {}, cliInitiated: true },
+      {
+        type: 'tool.requested',
+        toolUseId: 't1',
+        name: 'Read',
+        input: {},
+        cliInitiated: true,
+        parentToolUseId: null,
+      },
     ]);
     expect(n.push(result(0))).toEqual([
       { type: 'turn.cli-initiated', cause: 'notification', numTurns: 0 },
@@ -237,11 +254,36 @@ describe('sdk-stream normaliser — cases no recording gives', () => {
     n.push(line({ type: 'stream_event', event: { type: 'ping' } }));
     const stop = n.push(line({ type: 'stream_event', event: { type: 'message_stop' } }));
     expect(stop).toEqual([
-      { type: 'usage', messageId: 'm', input: 7, cacheRead: 0, cacheWrite: 2, output: 4 },
+      {
+        type: 'usage',
+        messageId: 'm',
+        input: 7,
+        cacheRead: 0,
+        cacheWrite: 2,
+        cacheWrite1h: 0,
+        output: 4,
+      },
     ]);
     expect(n.push(line({ type: 'stream_event', event: { type: 'message_stop' } }))).toEqual([]);
-    expect(n.push(result(1, { permission_denials: [{ tool_name: 'edit' }, 'junk'] }))).toEqual([
+    // Отказ с id вызова несёт его (W P-c: строка отказа сводится с вызовом), без id — без поля.
+    expect(
+      n.push(
+        result(1, {
+          permission_denials: [
+            { tool_name: 'edit' },
+            { tool_name: 'read_file', tool_use_id: 'call_1', tool_input: { file_path: 'a' } },
+            'junk',
+          ],
+        }),
+      ),
+    ).toEqual([
       { type: 'ask', ask: expect.objectContaining({ action: 'edit', tool: 'edit' }), denied: true },
+      {
+        type: 'ask',
+        ask: expect.objectContaining({ tool: 'read_file' }),
+        denied: true,
+        toolUseId: 'call_1',
+      },
       { type: 'turn.cli-initiated', cause: 'background-wake', numTurns: 1 },
     ]);
   });

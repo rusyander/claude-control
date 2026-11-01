@@ -6,6 +6,8 @@ import {
   readFileSync,
   realpathSync,
   statSync,
+  symlinkSync,
+  unlinkSync,
   utimesSync,
   type Stats,
 } from 'node:fs';
@@ -124,6 +126,21 @@ export function sameFileBytes(a: string, b: string): boolean {
   }
 }
 
+/**
+ * Повторное зеркало (G20): файл назначения есть и не старее источника больше чем на секунду —
+ * переписывать нечего (запас 1 с — точность времени файла у ФС разная). Не прочиталось — `false`:
+ * переписать лишний раз безопаснее, чем оставить старое.
+ */
+export function notOlderThan(src: string, dst: string): boolean {
+  try {
+    const from = statSync(longForm(src), { throwIfNoEntry: false });
+    const to = statSync(longForm(dst), { throwIfNoEntry: false });
+    return from !== undefined && to?.isFile() === true && to.mtimeMs + 1000 >= from.mtimeMs;
+  } catch {
+    return false;
+  }
+}
+
 export function fileExists(path: string): boolean {
   return statSync(longForm(path), { throwIfNoEntry: false })?.isFile() === true;
 }
@@ -138,5 +155,35 @@ export function readCopyText(path: string): string | undefined {
     return stats?.isFile() ? readFileSync(longForm(path), 'utf8') : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Каталог окружения сборки копии (`node_modules`, `.venv`) — ссылкой в папку базы (прогон базы
+ * итога и «красный до»): база выложена `worktree add` без установки, и её тесты иначе падали бы на
+ * импорте, а не на своём утверждении. Ссылка, не копия: гигабайты зависимостей не дублируются, а
+ * lock-файл базы и копии в задаче один (копию ставили от базы). Снимать — только `unlinkDirLink`:
+ * рекурсивное удаление прошло бы сквозь ссылку в зависимости копии.
+ */
+export function linkDir(target: string, at: string, os: OsKind = currentOs()): Fact<true> {
+  try {
+    if (!statSync(longForm(target, os), { throwIfNoEntry: false })?.isDirectory())
+      return { absent: true };
+    if (lstatSync(longForm(at, os), { throwIfNoEntry: false })) return { unknown: `${at} exists` };
+    symlinkSync(longForm(target, os), longForm(at, os), os === 'win32' ? 'junction' : 'dir');
+    return { value: true };
+  } catch (error) {
+    return { unknown: reasonOf(error) };
+  }
+}
+
+/** Снять ссылку `linkDir`, не заходя в цель; не ссылка — не трогается (`false`). */
+export function unlinkDirLink(at: string, os: OsKind = currentOs()): boolean {
+  try {
+    if (!lstatSync(longForm(at, os), { throwIfNoEntry: false })?.isSymbolicLink()) return false;
+    unlinkSync(longForm(at, os));
+    return true;
+  } catch {
+    return false;
   }
 }

@@ -10,6 +10,8 @@ export const BASE_REPO: TaskInput['repo'] = {
 };
 
 export const HELLO_FILE = 'hello.txt';
+/** Id требования задач библиотеки: ядро выдаёт требованиям UUIDv7 (02:54), заявка шага ссылается на него. */
+export const REQ_1 = '01920000-0000-7000-8000-00000000a001';
 export const HELLO_TEXT = 'hello from the stub task\n';
 
 /**
@@ -27,7 +29,7 @@ export const HAPPY_PATH: StubTask = {
     request: `Create ${HELLO_FILE} with a greeting and commit it on the current branch.`,
     repo: BASE_REPO,
     stepKind: 'work',
-    requirements: [{ id: 'r1', text: `${HELLO_FILE} exists with a greeting, committed` }],
+    requirements: [{ id: REQ_1, text: `${HELLO_FILE} exists with a greeting, committed` }],
   },
   moves: [
     { op: 'write', path: `\${copy}/${HELLO_FILE}`, content: HELLO_TEXT },
@@ -40,7 +42,7 @@ export const HAPPY_PATH: StubTask = {
         stepId: '${stepId}',
         outcome: 'done',
         requirements: [
-          { id: 'r1', state: 'n/a', evidence: 'no check registry before phase 3; commit made' },
+          { id: REQ_1, state: 'n/a', evidence: 'no check registry before phase 3; commit made' },
         ],
         summary: `${HELLO_FILE} written and committed`,
       },

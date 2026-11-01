@@ -23,6 +23,12 @@ interface TransferInput {
 
 const slash = (path: string): string => path.replace(/\\/g, '/');
 
+/** Тест стороны панели запускается vitest своего пакета: механика сит живёт в `packages/sieves`. */
+function panelTestCommand(test: string): string {
+  const owner = /^((?:apps|packages)\/[^/]+)\/(.+)$/.exec(test);
+  return owner ? `\`pnpm -C ${owner[1]} exec vitest run ${owner[2]}\`` : `\`${test}\``;
+}
+
 function divergenceLines(rows: readonly GlobalLayerRow[], sieve: string | undefined): string[] {
   const lines: string[] = [];
   for (const row of rows) {
@@ -74,7 +80,7 @@ export function transferPrompt(input: TransferInput): string {
     '',
     'Acceptance (all must pass before you report done):',
     `- \`${cli}${toGlobal ? ` --proposal ${slash(proposalDir)}` : ''}\` exits 0 — the corpus is green on BOTH sides.`,
-    `- Panel tests: \`pnpm --filter server exec vitest run ${pair.panel.tests.join(' ')}\`.`,
+    `- Panel tests: ${pair.panel.tests.map(panelTestCommand).join(', ')}.`,
     `- Global tests: ${pair.global.tests
       .map((test) => `\`node ${slash(join(configRoot, test))}\``)
       .join(

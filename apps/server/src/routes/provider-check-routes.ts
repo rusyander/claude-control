@@ -5,8 +5,10 @@ import type {
   ProviderChecksResponse,
 } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
-import { checkProvider } from '../domains/provider-check/provider-check.ts';
+import { checkProvider, createCoreRoutesReader } from '../domains/provider-check/provider-check.ts';
 import { getProvider, isKnownProviderId } from '../providers/registry.ts';
+import { coreHomeOf } from '../lib/hop-recorder.mjs';
+import { createCoreIdentityDeps } from '../lib/listen-identity/listen-identity.ts';
 import { attachTextCodes } from '../lib/server-texts/server-texts.ts';
 
 /**
@@ -22,6 +24,13 @@ import { attachTextCodes } from '../lib/server-texts/server-texts.ts';
  * и повесил бы чужой бейдж.
  */
 export function registerProviderCheckRoutes(app: FastifyInstance, ctx: ServerContext): void {
+  // Маршруты ядра — тем же домом и той же сверкой ОС, что у прокладки `/api/core`: строку,
+  // которую ОС не подтвердила, проверка не спрашивает, и bearer ядра никуда не уходит.
+  const coreRoutes = createCoreRoutesReader({
+    home: () => coreHomeOf(),
+    identity: createCoreIdentityDeps(),
+  });
+
   app.get(
     '/api/providers/checks',
     () =>
@@ -55,6 +64,7 @@ export function registerProviderCheckRoutes(app: FastifyInstance, ctx: ServerCon
         withAssistant: request.body?.assistant !== false,
         // Только кэш каталога: проверка не должна ждать сеть ради имени модели.
         models: ctx.models.current(provider.modelVendors ?? []).models,
+        coreRoutes,
       });
 
       ctx.store.saveProviderCheck(result);

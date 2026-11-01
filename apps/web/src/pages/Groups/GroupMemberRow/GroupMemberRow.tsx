@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
-import { pickLang } from '@features/GroupPath';
+import { pickLang } from '@entities/StepPath';
 import type { GroupMemberRowProps } from './GroupMemberRow.types';
 import styles from './GroupMemberRow.module.scss';
 import { projectName } from '../model/projectName';

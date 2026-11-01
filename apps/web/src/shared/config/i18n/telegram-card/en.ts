@@ -40,7 +40,7 @@ export const telegramCardEn: typeof telegramCardRu = {
   when: 'When to call',
   waits:
     'The agent waits for you — a question or a permission · if not answered in the panel within',
-  finished: 'The agent finished — if it worked longer than',
+  finished: 'Task closed or the agent waits for a decision — if it worked longer than',
   broken: 'Something broke — the agent failed, tests are red, a group got stuck or went in circles',
   minutes: 'min',
   minutesAria: 'Minutes',

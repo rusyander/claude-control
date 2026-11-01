@@ -1,4 +1,5 @@
 import type { Platform, PlatformDataMask } from '@agentdeck/contracts';
+import { dataMaskDecision } from '@agentdeck/dlp/data-mask';
 import { maskRulesFor } from '@agentdeck/dlp/default-rules';
 import type { PlatformDriver } from '../drivers/driver.ts';
 
@@ -19,7 +20,11 @@ export function declaresAnonymization(driver: PlatformDriver): boolean {
  * карточка её тихо сняла.
  */
 export function dataMaskOn(platform: Platform, driver: PlatformDriver, globalOn: boolean): boolean {
-  return globalOn || (platform.dataMask ?? declaresAnonymization(driver));
+  return dataMaskDecision({
+    globalOn,
+    choice: platform.dataMask,
+    declared: declaresAnonymization(driver),
+  }).on;
 }
 
 export function describeDataMask(
@@ -29,17 +34,8 @@ export function describeDataMask(
   appDataDir: string,
 ): PlatformDataMask {
   const declared = declaresAnonymization(driver);
-  const byContour = platform.dataMask ?? declared;
-  const on = globalOn || byContour;
-  const reason: PlatformDataMask['reason'] = byContour
-    ? platform.dataMask === undefined
-      ? 'declared'
-      : 'chosen'
-    : globalOn
-      ? 'global'
-      : platform.dataMask === false
-        ? 'chosen'
-        : 'none';
+  // Само решение — в `@agentdeck/dlp/data-mask`: его же спрашивает хост звеньев ядра.
+  const { on, reason } = dataMaskDecision({ globalOn, choice: platform.dataMask, declared });
   const rules = maskRulesFor(appDataDir);
   return {
     on,

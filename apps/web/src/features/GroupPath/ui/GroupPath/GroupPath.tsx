@@ -19,9 +19,8 @@ import { rowText } from '../../model/describe';
 import { usePathContext } from '../../model/usePathContext';
 import { useEntryTitle } from '../../model/useEntryTitle';
 import { buildLayout } from '../../model/layout';
-import { useStepDrag } from '../../model/useStepDrag';
 import { PathEntryRow } from '../PathEntryRow/PathEntryRow';
-import { PathAddSlot } from '../PathAddSlot/PathAddSlot';
+import { PathAddSlot, StepPathList, useStepDrag } from '@entities/StepPath';
 import { PathStage } from '../PathStage/PathStage';
 import { PathToolbar } from '../PathToolbar/PathToolbar';
 import { SkillBlock } from '../SkillBlock/SkillBlock';
@@ -280,7 +279,7 @@ export function GroupPath({ group, startComposer }: GroupPathProps) {
         </Typography>
       )}
 
-      <ol ref={drag.listRef} className={styles.list} aria-label={t('groupPath.listLabel')}>
+      <StepPathList listRef={drag.listRef} label={t('groupPath.listLabel')}>
         {isFiltered ? (
           visible.map(renderRow)
         ) : (
@@ -297,7 +296,7 @@ export function GroupPath({ group, startComposer }: GroupPathProps) {
             {renderLayout()}
           </>
         )}
-      </ol>
+      </StepPathList>
 
       {opened && (
         <StepDetailModal

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { newId } from '../lib/ids/uuidv7.ts';
+import { toolEventData } from '../journal/__fixtures__/journal-harness.ts';
 import { startStand, TOKENS, type Stand } from './__fixtures__/api-harness.ts';
 
 let stand: Stand | undefined;
@@ -69,6 +70,26 @@ describe('core API reads', () => {
     expect((await stand.get(`/v1/tasks/${newId()}`)).status).toBe(404);
     expect((await stand.get('/v1/tasks/not-an-id')).status).toBe(400);
     expect((await stand.get('/v1/routes')).status).toBe(501);
+    // Ручки этапа 4 — в своих модулях (зоны A и D); чтение — тем же токеном чтения. Библиотека —
+    // дом стенда из среды API: пустая, пресеты из кода.
+    const scenarios = await stand.get('/v1/scenarios');
+    expect({ status: scenarios.status, body: await scenarios.json() }).toMatchObject({
+      status: 200,
+      body: { library: [], problems: [] },
+    });
+    expect((await stand.get('/v1/scenarios', TOKENS.session)).status).toBe(401);
+    const estimate = (token?: string) =>
+      fetch(`${stand!.url}/v1/estimate`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: '{}',
+      });
+    // Пустое тело не проходит разбор раньше среды деления.
+    expect((await estimate(TOKENS.core)).status).toBe(400);
+    expect((await estimate()).status).toBe(401);
     expect((await stand.get('/v1/nonce?page=x')).status).toBe(400);
     expect((await stand.get('/v1/nonce', TOKENS.session)).status).toBe(401);
   });
@@ -81,14 +102,37 @@ describe('core API reads', () => {
       (await (await stand!.get('/v1/health')).json()) as Record<string, unknown>;
     expect(await health()).toMatchObject({
       queue: { commandsInFlight: 0, commandsPending: 0 },
-      window: { unknown: expect.stringContaining('economy/window') },
+      window: { routes: [] },
       journalLagMs: 0,
+    });
+    // Факт предела в книге ядра — health судит его тем же `economy/window`: ≥90 % держит.
+    const resetAt = Date.now() + 60_000;
+    stand.windows.observe({
+      routeId: 'r1',
+      limitKind: 'window',
+      usedPct: 95,
+      resetAt,
+      refusal: false,
+      source: 'cli-event',
+      at: Date.now(),
+    });
+    expect((await health()).window).toEqual({
+      routes: [
+        {
+          routeId: 'r1',
+          limitKind: 'window',
+          verdict: 'held',
+          resumeAt: resetAt,
+          usedPct: 95,
+          observedAt: expect.any(Number),
+        },
+      ],
     });
     // Телеметрия ждёт пачечного fsync — отставание видно, пока он не прошёл.
     task.append({
       kind: 'tool.event',
       actor: 'core',
-      data: { sessionId: newId(), effectClass: 'read', target: 'f', ms: 1 },
+      data: toolEventData(newId(), 'f', 1),
     });
     stand.clock.advance(700);
     expect((await health()).journalLagMs).toBe(700);

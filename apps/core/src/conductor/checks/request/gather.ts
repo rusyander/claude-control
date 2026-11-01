@@ -8,7 +8,7 @@ import type {
 import { absentKeyOf, type KeyOf } from '../../../verifier/key/index.ts';
 import { absentRecordDraft, type RecordStore } from '../../../verifier/store/index.ts';
 import { matchRequest } from '../match.ts';
-import { EMPTY_REGISTRY, WINDOW, why } from './helpers.ts';
+import { checkWindow, EMPTY_REGISTRY, why } from './helpers.ts';
 import type { Gathered, ServiceState } from './request.types.ts';
 
 /** Чтения до решения (реестр → запись → ключ → записи ключа и «в полёте») и ответы по записям. */
@@ -69,8 +69,8 @@ export async function gather(
       inflight: flight && 'value' in flight && flight.value ? flight.value : null,
       phase: req.phase,
       changedUnits,
-      window: WINDOW,
-      fresh: null,
+      window: checkWindow(deps.window?.(req) ?? [], req.phase),
+      fresh: deps.fresh?.(req) ?? null,
       quarantined: quarantine && 'value' in quarantine ? quarantine.value.map((q) => q.test) : [],
     },
   };

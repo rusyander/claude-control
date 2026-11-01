@@ -35,6 +35,9 @@ const DEV_WATCH = process.env.DW_SRC
 const PROBE = new URL('./dev-boot-probe.mjs', import.meta.url);
 const BRAND = new URL('./brand.mjs', import.meta.url);
 const RESTART = new URL('./dev-restart.mjs', import.meta.url);
+const HOP_RECORDER = new URL('./hop-recorder.mjs', import.meta.url);
+// Сторож пишет звенья ядру (P131): дом ядра теста — пустой временный, не настоящий.
+process.env.AGENTDECK_CORE_HOME = mkdtempSync(join(tmpdir(), 'dw-core-'));
 const MUSTFAIL = fileURLToPath(
   new URL('../../assets/kit/agentdeck-kit/tools/mustfail.mjs', import.meta.url),
 );
@@ -137,6 +140,7 @@ describe('dev-сторож и mustfail', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(
       join(serverDir, 'src', 'index.ts'),

@@ -42,6 +42,12 @@ describe('core boot', () => {
     const open = await seed.create(CREATED);
     const ended = await seed.create(CREATED);
     ended.append({ kind: 'task.ended', actor: 'core', data: { outcome: 'cancelled' } });
+    // Закрытый конец — с отчётом; без него задача открылась бы, чтобы её конец закрыли.
+    ended.append({
+      kind: 'report.final',
+      actor: 'core',
+      data: { at: 'ended', report: { sha256: 'a'.repeat(64), bytes: 1 } },
+    });
     seed.closeAll();
 
     const core = await bootCore({ home, build: 'boot-test' });
@@ -74,6 +80,11 @@ describe('core boot', () => {
       const log = events(layout.logs);
       expect(log.find((e) => e.event === 'tasks.opened')).toMatchObject({ opened: 1, refused: [] });
       expect(log.find((e) => e.event === 'port')).toMatchObject({ port: core.port });
+      // Дирижёр запущен загрузкой один раз: шесть зон этапа 4, две этапа 6 (страж, публикатор)
+      // слой пользователя этапа 7 и наблюдатель этапа 8.
+      expect(log.filter((e) => e.event === 'conductor.started')).toEqual([
+        expect.objectContaining({ zones: 10 }),
+      ]);
       expect(readFileSync(join(layout.root, 'machine-id'), 'utf8')).toMatch(/^[0-9a-f-]{36}\n$/);
 
       await core.stop();
@@ -83,6 +94,7 @@ describe('core boot', () => {
       const after = readProcs(layout.procs);
       expect('value' in after && after.value.cores).toEqual([]);
       expect(events(layout.logs).at(-1)?.event).toBe('stop');
+      expect(events(layout.logs).filter((e) => e.event === 'conductor.stopped')).toHaveLength(1);
     } finally {
       if (!stopped) await core.stop();
     }

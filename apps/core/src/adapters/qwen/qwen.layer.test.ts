@@ -25,7 +25,7 @@ function spec(over: Partial<SessionSpec> = {}): SessionSpec {
     platform: { coreHome: join(CWD, '..', 'qwen-layer-core'), tokenFiles: [] },
     tools: 'all',
     mcpServers: {},
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     env: { pin: {} },
     coreHook: 'node hook.mjs core',
     core: {

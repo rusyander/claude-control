@@ -1,8 +1,8 @@
-import { dirname, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { relative } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { DECISION_CLASSES } from '@agentdeck/contracts/core/decisions';
+import { coreProgram, PROGRAM_TIMEOUT_MS, SRC } from './__fixtures__/ts-program.ts';
 
 /**
  * P01 (00 §Decision classes, F01): у каждого класса решений ровно один судья — функция в модуле
@@ -11,9 +11,6 @@ import { DECISION_CLASSES } from '@agentdeck/contracts/core/decisions';
  * Экспорт формы «решение» вне своего модуля, второй экспорт того же класса или тип `…Decision`
  * вне реестра — красный.
  */
-
-const CORE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SRC = resolve(CORE, 'src');
 
 /**
  * Типы с окончанием `Decision`, которые не класс решений: имя совпало, судьи нет. Каждая строка —
@@ -30,39 +27,8 @@ interface Judge {
   type: string;
 }
 
-const PARSED = new Map<string, ts.SourceFile>();
-
-/** Полная программа TypeScript — десятки секунд под параллельными наборами, а не 20 с по умолчанию. */
-const PROGRAM_TIMEOUT_MS = 90_000;
-
-function program(extra: Record<string, string> = {}): ts.Program {
-  const config = ts.getParsedCommandLineOfConfigFile(
-    resolve(CORE, 'tsconfig.json'),
-    {},
-    { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined },
-  );
-  if (!config) throw new Error('core tsconfig unreadable');
-  const host = ts.createCompilerHost(config.options);
-  const virtual = new Map(Object.entries(extra).map(([rel, text]) => [resolve(SRC, rel), text]));
-  const norm = (f: string) => resolve(f);
-  const baseRead = host.readFile.bind(host);
-  const baseExists = host.fileExists.bind(host);
-  const baseSource = host.getSourceFile.bind(host);
-  host.readFile = (f) => virtual.get(norm(f)) ?? baseRead(f);
-  host.fileExists = (f) => virtual.has(norm(f)) || baseExists(f);
-  host.getSourceFile = (f, lang, ...rest) => {
-    const text = virtual.get(norm(f));
-    if (text !== undefined) return ts.createSourceFile(f, text, lang, true);
-    // Разобранные файлы (lib.d.ts, типы node, ядро) общие для обеих программ: второй разбор
-    // тех же мегабайт под общей нагрузкой выводил тест за срок, ничего не проверяя.
-    const cached = PARSED.get(f);
-    if (cached) return cached;
-    const parsed = baseSource(f, lang, ...rest);
-    if (parsed) PARSED.set(f, parsed);
-    return parsed;
-  };
-  return ts.createProgram([...config.fileNames, ...virtual.keys()], config.options, host);
-}
+/** Программа ядра — общая с каталогом сигналов (`__fixtures__/ts-program.ts`). */
+const program = coreProgram;
 
 /** Имя типа результата: алиас или символ, Promise<…> распакован. */
 function resultTypeName(checker: ts.TypeChecker, type: ts.Type): string | undefined {
@@ -146,6 +112,7 @@ describe('decision classes', () => {
         expect.arrayContaining([
           'AuthorityDecision@policy/authority/authority.ts',
           'ReconcileDecision@conductor/reconcile.ts',
+          'SignalDecision@observer/judge.ts',
         ]),
       );
       // Каждая строка исключений ещё жива: мёртвое исключение — мусор, который маскирует будущее.

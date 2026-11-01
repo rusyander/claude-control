@@ -47,7 +47,7 @@ function spec(over: Partial<SessionSpec> = {}): SessionSpec {
     platform: { coreHome: join(tmpdir(), 'claude-sec-core'), tokenFiles: [] },
     tools: 'all',
     mcpServers: {},
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     env: { pin: {} },
     core: {
       taskId: 't',
@@ -106,13 +106,13 @@ describe('F-07: the endpoint binding outranks env from human and repo settings',
       { env: { ANTHROPIC_BASE_URL: 'http://repo.example', ANTHROPIC_API_KEY: 'x', BAR: 'repo' } },
     );
     const bound = settingsOf(
-      planClaude(spec({ cwd, env: { pin }, layer: { hooks: 'observe' } }), binding()),
+      planClaude(spec({ cwd, env: { pin }, layer: { hooks: 'observe', skills: 'on' } }), binding()),
     );
     expect(bound.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:9');
     expect(bound.env).toMatchObject({ FOO: 'user', BAR: 'repo' });
     // Без привязки (вход человека) адрес репозитория тоже не доходит.
     const unbound = settingsOf(
-      planClaude(spec({ cwd, env: { pin }, layer: { hooks: 'observe' } })),
+      planClaude(spec({ cwd, env: { pin }, layer: { hooks: 'observe', skills: 'on' } })),
     );
     expect(unbound.env.ANTHROPIC_BASE_URL).toBe('http://user.example');
     expect(unbound.env).not.toHaveProperty('ANTHROPIC_API_KEY');
@@ -123,7 +123,9 @@ describe('F-08: the human disableAllHooks cannot drop the core hook', () => {
   it('every mode writes disableAllHooks:false in our settings', () => {
     const { pin, cwd } = layered({ disableAllHooks: true });
     for (const mode of ['on', 'observe', 'off'] as const) {
-      const settings = settingsOf(planClaude(spec({ cwd, env: { pin }, layer: { hooks: mode } })));
+      const settings = settingsOf(
+        planClaude(spec({ cwd, env: { pin }, layer: { hooks: mode, skills: 'on' } })),
+      );
       expect(settings.disableAllHooks).toBe(false);
       expect(settings.hooks.PreToolUse).toContainEqual({
         matcher: '*',
@@ -231,7 +233,7 @@ describe('F-32: human allow rules that would answer before the judge are not car
       { permissions: { allow: ['WebFetch', 'Bash(npm run x:*)'], deny: ['Write'] } },
     );
     const settings = settingsOf(
-      planClaude(spec({ cwd, env: { pin }, layer: { hooks: 'observe' } })),
+      planClaude(spec({ cwd, env: { pin }, layer: { hooks: 'observe', skills: 'on' } })),
     );
     expect(settings.permissions.allow).toEqual(['Read', 'Bash(npm test:*)']);
     // Запрет из репозитория остаётся: он только сужает.
@@ -252,6 +254,7 @@ describe('F-33: a hook event name is never shell text in the recorder command', 
       },
       'observe',
       { command: 'rec', log: 'l' },
+      'obs',
     );
     expect(Object.keys(out.hooks)).toEqual(['PreToolUse']);
     expect(JSON.stringify(out)).not.toContain('calc');
@@ -281,7 +284,9 @@ describe('F-35: unreadable human settings refuse an observe/off session', () => 
     writeFileSync(join(root, 'settings.json'), '{broken');
     const pin = { CLAUDE_CONFIG_DIR: root };
     for (const mode of ['observe', 'off'] as const) {
-      expect(refuseClaude(spec({ env: { pin }, layer: { hooks: mode } }))).toMatch(/unreadable/);
+      expect(refuseClaude(spec({ env: { pin }, layer: { hooks: mode, skills: 'on' } }))).toMatch(
+        /unreadable/,
+      );
     }
     expect(refuseClaude(spec({ env: { pin } }))).toBeNull();
   });

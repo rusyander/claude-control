@@ -1,0 +1,40 @@
+{
+  "topic": "core",
+  "scenario": "ask",
+  "frames": [
+    {
+      "id": "01-launch",
+      "side": "panel",
+      "file": "01-launch.png",
+      "masked": 4,
+      "width": 988,
+      "height": 160,
+      "shotAt": "2026-11-01T17:09:16.050Z",
+      "text": "Пункт 10 запуск Launch the task? Split: one unit (no split). Одобрить разбиение Правка разбиения — на экране запуска Отменить задачу",
+      "en": {
+        "file": "01-launch.en.png",
+        "masked": 4,
+        "width": 988,
+        "height": 160,
+        "shotAt": "2026-11-01T17:09:19.515Z",
+        "text": "Item 10 launch Launch the task? Split: one unit (no split). Approve the split Editing the split is on the launch screen Cancel the task"
+      },
+      "dark": {
+        "file": "01-launch.dark.png",
+        "masked": 4,
+        "width": 988,
+        "height": 160,
+        "shotAt": "2026-11-01T17:09:22.898Z",
+        "text": "Пункт 10 запуск Launch the task? Split: one unit (no split). Одобрить разбиение Правка разбиения — на экране запуска Отменить задачу"
+      },
+      "darkEn": {
+        "file": "01-launch.dark.en.png",
+        "masked": 4,
+        "width": 988,
+        "height": 160,
+        "shotAt": "2026-11-01T17:09:26.648Z",
+        "text": "Item 10 launch Launch the task? Split: one unit (no split). Approve the split Editing the split is on the launch screen Cancel the task"
+      }
+    }
+  ]
+}

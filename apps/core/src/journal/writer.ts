@@ -55,6 +55,12 @@ export interface WriterOptions {
   holdsLease: () => boolean;
   /** Подмена таймера пачки телеметрии — для тестов. */
   setTimer?: (fn: () => void, ms: number) => { cancel(): void };
+  /**
+   * Строка отвергнута (этап 8, сигнал `journal-rejected`): зовётся, когда отказ уже лежит в
+   * `journal.rejected.jsonl`, и до броска `JournalInputError`. Сбой крючка отказ не подменяет;
+   * запись в журнал изнутри крючка допустима — писатель в этот миг ничего не сдвинул.
+   */
+  onRejected?: (rejection: { kind: string; issues: string[] }) => void;
 }
 
 export interface JournalWriter {
@@ -116,6 +122,12 @@ export function openWriter(dir: string, options: WriterOptions): JournalWriter {
     const entry = { rejectedAt: stamp.at, bootId: options.clock.bootId, issues, input: safe };
     rejectedLog.append(Buffer.from(`${JSON.stringify(entry)}\n`));
     rejectedLog.sync();
+    const kind = (input as { kind?: unknown } | null)?.kind;
+    try {
+      options.onRejected?.({ kind: typeof kind === 'string' && kind ? kind : '(input)', issues });
+    } catch {
+      // Наблюдатель не может подменить отказ своим сбоем: вызывающий получит именно отказ.
+    }
     throw new JournalInputError(issues);
   };
 

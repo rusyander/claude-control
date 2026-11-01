@@ -30,7 +30,7 @@ function spec(over: Partial<SessionSpec>): SessionSpec {
     platform: { coreHome: join(cwd, '..', 'qwen-sid-core'), tokenFiles: [] },
     tools: 'all',
     mcpServers: {},
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     env: { pin: {} },
     core: {
       taskId: 't',

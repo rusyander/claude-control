@@ -17,8 +17,26 @@ export {
   LIMIT_KINDS,
   routeSchema,
   allowedRouteSchema,
+  REQUIREMENT_VERDICTS,
+  REQUIREMENT_SOURCES,
+  HUMAN_ASK_SOURCES,
+  LAUNCH_POLICIES,
+  STEP_END_BASES,
+  OVERRIDE_SCOPES,
+  COMMAND_TIMINGS,
+  GRANT_OPS,
+  REPORT_POINTS,
+  SIGNAL_ACTIONS,
+  SESSION_PROBE_VERDICTS,
 } from './journal-data.ts';
-export type { JournalKind, JournalDataV1, ActionKind } from './journal-data.ts';
+export type {
+  JournalKind,
+  JournalDataV1,
+  ActionKind,
+  RequirementVerdict,
+  HumanAskSource,
+  SignalAction,
+} from './journal-data.ts';
 
 /** Версия, которую пишут; читаются все версии из `JOURNAL_DATA_BY_VERSION` через апкастеры. */
 export const JOURNAL_VERSION = 1;

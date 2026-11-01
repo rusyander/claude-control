@@ -8,7 +8,7 @@ import { KnobSelect } from '../KnobSelect/KnobSelect';
 import { TypeChip } from '../TypeChip/TypeChip';
 import type { PathEntryRowProps } from './PathEntryRow.types';
 import styles from './PathEntryRow.module.scss';
-import { pickLang } from '../../lib/pickLang';
+import { DragHandle, pickLang } from '@entities/StepPath';
 import { RowHint } from './RowHint/RowHint';
 import { useHint } from '../../model/useHint';
 
@@ -49,19 +49,7 @@ export function PathEntryRow({
       className={`${styles.row} ${styles[`type-${type}`] ?? ''} ${isDragging ? styles.dragging : ''}`}
     >
       {dragHandle ? (
-        <button
-          type="button"
-          className={styles.handle}
-          aria-label={t('groupBuilder.drag.handle', { title: words.title })}
-          aria-describedby={`${hintId}-drag`}
-          title={t('groupBuilder.drag.handleHint')}
-          {...dragHandle}
-        >
-          <Icon name="grip" size={16} />
-          <span id={`${hintId}-drag`} hidden>
-            {t('groupBuilder.drag.handleHint')}
-          </span>
-        </button>
+        <DragHandle title={words.title} handle={dragHandle} />
       ) : (
         <span className={styles.handleSpace} aria-hidden="true" />
       )}

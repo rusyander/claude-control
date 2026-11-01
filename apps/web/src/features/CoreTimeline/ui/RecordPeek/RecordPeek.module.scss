@@ -1,0 +1,18 @@
+// Запись раскрывается под строкой проверки: рамка отделяет её от соседних строк ленты.
+.record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.argv {
+  overflow-wrap: anywhere;
+}
+
+.list {
+  margin: 0;
+  padding-left: var(--spacing-md);
+}

@@ -59,6 +59,7 @@ import {
   legacyAppDataDirOf,
   resolveBrandDir,
 } from '../apps/server/src/lib/brand.mjs';
+import { describeRecord, listenerPid, watchHops } from '../apps/server/src/lib/hop-recorder.mjs';
 import { killChildProcessTree, killProcessTree } from '../apps/server/src/lib/kill-tree.mjs';
 import {
   bootTime,
@@ -78,7 +79,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // отдаёт EPERM, а PATH под Git Bash до них не всегда доводит.
 const SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
 const SCHTASKS = WIN ? join(SYSTEM32, 'schtasks.exe') : 'schtasks';
-const NETSTAT = WIN ? join(SYSTEM32, 'netstat.exe') : 'netstat';
 const WSCRIPT = join(SYSTEM32, 'wscript.exe');
 
 /** Половины стенда. Порт — единственный надёжный признак жизни. */
@@ -171,37 +171,71 @@ function killTree(pid, spawnedAt) {
   killProcessTree(pid, { group: !WIN, spawnedAt });
 }
 
+// Кто слушает порт (`listenerPid`, из `hop-recorder.mjs`) нужен дважды: у стенда, взятого под
+// наблюдение, нет дочернего процесса — без номера слушателя его остаток нечем погасить; и
+// слушатели обеих половин — звенья пересылки, которые ядру называет надзор (P131).
+
 /**
- * Кто слушает порт на петле, или 0. Нужен ровно за одним: у стенда, который
- * сторож взял под наблюдение, а не запускал сам, нет дочернего процесса — и без
- * этого его остаток нечем погасить.
+ * Звенья ядру (P131): слушатели 5178 и 8888 — сервер панели и Vite. Тот же надзор, что у
+ * dev-сторожа (`watchHops`): ядро, поднятое позже сторожа, получает звенья само, как только его
+ * строка появится в `procs.json`. Файла итога сторож не пишет — его ждёт прокладка сервера, и
+ * пишет его dev-сторож, владелец процесса сервера.
+ *
+ * Раньше запись шла на ближайшем опросе после подъёма (до 20 с): всё это время первая команда
+ * через свежий сервер или Vite шла от pid, которого у ядра нет. Теперь сразу после запуска
+ * половины сторож ждёт нового слушателя её порта и пишет звенья тут же.
  */
-function listenerPid(port) {
-  try {
-    if (WIN) {
-      const out = execFileSync(NETSTAT, ['-ano', '-p', 'TCP'], {
-        encoding: 'utf8',
-        windowsHide: true,
-      });
-      for (const line of out.split(/\r?\n/)) {
-        const match = line.trim().match(/^TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)$/i);
-        if (match && Number(match[1]) === port) return Number(match[2]);
-      }
-    } else {
-      const out = execFileSync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], {
-        encoding: 'utf8',
-      });
-      return Number(out.split(/\s+/).filter(Boolean)[0]) || 0;
+let hopPids = '';
+const hopsNow = () => UNITS.map((unit) => listenerPid(unit.port)).filter(Boolean);
+/** Надзор звеньев — только в режиме сторожа (`--status`/`--install` его не заводят). */
+let hops = null;
+function watchStandHops() {
+  hops = watchHops({
+    pidsOf: () => {
+      const pids = hopsNow();
+      hopPids = pids.join(',');
+      return pids;
+    },
+    onRecord: (results, pids) => {
+      const line = describeRecord(results, pids);
+      if (line) log(line);
+    },
+  });
+}
+
+/** Опрос слушателя, пока половина поднимается: чаще опроса порта, иначе ждали бы те же 20 с. */
+const HOP_POLL_MS = 250;
+
+/**
+ * Записать звенья, как только порт половины займёт НОВЫЙ слушатель (не `stalePid` — остаток
+ * прежнего процесса, который ещё не отпустил порт). Новый запуск той же половины отменяет
+ * прежнее ожидание; не дождались за стартовую паузу — запишет опрос (`checkHops`).
+ */
+function hopsAfterStart(unit, stalePid) {
+  const ticket = {};
+  unit.hopTicket = ticket;
+  const deadline = Date.now() + GRACE_MS;
+  const poll = () => {
+    if (unit.hopTicket !== ticket || Date.now() > deadline) return;
+    const pid = listenerPid(unit.port);
+    if (pid && pid !== stalePid) {
+      unit.hopTicket = null;
+      void hops?.refresh();
+      return;
     }
-  } catch {
-    // Слушателя нет либо утилиты нет — и то и другое значит «гасить нечего».
-  }
-  return 0;
+    setTimeout(poll, HOP_POLL_MS).unref?.();
+  };
+  poll();
+}
+
+/** На опросе: набор слушателей сменился (половину подняли руками, вторая встала позже) — переписать. */
+function checkHops() {
+  if (hopsNow().join(',') !== hopPids) void hops?.refresh();
 }
 
 // === Запуск и остановка половины стенда ===
 
-function start(unit) {
+function start(unit, stalePid = 0) {
   // На Windows зовём cmd.exe явной строкой, а не `shell: true` с массивом:
   // на массиве Node пишет DEP0190 и склеивает аргументы без экранирования.
   // Так же запускает свои скрипты и сам pnpm — `cmd /d /s /c vite`.
@@ -217,6 +251,8 @@ function start(unit) {
 
   unit.child = child;
   unit.startedAt = Date.now();
+  // Новый процесс половины — новый pid звена: записать, как только он займёт порт.
+  hopsAfterStart(unit, stalePid);
   unit.failures = 0;
   unit.stderrLines = 0;
 
@@ -269,9 +305,11 @@ function restart(unit) {
   if (unit.nextStartAt && Date.now() < unit.nextStartAt) return;
   const port = unit.silentPort || unit.port;
   log(`${unit.id}: порт ${port}${port === unit.port ? '' : ' (шлюз)'} молчит — перезапуск`);
+  // Молчит шлюз — порт половины ещё слушает прежний процесс: его pid звеном не считается.
+  const stalePid = listenerPid(unit.port);
   stop(unit);
   dropAdopted(unit);
-  start(unit);
+  start(unit, stalePid);
   unit.backoffMs = Math.min(wait * 2, BACKOFF_MAX_MS);
   unit.nextStartAt = Date.now() + wait;
 }
@@ -384,6 +422,7 @@ async function tick() {
   }
   // Окно — только когда отвечают обе половины: раньше оно показало бы ошибку.
   if (appPending && UNITS.every((unit) => unit.silentPort === 0)) openAppOnce();
+  checkHops();
 }
 
 // === Автозапуск ===
@@ -631,6 +670,7 @@ if (mode === '--install') {
     !openedThisBoot(readMarker(STATE_DIR), bootTime(Date.now(), uptime()));
 
   log(`сторож поднялся, корень ${ROOT}`);
+  watchStandHops();
   for (const unit of UNITS) {
     if (await probe(unit.port)) {
       unit.healthySince = Date.now();
@@ -645,6 +685,8 @@ if (mode === '--install') {
       start(unit);
     }
   }
+  // Стенд, взятый под наблюдение, уже слушает: его звенья — сразу, не через 20 с.
+  checkHops();
 
   const timer = setInterval(() => {
     void tick();
@@ -652,6 +694,7 @@ if (mode === '--install') {
 
   const shutdown = () => {
     clearInterval(timer);
+    hops?.stop();
     for (const unit of UNITS) stop(unit);
     try {
       rmSync(PID_PATH, { force: true });

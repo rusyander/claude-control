@@ -49,7 +49,9 @@
  * Стенд не нужен: всё читается с диска.
  *
  * Запуск: `node tools/qa/check-help-shots.mjs` (`--selftest` — прогон самого
- * сторожа: он обязан краснеть на подложенной утечке).
+ * сторожа: он обязан краснеть на подложенной утечке; `--topic <раздел>` —
+ * только этот раздел: его кадры, схемы, ссылки на них и опись исходников, чтобы
+ * кейс одного раздела не краснел от чужого отставания; без флага — весь каталог).
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -599,6 +601,53 @@ function variantIndexProblems(catalog, readIndex) {
   return problems;
 }
 
+/**
+ * Раздел из `--topic <id>` (или `--topic=<id>`). Нет флага — `undefined`, весь
+ * каталог; флаг без значения — ошибка, а не тихий полный прогон: кейс, который
+ * просил один раздел, не должен молча судиться по всем.
+ */
+function topicArg(argv) {
+  const at = argv.findIndex((arg) => arg === '--topic' || arg.startsWith('--topic='));
+  if (at < 0) return { topic: undefined };
+  const value = argv[at].includes('=') ? argv[at].slice('--topic='.length) : argv[at + 1];
+  if (!value || value.startsWith('--')) return { error: 'у --topic нет раздела: --topic <id>' };
+  return { topic: value };
+}
+
+/**
+ * Всё, что прогон проверяет, суженное до одного раздела. Ключ — раздел, которому
+ * принадлежит РЕСУРС: кадр и схема — по папке каталога, ссылка `<HelpShot>` и
+ * `<HelpDiagram>` — по своему `topic`, запись описи — по разделу записи. Поэтому
+ * кадр раздела, показанный чужим документом, проверяется вместе со своей
+ * ссылкой, и «кадр никто не показывает» не краснеет ложно. Ссылка без `topic`
+ * (поломка разметки) остаётся у раздела, чей документ её содержит
+ * (`documentDir` — папка документа в `pages/Help/topics`).
+ */
+function narrowToTopic(input, topic, documentDir) {
+  const own = (item) => item.topic === topic;
+  const ownUsage = (usage) =>
+    usage.topic
+      ? usage.topic === topic
+      : documentDir !== undefined && usage.file.split(/[\\/]/)[0] === documentDir;
+  return {
+    catalog: input.catalog.filter(own),
+    usages: {
+      shots: input.usages.shots.filter(ownUsage),
+      diagrams: input.usages.diagrams.filter(ownUsage),
+    },
+    diagrams: input.diagrams.filter(own),
+    freshness: input.freshness.filter(own),
+    states: input.states.filter(own),
+  };
+}
+
+/** Папка документа раздела внутри `pages/Help/topics` — по записи описи исходников. */
+function documentDirOf(manifest, topic) {
+  const document = (manifest.topics ?? []).find((entry) => entry.topic === topic)?.document;
+  const prefix = 'apps/web/src/pages/Help/topics/';
+  return document?.startsWith(prefix) ? document.slice(prefix.length).split('/')[0] : undefined;
+}
+
 /** Сторож обязан уметь краснеть. Все образцы ниже вымышлены. */
 function selftest() {
   const secrets = [{ name: 'вымышленный:KEY', value: 'абсолютно-секретное-значение' }];
@@ -738,6 +787,7 @@ function selftest() {
 
   failed += selftestVariants(broken, structural);
   failed += selftestSources();
+  failed += selftestTopic(broken, usages);
 
   console.log(
     failed === 0
@@ -887,8 +937,79 @@ function selftestSources() {
   return failed;
 }
 
+/**
+ * `--topic`: поломка чужого раздела не краснит свой, своя — краснит по-прежнему,
+ * а флаг без значения — отказ. Без флага весь каталог проверяет `selftest` выше.
+ */
+function selftestTopic(broken, usages) {
+  let failed = 0;
+  const check = (name, good) => {
+    console.log(`${good ? 'ок   ' : 'ПЛОХО'} --topic: ${name}`);
+    if (!good) failed += 1;
+  };
+  const input = {
+    catalog: broken,
+    usages: {
+      shots: [
+        ...usages.shots,
+        // Разметка без topic в документе раздела «варианты» — остаётся у него.
+        { file: 'ВариантыTopic/Y.tsx', scenario: 'проверка', frame: '01', side: 'panel' },
+      ],
+      diagrams: usages.diagrams,
+    },
+    diagrams: [{ topic: 'вымысел', file: 'лишняя.svg', name: 'лишняя', ok: false }],
+    freshness: [{ topic: 'вымысел', name: 'позавчерашняя', stale: true }],
+    states: [
+      { topic: 'вымысел', path: 'a.ts', why: 'а', document: 'd.tsx', moved: true },
+      { topic: 'варианты', path: 'b.ts', why: 'б', document: 'e.tsx', ok: true },
+    ],
+  };
+  const run = (topic, dir) => {
+    const part = narrowToTopic(input, topic, dir);
+    const { problems } = verify(part.catalog, part.usages, '', [], part.diagrams, part.freshness);
+    return [...problems, ...sourceProblems(part.states)];
+  };
+  const has = (problems, fragment) => problems.some((problem) => problem.includes(fragment));
+
+  const variants = run('варианты', 'ВариантыTopic');
+  check('свой раздел краснеет своей поломкой', has(variants, 'светлого русского оригинала'));
+  check('ссылка без topic остаётся у документа раздела', has(variants, 'не хватает topic'));
+  check(
+    'чужая поломка не краснит',
+    !variants.some((problem) => problem.includes('вымысел')) &&
+      !has(variants, 'не PNG') &&
+      !has(variants, 'отстала от исходника') &&
+      !has(variants, 'код ушёл вперёд'),
+  );
+
+  const fiction = run('вымысел', 'ВымыселTopic');
+  check('другой раздел видит только своё', has(fiction, 'такого кадра в каталоге нет'));
+  check('опись исходников сужается тоже', has(fiction, 'a.ts: код ушёл вперёд'));
+  check(
+    'чужие кадры и разметка не попадают',
+    !has(fiction, '[dark-ru]: УТЕЧКА') && !has(fiction, 'не хватает topic'),
+  );
+
+  check('флаг без раздела — отказ', topicArg(['--topic']).error !== undefined);
+  check('--topic=<id> читается', topicArg(['--topic=core']).topic === 'core');
+  check('без флага — весь каталог', topicArg([]).topic === undefined && !topicArg([]).error);
+  return failed;
+}
+
 function main() {
   if (process.argv.includes('--selftest')) return selftest();
+
+  const { topic, error } = topicArg(process.argv.slice(2));
+  if (error) {
+    console.log(error);
+    return 1;
+  }
+  const helpTopics = readHelpTopics();
+  if (topic !== undefined && !helpTopics.includes(topic)) {
+    // Опечатка в кейсе не должна давать зелёный «проверять нечего».
+    console.log(`Раздела «${topic}» в справке нет. Есть: ${helpTopics.join(', ')}`);
+    return 1;
+  }
 
   const catalog = readCatalog();
   if (catalog.length === 0) {
@@ -898,24 +1019,34 @@ function main() {
 
   const secrets = readSecrets();
   const dictionary = readDictionary();
-  const { problems, ok, coverage } = verify(
-    catalog,
-    readUsages(),
-    dictionary,
-    secrets,
-    readDiagrams(),
-    readDiagramFreshness(),
-  );
-
   // Свежесть документов — отдельная нога прогона: у неё свой источник (опись
   // исходников), свой счёт и своя команда гашения.
   const manifest = readSourceManifest();
   const watched = manifest.topics ?? [];
-  const states = sourceStates(manifest, (path) => readRepoFile(path), readHelpTopics());
+  const full = {
+    catalog,
+    usages: readUsages(),
+    diagrams: readDiagrams(),
+    freshness: readDiagramFreshness(),
+    states: sourceStates(manifest, (path) => readRepoFile(path), helpTopics),
+  };
+  const scope =
+    topic === undefined ? full : narrowToTopic(full, topic, documentDirOf(manifest, topic));
+  if (topic !== undefined) console.log(`Только раздел «${topic}» (--topic)`);
+
+  const { problems, ok, coverage } = verify(
+    scope.catalog,
+    scope.usages,
+    dictionary,
+    secrets,
+    scope.diagrams,
+    scope.freshness,
+  );
+  const { states } = scope;
   problems.push(...sourceProblems(states));
   problems.push(
-    ...variantIndexProblems(catalog, (topic) => {
-      const path = join(SHOTS_ROOT, topic, VARIANT_INDEX);
+    ...variantIndexProblems(scope.catalog, (name) => {
+      const path = join(SHOTS_ROOT, name, VARIANT_INDEX);
       return existsSync(path) ? readFileSync(path, 'utf8') : undefined;
     }),
   );
@@ -927,17 +1058,21 @@ function main() {
   // Сколько разделов под наблюдением — видно всегда: непокрытый раздел не
   // краснеет (иначе правило нельзя было бы вводить по одному), и единственное,
   // что о нём говорит, — эта строка.
-  console.log(
-    `Разделов сверено с кодом: ${watched.length} из ${readHelpTopics().length}` +
-      ` (исходников ${states.filter((state) => state.ok).length} сходится)`,
-  );
+  const matching = states.filter((state) => state.ok).length;
+  let watchLine = `Разделов сверено с кодом: ${watched.length} из ${helpTopics.length} (исходников ${matching} сходится)`;
+  if (topic !== undefined) {
+    watchLine = watched.some((entry) => entry.topic === topic)
+      ? `Раздел сверяется с кодом: исходников ${matching} сходится`
+      : 'Раздел с кодом не сверяется — записи в описи исходников нет';
+  }
+  console.log(watchLine);
   for (const line of variantReport(coverage)) console.log(line);
   for (const problem of problems) console.log(`  ${problem}`);
 
   console.log(
     problems.length === 0
-      ? 'Каталог снимков чист: опись сходится с диском, ссылки живые, утечек нет, ' +
-          'сверенные разделы описывают сегодняшний код.'
+      ? `${topic === undefined ? 'Каталог снимков' : `Раздел «${topic}»`} чист: опись сходится ` +
+          'с диском, ссылки живые, утечек нет, сверенные разделы описывают сегодняшний код.'
       : `\nПроблем: ${problems.length}`,
   );
   return problems.length === 0 ? 0 : 1;

@@ -24,6 +24,7 @@ const STEP_KEYS = new Set([
   'headers',
   'usage',
   'extra',
+  'model',
 ]);
 
 /**
@@ -258,9 +259,11 @@ export function normalizeStep(step) {
   if (typeof extra !== 'object' || extra === null || Array.isArray(extra))
     throw new TypeError('stub-model: step.extra must be an object of reply fields');
   const usage = checkUsage(step.usage);
+  optionalString(step.model, 'step.model');
   return {
     parts,
     error,
+    ...(step.model ? { model: step.model } : {}),
     holdMs: nonNegative(step.holdMs, 'step.holdMs'),
     stallMs: nonNegative(step.stallMs, 'step.stallMs'),
     window: checkWindow(step.window),

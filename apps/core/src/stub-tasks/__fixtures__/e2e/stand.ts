@@ -161,7 +161,12 @@ export function configFor(
   s: Stand,
   adapter: AdapterUnderTest,
   until: Until,
-  over: { taskId?: string; kill?: KillPoint; waitMs?: number } = {},
+  over: {
+    taskId?: string;
+    kill?: KillPoint;
+    waitMs?: number;
+    observer?: ChildConfig['observer'];
+  } = {},
 ): ChildConfig {
   return {
     home: s.home,
@@ -174,11 +179,13 @@ export function configFor(
     routeId: `stub:${ROUTE_NAME}`,
     taskTitle: s.task.input.title,
     request: s.task.input.request,
+    requirements: s.task.input.requirements,
     stepKind: s.task.input.stepKind,
     until,
     waitMs: over.waitMs ?? 120_000,
     ...(over.taskId ? { taskId: over.taskId } : {}),
     ...(over.kill ? { kill: over.kill } : {}),
+    ...(over.observer ? { observer: over.observer } : {}),
   };
 }
 

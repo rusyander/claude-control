@@ -4,6 +4,7 @@
  * `git/` — различия ОС (длинные пути, кодировка вывода, регистр имён окружения) остаются здесь.
  */
 export { commonDir, commonDirSync, workTreeOf, type WorkTreeOf } from './git/common-dir.ts';
+export { changedPaths, diffFileOf, diffUnit } from './git/diff.ts';
 export { inputDigests } from './git/inputs.ts';
 export { git, gitEnv } from './git/run.ts';
 export { createOnceLinked, listStoreDir, readStoreFile } from './git/store-files.ts';

@@ -1,3 +1,4 @@
+import type { HumanAskSource } from '@agentdeck/contracts/core/journal';
 import type { AskActionKind } from '@agentdeck/contracts/core/model-tools';
 import { matchesAny } from '../../lib/glob/glob.ts';
 import type {
@@ -5,12 +6,13 @@ import type {
   HumanPointInput,
   HumanPointItem,
   HumanPointPolicy,
+  NamedPoint,
 } from './human-point.types.ts';
 
 /**
  * Нужен ли человек (06 §Human points, F10, P20 P96). Закрытый список решает по ТИПУ действия;
- * текст вопроса ядро не читает (R:S3-12). Пункты 6, 7, 8 и 10 поднимает само ядро (круги,
- * бюджет, шаг сценария, одобрение запуска) — модель их не заявит никаким действием.
+ * текст вопроса ядро не читает (R:S3-12). Пункты 4 (сверка), 6, 7, 8, 10 и отказ права (3, 5)
+ * называет само ядро — каждый источник только свои (`SOURCE_POINTS`); модель пункт не называет.
  *
  * Всё вне списка — не вопрос человеку, а развилка в итоговый отчёт: шаг продолжает с
  * рекомендацией модели, даже если модель просила остановиться (блокирующий вопрос вне
@@ -92,10 +94,46 @@ function listItem(
   }
 }
 
+/**
+ * Какие пункты источник ядра может назвать (G15). `null` — источник модели: пункт решает только
+ * действие. Таблица полная по типу: новый источник без строки не соберётся.
+ */
+const SOURCE_POINTS: Record<HumanAskSource, readonly NamedPoint[] | null> = {
+  ask_human: null,
+  blocker: null,
+  permit: [3, 5],
+  reconcile: [4],
+  'round-cap': [6],
+  budget: [7],
+  'scenario-step': [8],
+  launch: [10],
+};
+
 export function decideHumanPoint(
   input: HumanPointInput,
   policy: HumanPointPolicy,
 ): HumanPointDecision {
+  const named = SOURCE_POINTS[input.source];
+  if (named !== null) {
+    if (input.point !== null && named.includes(input.point)) {
+      const blocking = ALWAYS_BLOCKING.has(input.point) || input.blocking;
+      return { point: input.point, blocking, reason: `${input.source} names item ${input.point}` };
+    }
+    return {
+      point: null,
+      blocking: false,
+      refused: true,
+      reason: `${input.source} may name items ${named.join('/')}, not ${input.point ?? 'none'}`,
+    };
+  }
+  if (input.point !== null) {
+    return {
+      point: null,
+      blocking: false,
+      refused: true,
+      reason: `${input.source} names no item itself: the typed action decides`,
+    };
+  }
   if (input.action) {
     const hit = listItem(input.action, policy);
     if ('item' in hit) {

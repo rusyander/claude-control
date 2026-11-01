@@ -1,7 +1,9 @@
 import { createAdapterRegistry } from '../../adapters/index.ts';
 import type { TaskRegistry } from '../../conductor/tasks.ts';
+import type { WindowBook } from '../../economy/window/index.ts';
 import type { CoreHomeLayout } from '../../platform/core-home.ts';
 import { captureWiring, type CaptureWiring } from './capture.ts';
+import { evidenceWiring } from './evidence.ts';
 import { outcomesWiring, type OutcomesWiring } from './outcomes.ts';
 import { profileWiring, type ProfileWiring } from './profile.ts';
 import { queueWiring, type QueueWiring } from './queue.ts';
@@ -18,6 +20,10 @@ export interface VerifierWiringDeps {
   layout: CoreHomeLayout;
   /** Журнал ядра — захват называет в нём непойманные дороги и итог забора очереди. */
   note?: (event: string, data: Record<string, unknown>) => void;
+  /** Книга окон ядра (G7) — та же, что у проводки экономики и `/v1/health`; суд проверки по ней. */
+  windows?: WindowBook;
+  /** Секреты окружения сеанса (P61) — те же, что маскирует бриф: выдержки `check` модели. */
+  known?(taskId: string, sessionId: string): readonly string[];
 }
 
 export interface VerifierWiring {
@@ -51,7 +57,8 @@ export function buildVerifierWiring(_deps: VerifierWiringDeps): VerifierWiring {
   const services = servicesWiring(_deps);
   const queue = queueWiring({ ..._deps, services });
   return {
-    verify: verifyWiring(_deps),
+    // Свежесть и охват доказательства `step_done` — теми же чтениями, что вход проверок (G22, P92).
+    verify: { ...verifyWiring(_deps), evidence: evidenceWiring(queue) },
     outcomes: outcomesWiring(),
     queue,
     capture: captureWiring({ ..._deps, queue, images: cliImages }),

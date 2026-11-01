@@ -35,7 +35,7 @@ export interface MachineDef<S extends string, E extends string> {
   unmatched: 'reject';
 }
 
-const TASK_STATES = [
+export const TASK_STATES = [
   'draft',
   'estimating',
   'awaiting-launch',
@@ -57,6 +57,7 @@ const TASK_EVENTS = [
   'window-reset',
   'publish',
   'published',
+  'finish',
   'cancel',
   'fail',
   'deadline',
@@ -81,6 +82,8 @@ export const TASK_MACHINE: MachineDef<TaskState, TaskEvent> = {
     { on: 'window-reset', from: ['waiting-window'], to: 'running' },
     { on: 'publish', from: ['running'], to: 'publishing' },
     { on: 'published', from: ['publishing'], to: 'done' },
+    // Сценарий без публикации (только ревью, G8): все единицы в конце — задача готова без публикатора.
+    { on: 'finish', from: ['running'], to: 'done' },
     { on: 'cancel', from: LIVE_TASK, to: 'cancelled' },
     { on: 'fail', from: LIVE_TASK, to: 'failed' },
     // Срок оценки — бюджет шага плана: оценка не уложилась → задача падает с отчётом.
@@ -193,7 +196,7 @@ export const UNIT_MACHINE: MachineDef<UnitState, UnitEvent> = {
   unmatched: 'reject',
 };
 
-const STEP_STATES = [
+export const STEP_STATES = [
   'queued',
   'running',
   'checking',
@@ -251,7 +254,7 @@ export const STEP_MACHINE: MachineDef<StepState, StepEvent> = {
   unmatched: 'reject',
 };
 
-const SESSION_STATES = ['starting', 'live', 'quiet', 'ended', 'lost'] as const;
+export const SESSION_STATES = ['starting', 'live', 'quiet', 'ended', 'lost'] as const;
 const SESSION_EVENTS = ['spawned', 'output', 'silent', 'exited', 'host-dead', 'deadline'] as const;
 export type SessionState = (typeof SESSION_STATES)[number];
 export type SessionEvent = (typeof SESSION_EVENTS)[number];
@@ -311,7 +314,7 @@ export const CHECK_MACHINE: MachineDef<CheckRunState, CheckRunEvent> = {
   unmatched: 'reject',
 };
 
-const ASK_STATES = ['open', 'answered', 'expired', 'withdrawn'] as const;
+export const ASK_STATES = ['open', 'answered', 'expired', 'withdrawn'] as const;
 const ASK_EVENTS = ['answer', 'expire', 'withdraw'] as const;
 export type AskState = (typeof ASK_STATES)[number];
 export type AskEvent = (typeof ASK_EVENTS)[number];

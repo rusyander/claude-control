@@ -9,6 +9,7 @@ import type {
   TmsSettings,
 } from '@agentdeck/contracts';
 import { INTEGRATION_ORDER } from '@agentdeck/contracts/integrations';
+import { integrationKeyId } from '@agentdeck/keys/integration-keys';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import {
   clearStoredKey,
@@ -73,9 +74,9 @@ export function needsToken(id: IntegrationId): boolean {
   return !TOKENLESS.includes(id);
 }
 
-/** Ключ токена в общем хранилище секретов панели. */
+/** Ключ токена в общем хранилище секретов панели — то же имя читает ядро (`@agentdeck/keys`). */
 export function tokenId(id: IntegrationId): string {
-  return `int:${id}`;
+  return integrationKeyId(id);
 }
 
 export function isIntegrationId(value: string): value is IntegrationId {

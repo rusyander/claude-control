@@ -1,6 +1,12 @@
 import { join } from 'node:path';
 import type { Fact } from '@agentdeck/contracts/core/facts';
-import { copyWithTimes, linkOnTheWay, listFilesUnder, sourceKind } from '../../platform/copy-fs.ts';
+import {
+  copyWithTimes,
+  linkOnTheWay,
+  listFilesUnder,
+  notOlderThan,
+  sourceKind,
+} from '../../platform/copy-fs.ts';
 import { localLayerLists, setIndexFlags, type CopyGitOptions } from '../../platform/copy-git.ts';
 import { isCopyEnvFile } from '../../verifier/env/index.ts';
 import type { MirrorReport, MirrorSettings } from './copy.types.ts';
@@ -16,7 +22,13 @@ import {
  * Перенос локального слоя основной копии в копию единицы (04:97). Каждый файл читается назад
  * (размер); не лёг — второй перенос, не лёг и он — назван на единице (готовность копии, перенесено
  * из панели `copy-readiness.ts` в форме «одна попытка добора»). Флаг git ставится только на
- * перенесённое. Перенос всегда полный: копия свежая, повторное зеркало «по кнопке» — не в ядре.
+ * перенесённое.
+ *
+ * `newerOnly` — повторное зеркало (G20, логика панели `mirror-local.ts`): копия, выложенная при
+ * оценке, ждёт запуска, а человек тем временем правит свой `.env.local`. Перед первым шагом работы
+ * переписывается только то, что в основной копии СВЕЖЕЕ (запас 1 с — точность времени файла у ФС
+ * разная); время переносится вместе с файлом, поэтому второй проход ничего не трогает, а правка в
+ * самой копии (она новее) не затирается.
  */
 /** Имя файла окружения в смысле списка зеркала (`.env`, `.env.*`, `*.env`). */
 function envLike(name: string): boolean {
@@ -33,6 +45,7 @@ export async function mirrorLocalLayer(
   copy: string,
   settings: MirrorSettings | undefined,
   options: CopyGitOptions = {},
+  mode: { newerOnly?: boolean } = {},
 ): Promise<Fact<MirrorReport>> {
   const lists = await localLayerLists(main, options);
   if (!('value' in lists)) return lists;
@@ -50,6 +63,7 @@ export async function mirrorLocalLayer(
     unlisted: plan.unlisted,
     built: plan.built,
     flagsFailed: [],
+    ...(mode.newerOnly ? { kept: [] } : {}),
   };
   for (const rel of plan.files) {
     const src = join(main, rel);
@@ -86,6 +100,10 @@ export async function mirrorLocalLayer(
         path: rel,
         why: `larger than 8 MB (${Math.round(kind.size / 1024 / 1024)} MB)`,
       });
+      continue;
+    }
+    if (mode.newerOnly && notOlderThan(src, join(copy, rel))) {
+      report.kept?.push(rel);
       continue;
     }
     let copied = copyWithTimes(src, join(copy, rel));

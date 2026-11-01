@@ -1,16 +1,22 @@
-import { z } from 'zod';
+import {
+  isLoopbackCoreUrl,
+  procsFileSchema,
+  type ProcEntry,
+  type ProcsFile,
+  type ServerEntry,
+} from '@agentdeck/contracts/core/procs';
 import {
   acquireExclusive,
   releaseExclusive,
   type LockDeps,
   type LockHolder,
 } from './exclusive-lock.ts';
-import { factReason, hasValue, type Fact } from './os-kind.ts';
-import { normalizeAddress } from './peer-pid.ts';
-import type { Liveness } from './process-identity.ts';
 import { writeFileAtomic } from './safe-io/atomic-write.ts';
 import { readBytesSync } from './safe-io/files.ts';
-import type { TcpEntry } from './tcp-table.ts';
+
+// Схема строк, проверка loopback и личности ядра — в контрактах (`core/procs.ts`, core-s9 F10):
+// ту же проверку зовёт прокладка панели. Здесь — только файл под замком.
+export type { ProcEntry, ProcsFile, ServerEntry };
 
 /**
  * Реестр процессов `<core home>/procs.json` (00 §Processes, P83): где слушает каждая сборка
@@ -22,48 +28,6 @@ import type { TcpEntry } from './tcp-table.ts';
  * друг друга: чтение-правка-запись идёт только под замком.
  */
 
-// Строки — `looseObject` (F-54): файл общий для сборок ядра, и поле, добавленное другой сборкой,
-// не делает файл «мусором» (findCore → unknown, registerCore → отказ загрузки); при переписи
-// чужие поля сохраняются.
-export const procEntrySchema = z.looseObject({
-  build: z.string().min(1),
-  pid: z.number().int().nonnegative(),
-  pidStart: z.string().min(1),
-  bootId: z.string().min(1),
-  port: z.number().int().positive(),
-  url: z.string().min(1),
-  startedAt: z.number().int().nonnegative(),
-  home: z.string().min(1),
-  portDecision: z.looseObject({
-    rejected: z.array(z.looseObject({ port: z.number().int().nonnegative(), reason: z.string() })),
-  }),
-});
-export type ProcEntry = z.infer<typeof procEntrySchema>;
-
-/**
- * Серверы машины, которые запускает ядро (11 §Hop chain, §Local servers): хост звеньев, свой
- * сервер моделей, сервер-заглушка. Строка — для поиска и для уборки по pid + старту; доступа
- * (ключа, токена) здесь нет никогда.
- */
-export const SERVER_KINDS = ['hop-host', 'model-server', 'stub-server'] as const;
-export const serverEntrySchema = z.looseObject({
-  kind: z.enum(SERVER_KINDS),
-  id: z.string().min(1),
-  pid: z.number().int().nonnegative(),
-  pidStart: z.string().min(1),
-  port: z.number().int().positive(),
-  ownerBootId: z.string().min(1),
-  startedAt: z.number().int().nonnegative(),
-});
-export type ServerEntry = z.infer<typeof serverEntrySchema>;
-
-export const procsFileSchema = z.looseObject({
-  v: z.literal(1),
-  cores: z.array(procEntrySchema),
-  servers: z.array(serverEntrySchema).default([]),
-});
-export type ProcsFile = z.infer<typeof procsFileSchema>;
-
 /** Замок молчит дольше — держатель считается брошенным (если и мёртв). */
 export const LOCK_SILENT_MS = 10_000;
 /**
@@ -72,29 +36,6 @@ export const LOCK_SILENT_MS = 10_000;
  * перехватываемым, — и падало в цикле перезапусков. Обе величины — от одной константы.
  */
 export const LOCK_WAIT_MS = LOCK_SILENT_MS + 5_000;
-
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
-
-/**
- * Адрес строки годен для bearer сессии (F-19, половина платформы): `http` на loopback, без
- * учётных данных в адресе, и порт адреса = порт строки. Иное (чужой хост, LAN, подменённый
- * порт) — строка не ядро этой машины, читатель её не видит.
- */
-export function isLoopbackCoreUrl(entry: Pick<ProcEntry, 'url' | 'port'>): boolean {
-  let url: URL;
-  try {
-    url = new URL(entry.url);
-  } catch {
-    return false;
-  }
-  return (
-    url.protocol === 'http:' &&
-    url.username === '' &&
-    url.password === '' &&
-    LOOPBACK_HOSTS.has(url.hostname) &&
-    Number(url.port) === entry.port
-  );
-}
 
 export function readProcs(
   path: string,
@@ -105,52 +46,6 @@ export function readProcs(
   if (!parsed.success) return { unknown: 'garbage: procs.json failed schema' };
   // Строка с адресом не на loopback не отдаётся ни одному читателю и уходит при следующей переписи.
   return { value: { ...parsed.data, cores: parsed.data.cores.filter(isLoopbackCoreUrl) } };
-}
-
-export interface CoreEntryCheckDeps {
-  tcp(): Promise<Fact<TcpEntry[]>>;
-  isAlive(id: { pid: number; start: string }): Promise<Liveness>;
-}
-
-/**
- * Личность ядра строки перед отправкой ему bearer (F-19): порт строки на loopback слушает
- * именно pid строки, и этот pid жив с тем же стартом. Иначе — `unknown` с причиной, bearer не
- * уходит. Вызывает читатель (мост MCP) — здесь только проверка.
- */
-export async function verifyCoreEntry(
-  entry: ProcEntry,
-  deps: CoreEntryCheckDeps,
-): Promise<Fact<true>> {
-  if (!isLoopbackCoreUrl(entry)) return { unknown: `core url is not loopback: ${entry.url}` };
-  const table = await deps.tcp();
-  if (!hasValue(table)) return { unknown: `tcp table: ${factReason(table)}` };
-  const owners = new Set(
-    table.value
-      .filter(
-        (row) =>
-          row.state === 'listen' &&
-          row.localPort === entry.port &&
-          (isLoopbackAddress(row.localAddress) || isAnyAddress(row.localAddress)),
-      )
-      .map((row) => row.pid),
-  );
-  if (owners.size === 0) return { unknown: `nobody listens on ${entry.port}` };
-  if (owners.size > 1 || !owners.has(entry.pid))
-    return {
-      unknown: `port ${entry.port} listener is pid ${[...owners].join(', ')}, not ${entry.pid}`,
-    };
-  const live = await deps.isAlive({ pid: entry.pid, start: entry.pidStart });
-  if (live !== 'alive') return { unknown: `core pid ${entry.pid} is ${live}` };
-  return { value: true };
-}
-
-function isAnyAddress(address: string): boolean {
-  return address === '0.0.0.0' || address === '::';
-}
-
-function isLoopbackAddress(address: string): boolean {
-  const norm = normalizeAddress(address);
-  return norm === '::1' || /^127\./.test(norm);
 }
 
 function safeJson(text: string): unknown {

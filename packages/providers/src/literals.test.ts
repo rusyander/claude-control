@@ -33,6 +33,17 @@ describe('литералы для линта P108', () => {
       'gpt-codex',
       'gpt-codex-spark',
     ]);
+    // Алиасы модели — из ступеней фактов (`modelRungs`), руками в линте больше не ведутся.
+    expect(CLI_LITERALS.modelAliases).toEqual([
+      'claude-fable',
+      'claude-haiku',
+      'claude-opus',
+      'claude-sonnet',
+      'fable',
+      'haiku',
+      'opus',
+      'sonnet',
+    ]);
   });
 
   it('переменные окружения собраны со всех каналов, ключей и пределов', () => {
@@ -80,6 +91,7 @@ describe('литералы для линта P108', () => {
       ],
       modelVendors: ['newvendor'],
       modelLadder: ['new-small'],
+      modelRungs: [{ model: 'newbig', ids: ['newcli-big'] }],
     };
     const literals = deriveLiterals([extra]);
     expect(literals).toEqual({
@@ -88,6 +100,7 @@ describe('литералы для линта P108', () => {
       binaryNames: ['newcli', 'newcli.cmd'],
       envVarNames: ['NEWCLI_BASE', 'NEWCLI_RUN'],
       modelFamilyPrefixes: ['new-small'],
+      modelAliases: ['newbig', 'newcli-big'],
     });
   });
 });

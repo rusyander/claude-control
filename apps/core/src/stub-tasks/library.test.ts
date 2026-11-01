@@ -5,9 +5,18 @@ import { parseStepDone, parseModelCall } from '@agentdeck/contracts/core/model-t
 import { DIALECT_IDS } from '@agentdeck/stub-model';
 import { describe, expect, it } from 'vitest';
 import { STEP_DONE_INVALID, STEP_DONE_REFUSED } from '../conductor/model-tools/step-done.ts';
-import { fillDeep } from './__fixtures__/script.ts';
-import { HAPPY_PATH, READ_IN_PHASE_2, STUB_TASKS } from './__fixtures__/library/index.ts';
-import type { Judge, Phase2Probe, StubTask } from './__fixtures__/stub-tasks.types.ts';
+import type { StepContext } from '@agentdeck/stub-model';
+import { fillDeep, moveAt, stepFor } from './__fixtures__/script.ts';
+import { HAPPY_PATH, READ_BY_FACT, STUB_TASKS } from './__fixtures__/library/index.ts';
+import { GUARD_ROAD_RUNS } from './__fixtures__/library/stage6-g.ts';
+import type {
+  Judge,
+  Move,
+  Phase2Probe,
+  Phase4Probe,
+  StubTask,
+  TimedMove,
+} from './__fixtures__/stub-tasks.types.ts';
 
 /**
  * Библиотека согласована сама с собой (R:S2-25): каждый вид журнала, класс решения, вид
@@ -30,7 +39,33 @@ function journalKinds(task: StubTask): string[] {
     }
     if (p.kind === 'model-tool' && p.expect.decision) kinds.push('decision');
   }
+  for (const p of task.phase4 ?? []) add(p.expect.journal);
   return kinds;
+}
+
+/**
+ * Пробы этапа 4 против контрактов: вид строки, класс решения и тело каждой команды — настоящие.
+ * Отдельной функцией, чтобы её можно было увидеть красной на заведомо плохой пробе: каталог
+ * этапа 4 пуст до волны 1, и проверка на нём одном ничего бы не доказала.
+ */
+function phase4Problems(probe: Phase4Probe): string[] {
+  const problems: string[] = [];
+  const { present = [], absent = [] } = probe.expect.journal;
+  for (const kind of [...present, ...absent])
+    if (!(JOURNAL_KINDS as readonly string[]).includes(kind)) problems.push(`journal ${kind}`);
+  for (const cls of probe.expect.decisions ?? [])
+    if (!(DECISION_CLASS_IDS as readonly string[]).includes(cls)) problems.push(`decision ${cls}`);
+  for (const command of probe.commands ?? []) {
+    const parsed = parseCommand({
+      cmdId: '01920000-0000-7000-8000-00000000c0de',
+      kind: command.kind,
+      target: { taskId: SAMPLE.stepId },
+      fields: command.fields,
+      proof: {},
+    });
+    if (!parsed.ok) problems.push(`command ${command.kind}`);
+  }
+  return problems;
 }
 
 function decisionClasses(task: StubTask): string[] {
@@ -39,7 +74,23 @@ function decisionClasses(task: StubTask): string[] {
   const fromProbes = task.phase2.flatMap((p) =>
     p.kind === 'model-tool' && p.expect.decision ? [p.expect.decision.class] : [],
   );
-  return [...fromJudges, ...fromProbes];
+  const fromStage4 = (task.phase4 ?? []).flatMap((p) => p.expect.decisions ?? []);
+  return [...fromJudges, ...fromProbes, ...fromStage4];
+}
+
+/** Поля ходов этапа 8 (окно чтения, код выхода подделки CLI) — отдельной функцией, чтобы видеть её красной. */
+function moveProblems(move: TimedMove): string[] {
+  const problems: string[] = [];
+  if (move.op === 'read' && move.range) {
+    const { offset, limit } = move.range;
+    if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1)
+      problems.push(`range ${JSON.stringify(move.range)}`);
+  }
+  if (move.op === 'shell' && move.exit !== undefined) {
+    if (!Number.isInteger(move.exit) || move.exit < 0 || move.exit > 255)
+      problems.push(`exit ${move.exit}`);
+  }
+  return problems;
 }
 
 const reconcileProbes = (): Extract<Phase2Probe, { kind: 'reconcile' }>[] =>
@@ -107,6 +158,23 @@ describe('stub-task library', () => {
     },
   );
 
+  it('stage-4 probes: every journal kind, decision class and command body comes from the contracts', () => {
+    for (const task of STUB_TASKS)
+      for (const probe of task.phase4 ?? [])
+        expect({ task: task.id, problems: phase4Problems(probe) }).toEqual({
+          task: task.id,
+          problems: [],
+        });
+    // Проверка видна красной: выдуманный вид строки, класс и команда без обязательного поля.
+    const bad: Phase4Probe = {
+      zone: 'B',
+      property: 'P16',
+      commands: [{ kind: 'pause', fields: {} }],
+      expect: { journal: { present: ['no.such' as never] }, decisions: ['no-such' as never] },
+    };
+    expect(phase4Problems(bad)).toEqual(['journal no.such', 'decision no-such', 'command pause']);
+  });
+
   it('every outbox action kind is cut before and after its effect', () => {
     const probes = reconcileProbes();
     for (const kind of ACTION_KINDS) {
@@ -115,7 +183,7 @@ describe('stub-task library', () => {
     }
     // Факт читается — решение «было/не было»; не читается — повтор, затем человек, но не «нет».
     for (const p of probes) {
-      if (READ_IN_PHASE_2.includes(p.action)) {
+      if (READ_BY_FACT.includes(p.action)) {
         expect(p.expect.verdict).toBe(p.cut === 'before-effect' ? 'not-happened' : 'happened');
       } else {
         expect(p.expect).toMatchObject({ verdict: 'retry', pastWindow: { verdict: 'ask' } });
@@ -123,29 +191,69 @@ describe('stub-task library', () => {
     }
   });
 
-  it('P132 every argv-invisible publish road of 05 waits for forged-publish at phase 6', () => {
-    for (const id of [
-      'script-file-publish',
-      'interpreter-publish',
-      'package-script-publish',
-      'git-config-shell-edit',
-      'hook-triggered-publish',
-    ]) {
+  it('P132 every argv-invisible publish road of 05 is run at phase 6 in both variants', () => {
+    const runs = Object.keys(GUARD_ROAD_RUNS);
+    for (const road of ['script-file', 'interpreter', 'package-script', 'git-config-shell-edit']) {
+      expect(runs).toContain(road === 'git-config-shell-edit' ? road : `${road}-publish`);
+      expect(runs).toContain(`${road}-bypass`);
+    }
+    expect(runs).toContain('hook-triggered-publish');
+    expect(runs).toContain('hook-triggered-bypass');
+    for (const id of runs) {
       const task = STUB_TASKS.find((t) => t.id === id);
       expect(task, id).toBeDefined();
-      expect(task!.verdicts, id).toContainEqual(
-        expect.objectContaining({
-          property: 'P132',
-          phase: 6,
-          judge: { kind: 'signal', signal: 'forged-publish' },
-        }),
-      );
-      expect(task!.observer.signals, id).toContain('forged-publish');
+      const verdict = task!.verdicts.find((v) => v.property === 'P132');
+      expect(verdict, id).toMatchObject({
+        phase: 6,
+        judge: { kind: 'signal', signal: 'forged-publish' },
+      });
+      // Сигнал ждут ровно там, где исполнитель ждёт улик; remote сдвинут — улика обязана быть.
+      const evidence = GUARD_ROAD_RUNS[id]!.evidence;
+      expect(task!.observer.signals, id).toEqual(evidence.length > 0 ? ['forged-publish'] : []);
+      if (GUARD_ROAD_RUNS[id]!.remote === 'moved') expect(evidence.length, id).toBeGreaterThan(0);
       // Фаза 2 эту дорогу не видит — проба записывает это, а не прячет.
       const permits = task!.phase2.filter((p) => p.kind === 'permit');
       expect(permits.length, id).toBeGreaterThan(0);
       for (const p of permits) expect(p.expect, id).toEqual({ allow: true });
     }
+  });
+
+  it('stage-8 move fields are well formed: read range, faked exit code, turn-end mark', () => {
+    for (const task of STUB_TASKS)
+      expect({ task: task.id, problems: task.moves.flatMap(moveProblems) }).toEqual({
+        task: task.id,
+        problems: [],
+      });
+    // Проверка видна красной: окно с отрицательным началом и пустое, код выхода не байт.
+    const bad: TimedMove[] = [
+      { op: 'read', path: 'a', range: { offset: -1, limit: 0 } },
+      { op: 'shell', argv: ['x'], exit: 256 },
+    ];
+    expect(bad.flatMap(moveProblems)).toEqual(['range {"offset":-1,"limit":0}', 'exit 256']);
+  });
+
+  it('stage-8 read range lands only in the fields the read tool declares', () => {
+    const read = (props: Record<string, unknown>) =>
+      ({
+        dialect: 'anthropic-messages',
+        request: { body: { messages: [] } },
+        info: { tools: [{ name: 'Read', schema: { type: 'object', properties: props } }] },
+      }) as unknown as StepContext;
+    const move: Move = { op: 'read', path: 'src/a.ts', range: { offset: 40, limit: 20 } };
+    expect(stepFor(move, read({ file_path: {}, offset: {}, limit: {} }))).toEqual({
+      tool: { name: 'Read', args: { file_path: 'src/a.ts', offset: 40, limit: 20 } },
+    });
+    // Инструмент без полей окна — чтение целиком, не выдуманные аргументы.
+    expect(stepFor(move, read({ file_path: {} }))).toEqual({
+      tool: { name: 'Read', args: { file_path: 'src/a.ts' } },
+    });
+  });
+
+  it('stage-8 turnEnd puts one text answer after the marked move; the next move follows it', () => {
+    const a: TimedMove = { op: 'read', path: 'a', turnEnd: true };
+    const b: TimedMove = { op: 'read', path: 'b' };
+    expect([0, 1, 2, 3].map((n) => moveAt([a, b], n))).toEqual([a, 'turn-end', b, undefined]);
+    expect([0, 1, 2].map((n) => moveAt([b, a], n))).toEqual([b, a, 'turn-end']);
   });
 
   it('adversarial cases named by the plan are all present', () => {

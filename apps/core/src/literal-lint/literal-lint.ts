@@ -213,6 +213,17 @@ function under(path: string, folder: string): boolean {
   return path === base || path.startsWith(`${base}/`);
 }
 
+// Разбор TS — самая дорогая часть прохода: каждый набор правил над тем же исходником берёт уже
+// разобранный вид, а не разбирает файл заново (P51 и P108 над всем деревом — два разбора на файл).
+const parsed = new WeakMap<LiteralSource, { text: string; views: Views }>();
+function viewsOf(source: LiteralSource): Views {
+  const hit = parsed.get(source);
+  if (hit && hit.text === source.text) return hit.views;
+  const views = sourceViews(source.path, source.text);
+  parsed.set(source, { text: source.text, views });
+  return views;
+}
+
 export function scanSources(sources: readonly LiteralSource[], set: LiteralRuleSet): LiteralScan {
   const exempt = set.exempt.map((source) => new RegExp(source));
   const compile = (rule: LiteralRule, bindings: Views['bindings']): RegExp =>
@@ -227,7 +238,7 @@ export function scanSources(sources: readonly LiteralSource[], set: LiteralRuleS
     if (set.allowed.some((folder) => under(source.path, folder))) continue;
     if (exempt.some((regex) => regex.test(source.path))) continue;
     checked.push(source.path);
-    const views = sourceViews(source.path, source.text);
+    const views = viewsOf(source);
     const lines = lineStarts(source.text);
     const at = (pos: number): { line: number; column: number } => {
       let low = 0;

@@ -1,0 +1,59 @@
+{
+  "title": {
+    "ru": "Telegram пишет о конце хода только «Задача закрыта» или «Агент ждёт вас»",
+    "en": "Telegram reports a turn end only as «Task closed» or «The agent waits for you»"
+  },
+  "items": [
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Конец хода после долгой работы приходит одной из двух карточек. «✅ Задача закрыта» — когда агент сам пишет, что закрыта вся задача, с одной-двумя фразами о том, что сделано. «⏳ Агент ждёт вас» — когда ход кончился вопросом, просьбой решить или висящим вопросом, со строкой «Нужно решить:» и вариантами, если они названы. Проект, «шёл N мин» и «Открыть чат →» остались на месте.",
+        "en": "A turn end after long work arrives as one of two cards. «✅ Задача закрыта» when the agent itself writes that the whole task is closed, with one or two sentences on what was done. «⏳ Агент ждёт вас» when the turn ended with a question, a request to decide or a pending question, with a «Нужно решить:» line and the options when they are named. The project, «шёл N мин» and «Открыть чат →» stay."
+      },
+      "area": { "ru": "Telegram", "en": "Telegram" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Промежуточные остановки больше не приходят как «ГОТОВО»: закрытый этап или зона, «жду агентов», «гейт ещё идёт», ход, за которым через 20 секунд снова пошла работа, конец, отбитый хуком Stop, звено группы, пробуждение, которое агент назначил себе сам. Если неясно, закрыта задача или нет, сообщение не уходит.",
+        "en": "Intermediate stops no longer arrive as «ГОТОВО»: a closed stage or zone, «waiting for agents», «the gate is still running», a turn followed by more work within 20 seconds, an end the Stop hook pushed back, a group member, a wake-up the agent scheduled for itself. When it is unclear whether the task is closed, nothing is sent."
+      },
+      "area": { "ru": "Telegram", "en": "Telegram" },
+      "images": ["telegram-before.png", "telegram-after.png"]
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Запрос прав и вопрос агента без кнопок приходят тем же видом «⏳ Агент ждёт вас» со строкой «Нужно разрешение:» или «Нужно решить:». Вопрос, который уже ушёл своим сообщением, второй раз в конце хода не повторяется.",
+        "en": "A permission request and an agent question without buttons arrive as the same «⏳ Агент ждёт вас» kind with a «Нужно разрешение:» or «Нужно решить:» line. A question that already went out as its own message is not repeated at the turn end."
+      },
+      "area": { "ru": "Telegram", "en": "Telegram" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Интеграции» и подпись галочки на карточке Telegram описывают две карточки конца хода и то, что промежуточные остановки не приходят.",
+        "en": "The «Integrations» help and the checkbox label on the Telegram card describe the two turn-end cards and that intermediate stops never arrive."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ],
+  "images": [
+    {
+      "file": "telegram-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: четыре остановки одной задачи — четыре одинаковых «ГОТОВО», без слова о том, что сделано и закрыта ли задача",
+        "en": "Before: four stops of one task arrive as four identical «ГОТОВО» cards, with no word on what was done or whether the task is closed"
+      }
+    },
+    {
+      "file": "telegram-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: те же четыре остановки — две промежуточные молчат, приходят «Задача закрыта» с итогом и «Агент ждёт вас» с вопросом и вариантами",
+        "en": "After: the same four stops — the two intermediate ones stay silent; «Задача закрыта» arrives with the outcome and «Агент ждёт вас» with the question and options"
+      }
+    }
+  ]
+}

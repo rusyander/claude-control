@@ -27,6 +27,7 @@ import { DlpTopic } from '../topics/DlpTopic/DlpTopic';
 import { PlatformTopic } from '../topics/PlatformTopic/PlatformTopic';
 import { LocalModelsTopic } from '../topics/LocalModelsTopic/LocalModelsTopic';
 import { KitTopic } from '../topics/KitTopic/KitTopic';
+import { CoreTopic } from '../topics/CoreTopic/CoreTopic';
 import { PromptsTopic } from '../topics/PromptsTopic/PromptsTopic';
 import { ProvidersTopic } from '../topics/ProvidersTopic/ProvidersTopic';
 import { PanelAgentTopic } from '../topics/PanelAgentTopic/PanelAgentTopic';
@@ -136,6 +137,10 @@ export const HELP_GROUPS: HelpGroup[] = [
       // Сразу за локальными моделями: набор панели подключается к тем же агентам,
       // и Qwen Code получает его именно на локальной модели.
       { id: 'kit', icon: 'skills', pagePath: '/kit', Content: KitTopic },
+      // Сразу за набором — в том же порядке, что в боковом меню. Документ один на три страницы
+      // ядра (задачи, запуск, сценарии); `pagePath` ведёт в список задач, откуда открываются две
+      // другие.
+      { id: 'core', icon: 'layers', pagePath: '/core', Content: CoreTopic },
       // После контура намеренно: три промпта из пяти существуют ради него, и
       // читать про тексты, которыми панель разговаривает с моделью, осмысленно
       // после того, как узнал, куда эти тексты уезжают. Вкладка настроек, а не

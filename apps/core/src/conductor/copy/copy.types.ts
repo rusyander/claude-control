@@ -54,6 +54,8 @@ export interface MirrorReport {
   built: RepoPath[];
   /** Флаг git в копии не встал — файл есть, но git покажет его изменённым. */
   flagsFailed: RepoPath[];
+  /** Повторное зеркало (`newerOnly`): файл копии не старее основной — не переписан. */
+  kept?: RepoPath[];
 }
 
 /** Один шаг установки: команда проекта в корне стека. */
@@ -135,6 +137,8 @@ export interface CopySetupInput {
   reverted: Fact<RepoPath[]>;
   /** `on` — ключ прочитан назад из конфига репозитория; `not-needed` — не Windows. */
   longPaths: Fact<'on' | 'not-needed'>;
+  /** Копия оценки (G6): установка посчитана, но отложена до первого шага работы. */
+  deferred?: true;
 }
 
 /** Копия не выложена (база не прочиталась, `worktree add` отказал): настраивать нечего. */
@@ -153,6 +157,8 @@ export interface CopySetupDecision {
   failure?: { stage: SetupStage; tail: string; firstError?: string };
   /** Строки для задания модели — английские (решение D-E): что подготовлено и что нет. */
   brief: string[];
+  /** Установка отложена (копия оценки): её доставит первый шаг, что правит копию. */
+  installDeferred?: true;
 }
 
 /** Копия, выложенная действием `copy-create`. */

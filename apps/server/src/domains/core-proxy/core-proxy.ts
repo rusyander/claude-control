@@ -1,68 +1,66 @@
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import type { Fact } from '@agentdeck/contracts/core/facts';
+import {
+  newestLoopbackCore,
+  procsFileSchema,
+  verifyCoreEntry,
+  type CoreEntryCheckDeps,
+  type ProcEntry,
+} from '@agentdeck/contracts/core/procs';
 
 /**
- * Где ядро и чем к нему стучаться (07 §Phases, фаза 2: минимальная прокладка панели). Ядро —
- * отдельный процесс: панель находит его по `<дом ядра>/procs.json` и говорит токеном ядра
- * `<дом ядра>/token` по HTTP на 127.0.0.1. Ни строки не пишет: перезапуск панели — это только
- * новое чтение этих двух файлов, журнал задач и сессии его не замечают (P23, F12).
+ * Где ядро и чем к нему стучаться (07 §Phases): панель находит ядро по `<дом ядра>/procs.json`
+ * и говорит токеном ядра `<дом ядра>/token` по HTTP на loopback. Ни строки не пишет: перезапуск
+ * панели — это только новое чтение этих двух файлов (P23, F12).
+ *
+ * Строка файла — не доказательство (core-s9 F10, F-19): прежде прокладка верила любому адресу
+ * из файла, и bearer ядра уходил тому, кто вписал свою строку. Теперь строка разбирается схемой
+ * контрактов, берётся только loopback-адрес с портом строки, а перед отправкой токена
+ * `verifyCoreEntry` (та же функция, что у мостов ядра) сверяет: порт слушает pid строки, и этот
+ * pid жив с тем же стартом. Не сверилось — токен не уходит никуда.
  *
  * Читается на каждом запросе, а не при старте: ядро могло перезапуститься на другом порте.
+ * Дом ядра (`coreHomeOf`) — один на панель, в `lib/hop-recorder.mjs`: сторож, записывающий
+ * звенья, и прокладка обязаны смотреть в один и тот же дом.
  * Кода ядра здесь нет — граница панель/ядро держится правилом depcruise.
  */
-
-export const CORE_HOME_ENV = 'AGENTDECK_CORE_HOME';
-
-export function coreHomeOf(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env[CORE_HOME_ENV];
-  if (override && override.trim() !== '') return resolve(override);
-  return join(homedir(), '.agentdeck', 'core');
-}
 
 export interface CoreLocation {
   url: string;
   token: string;
-  pid: number;
-  build: string;
+  entry: ProcEntry;
 }
 
-interface ProcRow {
-  url?: unknown;
-  pid?: unknown;
-  build?: unknown;
-  startedAt?: unknown;
-}
+const reasonOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
+/** Строка ядра из `procs.json` и токен; иначе — чего не хватило (файла, строки, токена). */
 export function locateCore(home: string): CoreLocation | { missing: string } {
-  let procs: { cores?: ProcRow[] };
-  let token: string;
+  let raw: unknown;
   try {
-    procs = JSON.parse(readFileSync(join(home, 'procs.json'), 'utf8')) as { cores?: ProcRow[] };
+    raw = JSON.parse(readFileSync(join(home, 'procs.json'), 'utf8'));
   } catch (error) {
-    return { missing: `procs.json: ${error instanceof Error ? error.message : String(error)}` };
+    return { missing: `procs.json: ${reasonOf(error)}` };
   }
+  const parsed = procsFileSchema.safeParse(raw);
+  if (!parsed.success) return { missing: 'procs.json: not a procs file' };
+  // Несколько сборок разом (P83) — последняя запущенная среди loopback-строк; выбор — дело надзора.
+  const entry = newestLoopbackCore(parsed.data.cores);
+  if (!entry) return { missing: 'no loopback core in procs.json' };
+  let token: string;
   try {
     token = readFileSync(join(home, 'token'), 'utf8').trim();
   } catch (error) {
-    return { missing: `token: ${error instanceof Error ? error.message : String(error)}` };
+    return { missing: `token: ${reasonOf(error)}` };
   }
-  // Несколько сборок разом (P83) — берём последнюю запущенную; выбор сборки — дело надзора.
-  const newest = (procs.cores ?? [])
-    .filter((c): c is ProcRow & { url: string; pid: number; startedAt: number } => {
-      return (
-        typeof c.url === 'string' && typeof c.pid === 'number' && typeof c.startedAt === 'number'
-      );
-    })
-    .sort((a, b) => b.startedAt - a.startedAt)[0];
-  if (!newest) return { missing: 'no core in procs.json' };
   if (!token) return { missing: 'token: empty' };
-  return {
-    url: newest.url.replace(/\/+$/, ''),
-    token,
-    pid: newest.pid,
-    build: typeof newest.build === 'string' ? newest.build : '',
-  };
+  return { url: entry.url.replace(/\/+$/, ''), token, entry };
+}
+
+/** Сверка личности строки перед bearer (F-19): `unknown` — токен не отправляется. */
+export function verifyCore(core: CoreLocation, deps: CoreEntryCheckDeps): Promise<Fact<true>> {
+  return verifyCoreEntry(core.entry, deps);
 }
 
 export const FORWARDED_PEER_HEADER = 'x-agentdeck-peer-pid';
@@ -78,26 +76,24 @@ export interface CoreForward {
    * ядро сочтёт пересылку непроверенной и примет только подпись устройства.
    */
   peerPid?: number;
+  /** Возобновление потока событий: последний полученный номер строки (SSE). */
+  lastEventId?: string;
+  signal?: AbortSignal;
 }
 
-export async function forwardToCore(
-  core: CoreLocation,
-  call: CoreForward,
-): Promise<{ status: number; body: unknown }> {
+/**
+ * Запрос к ядру — только к уже сверенной строке. Ответ отдаётся как есть, потоком: прокладка
+ * тела не копит (поток событий задачи живёт часами), разбор — забота вызывающего.
+ */
+export function forwardToCore(core: CoreLocation, call: CoreForward): Promise<Response> {
   const headers: Record<string, string> = { authorization: `Bearer ${core.token}` };
   if (call.body !== undefined) headers['content-type'] = 'application/json';
   if (call.peerPid !== undefined) headers[FORWARDED_PEER_HEADER] = String(call.peerPid);
-  const res = await fetch(`${core.url}${call.path}`, {
+  if (call.lastEventId !== undefined) headers['last-event-id'] = call.lastEventId;
+  return fetch(`${core.url}${call.path}`, {
     method: call.method,
     headers,
     ...(call.body !== undefined ? { body: JSON.stringify(call.body) } : {}),
+    ...(call.signal ? { signal: call.signal } : {}),
   });
-  const text = await res.text();
-  let body: unknown = text;
-  try {
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    // Не JSON — отдаём как есть.
-  }
-  return { status: res.status, body };
 }

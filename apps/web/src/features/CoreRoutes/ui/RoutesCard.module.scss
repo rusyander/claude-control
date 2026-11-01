@@ -1,0 +1,12 @@
+// Строка маршрута: рамка, а не фон — исчерпание видно значком со словом, не только цветом.
+.row {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}

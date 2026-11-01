@@ -9,14 +9,14 @@
       "masked": 0,
       "width": 1116,
       "height": 545,
-      "shotAt": "2026-10-25T14:38:12.535Z",
+      "shotAt": "2026-10-30T07:31:45.005Z",
       "text": "Вебхук не проверялось Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь",
       "en": {
         "file": "01-webhook.en.png",
         "masked": 0,
         "width": 1116,
         "height": 545,
-        "shotAt": "2026-10-25T14:38:46.506Z",
+        "shotAt": "2026-10-30T07:33:26.611Z",
         "text": "Webhook not checked Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token No key yet. It goes into the encrypted store and never returns to this screen. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection"
       },
       "dark": {
@@ -24,7 +24,7 @@
         "masked": 0,
         "width": 1116,
         "height": 545,
-        "shotAt": "2026-10-25T14:39:20.240Z",
+        "shotAt": "2026-10-30T07:34:31.170Z",
         "text": "Вебхук не проверялось Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь"
       },
       "darkEn": {
@@ -32,7 +32,7 @@
         "masked": 0,
         "width": 1116,
         "height": 545,
-        "shotAt": "2026-10-25T14:39:54.014Z",
+        "shotAt": "2026-10-30T07:35:27.923Z",
         "text": "Webhook not checked Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token No key yet. It goes into the encrypted store and never returns to this screen. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection"
       }
     },
@@ -43,31 +43,31 @@
       "masked": 0,
       "width": 1116,
       "height": 605,
-      "shotAt": "2026-10-25T14:38:19.983Z",
-      "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 25.10.2026, 17:38:15",
+      "shotAt": "2026-10-30T07:31:52.564Z",
+      "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 30.10.2026, 12:31:48",
       "en": {
         "file": "02-webhook-checked.en.png",
         "masked": 0,
         "width": 1116,
         "height": 605,
-        "shotAt": "2026-10-25T14:38:53.940Z",
-        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/25/2026, 5:38:49 PM"
+        "shotAt": "2026-10-30T07:33:34.177Z",
+        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/30/2026, 12:33:29 PM"
       },
       "darkEn": {
         "file": "02-webhook-checked.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 605,
-        "shotAt": "2026-10-25T14:40:01.458Z",
-        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/25/2026, 5:39:56 PM"
+        "shotAt": "2026-10-30T07:35:35.473Z",
+        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/30/2026, 12:35:31 PM"
       },
       "dark": {
         "file": "02-webhook-checked.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 605,
-        "shotAt": "2026-10-25T14:39:27.667Z",
-        "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 25.10.2026, 17:39:22"
+        "shotAt": "2026-10-30T07:34:38.668Z",
+        "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 30.10.2026, 12:34:33"
       }
     },
     {
@@ -77,31 +77,31 @@
       "masked": 0,
       "width": 1116,
       "height": 605,
-      "shotAt": "2026-10-25T14:38:24.009Z",
-      "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 25.10.2026, 17:38:15",
+      "shotAt": "2026-10-30T07:31:56.748Z",
+      "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 30.10.2026, 12:31:48",
       "en": {
         "file": "03-events.en.png",
         "masked": 0,
         "width": 1116,
         "height": 605,
-        "shotAt": "2026-10-25T14:38:57.963Z",
-        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/25/2026, 5:38:49 PM"
+        "shotAt": "2026-10-30T07:33:38.327Z",
+        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/30/2026, 12:33:29 PM"
       },
       "darkEn": {
         "file": "03-events.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 605,
-        "shotAt": "2026-10-25T14:40:05.483Z",
-        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/25/2026, 5:39:56 PM"
+        "shotAt": "2026-10-30T07:35:39.635Z",
+        "text": "Webhook connected Enabled The same events at an address of your own: Slack, Mattermost, an on-call bot, an internal bus — one POST with JSON. Receiver URL Where to POST the JSON. http(s) only. What to write about Run finished Run failed Case failed Agent asks for rights Agent asked a question Contour budget running out Group watch signal (“attention” and “alarm”) Send a test event Only the event header leaves the machine: kind, text and the project folder name. No prompt, no agent answer, no paths. Token Key saved: whs…7b13. A new value replaces it, an empty field leaves it alone. A signing secret, not an access token. Set — the body is signed with the X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned. Save Check connection Forget key The receiver answered the probe event (the body was signed). checked 10/30/2026, 12:35:31 PM"
       },
       "dark": {
         "file": "03-events.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 605,
-        "shotAt": "2026-10-25T14:39:31.676Z",
-        "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 25.10.2026, 17:39:22"
+        "shotAt": "2026-10-30T07:34:42.786Z",
+        "text": "Вебхук связь есть Включена Те же события своим адресом: Slack, Mattermost, дежурный бот, внутренняя шина — один POST с JSON. Адрес приёмника Куда слать POST с JSON. Только http(s). О чём писать Прогон завершён Прогон упал Кейс провален Агент просит права Агент задал вопрос Бюджет контура на исходе Сигнал сторожа групп («внимание» и «тревога») Отправить пробное Наружу уходит только заголовок события: вид, текст и имя папки проекта. Ни промпта, ни ответа агента, ни путей. Токен Ключ сохранён: whs…7b13. Новое значение заменит его, пустое поле — оставит как есть. Секрет подписи, не токен доступа. Задан — тело подписывается заголовком X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи. Сохранить Проверить связь Забыть ключ Приёмник ответил на пробное событие (тело подписано). проверено 30.10.2026, 12:34:33"
       }
     },
     {
@@ -111,14 +111,14 @@
       "masked": 0,
       "width": 1116,
       "height": 340,
-      "shotAt": "2026-10-25T14:38:31.725Z",
+      "shotAt": "2026-10-30T07:32:08.473Z",
       "text": "Telegram не подключён 1. Бот · Токен бота Токен сохранён: 700…0000 Проверить Бот @qa_release_bot на связи. 2. Вы Нажмите «Подключить» и напишите боту /start. Анна (@anna_qa), id 100200300 — это вы? Да, это я Нет, отменить Дополнительно",
       "en": {
         "file": "04-telegram.en.png",
         "masked": 0,
         "width": 1116,
         "height": 340,
-        "shotAt": "2026-10-25T14:39:05.654Z",
+        "shotAt": "2026-10-30T07:33:51.050Z",
         "text": "Telegram not connected 1. Bot · Bot token Token saved: 700…0000 Check The bot @qa_release_bot is reachable. 2. You Press Connect and send /start to the bot. Анна (@anna_qa), id 100200300 — is this you? Yes, it is me No, cancel Advanced"
       },
       "dark": {
@@ -126,7 +126,7 @@
         "masked": 0,
         "width": 1116,
         "height": 340,
-        "shotAt": "2026-10-25T14:39:39.408Z",
+        "shotAt": "2026-10-30T07:34:51.859Z",
         "text": "Telegram не подключён 1. Бот · Токен бота Токен сохранён: 700…0000 Проверить Бот @qa_release_bot на связи. 2. Вы Нажмите «Подключить» и напишите боту /start. Анна (@anna_qa), id 100200300 — это вы? Да, это я Нет, отменить Дополнительно"
       },
       "darkEn": {
@@ -134,7 +134,7 @@
         "masked": 0,
         "width": 1116,
         "height": 340,
-        "shotAt": "2026-10-25T14:40:13.209Z",
+        "shotAt": "2026-10-30T07:35:51.327Z",
         "text": "Telegram not connected 1. Bot · Bot token Token saved: 700…0000 Check The bot @qa_release_bot is reachable. 2. You Press Connect and send /start to the bot. Анна (@anna_qa), id 100200300 — is this you? Yes, it is me No, cancel Advanced"
       }
     },
@@ -145,31 +145,31 @@
       "masked": 0,
       "width": 1116,
       "height": 352,
-      "shotAt": "2026-10-25T14:38:35.796Z",
-      "text": "Telegram работает · @qa_release_bot Вы: Анна (@anna_qa) Переподключить Когда звать Агент ждёт тебя — вопрос или разрешение · если не ответил в панели за мин Агент закончил — если работал дольше мин Что-то сломалось — агент упал, тесты красные, группа зависла или пошла по кругу Отправить пробное Сохранить Дополнительно",
+      "shotAt": "2026-10-30T07:32:14.739Z",
+      "text": "Telegram работает · @qa_release_bot Вы: Анна (@anna_qa) Переподключить Когда звать Агент ждёт тебя — вопрос или разрешение · если не ответил в панели за мин Задача закрыта или агент ждёт решения — если работал дольше мин Что-то сломалось — агент упал, тесты красные, группа зависла или пошла по кругу Отправить пробное Сохранить Дополнительно",
       "en": {
         "file": "05-telegram-answers.en.png",
         "masked": 0,
         "width": 1116,
         "height": 352,
-        "shotAt": "2026-10-25T14:39:09.721Z",
-        "text": "Telegram working · @qa_release_bot You: Анна (@anna_qa) Reconnect When to call The agent waits for you — a question or a permission · if not answered in the panel within min The agent finished — if it worked longer than min Something broke — the agent failed, tests are red, a group got stuck or went in circles Send a test message Save Advanced"
+        "shotAt": "2026-10-30T07:33:57.873Z",
+        "text": "Telegram working · @qa_release_bot You: Анна (@anna_qa) Reconnect When to call The agent waits for you — a question or a permission · if not answered in the panel within min Task closed or the agent waits for a decision — if it worked longer than min Something broke — the agent failed, tests are red, a group got stuck or went in circles Send a test message Save Advanced"
       },
       "dark": {
         "file": "05-telegram-answers.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 352,
-        "shotAt": "2026-10-25T14:39:43.472Z",
-        "text": "Telegram работает · @qa_release_bot Вы: Анна (@anna_qa) Переподключить Когда звать Агент ждёт тебя — вопрос или разрешение · если не ответил в панели за мин Агент закончил — если работал дольше мин Что-то сломалось — агент упал, тесты красные, группа зависла или пошла по кругу Отправить пробное Сохранить Дополнительно"
+        "shotAt": "2026-10-30T07:34:57.577Z",
+        "text": "Telegram работает · @qa_release_bot Вы: Анна (@anna_qa) Переподключить Когда звать Агент ждёт тебя — вопрос или разрешение · если не ответил в панели за мин Задача закрыта или агент ждёт решения — если работал дольше мин Что-то сломалось — агент упал, тесты красные, группа зависла или пошла по кругу Отправить пробное Сохранить Дополнительно"
       },
       "darkEn": {
         "file": "05-telegram-answers.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 352,
-        "shotAt": "2026-10-25T14:40:17.282Z",
-        "text": "Telegram working · @qa_release_bot You: Анна (@anna_qa) Reconnect When to call The agent waits for you — a question or a permission · if not answered in the panel within min The agent finished — if it worked longer than min Something broke — the agent failed, tests are red, a group got stuck or went in circles Send a test message Save Advanced"
+        "shotAt": "2026-10-30T07:35:57.021Z",
+        "text": "Telegram working · @qa_release_bot You: Анна (@anna_qa) Reconnect When to call The agent waits for you — a question or a permission · if not answered in the panel within min Task closed or the agent waits for a decision — if it worked longer than min Something broke — the agent failed, tests are red, a group got stuck or went in circles Send a test message Save Advanced"
       }
     }
   ]

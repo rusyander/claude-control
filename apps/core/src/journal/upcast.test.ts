@@ -11,7 +11,9 @@ import { UPCASTERS, upcastToCurrent } from './upcast.ts';
 const FIXTURES = join(import.meta.dirname, '__fixtures__');
 /** Цепочка замороженной фикстуры v1: изменилась — значит фикстуру перегенерировали, а не сохранили. */
 // Перегенерирована 28.10: `session.started` получил `argv` (решение координатора, W2-B).
-const V1_HASH = '670d8e82f5c619cf0d86bad7ba6c66acc33dd65996ea75295643009b5c442b02';
+// Перегенерирована 29.10: V1 дополнен этапом 4 на месте (G1) — `task.created.profilePins/origin/
+// launchPolicy/ciWait`, строки `requirement.extracted`, `unit.created`, `scenario.overlay`, `step.started`.
+const V1_HASH = '67b084199455f12045534f3f74637999a235ca2d87a86dbd8aab58a38d5a62ce';
 
 function stage(fixture: string, mutate?: (lines: string[]) => string[]) {
   const text = readFileSync(join(FIXTURES, fixture), 'utf8');
@@ -51,9 +53,11 @@ describe('journal versions', () => {
     expect(Object.values(state.actions).map((a) => a.status)).toEqual(['done']);
     expect(Object.values(state.resources).map((r) => r.status)).toEqual(['released']);
     expect(Object.values(state.commands).map((c) => c.status)).toEqual(['applied']);
-    // В работе строки 5–15 по 1 с; строка скачка несёт 59 с сна и не добавляет ничего (P56).
+    expect(Object.values(state.units).map((u) => u.branch)).toEqual(['agentdeck/fixture']);
+    expect(Object.values(state.steps).map((s) => s.stepKind)).toEqual(['work']);
+    // В работе строки 5–19 по 1 с; строка скачка несёт 59 с сна и не добавляет ничего (P56).
     expect(state.counters.clockJumps).toBe(1);
-    expect(state.work.activeMs).toBe(10_000);
+    expect(state.work.activeMs).toBe(14_000);
   });
 
   it('P45 strict schemas: an unknown envelope field or data field in a stored line → corrupt, not dropped', () => {
@@ -75,11 +79,41 @@ describe('journal versions', () => {
         l.includes('"kind":"session.started"') ? l.replace(/"argv":\[[^\]]*\],/, '') : l,
       ),
     );
-    expect(() => readJournalLines(noArgv.dir, noArgv.taskId)).toThrow(/argv|seq 6/i);
+    expect(() => readJournalLines(noArgv.dir, noArgv.taskId)).toThrow(/argv|seq 10/i);
     const newer = stage('v1.jsonl', (lines) =>
       lines.map((l, i) => (i === 3 ? l.replace('{"v":1,', '{"v":99,') : l)),
     );
     expect(() => readJournalLines(newer.dir, newer.taskId)).toThrow(JournalCorruptError);
+  });
+
+  it('session.started.modelAsked null (CLI default model) reads and folds to a null modelAsked; the frozen string line still reads', () => {
+    // Расширение схемы (`registryId.nullable()`, 30.10): старая строка с моделью не ломается, новая
+    // без модели — не порча.
+    const noModel = stage('v1.jsonl', (lines) =>
+      lines.map((l) =>
+        l.includes('"kind":"session.started"')
+          ? l.replace('"modelAsked":"model-a"', '"modelAsked":null')
+          : l,
+      ),
+    );
+    const { state } = readTaskView(noModel.dir, noModel.taskId);
+    expect(state.anomalies).toEqual([]);
+    expect(Object.values(state.sessions).map((s) => s.modelAsked)).toEqual([null]);
+    const frozen = stage('v1.jsonl');
+    expect(
+      Object.values(readTaskView(frozen.dir, frozen.taskId).state.sessions).map(
+        (s) => s.modelAsked,
+      ),
+    ).toEqual(['model-a']);
+    // Пустая строка вместо модели — по-прежнему порча: «нет модели» пишется только `null`.
+    const empty = stage('v1.jsonl', (lines) =>
+      lines.map((l) =>
+        l.includes('"kind":"session.started"')
+          ? l.replace('"modelAsked":"model-a"', '"modelAsked":""')
+          : l,
+      ),
+    );
+    expect(() => readJournalLines(empty.dir, empty.taskId)).toThrow(/modelAsked|seq 10/i);
   });
 
   it('upcaster chain lifts an old line step by step and refuses a gap', () => {

@@ -36,6 +36,7 @@ import { portabilityEn } from './en/topics/portability';
 import { phoneEn } from './en/topics/phone';
 import { localModelsEn } from './en/topics/localModels';
 import { kitEn } from './en/topics/kit';
+import { coreEn } from './en/topics/core';
 import { watcherEn } from './en/topics/watcher';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
@@ -152,6 +153,7 @@ export const helpEn: HelpSchema = {
     phone: phoneEn.shots,
     localModels: localModelsEn.shots,
     kit: kitEn.shots,
+    core: coreEn.shots,
     watcher: watcherEn.shots,
   },
 
@@ -187,6 +189,7 @@ export const helpEn: HelpSchema = {
     phone: phoneEn.diagrams,
     localModels: localModelsEn.diagrams,
     kit: kitEn.diagrams,
+    core: coreEn.diagrams,
   },
 
   topics: {
@@ -216,6 +219,7 @@ export const helpEn: HelpSchema = {
     phone: phoneEn.topic,
     localModels: localModelsEn.topic,
     kit: kitEn.topic,
+    core: coreEn.topic,
     watcher: watcherEn.topic,
     platform: platformEn.topic,
     endpoints: endpointsEn.topic,

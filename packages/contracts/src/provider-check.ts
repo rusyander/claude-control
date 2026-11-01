@@ -35,6 +35,8 @@ export type ProviderCheckStepId =
   | 'env'
   /** Круг чтения-записи глобальных инструкций на копии конфигурации. */
   | 'instructions'
+  /** Маршрут входа CLI (`cli-login:<id>`) у ядра исполнения задач: доступ есть и не исчерпан. */
+  | 'coreRoute'
   /** Один настоящий запуск ассистента провайдера. */
   | 'assistant';
 
@@ -89,6 +91,7 @@ const stepSchema = object({
     literal('permissions'),
     literal('env'),
     literal('instructions'),
+    literal('coreRoute'),
     literal('assistant'),
   ]),
   status: union([literal('pass'), literal('warn'), literal('fail'), literal('skipped')]),

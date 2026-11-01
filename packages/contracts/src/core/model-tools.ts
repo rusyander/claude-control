@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { uuidv7 } from './ids.ts';
+import { stepDefId, type CoreStepKind, type StepKind } from './scenario.ts';
 
 /**
  * Инструменты модели — сервер MCP ядра `agentdeck` (03 §Model tools, F04 F10 F16). Схемы строгие:
@@ -20,6 +21,7 @@ export const MODEL_TOOL_NAMES = [
   'ask_human',
   'blocker',
   'core_state',
+  'unit_diff',
 ] as const;
 export type ModelToolName = (typeof MODEL_TOOL_NAMES)[number];
 
@@ -42,6 +44,15 @@ export const SESSION_STEP_KINDS = [
 export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
 
 /**
+ * Виды сессии и ядра вместе — ровно `STEP_KINDS` сценария, без пересечения: вид без места (или в
+ * обоих списках) не соберётся, а не уйдёт в «нет сессии» молча.
+ */
+type Exactly<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const STEP_KINDS_PARTITIONED: Exactly<SessionStepKind | CoreStepKind, StepKind> &
+  Exactly<Extract<SessionStepKind, CoreStepKind>, never> = true;
+void STEP_KINDS_PARTITIONED;
+
+/**
  * Только чтение (P73): ревью, исследование и отчёт ничего не правят — 02 называет их так;
  * разбор задачи, план и деление тоже (решение 28.10): их итог — вызов инструмента модели и
  * строка журнала, а не файл копии.
@@ -62,6 +73,11 @@ const CHECK_KINDS: ReadonlySet<string> = new Set([
   'answer-reviewers',
   'custom',
 ]);
+/**
+ * `unit_diff` — дифф одного файла единицы для тех, кто судит уже сделанную правку: ревью и ответ
+ * ревьюерам. Пакет ревью сверх предела называет файлы списком, тело берётся этим инструментом.
+ */
+const UNIT_DIFF_KINDS: ReadonlySet<string> = new Set(['review', 'answer-reviewers']);
 
 export interface StepToolPlan {
   /** Встроенные инструменты CLI: `read-only` — без правки файлов и без команд, меняющих копию. */
@@ -73,7 +89,11 @@ export interface StepToolPlan {
 /** Набор инструментов по виду шага; `null` — у вида нет сессии модели (запуск отказан). */
 export function toolPlanFor(stepKind: string): StepToolPlan | null {
   if (!(SESSION_STEP_KINDS as readonly string[]).includes(stepKind)) return null;
-  const modelTools = MODEL_TOOL_NAMES.filter((t) => t !== 'check' || CHECK_KINDS.has(stepKind));
+  const modelTools = MODEL_TOOL_NAMES.filter(
+    (t) =>
+      (t !== 'check' || CHECK_KINDS.has(stepKind)) &&
+      (t !== 'unit_diff' || UNIT_DIFF_KINDS.has(stepKind)),
+  );
   return { builtins: READ_ONLY_KINDS.has(stepKind) ? 'read-only' : 'all', modelTools };
 }
 
@@ -81,15 +101,42 @@ const line = (max: number) => z.string().min(1).max(max);
 /** Номер записи проверки (04 §Records): единственное, чем подтверждается вердикт. */
 const recordId = line(200);
 
-const requirementClaim = z.discriminatedUnion('state', [
+/**
+ * Заявление о требовании: id — UUIDv7, выданный ядром при извлечении (одно написание, F26, G3);
+ * номер «R3» модель не цитирует — неизвестный id — ошибка поля.
+ */
+export const requirementClaimSchema = z.discriminatedUnion('state', [
   z.strictObject({
-    id: line(200),
+    id: uuidv7,
     state: z.literal('covered'),
     evidence: z.array(recordId).min(1).max(50),
   }),
-  /** «Не применимо» — с причиной словами, а не с записью. */
-  z.strictObject({ id: line(200), state: z.literal('n/a'), evidence: line(2000) }),
+  /** «Не применимо» — с причиной словами, а не с записью; засчитывается только подтверждением ревью. */
+  z.strictObject({ id: uuidv7, state: z.literal('n/a'), evidence: line(2000) }),
 ]);
+export type RequirementClaim = z.infer<typeof requirementClaimSchema>;
+
+/** intake / plan: требования, прочитанные из запроса или тикета; id им выдаёт ядро (02:54). */
+export const extractedRequirementSchema = z.strictObject({
+  text: line(2000),
+  source: z.enum(['request', 'ticket']),
+});
+/** plan / review: источник сверен со списком, недостающее добавлено (02:55, P93). */
+export const requirementsReviewSchema = z.strictObject({
+  complete: z.boolean(),
+  added: z.array(z.strictObject({ text: line(2000) })).max(100),
+});
+/** review: типизированное подтверждение — единственная дорога для ворот `text` и для n/a (02:57-60). */
+export const confirmationSchema = z.strictObject({
+  target: z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('requirement'), id: uuidv7 }),
+    z.strictObject({ kind: z.literal('n/a'), id: uuidv7 }),
+    z.strictObject({ kind: z.literal('gate'), stepDefId, index: z.number().int().nonnegative() }),
+  ]),
+  verdict: z.enum(['confirmed', 'refuted']),
+  reason: line(1000),
+});
+export type Confirmation = z.infer<typeof confirmationSchema>;
 
 const unitProposal = z.strictObject({
   name: line(200),
@@ -101,7 +148,21 @@ const unitProposal = z.strictObject({
       tokens: z.number().int().positive().optional(),
     })
     .optional(),
+  /** Ключ или путь репозитория задачи на нескольких репозиториях; нет — единственный репозиторий. */
+  repo: line(500).optional(),
+  /** Единица-контракт (G19): неявные рёбра ко всем единицам других репозиториев. */
+  contract: z.boolean().optional(),
 });
+
+/**
+ * Цель ревью, которую насчитал разбор (02:19, 02:69): ссылка на MR и, на нескольких репозиториях,
+ * его репозиторий. Две и больше — ядро предлагает единицу на цель; одна — деления нет.
+ */
+const reviewTarget = z.strictObject({
+  ref: line(500),
+  repo: line(500).optional(),
+});
+export type ReviewTarget = z.infer<typeof reviewTarget>;
 
 const finding = z.strictObject({
   file: line(500),
@@ -127,25 +188,55 @@ export const STEP_DONE_MAX_CHARS = 15_000;
 export const stepDoneSchema = z.strictObject({
   stepId: uuidv7,
   outcome: z.enum(['done', 'partial', 'blocked']),
-  requirements: z.array(requirementClaim).max(200),
+  requirements: z.array(requirementClaimSchema).max(200),
   units: z.array(unitProposal).min(1).max(20).optional(),
+  reviewTargets: z.array(reviewTarget).min(1).max(20).optional(),
   findings: z.array(finding).max(100).optional(),
   replies: z.array(reply).max(100).optional(),
   handoff: line(4000).optional(),
   summary: line(STEP_DONE_SUMMARY_MAX),
   forks: z.array(fork).max(20).optional(),
+  extracted: z.array(extractedRequirementSchema).max(200).optional(),
+  requirementsReview: requirementsReviewSchema.optional(),
+  confirmations: z.array(confirmationSchema).max(200).optional(),
 });
 export type StepDoneCall = z.infer<typeof stepDoneSchema>;
 
+type KindBoundField =
+  | 'units'
+  | 'reviewTargets'
+  | 'findings'
+  | 'replies'
+  | 'extracted'
+  | 'requirementsReview'
+  | 'confirmations';
 /**
  * Поля, которые годятся не каждому виду шага: замечания — только ревью, ответы в обсуждения —
- * только ответу ревьюерам, деление на единицы — только плану и разделению.
+ * только ответу ревьюерам, деление на единицы — только плану и разделению, цели ревью — только
+ * разбору; извлечение требований — разбору и плану, сверка извлечения — плану и ревью,
+ * подтверждения — только ревью (G4).
  */
-export const STEP_DONE_KIND_FIELDS: Record<'units' | 'findings' | 'replies', readonly string[]> = {
+export const STEP_DONE_KIND_FIELDS: Record<KindBoundField, readonly SessionStepKind[]> = {
   units: ['plan', 'split'],
+  reviewTargets: ['intake'],
   findings: ['review'],
   replies: ['answer-reviewers'],
+  extracted: ['intake', 'plan'],
+  requirementsReview: ['plan', 'review'],
+  confirmations: ['review'],
 };
+
+/** Коды ошибок поля доказательства в ответе `step_done` (зона C): раз — список, потом отказ (P72). */
+export const STEP_DONE_EVIDENCE_CODES = [
+  'unknown-requirement',
+  /** Ключ записи ≠ `keyOf` на текущем дереве (F-051, G22). */
+  'stale-evidence',
+  /** Замыкание ∩ изменённые файлы пусто, или статическая запись для требования поведения (P92). */
+  'irrelevant-evidence',
+  /** Происхождение записи ≠ `core` (02:61). */
+  'captured-evidence',
+] as const;
+export type StepDoneEvidenceCode = (typeof STEP_DONE_EVIDENCE_CODES)[number];
 
 export const checkCallSchema = z
   .strictObject({
@@ -201,12 +292,17 @@ export type BlockerCall = z.infer<typeof blockerSchema>;
 
 export const coreStateSchema = z.strictObject({});
 
+/** Путь файла из пакета ревью — относительный к копии единицы. */
+export const unitDiffSchema = z.strictObject({ file: z.string().min(1).max(4096) });
+export type UnitDiffCall = z.infer<typeof unitDiffSchema>;
+
 export const MODEL_TOOL_SCHEMAS = {
   step_done: stepDoneSchema,
   check: checkCallSchema,
   ask_human: askHumanSchema,
   blocker: blockerSchema,
   core_state: coreStateSchema,
+  unit_diff: unitDiffSchema,
 } as const satisfies Record<ModelToolName, z.ZodType>;
 
 /** Описания для `tools/list` — модель читает их, поэтому по-английски (как и ответы). */
@@ -224,6 +320,9 @@ export const MODEL_TOOL_DESCRIPTIONS: Record<ModelToolName, string> = {
   blocker:
     'Report what stops the step: env, access, external or requirement-conflict, with the detail.',
   core_state: 'Read the core state of this step: task, unit, step, open asks.',
+  unit_diff:
+    'Read the diff of one file of the reviewed unit against its base. Only files listed in the ' +
+    'review pack; the body is masked and, when long, cut with a marker naming where to read on.',
 };
 
 export type FieldIssueCode = 'unknown-field' | 'missing-field' | 'invalid-field';
@@ -282,7 +381,8 @@ export function parseStepDone(input: unknown, stepKind: string): ParsedCall<Step
   if (!parsed.ok) return parsed;
   const issues: FieldIssue[] = [];
   for (const [field, kinds] of Object.entries(STEP_DONE_KIND_FIELDS)) {
-    if (parsed.value[field as keyof StepDoneCall] !== undefined && !kinds.includes(stepKind)) {
+    const allowed = (kinds as readonly string[]).includes(stepKind);
+    if (parsed.value[field as keyof StepDoneCall] !== undefined && !allowed) {
       issues.push({
         path: field,
         code: 'invalid-field',

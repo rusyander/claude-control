@@ -37,7 +37,11 @@ const EXPECTED: Record<string, Expected> = {
     status: 'verified',
     binary: ['claude', 'claude.cmd'],
     login: 'account',
-    vendorApi: { kind: 'anthropic', keyVars: ['ANTHROPIC_API_KEY'] },
+    vendorApi: {
+      kind: 'anthropic',
+      keyVars: ['ANTHROPIC_API_KEY'],
+      baseUrl: 'https://api.anthropic.com',
+    },
     cliRunnable: true,
     vars: [
       ['anthropic', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', undefined, 'ANTHROPIC_AUTH_TOKEN'],
@@ -49,7 +53,11 @@ const EXPECTED: Record<string, Expected> = {
     status: 'experimental',
     binary: ['codex', 'codex.cmd'],
     login: 'account',
-    vendorApi: { kind: 'openai', keyVars: ['OPENAI_API_KEY'] },
+    vendorApi: {
+      kind: 'openai',
+      keyVars: ['OPENAI_API_KEY'],
+      baseUrl: 'https://api.openai.com/v1',
+    },
     cliRunnable: true,
     vars: [],
     file: ['codex-toml', 'openai-compat', 'responses'],
@@ -61,7 +69,11 @@ const EXPECTED: Record<string, Expected> = {
     status: 'experimental',
     binary: ['gemini', 'gemini.cmd'],
     login: 'account',
-    vendorApi: { kind: 'google', keyVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] },
+    vendorApi: {
+      kind: 'google',
+      keyVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+      baseUrl: 'https://generativelanguage.googleapis.com',
+    },
     cliRunnable: true,
     vars: [
       [
@@ -149,7 +161,11 @@ const EXPECTED: Record<string, Expected> = {
     status: 'experimental',
     binary: ['aider', 'aider.cmd'],
     login: 'cli-config',
-    vendorApi: { kind: 'openai', keyVars: ['OPENAI_API_KEY'] },
+    vendorApi: {
+      kind: 'openai',
+      keyVars: ['OPENAI_API_KEY'],
+      baseUrl: 'https://api.openai.com/v1',
+    },
     cliRunnable: true,
     vars: [
       ['openai-compat', 'AIDER_OPENAI_API_BASE', 'AIDER_MODEL', 'openai/', 'AIDER_OPENAI_API_KEY'],

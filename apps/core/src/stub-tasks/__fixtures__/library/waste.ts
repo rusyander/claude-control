@@ -1,12 +1,12 @@
 import type { StubTask } from '../stub-tasks.types.ts';
-import { BASE_REPO } from './happy-path.ts';
+import { BASE_REPO, REQ_1 } from './happy-path.ts';
 
 const INPUT = {
   title: 'Summarise README',
   request: 'Read README.md and report what the repository is for.',
   repo: BASE_REPO,
   stepKind: 'work',
-  requirements: [{ id: 'r1', text: 'purpose of the repository reported' }],
+  requirements: [{ id: REQ_1, text: 'purpose of the repository reported' }],
 };
 
 const DONE = {
@@ -15,7 +15,7 @@ const DONE = {
   args: {
     stepId: '${stepId}',
     outcome: 'done',
-    requirements: [{ id: 'r1', state: 'n/a', evidence: 'report-only step, nothing to check' }],
+    requirements: [{ id: REQ_1, state: 'n/a', evidence: 'report-only step, nothing to check' }],
     summary: 'README read; the repository is a throwaway stub repo',
   },
 } as const;

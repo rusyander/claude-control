@@ -56,6 +56,18 @@ const WatcherPage = lazyRouteComponent(
   'WatcherPage',
 );
 const HelpPage = lazyRouteComponent(() => import('@pages/Help/HelpPage/HelpPage'), 'HelpPage');
+const CoreTasksPage = lazyRouteComponent(
+  () => import('@pages/CoreTask/CoreTasksPage/CoreTasksPage'),
+  'CoreTasksPage',
+);
+const CoreLaunchPage = lazyRouteComponent(
+  () => import('@pages/CoreLaunch/CoreLaunchPage/CoreLaunchPage'),
+  'CoreLaunchPage',
+);
+const CoreScenariosPage = lazyRouteComponent(
+  () => import('@pages/CoreScenarios/CoreScenariosPage/CoreScenariosPage'),
+  'CoreScenariosPage',
+);
 const AnalyticsPage = lazyRouteComponent(
   () => import('@pages/Analytics/AnalyticsPage/AnalyticsPage'),
   'AnalyticsPage',
@@ -133,6 +145,10 @@ const routes = [
   { path: '/compare', component: ProviderComparePage },
   { path: '/portability', component: PortabilityPage },
   { path: '/watcher', component: WatcherPage },
+  // Ядро задач — свой процесс; панель только показывает его через прокладку `/api/core/*`.
+  { path: '/core', component: CoreTasksPage },
+  { path: '/core/launch', component: CoreLaunchPage },
+  { path: '/core/scenarios', component: CoreScenariosPage },
   // Словарь справки — отдельный чанк; лоадер дотягивает его до первого
   // рендера, поэтому страница ни разу не видит «help.…» вместо текста.
   { path: '/help', component: HelpPage, loader: () => loadHelp(toLanguage(i18n.language)) },

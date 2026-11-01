@@ -2,7 +2,7 @@ import type { PathStep } from '@agentdeck/contracts';
 import { skillTextSteps } from './skillText';
 import type { RowText } from './describe.types';
 import type { PathRow } from './pathRows.types';
-import { pickLang } from '../lib/pickLang';
+import { pickLang } from '@entities/StepPath';
 
 /** Скилл из общего списка: текст нужен для разделов шагов, описание — для подсказки. */
 export interface KnownSkill {

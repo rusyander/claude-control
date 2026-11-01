@@ -13,14 +13,17 @@
  * а `%TEMP%` на Windows начинается с имени пользователя — в справку, которую
  * читают чужие люди, не уезжает ни одно имя человека. По той же причине панели
  * подсовывается собственный домашний каталог: раздел «Права» показывает его в
- * карточке системы.
+ * карточке системы. Физически стенд — во временной папке ОС, рядом лежит лишь
+ * соединение на неё (`linked-stand.mjs`): иначе ворота «решает только человек»
+ * отбивали `PATCH /api/settings` съёмки (язык кадра) 403.
  *
  * Каталог помечается файлом-меткой и сносится в конце — метка не даёт снести
  * чужую папку, если имя совпало.
  */
-import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { REPO_ROOT } from './kit.mjs';
+import { dropLinkedStand, makeLinkedStand } from './linked-stand.mjs';
 
 /** Корень одноразового стенда: сосед репозитория, а не его подкаталог. */
 export const STAND = join(dirname(REPO_ROOT), 'claude-demo');
@@ -42,8 +45,8 @@ export const MCP_CONFIG = join(CONFIG_DIR, '.claude.json');
 /** Выдуманный сервер заказов: его команда видна в кадре, поэтому путь опрятный. */
 export const ORDERS_SERVER = join(STAND, 'orders-mcp', 'server.mjs').replace(/\\/g, '/');
 
-/** Метка «каталог создан съёмкой» — без неё чужая папка не сносится. */
-const MARK = '.help-shots-owned';
+/** Префикс настоящего каталога стенда во временной папке. */
+const TEMP_PREFIX = 'cc-help-access-';
 
 const SETTINGS = join(CONFIG_DIR, 'settings.json');
 const SETTINGS_LOCAL = join(CONFIG_DIR, 'settings.local.json');
@@ -58,13 +61,10 @@ const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
  * который читает про «подключение сервера», это только мешает.
  */
 export function makeStand() {
-  if (existsSync(STAND) && !existsSync(join(STAND, MARK))) {
-    throw new Error(`${STAND} уже существует и создан не съёмкой — выберите другой путь`);
-  }
+  makeLinkedStand(STAND, TEMP_PREFIX, 'tools/help-shots/permissions-panel.mjs');
   mkdirSync(join(CONFIG_DIR, 'agentdeck'), { recursive: true });
   mkdirSync(HOME_DIR, { recursive: true });
   mkdirSync(join(STAND, 'orders-mcp'), { recursive: true });
-  writeFileSync(join(STAND, MARK), 'создан tools/help-shots/permissions-panel.mjs\n', 'utf8');
   copyFileSync(join(import.meta.dirname, 'demo-mcp-server.mjs'), ORDERS_SERVER);
   writeState();
   return STAND;
@@ -72,7 +72,7 @@ export function makeStand() {
 
 /** Снести стенд — но только тот, который создали мы. */
 export function dropStand() {
-  if (existsSync(join(STAND, MARK))) rmSync(STAND, { recursive: true, force: true });
+  dropLinkedStand(STAND, TEMP_PREFIX);
 }
 
 /**

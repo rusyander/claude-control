@@ -19,7 +19,7 @@ export interface TelegramCardDraft extends TelegramGroups {
    * кнопками ответа, всегда (отдельной галочки нет с 25.10.2026).
    */
   afterMinutes: string;
-  /** «Агент закончил» — сообщать после долгой работы. */
+  /** «Задача закрыта или агент ждёт решения» — сообщать о конце хода после долгой работы. */
   finished: boolean;
   doneAfterMinutes: string;
 }

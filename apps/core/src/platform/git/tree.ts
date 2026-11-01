@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdtempSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, statSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Fact } from '@agentdeck/contracts/core/facts';
@@ -127,9 +127,16 @@ async function buildTree(
   options: GitOptions,
 ): Promise<string> {
   const call = { ...options, timeoutMs: TIMEOUT_MS, extraEnv: { GIT_INDEX_FILE: indexFile } };
-  const seeded = seedFrom !== null && statSync(seedFrom, { throwIfNoEntry: false }) !== undefined;
-  if (seeded) {
+  const seed = seedFrom === null ? undefined : statSync(seedFrom, { throwIfNoEntry: false });
+  if (seedFrom !== null && seed !== undefined) {
     retryTransient(() => copyFileSync(seedFrom, indexFile), DEFAULT_RETRY, READ_TRANSIENT_CODES);
+    // Копия держит mtime настоящего индекса: по нему git узнаёт «гоночные» строки (файл
+    // переписан в ту же секунду, что записан индекс, размер тот же) и перечитывает их тело.
+    // Свежий mtime копии делал такую строку «чистой» — в дереве оставался старый blob, ключ
+    // зависел от того, в какую секунду его сняли (Linux, git без наносекунд). Округление вниз —
+    // в безопасную сторону: строк, что перечитываются, только больше.
+    const mtime = Math.floor(seed.mtimeMs) / 1000;
+    utimesSync(indexFile, mtime, mtime);
     await clearHidingFlags(repo, call);
   } else if ((await revTreeId(repo, 'HEAD', options)) !== null) {
     await git(repo, ['read-tree', 'HEAD'], call);

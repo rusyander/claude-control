@@ -43,7 +43,7 @@ function spec(cwd: string): SessionSpec {
     platform: { coreHome: join(cwd, '..', 'core'), tokenFiles: [] },
     tools: 'all',
     mcpServers: { agentdeck: { command: 'node', args: ['core-mcp.mjs'] } },
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     env: { pin: {} },
     coreHook: 'node hook.mjs core',
     core: {

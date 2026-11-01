@@ -9,7 +9,7 @@ import { knobNumbers } from './knobNumbers';
 import { KNOB_AUTO } from './knobs.constants';
 import { knobSelectValue } from './knobSelectValue';
 import { knobEditValue } from './knobEditValue';
-import { ownStepCount } from './ownStepCount';
+import { ownStepCount } from '@entities/StepPath';
 import { canInsertAfter } from './canInsertAfter';
 import { firstParagraph } from './firstParagraph';
 import { stepOfQuote } from './stepOfQuote';

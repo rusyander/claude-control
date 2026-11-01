@@ -38,6 +38,11 @@ export interface ResumeDeps {
   beats?: boolean;
   /** Потеряли аренду (перехват другим ядром) — задача закрыта для записи. */
   onLeaseLost?: (taskId: string) => void;
+  /**
+   * Писатель отверг строку (схема, тело): зовётся до броска отказа (`WriterOptions.onRejected`),
+   * загрузка ведёт его в сигнал `journal-rejected` наблюдателя (этап 8, F11).
+   */
+  onRejected?: (taskId: string, rejection: { kind: string; issues: string[] }) => void;
 }
 
 export interface LiveTask {
@@ -103,6 +108,9 @@ export async function resume(
       nextSeq: folded.read.lines.length + 1,
       lastHash: folded.read.lastHash,
       holdsLease: () => lease.holds(),
+      ...(deps.onRejected
+        ? { onRejected: (rejection) => deps.onRejected?.(taskId, rejection) }
+        : {}),
     });
     const task = liveTask(dir, taskId, folded.state, writer, lease, deps.mask);
     if (repairedBytes > 0) {
@@ -142,16 +150,30 @@ function liveTask(
   let closed = false;
   let sinceSnapshot = 0;
   const listeners = new Set<(line: JournalLine, state: TaskFoldState) => void>();
+  // Строка, дописанная изнутри подписчика (наблюдатель пишет решение и сигнал), ждёт, пока
+  // текущую строку увидят все подписчики (этап 8, R10): иначе следующий подписчик получил бы
+  // `seq + 1` раньше `seq`, а SSE молча выбрасывает строку не по порядку (`seq <= lastSeq`).
+  const pending: [JournalLine, TaskFoldState][] = [];
+  let dispatching = false;
   const commit = (line: JournalLine): void => {
     state = reduce(state, line);
     sinceSnapshot += 1;
     if (sinceSnapshot >= SNAPSHOT_EVERY) task.snapshotNow();
-    for (const listener of listeners) {
-      try {
-        listener(line, state);
-      } catch {
-        // Подписчик (SSE, наблюдатель) не может сломать запись: событие уже на диске.
+    pending.push([line, state]);
+    if (dispatching) return;
+    dispatching = true;
+    try {
+      for (let next = pending.shift(); next; next = pending.shift()) {
+        for (const listener of listeners) {
+          try {
+            listener(next[0], next[1]);
+          } catch {
+            // Подписчик (SSE, наблюдатель) не может сломать запись: событие уже на диске.
+          }
+        }
       }
+    } finally {
+      dispatching = false;
     }
   };
   const task: LiveTask = {

@@ -6,6 +6,8 @@ import type { PermitCallDeps, SessionBinding } from '../conductor/model-tools/mo
 import type { LiveTask } from '../journal/resume.ts';
 import { createPendingPermits, type PendingPermits } from '../policy/permit/pending.ts';
 import type { PermitContext } from '../policy/permit/permit.types.ts';
+import type { EconomyTap } from './economy-wiring/index.ts';
+import type { ObserverTap } from './observer-wiring/observer-wiring.types.ts';
 
 /**
  * Живые сессии ядра и их дорога права (03 §CLI adapter, 06 §Session permissions). Запущенная
@@ -55,6 +57,11 @@ export interface AttachedSession {
 export interface SessionRuntime {
   attach(spec: AttachSpec): AttachedSession;
   permitDeps(task: LiveTask, binding: SessionBinding): PermitCallDeps | undefined;
+  /**
+   * Вопрос о праве сессии принят сервером права и ждёт решения ядра (`PendingPermits.deciding`):
+   * тишина потока тогда — ожидание ядра, не модели (сторож тишины этапа 8).
+   */
+  permitPending(sessionId: string): boolean;
   /** Сколько сессий прикреплено (для загрузки и проверок). */
   size(): number;
 }
@@ -63,6 +70,17 @@ export interface SessionRuntimeOptions {
   settleMs?: number;
   /** Сбой ответа строкой протокола — в журнал ядра, не в поток сессии. */
   note?: (event: string, data: Record<string, unknown>) => void;
+  /** Кран экономики (этап 5): расход и факты окна из потока каждой сессии. */
+  economy?: EconomyTap;
+  /** Кран слоя пользователя (этап 7): отказы хуков человека, петли, потеря слоя — из потока. */
+  userLayer?: UserLayerTap;
+  /** Кран наблюдателя (этап 8): факты вызовов инструментов и активности сессии — из потока. */
+  observer?: ObserverTap;
+}
+
+/** Кран слоя пользователя: событие потока сессии — после ворота права, рядом с экономикой. */
+export interface UserLayerTap {
+  onEvent(task: LiveTask, binding: SessionBinding, event: AdapterEvent): void;
 }
 
 interface Entry {
@@ -167,10 +185,13 @@ export function createSessionRuntime(options: SessionRuntimeOptions = {}): Sessi
       let cliTurns = 0;
       let events = 0;
       const journaledCliTurns = spec.resumed ? countCliTurns(task, binding.sessionId) : 0;
+      // Событие из истории прикреплённой заново сессии: `replayed` первых, а без счёта — любое
+      // (сверка по счёту строк журнала).
+      const historyAt = (index: number): boolean =>
+        spec.replayed === undefined || index < spec.replayed;
       const journalCliTurn = (cause: TurnCause, index: number): void => {
         cliTurns += 1;
-        const inHistory = spec.replayed === undefined || index < spec.replayed;
-        if (inHistory && cliTurns <= journaledCliTurns) return;
+        if (historyAt(index) && cliTurns <= journaledCliTurns) return;
         try {
           // Ход, начатый самим CLI (03, P48): ядро его не посылало — видно только по журналу.
           task.append({
@@ -187,6 +208,43 @@ export function createSessionRuntime(options: SessionRuntimeOptions = {}): Sessi
           });
         }
       };
+      // Сбой крана экономики — запись в журнал ядра, поток сессии не рвётся.
+      const tapEconomy = (event: AdapterEvent): void => {
+        try {
+          options.economy?.onEvent(task, binding, event);
+        } catch (error) {
+          note('economy.tap.failed', {
+            taskId: binding.taskId,
+            sessionId: binding.sessionId,
+            reason: reasonText(error),
+          });
+        }
+      };
+      // Сбой крана слоя — так же: запись в журнал ядра, поток и кран экономики не рвутся.
+      const tapUserLayer = (event: AdapterEvent): void => {
+        try {
+          options.userLayer?.onEvent(task, binding, event);
+        } catch (error) {
+          note('user-layer.tap.failed', {
+            taskId: binding.taskId,
+            sessionId: binding.sessionId,
+            reason: reasonText(error),
+          });
+        }
+      };
+      // Кран наблюдателя — так же; история новой сессии не бывает (`resumed` нет — всё живое).
+      const tapObserver = (event: AdapterEvent, index: number): void => {
+        try {
+          const inHistory = spec.resumed === true && historyAt(index);
+          options.observer?.onEvent(task, binding, event, { inHistory });
+        } catch (error) {
+          note('observer.tap.failed', {
+            taskId: binding.taskId,
+            sessionId: binding.sessionId,
+            reason: reasonText(error),
+          });
+        }
+      };
       const pump = async (): Promise<void> => {
         try {
           for await (const event of adapter.events(handle)) {
@@ -195,6 +253,9 @@ export function createSessionRuntime(options: SessionRuntimeOptions = {}): Sessi
             if (!attached) continue;
             gate.observe(binding.sessionId, event);
             if (event.type === 'turn.cli-initiated') journalCliTurn(event.cause, index);
+            tapEconomy(event);
+            tapUserLayer(event);
+            tapObserver(event, index);
             if (event.type === 'permit.request') {
               void answerInBand(entry, event.requestId, event.raw);
             }
@@ -216,6 +277,7 @@ export function createSessionRuntime(options: SessionRuntimeOptions = {}): Sessi
     permitDeps(task, binding) {
       return live.get(keyOf(task.taskId, binding.sessionId))?.deps;
     },
+    permitPending: (sessionId) => gate.deciding(sessionId),
     size: () => live.size,
   };
 }

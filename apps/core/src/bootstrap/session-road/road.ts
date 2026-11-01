@@ -1,9 +1,11 @@
 import { join } from 'node:path';
 import { PERMIT_MCP_SERVER, PERMIT_TOOL } from '@agentdeck/contracts/core/model-tools';
+import type { SessionStateDoc, UserLayerInventory } from '@agentdeck/contracts/core/user-layer';
 import type {
   AdapterChannelSummary,
   CompatDecision,
   CredentialKind,
+  Dialect,
   Route,
   RouteEndpoint,
   RouteLease,
@@ -36,16 +38,38 @@ import type { RouteRegistry } from '../../routes/registry.ts';
 import { TREE_MARKER } from '../../session-host/host.ts';
 import { PERMIT_SELF_TOOL, type SessionRuntime } from '../session-runtime.ts';
 import { compat as judgeCompat } from '../../routes/compat/compat.ts';
-import { compatInputs, compatRecord } from './compat-gate.ts';
+import { modelRequired } from '../../routes/lease.ts';
+import { compatInputs, compatRecord, type CompatCandidateRef } from './compat-gate.ts';
+import { permitSourcesFor } from './permit-sources.ts';
 import { captureRoadsSignal, scanEngines } from './capture-roads.ts';
 import {
   coreHookCommand,
   installCaptureWrappers,
   installContainerWrappers,
+  installStateWrapper,
+  recorderCommand,
   WRAPPER_DIR,
 } from './hook-file.ts';
+import {
+  HOOKS_LOG,
+  journalLayerObserved,
+  journalLayerStart,
+  panelTrusted,
+} from './layer-journal.ts';
+import { createSessionLayerBook } from './layer-facts.ts';
+import {
+  hopPolicy,
+  hopReason,
+  linkHop,
+  unlinkHop,
+  type HopLinked,
+  type RoadHops,
+} from './hop-link.ts';
+import type { SessionKeyBook } from '../session-keys.ts';
 import { sessionPath, type LoginPathReader } from './launch-env.ts';
 import { createLeaseBook, journalLease } from './lease-release.ts';
+import { sessionMcpList, strictServers, withMcpDeny } from './mcp-list.ts';
+import type { McpList } from '../../context/mcp/index.ts';
 import {
   ownCopiesOf,
   protectedAtEnd,
@@ -119,6 +143,26 @@ export interface RoadDeps {
   liveCopies?: () => readonly string[];
   /** Реестр стендов: стенд ядра, снятый концом задачи, снимается и с наблюдения (A2r5-F04). */
   stands?: ReleaseDeps['stands'];
+  /**
+   * Хост звеньев (11 §Hop chain, G4): ключ из хранилища панели, перевод диалекта, шлюз контура,
+   * маска политики. Нет — сеанс, которому нужно звено, отказывает с причиной.
+   */
+  hops?: RoadHops;
+  /**
+   * Книга ключей сеанса (P61): значение ключа `env`, прочитанное дорогой, уходит маске `known`
+   * (`session-keys.ts`), даже под несекретным именем. Нет — дорога ключи не отмечает.
+   */
+  keys?: SessionKeyBook;
+  /**
+   * Версия CLI сеанса для `session.started` — тот же читатель, что у замера базы (`--version`
+   * один раз на «команда × PATH»). Нет — в журнале `not-probed`; не прочиталась — `unread`.
+   */
+  cliVersion?: (p: Prepared) => Promise<string | null>;
+  /**
+   * Снимок `agentdeck state` на запуск (этап 7, G8): ложится в `state.json` сессии запасным путём
+   * команды, когда ядро недоступно. Нет — в файле только задача, шаг и вид шага, как прежде.
+   */
+  sessionState?: (task: LiveTask, start: RoadStart) => SessionStateDoc | undefined;
 }
 
 export interface LaunchOptions {
@@ -140,7 +184,14 @@ export interface SessionRoad {
   attach(input: RoadAttach): RoadSession;
   /** Факты права сессии без запуска (сессия прежнего ядра, прикреплённая заново). */
   contextFor(start: RoadStart): PermitContext;
+  /**
+   * PATH, с которым сессия запустит CLI (каталоги `prefix` + PATH логин-шелла, без обёрток): по нему
+   * же предпроверка ищет CLI — иначе проба и запуск видят разные каталоги.
+   */
+  searchPath(prefix?: readonly string[]): Promise<string>;
   releaseTask(task: LiveTask): Promise<TaskRelease>;
+  /** Опись слоя человека у сеанса (кран слоя: кандидаты безымянного отказа); нет — `null`. */
+  layerInventory(sessionId: string): UserLayerInventory | null;
 }
 
 const OPEN = new Set(['starting', 'live', 'quiet']);
@@ -151,14 +202,18 @@ interface Leased {
   adapter: CliAdapter;
   route: Route;
   lease: RouteLease;
-  compat: Extract<CompatDecision, { kind: 'direct' }>;
+  compat: Extract<CompatDecision, { kind: 'direct' | 'via-gateway' }>;
   refuse: (reason: string) => Promise<PrepareOutcome>;
 }
 
-function isAdapterChannel(
-  channel: Extract<CompatDecision, { kind: 'direct' }>['channel'],
-): channel is AdapterChannelSummary {
+function isAdapterChannel(channel: Leased['compat']['channel']): channel is AdapterChannelSummary {
   return channel.via !== 'login';
+}
+
+/** Диалект аренды: при переводе звеном — диалект ВЕРХА (`to`), не CLI; вход CLI — без диалекта. */
+function leaseDialectOf(compat: Leased['compat']): { dialect?: Dialect } {
+  if (compat.kind === 'via-gateway') return { dialect: compat.to };
+  return isAdapterChannel(compat.channel) ? { dialect: compat.channel.dialect } : {};
 }
 
 function keyOf(
@@ -172,9 +227,9 @@ function keyOf(
     if (!found) return { refused: `key variable ${ref.name} not in the task pin` };
     return { key: found, kind: 'env' };
   }
-  // Хранилище ключей панели и вставка звеном (шлюз, стадия 5) ядру ещё не доступны: запуск без
-  // ключа шёл бы с отказом модели на каждом ходу — отказ здесь, с причиной.
-  return { refused: `key source ${ref.kind} is not wired into the core yet` };
+  // Ключ хранилища панели и вставка звеном идут ТОЛЬКО через звено (`hop-link.ts`, G5): мимо
+  // звена ядро ключ не читает — отказ с причиной, а не сеанс без ключа.
+  return { refused: `key source ${ref.kind} goes only through the hop` };
 }
 
 export function createSessionRoad(deps: RoadDeps): SessionRoad {
@@ -188,6 +243,16 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
   // сама сессия, ревью B2r4-F02/F04); дом ядра — для сессии, прикреплённой после перезапуска.
   const stateDir = join(deps.layout.root, 'session-state');
   const held = new Map<string, { baseline: Baseline; protected: ProtectedHeld }>();
+  // Метки сеансов у звена: снимаются на остановке сеанса, на отказе подготовки и запуска.
+  const linked = new Map<string, Pick<HopLinked, 'handle' | 'tag'>>();
+  const unlink = async (sessionId: string): Promise<void> => {
+    const link = linked.get(sessionId);
+    if (!link) return;
+    linked.delete(sessionId);
+    await unlinkHop(link, deps.note);
+  };
+  // Факты слоя сеансов: режим навыков, подагенты, опись — судье права и крану слоя.
+  const layers = createSessionLayerBook();
   const platform: PlatformDenyFacts = {
     coreHome: deps.layout.root,
     tokenFiles: [deps.layout.token],
@@ -197,13 +262,17 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
   const sourceOf = (start: RoadStart): string | undefined =>
     start.sourceRepo ?? start.trust?.sourceRepo ?? sourceRepoOf(start.task, start.stepId);
 
+  /** Строгий список MCP шага (`mcp-list.ts`): один для оверлея CLI, судьи права и ключа базы. */
+  const mcpOf = (start: RoadStart): McpList | null => sessionMcpList(start.stepKind, start.routeId);
+
   const contextFor = (start: RoadStart): PermitContext => {
     const { task } = start;
     // Судья решает по тем же запретам, что оверлей CLI получил при запуске (F-11): платформа,
-    // `.git` и настройки CLI копии, плюс сам инструмент права (модель не одобряет себя).
+    // `.git` и настройки CLI копии, запреты списка MCP вида, плюс сам инструмент права.
+    const stepDeny = withMcpDeny(start.deny, mcpOf(start));
     const permitDeny = sessionPermitDeny(
       platform,
-      { ...start.deny, mcpTools: [...start.deny.mcpTools, PERMIT_SELF_TOOL] },
+      { ...stepDeny, mcpTools: [...stepDeny.mcpTools, PERMIT_SELF_TOOL] },
       start.cwd,
     );
     const allow = readAllowFor(deps.layout.config, sourceOf(start));
@@ -229,15 +298,24 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     for (const refused of built.refused) {
       signal('read-scope-refused', 'info', refused.entry, refused.reason);
     }
+    // Пункты человека 3 и 5 (P130): `grantRequired` конфига ядра, гранты задачи, источники адреса.
+    const human = permitSourcesFor(task, {
+      stepId: start.stepId,
+      copyRoot: start.cwd,
+      sourceRepo: sourceOf(start),
+      config: deps.layout.config,
+    });
+    for (const p of human.problems) signal('permit-sources-unread', 'warn', p.subject, p.why);
     return {
       copyRoot: start.cwd,
       ownedPaths: start.ownedPaths ?? [],
       deny: permitDeny.deny,
       platformPaths: permitDeny.platformPaths,
-      endpointSources: [],
-      grantRequired: [],
-      grants: [],
+      endpointSources: human.endpointSources,
+      grantRequired: human.grantRequired,
+      grants: human.grants,
       readScope: built.scope,
+      ...layers.context(start, adapter),
     };
   };
 
@@ -248,9 +326,27 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     const route: Route | undefined = deps.routes.get(start.routeId);
     if (!route) return { ok: false, reason: `route ${start.routeId} not registered` };
     const recorder = journalRecorder(task);
+    // Модель по умолчанию CLI годится только входу самого CLI: маршруту с адресом нужна модель
+    // в адресе (переменная модели CLI), а угадывать её дорога не будет — отказ до всего.
+    const needs = modelRequired(route, start.model);
+    if (needs) return { ok: false, reason: needs };
 
     // ── совместимость: до аренды, токена, каталога и процесса ──
-    const inputs = await compatInputs(task, adapter, route, start.model);
+    // Запасные тройки суда `tier` (P110): незарегистрированная не кандидат — её фактов нет.
+    const candidates: CompatCandidateRef[] = [];
+    for (const alt of start.alternatives ?? []) {
+      const a = deps.adapters.get(alt.adapterId);
+      const r = deps.routes.get(alt.routeId);
+      if (a && r) candidates.push({ adapter: a, route: r, model: alt.model });
+    }
+    const inputs = await compatInputs(
+      task,
+      adapter,
+      route,
+      start.model,
+      candidates,
+      hopPolicy(deps.hops, route.id),
+    );
     const compat = judgeCompat(
       inputs.adapter,
       inputs.facts.route,
@@ -261,10 +357,7 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     if (compat.kind === 'refused') {
       return { ok: false, reason: `compat refused: ${compat.code}`, compat };
     }
-    if (compat.kind === 'via-gateway') {
-      return { ok: false, reason: 'compat needs a gateway hop; gateway not built yet', compat };
-    }
-    const channel = compat.channel;
+    // `via-gateway` — перевод диалекта звеном шлюза: метку регистрирует `afterLease` (`hop-link.ts`).
 
     // ── аренда ──
     const acquired = start.lease === undefined;
@@ -274,8 +367,9 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
         {
           taskId: task.taskId,
           sessionId: start.sessionId,
+          // `null` — модель выбирает CLI: её берёт только вход CLI, остальные отказывают сами.
           model: start.model,
-          ...(isAdapterChannel(channel) ? { dialect: channel.dialect } : {}),
+          ...leaseDialectOf(compat),
         },
         recorder,
       ));
@@ -285,6 +379,7 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     if (acquired) journalLease(task, start.sessionId, { routeId: route.id, lease });
     const refuse = async (reason: string): Promise<PrepareOutcome> => {
       held.delete(start.sessionId);
+      await unlink(start.sessionId);
       if (acquired) {
         await route.release(lease, recorder).catch(() => undefined);
         leases.forget(task.taskId, lease.leaseId);
@@ -308,16 +403,60 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     // ── адрес маршрута ──
     let endpoint: SessionSpec['endpoint'];
     let credentialKind: CredentialKind = route.kind === 'cli-login' ? 'cli-store' : 'none';
+    // Пин сеанса: через звено — без ключей и с адресом звена (`applyHopEnv`, P112).
+    let pin = start.pin;
+    let hops: Prepared['hops'] = [];
     if (isAdapterChannel(channel)) {
+      // Сюда без модели не доходят (`modelRequired`); проверка — для типа и на случай нового пути.
+      if (start.model === null) return refuse(modelRequired(route, null) ?? 'model required');
       const got = await route.endpoint(lease, recorder);
       if (!got) return refuse(`route ${route.id} gave no live endpoint`);
-      const key = keyOf(got, start.pin);
-      if ('refused' in key) return refuse(key.refused);
-      credentialKind = key.kind;
-      endpoint = {
-        channel,
-        endpoint: { baseUrl: got.baseUrl, dialect: got.dialect, model: start.model, key: key.key },
-      };
+      const reason = hopReason(route, got, compat, deps.hops);
+      if (reason !== null) {
+        // ── звено (G4): CLI говорит со звеном своим диалектом, ключ подставляет только звено ──
+        const link = await linkHop({
+          hops: deps.hops,
+          reason,
+          sessionId: start.sessionId,
+          route,
+          endpoint: got,
+          channel,
+          compat,
+          pin: start.pin,
+        });
+        if ('refused' in link) return refuse(link.refused);
+        linked.set(start.sessionId, link);
+        if (link.sessionKey)
+          deps.keys?.record(start.sessionId, link.sessionKey.name, link.sessionKey.value);
+        credentialKind = 'hop-injected';
+        pin = link.pin;
+        hops = link.hops;
+        endpoint = {
+          channel,
+          endpoint: {
+            baseUrl: link.baseUrl,
+            dialect: channel.dialect,
+            model: start.model,
+            key: link.key,
+          },
+        };
+      } else {
+        const key = keyOf(got, start.pin);
+        if ('refused' in key) return refuse(key.refused);
+        // Ключ `env` уходит в окружение CLI — и маске `known`, каким бы ни было имя переменной.
+        if (got.keyRef?.kind === 'env')
+          deps.keys?.record(start.sessionId, got.keyRef.name, key.key);
+        credentialKind = key.kind;
+        endpoint = {
+          channel,
+          endpoint: {
+            baseUrl: got.baseUrl,
+            dialect: got.dialect,
+            model: start.model,
+            key: key.key,
+          },
+        };
+      }
     }
 
     // ── окружение ──
@@ -328,10 +467,14 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     // ── хук ядра и обёртки PATH (исполняемые, P105) ──
     const hook = coreHookCommand(start.dir, nodeArgv, os);
     if (!hook.ok) return refuse(hook.reason);
+    // Запись хуков человека в `observe` (P87, G7): без неё переходник не исполнил бы ни одного
+    // хука человека и назвал бы это потерей — дорога ставит её всегда, режим решит переходник.
+    const hookRecorder = recorderCommand(start.dir, nodeArgv, os);
+    if (!hookRecorder.ok) return refuse(hookRecorder.reason);
     const wrappers = installContainerWrappers({
       dir: start.dir,
       taskId: task.taskId,
-      env: { ...start.pin, PATH: sessionPath('', prefix, loginPath) },
+      env: { ...pin, PATH: sessionPath('', prefix, loginPath) },
       os,
       nodeArgv,
     });
@@ -342,11 +485,21 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
         failed: wrappers.failed,
       });
     }
+    // `agentdeck state` для хуков человека (03:82, G8): обёртка в том же `bin` сессии. Не встала —
+    // сеанс идёт (это удобство автора хука, не граница), причина — в журнал ядра, не молчание.
+    const stateCommand = installStateWrapper({ dir: start.dir, os, nodeArgv });
+    if (!stateCommand.ok) {
+      deps.note('session.state-wrapper.failed', {
+        taskId: task.taskId,
+        sessionId: start.sessionId,
+        reason: stateCommand.reason,
+      });
+    }
     // Захват проверок (03 §Process capture): обёртки PATH над go/pytest/cargo … и прокладка
     // `--require` в NODE_OPTIONS CLI; какие дороги захвачены, а какие нет — сигналом в журнал.
     const capture = installCaptureWrappers({
       dir: start.dir,
-      env: { ...start.pin, PATH: sessionPath('', prefix, loginPath) },
+      env: { ...pin, PATH: sessionPath('', prefix, loginPath) },
       os,
       nodeArgv,
     });
@@ -388,35 +541,46 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
       AGENTDECK_SESSION_TOKEN: token,
       [CORE_PROCS_VAR]: deps.layout.procs,
     };
+    const mcp = mcpOf(start);
     const mcpServers = Object.fromEntries(
-      Object.entries(coreMcpServers(nodeArgv)).map(([name, entry]) => [
+      Object.entries(strictServers(coreMcpServers(nodeArgv), mcp)).map(([name, entry]) => [
         name,
         { ...entry, env: bridgeEnv },
       ]),
     );
-    // Доверие — к ИСХОДНОМУ репозиторию (F-86); отметку панели ядро ещё не читает — `false`, и
-    // слой репозитория открывает только запись доверия самого CLI.
+    // Доверие — к ИСХОДНОМУ репозиторию (F-86): отметка панели — `config.trustedRepos` (03:44);
+    // её нет — слой репозитория открывает только запись доверия самого CLI.
     const sourceRepo = sourceOf(start);
-    const trust = start.trust ?? (sourceRepo ? { sourceRepo, panelMark: false } : undefined);
+    let trust = start.trust;
+    if (!trust && sourceRepo) {
+      const mark = panelTrusted(deps.layout, sourceRepo, os);
+      if (mark.unread) {
+        deps.note('session.trust.unread', { sessionId: start.sessionId, reason: mark.unread });
+      }
+      trust = { sourceRepo, panelMark: mark.mark };
+    }
+    const stateDoc = deps.sessionState?.(task, start);
     const spec: SessionSpec = {
       sessionId: start.sessionId,
       dir: start.dir,
       cwd: start.cwd,
-      model: start.model,
+      // Нет модели — нет `--model`: CLI берёт свою по умолчанию.
+      ...(start.model !== null ? { model: start.model } : {}),
       ...(start.effort ? { effort: start.effort } : {}),
       brief: start.brief,
-      ...(start.resume ? { resume: start.resume } : {}),
+      ...(start.resume ? { resume: { conversationId: start.resume.conversationId } } : {}),
       ...(endpoint ? { endpoint } : {}),
-      deny: start.deny,
+      deny: withMcpDeny(start.deny, mcp),
       platform,
       tools: start.tools,
       coreHook: hook.command,
+      recorder: { command: hookRecorder.command, log: join(start.dir, HOOKS_LOG) },
       mcpServers,
       permitServer: { name: PERMIT_MCP_SERVER, tool: PERMIT_TOOL },
       layer: start.layer,
       ...(trust ? { trust } : {}),
       env: {
-        pin: start.pin,
+        pin,
         session: {
           PATH: sessionPath(wrapperDir, prefix, loginPath),
           [CORE_PROCS_VAR]: deps.layout.procs,
@@ -429,6 +593,7 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
         stepKind: start.stepKind,
         coreUrl: deps.url,
         sessionToken: token,
+        ...(stateDoc ? { state: { ...stateDoc } } : {}),
       },
     };
     return {
@@ -445,13 +610,33 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
         loginPath,
         credentialKind,
         routeKind: route.kind,
+        hops,
+        ...(mcp ? { mcpHash: mcp.hash } : {}),
         hint: `${TREE_MARKER}=${start.sessionId}`,
       },
     };
   }
 
+  // Версия CLI запущенного сеанса — до строки `session.started` (её пишет `started`).
+  const versions = new Map<string, string>();
+  async function readVersion(p: Prepared): Promise<string> {
+    if (!deps.cliVersion) return 'not-probed';
+    try {
+      return (await deps.cliVersion(p)) ?? 'unread';
+    } catch {
+      return 'unread';
+    }
+  }
+  function takeVersion(sessionId: string): string {
+    const got = versions.get(sessionId) ?? 'not-probed';
+    versions.delete(sessionId);
+    return got;
+  }
+
   async function launch(p: Prepared, options: LaunchOptions = {}): Promise<LaunchResult> {
     let got: { handle: SessionHandle; layer: LayerRun } | undefined;
+    // Версия читается рядом с запуском, не перед ним: старт сеанса её не ждёт лишний раз.
+    const version = readVersion(p);
     const started = await runAction(
       p.start.task,
       { kind: 'process-start', target: p.spec.dir, idempotencyHint: p.hint },
@@ -465,11 +650,14 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
       { stepId: p.start.stepId },
     );
     if (!started.ok || !got) {
+      // Сеанса не будет — метка у звена ему больше не нужна.
+      await unlink(p.start.sessionId);
       return {
         ok: false,
         reason: `process-start failed: ${started.ok ? 'no handle' : started.code}`,
       };
     }
+    versions.set(p.start.sessionId, await version);
     return { ok: true, ...got };
   }
 
@@ -484,9 +672,9 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
         sessionId,
         stepId,
         adapter: p.adapter.id,
-        cliVersion: 'not-probed',
+        cliVersion: takeVersion(sessionId),
         route: { kind: p.routeKind, id: p.route.id },
-        hops: [],
+        hops: p.hops,
         credentialKind: p.credentialKind,
         modelAsked: p.start.model,
         modelServed: null,
@@ -497,8 +685,8 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
         cliStart: handle.child.start,
         cwd: handle.spawned.cwd,
         argv: handle.spawned.argv,
-        resumeOf: null,
-        cacheAgeMs: null,
+        resumeOf: p.start.resume?.of ?? null,
+        cacheAgeMs: p.start.resume?.cacheAgeMs ?? null,
         layer,
         lease: { leaseId: p.lease.leaseId, rids: p.lease.resources.map((r) => r.rid) },
       },
@@ -509,6 +697,20 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
       sessionId,
       data: { sessionId, event: 'spawned', from: 'starting', to: 'live' },
     });
+    const inventory = journalLayerStart({
+      task,
+      stepId,
+      sessionId,
+      dir: p.spec.dir,
+      cli: p.adapter.id,
+      caps: p.adapter.caps,
+      ...(p.adapter.inventory ? { inventoryOf: p.adapter.inventory } : {}),
+      pin: p.spec.env.pin,
+      cwd: p.spec.cwd,
+      skills: p.spec.layer.skills,
+      layer,
+    });
+    layers.started(sessionId, inventory);
   }
 
   function attach(input: RoadAttach): RoadSession {
@@ -550,6 +752,8 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
           data: { sessionId, event: 'exited', from: state as never, to: 'ended' },
         });
       }
+      // Сводка записи хуков `observe` — после остановки CLI: новых вызовов записи уже не будет.
+      journalLayerObserved(task, sessionId, handle.dir);
       const after = await scanAfterStop(ctx, before, stop);
       const protectedRoots = await protectedAtEnd({
         task,
@@ -561,6 +765,9 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
         ...(mine ? { held: mine.protected } : {}),
       });
       held.delete(sessionId);
+      layers.forget(sessionId);
+      // Метка у звена — после остановки CLI: до неё сеанс ещё шлёт запросы через звено.
+      await unlink(sessionId);
       return { stop, found: after.found, unread: after.unread, protectedRoots };
     };
     return {
@@ -576,6 +783,8 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     started,
     attach,
     contextFor,
+    layerInventory: layers.inventoryOf,
+    searchPath: async (prefix = []) => sessionPath('', prefix, await deps.loginPath()),
     releaseTask: (task) =>
       releaseTaskEnd(task, {
         liveCopies: liveCopies(),

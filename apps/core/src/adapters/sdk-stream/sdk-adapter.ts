@@ -1,4 +1,9 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, lstatSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  FROM_HUMAN_LINE,
+  PLATFORM_MARKER,
+  type SendOrigin,
+} from '@agentdeck/contracts/core/user-layer';
 import { dirname, join } from 'node:path';
 import { attachSession, type AttachOutcome } from '../../session-host/client.ts';
 import type { Identity } from '../../session-host/protocol.ts';
@@ -42,6 +47,26 @@ export interface SdkLaunchPlan {
   files: Record<string, string>;
   /** Что план добавил к слою на деле (F-86: сколько запретов репозитория дошло, какие сняты). */
   layerDetail?: string;
+  /** Потери частей слоя человека (G-b) — в `LayerRun.losses` запуска. */
+  layerLosses?: string[];
+  /** Копии в каталог сеанса (каталог или файл → путь относительно каталога сеанса). */
+  copies?: { from: string; to: string }[];
+}
+
+/**
+ * Метка платформы первой строкой текста в сессию (06:119, P37, G2): хук человека отличает голос
+ * платформы от человека; слова человека — второй строкой `agentdeck-from: human`. Уже меченый
+ * текст не метится второй раз.
+ */
+export function markText(text: string, origin: SendOrigin = 'platform'): string {
+  const head =
+    origin === 'human'
+      ? `${PLATFORM_MARKER}
+${FROM_HUMAN_LINE}
+`
+      : `${PLATFORM_MARKER}
+`;
+  return text.startsWith(head) ? text : `${head}${text}`;
 }
 
 export interface SdkAdapterDef {
@@ -49,6 +74,9 @@ export interface SdkAdapterDef {
   caps: AdapterCaps;
   /** Имя исполняемого файла (разрешает платформа) — из фактов запуска CLI. */
   command: string;
+  /** Лестница уровня шага из фактов запуска CLI; нет — ранга модели не знаем. */
+  ladder?: CliAdapter['ladder'];
+  transcriptPresent?: CliAdapter['transcriptPresent'];
   echo: boolean;
   bindEndpoint(
     channel: AdapterChannelSummary,
@@ -74,11 +102,25 @@ export interface SdkAdapterDef {
   mapPermission(raw: RawToolCall): PermissionAsk;
   /** Код ядра по тексту ошибки CLI — строка потока или stderr при выходе. */
   classifyError?(text: string): AdapterErrorCode | null;
+  /** Строка окна подписки (`caps.windowEvent: true`); нет — окно этого CLI `unknown`. */
+  readWindow?: SdkRule['readWindow'];
+  /** Как читать исход вызова из `tool_result` этого CLI (этап 8, F18); нет — без `outcome`. */
+  outcome?: SdkRule['outcome'];
+  /**
+   * Чтение отказов хуков человека для сеанса (G-e): по спеке и слою запуска (`null` — сеанс
+   * прежнего ядра, спеки нет). Нет — CLI отказ хука не отличает, `hook.refused` не издаётся.
+   */
+  hookReader?(spec: SessionSpec | null, layer: LayerRun | null): SdkRule['hookRefusals'];
 }
 
 export interface SdkAdapterOptions {
   /** Другой исполняемый файл (подставной CLI набора соответствия). */
   command?: string;
+  /**
+   * Явный путь CLI из настройки ядра (`cliPaths`, F9), читается на КАЖДОМ запуске: правка
+   * настройки действует со следующей сессии. `undefined` — пути нет, решает `command` / поиск.
+   */
+  commandOf?: () => string | undefined;
   extraDirs?: string[];
   pollMs?: number;
 }
@@ -117,12 +159,36 @@ export function writeSessionFiles(dir: string, files: Record<string, string>): v
   }
 }
 
+/**
+ * Копии слоя (навыки, агенты) в каталог сеанса. Ссылки не переносятся: ссылка вела бы из копии
+ * за её пределы, а копия — то, что ядро прочло и показало в описи.
+ */
+export function copySessionFiles(
+  dir: string,
+  copies: readonly { from: string; to: string }[],
+): void {
+  for (const copy of copies) {
+    const target = join(dir, copy.to);
+    mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+    cpSync(copy.from, target, {
+      recursive: true,
+      filter: (source) => !lstatSync(source).isSymbolicLink(),
+    });
+  }
+}
+
 export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions = {}): SdkAdapter {
   const sessions = new Map<string, SdkSession>();
   const rule: SdkRule = {
     echo: def.echo,
     mapPermission: (raw: RawToolCall) => def.mapPermission(raw),
     ...(def.classifyError ? { classifyError: def.classifyError } : {}),
+    ...(def.readWindow ? { readWindow: def.readWindow } : {}),
+    ...(def.outcome ? { outcome: def.outcome } : {}),
+  };
+  const ruleFor = (spec: SessionSpec | null, layer: LayerRun | null): SdkRule => {
+    const hookRefusals = def.hookReader?.(spec, layer);
+    return hookRefusals ? { ...rule, hookRefusals } : rule;
   };
 
   const need = (handle: SessionHandle): SdkSession => {
@@ -131,12 +197,25 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
     return session;
   };
 
+  /**
+   * Файл CLI сейчас: путь из настройки ядра (`cliPaths`, читается на каждом обращении), иначе
+   * подставной, иначе имя из фактов запуска. Один для запуска сеанса и для `--version`: иначе
+   * версию отвечал бы CLI из PATH, а сеанс шёл бы настроенным.
+   */
+  const commandNow = (): string => options.commandOf?.() ?? options.command ?? def.command;
+
   return {
     id: def.id,
     // Образ процесса CLI — его исполняемый файл из фактов запуска (A2-F02).
     images: [def.command],
+    get versionCommand() {
+      return commandNow();
+    },
+    ...(def.ladder ? { ladder: def.ladder } : {}),
+    ...(def.transcriptPresent ? { transcriptPresent: def.transcriptPresent } : {}),
     caps: def.caps,
     readLayer: (pin) => def.readLayer(pin),
+    inventory: (pin, cwd, repoLayer) => def.layer.inventory(pin, cwd, repoLayer),
     bindEndpoint: (channel, endpoint, limits) => def.bindEndpoint(channel, endpoint, limits),
     mapPermission: (raw) => def.mapPermission(raw),
     permitCodec: SDK_PERMIT_CODEC,
@@ -157,13 +236,15 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
         if (!bound.ok) return { ok: false, reason: `endpoint refused: ${bound.code}` };
         binding = bound.binding;
       }
-      const plan = def.plan(spec, binding, layer);
+      // Бриф — первый текст ядра в сессию: метка платформы первой строкой (P37).
+      const plan = def.plan({ ...spec, brief: markText(spec.brief) }, binding, layer);
       mkdirSync(spec.dir, { recursive: true, mode: 0o700 });
       writeSessionFiles(spec.dir, { ...(binding?.files ?? {}), ...plan.files });
+      if (plan.copies) copySessionFiles(spec.dir, plan.copies);
       const outcome = await launchCli({
         dir: spec.dir,
         sessionId: spec.sessionId,
-        command: options.command ?? def.command,
+        command: commandNow(),
         args: [...plan.args, ...(binding?.argv ?? [])],
         cwd: spec.cwd,
         env: {
@@ -185,22 +266,31 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
       };
       sessions.set(
         spec.sessionId,
-        new SdkSession(outcome.dir, rule, {
+        new SdkSession(outcome.dir, ruleFor(spec, layer), {
           ...(options.pollMs === undefined ? {} : { pollMs: options.pollMs }),
           permit: def.inBandPermit && spec.permitServer ? 'core' : 'refuse',
           ...(def.initialize ? { initialize: def.initialize } : {}),
         }),
       );
       const detail = [layer.detail, plan.layerDetail].filter(Boolean).join('; ');
-      return { ok: true, handle, layer: detail ? { ...layer, detail } : layer };
+      const losses = [...(layer.losses ?? []), ...(plan.layerLosses ?? [])];
+      return {
+        ok: true,
+        handle,
+        layer: {
+          ...layer,
+          ...(detail ? { detail } : {}),
+          ...(losses.length > 0 ? { losses } : {}),
+        },
+      };
     },
 
     events(handle): AsyncIterable<AdapterEvent> {
       return need(handle).events();
     },
 
-    send(handle, message, cmdId) {
-      return need(handle).send(cmdId, message);
+    send(handle, message, cmdId, origin) {
+      return need(handle).send(cmdId, markText(message, origin));
     },
 
     async stop(handle, mode: StopMode): Promise<StopOutcome> {
@@ -233,7 +323,7 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
       sessions.get(input.sessionId)?.close();
       let session: SdkSession;
       try {
-        session = new SdkSession(input.dir, rule, {
+        session = new SdkSession(input.dir, ruleFor(null, null), {
           ...(options.pollMs === undefined ? {} : { pollMs: options.pollMs }),
           permit: def.inBandPermit && input.permitServer ? 'core' : 'refuse',
           ...(def.initialize ? { initialize: def.initialize } : {}),

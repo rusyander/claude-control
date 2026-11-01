@@ -37,6 +37,11 @@ export function venvBinDir(os: OsKind): string {
   return os === 'win32' ? '.venv/Scripts' : '.venv/bin';
 }
 
+/** Интерпретатор venv копии — путь от корня стека (запуск разрешает его от cwd шага). */
+export function venvPython(os: OsKind): string {
+  return os === 'win32' ? `${venvBinDir(os)}/python.exe` : `${venvBinDir(os)}/python`;
+}
+
 /** Имя команды без суффикса исполняемого файла Windows: `gradlew.bat` ≡ `gradlew` при сопоставлении. */
 export function commandStem(name: string): string {
   return name.replace(/\.(bat|cmd|exe)$/i, '');

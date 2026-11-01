@@ -1,0 +1,28 @@
+/* Ворота — своя группа полей с подписью: чтение с экрана называет группу,
+   а не перечисляет одинаковые «Ворота шага» без контекста. */
+.gates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.legend {
+  padding: 0 4px;
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
+
+.kind {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.detail {
+  flex: 2 1 240px;
+  min-width: 0;
+}

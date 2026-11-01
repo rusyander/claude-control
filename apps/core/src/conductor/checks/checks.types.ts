@@ -1,6 +1,8 @@
 import type { Fact } from '@agentdeck/contracts/core/facts';
 import type { JournalDataV1, JournalKind } from '@agentdeck/contracts/core/journal';
+import type { WindowDecision } from '@agentdeck/contracts/core/economy';
 import type {
+  CheckDecisionInput,
   CheckEntry,
   CheckRegistry,
   CheckRequest,
@@ -68,6 +70,16 @@ export interface CheckDeps {
   writeQuarantine?(req: CheckRequest, entries: QuarantineEntry[]): void;
   /** Невыполненные условия, которые уже видит вызывающий (диск, сервисы) — в одно решение (P03). */
   blockers?(req: CheckRequest): Promise<Unmet[]>;
+  /**
+   * Вердикты окна маршрута шага, просящего проверку (книга окон L); нет — фактов нет, открыто.
+   * Проводка: маршрут сессии шага `req.stepId` задачи `req.taskId`.
+   */
+  window?(req: CheckRequest): readonly WindowDecision[];
+  /**
+   * Разовый fresh-перезапуск задачи (команда `fresh-rerun`), ещё не потраченный; `null` — нет.
+   * Тратится строкой решения `check` с `run`, вход которой его нёс (`freshPending`).
+   */
+  fresh?(req: CheckRequest): CheckDecisionInput['fresh'];
   /** Остановка извне (пауза, отмена задачи) для прогона ядра. */
   signal?(req: CheckRequest): AbortSignal | undefined;
   /** Подмена прогона — только для тестов дорог; по умолчанию `runCheck`. */

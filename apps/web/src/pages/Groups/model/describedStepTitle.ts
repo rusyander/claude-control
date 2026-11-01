@@ -1,6 +1,6 @@
 import type { GroupMembersView } from '@agentdeck/contracts';
 import type { SkillStepTitle } from './tile.types';
-import { pickLang } from '@features/GroupPath';
+import { pickLang } from '@entities/StepPath';
 
 /**
  * Название шага скилла из описаний состава: описан — на языке интерфейса; ещё

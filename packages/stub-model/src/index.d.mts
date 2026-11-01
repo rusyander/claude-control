@@ -76,6 +76,8 @@ export interface Step {
    * (chat), объект `response` события `response.completed` (responses).
    */
   extra?: Record<string, unknown>;
+  /** Модель в ответе вместо запрошенной (по умолчанию — `model` запроса): подмена маршрутом, P119. */
+  model?: string;
 }
 
 export interface RequestInfo {
@@ -166,6 +168,18 @@ export interface RouteReply {
   /** Строка — как есть (`text/plain`), иначе JSON. */
   body?: unknown;
   headers?: Record<string, string>;
+  /**
+   * Поток вызывающего (сценарий провода чужой формы, напр. вендорные кадры контура): кадры
+   * пишет пакет (`frame`), `data` строкой — как есть (`[DONE]`), иначе JSON. Есть `sse` —
+   * `body` не читается, заголовки потока ставит пакет.
+   */
+  sse?: { frames: SseFrame[]; delayMs?: number };
+}
+
+/** Кадр потока: необязательное имя события и данные. */
+export interface SseFrame {
+  event?: string;
+  data: unknown;
 }
 
 export interface StubModelOptions {

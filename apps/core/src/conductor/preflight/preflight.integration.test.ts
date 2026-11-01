@@ -165,6 +165,34 @@ describe('preflight of roads (P101)', () => {
     expect(unsure.blocking.map((b) => b.road)).toEqual(['container-engine']);
   });
 
+  it('git-version: the real git passes; older than 2.38 blocks with the fix; a non-publishing scenario skips it', async () => {
+    const live = await runPreflight({ needsServices: true }, { ...real(), ...foreignOk });
+    expect(live.roads.find((r) => r.road === 'git-version')).toMatchObject({
+      status: 'ok',
+      detail: expect.stringMatching(/^git \d+\.\d+\.\d+$/),
+    });
+    const old = { ...real({ gitVersion: async () => ({ value: 'git version 2.37.9' }) }) };
+    const blocked = await runPreflight({ needsServices: true }, { ...old, ...foreignOk });
+    expect(blocked.start).toBe(false);
+    expect(blocked.blocking).toEqual([
+      {
+        road: 'git-version',
+        status: 'fail',
+        detail: 'git 2.37.9 has no merge-tree --write-tree',
+        fix: 'install git 2.38.0 or newer',
+      },
+    ]);
+    const quiet = await runPreflight(
+      { needsServices: true, publishes: false },
+      { ...old, ...foreignOk },
+    );
+    expect(quiet.start).toBe(true);
+    expect(statusOf(quiet.roads, 'git-version')).toBe('skipped');
+    const garbled = real({ gitVersion: async () => ({ value: 'not a version' }) });
+    const unsure = await runPreflight({ needsServices: true }, { ...garbled, ...foreignOk });
+    expect(unsure.blocking.map((b) => [b.road, b.status])).toEqual([['git-version', 'unknown']]);
+  });
+
   it('disk below threshold: no start and no new copies; disk unknown: start with the doubt named; low RAM lowers slots', async () => {
     const low = await runPreflight(
       { needsServices: false },

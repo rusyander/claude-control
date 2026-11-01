@@ -53,6 +53,18 @@ export const checksEn: Record<ChecksMessageCode, string> = {
     'The instructions file reads and writes back unchanged ({{count}} characters).',
   'checks-instructions-file-changed': 'Rewriting the instructions file changed its text.',
   'checks-instructions-file-unread': 'The file was not read: {{reason}}',
+  'checks-core-route-absent':
+    'The task execution core is not running — this CLI’s route in the core was not checked.',
+  'checks-core-route-unverified':
+    'The OS did not confirm the core entry, no request was sent to the core: {{reason}}',
+  'checks-core-route-unreachable': 'The core did not return its route list: {{reason}}',
+  'checks-core-route-none': 'The core has no route {{route}} — core tasks do not run on this CLI.',
+  'checks-core-route-ok': 'Core route {{route}}: credential present, route not exhausted.',
+  'checks-core-route-exhausted':
+    'Core route {{route}} is exhausted: tasks on it will not start until a person clears the mark.',
+  'checks-core-route-no-credential': 'Core route {{route}} has no credential — sign in to the CLI.',
+  'checks-core-route-credential-unknown':
+    'Core route {{route}} exists, but the core does not know whether you are signed in: it never reads the CLI login store.',
   'sandbox-event-bash-safe-title': 'A harmless command',
   'sandbox-event-bash-safe-description': 'An ordinary Bash call — the guard should not step in.',
   'sandbox-event-bash-destructive-title': 'Recursive deletion',

@@ -1,0 +1,21 @@
+// Время — узкой колонкой слева: строки ленты читаются сверху вниз по времени, как журнал.
+.entry {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.clock {
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+}
+
+.body {
+  min-width: 0;
+}
+
+.detail {
+  overflow-wrap: anywhere;
+}

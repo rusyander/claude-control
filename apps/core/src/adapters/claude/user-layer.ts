@@ -34,6 +34,8 @@ export interface UserLayer {
   deny: string[];
   env: Record<string, string>;
   hooks: HookTable;
+  /** Файл каждой группы хуков: `hookFiles[event][i]` — откуда `hooks[event][i]` (ключ описи). */
+  hookFiles: Record<string, string[]>;
   /** Прочитанные файлы и те, что не прочлись (порча — названа, не «пусто»). */
   read: string[];
   unreadable: string[];
@@ -105,6 +107,7 @@ export function readUserLayer(files: readonly (string | LayerFile)[]): UserLayer
     deny: [],
     env: {},
     hooks: {},
+    hookFiles: {},
     read: [],
     unreadable: [],
   };
@@ -147,8 +150,11 @@ export function readUserLayer(files: readonly (string | LayerFile)[]): UserLayer
     for (const [event, groups] of Object.entries(hooks)) {
       if (!Array.isArray(groups)) continue;
       const list = (layer.hooks[event] ??= []);
+      const from = (layer.hookFiles[event] ??= []);
       for (const group of groups as unknown[]) {
-        if (isRecord(group) && Array.isArray(group.hooks)) list.push(group as unknown as HookGroup);
+        if (!isRecord(group) || !Array.isArray(group.hooks)) continue;
+        list.push(group as unknown as HookGroup);
+        from.push(file);
       }
     }
   }
@@ -159,38 +165,74 @@ export interface ObservedHook {
   key: string;
   event: string;
   matcher: string | undefined;
+  /** `command` — исполнима записью; другой вид (`prompt`, `agent`) запись назовёт сбоем. */
+  type: string;
   command: string;
+  /** Срок хука в секундах, как у CLI; нет — срок CLI по умолчанию. */
+  timeout?: number;
+  sourcePath: string;
 }
 
 const quote = (value: string): string => `"${value.replace(/"/g, '\\"')}"`;
 
+/** Срок хука без `timeout` у записи (сек); CLI сам ждёт не меньше. */
+export const HOOK_TIMEOUT_S = 60;
+
 /**
- * Хуки человека под режим слоя. `observe`: каждая команда → запись ядра с ключом, исходная
- * команда — в списке наблюдаемых (её текст — данные, не исполняется). `off` — ничего.
+ * Хуки человека в порядке старшинства с ключами описи (`<событие>.<группа>.<хук>`): тот же ключ
+ * у описи, у записи `observe` и у отказа хука в потоке. Чужое имя события (`x & calc`) — не
+ * событие CLI: в записи его нет (F-33), CLI его и не вызвал бы.
+ */
+export function keyedHooks(layer: UserLayer): ObservedHook[] {
+  const out: ObservedHook[] = [];
+  for (const [event, groups] of Object.entries(layer.hooks)) {
+    if (!HOOK_EVENTS.has(event)) continue;
+    groups.forEach((group, g) =>
+      group.hooks.forEach((hook, h) =>
+        out.push({
+          key: `${event}.${g}.${h}`,
+          event,
+          matcher: typeof group.matcher === 'string' ? group.matcher : undefined,
+          type: typeof hook.type === 'string' ? hook.type : 'command',
+          command: typeof hook.command === 'string' ? hook.command : '',
+          ...(typeof hook.timeout === 'number' ? { timeout: hook.timeout } : {}),
+          sourcePath: layer.hookFiles[event]?.[g] ?? '',
+        }),
+      ),
+    );
+  }
+  return out;
+}
+
+/**
+ * Хуки человека под режим слоя. `observe`: каждый хук → запись ядра с ключом, исходная
+ * команда — в списке наблюдаемых (её текст — данные, не argv записи). `off` — ничего. Без
+ * записи `observe` хуков не ставит — и это названо (`unrecorded`), не молчаливый `off`.
  */
 export function layerHooks(
   layer: UserLayer,
   mode: LayerMode,
   recorder: { command: string; log: string } | undefined,
-): { hooks: HookTable; observed: ObservedHook[] } {
-  if (mode !== 'observe' || !recorder) return { hooks: {}, observed: [] };
+  observedFile: string,
+): { hooks: HookTable; observed: ObservedHook[]; unrecorded: boolean } {
+  const keyed = mode === 'observe' ? keyedHooks(layer) : [];
+  if (!recorder) return { hooks: {}, observed: [], unrecorded: keyed.length > 0 };
   const hooks: HookTable = {};
-  const observed: ObservedHook[] = [];
-  for (const [event, groups] of Object.entries(layer.hooks)) {
-    // Имя события идёт в командную строку записи: чужое имя (`x & calc`) — текст оболочки,
-    // а не событие CLI (F-33). Такое событие CLI и не вызвал бы — его нет и в записи.
-    if (!HOOK_EVENTS.has(event)) continue;
-    hooks[event] = groups.map((group, g) => ({
-      ...(group.matcher === undefined ? {} : { matcher: group.matcher }),
-      hooks: group.hooks.map((hook, h) => {
-        const key = `${event}.${g}.${h}`;
-        observed.push({ key, event, matcher: group.matcher, command: hook.command ?? '' });
-        return {
-          type: 'command',
-          command: `${recorder.command} --log ${quote(recorder.log)} --hook ${key}`,
-        };
-      }),
-    }));
+  for (const hook of keyed) {
+    const [, g] = hook.key.split('.');
+    const groups = (hooks[hook.event] ??= []);
+    const index = Number(g);
+    groups[index] ??= {
+      ...(hook.matcher === undefined ? {} : { matcher: hook.matcher }),
+      hooks: [],
+    };
+    groups[index].hooks.push({
+      type: 'command',
+      command: `${recorder.command} --log ${quote(recorder.log)} --hook ${hook.key} --observed ${quote(observedFile)}`,
+      // Запись ждёт хук человека его же сроком: CLI не должен оборвать её раньше.
+      timeout: (hook.timeout ?? HOOK_TIMEOUT_S) + 5,
+    });
   }
-  return { hooks, observed };
+  for (const event of Object.keys(hooks)) hooks[event] = hooks[event]!.filter(Boolean);
+  return { hooks, observed: keyed, unrecorded: false };
 }

@@ -16,7 +16,7 @@ import { rowBilingual } from './rowBilingual';
 import type { StepSource } from './stepSource.types';
 import { entrySource } from './entrySource';
 import { sourceFile } from './sourceFile';
-import { pickLang } from '../lib/pickLang';
+import { pickLang } from '@entities/StepPath';
 
 /**
  * Всё, что строке порядка работы нужно знать о мире вокруг группы: какие

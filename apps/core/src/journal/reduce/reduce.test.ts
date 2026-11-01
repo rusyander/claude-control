@@ -12,6 +12,7 @@ import {
   type MachineDef,
 } from '@agentdeck/contracts/core/states';
 import { newId } from '../../lib/ids/uuidv7.ts';
+import { remoteRefsKey } from './publish.ts';
 import { initialState, reduce } from './reduce.ts';
 import { commandBodyHash } from '../command-body.ts';
 import { REDUCER_VERSION, type TaskFoldState } from './reduce.types.ts';
@@ -65,7 +66,12 @@ const SEATS: Seat[] = [
     machine: UNIT_MACHINE,
     kind: 'unit.transition',
     idKey: 'unitId',
-    place: (s, id, st) => ({ ...s, units: { [id]: { state: st as never, branch: 'b' } } }),
+    place: (s, id, st) => ({
+      ...s,
+      units: {
+        [id]: { state: st as never, branch: 'b' } as unknown as TaskFoldState['units'][string],
+      },
+    }),
     read: (s, id) => s.units[id]?.state,
   },
   {
@@ -74,7 +80,13 @@ const SEATS: Seat[] = [
     idKey: 'stepId',
     place: (s, id, st) => ({
       ...s,
-      steps: { [id]: { state: st as never, unitId: newId(), stepKind: 'k' } },
+      steps: {
+        [id]: {
+          state: st as never,
+          unitId: newId(),
+          stepKind: 'k',
+        } as unknown as TaskFoldState['steps'][string],
+      },
     }),
     read: (s, id) => s.steps[id]?.state,
   },
@@ -96,6 +108,8 @@ const SEATS: Seat[] = [
           hostStart: 's',
           cliPid: null,
           cliStart: null,
+          hints: [],
+          parkAsked: null,
         },
       },
     }),
@@ -112,7 +126,10 @@ const SEATS: Seat[] = [
     machine: ASK_MACHINE,
     kind: 'ask.transition',
     idKey: 'askId',
-    place: (s, id, st) => ({ ...s, asks: { [id]: { state: st as never, point: 1 } } }),
+    place: (s, id, st) => ({
+      ...s,
+      asks: { [id]: { state: st as never, point: 1 } as unknown as TaskFoldState['asks'][string] },
+    }),
     read: (s, id) => s.asks[id]?.state,
   },
   {
@@ -202,9 +219,9 @@ describe('reduce', () => {
       }),
       line(6, 'ask.transition', { askId, event: 'answer', from: 'open', to: 'answered' }),
     ]);
-    expect(s.units[unitId]).toEqual({ state: 'running', branch: 'feat' });
-    expect(s.steps[stepId]).toEqual({ state: 'queued', unitId, stepKind: 'implement' });
-    expect(s.asks[askId]).toEqual({ state: 'answered', point: 4 });
+    expect(s.units[unitId]).toMatchObject({ state: 'running', branch: 'feat' });
+    expect(s.steps[stepId]).toMatchObject({ state: 'queued', unitId, stepKind: 'implement' });
+    expect(s.asks[askId]).toMatchObject({ state: 'answered', point: 4 });
     expect(s.anomalies).toEqual([{ seq: 5, reason: 'step: unknown entity' }]);
   });
 
@@ -233,7 +250,7 @@ describe('reduce', () => {
       line(3, 'step.transition', { stepId, event: 'start', from: 'queued', to: 'running' }),
     ];
     const s = fold([...running, claimed(4)]);
-    expect(s.steps[stepId]).toEqual({
+    expect(s.steps[stepId]).toMatchObject({
       state: 'checking',
       unitId,
       stepKind: 'work',
@@ -356,5 +373,18 @@ describe('reduce', () => {
     expect(s.anomalies).toHaveLength(50);
     expect(s.anomalies[0]?.seq).toBe(21);
     expect(s.seq).toBe(70);
+  });
+
+  it('remote-refs baselines of two repos with the same remote name stay apart', () => {
+    const a = { 'refs/heads/main': 'a'.repeat(40) };
+    const b = { 'refs/heads/main': 'b'.repeat(40) };
+    const s = fold([
+      line(1, 'publish.remote-refs', { repoKey: 'r1', remote: 'origin', refs: a }),
+      line(2, 'publish.remote-refs', { repoKey: 'r2', remote: 'origin', refs: b }),
+      line(3, 'publish.remote-refs', { remote: 'origin', refs: b }),
+    ]);
+    expect(s.remoteRefs[remoteRefsKey('r1', 'origin')]?.refs).toEqual(a);
+    expect(s.remoteRefs[remoteRefsKey('r2', 'origin')]?.refs).toEqual(b);
+    expect(s.remoteRefs['origin']?.seq).toBe(3);
   });
 });

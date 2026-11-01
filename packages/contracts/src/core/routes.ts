@@ -51,6 +51,11 @@ export interface RouteCaps {
    * Нет канала у переходника → отказ `window_untellable`.
    */
   limitsToTell: boolean;
+  /**
+   * Возможности звена, которые маршрут просит (непрозрачные id, P108): непусто — сеанс идёт через
+   * хост звеньев даже при прямом диалекте (локальный маршрут × Claude, 07:64). Нет — не просит.
+   */
+  hopFeatures?: string[];
 }
 
 // ── Факты маршрута (01 §Facts, 11 таблица R:PR-03) ────────────────────────────────────
@@ -129,7 +134,11 @@ export interface RouteEndpoint {
 export interface RouteAcquireSpec {
   taskId: string;
   sessionId?: string;
-  model: ModelId;
+  /**
+   * `null` — модель выбирает сам CLI (оценка без потолка). Годится только входу CLI; маршрут,
+   * которому нужна модель в адресе, отказывает `model_absent`, называя себя (`modelRequired`).
+   */
+  model: ModelId | null;
   /** Диалект входа, выбранный совместимостью (`direct` — канал, `via-gateway` — `to`); нет — первый из возможностей. */
   dialect?: Dialect;
   /** Когда освобождать ресурсы аренды (01 §Resources); по умолчанию `task-end`. */
@@ -158,7 +167,11 @@ export interface RouteResource {
  * исходом, числа и причины. Маршрут журнала не знает — пишет дирижёр через `RouteRecorder`.
  */
 export interface RouteDecisionRecord {
-  class: 'fit' | 'compat' | 'slot-wait' | 'endpoint';
+  /**
+   * С фазы 5 и решения экономики. Замена (P46) — решение класса того, кто заменил: модель и
+   * маршрут — `tier`, порт звена — `endpoint`; отдельного класса «замена» в реестре нет.
+   */
+  class: 'fit' | 'compat' | 'slot-wait' | 'endpoint' | 'tier' | 'continuation' | 'window';
   facts: { readClass: string; kind: 'value' | 'absent' | 'unknown' }[];
   numbers: Record<string, number>;
   reasons: string[];
@@ -184,7 +197,8 @@ export interface RouteRecorder {
 export interface RouteLease {
   leaseId: string;
   routeId: RouteId;
-  model: ModelId;
+  /** `null` — аренда входа CLI под модель по умолчанию CLI (как `RouteAcquireSpec.model`). */
+  model: ModelId | null;
   /** Ресурсы этой аренды в порядке создания; освобождаются в обратном. */
   resources: RouteResource[];
 }
@@ -246,6 +260,13 @@ export interface AdapterCaps {
   effort: boolean;
   images: boolean;
   subagents: boolean;
+  /** Навыки человека включаются и выключаются по сеансу (06:115); нет случая — не объявлено. */
+  skillControl: boolean;
+  /**
+   * Хук ядра и запреты держатся внутри подагента CLI (G5): `true`/`false` — доказано пробой,
+   * `null` — не проверено (подагент тогда отказывается `subagent-unproven`, названо).
+   */
+  subagentHooks: boolean | null;
   login: LoginKind;
   /** В порядке предпочтения; пусто — только свой вход CLI. */
   channels: AdapterChannelSummary[];
@@ -291,7 +312,8 @@ export interface CompatRoute {
 }
 
 export interface ModelFacts {
-  id: ModelId;
+  /** `null` — модель по умолчанию CLI: её выбирает сам CLI, ядро имени не знает. */
+  id: ModelId | null;
   /** Маршрут отдаёт эту модель: `value` — да, `absent` — нет. */
   served: FactState;
   contextTokens?: number;
@@ -325,7 +347,8 @@ export interface CompatPolicy {
 export interface CompatAlternative {
   adapter: AdapterId;
   route: RouteId;
-  model: ModelId;
+  /** `null` — модель по умолчанию CLI (как `ModelFacts.id`). */
+  model: ModelId | null;
   kind: 'direct' | 'via-gateway';
 }
 

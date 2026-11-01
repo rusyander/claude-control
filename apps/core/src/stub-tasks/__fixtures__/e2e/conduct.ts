@@ -3,12 +3,19 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ActionKind, JournalLine } from '@agentdeck/contracts/core/journal';
 import type { RouteLease, RouteResource } from '@agentdeck/contracts/core/routes';
-import type { AdapterEvent, SessionHandle } from '../../../adapters/index.ts';
+import type { Scenario, StepDef, StepKind } from '@agentdeck/contracts/core/scenario';
+import type { SessionHandle } from '../../../adapters/index.ts';
 import type { DenySet } from '../../../adapters/adapter.types.ts';
 import { stopSession } from '../../../adapters/launcher/session-io.ts';
 import type { BootedCore } from '../../../bootstrap/boot.ts';
+import { roadSessionPort } from '../../../bootstrap/conductor-wiring/loop.ts';
+import { observerHooks } from '../../../bootstrap/conductor-wiring/observer.ts';
 import type { RoadStart } from '../../../bootstrap/session-road.ts';
+import { raiseHumanPoint } from '../../../conductor/human/raise.ts';
 import { ActionFailed, runAction } from '../../../conductor/outbox.ts';
+import { runTask } from '../../../conductor/run/run.ts';
+import type { ConductorHooks } from '../../../conductor/run/run.types.ts';
+import { presetStep } from '../../../conductor/scenario/presets.ts';
 import type { LiveTask } from '../../../journal/resume.ts';
 import { readJournalLines } from '../../../journal/read-lines.ts';
 import { newId } from '../../../lib/ids/uuidv7.ts';
@@ -137,7 +144,7 @@ export async function conduct(
       repos: [{ repoKey: 'r1', path: cfg.repo, baseRef: cfg.baseBranch }],
       build: 'stub-e2e',
       scenario: { id: 'default', version: 1 },
-      profileHash: null,
+      profilePins: [],
       modelCeiling: null,
       userLayerHash: null,
       envPin: '',
@@ -147,6 +154,9 @@ export async function conduct(
         { adapter: adapter.id, route: { kind: route.kind, id: route.id }, modelPattern: '*' },
       ],
       routesSourceLevel: 2,
+      origin: null,
+      launchPolicy: 'confirm',
+      ciWait: false,
     });
   }
   const live = task;
@@ -160,6 +170,22 @@ export async function conduct(
     installJournalKill(live, cfg.kill, killLog);
   }
 
+  // ── требования ── (стоит за разбором, которого в фазе 2 нет): id ядра в журнале — без них
+  // `step_done` откажет заявке на id, которого ядро не выдавало (G3). Допись идемпотентна по id.
+  const extracted = new Set(
+    readJournalLines(live.dir, live.taskId)
+      .lines.filter((l) => l.kind === 'requirement.extracted')
+      .map((l) => (l.data as { requirementId: string }).requirementId),
+  );
+  for (const [i, r] of (cfg.requirements ?? []).entries()) {
+    if (extracted.has(r.id)) continue;
+    live.append({
+      kind: 'requirement.extracted',
+      actor: 'core',
+      data: { requirementId: r.id, ordinal: i + 1, text: r.text, source: 'request', stepId: null },
+    });
+  }
+
   // ── единица ──
   let unitId = Object.keys(live.state.units)[0];
   if (!unitId) {
@@ -168,7 +194,16 @@ export async function conduct(
       kind: 'unit.created',
       actor: 'core',
       unitId,
-      data: { unitId, repoKey: 'r1', branch: `agentdeck/${unitId.slice(-8)}`, ownedPaths: [] },
+      data: {
+        unitId,
+        name: 'unit',
+        repoKey: 'r1',
+        branch: `agentdeck/${unitId.slice(-8)}`,
+        ownedPaths: [],
+        after: [],
+        contract: false,
+        splitId: null,
+      },
     });
   }
   const branch = live.state.units[unitId]!.branch;
@@ -225,29 +260,13 @@ export async function conduct(
     if (!made.ok) throw new Error(`copy-create failed: ${made.code}`);
   }
 
-  // ── шаг ──
-  let stepId = Object.keys(live.state.steps)[0];
-  if (!stepId) {
-    stepId = newId();
-    live.append({
-      kind: 'step.started',
-      actor: 'core',
-      unitId,
-      stepId,
-      data: { stepId, unitId, stepKind: cfg.stepKind, budgetMs: cfg.waitMs },
-    });
-  }
-  // Ядро умерло между `step.started` и переходом: шаг ещё в очереди — переход пишется сейчас.
-  if (live.state.steps[stepId]?.state === 'queued') {
-    live.append({
-      kind: 'step.transition',
-      actor: 'core',
-      stepId,
-      data: { stepId, event: 'start', from: 'queued', to: 'running' },
-    });
-  }
-  const step = stepId;
-  const stepState = (): string => live.state.steps[step]?.state ?? 'absent';
+  // ── шаг: исполнитель дирижёра этапа 4 (`runTask`) над дорогой сессии ядра ──
+  // Шаг заводит и запускает исполнитель по одношаговому сценарию; прогон только готовит копию,
+  // разбирает сессии прежнего ядра и ждёт исхода. Шаг — первый (и единственный) в журнале.
+  const stepState = (): string => {
+    const id = Object.keys(live.state.steps)[0];
+    return id ? (live.state.steps[id]?.state ?? 'absent') : 'absent';
+  };
   const result = (outcome: ChildResult['outcome']): ChildResult => ({
     taskId: live.taskId,
     unitId: unitId!,
@@ -275,9 +294,7 @@ export async function conduct(
   // Открытые сессии прежнего ядра (01 §Sessions at core death, P89): живой хост — та же сессия
   // продолжает шаг; кончилась — `exited`; хост мёртв — дерево снимается, `lost`; живость не
   // прочитана — сессию не хороним и не заменяем.
-  let resumed: SessionHandle | undefined;
-  /** Сколько первых событий прикреплённого потока — история (ответ `reattach`, F-105). */
-  let replayed: number | undefined;
+  let resumed: { stepId: string; handle: SessionHandle; replayed?: number } | undefined;
   for (const [sessionId, session] of Object.entries(live.state.sessions)) {
     if (!OPEN_SESSION.has(session.state)) continue;
     const got =
@@ -296,8 +313,11 @@ export async function conduct(
       ...('reason' in got ? { reason: got.reason } : {}),
     });
     if (got.state === 'live') {
-      resumed = got.handle;
-      replayed = got.replayed;
+      resumed = {
+        stepId: session.stepId,
+        handle: got.handle,
+        ...(got.replayed === undefined ? {} : { replayed: got.replayed }),
+      };
       reattached.push({
         sessionId,
         hostPid: got.handle.host.pid,
@@ -334,19 +354,15 @@ export async function conduct(
   // Заявление принято прежним ядром (`step.claimed` переводит шаг в `checking`), а сессии,
   // которая его сделала, уже нет — запускать нечего.
   if (cfg.until === 'claimed' && stepState() === 'checking' && !resumed) return result('claimed');
-  if (stepState() !== 'running' && !resumed) {
-    throw new Error(`step ${step} is ${stepState()}, not running`);
-  }
 
-  // ── сессия (действие outbox) — только если прежней живой нет ──
   // Дорога сессии ядра (03 §Launcher): та же, что у продукта, — совместимость по разрешённой
   // тройке задачи, аренда маршрута (живая из журнала после перезапуска), токен, PATH входа,
   // настоящий хук ядра, оверлей запретов, прикрепление и поиск ресурсов на остановке.
-  const startOf = (sessionId: string): RoadStart => {
+  const startOf = (stepId: string, sessionId: string): RoadStart => {
     const lease = journalLease(live, route.id);
     return {
       task: live,
-      stepId: step,
+      stepId,
       stepKind: cfg.stepKind,
       adapterId: adapter.id,
       routeId: route.id,
@@ -354,62 +370,119 @@ export async function conduct(
       sessionId,
       dir: sessionDir(sessionId),
       cwd: copy,
-      brief: briefFor({ stepId: step, copyRoot: copy, request: cfg.request }),
+      brief: briefFor({ stepId, copyRoot: copy, request: cfg.request }),
       deny: STEP_DENY,
       tools: 'all',
       // Слой человека снимается там, где переходник это умеет; иначе (Qwen) его нет и так: дом CLI
       // — одноразовый каталог стенда, а не настоящий.
-      layer: { hooks: adapter.caps.layerControl ? 'off' : 'on' },
+      layer: { hooks: cfg.layerMode ?? (adapter.caps.layerControl ? 'off' : 'on'), skills: 'on' },
+      // Набор слоя — выбор теста, а не чужой репозиторий: исходник отмечен доверенным панелью,
+      // иначе `on` у Claude шёл бы `observe` (недоверенная копия, F-86).
+      ...(cfg.layerMode ? { trust: { sourceRepo: cfg.repo, panelMark: true } } : {}),
       pin: cliPin(cfg.cliHome, sessionId),
       pathPrefix: [dirname(process.execPath)],
       ...(lease ? { lease } : {}),
     };
   };
-  const launchNew = async (): Promise<SessionHandle> => {
-    const sessionId = newId();
-    const prepared = await core.road.prepare(startOf(sessionId));
-    if (!prepared.ok) throw new Error(`session road refused: ${prepared.reason}`);
-    const got = await core.road.launch(prepared.prepared, {
-      afterEffect: () => effectKill('process-start'),
-    });
-    if (!got.ok) throw new Error(got.reason);
-    const handle = got.handle;
-    launched.push(sessionId);
-    core.road.started(prepared.prepared, handle, got.layer);
-    return handle;
-  };
-  const handle = resumed ?? (await launchNew());
-  const sessionId = handle.sessionId;
-
-  // Судья решает по тем же запретам, что оверлей CLI получил при запуске (F-11) — их собирает
-  // дорога: платформа, `.git` и настройки CLI копии, сам инструмент права, область чтения.
-  const context = core.road.contextFor(startOf(sessionId));
   let cliInitiated = false;
   let claimedTurnEnded = false;
-  const attached = core.road.attach({
+  let ended = false;
+  const port = roadSessionPort({
     task: live,
-    sessionId,
-    adapter,
-    handle,
-    context,
-    cwd: copy,
-    resumed: resumed !== undefined,
-    ...(replayed === undefined ? {} : { replayed }),
-    onEvent: (event: AdapterEvent) => {
+    road: {
+      prepare: (start) => core.road.prepare(start),
+      launch: (prepared, options) => core.road.launch(prepared, options),
+      started: (prepared, handle, layer) => {
+        launched.push(handle.sessionId);
+        core.road.started(prepared, handle, layer);
+      },
+      attach: (input) => core.road.attach(input),
+      contextFor: (start) => core.road.contextFor(start),
+    },
+    adapterOf: (id) => (id === adapter.id ? adapter : undefined),
+    startOf: (s, sessionId) => startOf(s.stepId, sessionId),
+    resumeOf: (stepId) =>
+      resumed?.stepId === stepId
+        ? {
+            handle: resumed.handle,
+            ...(resumed.replayed === undefined ? {} : { replayed: resumed.replayed }),
+          }
+        : undefined,
+    launch: { afterEffect: () => effectKill('process-start') },
+    onEvent: (_stepId, event) => {
       events.push(event.type);
       if (event.type === 'turn.cli-initiated') cliInitiated = true;
       if (event.type === 'turn.ended' && stepState() !== 'running') claimedTurnEnded = true;
     },
+    onEnded: () => {
+      ended = true;
+    },
+    note,
   });
-  let ended = false;
-  void attached.done.then(() => {
-    ended = true;
-  });
-  // cmdId — шаг: та же сессия после перезапуска ядра получает «дубль», а не второе сообщение.
-  if (stepState() === 'running') {
-    const sent = await adapter.send(handle, cfg.request, step);
-    note('sent', { sessionId, dup: sent.dup });
+  // Сессия прежнего ядра, чей шаг уже заявлен: исполнитель её не откроет (шаг в `checking`),
+  // а её конец хода — тот исход, которого ждёт прогон; прикрепляем здесь.
+  if (resumed && stepState() !== 'running' && stepState() !== 'queued') {
+    const rec = live.state.steps[resumed.stepId];
+    await port.open(
+      {
+        taskId: live.taskId,
+        unitId,
+        repoKey: 'r1',
+        copyDir: copy,
+        stepId: resumed.stepId,
+        def: stubStep(cfg.stepKind),
+        round: rec?.round ?? 0,
+        sessionId: null,
+      },
+      [],
+      { turnEnded: () => undefined, tool: () => undefined, ended: () => undefined },
+    );
   }
+
+  // Проверок у сквозного прогона нет: заявленный шаг стоит в `checking`, пока прогон не кончится.
+  // Остановка рвёт крючок без вердикта — шаг в журнале не двигается (его судит следующее ядро).
+  let release!: () => void;
+  const released = new Promise<void>((r) => {
+    release = r;
+  });
+  const hooks: ConductorHooks = {
+    preStep: () =>
+      Promise.resolve({
+        verdict: { ok: true },
+        sections: [{ id: 'task', text: cfg.request, from: 'stub-e2e' }],
+      }),
+    postStep: async () => {
+      await released;
+      throw new Error('conduct stopped');
+    },
+  };
+  const scenario: Scenario = {
+    id: 'default',
+    version: 1,
+    title: 'stub e2e',
+    steps: [stubStep(cfg.stepKind)],
+  };
+  // Исполнитель ведёт только идущую задачу; запуск стенда — без подтверждения человека (как
+  // раньше прогон шёл и по черновику), один раз на журнал: перезапуск видит `running`.
+  const from = live.state.task;
+  if (from === 'draft' || from === 'awaiting-launch') {
+    live.append({
+      kind: 'task.transition',
+      actor: 'core',
+      data: { taskId: live.taskId, event: 'launch', from, to: 'running' },
+    });
+  }
+  const run = runTask(live, {
+    // Зона наблюдателя дирижёра продукта (подсказки одним сообщением платформы на конце хода);
+    // из зависимостей она читает только реестр задач.
+    hooks: [observerHooks({ registry: core.registry }), hooks],
+    scenarioOf: (ref) =>
+      ref.id === scenario.id && ref.version === scenario.version ? scenario : undefined,
+    sessions: port,
+    raise: (r) => raiseHumanPoint(live, r),
+    now: Date.now,
+    note,
+  });
 
   const deadline = Date.now() + cfg.waitMs;
   let outcome: ChildResult['outcome'] = 'timeout';
@@ -431,15 +504,19 @@ export async function conduct(
   }
   // Разговор CLI, каким его увидело ЭТО ядро (история + живой хвост) — доказательство той же сессии.
   for (const entry of reattached) {
-    entry.conversationId = (adapter as SdkAdapter).session(handle)?.conversationId ?? null;
+    entry.conversationId =
+      (resumed && (adapter as SdkAdapter).session(resumed.handle)?.conversationId) ?? null;
   }
-  // Остановка дорогой: порты до, временный каталог и остаток дерева после — в журнал задачи.
-  const end = await attached.end('soft');
-  note('session.end', {
-    sessionId,
-    how: end.stop.how,
-    found: end.found.map((f) => f.kind),
-    unread: end.unread,
-  });
+  // `stop` ставит остановку синхронно — освобождённый крючок уже не даст исполнителю хода.
+  const stopping = run.stop('end');
+  release();
+  await stopping;
+  // Сессия, кончившаяся сама, исполнителем не снимается — дорога всё равно ищет её остаток.
+  await port.release();
   return result(outcome);
+}
+
+/** Одношаговый сценарий прогона: шаг `work` того вида, что задан стендом. */
+function stubStep(kind: string): StepDef {
+  return presetStep('work', kind as StepKind, 'Работа', []);
 }

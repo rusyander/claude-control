@@ -143,26 +143,68 @@ describe('core-s2 session host — no orphan CLI, no false ack, no empty key', (
   }, 30_000);
 
   it('F-22 input to a CLI that closed its stdin is refused (write error surfaces), not acked', async () => {
+    // Порядок держат события, а не окна времени. Прежде CLI жил ровно 3 с, а ввод слали 2,5 с:
+    // на Windows отказ приходил только при выходе CLI, и под нагрузкой (CLI стартует дольше,
+    // чем хост читает его личность) выход выпадал за окно — красное без дефекта (F-22 flake).
+    // CLI закрывает ввод, отмечается в stdout и живёт, пока тест не положит `release`.
     const { dir, channel } = plant(
       'closed-stdin',
       // destroy() на Linux дескриптор 0 не закрывает — запись тогда просто стоит; закрываем явно.
       [
         '-e',
-        "process.stdin.destroy(); try { require('node:fs').closeSync(0); } catch {} setTimeout(() => process.exit(0), 3000);",
+        [
+          "const fs = require('node:fs');",
+          'process.stdin.destroy();',
+          'try { fs.closeSync(0); } catch {}',
+          "process.stdout.write('closed' + String.fromCharCode(10));",
+          "setInterval(() => { if (fs.existsSync('release')) process.exit(0); }, 50);",
+          'setTimeout(() => process.exit(0), 20000);',
+        ].join(' '),
       ],
       {},
     );
     const running = runHost(dir);
-    await waitFor(() => (existsSync(sessionFile(dir, 'host')) ? true : undefined));
-    await new Promise((done) => setTimeout(done, 500));
+    // Канал принимает клиента только после host.json (личность CLI прочитана), а CLI отмечает
+    // закрытый ввод сам — ждём обоих, в любом порядке.
+    await waitFor(
+      () =>
+        existsSync(sessionFile(dir, 'host')) && outText(dir).includes('closed') ? true : undefined,
+      10_000,
+      'stdin closed',
+    );
     const raw = client(channel);
     raw.socket.write(encode({ t: 'hello', token: TOKEN }));
-    // Канал ОС может принять первый кусок в буфер — шлём, пока не придёт отказ или выход.
-    for (let i = 0; i < 20 && !raw.got.some((m) => m.t === 'refused'); i += 1) {
-      raw.socket.write(encode({ t: 'input', cmdId: `x${i}`, data: `${'z'.repeat(70_000)}\n` }));
-      await new Promise((done) => setTimeout(done, 100));
+    // 70 КБ больше буфера канала ОС: ни один кусок не ложится в буфер «записанным» молча.
+    const ids = ['x0', 'x1', 'x2'];
+    for (const cmdId of ids) {
+      raw.socket.write(encode({ t: 'input', cmdId, data: `${'z'.repeat(70_000)}\n` }));
     }
-    expect(raw.got.some((m) => m.t === 'refused')).toBe(true);
+    // Хост разбирает сообщения по порядку: ответ на `status` — все три ввода уже у него.
+    raw.socket.write(encode({ t: 'status' }));
+    const status = await waitFor(() => raw.got.find((m) => m.t === 'status'));
+    expect(status).toMatchObject({ inputs: 0 });
+    const answered = (): HostMessage[] =>
+      raw.got.filter((m) => 'cmdId' in m && ids.includes(m.cmdId));
+    if (process.platform !== 'win32') {
+      // POSIX: дескриптор закрыт по-настоящему — ошибка записи приходит при живом CLI.
+      await waitFor(() => (answered().some((m) => m.t === 'refused') ? true : undefined));
+      expect(existsSync(sessionFile(dir, 'exit'))).toBe(false);
+    }
+    // Windows: libuv не закрывает дескрипторы 0–2 (`closeSync(0)` — пустая операция), а
+    // stdin.destroy() закрывает лишь копию; канал рвётся, когда процесс уходит, — ошибка записи
+    // приходит тогда же. Ни на одной ОС ввод не подтверждён как записанный.
+    writeFileSync(join(dir, 'release'), '');
+    await waitFor(() => (answered().length === ids.length ? true : undefined), 10_000, 'answers');
+    for (const cmdId of ids) {
+      expect(answered().filter((m) => 'cmdId' in m && m.cmdId === cmdId)).toHaveLength(1);
+    }
+    expect(answered().every((m) => m.t === 'refused')).toBe(true);
+    // Первый ввод уже стоял в записи: его отказ — ошибка самой записи, а не «CLI вышел».
+    const first = answered().find((m) => 'cmdId' in m && m.cmdId === 'x0');
+    expect(first).toMatchObject({ t: 'refused' });
+    expect(first && 'reason' in first ? first.reason : '').not.toMatch(
+      /cli exited|cli stdin closed/,
+    );
     raw.socket.destroy();
     await running;
   }, 30_000);

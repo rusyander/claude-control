@@ -301,7 +301,14 @@ export function stepFor(move: Move, ctx: StepContext): Step {
     case 'read': {
       const tool = findBuiltin(tools, 'read');
       if (!tool) return missing('a read tool');
-      return { tool: { name: tool.name, args: pathArgs(tool, fill(move.path, values)) } };
+      const args = pathArgs(tool, fill(move.path, values));
+      // Окно — только в поля, которые инструмент объявил (Claude `Read`, Qwen `read_file`: offset/limit).
+      if (move.range) {
+        const props = propsOf(tool);
+        if ('offset' in props) args.offset = move.range.offset;
+        if ('limit' in props) args.limit = move.range.limit;
+      }
+      return { tool: { name: tool.name, args } };
     }
     case 'shell': {
       const argv = move.argv.map((a) => fill(a, values));
@@ -324,20 +331,63 @@ export function stepFor(move: Move, ctx: StepContext): Step {
 }
 
 function timed(step: Step, move: TimedMove): Step {
+  const { usage, window } = move;
   return {
     ...step,
     ...(move.holdMs ? { holdMs: move.holdMs } : {}),
     ...(move.stallMs ? { stallMs: move.stallMs } : {}),
+    // У протокола заглушки нет поля записи кеша: контекст (вход + кеш) сохраняется суммой.
+    ...(usage
+      ? {
+          usage: {
+            input: usage.input + (usage.cacheWrite ?? 0),
+            output: usage.output ?? 2,
+            cached: usage.cacheRead ?? 0,
+          },
+        }
+      : {}),
+    ...(window
+      ? {
+          window: {
+            status: window.status,
+            utilization: window.usedPct / 100,
+            resetsAt: Math.floor((Date.now() + window.resetInMs) / 1000),
+          },
+        }
+      : {}),
   };
+}
+
+/** Ответ заглушки за ходом с меткой `turnEnd`: текст без инструмента — CLI кончает свой ход. */
+export const TURN_END_TEXT = 'turn end';
+
+/**
+ * Ход задачи по номеру ответа модели: за каждым ходом с `turnEnd` стоит лишний ответ текстом,
+ * поэтому номер ответа и номер хода расходятся. `turn-end` — это тот вставленный ответ.
+ */
+export function moveAt(
+  moves: readonly TimedMove[],
+  answer: number,
+): TimedMove | 'turn-end' | undefined {
+  let left = answer;
+  for (const move of moves) {
+    if (left === 0) return move;
+    left -= 1;
+    if (move.turnEnd) {
+      if (left === 0) return 'turn-end';
+      left -= 1;
+    }
+  }
+  return undefined;
 }
 
 /** Сценарий задачи для `startStubModel({ script })` / `createStubRoute({ script })`. */
 export function scriptFor(task: Pick<StubTask, 'moves'>, closing = 'done'): StepFn {
   return (ctx) => {
     if (!findBuiltin(ctx.info.tools, 'shell')) return { text: SIDE_REPLY };
-    const index = assistantTurns(ctx.dialect, ctx.request.body);
-    const move = task.moves[index];
+    const move = moveAt(task.moves, assistantTurns(ctx.dialect, ctx.request.body));
     if (!move) return { text: closing };
+    if (move === 'turn-end') return { text: TURN_END_TEXT };
     return timed(stepFor(move, ctx), move);
   };
 }

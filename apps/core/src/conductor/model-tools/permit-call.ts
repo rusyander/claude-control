@@ -1,6 +1,7 @@
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { decidePermit } from '../../policy/permit/permit.ts';
+import { judgeWithGrants, raisePermitPoint } from '../human/permit-point.ts';
 import type { PermitCallDeps, SessionBinding } from './model-tools.types.ts';
 
 /**
@@ -45,7 +46,9 @@ export async function answerPermitCall(
   if (!claim.pending) return forged(`permit:${read.toolUseId}`, claim.reason);
 
   const ask = deps.mapPermission(read.call);
-  const decision = decidePermit(ask, deps.context, b.stepKind);
+  const { decision, ledger } = judgeWithGrants(task, b, deps.context, (ctx) =>
+    decidePermit(ask, ctx, b.stepKind),
+  );
   const decided = task.append({
     kind: 'decision',
     actor: 'core',
@@ -58,7 +61,14 @@ export async function answerPermitCall(
       facts: [],
       numbers: {},
       reasons: [decision.reason],
-      output: { ...decision, action: ask.action, target: ask.target, tool: ask.tool },
+      // id вызова CLI — тот же, что у строки хука того же вызова: наблюдатель не считает отказ дважды.
+      output: {
+        ...decision,
+        action: ask.action,
+        target: ask.target,
+        tool: ask.tool,
+        toolUseId: read.toolUseId,
+      },
     },
   });
   if (decision.allow && decision.signal) {
@@ -76,6 +86,8 @@ export async function answerPermitCall(
       },
     });
   }
+  // Отказ с пунктом человека — не только отказ: шаг ждёт ответа (P130), один вопрос на запрос.
+  raisePermitPoint(task, b, ask, decision, ledger, deps.context.copyRoot);
   const reply = decision.allow
     ? deps.codec.render({ allow: true, input: read.call.input })
     : deps.codec.render({ allow: false, message: `Denied by the platform: ${decision.reason}.` });

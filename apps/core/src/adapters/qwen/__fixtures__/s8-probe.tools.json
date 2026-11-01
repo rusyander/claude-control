@@ -1,0 +1,450 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "agent",
+      "description": "Launch a new agent to handle complex, multi-step tasks autonomously.\nThe Agent tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.\n\nAvailable agent types and the tools they have access to:\nNo subagents are currently configured. You can create subagents using the /agents command.\n\nWhen using the Agent tool, specify a subagent_type to select which agent type to use. If omitted, the general-purpose agent is used. Top-level regular subagents run in the background by default and report their results through a completion notification; set `run_in_background: false` when you need a regular subagent's result inline before continuing. A fork (`subagent_type: \"fork\"`) inherits the parent conversation context. A background fork's result arrives through a completion notification. Forks inherit the full parent conversation by default; set `fork_turns` to a positive integer string to limit inheritance to that many recent real user turns. Set `fork_tools` to restrict which of the still-visible parent tools the fork may execute, or `fork_profile` to load the same restriction from a project profile.\n\nWhen NOT to use the Agent tool:\n- If you want to read a specific file path, use the read_file tool or the glob tool instead of the agent tool, to find the match more quickly\n- If you are searching for a specific class definition like \"class Foo\", use the grep_search tool instead, to find the match more quickly\n- If you are searching for code within a specific file or set of 2-3 files, use the read_file tool instead of the agent tool, to find the match more quickly\n- Other tasks that are not related to the agent descriptions above\n\n\n\nUsage notes:\n- Always include a short description (3-5 words) summarizing what the agent will do\n- Delegate only concrete, bounded tasks that can run independently.\n- Keep immediate critical-path work local when your next action depends on it.\n- Do not duplicate work between the parent and subagents.\n- Run agents concurrently only when their tasks are independent. For code changes, give concurrent agents disjoint write scopes; launch them in a single message with multiple tool uses.\n- A background agent reports its result through a completion notification in a later turn. A foreground regular agent returns its result inline. Agent results are not visible to the user, so relay the relevant outcome in your response.\n- While background agents run, continue meaningful non-overlapping work. Wait for an agent only when its result blocks the next required step.\n- Reuse an existing background agent for related follow-up work instead of launching a duplicate: call list_agents to inspect the current roster, then call send_message with its `task_id`. Running agents receive the message at the next tool-round boundary; paused agents resume with it as their first continuation instruction; completed agents continue on their resident runtime when available and otherwise revive from their retained transcript. If the task is no longer retained or cannot be resumed or revived, launch a new agent.\n- Provide clear, detailed prompts so the agent can work autonomously and return exactly the information you need.\n- Regular subagents and named teammates start without parent conversation history. Only fork agents accept `fork_turns`, `fork_tools`, and `fork_profile`; omit `fork_turns` for the full conversation and omit both restriction parameters to allow every inherited tool except `ask_user_question`. Regular subagents do not receive that tool either.\n- Treat the agent's output as evidence, not as automatically correct. Verify factual claims, review code changes, and run relevant checks before integrating or relaying the result.\n- Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, web fetches, etc.), since it is not aware of the user's intent\n- If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first. Use your judgement.\n- If the user asks for agents \"in parallel\", group independent launches in a single message with multiple Agent tool use content blocks. Do not parallelize overlapping code changes.\n- Top-level regular subagents run in the background by default. Set `run_in_background: false` when the current turn must wait for the result before continuing. Nested agent launches run in the foreground and return to their direct parent; an explicit `run_in_background: true` request is rejected because nested agents cannot receive background completion notifications. Unnamed caller-owned `working_dir` launches run in the foreground: an explicit `run_in_background: true` request is rejected, while a configured background default (`background: true` in a subagent definition) is rejected at the top level and downgraded to the foreground for nested launches.\n- You can optionally set `isolation: \"worktree\"` to run the agent in a temporary git worktree, giving it an isolated copy of the repository. The worktree is automatically cleaned up if the agent makes no changes; if changes are made, the worktree path and branch are returned in the result so you can review or merge them.\n\n## Working with background agents\n\n**Don't peek.** Do not read or tail a background agent's output file while it runs. You get a completion notification; trust it. Reading the transcript mid-flight pulls the agent's tool noise into your context, which defeats the point of delegating.\n\n**Don't race.** After launching a background agent, you know nothing about what it found. Never fabricate or predict its results in any format — not as prose, summary, or structured output. The notification arrives as a user-role message in a later turn; it is never something you write yourself. If the user asks a follow-up before the notification lands, tell them the agent is still running — give status, not a guess.\n\n**Don't relaunch.** A notification that has not arrived means the agent is still running, not that it was lost. Do not start a replacement agent for the same task; the result arrives under the original task_id. Use list_agents to check the roster and send_message to redirect a running agent.\n\n## When to fork\n\nA fork (`subagent_type: \"fork\"`) inherits your full context by default. Set `fork_turns` to a positive integer string only when a bounded recent window is sufficient. A background fork reports its result through a completion notification; set `run_in_background: true` in interactive sessions when you need that result. Headless forks always use this background path. Omitting `subagent_type` does NOT fork.\n\nChoose a fork when the task needs substantial context from the parent conversation. Use a regular subagent when a fresh prompt provides enough context.\n\nForks are cheap because they share your prompt cache. Don't set `model` on a fork — a different model can't reuse the parent's cache. Pass a short `name` (one or two words, lowercase) so the user can track the fork.\n\nThe background-agent rules above apply to background forks unchanged.\n\n**Writing a fork prompt.** With the default full history, the prompt is a *directive* — what to do, not what the situation is. When `fork_turns` limits history, include any older context the fork still needs. Be specific about scope: what's in, what's out, what another agent is handling.\n\n## Writing the prompt\n\nBrief the agent like a smart colleague: make the delegated task, boundaries, and expected output explicit. Regular subagents have not seen this conversation; forks inherit all or the selected recent window.\n- Explain what you're trying to accomplish and why.\n- Describe what you've already learned or ruled out.\n- Give enough context about the surrounding problem that the agent can make judgment calls rather than just following a narrow instruction.\n- If you need a short response, say so explicitly.\n- For lookups, provide the exact target. For investigations, provide the actual question rather than an over-prescribed sequence of steps.\n\nTerse command-style prompts produce shallow, generic work.\n\n**Never delegate understanding.** Do not write prompts like \"based on your findings, fix the bug\" or \"based on the research, implement it.\" Those phrases push synthesis onto the agent instead of doing it yourself. Write prompts that prove you understood the task: include relevant file paths, constraints, what specifically needs to be learned or changed, and what is out of scope.\n\nAfter launching an agent, do not fabricate or predict what it found before it returns. If the user asks a follow-up before the result arrives, provide status rather than guessing.\n\nExample usage:\n\n<example_agent_descriptions>\n\"test-runner\": use this agent after you are done writing code to run tests\n</example_agent_descriptions>\n\n<example>\nuser: \"Please write a function that checks if a number is prime\"\nassistant: I'm going to use the Write tool to write the following code:\n<code>\nfunction isPrime(n) {\n  if (n <= 1) return false\n  for (let i = 2; i * i <= n; i++) {\n    if (n % i === 0) return false\n  }\n  return true\n}\n</code>\n<commentary>\nSince a significant piece of code was written and the task was completed, now use the test-runner agent to run the tests\n</commentary>\nassistant: Uses the agent tool to launch the test-runner agent\n</example>\n",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "A short (3-5 word) description of the task"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The task for the agent to perform"
+          },
+          "subagent_type": {
+            "type": "string",
+            "description": "The named agent type to use, or \"fork\" to inherit the parent conversation context"
+          },
+          "fork_turns": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": ["all"]
+              },
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$"
+              }
+            ],
+            "description": "Only valid with subagent_type \"fork\". Omit it or use \"all\" to inherit the full parent conversation; use a positive integer string such as \"3\" to inherit the most recent three real user turns. Tool responses and pure system reminders do not count as turns."
+          },
+          "fork_tools": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only valid with subagent_type \"fork\". Exact tool names and MCP server patterns this fork may execute. Entries cannot have surrounding whitespace; wildcard entries must be \"mcp__*\" or a trailing MCP tool-prefix pattern such as \"mcp__github__read_*\". The model-visible tool declarations remain unchanged for prompt-cache sharing, while the task prompt tells the fork about the restriction. Forks can never execute ask_user_question; omit fork_tools to allow every other inherited tool, or use an empty array to reject every tool call."
+          },
+          "fork_profile": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 50,
+            "description": "Only valid with subagent_type \"fork\". Loads a project profile from .qwen/fork-profiles/<name>.md and applies its tools and optional promptHint. Cannot be combined with fork_tools."
+          },
+          "run_in_background": {
+            "type": "boolean",
+            "default": true,
+            "description": "Defaults to true for top-level regular subagents. Set to false to run a regular agent in the foreground and return its result inline. Set to true for an interactive fork to receive its completion notification; headless forks always run in the background. Nested agents run in the foreground unless run_in_background is explicitly true, which is rejected because they cannot receive background completion notifications. Unnamed caller-owned working_dir launches run in the foreground; explicit run_in_background: true is rejected, while a configured background default is rejected at the top level and downgraded to the foreground for nested launches because the caller owns the worktree lifecycle. A configured default comes from a subagent definition with background: true."
+          },
+          "isolation": {
+            "type": "string",
+            "enum": ["worktree"],
+            "description": "Isolation mode. 'worktree' creates a temporary git worktree under <projectRoot>/.qwen/worktrees/agent-<7hex> so the agent works on an isolated copy of the repo. The worktree is auto-removed if the agent makes no changes; otherwise the worktree path and branch are returned in the result."
+          },
+          "working_dir": {
+            "type": "string",
+            "description": "Pin a sub-agent or named teammate to an EXISTING, caller-owned git worktree of this repo (absolute path, or relative to the current directory). Unlike 'isolation', the worktree is NOT created or cleaned up by Agent. Relative file, shell, and search operations resolve inside it. This is a cwd pin, not a filesystem sandbox: explicit absolute paths can still reach outside. The path must be a registered linked worktree of this repository. If both working_dir and isolation are provided, isolation is ignored."
+          }
+        },
+        "required": ["description", "prompt"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ask_user_question",
+      "description": "Use this tool when you need to ask the user questions during execution. This allows you to:\n1. Gather user preferences or requirements\n2. Clarify ambiguous instructions\n3. Get decisions on implementation choices as you work\n4. Offer choices to the user about what direction to take.\n\nUsage notes:\n- Users will always be able to select \"Other\" to provide custom text input\n- Use multiSelect: true to allow multiple answers to be selected for a question\n- If you recommend a specific option, make that the first option in the list and add \"(Recommended)\" at the end of the label\n\nPlan mode note: In plan mode, use this tool to clarify requirements or choose between approaches BEFORE finalizing your plan. Do NOT use this tool to ask \"Is this plan ready?\" or \"Should I proceed?\" - use ExitPlanMode for plan approval.\n",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "questions": {
+            "description": "Questions to ask the user (1-4 questions)",
+            "minItems": 1,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "question": {
+                  "description": "The complete question to ask the user. Should be clear, specific, and end with a question mark. Example: \"Which library should we use for date formatting?\" If multiSelect is true, phrase it accordingly, e.g. \"Which features do you want to enable?\"",
+                  "type": "string"
+                },
+                "header": {
+                  "description": "Very short label displayed as a chip/tag (max 12 chars). Examples: \"Auth method\", \"Library\", \"Approach\".",
+                  "type": "string"
+                },
+                "options": {
+                  "description": "The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.",
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "description": "The display text for this option that the user will see and select. Should be concise (1-5 words) and clearly describe the choice.",
+                        "type": "string"
+                      },
+                      "description": {
+                        "description": "Explanation of what this option means or what will happen if chosen. Useful for providing context about trade-offs or implications.",
+                        "type": "string"
+                      }
+                    },
+                    "required": ["label", "description"],
+                    "additionalProperties": false
+                  }
+                },
+                "multiSelect": {
+                  "description": "Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.",
+                  "default": false,
+                  "type": "boolean"
+                }
+              },
+              "required": ["question", "header", "options"]
+            }
+          },
+          "metadata": {
+            "description": "Optional metadata for tracking and analytics purposes. Not displayed to user.",
+            "type": "object",
+            "properties": {
+              "source": {
+                "description": "Optional identifier for the source of this question (e.g., \"remember\" for /remember command). Used for analytics tracking.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": ["questions"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "edit",
+      "description": "Replaces text within a file. By default, replaces a single occurrence. Set `replace_all` to true when you intend to modify every instance of `old_string`. This tool requires providing significant context around the change to ensure precise targeting. Always use the read_file tool to examine the file's current content before attempting a text replacement.\n\n      The user has the ability to modify the `new_string` content. If modified, this will be stated in the response.\n\nExpectation for required parameters:\n1. `file_path` MUST be an absolute path; otherwise an error will be thrown.\n2. `old_string` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).\n3. `new_string` MUST be the exact literal text to replace `old_string` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic.\n4. NEVER escape `old_string` or `new_string`, that would break the exact literal text requirement.\n**Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for `old_string`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.\n**Multiple replacements:** Set `replace_all` to true when you want to replace every occurrence that matches `old_string`.",
+      "parameters": {
+        "properties": {
+          "file_path": {
+            "description": "The absolute path to the file to modify. Must start with '/'.",
+            "type": "string"
+          },
+          "old_string": {
+            "description": "The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.",
+            "type": "string"
+          },
+          "new_string": {
+            "description": "The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.",
+            "type": "string"
+          },
+          "replace_all": {
+            "type": "boolean",
+            "description": "Replace all occurrences of old_string (default false)."
+          }
+        },
+        "required": ["file_path", "old_string", "new_string"],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_goal",
+      "description": "Read the current Goal during a permitted Goal turn: its objective, status, budget figures, and the verifier's feedback on the previous proposal when there is any. Outside a Goal turn it returns \"active\": false with \"lastGoal\", a summary of the session's most recent Goal. It never changes Goal state. Use the result silently; do not mention the retrieval to the user."
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "glob",
+      "description": "Fast file pattern matching tool that works with any codebase size\n- Supports glob patterns like \"**/*.js\" or \"src/**/*.ts\"\n- Returns matching file paths sorted by modification time\n- Use this tool when you need to find files by name patterns\n- When you are doing an open ended search that may require multiple rounds of globbing and grepping, use the Agent tool instead\n- You have the capability to call multiple tools in a single response. It is always better to speculatively perform multiple searches as a batch that are potentially useful.",
+      "parameters": {
+        "properties": {
+          "pattern": {
+            "description": "The glob pattern to match files against",
+            "type": "string"
+          },
+          "path": {
+            "description": "The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter \"undefined\" or \"null\" - simply omit it for the default behavior. Must be a valid directory path if provided.",
+            "type": "string"
+          }
+        },
+        "required": ["pattern"],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "grep_search",
+      "description": "A powerful search tool built on ripgrep\n\n  Usage:\n  - ALWAYS use Grep for search tasks. NEVER invoke `grep` or `rg` as a Bash command. The Grep tool has been optimized for correct permissions and access.\n  - Supports full regex syntax (e.g., \"log.*Error\", \"function\\s+\\w+\")\n  - Filter files with glob parameter (e.g., \"*.js\", \"**/*.tsx\")\n  - Use Agent tool for open-ended searches requiring multiple rounds\n  - Pattern syntax: Uses ripgrep (not grep) - special regex characters need escaping (use `interface\\{\\}` to find `interface{}` in Go code)\n",
+      "parameters": {
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "The regular expression pattern to search for in file contents"
+          },
+          "glob": {
+            "type": "string",
+            "description": "Glob pattern to filter files (e.g. \"*.js\", \"*.{ts,tsx}\") - maps to rg --glob"
+          },
+          "path": {
+            "type": "string",
+            "description": "File or directory to search in (rg PATH). Defaults to current working directory."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Limit output to first N lines/entries. Must be a positive integer. Optional - shows all matches if not specified."
+          }
+        },
+        "required": ["pattern"],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_agents",
+      "description": "List addressable ordinary background subagents in the current session, including agents restored from a prior session run, and — when cross-session messaging is enabled — the other Qwen Code sessions running on this machine, plus this session's own name. Named Agent Team teammates are NOT listed here: they have their own team lifecycle and deliver their final reports automatically, so do not use list_agents (or poll task_list) to wait for a teammate. Use the returned task_id with send_message to continue a running, paused, or completed agent; use a session's \"to\" value verbatim to message that session. Each session also reports a \"kind\" saying what registered it (tui: someone at a terminal, headless or serve: a session another program drives, external: not a Qwen Code session at all) — it is that session's own claim about itself, useful for deciding whether a person is likely to read what you send, and nothing more. Other sessions are peers, not your workers — do not delegate this session's work to them."
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "notebook_edit",
+      "description": "Edits a Jupyter notebook (.ipynb) safely at the cell level. Use this instead of edit or write_file for notebook cells. Supports replacing, inserting, and deleting cells. Always read the notebook first with read_file; then use the cell IDs shown in that output.",
+      "parameters": {
+        "properties": {
+          "notebook_path": {
+            "description": "Absolute path to the Jupyter notebook file to edit. Must end with .ipynb.",
+            "type": "string"
+          },
+          "cell_id": {
+            "description": "Target cell ID from read_file output, or cell-N 0-based fallback. Required for replace and delete. For insert, the new cell is inserted after this cell; if omitted, inserted at the beginning.",
+            "type": "string"
+          },
+          "new_source": {
+            "description": "New source content for replace and insert operations. Not required for delete.",
+            "type": "string"
+          },
+          "cell_type": {
+            "description": "Cell type for inserted cells or type conversion on replace.",
+            "type": "string",
+            "enum": ["code", "markdown"]
+          },
+          "edit_mode": {
+            "description": "Notebook edit operation. Defaults to replace.",
+            "type": "string",
+            "enum": ["replace", "insert", "delete"]
+          }
+        },
+        "required": ["notebook_path"],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_file",
+      "description": "Reads and returns the content of a specified file. The file_path argument MUST be an absolute path. Always construct it by combining the project root with the file's relative path (e.g. project root '/path/to/project/' + relative 'foo/bar.txt' = '/path/to/project/foo/bar.txt'). If the user provides a relative path, resolve it against the project root first. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), PDF files, and Jupyter notebooks (.ipynb). For text files, it can read specific line ranges. For PDF files, use the 'pages' parameter to extract specific page ranges as text (e.g. '1-5'). Max 20 pages per request. Large PDFs cannot be read all at once when the model does not support native PDF input; retry with narrower page ranges if the tool reports a PDF is too large. With a configured vision bridge, failed PDF text extraction or an irreducibly large single page may be transcribed automatically, at most four pages per call; this transcription is lossy and marked as untrusted. This tool can read Jupyter notebooks (.ipynb) and returns structured cell content with outputs.",
+      "parameters": {
+        "properties": {
+          "file_path": {
+            "description": "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+            "type": "string"
+          },
+          "offset": {
+            "description": "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+            "type": "integer"
+          },
+          "limit": {
+            "description": "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+            "type": "integer"
+          },
+          "pages": {
+            "description": "Optional: For PDF files, the page range to extract as text (e.g., '1-5', '3', '10-20'). Pages are 1-indexed. Max 20 pages per request. Open-ended ranges like '3-' are not supported. Use this for large PDFs or when the model does not support native PDF input.",
+            "type": "string"
+          }
+        },
+        "required": ["file_path"],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "run_shell_command",
+      "description": "Executes a given shell command (as `cmd.exe /d /s /c <command>`) in a subprocess with optional timeout, ensuring proper handling and security measures.\n\nIMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.\n\n**Usage notes**:\n- The command argument is required.\n- You can specify an optional timeout in milliseconds (up to 600000ms / 10 minutes). If not specified, commands will timeout after 120000ms (2 minutes). For longer commands, use `is_background: true` and observe the managed task instead of passing a larger timeout.\n- It is very helpful if you write a clear, concise description of what this command does in 5-10 words.\n\n- Avoid using run_shell_command with the `find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:\n  - File search: Use glob (NOT find or ls)\n  - Content search: Use grep_search (NOT grep or rg)\n  - Read files: Use read_file (NOT cat/head/tail)\n  - Edit files: Use edit (NOT sed/awk)\n  - Write files: Use write_file (NOT echo >/cat <<EOF)\n  - Communication: Output text directly (NOT echo/printf)\n- **Shell argument quoting and special characters**: The active shell is cmd.exe. When passing arguments that contain special characters (parentheses `()`, backticks ````, dollar signs `$`, backslashes `\\`, semicolons `;`, pipes `|`, angle brackets `<>`, ampersands `&`, exclamation marks `!`, etc.), you MUST ensure they are properly quoted to prevent cmd.exe from misinterpreting them as shell syntax:\n  - Use double quotes around arguments that contain spaces or metacharacters.\n  - Escape literal cmd.exe metacharacters such as `&`, `|`, `<`, `>`, and `^` with caret (`^`).\n  - Single quotes do not quote arguments in cmd.exe.\n  - Be careful with `%VAR%` environment-variable expansion; avoid literal `%...%` unless expansion is intended.\n  - Do NOT use Bash-only forms such as ANSI-C quoting (`$'...'`) or Bash heredocs.\n- When issuing multiple commands:\n  - If the commands are independent and can run in parallel, make multiple run_shell_command tool calls in a single message. For example, if you need to run \"git status\" and \"git diff\", send a single message with two run_shell_command tool calls in parallel.\n  - If the commands depend on each other and must run sequentially, use a single run_shell_command call with '&&' to chain them together (e.g., `git add . && git commit -m \"message\" && git push`).\n  - Use '&' only when you need to run commands sequentially but don't care if earlier commands fail.\n  - DO NOT use ';' or newlines to separate commands in cmd.exe.\n- Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of `cd`. You may use `cd` if the User explicitly requests it.\n  <good-example>\n  pytest /foo/bar/tests\n  </good-example>\n  <bad-example>\n  cd /foo/bar && pytest tests\n  </bad-example>\n\n**Background vs Foreground Execution:**\n- You should decide whether commands should run in background or foreground based on their nature:\n- Use background execution (is_background: true) for:\n  - Long-running development servers: `npm run start`, `npm run dev`, `yarn dev`, `bun run start`\n  - Build watchers: `npm run watch`, `webpack --watch`\n  - Database servers: `mongod`, `mysql`, `redis-server`\n  - Web servers: `python -m http.server`, `php -S localhost:8000`\n  - Any command expected to run indefinitely until manually stopped\n\n  - To stop a background command started by this tool, use `task_stop` when a task id is available. Do not use broad process-name kills such as `kill $(pgrep node)`, `pkill node`, or `killall node`; use a specific PID or process group id where supported.\n- Use foreground execution (is_background: false) for:\n  - One-time commands: `ls`, `cat`, `grep`\n  - Build commands: `npm run build`, `make`\n  - Installation commands: `npm install`, `pip install`\n  - Git operations: `git commit`, `git push`\n  - Test runs: `npm test`, `pytest`\n",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Exact cmd.exe command to execute as `cmd.exe /d /s /c <command>`"
+          },
+          "is_background": {
+            "type": "boolean",
+            "description": "Optional: Whether to run the command in background. If not specified, defaults to false (foreground execution). Explicitly set to true for long-running processes like development servers, watchers, or daemons that should continue running without blocking further commands."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600000,
+            "description": "Optional timeout in milliseconds (max 600000)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks."
+          },
+          "directory": {
+            "type": "string",
+            "description": "(OPTIONAL) The absolute path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist."
+          }
+        },
+        "required": ["command"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "skill",
+      "description": "Execute a skill within the main conversation\n\n<skills_instructions>\nWhen users ask you to perform tasks, check if any of the available skills can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.\n\nHow to invoke:\n- Use this tool with the skill name only (no arguments)\n- Name the skill exactly as it appears in the available-skills listing; do not shorten or guess a spelling.\n- Examples:\n  - `skill: \"pdf\"` - invoke the pdf skill\n  - `skill: \"xlsx\"` - invoke the xlsx skill\n  - `skill: \"ms-office-suite:pdf\"` - invoke the pdf skill owned by the ms-office-suite extension\n  - `skill: \"mcp-prompt\", args: \"topic\"` - invoke a model-invocable command with arguments\n\nImportant:\n- Available skills are listed in <system-reminder> messages in the conversation; only use skills listed there.\n- A skill provided by an extension is registered as `<extensionName>:<skillName>` (e.g. `ms-office-suite:pdf`), so two extensions offering the same authored name are two different skills. Personal, project, and bundled skills keep the single name their author wrote and are never prefixed.\n- When a skill is relevant, you must invoke this tool IMMEDIATELY as your first action\n- NEVER just announce or mention a skill in your text response without actually calling this tool\n- This is a BLOCKING REQUIREMENT: invoke the relevant Skill tool BEFORE generating any other response about the task\n- Do not invoke a skill that is already running\n- Do not use this tool for built-in CLI commands (like /help, /clear, etc.)\n- When executing scripts or loading referenced files, ALWAYS resolve absolute paths from skill's base directory. Examples:\n  - `bash scripts/init.sh` -> `bash /path/to/skill/scripts/init.sh`\n  - `python scripts/helper.py` -> `python /path/to/skill/scripts/helper.py`\n  - `reference.md` -> `/path/to/skill/reference.md`\n</skills_instructions>",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "skill": {
+            "type": "string",
+            "description": "The skill or command name. E.g., \"pdf\" or \"xlsx\""
+          },
+          "args": {
+            "type": "string",
+            "description": "Optional arguments for model-invocable slash commands."
+          }
+        },
+        "required": ["skill"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "tool_call",
+      "description": "Invokes a deferred tool after its schema has been reviewed with tool_search. Pass the exact deferred tool name and arguments matching the reviewed schema. Permissions, hooks, and approvals apply to the underlying tool.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Exact deferred tool name returned by tool_search.",
+            "minLength": 1
+          },
+          "arguments": {
+            "type": "object",
+            "description": "Arguments matching the deferred tool schema returned by tool_search."
+          }
+        },
+        "required": ["name", "arguments"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "tool_search",
+      "description": "Reviews function declarations for deferred tools without changing the active tool list.\n\nDeferred tools appear by name in the deferred-tools startup reminder. This tool takes a query, matches it against the deferred tool list, and returns the matched tools' function declarations (name + description + parameter schema) inside a <functions> block.\n\nThe returned <functions> block is informational. After reviewing a hidden deferred tool's schema, invoke it through tool_call with its exact name and schema-shaped arguments. Do not call a hidden deferred tool directly: its declaration remains hidden so the model-facing tool list and prompt-cache prefix stay stable (a tool-set refresh may still re-declare it when the live history contains a direct call to it). If select: returns a tool that is already declared, call that tool directly; tool_call accepts hidden deferred tools only.\n\nQuery forms:\n- \"select:ToolA,ToolB\" — fetch these exact tools by name\n- \"keyword phrase\" — keyword search, up to max_results best matches\n- \"+must-word other\" — require \"must-word\" in the name, rank remaining terms\n",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Query to find deferred tools. Use \"select:<tool_name>\" for direct selection, or keywords to search.",
+            "minLength": 1
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Maximum number of results to return (default: 5)",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "update_goal",
+      "description": "Propose that the current Goal is complete or blocked. An independent verifier decides; this tool never changes the Goal's status. The verifier reads only the most recent records of this Goal's transcript (your visible output, tool results, the user's messages), so run the checks that prove every objective condition immediately before calling. If completion depends on content delivered in this turn, emit only what the objective requires first, with no progress or completion commentary. For blocked, set blockerKind: authority (a user or maintainer decision or permission is required), external (an evidenced external resource or capability is unavailable), or infeasible (a tool result, not your own text, shows the objective cannot be satisfied as written: it contradicts itself, names a target that verifiably does not exist, or needs an action no tool can perform; never for difficulty, uncertainty, information you could still obtain, or wanting to ask; the reason must state what was checked and why no in-scope work could satisfy the objective). The verifier may accept those three on the first turn they are proposed; a rejected proposal leaves the Goal running. Omit blockerKind, or set repeated, for the same blocker with the exact same reason text across three consecutive Goal turns, which is only sent to the verifier on the third. Never tell the user the Goal is complete or blocked: when the result reports readyForVerification, end the turn with no further text; otherwise keep working. The Goal status card reports the verdict.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["complete", "blocked"]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blockerKind": {
+            "type": "string",
+            "enum": ["authority", "external", "repeated", "infeasible"],
+            "description": "Which blocker a blocked proposal reports; the tool description says when each applies."
+          }
+        },
+        "required": ["status", "reason"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "write_file",
+      "description": "Writes content to a specified file in the local filesystem. A request to create or generate a file does not establish that the target path is new. Unless the target's absence or current text contents have already been established in this session, you MUST use the read_file tool first; if the file does not exist, then create it. With prior-read enforcement enabled, blind overwrites are rejected. The file_path argument MUST be an absolute path. Always construct it by combining the project root with the file's relative path (e.g. project root '/path/to/project/' + relative 'foo/bar.txt' = '/path/to/project/foo/bar.txt'). If the user provides a relative path, resolve it against the project root first.\n\nArtifact-like files such as HTML, PDF, images, notebooks, and office documents are automatically registered as session artifacts. Intermediate files that exist only to produce another artifact — for example HTML written solely to print a PDF — must set record_as_artifact=false, or be written under .qwen/tmp/ so they are not registered. Delete those intermediates when done.\n\nThe user has the ability to modify `content`. If modified, this will be stated in the response.",
+      "parameters": {
+        "properties": {
+          "file_path": {
+            "description": "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
+            "type": "string"
+          },
+          "content": {
+            "description": "The content to write to the file.",
+            "type": "string"
+          },
+          "record_as_artifact": {
+            "description": "Set false for intermediate files that should not appear as session artifacts, such as HTML used only to print a PDF. Defaults to true for artifact-like extensions.",
+            "type": "boolean"
+          }
+        },
+        "required": ["file_path", "content"],
+        "type": "object"
+      }
+    }
+  }
+]

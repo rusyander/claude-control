@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { z } from 'zod';
 import {
   COMMAND_FIELDS,
   COMMAND_KINDS,
@@ -6,9 +7,12 @@ import {
 } from '@agentdeck/contracts/core/commands';
 import { existsSync } from 'node:fs';
 import { readJournalLines } from '../journal/read-lines.ts';
-import { tempDir } from '../journal/__fixtures__/journal-harness.ts';
+import { MINI_SCENARIO, tempDir } from '../journal/__fixtures__/journal-harness.ts';
 import { join } from 'node:path';
 import { newId } from '../lib/ids/uuidv7.ts';
+import type { SplitEnv } from '../conductor/estimate/index.ts';
+import { forkOfFeature } from '../conductor/scenario/__fixtures__/scenario-harness.ts';
+import { libraryFile } from '../conductor/scenario/index.ts';
 import {
   DIRECT_PID,
   SESSION_PID,
@@ -30,15 +34,19 @@ const journal = (s: Stand) => readJournalLines(join(s.registry.tasksDir, s.taskI
 /** Минимально годные поля вида — чтобы проверить ровно одно лишнее или недостающее поле. */
 const VALID_FIELDS: Record<CommandKind, unknown> = {
   launch: {},
-  pause: {},
+  pause: { now: false },
   resume: {},
   cancel: { reason: 'стоп' },
-  'set-model': { scope: 'task', scopeId: newId(), model: 'm-1', effort: null },
-  'set-cli': { scope: 'task', scopeId: newId(), adapter: 'a-1' },
-  'edit-scenario': { scenarioId: 's', version: 1, applyNow: false },
+  'set-model': { scope: 'task', scopeId: newId(), model: 'm-1', effort: null, timing: 'now' },
+  'set-cli': { scope: 'task', scopeId: newId(), adapter: 'a-1', timing: 'now' },
+  'edit-scenario': { scenario: MINI_SCENARIO, baseVersion: 1, applyNow: false },
   answer: { askId: newId(), answer: 'да' },
   'approve-split': { splitId: newId() },
-  'edit-split': { splitId: newId(), units: [{ name: 'u', ownedPaths: ['src'] }] },
+  'edit-split': {
+    splitId: newId(),
+    units: [{ name: 'u', ownedPaths: ['src'], deps: [], repo: null, contract: false }],
+  },
+  'edit-requirements': { add: [{ text: 'требование' }], waive: [] },
   'fresh-rerun': { scope: 'check', ref: 'c' },
   'publish-now': { unitId: newId() },
   'move-build': { build: 'b' },
@@ -51,6 +59,7 @@ const VALID_FIELDS: Record<CommandKind, unknown> = {
     scopeId: newId(),
     allowedRoutes: [{ adapter: 'a-1', route: { kind: 'stub', id: 's-1' }, modelPattern: '*' }],
   },
+  'clear-exhausted': { routeId: 's-1' },
 };
 
 describe('POST /v1/commands', () => {
@@ -66,8 +75,10 @@ describe('POST /v1/commands', () => {
         status: 400,
         codes: ['unknown-field'],
       });
-      const shape = COMMAND_FIELDS[kind].shape as Record<string, unknown>;
-      for (const field of Object.keys(shape)) {
+      const shape = COMMAND_FIELDS[kind].shape as Record<string, z.ZodType>;
+      // Необязательное поле (`clean-remote.tags`) пропустить можно — «нет поля» судится только у обязательных.
+      const required = Object.keys(shape).filter((f) => !shape[f]!.safeParse(undefined).success);
+      for (const field of required) {
         const { [field]: _dropped, ...missing } = valid;
         const res = await stand.command(stand.envelope(kind, missing));
         expect({ kind, field, status: res.status, codes: issueCodes(res.body) }).toEqual({
@@ -218,11 +229,13 @@ describe('POST /v1/commands', () => {
       const { nonce, page } = await stand.nonce();
       const first = stand.envelope(
         'set-model',
-        { scope: 'task', scopeId: newId(), model: 'm-1', effort: null },
+        { scope: 'task', scopeId: newId(), model: 'm-1', effort: null, timing: 'safe-point' },
         { proof: { nonce, page } },
       );
       const decided = await stand.command(first);
-      expect(decided.body.code).toBe('not-implemented');
+      // Решённый исход любой: важно, что повтор получает его же. Область задачи со случайным id —
+      // судья set-model (этап 4, зона A) отказывает «unknown-scope».
+      expect(decided.body.code).toBe('unknown-scope');
       const before = journal(stand).length;
       const reordered = {
         ...first,
@@ -236,6 +249,7 @@ describe('POST /v1/commands', () => {
           scope: 'task',
           scopeId: newId(),
           adapter: 'a-1',
+          timing: 'safe-point',
         },
       });
       expect(other.status).toBe(409);
@@ -254,7 +268,9 @@ describe('POST /v1/commands', () => {
     );
     expect(strict.body.code).toBe('signature-required');
     // Обычная команда по числу своей страницы проходит суд полномочий (как при любом unknown).
-    const ordinary = await s.command(s.envelope('pause', {}, { proof: await s.nonce() }));
+    const ordinary = await s.command(
+      s.envelope('pause', { now: false }, { proof: await s.nonce() }),
+    );
     expect(ordinary.body.code).toBe('state-conflict');
     // Подпись устройства доказывает человека и через такое звено.
     const signedCmd = s.envelope('publish-now', { unitId: newId() });
@@ -262,7 +278,8 @@ describe('POST /v1/commands', () => {
       ...signedCmd,
       proof: { signature: s.device.signFor(signedCmd) },
     });
-    expect(signed).toMatchObject({ status: 501, body: { code: 'not-implemented' } });
+    // Полномочия приняты: отказ уже от самой команды — такой единицы в задаче нет.
+    expect(signed).toMatchObject({ status: 422, body: { code: 'unknown-unit' } });
   });
 
   it('G25 release-resource over HTTP: unknown rid → 404 no-such-resource, a tmpdir → 200 and gone, again → 409 already-released', async () => {
@@ -295,7 +312,7 @@ describe('POST /v1/commands', () => {
     stand = await startStand();
     const s = stand;
     const launch = async (proof: object, opts: Parameters<Stand['command']>[1] = {}) =>
-      s.command(s.envelope('pause', {}, { proof: proof as never }), opts);
+      s.command(s.envelope('pause', { now: false }, { proof: proof as never }), opts);
     // Честный путь: число своей страницы + пир не из сессии. Пауза из draft — конфликт состояния,
     // а не отказ полномочий: суд полномочий пройден.
     const honest = await s.nonce();
@@ -339,8 +356,8 @@ describe('POST /v1/commands', () => {
     const strict = s.envelope('publish-now', { unitId: newId() });
     const signedHeader = s.device.signFor(strict);
     const signed = await s.command({ ...strict, proof: { signature: signedHeader } });
-    // Полномочия приняты; сама публикация — фаза 6.
-    expect(signed).toMatchObject({ status: 501, body: { code: 'not-implemented' } });
+    // Полномочия приняты: отказ уже от самой команды — такой единицы в задаче нет.
+    expect(signed).toMatchObject({ status: 422, body: { code: 'unknown-unit' } });
     // Повтор той же подписи под новым cmdId — номер подписи уже погашен.
     const replay = await s.command({
       ...strict,
@@ -361,3 +378,37 @@ describe('POST /v1/commands', () => {
 function issueCodes(body: Record<string, unknown>): string[] {
   return ((body.issues as { code: string }[] | undefined) ?? []).map((i) => i.code);
 }
+
+describe('POST /v1/commands — command env of the API', () => {
+  it('the split port is read at command time: unwired approve-split is preflight-unwired, wired it is judged on the task', async () => {
+    stand = await startStand();
+    const approve = async () => {
+      const { nonce, page } = await stand!.nonce();
+      const cmd = stand!.envelope(
+        'approve-split',
+        { splitId: newId() },
+        { proof: { nonce, page } },
+      );
+      return (await stand!.command(cmd)).body;
+    };
+    expect(await approve()).toMatchObject({ status: 'rejected', code: 'preflight-unwired' });
+    // Среда отдана после сборки API (как загрузка после `startConductor`): следующая команда её
+    // видит и судится по задаче — черновик не ждёт запуска.
+    stand.setSplit({} as SplitEnv);
+    expect(await approve()).toMatchObject({ status: 'rejected', code: 'state-conflict' });
+  });
+
+  it('edit-scenario writes into the library of the API env home', async () => {
+    stand = await startStand();
+    const { nonce, page } = await stand.nonce();
+    const scenario = forkOfFeature('team-flow', 1);
+    const cmd = stand.envelope(
+      'edit-scenario',
+      { scenario, baseVersion: 1, applyNow: false },
+      { proof: { nonce, page } },
+    );
+    const out = await stand.command(cmd);
+    expect([out.status, out.body.status]).toEqual([200, 'applied']);
+    expect(existsSync(libraryFile(stand.layout.scenarios, scenario))).toBe(true);
+  });
+});

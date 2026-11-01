@@ -1,0 +1,210 @@
+{
+  "topic": "core",
+  "scenario": "launch",
+  "frames": [
+    {
+      "id": "01-form",
+      "side": "panel",
+      "file": "01-form.png",
+      "masked": 1,
+      "width": 988,
+      "height": 745,
+      "shotAt": "2026-11-01T17:06:50.504Z",
+      "text": "Задача Название Коротко: что должно получиться. Требования Текст задачи целиком — ядро хранит его как источник требований. Репозитории Путь к репозиторию База Ветка или коммит; пусто — ветка по умолчанию. Добавить репозиторий Сценарий Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам Пресет ядра или сохранённый сценарий из библиотеки. Ждать CI после публикации По умолчанию выключено: ядро не ждёт пайплайн, пока вы не попросите для этой задачи. Файл репозитория это решение не включает. Оценить",
+      "en": {
+        "file": "01-form.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 745,
+        "shotAt": "2026-11-01T17:07:21.186Z",
+        "text": "Task Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Estimate"
+      },
+      "dark": {
+        "file": "01-form.dark.png",
+        "masked": 1,
+        "width": 988,
+        "height": 745,
+        "shotAt": "2026-11-01T17:08:02.502Z",
+        "text": "Задача Название Коротко: что должно получиться. Требования Текст задачи целиком — ядро хранит его как источник требований. Репозитории Путь к репозиторию База Ветка или коммит; пусто — ветка по умолчанию. Добавить репозиторий Сценарий Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам Пресет ядра или сохранённый сценарий из библиотеки. Ждать CI после публикации По умолчанию выключено: ядро не ждёт пайплайн, пока вы не попросите для этой задачи. Файл репозитория это решение не включает. Оценить"
+      },
+      "darkEn": {
+        "file": "01-form.dark.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 745,
+        "shotAt": "2026-11-01T17:08:38.725Z",
+        "text": "Task Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Estimate"
+      }
+    },
+    {
+      "id": "02-estimate",
+      "side": "panel",
+      "file": "02-estimate.png",
+      "masked": 5,
+      "width": 988,
+      "height": 208,
+      "shotAt": "2026-11-01T17:06:55.056Z",
+      "text": "Оценка Оценивается Задача 01a19814-0800-7000-bf65-7ef3ada8e68c Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает",
+      "en": {
+        "file": "02-estimate.en.png",
+        "masked": 5,
+        "width": 988,
+        "height": 208,
+        "shotAt": "2026-11-01T17:07:31.873Z",
+        "text": "Estimate Estimating Task 01a19814-82e5-7000-a1b3-55770682632e Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers"
+      },
+      "dark": {
+        "file": "02-estimate.dark.png",
+        "masked": 5,
+        "width": 988,
+        "height": 208,
+        "shotAt": "2026-11-01T17:08:14.887Z",
+        "text": "Оценка Оценивается Задача 01a19815-24b2-7000-ac2c-2773e0d90f26 Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает"
+      },
+      "darkEn": {
+        "file": "02-estimate.dark.en.png",
+        "masked": 5,
+        "width": 988,
+        "height": 208,
+        "shotAt": "2026-11-01T17:08:47.403Z",
+        "text": "Estimate Estimating Task 01a19815-b141-7000-841f-e64482698235 Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers"
+      }
+    },
+    {
+      "id": "03-roads",
+      "side": "panel",
+      "file": "03-roads.png",
+      "masked": 1,
+      "width": 988,
+      "height": 1209,
+      "shotAt": "2026-11-01T17:06:55.662Z",
+      "text": "Проверка дорог cli в порядке claude найден •••••••••••• qwen найден •••••••••••• route в порядке cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp в порядке •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture в порядке preload ••••••••••••, endpoint registered push-closure не проверялась arrives with publish (05) ls-remote в порядке task has no remotes forge-read не проверялась arrives with publish (05) container-engine не проверялась profile needs no services disk в порядке free disk 1022.0 GB ram в порядке free memory 20.3 GB ports в порядке loopback bind ok (61335) repo-access в порядке ok git-version в порядке git 2.55.0",
+      "en": {
+        "file": "03-roads.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 1209,
+        "shotAt": "2026-11-01T17:07:32.492Z",
+        "text": "Road check cli fine claude found •••••••••••• qwen found •••••••••••• route fine cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp fine •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture fine preload ••••••••••••, endpoint registered push-closure not checked arrives with publish (05) ls-remote fine task has no remotes forge-read not checked arrives with publish (05) container-engine not checked profile needs no services disk fine free disk 1022.0 GB ram fine free memory 18.6 GB ports fine loopback bind ok (62661) repo-access fine ok git-version fine git 2.55.0"
+      },
+      "dark": {
+        "file": "03-roads.dark.png",
+        "masked": 1,
+        "width": 988,
+        "height": 1209,
+        "shotAt": "2026-11-01T17:08:15.505Z",
+        "text": "Проверка дорог cli в порядке claude найден •••••••••••• qwen найден •••••••••••• route в порядке cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp в порядке •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture в порядке preload ••••••••••••, endpoint registered push-closure не проверялась arrives with publish (05) ls-remote в порядке task has no remotes forge-read не проверялась arrives with publish (05) container-engine не проверялась profile needs no services disk в порядке free disk 1021.9 GB ram в порядке free memory 20.2 GB ports в порядке loopback bind ok (53422) repo-access в порядке ok git-version в порядке git 2.55.0"
+      },
+      "darkEn": {
+        "file": "03-roads.dark.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 1209,
+        "shotAt": "2026-11-01T17:08:48.034Z",
+        "text": "Road check cli fine claude found •••••••••••• qwen found •••••••••••• route fine cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp fine •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture fine preload ••••••••••••, endpoint registered push-closure not checked arrives with publish (05) ls-remote fine task has no remotes forge-read not checked arrives with publish (05) container-engine not checked profile needs no services disk fine free disk 1021.9 GB ram fine free memory 22.1 GB ports fine loopback bind ok (52386) repo-access fine ok git-version fine git 2.55.0"
+      }
+    },
+    {
+      "id": "04-rejected",
+      "side": "panel",
+      "file": "04-rejected.png",
+      "masked": 1,
+      "width": 988,
+      "height": 219,
+      "shotAt": "2026-11-01T17:06:56.240Z",
+      "text": "Отвергнутые правки сценария Репозиторий не может расширить то, что задали вы или ядро: эти значения не применены. Уровень 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's",
+      "en": {
+        "file": "04-rejected.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 201,
+        "shotAt": "2026-11-01T17:07:33.077Z",
+        "text": "Rejected scenario edits A repository cannot widen what you or the core set: these values were not applied. Level 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's"
+      },
+      "dark": {
+        "file": "04-rejected.dark.png",
+        "masked": 1,
+        "width": 988,
+        "height": 219,
+        "shotAt": "2026-11-01T17:08:16.103Z",
+        "text": "Отвергнутые правки сценария Репозиторий не может расширить то, что задали вы или ядро: эти значения не применены. Уровень 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's"
+      },
+      "darkEn": {
+        "file": "04-rejected.dark.en.png",
+        "masked": 0,
+        "width": 988,
+        "height": 201,
+        "shotAt": "2026-11-01T17:08:48.617Z",
+        "text": "Rejected scenario edits A repository cannot widen what you or the core set: these values were not applied. Level 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's"
+      }
+    },
+    {
+      "id": "05-split",
+      "side": "panel",
+      "file": "05-split.png",
+      "masked": 1,
+      "width": 988,
+      "height": 477,
+      "shotAt": "2026-11-01T17:07:14.080Z",
+      "text": "Деление на части предложил план проверка приняла Часть 1 Имя Репозиторий repo-23492b73 Свои пути По одному пути или маске в строке. Меняет контракт Оценка части: неизвестно, неизвестно Добавить часть Сохранить деление",
+      "en": {
+        "file": "05-split.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 477,
+        "shotAt": "2026-11-01T17:07:58.112Z",
+        "text": "Split into parts proposed by the plan accepted by the check Part 1 Name Repository repo-23492b73 Owned paths One path or mask per line. Changes a contract Part estimate: unknown, unknown Add part Save split"
+      },
+      "dark": {
+        "file": "05-split.dark.png",
+        "masked": 1,
+        "width": 988,
+        "height": 477,
+        "shotAt": "2026-11-01T17:08:34.973Z",
+        "text": "Деление на части предложил план проверка приняла Часть 1 Имя Репозиторий repo-23492b73 Свои пути По одному пути или маске в строке. Меняет контракт Оценка части: неизвестно, неизвестно Добавить часть Сохранить деление"
+      },
+      "darkEn": {
+        "file": "05-split.dark.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 477,
+        "shotAt": "2026-11-01T17:09:11.555Z",
+        "text": "Split into parts proposed by the plan accepted by the check Part 1 Name Repository repo-23492b73 Owned paths One path or mask per line. Changes a contract Part estimate: unknown, unknown Add part Save split"
+      }
+    },
+    {
+      "id": "06-launch",
+      "side": "panel",
+      "file": "06-launch.png",
+      "masked": 1,
+      "width": 988,
+      "height": 137,
+      "shotAt": "2026-11-01T17:07:14.673Z",
+      "text": "Запуск Запустить",
+      "en": {
+        "file": "06-launch.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 137,
+        "shotAt": "2026-11-01T17:07:58.685Z",
+        "text": "Launch Launch"
+      },
+      "dark": {
+        "file": "06-launch.dark.png",
+        "masked": 0,
+        "width": 988,
+        "height": 137,
+        "shotAt": "2026-11-01T17:08:35.551Z",
+        "text": "Запуск Запустить"
+      },
+      "darkEn": {
+        "file": "06-launch.dark.en.png",
+        "masked": 1,
+        "width": 988,
+        "height": 137,
+        "shotAt": "2026-11-01T17:09:12.130Z",
+        "text": "Launch Launch"
+      }
+    }
+  ]
+}

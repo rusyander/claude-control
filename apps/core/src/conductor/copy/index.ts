@@ -12,8 +12,13 @@ export {
   type PrepareOptions,
 } from './create.ts';
 export { decideCopySetup } from './decide.ts';
-export { planInstall, type ConfiguredInstall } from './install-plan.ts';
-export { journaledSetup, unitRepoOf } from './journal-view.ts';
+export {
+  planInstall,
+  REQUIREMENT_FILES,
+  venvPython,
+  type ConfiguredInstall,
+} from './install-plan.ts';
+export { journaledSetup, pinnedBaseOf, unitCopyOf, unitRepoOf } from './journal-view.ts';
 export { copyDirFor, worktreeDirName } from './location.ts';
 export { firstErrorLine, logTail, quietLog } from './log.ts';
 export { mirrorLocalLayer } from './mirror.ts';

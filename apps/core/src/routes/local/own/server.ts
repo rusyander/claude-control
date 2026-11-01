@@ -7,6 +7,7 @@ import {
   pidAlive,
   readKeptExit,
 } from '../../../platform/kept-launch.ts';
+import { sleep } from '../../../platform/os-kind.ts';
 import { allocatePort, LOOPBACK } from '../../../platform/ports.ts';
 import type { ProcessIdentity } from '../../../platform/process-table.ts';
 import { writeFileAtomic } from '../../../platform/safe-io/atomic-write.ts';
@@ -155,9 +156,16 @@ export async function stopLeftover(
   const left = leftoverOf(report);
   if (left || typeof root !== 'number') return left;
   if (report.targeted.some((id) => id.pid === root)) return undefined;
+  // Хранитель сам сообщил «цель вышла рано» и в этот миг ещё уходит: подождать коротко, прежде
+  // чем назвать остатком (полный прогон 30.10 под нагрузкой Windows). Живой дольше срока — остаток.
+  const deadline = Date.now() + EXITING_KEEPER_WAIT_MS;
+  while (pidAlive(root) && Date.now() < deadline) await sleep(50);
   if (pidAlive(root)) return `keeper pid ${root} alive after the stop, identity unread`;
   return undefined;
 }
+
+/** Срок ухода хранителя, что уже сообщил выход цели; дольше — живой номер, не уходящий. */
+const EXITING_KEEPER_WAIT_MS = 3_000;
 
 export async function startRouter(spec: RouterServerSpec): Promise<RunningRouter> {
   const presetPath = join(spec.workDir, 'models-preset.ini');

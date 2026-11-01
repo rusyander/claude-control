@@ -45,11 +45,21 @@ export interface ChildConfig {
   routeId: string;
   taskTitle: string;
   request: string;
+  /** Требования задачи с id ядра: пишутся в журнал до шага, заявка ссылается на них. */
+  requirements?: { id: string; text: string }[];
   stepKind: string;
   until: Until;
   /** Задача уже есть (перезапуск ядра) — продолжаем её; нет — создаём. */
   taskId?: string;
   kill?: KillPoint;
+  /**
+   * Режим хуков человека (P36): набор слоя посажен в дом CLI тестом (`layer-sets/plant.ts`).
+   * Нет — как раньше: слой снят там, где переходник это умеет. Задан — кран слоя человека
+   * (`createUserLayerTap`) пишет отказы хуков в журнал, как в продукте.
+   */
+  layerMode?: 'on' | 'observe' | 'off';
+  /** Пороги наблюдателя этапа 8 (тишина, порог без выученного p95): живой прогон — ниже 30 с; нет — спека. */
+  observer?: { silentAfterMs?: number; stallDefaultMs?: number };
   /** Сколько ждать конца шага (мс). */
   waitMs: number;
 }

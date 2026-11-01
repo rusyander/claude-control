@@ -2,11 +2,14 @@ import { relative } from 'node:path';
 import { toolPlanFor } from '@agentdeck/contracts/core/model-tools';
 import type { PermissionAsk } from '../../adapters/adapter.types.ts';
 import { matchesAny, toSlashes } from '../../lib/glob/glob.ts';
+import { CI_READ_COMMANDS } from '../../lib/publish-commands.ts';
 import { homeDir } from '../../platform/os-kind.ts';
-import { isInside, pathKey } from '../../platform/paths.ts';
+import { foldsCaseAt, isInside, pathKey } from '../../platform/paths.ts';
 import { analyzeExec, matchPrefix } from './exec-argv.ts';
 import { type FoldedPaths, foldedPaths, unfoldableRoot } from './context-paths.ts';
 import { execPlatformPath } from './exec-paths.ts';
+import { forgeFlagForms } from './forge-forms.ts';
+import { skillVerdict, subagentVerdict } from './layer-permit.ts';
 import { absolute, deny, underAny } from './judge-helpers.ts';
 import { readVerdict } from './read-scope.ts';
 import { canonicalTarget } from './target-path.ts';
@@ -25,8 +28,18 @@ function relativeInCopy(paths: FoldedPaths, abs: string): string {
   return toSlashes(relative(pathKey(paths.copyRoot), pathKey(abs)));
 }
 
-function covered(rel: string, list: readonly GlobOps[], op: 'edit' | 'exec-db'): boolean {
-  return list.some((g) => g.ops.includes(op) && matchesAny(rel, g.globs, true));
+/**
+ * Маска `grantRequired` / гранта против пути копии — правилом тома (R7, как `estimate/grants.ts`):
+ * Windows/macOS регистр не различают — `Migrations/1.sql` тот же файл, что `migrations/1.sql`;
+ * на Linux это другой файл, и маска чужого регистра его не накрывает.
+ */
+function covered(
+  rel: string,
+  list: readonly GlobOps[],
+  op: 'edit' | 'exec-db',
+  fold: boolean,
+): boolean {
+  return list.some((g) => g.ops.includes(op) && matchesAny(rel, g.globs, fold));
 }
 
 /**
@@ -89,11 +102,15 @@ export function decidePermit(
       if (editDenied !== undefined) {
         return deny('denied-path', `edit of ${rel}: under a path denied for this session`, null);
       }
-      if (covered(rel, ctx.grantRequired, 'edit') && !covered(rel, ctx.grants, 'edit')) {
+      const fold = foldsCaseAt(ctx.copyRoot);
+      if (
+        covered(rel, ctx.grantRequired, 'edit', fold) &&
+        !covered(rel, ctx.grants, 'edit', fold)
+      ) {
         return deny('grant-required', `edit of ${rel} needs a grant for this task`, 5);
       }
       // Свои пути — от корня копии: `src` единицы не значит чужой `pkg/src` (F-06).
-      const owned = ctx.ownedPaths.length === 0 || matchesAny(rel, ctx.ownedPaths, true, 'rooted');
+      const owned = ctx.ownedPaths.length === 0 || matchesAny(rel, ctx.ownedPaths, fold, 'rooted');
       return owned
         ? { allow: true, signal: null, reason: 'edit inside owned paths' }
         : { allow: true, signal: 'ownership', reason: `edit of ${rel} outside owned paths` };
@@ -113,11 +130,21 @@ export function decidePermit(
         heads: ctx.deny.commands.map((prefix) => prefix[0] ?? ''),
         primary: ask.tool === 'PowerShell' ? 'ps' : 'bash',
       });
+      // Флаги форджа до глагола (`gh -R o/r pr create`) — ещё формы той же команды.
+      const forms = analysis.forms.flatMap(forgeFlagForms);
       const matches = ctx.deny.commands.flatMap((prefix) =>
-        analysis.forms.map((form) => matchPrefix(form, prefix)),
+        forms.map((form) => matchPrefix(form, prefix)),
       );
       if (matches.includes('yes')) {
-        return deny('platform-step', 'publishing is a platform step', null);
+        // Чтение CI — тот же список запретов, но своя причина: ждёт CI ядро, не сессия. Строка,
+        // где рядом и публикация, называется публикацией — она важнее.
+        const hit = (prefix: readonly string[]) =>
+          forms.some((form) => matchPrefix(form, prefix) === 'yes');
+        const ciKeys = new Set(CI_READ_COMMANDS.map((p) => p.join(' ')));
+        const publishes = ctx.deny.commands.some((p) => !ciKeys.has(p.join(' ')) && hit(p));
+        return publishes
+          ? deny('platform-step', 'publishing is a platform step', null)
+          : deny('platform-step', 'CI state is read by the core (task ciWait)', null);
       }
       // Псевдоним, настройка или remote, которые префикс не увидит (pushurl, hooksPath, include).
       if (analysis.hazards.length > 0 && ctx.deny.commands.some((p) => p[0] === 'git')) {
@@ -169,6 +196,10 @@ export function decidePermit(
     case 'conversation':
       // Трогает только разговор CLI: отказ лишил бы шаг инструментов ядра (F-89, H1).
       return { allow: true, signal: null, reason: 'conversation-internal tool' };
+    case 'skill':
+      return skillVerdict(ask, ctx);
+    case 'subagent':
+      return subagentVerdict(ask, ctx, stepKind);
     default:
       // Класс, которого политика не знает, не разрешается молча.
       return deny('unknown-action', `unknown action class for ${ask.tool}`, null);

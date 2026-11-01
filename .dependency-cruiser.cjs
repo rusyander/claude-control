@@ -201,6 +201,16 @@ module.exports = {
       to: { path: '^apps/core/src/(?!session-host/|platform/|lib/)' },
     },
     {
+      name: 'core-hop-host-thin',
+      comment:
+        'Хост звеньев переживает ядро и панель (00:52, P123): держит только платформу и пакеты ' +
+        '(dlp, ключи, цены); журнал и решения ядра в него не входят — расход и отказы он отдаёт ' +
+        'клиенту `routes/hops` фактами.',
+      severity: 'error',
+      from: { path: '^apps/core/src/hop-host/', pathNot: '\\.test\\.ts$' },
+      to: { path: '^apps/core/src/(?!hop-host/|platform/|lib/)' },
+    },
+    {
       name: 'core-journal-below-parts',
       comment:
         'Журнал не знает ни частей, ни переходников (00 §Parts: «The journal never imports adapters»).',
@@ -290,7 +300,8 @@ module.exports = {
       severity: 'error',
       from: {
         path: '^apps/core/src/',
-        pathNot: '^apps/core/src/(platform|adapters|session-host)/|/__fixtures__/|\\.test\\.ts$',
+        pathNot:
+          '^apps/core/src/(platform|adapters|session-host|hop-host)/|/__fixtures__/|\\.test\\.ts$',
       },
       to: { path: '^(node:)?(fs|fs/promises|child_process)$' },
     },
@@ -320,6 +331,23 @@ module.exports = {
       severity: 'error',
       from: { path: '^packages/providers/', pathNot: '\\.test\\.ts$' },
       to: { path: '^(node:)?(fs|fs/promises|child_process|os|process)$' },
+    },
+    // Сита и заглушка форжа (этап 6 ядра) — общие для панели, ядра и проверок tools/qa.
+    {
+      name: 'publish-packages-apart-from-apps',
+      comment:
+        'Сита читают и панель, и публикатор ядра, заглушку форжа — тесты ядра и голый node; ' +
+        'импорт из приложения сделал бы пакет частью одного из них.',
+      severity: 'error',
+      from: { path: '^packages/(sieves|stub-forge)/' },
+      to: { path: '^apps/' },
+    },
+    {
+      name: 'sieves-only-contracts-and-dlp',
+      comment: 'Сито судит содержимое; из пакетов ему нужны только контракты и маска секретов.',
+      severity: 'error',
+      from: { path: '^packages/sieves/' },
+      to: { path: '^packages/', pathNot: '^packages/(sieves|contracts|dlp)/' },
     },
   ],
   options: {

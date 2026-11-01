@@ -1,6 +1,6 @@
 import type { DescribedPathStepProposal, LocalizedLine } from '@agentdeck/contracts';
 import { useTranslation } from 'react-i18next';
-import { pickLang } from '../../../lib/pickLang';
+import { pickLang } from '@entities/StepPath';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import styles from './AssistantTurn.module.scss';

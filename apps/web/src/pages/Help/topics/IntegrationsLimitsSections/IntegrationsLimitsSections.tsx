@@ -32,6 +32,7 @@ export function IntegrationsLimitsSections({ tr, common }: SectionProps) {
           rows={[
             { label: tr('storageSettings'), value: tr('storageSettingsValue'), isMono: true },
             { label: tr('storageTokens'), value: tr('storageTokensValue'), isMono: true },
+            { label: tr('storageCoreRead'), value: tr('storageCoreReadValue') },
             { label: tr('storageHealth'), value: tr('storageHealthValue'), isMono: true },
             { label: tr('storageLinks'), value: tr('storageLinksValue'), isMono: true },
             { label: tr('storageMcp'), value: tr('storageMcpValue'), isMono: true },

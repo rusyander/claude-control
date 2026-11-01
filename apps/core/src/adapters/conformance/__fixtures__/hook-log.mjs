@@ -29,7 +29,7 @@ const env = Object.fromEntries(
 if (file) {
   appendFileSync(
     file,
-    `${JSON.stringify({ role, key: at('--hook') ?? null, event: parsed?.hook_event_name ?? null, tool: parsed?.tool_name ?? null, env })}\n`,
+    `${JSON.stringify({ role, key: at('--hook') ?? null, event: parsed?.hook_event_name ?? null, tool: parsed?.tool_name ?? null, toolUseId: parsed?.tool_use_id ?? null, toolCallId: parsed?.tool_call_id ?? null, fields: parsed && typeof parsed === 'object' ? Object.keys(parsed).sort() : [], env })}\n`,
   );
 }
 // `--deny`: блокирующий отказ хука (код 2, причина в stderr) — так хук ядра запрещает вызов.

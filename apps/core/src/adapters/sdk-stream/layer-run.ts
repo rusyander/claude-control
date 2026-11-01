@@ -1,3 +1,4 @@
+import type { UserLayerInventory } from '@agentdeck/contracts/core/user-layer';
 import type { LayerMode, LayerRun, SessionSpec } from '../adapter.types.ts';
 
 /**
@@ -15,6 +16,16 @@ export interface LayerPolicy {
   readCliMark(sourceRepo: string, pin: Record<string, string>): Promise<CliTrustRead>;
   /** Режим недоверенной копии по запрошенному: Claude `on` → `observe`, Qwen — как есть. */
   untrusted(asked: LayerMode): LayerMode;
+  /**
+   * Опись слоя человека (01:18, 06:114-129): настройки, инструкции, правила, навыки, хуки, агенты
+   * с окружением задачи; `repoLayer` — читать ли слой репозитория (доверенная копия).
+   */
+  inventory(pin: Record<string, string>, cwd: string, repoLayer: boolean): UserLayerInventory;
+  /**
+   * CLI без управления слоем (`caps.layerControl: false`, 06:117, G3): любой запрошенный режим
+   * идёт `on`, и подмена названа этим текстом. Нет поля — CLI слоем управляет.
+   */
+  noControl?: string;
 }
 
 /** Слой «как просили» с доверенным репозиторием — для планов и отказов вне запуска (проверки). */
@@ -23,6 +34,13 @@ export function trustedLayer(spec: SessionSpec): LayerRun {
 }
 
 export async function resolveLayer(spec: SessionSpec, policy: LayerPolicy): Promise<LayerRun> {
+  const run = await resolveTrust(spec, policy);
+  if (!policy.noControl || run.asked === 'on') return run;
+  const named = `${policy.noControl}: hooks ${run.asked} → on`;
+  return { ...run, ran: 'on', detail: run.detail ? `${named}; ${run.detail}` : named };
+}
+
+async function resolveTrust(spec: SessionSpec, policy: LayerPolicy): Promise<LayerRun> {
   const asked = spec.layer.hooks;
   const trusted = (trust: 'panel' | 'cli'): LayerRun => ({
     asked,

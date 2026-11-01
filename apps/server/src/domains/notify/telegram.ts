@@ -9,6 +9,8 @@ import type { CodedText } from '../../lib/server-text/server-text.ts';
 import { safeDetail, telegramApiBase } from './telegram-api.ts';
 import { deliverTelegram, type DeliveryOptions } from './telegram-delivery.ts';
 import { composeRich, composeSignal } from './telegram-text.ts';
+import { classifyTurnEnd } from './turn-end/turn-end.ts';
+import type { TurnEnd } from './turn-end/turn-end.types.ts';
 import { escapeHtml } from './telegram-answers/html.ts';
 import type { ChatRoute } from './telegram-answers/telegram-answers.types.ts';
 import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
@@ -104,7 +106,29 @@ export interface TelegramDeps {
   /** Пауза перед повтором и часы — подменяются в тестах. */
   delivery?: DeliveryOptions;
   now?: () => number;
+  /**
+   * Чат снова работает (следующий ход, автопродолжение, ответ из очереди) —
+   * спрашивается через `settleMs` после конца хода: конец, за которым сразу
+   * пошла работа, — промежуточный.
+   */
+  busy?: (chatId: string) => boolean;
+  /** Чат — звено группы: о его шагах Telegram молчит, итог скажет группа. */
+  subtask?: (chatId: string) => boolean;
+  /** Сколько ждать после конца хода прогона панели, прежде чем судить его. */
+  settleMs?: number;
+  /** Отложенный запуск — подменяется в тестах. */
+  schedule?: (run: () => void, ms: number) => void;
 }
+
+/** Пауза перед судом о конце хода прогона панели: продолжения стартуют за секунды. */
+export const TURN_SETTLE_MS = 20_000;
+/** Сколько чатов помнить, чтобы одна карточка хода не ушла дважды. */
+const CARDS_MAX = 500;
+
+const later = (run: () => void, ms: number): void => {
+  const timer = setTimeout(run, ms);
+  timer.unref?.();
+};
 
 /**
  * Вид события панели → имя события в настройке подписки. Общий для всех
@@ -221,8 +245,25 @@ export async function telegramMe(token: string): Promise<string> {
  * Выключено, нет токена, нет чата или событие не подписано — тишина, без единого
  * запроса наружу. Права и вопросы молчат и тогда, когда их уже доставляют
  * ответы из Telegram (`answersCover`).
+ *
+ * Конец хода (`done`) уходит только карточкой «Задача закрыта» или «Агент ждёт
+ * вас» (`turn-end/`); промежуточная остановка молчит. Прогон панели судится
+ * через `settleMs`: за это время видно, пошла ли работа дальше. Сессия вне
+ * панели уже выждала своё (`outside-done.ts`).
  */
 export function createTelegramNotifier(deps: TelegramDeps): (notice: TelegramNotice) => void {
+  const cards = new Map<string, string>();
+  const deliver = (notice: TelegramNotice, turn?: TurnEnd): void => {
+    const settings = deps.settings();
+    if (!settings.enabled || !settings.chatId) return;
+    const token = deps.token();
+    if (!token) return;
+    void send(deps, token, settings.chatId, notice, turn).catch((error: unknown) => {
+      // Нет сети, лёг сервис, бот выкинут из чата — уведомление просто не дошло.
+      // Состояние панели от этого не меняется, и падать тут не с чего.
+      (deps.onError ?? warnSendFailed)(error);
+    });
+  };
   return (notice) => {
     const settings = deps.settings();
     if (!settings.enabled || !settings.chatId) return;
@@ -230,15 +271,61 @@ export function createTelegramNotifier(deps: TelegramDeps): (notice: TelegramNot
     if ((notice.kind === 'permission' || notice.kind === 'question') && deps.answersCover?.()) {
       return;
     }
-    const token = deps.token();
-    if (!token) return;
-
-    void send(deps, token, settings.chatId, notice).catch((error: unknown) => {
-      // Нет сети, лёг сервис, бот выкинут из чата — уведомление просто не дошло.
-      // Состояние панели от этого не меняется, и падать тут не с чего.
-      (deps.onError ?? warnSendFailed)(error);
-    });
+    if (!deps.token()) return;
+    if (notice.kind !== 'done') {
+      deliver(notice);
+      return;
+    }
+    const judge = (): void => {
+      const turn = judgeTurn(deps, notice, cards);
+      if (turn) deliver(notice, turn);
+    };
+    if (notice.outside) judge();
+    else (deps.schedule ?? later)(judge, deps.settleMs ?? TURN_SETTLE_MS);
   };
+}
+
+/**
+ * Конец хода — карточка или тишина. Промежуточный — тишина. Висящий вопрос
+ * инструментом, который уже ушёл своим сообщением (вопрос посреди хода или
+ * ответы с кнопками), второй раз не идёт. Одна карточка на ход и вид: тот же
+ * ход, кончившийся «закрыта» повторно после позднего уведомления фона, молчит.
+ */
+function judgeTurn(
+  deps: TelegramDeps,
+  notice: RunNotice,
+  cards: Map<string, string>,
+): TurnEnd | undefined {
+  let busy = false;
+  let subtask = false;
+  try {
+    busy = deps.busy?.(notice.chatId) ?? false;
+    subtask = deps.subtask?.(notice.chatId) ?? false;
+  } catch {
+    // Сбой справки о чате — судим по тому, что знает само уведомление.
+  }
+  const turn = classifyTurnEnd({
+    ...notice,
+    ...(busy || notice.continued ? { continued: true } : {}),
+    ...(subtask ? { subtask: true } : {}),
+  });
+  if (turn.kind === 'intermediate') return undefined;
+  const settings = deps.settings();
+  if (
+    turn.kind === 'waiting' &&
+    notice.asked &&
+    (settings.events.includes('question') || deps.answersCover?.())
+  ) {
+    return undefined;
+  }
+  if (notice.turnKey !== undefined) {
+    const key = `${notice.turnKey}|${turn.kind}`;
+    if (cards.get(notice.chatId) === key) return undefined;
+    cards.delete(notice.chatId);
+    cards.set(notice.chatId, key);
+    if (cards.size > CARDS_MAX) cards.delete(cards.keys().next().value as string);
+  }
+  return turn;
 }
 
 /**
@@ -260,11 +347,12 @@ async function send(
   token: string,
   chatId: string,
   notice: TelegramNotice,
+  turn?: TurnEnd,
 ): Promise<void> {
   const panelChat = 'chatId' in notice ? notice.chatId : undefined;
   const openId = panelChat ? (deps.openIdOf?.(panelChat) ?? panelChat) : undefined;
   const title = titleSafe(deps, notice);
-  const text = telegramText(notice, title, openId, viaOf(deps, notice, openId));
+  const text = telegramText(notice, title, openId, viaOf(deps, notice, openId), turn);
   const result = await deliverTelegram(token, chatId, text, deps.delivery);
   if (result.ok && result.messageId !== undefined) {
     deps.onSent?.(chatId, result.messageId, routeOf(notice, openId, title));
@@ -287,6 +375,7 @@ function telegramText(
   title: string | undefined,
   openId: string | undefined,
   via: string | undefined,
+  turn?: TurnEnd,
 ): string {
   if (notice.kind === 'groupSignal') {
     // Словами: что с группой; группа, код правила и числа — в свёрнутой цитате.
@@ -309,7 +398,8 @@ function telegramText(
   if (notice.kind === 'budgetNear' || notice.kind === 'budgetOver') {
     return composeSignal({ type: '💰 БЮДЖЕТ', essence: compose(notice).replace(/^\S+\s+/, '') });
   }
-  return composeRich(notice, title, openId, via) ?? escapeHtml(compose(notice));
+  const rich = notice.kind === 'done' && turn ? { ...notice, turn } : notice;
+  return composeRich(rich, title, openId, via) ?? escapeHtml(compose(notice));
 }
 
 /**

@@ -37,12 +37,18 @@ export interface HookIo {
 export interface HookCall {
   tool: string;
   input: Record<string, unknown>;
+  /**
+   * id вызова в потоке, если CLI его дал (Qwen Code — `tool_call_id`, Claude Code — `tool_use_id`):
+   * строка решения хука несёт его, и
+   * наблюдатель (этап 8) не считает один и тот же отказ дважды. Нет — поля нет.
+   */
+  toolUseId?: string;
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** Вызов из stdin хука: `tool_name` + `tool_input` (Claude Code, Qwen Code). */
+/** Вызов из stdin хука: `tool_name` + `tool_input` (Claude Code, Qwen Code), `tool_use_id` если есть. */
 export function readHookCall(stdin: string): HookCall | undefined {
   let doc: unknown;
   try {
@@ -53,7 +59,15 @@ export function readHookCall(stdin: string): HookCall | undefined {
   if (!isObject(doc) || typeof doc.tool_name !== 'string' || doc.tool_name === '') return undefined;
   const input = doc.tool_input ?? {};
   if (!isObject(input)) return undefined;
-  return { tool: doc.tool_name, input };
+  // Qwen Code: `tool_use_id` — его внутренний id (`toolu_<ms>_…`), id вызова в потоке —
+  // `tool_call_id` (проба этапа 8). Claude Code даёт только `tool_use_id` — он и есть id потока.
+  const callId = doc.tool_call_id;
+  const id = typeof callId === 'string' && callId !== '' ? callId : doc.tool_use_id;
+  return {
+    tool: doc.tool_name,
+    input,
+    ...(typeof id === 'string' && id !== '' ? { toolUseId: id } : {}),
+  };
 }
 
 function waitOf(env: NodeJS.ProcessEnv): number {

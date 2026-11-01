@@ -17,6 +17,7 @@ import type { LiveTask } from '../journal/resume.ts';
 import type { SessionTokens } from '../policy/session-tokens/session-tokens.ts';
 import { bearerOf } from './auth.ts';
 import { answerHookCall } from './session-hook.ts';
+import type { SessionStatePort } from './session-state.types.ts';
 import { apiError } from './errors.ts';
 
 /**
@@ -36,6 +37,8 @@ export interface SessionToolsDeps {
   tools: ModelToolDeps;
   /** Переходник, кодек и факты копии сессии; нет — вопрос о праве отказывается (fail-closed). */
   permitDeps(task: LiveTask, binding: SessionBinding): PermitCallDeps | undefined;
+  /** Документ `agentdeck state` (этап 7, зона состояния); нет — `/v1/session/state` 501. */
+  state?: SessionStatePort;
 }
 
 type Bound = { task: LiveTask; binding: SessionBinding };
@@ -91,6 +94,22 @@ export function registerSessionTools(app: FastifyInstance, deps: SessionToolsDep
     };
   });
 
+  // `agentdeck state` (03:82): чтение своей сессии по её токену — только своё, только чтение.
+  app.get('/v1/session/state', async (request, reply) => {
+    const got = await bind(deps, request, reply);
+    if (!got) return reply;
+    if (!deps.state) {
+      return reply
+        .code(501)
+        .send(apiError('not-implemented', 'Состояние сессии ещё не подключено'));
+    }
+    const doc = deps.state.read(got.task, got.binding);
+    if ('unknown' in doc) {
+      return reply.code(500).send(apiError('state-unreadable', doc.unknown));
+    }
+    return doc.value;
+  });
+
   app.post<{ Params: { name: string }; Body: { input?: unknown } }>(
     '/v1/session/tools/:name',
     async (request, reply) => {
@@ -117,7 +136,7 @@ export function registerSessionTools(app: FastifyInstance, deps: SessionToolsDep
 
   // Хук ядра PreToolUse (`run.ts hook`): решение тем же судьёй и теми же фактами сессии, что
   // у сервера права. Неприкреплённая сессия — 503 (хук повторяет, потом отказывает).
-  app.post<{ Body: { tool?: unknown; input?: unknown } }>(
+  app.post<{ Body: { tool?: unknown; input?: unknown; toolUseId?: unknown } }>(
     '/v1/session/hook',
     async (request, reply) => {
       const got = await bind(deps, request, reply);
@@ -128,7 +147,8 @@ export function registerSessionTools(app: FastifyInstance, deps: SessionToolsDep
           .code(503)
           .send(apiError('permit-unavailable', 'Сессия не прикреплена — вызов отказан'));
       }
-      const body = request.body as { tool?: unknown; input?: unknown } | undefined;
+      const body = request.body as
+        { tool?: unknown; input?: unknown; toolUseId?: unknown } | undefined;
       const input = body?.input ?? {};
       if (
         typeof body?.tool !== 'string' ||
@@ -142,7 +162,14 @@ export function registerSessionTools(app: FastifyInstance, deps: SessionToolsDep
       return answerHookCall(
         got.task,
         got.binding,
-        { tool: body.tool, input: input as Record<string, unknown> },
+        {
+          tool: body.tool,
+          input: input as Record<string, unknown>,
+          // Не строка или пусто — как будто CLI id не дал: вызов решается, только без id.
+          ...(typeof body.toolUseId === 'string' && body.toolUseId !== ''
+            ? { toolUseId: body.toolUseId }
+            : {}),
+        },
         permit,
       );
     },

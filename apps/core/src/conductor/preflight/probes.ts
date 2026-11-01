@@ -13,6 +13,7 @@ import type { MachineIo } from '../../platform/machine.types.ts';
 import { currentOs, type OsKind } from '../../platform/os-kind.ts';
 import { bindLoopback, type BindProbe } from '../../platform/ports.ts';
 import { git } from '../../platform/git.ts';
+import { gitVersionOf, MERGE_TREE_MIN_GIT, versionAtLeast } from '../../platform/git/merge-tree.ts';
 import type { PreflightInput, PreflightProbes, RoadOutcome } from './preflight.types.ts';
 
 /**
@@ -146,6 +147,42 @@ export function lsRemoteProbe(
   };
 }
 
+export type GitVersionRead = () => Promise<Fact<string>>;
+
+export const realGitVersion: GitVersionRead = async () => {
+  try {
+    const out = await git(process.cwd(), ['--version'], { timeoutMs: 10_000 });
+    return { value: out.stdout.trim() };
+  } catch (error) {
+    return { unknown: (error as Error).message };
+  }
+};
+
+/**
+ * git публикатора: `merge-tree --write-tree` (синхронизация с базой без рабочего дерева) есть с
+ * 2.38. Старее — `fail` с исправлением: публикация без проверки слияния не идёт.
+ */
+export function gitVersionProbe(read: GitVersionRead = realGitVersion) {
+  return async (): Promise<RoadOutcome> => {
+    const got = await read();
+    if (!('value' in got))
+      return {
+        status: 'unknown',
+        detail: `git --version: ${'unknown' in got ? got.unknown : 'absent'}`,
+      };
+    const have = gitVersionOf(got.value);
+    if (!have)
+      return { status: 'unknown', detail: `unreadable git version: ${got.value.slice(0, 80)}` };
+    if (!versionAtLeast(have, MERGE_TREE_MIN_GIT))
+      return {
+        status: 'fail',
+        detail: `git ${have.join('.')} has no merge-tree --write-tree`,
+        fix: `install git ${MERGE_TREE_MIN_GIT} or newer`,
+      };
+    return { status: 'ok', detail: `git ${have.join('.')}` };
+  };
+}
+
 /** Нужен ли движок контейнеров: рецепты сервисов или `needs` у проверок; профиль неизвестен — да. */
 export function needsServicesOf(profile: Fact<Profile>): PreflightInput['needsServices'] {
   if (!('value' in profile)) return 'unknown';
@@ -170,6 +207,7 @@ export interface MachineProbeInput {
   os?: OsKind;
   bind?: BindProbe;
   lsRemote?: LsRemote;
+  gitVersion?: GitVersionRead;
 }
 
 /**
@@ -210,5 +248,6 @@ export function machineProbes(input: MachineProbeInput): PreflightProbes {
     ports: portsProbe(input.bind),
     'repo-access': perRepo(input.repos, (r) => repoAccessProbe(r.path, io, input.os)),
     'ls-remote': perRepo(input.repos, (r) => lsRemoteProbe(r.path, r.remotes, input.lsRemote)),
+    'git-version': gitVersionProbe(input.gitVersion),
   };
 }

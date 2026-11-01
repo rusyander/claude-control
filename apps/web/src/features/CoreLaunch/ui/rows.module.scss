@@ -1,0 +1,27 @@
+// Строка списка экрана запуска: рамка и отступ вместо одного цвета — состояние читается и без цвета.
+.row {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.rowWarn {
+  border-color: var(--color-warning);
+}
+
+.rowDanger {
+  border-color: var(--color-danger);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+// Числа оценки: подпись над значением, колонки переносятся на узком экране.
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-sm);
+}

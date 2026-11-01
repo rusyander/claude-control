@@ -47,8 +47,11 @@ function liveWith(...paths: string[]): Pick<TaskRegistry, 'liveTasks'> {
   };
 }
 
+// Ключ, единица и выборка записи — для суда свежести и охвата у step_done (G22, P92).
+const TREE = { key: expect.stringMatching(/^[0-9a-f]{64}$/), unit: '', selection: [] };
+
 const facts = (verdict: string) => ({
-  value: { verdict, checkId: 'tests', taskId: TASK, origin: 'core' },
+  value: { verdict, checkId: 'tests', taskId: TASK, origin: 'core', ...TREE },
 });
 
 function draft(over: Partial<RecordDraft> = {}): RecordDraft {
@@ -209,7 +212,7 @@ describe('verify wiring on real git', () => {
     };
     const wiring = verifyWiring({ registry, layout: { root: home } });
     expect(wiring.records(id.value, own)).toEqual({
-      value: { verdict: 'pass', checkId: 'tests', taskId: own, origin: 'core' },
+      value: { verdict: 'pass', checkId: 'tests', taskId: own, origin: 'core', ...TREE },
     });
     // Записи чужой задачи в её хранилище для этой задачи нет; путь её репозитория модели не уходит.
     expect(wiring.records(theirs.value, own)).toEqual({ absent: true });
@@ -237,7 +240,7 @@ describe('verify wiring on real git', () => {
         inflight: null,
         phase: 'final',
         changedUnits: [],
-        window: { verdict: 'open', basis: 'not-modelled-until-phase-5' },
+        window: { verdict: 'open', basis: 'economy-window' },
         fresh: null,
         quarantined: [],
       });
@@ -261,7 +264,7 @@ describe('verify wiring on real git', () => {
     expect(ask(after.value)).toEqual({ kind: 'absent', recordId: written.value });
     const wiring = verifyWiring({ registry: liveWith(main), layout: { root: home } });
     expect(wiring.records(written.value, TASK)).toEqual({
-      value: { verdict: 'fail', checkId: 'nope', taskId: null, origin: 'core' },
+      value: { verdict: 'fail', checkId: 'nope', taskId: null, origin: 'core', ...TREE },
     });
   });
 });

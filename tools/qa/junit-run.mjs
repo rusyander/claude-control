@@ -14,7 +14,10 @@
  * импорт кладёт результат ровно на один кейс, — поэтому на каждый кейс файла
  * пишется свой `<testcase>` с `[caseId]` в имени.
  *
- * - `*.mjs|*.js|*.cjs` — запускается `node <файл>`; прошёл = код 0.
+ * - `*.mjs|*.js|*.cjs` — запускается `node <файл>`; прошёл = код 0. У скрипта
+ *   `automation.testName` — его собственные аргументы (`--topic core`): кейсы с
+ *   одинаковыми аргументами идут одним запуском, кейс без них — запуском без
+ *   аргументов, как раньше.
  * - `*.test.ts|*.test.tsx|*.spec.ts` — vitest своего пакета (ближайший
  *   `vitest.config.*` вверх по дереву), без покрытия: частичный прогон ниже
  *   порогов покрытия ронял бы весь набор. У кейса с `automation.testName`
@@ -192,11 +195,29 @@ async function runFile(file, cases) {
     return suiteOf(file, cases, { status: 'failed', message: `Файл проверки не найден: ${file}` });
   }
   if (/\.(test|spec)\.tsx?$/.test(file)) return runVitest(file, cases);
-  if (/\.(mjs|cjs|js)$/.test(file)) return runNodeGuarded(file, cases);
+  if (/\.(mjs|cjs|js)$/.test(file)) return runNodeByArgs(file, cases);
   return suiteOf(file, cases, {
     status: 'failed',
     message: `Не знаю, чем запускать ${file}: ожидается .mjs/.js/.cjs или *.test.ts`,
   });
+}
+
+/**
+ * Один запуск скрипта на каждый набор аргументов: кейс темы справки (`--topic core`) проверяет
+ * только свою тему, а не красится чужим отставанием; кейс без аргументов — полный прогон.
+ */
+async function runNodeByArgs(file, cases) {
+  const groups = new Map();
+  for (const item of cases.length > 0 ? cases : [{ caseId: undefined }]) {
+    const key = (item.testName ?? '').split(/\s+/).filter(Boolean).join(' ');
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  const suites = [];
+  for (const [key, group] of groups) {
+    const argv = key ? key.split(' ') : [];
+    suites.push(await runNodeGuarded(file, group[0].caseId === undefined ? [] : group, argv));
+  }
+  return { name: file, cases: suites.flatMap((suite) => suite.cases) };
 }
 
 /**
@@ -206,14 +227,14 @@ async function runFile(file, cases) {
  * причиной («не засчитано»), а не провал: иначе перезапуск сервера красил бы
  * кейсы дефектами, которых нет.
  */
-async function runNodeGuarded(file, cases) {
+async function runNodeGuarded(file, cases, argv) {
   if (!(await waitStand())) {
     return suiteOf(file, cases, {
       status: 'skipped',
       message: `Стенд ${health} не отвечает 90 с — проверка не запускалась.`,
     });
   }
-  const first = await runNode(file);
+  const first = await runNode(file, argv);
   if (first.passed || first.downSamples === 0) return suiteOf(file, cases, first.outcome);
   console.log(`  стенд пропадал во время проверки (${first.downSamples} опросов) — повтор`);
   if (!(await waitStand())) {
@@ -223,7 +244,7 @@ async function runNodeGuarded(file, cases) {
       message: `Стенд лёг во время проверки и не поднялся. ${first.outcome.message}`,
     });
   }
-  const second = await runNode(file);
+  const second = await runNode(file, argv);
   const note = `Первая попытка упала, пока стенд перезапускался (${first.downSamples} опросов без ответа).`;
   if (second.passed || second.downSamples === 0) {
     return suiteOf(file, cases, {
@@ -239,11 +260,11 @@ async function runNodeGuarded(file, cases) {
   });
 }
 
-function runNode(file) {
-  console.log(`\n▶ node ${file}`);
+function runNode(file, argv) {
+  console.log(`\n▶ node ${[file, ...argv].join(' ')}`);
   const started = Date.now();
   return new Promise((done) => {
-    const child = spawn(process.execPath, [file], { cwd: project, windowsHide: true });
+    const child = spawn(process.execPath, [file, ...argv], { cwd: project, windowsHide: true });
     let output = '';
     let downSamples = 0;
     let timedOut = false;

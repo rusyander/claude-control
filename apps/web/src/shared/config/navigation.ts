@@ -150,6 +150,23 @@ export const NAV_SECTIONS: NavSection[] = [
       // Набор панели — тоже панель-level: его получает любой прогон Claude, не только
       // локальный, а режим выбирается на CLI, а не на провайдера раздела.
       { path: '/kit', label: 'nav.kit', icon: 'skills', key: 'kit' },
+      // Ядро задач — свой процесс рядом с панелью, панель-level: задачи ведутся любым CLI.
+      // Запуск и сценарии открываются из раздела задач; палитра и окно агента их видят.
+      { path: '/core', label: 'nav.coreTasks', icon: 'layers', key: 'coreTasks' },
+      {
+        path: '/core/launch',
+        label: 'nav.coreLaunch',
+        icon: 'play',
+        key: 'coreLaunch',
+        inSidebar: false,
+      },
+      {
+        path: '/core/scenarios',
+        label: 'nav.coreScenarios',
+        icon: 'branch',
+        key: 'coreScenarios',
+        inSidebar: false,
+      },
       { path: '/help', label: 'nav.help', icon: 'help', key: 'help' },
     ],
   },

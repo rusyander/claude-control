@@ -50,8 +50,8 @@ describe('F-18 Windows helper DLL — cached only in the core home, loaded only 
       expect(run.ok).toBe(true);
       const out = run.ok ? run.stdout : '';
       expect(out.trim()).not.toBe('4242 1 999');
-      // Строка своего процесса — с именем образа (A2-F02): node.exe этого прогона.
-      expect(out).toMatch(new RegExp(`^${process.pid} \\d+ \\d+ node\\.exe$`, 'im'));
+      // Строка своего процесса — pid, родитель, старт, CPU (этап 8) и имя образа (A2-F02).
+      expect(out).toMatch(new RegExp(`^${process.pid} \\d+ \\d+ \\d+ node\\.exe$`, 'im'));
     },
     60_000,
   );

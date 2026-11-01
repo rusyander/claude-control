@@ -50,6 +50,7 @@ import {
   takeRestartRequest,
   writeRestartState,
 } from './dev-restart.mjs';
+import { HOP_RECORD_ENV, describeRecord, listenerPid, watchHops } from './hop-recorder.mjs';
 
 const CODE = new Set(['.ts', '.mts', '.mjs', '.js', '.json']);
 const SKIP_DIRS = new Set(['node_modules', '__fixtures__', 'coverage', 'dist']);
@@ -64,6 +65,8 @@ const TEST_FILE = /\.(test|spec)\.[cm]?[jt]s$/;
 export const QUIET_MS = Number(process.env.AGENTDECK_DEV_QUIET_MS) || 60_000;
 export const MAX_WAIT_MS = Number(process.env.AGENTDECK_DEV_MAX_WAIT_MS) || 300_000;
 const REQUEST_POLL_MS = 2_000;
+/** Порт фронта (Vite): его слушатель — второе звено пересылки команд к ядру. */
+const WEB_PORT = Number(process.env.WEB_PORT) || 8888;
 const DEFER_POLL_MS = Number(process.env.AGENTDECK_DEV_DEFER_POLL_MS) || 5_000;
 /** Предел ожидания ходов; `0` выключает его (ждать, как до 21.10, без предела). */
 const RUNS_CAP_MS = process.env.AGENTDECK_DEV_RUNS_CAP_MS
@@ -511,6 +514,21 @@ function main() {
   let probing = false;
   let again = false;
 
+  /**
+   * Сервер и Vite (по слушателю порта фронта) — звенья пересылки команд к ядру (P131). Ядру,
+   * поднятому после панели или перезапущенному, надзор пишет их сам, как только его строка
+   * появится в `procs.json`; итог — в файл, который ждёт прокладка сервера перед командой.
+   */
+  const hopFile = join(appData, 'core-hops.json');
+  const hops = watchHops({
+    pidsOf: () => [child?.pid ?? 0, listenerPid(WEB_PORT)],
+    file: hopFile,
+    onRecord: (results, pids) => {
+      const line = describeRecord(results, pids);
+      if (line) appendDevLog(appData, line);
+    },
+  });
+
   const launch = () => {
     const startedAt = Date.now();
     child = spawn(process.execPath, ['--experimental-strip-types', 'src/index.ts'], {
@@ -519,13 +537,16 @@ function main() {
       stdio: ['inherit', 'inherit', 'pipe'],
       // Сервер читает состояние отсрочки там же, где его пишет сторож: его
       // собственный каталог данных может переехать настройкой.
-      env: { ...process.env, AGENTDECK_DEV_RESTART_DIR: appData },
+      env: { ...process.env, AGENTDECK_DEV_RESTART_DIR: appData, [HOP_RECORD_ENV]: hopFile },
     });
     child.stderr?.on('data', (chunk) => {
       process.stderr.write(chunk);
       appendServerLog(appData, chunk);
     });
     appendDevLog(appData, `сервер запущен (pid ${child.pid}, сторож ${process.pid})`);
+    // Звенья ядру (P131) — сразу, пока новый сервер ещё поднимается: первая команда через
+    // него придёт уже к записанному pid, а pid прежнего сервера из набора ядра уходит.
+    void hops.refresh();
     const current = child;
     current.on('exit', (code, signal) => {
       if (current !== child) return;

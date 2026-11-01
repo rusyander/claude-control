@@ -10,6 +10,7 @@ import { tempDir } from '../journal/__fixtures__/journal-harness.ts';
 import { readJournalLines } from '../journal/read-lines.ts';
 import { newId } from '../lib/ids/uuidv7.ts';
 import { peerPid } from '../platform/peer-pid.ts';
+import { identityOfPid } from '../platform/process-identity.ts';
 import { startSessionStand, type SessionStand } from './__fixtures__/session-stand.ts';
 import { MCP_RUN } from './main.ts';
 
@@ -143,6 +144,9 @@ describe('P23 panel restart mid-run', () => {
     };
     stand = await startSessionStand({ peer });
     const s = stand;
+    // Старт — тем же чтением ОС, что пишет ядро: прокладка сверяет строку до bearer (F10).
+    const own = await identityOfPid(process.pid);
+    if (!('value' in own)) throw new Error('own process identity is unreadable');
     const home = tempDir('core-home-');
     writeFileSync(join(home, 'token'), s.coreToken);
     writeFileSync(
@@ -153,7 +157,7 @@ describe('P23 panel restart mid-run', () => {
           {
             build: 'test',
             pid: process.pid,
-            pidStart: 'test',
+            pidStart: own.value.start,
             bootId: newId(),
             port: s.port,
             url: s.url,
@@ -219,7 +223,7 @@ describe('P23 panel restart mid-run', () => {
           cmdId: newId(),
           kind: 'pause',
           target: { taskId: s.task.taskId },
-          fields: {},
+          fields: { now: false },
           proof,
         }),
       });

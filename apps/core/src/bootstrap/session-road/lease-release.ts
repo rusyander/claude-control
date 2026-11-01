@@ -45,7 +45,8 @@ export const LEASE_SIGNAL = 'route-lease';
 
 const leaseDetail = z.strictObject({
   routeId: z.string().min(1),
-  model: z.string(),
+  // `null` — аренда под модель по умолчанию CLI.
+  model: z.string().nullable(),
   rids: z.array(z.string().min(1)),
 });
 
@@ -119,6 +120,7 @@ function journaledLeases(lines: JournalLine[]): TakenLease[] {
       lease: {
         leaseId: data.lease.leaseId,
         routeId: data.route.id,
+        // Сессия без модели (по умолчанию CLI) — аренда без модели, как её выдал маршрут.
         model: data.modelAsked,
         resources,
       },

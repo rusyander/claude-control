@@ -8,7 +8,8 @@ import { powershellExe, runTool, type ToolRun } from './run-tool.ts';
  * Один помощник PowerShell + C# на все факты Windows, которые Node не читает сам
  * (09: «batched CIM/snapshot per tick», «GetExtendedTcpTable via batched PowerShell»):
  * - `table` — снимок процессов одним `NtQuerySystemInformation` (pid, ppid, время
- *   создания FILETIME) — атомарно и без дескрипторов; так же читает таблицу .NET;
+ *   создания FILETIME, процессор user + kernel) — атомарно и без дескрипторов; так же читает
+ *   таблицу .NET; запасной путь CIM отдаёт те же четыре столбца (`KernelModeTime + UserModeTime`);
  * - `kill` — снятие по дескриптору: время создания сверяется на ТОМ ЖЕ дескрипторе,
  *   которым процесс снимается, — номер, отданный другому, не снимается (`reused`);
  * - `tcp` — `GetExtendedTcpTable` (IPv4 + IPv6, с владельцем) — порты и peer pid;
@@ -64,8 +65,9 @@ public static class AgentdeckCoreHelper {
     }
     return sb.ToString();
   }
-  // Снимок одним NtQuerySystemInformation: строки {pid, ppid, FILETIME создания}; names не null —
-  // туда же, строка в строку, ImageName (UNICODE_STRING на 56: длина в байтах, Buffer на 64 x64 / 60 x86).
+  // Снимок одним NtQuerySystemInformation: строки {pid, ppid, FILETIME создания, процессор}; names не
+  // null — туда же, строка в строку, ImageName (UNICODE_STRING на 56: длина в байтах, Buffer на 64 x64 /
+  // 60 x86). Процессор — UserTime (40) + KernelTime (48), сотни нс: тот же вызов, второго нет (этап 8).
   static List<long[]> Snapshot() { return Snapshot(null); }
   static List<long[]> Snapshot(List<string> names) {
     int size = 1 << 20;
@@ -83,7 +85,7 @@ public static class AgentdeckCoreHelper {
         long offset = 0;
         while (true) {
           IntPtr entry = new IntPtr(buf.ToInt64() + offset);
-          rows.Add(new long[] { Marshal.ReadIntPtr(entry, pidAt).ToInt64(), Marshal.ReadIntPtr(entry, parentAt).ToInt64(), Marshal.ReadInt64(entry, 32) });
+          rows.Add(new long[] { Marshal.ReadIntPtr(entry, pidAt).ToInt64(), Marshal.ReadIntPtr(entry, parentAt).ToInt64(), Marshal.ReadInt64(entry, 32), Marshal.ReadInt64(entry, 40) + Marshal.ReadInt64(entry, 48) });
           if (names != null) {
             int bytes = Marshal.ReadInt16(entry, 56) & 0xFFFF;
             IntPtr text = Marshal.ReadIntPtr(entry, wide ? 64 : 60);
@@ -104,7 +106,7 @@ public static class AgentdeckCoreHelper {
     List<long[]> rows = Snapshot(names);
     for (int i = 0; i < rows.Count; i++) {
       long[] row = rows[i];
-      sb.Append(row[0]).Append(' ').Append(row[1]).Append(' ').Append(row[2]);
+      sb.Append(row[0]).Append(' ').Append(row[1]).Append(' ').Append(row[2]).Append(' ').Append(row[3]);
       string name = names[i].Replace('\\r', ' ').Replace('\\n', ' ').Trim();
       if (name.Length > 0) sb.Append(' ').Append(name);
       sb.Append('\\n');
@@ -345,11 +347,13 @@ try {
   else { exit 4 }
 } catch {
   if ($op -ne 'table') { exit 3 }
-  Get-CimInstance -ClassName Win32_Process -Property ProcessId,ParentProcessId,CreationDate,Name | ForEach-Object {
+  Get-CimInstance -ClassName Win32_Process -Property ProcessId,ParentProcessId,CreationDate,Name,KernelModeTime,UserModeTime | ForEach-Object {
     $created = 0
     if ($_.CreationDate) { $created = $_.CreationDate.ToFileTimeUtc() }
+    $cpu = '-'
+    if ($null -ne $_.KernelModeTime -and $null -ne $_.UserModeTime) { $cpu = [uint64]$_.KernelModeTime + [uint64]$_.UserModeTime }
     $name = "$($_.Name)" -replace '[\\r\\n]', ' '
-    [Console]::Out.Write("$($_.ProcessId) $($_.ParentProcessId) $created $name".TrimEnd() + [char]10)
+    [Console]::Out.Write("$($_.ProcessId) $($_.ParentProcessId) $created $cpu $name".TrimEnd() + [char]10)
   }
 }
 `;

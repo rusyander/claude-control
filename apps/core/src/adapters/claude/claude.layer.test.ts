@@ -54,7 +54,7 @@ function spec(cwd: string, config: string, over: Partial<SessionSpec> = {}): Ses
     platform: { coreHome: join(cwd, '..', 'core'), tokenFiles: [] },
     tools: 'all',
     mcpServers: {},
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     env: { pin: { CLAUDE_CONFIG_DIR: config } },
     coreHook: 'node core.mjs',
     recorder: { command: 'node rec.mjs', log: join(cwd, '..', 'rec.jsonl') },
@@ -100,7 +100,7 @@ describe('claude adapter — F-86 the layer the plan is built for', () => {
     const on = planClaude(spec(cwd, config), null, trustedLayer(spec(cwd, config)));
     expect(on.args).not.toContain('--setting-sources');
 
-    const observeSpec = spec(cwd, config, { layer: { hooks: 'observe' } });
+    const observeSpec = spec(cwd, config, { layer: { hooks: 'observe', skills: 'on' } });
     const observe = settingsOf(planClaude(observeSpec, null, trustedLayer(observeSpec)));
     expect(observe.env).toEqual({ HUMAN_VAR: 'h', REPO_VAR: 'r', LOCAL: 'l' });
     expect(observe.permissions.deny).toContain('Bash(rm:*)');
@@ -113,7 +113,7 @@ describe('claude adapter — F-86 the layer the plan is built for', () => {
     expect(refuseClaude(spec(cwd, config), {}, UNTRUSTED)).toMatch(
       /^repo settings unreadable, their deny rules would be lost: .*settings\.json: not JSON/,
     );
-    const observeSpec = spec(cwd, config, { layer: { hooks: 'observe' } });
+    const observeSpec = spec(cwd, config, { layer: { hooks: 'observe', skills: 'on' } });
     expect(refuseClaude(observeSpec, {}, trustedLayer(observeSpec))).toContain('unreadable');
 
     writeFileSync(join(config, 'settings.json'), 'nope');
@@ -200,7 +200,7 @@ describe('claude adapter — F-86 the layer the plan is built for', () => {
       join(config, 'settings.json'),
       JSON.stringify({ permissions: { deny: ['Read(/human.txt)'] } }),
     );
-    const observeSpec = spec(cwd, config, { layer: { hooks: 'observe' } });
+    const observeSpec = spec(cwd, config, { layer: { hooks: 'observe', skills: 'on' } });
     const deny = settingsOf(planClaude(observeSpec, null, trustedLayer(observeSpec))).permissions
       .deny;
     const posix = (p: string) =>

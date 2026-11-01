@@ -27,6 +27,9 @@ import { deferredAsksRu } from './deferred-asks/ru.ts';
 import { phoneSigningRu } from './phone-signing/ru.ts';
 import { turnTrailRu } from './turn-trail/ru.ts';
 import { agentTreeRu } from './agent-tree/ru.ts';
+import { coreTimelineRu } from './core-timeline/ru.ts';
+import { coreLaunchRu } from './core-launch/ru.ts';
+import { coreScenarioRu } from './core-scenario/ru.ts';
 
 export const ru = {
   /** Тексты сервера по коду — `server-message.ts`, `contracts/server-messages.ts`. */
@@ -76,6 +79,10 @@ export const ru = {
   turnTrail: turnTrailRu,
   /** Дерево агентов: узлы, ход субагента справа, счётчик в карточке группы — `agent-tree/ru.ts`. */
   agentTree: agentTreeRu,
+  /** Ядро задач (этап 9): лента и отказы, запуск, сценарии — `core-{timeline,launch,scenario}/ru.ts`. */
+  coreTimeline: coreTimelineRu,
+  coreLaunch: coreLaunchRu,
+  coreScenario: coreScenarioRu,
   /** Окно «Окружение» из чата проекта — `environment/ru.ts`. */
   environment: environmentRu,
   /** Раздел «Проекты — конфигурация»: шапка проекта, вкладки, документ инструкций — `projects/ru.ts`. */
@@ -188,6 +195,9 @@ export const ru = {
     platform: 'Контур',
     localModels: 'Локальные модели',
     kit: 'Набор панели',
+    coreTasks: 'Задачи ядра',
+    coreLaunch: 'Запуск задачи ядра',
+    coreScenarios: 'Сценарии ядра',
     help: 'Справка',
     sectionMain: 'Главное',
     sectionBehavior: 'Поведение агента',
@@ -6022,6 +6032,7 @@ export const ru = {
       permissions: 'Круг записи: права',
       env: 'Круг записи: переменные окружения',
       instructions: 'Круг записи: глобальные инструкции',
+      coreRoute: 'Маршрут у ядра задач',
       assistant: 'Запуск ассистента',
     },
   },
@@ -7298,7 +7309,10 @@ export const ru = {
       confluence: { baseUrl: 'Адрес сайта', email: 'Почта', deployment: 'Установка' },
       gitlab: { baseUrl: 'Адрес установки', repo: 'Репозиторий' },
       github: { baseUrl: 'Адрес установки', repo: 'Репозиторий' },
-      telegram: { chatId: 'Чат', doneAfterMinutes: '«Закончил», если работа шла дольше, мин' },
+      telegram: {
+        chatId: 'Чат',
+        doneAfterMinutes: '«Задача закрыта» и «ждёт вас», если работа шла дольше, мин',
+      },
       zephyr: { projectKey: 'Проект', groupId: 'Группа тестов' },
       xray: { projectKey: 'Проект', groupId: 'Группа тестов' },
       testit: { baseUrl: 'Адрес установки', projectKey: 'Проект', groupId: 'Группа тестов' },
@@ -7327,7 +7341,7 @@ export const ru = {
       telegram: {
         chatId: 'Числовой id чата или @имя канала.',
         doneAfterMinutes:
-          'Чаты панели и сессии из терминала и VS Code. 0 — не сообщать о завершении.',
+          'Чаты панели и сессии из терминала и VS Code. Промежуточные остановки не приходят. 0 — не сообщать о конце хода.',
       },
       zephyr: {
         projectKey: 'Ключ проекта Jira с кейсами и циклами.',

@@ -7,16 +7,15 @@ import {
   type ModelToolReply,
   MODEL_TOOL_NAMES,
 } from '@agentdeck/contracts/core/model-tools';
-import { nextState, STEP_MACHINE } from '@agentdeck/contracts/core/states';
 import type { LiveTask } from '../../journal/resume.ts';
-import { newId } from '../../lib/ids/uuidv7.ts';
-import { decideHumanPoint } from '../../policy/human-point/human-point.ts';
-import type { HumanPointInput } from '../../policy/human-point/human-point.types.ts';
+import type { RaiseInput } from '../human/human.types.ts';
+import { raiseHumanPoint } from '../human/raise.ts';
 import type { ModelToolDeps, SessionBinding } from './model-tools.types.ts';
 import { stepDone } from './step-done.ts';
+import { unitDiff } from './unit-diff.ts';
 
 /**
- * Сервер `agentdeck` со стороны ядра (03 §Model tools): один вход на пять инструментов. Набор
+ * Сервер `agentdeck` со стороны ядра (03 §Model tools): один вход на шесть инструментов. Набор
  * инструментов зависит от вида шага (P73) — вызов инструмента, которого у шага нет, отказан, даже
  * если мост MCP его показал. Публикации, настройки и гранта среди них нет (F23): модель ими не
  * распоряжается ни одним вызовом.
@@ -42,82 +41,55 @@ export const CHECK_ABSENT = {
   logPath: null,
 } as const;
 
+/**
+ * Вопрос модели — тот же подъём, что у права и дирижёра (G15): решение, `human.asked`, шаг ждёт.
+ * Здесь только форма ответа модели: вне списка — продолжай с рекомендацией (P20), в списке —
+ * номер вопроса и что делать.
+ */
 function humanPoint(
   task: LiveTask,
   b: SessionBinding,
-  input: HumanPointInput,
+  input: Omit<RaiseInput, 'stepId' | 'sessionId' | 'point' | 'dedupe'>,
   deps: ModelToolDeps,
 ): ModelToolReply {
-  const decision = decideHumanPoint(input, deps.humanPolicy);
-  const decided = task.append({
-    kind: 'decision',
-    actor: 'core',
-    stepId: b.stepId,
-    sessionId: b.sessionId,
-    data: {
-      decisionId: newId(),
-      class: 'human-point',
-      inputs: [],
-      facts: [],
-      numbers: {},
-      reasons: [decision.reason],
-      output:
-        decision.point === null
-          ? { point: null, blocking: false, fork: { ...decision.fork } }
-          : { point: decision.point, blocking: decision.blocking },
-    },
-  });
-  if (decision.point === null) {
-    // Вне списка: шаг идёт дальше с рекомендацией модели, развилка — в итоговый отчёт.
-    return {
-      ok: true,
-      result: {
-        humanPoint: false,
-        blocking: false,
-        proceedWith: input.recommendation,
-        reason: decision.reason,
-        decisionSeq: decided.seq,
-      },
-    };
+  const raised = raiseHumanPoint(
+    task,
+    { ...input, stepId: b.stepId, sessionId: b.sessionId, point: null, dedupe: null },
+    { policy: deps.humanPolicy(task, b) },
+  );
+  switch (raised.kind) {
+    case 'fork':
+      // Вне списка: шаг идёт дальше с рекомендацией модели, развилка — в итоговый отчёт.
+      return {
+        ok: true,
+        result: {
+          humanPoint: false,
+          blocking: false,
+          proceedWith: raised.proceedWith,
+          reason: raised.reason,
+          decisionSeq: raised.decisionSeq,
+        },
+      };
+    case 'refused':
+    case 'duplicate':
+      // Вопрос модели не несёт ни пункта, ни ключа: сюда не доходит; на случай — честный отказ.
+      return {
+        ok: false,
+        code: 'raise-refused',
+        message: `human point not raised: ${raised.kind}`,
+      };
+    case 'asked':
+      return {
+        ok: true,
+        result: {
+          humanPoint: true,
+          point: raised.point,
+          blocking: raised.blocking,
+          askId: raised.askId,
+          next: raised.blocking ? 'wait for the answer' : `continue with ${input.recommendation}`,
+        },
+      };
   }
-  const askId = newId();
-  task.append({
-    kind: 'human.asked',
-    actor: 'core',
-    stepId: b.stepId,
-    sessionId: b.sessionId,
-    cause: decided.seq,
-    data: {
-      askId,
-      point: decision.point,
-      question: input.question,
-      options: input.options,
-      defaultAction: decision.blocking ? null : input.recommendation,
-    },
-  });
-  const step = task.state.steps[b.stepId];
-  if (decision.blocking && step) {
-    const moved = nextState(STEP_MACHINE, step.state, 'ask');
-    if (moved.ok) {
-      task.append({
-        kind: 'step.transition',
-        actor: 'core',
-        stepId: b.stepId,
-        cause: decided.seq,
-        data: { stepId: b.stepId, event: 'ask', from: step.state, to: moved.to },
-      });
-    }
-  }
-  return {
-    ok: true,
-    result: {
-      humanPoint: true,
-      point: decision.point,
-      blocking: decision.blocking,
-      askId,
-      next: decision.blocking ? 'wait for the answer' : `continue with ${input.recommendation}`,
-    },
-  };
 }
 
 function askHuman(task: LiveTask, b: SessionBinding, call: AskHumanCall, deps: ModelToolDeps) {
@@ -200,14 +172,32 @@ export function isModelToolName(name: string): name is ModelToolName {
   return (MODEL_TOOL_NAMES as readonly string[]).includes(name);
 }
 
+function notInPlan(b: SessionBinding, name: string): ModelToolReply | null {
+  const plan = toolPlanFor(b.stepKind);
+  if (plan && isModelToolName(name) && plan.modelTools.includes(name)) return null;
+  return {
+    ok: false,
+    code: TOOL_NOT_IN_PLAN,
+    message: `${name} is not a tool of step kind ${b.stepKind}`,
+  };
+}
+
 /**
- * Ответ синхронный у всех инструментов, кроме живой проверки: её прогон ждёт слот и раннер,
- * поэтому с подключённым `deps.check` ответ `check` — обещание (маршрут его дожидается).
+ * Ответ синхронный у вопросов человеку, препятствия и состояния. Обещание — у `step_done` всегда
+ * (свежесть доказательства читается с диска, G22) и у живой проверки с подключённым `deps.check`
+ * (прогон ждёт слот и раннер); маршрут дожидается обоих.
  */
 export function handleModelTool(
   task: LiveTask,
   b: SessionBinding,
-  name: string,
+  name: 'step_done',
+  input: unknown,
+  deps: ModelToolDeps,
+): Promise<ModelToolReply>;
+export function handleModelTool(
+  task: LiveTask,
+  b: SessionBinding,
+  name: Exclude<ModelToolName, 'step_done' | 'unit_diff'>,
   input: unknown,
   deps: ModelToolDeps & { check?: undefined },
 ): ModelToolReply;
@@ -225,17 +215,12 @@ export function handleModelTool(
   input: unknown,
   deps: ModelToolDeps,
 ): ModelToolReply | Promise<ModelToolReply> {
-  const plan = toolPlanFor(b.stepKind);
-  if (!plan || !isModelToolName(name) || !plan.modelTools.includes(name)) {
-    return {
-      ok: false,
-      code: TOOL_NOT_IN_PLAN,
-      message: `${name} is not a tool of step kind ${b.stepKind}`,
-    };
-  }
-  switch (name) {
-    case 'step_done':
-      return stepDone(task, b, input, deps);
+  const refused = notInPlan(b, name);
+  if (name === 'step_done')
+    return refused ? Promise.resolve(refused) : stepDone(task, b, input, deps);
+  if (refused) return refused;
+  // Мимо плана сюда доходит только имя инструмента модели, и `step_done` уже ушёл выше.
+  switch (name as Exclude<ModelToolName, 'step_done'>) {
     case 'check': {
       const parsed = parseModelCall('check', input);
       if (!parsed.ok) return invalid(parsed.issues);
@@ -262,6 +247,23 @@ export function handleModelTool(
     case 'core_state': {
       const parsed = parseModelCall('core_state', input);
       return parsed.ok ? coreState(task, b) : invalid(parsed.issues);
+    }
+    case 'unit_diff': {
+      const parsed = parseModelCall('unit_diff', input);
+      if (!parsed.ok) return invalid(parsed.issues);
+      const facts = deps.unitDiff?.(task, b);
+      if (!facts) return { ok: false, code: 'not-wired', message: 'unit_diff is not connected' };
+      if (!('value' in facts))
+        return {
+          ok: false,
+          code: 'unknown',
+          message: `unit copy unreadable: ${'unknown' in facts ? facts.unknown : 'absent'}`,
+        };
+      return unitDiff(parsed.value, facts.value).then((reply): ModelToolReply =>
+        reply.ok
+          ? { ok: true, result: reply }
+          : { ok: false, code: reply.code, message: reply.message },
+      );
     }
   }
 }

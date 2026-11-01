@@ -77,6 +77,24 @@ export function isSecretName(name: string): boolean {
   );
 }
 
+/**
+ * Поля-имена: сегмент `key` в имени поля не делает его значение секретом, когда значение
+ * имеет форму этого имени. `repoKey` — ключ репозитория ядра `<папка>-<8 hex общего каталога
+ * git>` (`repoKeyOf`): правило пары JSON прятало его в строке `user-layer-report`, ответ оценки
+ * нёс «••••••», и грант запуска нельзя было подтвердить (s9, 01.11). Снимаются только правила
+ * пары «имя — значение» и только при точном имени и форме; ключ вендора, пёстрый хвост и base64
+ * в том же значении ловят остальные детекторы, как везде.
+ */
+const IDENTIFIER_FIELDS = new Map<string, RegExp>([
+  ['repoKey', /^[^"'`\\/\s][^"'`\\/\r\n\t]{0,254}-[0-9a-f]{8}$/],
+]);
+
+/** Секретна ли пара «имя — значение»: секретное имя, кроме поля-имени со значением своей формы. */
+function isSecretPair(name: string, value: string): boolean {
+  if (!isSecretName(name)) return false;
+  return !(IDENTIFIER_FIELDS.get(name)?.test(value) ?? false);
+}
+
 const isReference = (value: string): boolean => /^\$\{[^}]+\}$/.test(value.trim());
 
 /** Пусто или только ссылки `${VAR}` — значение без секрета. */
@@ -158,7 +176,17 @@ export interface MaskOptions {
    * ловят именные детекторы — это правило их не касается.
    */
   keepHashes?: boolean;
+  /**
+   * Id маршрута ядра `api-key:endpoint:<profileId>` слитно — имя реестра, а не пара «ключ:
+   * значение»: id карточки панели (`ep-<время36>-<хвост>`) с цифрой правило пары принимало
+   * за пароль, и журнал ядра отвергал `task.created` (W2b, 30.10). Снимается только правило
+   * пары; ключ известной формы или пёстрый хвост ловят остальные детекторы, как везде.
+   */
+  keepRouteIds?: boolean;
 }
+
+/** `api-key:endpoint:<id>` слитно, без пробела: так пишет id маршрута только реестр ядра. */
+const isEndpointRouteId = (pair: string): boolean => /^api-key:endpoint:[\w.@+-]+$/.test(pair);
 
 const isHash = (value: string): boolean => /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value);
 
@@ -249,7 +277,7 @@ function eachMatch(
 function quotedValue(match: RegExpExecArray, name: string): SecretSpan | undefined {
   const at = match[2] !== undefined ? 2 : 3;
   const value = match[at] ?? '';
-  if (!value.trim() || !isSecretName(name) || isSecretFree(value) || value === SECRET_MASK) {
+  if (!value.trim() || !isSecretPair(name, value) || isSecretFree(value) || value === SECRET_MASK) {
     return undefined;
   }
   return groupSpan(match, at);
@@ -262,20 +290,25 @@ const DETECTORS: Detector[] = [
       text,
       /"([^"\\]+)"\s*:\s*"((?:[^"\\]|\\.)*)"/dg,
       (match) =>
-        match[2] && !isReference(match[2]) && match[2] !== SECRET_MASK && isSecretName(match[1]!)
+        match[2] &&
+        !isReference(match[2]) &&
+        match[2] !== SECRET_MASK &&
+        isSecretPair(match[1]!, match[2])
           ? groupSpan(match, 2)
           : undefined,
       push,
     ),
   // `Authorization: Bearer x`, `X-Auth: x`, `password: x` — заголовок или пара в тексте.
-  (text, push) =>
+  (text, push, options) =>
     eachMatch(
       text,
       /(?<![\w-])([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*(?:(?:Bearer|Basic|Token|Digest)[ \t]+)?([^\s"'`,;]+)/dg,
       (match) => {
         const name = match[1]!;
         const value = match[2]!;
-        if (!isSecretName(name) || isReference(value) || value === SECRET_MASK) return undefined;
+        if (!isSecretPair(name, value) || isReference(value) || value === SECRET_MASK)
+          return undefined;
+        if (options.keepRouteIds && isEndpointRouteId(match[0])) return undefined;
         // У заголовков доступа значение — всегда секрет; у прочих пар в прозе
         // («Primary key: id») — только значение, похожее на секрет.
         const header =
@@ -302,7 +335,7 @@ const DETECTORS: Detector[] = [
       text,
       /(?<![\w-])(-{0,2}[A-Za-z_][A-Za-z0-9_-]*)=([^\s"'`&#]+)/dg,
       (match) =>
-        isSecretName(match[1]!.replace(/^-+/, '')) &&
+        isSecretPair(match[1]!.replace(/^-+/, ''), match[2]!) &&
         !isReference(match[2]!) &&
         match[2] !== SECRET_MASK
           ? groupSpan(match, 2)
@@ -356,7 +389,7 @@ const DETECTORS: Detector[] = [
       (match) => {
         const value = match[3]!;
         return value.trim() &&
-          isSecretName(match[2]!.replace(/^-+/, '')) &&
+          isSecretPair(match[2]!.replace(/^-+/, ''), value) &&
           !isSecretFree(value) &&
           value !== SECRET_MASK
           ? groupSpan(match, 3)

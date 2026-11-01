@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -71,5 +71,30 @@ describe('worktree tree ignores index flags that hide edits (B1-F04)', () => {
     unlinkSync(join(dir, 'c.txt'));
     const after = await blobs(dir);
     expect(after['c.txt']).toBe(before['c.txt']);
+  });
+});
+
+const pause = (ms: number): void => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+const second = (ms: number): number => Math.floor(ms / 1000);
+
+describe('worktree tree reads a racily clean file by its content', () => {
+  it('a same-size rewrite in the second the index was written moves the row, read a second later', async () => {
+    // Гонка git: строка индекса совпадает со stat файла, переписанного в ту же секунду тем же
+    // размером. Отличить её git может только по mtime индекса — копия затравки обязана его держать.
+    // Подготовка повторяется, пока запись, коммит и переписывание не легли в одну секунду.
+    let dir = '';
+    for (let attempt = 0; attempt < 5 && dir === ''; attempt++) {
+      while (Date.now() % 1000 > 100) pause(5);
+      const at = Date.now();
+      const d = repo();
+      writeFileSync(join(d, 'a.txt'), 'a.txt v9\n');
+      const st = statSync(join(d, 'a.txt'));
+      if (second(st.mtimeMs) === second(at) && second(st.ctimeMs) === second(at)) dir = d;
+    }
+    expect(dir, 'setup never fit one second').not.toBe('');
+    pause(1100);
+    expect((await blobs(dir))['a.txt']).toBe(blobOf(dir, 'a.txt v9\n'));
   });
 });

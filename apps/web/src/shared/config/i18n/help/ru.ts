@@ -43,6 +43,7 @@ import { portabilityRu } from './ru/topics/portability';
 import { phoneRu } from './ru/topics/phone';
 import { localModelsRu } from './ru/topics/localModels';
 import { kitRu } from './ru/topics/kit';
+import { coreRu } from './ru/topics/core';
 import { watcherRu } from './ru/topics/watcher';
 export const helpRu = {
   index: {
@@ -166,6 +167,7 @@ export const helpRu = {
     phone: phoneRu.shots,
     localModels: localModelsRu.shots,
     kit: kitRu.shots,
+    core: coreRu.shots,
     watcher: watcherRu.shots,
   },
 
@@ -207,6 +209,7 @@ export const helpRu = {
     phone: phoneRu.diagrams,
     localModels: localModelsRu.diagrams,
     kit: kitRu.diagrams,
+    core: coreRu.diagrams,
   },
 
   topics: {
@@ -236,6 +239,7 @@ export const helpRu = {
     phone: phoneRu.topic,
     localModels: localModelsRu.topic,
     kit: kitRu.topic,
+    core: coreRu.topic,
     watcher: watcherRu.topic,
     platform: platformRu.topic,
     endpoints: endpointsRu.topic,

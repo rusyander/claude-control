@@ -16,9 +16,11 @@ import {
   deferredName,
   fill,
   fillDeep,
+  moveAt,
   scriptFor,
   SIDE_REPLY,
   stepFor,
+  TURN_END_TEXT,
 } from './__fixtures__/script.ts';
 import type { Move, StubTask } from './__fixtures__/stub-tasks.types.ts';
 
@@ -273,7 +275,18 @@ async function post(path: string, body: Record<string, unknown>): Promise<Record
   return (await response.json()) as Record<string, unknown>;
 }
 
-const CASES = STUB_TASKS.flatMap((task) =>
+/**
+ * Задача с меткой `turnEnd` на первом ходе: ответ текстом за ним идёт по проводу, следующий ход
+ * задачи — следующим ответом. Перебор `task.moves` без `moveAt` здесь краснеет.
+ */
+const HAPPY = STUB_TASKS.find((t) => t.id === 'happy-path')!;
+const TURN_END_TASK: StubTask = {
+  ...HAPPY,
+  id: 'happy-path+turnEnd',
+  moves: HAPPY.moves.map((m, i) => (i === 0 ? { ...m, turnEnd: true as const } : m)),
+};
+
+const CASES = [...STUB_TASKS, TURN_END_TASK].flatMap((task) =>
   task.dialects.map((dialect) => [task.id, dialect, task] as const),
 );
 
@@ -289,10 +302,15 @@ describe('stub tasks over the shared stub model', () => {
         request: task.input.request,
       });
       const talk = conversation(dialect, system, task.input.request, declared(vocab));
-      for (const move of task.moves) {
+      // По номеру ответа, как сама заглушка (`moveAt`): за ходом с `turnEnd` — ответ текстом.
+      for (let answer = 0; ; answer += 1) {
+        const move = moveAt(task.moves, answer);
+        if (move === undefined) break;
         const raw = await post(vocab.path, talk.body());
         const reply = talk.read(raw);
-        expect(reply).toEqual(expected(move, vocab));
+        expect(reply).toEqual(
+          move === 'turn-end' ? { text: TURN_END_TEXT } : expected(move, vocab),
+        );
         talk.push(raw);
       }
       const closing = talk.read(await post(vocab.path, talk.body()));

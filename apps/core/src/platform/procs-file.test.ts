@@ -3,13 +3,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newId } from '../lib/ids/uuidv7.ts';
 import { tempDir } from '../journal/__fixtures__/journal-harness.ts';
-import {
-  findCore,
-  readProcs,
-  registerCore,
-  verifyCoreEntry,
-  type ProcEntry,
-} from './procs-file.ts';
+import { verifyCoreEntry } from '@agentdeck/contracts/core/procs';
+import { findCore, readProcs, registerCore, type ProcEntry } from './procs-file.ts';
 import type { TcpEntry } from './tcp-table.ts';
 
 function entry(over: Partial<ProcEntry> = {}): ProcEntry {

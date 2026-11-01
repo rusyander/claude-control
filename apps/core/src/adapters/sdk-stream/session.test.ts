@@ -127,6 +127,11 @@ describe('sdk-stream session pump — edges no live session gives', () => {
             request_id: 'p1',
             request: { subtype: 'can_use_tool', tool_name: 7, input: null },
           },
+          {
+            type: 'control_request',
+            request_id: 'p2',
+            request: { subtype: 'can_use_tool', tool_name: 'x', input: {}, tool_use_id: 'toolu_9' },
+          },
           { type: 'control_request', request: { subtype: 'can_use_tool' } },
         ],
         EXIT,
@@ -140,7 +145,17 @@ describe('sdk-stream session pump — edges no live session gives', () => {
       ask: { action: 'exec', target: '', tool: '', display: '' },
       denied: true,
     });
-    expect(asks).toEqual([{ tool: '', input: {} }]);
+    // id вызова в вопросе — в событии (W P-c: отказ сводится с вызовом).
+    expect(events).toContainEqual({
+      type: 'ask',
+      ask: { action: 'exec', target: 'x', tool: 'x', display: 'x' },
+      denied: true,
+      toolUseId: 'toolu_9',
+    });
+    expect(asks).toEqual([
+      { tool: '', input: {} },
+      { tool: 'x', input: {} },
+    ]);
     expect(events.some((e) => e.type === 'permit.request')).toBe(false);
   });
 

@@ -30,12 +30,22 @@ function patternMatches(pattern: string, id: string): boolean {
   return new RegExp(`^${parts.join('.*')}$`).test(id);
 }
 
+/**
+ * Модель тройки под разрешённым шаблоном. Модель по умолчанию CLI (`null`) — имени нет, и CLI
+ * может взять любую: её пропускает только шаблон «любая модель» (`*`); `claude-*` или точное имя —
+ * нет, выбор CLI мог бы выйти за них.
+ */
+function modelAllowed(pattern: string, id: string | null): boolean {
+  if (id === null) return pattern === '*';
+  return patternMatches(pattern, id);
+}
+
 function allowedBy(allowed: readonly AllowedTriple[], c: CompatAdapterTriple): boolean {
   return allowed.some(
     (t) =>
       t.adapter === c.adapter.id &&
       t.route === c.route.id &&
-      patternMatches(t.modelPattern, c.model.id),
+      modelAllowed(t.modelPattern, c.model.id),
   );
 }
 
@@ -94,8 +104,10 @@ function judge(c: CompatAdapterTriple, policy: CompatPolicy): Verdict {
   if (unavailable(route)) return { code: 'route_unavailable' };
   if (route.credential === 'absent') return { code: 'credential_absent' };
   if (model.served === 'absent') return { code: 'model_absent' };
-
   const binding = route.caps.binding;
+  // Маршруту с адресом нужна модель в адресе: модель по умолчанию CLI ему не годится.
+  if (model.id === null && binding.via !== 'cli-login') return { code: 'model_absent' };
+
   let verdict: Verdict;
   if (binding.via === 'cli-login') {
     // Вход CLI годится только своему CLI; канал адреса тут не нужен.

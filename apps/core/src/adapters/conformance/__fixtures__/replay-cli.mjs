@@ -8,7 +8,8 @@
 //   REPLAY_FIXTURE — запись (.jsonl); нет — вывода нет вовсе;
 //   REPLAY_DUMP    — сюда JSON: argv, окружение, cwd и все строки stdin (переписывается);
 //   REPLAY_STDERR  — текст в stderr при выходе; REPLAY_EXIT — код выхода (по умолчанию 0);
-//   REPLAY_EAGER=1 — первый отрезок сразу, не дожидаясь сообщения (ошибка запуска).
+//   REPLAY_EAGER=1 — первый отрезок сразу, не дожидаясь сообщения (ошибка запуска);
+//   REPLAY_VERSION — ответ на `--version` (по умолчанию 0.0.0).
 //
 // Запись режется на отрезки: отрезок кончается строкой `result` и следующими за ней строками
 // `command_lifecycle completed`. Отрезок со строкой `system task_notification` — фоновое
@@ -21,6 +22,12 @@ import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 const env = process.env;
+// `--version` — как у живого CLI, одной строкой и выход (версию читает замер базы ядра, G9);
+// REPLAY_VERSION — какая версия, по умолчанию 0.0.0. Проигрыш и REPLAY_DUMP не трогаются.
+if (process.argv.includes('--version')) {
+  writeSync(1, `${env.REPLAY_VERSION ?? '0.0.0'} (replay)\n`);
+  process.exit(0);
+}
 const raw = env.REPLAY_FIXTURE ? readFileSync(env.REPLAY_FIXTURE, 'utf8') : '';
 const lines = raw.split('\n').filter((l) => l.trim() !== '');
 const parsed = lines.map((l) => JSON.parse(l));

@@ -340,10 +340,15 @@ describe('R:PR-05 compat — caps, never names, over all 10 CLIs', () => {
                   : binding,
             },
           };
-          const renamedModel = { ...model, id: rename(model.id) };
+          // Модель по умолчанию CLI (`null`) имени не имеет — переименовывать нечего, шаблон «любая».
+          const renamedModel = { ...model, id: model.id === null ? null : rename(model.id) };
           const policy = basePolicy({
             allowed: [
-              { adapter: renamedAdapter.id, route: renamedRoute.id, modelPattern: renamedModel.id },
+              {
+                adapter: renamedAdapter.id,
+                route: renamedRoute.id,
+                modelPattern: renamedModel.id ?? '*',
+              },
             ],
           });
           expect(

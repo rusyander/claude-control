@@ -30,16 +30,15 @@ export const ACTION_READ_CLASS: Record<ActionKind, ReadClassName> = {
   'process-start': 'process.alive',
   'copy-create': 'copy.exists',
   'copy-remove': 'copy.exists',
+  'ref-delete': 'push.remote-sha',
 };
 
 /** Удаление случилось, когда предмета НЕТ; остальные — когда он есть. */
-const REMOVALS: ReadonlySet<ActionKind> = new Set(['container-remove', 'copy-remove']);
-
-/**
- * Наличие предмета не доказывает действие: MR есть и до обновления (ревью F-104). Есть —
- * спросить человека; нет — обновлять было нечего, действие не случилось.
- */
-const PRESENCE_UNPROVEN: ReadonlySet<ActionKind> = new Set(['mr-update']);
+const REMOVALS: ReadonlySet<ActionKind> = new Set([
+  'container-remove',
+  'copy-remove',
+  'ref-delete',
+]);
 
 export interface OpenAction {
   actionId: string;
@@ -87,14 +86,9 @@ export function decideReconcile(
     }
     return { ...base, verdict: 'ask', reason: `fact unknown (${fact.unknown}) past ${limit} ms` };
   }
+  // Значение — всегда свидетельство самого действия, не наличия предмета: читатель `mr-update`
+  // сравнивает хэш заголовка и описания с подсказкой (ревью F-104, решение G10 стадии 6).
   const present = kind === 'value';
-  if ('value' in fact && PRESENCE_UNPROVEN.has(action.kind)) {
-    return {
-      ...base,
-      verdict: 'ask',
-      reason: `${readClass} value: ${fact.value} — presence does not prove ${action.kind}`,
-    };
-  }
   const happened = REMOVALS.has(action.kind) ? !present : present;
   const evidence = 'value' in fact ? `: ${fact.value}` : '';
   return {
@@ -107,13 +101,6 @@ export function decideReconcile(
 /** Читатель факта по действию: значение = найденное свидетельство, `absent` = предмета нет. */
 export type ActionFactReader = (action: OpenAction) => Reader<string>;
 export type ActionFactReaders = Record<ActionKind, ActionFactReader>;
-
-/** Заглушка класса будущей фазы: отвечает `unknown`, никогда «нет». */
-export function stubReader(phase: number): ActionFactReader {
-  return () => () => {
-    throw new Error(`reader not built until phase ${phase}`);
-  };
-}
 
 /** Время первой записанной сверки каждого действия (`decision` класса `reconcile`). */
 function journaledFirstAsked(task: LiveTask): Map<string, number> {
@@ -195,6 +182,8 @@ export async function reconcileTask(
         data: {
           askId: newId(),
           point: 4,
+          source: 'reconcile',
+          dedupe: action.actionId,
           question: `Не удалось узнать, выполнено ли действие ${action.kind} → ${action.target}: ${decision.reason}`,
           options: ['повторить сверку', 'считать выполненным', 'считать невыполненным'],
           defaultAction: null,

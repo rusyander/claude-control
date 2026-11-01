@@ -507,7 +507,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * Push от Expo приходит в ПРИЛОЖЕНИЕ панели, и его видит только тот, у кого
    * оно установлено и спарено. Telegram получает и владелец без приложения, и
    * общий чат команды. Наружу уходят событие, папка проекта, имя чата и одна
-   * строка сути (`telegram-text.ts`) — без кода, путей, промпта и ответа агента.
+   * строка сути (`telegram-text.ts`) — без кода, путей и промпта. Конец хода —
+   * только «задача закрыта» (одна-две фразы итога под маской) или «агент ждёт
+   * вас» (что решить); промежуточная остановка молчит (`notify/turn-end/`).
    */
   const telegramAnswersCover: TelegramAnswersCover = { covers: () => false };
   const telegram = createTelegramNotifier({
@@ -518,6 +520,17 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     cliNameOf: (id) => (isKnownProviderId(id) ? getProvider(id).name : undefined),
     // Опрос ответов живёт в маршрутах и подставляет сюда своё «покрываю».
     answersCover: () => telegramAnswersCover.covers(),
+    // Конец хода, за которым чат снова работает, — промежуточный. Ход чужого CLI
+    // идёт у его сервиса (объявлен ниже — замыкание читает его при вызове).
+    busy: (chatId) => {
+      const foreign = parseForeignChatKey(chatId);
+      return foreign ? providerChats.isChatRunning(foreign.chatId) : chatRuns.isRunning(chatId);
+    },
+    // Звено группы: о его шагах молчим, итог скажет группа.
+    subtask: (chatId) =>
+      [chatId, ctx.store.canonicalChatKey(chatId)].some((key) =>
+        Boolean(ctx.store.getChatLink(key)?.parentChatId),
+      ),
     onResult: (result) => writeLastSend(ctx.location.paths.appData, result),
     // Номер отправленного — для /clear; уведомления сами не удаляются (это запись).
     onSent: (chatId, messageId, route) =>
@@ -540,9 +553,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     secret: () => readToken(ctx.location.paths.appData, 'webhook'),
   });
   /**
-   * Сессия из терминала или VS Code кончила ход — «Закончил» только в Telegram
-   * и только после долгой работы (порог карточки): push и вебхук о таких
-   * сессиях не сообщали и не обещали.
+   * Сессия из терминала или VS Code кончила ход — карточка только в Telegram,
+   * только после долгой работы (порог карточки) и только «закрыта» или «ждёт»
+   * (суд по транскрипту, `outside-done.ts`): push и вебхук о таких сессиях не
+   * сообщали и не обещали.
    */
   const outsideTurnEnded = createOutsideDone({
     transcriptOf: (sessionId) =>

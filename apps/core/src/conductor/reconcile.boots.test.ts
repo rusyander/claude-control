@@ -71,7 +71,7 @@ describe('reconcile across real boots', () => {
     third.task.close();
   });
 
-  it('F-104 mr-update: an existing MR does not prove the update — ask; no MR — not happened', () => {
+  it('F-104 mr-update: the reader value is the body-hash proof — happened; absent — not happened', () => {
     const action = (kind: ActionKind): OpenAction => ({
       actionId: newId(),
       kind,
@@ -80,7 +80,10 @@ describe('reconcile across real boots', () => {
       startedAt: 0,
       startedSeq: 1,
     });
-    expect(decideReconcile(action('mr-update'), { value: '!42' }, 0, 0).verdict).toBe('ask');
+    // Читатель отдаёт значение, только когда хэш MR равен подсказке (G10): это и есть «обновил».
+    expect(decideReconcile(action('mr-update'), { value: '!42 hash' }, 0, 0).verdict).toBe(
+      'happened',
+    );
     expect(decideReconcile(action('mr-update'), { absent: true }, 0, 0).verdict).toBe(
       'not-happened',
     );

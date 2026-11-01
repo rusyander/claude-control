@@ -4,6 +4,11 @@ import type {
   Dialect,
   RefusalCode,
 } from '@agentdeck/contracts/core/routes';
+import type {
+  SendOrigin,
+  SkillMode,
+  UserLayerInventory,
+} from '@agentdeck/contracts/core/user-layer';
 import type { Identity } from '../session-host/protocol.ts';
 import type {
   CoreSessionVars,
@@ -127,6 +132,12 @@ export interface LayerRun {
    * ещё — сколько запретов репозитория дошло данными и какие сняты (закрыли бы инструменты ядра).
    */
   detail?: string;
+  /**
+   * Части слоя человека, которые до сеанса не дошли (G-b): по одной на строку, без префикса. Дорога
+   * пишет каждую сигналом `layer-loss`; нет поля — потерь нет. Отдельным полем, а не текстом в
+   * `detail`: разбор строки по префиксу молча терял бы потерю, чей текст сменил форму.
+   */
+  losses?: string[];
 }
 
 /** Какие встроенные инструменты получает шаг (P73): ревью — только чтение. */
@@ -163,7 +174,11 @@ export interface SessionSpec {
    * не запускает: его вопросы приходят событием `permit.request`.
    */
   permitServer?: { name: string; tool: string };
-  layer: { hooks: LayerMode };
+  /**
+   * `skills` — навыки человека (06:115): шаг сценария называет режим всегда (дорога берёт его из
+   * `userLayer` шага), умолчания в переходнике нет — иначе «не спросили» и «включены» совпали бы.
+   */
+  layer: { hooks: LayerMode; skills: SkillMode };
   /**
    * Исходный репозиторий копии и отметка панели (F-86). Нет поля — источник неизвестен, копия
    * недоверенная: слой репозитория до сеанса не доходит, `on` идёт как `observe`.
@@ -187,12 +202,17 @@ export interface SessionHandle {
 /**
  * Типизированный вопрос о праве (06): текст команды — только для показа. `conversation` —
  * инструмент, который трогает только состояние разговора самого CLI (загрузка отложенных
- * инструментов, список дел); всё, что действует (субагент, навык), остаётся `other`.
+ * инструментов, список дел). `skill` — навык человека, `subagent` — подагент CLI (06:115, 06:124):
+ * судья пускает их только по фактам слоя (`PermitContext.layer` / `subagents`), без фактов —
+ * отказ, как прежде у `other`.
  */
 export interface PermissionAsk {
-  action: 'read' | 'edit' | 'exec' | 'net' | 'mcp' | 'conversation' | 'other';
-  /** Путь, argv[0..], имя инструмента MCP или адрес. */
+  action:
+    'read' | 'edit' | 'exec' | 'net' | 'mcp' | 'conversation' | 'skill' | 'subagent' | 'other';
+  /** Путь, argv[0..], имя инструмента MCP, имя навыка или тип подагента, адрес. */
   target: string;
+  /** `subagent`: модель, которую просит вызов (`null` — наследует модель сеанса). */
+  model?: string | null;
   argv?: string[];
   /**
    * `exec`: argv дословно тот, что исполнит оболочка (нет экранирования, раскрытий `$…`/`` `…` ``,
@@ -200,8 +220,24 @@ export interface PermissionAsk {
    * судья argv не верит и решает fail-closed (F-02). Нет поля — переходник этого не знает.
    */
   argvExact?: boolean;
+  /**
+   * `read`: диапазон чтения (`offset`/`limit` инструмента); `null` — файл целиком; нет поля —
+   * переходник диапазон не читает (этап 8, предикаты перечитывания и большого чтения).
+   */
+  range?: { offset: number | null; limit: number | null } | null;
   tool: string;
   display: string;
+}
+
+/**
+ * Исход вызова инструмента (этап 8, F18): только из структурного поля CLI, никогда из текста модели.
+ * `null` — CLI факт не отдал.
+ */
+export interface ToolOutcome {
+  exitCode: number | null;
+  /** Замаскированное начало текста ошибки, не длиннее 2 КБ. */
+  errorText: string | null;
+  bytes: number | null;
 }
 
 export type TurnCause = 'notification' | 'background-wake' | 'late-tail';
@@ -237,34 +273,92 @@ export type AdapterEvent =
       name: string;
       input: unknown;
       cliInitiated: boolean;
+      /**
+       * Вызов внутри подагента: id вызова-родителя (`Task`), у подагента свой контекст (этап 8,
+       * R11). `null` — главный контекст; нет поля — переходник этого ещё не знает.
+       */
+      parentToolUseId?: string | null;
     }
-  | { type: 'tool.result'; toolUseId: string; isError: boolean; cliInitiated: boolean }
-  | { type: 'text.delta'; text: string }
   | {
-      type: 'usage';
-      messageId: string;
-      input: number;
-      cacheRead: number;
-      cacheWrite: number;
-      output: number;
+      type: 'tool.result';
+      toolUseId: string;
+      isError: boolean;
+      cliInitiated: boolean;
+      /** Исход вызова из структурного поля CLI (этап 8, F18); нет поля — переходник его не читает. */
+      outcome?: ToolOutcome;
     }
-  | { type: 'ask'; ask: PermissionAsk; denied: boolean }
+  | { type: 'text.delta'; text: string }
+  | ({ type: 'usage' } & TurnUsage)
+  /**
+   * Факт окна подписки из потока CLI (11 §Economy, `windowEvent: true`): у CLI без
+   * задокументированного события его нет — окно `unknown`, отказ читается в потоке (G13).
+   */
+  | ({ type: 'window' } & WindowObservation)
+  /** Вопрос о праве, решённый в самом CLI; `toolUseId` — id вызова, если поток его назвал. */
+  | { type: 'ask'; ask: PermissionAsk; denied: boolean; toolUseId?: string }
   /**
    * Вопрос о праве в самом потоке (у CLI нет инструмента-вопроса, он спрашивает строкой
    * протокола и ждёт ответа в stdin): ядро решает по `raw` и отвечает `answerPermit`.
    */
   | { type: 'permit.request'; requestId: string; raw: unknown }
+  /**
+   * Хук человека отказал вызову (G-e): какой вызов (`null` — поток не назвал), событие хука, сам
+   * хук (`null` — CLI его не назвал; тогда кандидаты ищутся в описи по matcher), причина.
+   */
+  | {
+      type: 'hook.refused';
+      toolUseId: string | null;
+      event: string;
+      hook: string | null;
+      reason: string;
+      cliInitiated: boolean;
+    }
   | { type: 'error'; code: AdapterErrorCode; detail: string };
 
 export type AdapterErrorCode = 'fresh-required' | 'model-error' | 'exited' | 'protocol';
 
-/** Использование одного API-хода (03 `usage(h)`). */
+/**
+ * Использование одного API-хода (03 `usage(h)`): ПОЛНЫЕ текущие числа хода — повтор того же
+ * `messageId` заменяет прежний, а не прибавляется (P43).
+ */
 export interface TurnUsage {
   messageId: string;
   input: number;
   cacheRead: number;
   cacheWrite: number;
   output: number;
+  /** Доля `cacheWrite` с часовым сроком кэша (дороже пятиминутной); нет — 0. */
+  cacheWrite1h?: number;
+  /** Модель хода, как её назвал поток; нет — модель сеанса. */
+  model?: string;
+  /** Ход подагента CLI (строка с `parent_tool_use_id`): своей сессии ядра у него нет. */
+  subagent?: boolean;
+  /**
+   * Остаток хода: итог CLI (`result`) больше суммы сообщений хода — разница одной строкой,
+   * чтобы свёртка сошлась с итогом CLI, не удваивая записанное.
+   */
+  remainder?: boolean;
+  /**
+   * Окно контекста модели хода, как его назвал CLI (`result.modelUsage.<model>.contextWindow`):
+   * первый ход узнаёт его только в `result` и издаётся снова с ним, следующие несут его сразу.
+   */
+  contextWindow?: number;
+}
+
+/**
+ * Наблюдение окна подписки: доля (0..100) и сброс самого тесного окна, вид предела по
+ * `11 §Economy`. `warning` — CLI предупредил, но обслуживает (P19: держать нечего); `refusal` —
+ * отказал на деле.
+ */
+export interface WindowObservation {
+  limitKind: 'window' | 'rate' | 'budget' | 'slot';
+  usedPct: number | null;
+  /** Стена, мс; `null` — источник сброса не назвал. */
+  resetAt: number | null;
+  warning: boolean;
+  refusal: boolean;
+  /** Имя окна у источника (`five_hour`…) — для причины решения, судья его не читает. */
+  window: string | null;
 }
 
 /** Сырой вызов инструмента, как его видит CLI (для `mapPermission`). */
@@ -301,6 +395,16 @@ export interface ReadLayer {
   volatile?: string[];
 }
 
+/**
+ * Модели от слабой к сильной (имена, которые CLI принимает; понижение ставит их), другие имена
+ * той же ступени по индексу (приставки полных id) и усилие от низкого к высокому.
+ */
+export interface AdapterLadder {
+  models: readonly string[];
+  aliases: readonly (readonly string[])[];
+  efforts: readonly string[];
+}
+
 export interface CliAdapter {
   id: string;
   /**
@@ -309,8 +413,31 @@ export interface CliAdapter {
    * под образом `node` — такой предок не узнаётся, проверка идёт вне очереди и названа.
    */
   images: readonly string[];
+  /**
+   * Исполняемый файл CLI для вызовов вне сеанса (`--version` замера базы) — тот же, что запустил
+   * бы сеанс сейчас (путь `cliPaths` настройки ядра, иначе факты запуска), читается на каждом
+   * обращении; нет — переходник такого вызова не знает. Общие части ядра CLI не называют (P108).
+   */
+  versionCommand?: string;
+  /**
+   * Лестница уровня шага (03 §Economy) из фактов запуска CLI: понижение механики, ревьюер не
+   * слабее автора, ранг модели правки человека и потолок подагента. Нет — ранга модели у CLI не
+   * знаем, и каждый из этих судов называет это сам. Общие части ядра имён моделей не пишут (P108).
+   */
+  ladder?: AdapterLadder;
+  /**
+   * Транскрипт разговора на месте (P15): `false` — нет, `undefined` — неизвестно; нет метода —
+   * переходник продолжения по транскрипту не знает.
+   */
+  transcriptPresent?(pin: Record<string, string>, conversationId: string): boolean | undefined;
   /** Слой чтения CLI с закреплённым окружением задачи (`SessionSpec.env.pin`); без IO. */
   readLayer(pin: Record<string, string>): ReadLayer;
+  /**
+   * Опись слоя человека с пином задачи (06:114, P87): хуки, навыки, агенты, инструкции и их хеш —
+   * для `layer.changed`, решения `layer-run`, ключа замера базы, кандидатов безымянного отказа
+   * хука и модели определения подагента. Нет метода — опись неизвестна (`null`), не «пусто».
+   */
+  inventory?(pin: Record<string, string>, cwd: string, repoLayer: boolean): UserLayerInventory;
   caps: AdapterCaps;
   bindEndpoint(
     channel: AdapterChannelSummary,
@@ -322,7 +449,16 @@ export interface CliAdapter {
     spec: SessionSpec,
   ): Promise<{ ok: true; handle: SessionHandle; layer: LayerRun } | { ok: false; reason: string }>;
   events(handle: SessionHandle, options?: { pollMs?: number }): AsyncIterable<AdapterEvent>;
-  send(handle: SessionHandle, message: string, cmdId: string): Promise<{ dup: boolean }>;
+  /**
+   * `origin` — чей это текст (G2): метку платформы ставит переходник по нему; нет — `platform`.
+   * Переходники до зоны слоя его не читают.
+   */
+  send(
+    handle: SessionHandle,
+    message: string,
+    cmdId: string,
+    origin?: SendOrigin,
+  ): Promise<{ dup: boolean }>;
   stop(handle: SessionHandle, mode: StopMode): Promise<StopOutcome>;
   mapPermission(raw: RawToolCall): PermissionAsk;
   /** Форма вопроса о праве у этого CLI (сервер права или `permit.request`) и ответа на него. */

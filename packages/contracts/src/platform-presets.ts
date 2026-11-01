@@ -388,6 +388,25 @@ export function platformPreset(id: string): PlatformDriverPreset {
 }
 
 /**
+ * Объявляет ли база подмену данных — строку `anonymization` в манифесте драйвера сервера. Это
+ * умолчание маски карточки контура, пока человек не выбрал (`dataMaskDecision.declared`): ядро
+ * спрашивает здесь, потому что драйверов сервера не грузит.
+ */
+export const PLATFORM_BASE_ANONYMIZATION: Record<PlatformDriverBase, boolean> = {
+  'enterprise-platform': true,
+  'openai-compat': false,
+};
+
+export function platformDeclaresAnonymization(id: string): boolean {
+  return PLATFORM_BASE_ANONYMIZATION[platformPreset(id).base];
+}
+
+/** Заголовок ключа драйвера: пресета (Azure — `api-key` без слова) или базы (`Bearer`). */
+export function platformDriverAuth(id: string): { header: string; scheme: string } {
+  return platformPreset(id).auth ?? { header: 'authorization', scheme: 'Bearer' };
+}
+
+/**
  * Запись контура, где прослойки и промпта нет, — с умолчаниями пресета её типа.
  *
  * Не `default(true)` схемы: это умолчание платформы компании, и контур, сохранённый мимо

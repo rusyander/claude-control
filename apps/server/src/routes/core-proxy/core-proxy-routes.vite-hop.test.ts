@@ -8,6 +8,7 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { processStartOf } from '../../lib/listen-identity/listen-identity.ts';
 import { readTcpTable } from '../../lib/peer-process/peer-process.ts';
 import { FORWARDED_PEER_HEADER } from '../../domains/core-proxy/core-proxy.ts';
 import { createCoreProxyRoutes } from './core-proxy-routes.ts';
@@ -51,11 +52,27 @@ beforeAll(async () => {
   await new Promise<void>((done) => core!.listen(0, '127.0.0.1', done));
   const corePort = (core.address() as AddressInfo).port;
   writeFileSync(join(home, 'token'), 'core-token-for-the-hop-test');
+  // Строка — настоящая: порт слушает этот процесс, старт — от ОС (прокладка сверяет её до bearer, F10).
+  const pidStart = await processStartOf(process.pid);
+  if (!pidStart) throw new Error('own process start is unreadable on this OS');
   writeFileSync(
     join(home, 'procs.json'),
     JSON.stringify({
       v: 1,
-      cores: [{ url: `http://127.0.0.1:${corePort}`, pid: 1, startedAt: Date.now() }],
+      cores: [
+        {
+          build: 'test',
+          pid: process.pid,
+          pidStart,
+          bootId: 'boot',
+          port: corePort,
+          url: `http://127.0.0.1:${corePort}`,
+          startedAt: Date.now(),
+          home,
+          portDecision: { rejected: [] },
+        },
+      ],
+      servers: [],
     }),
   );
 

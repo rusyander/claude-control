@@ -4,6 +4,7 @@ import { listDir } from '../platform/safe-io/files.ts';
 import { readTaskView } from '../journal/read-view.ts';
 import type { TaskFoldState } from '../journal/reduce/reduce.types.ts';
 import { createTask, resume, type LiveTask, type ResumeDeps } from '../journal/resume.ts';
+import { endUnclosed } from './run/close.ts';
 import { join } from 'node:path';
 
 /**
@@ -30,10 +31,13 @@ export interface TaskRegistry {
   readonly mask: ResumeDeps['mask'];
   list(): TaskSummary[];
   view(taskId: string): TaskFoldState | undefined;
+  /** Причина «нужен человек» (`flag`), та же, что в списке; `null` — задача не помечена. */
+  attentionOf(taskId: string): string | null;
   live(taskId: string): LiveTask | undefined;
   liveTasks(): LiveTask[];
   /** Живая задача: уже открытая или открытая сейчас; аренда у другого — `undefined` + причина. */
   open(taskId: string): Promise<{ task: LiveTask } | { refused: string }>;
+  /** Незаконченные: идущие и кончившиеся без отчёта конца (`endUnclosed`, крах до закрытия). */
   openUnfinished(): Promise<{ opened: string[]; refused: { taskId: string; reason: string }[] }>;
   create(created: JournalDataV1['task.created']): Promise<LiveTask>;
   /** Аренда потеряна (перехват): задача больше не наша. */
@@ -79,7 +83,19 @@ const OPEN_FAILED = 'journal did not open';
 const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-export function createTaskRegistry(tasksDir: string, deps: ResumeDeps): TaskRegistry {
+export interface TaskRegistryHooks {
+  /**
+   * Задача стала живой в этом ядре (открыта или создана) — до подписчиков `watch` и до первой
+   * записи после открытия: наблюдатель (этап 8) подписывается на каждую, не пропуская строк.
+   */
+  onLive?(task: LiveTask): void;
+}
+
+export function createTaskRegistry(
+  tasksDir: string,
+  deps: ResumeDeps,
+  hooks: TaskRegistryHooks = {},
+): TaskRegistry {
   const live = new Map<string, LiveTask>();
   const attention = new Map<string, string>();
   const watchers = new Map<string, Set<TaskWatcher>>();
@@ -115,6 +131,7 @@ export function createTaskRegistry(tasksDir: string, deps: ResumeDeps): TaskRegi
     // Журнал открылся позже (файл отпустили) — пометка «не открылся» больше не правда.
     if (attention.get(taskId)?.startsWith(OPEN_FAILED)) attention.delete(taskId);
     live.set(taskId, outcome.task);
+    hooks.onLive?.(outcome.task);
     notify(taskId, (watcher) => watcher.live(outcome.task));
     return { task: outcome.task };
   };
@@ -137,6 +154,7 @@ export function createTaskRegistry(tasksDir: string, deps: ResumeDeps): TaskRegi
       });
     },
     view: viewOf,
+    attentionOf: (taskId) => attention.get(taskId) ?? null,
     live: (taskId) => live.get(taskId),
     liveTasks: () => [...live.values()],
     open(taskId) {
@@ -154,15 +172,18 @@ export function createTaskRegistry(tasksDir: string, deps: ResumeDeps): TaskRegi
       const opened: string[] = [];
       const refused: { taskId: string; reason: string }[] = [];
       for (const taskId of ids()) {
-        let ended: boolean;
+        let finished: boolean;
         try {
-          ended = readTaskView(join(tasksDir, taskId), taskId).state.ended !== null;
+          const state = readTaskView(join(tasksDir, taskId), taskId).state;
+          // Кончилась без отчёта конца (крах между концом и закрытием) — не закончена: её конец
+          // закрывает обход исполнителя этого ядра, ровно раз.
+          finished = state.ended !== null && !endUnclosed(state);
         } catch (error) {
           refused.push({ taskId, reason: reasonOf(error) });
           registry.flag(taskId, `journal unreadable: ${reasonOf(error)}`);
           continue;
         }
-        if (ended) continue;
+        if (finished) continue;
         let got: Opened;
         try {
           got = await registry.open(taskId);
@@ -187,6 +208,7 @@ export function createTaskRegistry(tasksDir: string, deps: ResumeDeps): TaskRegi
         },
       });
       live.set(task.taskId, task);
+      hooks.onLive?.(task);
       notify(task.taskId, (watcher) => watcher.live(task));
       return task;
     },

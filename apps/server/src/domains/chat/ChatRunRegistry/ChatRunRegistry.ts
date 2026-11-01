@@ -67,7 +67,7 @@ import {
   withoutProjectSource,
 } from '../../local-layer/local-layer.ts';
 import type { LayerRunExtras } from '../../local-layer/local-layer.types.ts';
-import { firstQuestionOf } from '../../notify/telegram-text.ts';
+import { firstQuestionOf, questionOptionsOf } from '../../notify/telegram-text.ts';
 
 /**
  * Реестр прогонов Claude Code, отвязанный от HTTP-запроса.
@@ -99,10 +99,30 @@ export interface RunNotice {
   question?: string;
   /** Текст последней ошибки — только у `error`; наружу идёт лишь её класс. */
   errorText?: string;
-  /** Сколько шёл ход, мс — у `done` и `error`: «Закончил» уходит только после долгой работы. */
+  /** Сколько шёл ход, мс — у `done` и `error`: о конце хода пишут только после долгой работы. */
   durationMs?: number;
   /** Сессия терминала или VS Code (не прогон панели): ответ на уведомление — через хук. */
   outside?: boolean;
+  // Факты конца хода — только у `done`. По ним Telegram решает, задача ли
+  // закрыта, ждёт ли агент решения или это промежуточная остановка, о которой
+  // не пишут (`notify/turn-end/`). Итог хода наружу идёт одной-двумя фразами
+  // под маской, push и вебхук его не читают.
+  /** Итог хода — текст после последнего вызова инструмента. */
+  answer?: string;
+  /** На конце хода висит вопрос `AskUserQuestion`. */
+  asked?: boolean;
+  /** Варианты висящего вопроса. */
+  options?: string[];
+  /** Работа пошла дальше: уехала в новый разговор, хук Stop отбил конец, начался следующий ход. */
+  continued?: boolean;
+  /** Ход оборван: процесс умер посреди него или унёс фоновые задачи. */
+  interrupted?: boolean;
+  /** Фоновые задачи сессии ещё идут. */
+  background?: boolean;
+  /** Агент назначил себе пробуждение. */
+  wakeup?: boolean;
+  /** Ход, к которому относится конец: одна карточка на ход и вид. */
+  turnKey?: string;
 }
 
 /**
@@ -2473,6 +2493,33 @@ export class ChatRunRegistry {
     }
   }
 
+  /**
+   * Факты конца хода для уведомления: итог, висящий вопрос со своими
+   * вариантами, обрыв, фон, уехавшая работа. Вопрос — последний, который не
+   * закрыл автовыбор; усыновлённый прогон тел вопросов не видел — тогда что
+   * решить, скажет сам ответ.
+   */
+  private turnFacts(
+    run: RegisteredRun,
+    seen: { answer: string; asked: boolean; interrupted: boolean; continued: boolean },
+  ): Partial<RunNotice> {
+    const pending = seen.asked
+      ? [...(run.askInputs?.entries() ?? [])].filter(([id]) => !run.autoPicked?.has(id)).at(-1)?.[1]
+      : undefined;
+    const question = pending === undefined ? undefined : firstQuestionOf(pending);
+    const options = pending === undefined ? [] : questionOptionsOf(pending);
+    return {
+      ...(seen.answer.trim() ? { answer: seen.answer } : {}),
+      ...(seen.asked ? { asked: true } : {}),
+      ...(question ? { question } : {}),
+      ...(options.length > 0 ? { options } : {}),
+      ...(seen.interrupted ? { interrupted: true } : {}),
+      ...(seen.continued ? { continued: true } : {}),
+      ...(this.livePool.backgroundOf(run.sessionId) ? { background: true } : {}),
+      turnKey: String(run.startedAt),
+    };
+  }
+
   /** Прогон завершился сам (процесс закрылся). */
   private finish(run: RegisteredRun): void {
     if (run.status !== 'running') return;
@@ -2550,6 +2597,9 @@ export class ChatRunRegistry {
 
     // Журнал сдачи усыновлённому по-прежнему не полагается: проверок панель не
     // видела не потому, что их не было, — их скрыл умерший поток.
+    // Работа уехала в новый разговор (или ждёт его старта на паузе) — конец
+    // этого хода не итог задачи, и Telegram о нём молчит.
+    let handedOver = false;
     if (this.planHandoff) {
       try {
         const event = this.planHandoff({
@@ -2575,6 +2625,7 @@ export class ChatRunRegistry {
           ...(run.limit ? { limit: run.limit } : {}),
         });
         if (event) this.emit(run, event);
+        handedOver = event?.kind === 'handoff' && Boolean(event.chatId) && !event.reason;
       } catch {
         // Молча: причина отказа человеку не поможет, а прогон обязан закрыться.
       }
@@ -2616,6 +2667,9 @@ export class ChatRunRegistry {
       projectPath: run.meta.projectPath,
       ...(run.errored && run.lastError ? { errorText: run.lastError } : {}),
       durationMs: Math.max(0, (run.finishedAt ?? Date.now()) - run.startedAt),
+      ...(run.errored
+        ? {}
+        : this.turnFacts(run, { answer, asked, interrupted, continued: handedOver })),
     });
     // Закрываем текущих слушателей, но буфер держим ещё минуту — вдруг клиент
     // переподключается и хочет догнать хвост с терминальным событием.

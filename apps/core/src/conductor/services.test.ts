@@ -24,6 +24,7 @@ import { identityOfPid } from '../platform/process-identity.ts';
 import type { CommandProof } from '../policy/authority/authority.ts';
 import { createStandRegistry, readHealth } from '../verifier/stand/index.ts';
 import { processCommand } from './commands.ts';
+import { commandEnv } from './commands/__fixtures__/command-env.ts';
 import { reconcileTask } from './reconcile.ts';
 import {
   attachStand,
@@ -167,7 +168,7 @@ describe('P90 release-resource through the real command path (read back before "
     const dir = mkdtempSync(join(tmpdir(), 'agentdeck-release-'));
     temps.push(dir);
     const rid = addResource(task, 'tmpdir', dir);
-    const got = await processCommand(task, release(task, rid), proof);
+    const got = await processCommand(task, release(task, rid), proof, commandEnv());
     expect(got).toMatchObject({ status: 'applied', outcome: { rid, verified: `${dir} absent` } });
     expect(existsSync(dir)).toBe(false);
     expect(task.state.resources[rid]).toEqual({ kind: 'tmpdir', status: 'verified' });
@@ -177,18 +178,18 @@ describe('P90 release-resource through the real command path (read back before "
       'resource.verified',
       'command.applied',
     ]);
-    const again = await processCommand(task, release(task, rid), proof);
+    const again = await processCommand(task, release(task, rid), proof, commandEnv());
     expect(again).toMatchObject({ status: 'rejected', code: 'already-released' });
     task.close();
   });
   it('unknown rid → no-such-resource; a lease → not-releasable (its own road); nothing released', async () => {
     const { task } = await openFresh();
-    expect(await processCommand(task, release(task, newId()), proof)).toMatchObject({
+    expect(await processCommand(task, release(task, newId()), proof, commandEnv())).toMatchObject({
       status: 'rejected',
       code: 'no-such-resource',
     });
     const lease = addResource(task, 'lease', '{"leaseId":"x"}');
-    expect(await processCommand(task, release(task, lease), proof)).toMatchObject({
+    expect(await processCommand(task, release(task, lease), proof, commandEnv())).toMatchObject({
       status: 'rejected',
       code: 'not-releasable',
     });
@@ -217,7 +218,7 @@ describe('P90 release-resource through the real command path (read back before "
     const rid = attachStand(task, registry, { process: id.value, health, intervalMs: 60_000 });
     expect(await registry.get(task.taskId)?.tick()).toMatchObject({ healthy: true });
     expect(await registry.standEpoch(task.taskId)).toBe(0);
-    const got = await processCommand(task, release(task, rid), proof);
+    const got = await processCommand(task, release(task, rid), proof, commandEnv());
     expect(got).toMatchObject({
       status: 'applied',
       outcome: { rid, verified: expect.stringMatching(/not answering$/) },

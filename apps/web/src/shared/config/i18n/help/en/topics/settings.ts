@@ -665,7 +665,10 @@ export const settingsEn: typeof settingsRu = {
         '“Carry into the panel” or “Carry into global” in a sieve row puts a task into the ' +
         'input of a new chat in the panel repository and opens the chat. You send it. The ' +
         'agent does not write to the global layer: it puts the change into the proposal ' +
-        'directory.',
+        'directory. The task names its own acceptance: the corpus is green on both sides, ' +
+        'the panel copy’s tests run under the vitest of its own package, and when carrying ' +
+        'into global the global copy’s tests run on a temporary copy of the layer with the ' +
+        'proposal laid over it, never on the live layer.',
       proposal: 'Proposal — diff, confirmation, backup',
       proposalText:
         'While the proposal sits in its directory, the comparison already measures it over ' +

@@ -3,6 +3,7 @@ import type {
   ResourceKind,
   ResourceRelease,
   RouteAcquireSpec,
+  RouteBinding,
   RouteRecorder,
   RouteResource,
 } from '@agentdeck/contracts/core/routes';
@@ -41,6 +42,30 @@ export class RouteRefused extends Error {
     this.code = code;
     this.reason = reason;
   }
+}
+
+/**
+ * Модель по умолчанию CLI (`model: null`) годится только входу самого CLI: маршруту с адресом нужна
+ * модель в адресе, угадывать её никто не будет. Отказ называет маршрут; `null` — модель годится.
+ */
+export function modelRequired(
+  route: { id: string; caps: { binding: RouteBinding } },
+  model: string | null,
+): string | null {
+  if (model !== null || route.caps.binding.via === 'cli-login') return null;
+  return `route ${route.id} needs a concrete model; the tier picked the CLI default (set a task model ceiling or a step model)`;
+}
+
+/** Модель аренды маршрута с адресом: `null` — отказ `model_absent` тем же текстом `modelRequired`. */
+export function requireModel(
+  route: { id: string; caps: { binding: RouteBinding } },
+  spec: RouteAcquireSpec,
+): string {
+  if (spec.model !== null) return spec.model;
+  throw new RouteRefused(
+    'model_absent',
+    modelRequired(route, null) ?? `route ${route.id} needs a concrete model`,
+  );
 }
 
 /** Прерывание ожидания и запуска (`AbortSignal` вызывающего). */

@@ -11,8 +11,11 @@ import {
   type RecordStore,
 } from '../../verifier/store/index.ts';
 
-/** Зона A (ключ, хранилище, решение): что проверки дают дороге модели. */
-export type VerifyWiring = Pick<ModelToolDeps, 'records'>;
+/**
+ * Зона A (ключ, хранилище, решение): что проверки дают дороге модели. `evidence` — читатель
+ * свежести и охвата записи (`evidence.ts`, этап 4 зона C); `index.ts` добавляет его из очереди.
+ */
+export type VerifyWiring = Pick<ModelToolDeps, 'records' | 'evidence'>;
 
 export interface VerifyWiringDeps {
   registry: Partial<Pick<TaskRegistry, 'liveTasks'>>;
@@ -83,6 +86,10 @@ export function verifyWiring(deps: VerifyWiringDeps): VerifyWiring {
                 checkId: rec.checkId,
                 taskId: rec.taskId,
                 origin: rec.origin,
+                // Ключ и единица — для суда свежести и охвата (G22, P92).
+                key: rec.key,
+                unit: rec.unit,
+                selection: rec.parts.selection,
               },
             };
           }

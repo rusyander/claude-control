@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MutantPlanRow } from '@agentdeck/contracts/core/records';
@@ -67,6 +67,32 @@ describe('verifier/mutate runPlan (G6)', () => {
       outcome: 'baseline-red',
       detail: expect.stringMatching(/пропущен/),
     });
+  });
+
+  it('the runner TEMP is outside .git, so a test that git-inits under TEMP gets a work tree; it leaves with the run', async () => {
+    const dir = repo();
+    const temps: string[] = [];
+    const inner = fakeRunner(dir, byBehaviour);
+    const runner: TestRunner = {
+      run: (input, ctx) => {
+        const temp = ctx.env.TEMP ?? '';
+        temps.push(temp);
+        // Тест, который заводит репозиторий в TEMP, — как `gitRepo` стендов.
+        const made = mkdtempSync(join(temp, 'repo-'));
+        const init = spawnSync('git', ['init', '-q'], { cwd: made, encoding: 'utf8' });
+        if (init.status !== 0) throw new Error(`git init under TEMP: ${init.stderr}`);
+        return inner.run(input, ctx);
+      },
+    };
+    const results = await runPlan([row('a + b', 'a - b')], { root: dir, runner });
+    expect(results.map((r) => r.outcome)).toEqual(['killed']);
+    expect(temps.length).toBeGreaterThan(0);
+    for (const temp of temps) {
+      expect(temp.replace(/\\/g, '/')).not.toContain('/.git/');
+      expect(temp.startsWith(join(dir, '.git'))).toBe(false);
+    }
+    // Папка прогона уходит вместе с ним.
+    expect(existsSync(temps[0] ?? '')).toBe(false);
   });
 
   it('while a mutant is applied the mustfail journal names this run: mutation-guard refuses foreign suites, the mutated bytes are journaled before the write', async () => {

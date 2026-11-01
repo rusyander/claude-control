@@ -164,6 +164,10 @@ export interface CheckRecord {
   taskId: Uuidv7 | null; // id псевдо-задачи для чужих сессий (04:42)
   checkRunId: Uuidv7 | null; // связь с журналом (code: journal-data.ts:238 `check.recorded`)
   log: { bytes: number; truncated: boolean; sha: Sha256Hex }; // `<store>/logs/<id>.log.gz`, голова+хвост свыше 2 МБ (архив store.cjs LOG_CAP)
+  /** Итог классов migration/contract; нет — у класса своего итога нет. Входит в sig. */
+  classOutcome?:
+    | { class: 'migration'; value: MigrationOutcome }
+    | { class: 'contract'; value: ContractOutcome[] };
   sig: string; // HMAC по всему, что выше
 }
 
@@ -207,8 +211,8 @@ export interface CheckDecisionInput {
   changedUnits: string[]; // охват
   window: {
     verdict: 'open' | 'warn' | 'refused';
-    basis: 'economy-window' | 'not-modelled-until-phase-5';
-  }; // decisions.ts:22; economy/window — фаза 5
+    basis: 'economy-window';
+  }; // decisions.ts:22; книга окон `economy/window` по маршруту шага (этап 5, `checkWindow`)
   fresh: { scope: 'check' | 'unit' | 'key'; ref: string } | null; // разовый fresh-перезапуск (code: commands.ts:43; действует с фазы 5, code: conductor/commands.ts:47)
   quarantined: string[]; // id тестов (04:85)
 }

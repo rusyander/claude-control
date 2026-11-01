@@ -104,6 +104,7 @@ async function runSide(
       standEpoch: result.standEpoch,
       taskId: input.taskId,
       checkRunId,
+      ...(result.classOutcome ? { classOutcome: result.classOutcome } : {}),
     },
     result.log,
   );

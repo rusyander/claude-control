@@ -157,6 +157,28 @@ describe('pending permits — limits, case and forgetting (core-s2 F-92)', () =>
     expect(await waiting).toMatchObject({ pending: false });
     expect(Date.now() - started).toBeLessThan(1_000);
   });
+
+  it('stage 8 deciding: true only while a question waits for its stream request — not for an answered or claimed call (stall watch input)', async () => {
+    const gate = createPendingPermits({ selfToolNames: [SELF] });
+    expect(gate.deciding(S)).toBe(false);
+    // Вопрос раньше запроса потока: ядро решает — тишина сессии не зависание.
+    const waiting = gate.claim(S, 'c1', STEP_DONE, 5_000);
+    expect(gate.deciding(S)).toBe(true);
+    expect(gate.deciding('other-session')).toBe(false);
+    gate.observe(S, requested('c1', STEP_DONE));
+    expect(await waiting).toEqual({ pending: true });
+    // Near-miss: `claimed` держится до `tool.result` — исполнение разрешённого не «решение».
+    expect(gate.deciding(S)).toBe(false);
+    // Ожидание, кончившееся таймером или забытой сессией, тоже снимает признак.
+    const timed = gate.claim(S, 'never', STEP_DONE, 5);
+    expect(gate.deciding(S)).toBe(true);
+    await timed;
+    expect(gate.deciding(S)).toBe(false);
+    const forgotten = gate.claim(S, 'never2', STEP_DONE, 5_000);
+    gate.forget(S);
+    await forgotten;
+    expect(gate.deciding(S)).toBe(false);
+  });
 });
 
 /** Кадры настоящего Qwen Code 0.24.3 (поток сеанса e2e, 28.10), сокращены до значимых полей. */

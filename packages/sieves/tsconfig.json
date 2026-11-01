@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "noEmit": true,
+    // Пакет грузят как есть сервер и ядро (`node --experimental-strip-types`): типы
+    // только стираются, поэтому enum, namespace и parameter properties ловятся здесь,
+    // а относительный импорт значения обязан нести расширение `.ts`.
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "vitest.config.ts"]
+}

@@ -1,5 +1,6 @@
 import { absent } from '../lib/facts/read-fact.ts';
-import { stubReader, type ActionFactReaders } from '../conductor/reconcile.ts';
+import type { ActionFactReaders } from '../conductor/reconcile.ts';
+import { forgeActionReaders, type ForgeReaderDeps } from './forge-wiring/readers.ts';
 import { containerActionReaders } from '../conductor/services.ts';
 import { copyState } from '../platform/copy-git.ts';
 import { markerSweep } from '../platform/env-marker.ts';
@@ -8,8 +9,8 @@ import { listDir } from '../platform/safe-io/files.ts';
 /**
  * Читатели фактов сверки (01 §Outbox): копия — каталог на диске; процесс — по метке окружения
  * дерева из `idempotencyHint` (`NAME=VALUE`); контейнер сервиса — движком по меткам задачи
- * (класс `container.by-label`, зона F). Пуш, MR, ответ, трекер — заглушки фазы 6: они отвечают
- * `unknown`, и сверка спрашивает человека по сроку.
+ * (класс `container.by-label`, зона F). Пуш, удаление ветки, MR и ответ в нити — форж и
+ * `ls-remote` по цели и подсказке действия (`forge-wiring/readers.ts`); трекер — всегда `unknown`.
  */
 
 function dirFact(path: string): string | { absent: true } {
@@ -31,13 +32,9 @@ function copyFact(path: string): string | { absent: true } {
   return `${state.value} ${path}`;
 }
 
-export function actionReaders(): ActionFactReaders {
+export function actionReaders(deps: ForgeReaderDeps = {}): ActionFactReaders {
   return {
-    push: stubReader(6),
-    'mr-create': stubReader(6),
-    'mr-update': stubReader(6),
-    'thread-reply': stubReader(6),
-    'tracker-write': stubReader(6),
+    ...forgeActionReaders(deps),
     ...containerActionReaders(),
     'copy-create': (action) => () => copyFact(action.target),
     'copy-remove': (action) => () => dirFact(action.target),

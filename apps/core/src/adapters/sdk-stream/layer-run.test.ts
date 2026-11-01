@@ -21,6 +21,9 @@ function policy(read: CliTrustRead): LayerPolicy & { asked: string[] } {
       return read;
     },
     untrusted: (mode) => (mode === 'on' ? 'observe' : mode),
+    inventory: () => {
+      throw new Error('inventory is not read by resolveLayer');
+    },
   };
 }
 

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tempDir } from '../journal/__fixtures__/journal-harness.ts';
 import { isUuidv7 } from '@agentdeck/contracts/core/ids';
+import { sha256Hex } from '../platform/core-config/files.ts';
 import { ensureCoreHome } from '../platform/core-home.ts';
 import { loadSigningDevices, machineIdOf } from './devices.ts';
 
@@ -57,5 +58,39 @@ describe('signing devices and machine id', () => {
       writeFileSync(file, broken);
       expect({ broken, devices: loadSigningDevices(layout) }).toEqual({ broken, devices: [] });
     }
+  });
+
+  it('G9 devices.json edited outside the core (state digest differs) proves no device, noted once per digest; matching digest keeps it', () => {
+    const layout = ensureCoreHome(join(tempDir('home-'), 'core'));
+    const file = join(layout.root, 'devices.json');
+    const state = join(layout.root, 'devices.state.json');
+    const paired = JSON.stringify({ devices: [{ id: 'phone', publicKey: 'pk1' }] });
+    writeFileSync(file, paired);
+    writeFileSync(state, JSON.stringify({ digest: sha256Hex(paired) }));
+    const notes: { event: string; data: Record<string, unknown> }[] = [];
+    const note = (event: string, data: Record<string, unknown>): void => {
+      notes.push({ event, data });
+    };
+    expect(loadSigningDevices(layout, note)).toEqual([{ id: 'phone', publicKey: 'pk1' }]);
+    const planted = JSON.stringify({
+      devices: [
+        { id: 'phone', publicKey: 'pk1' },
+        { id: 'evil', publicKey: 'pk9' },
+      ],
+    });
+    writeFileSync(file, planted);
+    expect(loadSigningDevices(layout, note)).toEqual([]);
+    expect(loadSigningDevices(layout, note)).toEqual([]);
+    expect(notes).toEqual([
+      {
+        event: 'devices.drift',
+        data: { fileDigest: sha256Hex(planted), reason: 'devices.json edited outside the core' },
+      },
+    ]);
+    // Память не читается — тоже ни одного устройства, а не «как раньше».
+    writeFileSync(file, paired);
+    writeFileSync(state, '{broken');
+    expect(loadSigningDevices(layout, note)).toEqual([]);
+    expect(notes.at(-1)?.data.reason).toBe('devices.state.json unreadable');
   });
 });

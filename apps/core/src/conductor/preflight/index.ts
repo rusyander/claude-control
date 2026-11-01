@@ -10,6 +10,15 @@ export {
   repoAccessProbe,
 } from './probes.ts';
 export type { LsRemote, MachineProbeInput, PreflightRepo } from './probes.ts';
+export {
+  captureProbe,
+  cliProbe,
+  coreMcpProbe,
+  roadProbes,
+  routeProbe,
+  type AllowedRoute,
+  type RoadProbeInput,
+} from './road-probes.ts';
 export { ROADS } from './preflight.types.ts';
 export type {
   PreflightInput,

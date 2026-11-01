@@ -14,10 +14,11 @@ import {
   planQwen as planWithLayer,
   QWEN_CAPS,
   QWEN_CHANNELS,
+  QWEN_LAYER,
   qwenHookCommand,
   refuseQwen,
 } from './qwen.ts';
-import { trustedLayer } from '../sdk-stream/layer-run.ts';
+import { resolveLayer, trustedLayer } from '../sdk-stream/layer-run.ts';
 
 /** План доверенного репозитория — слой как просили; недоверенная копия (F-86) — своими случаями. */
 const planQwen = (spec: SessionSpec, binding: Parameters<typeof planWithLayer>[1]) =>
@@ -46,7 +47,7 @@ function spec(over: Partial<SessionSpec> = {}): SessionSpec {
     platform: { coreHome: join(CWD, '..', 'qwen-plan-core'), tokenFiles: [] },
     tools: 'all',
     mcpServers: {},
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     env: { pin: {} },
     coreHook: 'node hook.mjs core',
     core: {
@@ -145,10 +146,20 @@ describe('qwen adapter — hook command', () => {
     expect(qwenHookCommand('   ')).toBeNull();
   });
 
-  it('refuses a layer it cannot control and a core hook it cannot run', () => {
+  it('runs a layer it cannot control as on, named (G3); refuses a core hook it cannot run', async () => {
     expect(refuseQwen(spec())).toBeNull();
     expect(refuseQwen(spec({ coreHook: 'node hook.mjs' }))).toBeNull();
-    expect(refuseQwen(spec({ layer: { hooks: 'observe' } }))).toMatch(/not controllable/);
+    expect(refuseQwen(spec({ layer: { hooks: 'observe', skills: 'on' } }))).toBeNull();
+    const trusted = { sourceRepo: CWD, panelMark: true };
+    await expect(
+      resolveLayer(spec({ layer: { hooks: 'off', skills: 'on' }, trust: trusted }), QWEN_LAYER),
+    ).resolves.toEqual({
+      asked: 'off',
+      ran: 'on',
+      repoLayer: true,
+      trust: 'panel',
+      detail: 'qwen: no layer control: hooks off → on',
+    });
     expect(refuseQwen(spec({ coreHook: '"a b/node" x' }))).toMatch(/whitespace/);
   });
 
@@ -298,9 +309,22 @@ describe('qwen adapter — permissions', () => {
       action: 'conversation',
       target: 'todo_write',
     });
-    expect(mapQwenPermission({ tool: 'agent', input: {} })).toMatchObject({
+    expect(
+      mapQwenPermission({ tool: 'agent', input: { subagent_type: 'reviewer', prompt: 'p' } }),
+    ).toEqual({
+      action: 'subagent',
+      target: 'reviewer',
+      model: null,
+      tool: 'agent',
+      display: 'agent reviewer',
+    });
+    expect(mapQwenPermission({ tool: 'skill', input: { skill: 'pdf' } })).toMatchObject({
+      action: 'skill',
+      target: 'pdf',
+    });
+    expect(mapQwenPermission({ tool: 'tool_call', input: {} })).toMatchObject({
       action: 'other',
-      target: 'agent',
+      target: 'tool_call',
     });
   });
 
@@ -334,10 +358,6 @@ describe('qwen adapter — assembled', () => {
     const adapter = createQwenAdapter();
     expect(adapter.id).toBe('qwen');
     expect(adapter.caps).toBe(QWEN_CAPS);
-    await expect(adapter.launch(spec({ layer: { hooks: 'off' } }))).resolves.toEqual({
-      ok: false,
-      reason: 'layer off is not controllable',
-    });
     await expect(
       adapter.launch(
         spec({

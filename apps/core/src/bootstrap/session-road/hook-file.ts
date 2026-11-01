@@ -1,12 +1,13 @@
 import { join } from 'node:path';
 import { CAPTURE_TOOLS, captureWrapperArgv } from '../../mcp/capture-wrap.ts';
-import { CONTAINER_MODE, HOOK_MODE, MCP_RUN } from '../../mcp/main.ts';
+import { CONTAINER_MODE, HOOK_MODE, MCP_RUN, RECORDER_MODE, STATE_MODE } from '../../mcp/main.ts';
 import { windowsShortPath, writePathWrapper, writeShellWrapper } from '../../platform/exec-bit.ts';
 import { resolveExecutable } from '../../platform/exec-resolve.ts';
 import type { OsKind } from '../../platform/os-kind.ts';
 
 /**
- * Файлы, которые дорога сессии ставит CLI (03 §Launcher, P105): хук ядра и обёртки PATH.
+ * Файлы, которые дорога сессии ставит CLI (03 §Launcher, P105): хук ядра, обёртки PATH и команда
+ * `agentdeck` для авторов хуков.
  * Каждый — через `writeExecutable`: 0755 явным `chmod` после записи и чтение режима назад, иначе
  * umask 077 или копия без бита дают файл, который CLI молча не запускает (хук не зовётся —
  * решения ядра нет). Отказ записи — отказ запуска, не сессия без хука.
@@ -35,7 +36,35 @@ export function coreHookCommand(
   os: OsKind,
   shorten: (path: string) => string | null = windowsShortPath,
 ): { ok: true; command: string } | { ok: false; reason: string } {
-  const argv = [...nodeArgv, MCP_RUN, HOOK_MODE];
+  return runTsCommand(HOOK_MODE, CORE_HOOK_FILE, 'core hook', dir, nodeArgv, os, shorten);
+}
+
+export const RECORDER_FILE = 'core-recorder';
+
+/**
+ * Команда записи хука человека в `observe` (P87, G7): та же дорога, что у хука ядра (`run.ts
+ * recorder`); ключ, журнал и список наблюдаемых переходник дописывает словами после неё — POSIX
+ * обёртка передаёт их через `"$@"`.
+ */
+export function recorderCommand(
+  dir: string,
+  nodeArgv: readonly string[],
+  os: OsKind,
+  shorten: (path: string) => string | null = windowsShortPath,
+): { ok: true; command: string } | { ok: false; reason: string } {
+  return runTsCommand(RECORDER_MODE, RECORDER_FILE, 'observe recorder', dir, nodeArgv, os, shorten);
+}
+
+function runTsCommand(
+  mode: string,
+  fileName: string,
+  what: string,
+  dir: string,
+  nodeArgv: readonly string[],
+  os: OsKind,
+  shorten: (path: string) => string | null,
+): { ok: true; command: string } | { ok: false; reason: string } {
+  const argv = [...nodeArgv, MCP_RUN, mode];
   if (os === 'win32') {
     const words = argv.map((word) => (/\s/.test(word) ? (shorten(word) ?? word) : word));
     return {
@@ -43,9 +72,9 @@ export function coreHookCommand(
       command: words.map((word, i) => (i === words.length - 1 ? word : dq(word))).join(' '),
     };
   }
-  const file = join(dir, CORE_HOOK_FILE);
+  const file = join(dir, fileName);
   const written = writeShellWrapper(file, argv, os);
-  if (!written.ok) return { ok: false, reason: `core hook not installed: ${written.reason}` };
+  if (!written.ok) return { ok: false, reason: `${what} not installed: ${written.reason}` };
   return { ok: true, command: dq(file) };
 }
 
@@ -114,6 +143,32 @@ export function installContainerWrappers(input: {
       });
   }
   return out;
+}
+
+/** Команда сессии для авторов хуков (03:82): `agentdeck state` — в `<dir>/bin`, первом в PATH. */
+export const AGENTDECK_COMMAND = 'agentdeck';
+
+/**
+ * Обёртка `agentdeck` в `<dir>/bin`: sh (POSIX и Git Bash, 0755 с чтением режима назад) и на
+ * Windows ещё `.cmd` (cmd и PowerShell ищут по PATHEXT). Обе зовут `run.ts state` node ядра —
+ * разбор подкоманды и запасной снимок там же (`mcp/state-cli.ts`). Не встала — причина, а не
+ * сессия, где команда из документации молча «не найдена».
+ */
+export function installStateWrapper(input: {
+  dir: string;
+  os: OsKind;
+  nodeArgv: readonly string[];
+}): { ok: true } | { ok: false; reason: string } {
+  const written = writePathWrapper(
+    join(input.dir, WRAPPER_DIR, AGENTDECK_COMMAND),
+    [...input.nodeArgv, MCP_RUN, STATE_MODE],
+    input.os,
+    'agentdeck state prints the session state for user hooks (core API, launch snapshot fallback)',
+  );
+  const failed = written.filter((w): w is { ok: false; reason: string } => !w.ok);
+  return failed.length === 0
+    ? { ok: true }
+    : { ok: false, reason: failed.map((w) => w.reason).join(' ') };
 }
 
 export interface CaptureWrapperOutcome {

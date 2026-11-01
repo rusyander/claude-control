@@ -1,0 +1,23 @@
+{
+  "name": "@agentdeck/stub-forge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Заглушка форжа по сценарию: подмножество API GitLab и GitHub для публикатора ядра, лента событий, след запросов — только loopback",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.mts",
+      "default": "./src/index.mjs"
+    }
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

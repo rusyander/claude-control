@@ -5,7 +5,7 @@ import { Toggle } from '@shared/ui/toggle';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
-import { ownStepCount } from '@features/GroupPath';
+import { ownStepCount } from '@entities/StepPath';
 import {
   useBuiltinGroups,
   useGroupMembers,

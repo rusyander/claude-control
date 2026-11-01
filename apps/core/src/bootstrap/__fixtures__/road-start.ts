@@ -1,7 +1,7 @@
 import { dirname, join } from 'node:path';
 import { livePin, type LiveRoot } from '../../adapters/conformance/__fixtures__/live.ts';
 import { replayEnv } from '../../adapters/conformance/__fixtures__/replay.ts';
-import { CREATED } from '../../journal/__fixtures__/journal-harness.ts';
+import { CREATED, FIRST_ROUND, SOLO_UNIT } from '../../journal/__fixtures__/journal-harness.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import type { BootedCore } from '../boot.ts';
@@ -57,14 +57,20 @@ export function roadStart(input: RoadStartInput): RoadStart {
     kind: 'unit.created',
     actor: 'core',
     unitId,
-    data: { unitId, repoKey: 'r1', branch: `agentdeck/${unitId.slice(-8)}`, ownedPaths: [] },
+    data: {
+      unitId,
+      repoKey: 'r1',
+      branch: `agentdeck/${unitId.slice(-8)}`,
+      ownedPaths: [],
+      ...SOLO_UNIT,
+    },
   });
   task.append({
     kind: 'step.started',
     actor: 'core',
     unitId,
     stepId,
-    data: { stepId, unitId, stepKind: 'work', budgetMs: 600_000 },
+    data: { stepId, unitId, stepKind: 'work', budgetMs: 600_000, ...FIRST_ROUND },
   });
   task.append({
     kind: 'step.transition',
@@ -91,7 +97,7 @@ export function roadStart(input: RoadStartInput): RoadStart {
       tools: [],
     },
     tools: 'all',
-    layer: { hooks: input.layer ?? 'on' },
+    layer: { hooks: input.layer ?? 'on', skills: 'on' },
     pin: livePin(live, replayEnv({ fixture: input.fixture, dump: input.dump })),
     pathPrefix: [input.bin, dirname(process.execPath)],
   };

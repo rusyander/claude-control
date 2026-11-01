@@ -1,3 +1,5 @@
+import { p95 } from '../../lib/stats.ts';
+
 /**
  * Срок прогона (01: «running: learned p95 × 3»). Выученные длительности — `ms` прошлых записей
  * той же проверки и единицы (без пауз, P43). Нет истории — щедрый срок по умолчанию: обрезать
@@ -8,14 +10,6 @@
 export const DEFAULT_DEADLINE_MS = 30 * 60_000;
 export const MIN_DEADLINE_MS = 60_000;
 export const DEADLINE_FACTOR = 3;
-
-/** p95 по ближайшему рангу; пустой список — `null`. */
-export function p95(samples: readonly number[]): number | null {
-  const clean = samples.filter((n) => Number.isFinite(n) && n >= 0).sort((a, b) => a - b);
-  if (clean.length === 0) return null;
-  const rank = Math.ceil(0.95 * clean.length);
-  return clean[Math.min(clean.length, Math.max(1, rank)) - 1]!;
-}
 
 /** Потолок удвоения после снятых прогонов: висящий набор не держит слот сутками. */
 export const MAX_DEADLINE_MS = 6 * 3_600_000;

@@ -20,9 +20,12 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const NET_TOOLS = new Set(['WebFetch', 'WebSearch']);
 /**
  * Только состояние разговора CLI: без `ToolSearch` CLI не загрузит отложенные инструменты ядра
- * (`mcp__agentdeck__step_done`), и шаг не закончится. `Task`/`Agent`/`Skill` действуют — `other`.
+ * (`mcp__agentdeck__step_done`), и шаг не закончится. `Skill` и `Task`/`Agent` действуют — у них
+ * свои классы `skill` / `subagent`, судья пускает их только по фактам слоя сеанса (06:115, 06:124).
  */
 const CONVERSATION_TOOLS = new Set(['ToolSearch', 'TodoWrite']);
+/** Проба L Q5: на проводе подагент — `Agent`, в списке `init.tools` ещё `Task`. */
+const SUBAGENT_TOOLS = new Set(['Task', 'Agent']);
 
 /** Класс ядра → встроенные инструменты Claude Code. */
 export const CLAUDE_TOOL_NAMES: Record<CoreToolClass, string[]> = {
@@ -46,6 +49,20 @@ function searchTarget(tool: string, input: Record<string, unknown>): string {
   return isAbsolute(mask) ? mask : join(root, mask);
 }
 
+const lineNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+
+/**
+ * Диапазон Read (этап 8): `offset` у Claude Code — номер первой строки с единицы (проба 2.1.310:
+ * offset 10 → `startLine: 10`), он и есть канон ядра. Ни одного поля — файл целиком (CLI читает
+ * до 2000 строк, дальше режет сам).
+ */
+export function claudeReadRange(input: Record<string, unknown>): PermissionAsk['range'] {
+  const offset = lineNumber(input.offset);
+  const limit = lineNumber(input.limit);
+  return offset === null && limit === null ? null : { offset, limit };
+}
+
 export function mapClaudePermission(raw: RawToolCall): PermissionAsk {
   const input = raw.input;
   const tool = raw.tool;
@@ -58,7 +75,13 @@ export function mapClaudePermission(raw: RawToolCall): PermissionAsk {
   }
   if (READ_TOOLS.has(tool)) {
     const target = text(input.file_path) || text(input.path);
-    return { action: 'read', target, tool, display: `${tool} ${target}`.trim() };
+    return {
+      action: 'read',
+      target,
+      ...(tool === 'Read' ? { range: claudeReadRange(input) } : {}),
+      tool,
+      display: `${tool} ${target}`.trim(),
+    };
   }
   if (EDIT_TOOLS.has(tool)) {
     const target = text(input.file_path) || text(input.notebook_path);
@@ -83,6 +106,16 @@ export function mapClaudePermission(raw: RawToolCall): PermissionAsk {
   }
   if (CONVERSATION_TOOLS.has(tool)) {
     return { action: 'conversation', target: tool, tool, display: tool };
+  }
+  if (tool === 'Skill') {
+    const target = text(input.skill);
+    return { action: 'skill', target, tool, display: `${tool} ${target}`.trim() };
+  }
+  if (SUBAGENT_TOOLS.has(tool)) {
+    // Модель вызова — псевдоним (`sonnet|opus|haiku|…`); нет — модель определения или сеанса.
+    const target = text(input.subagent_type);
+    const model = text(input.model) || null;
+    return { action: 'subagent', target, model, tool, display: `${tool} ${target}`.trim() };
   }
   return { action: 'other', target: tool, tool, display: tool };
 }

@@ -1,6 +1,6 @@
 import type { KnobView, PathStep } from '@agentdeck/contracts';
 import type { RowWords } from '../../model/rowWords';
-import type { DragHandleProps } from '../../model/useStepDrag';
+import type { DragHandleProps } from '@entities/StepPath';
 import type { RowText } from '../../model/describe.types';
 import type { PathRow } from '../../model/pathRows.types';
 import type { RowType } from '../../model/rowWords.types';

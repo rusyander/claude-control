@@ -221,7 +221,16 @@ async function stopAttached(
       while (code === undefined && Date.now() < deadline) await sleep(50);
       if (code !== undefined) return { how: 'exited', residual: [], code };
     }
-    const report = await session.stop(graceMs);
+    let report: Awaited<ReturnType<typeof session.stop>>;
+    try {
+      report = await session.stop(graceMs);
+    } catch (error) {
+      // CLI вышел сам, пока уходила остановка: хост записал исход и закрыл канал, `stopped` не
+      // придёт. Это выход, а не сбой — как при подключении; исхода на диске нет — сбой как был.
+      const late = readExit(dir);
+      if (late) return alreadyExited(late);
+      throw error;
+    }
     return {
       how: 'tree',
       residual: report.residual,

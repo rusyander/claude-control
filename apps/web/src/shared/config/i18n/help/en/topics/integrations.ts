@@ -66,8 +66,9 @@ export const integrationsEn: typeof integrationsRu = {
       'Without gh installed: a defect, a comment, linking a pull request to a run. With both forges connected the right one is picked by the link or by the project origin.',
     cardTelegram: 'Telegram',
     cardTelegramText:
-      'A message when a run ends, fails, asks for permission, asks a question, or a test ' +
-      'fails. Connected in two steps: the bot token and /start in the chat with the bot. ' +
+      'A message when a task is closed or the agent waits for a decision, a run fails, ' +
+      'asks for permission, asks a question, or a test fails; none for intermediate ' +
+      'stops. Connected in two steps: the bot token and /start in the chat with the bot. ' +
       'The switch turns everything off; sending never delays the work itself.',
     cardWebhook: 'Webhook',
     cardWebhookText:
@@ -261,15 +262,19 @@ export const integrationsEn: typeof integrationsRu = {
         'five minutes changes nothing. A bot the agent already listens to cannot be ' +
         'connected this way: the id goes into Advanced. A message reads at a glance. The ' +
         'first line, in bold, is the kind, the project after a folder mark and the session ' +
-        '(up to 40 characters): “❓ ВОПРОС · 📁 shop · Аудит проекта”, “❓ ВОПРОС 1/3 · …”, ' +
-        '“🔐 РАЗРЕШЕНИЕ · …”, “⏳ ОТЛОЖЕНО D-3 · …”, “✅ ГОТОВО · …”, “🛑 ОШИБКА · …”, ' +
-        '“🧪 ТЕСТЫ · …”, “⚠️ ТРЕВОГА · …”; another CLI, VS Code and the terminal go between ' +
-        'the project and the session: “📁 shop · Codex · Аудит проекта”, “📁 shop · VS Code ' +
-        '· …”; with no known project there is no mark. The second line is the essence, ' +
-        'exactly once: the question text (up to 300 ' +
-        'characters, then “…полностью в панели”), the description or the command itself (up ' +
-        'to 80 characters), what to decide on a D-n, “шёл 12 мин”, “Агент упал”, “5 из 120 ' +
-        'упали”, what happened to the group. Question options come as a numbered list only ' +
+        '(up to 40 characters): “✅ Задача закрыта · 📁 shop · Аудит проекта”, “⏳ Агент ' +
+        'ждёт вас · …”, “❓ ВОПРОС 1/3 · …” and “🔐 РАЗРЕШЕНИЕ · …” (with buttons), “⏳ ' +
+        'ОТЛОЖЕНО D-3 · …”, “🛑 ОШИБКА · …”, “🧪 ТЕСТЫ · …”, “⚠️ ТРЕВОГА · …”; another CLI, ' +
+        'VS Code and the terminal go between the project and the session: “📁 shop · Codex · ' +
+        'Аудит проекта”, “📁 shop · VS Code · …”; with no known project there is no mark. ' +
+        'The second line is the essence, exactly once: for “Задача закрыта” one or two ' +
+        'sentences on what was done; for “Агент ждёт вас” “Нужно решить:” and the question ' +
+        'with its options as a numbered list when they are named, or “Нужно разрешение:” and ' +
+        'the tool; for a question with buttons its text (up to 300 characters, then ' +
+        '“…полностью в панели”), the description or the command itself (up to 80 ' +
+        'characters), what to decide on a D-n, “Агент упал”, “5 из 120 упали”, what ' +
+        'happened to the group. A turn end carries “шёл 12 мин” under the essence. Options ' +
+        'of a question with buttons come as a numbered list only ' +
         'when at least one has a description; otherwise the buttons are enough. The command, ' +
         '“why you decide”, the group and the rule code are folded into a quote, and the last ' +
         'line is an “Открыть чат →” link to this chat in the panel (the 127.0.0.1 address of ' +
@@ -279,8 +284,8 @@ export const integrationsEn: typeof integrationsRu = {
         'компьютере”): an answer from Telegram would start a copy of that session in the ' +
         'panel while the question there kept waiting. Once the hook takes the question, ' +
         'buttons appear in the same message; there is no second one. ' +
-        'Secrets are masked; notifications without buttons carry no code, paths, prompt or ' +
-        'agent answer.',
+        'Secrets are masked and paths fold to the file name; notifications without buttons ' +
+        'carry no code, prompt or whole agent answer — only those one or two sentences.',
       notifyAnswers: '5. Connected Telegram: when to call',
       notifyAnswersText:
         'The connected card is short. The switch: off means nothing goes out and answers ' +
@@ -293,12 +298,20 @@ export const integrationsEn: typeof integrationsRu = {
         'same way as the panel button. A group question and a deferred D-n go at once. ' +
         'After the panel starts and after the computer wakes from sleep nothing goes out ' +
         'for two minutes: what piled up waits in case you are already answering in the ' +
-        'panel. “The agent finished” — only if work took longer than the set minutes. For ' +
-        'panel chats that is the run time; for terminal and VS Code sessions it counts from ' +
-        'your last message, and the panel learns the turn ended only from its Stop hook in ' +
-        'the Claude Code settings (“Agent on the computer” in the phone app writes it): no ' +
-        'hook, or the panel closed at that moment — no message; a turn continued by a ' +
-        'message from the phone has not ended. “Something broke” — a failed run, red tests, ' +
+        'panel. “Task closed or the agent waits for a decision” — a turn end after work ' +
+        'longer than the set minutes, and only two kinds: “✅ Задача закрыта” when the ' +
+        'agent itself writes that the whole task is closed (not a “zone”, not a “phase”, ' +
+        'not “almost”), and “⏳ Агент ждёт вас” when the turn ended with a question, a ' +
+        'request to decide or a pending question. An intermediate stop never arrives: ' +
+        '“waiting for agents”, “the gate is still running”, “next I do …”, a turn followed ' +
+        'by more work within 20 seconds, a group member, a wake-up the agent scheduled for ' +
+        'itself; in doubt, nothing is sent. A question that already went out as its own ' +
+        'message is not sent twice. For panel chats the time is the turn; for terminal and ' +
+        'VS Code sessions it counts from your last message, and the panel learns the turn ' +
+        'ended only from its Stop hook in the Claude Code settings (“Agent on the computer” ' +
+        'in the phone app writes it): no hook, or the panel closed at that moment — no ' +
+        'message; a turn the Stop hook pushed back or a message from the phone continued has ' +
+        'not ended. “Something broke” — a failed run, red tests, ' +
         'a group stuck or going in circles (a watch “attention” does not go to Telegram, ' +
         'only an alarm). One Save writes everything; if half of it did not save, the card ' +
         'says which half. Buttons and answers are taken only from your id in the private ' +
@@ -371,6 +384,11 @@ export const integrationsEn: typeof integrationsRu = {
     storageSettingsValue: 'agentdeck/state.json → integrations (addresses, deployment, events)',
     storageTokens: 'Tokens',
     storageTokensValue: 'agentdeck/provider-keys.enc, keys int:<id> (AES-256-GCM)',
+    storageCoreRead: 'Who else reads the tokens',
+    storageCoreReadValue:
+      'the task core — the GitLab or GitHub key under the same name, for its tasks’ MRs (create, ' +
+      'edit the description, answer review threads); it only reads the store, and its journal ' +
+      'gets the kind of access, never the key itself',
     storageHealth: 'Check verdicts',
     storageHealthValue: 'agentdeck/state.json → integrationHealth (state, reason, account)',
     storageLinks: 'Project links',

@@ -71,6 +71,20 @@ export function pathDirs(env: NodeJS.ProcessEnv, os: OsKind = currentOs()): stri
   return (envValue(env, 'PATH', os) ?? '').split(pathListSeparator(os)).filter(Boolean);
 }
 
+/** То же окружение с другим PATH: прежний ключ любого регистра (`Path` Windows) снят, иначе он первым найдётся. */
+export function withPath(
+  env: NodeJS.ProcessEnv,
+  path: string,
+  os: OsKind = currentOs(),
+): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (os === 'win32' ? key.toLowerCase() !== 'path' : key !== 'PATH') out[key] = value;
+  }
+  out.PATH = path;
+  return out;
+}
+
 /** Почему значения нет — для текста остатка и `unknown` наверх. */
 export function factReason<T>(fact: Fact<T>): string {
   if ('unknown' in fact) return fact.unknown;

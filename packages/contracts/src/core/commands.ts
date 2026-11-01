@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { registryId, uuidv7 } from './ids.ts';
-import { allowedRouteSchema } from './journal-data.ts';
+import { allowedRouteSchema, COMMAND_TIMINGS, GRANT_OPS, OVERRIDE_SCOPES } from './journal-data.ts';
+import { scenarioSchema } from './scenario.ts';
 
 /**
  * Команды человека ядру (01 §Commands, F23 F26). Конверт строгий, поля каждого вида — полный
@@ -12,12 +13,24 @@ import { allowedRouteSchema } from './journal-data.ts';
  * закрытый список имён: ядро работает с любым провайдером (владелец, 28.10).
  */
 
-const scope = z.enum(['task', 'unit', 'step']);
+const scope = z.enum(OVERRIDE_SCOPES);
 const empty = z.strictObject({});
+const line = (max: number) => z.string().min(1).max(max);
+/** Когда правка доходит до шага: в безопасной точке (по умолчанию в 02:78) или сразу (G9). */
+const timing = z.enum(COMMAND_TIMINGS);
+/** Единица в правке деления — те же поля, что у предложения плана, но все названы (P42). */
+const unitEdit = z.strictObject({
+  name: line(200),
+  ownedPaths: z.array(z.string().min(1)).min(1),
+  deps: z.array(line(200)),
+  repo: line(500).nullable(),
+  contract: z.boolean(),
+});
 
 export const COMMAND_FIELDS = {
   launch: empty,
-  pause: empty,
+  /** 02:78 «пауза в ближайшей безопасной точке»; `now` — остановка дерева сразу (G10). */
+  pause: z.strictObject({ now: z.boolean() }),
   resume: empty,
   cancel: z.strictObject({ reason: z.string().min(1).max(2000) }),
   'set-model': z.strictObject({
@@ -25,21 +38,28 @@ export const COMMAND_FIELDS = {
     scopeId: uuidv7,
     model: registryId,
     effort: registryId.nullable(),
+    timing,
   }),
-  'set-cli': z.strictObject({ scope, scopeId: uuidv7, adapter: registryId }),
+  'set-cli': z.strictObject({ scope, scopeId: uuidv7, adapter: registryId, timing }),
+  /**
+   * Новая версия сценария целиком в команде (G11); `baseVersion` не последняя — 409, как
+   * устаревший `expectSeq`.
+   */
   'edit-scenario': z.strictObject({
-    scenarioId: z.string().min(1),
-    version: z.number().int().nonnegative(),
+    scenario: scenarioSchema,
+    baseVersion: z.number().int().positive(),
     applyNow: z.boolean(),
   }),
   answer: z.strictObject({ askId: uuidv7, answer: z.string().min(1).max(16_000) }),
   'approve-split': z.strictObject({ splitId: uuidv7 }),
-  'edit-split': z.strictObject({
-    splitId: uuidv7,
-    units: z
-      .array(z.strictObject({ name: z.string().min(1), ownedPaths: z.array(z.string().min(1)) }))
-      .min(1),
-  }),
+  'edit-split': z.strictObject({ splitId: uuidv7, units: z.array(unitEdit).min(1).max(20) }),
+  /** Правка списка требований на экране запуска / деления (G2) — единственная дорога к `waived`. */
+  'edit-requirements': z
+    .strictObject({
+      add: z.array(z.strictObject({ text: line(2000) })).max(100),
+      waive: z.array(z.strictObject({ requirementId: uuidv7, reason: line(2000) })).max(200),
+    })
+    .refine((v) => v.add.length + v.waive.length > 0, { message: 'add or waive at least one' }),
   'fresh-rerun': z.strictObject({
     scope: z.enum(['check', 'unit', 'key']),
     ref: z.string().min(1),
@@ -51,9 +71,14 @@ export const COMMAND_FIELDS = {
   grant: z.strictObject({
     project: z.string().min(1),
     globs: z.array(z.string().min(1)).min(1),
-    ops: z.array(z.enum(['edit', 'exec-db'])).min(1),
+    ops: z.array(z.enum(GRANT_OPS)).min(1),
   }),
-  'clean-remote': z.strictObject({ branches: z.array(z.string().min(1)).min(1) }),
+  /** Ветки и теги задачи на сервере (06:19); `remote` — не `origin`, когда задача пушила в другой. */
+  'clean-remote': z.strictObject({
+    branches: z.array(z.string().min(1)).min(1),
+    tags: z.array(z.string().min(1)).optional(),
+    remote: z.string().min(1).optional(),
+  }),
   /** Единственный путь расширить разрешённые маршруты — живой ход человека (11 §Policy, R:PR-15). */
   /** Новый разрешённый набор целиком: шире или уже прежнего — решает сравнение, а не флаг. */
   'set-route': z.strictObject({
@@ -61,9 +86,21 @@ export const COMMAND_FIELDS = {
     scopeId: uuidv7,
     allowedRoutes: z.array(allowedRouteSchema).min(1),
   }),
+  /** Снять исчерпание маршрута (ответ 402): только человек, ядро и звено само не снимают (P122). */
+  'clear-exhausted': z.strictObject({ routeId: registryId }),
 } as const;
 
 export type CommandKind = keyof typeof COMMAND_FIELDS;
+/**
+ * Что судит суд полномочий: каждая команда и оценка (`POST /v1/estimate`, G5) — оценка не команда
+ * задачи (задачи ещё нет), но человека доказывает так же. Запись настройки ядра
+ * (`POST /v1/config`, G11) — тоже не команда задачи: настройка машинная, задачи у неё нет.
+ * Этап 9: `save-scenario` — новый сценарий в библиотеку (`POST /v1/scenarios`, однократная
+ * запись, F6) и `adopt-devices` — перенос привязанных ключей телефона в устройства ядра (F11);
+ * оба машинные, задачи у них нет.
+ */
+export type AuthorityKind =
+  CommandKind | 'estimate' | 'set-config' | 'save-scenario' | 'adopt-devices';
 export const COMMAND_KINDS = Object.keys(COMMAND_FIELDS) as CommandKind[];
 
 /**
@@ -99,10 +136,13 @@ export function parseCommand(
   input: unknown,
 ): { ok: true; command: CommandEnvelope } | { ok: false; issues: CommandIssue[] } {
   const envelope = commandEnvelopeSchema.safeParse(input);
-  if (!envelope.success) return { ok: false, issues: describe(envelope.error.issues, '', input) };
+  if (!envelope.success)
+    return { ok: false, issues: commandIssues(envelope.error.issues, '', input) };
   const raw = envelope.data.fields;
   const fields = COMMAND_FIELDS[envelope.data.kind].safeParse(raw);
-  if (!fields.success) return { ok: false, issues: describe(fields.error.issues, 'fields', raw) };
+  if (!fields.success) {
+    return { ok: false, issues: commandIssues(fields.error.issues, 'fields', raw) };
+  }
   return { ok: true, command: { ...envelope.data, fields: fields.data } };
 }
 
@@ -115,7 +155,8 @@ function valueAt(root: unknown, path: readonly PropertyKey[]): unknown {
   return at;
 }
 
-function describe(
+/** Проблемы zod → 400 с путём; общий разбор команд и тела `/v1/estimate` (`estimate.ts`). */
+export function commandIssues(
   issues: readonly z.core.$ZodIssue[],
   prefix: string,
   root: unknown,

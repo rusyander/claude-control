@@ -24,6 +24,38 @@ const OS_BASE_NAMES = [
 ] as const;
 
 /**
+ * Окружение ОС сессии CLI (P51): PATH, домашние и профильные папки, временные, локаль, XDG — без
+ * них CLI не найдёт ни себя, ни свои настройки. Имена CLI добавляет вызывающий.
+ */
+export const SESSION_OS_ENV_NAMES: readonly string[] = [
+  'PATH',
+  'Path',
+  'PATHEXT',
+  'SystemRoot',
+  'SYSTEMROOT',
+  'windir',
+  'ComSpec',
+  'HOME',
+  'USERPROFILE',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'USER',
+  'USERNAME',
+  'LOGNAME',
+  'SHELL',
+  'LANG',
+  'LC_ALL',
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_STATE_HOME',
+];
+
+/**
  * Системные временные папки (Windows `TEMP`/`TMP`, POSIX `TMPDIR`): раннер проверок ставит свою
  * на каждый прогон (P40), установщику нужна общая.
  */

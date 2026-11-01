@@ -24,6 +24,11 @@
 import type { WorktreeBootstrapState, WorktreeRuntimeNote } from './project-git';
 import type { GroupPermissionLevel, GroupRequestId } from './split-groups.ts';
 import { blockLang, blockLangPattern } from './brand.ts';
+import {
+  SPLIT_MAX_GROUPS,
+  SPLIT_MAX_TASKS_PER_GROUP,
+  SPLIT_PARALLEL_DEFAULT,
+} from './split-limits.ts';
 import { SPLIT_HUMAN_TAG, SPLIT_TICKET_TAG } from './split-tickets.ts';
 import {
   DELIVERY_CHECKS_LINE,
@@ -41,16 +46,13 @@ import {
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
 export const SPLIT_BLOCK_LANG = blockLang('split');
 
-/**
- * Потолки: предложение приходит из ответа модели, а не из формы.
- *
- * Групп до 30: группа — это ветка и MR, и выгрузка из трекера на 60–80 задач
- * законно раскладывается на 20 групп. Прежние 8 резали хвост молча — агент о
- * потолке не знал, человек об обрезке не узнавал (23.09.2026). Сколько групп
- * работает ОДНОВРЕМЕННО, решает не этот потолок, а настройка проекта.
- */
-export const SPLIT_MAX_GROUPS = 30;
-export const SPLIT_MAX_TASKS_PER_GROUP = 50;
+// Потолки и параллельность — в `split-limits.ts` (круг с `split-groups.ts`); пути импорта прежние.
+export {
+  SPLIT_MAX_GROUPS,
+  SPLIT_MAX_TASKS_PER_GROUP,
+  SPLIT_PARALLEL_DEFAULT,
+  SPLIT_PARALLEL_HEAVY,
+} from './split-limits.ts';
 
 /**
  * Разделение на проекте — задаётся человеком один раз, действует на каждое
@@ -70,15 +72,6 @@ export interface SplitSettings {
   parallel: number;
 }
 
-/** Прежнее поведение: при старом потолке в 8 групп разом шли все восемь. */
-export const SPLIT_PARALLEL_DEFAULT = 8;
-/**
- * Автоподбор для тяжёлой подготовки копии (несколько установок или сборка):
- * восемь копий по пять `npm ci` разом — сорок установщиков на одном диске.
- * Четыре, а не шесть — решение владельца по живому прогону 24.09.2026; так же
- * обещает и справка панели.
- */
-export const SPLIT_PARALLEL_HEAVY = 4;
 /**
  * Доставка включена из коробки (24.09.2026): «довести до MR» — штатный конец
  * задачи, а не редкий режим; главный выключатель — `AppSettings.deliverToMr`.

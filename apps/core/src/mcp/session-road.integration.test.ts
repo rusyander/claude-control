@@ -70,6 +70,7 @@ describe('session road: MCP bridges to the core', () => {
       'ask_human',
       'blocker',
       'core_state',
+      'unit_diff',
     ]);
     const state = callText(await rpc.request('tools/call', { name: 'core_state', arguments: {} }));
     expect(state).toMatchObject({

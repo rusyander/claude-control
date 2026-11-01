@@ -1,4 +1,6 @@
 import type { Profile, RepoPath } from '@agentdeck/contracts/core/records';
+import { currentOs, type OsKind } from '../../platform/os-kind.ts';
+import { venvPython } from '../../platform/build-wrappers.ts';
 import type { InstallPlan, InstallStep } from './copy.types.ts';
 
 /**
@@ -165,11 +167,85 @@ function jsStep(
   };
 }
 
+/**
+ * Файлы зависимостей Python без `uv.lock` (список панели `language-chains.ts`): цепочка venv +
+ * pip ставит их в `.venv` корня стека — без неё `pytest` копии находил бы чужой глобальный.
+ */
+export const REQUIREMENT_FILES: readonly string[] = [
+  'requirements.txt',
+  'requirements-dev.txt',
+  'requirements_dev.txt',
+  'dev-requirements.txt',
+  'requirements-test.txt',
+  'requirements_test.txt',
+  'test-requirements.txt',
+  'requirements/base.txt',
+  'requirements/dev.txt',
+  'requirements/test.txt',
+];
+
+export { venvPython };
+
+function pythonChain(
+  root: RepoPath,
+  exists: (rel: RepoPath) => boolean,
+  os: OsKind,
+): InstallStep[] {
+  const files = REQUIREMENT_FILES.filter((name) => exists(at(root, name)));
+  if (files.length === 0) return [];
+  const why = files.map((name) => at(root, name)).join(', ');
+  return [
+    { stack: 'python', root, command: 'python', args: ['-m', 'venv', '.venv'], why },
+    {
+      stack: 'python',
+      root,
+      command: venvPython(os),
+      args: [
+        '-m',
+        'pip',
+        'install',
+        '--disable-pip-version-check',
+        ...files.flatMap((name) => ['-r', name]),
+      ],
+      why,
+    },
+  ];
+}
+
+/**
+ * Сборки JVM/.NET. `dotnet restore --locked-mode` — только с `packages.lock.json`: без него
+ * восстановление берёт «свежее», а копия ставит ровно записанное. Gradle/Maven отдельного шага не
+ * имеют — зависимости тянет первая сборка; это сказано заметкой, не молчит.
+ */
+function buildToolStep(
+  s: Profile['stacks'][number],
+  exists: (rel: RepoPath) => boolean,
+): InstallStep | { note: string } {
+  if (s.stack === 'dotnet') {
+    if (exists(at(s.root, 'packages.lock.json')))
+      return {
+        stack: 'dotnet',
+        root: s.root,
+        command: 'dotnet',
+        args: ['restore', '--locked-mode'],
+        why: at(s.root, 'packages.lock.json'),
+      };
+    return {
+      note: 'no packages.lock.json: a locked restore is impossible, dependencies resolve inside the first build',
+    };
+  }
+  const tool = exists(at(s.root, 'pom.xml')) ? 'maven' : 'gradle';
+  return {
+    note: `${tool}: dependencies resolve inside the first build (no separate install step)`,
+  };
+}
+
 export function planInstall(
   profile: Pick<Profile, 'stacks' | 'packageManager'>,
   exists: (rel: RepoPath) => boolean,
   configured?: ConfiguredInstall,
   read?: ReadCopyText,
+  os: OsKind = currentOs(),
 ): InstallPlan {
   if (configured && configured.command.trim() !== '') {
     return {
@@ -236,7 +312,13 @@ export function planInstall(
           why: at(s.root, 'uv.lock'),
         });
       } else {
-        notes.push({ subject, why: 'no uv.lock: the virtualenv is not created by copy setup' });
+        const chain = pythonChain(s.root, exists, os);
+        if (chain.length > 0) steps.push(...chain);
+        else
+          notes.push({
+            subject,
+            why: 'no uv.lock and no requirements*.txt: the virtualenv is not created by copy setup',
+          });
       }
     } else if (s.stack === 'rust') {
       if (exists(at(s.root, 'Cargo.lock'))) {
@@ -249,10 +331,9 @@ export function planInstall(
         });
       } else notes.push({ subject, why: 'no Cargo.lock' });
     } else if (s.stack === 'jvm' || s.stack === 'dotnet') {
-      notes.push({
-        subject,
-        why: 'dependencies resolve inside the first build (no separate install step)',
-      });
+      const step = buildToolStep(s, exists);
+      if ('note' in step) notes.push({ subject, why: step.note });
+      else steps.push(step);
     } else {
       // generic (и любой стек без своей ветки): команды установки нет — это сказано, не молчит.
       notes.push({

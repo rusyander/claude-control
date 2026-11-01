@@ -5,6 +5,7 @@ import type {
   QueueClass,
   VerdictName,
 } from '@agentdeck/contracts/core/records';
+import { maskSink } from '../../context/sinks/index.ts';
 import { ANSWER_BUDGET_MS, type CheckService } from './request.ts';
 
 /**
@@ -29,6 +30,8 @@ export interface ModelCheckContext {
   changedUnits: string[];
   /** Записи реестра, что гонятся по единицам (`unit: 'package'`); остальные — на всей копии `.`. */
   packageChecks: string[];
+  /** Значения, известные ядру секретом по имени (окружение сеанса): маска выдержки по значению (P61). */
+  known?: readonly string[];
 }
 
 export type ModelCheckVerdict = VerdictName | 'running' | 'deferred' | 'refused' | 'narrowed';
@@ -131,6 +134,22 @@ function unitOf(unit: string, answer: CheckAnswer): Omit<ModelCheckUnit, 'logPat
   }
 }
 
+/**
+ * Выдержка — выход к модели (P61, 03 §Context «check excerpts»): причина и имена падений несут
+ * вывод проверки, где бывает ключ из окружения. Маска — на каждом поле ДО склейки и среза в 4000:
+ * срез посреди ключа оставил бы хвост, который детектор уже не узнает.
+ */
+function maskedUnit(
+  unit: Omit<ModelCheckUnit, 'logPath'>,
+  known: readonly string[] = [],
+): Omit<ModelCheckUnit, 'logPath'> {
+  return {
+    ...unit,
+    reason: unit.reason === null ? null : maskSink(unit.reason, 'excerpt', known).text,
+    failing: unit.failing.map((f) => maskSink(f, 'excerpt', known).text),
+  };
+}
+
 /** Худший вердикт решает: красный > без вердикта > идёт > отложено/отказ/сужено > зелёный. */
 const RANK: Record<ModelCheckVerdict, number> = {
   fail: 7,
@@ -207,7 +226,10 @@ export async function modelCheck(
         service.requestCheck(req),
         Math.max(0, deadline - Date.now()),
       );
-      const out = unitOf(unit, answer ?? { kind: 'running', checkRunId: '', since: Date.now() });
+      const out = maskedUnit(
+        unitOf(unit, answer ?? { kind: 'running', checkRunId: '', since: Date.now() }),
+        ctx.known,
+      );
       return { ...out, logPath: out.recordId ? service.logPath(req, out.recordId) : null };
     }),
   );

@@ -101,8 +101,11 @@ describe('P108 literal lint — CLI names only in adapters/ and routes/', () => 
       'routes/stub/stub.ts',
       'routes/compat/compat.ts',
       'routes/hops/hop.ts',
+      'hop-host/gateway/frames/frames.ts',
     ])
       expect(checked(path), path).toEqual([]);
+    // Сосед с тем же началом имени — не процесс звена.
+    expect(checked('hop-hostile/x.ts')).toEqual(['hop-hostile/x.ts']);
   });
 
   it('P108 literal lint is built from the registry: every adapter id, vendor, binary, env var and family is caught; a new CLI joins by itself', () => {
@@ -118,7 +121,16 @@ describe('P108 literal lint — CLI names only in adapters/ and routes/', () => 
     for (const name of CLI_LITERALS.envVarNames) expect(one(name), name).toContain('env-var');
     for (const family of CLI_LITERALS.modelFamilyPrefixes)
       expect(one(`${family}-9`), family).toContain('model-family');
+    // Алиасы модели — из ступеней фактов (`modelRungs`): и алиас, и полное имя по приставке.
+    expect(CLI_LITERALS.modelAliases.length).toBeGreaterThan(0);
+    for (const alias of CLI_LITERALS.modelAliases)
+      expect(one(`${alias}-9`), alias).toContain('model-alias');
     expect(CLI_LITERALS.adapterIds.length).toBe(CLI_RUN_FACTS.length);
+    // Реестр без литерала вида — правило этого вида молчит, а не ловит любую строку.
+    const empty: LiteralRuleSet = { ...P108_CLI_NAMES, rules: p108Rules(deriveLiterals([])) };
+    expect(
+      scanSources([{ path: 'policy/x.ts', text: "const v = 'anything';" }], empty).hits,
+    ).toEqual([]);
 
     // Новый CLI в реестре — новые правила без правки набора.
     const newcomer = {

@@ -18,4 +18,7 @@ export const systemRu: Record<SystemMessageCode, string> = {
   'location-dir-unavailable': 'Каталог недоступен: {{dir}}',
   'location-dir-unreadable': 'Нет прав на чтение каталога: {{dir}}',
   'location-app-data-failed': 'Каталог данных панели в {{root}} не создаётся: {{detail}}',
+  'core-absent': 'Ядро задач не запущено',
+  'core-unverified': 'Ядро задач не подтвердило себя: запрос не отправлен',
+  'core-unreachable': 'Ядро задач не отвечает',
 };

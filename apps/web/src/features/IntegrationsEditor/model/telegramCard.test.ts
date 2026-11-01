@@ -70,7 +70,7 @@ describe('группы «Когда звать» и события', () => {
 });
 
 describe('черновик карточки и два тела запроса', () => {
-  it('«Агент закончил»: порог 0 — галочка снята, минуты по умолчанию 5', () => {
+  it('«Задача закрыта или агент ждёт решения»: порог 0 — галочка снята, минуты по умолчанию 5', () => {
     expect(draftOfTelegram(settings({ doneAfterMinutes: 0 }), answers())).toMatchObject({
       finished: false,
       doneAfterMinutes: '5',

@@ -6,6 +6,7 @@ import type { CaptureAnswer, CaptureResult } from '@agentdeck/contracts/core/rec
 import { captureWiring } from '../../bootstrap/verifier-wiring/capture.ts';
 import { seedSession } from '../../conductor/model-tools/__fixtures__/seed.ts';
 import { createTaskRegistry, type TaskRegistry } from '../../conductor/tasks.ts';
+import { WindowBook } from '../../economy/window/index.ts';
 import { CREATED, deps, tempDir } from '../../journal/__fixtures__/journal-harness.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
@@ -123,6 +124,8 @@ export async function startCaptureStand(opts: CaptureStandOptions = {}): Promise
   const notes: CaptureStand['notes'] = [];
   const app = buildApi({
     registry,
+    // Стенд захвата без дирижёра: среды деления нет.
+    env: { layout, split: () => undefined },
     tokens: { core: coreToken, isSessionToken: (t) => tokens.verify(t) !== undefined },
     nonces: createNonceStore(),
     peer: {
@@ -132,6 +135,7 @@ export async function startCaptureStand(opts: CaptureStandOptions = {}): Promise
     },
     signature: { machineId: 'machine-test', devices: () => [], now: Date.now },
     health: { build: 'test', bootId: newId(), pid: process.pid, startedAt: Date.now(), home: root },
+    windows: new WindowBook(),
     now: Date.now,
     pingMs: 60_000,
   });

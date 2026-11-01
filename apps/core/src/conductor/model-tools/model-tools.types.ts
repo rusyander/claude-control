@@ -1,11 +1,13 @@
 import type { Fact } from '@agentdeck/contracts/core/facts';
 import type { CheckCall } from '@agentdeck/contracts/core/model-tools';
 import type { LiveTask } from '../../journal/resume.ts';
-import type { RecordOrigin, VerdictName } from '@agentdeck/contracts/core/records';
+import type { VerdictName } from '@agentdeck/contracts/core/records';
+import type { EvidenceNow, EvidenceRecord } from '../requirements/requirements.types.ts';
 import type { PermissionAsk, RawToolCall } from '../../adapters/adapter.types.ts';
 import type { HumanPointPolicy } from '../../policy/human-point/human-point.types.ts';
 import type { PendingPermits } from '../../policy/permit/pending.ts';
 import type { PermitCodec, PermitContext } from '../../policy/permit/permit.types.ts';
+import type { UnitDiffDeps } from './unit-diff.ts';
 
 /** Сессия, которой ядро выдало токен, — по журналу задачи (03: токен сессии = её шаг). */
 export interface SessionBinding {
@@ -20,14 +22,21 @@ export interface SessionBinding {
 export type RecordVerdict = VerdictName;
 
 /**
- * Что `step_done` знает о записи: вердикт и привязка — чья задача, кто исполнил, какая проверка.
- * Захваченная сеансом запись — обратная связь, не доказательство (02:61, P92).
+ * Что `step_done` знает о записи: вердикт и привязка — чья задача, кто исполнил, какая проверка —
+ * и ключ с единицей (G22: доказательство — запись с ключом текущего дерева). Захваченная сеансом
+ * запись — обратная связь, не доказательство (02:61, P92).
  */
-export interface RecordFacts {
-  verdict: RecordVerdict;
-  checkId: string;
-  taskId: string | null;
-  origin: RecordOrigin;
+export type RecordFacts = EvidenceRecord;
+
+/**
+ * Чтения `step_done` сверх записи (F-051, G22, P92): ключ проверки записи на ТЕКУЩЕМ дереве копии
+ * шага (той же дорогой, какой его считает вход проверок), класс проверки и замыкание единицы, и
+ * файлы, изменённые единицей против базы. Нет читателя — «покрыто» не принимается: свежесть не
+ * доказана (P44).
+ */
+export interface EvidenceReader {
+  now(task: LiveTask, b: SessionBinding, record: RecordFacts): Promise<Fact<EvidenceNow>>;
+  changed(task: LiveTask, b: SessionBinding): Promise<Fact<string[]>>;
 }
 
 export interface ModelToolDeps {
@@ -36,9 +45,19 @@ export interface ModelToolDeps {
    * каждый номер `absent`.
    */
   records(recordId: string, taskId: string): Fact<RecordFacts>;
-  humanPolicy: HumanPointPolicy;
+  evidence?: EvidenceReader;
+  /**
+   * Политика человека ЭТОЙ задачи (06:22): пол платформы ∪ `humanPoints` конфига ∪ строки
+   * `grantRequired` её проекта — читается на каждый вопрос, правка конфига действует сразу.
+   */
+  humanPolicy(task: LiveTask, b: SessionBinding): HumanPointPolicy;
   /** Живая проверка (зона C, `conductor/checks`); нет — ответ без вердикта (`CHECK_ABSENT`). */
   check?(task: LiveTask, b: SessionBinding, call: CheckCall): Promise<unknown>;
+  /**
+   * Дифф единицы шага для `unit_diff`: копия и закреплённая база единицы сессии. Нет — инструмент
+   * отказывает «не подключено»; `unknown` — копию или базу не назвать, тело не читается.
+   */
+  unitDiff?(task: LiveTask, b: SessionBinding): Fact<UnitDiffDeps>;
 }
 
 /** Что нужно ответу на вопрос о праве одной сессии: её переходник, кодек и факты копии. */

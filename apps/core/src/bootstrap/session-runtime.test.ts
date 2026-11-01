@@ -145,3 +145,56 @@ describe('session runtime journals turns the CLI started itself', () => {
     expect(notes).toEqual(['turn.cli-initiated.unjournaled']);
   });
 });
+
+describe('session runtime feeds the economy tap', () => {
+  it('every stream event reaches the tap with its task and binding, before the subscriber', async () => {
+    const { task, sessionId } = await taskWithSession();
+    const got = bindingOf(task, sessionId);
+    if (!('binding' in got)) throw new Error(got.reason);
+    const order: string[] = [];
+    await createSessionRuntime({
+      economy: {
+        onEvent: (t, b, e) =>
+          order.push(`tap:${e.type}:${t.taskId === task.taskId}:${b.sessionId}`),
+      },
+    }).attach({
+      task,
+      binding: got.binding,
+      adapter: fakeAdapter([wake('notification'), wake('late-tail')]),
+      handle: { sessionId } as SessionHandle,
+      context: CONTEXT,
+      onEvent: (e) => order.push(`sub:${e.type}`),
+    }).done;
+    expect(order).toEqual([
+      `tap:turn.cli-initiated:true:${sessionId}`,
+      'sub:turn.cli-initiated',
+      `tap:turn.cli-initiated:true:${sessionId}`,
+      'sub:turn.cli-initiated',
+    ]);
+  });
+
+  it('a throwing tap is noted and the stream goes on to the subscriber', async () => {
+    const { task, sessionId } = await taskWithSession();
+    const got = bindingOf(task, sessionId);
+    if (!('binding' in got)) throw new Error(got.reason);
+    const notes: string[] = [];
+    const seen: string[] = [];
+    await createSessionRuntime({
+      note: (event) => notes.push(event),
+      economy: {
+        onEvent: () => {
+          throw new Error('tap broke');
+        },
+      },
+    }).attach({
+      task,
+      binding: got.binding,
+      adapter: fakeAdapter([wake('notification'), wake('late-tail')]),
+      handle: { sessionId } as SessionHandle,
+      context: CONTEXT,
+      onEvent: (e) => seen.push(e.type),
+    }).done;
+    expect(seen).toEqual(['turn.cli-initiated', 'turn.cli-initiated']);
+    expect(notes).toEqual(['economy.tap.failed', 'economy.tap.failed']);
+  });
+});

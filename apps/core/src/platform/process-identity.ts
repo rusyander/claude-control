@@ -103,6 +103,65 @@ export function createLivenessProbe(
   };
 }
 
+/**
+ * Процессор дерева процесса (user + kernel, мс) по ОДНОМУ снимку: сам процесс и все потомки
+ * обходом по `ppid`. Корня нет или его процессор ОС не отдала — `null`; потомок без процессора
+ * в сумму не входит (у CIM бывает строка без него). Цикл в `ppid` (pid 0 — свой родитель) не
+ * зацикливает обход.
+ */
+export function treeCpuMs(rows: readonly ProcessRow[], rootPid: number): number | null {
+  const root = rows.find((r) => r.pid === rootPid);
+  if (typeof root?.cpuMs !== 'number') return null;
+  const children = new Map<number, ProcessRow[]>();
+  for (const r of rows) {
+    if (r.pid === r.ppid) continue;
+    children.set(r.ppid, [...(children.get(r.ppid) ?? []), r]);
+  }
+  const seen = new Set<number>([rootPid]);
+  const queue = [rootPid];
+  let sum = 0;
+  while (queue.length > 0) {
+    const pid = queue.shift() as number;
+    const row = pid === rootPid ? root : rows.find((r) => r.pid === pid);
+    if (typeof row?.cpuMs === 'number') sum += row.cpuMs;
+    for (const child of children.get(pid) ?? []) {
+      if (seen.has(child.pid)) continue;
+      seen.add(child.pid);
+      queue.push(child.pid);
+    }
+  }
+  return Math.round(sum);
+}
+
+/** Проба одной личности: жив ли и сколько процессора съело его дерево к моменту снимка. */
+export interface TreeProbe {
+  verdict: Liveness;
+  cpuMs: number | null;
+}
+
+/**
+ * Проба пачки личностей ОДНИМ снимком тика (03:165, 09: «batched per tick»): живость по pid +
+ * старту и процессор дерева каждого. Снимок не прочитан — все `unknown`, процессора нет. «Мёртв»
+ * из снимка перепроверяется путём `isAlive` (F-30: снимок мог быть начат до вопроса) — свежий
+ * снимок читается только тогда, на редкой смерти, а не на каждой пробе.
+ */
+export async function probeTrees(
+  probe: LivenessProbe,
+  ids: readonly ProcessIdentity[],
+): Promise<TreeProbe[]> {
+  if (ids.length === 0) return [];
+  const fact = await probe.snapshot();
+  if (!hasValue(fact)) return ids.map(() => ({ verdict: 'unknown', cpuMs: null }));
+  const rows = fact.value;
+  const out: TreeProbe[] = [];
+  for (const id of ids) {
+    let verdict = livenessIn(rows, id);
+    if (verdict === 'dead') verdict = await probe.isAlive(id);
+    out.push({ verdict, cpuMs: verdict === 'alive' ? treeCpuMs(rows, id.pid) : null });
+  }
+  return out;
+}
+
 /** Личность процесса по номеру — одним свежим снимком (без кэша тика). */
 export async function identityOfPid(
   pid: number,

@@ -11,7 +11,6 @@ import type {
   AdapterEvent,
   CliAdapter,
   DenySet,
-  LayerMode,
   SessionHandle,
   SessionSpec,
   ToolSet,
@@ -35,7 +34,11 @@ export interface RoadStart {
   /** Id переходника и маршрута — из решения, не из имён (P109). */
   adapterId: string;
   routeId: string;
-  model: string;
+  /**
+   * `null` — модель по умолчанию CLI (суд `tier`: шаблон со звездой, потолка нет): `--model` не
+   * передаётся. Годится только входу CLI; маршрут с адресом без модели дорога отказывает.
+   */
+  model: string | null;
   effort?: string;
   sessionId: string;
   /** Каталог сессии в доме ядра (создаёт запуск). */
@@ -46,7 +49,7 @@ export interface RoadStart {
   /** Запреты шага; запреты платформы дорога добавляет сама. */
   deny: DenySet;
   tools: ToolSet;
-  layer: { hooks: LayerMode };
+  layer: SessionSpec['layer'];
   trust?: SessionSpec['trust'];
   /** Пин задачи (PATH, локаль, дом CLI). */
   pin: Record<string, string>;
@@ -58,7 +61,24 @@ export interface RoadStart {
   ownedPaths?: readonly string[];
   /** Исходный репозиторий копии: по нему из конфига ядра берётся список чтения человека. */
   sourceRepo?: string;
-  resume?: { conversationId: string };
+  /**
+   * Продолжение разговора (решение `continuation` = `same-session`, 03:150-155): `conversationId` —
+   * разговор CLI (у Claude — id корневой сессии, `--session-id`), `of` — сессия ядра, которую
+   * продолжаем, `cacheAgeMs` — возраст кэша из чисел решения. `of`/`cacheAgeMs` идут в
+   * `session.started` (`resumeOf`), по ним цепочка разговора читается из журнала.
+   */
+  resume?: RoadResume;
+  /**
+   * Запасные тройки суда `tier` (`alternatives`, P110): отказ `compat` называет, какие из них
+   * годятся, — с фактами, прочитанными дорогой, а не догадкой.
+   */
+  alternatives?: readonly { adapterId: string; routeId: string; model: string | null }[];
+}
+
+export interface RoadResume {
+  conversationId: string;
+  of?: string;
+  cacheAgeMs?: number | null;
 }
 
 export interface Prepared {
@@ -73,6 +93,10 @@ export interface Prepared {
   loginPath: LoginPath;
   credentialKind: CredentialKind;
   routeKind: RouteKind;
+  /** Звенья сеанса (`session.started.hops`); пусто — сеанс идёт прямо по адресу маршрута. */
+  hops: { kind: 'dlp' | 'gateway'; port: number }[];
+  /** Отпечаток строгого списка MCP шага (`mcpListFor`) — `mcpHash` ключа замера базы (G9). */
+  mcpHash?: string;
   /** Подсказка идемпотентности `process-start`: метка дерева сессии. */
   hint: string;
 }

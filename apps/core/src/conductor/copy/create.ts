@@ -15,6 +15,7 @@ import {
 import { samePath } from '../../platform/paths.ts';
 import { removeVerified } from '../../platform/safe-io/remove.ts';
 import { ActionFailed, runAction, type JsonValue } from '../outbox.ts';
+import { unitBaseOf, type UnitCreated } from '../units/index.ts';
 import type {
   CopyCreateFailed,
   CopyPlaced,
@@ -118,6 +119,31 @@ function why(fact: Fact<unknown>): string {
   return 'absent' in fact ? 'absent' : 'value';
 }
 
+/**
+ * Основа ветки новой копии (02:73, G19) — решение `unitBaseOf`: ветка последнего предшественника
+ * того же репозитория (его правки уже в основе), иначе приколотая база задачи. Свою основу копия
+ * не считает: порядок единиц и их рёбра — знание деления.
+ */
+function branchBaseOf(task: LiveTask, unitId: string): string | { unknown: string } {
+  const own = task.state.units[unitId];
+  if (!own) return { unknown: `unit ${unitId} is not in the task fold` };
+  const units: UnitCreated[] = Object.entries(task.state.units)
+    .sort(([, a], [, b]) => a.createdSeq - b.createdSeq)
+    .map(([id, u]) => ({
+      unitId: id,
+      name: u.name,
+      repoKey: u.repoKey,
+      branch: u.branch,
+      ownedPaths: u.ownedPaths,
+      after: u.after,
+      contract: u.contract,
+      splitId: u.splitId,
+    }));
+  const got = unitBaseOf(own, units, task.state.created?.repos ?? []);
+  if ('unknown' in got) return got;
+  return got.kind === 'predecessor' ? got.branch : got.sha;
+}
+
 export async function createUnitCopy(
   task: LiveTask,
   unitId: string,
@@ -127,14 +153,30 @@ export async function createUnitCopy(
   if ('missing' in repo) return { ok: false, failed: repo.missing };
   const git = options.git ?? {};
   // База закрепляется первой попыткой (sha в журнале): повтор после краха не переезжает на
-  // сдвинувшуюся с тех пор ревизию-имя.
-  const baseRef = pinnedBaseOf(task, unitId) ?? repo.baseRef;
+  // сдвинувшуюся с тех пор ревизию-имя. Первая попытка берёт основу у зоны D (G19).
+  const pinned = pinnedBaseOf(task, unitId);
+  const baseRef = pinned ?? branchBaseOf(task, unitId);
+  if (typeof baseRef !== 'string') return { ok: false, failed: `base: ${baseRef.unknown}` };
   const base = await commitOf(repo.path, baseRef, git);
   if (!('value' in base)) {
     return {
       ok: false,
       failed: `base ${baseRef}: ${'unknown' in base ? base.unknown : 'absent'}`,
     };
+  }
+  // Первая попытка на уже существующей ветке (ветка MR у задачи ответов): `worktree add` берёт
+  // ветку как есть, и копия встала бы не на базу единицы — чужие локальные коммиты ушли бы в MR
+  // пушем. Ветка не на базе — отказ с обоими sha; повтор после краха (база в журнале) — своя ветка.
+  if (pinned === undefined) {
+    const tip = await commitOf(repo.path, `refs/heads/${repo.branch}`, git);
+    if ('unknown' in tip) return { ok: false, failed: `branch ${repo.branch}: ${tip.unknown}` };
+    if ('value' in tip && tip.value !== base.value)
+      return {
+        ok: false,
+        failed:
+          `branch ${repo.branch} already exists at ${tip.value.slice(0, 12)}, not at the unit base ` +
+          `${base.value.slice(0, 12)} — move or remove the local branch`,
+      };
   }
   const dir = copyDirFor(repo.path, repo.branch, options.root);
   // Причина отказа эффекта (строка git `fatal: …`, путь чужого каталога) идёт хвостом шагу (04:99).
@@ -196,6 +238,8 @@ export interface PrepareOptions extends CopyCreateOptions {
   endpoints?: readonly ServiceEndpoint[];
   configured?: ConfiguredInstall;
   setup: Omit<SetupDeps, 'git'>;
+  /** Копия оценки (G6): без установки; следующий заход без флага её доставит. */
+  deferInstall?: boolean;
 }
 
 function factKind(fact: Fact<unknown>): 'value' | 'absent' | 'unknown' {
@@ -261,7 +305,11 @@ export async function prepareUnitCopy(
   }
   const { placed, repo } = created;
   const journaled = journaledSetup(task, unitId);
-  if (journaled) return { decision: journaled, placed, journaled: false };
+  // Записанное решение — окончательное, кроме отложенной установки копии оценки: её доставляет
+  // заход без `deferInstall` (первый шаг работы), с повторным зеркалом только свежего — правку
+  // человека в основной копии за время ожидания запуска копия получает, свою не теряет.
+  const completing = journaled?.installDeferred === true && options.deferInstall !== true;
+  if (journaled && !completing) return { decision: journaled, placed, journaled: false };
   const result = await setupCopy(
     {
       main: repo.path,
@@ -275,6 +323,8 @@ export async function prepareUnitCopy(
       endpoints: options.endpoints ?? [],
       ...(options.configured ? { configured: options.configured } : {}),
       longPaths: placed.longPaths,
+      ...(options.deferInstall ? { deferInstall: true } : {}),
+      ...(completing ? { newerOnly: true } : {}),
     },
     { ...options.setup, ...(options.git ? { git: options.git } : {}) },
   );

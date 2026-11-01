@@ -15,4 +15,7 @@ export const systemMessageParams = {
   'location-dir-unavailable': ['dir'],
   'location-dir-unreadable': ['dir'],
   'location-app-data-failed': ['detail', 'root'],
+  'core-absent': [],
+  'core-unverified': [],
+  'core-unreachable': [],
 } as const satisfies Record<string, readonly string[]>;

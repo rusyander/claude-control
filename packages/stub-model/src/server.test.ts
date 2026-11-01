@@ -340,6 +340,31 @@ describe('route: the caller own paths before the library', () => {
     expect(await response.json()).toEqual({ error: { message: 'stub-model: route broke' } });
     expect(() => startStubModel({ route: 'x' as never })).toThrow(/route must be a function/);
   });
+
+  it('a route stream is written by the package frames; a client gone mid-delay stops it', async () => {
+    const stub = await start({
+      route: ({ path }) => {
+        if (path === '/bad') return { sse: { frames: 'x' as never } };
+        return {
+          headers: { 'x-own': '1' },
+          sse: {
+            delayMs: path === '/slow' ? 60_000 : 0,
+            frames: [{ event: 'ping', data: { a: 1 } }, { data: '[DONE]' }],
+          },
+        };
+      },
+    });
+    const response = await fetch(`${stub.baseUrl}/v1/own`);
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+    expect(response.headers.get('x-own')).toBe('1');
+    expect(await response.text()).toBe('event: ping\ndata: {"a":1}\n\ndata: [DONE]\n\n');
+    const aborter = new AbortController();
+    const slow = await fetch(`${stub.baseUrl}/slow`, { signal: aborter.signal });
+    expect(stub.holding()).toBe(false);
+    aborter.abort();
+    await expect(slow.text()).rejects.toThrow();
+    expect((await fetch(`${stub.baseUrl}/bad`)).status).toBe(500);
+  });
 });
 
 describe('request inspection per dialect', () => {
@@ -517,6 +542,23 @@ describe('script', () => {
     expect(() => startStubModel({ script: { rules: [{ when: 'x' }] } as never })).toThrow(
       /step is missing/,
     );
+  });
+
+  it('step.model answers with another model id than asked, in every dialect, stream and JSON (P119 substitution)', async () => {
+    const stub = await start({ script: () => ({ text: 'ok', model: 'served-other' }) });
+    for (const dialect of ['anthropic-messages', 'openai-chat', 'openai-responses'] as const)
+      for (const stream of [true, false]) {
+        const outcome = await call(stub.baseUrl, dialect, { text: 'x', stream });
+        expect(outcome.status).toBe(200);
+        expect(outcome.text).toContain('"served-other"');
+        expect(outcome.text).not.toContain('"claude-test"');
+        expect(outcome.text).not.toContain('"gpt-test"');
+      }
+    // Запрос назвал свою модель — след хранит запрошенную, ответ несёт подменённую.
+    expect(stub.requests.map((r) => r.model)).not.toContain('served-other');
+    const bad = await start({ script: () => ({ text: 'ok', model: 5 }) as never });
+    await call(bad.baseUrl, 'anthropic-messages', { text: 'x', stream: true });
+    expect(bad.requests[0]?.scriptError).toMatch(/step.model/);
   });
 
   it('a mid-stream error asked without stream falls back to the HTTP status', async () => {

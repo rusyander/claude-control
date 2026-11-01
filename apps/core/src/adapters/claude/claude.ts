@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { claudeRunFacts } from '@agentdeck/providers/claude';
 import { envVarsChannels } from '@agentdeck/providers/channels';
+import { tierLadderOf } from '@agentdeck/providers/ladder';
 import { CLI_RUN_FACTS } from '@agentdeck/providers/registry';
 import type {
   AdapterCaps,
@@ -14,6 +15,8 @@ import type {
 } from '../adapter.types.ts';
 import { READ_ONLY_DENIED } from '../read-only.ts';
 import { trustedLayer, type LayerPolicy } from '../sdk-stream/layer-run.ts';
+import { claudeInventory, claudeLayerParts, EMPTY_PARTS } from './layer-parts.ts';
+import { claudeLayerSupply } from './layer-supply.ts';
 import {
   createSdkAdapter,
   type SdkAdapter,
@@ -26,6 +29,8 @@ import {
   keepHumanAllow,
   mapClaudePermission,
 } from './permission.ts';
+import { claudeHookReader } from './hook-refusal.ts';
+import { CLAUDE_OUTCOME } from './outcome.ts';
 import {
   claudeConfigDir,
   layerHooks,
@@ -33,10 +38,13 @@ import {
   userLayerFiles,
   type HookTable,
 } from './user-layer.ts';
+import { copyParity } from './copy-parity.ts';
 import { claudeReadLayer } from './read-layer.ts';
 import { claudeRepoDeny, claudeRepoRules } from './repo-deny.ts';
 import { repoDenyDetail, repoDenyRefusal } from '../sdk-stream/repo-deny.ts';
 import { claudeTrustMark } from './trust.ts';
+import { claudeTranscriptPresent } from './transcript.ts';
+import { readClaudeWindow } from './window.ts';
 
 /**
  * Переходник Claude Code (03 §Claude adapter). Факты запуска — из `@agentdeck/providers`;
@@ -50,6 +58,7 @@ const FILES = {
   mcp: 'claude/mcp.json',
   brief: 'claude/brief.md',
   observed: 'claude/observed-hooks.json',
+  plugin: 'claude/plugin',
 } as const;
 
 /** Пределы локальной модели → переменные окружения (имена — из фактов запуска). */
@@ -100,9 +109,14 @@ export const CLAUDE_CAPS: AdapterCaps = {
   // Без случая в наборе соответствия возможность не объявляется (P121).
   images: false,
   subagents: false,
+  // Проба Q6: `--disable-slash-commands` снимает инструмент `Skill`, навыки и команды.
+  skillControl: true,
+  // Проба Q5: хук ядра, `--disallowedTools` и вопрос о праве держат и внутри подагента `Agent`.
+  subagentHooks: true,
   login: claudeRunFacts.login,
   channels: CLAUDE_CHANNELS,
-  windowEvent: false,
+  // Окно подписки — строка потока по факту запуска (`rate_limit_event`), разбор — `window.ts`.
+  windowEvent: claudeRunFacts.windowEvent !== undefined,
   limitsChannel: 'env',
 };
 
@@ -207,6 +221,7 @@ function settingsEditDeny(spec: SessionSpec): string[] {
 export const CLAUDE_LAYER: LayerPolicy = {
   readCliMark: claudeTrustMark,
   untrusted: (asked) => (asked === 'on' ? 'observe' : asked),
+  inventory: claudeInventory,
 };
 
 export function planClaude(
@@ -228,13 +243,28 @@ export function planClaude(
   const mode = layer.ran;
   const user =
     mode === 'on' ? null : readUserLayer(userLayerFiles(spec.env.pin, spec.cwd, layer.repoLayer));
-  const layered = user ? layerHooks(user, mode, spec.recorder) : { hooks: {}, observed: [] };
+  const layered = user
+    ? layerHooks(user, mode, spec.recorder, path(FILES.observed))
+    : { hooks: {}, observed: [], unrecorded: false };
+  // Части слоя без хуков (инструкции, правила, навыки, агенты) — их дорогами (проба Q4).
+  const supply = claudeLayerSupply(
+    mode === 'on' ? EMPTY_PARTS : claudeLayerParts(spec.env.pin, spec.cwd, layer.repoLayer),
+    mode,
+    spec.layer.skills,
+    spec.cwd,
+    FILES.plugin,
+  );
   // Привязка адреса старше окружения из настроек человека и репозитория (F-07): `--settings`
   // ядра — источник выше user/project, и в `on` тоже, иначе `env` репозитория уводит сеанс
   // на свой адрес со своим ключом (проба K1).
   const settingsEnv = { ...(user?.env ?? {}), ...(binding?.env ?? {}) };
   // Недоверенная копия: из файлов репозитория — только `deny`, данными (F-86).
   const repoDeny = layer.repoLayer ? null : claudeRepoDeny(spec);
+  // Копия грузит ровно то, что источник (E1): исключения инструкций источника — на корень копии.
+  const parity =
+    mode === 'on' && spec.trust
+      ? copyParity({ sourceRepo: spec.trust.sourceRepo, cwd: spec.cwd, pin: spec.env.pin })
+      : null;
 
   const settings = {
     permissions: {
@@ -254,6 +284,7 @@ export function planClaude(
     // старше, значение ядра — «хуки включены» (F-08).
     disableAllHooks: false,
     hooks: mergeHooks(layered.hooks, coreHooks),
+    ...(parity && parity.excludes.length > 0 ? { claudeMdExcludes: parity.excludes } : {}),
   };
   const files: Record<string, string> = {
     [FILES.settings]: JSON.stringify(settings, null, 2),
@@ -265,7 +296,8 @@ export function planClaude(
         ]),
       ),
     }),
-    [FILES.brief]: spec.brief,
+    [FILES.brief]: `${spec.brief}${supply.briefTail}`,
+    ...supply.files,
   };
   if (layered.observed.length > 0) files[FILES.observed] = JSON.stringify(layered.observed);
 
@@ -290,6 +322,8 @@ export function planClaude(
   ];
   // `on` — источники CLI как есть; иначе ни один файл человека, его права — нашим `--settings`.
   if (mode !== 'on') args.push('--setting-sources', '');
+  args.push(...supply.args);
+  if (supply.copies.length > 0) args.push('--plugin-dir', path(FILES.plugin));
   if (spec.resume) args.push('--resume', spec.resume.conversationId);
   else if (UUID.test(spec.sessionId)) args.push('--session-id', spec.sessionId);
   if (spec.model) args.push('--model', spec.model);
@@ -303,9 +337,27 @@ export function planClaude(
   else args.push('--permission-prompts', 'none');
 
   // Сессия ядра не обновляет CLI посреди задачи: версия — та, по справке которой собран argv.
-  const env: Record<string, string> = { DISABLE_AUTOUPDATER: '1' };
-  const layerDetail = repoDeny ? repoDenyDetail(repoDeny) : undefined;
-  return { args, env, files, ...(layerDetail ? { layerDetail } : {}) };
+  const env: Record<string, string> = { DISABLE_AUTOUPDATER: '1', ...supply.env };
+  const details = [
+    repoDeny ? repoDenyDetail(repoDeny) : undefined,
+    parity?.detail,
+    ...supply.detail,
+  ];
+  const layerDetail = details.filter(Boolean).join('; ') || undefined;
+  const losses = [
+    ...(layered.unrecorded
+      ? ['observe without a recorder, user hooks neither run nor recorded']
+      : []),
+    ...supply.losses,
+  ];
+  return {
+    args,
+    env,
+    files,
+    ...(supply.copies.length > 0 ? { copies: supply.copies } : {}),
+    ...(layerDetail ? { layerDetail } : {}),
+    ...(losses.length > 0 ? { layerLosses: losses } : {}),
+  };
 }
 
 export interface ClaudeAdapterOptions extends SdkAdapterOptions {
@@ -344,11 +396,14 @@ export function refuseClaude(
 }
 
 export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): SdkAdapter {
+  const ladder = tierLadderOf(claudeRunFacts);
   return createSdkAdapter(
     {
       id: claudeRunFacts.id,
       caps: CLAUDE_CAPS,
       command: claudeRunFacts.binary.command,
+      ...(ladder ? { ladder } : {}),
+      transcriptPresent: claudeTranscriptPresent,
       echo: true,
       bindEndpoint: bindClaudeEndpoint,
       layer: CLAUDE_LAYER,
@@ -357,6 +412,9 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): SdkAdap
       plan: planClaude,
       mapPermission: mapClaudePermission,
       classifyError: classifyClaudeError,
+      readWindow: readClaudeWindow,
+      outcome: CLAUDE_OUTCOME,
+      hookReader: claudeHookReader,
     },
     options,
   );

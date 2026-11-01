@@ -408,7 +408,10 @@ export const providersEn: typeof providersRu = {
         'The “Check” button runs a “read → write → read” round over every supported ' +
         'section. The write goes to a TEMPORARY COPY of the configuration: your files ' +
         'are not touched. The “Run the assistant” toggle is separate — that is one live ' +
-        'request to the model, spending your subscription or key.',
+        'request to the model, spending your subscription or key. The “Route in the task ' +
+        'core” step asks the running core whether it sees this CLI’s login and whether ' +
+        'the route is exhausted; with no core running, or one the system did not confirm, ' +
+        'the step is skipped with the reason and does not spoil the verdict.',
       switchResult: '4. The verdict in words, not in colour',
       switchResultText:
         'The frame says “3 of 6 passed” and carries the “partially verified” badge: the ' +

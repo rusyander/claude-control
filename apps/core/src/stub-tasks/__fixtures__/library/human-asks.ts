@@ -1,5 +1,5 @@
 import type { StubTask, TimedMove } from '../stub-tasks.types.ts';
-import { BASE_REPO, HELLO_FILE, HELLO_TEXT } from './happy-path.ts';
+import { BASE_REPO, HELLO_FILE, HELLO_TEXT, REQ_1 } from './happy-path.ts';
 
 const finish = (summary: string): TimedMove[] => [
   { op: 'write', path: `\${copy}/${HELLO_FILE}`, content: HELLO_TEXT },
@@ -9,7 +9,7 @@ const finish = (summary: string): TimedMove[] => [
     args: {
       stepId: '${stepId}',
       outcome: 'done',
-      requirements: [{ id: 'r1', state: 'n/a', evidence: 'no check registry before phase 3' }],
+      requirements: [{ id: REQ_1, state: 'n/a', evidence: 'no check registry before phase 3' }],
       summary,
     },
   },
@@ -21,7 +21,7 @@ const INPUT = {
   request: `Create ${HELLO_FILE} with a greeting.`,
   repo: BASE_REPO,
   stepKind: 'work',
-  requirements: [{ id: 'r1', text: `${HELLO_FILE} exists with a greeting` }],
+  requirements: [{ id: REQ_1, text: `${HELLO_FILE} exists with a greeting` }],
 };
 
 /**
@@ -66,7 +66,9 @@ export const OFF_LIST_BLOCKING_ASK: StubTask = {
       property: 'P85',
       phase: 7,
       judge: { kind: 'decision', class: 'permit' },
-      expect: 'an off-list blocking ask never unblocks a grantRequired edit',
+      expect:
+        'executed (grant-lifetime.integration.test, task grant-required-edit): an off-list ' +
+        'blocking ask is a fork; the grantRequired edit stays denied at the hook until the grant',
     },
   ],
   observer: { signals: [] },

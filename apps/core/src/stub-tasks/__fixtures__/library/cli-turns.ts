@@ -1,5 +1,5 @@
 import type { StubTask } from '../stub-tasks.types.ts';
-import { BASE_REPO } from './happy-path.ts';
+import { BASE_REPO, REQ_1 } from './happy-path.ts';
 
 /**
  * Ход, начатый самим CLI (F06, P48): модель запускает фоновую команду и заканчивает ход; команда
@@ -19,7 +19,7 @@ export const CLI_INITIATED_TURN: StubTask = {
     request: 'Start the slow probe in the background and report when it finishes.',
     repo: BASE_REPO,
     stepKind: 'work',
-    requirements: [{ id: 'r1', text: 'the probe finished and was reported' }],
+    requirements: [{ id: REQ_1, text: 'the probe finished and was reported' }],
   },
   moves: [
     { op: 'shell', argv: ['sleep', '2'], background: true },

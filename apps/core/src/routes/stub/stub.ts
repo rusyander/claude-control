@@ -25,7 +25,14 @@ import {
 import { liveEndpoint } from '../endpoint.ts';
 import { stopTree } from '../../platform/tree-stop.ts';
 import { routeFactDecls } from '../facts.ts';
-import { createResource, releaseOf, RouteAborted, RouteRefused, throwIfAborted } from '../lease.ts';
+import {
+  createResource,
+  releaseOf,
+  requireModel,
+  RouteAborted,
+  RouteRefused,
+  throwIfAborted,
+} from '../lease.ts';
 import { TREE_MARKER_NAME } from '../local/own/server.ts';
 import {
   encodeStubConfig,
@@ -259,6 +266,8 @@ export function createStubRoute(options: StubRouteOptions): StubRoute {
 
   async function acquire(spec: RouteAcquireSpec, record: RouteRecorder): Promise<RouteLease> {
     throwIfAborted(spec, 'stub start');
+    // Заглушка — маршрут с адресом: модель по умолчанию CLI ей не назвать, отказ до запуска.
+    const model = requireModel({ id, caps: STUB_CAPS }, spec);
     const dialect = spec.dialect ?? DIALECT_IDS[0] ?? 'anthropic-messages';
     // Диалект вне заглушки — отказ до запуска: иначе сервер поднялся бы с ссылкой, которую
     // перезапущенное ядро не прочтёт, и его освобождение стало бы утечкой живого сервера.
@@ -303,7 +312,7 @@ export function createStubRoute(options: StubRouteOptions): StubRoute {
     const lease: RouteLease = {
       leaseId: newId(),
       routeId: id,
-      model: spec.model,
+      model,
       resources: [resource],
     };
     servers.set(lease.leaseId, { lease, rid, dialect, ...server });

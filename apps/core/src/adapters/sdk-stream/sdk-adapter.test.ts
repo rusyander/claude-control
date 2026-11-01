@@ -31,6 +31,8 @@ writeFileSync(
 
 /** Слой, с которым каркас позвал план (F-86: план строится по слою на деле). */
 const planned: LayerRun[] = [];
+/** Бриф, с которым каркас позвал план (Q8: метка платформы первой строкой). */
+const briefs: string[] = [];
 
 const def: SdkAdapterDef = {
   id: 'sdk-probe',
@@ -38,10 +40,17 @@ const def: SdkAdapterDef = {
   command: COMMAND,
   echo: false,
   bindEndpoint: () => ({ ok: false, code: 'no_channel' }),
-  layer: { readCliMark: async () => ({ trusted: false }), untrusted: () => 'observe' },
+  layer: {
+    readCliMark: async () => ({ trusted: false }),
+    untrusted: () => 'observe',
+    inventory: () => {
+      throw new Error('inventory is not read by launch');
+    },
+  },
   readLayer: (pin) => ({ dirs: [join(pin.HOME ?? '', 'probe-layer')], credentials: [] }),
-  plan: (_spec, _binding, layer) => {
+  plan: (spec, _binding, layer) => {
     planned.push(layer);
+    briefs.push(spec.brief);
     return {
       args: ['--probe', 'plan-arg'],
       env: { PLAN_VAR: 'plan-value' },
@@ -92,7 +101,26 @@ describe('sdk adapter frame without optional parts', () => {
     expect(dump.env.NODE_OPTIONS ?? '').toContain('--require');
     expect(readFileSync(mark, 'utf8')).toBe('loaded');
     expect(readFileSync(join(spec.dir, 'plan', 'notes.txt'), 'utf8')).toBe('plan file');
+    // Бриф — текст платформы: план получает его уже с меткой (Q8), один раз.
+    expect(briefs.at(-1)).toBe(`<!-- agentdeck:platform -->\n${spec.brief}`);
     expect(adapter.session(result.handle)).toBeDefined();
+  });
+
+  it('F9: the configured CLI path (commandOf) wins over the adapter command, read at launch, no search dir needed', async () => {
+    const dumpFile = join(live.root, 'dump-cli-path.json');
+    const file = join(bin, process.platform === 'win32' ? `${COMMAND}.cmd` : COMMAND);
+    const configured: { path?: string } = {};
+    const adapter = createSdkAdapter(def, { pollMs: 20, commandOf: () => configured.path });
+    // Путь выставлен ПОСЛЕ создания переходника: читается на запуске, не при сборке реестра.
+    configured.path = file;
+    const result = await adapter.launch(
+      liveSpec(live, {
+        env: { pin: livePin(live, replayEnv({ dump: dumpFile, exit: 0 })) },
+      }),
+    );
+    if (!result.ok) throw new Error(`launch refused: ${result.reason}`);
+    open.push({ adapter, handle: result.handle });
+    expect((await waitDump(dumpFile)).argv).toEqual(['--probe', 'plan-arg']);
   });
 
   it('a command outside PATH and without the search dir fails the launch with the reason, no session kept', async () => {

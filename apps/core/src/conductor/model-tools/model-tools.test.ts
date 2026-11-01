@@ -8,7 +8,7 @@ import {
 import { deps, openFresh } from '../../journal/__fixtures__/journal-harness.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
 import { resume, type LiveTask } from '../../journal/resume.ts';
-import { seedSession, toolDeps } from './__fixtures__/seed.ts';
+import { R1, R2, seedRequirements, seedSession, toolDeps } from './__fixtures__/seed.ts';
 import { bindingOf } from './binding.ts';
 import { CHECK_ABSENT, handleModelTool, TOOL_NOT_IN_PLAN } from './model-tools.ts';
 import type { RecordVerdict, SessionBinding } from './model-tools.types.ts';
@@ -22,6 +22,7 @@ import type { RecordVerdict, SessionBinding } from './model-tools.types.ts';
 
 async function stepOf(stepKind: string) {
   const fresh = await openFresh();
+  seedRequirements(fresh.task);
   const seeded = seedSession(fresh.task, { stepKind });
   const bound = bindingOf(fresh.task, seeded.sessionId);
   if (!('binding' in bound)) throw new Error(bound.reason);
@@ -36,7 +37,7 @@ function claim(b: SessionBinding, over: Partial<StepDoneCall> = {}): StepDoneCal
   return {
     stepId: b.stepId,
     outcome: 'done',
-    requirements: [{ id: 'R1', state: 'covered', evidence: ['rec-green'] }],
+    requirements: [{ id: R1, state: 'covered', evidence: ['rec-green'] }],
     summary: 'did the work',
     ...over,
   };
@@ -46,7 +47,7 @@ describe('model tools', () => {
   it('P72 an invalid step_done returns its field errors once; a repeat is a counted refusal, also across a core restart', async () => {
     const { task, dir, taskId, b } = await stepOf('work');
     const bad = { stepId: b.stepId, requirements: [], summary: 'x', extra: 1 };
-    const first = handleModelTool(task, b, 'step_done', bad, toolDeps());
+    const first = await handleModelTool(task, b, 'step_done', bad, toolDeps());
     expect(first).toMatchObject({ ok: false, code: 'invalid' });
     const issues = (first as { issues: { path: string; code: string }[] }).issues;
     expect(issues).toEqual(
@@ -55,14 +56,14 @@ describe('model tools', () => {
         expect.objectContaining({ path: 'extra', code: 'unknown-field' }),
       ]),
     );
-    const second = handleModelTool(task, b, 'step_done', bad, toolDeps());
+    const second = await handleModelTool(task, b, 'step_done', bad, toolDeps());
     expect(second).toMatchObject({ ok: false, code: 'invalid-repeat' });
     expect(second).not.toHaveProperty('issues');
     task.close();
     // Новое ядро читает счёт из журнала: второго списка ошибок модель не получит.
     const reopened = await resume(dir, taskId, deps());
     if (!reopened.ok) throw new Error(reopened.reason);
-    const third = handleModelTool(reopened.task, b, 'step_done', bad, toolDeps());
+    const third = await handleModelTool(reopened.task, b, 'step_done', bad, toolDeps());
     expect(third).toMatchObject({ ok: false, code: 'invalid-repeat' });
     const refusals = lines(reopened.task)
       .filter((l) => l.kind === 'signal')
@@ -76,7 +77,13 @@ describe('model tools', () => {
     const { task, b } = await stepOf('work');
     const { outcome: _o, ...missing } = claim(b);
     const before = task.state.seq;
-    const reply = handleModelTool(task, b, 'step_done', missing, toolDeps({ 'rec-green': 'pass' }));
+    const reply = await handleModelTool(
+      task,
+      b,
+      'step_done',
+      missing,
+      toolDeps({ 'rec-green': 'pass' }),
+    );
     expect(reply).toMatchObject({ ok: false, code: 'invalid' });
     const written = lines(task).slice(before);
     expect(written.map((l) => l.kind)).toEqual(['signal']);
@@ -97,7 +104,7 @@ describe('model tools', () => {
   it('step_done fields foreign to the step kind and an oversized claim are field errors', async () => {
     const { task, b } = await stepOf('work');
     const finding = { file: 'a.ts', line: 1, severity: 'minor', text: 'x' } as const;
-    const reply = handleModelTool(
+    const reply = await handleModelTool(
       task,
       b,
       'step_done',
@@ -109,7 +116,7 @@ describe('model tools', () => {
       'findings',
     );
     const review = await stepOf('review');
-    const ok = handleModelTool(
+    const ok = await handleModelTool(
       review.task,
       review.b,
       'step_done',
@@ -127,7 +134,7 @@ describe('model tools', () => {
       const records: Record<string, RecordVerdict | 'unreadable'> = verdict
         ? { 'rec-green': verdict }
         : {};
-      const reply = handleModelTool(task, b, 'step_done', claim(b), toolDeps(records));
+      const reply = await handleModelTool(task, b, 'step_done', claim(b), toolDeps(records));
       expect(reply, String(verdict)).toMatchObject({ ok: false, code: 'evidence-rejected' });
       expect(lines(task).some((l) => l.kind === 'step.claimed')).toBe(false);
       expect(task.state.steps[b.stepId]?.state).toBe('running');
@@ -136,11 +143,11 @@ describe('model tools', () => {
     const { task, b } = await stepOf('work');
     const call = claim(b, {
       requirements: [
-        { id: 'R1', state: 'covered', evidence: ['rec-green', 'rec-flaky'] },
-        { id: 'R2', state: 'n/a', evidence: 'docs only' },
+        { id: R1, state: 'covered', evidence: ['rec-green', 'rec-flaky'] },
+        { id: R2, state: 'n/a', evidence: 'docs only' },
       ],
     });
-    const reply = handleModelTool(
+    const reply = await handleModelTool(
       task,
       b,
       'step_done',
@@ -163,7 +170,13 @@ describe('model tools', () => {
       claim: { seq: claimed?.seq, call },
     });
     // Шаг уже на проверке: второе заявление отказано, а не принято поверх.
-    const again = handleModelTool(task, b, 'step_done', call, toolDeps({ 'rec-green': 'pass' }));
+    const again = await handleModelTool(
+      task,
+      b,
+      'step_done',
+      call,
+      toolDeps({ 'rec-green': 'pass' }),
+    );
     expect(again).toMatchObject({ ok: false, code: 'step-not-running' });
     task.close();
   });
@@ -171,7 +184,7 @@ describe('model tools', () => {
   it('step_done for another step is refused', async () => {
     const { task, b } = await stepOf('work');
     const other = seedSession(task, { stepKind: 'work', unitId: b.unitId });
-    const reply = handleModelTool(
+    const reply = await handleModelTool(
       task,
       b,
       'step_done',
@@ -179,6 +192,63 @@ describe('model tools', () => {
       toolDeps({ 'rec-green': 'pass' }),
     );
     expect(reply).toMatchObject({ ok: false, code: 'foreign-step' });
+    task.close();
+  });
+
+  it('stage 8: step_done after a stop-step signal on the step is refused with its reason — the step stays running for the stop, no claim row', async () => {
+    const { task, b } = await stepOf('work');
+    const signal = (action: 'stop-step' | 'show', severity: 'stop' | 'warn') =>
+      task.append({
+        kind: 'signal',
+        actor: 'core',
+        stepId: b.stepId,
+        sessionId: b.sessionId,
+        data: {
+          signal: 'waste-fail-repeat',
+          severity,
+          action,
+          subject: 'node fail.js',
+          detail: '',
+        },
+      });
+    // Near-miss: показанный сигнал шаг не останавливает — заявление идёт.
+    signal('show', 'warn');
+    expect(task.state.steps[b.stepId]?.stops).toEqual([]);
+    signal('stop-step', 'stop');
+    const reply = await handleModelTool(
+      task,
+      b,
+      'step_done',
+      claim(b),
+      toolDeps({ 'rec-green': 'pass' }),
+    );
+    expect(reply).toMatchObject({
+      ok: false,
+      code: 'step-stopped',
+      message: 'step stopped: waste-fail-repeat: node fail.js',
+    });
+    expect(lines(task).filter((l) => l.kind === 'step.claimed')).toEqual([]);
+    expect(task.state.steps[b.stepId]?.state).toBe('running');
+    task.close();
+  });
+
+  it('stage 8 near-miss: a shown (not stop) signal on the step leaves step_done accepted', async () => {
+    const { task, b } = await stepOf('work');
+    task.append({
+      kind: 'signal',
+      actor: 'core',
+      stepId: b.stepId,
+      sessionId: b.sessionId,
+      data: { signal: 'waste-poll', severity: 'warn', action: 'show', subject: 'x', detail: '' },
+    });
+    const reply = await handleModelTool(
+      task,
+      b,
+      'step_done',
+      claim(b),
+      toolDeps({ 'rec-green': 'pass' }),
+    );
+    expect(reply).toMatchObject({ ok: true, result: { accepted: true } });
     task.close();
   });
 
@@ -192,8 +262,13 @@ describe('model tools', () => {
     }
     expect(toolPlanFor('review')).toEqual({
       builtins: 'read-only',
-      modelTools: ['step_done', 'check', 'ask_human', 'blocker', 'core_state'],
+      modelTools: ['step_done', 'check', 'ask_human', 'blocker', 'core_state', 'unit_diff'],
     });
+    // Дифф файла единицы — только тем, кто судит сделанную правку.
+    const withDiff = SESSION_STEP_KINDS.filter((k) =>
+      toolPlanFor(k)?.modelTools.includes('unit_diff'),
+    );
+    expect(withDiff).toEqual(['review', 'answer-reviewers']);
     expect(toolPlanFor('research')).toEqual({
       builtins: 'read-only',
       modelTools: ['step_done', 'ask_human', 'blocker', 'core_state'],

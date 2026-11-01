@@ -40,7 +40,7 @@ function spec(over: Partial<SessionSpec> = {}): SessionSpec {
     platform: { coreHome: join(tmpdir(), 'claude-plan-core'), tokenFiles: [] },
     tools: 'all',
     mcpServers: {},
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     env: { pin: {} },
     core: {
       taskId: 't',
@@ -204,6 +204,13 @@ describe('claude adapter — launch plan', () => {
     });
   });
 
+  it('no model in the spec (CLI default model) → argv carries no --model at all', () => {
+    // Модель по умолчанию CLI: ядро её не называет, флаг не пишется вовсе (пустой `--model` — ошибка CLI).
+    const plan = planClaude(spec());
+    expect(plan.args).not.toContain('--model');
+    expect(planClaude(spec({ model: '' })).args).not.toContain('--model');
+  });
+
   it('an effort the CLI does not know and a non-uuid session id are left out', () => {
     const plan = planClaude(spec({ effort: 'turbo', sessionId: 'not-a-uuid' }));
     expect(plan.args).not.toContain('--effort');
@@ -232,13 +239,14 @@ describe('claude adapter — launch plan', () => {
     const observe = planClaude(
       spec({
         cwd,
-        layer: { hooks: 'observe' },
+        layer: { hooks: 'observe', skills: 'on' },
         env: { pin },
         recorder: { command: 'node rec.mjs', log: 'C:\\logs\\r.jsonl' },
         coreHook: 'node core.mjs',
       }),
     );
     expect(after(observe.args, '--setting-sources')).toBe('');
+    const observedFile = join(spec({}).dir, 'claude', 'observed-hooks.json');
     const settings = JSON.parse(observe.files['claude/settings.json']!);
     expect(settings.permissions).toEqual({
       allow: ['Read'],
@@ -255,18 +263,37 @@ describe('claude adapter — launch plan', () => {
         hooks: [
           {
             type: 'command',
-            command: 'node rec.mjs --log "C:\\logs\\r.jsonl" --hook PreToolUse.0.0',
+            command: `node rec.mjs --log "C:\\logs\\r.jsonl" --hook PreToolUse.0.0 --observed "${observedFile}"`,
+            timeout: 65,
           },
         ],
       },
       { matcher: '*', hooks: [{ type: 'command', command: 'node core.mjs' }] },
     ]);
     expect(JSON.parse(observe.files['claude/observed-hooks.json']!)).toEqual([
-      { key: 'PreToolUse.0.0', event: 'PreToolUse', matcher: 'Bash', command: 'human.sh' },
+      {
+        key: 'PreToolUse.0.0',
+        event: 'PreToolUse',
+        matcher: 'Bash',
+        type: 'command',
+        command: 'human.sh',
+        sourcePath: join(config, 'settings.json'),
+      },
     ]);
 
-    const off = planClaude(spec({ cwd, layer: { hooks: 'off' }, env: { pin } }));
-    expect(JSON.parse(off.files['claude/settings.json']!).hooks).toEqual({});
+    // `off` с записью и хуком ядра, как ставит дорога: хуков человека нет, хук ядра остаётся.
+    const off = planClaude(
+      spec({
+        cwd,
+        layer: { hooks: 'off', skills: 'on' },
+        env: { pin },
+        recorder: { command: 'node rec.mjs', log: 'C:\\logs\\r.jsonl' },
+        coreHook: 'node core.mjs',
+      }),
+    );
+    expect(JSON.parse(off.files['claude/settings.json']!).hooks).toEqual({
+      PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'node core.mjs' }] }],
+    });
     expect(off.files['claude/observed-hooks.json']).toBeUndefined();
   });
 });
@@ -283,7 +310,7 @@ describe('claude adapter — user layer', () => {
     ]);
   });
 
-  it('a broken file is named unreadable, never read as empty; observe without a recorder records nothing', () => {
+  it('a broken file is named unreadable, never read as empty; observe without a recorder records nothing and says so', () => {
     const root = mkdtempSync(join(tmpdir(), 'claude-ul-'));
     const bad = join(root, 'bad.json');
     writeFileSync(bad, 'nope');
@@ -291,16 +318,40 @@ describe('claude adapter — user layer', () => {
     expect(layer.unreadable).toEqual([bad]);
     expect(layer.read).toEqual([]);
     const hooks = { Stop: [{ hooks: [{ type: 'command' }] }] };
-    expect(layerHooks({ ...layer, hooks }, 'observe', undefined)).toEqual({
+    const hookFiles = { Stop: ['settings.json'] };
+    expect(layerHooks({ ...layer, hooks, hookFiles }, 'observe', undefined, 'obs')).toEqual({
       hooks: {},
       observed: [],
+      unrecorded: true,
     });
-    const recorded = layerHooks({ ...layer, hooks }, 'observe', { command: 'rec', log: 'l"og' });
+    const recorded = layerHooks(
+      { ...layer, hooks, hookFiles },
+      'observe',
+      { command: 'rec', log: 'l"og' },
+      'o"bs',
+    );
     expect(recorded.hooks).toEqual({
-      Stop: [{ hooks: [{ type: 'command', command: 'rec --log "l\\"og" --hook Stop.0.0' }] }],
+      Stop: [
+        {
+          hooks: [
+            {
+              type: 'command',
+              command: 'rec --log "l\\"og" --hook Stop.0.0 --observed "o\\"bs"',
+              timeout: 65,
+            },
+          ],
+        },
+      ],
     });
     expect(recorded.observed).toEqual([
-      { key: 'Stop.0.0', event: 'Stop', matcher: undefined, command: '' },
+      {
+        key: 'Stop.0.0',
+        event: 'Stop',
+        matcher: undefined,
+        type: 'command',
+        command: '',
+        sourcePath: 'settings.json',
+      },
     ]);
   });
 });
@@ -344,11 +395,35 @@ describe('claude adapter — permissions', () => {
       action: 'net',
       target: 'q',
     });
-    expect(mapClaudePermission({ tool: 'Task', input: {} })).toEqual({
+    expect(mapClaudePermission({ tool: 'ExitPlanMode', input: {} })).toEqual({
       action: 'other',
-      target: 'Task',
-      tool: 'Task',
-      display: 'Task',
+      target: 'ExitPlanMode',
+      tool: 'ExitPlanMode',
+      display: 'ExitPlanMode',
+    });
+    // Проба L Q5: подагент — `Agent` (в `init.tools` ещё `Task`), модель — псевдоним в `model`.
+    expect(
+      mapClaudePermission({
+        tool: 'Agent',
+        input: { subagent_type: 'Explore', model: 'opus', prompt: 'p' },
+      }),
+    ).toEqual({
+      action: 'subagent',
+      target: 'Explore',
+      model: 'opus',
+      tool: 'Agent',
+      display: 'Agent Explore',
+    });
+    expect(mapClaudePermission({ tool: 'Task', input: { subagent_type: 'x' } })).toMatchObject({
+      action: 'subagent',
+      target: 'x',
+      model: null,
+    });
+    expect(mapClaudePermission({ tool: 'Skill', input: { skill: 'pdf' } })).toEqual({
+      action: 'skill',
+      target: 'pdf',
+      tool: 'Skill',
+      display: 'Skill pdf',
     });
   });
 

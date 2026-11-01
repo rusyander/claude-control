@@ -7,7 +7,10 @@ import { sessionPermitDeny } from '../../adapters/deny-overlay.ts';
 import { SDK_PERMIT_CODEC } from '../../adapters/sdk-stream/permit-codec.ts';
 import type { PeerDeps } from '../../api/auth.ts';
 import { buildApi } from '../../api/server.ts';
+import type { SessionStatePort } from '../../api/session-state.types.ts';
 import { registerSessionTools } from '../../api/session-tools.ts';
+import { WindowBook } from '../../economy/window/index.ts';
+import { commandEnv } from '../../conductor/commands/__fixtures__/command-env.ts';
 import { seedSession, toolDeps } from '../../conductor/model-tools/__fixtures__/seed.ts';
 import { createTaskRegistry, type TaskRegistry } from '../../conductor/tasks.ts';
 import { CREATED, deps, tempDir } from '../../journal/__fixtures__/journal-harness.ts';
@@ -50,6 +53,8 @@ export interface SessionStandOptions {
   tasksDir?: string;
   coreToken?: string;
   port?: number;
+  /** Порт `GET /v1/session/state` (этап 7); нет — ручка отвечает 501, как у загрузки без зоны. */
+  state?: SessionStatePort;
 }
 
 export async function startSessionStand(opts: SessionStandOptions = {}): Promise<SessionStand> {
@@ -85,6 +90,8 @@ export async function startSessionStand(opts: SessionStandOptions = {}): Promise
   };
   const app = buildApi({
     registry,
+    // Стенд ручек сессии без дирижёра: дом — пустой временный, среды деления нет.
+    env: commandEnv(),
     tokens: { core: coreToken, isSessionToken: (t) => tokens.verify(t) !== undefined },
     nonces,
     peer,
@@ -96,6 +103,7 @@ export async function startSessionStand(opts: SessionStandOptions = {}): Promise
       startedAt: Date.now(),
       home: tasksDir,
     },
+    windows: new WindowBook(),
     now: Date.now,
     pingMs: 60_000,
   });
@@ -110,6 +118,7 @@ export async function startSessionStand(opts: SessionStandOptions = {}): Promise
       context,
       settleMs: 150,
     }),
+    ...(opts.state ? { state: opts.state } : {}),
   });
   await app.listen({ host: '127.0.0.1', port: opts.port ?? 0 });
   const port = (app.server.address() as AddressInfo).port;

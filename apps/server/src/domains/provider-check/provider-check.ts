@@ -23,8 +23,13 @@
  *
  * Файл — вход проверки: шаги лежат в `provider-check/`
  * (`steps-environment.ts` — CLI и расположение конфигурации, `steps-write-cycle.ts`
- * — круги записи на копии файла, `steps-assistant.ts` — настоящий запуск,
- * `run.ts` — сборка списка шагов и уровень доверия).
+ * — круги записи на копии файла, `steps-core-route.ts` — маршрут входа CLI у ядра
+ * исполнения задач, `steps-assistant.ts` — настоящий запуск, `run.ts` — сборка списка шагов и
+ * уровень доверия).
+ *
+ * Шаг «маршрут ядра» спрашивает ядро только через строку `procs.json`, подтверждённую ОС; ядра нет
+ * или строка не сверилась — шаг пропущен с причиной и уровень не снижает.
  */
 export type { ProviderCheckDeps } from './types.ts';
 export { levelOf, checkProvider } from './run.ts';
+export { createCoreRoutesReader, type CoreRoutesReader } from './steps-core-route.ts';

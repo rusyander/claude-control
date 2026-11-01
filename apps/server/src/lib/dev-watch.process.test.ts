@@ -37,6 +37,9 @@ const DEV_WATCH = process.env.DW_SRC
 const PROBE = new URL('./dev-boot-probe.mjs', import.meta.url);
 const BRAND = new URL('./brand.mjs', import.meta.url);
 const RESTART = new URL('./dev-restart.mjs', import.meta.url);
+const HOP_RECORDER = new URL('./hop-recorder.mjs', import.meta.url);
+// Сторож пишет звенья ядру (P131): дом ядра теста — пустой временный, не настоящий.
+process.env.AGENTDECK_CORE_HOME = mkdtempSync(join(tmpdir(), 'dw-core-'));
 
 const FAKE_SERVER = `import { spawn } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -98,6 +101,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(join(serverDir, 'src', 'index.ts'), FAKE_SERVER);
     const pidsFile = join(root, 'pids.txt');
@@ -186,6 +190,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     // Каталог с точкой сторож не наблюдает: его файл пропадает и возвращается без правки.
     const gateFile = join(gate, 'gate.mjs');
     writeFileSync(gateFile, 'export const gate = 1;\n');
@@ -246,6 +251,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(
       join(serverDir, 'src', 'index.ts'),
@@ -331,6 +337,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(
       join(serverDir, 'src', 'index.ts'),
@@ -405,6 +412,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(
       join(serverDir, 'src', 'index.ts'),
@@ -482,6 +490,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(
       join(serverDir, 'src', 'index.ts'),
@@ -548,6 +557,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
     copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    copyFileSync(HOP_RECORDER, join(lib, 'hop-recorder.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(
       join(serverDir, 'src', 'index.ts'),

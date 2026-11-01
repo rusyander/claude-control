@@ -8,12 +8,12 @@
       "panel": {
         "module": "apps/server/src/domains/project-git/sieve-facts/sieve-facts.ts",
         "files": [
-          "apps/server/src/domains/project-git/sieve-scan/sieve-scan.ts",
+          "packages/sieves/src/sieve-scan.ts",
           "apps/server/src/domains/project-git/sieve-facts/sieve-facts.ts",
           "apps/server/src/domains/project-git/sieve-facts-scan.ts",
           "packages/contracts/src/sieves/catalog.ts"
         ],
-        "tests": ["apps/server/src/domains/project-git/sieve-scan/sieve-scan.test.ts"]
+        "tests": ["packages/sieves/src/sieve-scan.test.ts"]
       },
       "global": {
         "module": "hooks/lib/push-sieves-scan.mjs",

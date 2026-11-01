@@ -14,7 +14,11 @@
   "dependencies": {
     "@agentdeck/contracts": "workspace:*",
     "@agentdeck/dlp": "workspace:*",
+    "@agentdeck/keys": "workspace:*",
+    "@agentdeck/pricing": "workspace:*",
     "@agentdeck/providers": "workspace:*",
+    "@agentdeck/sieves": "workspace:*",
+    "@agentdeck/stub-forge": "workspace:*",
     "@agentdeck/stub-model": "workspace:*",
     "fastify": "^5.10.0",
     "zod": "^4.4.3"

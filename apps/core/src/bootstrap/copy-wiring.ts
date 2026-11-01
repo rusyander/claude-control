@@ -20,8 +20,8 @@ import { readBaseEnv } from '../platform/base-env.ts';
 /**
  * Копия единицы в сборе (04:97-99, G7): дирижёр зовёт `prepare` перед первым шагом единицы и
  * получает решение `copy-setup` (оно же уже в журнале) — `brief` кладётся в задание шага, провал
- * не прячется. `remove` — снятие по ресурсу (01 §Resources). Подключение — одна строка в
- * `boot-api.ts`: `copyWiring({ registry, layout, profileOf: verifier.profile.profileOf })`.
+ * не прячется. `remove` — снятие по ресурсу (01 §Resources). Подключает обвязка шага зоны F
+ * (`conductor-wiring/wiring.ts`): старт единицы, отложенная установка, снятие в конце единицы.
  */
 
 export interface CopyWiringDeps {
@@ -41,6 +41,8 @@ export interface CopyPrepareOptions {
   endpoints?: readonly ServiceEndpoint[];
   settings?: MirrorSettings;
   configured?: ConfiguredInstall;
+  /** Копия оценки (G6): без установки, её доставит следующий `prepare` без флага. */
+  deferInstall?: boolean;
 }
 
 export interface CopyPrepared {
@@ -79,6 +81,7 @@ export function copyWiring(deps: CopyWiringDeps): CopyWiring {
         ...(options.settings ? { settings: options.settings } : {}),
         ...(options.endpoints ? { endpoints: options.endpoints } : {}),
         ...(options.configured ? { configured: options.configured } : {}),
+        ...(options.deferInstall ? { deferInstall: true } : {}),
         setup: {
           env: await envPin(),
           logDir: join(deps.layout.logs, 'copy', taskId, unitId),

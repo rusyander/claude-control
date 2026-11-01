@@ -22,6 +22,21 @@ export const GIT_PUSH_EQUIVALENT: readonly (readonly string[])[] = [
 ];
 
 /**
+ * Состояние CI читает ядро (ожидание CI задачи, `ciWait` — живое решение человека, R:S1-09):
+ * сессия, ждущая пайплайн сама, жжёт ходы и обходит это решение. Префиксы едут в том же списке
+ * запретов (оверлей CLI не меняется), судья называет их своей причиной.
+ */
+export const CI_READ_COMMANDS: readonly (readonly string[])[] = [
+  ['gh', 'run'],
+  ['gh', 'pr', 'checks'],
+  ['gh', 'workflow', 'view'],
+  ['gh', 'workflow', 'run'],
+  ['glab', 'ci'],
+  ['glab', 'pipeline'],
+  ['glab', 'job'],
+];
+
+/**
  * Префиксы argv, запрещённые каждому сеансу: push и его равные, смена адреса push, запись форджа.
  * Чтение форджа сессии получают через прокси только для чтения (03), поэтому `gh api` /
  * `glab api` запрещены целиком: префикс argv не отличает чтение от записи.
@@ -64,4 +79,5 @@ export const PUBLISH_COMMANDS: readonly (readonly string[])[] = [
   ['glab', 'issue', 'reopen'],
   ['glab', 'release', 'create'],
   ['glab', 'api'],
+  ...CI_READ_COMMANDS,
 ];

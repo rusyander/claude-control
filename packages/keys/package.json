@@ -1,0 +1,23 @@
+{
+  "name": "@agentdeck/keys",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Хранилище ключей доступа и шифрование секретов — общие для панели, ядра и хоста переходов",
+  "exports": {
+    "./errors": "./src/errors.ts",
+    "./integration-keys": "./src/integration-keys.ts",
+    "./provider-keys": "./src/provider-keys.ts",
+    "./secret-crypto": "./src/secret-crypto.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

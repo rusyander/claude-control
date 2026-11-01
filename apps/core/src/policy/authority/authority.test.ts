@@ -1,14 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { COMMAND_KINDS, type CommandKind } from '@agentdeck/contracts/core/commands';
+import { COMMAND_KINDS, type AuthorityKind } from '@agentdeck/contracts/core/commands';
 import { COMMAND_PROOF_CLASS, decideAuthority, type CommandProof } from './authority.ts';
 import { createNonceStore, NONCE_LIMIT, NONCE_TTL_MS } from './nonce.ts';
 
 /**
  * Таблица 06 §Authority, переписанная из спецификации отдельно от кода: строки — виды команд,
- * столбцы — доказательства. Код и эта таблица обязаны совпасть на всём произведении.
+ * столбцы — доказательства. Код и эта таблица обязаны совпасть на всём произведении. Оценка
+ * (`/v1/estimate`) — строка таблицы наравне с командами: её судит тот же суд (G5).
  */
-const STRICT_FROM_SPEC: ReadonlySet<CommandKind> = new Set([
+const KINDS: readonly AuthorityKind[] = [
+  ...COMMAND_KINDS,
+  'estimate',
+  'set-config',
+  'save-scenario',
+  'adopt-devices',
+];
+const STRICT_FROM_SPEC: ReadonlySet<AuthorityKind> = new Set([
+  'set-config',
+  // Этап 9 (F6, F11): библиотека сценариев и ключи устройств — строго, как настройка ядра.
+  'save-scenario',
+  'adopt-devices',
   'answer',
+  'edit-requirements',
   'approve-split',
   'grant',
   'fresh-rerun',
@@ -16,9 +29,10 @@ const STRICT_FROM_SPEC: ReadonlySet<CommandKind> = new Set([
   'release-resource',
   'move-build',
   'clean-remote',
+  'clear-exhausted',
 ]);
 
-function specVerdict(kind: CommandKind, p: CommandProof): string {
+function specVerdict(kind: AuthorityKind, p: CommandProof): string {
   if (p.token === 'session' || p.peer === 'session-descendant') return 'forged-authority';
   if (p.token === 'none') return 'proof-required';
   if (p.signature === 'valid') return 'allow';
@@ -45,7 +59,7 @@ describe('authority', () => {
   it('P97 every command kind × proof (token, nonce, peer, signature) matches the 06 table', () => {
     let rows = 0;
     const mismatches: string[] = [];
-    for (const kind of COMMAND_KINDS) {
+    for (const kind of KINDS) {
       for (const token of TOKENS)
         for (const nonce of NONCES)
           for (const peer of PEERS)
@@ -61,8 +75,8 @@ describe('authority', () => {
             }
     }
     expect(mismatches).toEqual([]);
-    expect(rows).toBe(COMMAND_KINDS.length * 4 * 3 * 5 * 3);
-    for (const kind of COMMAND_KINDS) {
+    expect(rows).toBe(KINDS.length * 4 * 3 * 5 * 3);
+    for (const kind of KINDS) {
       expect({ kind, strict: COMMAND_PROOF_CLASS[kind] === 'human-strict' }).toEqual({
         kind,
         strict: STRICT_FROM_SPEC.has(kind),

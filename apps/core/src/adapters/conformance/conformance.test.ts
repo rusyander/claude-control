@@ -7,9 +7,11 @@ import type {
   AdapterCaps,
   AdapterEvent,
   CliAdapter,
+  LayerRun,
   SessionHandle,
   SessionSpec,
 } from '../adapter.types.ts';
+import { FROM_HUMAN_LINE, PLATFORM_MARKER } from '@agentdeck/contracts/core/user-layer';
 import { CLAUDE_CHANNELS, createClaudeAdapter } from '../claude/claude.ts';
 import { claudeAbsolutePattern } from '../claude/permission.ts';
 import { qwenPathPattern } from '../qwen/permission.ts';
@@ -52,6 +54,8 @@ interface Profile {
     wake?: string;
     /** Запрет оверлея при разрешающем сервере права: CLI отказывает сам, вопроса нет. */
     denyOverPermit?: string;
+    /** Ход со строкой окна подписки (`windowEvent`). */
+    window?: string;
   };
   /** Файл сеанса с правилами запрета (относительно каталога сеанса). */
   settings: string;
@@ -59,6 +63,10 @@ interface Profile {
   /** Строгий список MCP: что видит CLI из argv и файлов сеанса. */
   mcpNames(argv: string[], dir: string): string[];
   hookCommands(settings: Record<string, unknown>): string[];
+  /** Бриф, как его получил CLI (файлом или значением флага). */
+  brief(argv: string[]): string;
+  /** Навыки сеанса выключены — по argv CLI (`skillControl`). */
+  skillsOff?(argv: readonly string[]): boolean;
   shellRule(argv: readonly string[]): string;
   /** Правило запрета пути в словаре CLI (форма пути у каждого своя). */
   pathRule(cwd: string, path: string, op: 'read' | 'edit'): string;
@@ -93,8 +101,11 @@ const PROFILES: Profile[] = [
       refused: 'permit',
       wake: 'bg-permit-allow',
       denyOverPermit: 'deny-permit-allow',
+      window: 'window',
     },
     settings: 'claude/settings.json',
+    brief: (argv) => readFileSync(after(argv, '--append-system-prompt-file')!, 'utf8'),
+    skillsOff: (argv) => argv.includes('--disable-slash-commands'),
     denyRules: (s) => (s.permissions as { deny: string[] }).deny,
     mcpNames: (argv) =>
       Object.keys(
@@ -129,6 +140,10 @@ const PROFILES: Profile[] = [
       permitDeny: 'permit-core-deny',
     },
     settings: 'qwen/system-settings.json',
+    brief: (argv) =>
+      (argv.find((a) => a.startsWith('--append-system-prompt=')) ?? '').slice(
+        '--append-system-prompt='.length,
+      ),
     denyRules: (s) => (s.permissions as { deny: string[] }).deny,
     mcpNames: (argv) => {
       const at = argv.indexOf('--allowed-mcp-server-names');
@@ -186,6 +201,7 @@ async function run(
   tap: EventTap;
   dump: () => NonNullable<ReturnType<typeof readDump>>;
   spec: SessionSpec;
+  layer: LayerRun;
 }> {
   const { live, bin } = stand(profile);
   runs += 1;
@@ -209,6 +225,7 @@ async function run(
     handle: launched.handle,
     tap: new EventTap(adapter, launched.handle),
     spec,
+    layer: launched.layer,
     dump: () => {
       const d = readDump(dumpFile);
       if (!d) throw new Error('replay CLI never started');
@@ -415,7 +432,7 @@ const CASES: Case[] = [
       const layered = p.make({}).caps.layerControl;
       const r = await run(p, fx(p, p.fixtures.basic), {
         cwd: copy,
-        layer: { hooks: layered ? 'off' : 'on' },
+        layer: { hooks: layered ? 'off' : 'on', skills: 'on' },
       });
       const settings = settingsOf(r.handle, p);
       const rules = p.denyRules(settings);
@@ -541,7 +558,7 @@ const CASES: Case[] = [
     needs: ['layerControl'],
     async run(p) {
       for (const hooks of ['observe', 'off'] as const) {
-        const r = await run(p, fx(p, p.fixtures.basic), { layer: { hooks } });
+        const r = await run(p, fx(p, p.fixtures.basic), { layer: { hooks, skills: 'on' } });
         await r.adapter.send(r.handle, 'hello', A);
         await r.tap.until(ended);
         expect(after(r.dump().argv, '--setting-sources')).toBe('');
@@ -558,6 +575,46 @@ const CASES: Case[] = [
       await r.tap.until(ended);
       expect(after(r.dump().argv, '--effort')).toBe('high');
       await r.adapter.stop(r.handle, 'soft');
+    },
+  },
+  {
+    name: 'windowEvent: the subscription window line becomes one window event (usage %, reset, warning)',
+    needs: ['windowEvent'],
+    when: (p) => p.fixtures.window !== undefined,
+    async run(p) {
+      if (!p.fixtures.window) throw new Error('run without a window fixture: `when` must skip it');
+      const r = await run(p, fx(p, p.fixtures.window));
+      await r.adapter.send(r.handle, 'hello', A);
+      await r.tap.until(ended);
+      const windows = r.tap.seen.filter((e) => e.type === 'window');
+      expect(windows).toEqual([
+        {
+          type: 'window',
+          limitKind: 'window',
+          usedPct: 92,
+          resetAt: 1_788_351_600_000,
+          warning: true,
+          refusal: false,
+          window: 'five_hour',
+        },
+      ]);
+      await r.adapter.stop(r.handle, 'soft');
+    },
+  },
+  {
+    name: 'skills off reach the CLI as its own switch; skills on leave the CLI as is',
+    needs: ['skillControl'],
+    async run(p) {
+      const off = await run(p, fx(p, p.fixtures.basic), { layer: { hooks: 'on', skills: 'off' } });
+      await off.adapter.send(off.handle, 'hello one', A);
+      await off.tap.until(ended);
+      expect(p.skillsOff?.(off.dump().argv)).toBe(true);
+      await off.adapter.stop(off.handle, 'soft');
+      const on = await run(p, fx(p, p.fixtures.basic), { layer: { hooks: 'on', skills: 'on' } });
+      await on.adapter.send(on.handle, 'hello one', A);
+      await on.tap.until(ended);
+      expect(p.skillsOff?.(on.dump().argv)).toBe(false);
+      await on.adapter.stop(on.handle, 'soft');
     },
   },
 ];
@@ -581,17 +638,57 @@ const UNIVERSAL: Case[] = [
     },
   },
   {
-    name: 'a layer the adapter cannot control is refused before anything spawns',
+    name: 'a layer the adapter cannot control runs on, and the downgrade is named (G3)',
     needs: [],
     // Управляет слоями — случай не о нём (его слои судит случай `layerControl`).
     when: (p) => !p.make({}).caps.layerControl,
     async run(p) {
-      const adapter = p.make({});
-      const outcome = await adapter.launch(liveSpec(r0(p), { layer: { hooks: 'off' } }));
-      expect(outcome).toMatchObject({
-        ok: false,
-        reason: expect.stringMatching(/not controllable/),
+      const r = await run(p, fx(p, p.fixtures.basic), {
+        layer: { hooks: 'off', skills: 'on' },
+        trust: { sourceRepo: r0(p).cwd, panelMark: true },
       });
+      expect(r.layer).toMatchObject({ asked: 'off', ran: 'on' });
+      expect(r.layer.detail).toMatch(/no layer control: hooks off → on/);
+      await r.adapter.send(r.handle, 'hello one', A);
+      expect(await r.tap.until(ended)).toMatchObject({ attribution: A });
+      await r.adapter.stop(r.handle, 'soft');
+    },
+  },
+  {
+    // UNIVERSAL (P37, 06:119): метка платформы — первой строкой каждого текста ядра в сессию,
+    // слова человека — второй строкой `agentdeck-from: human`; привязка хода — по эху uuid, не по
+    // тексту (текст меченый — совпадения по тексту нет).
+    name: 'every text into the session starts with the platform marker; attribution still by echo',
+    needs: ['stream'],
+    async run(p) {
+      const r = await run(p, fx(p, p.fixtures.basic));
+      await r.adapter.send(r.handle, 'reminder', A);
+      await r.tap.until(ended);
+      // Дамп пишет сам подставной CLI при старте — читается после хода, иначе гонка с его запуском.
+      expect(
+        p.brief(r.dump().argv).startsWith(`${PLATFORM_MARKER}
+`),
+      ).toBe(true);
+      await r.adapter.send(r.handle, 'from the human', B, 'human');
+      const second = await r.tap.until(ended);
+      if (p.make({}).caps.attribution) expect(second).toMatchObject({ attribution: B });
+      const texts = r
+        .dump()
+        .stdin.filter((l) => l.type === 'user')
+        .map((l) => {
+          const content = (l.message as { content: unknown }).content;
+          return typeof content === 'string'
+            ? content
+            : (content as { text?: string }[]).map((c) => c.text ?? '').join('');
+        });
+      expect(texts).toEqual([
+        `${PLATFORM_MARKER}
+reminder`,
+        `${PLATFORM_MARKER}
+${FROM_HUMAN_LINE}
+from the human`,
+      ]);
+      await r.adapter.stop(r.handle, 'soft');
     },
   },
 ];
@@ -603,6 +700,8 @@ function r0(p: Profile): LiveRoot {
 afterAll(async () => {
   for (const { adapter, handle } of open) await adapter.stop(handle, 'tree').catch(() => undefined);
 });
+
+const TRI_STATE_CAPS: readonly string[] = ['subagentHooks'];
 
 describe('adapter conformance — P121 every declared cap has a case', () => {
   const BOOL_CAPS: BoolCap[] = [
@@ -618,6 +717,7 @@ describe('adapter conformance — P121 every declared cap has a case', () => {
     'effort',
     'images',
     'subagents',
+    'skillControl',
     'windowEvent',
   ];
 
@@ -627,8 +727,10 @@ describe('adapter conformance — P121 every declared cap has a case', () => {
     expect(registry.get('nope')).toBeUndefined();
     expect(registry.all()).toHaveLength(PROFILES.length);
     for (const adapter of registry.all()) {
+      // `subagentHooks` — тройное (`null` = не проверено): его доказывают живые пробы слоя
+      // (`layer-probe.live.integration.test.ts`), а не подставной CLI, хуков не исполняющий.
       const declared = Object.entries(adapter.caps)
-        .filter(([, v]) => typeof v === 'boolean')
+        .filter(([k, v]) => typeof v === 'boolean' && !TRI_STATE_CAPS.includes(k))
         .map(([k]) => k)
         .sort();
       expect(declared).toEqual([...BOOL_CAPS].sort());

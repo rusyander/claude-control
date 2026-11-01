@@ -27,6 +27,9 @@ command = "node"
 args = ["server.js"]
 `;
 
+// Ядра в этих тестах нет: шаг «маршрут ядра» пропущен и уровень не трогает (его — свой файл).
+const noCore = () => Promise.resolve({ absent: 'procs.json: ENOENT' });
+
 function okAssistant(): Promise<AssistantRunResult> {
   return Promise.resolve({
     ok: true,
@@ -64,6 +67,7 @@ describe('checkProvider', () => {
 
     const result = await checkProvider('codex', {
       appDataDir: appData,
+      coreRoutes: noCore,
       withAssistant: true,
       detectCli: () => true,
       runAssistantImpl: okAssistant,
@@ -77,6 +81,8 @@ describe('checkProvider', () => {
     expect(byId.env?.status).toBe('pass');
     expect(byId.instructions?.status).toBe('pass');
     expect(byId.assistant?.status).toBe('pass');
+    // Ядра нет — шаг пропущен с причиной, а «проверено» остаётся: пропуск уровень не снижает.
+    expect(byId.coreRoute?.status).toBe('skipped');
     expect(result.level).toBe('verified');
 
     // Файл пользователя не изменился, и пробный сервер в нём не появился.
@@ -91,6 +97,7 @@ describe('checkProvider', () => {
 
     const result = await checkProvider('codex', {
       appDataDir: appData,
+      coreRoutes: noCore,
       withAssistant: false,
       detectCli: () => true,
     });
@@ -103,6 +110,7 @@ describe('checkProvider', () => {
   it('без CLI и без запуска ассистента уровень честно частичный', async () => {
     const result = await checkProvider('codex', {
       appDataDir: appData,
+      coreRoutes: noCore,
       withAssistant: false,
       detectCli: () => false,
     });
@@ -115,6 +123,7 @@ describe('checkProvider', () => {
   it('ассистент ответил ошибкой — проверка провалена', async () => {
     const result = await checkProvider('codex', {
       appDataDir: appData,
+      coreRoutes: noCore,
       withAssistant: true,
       detectCli: () => true,
       runAssistantImpl: () =>
@@ -136,6 +145,7 @@ describe('checkProvider', () => {
   it('claude: разделы на своих маршрутах пропускаются, а не проваливаются', async () => {
     const result = await checkProvider('claude', {
       appDataDir: appData,
+      coreRoutes: noCore,
       withAssistant: true,
       detectCli: () => true,
       runAssistantImpl: okAssistant,

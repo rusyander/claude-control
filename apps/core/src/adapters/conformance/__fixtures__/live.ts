@@ -98,7 +98,7 @@ export function liveSpec(live: LiveRoot, over: Partial<SessionSpec> = {}): Sessi
     platform: liveFacts(live),
     tools: 'all',
     mcpServers: {},
-    layer: { hooks: 'on' },
+    layer: { hooks: 'on', skills: 'on' },
     // Стенд — доверенный репозиторий (отметка панели): случаи слоя `on` проверяют `on`. Случай
     // недоверенной копии снимает отметку сам (F-86).
     trust: { sourceRepo: live.cwd, panelMark: true },

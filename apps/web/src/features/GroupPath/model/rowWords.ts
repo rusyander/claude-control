@@ -3,7 +3,7 @@ import type { PathRow } from './pathRows.types';
 import type { WordsSource } from './rowWords.types';
 import { memberOf } from './memberOf';
 import { firstParagraph } from './firstParagraph';
-import { pickLang } from '../lib/pickLang';
+import { pickLang } from '@entities/StepPath';
 
 /** Строка словами на языке интерфейса: название, одна строка «что делает», подсказка. */
 export interface RowWords {

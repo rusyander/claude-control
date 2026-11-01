@@ -188,6 +188,11 @@ const SETS = [
     topic: 'phone',
     pages: ['phone-path'],
   },
+  {
+    source: 'docs/diagrams/core-guide/core-guide.drawio',
+    topic: 'core',
+    pages: ['panel-to-core', 'launch-to-steps'],
+  },
 ];
 
 // DIAGRAMS_ONLY=chat,groups сужает экспорт до своих разделов: полный прогон

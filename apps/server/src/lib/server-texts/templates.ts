@@ -11,6 +11,12 @@
  */
 export const serverTextTemplates = {
   'gateway-prefixed': { ru: 'AgentDeck: {{message}}', en: 'AgentDeck: {{message}}' },
+  'core-absent': { ru: 'Ядро задач не запущено', en: 'The task core is not running' },
+  'core-unverified': {
+    ru: 'Ядро задач не подтвердило себя: запрос не отправлен',
+    en: 'The task core did not prove its identity: the request was not sent',
+  },
+  'core-unreachable': { ru: 'Ядро задач не отвечает', en: 'The task core does not answer' },
   'gateway-joined': { ru: '{{message}}: {{detail}}', en: '{{message}}: {{detail}}' },
   'gateway-upstream-400': {
     ru: 'Контур не принял запрос',
@@ -861,6 +867,38 @@ export const serverTextTemplates = {
   'checks-instructions-file-unread': {
     ru: 'Файл не прочитан: {{reason}}',
     en: 'The file was not read: {{reason}}',
+  },
+  'checks-core-route-absent': {
+    ru: 'Ядро исполнения задач не запущено — маршрут этого CLI у ядра не проверялся.',
+    en: 'The task execution core is not running — this CLI’s route in the core was not checked.',
+  },
+  'checks-core-route-unverified': {
+    ru: 'Строку ядра не подтвердила ОС, запрос к ядру не отправлен: {{reason}}',
+    en: 'The OS did not confirm the core entry, no request was sent to the core: {{reason}}',
+  },
+  'checks-core-route-unreachable': {
+    ru: 'Ядро не отдало список маршрутов: {{reason}}',
+    en: 'The core did not return its route list: {{reason}}',
+  },
+  'checks-core-route-none': {
+    ru: 'У ядра нет маршрута {{route}} — задачи ядра на этом CLI не запускаются.',
+    en: 'The core has no route {{route}} — core tasks do not run on this CLI.',
+  },
+  'checks-core-route-ok': {
+    ru: 'Маршрут ядра {{route}}: доступ есть, маршрут не исчерпан.',
+    en: 'Core route {{route}}: credential present, route not exhausted.',
+  },
+  'checks-core-route-exhausted': {
+    ru: 'Маршрут ядра {{route}} исчерпан: задачи на нём не запустятся, пока человек не снимет отметку.',
+    en: 'Core route {{route}} is exhausted: tasks on it will not start until a person clears the mark.',
+  },
+  'checks-core-route-no-credential': {
+    ru: 'У маршрута ядра {{route}} нет доступа — войдите в CLI.',
+    en: 'Core route {{route}} has no credential — sign in to the CLI.',
+  },
+  'checks-core-route-credential-unknown': {
+    ru: 'Маршрут ядра {{route}} есть, но наличие входа ядро не знает: хранилище входа CLI оно не читает.',
+    en: 'Core route {{route}} exists, but the core does not know whether you are signed in: it never reads the CLI login store.',
   },
   'sandbox-event-bash-safe-title': { ru: 'Безобидная команда', en: 'A harmless command' },
   'sandbox-event-bash-safe-description': {

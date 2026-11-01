@@ -1,0 +1,74 @@
+{
+  "topic": "core",
+  "scenario": "tasks",
+  "frames": [
+    {
+      "id": "01-list",
+      "side": "panel",
+      "file": "01-list.png",
+      "masked": 0,
+      "width": 1280,
+      "height": 900,
+      "shotAt": "2026-11-01T17:10:54.042Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека всё спокойно Задачи ядра Задачи, которые ведёт ядро исполнения: шаги, сессии, проверки, расход и решения — по журналу задачи. Сценарии ядра Запуск задачи ядра README.md: typo В журнале cancelled Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту",
+      "en": {
+        "file": "01-list.en.png",
+        "masked": 0,
+        "width": 1280,
+        "height": 900,
+        "shotAt": "2026-11-01T17:11:01.203Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky all quiet Core tasks Tasks run by the execution core: steps, sessions, checks, spend and decisions — from the task journal. Core scenarios Launch a core task README.md: typo In the journal cancelled Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline"
+      },
+      "dark": {
+        "file": "01-list.dark.png",
+        "masked": 0,
+        "width": 1280,
+        "height": 900,
+        "shotAt": "2026-11-01T17:11:08.174Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека всё спокойно Задачи ядра Задачи, которые ведёт ядро исполнения: шаги, сессии, проверки, расход и решения — по журналу задачи. Сценарии ядра Запуск задачи ядра README.md: typo В журнале cancelled Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту"
+      },
+      "darkEn": {
+        "file": "01-list.dark.en.png",
+        "masked": 0,
+        "width": 1280,
+        "height": 900,
+        "shotAt": "2026-11-01T17:11:15.089Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky all quiet Core tasks Tasks run by the execution core: steps, sessions, checks, spend and decisions — from the task journal. Core scenarios Launch a core task README.md: typo In the journal cancelled Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline"
+      }
+    },
+    {
+      "id": "02-hops",
+      "side": "panel",
+      "file": "02-hops.png",
+      "masked": 0,
+      "width": 988,
+      "height": 126,
+      "shotAt": "2026-11-01T17:10:56.782Z",
+      "text": "Ядро ещё не знает эту панель Панель не записана ядру звеном: команды из неё ядро примет только с подписью телефона. Обычно панель записывает себя сама при запуске через pnpm dev или pnpm keepalive. Если плашка не уходит, перезапустите панель одной из этих команд.",
+      "en": {
+        "file": "02-hops.en.png",
+        "masked": 0,
+        "width": 988,
+        "height": 126,
+        "shotAt": "2026-11-01T17:11:03.993Z",
+        "text": "The core does not know this panel yet This panel is not recorded with the core as a hop, so the core accepts its commands only with a phone signature. The panel normally records itself when started with pnpm dev or pnpm keepalive. If this notice stays, restart the panel with one of those commands."
+      },
+      "dark": {
+        "file": "02-hops.dark.png",
+        "masked": 0,
+        "width": 988,
+        "height": 126,
+        "shotAt": "2026-11-01T17:11:10.826Z",
+        "text": "Ядро ещё не знает эту панель Панель не записана ядру звеном: команды из неё ядро примет только с подписью телефона. Обычно панель записывает себя сама при запуске через pnpm dev или pnpm keepalive. Если плашка не уходит, перезапустите панель одной из этих команд."
+      },
+      "darkEn": {
+        "file": "02-hops.dark.en.png",
+        "masked": 0,
+        "width": 988,
+        "height": 126,
+        "shotAt": "2026-11-01T17:11:17.826Z",
+        "text": "The core does not know this panel yet This panel is not recorded with the core as a hop, so the core accepts its commands only with a phone signature. The panel normally records itself when started with pnpm dev or pnpm keepalive. If this notice stays, restart the panel with one of those commands."
+      }
+    }
+  ]
+}

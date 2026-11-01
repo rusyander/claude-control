@@ -1,10 +1,10 @@
 import { dirname } from 'node:path';
 import {
-  readProcs,
   verifyCoreEntry,
   type CoreEntryCheckDeps,
   type ProcEntry,
-} from '../platform/procs-file.ts';
+} from '@agentdeck/contracts/core/procs';
+import { readProcs } from '../platform/procs-file.ts';
 import { readTcpTable } from '../platform/tcp-table.ts';
 import { createLivenessProbe } from '../platform/process-identity.ts';
 import { hasValue } from '../platform/os-kind.ts';

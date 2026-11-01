@@ -1,0 +1,10 @@
+// Причины свёрнуты: строка ленты остаётся одной строкой, основание — по раскрытию.
+.details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.reasons {
+  margin: var(--spacing-3xs) 0 0;
+  padding-left: var(--spacing-md);
+}

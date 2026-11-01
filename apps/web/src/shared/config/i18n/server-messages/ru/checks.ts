@@ -52,6 +52,19 @@ export const checksRu: Record<ChecksMessageCode, string> = {
     'Файл инструкций читается и записывается без изменений ({{count}} символов).',
   'checks-instructions-file-changed': 'Перезапись файла инструкций изменила его текст.',
   'checks-instructions-file-unread': 'Файл не прочитан: {{reason}}',
+  'checks-core-route-absent':
+    'Ядро исполнения задач не запущено — маршрут этого CLI у ядра не проверялся.',
+  'checks-core-route-unverified':
+    'Строку ядра не подтвердила ОС, запрос к ядру не отправлен: {{reason}}',
+  'checks-core-route-unreachable': 'Ядро не отдало список маршрутов: {{reason}}',
+  'checks-core-route-none':
+    'У ядра нет маршрута {{route}} — задачи ядра на этом CLI не запускаются.',
+  'checks-core-route-ok': 'Маршрут ядра {{route}}: доступ есть, маршрут не исчерпан.',
+  'checks-core-route-exhausted':
+    'Маршрут ядра {{route}} исчерпан: задачи на нём не запустятся, пока человек не снимет отметку.',
+  'checks-core-route-no-credential': 'У маршрута ядра {{route}} нет доступа — войдите в CLI.',
+  'checks-core-route-credential-unknown':
+    'Маршрут ядра {{route}} есть, но наличие входа ядро не знает: хранилище входа CLI оно не читает.',
   'sandbox-event-bash-safe-title': 'Безобидная команда',
   'sandbox-event-bash-safe-description': 'Обычный вызов Bash — страж не должен вмешиваться.',
   'sandbox-event-bash-destructive-title': 'Рекурсивное удаление',
